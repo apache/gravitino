@@ -42,11 +42,13 @@ import org.apache.gravitino.dto.responses.DropResponse;
 import org.apache.gravitino.dto.responses.PartitionListResponse;
 import org.apache.gravitino.dto.responses.PartitionNameListResponse;
 import org.apache.gravitino.dto.responses.PartitionResponse;
+import org.apache.gravitino.exceptions.IllegalStatisticNameException;
 import org.apache.gravitino.exceptions.NoSuchPartitionException;
 import org.apache.gravitino.exceptions.NoSuchPolicyException;
 import org.apache.gravitino.exceptions.NoSuchTagException;
 import org.apache.gravitino.exceptions.PartitionAlreadyExistsException;
 import org.apache.gravitino.exceptions.PolicyAlreadyAssociatedException;
+import org.apache.gravitino.exceptions.UnmodifiableStatisticException;
 import org.apache.gravitino.policy.Policy;
 import org.apache.gravitino.policy.SupportsPolicies;
 import org.apache.gravitino.rel.Column;
@@ -58,19 +60,26 @@ import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.indexes.Index;
 import org.apache.gravitino.rel.partitions.Partition;
 import org.apache.gravitino.rest.RESTUtils;
+import org.apache.gravitino.stats.PartitionRange;
+import org.apache.gravitino.stats.PartitionStatistics;
+import org.apache.gravitino.stats.PartitionStatisticsDrop;
+import org.apache.gravitino.stats.PartitionStatisticsUpdate;
 import org.apache.gravitino.stats.Statistic;
 import org.apache.gravitino.stats.StatisticValue;
+import org.apache.gravitino.stats.SupportsPartitionStatistics;
 import org.apache.gravitino.stats.SupportsStatistics;
 import org.apache.gravitino.tag.SupportsTags;
 import org.apache.gravitino.tag.Tag;
 
 /** Represents a relational table. */
 class RelationalTable
-<<<<<<< HEAD
-    implements Table, SupportsPartitions, SupportsTags, SupportsRoles, SupportsPolicies {
-=======
-    implements Table, SupportsPartitions, SupportsTags, SupportsRoles, SupportsStatistics {
->>>>>>> dc6f26d92 ([#7274] feat(client-java): Support statistics http client config for gravitino client)
+    implements Table,
+        SupportsPartitions,
+        SupportsTags,
+        SupportsRoles,
+        SupportsPolicies,
+        SupportsStatistics,
+        SupportsPartitionStatistics {
 
   private static final Joiner DOT_JOINER = Joiner.on(".");
 
@@ -82,11 +91,9 @@ class RelationalTable
 
   private final MetadataObjectTagOperations objectTagOperations;
   private final MetadataObjectRoleOperations objectRoleOperations;
-<<<<<<< HEAD
   private final MetadataObjectPolicyOperations objectPolicyOperations;
-=======
   private final MetadataObjectStatisticsOperations objectStatisticsOperations;
->>>>>>> dc6f26d92 ([#7274] feat(client-java): Support statistics http client config for gravitino client)
+  private final MetadataObjectPartitionStatisticsOperations objectPartitionStatisticsOperations;
 
   /**
    * Creates a new RelationalTable.
@@ -117,14 +124,13 @@ class RelationalTable
         new MetadataObjectTagOperations(namespace.level(0), tableObject, restClient);
     this.objectRoleOperations =
         new MetadataObjectRoleOperations(namespace.level(0), tableObject, restClient);
-<<<<<<< HEAD
     this.objectPolicyOperations =
         new MetadataObjectPolicyOperations(namespace.level(0), tableObject, restClient);
-=======
     this.objectStatisticsOperations =
-        new MetadataObjectStatisticsOperations(
-            namespace.level(0), namespace.level(1), tableObject, restClient);
->>>>>>> dc6f26d92 ([#7274] feat(client-java): Support statistics http client config for gravitino client)
+        new MetadataObjectStatisticsOperations(namespace.level(0), tableObject, restClient);
+    this.objectPartitionStatisticsOperations =
+        new MetadataObjectPartitionStatisticsOperations(
+            namespace.level(0), tableObject, restClient);
   }
 
   /**
@@ -335,6 +341,16 @@ class RelationalTable
     return this;
   }
 
+  @Override
+  public SupportsStatistics supportsStatistics() {
+    return this;
+  }
+
+  @Override
+  public SupportsPartitionStatistics supportsPartitionStatistics() {
+    return this;
+  }
+
   private static String tableFullName(Namespace tableNS, String tableName) {
     return DOT_JOINER.join(tableNS.level(1), tableNS.level(2), tableName);
   }
@@ -391,12 +407,30 @@ class RelationalTable
   }
 
   @Override
-  public List<Statistic> updateStatistics(Map<String, StatisticValue<?>> statistics) {
-    return objectStatisticsOperations.updateStatistics(statistics);
+  public void updateStatistics(Map<String, StatisticValue<?>> statistics)
+      throws UnmodifiableStatisticException, IllegalStatisticNameException {
+    objectStatisticsOperations.updateStatistics(statistics);
   }
 
   @Override
-  public boolean dropStatistics(List<String> statistics) {
+  public boolean dropStatistics(List<String> statistics) throws UnmodifiableStatisticException {
     return objectStatisticsOperations.dropStatistics(statistics);
+  }
+
+  @Override
+  public List<PartitionStatistics> listPartitionStatistics(PartitionRange range) {
+    return objectPartitionStatisticsOperations.listPartitionStatistics(range);
+  }
+
+  @Override
+  public void updatePartitionStatistics(List<PartitionStatisticsUpdate> statisticsToUpdate)
+      throws UnmodifiableStatisticException {
+    objectPartitionStatisticsOperations.updatePartitionStatistics(statisticsToUpdate);
+  }
+
+  @Override
+  public boolean dropPartitionStatistics(List<PartitionStatisticsDrop> statisticsToDrop)
+      throws UnmodifiableStatisticException {
+    return objectPartitionStatisticsOperations.dropPartitionStatistics(statisticsToDrop);
   }
 }

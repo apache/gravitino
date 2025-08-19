@@ -18,13 +18,14 @@
  */
 package org.apache.gravitino.client;
 
-import static org.apache.hc.core5.http.HttpStatus.SC_BAD_REQUEST;
-import static org.apache.hc.core5.http.HttpStatus.SC_INTERNAL_SERVER_ERROR;
-import static org.apache.hc.core5.http.HttpStatus.SC_METHOD_NOT_ALLOWED;
-import static org.apache.hc.core5.http.HttpStatus.SC_OK;
+import static javax.servlet.http.HttpServletResponse.SC_BAD_REQUEST;
+import static javax.servlet.http.HttpServletResponse.SC_INTERNAL_SERVER_ERROR;
+import static javax.servlet.http.HttpServletResponse.SC_METHOD_NOT_ALLOWED;
+import static javax.servlet.http.HttpServletResponse.SC_OK;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.Maps;
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.Collections;
@@ -32,32 +33,40 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import org.apache.commons.compress.utils.Lists;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.dto.AuditDTO;
 import org.apache.gravitino.dto.rel.ColumnDTO;
 import org.apache.gravitino.dto.rel.TableDTO;
-import org.apache.gravitino.dto.requests.StatisticsDropRequest;
-import org.apache.gravitino.dto.requests.StatisticsUpdateRequest;
+import org.apache.gravitino.dto.requests.PartitionStatisticsDropRequest;
+import org.apache.gravitino.dto.requests.PartitionStatisticsUpdateRequest;
 import org.apache.gravitino.dto.responses.BaseResponse;
 import org.apache.gravitino.dto.responses.DropResponse;
 import org.apache.gravitino.dto.responses.ErrorConstants;
 import org.apache.gravitino.dto.responses.ErrorResponse;
-import org.apache.gravitino.dto.responses.StatisticListResponse;
+import org.apache.gravitino.dto.responses.PartitionStatisticsListResponse;
+import org.apache.gravitino.dto.stats.PartitionStatisticsDTO;
+import org.apache.gravitino.dto.stats.PartitionStatisticsDropDTO;
+import org.apache.gravitino.dto.stats.PartitionStatisticsUpdateDTO;
 import org.apache.gravitino.dto.stats.StatisticDTO;
 import org.apache.gravitino.exceptions.IllegalStatisticNameException;
 import org.apache.gravitino.exceptions.UnmodifiableStatisticException;
 import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.types.Types;
-import org.apache.gravitino.stats.Statistic;
+import org.apache.gravitino.stats.PartitionRange;
+import org.apache.gravitino.stats.PartitionStatistics;
+import org.apache.gravitino.stats.PartitionStatisticsDrop;
+import org.apache.gravitino.stats.PartitionStatisticsModification;
+import org.apache.gravitino.stats.PartitionStatisticsUpdate;
 import org.apache.gravitino.stats.StatisticValue;
 import org.apache.gravitino.stats.StatisticValues;
-import org.apache.gravitino.stats.SupportsStatistics;
+import org.apache.gravitino.stats.SupportsPartitionStatistics;
 import org.apache.hc.core5.http.Method;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
-public class TestSupportsStatistics extends TestBase {
+public class TestSupportsPartitionStatistics extends TestBase {
 
   private static final String METALAKE_NAME = "metalake";
   private static final String CATALOG_NAME = "catalog1";
@@ -92,20 +101,20 @@ public class TestSupportsStatistics extends TestBase {
 
   @Test
   public void testListStatisticsForTable() throws JsonProcessingException {
-    testListStatistics(relationalTable.supportsStatistics(), getTableStatisticsPath());
+    testListStatistics(relationalTable.supportsPartitionStatistics(), getTableStatisticsPath());
   }
 
   @Test
   public void testUpdateStatisticsForTable() throws JsonProcessingException {
-    testUpdateStatistics(relationalTable.supportsStatistics(), getTableStatisticsPath());
+    testUpdateStatistics(relationalTable.supportsPartitionStatistics(), getTableStatisticsPath());
   }
 
   @Test
   public void testDropStatisticsForTable() throws JsonProcessingException {
-    testDropStatistics(relationalTable.supportsStatistics(), getTableStatisticsPath());
+    testDropStatistics(relationalTable.supportsPartitionStatistics(), getTableStatisticsPath());
   }
 
-  private void testListStatistics(SupportsStatistics supportsStatistics, String path)
+  private void testListStatistics(SupportsPartitionStatistics supportsStatistics, String path)
       throws JsonProcessingException {
     // Test successful list
     AuditDTO audit = AuditDTO.builder().withCreator("test").withCreateTime(Instant.now()).build();
@@ -128,30 +137,42 @@ public class TestSupportsStatistics extends TestBase {
             .withAudit(audit)
             .build();
 
-    StatisticListResponse response = new StatisticListResponse(new StatisticDTO[] {stat1, stat2});
-    buildMockResource(Method.GET, path, Collections.emptyMap(), null, response, SC_OK);
+    Map<String, String> map = Maps.newHashMap();
+    map.put("from", "p0");
 
-    List<Statistic> statistics = supportsStatistics.listStatistics();
-    Assertions.assertEquals(2, statistics.size());
-    Assertions.assertEquals("row_count", statistics.get(0).name());
-    Assertions.assertEquals(100L, statistics.get(0).value().get().value());
-    Assertions.assertTrue(statistics.get(0).reserved());
-    Assertions.assertFalse(statistics.get(0).modifiable());
+    PartitionStatisticsDTO partitionStatisticsDTO =
+        PartitionStatisticsDTO.of("p0", new StatisticDTO[] {stat1, stat2});
+    PartitionStatisticsListResponse response =
+        new PartitionStatisticsListResponse(new PartitionStatisticsDTO[] {partitionStatisticsDTO});
+    buildMockResource(Method.GET, path, map, null, response, SC_OK);
 
-    Assertions.assertEquals("custom.user_stat", statistics.get(1).name());
-    Assertions.assertEquals("test", statistics.get(1).value().get().value());
-    Assertions.assertFalse(statistics.get(1).reserved());
-    Assertions.assertTrue(statistics.get(1).modifiable());
+    List<PartitionStatistics> statistics =
+        supportsStatistics.listPartitionStatistics(
+            PartitionRange.downTo("p0", PartitionRange.BoundType.CLOSED));
+    Assertions.assertEquals(1, statistics.size());
+    Assertions.assertEquals("row_count", statistics.get(0).statistics()[0].name());
+    Assertions.assertEquals(100L, statistics.get(0).statistics()[0].value().get().value());
+    Assertions.assertTrue(statistics.get(0).statistics()[0].reserved());
+    Assertions.assertFalse(statistics.get(0).statistics()[0].modifiable());
+
+    Assertions.assertEquals("custom.user_stat", statistics.get(0).statistics()[1].name());
+    Assertions.assertEquals("test", statistics.get(0).statistics()[1].value().get().value());
+    Assertions.assertFalse(statistics.get(0).statistics()[1].reserved());
+    Assertions.assertTrue(statistics.get(0).statistics()[1].modifiable());
 
     // Test error handling
     ErrorResponse errorResp = ErrorResponse.internalError("Internal error");
     buildMockResource(
         Method.GET, path, Collections.emptyMap(), null, errorResp, SC_INTERNAL_SERVER_ERROR);
 
-    Assertions.assertThrows(RuntimeException.class, supportsStatistics::listStatistics);
+    Assertions.assertThrows(
+        RuntimeException.class,
+        () ->
+            supportsStatistics.listPartitionStatistics(
+                PartitionRange.upTo("p0", PartitionRange.BoundType.OPEN)));
   }
 
-  private void testUpdateStatistics(SupportsStatistics supportsStatistics, String path)
+  private void testUpdateStatistics(SupportsPartitionStatistics supportsStatistics, String path)
       throws JsonProcessingException {
     // Test successful update
     Map<String, StatisticValue<?>> statisticsToUpdate = new HashMap<>();
@@ -162,13 +183,17 @@ public class TestSupportsStatistics extends TestBase {
     expectedDTOs.put("row_count", StatisticValues.longValue(200L));
     expectedDTOs.put("custom.user_stat", StatisticValues.stringValue("updated"));
 
-    StatisticsUpdateRequest expectedRequest =
-        StatisticsUpdateRequest.builder().updates(expectedDTOs).build();
+    List<PartitionStatisticsUpdateDTO> updateDTOS = Lists.newArrayList();
+    updateDTOS.add(PartitionStatisticsUpdateDTO.of("p0", expectedDTOs));
+    PartitionStatisticsUpdateRequest expectedRequest =
+        new PartitionStatisticsUpdateRequest(updateDTOS);
 
+    List<PartitionStatisticsUpdate> updates = Lists.newArrayList();
+    updates.add(PartitionStatisticsModification.update("p0", statisticsToUpdate));
     BaseResponse response = new BaseResponse(0);
     buildMockResource(Method.PUT, path, Collections.emptyMap(), expectedRequest, response, SC_OK);
 
-    supportsStatistics.updateStatistics(statisticsToUpdate);
+    supportsStatistics.updatePartitionStatistics(updates);
 
     // Test unmodifiable statistic exception
     String unmodifiableErrorJson =
@@ -193,7 +218,7 @@ public class TestSupportsStatistics extends TestBase {
 
     Assertions.assertThrows(
         UnmodifiableStatisticException.class,
-        () -> supportsStatistics.updateStatistics(statisticsToUpdate));
+        () -> supportsStatistics.updatePartitionStatistics(updates));
 
     // Test illegal statistic name exception
     ErrorResponse illegalNameError =
@@ -209,27 +234,30 @@ public class TestSupportsStatistics extends TestBase {
 
     Assertions.assertThrows(
         IllegalStatisticNameException.class,
-        () -> supportsStatistics.updateStatistics(statisticsToUpdate));
+        () -> supportsStatistics.updatePartitionStatistics(updates));
   }
 
-  private void testDropStatistics(SupportsStatistics supportsStatistics, String path)
+  private void testDropStatistics(SupportsPartitionStatistics supportsStatistics, String path)
       throws JsonProcessingException {
     // Test successful drop
     List<String> statisticsToDrop = Arrays.asList("custom.user_stat1", "custom.user_stat2");
 
-    StatisticsDropRequest request =
-        StatisticsDropRequest.builder().names(statisticsToDrop.toArray(new String[0])).build();
+    List<PartitionStatisticsDropDTO> requestDrops = Lists.newArrayList();
+    requestDrops.add(PartitionStatisticsDropDTO.of("p0", statisticsToDrop));
+    PartitionStatisticsDropRequest request = new PartitionStatisticsDropRequest(requestDrops);
     DropResponse response = new DropResponse(true);
     buildMockResource(Method.POST, path, Collections.emptyMap(), request, response, SC_OK);
 
-    boolean dropped = supportsStatistics.dropStatistics(statisticsToDrop);
+    List<PartitionStatisticsDrop> drops = Lists.newArrayList();
+    drops.add(PartitionStatisticsModification.drop("p0", statisticsToDrop));
+    boolean dropped = supportsStatistics.dropPartitionStatistics(drops);
     Assertions.assertTrue(dropped);
 
     // Test drop non-existing statistics
     response = new DropResponse(false);
     buildMockResource(Method.POST, path, Collections.emptyMap(), request, response, SC_OK);
 
-    dropped = supportsStatistics.dropStatistics(statisticsToDrop);
+    dropped = supportsStatistics.dropPartitionStatistics(drops);
     Assertions.assertFalse(dropped);
 
     // Test unmodifiable statistic exception
@@ -250,12 +278,12 @@ public class TestSupportsStatistics extends TestBase {
 
     Assertions.assertThrows(
         UnmodifiableStatisticException.class,
-        () -> supportsStatistics.dropStatistics(statisticsToDrop));
+        () -> supportsStatistics.dropPartitionStatistics(drops));
   }
 
   private String getTableStatisticsPath() {
     return String.format(
-        "/api/metalakes/%s/objects/table/%s.%s.%s/statistics",
+        "/api/metalakes/%s/objects/table/%s.%s.%s/statistics/partitions",
         METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME, TABLE_NAME);
   }
 }

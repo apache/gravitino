@@ -56,7 +56,7 @@ public class StatisticPostgresSQLProvider extends StatisticBaseSQLProvider {
         + "  audit_info = EXCLUDED.audit_info,"
         + "  current_version = EXCLUDED.current_version,"
         + "  last_version = EXCLUDED.last_version,"
-        + "  deleted_at = EXCLUDE.deleted_at"
+        + "  deleted_at = EXCLUDED.deleted_at"
         + "</script>";
   }
 }

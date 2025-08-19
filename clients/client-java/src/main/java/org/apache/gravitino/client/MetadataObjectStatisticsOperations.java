@@ -21,24 +21,25 @@ package org.apache.gravitino.client;
 import com.google.common.base.Preconditions;
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
-import java.util.stream.Collectors;
 import org.apache.gravitino.MetadataObject;
+import org.apache.gravitino.dto.requests.StatisticsDropRequest;
 import org.apache.gravitino.dto.requests.StatisticsUpdateRequest;
+import org.apache.gravitino.dto.responses.BaseResponse;
 import org.apache.gravitino.dto.responses.DropResponse;
 import org.apache.gravitino.dto.responses.StatisticListResponse;
-import org.apache.gravitino.dto.stats.StatisticValueDTO;
 import org.apache.gravitino.exceptions.IllegalStatisticNameException;
 import org.apache.gravitino.exceptions.UnmodifiableStatisticException;
+import org.apache.gravitino.rest.RESTUtils;
 import org.apache.gravitino.stats.Statistic;
 import org.apache.gravitino.stats.StatisticValue;
 import org.apache.gravitino.stats.SupportsStatistics;
 
 /**
  * The implementation of {@link SupportsStatistics}. This interface will be composited into table to
- * provide statistics operations for table metadata objects.
+ * provide statistics operations for metadata objects.
  */
 class MetadataObjectStatisticsOperations implements SupportsStatistics {
 
@@ -46,30 +47,14 @@ class MetadataObjectStatisticsOperations implements SupportsStatistics {
   private final String statisticsRequestPath;
 
   MetadataObjectStatisticsOperations(
-      String metalakeName,
-      String catalogName,
-      MetadataObject metadataObject,
-      RESTClient restClient) {
+      String metalakeName, MetadataObject metadataObject, RESTClient restClient) {
     this.restClient = restClient;
-
-    // Build the REST API path based on the metadata object type
-    String fullName = metadataObject.fullName();
-
-    // Currently only TABLE type is supported
-    if (metadataObject.type() != MetadataObject.Type.TABLE) {
-      throw new IllegalArgumentException(
-          "Statistics are only supported for TABLE object type, but got: " + metadataObject.type());
-    }
-
-    // For table:
-    // api/metalakes/{metalake}/catalogs/{catalog}/schemas/{schema}/tables/{table}/statistics
-    String[] parts = fullName.split("\\.");
-    Preconditions.checkArgument(parts.length == 3, "Invalid table full name: " + fullName);
-    // fullName format is catalog.schema.table, we need schema and table
     this.statisticsRequestPath =
         String.format(
-            "api/metalakes/%s/catalogs/%s/schemas/%s/tables/%s/statistics",
-            metalakeName, catalogName, parts[1], parts[2]);
+            "api/metalakes/%s/objects/%s/%s/statistics",
+            RESTUtils.encodeString(metalakeName),
+            metadataObject.type().name().toLowerCase(Locale.ROOT),
+            RESTUtils.encodeString(metadataObject.fullName()));
   }
 
   @Override
@@ -82,57 +67,45 @@ class MetadataObjectStatisticsOperations implements SupportsStatistics {
             ErrorHandlers.statisticsErrorHandler());
 
     resp.validate();
+
     return Arrays.asList(resp.getStatistics());
   }
 
   @Override
-  public List<Statistic> updateStatistics(Map<String, StatisticValue<?>> statistics)
+  public void updateStatistics(Map<String, StatisticValue<?>> statistics)
       throws UnmodifiableStatisticException, IllegalStatisticNameException {
     Preconditions.checkArgument(
         statistics != null && !statistics.isEmpty(), "Statistics map must not be null or empty");
 
-    // Convert StatisticValue to StatisticValueDTO
-    Map<String, StatisticValueDTO<?>> statisticDTOs =
-        statistics.entrySet().stream()
-            .collect(
-                Collectors.toMap(
-                    Map.Entry::getKey,
-                    entry -> DTOConverters.toStatisticValueDTO(entry.getValue())));
-
-    StatisticsUpdateRequest request =
-        StatisticsUpdateRequest.builder().withStatistics(statisticDTOs).build();
+    StatisticsUpdateRequest request = StatisticsUpdateRequest.builder().updates(statistics).build();
     request.validate();
 
-    StatisticListResponse resp =
-        restClient.post(
+    BaseResponse resp =
+        restClient.put(
             statisticsRequestPath,
             request,
-            StatisticListResponse.class,
+            BaseResponse.class,
             Collections.emptyMap(),
             ErrorHandlers.statisticsErrorHandler());
 
     resp.validate();
-    return Arrays.asList(resp.getStatistics());
   }
 
   @Override
   public boolean dropStatistics(List<String> statistics) throws UnmodifiableStatisticException {
-    Preconditions.checkArgument(
-        statistics != null && !statistics.isEmpty(), "Statistics list must not be null or empty");
-
-    // Convert the list of statistics to a query parameter
-    Map<String, String> queryParams = new HashMap<>();
-    queryParams.put("statistics", String.join(",", statistics));
+    StatisticsDropRequest request = new StatisticsDropRequest(statistics.toArray(new String[0]));
+    request.validate();
 
     DropResponse resp =
-        restClient.delete(
+        restClient.post(
             statisticsRequestPath,
-            queryParams,
+            request,
             DropResponse.class,
             Collections.emptyMap(),
             ErrorHandlers.statisticsErrorHandler());
 
     resp.validate();
+
     return resp.dropped();
   }
 }

@@ -19,7 +19,6 @@
 package org.apache.gravitino.dto.requests;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
-<<<<<<< HEAD
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import com.google.common.base.Preconditions;
@@ -57,31 +56,10 @@ public class StatisticsUpdateRequest implements RESTRequest {
   }
 
   /** Default constructor for deserialization. */
-=======
-import com.google.common.base.Preconditions;
-import java.util.Map;
-import lombok.EqualsAndHashCode;
-import lombok.Getter;
-import lombok.ToString;
-import org.apache.gravitino.dto.stats.StatisticValueDTO;
-import org.apache.gravitino.rest.RESTRequest;
-
-/** Request to update statistics. */
-@Getter
-@EqualsAndHashCode
-@ToString
-public class StatisticsUpdateRequest implements RESTRequest {
-
-  @JsonProperty("statistics")
-  private final Map<String, StatisticValueDTO<?>> statistics;
-
-  /** Default constructor for Jackson deserialization. */
->>>>>>> dc6f26d92 ([#7274] feat(client-java): Support statistics http client config for gravitino client)
   public StatisticsUpdateRequest() {
     this(null);
   }
 
-<<<<<<< HEAD
   @Override
   public void validate() throws IllegalArgumentException {
     Preconditions.checkArgument(
@@ -94,69 +72,4 @@ public class StatisticsUpdateRequest implements RESTRequest {
               value != null, "statistic \"value\" for '%s' must not be null", name);
         });
   }
-=======
-  /**
-   * Constructor for StatisticsUpdateRequest.
-   *
-   * @param statistics The map of statistic names to their values.
-   */
-  public StatisticsUpdateRequest(Map<String, StatisticValueDTO<?>> statistics) {
-    this.statistics = statistics;
-  }
-
-  /**
-   * Validates the request.
-   *
-   * @throws IllegalArgumentException If the request is invalid.
-   */
-  @Override
-  public void validate() throws IllegalArgumentException {
-    Preconditions.checkArgument(
-        statistics != null && !statistics.isEmpty(), "statistics must not be null or empty");
-
-    // Validate each statistic name and value
-    statistics.forEach(
-        (name, value) -> {
-          Preconditions.checkArgument(
-              name != null && !name.isEmpty(), "statistic name must not be null or empty");
-          Preconditions.checkArgument(value != null, "statistic value must not be null");
-        });
-  }
-
-  /**
-   * Creates a new builder for StatisticsUpdateRequest.
-   *
-   * @return A new builder instance.
-   */
-  public static Builder builder() {
-    return new Builder();
-  }
-
-  /** Builder for StatisticsUpdateRequest. */
-  public static class Builder {
-    private Map<String, StatisticValueDTO<?>> statistics;
-
-    private Builder() {}
-
-    /**
-     * Sets the statistics to update.
-     *
-     * @param statistics The map of statistic names to their values.
-     * @return The builder instance.
-     */
-    public Builder withStatistics(Map<String, StatisticValueDTO<?>> statistics) {
-      this.statistics = statistics;
-      return this;
-    }
-
-    /**
-     * Builds the StatisticsUpdateRequest.
-     *
-     * @return The built request.
-     */
-    public StatisticsUpdateRequest build() {
-      return new StatisticsUpdateRequest(statistics);
-    }
-  }
->>>>>>> dc6f26d92 ([#7274] feat(client-java): Support statistics http client config for gravitino client)
 }

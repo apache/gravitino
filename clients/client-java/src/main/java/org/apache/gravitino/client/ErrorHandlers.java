@@ -251,21 +251,21 @@ public class ErrorHandlers {
   }
 
   /**
-<<<<<<< HEAD
    * Creates an error handler specific to job and job template operations.
    *
    * @return A Consumer representing the job error handler.
    */
   public static Consumer<ErrorResponse> jobErrorHandler() {
     return JobErrorHandler.INSTANCE;
-=======
+  }
+
+  /**
    * Creates an error handler specific to Statistics operations.
    *
    * @return A Consumer representing the Statistics error handler.
    */
   public static Consumer<ErrorResponse> statisticsErrorHandler() {
     return StatisticsErrorHandler.INSTANCE;
->>>>>>> dc6f26d92 ([#7274] feat(client-java): Support statistics http client config for gravitino client)
   }
 
   private ErrorHandlers() {}
@@ -1148,7 +1148,6 @@ public class ErrorHandlers {
     }
   }
 
-<<<<<<< HEAD
   /** Error handler specific to job and job template operations. */
   @SuppressWarnings("FormatStringAnnotation")
   private static class JobErrorHandler extends RestErrorHandler {
@@ -1195,7 +1194,13 @@ public class ErrorHandlers {
 
         case ErrorConstants.IN_USE_CODE:
           throw new InUseException(errorMsg);
-=======
+
+        default:
+          super.accept(errorResponse);
+      }
+    }
+  }
+
   /** Error handler specific to Statistics operations. */
   @SuppressWarnings("FormatStringAnnotation")
   private static class StatisticsErrorHandler extends RestErrorHandler {
@@ -1219,20 +1224,25 @@ public class ErrorHandlers {
             throw new NoSuchSchemaException(errorMessage);
           } else if (errorResponse.getType().equals(NoSuchTableException.class.getSimpleName())) {
             throw new NoSuchTableException(errorMessage);
-          } else if (errorResponse.getType().equals(NoSuchFilesetException.class.getSimpleName())) {
-            throw new NoSuchFilesetException(errorMessage);
+          } else if (errorResponse
+              .getType()
+              .equals(NoSuchMetadataObjectException.class.getSimpleName())) {
+            throw new NoSuchMetadataObjectException(errorMessage);
           } else {
             throw new NotFoundException(errorMessage);
           }
 
-        case ErrorConstants.FORBIDDEN_CODE:
+        case ErrorConstants.UNSUPPORTED_OPERATION_CODE:
           if (errorResponse
               .getType()
               .equals(UnmodifiableStatisticException.class.getSimpleName())) {
             throw new UnmodifiableStatisticException(errorMessage);
           } else {
-            throw new ForbiddenException(errorMessage);
+            throw new UnsupportedOperationException(errorMessage);
           }
+
+        case ErrorConstants.FORBIDDEN_CODE:
+          throw new ForbiddenException(errorMessage);
 
         case ErrorConstants.INTERNAL_ERROR_CODE:
           throw new RuntimeException(errorMessage);
@@ -1247,7 +1257,9 @@ public class ErrorHandlers {
           } else {
             throw new NotInUseException(errorMessage);
           }
->>>>>>> dc6f26d92 ([#7274] feat(client-java): Support statistics http client config for gravitino client)
+
+        case ErrorConstants.IN_USE_CODE:
+          throw new InUseException(errorMessage);
 
         default:
           super.accept(errorResponse);
