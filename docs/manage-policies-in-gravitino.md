@@ -231,6 +231,16 @@ Currently, Gravitino supports the following policy changes:
 
 You can enable or disable a policy.
 
+The `enabled` field of a policy is only a display attribute that marks whether the policy is enabled or disabled.
+It does not affect the actual behavior or characteristics of the policy itself. This field is intended for 
+external presentation and does not control policy application logic in Gravitino.
+
+The `enabled` field can be used for various purposes, such as:
+- You may want to temporarily disable a policy for auditing or review purposes, without deleting it or changing its content.
+- Enabling a policy can be used to indicate that it is ready for use or has passed necessary approvals.
+- The `enabled` status can be used in UI filtering or reporting to distinguish between active and inactive policies. 
+- An external policy enforcement system can use this field to determine whether to execute the corresponding policy.
+
 <Tabs groupId='language' queryString>
 <TabItem value="shell" label="Shell">
 
@@ -305,18 +315,33 @@ The request path for REST API is `/api/metalakes/{metalake}/objects/{metadataObj
 # First, create some policies to associate
 curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
 -H "Content-Type: application/json" \
--d '{"name": "policy1", "policyType": "custom", "supportedObjectTypes": ["CATALOG", "SCHEMA"], "content": {}}' \
-http://localhost:8090/api/metalakes/test/policies
+-d '{
+  "name": "policy1", 
+  "policyType": "custom", 
+  "content": {
+    "supportedObjectTypes": ["CATALOG", "TABLE"]
+  }
+}' http://localhost:8090/api/metalakes/test/policies
 
 curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
 -H "Content-Type: application/json" \
--d '{"name": "policy2", "policyType": "custom", "supportedObjectTypes": ["CATALOG"], "content": {}}' \
-http://localhost:8090/api/metalakes/test/policies
+-d '{
+  "name": "policy2", 
+  "policyType": "custom", 
+  "content": {
+    "supportedObjectTypes": ["CATALOG", "TABLE"]
+  }
+}' http://localhost:8090/api/metalakes/test/policies
 
 curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
 -H "Content-Type: application/json" \
--d '{"name": "policy3", "policyType": "custom", "supportedObjectTypes": ["CATALOG"], "content": {}}' \
-http://localhost:8090/api/metalakes/test/policies
+-d '{
+  "name": "policy3", 
+  "policyType": "custom", 
+  "content": {
+    "supportedObjectTypes": ["CATALOG", "TABLE"]
+  }
+}' http://localhost:8090/api/metalakes/test/policies
 
 # Associate and disassociate policies with a catalog
 curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
