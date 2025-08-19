@@ -19,6 +19,7 @@
 package org.apache.gravitino.catalog.model;
 
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
@@ -27,6 +28,7 @@ import java.time.Instant;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.Entity;
@@ -44,6 +46,7 @@ import org.apache.gravitino.exceptions.ModelVersionAliasesAlreadyExistException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchModelException;
 import org.apache.gravitino.exceptions.NoSuchModelVersionException;
+import org.apache.gravitino.exceptions.NoSuchModelVersionURINameException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.ModelEntity;
@@ -188,6 +191,23 @@ public class ModelCatalogOperations extends ManagedSchemaOperations
   }
 
   @Override
+  public ModelVersion[] listModelVersionInfos(NameIdentifier ident) throws NoSuchModelException {
+    NameIdentifierUtil.checkModel(ident);
+    Namespace modelVersionNs = NamespaceUtil.toModelVersionNs(ident);
+
+    try {
+      List<ModelVersionEntity> versions =
+          store.list(modelVersionNs, ModelVersionEntity.class, Entity.EntityType.MODEL_VERSION);
+      return versions.stream().map(this::toModelVersionImpl).toArray(ModelVersion[]::new);
+
+    } catch (NoSuchEntityException e) {
+      throw new NoSuchModelException(e, "Model %s does not exist", ident);
+    } catch (IOException ioe) {
+      throw new RuntimeException("Failed to list model version infos for model " + ident, ioe);
+    }
+  }
+
+  @Override
   public ModelVersion getModelVersion(NameIdentifier ident, int version)
       throws NoSuchModelVersionException {
     NameIdentifierUtil.checkModel(ident);
@@ -208,7 +228,7 @@ public class ModelCatalogOperations extends ManagedSchemaOperations
   @Override
   public void linkModelVersion(
       NameIdentifier ident,
-      String uri,
+      Map<String, String> uris,
       String[] aliases,
       String comment,
       Map<String, String> properties)
@@ -227,7 +247,7 @@ public class ModelCatalogOperations extends ManagedSchemaOperations
             // executing the insert operation.
             .withVersion(INIT_VERSION)
             .withAliases(aliasList)
-            .withUri(uri)
+            .withUris(uris)
             .withComment(comment)
             .withProperties(properties)
             .withAuditInfo(
@@ -247,6 +267,24 @@ public class ModelCatalogOperations extends ManagedSchemaOperations
     } catch (NoSuchEntityException e) {
       throw new NoSuchModelException(e, "Model %s does not exist", ident);
     }
+  }
+
+  @Override
+  public String getModelVersionUri(NameIdentifier ident, int version, String uriName)
+      throws NoSuchModelVersionException, NoSuchModelVersionURINameException {
+    NameIdentifierUtil.checkModel(ident);
+    NameIdentifier modelVersionIdent = NameIdentifierUtil.toModelVersionIdentifier(ident, version);
+
+    return internalGetModelVersionUri(ident, modelVersionIdent, Optional.ofNullable(uriName));
+  }
+
+  @Override
+  public String getModelVersionUri(NameIdentifier ident, String alias, String uriName)
+      throws NoSuchModelVersionException, NoSuchModelVersionURINameException {
+    NameIdentifierUtil.checkModel(ident);
+    NameIdentifier modelVersionIdent = NameIdentifierUtil.toModelVersionIdentifier(ident, alias);
+
+    return internalGetModelVersionUri(ident, modelVersionIdent, Optional.ofNullable(uriName));
   }
 
   @Override
@@ -413,7 +451,7 @@ public class ModelCatalogOperations extends ManagedSchemaOperations
         modelVersionEntity.aliases() == null
             ? Lists.newArrayList()
             : Lists.newArrayList(modelVersionEntity.aliases());
-    String entityUri = modelVersionEntity.uri();
+    String entityUri = modelVersionEntity.uris().get(ModelVersion.URI_NAME_UNKNOWN);
     Map<String, String> entityProperties =
         modelVersionEntity.properties() == null
             ? Maps.newHashMap()
@@ -460,7 +498,7 @@ public class ModelCatalogOperations extends ManagedSchemaOperations
         .withModelIdentifier(entityModelIdentifier)
         .withAliases(entityAliases)
         .withComment(entityComment)
-        .withUri(entityUri)
+        .withUris(ImmutableMap.of(ModelVersion.URI_NAME_UNKNOWN, entityUri))
         .withProperties(entityProperties)
         .withAuditInfo(
             AuditInfo.builder()
@@ -486,7 +524,7 @@ public class ModelCatalogOperations extends ManagedSchemaOperations
     return ModelVersionImpl.builder()
         .withVersion(modelVersion.version())
         .withAliases(modelVersion.aliases().toArray(new String[0]))
-        .withUri(modelVersion.uri())
+        .withUris(modelVersion.uris())
         .withComment(modelVersion.comment())
         .withProperties(modelVersion.properties())
         .withAuditInfo(modelVersion.auditInfo())
@@ -504,6 +542,49 @@ public class ModelCatalogOperations extends ManagedSchemaOperations
     } catch (IOException ioe) {
       throw new RuntimeException("Failed to get model version " + ident, ioe);
     }
+  }
+
+  private String internalGetModelVersionUri(
+      NameIdentifier modelIdent, NameIdentifier modelVersionIdent, Optional<String> uriName) {
+    ModelVersion modelVersion = internalGetModelVersion(modelVersionIdent);
+
+    Map<String, String> uris = modelVersion.uris();
+    // If the uriName is present, get from the uris directly
+    if (uriName.isPresent()) {
+      return getUriByName(uris, uriName.get(), modelVersionIdent);
+    }
+
+    // If there is only one uri of the model version, use it
+    if (uris.size() == 1) {
+      return uris.values().iterator().next();
+    }
+
+    // If the uri name is null, try to get the default uri name from the model version properties
+    Map<String, String> modelVersionProperties = modelVersion.properties();
+    if (modelVersionProperties.containsKey(ModelVersion.PROPERTY_DEFAULT_URI_NAME)) {
+      String defaultUriName = modelVersionProperties.get(ModelVersion.PROPERTY_DEFAULT_URI_NAME);
+      return getUriByName(uris, defaultUriName, modelVersionIdent);
+    }
+
+    // If the default uri name is not set for the model version, try to get the default uri name
+    // from the model properties
+    Map<String, String> modelProperties = getModel(modelIdent).properties();
+    if (modelProperties.containsKey(ModelVersion.PROPERTY_DEFAULT_URI_NAME)) {
+      String defaultUriName = modelProperties.get(ModelVersion.PROPERTY_DEFAULT_URI_NAME);
+      return getUriByName(uris, defaultUriName, modelVersionIdent);
+    }
+
+    throw new IllegalArgumentException(
+        "The default uri name needs to be set when the uri name is not specified");
+  }
+
+  private String getUriByName(
+      Map<String, String> uris, String uriName, NameIdentifier modelVersionIdent) {
+    if (!uris.containsKey(uriName)) {
+      throw new NoSuchModelVersionURINameException(
+          "URI name %s does not exist in model version %s", uriName, modelVersionIdent);
+    }
+    return uris.get(uriName);
   }
 
   private boolean internalDeleteModelVersion(NameIdentifier ident) {

@@ -28,7 +28,7 @@ val scalaVersion: String = project.properties["scalaVersion"] as? String ?: extr
 val sparkVersion: String = libs.versions.spark35.get()
 val kyuubiVersion: String = libs.versions.kyuubi4paimon.get()
 val sparkMajorVersion: String = sparkVersion.substringBeforeLast(".")
-val icebergVersion: String = libs.versions.iceberg4spark.get()
+val icebergVersion: String = libs.versions.iceberg.get()
 val paimonVersion: String = libs.versions.paimon.get()
 
 dependencies {
@@ -137,7 +137,16 @@ tasks.test {
   doFirst {
     environment("HADOOP_USER_NAME", "gravitino")
   }
-  dependsOn(":catalogs:catalog-hive:jar", ":catalogs:catalog-hive:runtimeJars", ":catalogs:catalog-lakehouse-iceberg:jar", ":catalogs:catalog-lakehouse-iceberg:runtimeJars", ":catalogs:catalog-lakehouse-paimon:jar", ":catalogs:catalog-lakehouse-paimon:runtimeJars", ":catalogs:catalog-hadoop:jar", ":catalogs:catalog-hadoop:runtimeJars")
+  dependsOn(
+    ":catalogs:catalog-hive:jar",
+    ":catalogs:catalog-hive:runtimeJars",
+    ":catalogs:catalog-lakehouse-iceberg:jar",
+    ":catalogs:catalog-lakehouse-iceberg:runtimeJars",
+    ":catalogs:catalog-lakehouse-paimon:jar",
+    ":catalogs:catalog-lakehouse-paimon:runtimeJars",
+    ":catalogs:catalog-fileset:jar",
+    ":catalogs:catalog-fileset:runtimeJars"
+  )
 
   val skipITs = project.hasProperty("skipITs")
   if (skipITs) {

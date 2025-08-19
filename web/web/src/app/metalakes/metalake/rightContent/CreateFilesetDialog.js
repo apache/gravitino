@@ -36,7 +36,9 @@ import {
   MenuItem,
   InputLabel,
   FormControl,
-  FormHelperText
+  FormHelperText,
+  Tooltip,
+  Switch
 } from '@mui/material'
 
 import Icon from '@/components/Icon'
@@ -45,7 +47,7 @@ import { useAppDispatch } from '@/lib/hooks/useStore'
 import { createFileset, updateFileset } from '@/lib/store/metalakes'
 
 import * as yup from 'yup'
-import { useForm, Controller } from 'react-hook-form'
+import { useForm, Controller, useFieldArray } from 'react-hook-form'
 import { yupResolver } from '@hookform/resolvers/yup'
 
 import { groupBy } from 'lodash-es'
@@ -56,7 +58,7 @@ import { useSearchParams } from 'next/navigation'
 const defaultValues = {
   name: '',
   type: 'managed',
-  storageLocation: '',
+  storageLocations: [{ name: '', location: '', defaultLocation: true }],
   comment: '',
   propItems: []
 }
@@ -64,11 +66,37 @@ const defaultValues = {
 const schema = yup.object().shape({
   name: yup.string().required().matches(nameRegex, nameRegexDesc),
   type: yup.mixed().oneOf(['managed', 'external']).required(),
-  storageLocation: yup.string().when('type', {
-    is: 'external',
-    then: schema => schema.required(),
-    otherwise: schema => schema
-  }),
+  storageLocations: yup
+    .array()
+    .of(
+      yup.object().shape({
+        name: yup.string().when('type', {
+          is: 'external',
+          then: schema => schema.required(),
+          otherwise: schema => schema
+        }),
+        location: yup.string().when('name', {
+          is: name => !!name,
+          then: schema => schema.required(),
+          otherwise: schema => schema
+        })
+      })
+    )
+    .test('unique', 'Location name must be unique', (storageLocations, ctx) => {
+      const values = storageLocations?.filter(l => !!l.name).map(l => l.name)
+      const duplicates = values.filter((value, index, self) => self.indexOf(value) !== index)
+
+      if (duplicates.length > 0) {
+        const duplicateIndex = values.lastIndexOf(duplicates[0])
+
+        return ctx.createError({
+          path: `storageLocations.${duplicateIndex}.name`,
+          message: 'This storage location name is duplicated'
+        })
+      }
+
+      return true
+    }),
   propItems: yup.array().of(
     yup.object().shape({
       required: yup.boolean(),
@@ -110,6 +138,9 @@ const CreateFilesetDialog = props => {
     mode: 'all',
     resolver: yupResolver(schema)
   })
+
+  const defaultLocationProps = watch('propItems').filter(item => item.key === 'default-location-name')[0]
+  const storageLocationsItems = watch('storageLocations')
 
   const handleFormChange = ({ index, event }) => {
     let data = [...innerProps]
@@ -154,6 +185,20 @@ const CreateFilesetDialog = props => {
     setValue('propItems', data)
   }
 
+  const { fields, append, remove } = useFieldArray({
+    control,
+    name: 'storageLocations'
+  })
+
+  const onChangeDefaultLocation = ({ index, event }) => {
+    fields.forEach((item, i) => {
+      if (i !== index) {
+        setValue(`storageLocations.${i}.defaultLocation`, false)
+      }
+    })
+    setValue(`storageLocations.${index}.defaultLocation`, event.target.checked)
+  }
+
   const handleClose = () => {
     reset()
     setInnerProps([])
@@ -188,7 +233,16 @@ const CreateFilesetDialog = props => {
         const filesetData = {
           name: data.name,
           type: data.type,
-          storageLocation: data.storageLocation,
+          storageLocations: data.storageLocations.reduce((acc, item) => {
+            if (item.name && item.location) {
+              acc[item.name] = item.location
+              if (item.defaultLocation && !properties['default-location-name']) {
+                properties['default-location-name'] = item.name
+              }
+            }
+
+            return acc
+          }, {}),
           comment: data.comment,
           properties
         }
@@ -238,8 +292,15 @@ const CreateFilesetDialog = props => {
       setCacheData(data)
       setValue('name', data.name)
       setValue('type', data.type)
-      setValue('storageLocation', data.storageLocation)
       setValue('comment', data.comment)
+
+      const storageLocations = Object.entries(data.storageLocations).map(([key, value]) => {
+        return {
+          name: key,
+          location: value,
+          defaultLocation: properties['default-location-name'] === key
+        }
+      })
 
       const propsItems = Object.entries(properties).map(([key, value]) => {
         return {
@@ -248,6 +309,7 @@ const CreateFilesetDialog = props => {
         }
       })
 
+      setValue('storageLocations', storageLocations)
       setInnerProps(propsItems)
       setValue('propItems', propsItems)
     }
@@ -329,38 +391,130 @@ const CreateFilesetDialog = props => {
             </Grid>
 
             <Grid item xs={12}>
-              <FormControl fullWidth>
-                <Controller
-                  name='storageLocation'
-                  control={control}
-                  rules={{ required: true }}
-                  render={({ field: { value, onChange } }) => (
-                    <TextField
-                      value={value}
-                      label='Storage Location'
-                      onChange={onChange}
-                      disabled={type === 'update'}
-                      placeholder=''
-                      error={Boolean(errors.storageLocation)}
-                      data-refer='fileset-storageLocation-field'
-                    />
-                  )}
-                />
-                {errors.storageLocation ? (
-                  <FormHelperText sx={{ color: 'error.main' }}>{errors.storageLocation.message}</FormHelperText>
-                ) : (
-                  <>
-                    <FormHelperText sx={{ color: 'text.main' }}>
-                      It is optional if the fileset is 'Managed' type and a storage location is already specified at the
-                      parent catalog or schema level.
-                    </FormHelperText>
-                    <FormHelperText sx={{ color: 'text.main' }}>
-                      It becomes mandatory if the fileset type is 'External' or no storage location is defined at the
-                      parent level.
-                    </FormHelperText>
-                  </>
-                )}
-              </FormControl>
+              <Typography sx={{ mb: 2 }} variant='body2'>
+                Storage Locations
+              </Typography>
+              {fields.map((field, index) => {
+                return (
+                  <Grid key={index} item xs={12} sx={{ '& + &': { mt: 2 } }}>
+                    <FormControl fullWidth>
+                      <Box
+                        key={field.id}
+                        sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1 }}
+                        data-refer={`storageLocations-${index}`}
+                      >
+                        <Box>
+                          <Controller
+                            name={`storageLocations.${index}.name`}
+                            control={control}
+                            render={({ field: { value, onChange } }) => (
+                              <TextField
+                                {...field}
+                                value={value}
+                                onChange={onChange}
+                                disabled={type === 'update'}
+                                label={`Name ${index + 1}`}
+                                data-refer={`storageLocations-name-${index}`}
+                                error={!!errors.storageLocations?.[index]?.name || !!errors.storageLocations?.message}
+                                helperText={
+                                  errors.storageLocations?.[index]?.name?.message || errors.storageLocations?.message
+                                }
+                                fullWidth
+                              />
+                            )}
+                          />
+                        </Box>
+                        <Box>
+                          <Controller
+                            name={`storageLocations.${index}.location`}
+                            control={control}
+                            render={({ field: { value, onChange } }) => (
+                              <TextField
+                                {...field}
+                                value={value}
+                                onChange={onChange}
+                                disabled={type === 'update'}
+                                label={`Location ${index + 1}`}
+                                data-refer={`storageLocations-location-${index}`}
+                                error={
+                                  !!errors.storageLocations?.[index]?.location || !!errors.storageLocations?.message
+                                }
+                                helperText={
+                                  errors.storageLocations?.[index]?.location?.message ||
+                                  errors.storageLocations?.message
+                                }
+                                fullWidth
+                              />
+                            )}
+                          />
+                        </Box>
+                        {!defaultLocationProps &&
+                          storageLocationsItems.length > 1 &&
+                          storageLocationsItems[0].name &&
+                          storageLocationsItems[0].location && (
+                            <Box>
+                              <Controller
+                                name={`storageLocations.${index}.defaultLocation`}
+                                control={control}
+                                render={({ field: { value, onChange } }) => (
+                                  <Tooltip title='Default Location' placement='top'>
+                                    <Switch
+                                      checked={value}
+                                      onChange={event => onChangeDefaultLocation({ index, event })}
+                                      disabled={type === 'update'}
+                                      size='small'
+                                    />
+                                  </Tooltip>
+                                )}
+                              />
+                            </Box>
+                          )}
+                        <Box>
+                          {index === 0 ? (
+                            <Box sx={{ minWidth: 40 }}>
+                              <IconButton
+                                sx={{ cursor: type === 'update' ? 'not-allowed' : 'pointer' }}
+                                onClick={() => {
+                                  if (type === 'update') return
+                                  append({ name: '', location: '', defaultLocation: false })
+                                }}
+                              >
+                                <Icon icon='mdi:plus-circle-outline' />
+                              </IconButton>
+                            </Box>
+                          ) : (
+                            <Box sx={{ minWidth: 40 }}>
+                              <IconButton
+                                sx={{ cursor: type === 'update' ? 'not-allowed' : 'pointer' }}
+                                onClick={() => {
+                                  if (type === 'update') return
+                                  remove(index)
+                                }}
+                              >
+                                <Icon icon='mdi:minus-circle-outline' />
+                              </IconButton>
+                            </Box>
+                          )}
+                        </Box>
+                      </Box>
+                    </FormControl>
+                  </Grid>
+                )
+              })}
+              {errors.storageLocations ? (
+                <FormHelperText sx={{ color: 'error.main' }}>{errors.storageLocations.message}</FormHelperText>
+              ) : (
+                <>
+                  <FormHelperText sx={{ color: 'text.main' }}>
+                    It is optional if the fileset is 'Managed' type and a storage location is already specified at the
+                    parent catalog or schema level.
+                  </FormHelperText>
+                  <FormHelperText sx={{ color: 'text.main' }}>
+                    It becomes mandatory if the fileset type is 'External' or no storage location is defined at the
+                    parent level.
+                  </FormHelperText>
+                </>
+              )}
             </Grid>
 
             <Grid item xs={12}>
@@ -405,7 +559,10 @@ const CreateFilesetDialog = props => {
                                 name='key'
                                 label='Key'
                                 value={item.key}
-                                disabled={item.disabled || (item.key === 'location' && type === 'update')}
+                                disabled={
+                                  item.disabled ||
+                                  (['location', 'default-location-name'].includes(item.key) && type === 'update')
+                                }
                                 onChange={event => handleFormChange({ index, event })}
                                 error={item.hasDuplicateKey || item.invalid || !item.key.trim()}
                                 data-refer={`props-key-${index}`}
@@ -418,14 +575,20 @@ const CreateFilesetDialog = props => {
                                 label='Value'
                                 error={item.required && item.value === ''}
                                 value={item.value}
-                                disabled={item.disabled || (item.key === 'location' && type === 'update')}
+                                disabled={
+                                  item.disabled ||
+                                  (['location', 'default-location-name'].includes(item.key) && type === 'update')
+                                }
                                 onChange={event => handleFormChange({ index, event })}
                                 data-refer={`props-value-${index}`}
                                 data-prev-refer={`props-${item.key}`}
                               />
                             </Box>
 
-                            {!(item.disabled || (item.key === 'location' && type === 'update')) ? (
+                            {!(
+                              item.disabled ||
+                              (['location', 'default-location-name'].includes(item.key) && type === 'update')
+                            ) ? (
                               <Box sx={{ minWidth: 40 }}>
                                 <IconButton onClick={() => removeFields(index)}>
                                   <Icon icon='mdi:minus-circle-outline' />

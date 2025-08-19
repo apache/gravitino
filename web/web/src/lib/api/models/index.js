@@ -46,6 +46,11 @@ const Apis = {
     `/api/metalakes/${encodeURIComponent(metalake)}/catalogs/${encodeURIComponent(
       catalog
     )}/schemas/${encodeURIComponent(schema)}/models/${encodeURIComponent(model)}/versions`,
+  UPDATE_VERSION: ({ metalake, catalog, schema, model, version }) => {
+    return `/api/metalakes/${encodeURIComponent(metalake)}/catalogs/${encodeURIComponent(
+      catalog
+    )}/schemas/${encodeURIComponent(schema)}/models/${encodeURIComponent(model)}/versions/${version}`
+  },
   DELETE_VERSION: ({ metalake, catalog, schema, model, version }) => {
     return `/api/metalakes/${encodeURIComponent(metalake)}/catalogs/${encodeURIComponent(
       catalog
@@ -85,6 +90,13 @@ export const getModelVersionsApi = params => {
 
 export const linkVersionApi = ({ metalake, catalog, schema, model, data }) => {
   return defHttp.post({ url: `${Apis.LINK_VERSION({ metalake, catalog, schema, model })}`, data })
+}
+
+export const updateVersionApi = ({ metalake, catalog, schema, model, version, data }) => {
+  return defHttp.put({
+    url: `${Apis.UPDATE_VERSION({ metalake, catalog, schema, model, version })}`,
+    data
+  })
 }
 
 export const getVersionDetailsApi = ({ metalake, catalog, schema, model, version }) => {

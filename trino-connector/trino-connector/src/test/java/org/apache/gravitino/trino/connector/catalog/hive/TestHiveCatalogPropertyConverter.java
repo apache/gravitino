@@ -22,6 +22,7 @@ package org.apache.gravitino.trino.connector.catalog.hive;
 import com.google.common.collect.ImmutableMap;
 import java.util.Map;
 import org.apache.gravitino.Catalog;
+import org.apache.gravitino.trino.connector.catalog.CatalogPropertyConverter;
 import org.apache.gravitino.trino.connector.metadata.GravitinoCatalog;
 import org.apache.gravitino.trino.connector.metadata.TestGravitinoCatalog;
 import org.junit.jupiter.api.Assertions;
@@ -32,7 +33,7 @@ public class TestHiveCatalogPropertyConverter {
   @Test
   public void testConverter() {
     // You can refer to testHiveCatalogCreatedByGravitino
-    HiveCatalogPropertyConverter hiveCatalogPropertyConverter = new HiveCatalogPropertyConverter();
+    CatalogPropertyConverter hiveCatalogPropertyConverter = new CatalogPropertyConverter();
     Map<String, String> map =
         ImmutableMap.<String, String>builder()
             .put("trino.bypass.hive.immutable-partitions", "true")
@@ -43,19 +44,22 @@ public class TestHiveCatalogPropertyConverter {
     Map<String, String> re = hiveCatalogPropertyConverter.gravitinoToEngineProperties(map);
     Assertions.assertEquals(re.get("hive.immutable-partitions"), "true");
     Assertions.assertEquals(re.get("hive.compression-codec"), "ZSTD");
-    Assertions.assertNull(re.get("hive.unknown-key"));
+    Assertions.assertEquals(re.get("hive.unknown-key"), "1");
   }
 
   @Test
   @SuppressWarnings("unchecked")
   public void testBuildConnectorProperties() throws Exception {
     String name = "test_catalog";
+    // trino.bypass properties will be skipped when the catalog properties is defined by Gravitino
     Map<String, String> properties =
         ImmutableMap.<String, String>builder()
+            .put("trino.bypass.hive.security", "skip_value")
             .put("metastore.uris", "thrift://localhost:9083")
-            .put("hive.unknown-key", "1")
-            .put("trino.bypass.unknown-key", "1")
+            .put("unknown-key", "1")
+            .put("trino.bypass.hive.unknown-key", "1")
             .put("trino.bypass.hive.config.resources", "/tmp/hive-site.xml, /tmp/core-site.xml")
+            .put("trino.bypass.hive.metastore.uri", "skip_value")
             .build();
     Catalog mockCatalog =
         TestGravitinoCatalog.mockCatalog(
@@ -75,7 +79,7 @@ public class TestHiveCatalogPropertyConverter {
         config.get("hive.config.resources"), "/tmp/hive-site.xml, /tmp/core-site.xml");
 
     // test unknown properties
-    Assertions.assertNull(config.get("hive.unknown-key"));
-    Assertions.assertNull(config.get("trino.bypass.unknown-key"));
+    Assertions.assertNull(config.get("unknown-key"));
+    Assertions.assertEquals(config.get("hive.unknown-key"), "1");
   }
 }

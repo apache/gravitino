@@ -44,12 +44,21 @@ tasks.withType(ShadowJar::class.java) {
   }
 
   // Relocate dependencies to avoid conflicts
-  relocate("org.jdom", "org.apache.gravitino.aliyun.shaded.org.jdom")
-  relocate("org.apache.commons.lang3", "org.apache.gravitino.aliyun.shaded.org.apache.commons.lang3")
   relocate("com.fasterxml.jackson", "org.apache.gravitino.aliyun.shaded.com.fasterxml.jackson")
-  relocate("com.google.common", "org.apache.gravitino.aliyun.shaded.com.google.common")
+  relocate("com.google", "org.apache.gravitino.aliyun.shaded.com.google")
+  relocate("com.sun.activation", "org.apache.gravitino.aliyun.shaded.com.sun.activation")
+  relocate("com.sun.istack", "org.apache.gravitino.aliyun.shaded.com.sun.istack")
+  relocate("com.sun.jersey", "org.apache.gravitino.aliyun.shaded.com.sun.jersey")
+  relocate("com.sun.xml", "org.apache.gravitino.aliyun.shaded.com.sun.xml")
+  relocate("okhttp3", "org.apache.gravitino.aliyun.shaded.okhttp3")
+  relocate("okio", "org.apache.gravitino.aliyun.shaded.okio")
+  relocate("org.apache.commons", "org.apache.gravitino.aliyun.shaded.org.apache.commons")
   relocate("org.apache.http", "org.apache.gravitino.aliyun.shaded.org.apache.http")
-  relocate("org.apache.commons.collections", "org.apache.gravitino.aliyun.shaded.org.apache.commons.collections")
+  relocate("org.checkerframework", "org.apache.gravitino.aliyun.shaded.org.checkerframework")
+  relocate("org.jacoco.agent.rt", "org.apache.gravitino.aliyun.shaded.org.jacoco.agent.rt")
+  relocate("org.jdom", "org.apache.gravitino.aliyun.shaded.org.jdom")
+
+  mergeServiceFiles()
 }
 
 tasks.jar {
@@ -58,5 +67,5 @@ tasks.jar {
 }
 
 tasks.compileJava {
-  dependsOn(":catalogs:catalog-hadoop:runtimeJars")
+  dependsOn(":catalogs:catalog-fileset:runtimeJars")
 }

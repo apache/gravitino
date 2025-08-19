@@ -24,7 +24,6 @@ from gravitino.utils.precondition import Precondition
 
 
 class TestPrecondition(unittest.TestCase):
-
     def test_check_argument(self):
         with self.assertRaises(IllegalArgumentException):
             Precondition.check_argument(False, "error")

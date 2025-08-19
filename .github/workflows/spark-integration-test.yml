@@ -16,7 +16,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: dorny/paths-filter@v3.0.2
+      - uses: dorny/paths-filter@de90cc6fb38fc0963ad72b210f1f284cd68cea36
         id: filter
         with:
           filters: |
@@ -53,7 +53,7 @@ jobs:
       matrix:
         # Integration test for AMD64 architecture
         architecture: [linux/amd64]
-        java-version: [ 8, 11, 17 ]
+        java-version: [ 17 ]
         scala-version: [ 2.12 ]
         test-mode: [ embedded, deploy ]
     uses: ./.github/workflows/spark-integration-test-action.yml

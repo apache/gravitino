@@ -50,7 +50,7 @@ import { yupResolver } from '@hookform/resolvers/yup'
 
 import { groupBy } from 'lodash-es'
 import { genUpdates } from '@/lib/utils'
-import { providers, filesetProviders, messagingProviders } from '@/lib/utils/initial'
+import { providers, messagingProviders } from '@/lib/utils/initial'
 import { nameRegex, nameRegexDesc, keyRegex } from '@/lib/utils/regex'
 import { useSearchParams } from 'next/navigation'
 
@@ -69,8 +69,6 @@ const schema = yup.object().shape({
     switch (type) {
       case 'relational':
         return schema.oneOf(providers.map(i => i.value)).required()
-      case 'fileset':
-        return schema.oneOf(filesetProviders.map(i => i.value)).required()
       case 'messaging':
         return schema.oneOf(messagingProviders.map(i => i.value)).required()
       default:
@@ -349,16 +347,12 @@ const CreateCatalogDialog = props => {
         setValue('provider', 'hive')
         break
       }
-      case 'fileset': {
-        setProviderTypes(filesetProviders)
-        setValue('provider', 'hadoop')
-        break
-      }
       case 'messaging': {
         setProviderTypes(messagingProviders)
         setValue('provider', 'kafka')
         break
       }
+      case 'fileset':
       case 'model': {
         setProviderTypes([])
         setValue('provider', '')
@@ -404,14 +398,11 @@ const CreateCatalogDialog = props => {
           providersItems = providers
           break
         }
-        case 'fileset': {
-          providersItems = filesetProviders
-          break
-        }
         case 'messaging': {
           providersItems = messagingProviders
           break
         }
+        case 'fileset':
         case 'model': {
           providersItems = []
           break
@@ -532,7 +523,7 @@ const CreateCatalogDialog = props => {
               </FormControl>
             </Grid>
 
-            {typeSelect !== 'model' && (
+            {!['model', 'fileset'].includes(typeSelect) && (
               <Grid item xs={12}>
                 <FormControl fullWidth>
                   <InputLabel id='select-catalog-provider' error={Boolean(errors.provider)}>

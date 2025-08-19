@@ -22,7 +22,6 @@ from gravitino.audit.caller_context import CallerContextHolder, CallerContext
 
 
 class TestCallerContext(unittest.TestCase):
-
     def test_caller_context(self):
         thread_names_and_values = [
             ("Thread1", {"k1": "v1", "k2": "v2"}),

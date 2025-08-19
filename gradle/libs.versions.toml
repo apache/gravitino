@@ -43,7 +43,10 @@ hadoop3-aliyun = "3.3.1"
 hadoop-minikdc = "3.3.1"
 htrace-core4 = "4.1.0-incubating"
 httpclient = "4.4.1"
-httpclient5 = "5.2.1"
+httpclient5 = "5.4.4"
+httpcore5 = "5.3.4"
+micrometer-core = "1.12.2"
+jackson-dataformat-yaml = "2.16.1"
 mockserver = "5.15.0"
 commons-csv = "1.12.0"
 commons-lang3 = "3.14.0"
@@ -55,9 +58,9 @@ commons-collections3 = "3.2.2"
 commons-configuration1 = "1.6"
 commons-dbcp2 = "2.11.0"
 caffeine = "2.9.3"
-iceberg = '1.6.1' # used for Gravitino Iceberg catalog and Iceberg REST service
-iceberg4spark = "1.4.1" # used for compile spark connector
-paimon = '1.2.0'
+iceberg = '1.9.2' # used for Gravitino Iceberg catalog and Iceberg REST service
+iceberg4connector = "1.6.1" # used for compile connectors like Spark, Flink, etc
+paimon = '0.12.0'
 spark33 = "3.3.4"
 spark34 = "3.4.3"
 spark35 = "3.5.1"
@@ -71,6 +74,7 @@ scala-java-compat = "1.0.2"
 sqlite-jdbc = "3.42.0.0"
 testcontainers = "1.20.6"
 jwt = "0.11.1"
+nimbus-jose-jwt = "9.37.3"
 jline = "3.21.0"
 okhttp3 = "4.11.0"
 opencsv = "2.3"
@@ -119,6 +123,12 @@ hudi = "0.15.0"
 google-auth = "1.28.0"
 aliyun-credentials = "0.3.12"
 openlineage = "1.29.0"
+jcstress = "0.8.15"
+jmh-plugin = "0.7.3"
+jmh = "1.37"
+jcasbin = "1.81.0"
+ognl = "3.4.7"
+concurrent-trees = "2.6.0"
 
 [libraries]
 aws-iam = { group = "software.amazon.awssdk", name = "iam", version.ref = "awssdk" }
@@ -134,13 +144,14 @@ jackson-databind = { group = "com.fasterxml.jackson.core", name = "jackson-datab
 jackson-annotations = { group = "com.fasterxml.jackson.core", name = "jackson-annotations", version.ref = "jackson" }
 jackson-datatype-jdk8 = { group = "com.fasterxml.jackson.datatype", name = "jackson-datatype-jdk8", version.ref = "jackson" }
 jackson-datatype-jsr310 = { group = "com.fasterxml.jackson.datatype", name = "jackson-datatype-jsr310", version.ref = "jackson" }
+jackson-dataformat-yaml = { group = "com.fasterxml.jackson.dataformat", name = "jackson-dataformat-yaml", version.ref = "jackson-dataformat-yaml" }
 guava = { group = "com.google.guava", name = "guava", version.ref = "guava" }
 kerby-core = { group = "org.apache.kerby", name = "kerb-core", version.ref = "kerby"}
 kerby-simplekdc = { group = "org.apache.kerby", name = "kerb-simplekdc", version.ref = "kerby"}
 lombok = { group = "org.projectlombok", name = "lombok", version.ref = "lombok" }
 junit-jupiter-api = { group = "org.junit.jupiter", name = "junit-jupiter-api", version.ref = "junit" }
 junit-jupiter-params = { group = "org.junit.jupiter", name = "junit-jupiter-params", version.ref = "junit" }
-junit-jupiter-engine = { group = "org.junit.jupiter", name = "junit-jupiter-engine"}
+junit-jupiter-engine = { group = "org.junit.jupiter", name = "junit-jupiter-engine", version.ref = "junit" }
 slf4j-api = { group = "org.slf4j", name = "slf4j-api", version.ref = "slf4j" }
 slf4j-simple = { group = "org.slf4j", name = "slf4j-simple", version.ref = "slf4j" }
 slf4j-jdk14 = { group = "org.slf4j", name = "slf4j-jdk14", version = "1.7.30" }
@@ -188,6 +199,9 @@ airlift-json = { group = "io.airlift", name = "json", version.ref = "airlift-jso
 airlift-resolver = { group = "io.airlift.resolver", name = "resolver", version.ref = "airlift-resolver"}
 httpclient = { group = "org.apache.httpcomponents", name = "httpclient", version.ref = "httpclient" }
 httpclient5 = { group = "org.apache.httpcomponents.client5", name = "httpclient5", version.ref = "httpclient5" }
+httpcore5 = { group = "org.apache.httpcomponents.core5", name = "httpcore5", version.ref = "httpcore5" }
+micrometer-core = { group = "io.micrometer", name = "micrometer-core", version.ref = "micrometer-core" }
+
 mockserver-netty = { group = "org.mock-server", name = "mockserver-netty", version.ref = "mockserver" }
 mockserver-client-java = { group = "org.mock-server", name = "mockserver-client-java", version.ref = "mockserver" }
 commons-csv = { group = "org.apache.commons", name = "commons-csv", version.ref = "commons-csv" }
@@ -232,6 +246,7 @@ trino-jdbc = { group = "io.trino", name = "trino-jdbc", version.ref = "trino" }
 jwt-api = { group = "io.jsonwebtoken", name = "jjwt-api", version.ref = "jwt"}
 jwt-impl = { group = "io.jsonwebtoken", name = "jjwt-impl", version.ref = "jwt"}
 jwt-gson = { group = "io.jsonwebtoken", name = "jjwt-gson", version.ref = "jwt"}
+nimbus-jose-jwt = { group = "com.nimbusds", name = "nimbus-jose-jwt", version.ref = "nimbus-jose-jwt"}
 metrics-core = { group = "io.dropwizard.metrics", name = "metrics-core", version.ref = "metrics" }
 metrics-jersey2 = { group = "io.dropwizard.metrics", name = "metrics-jersey2", version.ref = "metrics" }
 metrics-jvm = { group = "io.dropwizard.metrics", name = "metrics-jvm", version.ref = "metrics" }
@@ -280,7 +295,10 @@ google-auth-credentials = { group = "com.google.auth", name = "google-auth-libra
 
 aliyun-credentials-sdk = { group='com.aliyun', name='credentials-java', version.ref='aliyun-credentials' }
 flinkjdbc = {group='org.apache.flink',name='flink-connector-jdbc', version.ref='flinkjdbc'}
+concurrent-trees = { group = "com.googlecode.concurrent-trees", name = "concurrent-trees", version.ref = "concurrent-trees" }
+jcasbin = { group='org.casbin', name='jcasbin', version.ref="jcasbin" }
 openlineage-java= { group = "io.openlineage", name = "openlineage-java", version.ref = "openlineage" }
+ognl = { group='ognl', name='ognl', version.ref="ognl" }
 
 [bundles]
 log4j = ["slf4j-api", "log4j-slf4j2-impl", "log4j-api", "log4j-core", "log4j-12-api", "log4j-layout-template-json"]
@@ -304,3 +322,5 @@ tasktree = {id = "com.dorongold.task-tree", version = "2.1.1"}
 dependencyLicenseReport = {id = "com.github.jk1.dependency-license-report", version = "2.9"}
 bom = {id = "org.cyclonedx.bom", version = "1.5.0"}
 errorprone = {id = "net.ltgt.errorprone", version.ref = "error-prone"}
+jcstress = { id = "io.github.reyerizo.gradle.jcstress", version.ref = "jcstress" }
+jmh = { id = "me.champeau.jmh", version.ref = "jmh-plugin" }

@@ -38,6 +38,10 @@ public class IcebergConnectorAdapter implements CatalogConnectorAdapter {
   private final IcebergPropertyMeta propertyMetadata;
   private final PropertyConverter catalogConverter;
 
+  /**
+   * Constructs a new IcebergConnectorAdapter. Initializes the property metadata and catalog
+   * converter for handling Iceberg-specific configurations.
+   */
   public IcebergConnectorAdapter() {
     this.propertyMetadata = new IcebergPropertyMeta();
     this.catalogConverter = new IcebergCatalogPropertyConverter();

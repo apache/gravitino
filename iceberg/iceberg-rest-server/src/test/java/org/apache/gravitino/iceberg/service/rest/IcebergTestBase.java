@@ -29,6 +29,8 @@ import javax.ws.rs.core.MediaType;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.iceberg.service.IcebergObjectMapperProvider;
+import org.apache.iceberg.catalog.Namespace;
+import org.apache.iceberg.rest.RESTUtil;
 import org.glassfish.jersey.server.ResourceConfig;
 import org.glassfish.jersey.test.JerseyTest;
 import org.junit.jupiter.api.Assertions;
@@ -49,31 +51,38 @@ public class IcebergTestBase extends JerseyTest {
     return getIcebergClientBuilder(IcebergRestTestUtil.RENAME_VIEW_PATH, Optional.empty());
   }
 
-  public Invocation.Builder getTableClientBuilder() {
-    return getTableClientBuilder(Optional.empty());
-  }
-
-  public Invocation.Builder getViewClientBuilder() {
-    return getViewClientBuilder(Optional.empty());
-  }
-
-  public Invocation.Builder getTableClientBuilder(Optional<String> name) {
-    String path =
-        Joiner.on("/").skipNulls().join(IcebergRestTestUtil.TABLE_PATH, name.orElseGet(() -> null));
-    return getIcebergClientBuilder(path, Optional.empty());
-  }
-
-  public Invocation.Builder getViewClientBuilder(Optional<String> name) {
-    String path =
-        Joiner.on("/").skipNulls().join(IcebergRestTestUtil.VIEW_PATH, name.orElseGet(() -> null));
-    return getIcebergClientBuilder(path, Optional.empty());
-  }
-
-  public Invocation.Builder getReportMetricsClientBuilder(String name) {
+  public Invocation.Builder getTableClientBuilder(Namespace ns, Optional<String> name) {
     String path =
         Joiner.on("/")
             .skipNulls()
-            .join(IcebergRestTestUtil.TABLE_PATH, name, IcebergRestTestUtil.REPORT_METRICS_POSTFIX);
+            .join(
+                IcebergRestTestUtil.NAMESPACE_PATH + "/" + RESTUtil.encodeNamespace(ns) + "/tables",
+                name.orElseGet(() -> null));
+    return getIcebergClientBuilder(path, Optional.empty());
+  }
+
+  public Invocation.Builder getViewClientBuilder(Namespace ns) {
+    return getViewClientBuilder(ns, Optional.empty());
+  }
+
+  public Invocation.Builder getViewClientBuilder(Namespace ns, Optional<String> name) {
+    String path =
+        Joiner.on("/")
+            .skipNulls()
+            .join(
+                IcebergRestTestUtil.NAMESPACE_PATH + "/" + RESTUtil.encodeNamespace(ns) + "/views",
+                name.orElseGet(() -> null));
+    return getIcebergClientBuilder(path, Optional.empty());
+  }
+
+  public Invocation.Builder getReportMetricsClientBuilder(String name, Namespace ns) {
+    String path =
+        Joiner.on("/")
+            .skipNulls()
+            .join(
+                IcebergRestTestUtil.NAMESPACE_PATH + "/" + RESTUtil.encodeNamespace(ns) + "/tables",
+                name,
+                IcebergRestTestUtil.REPORT_METRICS_POSTFIX);
     return getIcebergClientBuilder(path, Optional.empty());
   }
 
@@ -81,12 +90,12 @@ public class IcebergTestBase extends JerseyTest {
     return getNamespaceClientBuilder(Optional.empty(), Optional.empty(), Optional.empty());
   }
 
-  public Invocation.Builder getNamespaceClientBuilder(Optional<String> namespace) {
+  public Invocation.Builder getNamespaceClientBuilder(Optional<Namespace> namespace) {
     return getNamespaceClientBuilder(namespace, Optional.empty(), Optional.empty());
   }
 
   public Invocation.Builder getNamespaceClientBuilder(
-      Optional<String> namespace,
+      Optional<Namespace> namespace,
       Optional<String> extraPath,
       Optional<Map<String, String>> queryParams) {
     String path =
@@ -94,18 +103,18 @@ public class IcebergTestBase extends JerseyTest {
             .skipNulls()
             .join(
                 IcebergRestTestUtil.NAMESPACE_PATH,
-                namespace.orElseGet(() -> null),
+                namespace.map(RESTUtil::encodeNamespace).orElseGet(() -> null),
                 extraPath.orElseGet(() -> null));
     return getIcebergClientBuilder(path, queryParams);
   }
 
-  public Invocation.Builder getUpdateNamespaceClientBuilder(String namespace) {
+  public Invocation.Builder getUpdateNamespaceClientBuilder(Namespace namespace) {
     String path =
         Joiner.on("/")
             .skipNulls()
             .join(
                 IcebergRestTestUtil.NAMESPACE_PATH,
-                namespace,
+                RESTUtil.encodeNamespace(namespace),
                 IcebergRestTestUtil.UPDATE_NAMESPACE_POSTFIX);
     return getIcebergClientBuilder(path, Optional.empty());
   }

@@ -20,6 +20,7 @@ package org.apache.gravitino;
 
 import java.io.IOException;
 import java.util.List;
+import org.apache.gravitino.exceptions.NoSuchEntityException;
 
 /**
  * This is an extended interface. This is mainly used for strengthen the ability of querying
@@ -36,14 +37,19 @@ public interface SupportsRelationOperations {
     /** Role and user relationship */
     ROLE_USER_REL,
     /** Role and group relationship */
-    ROLE_GROUP_REL
+    ROLE_GROUP_REL,
+    /** Job template and job relationship */
+    JOB_TEMPLATE_JOB_REL,
+    /** Policy and metadata object relationship */
+    POLICY_METADATA_OBJECT_REL,
   }
 
   /**
    * List the entities according to a given entity in a specific relation.
    *
+   * @param <E> The type of entities returned.
    * @param relType The type of relation.
-   * @param nameIdentifier The given entity identifier
+   * @param nameIdentifier The given entity identifier.
    * @param identType The given entity type.
    * @return The list of entities
    * @throws IOException When occurs storage issues, it will throw IOException.
@@ -56,6 +62,7 @@ public interface SupportsRelationOperations {
   /**
    * List the entities according to a given entity in a specific relation.
    *
+   * @param <E> the type of entities returned.
    * @param relType The type of relation.
    * @param nameIdentifier The given entity identifier
    * @param identType The given entity type.
@@ -69,6 +76,30 @@ public interface SupportsRelationOperations {
   <E extends Entity & HasIdentifier> List<E> listEntitiesByRelation(
       Type relType, NameIdentifier nameIdentifier, Entity.EntityType identType, boolean allFields)
       throws IOException;
+
+  /**
+   * Get a specific entity that is related to a given source entity.
+   *
+   * <p>For example, this can be used to get a specific policy that is directly associated with a
+   * metadata object.
+   *
+   * @param <E> The type of the entity to be returned.
+   * @param relType The type of relation.
+   * @param srcIdentifier The identifier of the source entity in the relation (e.g., a metadata
+   *     object).
+   * @param srcType The type of the source entity.
+   * @param destEntityIdent The identifier of the target entity to retrieve (e.g., a policy).
+   * @return The specific entity that is related to the source entity.
+   * @throws IOException If a storage-related error occurs.
+   * @throws NoSuchEntityException If the source entity or the target related entity does not exist,
+   *     or if the relation does not exist.
+   */
+  <E extends Entity & HasIdentifier> E getEntityByRelation(
+      Type relType,
+      NameIdentifier srcIdentifier,
+      Entity.EntityType srcType,
+      NameIdentifier destEntityIdent)
+      throws IOException, NoSuchEntityException;
 
   /**
    * insert a relation between two entities
@@ -89,4 +120,32 @@ public interface SupportsRelationOperations {
       Entity.EntityType dstType,
       boolean override)
       throws IOException;
+
+  /**
+   * Updates the relations for a given entity by adding a set of new relations and removing another
+   * set of relations.
+   *
+   * @param <E> The type of the entity returned in the list, which represents the final state of
+   *     related entities.
+   * @param relType The type of relation to update.
+   * @param srcEntityIdent The identifier of the source entity whose relations are being updated.
+   * @param srcEntityType The type of the source entity, which is the entity whose relations are
+   *     being updated.
+   * @param destEntitiesToAdd An array of identifiers for entities to be associated with.
+   * @param destEntitiesToRemove An array of identifiers for entities to be disassociated from.
+   * @return A list of entities that are related to the given entity after the update.
+   * @throws IOException If a storage-related error occurs.
+   * @throws NoSuchEntityException If any of the specified entities does not exist.
+   * @throws EntityAlreadyExistsException If a relation to be added already exists.
+   */
+  default <E extends Entity & HasIdentifier> List<E> updateEntityRelations(
+      Type relType,
+      NameIdentifier srcEntityIdent,
+      Entity.EntityType srcEntityType,
+      NameIdentifier[] destEntitiesToAdd,
+      NameIdentifier[] destEntitiesToRemove)
+      throws IOException, NoSuchEntityException, EntityAlreadyExistsException {
+    throw new UnsupportedOperationException(
+        "updateEntityRelations is not supported by this implementation");
+  }
 }

@@ -19,7 +19,18 @@
 
 'use client'
 
-import { Box, Grid, Typography, Table, TableHead, TableBody, TableRow, TableCell, TableContainer } from '@mui/material'
+import {
+  Box,
+  Grid,
+  Typography,
+  Table,
+  TableHead,
+  TableBody,
+  TableRow,
+  TableCell,
+  TableContainer,
+  Tooltip
+} from '@mui/material'
 
 import EmptyText from '@/components/EmptyText'
 
@@ -96,12 +107,71 @@ const DetailsView = () => {
               </Typography>
               {renderFieldText({ value: activatedItem?.type })}
             </Grid>
-            <Grid item xs={12} sx={{ mb: [0, 5] }}>
-              <Typography variant='body2' sx={{ mb: 2 }}>
-                Storage location
-              </Typography>
-              {renderFieldText({ value: activatedItem?.storageLocation })}
-            </Grid>
+            {activatedItem?.storageLocation && (
+              <Grid item xs={12} sx={{ mb: [0, 5] }}>
+                <Typography variant='body2' sx={{ mb: 2 }}>
+                  Storage location
+                </Typography>
+                {renderFieldText({ value: activatedItem?.storageLocation })}
+              </Grid>
+            )}
+            {activatedItem?.storageLocations && (
+              <Grid item xs={12} sx={{ mb: [0, 5] }}>
+                <Typography variant='body2' sx={{ mb: 2 }}>
+                  Storage Location(s)
+                </Typography>
+
+                <TableContainer>
+                  <Table>
+                    <TableHead
+                      sx={{
+                        backgroundColor: theme => theme.palette.action.hover
+                      }}
+                    >
+                      <TableRow>
+                        <TableCell sx={{ py: 2 }}>Name</TableCell>
+                        <TableCell sx={{ py: 2 }}>Location</TableCell>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody data-refer='details-props-table'>
+                      {Object.keys(activatedItem?.storageLocations).map((name, index) => {
+                        return (
+                          <TableRow key={index} data-refer={`details-props-index-${index}`}>
+                            <TableCell
+                              className={'twc-py-[0.7rem] twc-truncate twc-max-w-[134px]'}
+                              data-refer={`storageLocations-name-${name}`}
+                            >
+                              <Tooltip
+                                title={<span data-refer={`tip-storageLocations-name-${name}`}>{name}</span>}
+                                placement='bottom'
+                              >
+                                {name}
+                              </Tooltip>
+                            </TableCell>
+                            <TableCell
+                              className={'twc-py-[0.7rem] twc-truncate twc-max-w-[134px]'}
+                              data-refer={`storageLocations-location-${activatedItem?.storageLocations[name]}`}
+                              data-prev-refer={`storageLocations-name-${name}`}
+                            >
+                              <Tooltip
+                                title={
+                                  <span data-prev-refer={`storageLocations-name-${name}`}>
+                                    {activatedItem?.storageLocations[name]}
+                                  </span>
+                                }
+                                placement='bottom'
+                              >
+                                {activatedItem?.storageLocations[name]}
+                              </Tooltip>
+                            </TableCell>
+                          </TableRow>
+                        )
+                      })}
+                    </TableBody>
+                  </Table>
+                </TableContainer>
+              </Grid>
+            )}
           </>
         ) : null}
 

@@ -177,7 +177,7 @@ class ListPartitionImpl(ListPartition):
         return hash(
             (
                 self._name,
-                tuple(tuple(l) for l in self._lists),
+                tuple(tuple(sublist) for sublist in self._lists),
                 frozenset(self._properties.items()),
             )
         )

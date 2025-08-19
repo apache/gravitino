@@ -29,8 +29,11 @@ public final class ConfigConstants {
   /** HTTPS Server port, reused by Gravitino server and Iceberg REST server */
   public static final String WEBSERVER_HTTPS_PORT = "httpsPort";
 
-  /** The value of messages used to indicate that the configuration is not set. */
+  /** The value of messages used to indicate that the configuration is set to an empty value. */
   public static final String NOT_BLANK_ERROR_MSG = "The value can't be blank";
+
+  /** The value of messages used to indicate that the configuration is not set. */
+  public static final String NOT_NULL_ERROR_MSG = "The value can't be null";
 
   /** The value of messages used to indicate that the configuration should be a positive number. */
   public static final String POSITIVE_NUMBER_ERROR_MSG = "The value must be a positive number";
@@ -74,6 +77,9 @@ public final class ConfigConstants {
   /** The version number for the 0.9.0 release. */
   public static final String VERSION_0_9_0 = "0.9.0";
 
+  /** The version number for the 1.0.0 release. */
+  public static final String VERSION_1_0_0 = "1.0.0";
+
   /** The current version of backend storage initialization script. */
-  public static final String CURRENT_SCRIPT_VERSION = VERSION_0_9_0;
+  public static final String CURRENT_SCRIPT_VERSION = VERSION_1_0_0;
 }

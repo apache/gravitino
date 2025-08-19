@@ -44,10 +44,18 @@ public class DefaultCatalogConnectorFactory implements CatalogConnectorFactory {
   private static final String POSTGRESQL_CONNECTOR_PROVIDER_NAME = "jdbc-postgresql";
   private static final String TRINO_CLUSTER_CONNECTOR_PROVIDER_NAME = "trino-cluster";
 
+  /** Map of catalog provider names to their corresponding connector context builders */
   protected final HashMap<String, CatalogConnectorContext.Builder> catalogBuilders =
       new HashMap<>();
+
+  /** The region code indicates the location of this Trino instance */
   protected final String region;
 
+  /**
+   * Constructs a new DefaultCatalogConnectorFactory.
+   *
+   * @param config the Gravitino configuration
+   */
   public DefaultCatalogConnectorFactory(GravitinoConfig config) {
     this.region = config.getRegion();
 

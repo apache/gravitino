@@ -38,7 +38,7 @@ import org.apache.gravitino.rel.expressions.transforms.Transforms;
 
 /** This class is used to convert expression of bucket, sort_by, partition object to string */
 public class ExpressionUtil {
-  private static final String IDENTIFIER = "[a-zA-Z_][a-zA-Z0-9_]*";
+  private static final String IDENTIFIER = "[a-zA-Z_]\\w*";
   private static final String FUNCTION_ARG_INT = "(\\d+)";
   private static final String FUNCTION_ARG_IDENTIFIER = "(" + IDENTIFIER + ")";
   private static final Pattern YEAR_FUNCTION_PATTERN =
@@ -77,6 +77,12 @@ public class ExpressionUtil {
           "(" + IDENTIFIER + ")\\s+" + SORT_DIRECTION + "\\s+" + NULL_ORDERING,
           Pattern.CASE_INSENSITIVE);
 
+  /**
+   * Converts an array of transforms to a list of partition fields.
+   *
+   * @param transforms the array of transforms
+   * @return the list of partition fields
+   */
   public static List<String> expressionToPartitionFiled(Transform[] transforms) {
     try {
       List<String> partitionFields = new ArrayList<>();
@@ -92,6 +98,12 @@ public class ExpressionUtil {
     }
   }
 
+  /**
+   * Converts a list of partition fields to an array of transforms.
+   *
+   * @param partitions the list of partition fields
+   * @return the array of transforms
+   */
   public static Transform[] partitionFiledToExpression(List<String> partitions) {
     try {
       List<Transform> partitionTransforms = new ArrayList<>();
@@ -105,6 +117,12 @@ public class ExpressionUtil {
     }
   }
 
+  /**
+   * Converts an array of sort orders to a list of sort order fields.
+   *
+   * @param orders the array of sort orders
+   * @return the list of sort order fields
+   */
   public static List<String> expressionToSortOrderFiled(SortOrder[] orders) {
     try {
       List<String> orderFields = new ArrayList<>();
@@ -120,6 +138,12 @@ public class ExpressionUtil {
     }
   }
 
+  /**
+   * Converts a list of sort order fields to an array of sort orders.
+   *
+   * @param orderFields the list of sort order fields
+   * @return the array of sort orders
+   */
   public static SortOrder[] sortOrderFiledToExpression(List<String> orderFields) {
     try {
       List<SortOrder> sortOrders = new ArrayList<>();
@@ -273,7 +297,7 @@ public class ExpressionUtil {
                 (m) -> {
                   NamedReference.FieldReference sortField = NamedReference.field(m.group(1));
                   SortDirection sortDirection =
-                      m.group(1).toUpperCase().equals(SORT_DIRECTION_ASC)
+                      m.group(1).equalsIgnoreCase(SORT_DIRECTION_ASC)
                           ? SortDirection.ASCENDING
                           : SortDirection.DESCENDING;
                   NullOrdering nullOrdering =
@@ -288,11 +312,11 @@ public class ExpressionUtil {
                 (m) -> {
                   NamedReference.FieldReference sortField = NamedReference.field(m.group(1));
                   SortDirection sortDirection =
-                      m.group(2).toUpperCase().equals(SORT_DIRECTION_ASC)
+                      m.group(2).equalsIgnoreCase(SORT_DIRECTION_ASC)
                           ? SortDirection.ASCENDING
                           : SortDirection.DESCENDING;
                   NullOrdering nullOrdering =
-                      m.group(3).toUpperCase().equals(NULL_ORDERING_FIRST)
+                      m.group(3).equalsIgnoreCase(NULL_ORDERING_FIRST)
                           ? NullOrdering.NULLS_FIRST
                           : NullOrdering.NULLS_LAST;
                   sortOrders.add(SortOrders.of(sortField, sortDirection, nullOrdering));

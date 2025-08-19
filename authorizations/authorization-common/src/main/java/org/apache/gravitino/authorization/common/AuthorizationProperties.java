@@ -24,7 +24,7 @@ import java.util.stream.Collectors;
 public abstract class AuthorizationProperties {
   protected Map<String, String> properties;
 
-  public AuthorizationProperties(Map<String, String> properties) {
+  protected AuthorizationProperties(Map<String, String> properties) {
     this.properties =
         properties.entrySet().stream()
             .filter(entry -> entry.getKey().startsWith(getPropertiesPrefix()))

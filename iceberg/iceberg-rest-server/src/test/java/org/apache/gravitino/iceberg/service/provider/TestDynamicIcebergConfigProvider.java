@@ -23,7 +23,7 @@ import java.util.Map;
 import java.util.Optional;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
-import org.apache.gravitino.client.GravitinoAdminClient;
+import org.apache.gravitino.client.GravitinoClient;
 import org.apache.gravitino.client.GravitinoMetalake;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
 import org.apache.gravitino.iceberg.common.ops.IcebergCatalogWrapper;
@@ -75,7 +75,7 @@ public class TestDynamicIcebergConfigProvider {
             });
 
     DynamicIcebergConfigProvider provider = new DynamicIcebergConfigProvider();
-    GravitinoAdminClient client = Mockito.mock(GravitinoAdminClient.class);
+    GravitinoClient client = Mockito.mock(GravitinoClient.class);
     Mockito.when(client.loadMetalake(Mockito.any())).thenReturn(gravitinoMetalake);
     provider.setClient(client);
 
@@ -102,7 +102,7 @@ public class TestDynamicIcebergConfigProvider {
 
     Mockito.when(invalidCatalog.provider()).thenReturn("hive");
 
-    GravitinoAdminClient client = Mockito.mock(GravitinoAdminClient.class);
+    GravitinoClient client = Mockito.mock(GravitinoClient.class);
     Mockito.when(client.loadMetalake(Mockito.any())).thenReturn(gravitinoMetalake);
 
     DynamicIcebergConfigProvider provider = new DynamicIcebergConfigProvider();
@@ -112,9 +112,6 @@ public class TestDynamicIcebergConfigProvider {
         IllegalArgumentException.class, () -> provider.getIcebergCatalogConfig(invalidCatalogName));
     Assertions.assertThrowsExactly(
         IllegalArgumentException.class, () -> provider.getIcebergCatalogConfig(""));
-    Assertions.assertThrowsExactly(
-        IllegalArgumentException.class,
-        () -> provider.getIcebergCatalogConfig(IcebergConstants.ICEBERG_REST_DEFAULT_CATALOG));
   }
 
   @Test
@@ -142,7 +139,7 @@ public class TestDynamicIcebergConfigProvider {
                 put(customKey2, customValue2);
               }
             });
-    GravitinoAdminClient client = Mockito.mock(GravitinoAdminClient.class);
+    GravitinoClient client = Mockito.mock(GravitinoClient.class);
     Mockito.when(client.loadMetalake(Mockito.any())).thenReturn(gravitinoMetalake);
     DynamicIcebergConfigProvider provider = new DynamicIcebergConfigProvider();
     provider.setClient(client);

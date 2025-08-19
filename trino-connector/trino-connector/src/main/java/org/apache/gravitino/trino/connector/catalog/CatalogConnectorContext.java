@@ -47,6 +47,14 @@ public class CatalogConnectorContext {
 
   private final CatalogConnectorAdapter adapter;
 
+  /**
+   * Constructs a new CatalogConnectorContext.
+   *
+   * @param catalog the Gravitino catalog
+   * @param metalake the Gravitino metalake
+   * @param internalConnector the internal connector
+   * @param adapter the catalog connector adapter
+   */
   public CatalogConnectorContext(
       GravitinoCatalog catalog,
       GravitinoMetalake metalake,
@@ -60,71 +68,148 @@ public class CatalogConnectorContext {
     this.connector = new GravitinoConnector(catalog.geNameIdentifier(), this);
   }
 
+  /**
+   * Returns the Gravitino metalake associated with this context.
+   *
+   * @return the Gravitino metalake
+   */
   public GravitinoMetalake getMetalake() {
     return metalake;
   }
 
+  /**
+   * Returns the Gravitino catalog associated with this context.
+   *
+   * @return the Gravitino catalog
+   */
   public GravitinoCatalog getCatalog() {
     return catalog;
   }
 
+  /**
+   * Returns the Gravitino connector associated with this context.
+   *
+   * @return the Gravitino connector
+   */
   public GravitinoConnector getConnector() {
     return connector;
   }
 
+  /**
+   * Returns the internal connector associated with this context.
+   *
+   * @return the internal connector
+   */
   public Connector getInternalConnector() {
     return internalConnector;
   }
 
+  /**
+   * Returns the table properties associated with this context.
+   *
+   * @return the table properties
+   */
   public List<PropertyMetadata<?>> getTableProperties() {
     return adapter.getTableProperties();
   }
 
+  /**
+   * Returns the schema properties associated with this context.
+   *
+   * @return the schema properties
+   */
   public List<PropertyMetadata<?>> getSchemaProperties() {
     return adapter.getSchemaProperties();
   }
 
+  /**
+   * Returns the column properties associated with this context.
+   *
+   * @return the column properties
+   */
   public List<PropertyMetadata<?>> getColumnProperties() {
     return adapter.getColumnProperties();
   }
 
+  /** Closes the internal connector associated with this context. */
   public void close() {
     this.internalConnector.shutdown();
   }
 
+  /**
+   * Returns the metadata adapter associated with this context.
+   *
+   * @return the metadata adapter
+   */
   public CatalogConnectorMetadataAdapter getMetadataAdapter() {
     return adapter.getMetadataAdapter();
   }
 
+  /** Builder class for creating CatalogConnectorContext instances. */
   public static class Builder {
     private final CatalogConnectorAdapter connectorAdapter;
     private GravitinoCatalog catalog;
     private GravitinoMetalake metalake;
     private ConnectorContext context;
 
+    /**
+     * Constructs a new Builder with the specified connector adapter.
+     *
+     * @param connectorAdapter the connector adapter to use
+     */
     public Builder(CatalogConnectorAdapter connectorAdapter) {
       this.connectorAdapter = connectorAdapter;
     }
 
+    /**
+     * Constructs a new Builder with the specified connector adapter and catalog.
+     *
+     * @param connectorAdapter the connector adapter to use
+     * @param catalog the catalog to use
+     */
     private Builder(CatalogConnectorAdapter connectorAdapter, GravitinoCatalog catalog) {
       this.connectorAdapter = connectorAdapter;
       this.catalog = catalog;
     }
 
+    /**
+     * Clones the builder with a new catalog.
+     *
+     * @param catalog the new catalog to use
+     * @return a new builder with the specified catalog
+     */
     public Builder clone(GravitinoCatalog catalog) {
       return new Builder(connectorAdapter, catalog);
     }
 
+    /**
+     * Sets the metalake to use for the connector.
+     *
+     * @param metalake the metalake to use
+     * @return the builder
+     */
     public Builder withMetalake(GravitinoMetalake metalake) {
       this.metalake = metalake;
       return this;
     }
 
+    /**
+     * Sets the context to use for the connector.
+     *
+     * @param context the context to use
+     * @return the builder
+     */
     public Builder withContext(ConnectorContext context) {
       this.context = context;
       return this;
     }
 
+    /**
+     * Builds a new CatalogConnectorContext instance.
+     *
+     * @return the new CatalogConnectorContext instance
+     * @throws Exception if the metalake, catalog, or context is not set
+     */
     public CatalogConnectorContext build() throws Exception {
       Preconditions.checkArgument(metalake != null, "metalake is not null");
       Preconditions.checkArgument(catalog != null, "catalog is not null");

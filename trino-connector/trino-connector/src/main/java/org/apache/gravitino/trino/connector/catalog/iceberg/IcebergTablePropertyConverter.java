@@ -27,6 +27,10 @@ import com.google.common.collect.ImmutableMap;
 import org.apache.commons.collections4.bidimap.TreeBidiMap;
 import org.apache.gravitino.catalog.property.PropertyConverter;
 
+/**
+ * Property converter for Iceberg table properties. Handles the conversion of property keys between
+ * Trino and Gravitino formats for Iceberg tables.
+ */
 public class IcebergTablePropertyConverter extends PropertyConverter {
 
   // TODO (yuqi) add more properties
@@ -42,5 +46,10 @@ public class IcebergTablePropertyConverter extends PropertyConverter {
     // Note: As the properties for Iceberg table loaded from Gravitino are always empty currently,
     // no matter what the mapping is, the properties will be empty.
     return TRINO_KEY_TO_GRAVITINO_KEY;
+  }
+
+  public static String convertTableFormatToTrino(String format) {
+    format = format.replace("iceberg/", "");
+    return format.toUpperCase();
   }
 }

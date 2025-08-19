@@ -27,6 +27,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableMap;
 import io.trino.plugin.memory.MemoryConnector;
 import io.trino.spi.connector.ColumnHandle;
 import io.trino.spi.connector.ConnectorMetadata;
@@ -81,7 +82,7 @@ public class GravitinoMockServer implements AutoCloseable {
 
   public GravitinoMockServer() {
     createMetalake(testMetalake);
-    createCatalog(testMetalake, testCatalog);
+    createCatalog(testMetalake, testCatalog, ImmutableMap.of());
   }
 
   public void setCatalogConnectorManager(CatalogConnectorManager catalogConnectorManager) {
@@ -157,8 +158,9 @@ public class GravitinoMockServer implements AutoCloseable {
               @Override
               public Catalog answer(InvocationOnMock invocation) throws Throwable {
                 String catalogName = invocation.getArgument(0);
+                Map<String, String> properties = invocation.getArgument(4);
 
-                Catalog catalog = createCatalog(metalakeName, catalogName);
+                Catalog catalog = createCatalog(metalakeName, catalogName, properties);
 
                 return catalog;
               }
@@ -214,12 +216,14 @@ public class GravitinoMockServer implements AutoCloseable {
     return metaLake;
   }
 
-  private Catalog createCatalog(String metalakeName, String catalogName) {
+  private Catalog createCatalog(
+      String metalakeName, String catalogName, Map<String, String> properties) {
     Catalog catalog = mock(Catalog.class);
     when(catalog.name()).thenReturn(catalogName);
     when(catalog.provider()).thenReturn(testCatalogProvider);
     when(catalog.type()).thenReturn(Catalog.Type.RELATIONAL);
-    when(catalog.properties()).thenReturn(Map.of("max_ttl", "10"));
+    when(catalog.properties())
+        .thenReturn(properties.isEmpty() ? Map.of("max_ttl", "10") : properties);
 
     Audit mockAudit = mock(Audit.class);
     when(mockAudit.creator()).thenReturn("gravitino");
@@ -349,6 +353,7 @@ public class GravitinoMockServer implements AutoCloseable {
             any(Column[].class),
             anyString(),
             anyMap(),
+            any(),
             any(),
             any(),
             any()))

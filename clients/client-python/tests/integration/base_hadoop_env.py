@@ -30,7 +30,6 @@ PYTHON_BUILD_PATH = os.environ.get("PYTHON_BUILD_PATH")
 
 
 class BaseHadoopEnvironment:
-
     @classmethod
     def init_hadoop_env(cls):
         cls._unzip_hadoop_pack()

@@ -284,9 +284,6 @@ public class MysqlTableOperations extends JdbcTableOperations {
             "Unsupported table change type: " + change.getClass().getName());
       }
     }
-    if (!setProperties.isEmpty()) {
-      alterSql.add(generateTableProperties(setProperties));
-    }
 
     // Last modified comment
     if (null != updateComment) {
@@ -311,7 +308,7 @@ public class MysqlTableOperations extends JdbcTableOperations {
     }
     // Return the generated SQL statement
     String result = "ALTER TABLE `" + tableName + "`\n" + String.join(",\n", alterSql) + ";";
-    LOG.info("Generated alter table:{} sql: {}", databaseName + "." + tableName, result);
+    LOG.info("Generated alter table:{}.{} sql: {}", databaseName, tableName, result);
     return result;
   }
 
@@ -655,7 +652,7 @@ public class MysqlTableOperations extends JdbcTableOperations {
         Arrays.stream(columns).collect(Collectors.toMap(JdbcColumn::name, c -> c));
     for (Index index : indexes) {
       if (index.type() == Index.IndexType.UNIQUE_KEY) {
-        // the column in the unique index must be not null
+        // the auto increment column in the unique index must be not null
         for (String[] colNames : index.fieldNames()) {
           JdbcColumn column = columnMap.get(colNames[0]);
           Preconditions.checkArgument(
@@ -664,12 +661,66 @@ public class MysqlTableOperations extends JdbcTableOperations {
               colNames[0],
               index.name());
           Preconditions.checkArgument(
-              !column.nullable(),
-              "Column %s in the unique index %s must be a not null column",
+              !(column.autoIncrement() && column.nullable()),
+              "Auto increment column %s in the unique index %s must be a not null column",
               colNames[0],
               index.name());
         }
       }
+
+      if (index.type() == Index.IndexType.PRIMARY_KEY) {
+        // the column in the primary key must be not null
+        for (String[] colNames : index.fieldNames()) {
+          JdbcColumn column = columnMap.get(colNames[0]);
+          Preconditions.checkArgument(
+              column != null,
+              "Column %s in the primary key does not exist in the table",
+              colNames[0]);
+          Preconditions.checkArgument(
+              !column.nullable(),
+              "Column %s in the primary key must be a not null column",
+              colNames[0]);
+        }
+      }
     }
+  }
+
+  @Override
+  public Integer calculateDatetimePrecision(String typeName, int columnSize, int scale) {
+    String upperTypeName = typeName.toUpperCase();
+
+    // Check driver version compatibility first
+    boolean isDatetimeType =
+        "TIME".equals(upperTypeName)
+            || "TIMESTAMP".equals(upperTypeName)
+            || "DATETIME".equals(upperTypeName);
+
+    if (isDatetimeType) {
+      String driverVersion = getMySQLDriverVersion();
+      if (driverVersion != null && !isMySQLDriverVersionSupported(driverVersion)) {
+        LOG.warn(
+            "MySQL driver version {} is below 8.0.16, columnSize may not be accurate for precision calculation. "
+                + "Returning null for {} type precision. Driver version: {}",
+            driverVersion,
+            upperTypeName,
+            driverVersion);
+        return null;
+      }
+    }
+
+    switch (upperTypeName) {
+      case "TIME":
+        // TIME format: 'HH:MM:SS' (8 chars) + decimal point + precision
+        return columnSize >= TIME_FORMAT_WITH_DOT.length()
+            ? columnSize - TIME_FORMAT_WITH_DOT.length()
+            : 0;
+      case "TIMESTAMP":
+      case "DATETIME":
+        // TIMESTAMP/DATETIME format: 'YYYY-MM-DD HH:MM:SS' (19 chars) + decimal point + precision
+        return columnSize >= DATETIME_FORMAT_WITH_DOT.length()
+            ? columnSize - DATETIME_FORMAT_WITH_DOT.length()
+            : 0;
+    }
+    return null;
   }
 }

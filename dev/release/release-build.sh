@@ -37,8 +37,8 @@ Top level targets are
 All other inputs are environment variables
 
 GIT_REF - Release tag or commit to build from
-GRAVITINO_PACKAGE_VERSION - Release identifier in top level package directory (e.g. 0.9.1-rc1)
-GRAVITINO_VERSION - (optional) Version of Gravitino being built (e.g. 0.9.1)
+GRAVITINO_PACKAGE_VERSION - Release identifier in top level package directory (e.g. 0.10.0-rc1)
+GRAVITINO_VERSION - (optional) Version of Gravitino being built (e.g. 0.10.0)
 
 ASF_USERNAME - Username of ASF committer account
 ASF_PASSWORD - Password of ASF committer account
@@ -177,6 +177,10 @@ fi
 if [[ "$PYGRAVITINO_VERSION" == *"dev"* ]]; then
   RC_PYGRAVITINO_VERSION="${PYGRAVITINO_VERSION}"
 else
+  if [ -z "$RC_COUNT" ]; then
+    echo "ERROR: RC_COUNT must be set to run this script"
+    exit_with_usage
+  fi
   RC_PYGRAVITINO_VERSION="${PYGRAVITINO_VERSION}rc${RC_COUNT}"
 fi
 

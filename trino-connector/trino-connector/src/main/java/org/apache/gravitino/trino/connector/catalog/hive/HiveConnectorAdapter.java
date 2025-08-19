@@ -26,6 +26,7 @@ import java.util.Map;
 import org.apache.gravitino.catalog.property.PropertyConverter;
 import org.apache.gravitino.trino.connector.catalog.CatalogConnectorAdapter;
 import org.apache.gravitino.trino.connector.catalog.CatalogConnectorMetadataAdapter;
+import org.apache.gravitino.trino.connector.catalog.CatalogPropertyConverter;
 import org.apache.gravitino.trino.connector.catalog.HasPropertyMeta;
 import org.apache.gravitino.trino.connector.metadata.GravitinoCatalog;
 
@@ -38,20 +39,23 @@ public class HiveConnectorAdapter implements CatalogConnectorAdapter {
   private final HasPropertyMeta propertyMetadata;
   private final PropertyConverter catalogConverter;
 
+  /** Constructs a new HiveConnectorAdapter. */
   public HiveConnectorAdapter() {
     this.propertyMetadata = new HivePropertyMeta();
-    this.catalogConverter = new HiveCatalogPropertyConverter();
+    this.catalogConverter = new CatalogPropertyConverter();
   }
 
   @Override
   public Map<String, String> buildInternalConnectorConfig(GravitinoCatalog catalog)
       throws Exception {
     Map<String, String> config = new HashMap<>();
-    config.put("hive.metastore.uri", catalog.getRequiredProperty("metastore.uris"));
-    config.put("hive.security", "allow-all");
+    String metastoreUri = catalog.getRequiredProperty("metastore.uris");
     Map<String, String> trinoProperty =
         catalogConverter.gravitinoToEngineProperties(catalog.getProperties());
+    // The order of put operations determines the priority of parameters.
     config.putAll(trinoProperty);
+    config.put("hive.metastore.uri", metastoreUri);
+    config.put("hive.security", "allow-all");
     return config;
   }
 

@@ -30,6 +30,7 @@ public interface SQLExceptionConverter {
    * @param sqlException The sql exception to map
    * @param type The type of the entity
    * @param name The name of the entity
+   * @throws IOException if an I/O error occurs during exception conversion
    */
   void toGravitinoException(SQLException sqlException, Entity.EntityType type, String name)
       throws IOException;

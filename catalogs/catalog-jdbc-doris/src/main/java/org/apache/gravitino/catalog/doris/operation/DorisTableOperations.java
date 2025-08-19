@@ -134,7 +134,7 @@ public class DorisTableOperations extends JdbcTableOperations {
     }
 
     if (distribution.number() != 0) {
-      sqlBuilder.append(" BUCKETS ").append(distribution.number());
+      sqlBuilder.append(" BUCKETS ").append(DorisUtils.toBucketNumberString(distribution.number()));
     }
 
     properties = appendNecessaryProperties(properties);
@@ -577,7 +577,7 @@ public class DorisTableOperations extends JdbcTableOperations {
     }
     // Return the generated SQL statement
     String result = "ALTER TABLE `" + tableName + "`\n" + String.join(",\n", alterSql) + ";";
-    LOG.info("Generated alter table:{} sql: {}", databaseName + "." + tableName, result);
+    LOG.info("Generated alter table:{}.{} sql: {}", databaseName, tableName, result);
     return result;
   }
 
@@ -794,5 +794,34 @@ public class DorisTableOperations extends JdbcTableOperations {
       String createTableSyntax = result.getString("Create Table");
       return DorisUtils.extractDistributionInfoFromSql(createTableSyntax);
     }
+  }
+
+  @Override
+  public Integer calculateDatetimePrecision(String typeName, int columnSize, int scale) {
+    String upperTypeName = typeName.toUpperCase();
+
+    // Check driver version compatibility first
+    boolean isDatetimeType = "DATETIME".equals(upperTypeName);
+
+    if (isDatetimeType) {
+      String driverVersion = getMySQLDriverVersion();
+      if (driverVersion != null && !isMySQLDriverVersionSupported(driverVersion)) {
+        LOG.warn(
+            "MySQL driver version {} is below 8.0.16, columnSize may not be accurate for precision calculation. "
+                + "Returning null for {} type precision. Driver version: {}",
+            driverVersion,
+            upperTypeName,
+            driverVersion);
+        return null;
+      }
+    }
+
+    if (upperTypeName.equals("DATETIME")) {
+      // DATETIME format: 'YYYY-MM-DD HH:MM:SS' (19 chars) + decimal point + precision
+      return columnSize >= DATETIME_FORMAT_WITH_DOT.length()
+          ? columnSize - DATETIME_FORMAT_WITH_DOT.length()
+          : 0;
+    }
+    return null;
   }
 }

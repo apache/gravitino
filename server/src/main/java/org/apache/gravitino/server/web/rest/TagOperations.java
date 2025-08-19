@@ -248,6 +248,10 @@ public class TagOperations {
     }
   }
 
+  /**
+   * @deprecated This API has moved to {@code
+   *     /api/metalakes/{metalake}/objects/{type}/{fullName}/tags}.
+   */
   @Deprecated
   @GET
   @Path("{type}/{fullName}")
@@ -265,6 +269,10 @@ public class TagOperations {
     return metadataObjectTagOperations.listTagsForMetadataObject(metalake, type, fullName, verbose);
   }
 
+  /**
+   * @deprecated This API has moved to {@code
+   *     /api/metalakes/{metalake}/objects/{type}/{fullName}/tags/{tag}}.
+   */
   @Deprecated
   @GET
   @Path("{type}/{fullName}/{tag}")
@@ -282,6 +290,10 @@ public class TagOperations {
     return metadataObjectTagOperations.getTagForObject(metalake, type, fullName, tagName);
   }
 
+  /**
+   * @deprecated This API has moved to {@code
+   *     /api/metalakes/{metalake}/objects/{type}/{fullName}/tags}.
+   */
   @Deprecated
   @POST
   @Path("{type}/{fullName}")

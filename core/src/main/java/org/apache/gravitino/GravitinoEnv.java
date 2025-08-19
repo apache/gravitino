@@ -23,6 +23,7 @@ import org.apache.gravitino.audit.AuditLogManager;
 import org.apache.gravitino.authorization.AccessControlDispatcher;
 import org.apache.gravitino.authorization.AccessControlManager;
 import org.apache.gravitino.authorization.FutureGrantManager;
+import org.apache.gravitino.authorization.GravitinoAuthorizer;
 import org.apache.gravitino.authorization.OwnerDispatcher;
 import org.apache.gravitino.authorization.OwnerEventManager;
 import org.apache.gravitino.authorization.OwnerManager;
@@ -57,6 +58,8 @@ import org.apache.gravitino.hook.ModelHookDispatcher;
 import org.apache.gravitino.hook.SchemaHookDispatcher;
 import org.apache.gravitino.hook.TableHookDispatcher;
 import org.apache.gravitino.hook.TopicHookDispatcher;
+import org.apache.gravitino.job.JobManager;
+import org.apache.gravitino.job.JobOperationDispatcher;
 import org.apache.gravitino.listener.CatalogEventDispatcher;
 import org.apache.gravitino.listener.EventBus;
 import org.apache.gravitino.listener.EventListenerManager;
@@ -75,6 +78,8 @@ import org.apache.gravitino.metalake.MetalakeManager;
 import org.apache.gravitino.metalake.MetalakeNormalizeDispatcher;
 import org.apache.gravitino.metrics.MetricsSystem;
 import org.apache.gravitino.metrics.source.JVMMetricsSource;
+import org.apache.gravitino.policy.PolicyDispatcher;
+import org.apache.gravitino.policy.PolicyManager;
 import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.tag.TagDispatcher;
@@ -119,6 +124,8 @@ public class GravitinoEnv {
 
   private TagDispatcher tagDispatcher;
 
+  private PolicyDispatcher policyDispatcher;
+
   private AccessControlDispatcher accessControlDispatcher;
 
   private IdGenerator idGenerator;
@@ -133,9 +140,12 @@ public class GravitinoEnv {
 
   private AuditLogManager auditLogManager;
 
+  private JobOperationDispatcher jobOperationDispatcher;
+
   private EventBus eventBus;
   private OwnerDispatcher ownerDispatcher;
   private FutureGrantManager futureGrantManager;
+  private GravitinoAuthorizer gravitinoAuthorizer;
 
   protected GravitinoEnv() {}
 
@@ -340,6 +350,15 @@ public class GravitinoEnv {
   }
 
   /**
+   * Get the PolicyDispatcher associated with the Gravitino environment.
+   *
+   * @return The PolicyDispatcher instance.
+   */
+  public PolicyDispatcher policyDispatcher() {
+    return policyDispatcher;
+  }
+
+  /**
    * Get the Owner dispatcher associated with the Gravitino environment.
    *
    * @return The OwnerManager instance.
@@ -364,6 +383,34 @@ public class GravitinoEnv {
    */
   public EventListenerManager eventListenerManager() {
     return eventListenerManager;
+  }
+
+  /**
+   * Set GravitinoAuthorizer to GravitinoEnv
+   *
+   * @param gravitinoAuthorizer the GravitinoAuthorizer instance
+   */
+  public void setGravitinoAuthorizer(GravitinoAuthorizer gravitinoAuthorizer) {
+    this.gravitinoAuthorizer = gravitinoAuthorizer;
+  }
+
+  /**
+   * Get The GravitinoAuthorizer
+   *
+   * @return the GravitinoAuthorizer instance
+   */
+  public GravitinoAuthorizer gravitinoAuthorizer() {
+    return gravitinoAuthorizer;
+  }
+
+  /**
+   * Get the JobOperationDispatcher associated with the Gravitino environment.
+   *
+   * @return The JobOperationDispatcher instance.
+   */
+  public JobOperationDispatcher jobOperationDispatcher() {
+    Preconditions.checkArgument(jobOperationDispatcher != null, "GravitinoEnv is not initialized.");
+    return jobOperationDispatcher;
   }
 
   public void start() {
@@ -408,6 +455,15 @@ public class GravitinoEnv {
 
     if (metalakeManager != null) {
       metalakeManager.close();
+    }
+
+    if (jobOperationDispatcher != null) {
+      try {
+        jobOperationDispatcher.close();
+        jobOperationDispatcher = null;
+      } catch (Exception e) {
+        LOG.warn("Failed to close JobOperationDispatcher", e);
+      }
     }
 
     LOG.info("Gravitino Environment is shut down.");
@@ -525,5 +581,10 @@ public class GravitinoEnv {
 
     // Create and initialize Tag related modules
     this.tagDispatcher = new TagEventDispatcher(eventBus, new TagManager(idGenerator, entityStore));
+    // todo: support policy event dispatcher
+    this.policyDispatcher = new PolicyManager(idGenerator, entityStore);
+
+    // TODO: Support event for job operation dispatcher
+    this.jobOperationDispatcher = new JobManager(config, entityStore, idGenerator);
   }
 }

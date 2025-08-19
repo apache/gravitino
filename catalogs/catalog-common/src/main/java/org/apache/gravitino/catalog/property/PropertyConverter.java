@@ -27,9 +27,8 @@ import org.slf4j.LoggerFactory;
 /** Transforming between Apache Gravitino schema/table/column property and engine property. */
 public abstract class PropertyConverter {
 
-  protected static final String TRINO_PROPERTIES_PREFIX = "trino.bypass.";
-
   private static final Logger LOG = LoggerFactory.getLogger(PropertyConverter.class);
+
   /**
    * Mapping that maps engine properties to Gravitino properties. It will return a map that holds
    * the mapping between engine and Gravitino properties.
@@ -38,7 +37,7 @@ public abstract class PropertyConverter {
    */
   public abstract Map<String, String> engineToGravitinoMapping();
 
-  Map<String, String> reverseMap(Map<String, String> map) {
+  public Map<String, String> reverseMap(Map<String, String> map) {
     Map<String, String> res = new HashMap<>();
     for (Map.Entry<String, String> entry : map.entrySet()) {
       res.put(entry.getValue(), entry.getKey());
@@ -47,7 +46,12 @@ public abstract class PropertyConverter {
     return res;
   }
 
-  /** Convert Gravitino properties to engine properties. */
+  /**
+   * Convert Gravitino properties to engine properties.
+   *
+   * @param gravitinoProperties map of Gravitino properties
+   * @return map of engine properties
+   */
   public Map<String, String> gravitinoToEngineProperties(Map<String, String> gravitinoProperties) {
     Map<String, String> engineProperties = new HashMap<>();
     Map<String, String> gravitinoToEngineMapping = reverseMap(engineToGravitinoMapping());
@@ -67,6 +71,9 @@ public abstract class PropertyConverter {
    *
    * <p>If different engine has different behavior about error handling, you can override this
    * method.
+   *
+   * @param engineProperties map of engine properties
+   * @return map of Gravitino properties
    */
   public Map<String, Object> engineToGravitinoProperties(Map<String, Object> engineProperties) {
     Map<String, Object> gravitinoProperties = new HashMap<>();

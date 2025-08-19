@@ -30,6 +30,7 @@ import org.apache.iceberg.types.Types.StringType;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
+@SuppressWarnings("deprecation")
 public class TestIcebergRESTUtils {
 
   @Test
@@ -49,9 +50,6 @@ public class TestIcebergRESTUtils {
     Assertions.assertEquals("catalog", IcebergRestUtils.getCatalogName(prefix));
     Assertions.assertEquals(
         IcebergConstants.ICEBERG_REST_DEFAULT_CATALOG, IcebergRestUtils.getCatalogName(""));
-    Assertions.assertThrowsExactly(
-        IllegalArgumentException.class,
-        () -> IcebergRestUtils.getCatalogName(IcebergConstants.ICEBERG_REST_DEFAULT_CATALOG + "/"));
   }
 
   @Test

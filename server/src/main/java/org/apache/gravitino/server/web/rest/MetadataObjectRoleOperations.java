@@ -28,14 +28,17 @@ import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.Response;
+import org.apache.gravitino.Entity;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.authorization.AccessControlDispatcher;
 import org.apache.gravitino.dto.responses.NameListResponse;
 import org.apache.gravitino.metrics.MetricNames;
+import org.apache.gravitino.server.authorization.MetadataFilterHelper;
 import org.apache.gravitino.server.authorization.NameBindings;
 import org.apache.gravitino.server.web.Utils;
+import org.apache.gravitino.utils.NameIdentifierUtil;
 
 @NameBindings.AccessControlInterfaces
 @Path("/metalakes/{metalake}/objects/{type}/{fullName}/roles")
@@ -44,6 +47,8 @@ public class MetadataObjectRoleOperations {
   private final AccessControlDispatcher accessControlDispatcher;
 
   @Context private HttpServletRequest httpRequest;
+
+  private static final String LIST_ROLE_PRIVILEGE = "METALAKE::OWNER || ROLE::OWNER || ROLE::SELF";
 
   public MetadataObjectRoleOperations() {
     // Because accessControlManager may be null when Gravitino doesn't enable authorization,
@@ -70,6 +75,13 @@ public class MetadataObjectRoleOperations {
           httpRequest,
           () -> {
             String[] names = accessControlDispatcher.listRoleNamesByObject(metalake, object);
+            names =
+                MetadataFilterHelper.filterByExpression(
+                    metalake,
+                    LIST_ROLE_PRIVILEGE,
+                    Entity.EntityType.ROLE,
+                    names,
+                    (roleName) -> NameIdentifierUtil.ofRole(metalake, roleName));
             return Utils.ok(new NameListResponse(names));
           });
     } catch (Exception e) {

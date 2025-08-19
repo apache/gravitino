@@ -20,6 +20,7 @@
 package org.apache.gravitino.cli.commands;
 
 import java.util.List;
+import org.apache.gravitino.authorization.User;
 import org.apache.gravitino.cli.CommandContext;
 import org.apache.gravitino.cli.ErrorMessages;
 import org.apache.gravitino.client.GravitinoClient;
@@ -48,10 +49,12 @@ public class UserDetails extends Command {
   @Override
   public void handle() {
     List<String> roles = null;
+    User userObject = null;
 
     try {
       GravitinoClient client = buildClient(metalake);
-      roles = client.getUser(user).roles();
+      userObject = client.getUser(user);
+      roles = userObject.roles();
     } catch (NoSuchMetalakeException err) {
       exitWithError(ErrorMessages.UNKNOWN_METALAKE);
     } catch (NoSuchUserException err) {
@@ -60,10 +63,10 @@ public class UserDetails extends Command {
       exitWithError(exp.getMessage());
     }
 
-    if (roles.isEmpty()) {
+    if (roles == null || roles.isEmpty()) {
       printInformation("The user has no roles.");
     } else {
-      printResults(String.join(",", roles));
+      printResults(userObject);
     }
   }
 }

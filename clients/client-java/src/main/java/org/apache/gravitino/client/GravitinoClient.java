@@ -78,6 +78,7 @@ public class GravitinoClient extends GravitinoClientBase
    * @param checkVersion Whether to check the version of the Gravitino server. Gravitino does not
    *     support the case that the client-side version is higher than the server-side version.
    * @param headers The base header for Gravitino API.
+   * @param properties A map of properties (key-value pairs) used to configure the Gravitino client.
    * @throws NoSuchMetalakeException if the metalake with specified name does not exist.
    */
   private GravitinoClient(
@@ -85,8 +86,9 @@ public class GravitinoClient extends GravitinoClientBase
       String metalakeName,
       AuthDataProvider authDataProvider,
       boolean checkVersion,
-      Map<String, String> headers) {
-    super(uri, authDataProvider, checkVersion, headers);
+      Map<String, String> headers,
+      Map<String, String> properties) {
+    super(uri, authDataProvider, checkVersion, headers, properties);
     this.metalake = loadMetalake(metalakeName);
   }
 
@@ -421,6 +423,7 @@ public class GravitinoClient extends GravitinoClientBase
    * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
    * @throws IllegalPrivilegeException If any privilege can't be bind to the metadata object.
    * @throws RuntimeException If granting roles to a role encounters storage issues.
+   * @deprecated use {@link #grantPrivilegesToRole(String, MetadataObject, Set)} instead.
    */
   @Deprecated
   public Role grantPrivilegesToRole(String role, MetadataObject object, List<Privilege> privileges)
@@ -462,6 +465,7 @@ public class GravitinoClient extends GravitinoClientBase
    * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
    * @throws IllegalPrivilegeException If any privilege can't be bind to the metadata object.
    * @throws RuntimeException If revoking privileges from a role encounters storage issues.
+   * @deprecated use {@link #revokePrivilegesFromRole(String, MetadataObject, Set)} instead.
    */
   @Deprecated
   public Role revokePrivilegesFromRole(
@@ -597,7 +601,8 @@ public class GravitinoClient extends GravitinoClientBase
           metalakeName != null && !metalakeName.isEmpty(),
           "The argument 'metalakeName' must be a valid name");
 
-      return new GravitinoClient(uri, metalakeName, authDataProvider, checkVersion, headers);
+      return new GravitinoClient(
+          uri, metalakeName, authDataProvider, checkVersion, headers, properties);
     }
   }
 }

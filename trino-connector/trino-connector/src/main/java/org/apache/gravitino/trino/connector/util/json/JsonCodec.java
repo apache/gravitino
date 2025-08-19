@@ -39,6 +39,7 @@ import io.trino.spi.connector.ConnectorInsertTableHandle;
 import io.trino.spi.connector.ConnectorSplit;
 import io.trino.spi.connector.ConnectorTableHandle;
 import io.trino.spi.connector.ConnectorTransactionHandle;
+import io.trino.spi.type.StandardTypes;
 import io.trino.spi.type.Type;
 import io.trino.spi.type.TypeManager;
 import io.trino.spi.type.TypeSignature;
@@ -46,8 +47,13 @@ import java.lang.reflect.Field;
 import java.util.function.Function;
 import org.apache.gravitino.trino.connector.GravitinoConnectorPluginManager;
 
+/**
+ * Utility class for JSON serialization and deserialization in the Gravitino Trino connector.
+ * Provides functionality for handling various Trino-specific types and plugin classes.
+ */
 public class JsonCodec {
   private static ObjectMapper mapper;
+  private static Type jsonType;
 
   private static ObjectMapper buildMapper(ClassLoader classLoader) {
     try {
@@ -57,6 +63,17 @@ public class JsonCodec {
       return createMapper(typeManager);
     } catch (Exception e) {
       throw new TrinoException(GRAVITINO_RUNTIME_ERROR, "Failed to build ObjectMapper", e);
+    }
+  }
+
+  private static Type buildJsonType(ClassLoader classLoader) {
+    try {
+      ClassLoader appClassLoader =
+          GravitinoConnectorPluginManager.instance(classLoader).getAppClassloader();
+      TypeManager typeManager = createTypeManager(appClassLoader);
+      return typeManager.getType(new TypeSignature(StandardTypes.JSON));
+    } catch (Exception e) {
+      throw new TrinoException(GRAVITINO_RUNTIME_ERROR, "Failed to build JsonType", e);
     }
   }
 
@@ -195,6 +212,14 @@ public class JsonCodec {
     }
   }
 
+  /**
+   * Gets the singleton ObjectMapper instance for JSON processing. Creates a new mapper if one
+   * doesn't exist, configured with all necessary modules and settings for handling Trino-specific
+   * types and plugin classes.
+   *
+   * @param appClassLoader the class loader to use for loading application classes
+   * @return the configured ObjectMapper instance
+   */
   public static ObjectMapper getMapper(ClassLoader appClassLoader) {
     if (mapper != null) {
       return mapper;
@@ -206,6 +231,20 @@ public class JsonCodec {
       }
       mapper = buildMapper(appClassLoader);
       return mapper;
+    }
+  }
+
+  public static Type getJsonType(ClassLoader classLoader) {
+    if (jsonType != null) {
+      return jsonType;
+    }
+
+    synchronized (JsonCodec.class) {
+      if (jsonType != null) {
+        return jsonType;
+      }
+      jsonType = buildJsonType(classLoader);
+      return jsonType;
     }
   }
 }

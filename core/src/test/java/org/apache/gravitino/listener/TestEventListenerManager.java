@@ -23,6 +23,7 @@ import com.google.common.collect.ImmutableSet;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 import org.apache.gravitino.NameIdentifier;
@@ -30,6 +31,7 @@ import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.listener.DummyEventListener.DummyAsyncEventListener;
 import org.apache.gravitino.listener.DummyEventListener.DummyAsyncIsolatedEventListener;
 import org.apache.gravitino.listener.api.EventListenerPlugin;
+import org.apache.gravitino.listener.api.event.BaseEvent;
 import org.apache.gravitino.listener.api.event.Event;
 import org.apache.gravitino.listener.api.event.OperationStatus;
 import org.apache.gravitino.listener.api.event.PreEvent;
@@ -248,6 +250,24 @@ public class TestEventListenerManager {
 
     Assertions.assertDoesNotThrow(() -> eventBus.dispatchEvent(DUMMY_EXCEPTION_PRE_EVENT_INSTANCE));
     eventListenerManager.stop();
+  }
+
+  @Test
+  void testTransformPreEvent() {
+    String sync1 = "sync1";
+    String sync2 = "sync2";
+    Map<String, String> properties = createSyncEventListenerConfig(sync1, sync2);
+
+    EventListenerManager eventListenerManager = new EventListenerManager();
+    eventListenerManager.init(properties);
+    eventListenerManager.start();
+
+    EventBus eventBus = eventListenerManager.createEventBus();
+    Optional<BaseEvent> transformedEvent =
+        eventBus.dispatchEvent(new CountingPreEvent("user1", NameIdentifier.of("ns", "name"), 0));
+    Assertions.assertTrue(transformedEvent.isPresent());
+    Assertions.assertTrue(transformedEvent.get() instanceof CountingPreEvent);
+    Assertions.assertEquals(2, ((CountingPreEvent) transformedEvent.get()).count());
   }
 
   private Map<String, String> createIsolatedAsyncEventListenerConfig(String async1, String async2) {

@@ -71,7 +71,7 @@ public abstract class Config {
   }
 
   /** Constructs a Config instance and loads default configurations. */
-  public Config() {
+  protected Config() {
     this(true);
   }
 
@@ -198,7 +198,7 @@ public abstract class Config {
         (k, v) -> {
           String trimmedK = k.trim();
           String trimmedV = v.trim();
-          if (!trimmedK.isEmpty() && !trimmedV.isEmpty()) {
+          if (!trimmedK.isEmpty()) {
             if (predicate.test(trimmedK)) {
               configMap.put(trimmedK, trimmedV);
             }

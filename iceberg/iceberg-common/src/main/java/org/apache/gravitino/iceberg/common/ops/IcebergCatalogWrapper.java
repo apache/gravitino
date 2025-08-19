@@ -96,9 +96,7 @@ public class IcebergCatalogWrapper implements AutoCloseable {
 
   private void validateNamespace(Optional<Namespace> namespace) {
     namespace.ifPresent(
-        n ->
-            Preconditions.checkArgument(
-                n.toString().isEmpty() == false, "Namespace couldn't be empty"));
+        n -> Preconditions.checkArgument(!n.toString().isEmpty(), "Namespace couldn't be empty"));
     if (asNamespaceCatalog == null) {
       throw new UnsupportedOperationException(
           "The underlying catalog doesn't support namespace operation");
@@ -233,6 +231,10 @@ public class IcebergCatalogWrapper implements AutoCloseable {
 
   public ListTablesResponse listView(Namespace namespace) {
     return CatalogHandlers.listViews(getViewCatalog(), namespace);
+  }
+
+  public boolean supportsViewOperations() {
+    return catalog instanceof ViewCatalog;
   }
 
   @Override

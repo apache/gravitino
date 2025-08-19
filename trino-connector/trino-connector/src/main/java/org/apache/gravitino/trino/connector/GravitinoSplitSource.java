@@ -33,6 +33,11 @@ public class GravitinoSplitSource implements ConnectorSplitSource {
 
   private final ConnectorSplitSource connectorSplitSource;
 
+  /**
+   * Constructs a new GravitinoSplitSource with the specified split source.
+   *
+   * @param connectorSplitSource the internal connector split source
+   */
   public GravitinoSplitSource(ConnectorSplitSource connectorSplitSource) {
     this.connectorSplitSource = connectorSplitSource;
   }

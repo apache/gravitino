@@ -133,7 +133,11 @@ public class CatalogEntity implements Entity, Auditable, HasIdentifier {
     return EntityType.CATALOG;
   }
 
-  /** Convert the catalog entity to a {@link CatalogInfo} instance. */
+  /**
+   * Converts the catalog entity to a {@link CatalogInfo} instance.
+   *
+   * @return a new {@link CatalogInfo} instance
+   */
   public CatalogInfo toCatalogInfo() {
     return new CatalogInfo(id, name, type, provider, comment, properties, auditInfo, namespace);
   }

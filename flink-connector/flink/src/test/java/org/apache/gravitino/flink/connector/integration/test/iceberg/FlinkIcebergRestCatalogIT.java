@@ -28,8 +28,12 @@ import org.apache.gravitino.flink.connector.iceberg.IcebergPropertiesConstants;
 import org.apache.gravitino.flink.connector.integration.test.utils.TestUtils;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Tag;
+import org.junit.jupiter.api.condition.DisabledIf;
 
 @Tag("gravitino-docker-test")
+// Flink connector use low Iceberg version, couldn't work with Iceberg REST server with high Iceberg
+// version in embedded mode.
+@DisabledIf("org.apache.gravitino.integration.test.util.ITUtils#isEmbedded")
 public class FlinkIcebergRestCatalogIT extends FlinkIcebergCatalogIT {
 
   @Override
@@ -38,8 +42,6 @@ public class FlinkIcebergRestCatalogIT extends FlinkIcebergCatalogIT {
     catalogProperties.put(
         IcebergPropertiesConstants.GRAVITINO_ICEBERG_CATALOG_BACKEND,
         IcebergPropertiesConstants.ICEBERG_CATALOG_BACKEND_REST);
-    catalogProperties.put(
-        IcebergPropertiesConstants.GRAVITINO_ICEBERG_CATALOG_WAREHOUSE, warehouse);
     catalogProperties.put(
         IcebergPropertiesConstants.GRAVITINO_ICEBERG_CATALOG_URI, icebergRestServiceUri);
     return catalogProperties;

@@ -14,11 +14,13 @@
 # KIND, either express or implied.  See the License for the
 # specific language governing permissions and limitations
 # under the License.
+
 from dataclasses import dataclass, field
 from typing import List
 
 from dataclasses_json import config
 
+from gravitino.dto.model_version_dto import ModelVersionDTO
 from gravitino.dto.responses.base_response import BaseResponse
 from gravitino.exceptions.base import IllegalArgumentException
 
@@ -42,3 +44,38 @@ class ModelVersionListResponse(BaseResponse):
 
         if self._versions is None:
             raise IllegalArgumentException("versions must not be null")
+
+
+@dataclass
+class ModelVersionInfoListResponse(BaseResponse):
+    """Represents a response for a list of model versions with their information."""
+
+    _versions: List[ModelVersionDTO] = field(metadata=config(field_name="infos"))
+
+    def versions(self) -> List[ModelVersionDTO]:
+        return self._versions
+
+    def validate(self):
+        """Validates the response data.
+
+        Raises:
+            IllegalArgumentException if versions are not set.
+        """
+        super().validate()
+
+        if self._versions is None:
+            raise IllegalArgumentException("versions must not be null")
+
+        for version in self._versions:
+            if version is None:
+                raise IllegalArgumentException("Model version must not be null")
+            if version.version is None:
+                raise IllegalArgumentException(
+                    "Model version 'version' must not be null"
+                )
+            if version.uri() is None:
+                raise IllegalArgumentException("Model version 'uri' must not be null")
+            if version.audit_info() is None:
+                raise IllegalArgumentException(
+                    "Model version 'auditInfo' must not be null"
+                )

@@ -76,7 +76,7 @@ cd gravitino
 git config user.name "$GIT_NAME"
 git config user.email "$GIT_EMAIL"
 
-PYGRAVITINO_RELEASE_VERSION="${RELEASE_VERSION}"
+PYGRAVITINO_RELEASE_VERSION="${RELEASE_VERSION/}"
 PYGRAVITINO_NEXT_VERSION=$(echo $NEXT_VERSION | sed 's/-SNAPSHOT/.dev0/')
 
 # Create release version for Java, Python ,Rust and Chart

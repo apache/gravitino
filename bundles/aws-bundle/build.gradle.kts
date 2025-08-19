@@ -11,7 +11,8 @@
  *
  * Unless required by applicable law or agreed to in writing,
  * software distributed under the License is distributed on an
- * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS
+ * OF ANY
  * KIND, either express or implied.  See the License for the
  * specific language governing permissions and limitations
  * under the License.
@@ -40,9 +41,18 @@ tasks.withType(ShadowJar::class.java) {
     exclude(dependency("org.slf4j:slf4j-api"))
   }
 
-  relocate("org.apache.commons.lang3", "org.apache.gravitino.aws.shaded.org.apache.commons.lang3")
-  relocate("com.google.common", "org.apache.gravitino.aws.shaded.com.google.common")
   relocate("com.fasterxml.jackson", "org.apache.gravitino.aws.shaded.com.fasterxml.jackson")
+  relocate("com.google.common", "org.apache.gravitino.aws.shaded.com.google.common")
+  relocate("com.google.errorprone", "org.apache.gravitino.aws.shaded.com.google.errorprone")
+  relocate("com.google.thirdparty", "org.apache.gravitino.aws.shaded.com.google.thirdparty")
+  relocate("io.netty", "org.apache.gravitino.aws.shaded.io.netty")
+  relocate("org.apache.commons", "org.apache.gravitino.aws.shaded.org.apache.commons")
+  relocate("org.apache.http", "org.apache.gravitino.aws.shaded.org.apache.http")
+  relocate("org.checkerframework", "org.apache.gravitino.aws.shaded.org.checkerframework")
+  relocate("org.reactivestreams", "org.apache.gravitino.aws.shaded.org.reactivestreams")
+  relocate("org.wildfly.openssl", "org.apache.gravitino.aws.shaded.org.wildfly.openssl")
+  relocate("software.amazon", "org.apache.gravitino.aws.shaded.software.amazon")
+
   mergeServiceFiles()
 }
 
@@ -52,5 +62,5 @@ tasks.jar {
 }
 
 tasks.compileJava {
-  dependsOn(":catalogs:catalog-hadoop:runtimeJars")
+  dependsOn(":catalogs:catalog-fileset:runtimeJars")
 }

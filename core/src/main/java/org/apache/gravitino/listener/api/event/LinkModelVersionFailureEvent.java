@@ -37,6 +37,8 @@ public class LinkModelVersionFailureEvent extends ModelFailureEvent {
    * @param user The username of the individual who initiated the operation to link a model version.
    * @param identifier The identifier of the model that was involved in the failed operation.
    * @param exception The exception encountered during the attempt to link a model version.
+   * @param linkModelVersionRequest The original {@link ModelVersionInfo} request containing details
+   *     of the model version link operation that failed.
    */
   public LinkModelVersionFailureEvent(
       String user,

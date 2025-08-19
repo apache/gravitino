@@ -48,6 +48,13 @@ fi
 
 . "$SELF/release-util.sh"
 
+if ! is_dry_run; then
+  if [[ -z "$PYPI_API_TOKEN" ]]; then
+    echo 'The environment variable PYPI_API_TOKEN is not set. Exiting.'
+    exit 1
+  fi
+fi
+
 if [ "$RUNNING_IN_DOCKER" = "1" ]; then
   # Inside docker, need to import the GPG key stored in the current directory.
   echo $GPG_PASSPHRASE | $GPG --passphrase-fd 0 --import "$SELF/gpg.key"

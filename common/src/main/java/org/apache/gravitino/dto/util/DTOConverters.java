@@ -51,6 +51,9 @@ import org.apache.gravitino.dto.authorization.UserDTO;
 import org.apache.gravitino.dto.credential.CredentialDTO;
 import org.apache.gravitino.dto.file.FileInfoDTO;
 import org.apache.gravitino.dto.file.FilesetDTO;
+import org.apache.gravitino.dto.job.JobTemplateDTO;
+import org.apache.gravitino.dto.job.ShellJobTemplateDTO;
+import org.apache.gravitino.dto.job.SparkJobTemplateDTO;
 import org.apache.gravitino.dto.messaging.TopicDTO;
 import org.apache.gravitino.dto.model.ModelDTO;
 import org.apache.gravitino.dto.model.ModelVersionDTO;
@@ -83,6 +86,9 @@ import org.apache.gravitino.dto.tag.MetadataObjectDTO;
 import org.apache.gravitino.dto.tag.TagDTO;
 import org.apache.gravitino.file.FileInfo;
 import org.apache.gravitino.file.Fileset;
+import org.apache.gravitino.job.JobTemplate;
+import org.apache.gravitino.job.ShellJobTemplate;
+import org.apache.gravitino.job.SparkJobTemplate;
 import org.apache.gravitino.messaging.Topic;
 import org.apache.gravitino.model.Model;
 import org.apache.gravitino.model.ModelVersion;
@@ -689,6 +695,19 @@ public class DTOConverters {
   }
 
   /**
+   * Converts an array of ModelVersions to an array of ModelVersionDTOs.
+   *
+   * @param modelVersions The modelVersions to be converted.
+   * @return The array of ModelVersionDTOs.
+   */
+  public static ModelVersionDTO[] toDTOs(ModelVersion[] modelVersions) {
+    if (ArrayUtils.isEmpty(modelVersions)) {
+      return new ModelVersionDTO[0];
+    }
+    return Arrays.stream(modelVersions).map(DTOConverters::toDTO).toArray(ModelVersionDTO[]::new);
+  }
+
+  /**
    * Converts an array of Columns to an array of ColumnDTOs.
    *
    * @param columns The columns to be converted.
@@ -1127,6 +1146,46 @@ public class DTOConverters {
       return Privileges.allow(privilegeDTO.name());
     } else {
       return Privileges.deny(privilegeDTO.name());
+    }
+  }
+
+  /**
+   * Converts a JobTemplateDTO to a JobTemplate.
+   *
+   * @param jobTemplateDTO The job template DTO to be converted.
+   * @return The job template.
+   */
+  public static JobTemplate fromDTO(JobTemplateDTO jobTemplateDTO) {
+    switch (jobTemplateDTO.jobType()) {
+      case SHELL:
+        return ShellJobTemplate.builder()
+            .withName(jobTemplateDTO.name())
+            .withComment(jobTemplateDTO.comment())
+            .withExecutable(jobTemplateDTO.executable())
+            .withArguments(jobTemplateDTO.arguments())
+            .withEnvironments(jobTemplateDTO.environments())
+            .withCustomFields(jobTemplateDTO.customFields())
+            .withScripts(((ShellJobTemplateDTO) jobTemplateDTO).scripts())
+            .build();
+
+      case SPARK:
+        return SparkJobTemplate.builder()
+            .withName(jobTemplateDTO.name())
+            .withComment(jobTemplateDTO.comment())
+            .withExecutable(jobTemplateDTO.executable())
+            .withArguments(jobTemplateDTO.arguments())
+            .withEnvironments(jobTemplateDTO.environments())
+            .withCustomFields(jobTemplateDTO.customFields())
+            .withClassName(((SparkJobTemplateDTO) jobTemplateDTO).className())
+            .withJars(((SparkJobTemplateDTO) jobTemplateDTO).jars())
+            .withFiles(((SparkJobTemplateDTO) jobTemplateDTO).files())
+            .withArchives(((SparkJobTemplateDTO) jobTemplateDTO).archives())
+            .withConfigs(((SparkJobTemplateDTO) jobTemplateDTO).configs())
+            .build();
+
+      default:
+        throw new IllegalArgumentException(
+            "Unsupported job template type: " + jobTemplateDTO.jobType());
     }
   }
 }

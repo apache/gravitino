@@ -29,17 +29,37 @@ import java.util.List;
 import java.util.Map;
 import org.apache.gravitino.trino.connector.catalog.HasPropertyMeta;
 
+/**
+ * Property metadata for Iceberg catalogs, tables and schemas. This class defines and manages the
+ * property metadata for Iceberg-specific configurations.
+ */
 public class IcebergPropertyMeta implements HasPropertyMeta {
 
+  /** Property key for table partitioning configuration. */
   public static final String ICEBERG_PARTITIONING_PROPERTY = "partitioning";
+
+  /** Property key for table sorting configuration. */
   public static final String ICEBERG_SORTED_BY_PROPERTY = "sorted_by";
+
+  /** Property key for table location configuration. */
   public static final String ICEBERG_LOCATION_PROPERTY = "location";
+
+  /** Property key for table format configuration. */
+  public static final String ICEBERG_FORMAT_PROPERTY = "format";
+
+  /** Property key for table format version configuration. */
+  public static final String ICEBERG_FORMAT_VERSION_PROPERTY = "format_version";
+
+  private static final String DEFAULT_ICEBERG_FORMAT = "PARQUET";
+  private static final String DEFAULT_ICEBERG_FORMAT_VERSION = "2";
 
   // Value is whether this property is reserved and cannot be used by users
   // TODO (yuqi) add more properties
+  /** Map of table property metadata to their reservation status. */
   public static final Map<PropertyMetadata<?>, Boolean> TABLE_PROPERTY_TO_RESERVED_MAP =
       new ImmutableMap.Builder().build();
 
+  /** List of supported table property metadata. */
   public static final List<PropertyMetadata<?>> TABLE_PROPERTY_META =
       ImmutableList.of(
           new PropertyMetadata<>(
@@ -61,12 +81,21 @@ public class IcebergPropertyMeta implements HasPropertyMeta {
               value -> (List<?>) value,
               value -> value),
           PropertyMetadata.stringProperty(
-              ICEBERG_LOCATION_PROPERTY, "Location for table storage", null, false));
+              ICEBERG_LOCATION_PROPERTY, "Location for table storage", null, false),
+          PropertyMetadata.stringProperty(
+              ICEBERG_FORMAT_PROPERTY, "Table format", DEFAULT_ICEBERG_FORMAT, false),
+          PropertyMetadata.stringProperty(
+              ICEBERG_FORMAT_VERSION_PROPERTY,
+              "Format version",
+              DEFAULT_ICEBERG_FORMAT_VERSION,
+              false));
 
   // TODO (yuqi) add more properties
+  /** Map of schema property metadata to their reservation status. */
   public static final Map<PropertyMetadata<?>, Boolean> SCHEMA_PROPERTY_TO_RESERVED_MAP =
       new ImmutableMap.Builder().build();
 
+  /** List of supported schema property metadata. */
   public static final List<PropertyMetadata<?>> SCHEMA_PROPERTY_META =
       SCHEMA_PROPERTY_TO_RESERVED_MAP.entrySet().stream()
           .map(Map.Entry::getKey)

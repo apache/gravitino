@@ -29,6 +29,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import java.util.stream.Stream;
 import javax.servlet.http.HttpServletRequest;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import org.apache.gravitino.credential.CredentialConstants;
@@ -52,11 +53,14 @@ import org.apache.gravitino.iceberg.service.provider.IcebergConfigProviderFactor
 import org.apache.gravitino.iceberg.service.provider.StaticIcebergConfigProvider;
 import org.apache.gravitino.listener.EventBus;
 import org.apache.gravitino.listener.api.EventListenerPlugin;
+import org.apache.iceberg.catalog.Namespace;
+import org.apache.iceberg.rest.RESTUtil;
 import org.glassfish.hk2.utilities.binding.AbstractBinder;
 import org.glassfish.jersey.jackson.JacksonFeature;
 import org.glassfish.jersey.logging.LoggingFeature;
 import org.glassfish.jersey.logging.LoggingFeature.Verbosity;
 import org.glassfish.jersey.server.ResourceConfig;
+import org.junit.jupiter.params.provider.Arguments;
 
 public class IcebergRestTestUtil {
 
@@ -65,10 +69,12 @@ public class IcebergRestTestUtil {
   public static final String CONFIG_PATH = V_1 + "/config";
   public static final String NAMESPACE_PATH = V_1 + "/namespaces";
   public static final String UPDATE_NAMESPACE_POSTFIX = "properties";
-  public static final String TEST_NAMESPACE_NAME = "gravitino-test";
-  public static final String TABLE_PATH = NAMESPACE_PATH + "/" + TEST_NAMESPACE_NAME + "/tables";
+  public static final Namespace TEST_NAMESPACE_NAME = Namespace.of("gravitino-test");
+  public static final Namespace TEST_NESTED_NAMESPACE_NAME =
+      Namespace.of("gravitino-test-2", "nested");
 
-  public static final String VIEW_PATH = NAMESPACE_PATH + "/" + TEST_NAMESPACE_NAME + "/views";
+  public static final String VIEW_PATH =
+      NAMESPACE_PATH + "/" + RESTUtil.encodeNamespace(TEST_NAMESPACE_NAME) + "/views";
   public static final String RENAME_TABLE_PATH = V_1 + "/tables/rename";
 
   public static final String RENAME_VIEW_PATH = V_1 + "/views/rename";
@@ -105,6 +111,17 @@ public class IcebergRestTestUtil {
       catalogConf.put(String.format("%s.catalog-backend-name", catalogConfigPrefix), PREFIX);
       catalogConf.put(
           CredentialConstants.CREDENTIAL_PROVIDERS, DummyCredentialProvider.DUMMY_CREDENTIAL_TYPE);
+      catalogConf.put(
+          String.format("%s.%s", catalogConfigPrefix, IcebergConstants.IO_IMPL),
+          "org.apache.iceberg.aws.s3.S3FileIO");
+      catalogConf.put(
+          String.format("%s.%s", catalogConfigPrefix, IcebergConstants.ICEBERG_S3_ENDPOINT),
+          "https://s3-endpoint.example.com");
+      catalogConf.put(
+          String.format("%s.%s", catalogConfigPrefix, IcebergConstants.AWS_S3_REGION), "us-west-2");
+      catalogConf.put(
+          String.format("%s.%s", catalogConfigPrefix, IcebergConstants.ICEBERG_OSS_ENDPOINT),
+          "https://oss-endpoint.example.com");
       IcebergConfigProvider configProvider = IcebergConfigProviderFactory.create(catalogConf);
       configProvider.initialize(catalogConf);
       // used to override register table interface
@@ -152,5 +169,19 @@ public class IcebergRestTestUtil {
     when(mockRequest.getRemoteHost()).thenReturn("localhost");
     when(mockRequest.getHeaderNames()).thenReturn(Collections.emptyEnumeration());
     return mockRequest;
+  }
+
+  public static Namespace[] testNamespaces() {
+    return new Namespace[] {TEST_NAMESPACE_NAME, TEST_NESTED_NAMESPACE_NAME};
+  }
+
+  public static Stream<Arguments> testPrefixesAndNamespaces() {
+    Namespace[] namespaces = testNamespaces();
+    String[] prefixes = {"", PREFIX};
+    return Arrays.stream(prefixes)
+        .flatMap(
+            prefix ->
+                Arrays.stream(namespaces)
+                    .flatMap(ns -> Stream.of(Arguments.arguments(prefix, ns))));
   }
 }

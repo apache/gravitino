@@ -48,7 +48,7 @@ def gcs_is_configured():
 @unittest.skipUnless(gcs_is_configured(), "GCS is not configured.")
 class TestGvfsWithGCS(TestGvfsWithHDFS):
     # Before running this test, please set the make sure gcp-bundle-x.jar has been
-    # copy to the $GRAVITINO_HOME/catalogs/hadoop/libs/ directory
+    # copy to the $GRAVITINO_HOME/catalogs/fileset/libs/ directory
     key_file = os.environ.get("GCS_SERVICE_ACCOUNT_JSON_PATH")
     bucket_name = os.environ.get("GCS_BUCKET_NAME")
     metalake_name: str = "TestGvfsWithGCS_metalake" + str(randint(1, 10000))
@@ -65,7 +65,9 @@ class TestGvfsWithGCS(TestGvfsWithHDFS):
     def setUpClass(cls):
         cls._get_gravitino_home()
 
-        cls.hadoop_conf_path = f"{cls.gravitino_home}/catalogs/hadoop/conf/hadoop.conf"
+        cls.hadoop_conf_path = (
+            f"{cls.gravitino_home}/catalogs/fileset/conf/fileset.conf"
+        )
         # restart the server
         cls.restart_server()
         # create entity

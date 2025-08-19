@@ -87,7 +87,17 @@ public class HiveDataTypeConverter implements DataTypeConverter<TypeInfo, String
       case DATE:
         return getPrimitiveTypeInfo(DATE_TYPE_NAME);
       case TIMESTAMP:
-        return getPrimitiveTypeInfo(TIMESTAMP_TYPE_NAME);
+        if (type instanceof Types.TimestampType) {
+          Types.TimestampType tsType = (Types.TimestampType) type;
+          // Timestamps are interpreted to be timezoneless in Hive:
+          // https://hive.apache.org/docs/latest/languagemanual-types_27838462/#timestamps
+          if (tsType.hasTimeZone()) {
+            throw new UnsupportedOperationException(
+                "Unsupported conversion: Please use the TIMESTAMP WITHOUT TIMEZONE type. TIMESTAMP WITH TIMEZONE type is not supported by Hive.");
+          }
+          return getPrimitiveTypeInfo(TIMESTAMP_TYPE_NAME);
+        }
+        throw new UnsupportedOperationException("Unknown timestamp type: " + type);
       case DECIMAL:
         Types.DecimalType decimalType = (Types.DecimalType) type;
         return getDecimalTypeInfo(decimalType.precision(), decimalType.scale());

@@ -76,6 +76,13 @@ public class CatalogConnectorManager {
   private GravitinoAdminClient gravitinoClient;
   private GravitinoConfig config;
 
+  /**
+   * Constructs a new CatalogConnectorManager with the specified catalog register and catalog
+   * connector factory.
+   *
+   * @param catalogRegister the catalog register
+   * @param catalogFactory the catalog connector factory
+   */
   public CatalogConnectorManager(
       CatalogRegister catalogRegister, CatalogConnectorFactory catalogFactory) {
     this.catalogRegister = catalogRegister;
@@ -95,6 +102,12 @@ public class CatalogConnectorManager {
             .build());
   }
 
+  /**
+   * Configures the catalog connector manager with the specified Gravitino configuration and client.
+   *
+   * @param config the Gravitino configuration
+   * @param client the Gravitino admin client
+   */
   public void config(GravitinoConfig config, GravitinoAdminClient client) {
     this.config = Preconditions.checkNotNull(config, "config is not null");
     if (client == null) {
@@ -106,6 +119,12 @@ public class CatalogConnectorManager {
     this.targetMetalake = config.getMetalake();
   }
 
+  /**
+   * Starts the catalog connector manager with the specified Trino connector context.
+   *
+   * @param context the Trino connector context
+   * @throws Exception if the catalog connector manager fails to start
+   */
   public void start(ConnectorContext context) throws Exception {
     catalogRegister.init(context, config);
     if (catalogRegister.isCoordinator()) {
@@ -153,6 +172,13 @@ public class CatalogConnectorManager {
     }
   }
 
+  /**
+   * Retrieves a metalake by its name.
+   *
+   * @param metalakeName the name of the metalake
+   * @return the metalake
+   * @throws TrinoException if the metalake does not exist
+   */
   public GravitinoMetalake retrieveMetalake(String metalakeName) {
     try {
       return gravitinoClient.loadMetalake(metalakeName);
@@ -262,35 +288,79 @@ public class CatalogConnectorManager {
         catalog.getMetalake());
   }
 
+  /**
+   * Retrieves the catalog connector context for the specified catalog name.
+   *
+   * @param catalogName the name of the catalog
+   * @return the catalog connector context
+   */
   public CatalogConnectorContext getCatalogConnector(String catalogName) {
     return catalogConnectors.get(catalogName);
   }
 
+  /**
+   * Checks if a catalog connector exists for the specified catalog name.
+   *
+   * @param catalogName the name of the catalog
+   * @return true if the catalog connector exists, false otherwise
+   */
   public boolean catalogConnectorExist(String catalogName) {
     return catalogConnectors.containsKey(catalogName);
   }
 
+  /**
+   * Retrieves all catalogs managed by this connector manager.
+   *
+   * @return a list of Gravitino catalogs
+   */
   public List<GravitinoCatalog> getCatalogs() {
     return catalogConnectors.values().stream().map(CatalogConnectorContext::getCatalog).toList();
   }
 
+  /** Shuts down the catalog connector manager. */
   public void shutdown() {
     LOG.info("Gravitino CatalogConnectorManager shutdown.");
     throw new NotImplementedException();
   }
 
+  /**
+   * Retrieves the Trino catalog name for the specified metalake and catalog.
+   *
+   * @param metalake the name of the metalake
+   * @param catalog the name of the catalog
+   * @return the Trino catalog name
+   */
   public String getTrinoCatalogName(String metalake, String catalog) {
     return config.singleMetalakeMode() ? catalog : String.format("\"%s.%s\"", metalake, catalog);
   }
 
+  /**
+   * Retrieves the Trino catalog name for the specified catalog.
+   *
+   * @param catalog the catalog
+   * @return the Trino catalog name
+   */
   public String getTrinoCatalogName(GravitinoCatalog catalog) {
     return getTrinoCatalogName(catalog.getMetalake(), catalog.getName());
   }
 
+  /**
+   * Retrieves the set of metalakes that have been used.
+   *
+   * @return the set of metalakes
+   */
   public Set<String> getUsedMetalakes() {
     return metalakes.keySet();
   }
 
+  /**
+   * Creates a new connector for the specified catalog name.
+   *
+   * @param connectorName the name of the connector
+   * @param config the Gravitino configuration
+   * @param context the Trino connector context
+   * @return the created connector
+   */
   public Connector createConnector(
       String connectorName, GravitinoConfig config, ConnectorContext context) {
     try {
@@ -316,11 +386,23 @@ public class CatalogConnectorManager {
     }
   }
 
+  /**
+   * Loads the metalake synchronously.
+   *
+   * @throws Exception if the metalake fails to load
+   */
   public void loadMetalakeSync() throws Exception {
     Future<?> future = executorService.submit(this::loadMetalake);
     future.get(LOAD_METALAKE_TIMEOUT, TimeUnit.SECONDS);
   }
 
+  /**
+   * Retrieves the Gravitino metalake for the specified name.
+   *
+   * @param metalake the name of the metalake
+   * @return the Gravitino metalake
+   * @throws TrinoException if the metalake is not found
+   */
   public GravitinoMetalake getMetalake(String metalake) {
     return metalakes.computeIfAbsent(metalake, this::retrieveMetalake);
   }

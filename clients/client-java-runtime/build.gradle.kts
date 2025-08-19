@@ -27,7 +27,7 @@ plugins {
 configurations.all {
   resolutionStrategy.eachDependency {
     if (requested.group == "org.apache.logging.log4j") {
-      throw GradleException("Forbidden dependency 'org.apache.logging.log4j' found!")
+      throw GradleException("Dependency 'org.apache.logging.log4j' is not allowed.")
     }
   }
 }
@@ -47,6 +47,8 @@ tasks.withType<ShadowJar>(ShadowJar::class.java) {
   relocate("org.apache.httpcomponents", "org.apache.gravitino.shaded.org.apache.httpcomponents")
   relocate("org.apache.commons", "org.apache.gravitino.shaded.org.apache.commons")
   relocate("org.antlr", "org.apache.gravitino.shaded.org.antlr")
+
+  mergeServiceFiles()
 }
 
 tasks.jar {

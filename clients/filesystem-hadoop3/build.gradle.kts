@@ -42,7 +42,7 @@ dependencies {
 
   testImplementation(project(":api"))
   testImplementation(project(":core"))
-  testImplementation(project(":catalogs:catalog-hadoop"))
+  testImplementation(project(":catalogs:catalog-fileset"))
   testImplementation(project(":common"))
   testImplementation(project(":server"))
   testImplementation(project(":server-common"))
@@ -90,8 +90,8 @@ tasks.build {
 }
 
 tasks.compileJava {
-  dependsOn(":catalogs:catalog-hadoop:jar")
-  dependsOn(":catalogs:catalog-hadoop:runtimeJars")
+  dependsOn(":catalogs:catalog-fileset:jar")
+  dependsOn(":catalogs:catalog-fileset:runtimeJars")
 }
 
 tasks.test {
@@ -99,7 +99,7 @@ tasks.test {
   if (skipITs) {
     exclude("**/integration/test/**")
   } else {
-    dependsOn(":catalogs:catalog-hadoop:jar", ":catalogs:catalog-hadoop:runtimeJars")
+    dependsOn(":catalogs:catalog-fileset:jar", ":catalogs:catalog-fileset:runtimeJars")
   }
 
   // this task depends on :bundles:aws-bundle:shadowJar

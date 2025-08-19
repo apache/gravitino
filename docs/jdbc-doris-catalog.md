@@ -39,7 +39,7 @@ You can check the relevant data source configuration in
 [data source properties](https://commons.apache.org/proper/commons-dbcp/configuration.html) for
 more details.
 
-Besides the [common catalog properties](./gravitino-server-config.md#gravitino-catalog-properties-configuration), the Doris catalog has the following properties:
+Besides the [common catalog properties](./gravitino-server-config.md#apache-gravitino-catalog-properties-configuration), the Doris catalog has the following properties:
 
 | Configuration item   | Description                                                                                                                                                                                                                                                                                                                                                                                                      | Default value | Required | Since Version    |
 |----------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|----------|------------------|
@@ -54,6 +54,31 @@ Besides the [common catalog properties](./gravitino-server-config.md#gravitino-c
 
 Before using the Doris Catalog, you must download the corresponding JDBC driver to the `catalogs/jdbc-doris/libs` directory.
 Gravitino doesn't package the JDBC driver for Doris due to licensing issues.
+
+### Driver Version Compatibility
+
+The Doris catalog includes driver version compatibility checks for datetime precision calculation:
+
+- **MySQL Connector/J versions >= 8.0.16**: Full support for datetime precision calculation
+- **MySQL Connector/J versions < 8.0.16**: Limited support - datetime precision calculation returns `null` with a warning log
+
+This limitation affects the following datetime types:
+- `DATETIME(p)` - datetime precision
+
+When using an unsupported driver version, the system will:
+1. Continue to work normally with default precision (0)
+2. Log a warning message indicating the driver version limitation
+3. Return `null` for precision calculations to avoid incorrect results
+
+**Example warning log:**
+```
+WARN: MySQL driver version mysql-connector-java-8.0.11 is below 8.0.16, 
+columnSize may not be accurate for precision calculation. 
+Returning null for DATETIME type precision. Driver version: mysql-connector-java-8.0.11
+```
+
+**Recommended driver versions:**
+- `mysql-connector-java-8.0.16` or higher
 
 ### Catalog operations
 
@@ -86,21 +111,21 @@ Please refer to
 
 #### Table column types
 
-| Gravitino Type | Doris Type |
-|----------------|------------|
-| `Boolean`      | `Boolean`  |
-| `Byte`         | `TinyInt`  |
-| `Short`        | `SmallInt` |
-| `Integer`      | `Int`      |
-| `Long`         | `BigInt`   |
-| `Float`        | `Float`    |
-| `Double`       | `Double`   |
-| `Decimal`      | `Decimal`  |
-| `Date`         | `Date`     |
-| `Timestamp`    | `Datetime` |
-| `VarChar`      | `VarChar`  |
-| `FixedChar`    | `Char`     |
-| `String`       | `String`   |
+| Gravitino Type   | Doris Type      |
+|------------------|-----------------|
+| `Boolean`        | `Boolean`       |
+| `Byte`           | `TinyInt`       |
+| `Short`          | `SmallInt`      |
+| `Integer`        | `Int`           |
+| `Long`           | `BigInt`        |
+| `Float`          | `Float`         |
+| `Double`         | `Double`        |
+| `Decimal`        | `Decimal`       |
+| `Date`           | `Date`          |
+| `Timestamp[(p)]` | `Datetime[(p)]` |
+| `VarChar`        | `VarChar`       |
+| `FixedChar`      | `Char`          |
+| `String`         | `String`        |
 
 
 Doris doesn't support Gravitino `Fixed` `Timestamp_tz` `IntervalDay` `IntervalYear` `Union` `UUID` type.

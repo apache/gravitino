@@ -28,7 +28,7 @@ The Hive catalog supports creating, updating, and deleting databases and tables 
 
 ### Catalog properties
 
-Besides the [common catalog properties](./gravitino-server-config.md#gravitino-catalog-properties-configuration), the Hive catalog has the following properties:
+Besides the [common catalog properties](./gravitino-server-config.md#apache-gravitino-catalog-properties-configuration), the Hive catalog has the following properties:
 
 | Property Name                            | Description                                                                                                                                                                                                                                         | Default Value | Required                     | Since Version |
 |------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|------------------------------|---------------|
@@ -54,7 +54,7 @@ When you use the Gravitino with Trino. You can pass the Trino Hive connector con
 
 When you use the Gravitino with Spark. You can pass the Spark Hive connector configuration using prefix `spark.bypass.`. For example, using `spark.bypass.hive.exec.dynamic.partition.mode` to pass the `hive.exec.dynamic.partition.mode` to the Spark Hive connector in Spark runtime.
 
-When you use the Gravitino authorization Hive with Apache Ranger. You can see the [Authorization Hive with Ranger properties](security/authorization-pushdown.md#authorization-hive-with-ranger-properties)
+When you use the Gravitino authorization Hive with Apache Ranger. You can see the [Authorization Hive with Ranger properties](security/authorization-pushdown.md#example-of-using-the-ranger-hadoop-sql-plugin)
 ### Catalog operations
 
 Refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metadata-using-gravitino.md#catalog-operations) for more details.

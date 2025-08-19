@@ -73,4 +73,54 @@ public interface OAuthConfig {
           .stringConf()
           .checkValue(StringUtils::isNotBlank, ConfigConstants.NOT_BLANK_ERROR_MSG)
           .create();
+
+  // OAuth provider configs
+  ConfigEntry<String> PROVIDER =
+      new ConfigBuilder(OAUTH_CONFIG_PREFIX + "provider")
+          .doc("The OAuth provider to use (e.g., azure)")
+          .version(ConfigConstants.VERSION_1_0_0)
+          .stringConf()
+          .create();
+
+  ConfigEntry<String> CLIENT_ID =
+      new ConfigBuilder(OAUTH_CONFIG_PREFIX + "clientId")
+          .doc("OAuth client ID used for Web UI authentication")
+          .version(ConfigConstants.VERSION_1_0_0)
+          .stringConf()
+          .create();
+
+  ConfigEntry<String> AUTHORITY =
+      new ConfigBuilder(OAUTH_CONFIG_PREFIX + "authority")
+          .doc("OAuth authority URL (authorization server)")
+          .version(ConfigConstants.VERSION_1_0_0)
+          .stringConf()
+          .create();
+
+  ConfigEntry<String> SCOPE =
+      new ConfigBuilder(OAUTH_CONFIG_PREFIX + "scope")
+          .doc("OAuth scopes (space-separated)")
+          .version(ConfigConstants.VERSION_1_0_0)
+          .stringConf()
+          .create();
+
+  ConfigEntry<String> JWKS_URI =
+      new ConfigBuilder(OAUTH_CONFIG_PREFIX + "jwksUri")
+          .doc("JWKS URI for token validation")
+          .version(ConfigConstants.VERSION_1_0_0)
+          .stringConf()
+          .create();
+
+  ConfigEntry<String> PRINCIPAL_FIELD =
+      new ConfigBuilder(OAUTH_CONFIG_PREFIX + "principalField")
+          .doc("JWT claim field to use as principal identity (e.g., 'sub', 'client_id', 'appid')")
+          .version(ConfigConstants.VERSION_1_0_0)
+          .stringConf()
+          .createWithDefault("sub");
+
+  ConfigEntry<String> TOKEN_VALIDATOR_CLASS =
+      new ConfigBuilder(OAUTH_CONFIG_PREFIX + "tokenValidatorClass")
+          .doc("Fully qualified class name of the OAuth token validator implementation")
+          .version(ConfigConstants.VERSION_1_0_0)
+          .stringConf()
+          .createWithDefault("org.apache.gravitino.server.authentication.StaticSignKeyValidator");
 }

@@ -19,6 +19,7 @@
 package org.apache.gravitino.catalog.doris.integration.test;
 
 import static org.apache.gravitino.integration.test.util.ITUtils.assertPartition;
+import static org.apache.gravitino.rel.Column.DEFAULT_VALUE_OF_CURRENT_TIMESTAMP;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -27,6 +28,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import java.io.IOException;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
@@ -61,6 +64,7 @@ import org.apache.gravitino.rel.expressions.Expression;
 import org.apache.gravitino.rel.expressions.NamedReference;
 import org.apache.gravitino.rel.expressions.distributions.Distribution;
 import org.apache.gravitino.rel.expressions.distributions.Distributions;
+import org.apache.gravitino.rel.expressions.distributions.Strategy;
 import org.apache.gravitino.rel.expressions.literals.Literal;
 import org.apache.gravitino.rel.expressions.literals.Literals;
 import org.apache.gravitino.rel.expressions.sorts.SortOrder;
@@ -876,12 +880,17 @@ public class CatalogDorisIT extends BaseIT {
 
   @Test
   void testTableWithTimeStampColumn() {
-    // create a table
     String tableName = GravitinoITUtils.genRandomName("test_table_with_timestamp_column");
     NameIdentifier tableIdentifier = NameIdentifier.of(schemaName, tableName);
     Column[] columns = createColumns();
     columns =
-        ArrayUtils.add(columns, Column.of("timestamp_col", Types.TimestampType.withoutTimeZone()));
+        ArrayUtils.addAll(
+            columns,
+            Column.of("datetime_col", Types.TimestampType.withoutTimeZone()),
+            Column.of("datetime_col_0", Types.TimestampType.withoutTimeZone(0)),
+            Column.of("datetime_col_1", Types.TimestampType.withoutTimeZone(1)),
+            Column.of("datetime_col_3", Types.TimestampType.withoutTimeZone(3)),
+            Column.of("datetime_col_6", Types.TimestampType.withoutTimeZone(6)));
     Distribution distribution = createDistribution();
     Index[] indexes =
         new Index[] {
@@ -899,15 +908,35 @@ public class CatalogDorisIT extends BaseIT {
         null,
         indexes);
 
-    // load table
     Table loadTable = tableCatalog.loadTable(tableIdentifier);
-    Column timestampColumn =
-        Arrays.stream(loadTable.columns())
-            .filter(c -> "timestamp_col".equals(c.name()))
-            .findFirst()
-            .get();
 
-    Assertions.assertEquals(Types.TimestampType.withoutTimeZone(), timestampColumn.dataType());
+    // Verify datetime type precisions
+    Column[] datetimeColumns =
+        Arrays.stream(loadTable.columns())
+            .filter(c -> c.name().startsWith("datetime_col"))
+            .toArray(Column[]::new);
+
+    Assertions.assertEquals(5, datetimeColumns.length);
+
+    for (Column column : datetimeColumns) {
+      switch (column.name()) {
+        case "datetime_col":
+        case "datetime_col_0":
+          Assertions.assertEquals(Types.TimestampType.withoutTimeZone(0), column.dataType());
+          break;
+        case "datetime_col_1":
+          Assertions.assertEquals(Types.TimestampType.withoutTimeZone(1), column.dataType());
+          break;
+        case "datetime_col_3":
+          Assertions.assertEquals(Types.TimestampType.withoutTimeZone(3), column.dataType());
+          break;
+        case "datetime_col_6":
+          Assertions.assertEquals(Types.TimestampType.withoutTimeZone(6), column.dataType());
+          break;
+        default:
+          Assertions.fail("Unexpected datetime column: " + column.name());
+      }
+    }
   }
 
   @Test
@@ -1003,5 +1032,111 @@ public class CatalogDorisIT extends BaseIT {
 
       tableCatalog.dropTable(tableIdentifier);
     }
+  }
+
+  @Test
+  void testAllDistributionWithAuto() {
+    Distribution distribution =
+        Distributions.auto(Strategy.HASH, NamedReference.field(DORIS_COL_NAME1));
+
+    String tableName = GravitinoITUtils.genRandomName("test_distribution_table");
+    NameIdentifier tableIdentifier = NameIdentifier.of(schemaName, tableName);
+    Column[] columns = createColumns();
+    Index[] indexes = Indexes.EMPTY_INDEXES;
+    Map<String, String> properties = createTableProperties();
+    Transform[] partitioning = Transforms.EMPTY_TRANSFORM;
+    TableCatalog tableCatalog = catalog.asTableCatalog();
+    tableCatalog.createTable(
+        tableIdentifier,
+        columns,
+        table_comment,
+        properties,
+        partitioning,
+        distribution,
+        null,
+        indexes);
+    // load table
+    Table loadTable = tableCatalog.loadTable(tableIdentifier);
+
+    Assertions.assertEquals(distribution.strategy(), loadTable.distribution().strategy());
+    Assertions.assertEquals(distribution.number(), loadTable.distribution().number());
+    Assertions.assertArrayEquals(
+        distribution.expressions(), loadTable.distribution().expressions());
+    tableCatalog.dropTable(tableIdentifier);
+  }
+
+  @Test
+  void testColumnDefaultValue() {
+
+    Column col_default_value_date =
+        Column.of(
+            "col_default_value_date",
+            Types.DateType.get(),
+            "col_default_value_date",
+            false,
+            false,
+            Literals.dateLiteral("2024-01-01"));
+
+    Column col_default_value_timestamp =
+        Column.of(
+            "col_default_value_timestamp",
+            Types.TimestampType.withoutTimeZone(),
+            "col_default_value_timestamp",
+            false,
+            false,
+            Literals.timestampLiteral("2024-01-01T01:01:01"));
+
+    Column col_default_value_timestamp_2 =
+        Column.of(
+            "col_default_value_timestamp_2",
+            Types.TimestampType.withoutTimeZone(),
+            "col_default_value_timestamp_2",
+            false,
+            false,
+            DEFAULT_VALUE_OF_CURRENT_TIMESTAMP);
+    Column[] columns = createColumns();
+
+    columns =
+        ArrayUtils.addAll(
+            columns,
+            col_default_value_date,
+            col_default_value_timestamp,
+            col_default_value_timestamp_2);
+
+    NameIdentifier tableIdent =
+        NameIdentifier.of(
+            schemaName, GravitinoITUtils.genRandomName("test_table_with_default_value"));
+    Distribution distribution = createDistribution();
+
+    Index[] indexes =
+        new Index[] {
+          Indexes.of(Index.IndexType.PRIMARY_KEY, "k1_index", new String[][] {{DORIS_COL_NAME1}})
+        };
+
+    Map<String, String> properties = createTableProperties();
+    TableCatalog tableCatalog = catalog.asTableCatalog();
+    tableCatalog.createTable(
+        tableIdent,
+        columns,
+        table_comment,
+        properties,
+        Transforms.EMPTY_TRANSFORM,
+        distribution,
+        null,
+        indexes);
+
+    Table loadedTable = tableCatalog.loadTable(tableIdent);
+
+    Column[] colDefaultValues =
+        Arrays.stream(loadedTable.columns())
+            .filter(c -> c.name().startsWith("col_default_value_"))
+            .toArray(Column[]::new);
+
+    Assertions.assertEquals(
+        Literals.dateLiteral(LocalDate.of(2024, 1, 1)), colDefaultValues[0].defaultValue());
+    Assertions.assertEquals(
+        Literals.timestampLiteral(LocalDateTime.of(2024, 1, 1, 1, 1, 1)),
+        colDefaultValues[1].defaultValue());
+    Assertions.assertEquals(DEFAULT_VALUE_OF_CURRENT_TIMESTAMP, colDefaultValues[2].defaultValue());
   }
 }

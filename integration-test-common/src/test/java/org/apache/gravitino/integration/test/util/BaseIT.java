@@ -24,6 +24,7 @@ import static org.apache.gravitino.integration.test.util.TestDatabaseName.PG_JDB
 import static org.apache.gravitino.server.GravitinoServer.WEBSERVER_CONF_PREFIX;
 
 import com.google.common.base.Splitter;
+import com.google.common.collect.ImmutableMap;
 import java.io.File;
 import java.io.IOException;
 import java.lang.reflect.Field;
@@ -37,10 +38,14 @@ import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.RandomStringUtils;
@@ -105,6 +110,11 @@ public class BaseIT {
   public static final String DOWNLOAD_POSTGRESQL_JDBC_DRIVER_URL =
       "https://jdbc.postgresql.org/download/postgresql-42.7.0.jar";
 
+  public static final Map<String, Pattern> SUPPORTED_CLEAN_CONFLICTS_DRIVER_TYPES =
+      ImmutableMap.of(
+          "mysql", Pattern.compile("mysql-connector-java-([\\d.]+)\\.jar"),
+          "postgresql", Pattern.compile("postgresql-([\\d.]+)\\.jar"));
+
   private TestDatabaseName META_DATA;
   private MySQLContainer MYSQL_CONTAINER;
   private PostgreSQLContainer POSTGRESQL_CONTAINER;
@@ -152,21 +162,37 @@ public class BaseIT {
     }
   }
 
-  protected void downLoadJDBCDriver() throws IOException {
+  private void setupJdbcDrivers() throws IOException {
+    String[] driverUrls = {DOWNLOAD_MYSQL_JDBC_DRIVER_URL, DOWNLOAD_POSTGRESQL_JDBC_DRIVER_URL};
+    String[] dirs = getJdbcDriverDownloadDirs();
+    downloadJdbcDrivers(driverUrls, dirs);
+    cleanJdbcDriverConflicts(driverUrls, dirs);
+  }
+
+  private String[] getJdbcDriverDownloadDirs() {
     String gravitinoHome = System.getenv("GRAVITINO_HOME");
     if (!ITUtils.EMBEDDED_TEST_MODE.equals(testMode)) {
-      String serverPath = ITUtils.joinPath(gravitinoHome, "libs");
-      String icebergCatalogPath =
-          ITUtils.joinPath(gravitinoHome, "catalogs", "lakehouse-iceberg", "libs");
-      DownloaderUtils.downloadFile(DOWNLOAD_MYSQL_JDBC_DRIVER_URL, serverPath, icebergCatalogPath);
-      DownloaderUtils.downloadFile(
-          DOWNLOAD_POSTGRESQL_JDBC_DRIVER_URL, serverPath, icebergCatalogPath);
+      return new String[] {
+        ITUtils.joinPath(gravitinoHome, "libs"),
+        ITUtils.joinPath(gravitinoHome, "catalogs", "lakehouse-iceberg", "libs")
+      };
     } else {
-      Path icebergLibsPath =
-          Paths.get(gravitinoHome, "catalogs", "catalog-lakehouse-iceberg", "build", "libs");
-      DownloaderUtils.downloadFile(DOWNLOAD_MYSQL_JDBC_DRIVER_URL, icebergLibsPath.toString());
+      return new String[] {
+        Paths.get(gravitinoHome, "catalogs", "catalog-lakehouse-iceberg", "build", "libs")
+            .toString()
+      };
+    }
+  }
 
-      DownloaderUtils.downloadFile(DOWNLOAD_POSTGRESQL_JDBC_DRIVER_URL, icebergLibsPath.toString());
+  private void downloadJdbcDrivers(String[] driverUrls, String[] dirs) throws IOException {
+    for (String driverUrl : driverUrls) {
+      DownloaderUtils.downloadFile(driverUrl, dirs);
+    }
+  }
+
+  private void cleanJdbcDriverConflicts(String[] driverUrls, String[] dirs) throws IOException {
+    for (String driverUrl : driverUrls) {
+      checkAndCleanDriverConflicts(driverUrl, dirs);
     }
   }
 
@@ -312,7 +338,8 @@ public class BaseIT {
     } else {
       rewriteGravitinoServerConfig();
       serverConfig.loadFromFile(GravitinoServer.CONF_FILE);
-      downLoadJDBCDriver();
+
+      setupJdbcDrivers();
 
       GravitinoITUtils.startGravitinoServer();
 
@@ -423,7 +450,7 @@ public class BaseIT {
     }
 
     String gravitinoHome = System.getenv("GRAVITINO_HOME");
-    String hadoopLibDirs = ITUtils.joinPath(gravitinoHome, "catalogs", "hadoop", "libs");
+    String hadoopLibDirs = ITUtils.joinPath(gravitinoHome, "catalogs", "fileset", "libs");
     copyBundleJarsToDirectory(bundleName, hadoopLibDirs);
   }
 
@@ -461,5 +488,100 @@ public class BaseIT {
     } catch (Exception e) {
       throw new IllegalStateException("Failed to set environment variable", e);
     }
+  }
+
+  /**
+   * Check and clean driver version conflicts in directories
+   *
+   * @param targetUrl Target driver URL
+   * @param directories Directories to check
+   * @throws IOException If file operations fail
+   */
+  private static void checkAndCleanDriverConflicts(String targetUrl, String... directories)
+      throws IOException {
+    String expectedFileName = DownloaderUtils.getFileName(targetUrl);
+    String expectedVersion = extractVersion(expectedFileName);
+    String driverType = getDriverType(expectedFileName);
+
+    // expectedVersion and driverType can be null when the driver type is not currently supported
+    if (expectedVersion == null || driverType == null) {
+      LOG.warn(
+          "Unable to extract driver version or type from URL: {}. Only mysql and postgresql drivers are currently supported.",
+          targetUrl);
+      return;
+    }
+
+    LOG.info(
+        "Starting driver version conflict check, expected version: {} - {}",
+        driverType,
+        expectedVersion);
+
+    for (String directory : directories) {
+      cleanConflictingDrivers(directory, driverType, expectedVersion);
+    }
+  }
+
+  /** Clean conflicting drivers in the specified directory */
+  private static void cleanConflictingDrivers(
+      String directory, String driverType, String expectedVersion) throws IOException {
+    Path dirPath = Paths.get(directory);
+    if (!Files.exists(dirPath)) {
+      return;
+    }
+
+    File[] files = dirPath.toFile().listFiles();
+    if (files == null) {
+      return;
+    }
+
+    Set<String> conflictingFiles = new HashSet<>();
+
+    for (File file : files) {
+      if (file.isFile()) {
+        String fileName = file.getName();
+        String version = extractVersion(fileName);
+        String type = getDriverType(fileName);
+
+        // If it's the same type of driver but different version, mark as conflict
+        if (type != null
+            && type.equals(driverType)
+            && version != null
+            && !version.equals(expectedVersion)) {
+          conflictingFiles.add(fileName);
+        }
+      }
+    }
+
+    // Delete conflicting driver files
+    for (String conflictingFile : conflictingFiles) {
+      Path conflictingPath = dirPath.resolve(conflictingFile);
+      try {
+        Files.deleteIfExists(conflictingPath);
+        LOG.info("Deleted conflicting driver file: {}", conflictingPath);
+      } catch (IOException e) {
+        LOG.warn("Failed to delete conflicting driver file: {}", conflictingPath, e);
+      }
+    }
+  }
+
+  /** Extract version number from filename */
+  private static String extractVersion(String fileName) {
+    for (Pattern pattern : SUPPORTED_CLEAN_CONFLICTS_DRIVER_TYPES.values()) {
+      Matcher matcher = pattern.matcher(fileName);
+      if (matcher.matches()) {
+        return matcher.group(1);
+      }
+    }
+    return null;
+  }
+
+  /** Extract driver type from filename */
+  private static String getDriverType(String fileName) {
+    for (Map.Entry<String, Pattern> entry : SUPPORTED_CLEAN_CONFLICTS_DRIVER_TYPES.entrySet()) {
+      if (entry.getValue().matcher(fileName).matches()) {
+        return entry.getKey();
+      }
+    }
+    return null;
   }
 }

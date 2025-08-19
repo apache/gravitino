@@ -84,4 +84,4 @@ ModelVersion doesn't have predefined properties. Users can define the properties
 
 ### ModelVersion operations
 
-Refer to [ModelVersion operation](./manage-model-metadata-using-gravitino.md#model-version-operations) for more details.
+Refer to [ModelVersion operation](./manage-model-metadata-using-gravitino.md#modelversion-operations) for more details.
