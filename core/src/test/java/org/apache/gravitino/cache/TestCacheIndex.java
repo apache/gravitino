@@ -33,7 +33,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 public class TestCacheIndex {
-  private RadixTree<EntityCacheKey> indexTree;
+  private RadixTree<EntityCacheRelationKey> indexTree;
 
   private NameIdentifier ident1;
   private NameIdentifier ident2;
@@ -48,18 +48,18 @@ public class TestCacheIndex {
   private NameIdentifier ident11;
   private NameIdentifier ident12;
 
-  private EntityCacheKey key1;
-  private EntityCacheKey key2;
-  private EntityCacheKey key3;
-  private EntityCacheKey key4;
-  private EntityCacheKey key5;
-  private EntityCacheKey key6;
-  private EntityCacheKey key7;
-  private EntityCacheKey key8;
-  private EntityCacheKey key9;
-  private EntityCacheKey key10;
-  private EntityCacheKey key11;
-  private EntityCacheKey key12;
+  private EntityCacheRelationKey key1;
+  private EntityCacheRelationKey key2;
+  private EntityCacheRelationKey key3;
+  private EntityCacheRelationKey key4;
+  private EntityCacheRelationKey key5;
+  private EntityCacheRelationKey key6;
+  private EntityCacheRelationKey key7;
+  private EntityCacheRelationKey key8;
+  private EntityCacheRelationKey key9;
+  private EntityCacheRelationKey key10;
+  private EntityCacheRelationKey key11;
+  private EntityCacheRelationKey key12;
 
   @BeforeEach
   void setUp() {
@@ -80,24 +80,24 @@ public class TestCacheIndex {
     ident11 = NameIdentifierUtil.ofUser("metalake2", "user1");
     ident12 = NameIdentifierUtil.ofUser("metalake2", "user2");
 
-    key1 = EntityCacheKey.of(ident1, Entity.EntityType.SCHEMA);
-    key2 = EntityCacheKey.of(ident2, Entity.EntityType.SCHEMA);
-    key3 = EntityCacheKey.of(ident3, Entity.EntityType.TABLE);
-    key4 = EntityCacheKey.of(ident4, Entity.EntityType.TOPIC);
-    key5 = EntityCacheKey.of(ident5, Entity.EntityType.TABLE);
-    key6 = EntityCacheKey.of(ident6, Entity.EntityType.TABLE);
+    key1 = EntityCacheRelationKey.of(ident1, Entity.EntityType.SCHEMA);
+    key2 = EntityCacheRelationKey.of(ident2, Entity.EntityType.SCHEMA);
+    key3 = EntityCacheRelationKey.of(ident3, Entity.EntityType.TABLE);
+    key4 = EntityCacheRelationKey.of(ident4, Entity.EntityType.TOPIC);
+    key5 = EntityCacheRelationKey.of(ident5, Entity.EntityType.TABLE);
+    key6 = EntityCacheRelationKey.of(ident6, Entity.EntityType.TABLE);
 
     key7 =
-        EntityCacheKey.of(
+        EntityCacheRelationKey.of(
             ident7, Entity.EntityType.ROLE, SupportsRelationOperations.Type.ROLE_GROUP_REL);
     key8 =
-        EntityCacheKey.of(
+        EntityCacheRelationKey.of(
             ident8, Entity.EntityType.ROLE, SupportsRelationOperations.Type.ROLE_USER_REL);
 
-    key9 = EntityCacheKey.of(ident9, Entity.EntityType.GROUP);
-    key10 = EntityCacheKey.of(ident10, Entity.EntityType.GROUP);
-    key11 = EntityCacheKey.of(ident11, Entity.EntityType.USER);
-    key12 = EntityCacheKey.of(ident12, Entity.EntityType.USER);
+    key9 = EntityCacheRelationKey.of(ident9, Entity.EntityType.GROUP);
+    key10 = EntityCacheRelationKey.of(ident10, Entity.EntityType.GROUP);
+    key11 = EntityCacheRelationKey.of(ident11, Entity.EntityType.USER);
+    key12 = EntityCacheRelationKey.of(ident12, Entity.EntityType.USER);
 
     addIndex(indexTree, key12);
     addIndex(indexTree, key11);
@@ -120,107 +120,110 @@ public class TestCacheIndex {
 
   @Test
   void testGetFromByMetalakePrefix() {
-    List<EntityCacheKey> storeEntityCacheKeys =
+    List<EntityCacheRelationKey> storeEntityCacheRelationKeys =
         ImmutableList.copyOf(indexTree.getValuesForKeysStartingWith("metalake1"));
 
-    Assertions.assertEquals(8, storeEntityCacheKeys.size());
-    Assertions.assertTrue(storeEntityCacheKeys.contains(key1));
-    Assertions.assertTrue(storeEntityCacheKeys.contains(key3));
-    Assertions.assertTrue(storeEntityCacheKeys.contains(key4));
-    Assertions.assertTrue(storeEntityCacheKeys.contains(key5));
-    Assertions.assertTrue(storeEntityCacheKeys.contains(key6));
-    Assertions.assertTrue(storeEntityCacheKeys.contains(key7));
-    Assertions.assertTrue(storeEntityCacheKeys.contains(key9));
-    Assertions.assertTrue(storeEntityCacheKeys.contains(key10));
+    Assertions.assertEquals(8, storeEntityCacheRelationKeys.size());
+    Assertions.assertTrue(storeEntityCacheRelationKeys.contains(key1));
+    Assertions.assertTrue(storeEntityCacheRelationKeys.contains(key3));
+    Assertions.assertTrue(storeEntityCacheRelationKeys.contains(key4));
+    Assertions.assertTrue(storeEntityCacheRelationKeys.contains(key5));
+    Assertions.assertTrue(storeEntityCacheRelationKeys.contains(key6));
+    Assertions.assertTrue(storeEntityCacheRelationKeys.contains(key7));
+    Assertions.assertTrue(storeEntityCacheRelationKeys.contains(key9));
+    Assertions.assertTrue(storeEntityCacheRelationKeys.contains(key10));
 
-    List<EntityCacheKey> storeEntityCacheKeys2 =
+    List<EntityCacheRelationKey> storeEntityCacheRelationKeys2 =
         ImmutableList.copyOf(indexTree.getValuesForKeysStartingWith("metalake2"));
 
-    Assertions.assertEquals(4, storeEntityCacheKeys2.size());
-    Assertions.assertTrue(storeEntityCacheKeys2.contains(key2));
-    Assertions.assertTrue(storeEntityCacheKeys2.contains(key8));
-    Assertions.assertTrue(storeEntityCacheKeys2.contains(key11));
-    Assertions.assertTrue(storeEntityCacheKeys2.contains(key12));
+    Assertions.assertEquals(4, storeEntityCacheRelationKeys2.size());
+    Assertions.assertTrue(storeEntityCacheRelationKeys2.contains(key2));
+    Assertions.assertTrue(storeEntityCacheRelationKeys2.contains(key8));
+    Assertions.assertTrue(storeEntityCacheRelationKeys2.contains(key11));
+    Assertions.assertTrue(storeEntityCacheRelationKeys2.contains(key12));
   }
 
   @Test
   void testGetByCatalogPrefix() {
-    List<EntityCacheKey> storeEntityCacheKeys =
+    List<EntityCacheRelationKey> storeEntityCacheRelationKeys =
         ImmutableList.copyOf(indexTree.getValuesForKeysStartingWith("metalake1.catalog1"));
 
-    Assertions.assertEquals(4, storeEntityCacheKeys.size());
-    Assertions.assertTrue(storeEntityCacheKeys.contains(key1));
-    Assertions.assertTrue(storeEntityCacheKeys.contains(key3));
-    Assertions.assertTrue(storeEntityCacheKeys.contains(key4));
-    Assertions.assertTrue(storeEntityCacheKeys.contains(key6));
+    Assertions.assertEquals(4, storeEntityCacheRelationKeys.size());
+    Assertions.assertTrue(storeEntityCacheRelationKeys.contains(key1));
+    Assertions.assertTrue(storeEntityCacheRelationKeys.contains(key3));
+    Assertions.assertTrue(storeEntityCacheRelationKeys.contains(key4));
+    Assertions.assertTrue(storeEntityCacheRelationKeys.contains(key6));
 
-    storeEntityCacheKeys =
+    storeEntityCacheRelationKeys =
         ImmutableList.copyOf(indexTree.getValuesForKeysStartingWith("metalake1.catalog2"));
-    Assertions.assertEquals(1, storeEntityCacheKeys.size());
-    Assertions.assertTrue(storeEntityCacheKeys.contains(key5));
+    Assertions.assertEquals(1, storeEntityCacheRelationKeys.size());
+    Assertions.assertTrue(storeEntityCacheRelationKeys.contains(key5));
   }
 
   @Test
   void testGetBySchemaPrefix() {
-    List<EntityCacheKey> storeEntityCacheKeys =
+    List<EntityCacheRelationKey> storeEntityCacheRelationKeys =
         ImmutableList.copyOf(indexTree.getValuesForKeysStartingWith("metalake1.catalog1.schema1"));
 
-    Assertions.assertEquals(3, storeEntityCacheKeys.size());
-    Assertions.assertTrue(storeEntityCacheKeys.contains(key1));
-    Assertions.assertTrue(storeEntityCacheKeys.contains(key3));
-    Assertions.assertTrue(storeEntityCacheKeys.contains(key4));
+    Assertions.assertEquals(3, storeEntityCacheRelationKeys.size());
+    Assertions.assertTrue(storeEntityCacheRelationKeys.contains(key1));
+    Assertions.assertTrue(storeEntityCacheRelationKeys.contains(key3));
+    Assertions.assertTrue(storeEntityCacheRelationKeys.contains(key4));
 
-    storeEntityCacheKeys =
+    storeEntityCacheRelationKeys =
         ImmutableList.copyOf(indexTree.getValuesForKeysStartingWith("metalake1.catalog1.schema2"));
-    Assertions.assertEquals(1, storeEntityCacheKeys.size());
-    Assertions.assertTrue(storeEntityCacheKeys.contains(key6));
+    Assertions.assertEquals(1, storeEntityCacheRelationKeys.size());
+    Assertions.assertTrue(storeEntityCacheRelationKeys.contains(key6));
 
-    storeEntityCacheKeys =
+    storeEntityCacheRelationKeys =
         ImmutableList.copyOf(indexTree.getValuesForKeysStartingWith("metalake1.catalog2.schema1"));
-    Assertions.assertEquals(1, storeEntityCacheKeys.size());
-    Assertions.assertTrue(storeEntityCacheKeys.contains(key5));
+    Assertions.assertEquals(1, storeEntityCacheRelationKeys.size());
+    Assertions.assertTrue(storeEntityCacheRelationKeys.contains(key5));
   }
 
   @Test
   void testGetByExactKey() {
-    EntityCacheKey storeEntityCacheKey = indexTree.getValueForExactKey(key1.toString());
-    Assertions.assertEquals(key1, storeEntityCacheKey);
+    EntityCacheRelationKey storeEntityCacheRelationKey =
+        indexTree.getValueForExactKey(key1.toString());
+    Assertions.assertEquals(key1, storeEntityCacheRelationKey);
 
-    storeEntityCacheKey = indexTree.getValueForExactKey(key2.toString());
-    Assertions.assertEquals(key2, storeEntityCacheKey);
+    storeEntityCacheRelationKey = indexTree.getValueForExactKey(key2.toString());
+    Assertions.assertEquals(key2, storeEntityCacheRelationKey);
 
-    storeEntityCacheKey = indexTree.getValueForExactKey(key3.toString());
-    Assertions.assertEquals(key3, storeEntityCacheKey);
+    storeEntityCacheRelationKey = indexTree.getValueForExactKey(key3.toString());
+    Assertions.assertEquals(key3, storeEntityCacheRelationKey);
 
-    storeEntityCacheKey = indexTree.getValueForExactKey(key4.toString());
-    Assertions.assertEquals(key4, storeEntityCacheKey);
+    storeEntityCacheRelationKey = indexTree.getValueForExactKey(key4.toString());
+    Assertions.assertEquals(key4, storeEntityCacheRelationKey);
 
-    storeEntityCacheKey = indexTree.getValueForExactKey(key5.toString());
-    Assertions.assertEquals(key5, storeEntityCacheKey);
+    storeEntityCacheRelationKey = indexTree.getValueForExactKey(key5.toString());
+    Assertions.assertEquals(key5, storeEntityCacheRelationKey);
 
-    storeEntityCacheKey = indexTree.getValueForExactKey(key6.toString());
-    Assertions.assertEquals(key6, storeEntityCacheKey);
+    storeEntityCacheRelationKey = indexTree.getValueForExactKey(key6.toString());
+    Assertions.assertEquals(key6, storeEntityCacheRelationKey);
 
-    storeEntityCacheKey = indexTree.getValueForExactKey(key7.toString());
-    Assertions.assertEquals(key7, storeEntityCacheKey);
+    storeEntityCacheRelationKey = indexTree.getValueForExactKey(key7.toString());
+    Assertions.assertEquals(key7, storeEntityCacheRelationKey);
 
-    storeEntityCacheKey = indexTree.getValueForExactKey(key8.toString());
-    Assertions.assertEquals(key8, storeEntityCacheKey);
+    storeEntityCacheRelationKey = indexTree.getValueForExactKey(key8.toString());
+    Assertions.assertEquals(key8, storeEntityCacheRelationKey);
 
-    storeEntityCacheKey = indexTree.getValueForExactKey(key9.toString());
-    Assertions.assertEquals(key9, storeEntityCacheKey);
+    storeEntityCacheRelationKey = indexTree.getValueForExactKey(key9.toString());
+    Assertions.assertEquals(key9, storeEntityCacheRelationKey);
 
-    storeEntityCacheKey = indexTree.getValueForExactKey(key10.toString());
-    Assertions.assertEquals(key10, storeEntityCacheKey);
+    storeEntityCacheRelationKey = indexTree.getValueForExactKey(key10.toString());
+    Assertions.assertEquals(key10, storeEntityCacheRelationKey);
 
-    storeEntityCacheKey = indexTree.getValueForExactKey(key11.toString());
-    Assertions.assertEquals(key11, storeEntityCacheKey);
+    storeEntityCacheRelationKey = indexTree.getValueForExactKey(key11.toString());
+    Assertions.assertEquals(key11, storeEntityCacheRelationKey);
 
-    storeEntityCacheKey = indexTree.getValueForExactKey(key12.toString());
-    Assertions.assertEquals(key12, storeEntityCacheKey);
+    storeEntityCacheRelationKey = indexTree.getValueForExactKey(key12.toString());
+    Assertions.assertEquals(key12, storeEntityCacheRelationKey);
   }
 
-  private void addIndex(RadixTree<EntityCacheKey> indexTree, EntityCacheKey storeEntityCacheKey) {
-    indexTree.put(storeEntityCacheKey.toString(), storeEntityCacheKey);
+  private void addIndex(
+      RadixTree<EntityCacheRelationKey> indexTree,
+      EntityCacheRelationKey storeEntityCacheRelationKey) {
+    indexTree.put(storeEntityCacheRelationKey.toString(), storeEntityCacheRelationKey);
   }
 }

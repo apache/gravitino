@@ -78,7 +78,7 @@ public class TestUtil {
    * @return The test {@link BaseMetalake} entity.
    */
   public static BaseMetalake getTestMetalake() {
-    return getTestMetalake(generator.nextId(), "test_metalake", "metalake entity test");
+    return getTestMetalake(generator.nextId(), "m1", "metalake entity test");
   }
 
   /**
@@ -107,7 +107,7 @@ public class TestUtil {
    */
   public static CatalogEntity getTestCatalogEntity() {
     return getTestCatalogEntity(
-        generator.nextId(), "test_catalog", Namespace.of("m1"), "hive", "catalog entity test");
+        generator.nextId(), "c2", Namespace.of("m1"), "hive", "catalog entity test");
   }
 
   /**
