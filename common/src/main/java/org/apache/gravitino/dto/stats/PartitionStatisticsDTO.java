@@ -63,7 +63,7 @@ public class PartitionStatisticsDTO implements PartitionStatistics {
   /** Validates the PartitionStatisticsDTO instance. */
   public void validate() {
     Preconditions.checkArgument(
-        StringUtils.isNotBlank(partitionName), "\"name\" must not be null or empty");
+        StringUtils.isNotBlank(partitionName), "\"partitionName\" must not be null or empty");
     Preconditions.checkArgument(statistics != null, "\"statistics\" must not be null");
     for (StatisticDTO statistic : statistics) {
       statistic.validate();
