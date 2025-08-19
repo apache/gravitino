@@ -65,6 +65,9 @@ jobs:
       - name: Build with Gradle
         run: |
           ./gradlew build -x test
+
+      - name: Build release jars
+        run: |
           ./gradlew release -x test
 
   # To check the spark-connector is compatible with scala2.13
