@@ -96,7 +96,7 @@ CREATE TABLE IF NOT EXISTS schema_meta (
     UNIQUE (catalog_id, schema_name, deleted_at)
     );
 
-CREATE INDEX IF NOT EXISTS idx_metalake_id ON schema_meta (metalake_id);
+CREATE INDEX IF NOT EXISTS schema_meta_idx_metalake_id ON schema_meta (metalake_id);
 COMMENT ON TABLE schema_meta IS 'schema metadata';
 
 COMMENT ON COLUMN schema_meta.schema_id IS 'schema id';
@@ -125,8 +125,8 @@ CREATE TABLE IF NOT EXISTS table_meta (
     UNIQUE (schema_id, table_name, deleted_at)
     );
 
-CREATE INDEX IF NOT EXISTS idx_metalake_id ON table_meta (metalake_id);
-CREATE INDEX IF NOT EXISTS idx_catalog_id ON table_meta (catalog_id);
+CREATE INDEX IF NOT EXISTS table_meta_idx_metalake_id ON table_meta (metalake_id);
+CREATE INDEX IF NOT EXISTS table_meta_idx_catalog_id ON table_meta (catalog_id);
 COMMENT ON TABLE table_meta IS 'table metadata';
 
 COMMENT ON COLUMN table_meta.table_id IS 'table id';
@@ -160,9 +160,9 @@ CREATE TABLE IF NOT EXISTS table_column_version_info (
     PRIMARY KEY (id),
     UNIQUE (table_id, table_version, column_id, deleted_at)
 );
-CREATE INDEX idx_mid ON table_column_version_info (metalake_id);
-CREATE INDEX idx_cid ON table_column_version_info (catalog_id);
-CREATE INDEX idx_sid ON table_column_version_info (schema_id);
+CREATE INDEX table_column_version_info_idx_mid ON table_column_version_info (metalake_id);
+CREATE INDEX table_column_version_info_idx_cid ON table_column_version_info (catalog_id);
+CREATE INDEX table_column_version_info_idx_sid ON table_column_version_info (schema_id);
 COMMENT ON TABLE table_column_version_info IS 'table column version information';
 
 COMMENT ON COLUMN table_column_version_info.id IS 'auto increment id';
@@ -199,8 +199,8 @@ CREATE TABLE IF NOT EXISTS fileset_meta (
     UNIQUE (schema_id, fileset_name, deleted_at)
     );
 
-CREATE INDEX IF NOT EXISTS idx_metalake_id ON fileset_meta (metalake_id);
-CREATE INDEX IF NOT EXISTS idx_catalog_id ON fileset_meta (catalog_id);
+CREATE INDEX IF NOT EXISTS fileset_meta_idx_metalake_id ON fileset_meta (metalake_id);
+CREATE INDEX IF NOT EXISTS fileset_meta_idx_catalog_id ON fileset_meta (catalog_id);
 COMMENT ON TABLE fileset_meta IS 'fileset metadata';
 
 COMMENT ON COLUMN fileset_meta.fileset_id IS 'fileset id';
@@ -231,9 +231,9 @@ CREATE TABLE IF NOT EXISTS fileset_version_info (
     UNIQUE (fileset_id, version, storage_location_name, deleted_at)
     );
 
-CREATE INDEX IF NOT EXISTS idx_metalake_id ON fileset_version_info (metalake_id);
-CREATE INDEX IF NOT EXISTS idx_catalog_id ON fileset_version_info (catalog_id);
-CREATE INDEX IF NOT EXISTS idx_schema_id ON fileset_version_info (schema_id);
+CREATE INDEX IF NOT EXISTS fileset_version_info_idx_metalake_id ON fileset_version_info (metalake_id);
+CREATE INDEX IF NOT EXISTS fileset_version_info_idx_idx_catalog_id ON fileset_version_info (catalog_id);
+CREATE INDEX IF NOT EXISTS fileset_version_info_idx_idx_schema_id ON fileset_version_info (schema_id);
 COMMENT ON TABLE fileset_version_info IS 'fileset version information';
 
 COMMENT ON COLUMN fileset_version_info.id IS 'auto increment id';
@@ -265,8 +265,8 @@ CREATE TABLE IF NOT EXISTS topic_meta (
     UNIQUE (schema_id, topic_name, deleted_at)
     );
 
-CREATE INDEX IF NOT EXISTS idx_metalake_id ON topic_meta (metalake_id);
-CREATE INDEX IF NOT EXISTS idx_catalog_id ON topic_meta (catalog_id);
+CREATE INDEX IF NOT EXISTS topic_meta_idx_metalake_id ON topic_meta (metalake_id);
+CREATE INDEX IF NOT EXISTS topic_meta_idx_catalog_id ON topic_meta (catalog_id);
 COMMENT ON TABLE topic_meta IS 'topic metadata';
 
 COMMENT ON COLUMN topic_meta.topic_id IS 'topic id';
@@ -341,7 +341,7 @@ CREATE TABLE IF NOT EXISTS role_meta_securable_object (
     PRIMARY KEY (id)
     );
 
-CREATE INDEX IF NOT EXISTS idx_role_id ON role_meta_securable_object (role_id);
+CREATE INDEX IF NOT EXISTS role_meta_securable_object_idx_role_id ON role_meta_securable_object (role_id);
 COMMENT ON TABLE role_meta_securable_object IS 'role to securable object relation metadata';
 
 COMMENT ON COLUMN role_meta_securable_object.id IS 'auto increment id';
@@ -367,7 +367,7 @@ CREATE TABLE IF NOT EXISTS user_role_rel (
     UNIQUE (user_id, role_id, deleted_at)
     );
 
-CREATE INDEX IF NOT EXISTS idx_user_id ON user_role_rel (user_id);
+CREATE INDEX IF NOT EXISTS user_role_rel_idx_user_id ON user_role_rel (user_id);
 COMMENT ON TABLE user_role_rel IS 'user role relation metadata';
 
 COMMENT ON COLUMN user_role_rel.id IS 'auto increment id';
@@ -413,7 +413,7 @@ CREATE TABLE IF NOT EXISTS group_role_rel (
     UNIQUE (group_id, role_id, deleted_at)
     );
 
-CREATE INDEX IF NOT EXISTS idx_group_id ON group_role_rel (group_id);
+CREATE INDEX IF NOT EXISTS group_role_rel_idx_group_id ON group_role_rel (group_id);
 COMMENT ON TABLE group_role_rel IS 'relation between group and role';
 COMMENT ON COLUMN group_role_rel.id IS 'auto increment id';
 COMMENT ON COLUMN group_role_rel.group_id IS 'group id';
@@ -460,8 +460,8 @@ CREATE TABLE IF NOT EXISTS tag_relation_meta (
     UNIQUE (tag_id, metadata_object_id, metadata_object_type, deleted_at)
     );
 
-CREATE INDEX IF NOT EXISTS idx_tag_id ON tag_relation_meta (tag_id);
-CREATE INDEX IF NOT EXISTS idx_metadata_object_id ON tag_relation_meta (metadata_object_id);
+CREATE INDEX IF NOT EXISTS tag_relation_meta_idx_tag_id ON tag_relation_meta (tag_id);
+CREATE INDEX IF NOT EXISTS tag_relation_meta_idx_metadata_object_id ON tag_relation_meta (metadata_object_id);
 COMMENT ON TABLE tag_relation_meta IS 'tag metadata object relation';
 COMMENT ON COLUMN tag_relation_meta.id IS 'auto increment id';
 COMMENT ON COLUMN tag_relation_meta.tag_id IS 'tag id';
@@ -487,8 +487,8 @@ CREATE TABLE IF NOT EXISTS owner_meta (
     UNIQUE (owner_id, metadata_object_id, metadata_object_type, deleted_at)
     );
 
-CREATE INDEX IF NOT EXISTS idx_owner_id ON owner_meta (owner_id);
-CREATE INDEX IF NOT EXISTS idx_metadata_object_id ON owner_meta (metadata_object_id);
+CREATE INDEX IF NOT EXISTS owner_meta_idx_owner_id ON owner_meta (owner_id);
+CREATE INDEX IF NOT EXISTS owner_meta_idx_metadata_object_id ON owner_meta (metadata_object_id);
 COMMENT ON TABLE owner_meta IS 'owner relation';
 COMMENT ON COLUMN owner_meta.id IS 'auto increment id';
 COMMENT ON COLUMN owner_meta.metalake_id IS 'metalake id';
@@ -517,8 +517,8 @@ CREATE TABLE IF NOT EXISTS model_meta (
     UNIQUE (schema_id, model_name, deleted_at)
     );
 
-CREATE INDEX IF NOT EXISTS idx_metalake_id ON model_meta (metalake_id);
-CREATE INDEX IF NOT EXISTS idx_catalog_id ON model_meta (catalog_id);
+CREATE INDEX IF NOT EXISTS model_meta_idx_metalake_id ON model_meta (metalake_id);
+CREATE INDEX IF NOT EXISTS model_meta_idx_catalog_id ON model_meta (catalog_id);
 COMMENT ON TABLE model_meta IS 'model metadata';
 
 COMMENT ON COLUMN model_meta.model_id IS 'model id';
@@ -550,9 +550,9 @@ CREATE TABLE IF NOT EXISTS model_version_info (
     UNIQUE (model_id, version, model_version_uri_name, deleted_at)
     );
 
-CREATE INDEX IF NOT EXISTS idx_metalake_id ON model_version_info (metalake_id);
-CREATE INDEX IF NOT EXISTS idx_catalog_id ON model_version_info (catalog_id);
-CREATE INDEX IF NOT EXISTS idx_schema_id ON model_version_info (schema_id);
+CREATE INDEX IF NOT EXISTS model_version_info_idx_metalake_id ON model_version_info (metalake_id);
+CREATE INDEX IF NOT EXISTS model_version_info_idx_catalog_id ON model_version_info (catalog_id);
+CREATE INDEX IF NOT EXISTS model_version_info_idx_schema_id ON model_version_info (schema_id);
 COMMENT ON TABLE model_version_info IS 'model version information';
 
 COMMENT ON COLUMN model_version_info.id IS 'auto increment id';
@@ -579,7 +579,7 @@ CREATE TABLE IF NOT EXISTS model_version_alias_rel (
     UNIQUE (model_id, model_version_alias, deleted_at)
     );
 
-CREATE INDEX IF NOT EXISTS idx_model_version_alias on model_version_alias_rel (model_version_alias);
+CREATE INDEX IF NOT EXISTS model_version_alias_rel_idx_model_version_alias on model_version_alias_rel (model_version_alias);
 COMMENT ON TABLE model_version_alias_rel IS 'model version alias relation';
 
 COMMENT ON COLUMN model_version_alias_rel.id IS 'auto increment id';
@@ -626,7 +626,7 @@ CREATE TABLE IF NOT EXISTS policy_version_info (
     UNIQUE (policy_id, version, deleted_at)
 );
 
-CREATE INDEX IF NOT EXISTS idx_metalake_id ON policy_version_info (metalake_id);
+CREATE INDEX IF NOT EXISTS policy_version_info_idx_metalake_id ON policy_version_info (metalake_id);
 COMMENT ON TABLE policy_version_info IS 'policy version info';
 COMMENT ON COLUMN policy_version_info.id IS 'auto increment id';
 COMMENT ON COLUMN policy_version_info.metalake_id IS 'metalake id';
@@ -651,8 +651,8 @@ CREATE TABLE IF NOT EXISTS policy_relation_meta (
     UNIQUE (policy_id, metadata_object_id, metadata_object_type, deleted_at)
 );
 
-CREATE INDEX IF NOT EXISTS idx_policy_id ON policy_relation_meta (policy_id);
-CREATE INDEX IF NOT EXISTS idx_metadata_object_id ON policy_relation_meta (metadata_object_id);
+CREATE INDEX IF NOT EXISTS policy_relation_meta_idx_policy_id ON policy_relation_meta (policy_id);
+CREATE INDEX IF NOT EXISTS policy_relation_meta_idx_metadata_object_id ON policy_relation_meta (metadata_object_id);
 COMMENT ON TABLE policy_relation_meta IS 'policy metadata object relation';
 COMMENT ON COLUMN policy_relation_meta.id IS 'auto increment id';
 COMMENT ON COLUMN policy_relation_meta.policy_id IS 'policy id';
@@ -679,8 +679,8 @@ CREATE TABLE IF NOT EXISTS statistic_meta (
     UNIQUE (statistic_name, metadata_object_id, deleted_at)
 );
 
-CREATE INDEX IF NOT EXISTS idx_stid ON statistic_meta (statistic_id);
-CREATE INDEX IF NOT EXISTS idx_moid ON statistic_meta (metadata_object_id);
+CREATE INDEX IF NOT EXISTS statistic_meta_idx_stid ON statistic_meta (statistic_id);
+CREATE INDEX IF NOT EXISTS statistic_meta_idx_moid ON statistic_meta (metadata_object_id);
 COMMENT ON TABLE statistic_meta IS 'statistic metadata';
 COMMENT ON COLUMN statistic_meta.id IS 'auto increment id';
 COMMENT ON COLUMN statistic_meta.statistic_id IS 'statistic id';
@@ -735,8 +735,8 @@ CREATE TABLE IF NOT EXISTS job_run_meta (
     UNIQUE (metalake_id, job_execution_id, deleted_at)
 );
 
-CREATE INDEX IF NOT EXISTS idx_job_template_id ON job_run_meta (job_template_id);
-CREATE INDEX IF NOT EXISTS idx_job_execution_id ON job_run_meta (job_execution_id);
+CREATE INDEX IF NOT EXISTS job_run_meta_idx_job_template_id ON job_run_meta (job_template_id);
+CREATE INDEX IF NOT EXISTS job_run_meta_idx_job_execution_id ON job_run_meta (job_execution_id);
 COMMENT ON TABLE job_run_meta IS 'job run metadata';
 COMMENT ON COLUMN job_run_meta.job_run_id IS 'job run id';
 COMMENT ON COLUMN job_run_meta.job_template_id IS 'job template id';
