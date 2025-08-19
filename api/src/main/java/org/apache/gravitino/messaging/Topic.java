@@ -25,6 +25,7 @@ import org.apache.gravitino.Auditable;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.annotation.Evolving;
 import org.apache.gravitino.authorization.SupportsRoles;
+import org.apache.gravitino.policy.SupportsPolicies;
 import org.apache.gravitino.tag.SupportsTags;
 
 /**
@@ -58,6 +59,14 @@ public interface Topic extends Auditable {
    */
   default SupportsTags supportsTags() {
     throw new UnsupportedOperationException("Topic does not support tag operations.");
+  }
+
+  /**
+   * @return the {@link SupportsPolicies} if the topic supports policy operations.
+   * @throws UnsupportedOperationException if the topic does not support policy operations.
+   */
+  default SupportsPolicies supportsPolicies() {
+    throw new UnsupportedOperationException("Topic does not support policy operations.");
   }
 
   /**
