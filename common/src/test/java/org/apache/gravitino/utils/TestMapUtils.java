@@ -29,13 +29,49 @@ public class TestMapUtils {
   @Test
   public void testGetPrefixMap() {
     Map configs = ImmutableMap.of("a.b", "", "a.c", "", "", "", "b.a", "");
-
-    Assertions.assertEquals(ImmutableMap.of(), MapUtils.getPrefixMap(configs, "xx"));
-    Assertions.assertThrowsExactly(
-        NullPointerException.class, () -> MapUtils.getPrefixMap(configs, null));
     Assertions.assertEquals(
-        ImmutableMap.of("b", "", "c", ""), MapUtils.getPrefixMap(configs, "a."));
-    Assertions.assertEquals(ImmutableMap.of("a", ""), MapUtils.getPrefixMap(configs, "b."));
-    Assertions.assertEquals(configs, MapUtils.getPrefixMap(configs, ""));
+        ImmutableMap.of("a.b", "", "a.c", ""), MapUtils.getPrefixMap(configs, "a.", true));
+    Assertions.assertEquals(
+        ImmutableMap.of("b", "", "c", ""), MapUtils.getPrefixMap(configs, "a.", false));
+
+    Assertions.assertEquals(ImmutableMap.of("b.a", ""), MapUtils.getPrefixMap(configs, "b.", true));
+    Assertions.assertEquals(ImmutableMap.of("a", ""), MapUtils.getPrefixMap(configs, "b.", false));
+
+    Assertions.assertEquals(configs, MapUtils.getPrefixMap(configs, "", true));
+    Assertions.assertEquals(configs, MapUtils.getPrefixMap(configs, "", false));
+
+    Assertions.assertThrowsExactly(
+        IllegalArgumentException.class, () -> MapUtils.getPrefixMap(configs, null, true));
+    Assertions.assertThrowsExactly(
+        IllegalArgumentException.class, () -> MapUtils.getPrefixMap(null, "", true));
+  }
+
+  @Test
+  void testGetMapWithoutPrefix() {
+    Map<String, String> properties =
+        ImmutableMap.of(
+            "location-a",
+            "path-a",
+            "location-b",
+            "path-b",
+            "location-c",
+            "path-c",
+            "property-a",
+            "value-a",
+            "property-b",
+            "value-b",
+            "property-c",
+            "value-c");
+
+    Assertions.assertEquals(
+        ImmutableMap.of("property-a", "value-a", "property-b", "value-b", "property-c", "value-c"),
+        MapUtils.getMapWithoutPrefix(properties, "location-"));
+
+    Assertions.assertEquals(
+        ImmutableMap.of("location-a", "path-a", "location-b", "path-b", "location-c", "path-c"),
+        MapUtils.getMapWithoutPrefix(properties, "property-"));
+    Assertions.assertEquals(properties, MapUtils.getMapWithoutPrefix(properties, "unknown-"));
+    Assertions.assertThrowsExactly(
+        IllegalArgumentException.class, () -> MapUtils.getMapWithoutPrefix(properties, null));
   }
 }
