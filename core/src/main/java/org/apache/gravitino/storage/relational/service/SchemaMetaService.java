@@ -82,7 +82,6 @@ public class SchemaMetaService {
 
   public SchemaIds getSchemaIdByMetalakeNameAndCatalogNameAndSchemaName(
       String metalakeName, String catalogName, String schemaName) {
-    System.out.println("test");
     return SessionUtils.getWithoutCommit(
         SchemaMetaMapper.class,
         mapper ->
