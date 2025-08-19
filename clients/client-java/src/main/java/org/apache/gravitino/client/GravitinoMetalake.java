@@ -73,7 +73,6 @@ import org.apache.gravitino.dto.requests.UserAddRequest;
 import org.apache.gravitino.dto.responses.BaseResponse;
 import org.apache.gravitino.dto.responses.CatalogListResponse;
 import org.apache.gravitino.dto.responses.CatalogResponse;
-import org.apache.gravitino.dto.responses.DeleteResponse;
 import org.apache.gravitino.dto.responses.DropResponse;
 import org.apache.gravitino.dto.responses.EntityListResponse;
 import org.apache.gravitino.dto.responses.ErrorResponse;
@@ -1017,18 +1016,18 @@ public class GravitinoMetalake extends MetalakeDTO
    * @throws RuntimeException If deleting the Role encounters storage issues.
    */
   public boolean deleteRole(String role) throws NoSuchMetalakeException {
-    DeleteResponse resp =
+    DropResponse resp =
         restClient.delete(
             String.format(
                 API_METALAKES_ROLES_PATH,
                 RESTUtils.encodeString(this.name()),
                 RESTUtils.encodeString(role)),
-            DeleteResponse.class,
+            DropResponse.class,
             Collections.emptyMap(),
             ErrorHandlers.roleErrorHandler());
     resp.validate();
 
-    return resp.deleted();
+    return resp.dropped();
   }
 
   /**
