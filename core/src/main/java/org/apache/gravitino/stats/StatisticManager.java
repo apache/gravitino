@@ -350,17 +350,17 @@ public class StatisticManager implements Closeable {
   @VisibleForTesting
   public static class CustomPartitionStatistic implements PartitionStatistics {
 
-    private final String name;
+    private final String partitionName;
     private final Statistic[] statistics;
 
     public CustomPartitionStatistic(String partitionName, Statistic[] statistics) {
-      this.name = partitionName;
+      this.partitionName = partitionName;
       this.statistics = statistics;
     }
 
     @Override
     public String partitionName() {
-      return name;
+      return partitionName;
     }
 
     @Override
