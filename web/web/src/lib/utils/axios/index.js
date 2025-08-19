@@ -174,12 +174,22 @@ const transform = {
    */
   requestInterceptors: async (config, options) => {
     // ** Pre-Request Configuration Handling
-    // Use OAuth provider factory for proper token management
-    const token = await oauthProviderFactory.getAccessToken()
 
-    if (token && config?.requestOptions?.withToken !== false) {
-      // ** jwt token
-      config.headers.Authorization = options.authenticationScheme ? `${options.authenticationScheme} ${token}` : token
+    // Skip token retrieval for GitHub API calls entirely
+    if (config.url === githubApis.GET) {
+      return config
+    }
+
+    // Use OAuth provider factory for proper token management
+    try {
+      const token = await oauthProviderFactory.getAccessToken()
+
+      if (token && config?.requestOptions?.withToken !== false) {
+        // ** jwt token
+        config.headers.Authorization = options.authenticationScheme ? `${options.authenticationScheme} ${token}` : token
+      }
+    } catch (error) {
+      console.warn('Failed to get access token:', error)
     }
 
     return config
