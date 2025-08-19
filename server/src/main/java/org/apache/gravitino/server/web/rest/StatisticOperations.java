@@ -21,7 +21,6 @@ package org.apache.gravitino.server.web.rest;
 import com.codahale.metrics.annotation.ResponseMetered;
 import com.codahale.metrics.annotation.Timed;
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import java.util.List;
@@ -226,12 +225,12 @@ public class StatisticOperations {
       @PathParam("fullName") String fullName,
       @QueryParam("from") String fromPartitionName,
       @QueryParam("to") String toPartitionName,
-      @QueryParam("fromExclusive") @DefaultValue("false") boolean fromExclusive,
-      @QueryParam("toExclusive") @DefaultValue("false") boolean toExclusive) {
+      @QueryParam("fromInclusive") @DefaultValue("true") boolean fromInclusive,
+      @QueryParam("toInclusive") @DefaultValue("false") boolean toInclusive) {
 
     String formattedFromPartitionName =
-        getFormattedFromPartitionName(fromPartitionName, fromExclusive);
-    String formattedToPartitionName = getFormattedToPartitionName(toPartitionName, toExclusive);
+        getFormattedFromPartitionName(fromPartitionName, fromInclusive);
+    String formattedToPartitionName = getFormattedToPartitionName(toPartitionName, toInclusive);
 
     LOG.info(
         "Listing partition statistics for table: {} in the metalake {} from {} to {}",
@@ -259,8 +258,8 @@ public class StatisticOperations {
             MetadataObjectUtil.checkMetadataObject(metalake, object);
 
             PartitionRange range;
-            PartitionRange.BoundType fromBoundType = getFromBoundType(fromExclusive);
-            PartitionRange.BoundType toBoundType = getFromBoundType(toExclusive);
+            PartitionRange.BoundType fromBoundType = getFromBoundType(fromInclusive);
+            PartitionRange.BoundType toBoundType = getFromBoundType(toInclusive);
             if (fromPartitionName != null && toPartitionName != null) {
               range =
                   PartitionRange.between(
@@ -428,38 +427,32 @@ public class StatisticOperations {
     }
   }
 
+  @VisibleForTesting
+  static PartitionRange.BoundType getFromBoundType(boolean inclusive) {
+    return inclusive ? PartitionRange.BoundType.CLOSED : PartitionRange.BoundType.OPEN;
+  }
+
   private static String getFormattedFromPartitionName(
-      String fromPartitionName, boolean fromExclusive) {
-    if (fromExclusive) {
-      Preconditions.checkArgument(
-          StringUtils.isNotBlank(fromPartitionName),
-          "'from' partition name must not be null or empty when 'fromExclusive' is true");
-      return "[" + fromPartitionName;
+      String fromPartitionName, boolean fromInclusive) {
+    if (fromPartitionName == null) {
+      return "(-INF";
     } else {
-      if (fromPartitionName == null) {
-        return "(-INF";
-      } else {
+      if (fromInclusive) {
         return "(" + fromPartitionName;
+      } else {
+        return "[" + fromPartitionName;
       }
     }
   }
 
-  @VisibleForTesting
-  static PartitionRange.BoundType getFromBoundType(boolean exclusive) {
-    return exclusive ? PartitionRange.BoundType.CLOSED : PartitionRange.BoundType.OPEN;
-  }
-
-  private static String getFormattedToPartitionName(String toPartitionName, boolean toExclusive) {
-    if (toExclusive) {
-      Preconditions.checkArgument(
-          StringUtils.isNotBlank(toPartitionName),
-          "'to' partition name must not be null or empty when 'toExclusive' is true");
-      return toPartitionName + "]";
+  private static String getFormattedToPartitionName(String toPartitionName, boolean toInclusive) {
+    if (toPartitionName == null) {
+      return "INF)";
     } else {
-      if (toPartitionName == null) {
-        return "INF)";
-      } else {
+      if (toInclusive) {
         return toPartitionName + ")";
+      } else {
+        return toPartitionName + "]";
       }
     }
   }
