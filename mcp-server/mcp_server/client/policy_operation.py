@@ -74,7 +74,7 @@ class PolicyOperation(ABC):
         self, metadata_full_name: str, metadata_type: str, policy_name: str
     ) -> str:
         """
-        Get the policy with are associated with a specific metadata item.
+        Get the policy associated with a specific metadata item.
 
         Args:
             metadata_full_name: Full name of the metadata item (e.g., table, column)
