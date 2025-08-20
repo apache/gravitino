@@ -99,7 +99,7 @@ public class VersioningFilter implements Filter {
 
       // If version accept header is set, then we need to check if it is supported.
       Matcher m = ACCEPT_VERSION_REGEX.matcher(value);
-      if (m.matches()) {
+      if (m.find()) {
         int version = Integer.parseInt(m.group(1));
 
         if (!ApiVersion.isSupportedVersion(version)) {

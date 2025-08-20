@@ -259,4 +259,18 @@ public class TestVersioningFilter {
     assertTrue(actualHeaderNames.contains("Header2"));
     assertTrue(actualHeaderNames.contains("CustomHeader"));
   }
+
+  @Test
+  public void testDoFilterWithHeaderContainingValidVersionAsSubstring() throws Exception {
+    VersioningFilter filter = new VersioningFilter();
+    FilterChain mockChain = mock(FilterChain.class);
+    HttpServletRequest mockRequest = mock(HttpServletRequest.class);
+    HttpServletResponse mockResponse = mock(HttpServletResponse.class);
+    when(mockRequest.getHeaders("Accept"))
+        .thenReturn(new Vector<>(Collections.singletonList("foo application/vnd.gravitino.v1+json bar")).elements());
+
+    filter.doFilter(mockRequest, mockResponse, mockChain);
+    verify(mockChain).doFilter(any(), any());
+    verify(mockResponse).sendError(HttpServletResponse.SC_NOT_ACCEPTABLE, "Unsupported version");
+  }
 }
