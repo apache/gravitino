@@ -105,4 +105,10 @@ public class TestCompatibilityUtils {
     Assertions.assertEquals(
         Status.UNKNOWN, CompatibilityUtils.toAuditLogStatus(OperationStatus.UNKNOWN));
   }
+
+  @Test
+  void testOperationStatusNullHandling() {
+    Assertions.assertDoesNotThrow(() -> CompatibilityUtils.toAuditLogStatus(null));
+    Assertions.assertEquals(Status.UNKNOWN, CompatibilityUtils.toAuditLogStatus(null));
+  }
 }

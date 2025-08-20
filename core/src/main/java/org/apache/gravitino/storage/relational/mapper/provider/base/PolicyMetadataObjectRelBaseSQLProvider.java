@@ -37,8 +37,8 @@ public class PolicyMetadataObjectRelBaseSQLProvider {
   public String listPolicyPOsByMetadataObjectIdAndType(
       @Param("metadataObjectId") Long metadataObjectId,
       @Param("metadataObjectType") String metadataObjectType) {
-    return "SELECT pm.policy_id, pm.policy_name, pm.policy_type, pm.metalake_id, pm.inheritable,"
-        + " pm.exclusive, pm.supported_object_types, pm.audit_info, pm.current_version, pm.last_version,"
+    return "SELECT pm.policy_id, pm.policy_name, pm.policy_type, pm.metalake_id,"
+        + " pm.audit_info, pm.current_version, pm.last_version,"
         + " pm.deleted_at, pvi.id, pvi.metalake_id as version_metalake_id, pvi.policy_id as version_policy_id,"
         + " pvi.version, pvi.policy_comment, pvi.enabled, pvi.content, pvi.deleted_at as version_deleted_at"
         + " FROM "
@@ -58,8 +58,8 @@ public class PolicyMetadataObjectRelBaseSQLProvider {
       @Param("metadataObjectId") Long metadataObjectId,
       @Param("metadataObjectType") String metadataObjectType,
       @Param("policyName") String policyName) {
-    return "SELECT pm.policy_id, pm.policy_name, pm.policy_type, pm.metalake_id, pm.inheritable,"
-        + " pm.exclusive, pm.supported_object_types, pm.audit_info, pm.current_version, pm.last_version,"
+    return "SELECT pm.policy_id, pm.policy_name, pm.policy_type, pm.metalake_id,"
+        + " pm.audit_info, pm.current_version, pm.last_version,"
         + " pm.deleted_at, pvi.id, pvi.metalake_id as version_metalake_id, pvi.policy_id as version_policy_id,"
         + " pvi.version, pvi.policy_comment, pvi.enabled, pvi.content, pvi.deleted_at as version_deleted_at"
         + " FROM "

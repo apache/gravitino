@@ -1096,7 +1096,9 @@ public class Types {
 
     @Override
     public String simpleString() {
-      return "map<" + keyType.simpleString() + "," + valueType.simpleString() + ">";
+      return valueNullable
+          ? "map<" + keyType.simpleString() + "," + valueType.simpleString() + ">"
+          : "map<" + keyType.simpleString() + "," + valueType.simpleString() + ", NOT NULL>";
     }
 
     @Override

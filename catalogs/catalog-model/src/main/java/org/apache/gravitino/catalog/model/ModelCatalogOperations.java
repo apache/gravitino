@@ -19,7 +19,6 @@
 package org.apache.gravitino.catalog.model;
 
 import com.google.common.base.Preconditions;
-import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
@@ -451,7 +450,7 @@ public class ModelCatalogOperations extends ManagedSchemaOperations
         modelVersionEntity.aliases() == null
             ? Lists.newArrayList()
             : Lists.newArrayList(modelVersionEntity.aliases());
-    String entityUri = modelVersionEntity.uris().get(ModelVersion.URI_NAME_UNKNOWN);
+    Map<String, String> entityUris = Maps.newHashMap(modelVersionEntity.uris());
     Map<String, String> entityProperties =
         modelVersionEntity.properties() == null
             ? Maps.newHashMap()
@@ -474,7 +473,15 @@ public class ModelCatalogOperations extends ManagedSchemaOperations
 
       } else if (change instanceof ModelVersionChange.UpdateUri) {
         ModelVersionChange.UpdateUri updateUriChange = (ModelVersionChange.UpdateUri) change;
-        entityUri = updateUriChange.newUri();
+        doUpdateUri(entityUris, updateUriChange);
+
+      } else if (change instanceof ModelVersionChange.AddUri) {
+        ModelVersionChange.AddUri addUriChange = (ModelVersionChange.AddUri) change;
+        doAddUri(entityUris, addUriChange);
+
+      } else if (change instanceof ModelVersionChange.RemoveUri) {
+        ModelVersionChange.RemoveUri removeUriChange = (ModelVersionChange.RemoveUri) change;
+        doRemoveUri(entityUris, removeUriChange);
 
       } else if (change instanceof ModelVersionChange.UpdateAliases) {
         ModelVersionChange.UpdateAliases updateAliasesChange =
@@ -493,12 +500,16 @@ public class ModelCatalogOperations extends ManagedSchemaOperations
       }
     }
 
+    if (entityUris.isEmpty()) {
+      throw new IllegalArgumentException("Model version URI cannot be empty");
+    }
+
     return ModelVersionEntity.builder()
         .withVersion(entityVersion)
         .withModelIdentifier(entityModelIdentifier)
         .withAliases(entityAliases)
         .withComment(entityComment)
-        .withUris(ImmutableMap.of(ModelVersion.URI_NAME_UNKNOWN, entityUri))
+        .withUris(entityUris)
         .withProperties(entityProperties)
         .withAuditInfo(
             AuditInfo.builder()
@@ -612,6 +623,18 @@ public class ModelCatalogOperations extends ManagedSchemaOperations
   private void doRemoveProperty(
       Map<String, String> entityProperties, ModelVersionChange.RemoveProperty change) {
     entityProperties.remove(change.property());
+  }
+
+  private void doUpdateUri(Map<String, String> entityUris, ModelVersionChange.UpdateUri change) {
+    entityUris.replace(change.uriName(), change.newUri());
+  }
+
+  private void doAddUri(Map<String, String> entityUris, ModelVersionChange.AddUri change) {
+    entityUris.putIfAbsent(change.uriName(), change.uri());
+  }
+
+  private void doRemoveUri(Map<String, String> entityUris, ModelVersionChange.RemoveUri change) {
+    entityUris.remove(change.uriName());
   }
 
   private void doDeleteAlias(List<String> entityAliases, Set<String> deleteSet) {

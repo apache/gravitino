@@ -21,11 +21,25 @@ from enum import Enum
 
 class JobHandle(ABC):
     class Status(Enum):
-        QUEUED = "QUEUED"
-        STARTED = "STARTED"
-        FAILED = "FAILED"
-        SUCCEEDED = "SUCCEEDED"
-        CANCELLED = "CANCELLED"
+        QUEUED = "queued"
+        STARTED = "started"
+        FAILED = "failed"
+        SUCCEEDED = "succeeded"
+        CANCELLING = "cancelling"
+        CANCELLED = "cancelled"
+
+        @classmethod
+        def job_status_serialize(cls, status: "JobHandle.Status") -> str:
+            """Serializes the job status to a string."""
+            return status.value.lower()
+
+        @classmethod
+        def job_status_deserialize(cls, status: str) -> "JobHandle.Status":
+            """Deserializes a string to a job status."""
+            for m in cls:
+                if m.value.lower() == status.lower():
+                    return m
+            raise ValueError(f"Unknown job status: {status}")
 
     @abstractmethod
     def job_template_name(self) -> str:

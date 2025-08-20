@@ -75,11 +75,11 @@ public class PolicyManager implements PolicyDispatcher {
 
   @Override
   public String[] listPolicies(String metalake) {
-    return Arrays.stream(listPolicyInfos(metalake)).map(Policy::name).toArray(String[]::new);
+    return Arrays.stream(listPolicyInfos(metalake)).map(PolicyEntity::name).toArray(String[]::new);
   }
 
   @Override
-  public Policy[] listPolicyInfos(String metalake) {
+  public PolicyEntity[] listPolicyInfos(String metalake) {
     NameIdentifier metalakeIdent = NameIdentifierUtil.ofMetalake(metalake);
     checkMetalake(metalakeIdent, entityStore);
     return TreeLockUtils.doWithTreeLock(
@@ -90,7 +90,7 @@ public class PolicyManager implements PolicyDispatcher {
             return entityStore
                 .list(
                     NamespaceUtil.ofPolicy(metalake), PolicyEntity.class, Entity.EntityType.POLICY)
-                .toArray(new Policy[0]);
+                .toArray(new PolicyEntity[0]);
           } catch (IOException ioe) {
             LOG.error("Failed to list policies under metalake {}", metalake, ioe);
             throw new RuntimeException(ioe);
@@ -99,7 +99,7 @@ public class PolicyManager implements PolicyDispatcher {
   }
 
   @Override
-  public Policy getPolicy(String metalake, String policyName) throws NoSuchPolicyException {
+  public PolicyEntity getPolicy(String metalake, String policyName) throws NoSuchPolicyException {
     checkMetalake(NameIdentifier.of(metalake), entityStore);
     return TreeLockUtils.doWithTreeLock(
         NameIdentifierUtil.ofPolicy(metalake, policyName),
@@ -121,15 +121,12 @@ public class PolicyManager implements PolicyDispatcher {
   }
 
   @Override
-  public Policy createPolicy(
+  public PolicyEntity createPolicy(
       String metalake,
       String policyName,
-      String type,
+      Policy.BuiltInType type,
       String comment,
       boolean enabled,
-      boolean exclusive,
-      boolean inheritable,
-      Set<MetadataObject.Type> supportedObjectTypes,
       PolicyContent content)
       throws PolicyAlreadyExistsException {
     NameIdentifier metalakeIdent = NameIdentifierUtil.ofMetalake(metalake);
@@ -146,9 +143,6 @@ public class PolicyManager implements PolicyDispatcher {
                   .withComment(comment)
                   .withPolicyType(type)
                   .withEnabled(enabled)
-                  .withExclusive(exclusive)
-                  .withInheritable(inheritable)
-                  .withSupportedObjectTypes(supportedObjectTypes)
                   .withContent(content)
                   .withAuditInfo(
                       AuditInfo.builder()
@@ -171,7 +165,7 @@ public class PolicyManager implements PolicyDispatcher {
   }
 
   @Override
-  public Policy alterPolicy(String metalake, String policyName, PolicyChange... changes) {
+  public PolicyEntity alterPolicy(String metalake, String policyName, PolicyChange... changes) {
     NameIdentifier metalakeIdent = NameIdentifierUtil.ofMetalake(metalake);
     checkMetalake(metalakeIdent, entityStore);
     return TreeLockUtils.doWithTreeLock(
@@ -259,15 +253,12 @@ public class PolicyManager implements PolicyDispatcher {
   }
 
   @Override
-  public Policy[] listPolicyInfosForMetadataObject(String metalake, MetadataObject metadataObject) {
+  public PolicyEntity[] listPolicyInfosForMetadataObject(
+      String metalake, MetadataObject metadataObject) {
     NameIdentifier entityIdent = MetadataObjectUtil.toEntityIdent(metalake, metadataObject);
     Entity.EntityType entityType = MetadataObjectUtil.toEntityType(metadataObject);
 
     MetadataObjectUtil.checkMetadataObject(metalake, metadataObject);
-    Preconditions.checkArgument(
-        Policy.SUPPORTS_ALL_OBJECT_TYPES.contains(metadataObject.type()),
-        "Cannot list policies for unsupported metadata object type %s",
-        metadataObject.type());
     checkMetalake(NameIdentifier.of(metalake), entityStore);
 
     return TreeLockUtils.doWithTreeLock(
@@ -303,7 +294,9 @@ public class PolicyManager implements PolicyDispatcher {
       String[] policiesToAdd,
       String[] policiesToRemove) {
     Preconditions.checkArgument(
-        Policy.SUPPORTS_ALL_OBJECT_TYPES.contains(metadataObject.type()),
+        !metadataObject.type().equals(MetadataObject.Type.METALAKE)
+            && !metadataObject.type().equals(MetadataObject.Type.ROLE)
+            && !metadataObject.type().equals(MetadataObject.Type.COLUMN),
         "Cannot associate policies for unsupported metadata object type %s",
         metadataObject.type());
 
@@ -371,7 +364,7 @@ public class PolicyManager implements PolicyDispatcher {
   }
 
   @Override
-  public Policy getPolicyForMetadataObject(
+  public PolicyEntity getPolicyForMetadataObject(
       String metalake, MetadataObject metadataObject, String policyName) {
     NameIdentifier entityIdent = MetadataObjectUtil.toEntityIdent(metalake, metadataObject);
     Entity.EntityType entityType = MetadataObjectUtil.toEntityType(metadataObject);
@@ -451,9 +444,6 @@ public class PolicyManager implements PolicyDispatcher {
         .withComment(policyEntity.comment())
         .withPolicyType(policyEntity.policyType())
         .withEnabled(policyEntity.enabled())
-        .withExclusive(policyEntity.exclusive())
-        .withInheritable(policyEntity.inheritable())
-        .withSupportedObjectTypes(policyEntity.supportedObjectTypes())
         .withContent(policyEntity.content())
         .withAuditInfo(
             AuditInfo.builder()
@@ -491,6 +481,24 @@ public class PolicyManager implements PolicyDispatcher {
         newComment = ((PolicyChange.UpdatePolicyComment) change).getNewComment();
       } else if (change instanceof PolicyChange.UpdateContent) {
         PolicyChange.UpdateContent updateContent = (PolicyChange.UpdateContent) change;
+        Policy.BuiltInType policyType =
+            Policy.BuiltInType.fromPolicyType(updateContent.getPolicyType());
+        Preconditions.checkArgument(
+            policyEntity.policyType() == policyType,
+            "Policy type mismatch: expected %s but got %s",
+            policyEntity.policyType(),
+            updateContent.getPolicyType());
+
+        if (policyType != Policy.BuiltInType.CUSTOM) {
+          // cannot change the supported object types for built-in policies
+          Preconditions.checkArgument(
+              Sets.difference(
+                      policyEntity.content().supportedObjectTypes(),
+                      updateContent.getContent().supportedObjectTypes())
+                  .isEmpty(),
+              "Policy content type mismatch: expected %s but got %s");
+        }
+
         newContent = updateContent.getContent();
       } else {
         throw new IllegalArgumentException("Unsupported policy change: " + change);

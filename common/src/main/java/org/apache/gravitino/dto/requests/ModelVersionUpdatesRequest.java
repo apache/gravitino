@@ -41,6 +41,10 @@ public class ModelVersionUpdatesRequest implements RESTRequest {
   /** {@inheritDoc} */
   @Override
   public void validate() throws IllegalArgumentException {
+    if (updates == null) {
+      throw new IllegalArgumentException("updates cannot be null");
+    }
+
     updates.forEach(ModelVersionUpdateRequest::validate);
   }
 }

@@ -141,7 +141,7 @@ public class TableEntity implements Entity, Auditable, HasIdentifier {
 
   @Override
   public int hashCode() {
-    return Objects.hashCode(id, name, auditInfo, columns);
+    return Objects.hashCode(id, name, auditInfo, columns, namespace);
   }
 
   public static class Builder {

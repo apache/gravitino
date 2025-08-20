@@ -19,11 +19,11 @@
 package org.apache.gravitino.storage.relational.service;
 
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.Lists;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
-import org.apache.commons.compress.utils.Lists;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.MetadataObject;

@@ -30,7 +30,7 @@ import org.apache.gravitino.job.local.LocalJobExecutorConfigs;
 
 public class JobExecutorFactory {
 
-  private static final String JOB_EXECUTOR_CONF_PREFIX = "gravitino.executor.";
+  private static final String JOB_EXECUTOR_CONF_PREFIX = "gravitino.jobExecutor.";
 
   private static final String JOB_EXECUTOR_CLASS_SUFFIX = ".class";
 

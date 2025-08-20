@@ -16,13 +16,28 @@
  * specific language governing permissions and limitations
  * under the License.
  */
+package org.apache.gravitino.meta;
 
-package org.apache.gravitino.auth;
+public class TableStatisticEntity extends StatisticEntity {
+  @Override
+  public EntityType type() {
+    return EntityType.TABLE_STATISTIC;
+  }
 
-/** The type of OAuth provider. */
-public enum ProviderType {
-  /** Default provider. */
-  DEFAULT,
-  /** Azure AD provider. */
-  AZURE
+  public static Builder builder() {
+    return new Builder();
+  }
+
+  public static class Builder extends StatisticEntityBuilder<Builder, TableStatisticEntity> {
+    @Override
+    protected TableStatisticEntity internalBuild() {
+      TableStatisticEntity entity = new TableStatisticEntity();
+      entity.id = id;
+      entity.name = name;
+      entity.value = value;
+      entity.auditInfo = auditInfo;
+      entity.namespace = namespace;
+      return entity;
+    }
+  }
 }

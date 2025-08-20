@@ -204,7 +204,7 @@ public class TagOperations {
           () -> {
             boolean deleted = tagDispatcher.deleteTag(metalake, name);
             if (!deleted) {
-              LOG.warn("Failed to delete tag {} under metalake {}", name, metalake);
+              LOG.warn("Cannot find to be deleted tag {} under metalake {}", name, metalake);
             } else {
               LOG.info("Deleted tag: {} under metalake: {}", name, metalake);
             }
