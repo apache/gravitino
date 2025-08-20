@@ -258,8 +258,9 @@ def load_policy_tools(mcp: FastMCP):
         """
         List all metadata items associated with a specific policy.
 
-        The child metadata items which inherited the associate from the parent metadata will be excluded in the result.
-        For example, if the policy is associated with the catalog, the catalog's child metadata items will be excluded in the result.
+        The child metadata items which inherited the associate from the parent metadata
+        will be excluded in the result. For example, if the policy is associated with
+        the catalog, the catalog's child metadata items will be excluded in the result.
 
         Args:
             ctx (Context): The request context object containing lifespan context
