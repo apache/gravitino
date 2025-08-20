@@ -83,6 +83,7 @@ import org.apache.gravitino.dto.rel.partitions.IdentityPartitionDTO;
 import org.apache.gravitino.dto.rel.partitions.ListPartitionDTO;
 import org.apache.gravitino.dto.rel.partitions.PartitionDTO;
 import org.apache.gravitino.dto.rel.partitions.RangePartitionDTO;
+import org.apache.gravitino.dto.stats.StatisticDTO;
 import org.apache.gravitino.dto.tag.MetadataObjectDTO;
 import org.apache.gravitino.dto.tag.TagDTO;
 import org.apache.gravitino.file.FileInfo;
@@ -117,6 +118,7 @@ import org.apache.gravitino.rel.partitions.Partition;
 import org.apache.gravitino.rel.partitions.Partitions;
 import org.apache.gravitino.rel.partitions.RangePartition;
 import org.apache.gravitino.rel.types.Types;
+import org.apache.gravitino.stats.Statistic;
 import org.apache.gravitino.tag.Tag;
 
 /** Utility class for converting between DTOs and domain objects. */
@@ -839,6 +841,30 @@ public class DTOConverters {
       return new GroupDTO[0];
     }
     return Arrays.stream(groups).map(DTOConverters::toDTO).toArray(GroupDTO[]::new);
+  }
+
+  /**
+   * Converts an array of statistics to an array of StatisticDTOs.
+   *
+   * @param statistics The statistics to be converted.
+   * @return The array of StatisticDTOs.
+   */
+  public static StatisticDTO[] toDTOs(Statistic[] statistics) {
+    if (ArrayUtils.isEmpty(statistics)) {
+      return new StatisticDTO[0];
+    }
+
+    return Arrays.stream(statistics)
+        .map(
+            statistic ->
+                StatisticDTO.builder()
+                    .withName(statistic.name())
+                    .withValue(statistic.value())
+                    .withModifiable(statistic.modifiable())
+                    .withReserved(statistic.reserved())
+                    .withAudit(toDTO(statistic.auditInfo()))
+                    .build())
+        .toArray(StatisticDTO[]::new);
   }
 
   /**

@@ -187,7 +187,7 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
       }
       FileSystemCacheKey that = (FileSystemCacheKey) o;
       return conf.equals(that.conf)
-          && (scheme == null ? that.authority == null : scheme.equals(that.scheme))
+          && (scheme == null ? that.scheme == null : scheme.equals(that.scheme))
           && (authority == null ? that.authority == null : authority.equals(that.authority))
           && currentUser.equals(that.currentUser);
     }
@@ -558,7 +558,9 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
             && !properties.isEmpty()
             && properties.containsKey(PROPERTY_DEFAULT_LOCATION_NAME)
             && filesetPaths.containsKey(properties.get(PROPERTY_DEFAULT_LOCATION_NAME)),
-        "Default location name must be set and must be one of the fileset locations, "
+        "The fileset property "
+            + PROPERTY_DEFAULT_LOCATION_NAME
+            + " must be set and must be one of the fileset locations, "
             + "location names: "
             + filesetPaths.keySet()
             + ", default location name: "

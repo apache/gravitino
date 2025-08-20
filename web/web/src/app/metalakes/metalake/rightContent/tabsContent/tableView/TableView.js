@@ -466,6 +466,35 @@ const TableView = () => {
       minWidth: 60,
       disableColumnMenu: true,
       type: 'string',
+      field: 'defaultValue',
+      headerName: 'Default Value',
+      renderCell: ({ row }) => {
+        const { defaultValue } = row
+
+        return typeof defaultValue !== 'undefined' ? (
+          <Box sx={{ display: 'flex', alignItems: 'center' }}>
+            <Typography
+              noWrap
+              variant='body2'
+              sx={{
+                fontWeight: 400,
+                color: 'text.secondary',
+                textDecoration: 'none'
+              }}
+            >
+              {`${defaultValue?.value}`}
+            </Typography>
+          </Box>
+        ) : (
+          <EmptyText />
+        )
+      }
+    },
+    {
+      flex: 0.1,
+      minWidth: 60,
+      disableColumnMenu: true,
+      type: 'string',
       field: 'comment',
       headerName: 'Comment',
       renderCell: ({ row }) => {

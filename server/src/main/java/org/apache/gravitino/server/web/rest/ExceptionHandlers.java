@@ -188,6 +188,11 @@ public class ExceptionHandlers {
     return RolePermissionOperationHandler.INSTANCE.handle(type, name, parent, e);
   }
 
+  public static Response handleStatisticException(
+      OperationType type, String name, String parent, Exception e) {
+    return StatisticExceptionHandler.INSTANCE.handle(type, name, parent, e);
+  }
+
   private static class PartitionExceptionHandler extends BaseExceptionHandler {
 
     private static final ExceptionHandler INSTANCE = new PartitionExceptionHandler();
@@ -902,6 +907,35 @@ public class ExceptionHandlers {
 
       } else {
         return super.handle(op, jobTemplate, parent, e);
+      }
+    }
+  }
+
+  private static class StatisticExceptionHandler extends BaseExceptionHandler {
+
+    private static final ExceptionHandler INSTANCE = new StatisticExceptionHandler();
+
+    private static String getStatisticErrorMsg(
+        String name, String operation, String parent, String reason) {
+      return String.format(
+          "Failed to operate statistic(s)%s operation [%s] on parent [%s], reason [%s]",
+          name, operation, parent, reason);
+    }
+
+    @Override
+    public Response handle(OperationType op, String name, String object, Exception e) {
+      String formatted = StringUtil.isBlank(name) ? "" : " [" + name + "]";
+      String errorMsg = getStatisticErrorMsg(formatted, op.name(), object, getErrorMsg(e));
+      LOG.warn(errorMsg, e);
+
+      if (e instanceof IllegalArgumentException) {
+        return Utils.illegalArguments(errorMsg, e);
+
+      } else if (e instanceof NotFoundException) {
+        return Utils.notFound(errorMsg, e);
+
+      } else {
+        return super.handle(op, name, object, e);
       }
     }
   }
