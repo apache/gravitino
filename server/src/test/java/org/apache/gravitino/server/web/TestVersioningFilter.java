@@ -267,7 +267,10 @@ public class TestVersioningFilter {
     HttpServletRequest mockRequest = mock(HttpServletRequest.class);
     HttpServletResponse mockResponse = mock(HttpServletResponse.class);
     when(mockRequest.getHeaders("Accept"))
-        .thenReturn(new Vector<>(Collections.singletonList("foo application/vnd.gravitino.v1+json bar")).elements());
+        .thenReturn(
+          new Vector<>(Collections.singletonList("foo application/vnd.gravitino.v1+json bar")).elements(),
+          new Vector<>(Collections.singletonList("foo application/vnd.gravitino.v2+json bar")).elements(),
+          new Vector<>(Collections.singletonList("foo application/vnd.gravitino.v3+json bar")).elements());
 
     filter.doFilter(mockRequest, mockResponse, mockChain);
     verify(mockChain).doFilter(any(), any());
