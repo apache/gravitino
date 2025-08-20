@@ -195,7 +195,7 @@ public abstract class CatalogPaimonBaseIT extends BaseIT {
     Assertions.assertThrows(
         DatabaseNotExistException.class,
         () -> {
-          paimonCatalog.loadDatabaseProperties(schemaIdent.name());
+          paimonCatalog.getDatabase(schemaIdent.name()).options();
         });
 
     schemaNames = new HashSet<>(Arrays.asList(schemas.listSchemas()));
