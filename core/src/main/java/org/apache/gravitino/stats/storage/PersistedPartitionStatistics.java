@@ -18,25 +18,24 @@
  */
 package org.apache.gravitino.stats.storage;
 
-import java.util.Map;
-import org.apache.gravitino.stats.StatisticValue;
+import java.util.List;
 
 /** Represents a collection of statistics for a specific partition in a metadata object. */
 public class PersistedPartitionStatistics {
 
   private final String partitionName;
-  private final Map<String, StatisticValue<?>> statistics;
+  private final List<PersistedStatistic> statistics;
 
   /**
    * Creates an instance of {@link PersistedPartitionStatistics}.
    *
    * @param partitionName the name of the partition for which these statistics are applicable
-   * @param statistics a map of statistics applicable to the partition, where the key is the
-   *     statistic name
+   * @param statistics a list of statistics applicable to the partition, where each statistic is
+   *     represented by a {@link PersistedStatistic} object
    * @return a new instance of {@link PersistedPartitionStatistics}
    */
   public static PersistedPartitionStatistics of(
-      String partitionName, Map<String, StatisticValue<?>> statistics) {
+      String partitionName, List<PersistedStatistic> statistics) {
     return new PersistedPartitionStatistics(partitionName, statistics);
   }
 
@@ -44,11 +43,10 @@ public class PersistedPartitionStatistics {
    * Private constructor for {@link PersistedPartitionStatistics}.
    *
    * @param partitionName the name of the partition for which these statistics are applicable
-   * @param statistics a map of statistics applicable to the partition, where the key is the
-   *     statistic name
+   * @param statistics a list of statistics applicable to the partition, where each statistic is
+   *     represented by a {@link PersistedStatistic} object
    */
-  private PersistedPartitionStatistics(
-      String partitionName, Map<String, StatisticValue<?>> statistics) {
+  private PersistedPartitionStatistics(String partitionName, List<PersistedStatistic> statistics) {
     this.partitionName = partitionName;
     this.statistics = statistics;
   }
@@ -63,11 +61,12 @@ public class PersistedPartitionStatistics {
   }
 
   /**
-   * Returns the statistics for the partition.
+   * Returns the statistics applicable to the partition.
    *
-   * @return a map of statistics applicable to the partition, where the key is the statistic name
+   * @return a list of {@link PersistedStatistic} objects, each representing a statistic for the
+   *     partition
    */
-  public Map<String, StatisticValue<?>> statistics() {
+  public List<PersistedStatistic> statistics() {
     return statistics;
   }
 }
