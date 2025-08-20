@@ -30,7 +30,7 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.StringUtils;
@@ -89,7 +89,7 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
    */
   private Set<Long> loadedOwners = ConcurrentHashMap.newKeySet();
 
-  private static ExecutorService executor =
+  private static Executor executor =
       Executors.newFixedThreadPool(
           50,
           runable -> {
@@ -105,7 +105,6 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
     denyEnforcer = new SyncedEnforcer(getModel("/jcasbin_model.conf"), new GravitinoAdapter());
     denyInternalAuthorizer = new InternalAuthorizer(denyEnforcer);
     initializeOwnerAsync();
-    Runtime.getRuntime().addShutdownHook(new Thread(() -> executor.shutdown()));
   }
 
   private Model getModel(String modelFilePath) {
@@ -475,9 +474,9 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
   /** Async initialize owner */
   private void initializeOwnerAsync() {
     OwnerPolicyAsyncLoader loader = OwnerPolicyAsyncLoader.create(executor);
-    CompletableFuture<List<OwnerRelPO>> ownerFuture = loader.loadAllOwnerAsync(100);
-    ownerFuture.thenAcceptAsync(
-        ownerRels -> {
+    loader.loadAllOwnerAsync(
+        100,
+        (ownerRels) -> {
           for (OwnerRelPO ownerRel : ownerRels) {
             String ownerType = ownerRel.getOwnerType();
             if ("user".equalsIgnoreCase(ownerType)) {
@@ -493,8 +492,7 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
               loadedOwners.add(metadataObjectId);
             }
           }
-        },
-        executor);
+        });
   }
 
   private void loadPolicyByRoleEntity(RoleEntity roleEntity) {

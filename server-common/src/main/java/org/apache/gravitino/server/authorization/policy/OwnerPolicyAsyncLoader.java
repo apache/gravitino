@@ -21,8 +21,8 @@ import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutorService;
-import java.util.stream.Collectors;
+import java.util.concurrent.Executor;
+import java.util.function.Consumer;
 import org.apache.gravitino.storage.relational.po.OwnerRelPO;
 import org.apache.gravitino.storage.relational.service.OwnerMetaService;
 import org.slf4j.Logger;
@@ -33,35 +33,24 @@ public class OwnerPolicyAsyncLoader {
 
   private static final Logger LOG = LoggerFactory.getLogger(OwnerPolicyAsyncLoader.class);
 
-  private final ExecutorService executor;
+  private final Executor executor;
 
-  private OwnerPolicyAsyncLoader(ExecutorService executor) {
+  private OwnerPolicyAsyncLoader(Executor executor) {
     this.executor = executor;
   }
 
-  public static OwnerPolicyAsyncLoader create(ExecutorService executor) {
+  public static OwnerPolicyAsyncLoader create(Executor executor) {
     Preconditions.checkNotNull(executor, "Executor can not be null");
     return new OwnerPolicyAsyncLoader(executor);
   }
 
-  public CompletableFuture<List<OwnerRelPO>> loadAllOwnerAsync(long pageSize) {
+  public void loadAllOwnerAsync(long pageSize, Consumer<List<OwnerRelPO>> consumer) {
     List<PageRequestGenerator.PageRequest> requests =
         PageRequestGenerator.generate(OwnerMetaService.getInstance().countAllOwner(), pageSize);
-    List<CompletableFuture<List<OwnerRelPO>>> futures =
-        requests.stream().map(this::loadOwnerAsync).toList();
-    return CompletableFuture.allOf(futures.toArray(new CompletableFuture[0]))
-        .thenApplyAsync(
-            vo ->
-                futures.stream()
-                    .map(CompletableFuture::join)
-                    .flatMap(List::stream)
-                    .collect(Collectors.toList()),
-            executor)
-        .exceptionallyAsync(
-            ex -> {
-              LOG.error("Load owner policy in GravitinoAuthorizer error:{}", ex.getMessage(), ex);
-              return new ArrayList<>();
-            });
+    requests.forEach(
+        (request) -> {
+          this.loadOwnerAsync(request).thenAcceptAsync(consumer);
+        });
   }
 
   private CompletableFuture<List<OwnerRelPO>> loadOwnerAsync(

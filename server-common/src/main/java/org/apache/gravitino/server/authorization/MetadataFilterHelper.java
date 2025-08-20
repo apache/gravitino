@@ -49,11 +49,11 @@ public class MetadataFilterHelper {
 
   private MetadataFilterHelper() {}
 
-  private static ExecutorService executor =
+  private static final ExecutorService executor =
       Executors.newFixedThreadPool(
-          50,
-          runable -> {
-            Thread thread = new Thread(runable);
+          200,
+          runnable -> {
+            Thread thread = new Thread(runnable);
             thread.setName("GravitinoAuthorizer-ThreadPool-" + thread.getId());
             return thread;
           });
@@ -104,37 +104,31 @@ public class MetadataFilterHelper {
       String expression,
       Entity.EntityType entityType,
       NameIdentifier[] nameIdentifiers) {
-    AuthorizationExpressionEvaluator authorizationExpressionEvaluator =
-        new AuthorizationExpressionEvaluator(expression);
     if (!enableAuthorization()) {
       return nameIdentifiers;
     }
     return ThreadLocalAuthorizationCache.executeWithThreadCache(
-            () -> {
-              List<CompletableFuture<NameIdentifier>> futures = new ArrayList<>();
-              for (NameIdentifier nameIdentifier : nameIdentifiers) {
-                futures.add(
-                    CompletableFuture.supplyAsync(() -> nameIdentifier)
-                        .thenApplyAsync(
-                            metaDataName -> {
-                              Map<Entity.EntityType, NameIdentifier> nameIdentifierMap =
-                                  spiltMetadataNames(metalake, entityType, metaDataName);
-                              return authorizationExpressionEvaluator.evaluate(nameIdentifierMap)
-                                  ? metaDataName
-                                  : null;
-                            },
-                            executor));
-              }
-              return CompletableFuture.allOf(futures.toArray(new CompletableFuture[0]))
-                  .thenApplyAsync(
-                      v ->
-                          futures.stream()
-                              .map(CompletableFuture::join) // 获取每个结果
-                              .filter(Objects::nonNull)
-                              .toArray(NameIdentifier[]::new),
-                      executor);
-            })
-        .join();
+        () -> {
+          List<CompletableFuture<NameIdentifier>> futures = new ArrayList<>();
+          for (NameIdentifier nameIdentifier : nameIdentifiers) {
+            futures.add(
+                CompletableFuture.supplyAsync(
+                    () -> {
+                      Map<Entity.EntityType, NameIdentifier> nameIdentifierMap =
+                          spiltMetadataNames(metalake, entityType, nameIdentifier);
+                      AuthorizationExpressionEvaluator authorizationExpressionEvaluator =
+                          new AuthorizationExpressionEvaluator(expression);
+                      return authorizationExpressionEvaluator.evaluate(nameIdentifierMap)
+                          ? nameIdentifier
+                          : null;
+                    },
+                    executor));
+          }
+          return futures.stream()
+              .map(CompletableFuture::join)
+              .filter(Objects::nonNull)
+              .toArray(NameIdentifier[]::new);
+        });
   }
 
   /**
@@ -157,39 +151,30 @@ public class MetadataFilterHelper {
     if (!enableAuthorization()) {
       return entities;
     }
-    AuthorizationExpressionEvaluator authorizationExpressionEvaluator =
-        new AuthorizationExpressionEvaluator(expression);
     return ThreadLocalAuthorizationCache.executeWithThreadCache(
-            () -> {
-              List<CompletableFuture<E>> futures = new ArrayList<>();
-              for (E entity : entities) {
-                futures.add(
-                    CompletableFuture.supplyAsync(() -> entity)
-                        .thenApplyAsync(
-                            tempEntity -> {
-                              NameIdentifier nameIdentifier = toNameIdentifier.apply(tempEntity);
-                              Map<Entity.EntityType, NameIdentifier> nameIdentifierMap =
-                                  spiltMetadataNames(metalake, entityType, nameIdentifier);
-                              return authorizationExpressionEvaluator.evaluate(nameIdentifierMap)
-                                  ? tempEntity
-                                  : null;
-                            },
-                            executor));
-              }
-              return CompletableFuture.allOf(futures.toArray(new CompletableFuture[0]))
-                  .thenApplyAsync(
-                      v ->
-                          futures.stream()
-                              .map(CompletableFuture::join) // 获取每个结果
-                              .filter(Objects::nonNull)
-                              .toArray(
-                                  size ->
-                                      (E[])
-                                          Array.newInstance(
-                                              entities.getClass().getComponentType(), size)),
-                      executor);
-            })
-        .join();
+        () -> {
+          List<CompletableFuture<E>> futures = new ArrayList<>();
+          for (E entity : entities) {
+            futures.add(
+                CompletableFuture.supplyAsync(
+                    () -> {
+                      AuthorizationExpressionEvaluator authorizationExpressionEvaluator =
+                          new AuthorizationExpressionEvaluator(expression);
+                      NameIdentifier nameIdentifier = toNameIdentifier.apply(entity);
+                      Map<Entity.EntityType, NameIdentifier> nameIdentifierMap =
+                          spiltMetadataNames(metalake, entityType, nameIdentifier);
+                      return authorizationExpressionEvaluator.evaluate(nameIdentifierMap)
+                          ? entity
+                          : null;
+                    },
+                    executor));
+          }
+          return futures.stream()
+              .map(CompletableFuture::join) // 获取每个结果
+              .filter(Objects::nonNull)
+              .toArray(
+                  size -> (E[]) Array.newInstance(entities.getClass().getComponentType(), size));
+        });
   }
 
   /**
