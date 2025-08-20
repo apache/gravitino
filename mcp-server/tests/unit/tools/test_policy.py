@@ -94,7 +94,7 @@ class TestPolicyTool(unittest.TestCase):
                     {
                         "metadata_full_name": "catalog.db.table",
                         "metadata_type": "table",
-                        "policies_to_disassociate": ["mock_policy"],
+                        "policies_to_remove": ["mock_policy"],
                     },
                 )
                 self.assertEqual(
@@ -113,7 +113,7 @@ class TestPolicyTool(unittest.TestCase):
                     {
                         "metadata_full_name": "catalog.db.table",
                         "metadata_type": "table",
-                        "policies_to_associate": ["mock_policy"],
+                        "policies_to_add": ["mock_policy"],
                     },
                 )
                 self.assertEqual(

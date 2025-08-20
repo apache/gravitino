@@ -59,50 +59,40 @@ from mcp_server.client.topic_operation import TopicOperation
 
 class PlainRESTClientOperation(GravitinoOperation):
     def __init__(self, metalake_name: str, uri: str):
-        self.metalake_name = metalake_name
-        self.rest_client = httpx.AsyncClient(base_url=uri)
+        rest_client = httpx.AsyncClient(base_url=uri)
+        self.catalog_operation = PlainRESTClientCatalogOperation(metalake_name, rest_client)
+        self.table_operation = PlainRESTClientTableOperation(metalake_name, rest_client)
+        self.schema_operation = PlainRESTClientSchemaOperation(metalake_name, rest_client)
+        self.topic_operation = PlainRESTClientTopicOperation(metalake_name, rest_client)
+        self.model_operation = PlainRESTClientModelOperation(metalake_name, rest_client)
+        self.tag_operation = PlainRESTClientTagOperation(metalake_name, rest_client)
+        self.fileset_operation = PlainRESTClientFilesetOperation(metalake_name, rest_client)
+        self.job_operation = PlainRESTClientJobOperation(metalake_name, rest_client)
+        self.policy_operation = PlainRESTClientPolicyOperation(metalake_name, rest_client)
 
     def as_catalog_operation(self) -> CatalogOperation:
-        return PlainRESTClientCatalogOperation(
-            metalake_name=self.metalake_name, rest_client=self.rest_client
-        )
+        return self.catalog_operation
 
     def as_table_operation(self) -> TableOperation:
-        return PlainRESTClientTableOperation(
-            metalake_name=self.metalake_name, rest_client=self.rest_client
-        )
+        return self.table_operation
 
     def as_schema_operation(self) -> SchemaOperation:
-        return PlainRESTClientSchemaOperation(
-            metalake_name=self.metalake_name, rest_client=self.rest_client
-        )
+        return self.schema_operation
 
     def as_topic_operation(self) -> TopicOperation:
-        return PlainRESTClientTopicOperation(
-            metalake_name=self.metalake_name, rest_client=self.rest_client
-        )
+        return self.topic_operation
 
     def as_model_operation(self) -> ModelOperation:
-        return PlainRESTClientModelOperation(
-            metalake_name=self.metalake_name, rest_client=self.rest_client
-        )
+        return self.model_operation
 
     def as_fileset_operation(self):
-        return PlainRESTClientFilesetOperation(
-            metalake_name=self.metalake_name, rest_client=self.rest_client
-        )
+        return self.fileset_operation
 
     def as_tag_operation(self) -> TagOperation:
-        return PlainRESTClientTagOperation(
-            metalake_name=self.metalake_name, rest_client=self.rest_client
-        )
+        return self.tag_operation
 
     def as_job_operation(self) -> JobOperation:
-        return PlainRESTClientJobOperation(
-            metalake_name=self.metalake_name, rest_client=self.rest_client
-        )
+        return self.job_operation
 
     def as_policy_operation(self) -> PolicyOperation:
-        return PlainRESTClientPolicyOperation(
-            metalake_name=self.metalake_name, rest_client=self.rest_client
-        )
+        return self.policy_operation

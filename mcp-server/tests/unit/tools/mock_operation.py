@@ -112,12 +112,12 @@ class MockPolicyOperation(PolicyOperation):
         self,
         metadata_full_name: str,
         metadata_type: str,
-        policies_to_associate: list,
-        policies_to_disassociate: list,
+        policies_to_add: list,
+        policies_to_remove: list,
     ) -> str:
         return (
             f"associate_policy_with_metadata: {metadata_full_name}, {metadata_type}, "
-            f"{policies_to_associate}, {policies_to_disassociate}"
+            f"{policies_to_add}, {policies_to_remove}"
         )
 
     async def get_policy_for_metadata(

@@ -47,14 +47,14 @@ class PlainRESTClientPolicyOperation(PolicyOperation):
         self,
         metadata_full_name: str,
         metadata_type: str,
-        policies_to_associate: list,
-        policies_to_disassociate: list,
+        policies_to_add: list,
+        policies_to_remove: list,
     ) -> str:
         response = await self.rest_client.post(
             f"/api/metalakes/{self.metalake_name}/objects/{metadata_type}/{metadata_full_name}/policies",
             json={
-                "policiesToAdd": policies_to_associate,
-                "policiesToRemove": policies_to_disassociate,
+                "policiesToAdd": policies_to_add,
+                "policiesToRemove": policies_to_remove,
             },
         )
         return extract_content_from_response(response, "names", [])

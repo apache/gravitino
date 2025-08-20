@@ -88,7 +88,7 @@ def load_policy_tools(mcp: FastMCP):
             str : A structured JSON object containing the policy configuration with the following fields:
                 name: Unique policy identifier (string)
                 comment: Descriptive text about the policy (string)
-                policyType: Classification of policy (e.g., "custom", "system") (string)
+                policyType: Classification of policy (e.g., "custom") (string)
                 enabled: Activation status (boolean)
                 content: Rule definitions and scope settings (dict)
                   - customRules: Key-value pairs of rule identifiers and settings (dict)
@@ -137,7 +137,7 @@ def load_policy_tools(mcp: FastMCP):
         ctx: Context,
         metadata_full_name: str,
         metadata_type: str,
-        policies_to_associate: list,
+        policies_to_add: list,
     ) -> str:
         """
         Associate policies with metadata.
@@ -154,12 +154,12 @@ def load_policy_tools(mcp: FastMCP):
             metadata_type (str): Type of the metadata object (e.g., "table", "schema", "catalog",
              "fileset", "model", "topic"). For More information, please see
              tool `list_all_metadata_types`.
-            policies_to_associate (list): List of policy names to associate with the metadata.
+            policies_to_add (list): List of policy names to associate with the metadata.
 
         Example input:
             metadata_full_name: "catalog.schema.table"
             metadata_type: "table"
-            policies_to_associate: ["policy1", "policy2"]
+            policies_to_add: ["policy1", "policy2"]
 
         Returns:
             str: JSON-formatted string containing the names of associated policies.
@@ -175,7 +175,7 @@ def load_policy_tools(mcp: FastMCP):
             await client.as_policy_operation().associate_policy_with_metadata(
                 metadata_full_name,
                 metadata_type,
-                policies_to_associate,
+                policies_to_add,
                 [],
             )
         )
@@ -185,7 +185,7 @@ def load_policy_tools(mcp: FastMCP):
         ctx: Context,
         metadata_full_name: str,
         metadata_type: str,
-        policies_to_disassociate: list,
+        policies_to_remove: list,
     ) -> str:
         """
         Disassociate policies from metadata.
@@ -198,12 +198,12 @@ def load_policy_tools(mcp: FastMCP):
             metadata_type (str): Type of the metadata object (e.g., "table", "schema", "catalog",
              "fileset", "model", "topic"). For More information, please see
              tool `list_all_metadata_types`.
-            policies_to_disassociate (list): List of policy names to disassociate from the metadata.
+            policies_to_remove (list): List of policy names to disassociate from the metadata.
 
         Example input:
             metadata_full_name: "catalog.schema.table"
             metadata_type: "table"
-            policies_to_disassociate: ["policy1", "policy2"]
+            policies_to_remove: ["policy1", "policy2"]
 
         Returns:
             str: JSON-formatted string containing the names of associated policies.
@@ -216,7 +216,7 @@ def load_policy_tools(mcp: FastMCP):
         client = ctx.request_context.lifespan_context.rest_client()
         return (
             await client.as_policy_operation().associate_policy_with_metadata(
-                metadata_full_name, metadata_type, [], policies_to_disassociate
+                metadata_full_name, metadata_type, [], policies_to_remove
             )
         )
 

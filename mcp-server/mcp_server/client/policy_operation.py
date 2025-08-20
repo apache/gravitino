@@ -51,8 +51,8 @@ class PolicyOperation(ABC):
         self,
         metadata_full_name: str,
         metadata_type: str,
-        policies_to_associate: list,
-        policies_to_disassociate: list,
+        policies_to_add: list,
+        policies_to_remove: list,
     ) -> str:
         """
         Associate policies with metadata.
@@ -60,8 +60,8 @@ class PolicyOperation(ABC):
         Args:
             metadata_full_name: Full name of the metadata item (e.g., table, column)
             metadata_type: Type of the metadata (e.g., "table", "column")
-            policies_to_associate: List of policy names to associate with the metadata
-            policies_to_disassociate: List of policy names to disassociate from the metadata
+            policies_to_add: List of policy names to associate with the metadata
+            policies_to_remove: List of policy names to disassociate from the metadata
 
         Returns:
             str: JSON formatted string containing list of policy names that were
