@@ -438,9 +438,9 @@ public class StatisticOperations {
       return "(-INF";
     } else {
       if (fromInclusive) {
-        return "(" + fromPartitionName;
-      } else {
         return "[" + fromPartitionName;
+      } else {
+        return "(" + fromPartitionName;
       }
     }
   }
@@ -450,9 +450,9 @@ public class StatisticOperations {
       return "INF)";
     } else {
       if (toInclusive) {
-        return toPartitionName + ")";
-      } else {
         return toPartitionName + "]";
+      } else {
+        return toPartitionName + ")";
       }
     }
   }
