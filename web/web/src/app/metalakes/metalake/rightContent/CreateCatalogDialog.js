@@ -128,10 +128,12 @@ const CreateCatalogDialog = props => {
       if (item.key === 'warehouse') {
         return { ...item, required: ['hive', 'jdbc'].includes(catalogBackendSelect) }
       }
+
       return item
     })
     setInnerProps(updateProps)
-  }, [catalogBackendSelect])
+  }, [catalogBackendSelect, innerProps])
+
   const handleFormChange = ({ index, event }) => {
     let data = [...innerProps]
     data[index][event.target.name] = event.target.value
