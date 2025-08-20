@@ -94,7 +94,9 @@ public class ModelVersionLinkRequest implements RESTRequest {
     }
 
     if (uris == null || uris.isEmpty()) {
-      Preconditions.checkArgument(StringUtils.isNotBlank(uri), "URI cannot be empty");
+      Preconditions.checkArgument(
+          StringUtils.isNotBlank(uri),
+          "\"uri\" field cannot be empty if uris field is null or empty");
     } else {
       uris.forEach(
           (n, u) -> {
