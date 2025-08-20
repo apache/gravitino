@@ -784,7 +784,8 @@ public class CatalogsPage extends BaseWebIT {
 
   public boolean verifyTableColumns() {
     try {
-      List<String> columns = Arrays.asList("Name", "Type", "Nullable", "AutoIncrement", "Comment");
+      List<String> columns =
+          Arrays.asList("Name", "Type", "Nullable", "AutoIncrement", "Default Value", "Comment");
 
       List<WebElement> columnHeadersRows =
           columnHeaders.findElements(By.xpath("./div[@role='columnheader']"));
