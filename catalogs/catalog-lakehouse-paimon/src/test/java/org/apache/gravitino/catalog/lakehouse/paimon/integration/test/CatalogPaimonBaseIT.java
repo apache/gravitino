@@ -1116,6 +1116,7 @@ public abstract class CatalogPaimonBaseIT extends BaseIT {
 
   private Map<String, String> createProperties() {
     Map<String, String> properties = Maps.newHashMap();
+    properties.put("alter-column-null-to-not-null.disabled", "false");
     properties.put("key1", "val1");
     properties.put("key2", "val2");
     return properties;
