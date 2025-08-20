@@ -263,7 +263,8 @@ public class ModelAuthorizationIT extends BaseRestApiAuthorizationIT {
   @Test
   @Order(8)
   public void testLoadModelVersion() {
-    ModelCatalog modelCatalog = client.loadMetalake(METALAKE).loadCatalog(CATALOG).asModelCatalog();
+    GravitinoMetalake gravitinoMetalake = client.loadMetalake(METALAKE);
+    ModelCatalog modelCatalog = gravitinoMetalake.loadCatalog(CATALOG).asModelCatalog();
     Catalog catalogEntityLoadByNormalUser =
         normalUserClient.loadMetalake(METALAKE).loadCatalog(CATALOG);
     ModelCatalog modelCatalogLoadByNormalUser = catalogEntityLoadByNormalUser.asModelCatalog();
@@ -275,6 +276,17 @@ public class ModelAuthorizationIT extends BaseRestApiAuthorizationIT {
         () -> {
           modelCatalogLoadByNormalUser.getModelVersion(NameIdentifier.of(SCHEMA, "model1"), 1);
         });
+
+    gravitinoMetalake.grantPrivilegesToRole(
+        role,
+        MetadataObjects.of(ImmutableList.of(CATALOG, SCHEMA, "model1"), MetadataObject.Type.MODEL),
+        ImmutableSet.of(Privileges.UseModel.allow()));
+    version = modelCatalogLoadByNormalUser.getModelVersion(NameIdentifier.of(SCHEMA, "model1"), 1);
+    assertEquals(1, version.version());
+    gravitinoMetalake.revokePrivilegesFromRole(
+        role,
+        MetadataObjects.of(ImmutableList.of(CATALOG, SCHEMA, "model1"), MetadataObject.Type.MODEL),
+        ImmutableSet.of(Privileges.UseModel.allow()));
   }
 
   @Test
