@@ -30,6 +30,7 @@ import java.util.Map;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.authorization.Privileges;
 import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.file.Fileset;
@@ -389,6 +390,7 @@ public class TestUtil {
   public static UserEntity getTestUserEntity(
       long id, String name, String metalake, List<Long> roles) {
     return UserEntity.builder()
+        .withNamespace(AuthorizationUtils.ofUserNamespace(metalake))
         .withId(id)
         .withName(name)
         .withNamespace(NamespaceUtil.ofUser(metalake))
@@ -421,7 +423,7 @@ public class TestUtil {
     return GroupEntity.builder()
         .withId(id)
         .withName(name)
-        .withNamespace(NamespaceUtil.ofGroup(metalake))
+        .withNamespace(AuthorizationUtils.ofGroupNamespace(metalake))
         .withAuditInfo(getTestAuditInfo())
         .withRoleNames(roles)
         .build();
@@ -449,7 +451,7 @@ public class TestUtil {
     return RoleEntity.builder()
         .withId(id)
         .withName(name)
-        .withNamespace(NamespaceUtil.ofRole(metalake))
+        .withNamespace(AuthorizationUtils.ofRoleNamespace(metalake))
         .withAuditInfo(getTestAuditInfo())
         .withSecurableObjects(ImmutableList.of(getMockSecurableObject()))
         .build();
