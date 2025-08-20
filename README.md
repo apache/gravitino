@@ -1,3 +1,7 @@
+[![Build Status](https://github.com/SameerSalman29/gravitino/actions/workflows/main.yml/badge.svg)](https://github.com/SameerSalman29/gravitino/actions)
+[![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
+[![Open Issues](https://img.shields.io/github/issues/SameerSalman29/gravitino)](https://github.com/SameerSalman29/gravitino/issues)
+
 <!--
   Licensed to the Apache Software Foundation (ASF) under one
   or more contributor license agreements.  See the NOTICE file
@@ -18,6 +22,21 @@
 -->
 
 # Apache Gravitino™
+
+## Table of Contents
+- [Introduction](#introduction)
+- [Gravitino Architecture](#gravitino-architecture)
+- [Key Features](#-key-features)
+- [Common Use Cases](#-common-use-cases)
+- [Documentation](#-documentation)
+- [Quick Start](#-quick-start)
+- [Iceberg REST Catalog](#-iceberg-rest-catalog)
+- [Trino Integration](#-trino-integration)
+- [Building from Source](#-building-from-source)
+- [Developer Resources](#-developer-resources)
+- [Contributing](#-contributing)
+- [ASF Resources](#-asf-resources)
+- [License](#-license)
 
 [![GitHub Actions Build](https://github.com/apache/gravitino/actions/workflows/build.yml/badge.svg)](https://github.com/apache/gravitino/actions/workflows/build.yml)
 [![GitHub Actions Integration Test](https://github.com/apache/gravitino/actions/workflows/integration-test.yml/badge.svg)](https://github.com/apache/gravitino/actions/workflows/integration-test.yml)
