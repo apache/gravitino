@@ -246,16 +246,18 @@ public class ModelAuthorizationIT extends BaseRestApiAuthorizationIT {
     ModelCatalog modelCatalogLoadByNormalUser = catalogEntityLoadByNormalUser.asModelCatalog();
     int[] versions = modelCatalog.listModelVersions(NameIdentifier.of(SCHEMA, "model1"));
     assertEquals(2, versions.length);
-    assertThrows(
-        "Can not access metadata {" + METALAKE + "," + CATALOG + "." + SCHEMA + "model1" + "}.",
-        ForbiddenException.class,
-        () -> modelCatalogLoadByNormalUser.listModelVersions(NameIdentifier.of(SCHEMA, "model1")));
+    versions = modelCatalogLoadByNormalUser.listModelVersions(NameIdentifier.of(SCHEMA, "model1"));
+    assertEquals(0, versions.length);
     gravitinoMetalake.grantPrivilegesToRole(
         role,
         MetadataObjects.of(ImmutableList.of(CATALOG, SCHEMA, "model1"), MetadataObject.Type.MODEL),
         ImmutableSet.of(Privileges.UseModel.allow()));
     versions = modelCatalogLoadByNormalUser.listModelVersions(NameIdentifier.of(SCHEMA, "model1"));
     assertEquals(2, versions.length);
+    gravitinoMetalake.revokePrivilegesFromRole(
+        role,
+        MetadataObjects.of(ImmutableList.of(CATALOG, SCHEMA, "model1"), MetadataObject.Type.MODEL),
+        ImmutableSet.of(Privileges.UseModel.allow()));
   }
 
   @Test
