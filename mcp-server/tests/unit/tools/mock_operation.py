@@ -26,6 +26,7 @@ from mcp_server.client import (
 )
 from mcp_server.client.fileset_operation import FilesetOperation
 from mcp_server.client.job_operation import JobOperation
+from mcp_server.client.statistic_operation import StatisticOperation
 
 
 class MockOperation(GravitinoOperation):
@@ -55,6 +56,9 @@ class MockOperation(GravitinoOperation):
 
     def as_job_operation(self) -> JobOperation:
         return MockJobOperation()
+
+    def as_statistic_operation(self) -> StatisticOperation:
+        return MockStatisticOperation()
 
 
 class MockCatalogOperation(CatalogOperation):
@@ -196,3 +200,23 @@ class MockJobOperation(JobOperation):
 
     async def cancel_job(self, job_id: str) -> str:
         return f"mock_job_cancelled: {job_id}"
+
+
+class MockStatisticOperation(StatisticOperation):
+    async def get_list_of_statistics(
+        self, metalake_name: str, metadata_type: str, metadata_fullname: str
+    ) -> str:
+        return "mock_statistics"
+
+    # pylint: disable=R0917
+    async def get_list_statistic_for_partition(
+        self,
+        metalake_name: str,
+        metadata_type: str,
+        metadata_fullname: str,
+        from_partition_name: str,
+        to_partition_name: str,
+        from_inclusive: bool = True,
+        to_inclusive: bool = False,
+    ) -> str:
+        return "mock_statistics_for_partition"

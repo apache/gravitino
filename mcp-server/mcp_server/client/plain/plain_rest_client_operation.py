@@ -40,6 +40,9 @@ from mcp_server.client.plain.plain_rest_client_model_operation import (
 from mcp_server.client.plain.plain_rest_client_schema_operation import (
     PlainRESTClientSchemaOperation,
 )
+from mcp_server.client.plain.plain_rest_client_statistic_operation import (
+    PlainRESTClientStatisticOperation,
+)
 from mcp_server.client.plain.plain_rest_client_table_operation import (
     PlainRESTClientTableOperation,
 )
@@ -94,5 +97,10 @@ class PlainRESTClientOperation(GravitinoOperation):
 
     def as_job_operation(self) -> JobOperation:
         return PlainRESTClientJobOperation(
+            metalake_name=self.metalake_name, rest_client=self.rest_client
+        )
+
+    def as_statistic_operation(self):
+        return PlainRESTClientStatisticOperation(
             metalake_name=self.metalake_name, rest_client=self.rest_client
         )
