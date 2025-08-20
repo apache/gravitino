@@ -937,6 +937,95 @@ public class TestGenericModelCatalog extends TestBase {
         "internal error");
   }
 
+  @ParameterizedTest
+  @ValueSource(strings = {"schema1/model1/alias1/alias2", "스키마1/모델1/별칭1/별칭2"})
+  void testUpdateModelVersionWithMultipleUris(String input) throws JsonProcessingException {
+    String[] split = input.split("/");
+    String schemaName = split[0];
+    String modelName = split[1];
+    String[] aliases = new String[] {split[2], split[3]};
+    String comment = "comment";
+    int version = 0;
+
+    NameIdentifier modelId = NameIdentifier.of(schemaName, modelName);
+    String modelVersionPath =
+        withSlash(
+            GenericModelCatalog.formatModelVersionRequestPath(
+                    NameIdentifier.of(METALAKE_NAME, CATALOG_NAME, schemaName, modelName))
+                + "/aliases/"
+                + RESTUtils.encodeString(aliases[0]));
+
+    // Test update uri
+    Map<String, String> uris = ImmutableMap.of("n1", "u1", "n2", "u2");
+    ModelVersionDTO mockModelVersion =
+        mockModelVersion(version, uris, aliases, comment, Collections.emptyMap());
+    ModelVersionResponse resp = new ModelVersionResponse(mockModelVersion);
+    ModelVersionUpdateRequest.UpdateModelVersionUriRequest updateUri =
+        new ModelVersionUpdateRequest.UpdateModelVersionUriRequest("n2", "u2");
+    buildMockResource(
+        Method.PUT,
+        modelVersionPath,
+        new ModelVersionUpdatesRequest(ImmutableList.of(updateUri)),
+        resp,
+        HttpStatus.SC_OK);
+    ModelVersion updatedModelVersion =
+        catalog
+            .asModelCatalog()
+            .alterModelVersion(modelId, aliases[0], updateUri.modelVersionChange());
+    compareModelVersion(mockModelVersion, updatedModelVersion);
+    Assertions.assertEquals(uris, updatedModelVersion.uris());
+    Assertions.assertEquals(comment, updatedModelVersion.comment());
+    Assertions.assertEquals(Collections.emptyMap(), updatedModelVersion.properties());
+    Assertions.assertEquals(version, updatedModelVersion.version());
+    Assertions.assertArrayEquals(aliases, updatedModelVersion.aliases());
+
+    // Test add uri
+    uris = ImmutableMap.of("n1", "u1", "n2", "u2");
+    mockModelVersion = mockModelVersion(version, uris, aliases, comment, Collections.emptyMap());
+    resp = new ModelVersionResponse(mockModelVersion);
+    ModelVersionUpdateRequest.AddModelVersionUriRequest addUri =
+        new ModelVersionUpdateRequest.AddModelVersionUriRequest("n2", "u2");
+    buildMockResource(
+        Method.PUT,
+        modelVersionPath,
+        new ModelVersionUpdatesRequest(ImmutableList.of(addUri)),
+        resp,
+        HttpStatus.SC_OK);
+    updatedModelVersion =
+        catalog
+            .asModelCatalog()
+            .alterModelVersion(modelId, aliases[0], addUri.modelVersionChange());
+    compareModelVersion(mockModelVersion, updatedModelVersion);
+    Assertions.assertEquals(uris, updatedModelVersion.uris());
+    Assertions.assertEquals(comment, updatedModelVersion.comment());
+    Assertions.assertEquals(Collections.emptyMap(), updatedModelVersion.properties());
+    Assertions.assertEquals(version, updatedModelVersion.version());
+    Assertions.assertArrayEquals(aliases, updatedModelVersion.aliases());
+
+    // Test remove uri
+    uris = ImmutableMap.of("n1", "u1");
+    mockModelVersion = mockModelVersion(version, uris, aliases, comment, Collections.emptyMap());
+    resp = new ModelVersionResponse(mockModelVersion);
+    ModelVersionUpdateRequest.RemoveModelVersionUriRequest removeUri =
+        new ModelVersionUpdateRequest.RemoveModelVersionUriRequest("n2");
+    buildMockResource(
+        Method.PUT,
+        modelVersionPath,
+        new ModelVersionUpdatesRequest(ImmutableList.of(removeUri)),
+        resp,
+        HttpStatus.SC_OK);
+    updatedModelVersion =
+        catalog
+            .asModelCatalog()
+            .alterModelVersion(modelId, aliases[0], removeUri.modelVersionChange());
+    compareModelVersion(mockModelVersion, updatedModelVersion);
+    Assertions.assertEquals(uris, updatedModelVersion.uris());
+    Assertions.assertEquals(comment, updatedModelVersion.comment());
+    Assertions.assertEquals(Collections.emptyMap(), updatedModelVersion.properties());
+    Assertions.assertEquals(version, updatedModelVersion.version());
+    Assertions.assertArrayEquals(aliases, updatedModelVersion.aliases());
+  }
+
   private ModelDTO mockModelDTO(
       String modelName, int latestVersion, String comment, Map<String, String> properties) {
     return ModelDTO.builder()
@@ -950,9 +1039,19 @@ public class TestGenericModelCatalog extends TestBase {
 
   private ModelVersionDTO mockModelVersion(
       int version, String uri, String[] aliases, String comment, Map<String, String> properties) {
+    return mockModelVersion(
+        version, ImmutableMap.of(ModelVersion.URI_NAME_UNKNOWN, uri), aliases, comment, properties);
+  }
+
+  private ModelVersionDTO mockModelVersion(
+      int version,
+      Map<String, String> uris,
+      String[] aliases,
+      String comment,
+      Map<String, String> properties) {
     return ModelVersionDTO.builder()
         .withVersion(version)
-        .withUris(ImmutableMap.of(ModelVersion.URI_NAME_UNKNOWN, uri))
+        .withUris(uris)
         .withAliases(aliases)
         .withComment(comment)
         .withProperties(properties)
@@ -970,6 +1069,7 @@ public class TestGenericModelCatalog extends TestBase {
   private void compareModelVersion(ModelVersion expect, ModelVersion result) {
     Assertions.assertEquals(expect.version(), result.version());
     Assertions.assertEquals(expect.uri(), result.uri());
+    Assertions.assertEquals(expect.uris(), result.uris());
     Assertions.assertArrayEquals(expect.aliases(), result.aliases());
     Assertions.assertEquals(expect.comment(), result.comment());
     Assertions.assertEquals(expect.properties(), result.properties());
