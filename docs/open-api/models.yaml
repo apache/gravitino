@@ -489,13 +489,13 @@ components:
           type: string
           description: The uri of the model version
           nullable: true
-          default: {}
-          additionalProperties:
-            type: string
         uris:
           type: object
           description: The uris of the model version
           nullable: true
+          default: {}
+          additionalProperties:
+            type: string
         version:
           type: integer
           description: The version of the model
