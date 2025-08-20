@@ -57,18 +57,37 @@ from mcp_server.client.plain.plain_rest_client_topic_operation import (
 from mcp_server.client.topic_operation import TopicOperation
 
 
+# pylint: disable=too-many-instance-attributes
 class PlainRESTClientOperation(GravitinoOperation):
     def __init__(self, metalake_name: str, uri: str):
         rest_client = httpx.AsyncClient(base_url=uri)
-        self.catalog_operation = PlainRESTClientCatalogOperation(metalake_name, rest_client)
-        self.table_operation = PlainRESTClientTableOperation(metalake_name, rest_client)
-        self.schema_operation = PlainRESTClientSchemaOperation(metalake_name, rest_client)
-        self.topic_operation = PlainRESTClientTopicOperation(metalake_name, rest_client)
-        self.model_operation = PlainRESTClientModelOperation(metalake_name, rest_client)
-        self.tag_operation = PlainRESTClientTagOperation(metalake_name, rest_client)
-        self.fileset_operation = PlainRESTClientFilesetOperation(metalake_name, rest_client)
-        self.job_operation = PlainRESTClientJobOperation(metalake_name, rest_client)
-        self.policy_operation = PlainRESTClientPolicyOperation(metalake_name, rest_client)
+        self.catalog_operation = PlainRESTClientCatalogOperation(
+            metalake_name, rest_client
+        )
+        self.table_operation = PlainRESTClientTableOperation(
+            metalake_name, rest_client
+        )
+        self.schema_operation = PlainRESTClientSchemaOperation(
+            metalake_name, rest_client
+        )
+        self.topic_operation = PlainRESTClientTopicOperation(
+            metalake_name, rest_client
+        )
+        self.model_operation = PlainRESTClientModelOperation(
+            metalake_name, rest_client
+        )
+        self.tag_operation = PlainRESTClientTagOperation(
+            metalake_name, rest_client
+        )
+        self.fileset_operation = PlainRESTClientFilesetOperation(
+            metalake_name, rest_client
+        )
+        self.job_operation = PlainRESTClientJobOperation(
+            metalake_name, rest_client
+        )
+        self.policy_operation = PlainRESTClientPolicyOperation(
+            metalake_name, rest_client
+        )
 
     def as_catalog_operation(self) -> CatalogOperation:
         return self.catalog_operation
