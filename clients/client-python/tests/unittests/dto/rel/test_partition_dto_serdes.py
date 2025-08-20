@@ -15,6 +15,7 @@
 # specific language governing permissions and limitations
 # under the License.
 
+import json
 import unittest
 from enum import Enum
 from typing import cast
@@ -354,3 +355,129 @@ class TestPartitionSerdesUtils(unittest.TestCase):
                 self.assertEqual(partition_dto.lower(), dto.lower())
                 self.assertEqual(partition_dto.upper(), dto.upper())
                 self.assertEqual(partition_dto.properties(), dto.properties())
+
+    def test_partition_dto_serdes_identity_from_json_string(self):
+        """Tests deserialize `IdentityPartitionDTO` from JSON string."""
+
+        expected_json_string = """
+            {
+                "type": "identity",
+                "name": "test_identity_partition",
+                "fieldNames": [
+                    [
+                        "upper"
+                    ],
+                    [
+                        "lower"
+                    ]
+                ],
+                "values": [
+                    {
+                        "type": "literal",
+                        "dataType": "integer",
+                        "value": "0"
+                    },
+                    {
+                        "type": "literal",
+                        "dataType": "integer",
+                        "value": "100"
+                    }
+                ],
+                "properties": {
+                    "key1": "value1",
+                    "key2": "value2"
+                }
+            }
+        """
+        expected_serialized = json.loads(expected_json_string)
+        deserialized_dto = PartitionDTOSerdes.deserialize(expected_serialized)
+        self.assertTrue(deserialized_dto == self.identity_partition_dto)
+
+    def test_partition_dto_serdes_list_from_json_string(self):
+        """Tests deserialize `ListPartitionDTO` from JSON string."""
+
+        additional_literal_values = {
+            "upper": LiteralDTO.builder()
+            .with_data_type(Types.IntegerType.get())
+            .with_value(value="101")
+            .build(),
+            "lower": LiteralDTO.builder()
+            .with_data_type(Types.IntegerType.get())
+            .with_value(value="200")
+            .build(),
+        }
+        list_partition_dto = ListPartitionDTO(
+            name="test_list_partition",
+            lists=[
+                list(self.literal_values.values()),
+                list(additional_literal_values.values()),
+            ],
+            properties={},
+        )
+        expected_json_string = """
+            {
+                "type": "list",
+                "name": "test_list_partition",
+                "lists": [
+                    [
+                        {
+                            "type": "literal",
+                            "dataType": "integer",
+                            "value": "0"
+                        },
+                        {
+                            "type": "literal",
+                            "dataType": "integer",
+                            "value": "100"
+                        }
+                    ],
+                    [
+                        {
+                            "type": "literal",
+                            "dataType": "integer",
+                            "value": "101"
+                        },
+                        {
+                            "type": "literal",
+                            "dataType": "integer",
+                            "value": "200"
+                        }
+                    ]
+                ]
+            }
+        """
+        expected_serialized = json.loads(expected_json_string)
+        deserialized_dto = cast(
+            ListPartitionDTO, PartitionDTOSerdes.deserialize(expected_serialized)
+        )
+        self.assertIs(deserialized_dto.type(), list_partition_dto.type())
+        self.assertEqual(deserialized_dto.name(), list_partition_dto.name())
+        self.assertListEqual(deserialized_dto.lists(), list_partition_dto.lists())
+        self.assertEqual(deserialized_dto.properties(), {})
+
+    def test_partition_dto_serdes_range_from_json_string(self):
+        """Tests deserialize `RangePartitionDTO` from JSON string."""
+
+        expected_json_string = """
+            {
+                "type": "range",
+                "name": "test_range_partition",
+                "upper": {
+                    "type": "literal",
+                    "dataType": "integer",
+                    "value": "0"
+                },
+                "lower": {
+                    "type": "literal",
+                    "dataType": "integer",
+                    "value": "100"
+                },
+                "properties": {
+                    "key1": "value1",
+                    "key2": "value2"
+                }
+            }
+        """
+        expected_serialized = json.loads(expected_json_string)
+        deserialized_dto = PartitionDTOSerdes.deserialize(expected_serialized)
+        self.assertTrue(deserialized_dto == self.range_partition_dto)
