@@ -30,7 +30,7 @@ class PlainRESTClientPolicyOperation(PolicyOperation):
 
     async def get_list_of_policies(self) -> str:
         response = await self.rest_client.get(
-            f"/api/metalakes/{self.metalake_name}/policies"
+            f"/api/metalakes/{self.metalake_name}/policies?details=true"
         )
         return extract_content_from_response(response, "policies", [])
 

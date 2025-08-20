@@ -74,7 +74,7 @@ class PolicyOperation(ABC):
         self, metadata_full_name: str, metadata_type: str, policy_name: str
     ) -> str:
         """
-        List all policies associated with a specific metadata item.
+        Get the policy with are associated with a specific metadata item.
 
         Args:
             metadata_full_name: Full name of the metadata item (e.g., table, column)
@@ -82,7 +82,7 @@ class PolicyOperation(ABC):
             policy_name: Name of the policy
 
         Returns:
-            str: JSON formatted string containing list of policy names associated with the metadata
+            str: JSON formatted string containing policy metadata
         """
         pass
 
@@ -98,7 +98,7 @@ class PolicyOperation(ABC):
             metadata_type: Type of the metadata (e.g., "table", "column")
 
         Returns:
-            str: JSON formatted string containing list of policy names associated with the metadata
+            str: JSON formatted string containing list of policy metadata associated with the metadata
         """
         pass
 
