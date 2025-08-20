@@ -379,6 +379,14 @@ paths:
         - model
       summary: Get model version uri
       operationId: getModelVersionUri
+      parameters:
+        - name: uriName
+          in: query
+          required: false
+          schema:
+            type: string
+            default: null
+          description: The uri name of the model version
       responses:
         "200":
           $ref: "#/components/responses/ModelVersionUriResponse"
@@ -409,6 +417,14 @@ paths:
         - model
       summary: Get model version uri by alias
       operationId: getModelVersionUriByAlias
+      parameters:
+        - name: uriName
+          in: query
+          required: false
+          schema:
+            type: string
+            default: null
+          description: The uri name of the model version
       responses:
         "200":
           $ref: "#/components/responses/ModelVersionUriResponse"
