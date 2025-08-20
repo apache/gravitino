@@ -259,7 +259,7 @@ subprojects {
     mavenLocal()
   }
 
-  fun CompatibleWithJDK8(project: Project): Boolean {
+  fun compatibleWithJDK8(project: Project): Boolean {
     val isReleaseRun = gradle.startParameter.taskNames.any { it == "release" || it == "publish" || it == "publishToMavenLocal" }
     if (!isReleaseRun) {
       return false
@@ -290,7 +290,6 @@ subprojects {
     description = "print JVM information"
 
     doLast {
-
       val compileJvmVersion = tasks.withType<JavaCompile>().firstOrNull()?.javaCompiler?.get()
         ?.metadata?.languageVersion?.asInt() ?: "undefined"
 
@@ -329,7 +328,7 @@ subprojects {
           vendor.set(JvmVendorSpec.AMAZON)
         }
         languageVersion.set(JavaLanguageVersion.of(17))
-      } else if (CompatibleWithJDK8(project)) {
+      } else if (compatibleWithJDK8(project)) {
         languageVersion.set(JavaLanguageVersion.of(17))
         sourceCompatibility = JavaVersion.VERSION_1_8
         targetCompatibility = JavaVersion.VERSION_1_8
@@ -1077,10 +1076,6 @@ tasks.register("release") {
   description = "Builds and package a release version."
   doFirst {
     println("Releasing project...")
-  }
-
-  doLast {
-    println("Release build completed")
   }
 
   dependsOn(subprojects.map { it.tasks.named("build") })
