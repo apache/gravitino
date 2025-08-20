@@ -83,6 +83,13 @@ public class PostgreSQLDataTypeTransformer extends GeneralDataTypeTransformer {
       }
 
       return Types.VarCharType.of(varcharType.getLength().get());
+    } else if (typeClass == io.trino.spi.type.ArrayType.class) {
+      return Types.ListType.of(
+          getGravitinoType(((io.trino.spi.type.ArrayType) type).getElementType()), false);
+    } else if (typeClass == io.trino.spi.type.MapType.class) {
+      io.trino.spi.type.MapType mapType = (io.trino.spi.type.MapType) type;
+      return Types.MapType.of(
+          getGravitinoType(mapType.getKeyType()), getGravitinoType(mapType.getValueType()), false);
     }
 
     return super.getGravitinoType(type);
