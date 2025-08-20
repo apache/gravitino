@@ -92,8 +92,8 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
   private static Executor executor =
       Executors.newFixedThreadPool(
           50,
-          runable -> {
-            Thread thread = new Thread(runable);
+          runnable -> {
+            Thread thread = new Thread(runnable);
             thread.setName("GravitinoAuthorizer-ThreadPool-" + thread.getId());
             return thread;
           });
