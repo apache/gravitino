@@ -22,6 +22,8 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.when;
 
+import java.lang.reflect.Field;
+import java.util.concurrent.Executor;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.Entity;
@@ -61,6 +63,7 @@ public class TestMetadataFilterHelper {
 
   @Test
   public void testFilter() {
+    makeCompletableFutureUseCurrentThread();
     try (MockedStatic<PrincipalUtils> principalUtilsMocked = mockStatic(PrincipalUtils.class);
         MockedStatic<GravitinoAuthorizerProvider> mockStatic =
             mockStatic(GravitinoAuthorizerProvider.class)) {
@@ -90,6 +93,7 @@ public class TestMetadataFilterHelper {
 
   @Test
   public void testFilterByExpression() {
+    makeCompletableFutureUseCurrentThread();
     try (MockedStatic<PrincipalUtils> principalUtilsMocked = mockStatic(PrincipalUtils.class);
         MockedStatic<GravitinoAuthorizerProvider> mockStatic =
             mockStatic(GravitinoAuthorizerProvider.class)) {
@@ -119,6 +123,18 @@ public class TestMetadataFilterHelper {
       Assertions.assertEquals(2, filtered2.length);
       Assertions.assertEquals("testMetalake.testCatalog.testSchema", filtered2[0].toString());
       Assertions.assertEquals("testMetalake.testCatalog.testSchema2", filtered2[1].toString());
+    }
+  }
+
+  private static void makeCompletableFutureUseCurrentThread() {
+    try {
+      Executor currentThread = Runnable::run;
+      Class<MetadataFilterHelper> jcasbinAuthorizerClass = MetadataFilterHelper.class;
+      Field field = jcasbinAuthorizerClass.getDeclaredField("executor");
+      field.setAccessible(true);
+      field.set(null, currentThread);
+    } catch (Exception e) {
+      throw new RuntimeException(e);
     }
   }
 }

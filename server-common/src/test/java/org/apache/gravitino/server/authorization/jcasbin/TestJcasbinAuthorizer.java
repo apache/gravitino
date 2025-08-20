@@ -228,18 +228,6 @@ public class TestJcasbinAuthorizer {
     assertFalse(doAuthorize(currentPrincipal));
   }
 
-  private static void makeCompletableFutureUseCurrentThread(JcasbinAuthorizer jcasbinAuthorizer) {
-    try {
-      Executor currentThread = Runnable::run;
-      Class<JcasbinAuthorizer> jcasbinAuthorizerClass = JcasbinAuthorizer.class;
-      Field field = jcasbinAuthorizerClass.getDeclaredField("executor");
-      field.setAccessible(true);
-      FieldUtils.writeField(field, jcasbinAuthorizer, currentThread);
-    } catch (Exception e) {
-      throw new RuntimeException(e);
-    }
-  }
-
   @Test
   public void testAuthorizeByOwner() throws IOException {
     Principal currentPrincipal = PrincipalUtils.getCurrentPrincipal();
@@ -348,5 +336,17 @@ public class TestJcasbinAuthorizer {
   private static SecurableObject getDenySecurableObject() {
     return POConverters.fromSecurableObjectPO(
         "testCatalog2", getDenySecurableObjectPO(), MetadataObject.Type.CATALOG);
+  }
+
+  private static void makeCompletableFutureUseCurrentThread(JcasbinAuthorizer jcasbinAuthorizer) {
+    try {
+      Executor currentThread = Runnable::run;
+      Class<JcasbinAuthorizer> jcasbinAuthorizerClass = JcasbinAuthorizer.class;
+      Field field = jcasbinAuthorizerClass.getDeclaredField("executor");
+      field.setAccessible(true);
+      FieldUtils.writeField(field, jcasbinAuthorizer, currentThread);
+    } catch (Exception e) {
+      throw new RuntimeException(e);
+    }
   }
 }
