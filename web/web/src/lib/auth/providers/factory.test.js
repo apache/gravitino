@@ -7,10 +7,10 @@ describe('OAuth Provider Factory', () => {
 
   beforeEach(() => {
     vi.clearAllMocks()
-    
+
     // Create a fresh factory instance for each test
     factory = new OAuthProviderFactory()
-    
+
     // Create a proper fetch mock
     fetchMock = vi.fn()
     global.fetch = fetchMock
@@ -85,9 +85,7 @@ describe('OAuth Provider Factory', () => {
         statusText: 'Internal Server Error'
       })
 
-      await expect(factory.getProvider()).rejects.toThrow(
-        'Failed to fetch OAuth config: 500'
-      )
+      await expect(factory.getProvider()).rejects.toThrow('Failed to fetch OAuth config: 500')
     })
 
     it('should handle invalid JSON responses', async () => {

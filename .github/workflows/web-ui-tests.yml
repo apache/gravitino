@@ -2,16 +2,15 @@ name: Web UI Tests
 
 on:
   push:
-    branches: [ main, develop ]
+    branches: [ "main", "branch-*" ]
     paths:
       - 'web/web/**'
       - '.github/workflows/web-ui-tests.yml'
   pull_request:
-    branches: [ main, develop ]
+    branches: [ "main", "branch-*" ]
     paths:
       - 'web/web/**'
       - '.github/workflows/web-ui-tests.yml'
-  workflow_dispatch:
 
 jobs:
   test:
@@ -48,15 +47,7 @@ jobs:
     - name: Run tests
       working-directory: web/web
       run: pnpm test:coverage
-    
-    - name: Upload coverage reports to Codecov
-      uses: codecov/codecov-action@v3
-      with:
-        file: ./web/web/coverage/lcov.info
-        flags: frontend
-        name: codecov-frontend
-        fail_ci_if_error: false
-    
+
     - name: Build application
       working-directory: web/web
       run: pnpm build

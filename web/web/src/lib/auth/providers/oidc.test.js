@@ -15,7 +15,7 @@ describe('OidcOAuthProvider', () => {
   beforeEach(() => {
     // Reset all mocks
     vi.clearAllMocks()
-    
+
     // Create mock UserManager
     mockUserManager = {
       getUser: vi.fn(),
@@ -24,9 +24,9 @@ describe('OidcOAuthProvider', () => {
       signinSilent: vi.fn(),
       removeUser: vi.fn()
     }
-    
+
     UserManager.mockImplementation(() => mockUserManager)
-    
+
     provider = new OidcOAuthProvider()
   })
 
@@ -136,6 +136,7 @@ describe('OidcOAuthProvider', () => {
 
     it('should attempt silent refresh for expired user', async () => {
       const expiredUser = { expired: true }
+
       const refreshedUser = {
         id_token: 'new-id-token',
         expired: false
@@ -152,7 +153,7 @@ describe('OidcOAuthProvider', () => {
 
     it('should handle silent refresh failure', async () => {
       const expiredUser = { expired: true }
-      
+
       mockUserManager.getUser.mockResolvedValue(expiredUser)
       mockUserManager.signinSilent.mockRejectedValue(new Error('Refresh failed'))
       mockUserManager.removeUser.mockResolvedValue()
