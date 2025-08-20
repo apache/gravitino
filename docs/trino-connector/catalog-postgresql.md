@@ -22,7 +22,7 @@ For example, the table name MyTable is equivalent to mytable and MYTABLE.
 However, if you create a table with quoted identifiers, such as "MyTable", it becomes case sensitive and must be referenced exactly as "MyTable".
 
 When using the Gravitino Trino connector with PostgreSQL, you must use unquoted identifiers to avoid case sensitivity issues.
-Otherwise, table names or column names containing uppercase letters may not be found.
+Otherwise, schema names, table names or column names containing uppercase letters may not be found.
 
 ## Create table
 
