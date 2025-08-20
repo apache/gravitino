@@ -132,7 +132,7 @@ def load_policy_tools(mcp: FastMCP):
         client = ctx.request_context.lifespan_context.rest_client()
         return await client.as_policy_operation().load_policy(policy_name)
 
-    @mcp.tool(tags={"policy"})
+    @mcp.tool(tags={"policy"}, enabled=False)
     async def associate_policy_with_metadata(
         ctx: Context,
         metadata_full_name: str,
@@ -180,7 +180,7 @@ def load_policy_tools(mcp: FastMCP):
             )
         )
 
-    @mcp.tool(tags={"policy"})
+    @mcp.tool(tags={"policy"}, enabled=False)
     async def disassociate_policy_from_metadata(
         ctx: Context,
         metadata_full_name: str,
