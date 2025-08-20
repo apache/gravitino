@@ -49,7 +49,7 @@ cp ${gravitino_home}/bundles/aws/build/libs/gravitino-aws-*.jar bundles/
 cp ${gravitino_home}/bundles/azure/build/libs/gravitino-azure-*.jar bundles/
 cp ${gravitino_home}/bundles/aliyun-bundle/build/libs/gravitino-aliyun-bundle-*.jar bundles/
 
-iceberg_version="1.6.1"
+iceberg_version="1.9.2"
 
 iceberg_gcp_bundle="iceberg-gcp-bundle-${iceberg_version}.jar"
 if [ ! -f "bundles/${iceberg_gcp_bundle}" ]; then
