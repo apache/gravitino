@@ -472,6 +472,14 @@ public class GravitinoEnv {
       }
     }
 
+    if (statisticManager != null) {
+      try {
+        statisticManager.close();
+      } catch (Exception e) {
+        LOG.warn("Failed to close StatisticManager", e);
+      }
+    }
+
     LOG.info("Gravitino Environment is shut down.");
   }
 
@@ -563,7 +571,7 @@ public class GravitinoEnv {
     ModelNormalizeDispatcher modelNormalizeDispatcher =
         new ModelNormalizeDispatcher(modelHookDispatcher, catalogManager);
     this.modelDispatcher = new ModelEventDispatcher(eventBus, modelNormalizeDispatcher);
-    this.statisticManager = new StatisticManager(entityStore, idGenerator);
+    this.statisticManager = new StatisticManager(entityStore, idGenerator, config);
 
     // Create and initialize access control related modules
     boolean enableAuthorization = config.get(Configs.ENABLE_AUTHORIZATION);
