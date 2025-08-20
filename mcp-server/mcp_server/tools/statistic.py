@@ -57,6 +57,12 @@ def load_statistic_tools(mcp: FastMCP):
                 }
               }
             ]
+
+            name: The name of the statistic.
+            value: The value of the statistic.
+            reserved: Indicates if the statistic is reserved.
+            modifiable: Indicates if the statistic can be modified.
+            audit: Metadata about the statistic's creation and modification.
         """
         client = ctx.request_context.lifespan_context.rest_client()
         return await client.as_statistic_operation().get_list_of_statistics(
@@ -114,6 +120,14 @@ def load_statistic_tools(mcp: FastMCP):
                 ]
               }
             ]
+
+            partitionName: The name of the partition.
+            statistics: A list of statistics for the partition, each statistic includes:
+                - name: The name of the statistic.
+                - value: The value of the statistic.
+                - reserved: Indicates if the statistic is reserved.
+                - modifiable: Indicates if the statistic can be modified.
+                - audit: Metadata about the statistic's creation and modification.
         """
         client = ctx.request_context.lifespan_context.rest_client()
         return await client.as_statistic_operation().get_list_statistic_for_partition(
