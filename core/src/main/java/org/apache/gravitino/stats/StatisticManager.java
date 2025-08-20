@@ -20,6 +20,7 @@ package org.apache.gravitino.stats;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.Lists;
+import java.io.Closeable;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.List;
@@ -28,6 +29,8 @@ import java.util.Optional;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.gravitino.Audit;
+import org.apache.gravitino.Config;
+import org.apache.gravitino.Configs;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.MetadataObject;
@@ -40,6 +43,11 @@ import org.apache.gravitino.lock.LockType;
 import org.apache.gravitino.lock.TreeLockUtils;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.StatisticEntity;
+import org.apache.gravitino.stats.storage.MetadataObjectStatisticsDrop;
+import org.apache.gravitino.stats.storage.MetadataObjectStatisticsUpdate;
+import org.apache.gravitino.stats.storage.PartitionStatisticStorage;
+import org.apache.gravitino.stats.storage.PartitionStatisticStorageFactory;
+import org.apache.gravitino.stats.storage.PersistedPartitionStatistics;
 import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.utils.Executable;
 import org.apache.gravitino.utils.MetadataObjectUtil;
@@ -48,17 +56,34 @@ import org.apache.gravitino.utils.PrincipalUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class StatisticManager {
+public class StatisticManager implements Closeable {
 
+  private static final String OPTIONS_PREFIX = "gravitino.stats.partition.option.";
   private static final Logger LOG = LoggerFactory.getLogger(StatisticManager.class);
 
   private final EntityStore store;
 
   private final IdGenerator idGenerator;
+  private final PartitionStatisticStorage partitionStorage;
 
-  public StatisticManager(EntityStore store, IdGenerator idGenerator) {
+  public StatisticManager(EntityStore store, IdGenerator idGenerator, Config config) {
     this.store = store;
     this.idGenerator = idGenerator;
+    String className = config.get(Configs.PARTITION_STATS_STORAGE_FACTORY_CLASS);
+    Map<String, String> options = config.getConfigsWithPrefix(OPTIONS_PREFIX);
+    try {
+      PartitionStatisticStorageFactory factory =
+          (PartitionStatisticStorageFactory)
+              Class.forName(className).getDeclaredConstructor().newInstance();
+      this.partitionStorage = factory.create(options);
+    } catch (Exception e) {
+      LOG.error(
+          "Failed to create and initialize partition statistics storage factory by name {}.",
+          className,
+          e);
+      throw new RuntimeException(
+          "Failed to create and initialize partition statistics storage factory: " + className, e);
+    }
   }
 
   public List<Statistic> listStatistics(String metalake, MetadataObject metadataObject) {
@@ -182,9 +207,110 @@ public class StatisticManager {
     }
   }
 
+  public boolean dropPartitionStatistics(
+      String metalake,
+      MetadataObject metadataObject,
+      List<PartitionStatisticsDrop> partitionStatistics) {
+    try {
+      List<MetadataObjectStatisticsDrop> partitionStatisticsToDrop =
+          Lists.newArrayList(MetadataObjectStatisticsDrop.of(metadataObject, partitionStatistics));
+      NameIdentifier identifier = MetadataObjectUtil.toEntityIdent(metalake, metadataObject);
+
+      return TreeLockUtils.doWithTreeLock(
+              identifier,
+              LockType.WRITE,
+              () -> partitionStorage.dropStatistics(metalake, partitionStatisticsToDrop))
+          != 0;
+    } catch (IOException ioe) {
+      LOG.error(
+          "Failed to drop partition statistics for {} in metalake {}.",
+          metadataObject,
+          metalake,
+          ioe);
+      throw new RuntimeException(ioe);
+    }
+  }
+
+  public void updatePartitionStatistics(
+      String metalake,
+      MetadataObject metadataObject,
+      List<PartitionStatisticsUpdate> partitionStatistics) {
+    try {
+      NameIdentifier identifier = MetadataObjectUtil.toEntityIdent(metalake, metadataObject);
+
+      List<MetadataObjectStatisticsUpdate> statisticsToUpdate = Lists.newArrayList();
+      statisticsToUpdate.add(
+          MetadataObjectStatisticsUpdate.of(metadataObject, partitionStatistics));
+      TreeLockUtils.doWithTreeLock(
+          identifier,
+          LockType.WRITE,
+          (Executable<Void, IOException>)
+              () -> {
+                partitionStorage.updateStatistics(metalake, statisticsToUpdate);
+                return null;
+              });
+    } catch (IOException ioe) {
+      LOG.error(
+          "Failed to update partition statistics for {} in metalake {}.",
+          metadataObject,
+          metalake,
+          ioe);
+      throw new RuntimeException(ioe);
+    }
+  }
+
+  public List<PartitionStatistics> listPartitionStatistics(
+      String metalake, MetadataObject metadataObject, PartitionRange range) {
+    try {
+      NameIdentifier identifier = MetadataObjectUtil.toEntityIdent(metalake, metadataObject);
+
+      List<PersistedPartitionStatistics> partitionStats =
+          TreeLockUtils.doWithTreeLock(
+              identifier,
+              LockType.READ,
+              () -> partitionStorage.listStatistics(metalake, metadataObject, range));
+
+      List<PartitionStatistics> listedStats = Lists.newArrayList();
+
+      if (partitionStats == null || partitionStats.isEmpty()) {
+        return listedStats;
+      }
+
+      return partitionStats.stream()
+          .map(
+              partitionStat -> {
+                String partitionName = partitionStat.partitionName();
+                Statistic[] statistics =
+                    partitionStat.statistics().stream()
+                        .map(
+                            entry -> {
+                              String statName = entry.name();
+                              StatisticValue<?> value = entry.value();
+                              AuditInfo auditInfo = entry.auditInfo();
+                              return new CustomStatistic(statName, value, auditInfo);
+                            })
+                        .toArray(Statistic[]::new);
+
+                return new CustomPartitionStatistic(partitionName, statistics);
+              })
+          .collect(Collectors.toList());
+    } catch (IOException ioe) {
+      LOG.error(
+          "Failed to list partition statistics for {} in metalake {}.",
+          metadataObject,
+          metalake,
+          ioe);
+      throw new RuntimeException(ioe);
+    }
+  }
+
+  @Override
+  public void close() throws IOException {
+    partitionStorage.close();
+  }
+
   @VisibleForTesting
   public static class CustomStatistic implements Statistic {
-
     private final String name;
     private final StatisticValue<?> value;
     private final Audit auditInfo;
@@ -218,6 +344,28 @@ public class StatisticManager {
     @Override
     public Audit auditInfo() {
       return auditInfo;
+    }
+  }
+
+  @VisibleForTesting
+  public static class CustomPartitionStatistic implements PartitionStatistics {
+
+    private final String partitionName;
+    private final Statistic[] statistics;
+
+    public CustomPartitionStatistic(String partitionName, Statistic[] statistics) {
+      this.partitionName = partitionName;
+      this.statistics = statistics;
+    }
+
+    @Override
+    public String partitionName() {
+      return partitionName;
+    }
+
+    @Override
+    public Statistic[] statistics() {
+      return statistics;
     }
   }
 }
