@@ -94,7 +94,7 @@ def load_policy_tools(mcp: FastMCP):
                   - customRules: Key-value pairs of rule identifiers and settings (dict)
                   - properties: Additional configuration properties (dict)
                   - supportedObjectTypes: Entities this policy applies to (list of string)
-                inherited: Parent policy reference if applicable (null or dict)
+                inherited: Whether the policy is inherited from parent metadata (boolean)
                 audit: Creation metadata (dict)
                   - creator: User or service that created the policy (string)
                   - createTime: ISO 8601 timestamp of creation (string)
@@ -258,7 +258,7 @@ def load_policy_tools(mcp: FastMCP):
         """
         List all metadata items associated with a specific policy.
 
-        The child metadata items which inherited the associate from the parent metadata
+        The child metadata items which inherit the associate from the parent metadata
         will be excluded in the result. For example, if the policy is associated with
         the catalog, the catalog's child metadata items will be excluded in the result.
 
@@ -355,7 +355,7 @@ def load_policy_tools(mcp: FastMCP):
                         "catalog"
                     ]
                 },
-                "inherited": null,
+                "inherited": false,
                 "audit": {
                     "creator": "anonymous",
                     "createTime": "2025-08-18T08:29:30.016501Z"
