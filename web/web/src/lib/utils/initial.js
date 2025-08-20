@@ -157,7 +157,6 @@ export const providers = [
       {
         key: 'warehouse',
         value: '',
-        required: true,
         description: 'Apache Iceberg catalog warehouse config'
       },
       {

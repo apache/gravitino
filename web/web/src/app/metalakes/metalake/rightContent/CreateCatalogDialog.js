@@ -121,7 +121,17 @@ const CreateCatalogDialog = props => {
 
   const providerSelect = watch('provider')
   const typeSelect = watch('type')
+  const catalogBackendSelect = watch('propItems').find(i => i.key === 'catalog-backend')?.value
 
+  useEffect(() => {
+    const updateProps = innerProps.map(item => {
+      if (item.key === 'warehouse') {
+        return { ...item, required: ['hive', 'jdbc'].includes(catalogBackendSelect) }
+      }
+      return item
+    })
+    setInnerProps(updateProps)
+  }, [catalogBackendSelect])
   const handleFormChange = ({ index, event }) => {
     let data = [...innerProps]
     data[index][event.target.name] = event.target.value
@@ -217,7 +227,7 @@ const CreateCatalogDialog = props => {
 
     if (
       propItems[0]?.key === 'catalog-backend' &&
-      propItems[0]?.value === 'hive' &&
+      ['hive', 'rest'].includes(propItems[0]?.value) &&
       ['lakehouse-iceberg', 'lakehouse-paimon'].includes(providerSelect)
     ) {
       nextProps = propItems.filter(item => !['jdbc-driver', 'jdbc-user', 'jdbc-password'].includes(item.key))
@@ -227,14 +237,6 @@ const CreateCatalogDialog = props => {
       providerSelect === 'lakehouse-paimon'
     ) {
       nextProps = propItems.filter(item => !['jdbc-driver', 'jdbc-user', 'jdbc-password', 'uri'].includes(item.key))
-    } else if (
-      propItems[0]?.key === 'catalog-backend' &&
-      propItems[0]?.value === 'rest' &&
-      providerSelect === 'lakehouse-iceberg'
-    ) {
-      nextProps = propItems.filter(
-        item => !['jdbc-driver', 'jdbc-user', 'jdbc-password', 'warehouse'].includes(item.key)
-      )
     }
     const parentField = nextProps.find(i => i.key === 'authentication.type')
     if (!parentField || parentField?.value === 'simple') {
