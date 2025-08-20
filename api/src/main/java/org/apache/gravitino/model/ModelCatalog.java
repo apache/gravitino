@@ -250,15 +250,13 @@ public interface ModelCatalog {
    * @throws NoSuchModelException If the model does not exist.
    * @throws ModelVersionAliasesAlreadyExistException If the aliases already exist in the model.
    */
-  default void linkModelVersion(
+  void linkModelVersion(
       NameIdentifier ident,
       Map<String, String> uris,
       String[] aliases,
       String comment,
       Map<String, String> properties)
-      throws NoSuchModelException, ModelVersionAliasesAlreadyExistException {
-    throw new UnsupportedOperationException("Not supported yet");
-  }
+      throws NoSuchModelException, ModelVersionAliasesAlreadyExistException;
 
   /**
    * Get the URI of the model artifact with a specified version number and URI name.

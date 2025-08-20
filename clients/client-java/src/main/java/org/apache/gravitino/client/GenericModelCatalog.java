@@ -220,14 +220,14 @@ class GenericModelCatalog extends BaseSchemaCatalog implements ModelCatalog {
   @Override
   public void linkModelVersion(
       NameIdentifier ident,
-      String uri,
+      Map<String, String> uris,
       String[] aliases,
       String comment,
       Map<String, String> properties)
       throws NoSuchModelException, ModelVersionAliasesAlreadyExistException {
     checkModelNameIdentifier(ident);
 
-    ModelVersionLinkRequest req = new ModelVersionLinkRequest(uri, aliases, comment, properties);
+    ModelVersionLinkRequest req = new ModelVersionLinkRequest(uris, aliases, comment, properties);
     NameIdentifier modelFullIdent = modelFullNameIdentifier(ident);
     BaseResponse resp =
         restClient.post(

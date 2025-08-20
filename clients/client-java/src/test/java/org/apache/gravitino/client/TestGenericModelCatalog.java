@@ -493,7 +493,10 @@ public class TestGenericModelCatalog extends TestBase {
 
     ModelVersionLinkRequest request =
         new ModelVersionLinkRequest(
-            "uri", new String[] {"alias1", "alias2"}, "comment", Collections.emptyMap());
+            ImmutableMap.of(ModelVersion.URI_NAME_UNKNOWN, "uri"),
+            new String[] {"alias1", "alias2"},
+            "comment",
+            Collections.emptyMap());
     BaseResponse resp = new BaseResponse(0);
     buildMockResource(Method.POST, modelVersionPath, request, resp, HttpStatus.SC_OK);
 
@@ -559,6 +562,94 @@ public class TestGenericModelCatalog extends TestBase {
                 .linkModelVersion(
                     modelId,
                     "uri",
+                    new String[] {"alias1", "alias2"},
+                    "comment",
+                    Collections.emptyMap()),
+        "internal error");
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"schema1/model1", "스키마1/모델1"})
+  public void testLinkModelVersionWithMultipleUris(String input) throws JsonProcessingException {
+    String[] split = input.split("/");
+    String schemaName = split[0];
+    String modelName = split[1];
+    NameIdentifier modelId = NameIdentifier.of(schemaName, modelName);
+    String modelVersionPath =
+        withSlash(
+            GenericModelCatalog.formatModelVersionRequestPath(
+                    NameIdentifier.of(METALAKE_NAME, CATALOG_NAME, schemaName, modelName))
+                + "/versions");
+
+    Map<String, String> uris = ImmutableMap.of("n1", "u1", "n2", "u2");
+    ModelVersionLinkRequest request =
+        new ModelVersionLinkRequest(
+            uris, new String[] {"alias1", "alias2"}, "comment", Collections.emptyMap());
+    BaseResponse resp = new BaseResponse(0);
+    buildMockResource(Method.POST, modelVersionPath, request, resp, HttpStatus.SC_OK);
+
+    Assertions.assertDoesNotThrow(
+        () ->
+            catalog
+                .asModelCatalog()
+                .linkModelVersion(
+                    modelId,
+                    uris,
+                    new String[] {"alias1", "alias2"},
+                    "comment",
+                    Collections.emptyMap()));
+
+    // Throw model not found exception
+    ErrorResponse errResp =
+        ErrorResponse.notFound(NoSuchModelException.class.getSimpleName(), "model not found");
+    buildMockResource(Method.POST, modelVersionPath, request, errResp, HttpStatus.SC_NOT_FOUND);
+
+    Assertions.assertThrows(
+        NoSuchModelException.class,
+        () ->
+            catalog
+                .asModelCatalog()
+                .linkModelVersion(
+                    modelId,
+                    uris,
+                    new String[] {"alias1", "alias2"},
+                    "comment",
+                    Collections.emptyMap()),
+        "model not found");
+
+    // Throw ModelVersionAliasesAlreadyExistException
+    ErrorResponse errResp2 =
+        ErrorResponse.alreadyExists(
+            ModelVersionAliasesAlreadyExistException.class.getSimpleName(),
+            "model version already exists");
+    buildMockResource(Method.POST, modelVersionPath, request, errResp2, HttpStatus.SC_CONFLICT);
+
+    Assertions.assertThrows(
+        ModelVersionAliasesAlreadyExistException.class,
+        () ->
+            catalog
+                .asModelCatalog()
+                .linkModelVersion(
+                    modelId,
+                    uris,
+                    new String[] {"alias1", "alias2"},
+                    "comment",
+                    Collections.emptyMap()),
+        "model version already exists");
+
+    // Throw RuntimeException
+    ErrorResponse errResp3 = ErrorResponse.internalError("internal error");
+    buildMockResource(
+        Method.POST, modelVersionPath, request, errResp3, HttpStatus.SC_INTERNAL_SERVER_ERROR);
+
+    Assertions.assertThrows(
+        RuntimeException.class,
+        () ->
+            catalog
+                .asModelCatalog()
+                .linkModelVersion(
+                    modelId,
+                    uris,
                     new String[] {"alias1", "alias2"},
                     "comment",
                     Collections.emptyMap()),

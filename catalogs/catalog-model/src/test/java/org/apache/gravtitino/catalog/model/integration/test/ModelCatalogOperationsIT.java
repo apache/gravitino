@@ -370,6 +370,51 @@ public class ModelCatalogOperationsIT extends BaseIT {
   }
 
   @Test
+  public void testLinkModelVersionWithMultipleUris() {
+    String modelName = RandomNameUtils.genRandomName("model1");
+    NameIdentifier modelIdent = NameIdentifier.of(schemaName, modelName);
+    gravitinoCatalog.asModelCatalog().registerModel(modelIdent, null, null);
+    Map<String, String> uris = ImmutableMap.of("n1", "u1", "n2", "u2");
+    gravitinoCatalog
+        .asModelCatalog()
+        .linkModelVersion(modelIdent, uris, new String[] {"alias1"}, "comment1", null);
+
+    Assertions.assertTrue(gravitinoCatalog.asModelCatalog().modelVersionExists(modelIdent, 0));
+    Assertions.assertTrue(
+        gravitinoCatalog.asModelCatalog().modelVersionExists(modelIdent, "alias1"));
+
+    // Test get model version
+    ModelVersion modelVersion = gravitinoCatalog.asModelCatalog().getModelVersion(modelIdent, 0);
+    Assertions.assertEquals(0, modelVersion.version());
+    Assertions.assertEquals(uris, modelVersion.uris());
+    Assertions.assertArrayEquals(new String[] {"alias1"}, modelVersion.aliases());
+    Assertions.assertEquals("comment1", modelVersion.comment());
+    Assertions.assertEquals(Collections.emptyMap(), modelVersion.properties());
+
+    // Test list model versions
+    int[] modelVersions = gravitinoCatalog.asModelCatalog().listModelVersions(modelIdent);
+    Set<Integer> resultSet = Arrays.stream(modelVersions).boxed().collect(Collectors.toSet());
+    Assertions.assertEquals(1, resultSet.size());
+    Assertions.assertTrue(resultSet.contains(0));
+
+    // Test list model version infos
+    ModelVersion[] modelVersionInfos =
+        gravitinoCatalog.asModelCatalog().listModelVersionInfos(modelIdent);
+    Assertions.assertEquals(1, modelVersionInfos.length);
+    Assertions.assertEquals(0, modelVersionInfos[0].version());
+    Assertions.assertEquals(uris, modelVersionInfos[0].uris());
+    Assertions.assertArrayEquals(new String[] {"alias1"}, modelVersionInfos[0].aliases());
+    Assertions.assertEquals("comment1", modelVersionInfos[0].comment());
+    Assertions.assertEquals(Collections.emptyMap(), modelVersionInfos[0].properties());
+
+    // Test delete and list model versions info
+    Assertions.assertTrue(gravitinoCatalog.asModelCatalog().deleteModelVersion(modelIdent, 0));
+    int[] modelVersionsAfterDelete =
+        gravitinoCatalog.asModelCatalog().listModelVersions(modelIdent);
+    Assertions.assertEquals(0, modelVersionsAfterDelete.length);
+  }
+
+  @Test
   void testLinkAndUpdateModelVersionComment() {
     String modelName = RandomNameUtils.genRandomName("model1");
     Map<String, String> properties = ImmutableMap.of("key1", "val1", "key2", "val2");
