@@ -720,7 +720,7 @@ public class DTOConverters {
         .withVersion(modelVersion.version())
         .withComment(modelVersion.comment())
         .withAliases(modelVersion.aliases())
-        .withUri(modelVersion.uri())
+        .withUris(modelVersion.uris())
         .withProperties(modelVersion.properties())
         .withAudit(toDTO(modelVersion.auditInfo()))
         .build();
