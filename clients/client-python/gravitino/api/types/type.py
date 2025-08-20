@@ -146,7 +146,17 @@ class NumericType(PrimitiveType, ABC):
 class DateTimeType(PrimitiveType, ABC):
     """Base class for all date/time types."""
 
-    pass
+    # Indicates that precision for the date/time type was not explicitly set by the user.
+    # The value should be converted to the catalog's default precision.
+    DATE_TIME_PRECISION_NOT_SET = -1
+
+    # Represents the minimum precision range for timestamp, time and other date/time types.
+    # The minimum precision is 0, which means second-level precision.
+    MIN_ALLOWED_PRECISION = 0
+
+    # Represents the maximum precision allowed for timestamp, time and other date/time types.
+    # The maximum precision is 12, which means picosecond-level precision.
+    MAX_ALLOWED_PRECISION = 12
 
 
 class IntervalType(PrimitiveType, ABC):
