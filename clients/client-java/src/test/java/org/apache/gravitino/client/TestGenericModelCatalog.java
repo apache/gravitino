@@ -48,6 +48,7 @@ import org.apache.gravitino.dto.responses.ModelResponse;
 import org.apache.gravitino.dto.responses.ModelVersionInfoListResponse;
 import org.apache.gravitino.dto.responses.ModelVersionListResponse;
 import org.apache.gravitino.dto.responses.ModelVersionResponse;
+import org.apache.gravitino.dto.responses.ModelVersionUriResponse;
 import org.apache.gravitino.exceptions.ModelAlreadyExistsException;
 import org.apache.gravitino.exceptions.ModelVersionAliasesAlreadyExistException;
 import org.apache.gravitino.exceptions.NoSuchModelException;
@@ -1024,6 +1025,58 @@ public class TestGenericModelCatalog extends TestBase {
     Assertions.assertEquals(Collections.emptyMap(), updatedModelVersion.properties());
     Assertions.assertEquals(version, updatedModelVersion.version());
     Assertions.assertArrayEquals(aliases, updatedModelVersion.aliases());
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"schema1/model1", "스키마1/모델1"})
+  public void testGetModelVersionUri(String input) throws JsonProcessingException {
+    String[] split = input.split("/");
+    String schemaName = split[0];
+    String modelName = split[1];
+    NameIdentifier modelId = NameIdentifier.of(schemaName, modelName);
+
+    int version = 0;
+    String modelVersionUriPath =
+        withSlash(
+            GenericModelCatalog.formatModelVersionRequestPath(
+                    NameIdentifier.of(METALAKE_NAME, CATALOG_NAME, schemaName, modelName))
+                + "/versions/"
+                + version
+                + "/uri");
+    String uriName = "name-s3";
+    String uri = "s3://path/to/model";
+    Map<String, String> params = ImmutableMap.of("uriName", uriName);
+    ModelVersionUriResponse resp = new ModelVersionUriResponse(uri);
+    buildMockResource(Method.GET, modelVersionUriPath, params, null, resp, HttpStatus.SC_OK);
+
+    Assertions.assertEquals(
+        uri, catalog.asModelCatalog().getModelVersionUri(modelId, version, uriName));
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"schema1/model1", "스키마1/모델1"})
+  public void testGetModelVersionUriByAlias(String input) throws JsonProcessingException {
+    String[] split = input.split("/");
+    String schemaName = split[0];
+    String modelName = split[1];
+    NameIdentifier modelId = NameIdentifier.of(schemaName, modelName);
+
+    String alias = "alias1";
+    String modelVersionUriPath =
+        withSlash(
+            GenericModelCatalog.formatModelVersionRequestPath(
+                    NameIdentifier.of(METALAKE_NAME, CATALOG_NAME, schemaName, modelName))
+                + "/aliases/"
+                + alias
+                + "/uri");
+    String uriName = "name-s3";
+    String uri = "s3://path/to/model";
+    Map<String, String> params = ImmutableMap.of("uriName", uriName);
+    ModelVersionUriResponse resp = new ModelVersionUriResponse(uri);
+    buildMockResource(Method.GET, modelVersionUriPath, params, null, resp, HttpStatus.SC_OK);
+
+    Assertions.assertEquals(
+        uri, catalog.asModelCatalog().getModelVersionUri(modelId, alias, uriName));
   }
 
   private ModelDTO mockModelDTO(

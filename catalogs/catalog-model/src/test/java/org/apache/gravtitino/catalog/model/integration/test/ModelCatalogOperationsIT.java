@@ -35,6 +35,7 @@ import org.apache.gravitino.exceptions.ModelAlreadyExistsException;
 import org.apache.gravitino.exceptions.ModelVersionAliasesAlreadyExistException;
 import org.apache.gravitino.exceptions.NoSuchModelException;
 import org.apache.gravitino.exceptions.NoSuchModelVersionException;
+import org.apache.gravitino.exceptions.NoSuchModelVersionURINameException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.integration.test.util.BaseIT;
 import org.apache.gravitino.model.Model;
@@ -1069,6 +1070,144 @@ public class ModelCatalogOperationsIT extends BaseIT {
     Assertions.assertArrayEquals(newAliases, reloadedModelVersion.aliases());
     Assertions.assertEquals(modelVersion.comment(), reloadedModelVersion.comment());
     Assertions.assertEquals(modelVersion.properties(), reloadedModelVersion.properties());
+  }
+
+  @Test
+  public void testGetModelVersionUri() {
+    // Test get model version without default uri name
+    String modelName = RandomNameUtils.genRandomName("model1");
+    NameIdentifier modelIdent = NameIdentifier.of(schemaName, modelName);
+    gravitinoCatalog.asModelCatalog().registerModel(modelIdent, null, null);
+    Map<String, String> uris = ImmutableMap.of("n1", "u1", "n2", "u2");
+    gravitinoCatalog
+        .asModelCatalog()
+        .linkModelVersion(modelIdent, uris, new String[] {"alias1"}, "comment1", null);
+    Assertions.assertTrue(gravitinoCatalog.asModelCatalog().modelVersionExists(modelIdent, 0));
+    Assertions.assertTrue(
+        gravitinoCatalog.asModelCatalog().modelVersionExists(modelIdent, "alias1"));
+
+    Assertions.assertEquals(
+        "u1", gravitinoCatalog.asModelCatalog().getModelVersionUri(modelIdent, 0, "n1"));
+    Assertions.assertEquals(
+        "u2", gravitinoCatalog.asModelCatalog().getModelVersionUri(modelIdent, 0, "n2"));
+    Assertions.assertThrows(
+        NoSuchModelVersionURINameException.class,
+        () -> gravitinoCatalog.asModelCatalog().getModelVersionUri(modelIdent, 0, "n3"));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> gravitinoCatalog.asModelCatalog().getModelVersionUri(modelIdent, 0, null));
+
+    // Test get model version with default uri name
+    String modelName1 = RandomNameUtils.genRandomName("model1");
+    NameIdentifier modelIdent1 = NameIdentifier.of(schemaName, modelName1);
+    Map<String, String> modelProperties =
+        ImmutableMap.of(ModelVersion.PROPERTY_DEFAULT_URI_NAME, "n1");
+    gravitinoCatalog.asModelCatalog().registerModel(modelIdent1, null, modelProperties);
+    gravitinoCatalog
+        .asModelCatalog()
+        .linkModelVersion(modelIdent1, uris, new String[] {"alias2"}, "comment1", null);
+    Assertions.assertTrue(gravitinoCatalog.asModelCatalog().modelVersionExists(modelIdent1, 0));
+    Assertions.assertTrue(
+        gravitinoCatalog.asModelCatalog().modelVersionExists(modelIdent1, "alias2"));
+
+    Assertions.assertEquals(
+        "u1", gravitinoCatalog.asModelCatalog().getModelVersionUri(modelIdent1, 0, "n1"));
+    Assertions.assertEquals(
+        "u2", gravitinoCatalog.asModelCatalog().getModelVersionUri(modelIdent1, 0, "n2"));
+    Assertions.assertThrows(
+        NoSuchModelVersionURINameException.class,
+        () -> gravitinoCatalog.asModelCatalog().getModelVersionUri(modelIdent1, 0, "n3"));
+    Assertions.assertEquals(
+        "u1", gravitinoCatalog.asModelCatalog().getModelVersionUri(modelIdent1, 0, null));
+
+    Map<String, String> modelVersionProperties =
+        ImmutableMap.of(ModelVersion.PROPERTY_DEFAULT_URI_NAME, "n2");
+    gravitinoCatalog
+        .asModelCatalog()
+        .linkModelVersion(
+            modelIdent1, uris, new String[] {"alias3"}, "comment1", modelVersionProperties);
+    Assertions.assertTrue(gravitinoCatalog.asModelCatalog().modelVersionExists(modelIdent1, 1));
+    Assertions.assertTrue(
+        gravitinoCatalog.asModelCatalog().modelVersionExists(modelIdent1, "alias3"));
+
+    Assertions.assertEquals(
+        "u1", gravitinoCatalog.asModelCatalog().getModelVersionUri(modelIdent1, 1, "n1"));
+    Assertions.assertEquals(
+        "u2", gravitinoCatalog.asModelCatalog().getModelVersionUri(modelIdent1, 1, "n2"));
+    Assertions.assertThrows(
+        NoSuchModelVersionURINameException.class,
+        () -> gravitinoCatalog.asModelCatalog().getModelVersionUri(modelIdent1, 1, "n3"));
+    Assertions.assertEquals(
+        "u2", gravitinoCatalog.asModelCatalog().getModelVersionUri(modelIdent1, 1, null));
+  }
+
+  @Test
+  public void testGetModelVersionUriByAlias() {
+    // Test get model version without default uri name
+    String modelName = RandomNameUtils.genRandomName("model1");
+    NameIdentifier modelIdent = NameIdentifier.of(schemaName, modelName);
+    gravitinoCatalog.asModelCatalog().registerModel(modelIdent, null, null);
+    Map<String, String> uris = ImmutableMap.of("n1", "u1", "n2", "u2");
+    gravitinoCatalog
+        .asModelCatalog()
+        .linkModelVersion(modelIdent, uris, new String[] {"alias1"}, "comment1", null);
+    Assertions.assertTrue(gravitinoCatalog.asModelCatalog().modelVersionExists(modelIdent, 0));
+    Assertions.assertTrue(
+        gravitinoCatalog.asModelCatalog().modelVersionExists(modelIdent, "alias1"));
+
+    Assertions.assertEquals(
+        "u1", gravitinoCatalog.asModelCatalog().getModelVersionUri(modelIdent, "alias1", "n1"));
+    Assertions.assertEquals(
+        "u2", gravitinoCatalog.asModelCatalog().getModelVersionUri(modelIdent, "alias1", "n2"));
+    Assertions.assertThrows(
+        NoSuchModelVersionURINameException.class,
+        () -> gravitinoCatalog.asModelCatalog().getModelVersionUri(modelIdent, "alias1", "n3"));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> gravitinoCatalog.asModelCatalog().getModelVersionUri(modelIdent, "alias1", null));
+
+    // Test get model version with default uri name
+    String modelName1 = RandomNameUtils.genRandomName("model1");
+    NameIdentifier modelIdent1 = NameIdentifier.of(schemaName, modelName1);
+    Map<String, String> modelProperties =
+        ImmutableMap.of(ModelVersion.PROPERTY_DEFAULT_URI_NAME, "n1");
+    gravitinoCatalog.asModelCatalog().registerModel(modelIdent1, null, modelProperties);
+    gravitinoCatalog
+        .asModelCatalog()
+        .linkModelVersion(modelIdent1, uris, new String[] {"alias2"}, "comment1", null);
+    Assertions.assertTrue(gravitinoCatalog.asModelCatalog().modelVersionExists(modelIdent1, 0));
+    Assertions.assertTrue(
+        gravitinoCatalog.asModelCatalog().modelVersionExists(modelIdent1, "alias2"));
+
+    Assertions.assertEquals(
+        "u1", gravitinoCatalog.asModelCatalog().getModelVersionUri(modelIdent1, "alias2", "n1"));
+    Assertions.assertEquals(
+        "u2", gravitinoCatalog.asModelCatalog().getModelVersionUri(modelIdent1, "alias2", "n2"));
+    Assertions.assertThrows(
+        NoSuchModelVersionURINameException.class,
+        () -> gravitinoCatalog.asModelCatalog().getModelVersionUri(modelIdent1, "alias2", "n3"));
+    Assertions.assertEquals(
+        "u1", gravitinoCatalog.asModelCatalog().getModelVersionUri(modelIdent1, "alias2", null));
+
+    Map<String, String> modelVersionProperties =
+        ImmutableMap.of(ModelVersion.PROPERTY_DEFAULT_URI_NAME, "n2");
+    gravitinoCatalog
+        .asModelCatalog()
+        .linkModelVersion(
+            modelIdent1, uris, new String[] {"alias3"}, "comment1", modelVersionProperties);
+    Assertions.assertTrue(gravitinoCatalog.asModelCatalog().modelVersionExists(modelIdent1, 1));
+    Assertions.assertTrue(
+        gravitinoCatalog.asModelCatalog().modelVersionExists(modelIdent1, "alias3"));
+
+    Assertions.assertEquals(
+        "u1", gravitinoCatalog.asModelCatalog().getModelVersionUri(modelIdent1, "alias3", "n1"));
+    Assertions.assertEquals(
+        "u2", gravitinoCatalog.asModelCatalog().getModelVersionUri(modelIdent1, "alias3", "n2"));
+    Assertions.assertThrows(
+        NoSuchModelVersionURINameException.class,
+        () -> gravitinoCatalog.asModelCatalog().getModelVersionUri(modelIdent1, "alias3", "n3"));
+    Assertions.assertEquals(
+        "u2", gravitinoCatalog.asModelCatalog().getModelVersionUri(modelIdent1, "alias3", null));
   }
 
   private void createMetalake() {

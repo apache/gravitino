@@ -45,10 +45,12 @@ import org.apache.gravitino.dto.responses.ModelResponse;
 import org.apache.gravitino.dto.responses.ModelVersionInfoListResponse;
 import org.apache.gravitino.dto.responses.ModelVersionListResponse;
 import org.apache.gravitino.dto.responses.ModelVersionResponse;
+import org.apache.gravitino.dto.responses.ModelVersionUriResponse;
 import org.apache.gravitino.exceptions.ModelAlreadyExistsException;
 import org.apache.gravitino.exceptions.ModelVersionAliasesAlreadyExistException;
 import org.apache.gravitino.exceptions.NoSuchModelException;
 import org.apache.gravitino.exceptions.NoSuchModelVersionException;
+import org.apache.gravitino.exceptions.NoSuchModelVersionURINameException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.model.Model;
 import org.apache.gravitino.model.ModelCatalog;
@@ -238,6 +240,54 @@ class GenericModelCatalog extends BaseSchemaCatalog implements ModelCatalog {
             ErrorHandlers.modelErrorHandler());
 
     resp.validate();
+  }
+
+  @Override
+  public String getModelVersionUri(NameIdentifier ident, int version, String uriName)
+      throws NoSuchModelVersionException, NoSuchModelVersionURINameException {
+    checkModelNameIdentifier(ident);
+    Preconditions.checkArgument(version >= 0, "Model version must be non-negative");
+
+    NameIdentifier modelFullIdent = modelFullNameIdentifier(ident);
+    Map<String, String> queryParam =
+        uriName == null
+            ? Collections.emptyMap()
+            : ImmutableMap.of("uriName", RESTUtils.encodeString(uriName));
+    ModelVersionUriResponse resp =
+        restClient.get(
+            formatModelVersionRequestPath(modelFullIdent) + "/versions/" + version + "/uri",
+            queryParam,
+            ModelVersionUriResponse.class,
+            Collections.emptyMap(),
+            ErrorHandlers.modelErrorHandler());
+    resp.validate();
+    return resp.getUri();
+  }
+
+  @Override
+  public String getModelVersionUri(NameIdentifier ident, String alias, String uriName)
+      throws NoSuchModelVersionException, NoSuchModelVersionURINameException {
+    checkModelNameIdentifier(ident);
+    Preconditions.checkArgument(StringUtils.isNotBlank(alias), "Model alias must be non-empty");
+
+    NameIdentifier modelFullIdent = modelFullNameIdentifier(ident);
+    Map<String, String> queryParam =
+        uriName == null
+            ? Collections.emptyMap()
+            : ImmutableMap.of("uriName", RESTUtils.encodeString(uriName));
+    ModelVersionUriResponse resp =
+        restClient.get(
+            formatModelVersionRequestPath(modelFullIdent)
+                + "/aliases/"
+                + RESTUtils.encodeString(alias)
+                + "/uri",
+            queryParam,
+            ModelVersionUriResponse.class,
+            Collections.emptyMap(),
+            ErrorHandlers.modelErrorHandler());
+
+    resp.validate();
+    return resp.getUri();
   }
 
   @Override
