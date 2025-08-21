@@ -196,8 +196,7 @@ public class MetadataFilterHelper {
             Entity.EntityType.CATALOG, NameIdentifierUtil.getCatalogIdentifier(nameIdentifier));
         break;
       default:
-        nameIdentifierMap.put(entityType, nameIdentifier);
-        break;
+        throw new IllegalArgumentException("Unsupported entity type: " + entityType);
     }
     return nameIdentifierMap;
   }
