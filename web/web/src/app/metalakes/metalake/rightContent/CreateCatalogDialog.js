@@ -435,7 +435,8 @@ const CreateCatalogDialog = props => {
         if (findPropIndex === -1) {
           let propItem = {
             key: item,
-            value: properties[item]
+            value: properties[item],
+            disabled: type === 'update' && item.startsWith('location-') && data.provider === 'fileset'
           }
           propsItems.push(propItem)
         }

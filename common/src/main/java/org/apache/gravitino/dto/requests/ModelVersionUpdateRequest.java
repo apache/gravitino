@@ -50,6 +50,12 @@ import org.apache.gravitino.rest.RESTRequest;
       value = ModelVersionUpdateRequest.UpdateModelVersionUriRequest.class,
       name = "updateUri"),
   @JsonSubTypes.Type(
+      value = ModelVersionUpdateRequest.AddModelVersionUriRequest.class,
+      name = "addUri"),
+  @JsonSubTypes.Type(
+      value = ModelVersionUpdateRequest.RemoveModelVersionUriRequest.class,
+      name = "removeUri"),
+  @JsonSubTypes.Type(
       value = ModelVersionUpdateRequest.UpdateModelVersionAliasesRequest.class,
       name = "updateAliases")
 })
@@ -150,12 +156,27 @@ public interface ModelVersionUpdateRequest extends RESTRequest {
   @ToString
   @Getter
   class UpdateModelVersionUriRequest implements ModelVersionUpdateRequest {
+    @JsonProperty("uriName")
+    private final String uriName;
+
     @JsonProperty("newUri")
     private final String newUri;
+
+    /**
+     * Constructor for UpdateModelVersionUriRequest.
+     *
+     * @param newUri the new uri of the model version.
+     */
+    public UpdateModelVersionUriRequest(String newUri) {
+      this(null, newUri);
+    }
 
     /** {@inheritDoc} */
     @Override
     public ModelVersionChange modelVersionChange() {
+      if (StringUtils.isNotBlank(uriName)) {
+        return ModelVersionChange.updateUri(uriName, newUri);
+      }
       return ModelVersionChange.updateUri(newUri);
     }
 
@@ -168,6 +189,67 @@ public interface ModelVersionUpdateRequest extends RESTRequest {
     public void validate() throws IllegalArgumentException {
       Preconditions.checkArgument(
           StringUtils.isNotBlank(newUri), "\"newUri\" field is required and cannot be empty");
+    }
+  }
+
+  /** Request to add the URI of a model version. */
+  @EqualsAndHashCode
+  @AllArgsConstructor
+  @NoArgsConstructor(force = true)
+  @ToString
+  @Getter
+  class AddModelVersionUriRequest implements ModelVersionUpdateRequest {
+    @JsonProperty("uriName")
+    private final String uriName;
+
+    @JsonProperty("uri")
+    private final String uri;
+
+    /** {@inheritDoc} */
+    @Override
+    public ModelVersionChange modelVersionChange() {
+      return ModelVersionChange.addUri(uriName, uri);
+    }
+
+    /**
+     * Validates the request.
+     *
+     * @throws IllegalArgumentException If the request is invalid, this exception is thrown.
+     */
+    @Override
+    public void validate() throws IllegalArgumentException {
+      Preconditions.checkArgument(
+          StringUtils.isNotBlank(uriName), "\"uriName\" field is required and cannot be empty");
+      Preconditions.checkArgument(
+          StringUtils.isNotBlank(uri), "\"uri\" field is required and cannot be empty");
+    }
+  }
+
+  /** Request to remove the URI of a model version. */
+  @EqualsAndHashCode
+  @AllArgsConstructor
+  @NoArgsConstructor(force = true)
+  @ToString
+  @Getter
+  class RemoveModelVersionUriRequest implements ModelVersionUpdateRequest {
+    @JsonProperty("uriName")
+    private final String uriName;
+
+    /** {@inheritDoc} */
+    @Override
+    public ModelVersionChange modelVersionChange() {
+      return ModelVersionChange.removeUri(uriName);
+    }
+
+    /**
+     * Validates the request.
+     *
+     * @throws IllegalArgumentException If the request is invalid, this exception is thrown.
+     */
+    @Override
+    public void validate() throws IllegalArgumentException {
+      Preconditions.checkArgument(
+          StringUtils.isNotBlank(uriName), "\"uriName\" field is required and cannot be empty");
     }
   }
 
