@@ -58,7 +58,10 @@ class PolicyOperation(ABC):
         Associate policies with metadata.
 
         Args:
-            metadata_full_name: Full name of the metadata item (e.g., table, column)
+            metadata_full_name: Full name of the metadata object to associate policies with.
+            It's typically in the format "catalog.schema.table" or "catalog.schema" or "catalog"
+            or "catalog.schema.fileset". The "model", "topic" are also supported and the format
+            is the same as for "catalog.schema.table".
             metadata_type: Type of the metadata (e.g., "table", "column")
             policies_to_add: List of policy names to associate with the metadata
             policies_to_remove: List of policy names to disassociate from the metadata
@@ -77,7 +80,10 @@ class PolicyOperation(ABC):
         Get the policy associated with a specific metadata item.
 
         Args:
-            metadata_full_name: Full name of the metadata item (e.g., table, column)
+            metadata_full_name: Full name of the metadata object to associate policies with.
+            It's typically in the format "catalog.schema.table" or "catalog.schema" or "catalog"
+            or "catalog.schema.fileset". The "model", "topic" are also supported and the format
+            is the same as for "catalog.schema.table".
             metadata_type: Type of the metadata (e.g., "table", "column")
             policy_name: Name of the policy
 
@@ -94,7 +100,10 @@ class PolicyOperation(ABC):
         List all policies associated with a specific metadata item.
 
         Args:
-            metadata_full_name: Full name of the metadata item (e.g., table, column)
+            metadata_full_name: Full name of the metadata object to associate policies with.
+            It's typically in the format "catalog.schema.table" or "catalog.schema" or "catalog"
+            or "catalog.schema.fileset". The "model", "topic" are also supported and the format
+            is the same as for "catalog.schema.table".
             metadata_type: Type of the metadata (e.g., "table", "column")
 
         Returns:
