@@ -85,7 +85,6 @@ class TestPolicyTool(unittest.TestCase):
 
         asyncio.run(_test_list_metadata_for_policy(self.mcp))
 
-    @unittest.skip
     def test_disassociate_policy_from_metadata(self):
         async def _test_disassociate_policy_from_metadata(mcp_server):
             async with Client(mcp_server) as client:
@@ -104,7 +103,6 @@ class TestPolicyTool(unittest.TestCase):
 
         asyncio.run(_test_disassociate_policy_from_metadata(self.mcp))
 
-    @unittest.skip
     def test_associate_policy_with_metadata(self):
         async def _test_associate_policy_with_metadata(mcp_server):
             async with Client(mcp_server) as client:

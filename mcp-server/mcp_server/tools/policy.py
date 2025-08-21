@@ -132,7 +132,7 @@ def load_policy_tools(mcp: FastMCP):
         client = ctx.request_context.lifespan_context.rest_client()
         return await client.as_policy_operation().load_policy(policy_name)
 
-    @mcp.tool(tags={"policy"}, enabled=False)
+    @mcp.tool(tags={"policy"})
     async def associate_policy_with_metadata(
         ctx: Context,
         metadata_full_name: str,
@@ -180,7 +180,7 @@ def load_policy_tools(mcp: FastMCP):
             )
         )
 
-    @mcp.tool(tags={"policy"}, enabled=False)
+    @mcp.tool(tags={"policy"})
     async def disassociate_policy_from_metadata(
         ctx: Context,
         metadata_full_name: str,
@@ -230,7 +230,7 @@ def load_policy_tools(mcp: FastMCP):
         Args:
             ctx (Context): The request context object containing lifespan context
                            and connector information.
-            metadata_full_name (str): Full name of the metadata item (e.g., table, column). For more, please see tool
+            metadata_full_name (str): Full name of the metadata item. For more, please see tool
              `get_metadata_fullname_formats`.
             metadata_type (str): Type of the metadata (e.g., "table", "column"). For More information, please see
              tool `list_all_metadata_types`.
@@ -244,8 +244,33 @@ def load_policy_tools(mcp: FastMCP):
 
         Example Return Value:
             [
-                "policy1",
-                "policy2"
+                {
+                    "name": "my_policy1",
+                    "comment": "This is a test policy",
+                    "policyType": "custom",
+                    "enabled": true,
+                    "content": {
+                        "customRules": {
+                            "rule1": 123
+                        },
+                        "properties": {
+                            "key1": "value1"
+                        },
+                        "supportedObjectTypes": [
+                            "fileset",
+                            "model",
+                            "topic",
+                            "schema",
+                            "table",
+                            "catalog"
+                        ]
+                    },
+                    "inherited": false,
+                    "audit": {
+                        "creator": "anonymous",
+                        "createTime": "2025-08-18T08:29:30.016501Z"
+                    }
+                }
             ]
         """
         client = ctx.request_context.lifespan_context.rest_client()
@@ -319,7 +344,7 @@ def load_policy_tools(mcp: FastMCP):
         Args:
             ctx (Context): The request context object containing lifespan context
                            and connector information.
-            metadata_full_name (str): Full name of the metadata item (e.g., table, column). For more, please see tool
+            metadata_full_name (str): Full name of the metadata item. For more, please see tool
              `get_metadata_fullname_formats`.
             metadata_type (str): Type of the metadata (e.g., "table", "column"). For More information, please see
              tool `list_all_metadata_types`.
