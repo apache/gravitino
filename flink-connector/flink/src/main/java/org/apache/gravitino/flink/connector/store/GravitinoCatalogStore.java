@@ -67,17 +67,17 @@ public class GravitinoCatalogStore extends AbstractCatalogStore {
         gravitinoProperties);
   }
   /**
- * Removes the specified catalog.
- *
- * @param catalogName name of the catalog to remove
- * @param ignoreIfNotExists if true, ignore when the catalog does not exist
- * @throws CatalogException if the catalog cannot be removed
- */
+   * Removes the specified catalog.
+   *
+   * @param catalogName name of the catalog to remove
+   * @param ignoreIfNotExists if true, ignore when the catalog does not exist
+   * @throws CatalogException if the catalog cannot be removed
+   */
   @Override
   public void removeCatalog(String catalogName, boolean ignoreIfNotExists) throws CatalogException {
     try {
       boolean isDropped = gravitinoCatalogManager.dropCatalog(catalogName);
-      if(!ignoreIfNotExists && !isDropped){
+      if (!ignoreIfNotExists && !isDropped) {
         throw new CatalogException(String.format("Failed to remove the catalog: %s", catalogName));
       }
     } catch (Exception e) {
