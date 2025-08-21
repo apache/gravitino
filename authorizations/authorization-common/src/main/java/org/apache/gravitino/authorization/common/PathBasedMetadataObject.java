@@ -175,7 +175,7 @@ public class PathBasedMetadataObject implements AuthorizationMetadataObject {
         && Objects.equals(parent, that.parent)
         && Objects.equals(path, that.path)
         && Objects.equals(type, that.type)
-        && Objects.equals(recursive, that.recursive);
+        && recursive == that.recursive;
   }
 
   @Override
