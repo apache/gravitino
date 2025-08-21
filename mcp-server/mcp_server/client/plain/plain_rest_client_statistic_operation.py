@@ -24,7 +24,7 @@ class PlainRESTClientStatisticOperation(StatisticOperation):
         self.metalake_name = metalake_name
         self.rest_client = rest_client
 
-    async def get_list_of_statistics(
+    async def list_of_statistics(
         self, metalake_name: str, metadata_type: str, metadata_fullname: str
     ) -> str:
         response = await self.rest_client.get(
@@ -33,7 +33,7 @@ class PlainRESTClientStatisticOperation(StatisticOperation):
         return extract_content_from_response(response, "statistics", [])
 
     # pylint: disable=R0917
-    async def get_list_statistic_for_partition(
+    async def list_statistic_for_partition(
         self,
         metalake_name: str,
         metadata_type: str,
