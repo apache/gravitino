@@ -269,6 +269,7 @@ const CreateCatalogDialog = props => {
           'jdbc-driver': jdbcDriver,
           'jdbc-user': jdbcUser,
           'jdbc-password': jdbcPwd,
+          warehouse: warehouse,
           uri: uri,
           'authentication.type': authType,
           'authentication.kerberos.principal': kerberosPrincipal,
@@ -278,7 +279,7 @@ const CreateCatalogDialog = props => {
 
         if (
           catalogBackend &&
-          catalogBackend === 'hive' &&
+          ['rest', 'hive'].includes(catalogBackend) &&
           ['lakehouse-iceberg', 'lakehouse-paimon'].includes(providerSelect)
         ) {
           properties = {
@@ -286,18 +287,13 @@ const CreateCatalogDialog = props => {
             uri: uri,
             ...others
           }
+          warehouse && (properties['warehouse'] = warehouse)
         } else if (catalogBackend && catalogBackend === 'filesystem' && providerSelect === 'lakehouse-paimon') {
           properties = {
             'catalog-backend': catalogBackend,
             ...others
           }
           uri && (properties['uri'] = uri)
-        } else if (catalogBackend && catalogBackend === 'rest' && providerSelect === 'lakehouse-iceberg') {
-          properties = {
-            'catalog-backend': catalogBackend,
-            uri: uri,
-            ...others
-          }
         } else {
           properties = {
             uri: uri,
