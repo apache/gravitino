@@ -50,8 +50,11 @@ import org.apache.gravitino.Configs;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.Namespace;
 import org.apache.gravitino.SupportsRelationOperations;
 import org.apache.gravitino.meta.ModelVersionEntity;
+import org.apache.gravitino.meta.UserEntity;
+import org.apache.gravitino.utils.NamespaceUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -307,14 +310,75 @@ public class CaffeineEntityCache extends BaseEntityCache {
       newEntities = new ArrayList<>(merged);
     }
 
+    // DEBUG code
+    check_cache();
+
+    List<String> allCacheIndexKeys1 = Lists.newArrayList();
+    cacheIndex.getKeysStartingWith("").forEach(
+            k -> {
+              allCacheIndexKeys1.add(k.toString());
+            });
+
+    List<String> allReverseIndexKeys1 = Lists.newArrayList();
+    reverseIndex.getKeysStartingWith("").forEach(
+            k -> {
+              allReverseIndexKeys1.add(k.toString());
+            });
+
     cacheData.put(key, newEntities);
 
     for (Entity entity : newEntities) {
+        if (entity instanceof UserEntity) {
+          // UserEntity is not supported in the cache, skip it.
+          UserEntity userEntity = (UserEntity) entity;
+          if (userEntity.roleNames() != null) {
+            userEntity.roleNames().forEach(
+                    role -> {
+                      Namespace ns = NamespaceUtil.ofRole(userEntity.namespace().level(0));
+                      NameIdentifier nameIdentifier = NameIdentifier.of(ns, role);
+                      putReverseIndex(nameIdentifier, Entity.EntityType.ROLE, key);
+                    });
+          }
+        }
+
+//      Namespace ns = NamespaceUtil.ofRole(ident.namespace().level(0));
+//      NameIdentifier nameIdentifier = NameIdentifier.of(ns, role);
+
       putReverseIndex(entity, key);
     }
 
     if (cacheData.policy().getIfPresentQuietly(key) != null) {
       cacheIndex.put(key.toString(), key);
+    }
+
+    List<String> allCacheIndexKeys2 = Lists.newArrayList();
+    cacheIndex.getKeysStartingWith("").forEach(
+            k -> {
+              allCacheIndexKeys2.add(k.toString());
+            });
+
+    List<String> allReverseIndexKeys2 = Lists.newArrayList();
+    reverseIndex.getKeysStartingWith("").forEach(
+            k -> {
+              allReverseIndexKeys2.add(k.toString());
+            });
+
+    // DEBUG code
+    check_cache();
+  }
+
+  private void check_cache() {
+    // DEBUG code
+    long cacheDataSize = cacheData.estimatedSize();
+    int cacheIndexSize = cacheIndex.size();
+    int reverseIndexSize = reverseIndex.size();
+    if (cacheDataSize != cacheIndexSize
+            || cacheDataSize != reverseIndexSize
+            || cacheIndexSize != reverseIndexSize) {
+      throw new IllegalStateException(
+              String.format(
+                      "Cache data size (%d) does not match cache index size (%d) or reverse index size (%d).",
+                      cacheDataSize, cacheIndexSize, reverseIndexSize));
     }
   }
 
@@ -361,6 +425,17 @@ public class CaffeineEntityCache extends BaseEntityCache {
     return entityCacheKey;
   }
 
+  public void putReverseIndex(NameIdentifier nameIdentifier, Entity.EntityType type, EntityCacheRelationKey key) {
+//    EntityCacheKey entityCacheKey = makeEntityCacheKey(entity);
+    EntityCacheKey entityCacheKey = EntityCacheKey.of(nameIdentifier, type);
+    String strEntityCacheKey = entityCacheKey.toString();
+    List<EntityCacheKey> entityKeysToRemove =
+        Lists.newArrayList(reverseIndex.getValuesForKeysStartingWith(strEntityCacheKey));
+    String strEntityCacheKeyNo =
+        String.format("%s-%d", strEntityCacheKey, entityKeysToRemove.size());
+    reverseIndex.put(strEntityCacheKeyNo, key);
+  }
+
   public void putReverseIndex(Entity entity, EntityCacheRelationKey key) {
     Preconditions.checkArgument(entity != null, "EntityCacheRelationKey cannot be null");
 
@@ -368,9 +443,9 @@ public class CaffeineEntityCache extends BaseEntityCache {
       EntityCacheKey entityCacheKey = makeEntityCacheKey(entity);
       String strEntityCacheKey = entityCacheKey.toString();
       List<EntityCacheKey> entityKeysToRemove =
-          Lists.newArrayList(reverseIndex.getValuesForKeysStartingWith(strEntityCacheKey));
+              Lists.newArrayList(reverseIndex.getValuesForKeysStartingWith(strEntityCacheKey));
       String strEntityCacheKeyNo =
-          String.format("%s-%d", strEntityCacheKey, entityKeysToRemove.size());
+              String.format("%s-%d", strEntityCacheKey, entityKeysToRemove.size());
       reverseIndex.put(strEntityCacheKeyNo, key);
     }
   }
@@ -381,8 +456,29 @@ public class CaffeineEntityCache extends BaseEntityCache {
    * @param identifier The identifier of the entity to invalidate
    */
   private boolean invalidateEntities(NameIdentifier identifier) {
+    List<String> allCacheIndexKeys1 = Lists.newArrayList();
+    cacheIndex.getKeysStartingWith("").forEach(
+            k -> {
+              allCacheIndexKeys1.add(k.toString());
+            });
+
+    List<String> relationCacheIndex2 = Lists.newArrayList();
+    cacheIndex.getKeysStartingWith(identifier.toString())
+            .forEach(key -> {
+              relationCacheIndex2.add(key.toString());
+            });
+
+    List<String> allReverseIndexKeys1 = Lists.newArrayList();
+    reverseIndex.getKeysStartingWith("").forEach(
+            k -> {
+              allReverseIndexKeys1.add(k.toString());
+            });
+
     List<EntityCacheKey> entityKeysToRemove =
         Lists.newArrayList(cacheIndex.getValuesForKeysStartingWith(identifier.toString()));
+
+    // DEBUG code
+    check_cache();
 
     Map<EntityCacheRelationKey, List<Entity>> relationEnitiesMap =
         cacheData.getAllPresent(entityKeysToRemove);
@@ -392,6 +488,10 @@ public class CaffeineEntityCache extends BaseEntityCache {
     // INVALIDATE Role1, then need to remove RECORD1 and RECORD2
     relationEnitiesMap.forEach(
         (key, entities) -> {
+          if (key.relationType() == null) {
+            // If the relation type is null, it means it's a single entity, we can skip it.
+            return;
+          }
           entities.forEach(
               entity -> {
                 NameIdentifier child = getNameIdentifier(entity);
@@ -416,7 +516,7 @@ public class CaffeineEntityCache extends BaseEntityCache {
         key -> {
           // If the key is the same as the entity key, we can remove it from the cache.
           cacheData.invalidate(key);
-          cacheIndex.remove(key.toString());
+          boolean removed1 = cacheIndex.remove(key.toString());
           // Remove from reverse index
           // Convert EntityCacheRelationKey to EntityCacheKey
           EntityCacheKey reverseKey = EntityCacheKey.of(key.identifier(), key.entityType());
@@ -424,11 +524,40 @@ public class CaffeineEntityCache extends BaseEntityCache {
               .getKeysStartingWith(reverseKey.toString())
               .forEach(
                   reverseIndexKey -> {
-                    reverseIndex.remove(reverseIndexKey.toString());
+                    boolean removed2 = reverseIndex.remove(reverseIndexKey.toString());
                   });
         });
 
+    long cacheDataSize = cacheData.estimatedSize();
+    int cacheIndexSize = cacheIndex.size();
+    int reverseIndexSize = reverseIndex.size();
+
     cacheData.invalidateAll(entityKeysToRemove);
+
+    long cacheDataSize1 = cacheData.estimatedSize();
+    int cacheIndexSize1 = cacheIndex.size();
+    int reverseIndexSize1 = reverseIndex.size();
+
+    List<String> allCacheIndexKeys11 = Lists.newArrayList();
+    cacheIndex.getKeysStartingWith("").forEach(
+            k -> {
+              allCacheIndexKeys11.add(k.toString());
+            });
+
+    List<String> relationCacheIndex21 = Lists.newArrayList();
+    cacheIndex.getKeysStartingWith(identifier.toString())
+            .forEach(key -> {
+              relationCacheIndex21.add(key.toString());
+            });
+
+    List<String> allReverseIndexKeys11 = Lists.newArrayList();
+    reverseIndex.getKeysStartingWith("").forEach(
+            k -> {
+              allReverseIndexKeys11.add(k.toString());
+            });
+
+    // DEBUG code
+    check_cache();
 
     return !entityKeysToRemove.isEmpty();
   }

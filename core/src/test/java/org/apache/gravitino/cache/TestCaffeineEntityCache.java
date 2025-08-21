@@ -127,8 +127,9 @@ public class TestCaffeineEntityCache {
 
   @Test
   /**
-   * SCENE[0] CACHE1 = Role1 -> [catalog1, catalog2] ACTIVE: INVALIDATE Role1, then need to remove
-   * RECORD1 and RECORD2
+   * SCENE[0] <br>
+   * CACHE1 = Role1 -> [catalog1, catalog2] <br>
+   * ACTIVE: INVALIDATE Role1, then need to remove RECORD1 and RECORD2 <br>
    */
   void testRemoveCacheRelation0() {
     EntityCache cache = getNormalCache();
@@ -155,8 +156,10 @@ public class TestCaffeineEntityCache {
 
   @Test
   /**
-   * SCENE[1] CACHE1 = Role1 -> [catalog1, catalog2] CACHE2 = catalog1 -> [tab1, tab2] ACTIVE:
-   * INVALIDATE Role1, then need to remove RECORD1 and RECORD2
+   * SCENE[1] <br>
+   * CACHE1 = Role1 -> [catalog1, catalog2] <br>
+   * CACHE2 = catalog1 -> [tab1, tab2] <br>
+   * ACTIVE: INVALIDATE Role1, then need to remove RECORD1 and RECORD2 <br>
    */
   void testRemoveCacheRelation1() {
     EntityCache cache = getNormalCache();
@@ -186,8 +189,10 @@ public class TestCaffeineEntityCache {
 
   @Test
   /**
-   * SCENE[2] CACHE1 = Role1 -> [catalog1, catalog2] CACHE2 = catalog1 -> [tab1, tab2] ACTIVE:
-   * INVALIDATE catalog1, then need to remove RECORD1 and RECORD2
+   * SCENE[2] <br>
+   * CACHE1 = Role1 -> [catalog1, catalog2]  <br>
+   * CACHE2 = catalog1 -> [tab1, tab2]  <br>
+   * ACTIVE: INVALIDATE catalog1, then need to remove RECORD1 and RECORD2
    */
   void testRemoveCacheRelation2() {
     EntityCache cache = getNormalCache();
@@ -210,8 +215,10 @@ public class TestCaffeineEntityCache {
 
   @Test
   /**
-   * SCENE[3] CACHE1 = Metadata1 -> [] CACHE2 = Metadata1.Catalog1.tab1 -> [] ACTIVE: INVALIDATE
-   * Metadata1, then need to remove RECORD1 and RECORD2
+   * SCENE[3]<br>
+   * CACHE1 = Metadata1 -> []<br>
+   * CACHE2 = Metadata1.Catalog1.tab1 -> []<br>
+   * ACTIVE: INVALIDATE Metadata1, then need to remove RECORD1 and RECORD2<br>
    */
   void testRemoveCacheRelation3() {
     EntityCache cache = getNormalCache();

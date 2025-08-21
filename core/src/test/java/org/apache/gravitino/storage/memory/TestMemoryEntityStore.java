@@ -134,6 +134,27 @@ public class TestMemoryEntityStore {
     }
 
     @Override
+    public <E extends Entity & HasIdentifier> E update(
+            NameIdentifier ident, Class<E> type, EntityType entityType, List<String> roles, Function<E, E> updater)
+            throws IOException, NoSuchEntityException {
+      return executeInTransaction(
+              () -> {
+                E e = (E) entityMap.get(ident);
+                if (e == null) {
+                  throw new NoSuchEntityException("Entity %s does not exist", ident);
+                }
+
+                E newE = updater.apply(e);
+                NameIdentifier newIdent = NameIdentifier.of(newE.namespace(), newE.name());
+                if (!newIdent.equals(ident)) {
+                  delete(ident, entityType);
+                }
+                entityMap.put(newIdent, newE);
+                return newE;
+              });
+    }
+
+    @Override
     public <E extends Entity & HasIdentifier> E get(
         NameIdentifier ident, EntityType entityType, Class<E> cl)
         throws NoSuchEntityException, IOException {

@@ -80,6 +80,7 @@ class PermissionManager {
               AuthorizationUtils.ofUser(metalake, user),
               UserEntity.class,
               Entity.EntityType.USER,
+              roles,
               userEntity -> {
                 List<RoleEntity> roleEntities = Lists.newArrayList();
                 if (userEntity.roleNames() != null) {
