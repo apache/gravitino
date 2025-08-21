@@ -327,6 +327,7 @@ public class SparkQueryRunner {
             .config(GravitinoSparkConfig.GRAVITINO_URI, gravitinoUri)
             .config(GravitinoSparkConfig.GRAVITINO_METALAKE, metalakeName)
             .config(GravitinoSparkConfig.GRAVITINO_ENABLE_ICEBERG_SUPPORT, "true")
+            .config(GravitinoSparkConfig.GRAVITINO_ENABLE_PAIMON_SUPPORT, "true")
             .config("spark.gravitino.test.data.dir", dataDir)
             .config("hive.exec.dynamic.partition.mode", "nonstrict")
             // produce old parquet format
