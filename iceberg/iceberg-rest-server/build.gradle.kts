@@ -82,11 +82,7 @@ dependencies {
 
   testImplementation(libs.iceberg.aws.bundle)
   testImplementation(libs.iceberg.gcp.bundle)
-  // Prevent netty conflict
-  testImplementation(libs.reactor.netty.http)
-  testImplementation(libs.reactor.netty.core)
   testImplementation(libs.iceberg.azure.bundle) {
-    exclude("io.netty")
     exclude("com.google.guava", "guava")
   }
   testImplementation(libs.jersey.test.framework.core) {
