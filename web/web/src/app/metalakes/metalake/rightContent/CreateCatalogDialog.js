@@ -132,7 +132,8 @@ const CreateCatalogDialog = props => {
       return item
     })
     setInnerProps(updateProps)
-  }, [catalogBackendSelect, innerProps])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [catalogBackendSelect])
 
   const handleFormChange = ({ index, event }) => {
     let data = [...innerProps]
