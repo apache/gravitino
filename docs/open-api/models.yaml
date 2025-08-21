@@ -366,6 +366,82 @@ paths:
         "5xx":
           $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
 
+  /metalakes/{metalake}/catalogs/{catalog}/schemas/{schema}/models/{model}/versions/{version}/uri:
+    parameters:
+      - $ref: "./openapi.yaml#/components/parameters/metalake"
+      - $ref: "./openapi.yaml#/components/parameters/catalog"
+      - $ref: "./openapi.yaml#/components/parameters/schema"
+      - $ref: "./openapi.yaml#/components/parameters/model"
+      - $ref: "#/components/parameters/version"
+
+    get:
+      tags:
+        - model
+      summary: Get model version uri
+      operationId: getModelVersionUri
+      parameters:
+        - name: uriName
+          in: query
+          required: false
+          schema:
+            type: string
+            default: null
+          description: The uri name of the model version
+      responses:
+        "200":
+          $ref: "#/components/responses/ModelVersionUriResponse"
+        "404":
+          description: Not Found - The target model version uri does not exist
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+              examples:
+                NoSuchModelVersionException:
+                  $ref: "#/components/examples/NoSuchModelVersionException"
+                NoSuchModelVersionURINameException:
+                  $ref: "#/components/examples/NoSuchModelVersionURINameException"
+        "5xx":
+          $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
+
+  /metalakes/{metalake}/catalogs/{catalog}/schemas/{schema}/models/{model}/aliases/{alias}/uri:
+    parameters:
+      - $ref: "./openapi.yaml#/components/parameters/metalake"
+      - $ref: "./openapi.yaml#/components/parameters/catalog"
+      - $ref: "./openapi.yaml#/components/parameters/schema"
+      - $ref: "./openapi.yaml#/components/parameters/model"
+      - $ref: "#/components/parameters/alias"
+
+    get:
+      tags:
+        - model
+      summary: Get model version uri by alias
+      operationId: getModelVersionUriByAlias
+      parameters:
+        - name: uriName
+          in: query
+          required: false
+          schema:
+            type: string
+            default: null
+          description: The uri name of the model version
+      responses:
+        "200":
+          $ref: "#/components/responses/ModelVersionUriResponse"
+        "404":
+          description: Not Found - The target model version uri does not exist
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+              examples:
+                NoSuchModelVersionException:
+                  $ref: "#/components/examples/NoSuchModelVersionException"
+                NoSuchModelVersionURINameException:
+                  $ref: "#/components/examples/NoSuchModelVersionURINameException"
+        "5xx":
+          $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
+
 components:
   parameters:
     version:
@@ -422,13 +498,20 @@ components:
     ModelVersion:
       type: object
       required:
-        - uri
         - version
         - audit
       properties:
         uri:
           type: string
           description: The uri of the model version
+          nullable: true
+        uris:
+          type: object
+          description: The uris of the model version
+          nullable: true
+          default: {}
+          additionalProperties:
+            type: string
         version:
           type: integer
           description: The version of the model
@@ -578,12 +661,18 @@ components:
 
     ModelVersionLinkRequest:
       type: object
-      required:
-        - uri
       properties:
         uri:
           type: string
           description: The uri of the model version
+          nullable: true
+        uris:
+          type: object
+          description: The uris of the model version, either uris or uri should be provided
+          nullable: true
+          default: {}
+          additionalProperties:
+            type: string
         aliases:
           type: array
           description: The aliases of the model version
@@ -619,6 +708,8 @@ components:
         - $ref: "#/components/schemas/SetModelVersionPropertyRequest"
         - $ref: "#/components/schemas/RemoveModelVersionPropertyRequest"
         - $ref: "#/components/schemas/UpdateModelVersionUriRequest"
+        - $ref: "#/components/schemas/AddModelVersionUriRequest"
+        - $ref: "#/components/schemas/RemoveModelVersionUriRequest"
         - $ref: "#/components/schemas/UpdateModelVersionAliasesRequest"
       discriminator:
         propertyName: "@type"
@@ -627,6 +718,8 @@ components:
           setProperty: "#/components/schemas/SetModelVersionPropertyRequest"
           removeProperty: "#/components/schemas/RemoveModelVersionPropertyRequest"
           updateUri: "#/components/schemas/UpdateModelVersionUriRequest"
+          addUri: "#/components/schemas/AddModelVersionUriRequest"
+          removeUri: "#/components/schemas/RemoveModelVersionUriRequest"
           updateAliases: "#/components/schemas/UpdateModelVersionAliasesRequest"
 
     UpdateModelVersionCommentRequest:
@@ -703,9 +796,54 @@ components:
         newUri:
           type: string
           description: The new uri of the model version
+        uriName:
+          type: string
+          description: The uri name of the model version to be updated
       example: {
         "@type": "updateUri",
-        "newUri": "s3://path/to/model"
+        "newUri": "s3://path/to/model",
+        "uriName": "default-uri-name"
+      }
+
+    AddModelVersionUriRequest:
+      type: object
+      required:
+        - "@type"
+        - uriName
+        - uri
+      properties:
+        "@type":
+          type: string
+          enum:
+            - "addUri"
+        uriName:
+          type: string
+          description: The uri name of the model version to be added
+        uri:
+          type: string
+          description: The uri of the model version to be added
+      example: {
+        "@type": "addUri",
+        "uriName": "default-uri-name",
+        "uri": "s3://path/to/model"
+      }
+
+    RemoveModelVersionUriRequest:
+      type: object
+      required:
+        - "@type"
+        - uriName
+      properties:
+        "@type":
+          type: string
+          enum:
+            - "removeUri"
+        uriName:
+          type: string
+          description: The uri name of the model version to be removed
+      example: {
+        "@type": "removeUri",
+        "uriName": "default-uri-name"
       }
 
     UpdateModelVersionAliasesRequest:
@@ -807,6 +945,26 @@ components:
             ModelResponse:
               $ref: "#/components/examples/ModelVersionResponse"
 
+    ModelVersionUriResponse:
+      description: The response of model version uri
+      content:
+        application/vnd.gravitino.v1+json:
+          schema:
+            type: object
+            properties:
+              code:
+                type: integer
+                format: int32
+                description: Status code of the response
+                enum:
+                  - 0
+              uri:
+                type: string
+                description: The uri of the model version
+          examples:
+            ModelResponse:
+              $ref: "#/components/examples/ModelVersionUriResponse"
+
   examples:
     ModelRegisterRequest:
       value: {
@@ -882,7 +1040,10 @@ components:
       value: {
         "code": 0,
         "modelVersion" : {
-          "uri": "hdfs://path/to/model",
+          "uris": {
+            "hdfs": "hdfs://path/to/model",
+            "s3": "s3://path/to/model"
+          },
           "version": 0,
           "aliases": ["alias1", "alias2"],
           "comment": "This is a comment",
@@ -897,6 +1058,12 @@ components:
             "lastModifiedTime": "2021-01-01T00:00:00Z"
           }
         }
+      }
+
+    ModelVersionUriResponse:
+      value: {
+        "code": 0,
+        "uri": "hdfs://path/to/model"
       }
 
     ModelAlreadyExistsException:
@@ -936,5 +1103,15 @@ components:
         "message": "Model version does not exist",
         "stack": [
           "org.apache.gravitino.exceptions.NoSuchModelVersionException: Model version does not exist"
+        ]
+      }
+
+    NoSuchModelVersionURINameException:
+      value: {
+        "code": 1003,
+        "type": "NoSuchModelVersionURINameException",
+        "message": "Model version uri does not exist",
+        "stack": [
+          "org.apache.gravitino.exceptions.NoSuchModelVersionURINameException: Model version uri does not exist"
         ]
       }
