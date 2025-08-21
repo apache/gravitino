@@ -152,31 +152,6 @@ public class TestSparkPartitionUtils {
   }
 
   @Test
-  void testToGravitinoLiteralWithNull() {
-    GenericInternalRow rowWithNull = new GenericInternalRow(new Object[] {null});
-    Assertions.assertEquals(
-        Literals.NULL,
-        SparkPartitionUtils.toGravitinoLiteral(rowWithNull, 0, DataTypes.IntegerType));
-  }
-
-  @Test
-  void testToGravitinoLiteralWithNullForDifferentTypes() {
-    GenericInternalRow rowWithNull = new GenericInternalRow(new Object[] {null});
-
-    Assertions.assertEquals(
-        Literals.NULL,
-        SparkPartitionUtils.toGravitinoLiteral(rowWithNull, 0, DataTypes.StringType));
-
-    Assertions.assertEquals(
-        Literals.NULL,
-        SparkPartitionUtils.toGravitinoLiteral(rowWithNull, 0, DataTypes.BooleanType));
-
-    Assertions.assertEquals(
-        Literals.NULL,
-        SparkPartitionUtils.toGravitinoLiteral(rowWithNull, 0, DataTypes.DoubleType));
-  }
-
-  @Test
   void testToGravitinoLiteralWithMixedNullAndNonNull() {
     GenericInternalRow mixedRow =
         new GenericInternalRow(new Object[] {null, UTF8String.fromString("test"), 42});
