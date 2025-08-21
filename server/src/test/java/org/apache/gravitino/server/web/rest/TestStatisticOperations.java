@@ -60,6 +60,7 @@ import org.apache.gravitino.dto.stats.StatisticDTO;
 import org.apache.gravitino.dto.util.DTOConverters;
 import org.apache.gravitino.exceptions.IllegalStatisticNameException;
 import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
+import org.apache.gravitino.exceptions.UnmodifiableStatisticException;
 import org.apache.gravitino.lock.LockManager;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.rest.RESTUtils;
@@ -338,6 +339,35 @@ public class TestStatisticOperations extends JerseyTest {
     Assertions.assertEquals(ErrorConstants.ILLEGAL_ARGUMENTS_CODE, errorResp3.getCode());
     Assertions.assertEquals(
         IllegalStatisticNameException.class.getSimpleName(), errorResp3.getType());
+
+    // Test throw UnmodifiableStatisticException
+    doThrow(new UnmodifiableStatisticException("mock error"))
+        .when(manager)
+        .updateStatistics(any(), any(), any());
+    statsMap.clear();
+    statsMap.put(Statistic.CUSTOM_PREFIX + "test1", StatisticValues.stringValue("test"));
+    req = new StatisticsUpdateRequest(statsMap);
+
+    Response resp4 =
+        target(
+                "/metalakes/"
+                    + metalake
+                    + "/objects/"
+                    + tableObject.type()
+                    + "/"
+                    + tableObject.fullName()
+                    + "/statistics")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .put(entity(req, MediaType.APPLICATION_JSON_TYPE));
+
+    Assertions.assertEquals(Response.Status.METHOD_NOT_ALLOWED.getStatusCode(), resp4.getStatus());
+    Assertions.assertEquals(MediaType.APPLICATION_JSON_TYPE, resp4.getMediaType());
+
+    ErrorResponse errorResp4 = resp4.readEntity(ErrorResponse.class);
+    Assertions.assertEquals(ErrorConstants.UNSUPPORTED_OPERATION_CODE, errorResp4.getCode());
+    Assertions.assertEquals(
+        UnmodifiableStatisticException.class.getSimpleName(), errorResp4.getType());
   }
 
   @Test
@@ -415,6 +445,31 @@ public class TestStatisticOperations extends JerseyTest {
     ErrorResponse errorResp2 = resp2.readEntity(ErrorResponse.class);
     Assertions.assertEquals(ErrorConstants.INTERNAL_ERROR_CODE, errorResp2.getCode());
     Assertions.assertEquals(RuntimeException.class.getSimpleName(), errorResp2.getType());
+
+    // Test throw UnmodifiableStatisticException
+    doThrow(new UnmodifiableStatisticException("mock error"))
+        .when(manager)
+        .dropStatistics(any(), any(), any());
+    Response resp3 =
+        target(
+                "/metalakes/"
+                    + metalake
+                    + "/objects/"
+                    + tableObject.type()
+                    + "/"
+                    + tableObject.fullName()
+                    + "/statistics")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .post(entity(req, MediaType.APPLICATION_JSON_TYPE));
+
+    Assertions.assertEquals(Response.Status.METHOD_NOT_ALLOWED.getStatusCode(), resp3.getStatus());
+    Assertions.assertEquals(MediaType.APPLICATION_JSON_TYPE, resp3.getMediaType());
+
+    ErrorResponse errorResp3 = resp3.readEntity(ErrorResponse.class);
+    Assertions.assertEquals(ErrorConstants.UNSUPPORTED_OPERATION_CODE, errorResp3.getCode());
+    Assertions.assertEquals(
+        UnmodifiableStatisticException.class.getSimpleName(), errorResp3.getType());
   }
 
   @Test
@@ -645,6 +700,35 @@ public class TestStatisticOperations extends JerseyTest {
     Assertions.assertEquals(ErrorConstants.ILLEGAL_ARGUMENTS_CODE, errorResp3.getCode());
     Assertions.assertEquals(
         IllegalStatisticNameException.class.getSimpleName(), errorResp3.getType());
+
+    // Test throw UnmodifiableStatisticException
+    statsMap.clear();
+    statsMap.put(Statistic.CUSTOM_PREFIX + "test1", StatisticValues.longValue(1L));
+    doThrow(new UnmodifiableStatisticException("mock error"))
+        .when(manager)
+        .updatePartitionStatistics(any(), any(), any());
+
+    req = new PartitionStatisticsUpdateRequest(partitionStatsList);
+    Response resp4 =
+        target(
+                "/metalakes/"
+                    + metalake
+                    + "/objects/"
+                    + tableObject.type()
+                    + "/"
+                    + tableObject.fullName()
+                    + "/statistics/partitions")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .put(entity(req, MediaType.APPLICATION_JSON_TYPE));
+
+    Assertions.assertEquals(Response.Status.METHOD_NOT_ALLOWED.getStatusCode(), resp4.getStatus());
+    Assertions.assertEquals(MediaType.APPLICATION_JSON_TYPE, resp4.getMediaType());
+
+    ErrorResponse errorResp4 = resp4.readEntity(ErrorResponse.class);
+    Assertions.assertEquals(ErrorConstants.UNSUPPORTED_OPERATION_CODE, errorResp4.getCode());
+    Assertions.assertEquals(
+        UnmodifiableStatisticException.class.getSimpleName(), errorResp4.getType());
   }
 
   @Test
@@ -729,6 +813,31 @@ public class TestStatisticOperations extends JerseyTest {
     ErrorResponse errorResp2 = resp2.readEntity(ErrorResponse.class);
     Assertions.assertEquals(ErrorConstants.INTERNAL_ERROR_CODE, errorResp2.getCode());
     Assertions.assertEquals(RuntimeException.class.getSimpleName(), errorResp2.getType());
+
+    // Test throw UnmodifiableStatisticException
+    doThrow(new UnmodifiableStatisticException("mock error"))
+        .when(manager)
+        .dropPartitionStatistics(any(), any(), any());
+    Response resp3 =
+        target(
+                "/metalakes/"
+                    + metalake
+                    + "/objects/"
+                    + tableObject.type()
+                    + "/"
+                    + tableObject.fullName()
+                    + "/statistics/partitions")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .post(entity(req, MediaType.APPLICATION_JSON_TYPE));
+
+    Assertions.assertEquals(Response.Status.METHOD_NOT_ALLOWED.getStatusCode(), resp3.getStatus());
+    Assertions.assertEquals(MediaType.APPLICATION_JSON_TYPE, resp3.getMediaType());
+
+    ErrorResponse errorResp3 = resp3.readEntity(ErrorResponse.class);
+    Assertions.assertEquals(ErrorConstants.UNSUPPORTED_OPERATION_CODE, errorResp3.getCode());
+    Assertions.assertEquals(
+        UnmodifiableStatisticException.class.getSimpleName(), errorResp3.getType());
   }
 
   @Test
