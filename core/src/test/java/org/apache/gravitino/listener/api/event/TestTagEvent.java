@@ -19,14 +19,7 @@
 
 package org.apache.gravitino.listener.api.event;
 
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
-
 import com.google.common.collect.ImmutableMap;
-import java.util.Arrays;
-import java.util.Map;
-import java.util.Objects;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
@@ -45,6 +38,14 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.TestInstance.Lifecycle;
+
+import java.util.Arrays;
+import java.util.Map;
+import java.util.Objects;
+
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 @TestInstance(Lifecycle.PER_CLASS)
 public class TestTagEvent {
@@ -339,6 +340,17 @@ public class TestTagEvent {
     Assertions.assertEquals(tag.comment(), ((CreateTagFailureEvent) event).tagInfo().comment());
     Assertions.assertEquals(
         tag.properties(), ((CreateTagFailureEvent) event).tagInfo().properties());
+    Assertions.assertEquals(OperationType.CREATE_TAG, event.operationType());
+    Assertions.assertEquals(OperationStatus.FAILURE, event.operationStatus());
+  }
+
+  @Test
+  public void testNullTagInfoDoesNotThrow() {
+    Exception ex = new Exception("boom");
+    CreateTagFailureEvent event = new CreateTagFailureEvent("user", "metalake", null, ex);
+    Assertions.assertNull(event.tagInfo());
+    Assertions.assertNull(event.identifier());
+    Assertions.assertEquals(ex, event.exception());
     Assertions.assertEquals(OperationType.CREATE_TAG, event.operationType());
     Assertions.assertEquals(OperationStatus.FAILURE, event.operationStatus());
   }
