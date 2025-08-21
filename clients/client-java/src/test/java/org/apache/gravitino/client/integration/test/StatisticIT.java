@@ -16,9 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.catalog.hive.integration.test;
-
-import static org.apache.gravitino.catalog.hive.HiveCatalogPropertiesMetadata.METASTORE_URIS;
+package org.apache.gravitino.client.integration.test;
 
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
@@ -65,9 +63,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 @Tag("gravitino-docker-test")
-public class StatisticHiveIT extends BaseIT {
+public class StatisticIT extends BaseIT {
 
-  private static final Logger LOG = LoggerFactory.getLogger(StatisticHiveIT.class);
+  private static final Logger LOG = LoggerFactory.getLogger(StatisticIT.class);
   public static final String metalakeName =
       GravitinoITUtils.genRandomName("cataloghiveit_metalake");
   public String catalogName = GravitinoITUtils.genRandomName("cataloghiveit_catalog");
@@ -293,7 +291,7 @@ public class StatisticHiveIT extends BaseIT {
 
   protected void createCatalog() {
     Map<String, String> properties = Maps.newHashMap();
-    properties.put(METASTORE_URIS, HIVE_METASTORE_URIS);
+    properties.put("metastore.uris", HIVE_METASTORE_URIS);
 
     metalake.createCatalog(catalogName, Catalog.Type.RELATIONAL, provider, "comment", properties);
 
