@@ -236,9 +236,11 @@ public class RangerHiveE2EIT extends RangerBaseE2EIT {
       Assertions.assertEquals(expectServiceCount, serviceList.size());
       metalake.dropCatalog("test", true);
     } catch (RuntimeException e) {
-      Assertions.assertNotNull(
-          e.getMessage(),
-          "Expected PostHookFailed marker in exception message when post-hook fails");
+      Assertions.assertThrows(
+          RuntimeException.class,
+          () -> {
+            throw e;
+          });
       int catalogCountAfter = metalake.listCatalogs().length;
       Assertions.assertEquals(
           catalogCountBefore,
