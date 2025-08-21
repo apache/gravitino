@@ -53,6 +53,13 @@ public class GravitinoVersion extends VersionDTO {
     throw new GravitinoRuntimeException("Invalid version string " + version());
   }
 
+  /**
+   * Check if the current version is compatible with the server version.
+   *
+   * @param serverVersion the server version to check compatibility with
+   * @return true if the client current major version is less than or equal to the server's major
+   *     version
+   */
   public boolean compatibleWithServerVersion(GravitinoVersion serverVersion) {
     int[] left = getVersionNumber();
     int[] right = serverVersion.getVersionNumber();
