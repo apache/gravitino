@@ -84,6 +84,10 @@ public class MetalakeAuthorizationIT extends BaseRestApiAuthorizationIT {
     assertMetalakeEquals(
         new String[] {METALAKE, "testMetalake2", "testMetalake3"},
         serviceAdminClient.listMetalakes());
+    serviceAdminClient.disableMetalake("testMetalake2");
+    assertMetalakeEquals(
+        new String[] {METALAKE, "testMetalake2", "testMetalake3"},
+        serviceAdminClient.listMetalakes());
     assertMetalakeEquals(new String[] {METALAKE}, normalUserClient.listMetalakes());
     assertMetalakeEquals(new String[] {METALAKE}, serviceAdminButNotOwnerClient.listMetalakes());
     serviceAdminClient.loadMetalake("testMetalake2").addUser(SERVICE_ADMIN_BUT_NOT_OWNER);
