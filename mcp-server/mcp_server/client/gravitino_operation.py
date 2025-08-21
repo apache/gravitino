@@ -21,6 +21,7 @@ from mcp_server.client.catalog_operation import CatalogOperation
 from mcp_server.client.fileset_operation import FilesetOperation
 from mcp_server.client.job_operation import JobOperation
 from mcp_server.client.model_operation import ModelOperation
+from mcp_server.client.policy_operation import PolicyOperation
 from mcp_server.client.schema_operation import SchemaOperation
 from mcp_server.client.table_operation import TableOperation
 from mcp_server.client.tag_operation import TagOperation
@@ -79,6 +80,16 @@ class GravitinoOperation(ABC):
 
         Returns:
             ModelOperation: Interface for performing model-level operations
+        """
+        pass
+
+    @abstractmethod
+    def as_policy_operation(self) -> PolicyOperation:
+        """
+        Access the policy operation interface of this Gravitino operation.
+
+        Returns:
+            PolicyOperation: Interface for performing policy-level operations
         """
         pass
 
