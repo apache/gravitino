@@ -23,45 +23,37 @@ from fastmcp import Client
 from mcp_server.client.factory import RESTClientFactory
 from mcp_server.core import Setting
 from mcp_server.server import GravitinoMCPServer
-from tests.unit.tools import MockOperation
+from tests.unit.tools.mock_operation import MockOperation
 
 
-class TestStatisticTool(unittest.TestCase):
+class TestTopicTool(unittest.TestCase):
     def setUp(self):
         RESTClientFactory.set_rest_client(MockOperation)
-        server = GravitinoMCPServer(Setting("mock_job"))
+        server = GravitinoMCPServer(Setting("mock_metalake"))
         self.mcp = server.mcp
 
-    def test_list_of_statistics(self):
-        async def _test_list_of_statistics(mcp_server):
+    def test_list_topics(self):
+        async def _test_list_topics(mcp_server):
             async with Client(mcp_server) as client:
                 result = await client.call_tool(
-                    "list_statistics_for_metadata",
-                    {
-                        "metalake_name": "mock_metalake",
-                        "metadata_type": "mock_type",
-                        "metadata_fullname": "mock_fullname",
-                    },
+                    "list_of_topics",
+                    {"catalog_name": "mock", "schema_name": "mock"},
                 )
-                self.assertEqual("mock_statistics", result.content[0].text)
+                self.assertEqual("mock_topics", result.content[0].text)
 
-        asyncio.run(_test_list_of_statistics(self.mcp))
+        asyncio.run(_test_list_topics(self.mcp))
 
-    def test_list_statistics_for_partition(self):
-        async def _test_list_statistics_for_partition(mcp_server):
+    def test_load_topic(self):
+        async def _test_load_topic(mcp_server):
             async with Client(mcp_server) as client:
                 result = await client.call_tool(
-                    "list_statistics_for_partition",
+                    "load_topic",
                     {
-                        "metalake_name": "mock_metalake",
-                        "metadata_type": "mock_type",
-                        "metadata_fullname": "mock_fullname",
-                        "from_partition_name": "from_partition",
-                        "to_partition_name": "to_partition",
+                        "catalog_name": "mock",
+                        "schema_name": "mock",
+                        "topic_name": "mock",
                     },
                 )
-                self.assertEqual(
-                    "mock_statistics_for_partition", result.content[0].text
-                )
+                self.assertEqual("mock_topic", result.content[0].text)
 
-        asyncio.run(_test_list_statistics_for_partition(self.mcp))
+        asyncio.run(_test_load_topic(self.mcp))

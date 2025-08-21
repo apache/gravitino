@@ -84,7 +84,7 @@ class MockTableOperation(TableOperation):
 
 
 class MockFilesetOperation(FilesetOperation):
-    async def get_list_of_filesets(
+    async def list_of_filesets(
         self, catalog_name: str, schema_name: str
     ) -> str:
         return "mock_filesets"
@@ -108,9 +108,7 @@ class MockFilesetOperation(FilesetOperation):
 
 
 class MockModelOperation(ModelOperation):
-    async def get_list_of_models(
-        self, catalog_name: str, schema_name: str
-    ) -> str:
+    async def list_of_models(self, catalog_name: str, schema_name: str) -> str:
         return "mock_models"
 
     async def load_model(
@@ -135,9 +133,7 @@ class MockModelOperation(ModelOperation):
 
 
 class MockTopicOperation(TopicOperation):
-    async def get_list_of_topics(
-        self, catalog_name: str, schema_name: str
-    ) -> str:
+    async def list_of_topics(self, catalog_name: str, schema_name: str) -> str:
         return "mock_topics"
 
     async def load_topic(
@@ -147,7 +143,7 @@ class MockTopicOperation(TopicOperation):
 
 
 class MockTagOperation(TagOperation):
-    async def get_list_of_tags(self) -> str:
+    async def list_of_tags(self) -> str:
         return "mock_tags"
 
     async def create_tag(
@@ -169,7 +165,7 @@ class MockTagOperation(TagOperation):
         metadata_full_name: str,
         metadata_type: str,
         tags_to_associate: list,
-        tags_to_disassociate,
+        tags_to_disassociate: list,
     ) -> str:
         return f"mock_associated_tags: {tags_to_associate} with metadata {metadata_full_name} of type {metadata_type}"
 
@@ -183,13 +179,13 @@ class MockTagOperation(TagOperation):
 
 
 class MockJobOperation(JobOperation):
-    async def get_list_of_jobs(self, job_template_name: str = "") -> str:
+    async def list_of_jobs(self, job_template_name: str = "") -> str:
         return "mock_jobs"
 
     async def get_job_by_id(self, job_id: str) -> str:
         return f"mock_job: {job_id}"
 
-    async def get_list_of_job_templates(self) -> str:
+    async def list_of_job_templates(self) -> str:
         return "mock_job_templates"
 
     async def get_job_template_by_name(self, name: str) -> str:
@@ -203,13 +199,13 @@ class MockJobOperation(JobOperation):
 
 
 class MockStatisticOperation(StatisticOperation):
-    async def get_list_of_statistics(
+    async def list_of_statistics(
         self, metalake_name: str, metadata_type: str, metadata_fullname: str
     ) -> str:
         return "mock_statistics"
 
     # pylint: disable=R0917
-    async def get_list_statistic_for_partition(
+    async def list_statistic_for_partition(
         self,
         metalake_name: str,
         metadata_type: str,

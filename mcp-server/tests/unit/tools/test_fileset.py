@@ -26,42 +26,52 @@ from mcp_server.server import GravitinoMCPServer
 from tests.unit.tools import MockOperation
 
 
-class TestStatisticTool(unittest.TestCase):
+class TestFilesetTool(unittest.TestCase):
     def setUp(self):
         RESTClientFactory.set_rest_client(MockOperation)
-        server = GravitinoMCPServer(Setting("mock_job"))
+        server = GravitinoMCPServer(Setting("mock_metalake"))
         self.mcp = server.mcp
 
-    def test_list_of_statistics(self):
-        async def _test_list_of_statistics(mcp_server):
+    def test_list_filesets(self):
+        async def _test_list_filesets(mcp_server):
             async with Client(mcp_server) as client:
                 result = await client.call_tool(
-                    "list_statistics_for_metadata",
+                    "list_of_filesets",
+                    {"catalog_name": "mock", "schema_name": "mock"},
+                )
+                self.assertEqual("mock_filesets", result.content[0].text)
+
+        asyncio.run(_test_list_filesets(self.mcp))
+
+    def test_load_fileset(self):
+        async def _test_load_fileset(mcp_server):
+            async with Client(mcp_server) as client:
+                result = await client.call_tool(
+                    "load_fileset",
                     {
-                        "metalake_name": "mock_metalake",
-                        "metadata_type": "mock_type",
-                        "metadata_fullname": "mock_fullname",
+                        "catalog_name": "mock",
+                        "schema_name": "mock",
+                        "fileset_name": "mock",
                     },
                 )
-                self.assertEqual("mock_statistics", result.content[0].text)
+                self.assertEqual("mock_fileset", result.content[0].text)
 
-        asyncio.run(_test_list_of_statistics(self.mcp))
+        asyncio.run(_test_load_fileset(self.mcp))
 
-    def test_list_statistics_for_partition(self):
-        async def _test_list_statistics_for_partition(mcp_server):
+    def test_list_files_in_fileset(self):
+        async def _test_list_files_in_fileset(mcp_server):
             async with Client(mcp_server) as client:
                 result = await client.call_tool(
-                    "list_statistics_for_partition",
+                    "list_files_in_fileset",
                     {
-                        "metalake_name": "mock_metalake",
-                        "metadata_type": "mock_type",
-                        "metadata_fullname": "mock_fullname",
-                        "from_partition_name": "from_partition",
-                        "to_partition_name": "to_partition",
+                        "catalog_name": "mock",
+                        "schema_name": "mock",
+                        "fileset_name": "mock",
+                        "location_name": "mock_location",
                     },
                 )
                 self.assertEqual(
-                    "mock_statistics_for_partition", result.content[0].text
+                    "mock_files_in_fileset", result.content[0].text
                 )
 
-        asyncio.run(_test_list_statistics_for_partition(self.mcp))
+        asyncio.run(_test_list_files_in_fileset(self.mcp))

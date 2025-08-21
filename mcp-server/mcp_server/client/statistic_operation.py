@@ -24,7 +24,7 @@ class StatisticOperation(ABC):
     """
 
     @abstractmethod
-    async def get_list_of_statistics(
+    async def list_of_statistics(
         self, metalake_name: str, metadata_type: str, metadata_fullname: str
     ) -> str:
         """
@@ -41,7 +41,7 @@ class StatisticOperation(ABC):
 
     # pylint: disable=R0917
     @abstractmethod
-    async def get_list_statistic_for_partition(
+    async def list_statistic_for_partition(
         self,
         metalake_name: str,
         metadata_type: str,

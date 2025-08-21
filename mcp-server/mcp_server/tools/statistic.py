@@ -65,7 +65,7 @@ def load_statistic_tools(mcp: FastMCP):
             audit: Metadata about the statistic's creation and modification.
         """
         client = ctx.request_context.lifespan_context.rest_client()
-        return await client.as_statistic_operation().get_list_of_statistics(
+        return await client.as_statistic_operation().list_of_statistics(
             metalake_name, metadata_type, metadata_fullname
         )
 
@@ -130,12 +130,14 @@ def load_statistic_tools(mcp: FastMCP):
                 - audit: Metadata about the statistic's creation and modification.
         """
         client = ctx.request_context.lifespan_context.rest_client()
-        return await client.as_statistic_operation().get_list_statistic_for_partition(
-            metalake_name,
-            metadata_type,
-            metadata_fullname,
-            from_partition_name,
-            to_partition_name,
-            from_inclusive,
-            to_inclusive,
+        return (
+            await client.as_statistic_operation().list_statistic_for_partition(
+                metalake_name,
+                metadata_type,
+                metadata_fullname,
+                from_partition_name,
+                to_partition_name,
+                from_inclusive,
+                to_inclusive,
+            )
         )
