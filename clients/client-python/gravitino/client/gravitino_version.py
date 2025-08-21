@@ -78,10 +78,10 @@ class GravitinoVersion(VersionDTO):
             return False
         return True
 
-    def compatible_with_server_version(self, serverVersion) -> bool:
+    def compatible_with_server_version(self, server_version) -> bool:
         """
         Check if the current version is compatible with the server version.
         Compatibility is defined such that the client major version is less than or equal
         to the server major version.
         """
-        return self.major <= serverVersion.major
+        return self.major <= server_version.major

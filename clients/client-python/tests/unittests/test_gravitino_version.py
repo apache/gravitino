@@ -208,4 +208,3 @@ class TestGravitinoVersion(unittest.TestCase):
         version1 = GravitinoVersion(VersionDTO("1.6.0", "2023-01-01", "1234567"))
         version2 = GravitinoVersion(VersionDTO("0.6.0", "2023-01-01", "1234567"))
         self.assertFalse(version1.compatible_with_server_version(version2))
-
