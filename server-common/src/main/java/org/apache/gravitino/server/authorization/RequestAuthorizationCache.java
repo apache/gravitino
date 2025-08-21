@@ -78,10 +78,8 @@ public class RequestAuthorizationCache {
       allowAuthorizerThreadCache.set(tempAllowAuthorizer);
       denyAuthorizerThreadCache.set(tempDenyAuthorizer);
       hasLoadedRoleThreadLocal.set(tempRoleLoadedThread);
-      T result;
       try {
-        result = PrincipalUtils.doAs(currentPrincipal, supplier::get);
-        return result;
+        return PrincipalUtils.doAs(currentPrincipal, supplier::get);
       } catch (Exception e) {
         throw new RuntimeException(e);
       } finally {

@@ -119,6 +119,7 @@ public class TestJcasbinAuthorizer {
     principalUtilsMockedStatic
         .when(PrincipalUtils::getCurrentPrincipal)
         .thenReturn(new UserPrincipal(USERNAME));
+    principalUtilsMockedStatic.when(() -> PrincipalUtils.doAs(any(), any())).thenCallRealMethod();
     metadataIdConverterMockedStatic
         .when(() -> MetadataIdConverter.getID(any(), eq(METALAKE)))
         .thenReturn(CATALOG_ID);
@@ -145,7 +146,6 @@ public class TestJcasbinAuthorizer {
 
   @AfterAll
   public static void stop() {
-
     if (principalUtilsMockedStatic != null) {
       principalUtilsMockedStatic.close();
     }
@@ -249,7 +249,7 @@ public class TestJcasbinAuthorizer {
     assertFalse(doAuthorizeOwner(currentPrincipal));
   }
 
-  private boolean doAuthorize(Principal currentPrincipal) {
+  private Boolean doAuthorize(Principal currentPrincipal) {
     return RequestAuthorizationCache.executeWithThreadCache(
         () ->
             jcasbinAuthorizer.authorize(
@@ -259,7 +259,7 @@ public class TestJcasbinAuthorizer {
                 USE_CATALOG));
   }
 
-  private boolean doAuthorizeOwner(Principal currentPrincipal) {
+  private Boolean doAuthorizeOwner(Principal currentPrincipal) {
     return RequestAuthorizationCache.executeWithThreadCache(
         () ->
             jcasbinAuthorizer.isOwner(
