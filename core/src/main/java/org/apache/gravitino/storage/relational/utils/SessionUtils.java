@@ -41,15 +41,13 @@ public class SessionUtils {
    * @param <T> the type of the mapper
    */
   public static <T> void doWithCommit(Class<T> mapperClazz, Consumer<T> consumer) {
-    try (SqlSession session = SqlSessions.getSqlSession()) {
-      try {
-        T mapper = SqlSessions.getMapper(mapperClazz);
-        consumer.accept(mapper);
-        SqlSessions.commitAndCloseSqlSession();
-      } catch (Exception e) {
-        SqlSessions.rollbackAndCloseSqlSession();
-        throw e;
-      }
+    try {
+      T mapper = SqlSessions.getMapper(mapperClazz);
+      consumer.accept(mapper);
+      SqlSessions.commitAndCloseSqlSession();
+    } catch (Exception e) {
+      SqlSessions.rollbackAndCloseSqlSession();
+      throw e;
     }
   }
 
@@ -64,16 +62,14 @@ public class SessionUtils {
    * @param <R> the type of the result
    */
   public static <T, R> R doWithCommitAndFetchResult(Class<T> mapperClazz, Function<T, R> func) {
-    try (SqlSession session = SqlSessions.getSqlSession()) {
-      try {
-        T mapper = SqlSessions.getMapper(mapperClazz);
-        R result = func.apply(mapper);
-        SqlSessions.commitAndCloseSqlSession();
-        return result;
-      } catch (Exception e) {
-        SqlSessions.rollbackAndCloseSqlSession();
-        throw e;
-      }
+    try {
+      T mapper = SqlSessions.getMapper(mapperClazz);
+      R result = func.apply(mapper);
+      SqlSessions.commitAndCloseSqlSession();
+      return result;
+    } catch (Exception e) {
+      SqlSessions.rollbackAndCloseSqlSession();
+      throw e;
     }
   }
 
@@ -88,8 +84,16 @@ public class SessionUtils {
    * @param <R> the type of the result
    */
   public static <T, R> R doWithoutCommitAndFetchResult(Class<T> mapperClazz, Function<T, R> func) {
-    T mapper = SqlSessions.getMapper(mapperClazz);
-    return func.apply(mapper);
+    SqlSession existing = SqlSessions.peekSqlSession();
+    boolean owner = (existing == null);
+    try {
+      T mapper = SqlSessions.getMapper(mapperClazz);
+      return func.apply(mapper);
+    } finally {
+      if (owner) {
+        SqlSessions.rollbackAndCloseSqlSession();
+      }
+    }
   }
 
   /**
@@ -101,8 +105,16 @@ public class SessionUtils {
    * @param <T> the type of the mapper
    */
   public static <T> void doWithoutCommit(Class<T> mapperClazz, Consumer<T> consumer) {
-    T mapper = SqlSessions.getMapper(mapperClazz);
-    consumer.accept(mapper);
+    SqlSession existing = SqlSessions.peekSqlSession();
+    boolean owner = (existing == null);
+    try {
+      T mapper = SqlSessions.getMapper(mapperClazz);
+      consumer.accept(mapper);
+    } finally {
+      if (owner) {
+        SqlSessions.rollbackAndCloseSqlSession();
+      }
+    }
   }
 
   /**
@@ -116,14 +128,14 @@ public class SessionUtils {
    * @param <R> the type of the result
    */
   public static <T, R> R getWithoutCommit(Class<T> mapperClazz, Function<T, R> func) {
-    try (SqlSession session = SqlSessions.getSqlSession()) {
-      try {
-        T mapper = SqlSessions.getMapper(mapperClazz);
-        return func.apply(mapper);
-      } catch (Exception e) {
-        throw e;
-      } finally {
-        SqlSessions.closeSqlSession();
+    SqlSession existing = SqlSessions.peekSqlSession();
+    boolean owner = (existing == null);
+    try {
+      T mapper = SqlSessions.getMapper(mapperClazz);
+      return func.apply(mapper);
+    } finally {
+      if (owner) {
+        SqlSessions.rollbackAndCloseSqlSession();
       }
     }
   }
@@ -135,14 +147,18 @@ public class SessionUtils {
    * @param operations the operations to be performed
    */
   public static void doMultipleWithCommit(Runnable... operations) {
-    try (SqlSession session = SqlSessions.getSqlSession()) {
-      try {
-        Arrays.stream(operations).forEach(Runnable::run);
-        SqlSessions.commitAndCloseSqlSession();
-      } catch (Exception e) {
-        SqlSessions.rollbackAndCloseSqlSession();
-        throw e;
-      }
+    SqlSession existing = SqlSessions.peekSqlSession();
+    boolean owner = (existing == null);
+    if (owner) {
+      SqlSessions.getSqlSession();
+    }
+
+    try {
+      Arrays.stream(operations).forEach(Runnable::run);
+      if (owner) SqlSessions.commitAndCloseSqlSession();
+    } catch (Exception e) {
+      if (owner) SqlSessions.rollbackAndCloseSqlSession();
+      throw e;
     }
   }
 }

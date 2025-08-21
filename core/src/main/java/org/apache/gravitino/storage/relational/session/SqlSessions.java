@@ -39,6 +39,10 @@ public final class SqlSessions {
     return sessions;
   }
 
+  public static SqlSession peekSqlSession() {
+    return sessions.get();
+  }
+
   /**
    * Get the SqlSession object. If the SqlSession object is not present in the thread local, then
    * create a new SqlSession object and set it in the thread local.
