@@ -196,9 +196,14 @@ public class MetadataFilterHelper {
             Entity.EntityType.CATALOG, NameIdentifierUtil.getCatalogIdentifier(nameIdentifier));
         break;
       case METALAKE:
+        nameIdentifierMap.put(entityType, nameIdentifier);
+        break;
       case ROLE:
+        nameIdentifierMap.put(entityType, nameIdentifier);
+        break;
       case USER:
         nameIdentifierMap.put(entityType, nameIdentifier);
+        break;
       default:
         throw new IllegalArgumentException("Unsupported entity type: " + entityType);
     }
