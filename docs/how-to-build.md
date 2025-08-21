@@ -45,12 +45,6 @@ license: "This software is licensed under the Apache License version 2."
    ./gradlew build
    ```
 
-   If you want to use the client module with JDK 8, you can specify the version using -PclientCompatibleWithJDK8, for example:
-
-   ```shell
-   ./gradlew build -PclientCompatibleWithJDK8 -x test
-   ```
-
   The `./gradlew build` command builds all the Gravitino components, including the Gravitino server, Java and Python clients, Trino and Spark connectors, and more.
 
   For the Python client, the `./gradlew build` command builds the Python client with Python 3.8 by default. If you want to use Python 3.9, 3.10, 3.11, or 3.12 to build, please modify the property `pythonVersion` to 3.9, 3.10, 3.11, or 3.12 in the `gradle.properties` file, or specify the version with `-P` like:
