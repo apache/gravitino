@@ -16,6 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
+
 package org.apache.gravitino.catalog.lakehouse.paimon.ops;
 
 import static org.apache.gravitino.catalog.lakehouse.paimon.utils.TableOpsUtils.getFieldName;
@@ -92,7 +93,9 @@ public class TestPaimonCatalogOps {
   private static final String TABLE = "test_table_ops_table";
   private static final String COMMENT = "table_ops_table_comment";
   private static final NameIdentifier IDENTIFIER = NameIdentifier.of(Namespace.of(DATABASE), TABLE);
-  private static final Map<String, String> OPTIONS = ImmutableMap.of(BUCKET.key(), "10");
+  // Append only table should define a 'bucket-key' for bucketed append mode,
+  // otherwise the bucket num should be set to -1.
+  private static final Map<String, String> OPTIONS = ImmutableMap.of(BUCKET.key(), "-1");
 
   @BeforeEach
   public void setUp() throws Exception {
@@ -196,7 +199,19 @@ public class TestPaimonCatalogOps {
   }
 
   @Test
-  void testUpdateColumnNullability() throws Exception {
+  void testForceUpdateColumnNullability() throws Exception {
+    String propertyKey = "alter-column-null-to-not-null.disabled";
+    assertFalse(
+        paimonCatalogOps.loadTable(IDENTIFIER.toString()).options().containsKey(propertyKey));
+    // Test SetProperty with non-existent property.
+    String propertyValue = "false";
+    assertAlterTable(
+        table -> {
+          Map<String, String> options = table.options();
+          assertTrue(options.containsKey(propertyKey));
+          assertEquals(propertyValue, options.get(propertyKey));
+        },
+        setProperty(propertyKey, propertyValue));
     assertAlterTable(
         table -> {
           DataField dataField = table.rowType().getFields().get(1);
@@ -208,17 +223,24 @@ public class TestPaimonCatalogOps {
   }
 
   @Test
+  void testUpdateColumnNullability() {
+    assertThrowsExactly(
+        UnsupportedOperationException.class,
+        () -> assertAlterTable(table -> {}, updateColumnNullability(getFieldName("col_2"), false)));
+  }
+
+  @Test
   void testUpdateColumnPosition() throws Exception {
     // Test UpdateColumnPosition after column.
     assertUpdateColumnPosition(3, after("col_1"), 0, 2, 1, 3);
     // Test UpdateColumnPosition first column.
     assertUpdateColumnPosition(4, first(), 1, 3, 2, 0);
-    // Test NullPointerException with UpdateColumnPosition for non-existent column.
+    // Test IllegalArgumentException with UpdateColumnPosition for non-existent column.
     assertThrowsExactly(
         IllegalArgumentException.class, () -> assertUpdateColumnPosition(5, defaultPos()));
-    // Test NullPointerException with UpdateColumnPosition for after non-existent column.
+    // Test IllegalArgumentException with UpdateColumnPosition for after non-existent column.
     assertThrowsExactly(
-        NullPointerException.class, () -> assertUpdateColumnPosition(1, after("col_5")));
+        IllegalArgumentException.class, () -> assertUpdateColumnPosition(1, after("col_5")));
   }
 
   @Test

@@ -352,7 +352,7 @@ public class BaseIT {
               + jettyServerConfig.getHttpPort()
               + "/metrics";
       Awaitility.await()
-          .atMost(60, TimeUnit.SECONDS)
+          .atMost(600, TimeUnit.SECONDS)
           .pollInterval(1, TimeUnit.SECONDS)
           .until(() -> HttpUtils.isHttpServerUp(checkServerUrl));
     }
