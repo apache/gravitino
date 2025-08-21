@@ -39,6 +39,8 @@ import org.apache.gravitino.authorization.Privilege;
 import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionEvaluator;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.PrincipalUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * MetadataFilterHelper performs permission checks on the list data returned by the REST API based
@@ -47,16 +49,17 @@ import org.apache.gravitino.utils.PrincipalUtils;
  */
 public class MetadataFilterHelper {
 
-  private MetadataFilterHelper() {}
-
+  private static final Logger LOG = LoggerFactory.getLogger(MetadataFilterHelper.class);
   private static Executor executor =
       Executors.newFixedThreadPool(
-          200,
+          50,
           runnable -> {
             Thread thread = new Thread(runnable);
-            thread.setName("GravitinoAuthorizer-ThreadPool-" + thread.getId());
+            thread.setName("MetadataFilterHelper-ThreadPool-" + thread.getId());
             return thread;
           });
+
+  private MetadataFilterHelper() {}
 
   /**
    * Call {@link GravitinoAuthorizer} to filter the metadata list
@@ -77,7 +80,7 @@ public class MetadataFilterHelper {
     GravitinoAuthorizer gravitinoAuthorizer =
         GravitinoAuthorizerProvider.getInstance().getGravitinoAuthorizer();
     Principal currentPrincipal = PrincipalUtils.getCurrentPrincipal();
-    return ThreadLocalAuthorizationCache.executeWithThreadCache(
+    return RequestAuthorizationCache.executeWithThreadCache(
         () ->
             Arrays.stream(metadataList)
                 .filter(
@@ -107,21 +110,34 @@ public class MetadataFilterHelper {
     if (!enableAuthorization()) {
       return nameIdentifiers;
     }
-    return ThreadLocalAuthorizationCache.executeWithThreadCache(
+    return RequestAuthorizationCache.executeWithThreadCache(
         () -> {
           List<CompletableFuture<NameIdentifier>> futures = new ArrayList<>();
           for (NameIdentifier nameIdentifier : nameIdentifiers) {
+            Principal currentPrincipal = PrincipalUtils.getCurrentPrincipal();
             futures.add(
                 CompletableFuture.supplyAsync(
-                    () -> {
-                      Map<Entity.EntityType, NameIdentifier> nameIdentifierMap =
-                          spiltMetadataNames(metalake, entityType, nameIdentifier);
-                      AuthorizationExpressionEvaluator authorizationExpressionEvaluator =
-                          new AuthorizationExpressionEvaluator(expression);
-                      return authorizationExpressionEvaluator.evaluate(nameIdentifierMap)
-                          ? nameIdentifier
-                          : null;
-                    },
+                    RequestAuthorizationCache.threadLocalTransmitWrapper(
+                        () -> {
+                          try {
+                            return PrincipalUtils.doAs(
+                                currentPrincipal,
+                                () -> {
+                                  Map<Entity.EntityType, NameIdentifier> nameIdentifierMap =
+                                      spiltMetadataNames(metalake, entityType, nameIdentifier);
+                                  AuthorizationExpressionEvaluator
+                                      authorizationExpressionEvaluator =
+                                          new AuthorizationExpressionEvaluator(expression);
+                                  return authorizationExpressionEvaluator.evaluate(
+                                          nameIdentifierMap)
+                                      ? nameIdentifier
+                                      : null;
+                                });
+                          } catch (Exception e) {
+                            LOG.error("GravitinoAuthorize error:{}", e.getMessage(), e);
+                            return null;
+                          }
+                        }),
                     executor));
           }
           return futures.stream()
@@ -151,7 +167,7 @@ public class MetadataFilterHelper {
     if (!enableAuthorization()) {
       return entities;
     }
-    return ThreadLocalAuthorizationCache.executeWithThreadCache(
+    return RequestAuthorizationCache.executeWithThreadCache(
         () -> {
           List<CompletableFuture<E>> futures = new ArrayList<>();
           for (E entity : entities) {

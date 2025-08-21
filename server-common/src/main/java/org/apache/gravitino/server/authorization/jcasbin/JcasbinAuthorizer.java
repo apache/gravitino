@@ -48,7 +48,7 @@ import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.meta.RoleEntity;
 import org.apache.gravitino.meta.UserEntity;
 import org.apache.gravitino.server.authorization.MetadataIdConverter;
-import org.apache.gravitino.server.authorization.ThreadLocalAuthorizationCache;
+import org.apache.gravitino.server.authorization.RequestAuthorizationCache;
 import org.apache.gravitino.server.authorization.policy.OwnerPolicyAsyncLoader;
 import org.apache.gravitino.storage.relational.po.OwnerRelPO;
 import org.apache.gravitino.utils.MetadataObjectUtil;
@@ -127,7 +127,7 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
       Privilege.Name privilege) {
     String username = principal.getName();
     boolean result =
-        ThreadLocalAuthorizationCache.authorizeAllow(
+        RequestAuthorizationCache.authorizeAllow(
             username,
             metalake,
             metadataObject,
@@ -152,7 +152,7 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
       MetadataObject metadataObject,
       Privilege.Name privilege) {
     boolean result =
-        ThreadLocalAuthorizationCache.authorizeDeny(
+        RequestAuthorizationCache.authorizeDeny(
             principal.getName(),
             metalake,
             metadataObject,
@@ -173,7 +173,7 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
   @Override
   public boolean isOwner(Principal principal, String metalake, MetadataObject metadataObject) {
     boolean result =
-        ThreadLocalAuthorizationCache.authorizeAllow(
+        RequestAuthorizationCache.authorizeAllow(
             principal.getName(),
             metalake,
             metadataObject,
@@ -350,7 +350,7 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
         LOG.debug("Can not get entity id", e);
         return false;
       }
-      loadPrivilege(metalake, username, userId, metadataObject, metadataId);
+      loadPrivilege(metalake, username, userId, metadataObject, metadataId, privilege);
       return authorizeByJcasbin(userId, metadataObject, metadataId, privilege);
     }
 
@@ -379,17 +379,21 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
       String username,
       Long userId,
       MetadataObject metadataObject,
-      Long metadataObjectId) {
+      Long metadataObjectId,
+      String privilege) {
     try {
-      loadRolePrivilege(metalake, username, userId);
-      loadOwnerPolicy(metalake, metadataObject, metadataObjectId);
+      if (AuthConstants.OWNER.equals(privilege)) {
+        loadOwnerPolicy(metalake, metadataObject, metadataObjectId);
+      } else {
+        loadRolePrivilege(metalake, username, userId);
+      }
     } catch (Exception e) {
       LOG.error(e.getMessage(), e);
     }
   }
 
   private void loadRolePrivilege(String metalake, String username, Long userId) {
-    ThreadLocalAuthorizationCache.loadRole(
+    RequestAuthorizationCache.loadRole(
         () -> {
           EntityStore entityStore = GravitinoEnv.getInstance().entityStore();
           NameIdentifier userNameIdentifier = NameIdentifierUtil.ofUser(metalake, username);
@@ -440,6 +444,7 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
 
   private void loadOwnerPolicy(String metalake, MetadataObject metadataObject, Long metadataId) {
     if (loadedOwners.contains(metadataId)) {
+      LOG.debug("Metadata {} OWNER has bean loaded.", metadataId);
       return;
     }
     try {

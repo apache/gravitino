@@ -54,7 +54,7 @@ import org.apache.gravitino.meta.RoleEntity;
 import org.apache.gravitino.meta.SchemaVersion;
 import org.apache.gravitino.meta.UserEntity;
 import org.apache.gravitino.server.authorization.MetadataIdConverter;
-import org.apache.gravitino.server.authorization.ThreadLocalAuthorizationCache;
+import org.apache.gravitino.server.authorization.RequestAuthorizationCache;
 import org.apache.gravitino.storage.relational.po.SecurableObjectPO;
 import org.apache.gravitino.storage.relational.service.OwnerMetaService;
 import org.apache.gravitino.storage.relational.utils.POConverters;
@@ -250,7 +250,7 @@ public class TestJcasbinAuthorizer {
   }
 
   private boolean doAuthorize(Principal currentPrincipal) {
-    return ThreadLocalAuthorizationCache.executeWithThreadCache(
+    return RequestAuthorizationCache.executeWithThreadCache(
         () ->
             jcasbinAuthorizer.authorize(
                 currentPrincipal,
@@ -260,7 +260,7 @@ public class TestJcasbinAuthorizer {
   }
 
   private boolean doAuthorizeOwner(Principal currentPrincipal) {
-    return ThreadLocalAuthorizationCache.executeWithThreadCache(
+    return RequestAuthorizationCache.executeWithThreadCache(
         () ->
             jcasbinAuthorizer.isOwner(
                 currentPrincipal,

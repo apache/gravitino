@@ -17,12 +17,14 @@
 
 package org.apache.gravitino.server.authorization;
 
-import java.util.HashMap;
+import java.security.Principal;
 import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
 import java.util.function.Supplier;
 import org.apache.gravitino.MetadataObject;
+import org.apache.gravitino.utils.PrincipalUtils;
 
 /**
  * Used to avoid duplicate authorization checks for the same metadata within the same thread.
@@ -30,9 +32,9 @@ import org.apache.gravitino.MetadataObject;
  * <p>The time complexity of Jcasbin's enforce method is O(n). Further caching of authorization
  * results can reduce the time spent on authorization.
  */
-public class ThreadLocalAuthorizationCache {
+public class RequestAuthorizationCache {
 
-  private ThreadLocalAuthorizationCache() {}
+  private RequestAuthorizationCache() {}
 
   /** Used to cache the results of metadata authorization. */
   private static final ThreadLocal<Map<AuthorizationContext, Boolean>> allowAuthorizerThreadCache =
@@ -43,7 +45,7 @@ public class ThreadLocalAuthorizationCache {
       new ThreadLocal<>();
 
   /** Used to determine whether the role has already been loaded. */
-  private static final ThreadLocal<Boolean> hasLoadedRoleThreadLocal = new ThreadLocal<>();
+  private static final ThreadLocal<BooleanHolder> hasLoadedRoleThreadLocal = new ThreadLocal<>();
 
   /**
    * Wrap the authorization method with this method to prevent threadlocal leakage.
@@ -54,22 +56,53 @@ public class ThreadLocalAuthorizationCache {
    */
   public static <T> T executeWithThreadCache(Supplier<T> supplier) {
     start();
-    T result = supplier.get();
+    T result = threadLocalTransmitWrapper(supplier).get();
     end();
     return result;
   }
 
+  /**
+   * Used to wrap a Supplier to ensure that the ThreadLocal context can be correctly passed across
+   * threads, enabling pruning effects when concurrently obtaining authorization results.
+   *
+   * @param supplier supplier
+   * @return wrapped supplier
+   */
+  public static <T> Supplier<T> threadLocalTransmitWrapper(Supplier<T> supplier) {
+    Map<AuthorizationContext, Boolean> tempAllowAuthorizer = allowAuthorizerThreadCache.get();
+    Map<AuthorizationContext, Boolean> tempDenyAuthorizer = denyAuthorizerThreadCache.get();
+    BooleanHolder tempRoleLoadedThread = hasLoadedRoleThreadLocal.get();
+    Principal currentPrincipal = PrincipalUtils.getCurrentPrincipal();
+
+    return () -> {
+      allowAuthorizerThreadCache.set(tempAllowAuthorizer);
+      denyAuthorizerThreadCache.set(tempDenyAuthorizer);
+      hasLoadedRoleThreadLocal.set(tempRoleLoadedThread);
+      T result;
+      try {
+        result = PrincipalUtils.doAs(currentPrincipal, supplier::get);
+        return result;
+      } catch (Exception e) {
+        throw new RuntimeException(e);
+      } finally {
+        allowAuthorizerThreadCache.remove();
+        denyAuthorizerThreadCache.remove();
+        hasLoadedRoleThreadLocal.remove();
+      }
+    };
+  }
+
   public static void loadRole(Runnable runnable) {
-    Boolean hasLoadedRole = hasLoadedRoleThreadLocal.get();
+    BooleanHolder hasLoadedRole = hasLoadedRoleThreadLocal.get();
     if (hasLoadedRole == null) {
       runnable.run();
       return;
     }
-    if (hasLoadedRole) {
+    if (hasLoadedRole.isBool()) {
       return;
     }
     runnable.run();
-    hasLoadedRoleThreadLocal.set(true);
+    hasLoadedRole.setBool(true);
   }
 
   /**
@@ -125,15 +158,32 @@ public class ThreadLocalAuthorizationCache {
   }
 
   private static void start() {
-    allowAuthorizerThreadCache.set(new HashMap<>());
-    denyAuthorizerThreadCache.set(new HashMap<>());
-    hasLoadedRoleThreadLocal.set(false);
+    allowAuthorizerThreadCache.set(new ConcurrentHashMap<>());
+    denyAuthorizerThreadCache.set(new ConcurrentHashMap<>());
+    hasLoadedRoleThreadLocal.set(new BooleanHolder());
   }
 
   private static void end() {
     allowAuthorizerThreadCache.remove();
     denyAuthorizerThreadCache.remove();
     hasLoadedRoleThreadLocal.remove();
+  }
+
+  /**
+   * Boolean cannot be passed to other threads; use a BooleanHolder to hold a reference to the
+   * Boolean object, ensuring the Boolean value can be correctly and accurately passed between
+   * threads.
+   */
+  private static class BooleanHolder {
+    Boolean bool;
+
+    public Boolean isBool() {
+      return bool != null && bool;
+    }
+
+    public void setBool(Boolean bool) {
+      this.bool = bool;
+    }
   }
 
   public static class AuthorizationContext {

@@ -126,7 +126,7 @@ public class OwnerMetaService {
   public List<OwnerRelPO> listAllOwner(long pageNum, long pageSize) {
     return SessionUtils.getWithoutCommit(
         OwnerMetaMapper.class,
-        (mapper) -> mapper.selectAllOwner((pageNum - 1) + pageSize, pageSize));
+        (mapper) -> mapper.selectAllOwner((pageNum - 1) * pageSize, pageSize));
   }
 
   public Long countAllOwner() {

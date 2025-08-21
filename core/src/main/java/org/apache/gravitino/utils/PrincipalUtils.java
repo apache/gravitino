@@ -23,6 +23,7 @@ import com.google.common.base.Throwables;
 import java.security.Principal;
 import java.security.PrivilegedActionException;
 import java.security.PrivilegedExceptionAction;
+import java.util.Set;
 import javax.security.auth.Subject;
 import org.apache.gravitino.UserPrincipal;
 import org.apache.gravitino.auth.AuthConstants;
@@ -35,7 +36,9 @@ public class PrincipalUtils {
       throws Exception {
     try {
       Subject subject = new Subject();
-      subject.getPrincipals().add(principal);
+      Set<Principal> principals = subject.getPrincipals();
+      principals.clear();
+      principals.add(principal);
       return Subject.doAs(subject, action);
     } catch (PrivilegedActionException pae) {
       Throwable cause = pae.getCause();
