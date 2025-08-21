@@ -23,21 +23,6 @@
 
 # Apache Gravitino™
 
-## Table of Contents
-- [Introduction](#introduction)
-- [Gravitino Architecture](#gravitino-architecture)
-- [Key Features](#-key-features)
-- [Common Use Cases](#-common-use-cases)
-- [Documentation](#-documentation)
-- [Quick Start](#-quick-start)
-- [Iceberg REST Catalog](#-iceberg-rest-catalog)
-- [Trino Integration](#-trino-integration)
-- [Building from Source](#-building-from-source)
-- [Developer Resources](#-developer-resources)
-- [Contributing](#-contributing)
-- [ASF Resources](#-asf-resources)
-- [License](#-license)
-
 [![GitHub Actions Build](https://github.com/apache/gravitino/actions/workflows/build.yml/badge.svg)](https://github.com/apache/gravitino/actions/workflows/build.yml)
 [![GitHub Actions Integration Test](https://github.com/apache/gravitino/actions/workflows/integration-test.yml/badge.svg)](https://github.com/apache/gravitino/actions/workflows/integration-test.yml)
 [![License](https://img.shields.io/github/license/apache/gravitino)](https://github.com/apache/gravitino/blob/main/LICENSE)
