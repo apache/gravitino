@@ -1,0 +1,13 @@
+Metadata-Version: 2.4
+Name: gravitino_mcp_server
+Version: 1.0.0
+Summary: Gravitino MCP server
+Requires-Python: >=3.10
+Description-Content-Type: text/markdown
+License-File: LICENSE
+License-File: NOTICE
+Requires-Dist: fastmcp>=2.10.6
+Requires-Dist: parameterized>=0.9.0
+Requires-Dist: pytest>=8.4.1
+Requires-Dist: pylint>=2.20.0
+Dynamic: license-file
