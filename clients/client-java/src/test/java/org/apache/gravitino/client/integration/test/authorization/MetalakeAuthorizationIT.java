@@ -85,10 +85,10 @@ public class MetalakeAuthorizationIT extends BaseRestApiAuthorizationIT {
   @Test
   @Order(2)
   public void testListMetalake() {
-
     assertMetalakeEquals(
         new String[] {METALAKE, testMetalake2, testMetalake3}, serviceAdminClient.listMetalakes());
     serviceAdminClient.disableMetalake(testMetalake2);
+    assertMetalakeEquals(new String[] {METALAKE}, normalUserClient.listMetalakes());
     assertMetalakeEquals(
         new String[] {METALAKE, testMetalake2, testMetalake3}, serviceAdminClient.listMetalakes());
     serviceAdminClient.enableMetalake(testMetalake2);
