@@ -39,5 +39,6 @@ public enum OperationType {
   LIST_VERSIONS, // An operation to list versions of a model
   LINK, // An operation to link a version to a model
   RUN, // An operation to run a job
-  CANCEL // An operation to cancel a job
+  CANCEL, // An operation to cancel a job
+  UPDATE
 }

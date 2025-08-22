@@ -524,7 +524,7 @@ public class TestTableFormat {
             + "| column2 | string  | default value       |               | true     | This is a string column |\n"
             + "| column2 | string  | ''                  |               | true     | This is a string column |\n"
             + "| column2 | string  | current_timestamp() |               | true     | This is a string column |\n"
-            + "| column2 | string  | date([b])           |               | true     | This is a string column |\n"
+            + "| column2 | string  | date(b)             |               | true     | This is a string column |\n"
             + "+---------+---------+---------------------+---------------+----------+-------------------------+",
         output);
   }

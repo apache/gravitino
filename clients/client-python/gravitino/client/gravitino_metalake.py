@@ -322,7 +322,7 @@ class GravitinoMetalake(MetalakeDTO, SupportsJobs):
             raise ValueError("Job template name cannot be null or empty")
 
         url = (
-            f"{self.API_METALAKES_JOB_TEMPLATES_PATH}/{encode_string(self.name())}/"
+            f"{self.API_METALAKES_JOB_TEMPLATES_PATH.format(encode_string(self.name()))}/"
             f"{encode_string(job_template_name)}"
         )
         response = self.rest_client.get(url, error_handler=JOB_ERROR_HANDLER)
@@ -355,7 +355,7 @@ class GravitinoMetalake(MetalakeDTO, SupportsJobs):
             raise ValueError("Job template name cannot be null or empty")
 
         url = (
-            f"{self.API_METALAKES_JOB_TEMPLATES_PATH}/{encode_string(self.name())}/"
+            f"{self.API_METALAKES_JOB_TEMPLATES_PATH.format(encode_string(self.name()))}/"
             f"{encode_string(job_template_name)}"
         )
         response = self.rest_client.delete(url, error_handler=JOB_ERROR_HANDLER)
@@ -403,7 +403,10 @@ class GravitinoMetalake(MetalakeDTO, SupportsJobs):
         if not job_id or not job_id.strip():
             raise ValueError("Job ID cannot be null or empty")
 
-        url = f"{self.API_METALAKES_JOB_RUNS_PATH}/{encode_string(self.name())}/{encode_string(job_id)}"
+        url = (
+            f"{self.API_METALAKES_JOB_RUNS_PATH.format(encode_string(self.name()))}"
+            f"/{encode_string(job_id)}"
+        )
         response = self.rest_client.get(url, error_handler=JOB_ERROR_HANDLER)
         resp = JobResponse.from_json(response.body, infer_missing=True)
         resp.validate()
@@ -423,7 +426,7 @@ class GravitinoMetalake(MetalakeDTO, SupportsJobs):
         Raises:
             NoSuchJobTemplateException: If no job template with the specified name exists.
         """
-        url = f"{self.API_METALAKES_JOB_RUNS_PATH}/{encode_string(self.name())}"
+        url = f"{self.API_METALAKES_JOB_RUNS_PATH.format(encode_string(self.name()))}"
         request = JobRunRequest(job_template_name, job_conf)
 
         response = self.rest_client.post(
@@ -449,7 +452,10 @@ class GravitinoMetalake(MetalakeDTO, SupportsJobs):
         if not job_id or not job_id.strip():
             raise ValueError("Job ID cannot be null or empty")
 
-        url = f"{self.API_METALAKES_JOB_RUNS_PATH}/{encode_string(self.name())}/{encode_string(job_id)}"
+        url = (
+            f"{self.API_METALAKES_JOB_RUNS_PATH.format(encode_string(self.name()))}"
+            f"/{encode_string(job_id)}"
+        )
         response = self.rest_client.post(url, error_handler=JOB_ERROR_HANDLER)
         resp = JobResponse.from_json(response.body, infer_missing=True)
         resp.validate()

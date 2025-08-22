@@ -33,7 +33,7 @@ public abstract class LocalProcessBuilder {
     this.jobTemplate = jobTemplate;
     // Executable should be in the working directory, so we can figure out the working directory
     // from the executable path.
-    this.workingDirectory = new File(jobTemplate.executable()).getParentFile();
+    this.workingDirectory = new File(jobTemplate.executable()).getAbsoluteFile().getParentFile();
   }
 
   public abstract Process start();

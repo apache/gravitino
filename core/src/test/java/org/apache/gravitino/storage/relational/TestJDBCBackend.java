@@ -30,7 +30,6 @@ import static org.apache.gravitino.Configs.ENTITY_STORE;
 import static org.apache.gravitino.Configs.RELATIONAL_ENTITY_STORE;
 import static org.apache.gravitino.SupportsRelationOperations.Type.OWNER_REL;
 import static org.apache.gravitino.file.Fileset.LOCATION_NAME_UNKNOWN;
-import static org.apache.gravitino.policy.Policy.SUPPORTS_ALL_OBJECT_TYPES;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -39,6 +38,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Lists;
 import java.io.File;
 import java.io.IOException;
@@ -55,12 +55,14 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
+import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.authorization.AuthorizationUtils;
@@ -83,6 +85,7 @@ import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.meta.TopicEntity;
 import org.apache.gravitino.meta.UserEntity;
+import org.apache.gravitino.policy.Policy;
 import org.apache.gravitino.policy.PolicyContents;
 import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.storage.relational.mapper.CatalogMetaMapper;
@@ -108,6 +111,15 @@ import org.mockito.Mockito;
 // Avoid re-executing tests in subclasses
 @EnabledIf("isDirectlyRunningThisClass")
 public class TestJDBCBackend {
+  private static final Set<MetadataObject.Type> SUPPORTED_OBJECT_TYPES =
+      ImmutableSet.of(
+          MetadataObject.Type.CATALOG,
+          MetadataObject.Type.SCHEMA,
+          MetadataObject.Type.TABLE,
+          MetadataObject.Type.FILESET,
+          MetadataObject.Type.MODEL,
+          MetadataObject.Type.TOPIC);
+
   private final String JDBC_STORE_PATH =
       "/tmp/gravitino_jdbc_entityStore_" + UUID.randomUUID().toString().replace("-", "");
   private final String DB_DIR = JDBC_STORE_PATH + "/testdb";
@@ -615,9 +627,6 @@ public class TestJDBCBackend {
             .withPolicyType(policy.policyType())
             .withComment(policy.comment())
             .withEnabled(!policy.enabled())
-            .withExclusive(policy.exclusive())
-            .withInheritable(policy.inheritable())
-            .withSupportedObjectTypes(policy.supportedObjectTypes())
             .withContent(policy.content())
             .withAuditInfo(auditInfo)
             .build();
@@ -744,9 +753,6 @@ public class TestJDBCBackend {
             .withPolicyType(anotherPolicy.policyType())
             .withComment(anotherPolicy.comment())
             .withEnabled(!anotherPolicy.enabled())
-            .withExclusive(anotherPolicy.exclusive())
-            .withInheritable(anotherPolicy.inheritable())
-            .withSupportedObjectTypes(anotherPolicy.supportedObjectTypes())
             .withContent(anotherPolicy.content())
             .withAuditInfo(auditInfo)
             .build();
@@ -760,9 +766,6 @@ public class TestJDBCBackend {
             .withPolicyType(anotherPolicy.policyType())
             .withComment("v3")
             .withEnabled(anotherPolicyV2.enabled())
-            .withExclusive(anotherPolicy.exclusive())
-            .withInheritable(anotherPolicy.inheritable())
-            .withSupportedObjectTypes(SUPPORTS_ALL_OBJECT_TYPES)
             .withContent(anotherPolicy.content())
             .withAuditInfo(auditInfo)
             .build();
@@ -1558,13 +1561,11 @@ public class TestJDBCBackend {
         .withId(id)
         .withNamespace(ns)
         .withName(name)
-        .withPolicyType("test")
+        .withPolicyType(Policy.BuiltInType.CUSTOM)
         .withComment("")
         .withEnabled(true)
-        .withExclusive(true)
-        .withInheritable(true)
-        .withSupportedObjectTypes(SUPPORTS_ALL_OBJECT_TYPES)
-        .withContent(PolicyContents.custom(ImmutableMap.of("filed1", 123), null))
+        .withContent(
+            PolicyContents.custom(ImmutableMap.of("filed1", 123), SUPPORTED_OBJECT_TYPES, null))
         .withAuditInfo(auditInfo)
         .build();
   }

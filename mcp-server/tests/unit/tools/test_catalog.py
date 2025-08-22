@@ -27,13 +27,18 @@ from tests.unit.tools import MockOperation
 
 
 class TestCatalogTool(unittest.TestCase):
+    """Test the catalog tool functionality."""
 
     def setUp(self):
+        """Set up the test environment."""
+
         RESTClientFactory.set_rest_client(MockOperation)
         server = GravitinoMCPServer(Setting("mock_metalake"))
         self.mcp = server.mcp
 
     def test_list_catalogs(self):
+        """Test listing catalogs."""
+
         async def _test_list_catalogs(mcp_server):
             async with Client(mcp_server) as client:
                 result = await client.call_tool("get_list_of_catalogs")

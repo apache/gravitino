@@ -20,13 +20,17 @@
 package org.apache.gravitino.storage.relational;
 
 import static org.apache.gravitino.Configs.GARBAGE_COLLECTOR_SINGLE_DELETION_LIMIT;
+import static org.apache.gravitino.Entity.EntityType.TABLE;
 
+import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
+import java.util.stream.Collectors;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.Entity;
@@ -49,6 +53,7 @@ import org.apache.gravitino.meta.ModelVersionEntity;
 import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.meta.RoleEntity;
 import org.apache.gravitino.meta.SchemaEntity;
+import org.apache.gravitino.meta.StatisticEntity;
 import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.meta.TopicEntity;
@@ -138,6 +143,11 @@ public class JDBCBackend implements RelationalBackend {
             JobTemplateMetaService.getInstance().listJobTemplatesByNamespace(namespace);
       case JOB:
         return (List<E>) JobMetaService.getInstance().listJobsByNamespace(namespace);
+      case TABLE_STATISTIC:
+        return (List<E>)
+            StatisticMetaService.getInstance()
+                .listStatisticsByEntity(
+                    NameIdentifier.parse(namespace.toString()), Entity.EntityType.TABLE);
       default:
         throw new UnsupportedEntityTypeException(
             "Unsupported entity type: %s for list operation", entityType);
@@ -375,7 +385,7 @@ public class JDBCBackend implements RelationalBackend {
         return ModelVersionMetaService.getInstance()
             .deleteModelVersionMetasByLegacyTimeline(
                 legacyTimeline, GARBAGE_COLLECTOR_SINGLE_DELETION_LIMIT);
-      case STATISTIC:
+      case TABLE_STATISTIC:
         return StatisticMetaService.getInstance()
             .deleteStatisticsByLegacyTimeline(
                 legacyTimeline, GARBAGE_COLLECTOR_SINGLE_DELETION_LIMIT);
@@ -413,7 +423,7 @@ public class JDBCBackend implements RelationalBackend {
       case TAG:
       case MODEL:
       case MODEL_VERSION:
-      case STATISTIC:
+      case TABLE_STATISTIC:
       case JOB_TEMPLATE:
       case JOB:
         // These entity types have not implemented multi-versions, so we can skip.
@@ -477,6 +487,76 @@ public class JDBCBackend implements RelationalBackend {
   }
 
   @Override
+  public int batchDelete(
+      List<Pair<NameIdentifier, Entity.EntityType>> entitiesToDelete, boolean cascade)
+      throws IOException {
+    if (entitiesToDelete == null || entitiesToDelete.isEmpty()) {
+      return 0;
+    }
+    Preconditions.checkArgument(
+        1 == entitiesToDelete.stream().collect(Collectors.groupingBy(Pair::getRight)).size(),
+        "All entities must be of the same type for batch delete operation.");
+    Entity.EntityType entityType = entitiesToDelete.get(0).getRight();
+    switch (entityType) {
+      case TABLE_STATISTIC:
+        Preconditions.checkArgument(
+            cascade, "Batch delete for statistics must be cascade deleted.");
+        List<NameIdentifier> deleteIdents =
+            entitiesToDelete.stream().map(Pair::getLeft).collect(Collectors.toList());
+        int namespaceSize =
+            entitiesToDelete.stream()
+                .collect(Collectors.groupingBy(ident -> ident.getLeft().namespace()))
+                .size();
+        Preconditions.checkArgument(
+            1 == namespaceSize,
+            "All entities must be in the same namespace for batch delete operation.");
+
+        Namespace namespace = deleteIdents.get(0).namespace();
+        return StatisticMetaService.getInstance()
+            .batchDeleteStatisticPOs(
+                NameIdentifier.parse(namespace.toString()),
+                TABLE,
+                deleteIdents.stream().map(NameIdentifier::name).collect(Collectors.toList()));
+      default:
+        throw new IllegalArgumentException(
+            String.format("Batch delete is not supported for entity type %s", entityType.name()));
+    }
+  }
+
+  @Override
+  public <E extends Entity & HasIdentifier> void batchPut(List<E> entities, boolean overwritten)
+      throws IOException, EntityAlreadyExistsException {
+    if (entities.isEmpty()) {
+      return;
+    }
+
+    Preconditions.checkArgument(
+        1 == entities.stream().collect(Collectors.groupingBy(Entity::type)).size(),
+        "All entities must be of the same type for batchPut operation.");
+    Entity.EntityType entityType = entities.get(0).type();
+
+    switch (entityType) {
+      case TABLE_STATISTIC:
+        Preconditions.checkArgument(overwritten, "Batch put for statistics must be overwritten.");
+        List<StatisticEntity> statisticEntities =
+            entities.stream().map(e -> (StatisticEntity) e).collect(Collectors.toList());
+        Preconditions.checkArgument(
+            1 == entities.stream().collect(Collectors.groupingBy(HasIdentifier::namespace)).size(),
+            "All entities must be in the same namespace for batchPut operation.");
+
+        StatisticMetaService.getInstance()
+            .batchInsertStatisticPOsOnDuplicateKeyUpdate(
+                statisticEntities,
+                NameIdentifier.parse(statisticEntities.get(0).namespace().toString()),
+                Entity.EntityType.TABLE);
+        break;
+      default:
+        throw new IllegalArgumentException(
+            String.format("Batch put is not supported for entity type %s", entityType.name()));
+    }
+  }
+
+  @Override
   public <E extends Entity & HasIdentifier> List<E> listEntitiesByRelation(
       Type relType, NameIdentifier nameIdentifier, Entity.EntityType identType, boolean allFields)
       throws IOException {
@@ -506,14 +586,6 @@ public class JDBCBackend implements RelationalBackend {
         } else {
           throw new IllegalArgumentException(
               String.format("ROLE_USER_REL doesn't support type %s", identType.name()));
-        }
-
-      case JOB_TEMPLATE_JOB_REL:
-        if (identType == Entity.EntityType.JOB_TEMPLATE) {
-          return (List<E>) JobMetaService.getInstance().listJobsByTemplateIdent(nameIdentifier);
-        } else {
-          throw new IllegalArgumentException(
-              String.format("JOB_TEMPLATE_JOB_REL doesn't support type %s", identType.name()));
         }
 
       case POLICY_METADATA_OBJECT_REL:
