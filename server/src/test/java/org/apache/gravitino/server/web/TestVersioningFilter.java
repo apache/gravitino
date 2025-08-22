@@ -274,6 +274,17 @@ public class TestVersioningFilter {
 
     filter.doFilter(mockRequest, mockResponse, mockChain);
     verify(mockChain).doFilter(any(), any());
+
+    reset(mockChain, mockResponse);
+
+    filter.doFilter(mockRequest, mockResponse, mockChain);
+    verify(mockChain, never()).doFilter(any(), any());
+    verify(mockResponse).sendError(HttpServletResponse.SC_NOT_ACCEPTABLE, "Unsupported version");
+
+    reset(mockChain, mockResponse);
+
+    filter.doFilter(mockRequest, mockResponse, mockChain);
+    verify(mockChain, never()).doFilter(any(), any());
     verify(mockResponse).sendError(HttpServletResponse.SC_NOT_ACCEPTABLE, "Unsupported version");
   }
 }
