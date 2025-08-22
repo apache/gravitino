@@ -1,8 +1,27 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *  http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+
 import { setupServer } from 'msw/node'
 import { http, HttpResponse } from 'msw'
 
 const handlers = [
-  // Mock auth config endpoint (matches the actual API endpoint used by factory)
+  // Mock auth config endpoint (used by factory tests)
   http.get('/configs', () => {
     return HttpResponse.json({
       'gravitino.authenticator': 'oauth',
@@ -10,36 +29,6 @@ const handlers = [
       'gravitino.authenticator.oauth.authority': 'https://test-oidc.example.com',
       'gravitino.authenticator.oauth.clientId': 'test-client-id',
       'gravitino.authenticator.oauth.scope': 'openid profile email'
-    })
-  }),
-
-  // Mock OIDC discovery endpoint
-  http.get('https://test-oidc.example.com/.well-known/openid-configuration', () => {
-    return HttpResponse.json({
-      issuer: 'https://test-oidc.example.com',
-      authorization_endpoint: 'https://test-oidc.example.com/auth',
-      token_endpoint: 'https://test-oidc.example.com/token',
-      userinfo_endpoint: 'https://test-oidc.example.com/userinfo',
-      jwks_uri: 'https://test-oidc.example.com/.well-known/jwks',
-      scopes_supported: ['openid', 'profile', 'email'],
-      response_types_supported: ['code'],
-      grant_types_supported: ['authorization_code'],
-      subject_types_supported: ['public']
-    })
-  }),
-
-  // Mock JWKS endpoint
-  http.get('https://test-oidc.example.com/.well-known/jwks', () => {
-    return HttpResponse.json({
-      keys: [
-        {
-          kty: 'RSA',
-          use: 'sig',
-          kid: 'test-key-id',
-          n: 'test-modulus',
-          e: 'AQAB'
-        }
-      ]
     })
   })
 ]

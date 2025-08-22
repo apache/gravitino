@@ -290,6 +290,7 @@
    @mui/utils
    @mui/x-data-grid
    @mui/x-tree-view
+   @mswjs/interceptors
    @next/bundle-analyzer
    @next/env
    @next/eslint-plugin-next
@@ -332,6 +333,12 @@
    @typescript-eslint/types
    @typescript-eslint/typescript-estree
    @typescript-eslint/visitor-keys
+   @vitest/coverage-v8
+   @vitest/expect
+   @vitest/runner
+   @vitest/snapshot
+   @vitest/spy
+   @vitest/utils
    @xobotyi/scrollbar-width
    acorn
    acorn-jsx
@@ -521,6 +528,7 @@
    js-cookie
    js-tokens
    js-yaml
+   jsdom
    json-buffer
    json-schema-traverse
    json-stable-stringify-without-jsonify
@@ -550,6 +558,7 @@
    mlly
    mrmime
    ms
+   msw
    mz
    nanoid
    next
@@ -717,6 +726,7 @@
    update-browserslist-db
    use-sync-external-store
    util-deprecate
+   vitest
    webpack-bundle-analyzer
    which-boxed-primitive
    which-builtin-type
