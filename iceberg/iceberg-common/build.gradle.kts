@@ -54,7 +54,6 @@ dependencies {
     exclude("org.apache.curator")
     exclude("org.apache.zookeeper")
     exclude("org.mortbay.jetty")
-    exclude("commons-logging", "commons-logging")
   }
   // use hdfs-default.xml
   implementation(libs.hadoop2.hdfs) {
