@@ -107,7 +107,7 @@ public class SqlSessionFactoryHelper {
     configuration.setDatabaseId(jdbcType.name().toLowerCase());
     ServiceLoader<MapperPackageProvider> loader = ServiceLoader.load(MapperPackageProvider.class);
     for (MapperPackageProvider provider : loader) {
-      configuration.addMappers(provider.getPackageName());
+      provider.getMapperClasses().forEach(configuration::addMapper);
     }
 
     // Create the SqlSessionFactory object, it is a singleton object

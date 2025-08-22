@@ -185,6 +185,18 @@ paths:
   /lineage:
     $ref: "./lineage.yaml#/paths/~1lineage"
 
+  /metalakes/{metalake}/jobs/templates:
+    $ref: "./jobs.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1jobs~1templates"
+
+  /metalakes/{metalake}/jobs/templates/{jobTemplate}:
+    $ref: "./jobs.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1jobs~1templates~1%7BjobTemplate%7D"
+
+  /metalakes/{metalake}/jobs/runs:
+    $ref: "./jobs.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1jobs~1runs"
+
+  /metalakes/{metalake}/jobs/runs/{jobId}:
+    $ref: "./jobs.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1jobs~1runs~1%7BjobId%7D"
+
 components:
 
   schemas:

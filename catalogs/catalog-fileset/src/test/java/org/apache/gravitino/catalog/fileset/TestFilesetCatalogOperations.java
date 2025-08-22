@@ -1807,7 +1807,7 @@ public class TestFilesetCatalogOperations {
           exception
               .getMessage()
               .contains(
-                  "Default location name must be set and must be one of the fileset locations"),
+                  "The fileset property default-location-name must be set and must be one of the fileset locations"),
           "Exception message: " + exception.getMessage());
     }
   }

@@ -208,7 +208,7 @@ fs.getFileStatus(filesetPath);
    File System runtime jar, like so:
 
     ```shell
-    ./${SPARK_HOME}/bin/spark-submit --packages org.apache.gravitino:filesystem-hadoop3-runtime:${version}
+    ./${SPARK_HOME}/bin/spark-submit --packages org.apache.gravitino:gravitino-filesystem-hadoop3-runtime:${version}
     ```
 
    If you want to include the Gravitino Virtual File System runtime jar in your Spark installation, add it to the `${SPARK_HOME}/jars/` folder.
