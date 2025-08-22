@@ -19,6 +19,14 @@
 
 package org.apache.gravitino.catalog.jdbc.operation;
 
+/**
+ * Interface marking classes that require a {@link DatabaseOperation} instance.
+ */
 public interface RequireDatabaseOperation {
+  /**
+   * Sets the {@link DatabaseOperation} instance used for database operations.
+   *
+   * @param databaseOperation The database operation instance to set
+   */
   void setDatabaseOperation(DatabaseOperation databaseOperation);
 }

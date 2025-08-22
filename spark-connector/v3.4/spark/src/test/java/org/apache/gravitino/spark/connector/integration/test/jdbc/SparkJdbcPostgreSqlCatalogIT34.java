@@ -23,7 +23,6 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 
-@Disabled("Disabled until PG table creation is supported")
 public class SparkJdbcPostgreSqlCatalogIT34 extends SparkJdbcPostgreSqlCatalogIT {
 
   @Test

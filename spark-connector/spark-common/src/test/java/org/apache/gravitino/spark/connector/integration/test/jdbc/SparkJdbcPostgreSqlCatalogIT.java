@@ -77,11 +77,6 @@ public class SparkJdbcPostgreSqlCatalogIT extends SparkCommonIT {
   }
 
   @Override
-  protected boolean supportListTable() {
-    return true;
-  }
-
-  @Override
   protected boolean supportsCreateTableWithComment() {
     return false;
   }
