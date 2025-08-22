@@ -52,6 +52,8 @@ public class ITUtils {
   public static final String TEST_MODE = "testMode";
   public static final String EMBEDDED_TEST_MODE = "embedded";
   public static final String DEPLOY_TEST_MODE = "deploy";
+  /** Enable entity cache or not */
+  public static final String ENABLE_ENTITY_CACHE = "enableEntityCache";
 
   public static String joinPath(String... dirs) {
     return String.join(File.separator, dirs);
