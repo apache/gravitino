@@ -45,15 +45,19 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
+
+import org.apache.commons.lang3.ArrayUtils;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.HasIdentifier;
+import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.SupportsRelationOperations;
 import org.apache.gravitino.meta.GroupEntity;
 import org.apache.gravitino.meta.ModelVersionEntity;
+import org.apache.gravitino.meta.RoleEntity;
 import org.apache.gravitino.meta.UserEntity;
 import org.apache.gravitino.utils.NamespaceUtil;
 import org.slf4j.Logger;
@@ -335,7 +339,7 @@ public class CaffeineEntityCache extends BaseEntityCache {
           if (userEntity.roleNames() != null) {
             userEntity.roleNames().forEach(
                     role -> {
-                      Namespace ns = NamespaceUtil.ofRole(userEntity.namespace().level(0));
+                      Namespace ns = NamespaceUtil.ofUser(userEntity.namespace().level(0));
                       NameIdentifier nameIdentifier = NameIdentifier.of(ns, role);
                       putReverseIndex(nameIdentifier, Entity.EntityType.ROLE, key);
                     });
@@ -346,9 +350,36 @@ public class CaffeineEntityCache extends BaseEntityCache {
           if (groupEntity.roleNames() != null) {
             groupEntity.roleNames().forEach(
                     role -> {
-                      Namespace ns = NamespaceUtil.ofRole(groupEntity.namespace().level(0));
+                      Namespace ns = NamespaceUtil.ofGroup(groupEntity.namespace().level(0));
                       NameIdentifier nameIdentifier = NameIdentifier.of(ns, role);
                       putReverseIndex(nameIdentifier, Entity.EntityType.ROLE, key);
+                    });
+          }
+        } else if (entity instanceof RoleEntity) {
+          // UserEntity is not supported in the cache, skip it.
+          RoleEntity roleEntity = (RoleEntity) entity;
+          if (roleEntity.securableObjects() != null) {
+            roleEntity.securableObjects().forEach(
+                    securableObject -> {
+                      Namespace namespace = Namespace.empty();
+//                      Namespace nsParent = Namespace.fromString(securableObject.parent());
+                      Entity.EntityType entityType = Entity.EntityType.METALAKE;
+                      switch (securableObject.type()){
+                        case CATALOG:
+                          entityType = Entity.EntityType.CATALOG;
+                          namespace = NamespaceUtil.ofCatalog(roleEntity.namespace().level(0));
+                          break;
+                        case FILESET:
+                          entityType = Entity.EntityType.FILESET;
+                          Namespace nsParent = Namespace.fromString(securableObject.parent());
+                          namespace = NamespaceUtil.ofFileset(roleEntity.namespace().level(0), nsParent.level(0), nsParent.level(1));
+                          break;
+                        default:
+                          throw new IllegalStateException("Unprocessed securable object type: " + securableObject.type());
+                      }
+                      Namespace so_namespace = Namespace.of(ArrayUtils.add(namespace.levels(), securableObject.name()));
+                      NameIdentifier nameIdentifier = NameIdentifier.of(so_namespace, securableObject.name());
+                      putReverseIndex(nameIdentifier, entityType, key);
                     });
           }
         }
