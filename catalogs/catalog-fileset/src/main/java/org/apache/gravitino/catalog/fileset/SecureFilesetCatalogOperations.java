@@ -358,7 +358,7 @@ public class SecureFilesetCatalogOperations
         Timer writeTimer = (Timer) FieldUtils.readField(writeThrottler, "timer", true);
         writeTimer.cancel();
       } catch (Exception e) {
-        LOG.warn("Failed to find GCS shaded LogFactory", e);
+        LOG.warn("Failed to handle Azure file system...", e);
       }
 
       clearShutdownHooks();
@@ -369,7 +369,7 @@ public class SecureFilesetCatalogOperations
 
   private static void clearThreadLocalMap(Thread thread) {
     if (thread != null && thread.getName().startsWith("Gravitino-webserver-")) {
-      // try to
+      // Try to
       try {
         Field threadLocalsField = Thread.class.getDeclaredField("threadLocals");
         threadLocalsField.setAccessible(true);
@@ -454,7 +454,7 @@ public class SecureFilesetCatalogOperations
                     == FilesetCatalogOperations.class.getClassLoader();
               });
     } catch (Exception e) {
-      throw new RuntimeException("Failed to clean shutdown hooks", e);
+      LOG.warn("Failed to clean shutdown hooks", e);
     }
   }
 
