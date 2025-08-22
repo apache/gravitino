@@ -241,7 +241,7 @@ class MockStatisticOperation(StatisticOperation):
     async def list_of_statistics(
         self, metalake_name: str, metadata_type: str, metadata_fullname: str
     ) -> str:
-        return "mock_statistics"
+        return f"mock_statistics: {metalake_name}, {metadata_type}, {metadata_fullname}"
 
     # pylint: disable=R0917
     async def list_statistic_for_partition(
@@ -254,4 +254,7 @@ class MockStatisticOperation(StatisticOperation):
         from_inclusive: bool = True,
         to_inclusive: bool = False,
     ) -> str:
-        return "mock_statistics_for_partition"
+        return (
+            f"mock_statistics_for_partition: {metalake_name}, {metadata_type}, {metadata_fullname},"
+            f" {from_partition_name}, {to_partition_name}, {from_inclusive}, {to_inclusive}"
+        )

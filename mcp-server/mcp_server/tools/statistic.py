@@ -28,7 +28,11 @@ def load_statistic_tools(mcp: FastMCP):
     ) -> str:
         """
         Retrieve a list of statistics for a specific metadata object. Currently,
-            this tool only supports statistics for tables
+            this tool only supports statistics for tables, so `metadata_type`
+            should always be "table" and metadata_fullname should be in the format
+            "{catalog}.{schema}.{table}". For more information about the metadata
+            type and full name formats, please refer to the tool
+            'metadata_type_to_fullname_formats'.
 
         Args:
             ctx (Context): The request context.

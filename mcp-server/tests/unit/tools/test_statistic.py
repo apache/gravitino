@@ -43,7 +43,10 @@ class TestStatisticTool(unittest.TestCase):
                         "metadata_fullname": "mock_fullname",
                     },
                 )
-                self.assertEqual("mock_statistics", result.content[0].text)
+                self.assertEqual(
+                    "mock_statistics: mock_metalake, mock_type, mock_fullname",
+                    result.content[0].text,
+                )
 
         asyncio.run(_test_list_of_statistics(self.mcp))
 
@@ -61,7 +64,9 @@ class TestStatisticTool(unittest.TestCase):
                     },
                 )
                 self.assertEqual(
-                    "mock_statistics_for_partition", result.content[0].text
+                    "mock_statistics_for_partition: mock_metalake, mock_type, mock_fullname, "
+                    "from_partition, to_partition, True, False",
+                    result.content[0].text,
                 )
 
         asyncio.run(_test_list_statistics_for_partition(self.mcp))
