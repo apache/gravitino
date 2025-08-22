@@ -33,6 +33,7 @@ public class GravitinoITUtils {
   }
 
   public static void startGravitinoServer() {
+    LOG.info("qihouliang, Starting Gravitino server ...");
     String gravitinoStartShell = System.getenv("GRAVITINO_HOME") + "/bin/gravitino.sh";
 
     String krb5Path = System.getProperty("java.security.krb5.conf");
@@ -62,6 +63,8 @@ public class GravitinoITUtils {
       CommandExecutor.executeCommandLocalHost(
           gravitinoStartShell + " start", false, ProcessData.TypesOfData.OUTPUT);
     }
+    LOG.info(
+        "qihouliang, Gravitino server started with command: {}", gravitinoStartShell + " start");
     // wait for server to start.
     sleep(3000, false);
   }

@@ -31,8 +31,8 @@ import org.apache.gravitino.catalog.lakehouse.paimon.PaimonCatalogBackend;
 import org.apache.gravitino.catalog.lakehouse.paimon.PaimonConfig;
 import org.apache.gravitino.integration.test.container.ContainerSuite;
 import org.apache.gravitino.integration.test.container.HiveContainer;
+import org.apache.paimon.catalog.CachingCatalog;
 import org.apache.paimon.catalog.Catalog;
-import org.apache.paimon.catalog.FileSystemCatalog;
 import org.apache.paimon.factories.FactoryException;
 import org.apache.paimon.hive.HiveCatalog;
 import org.apache.paimon.jdbc.JdbcCatalog;
@@ -46,7 +46,7 @@ public class TestCatalogUtils {
   @Test
   void testLoadCatalogBackend() throws Exception {
     // Test load FileSystemCatalog for filesystem metastore.
-    assertCatalog(PaimonCatalogBackend.FILESYSTEM.name(), FileSystemCatalog.class);
+    assertCatalog(PaimonCatalogBackend.FILESYSTEM.name(), CachingCatalog.class);
     // Test load JdbcCatalog for jdbc metastore.
     assertCatalog(PaimonCatalogBackend.JDBC.name(), JdbcCatalog.class);
     // Test load HiveCatalog for hive metastore.

@@ -150,6 +150,7 @@ public class BaseIT {
 
     Files.move(configPath, tmpPath);
     ITUtils.rewriteConfigFile(tmpPath.toString(), configPath.toString(), customConfigs);
+    LOG.info("qihouliang, Rewrite Gravitino server config file: {}", configPath);
   }
 
   private void recoverGravitinoServerConfig() throws IOException {
