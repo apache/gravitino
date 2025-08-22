@@ -129,6 +129,10 @@ public abstract class SparkCommonIT extends SparkEnvIT {
   // after the issue is addressed
   protected abstract boolean supportListTable();
 
+  protected boolean supportsCreateTableWithComment() {
+    return true;
+  }
+
   protected SparkTableInfoChecker getTableInfoChecker() {
     return SparkTableInfoChecker.create();
   }
@@ -323,6 +327,7 @@ public abstract class SparkCommonIT extends SparkEnvIT {
   }
 
   @Test
+  @EnabledIf("supportsCreateTableWithComment")
   void testCreateTableWithComment() {
     String tableName = "comment_table";
     dropTableIfExists(tableName);
