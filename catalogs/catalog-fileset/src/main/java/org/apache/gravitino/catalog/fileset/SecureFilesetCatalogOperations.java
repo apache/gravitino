@@ -281,6 +281,12 @@ public class SecureFilesetCatalogOperations
 
     UserContext.cleanAllUserContext();
 
+    boolean testEnv = System.getenv("GRAVITINO_TEST") != null;
+    if (testEnv) {
+      // In test environment, we do not need to clean up class loader related stuff
+      return;
+    }
+
     try {
 
       closeStatsDataClearerInFileSystem();
