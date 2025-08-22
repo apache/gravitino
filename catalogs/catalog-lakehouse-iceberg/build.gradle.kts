@@ -104,6 +104,7 @@ tasks {
       exclude("guava-*.jar")
       exclude("log4j-*.jar")
       exclude("slf4j-*.jar")
+      exclude("commons-logging-*.jar")
     }
     into("$rootDir/distribution/package/catalogs/lakehouse-iceberg/libs")
   }

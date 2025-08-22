@@ -19,19 +19,32 @@
 package org.apache.gravitino.iceberg.common.ops;
 
 import com.google.common.base.Preconditions;
+import java.lang.ref.WeakReference;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
 import java.sql.Driver;
 import java.sql.DriverManager;
+import java.util.IdentityHashMap;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import java.util.ServiceLoader;
+import java.util.concurrent.ConcurrentHashMap;
 import lombok.Getter;
 import lombok.Setter;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.reflect.FieldUtils;
+import org.apache.commons.logging.LogFactory;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergCatalogBackend;
+import org.apache.gravitino.iceberg.common.ClosableHiveCatalog;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
 import org.apache.gravitino.iceberg.common.utils.IcebergCatalogUtil;
 import org.apache.gravitino.utils.IsolatedClassLoader;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.io.WritableComparator;
+import org.apache.hadoop.security.SecurityInfo;
+import org.apache.hadoop.security.SecurityUtil;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.iceberg.Transaction;
 import org.apache.iceberg.catalog.Catalog;
@@ -257,6 +270,165 @@ public class IcebergCatalogWrapper implements AutoCloseable {
     } else if (catalogBackend.equals(IcebergCatalogBackend.HIVE)) {
       // TODO(yuqi) add close for other catalog types such Hive catalog, for more, please refer to
       // https://github.com/apache/gravitino/pull/2548/commits/ab876b69b7e094bbd8c174d48a2365a18ed5176d
+    }
+
+    try {
+      Field statisticsCleanerField =
+          FieldUtils.getField(FileSystem.Statistics.class, "STATS_DATA_CLEANER", true);
+      Object statisticsCleaner = statisticsCleanerField.get(null);
+      if (statisticsCleaner != null) {
+        ((Thread) statisticsCleaner).interrupt();
+        ((Thread) statisticsCleaner).setContextClassLoader(null);
+        ((Thread) statisticsCleaner).join();
+      }
+
+      FileSystem.closeAll();
+
+      // Clear all thread references to the ClosableHiveCatalog class loader.
+      Thread[] threads = getAllThreads();
+      for (Thread thread : threads) {
+        if (isPeerCacheThread(thread)) {
+          LOG.info("Interrupting peer cache thread: {}", thread.getName());
+          thread.setContextClassLoader(null);
+          thread.interrupt();
+          try {
+            thread.join();
+          } catch (InterruptedException e) {
+            LOG.warn("Failed to join peer cache thread: {}", thread.getName(), e);
+          }
+        }
+      }
+
+      clearClassLoaderReferences();
+
+      releaseClassLoaderReferences(this.getClass().getClassLoader());
+
+      releaseReference();
+
+    } catch (Exception e) {
+      LOG.warn("Failed to close FileSystem statistics cleaner", e);
+    }
+  }
+
+  private static Thread[] getAllThreads() {
+    ThreadGroup rootGroup = Thread.currentThread().getThreadGroup();
+    ThreadGroup parentGroup;
+    while ((parentGroup = rootGroup.getParent()) != null) {
+      rootGroup = parentGroup;
+    }
+
+    Thread[] threads = new Thread[rootGroup.activeCount()];
+    while (rootGroup.enumerate(threads, true) == threads.length) {
+      threads = new Thread[threads.length * 2];
+    }
+    return threads;
+  }
+
+  private static boolean isPeerCacheThread(Thread thread) {
+    return thread != null
+        //        && thread.getName() != null
+        //        && thread.getName().contains("org.apache.hadoop.hdfs.PeerCache")
+        && thread.getContextClassLoader() == ClosableHiveCatalog.class.getClassLoader();
+  }
+
+  public static void clearClassLoaderReferences() {
+    try {
+      Class<?> shutdownHooks = Class.forName("java.lang.ApplicationShutdownHooks");
+      Field hooksField = shutdownHooks.getDeclaredField("hooks");
+      hooksField.setAccessible(true);
+
+      IdentityHashMap<Thread, Thread> hooks =
+          (IdentityHashMap<Thread, Thread>) hooksField.get(null);
+
+      hooks
+          .entrySet()
+          .removeIf(
+              entry -> {
+                Thread thread = entry.getKey();
+                return thread.getContextClassLoader() == ClosableHiveCatalog.class.getClassLoader();
+              });
+    } catch (Exception e) {
+      throw new RuntimeException("Failed to clean shutdown hooks", e);
+    }
+  }
+
+  public static void releaseClassLoaderReferences(ClassLoader classLoader) {
+    try {
+      Class<?> logFactoryClass =
+          Class.forName("org.apache.htrace.shaded.commons.logging.LogFactory");
+
+      // 获取静态字段 thisClassLoader
+      Field thisClassLoaderField = logFactoryClass.getDeclaredField("thisClassLoader");
+      thisClassLoaderField.setAccessible(true);
+
+      // 如果当前被引用的就是我们要清理的类加载器
+      if (thisClassLoaderField.get(null) == classLoader) {
+        // 重置为系统类加载器
+        thisClassLoaderField.set(null, ClassLoader.getSystemClassLoader());
+      }
+
+      // 尝试清除工厂缓存
+      try {
+        Method release = logFactoryClass.getMethod("release", ClassLoader.class);
+        release.invoke(null, classLoader);
+      } catch (NoSuchMethodException e) {
+        // 旧版本可能没有此方法
+      }
+    } catch (Exception e) {
+      // 日志记录或处理异常
+    }
+  }
+
+  public static void releaseReference() {
+    try {
+
+      LogFactory.release(IcebergCatalogWrapper.class.getClassLoader());
+
+      Field cacheClass = FieldUtils.getDeclaredField(Configuration.class, "CACHE_CLASSES", true);
+      cacheClass.setAccessible(true);
+      Map<ClassLoader, Map<String, WeakReference<Class<?>>>> cacheClasses =
+          (Map<ClassLoader, Map<String, WeakReference<Class<?>>>>) cacheClass.get(null);
+      cacheClasses.clear();
+
+      //      Field field = Proxy.class.getDeclaredField("proxyClassCache");
+      //      Field modifiersField = Field.class.getDeclaredField("modifiers");
+      //      modifiersField.setAccessible(true);
+      //      modifiersField.setInt(field, field.getModifiers() & ~Modifier.FINAL);
+      //
+      //      field.setAccessible(true);
+      //      field.set(null, null);
+
+      Field f = FieldUtils.getDeclaredField(UserGroupInformation.class, "conf", true);
+      f.setAccessible(true);
+      f.set(null, null);
+
+      f = FieldUtils.getDeclaredField(UserGroupInformation.class, "loginUser", true);
+      f.setAccessible(true);
+      f.set(null, null);
+
+      f = FieldUtils.getDeclaredField(FileSystem.Statistics.class, "STATS_DATA_CLEANER", true);
+      f.setAccessible(true);
+      Thread t = (Thread) f.get(null);
+      t.interrupt();
+      t.join();
+      t.setContextClassLoader(null);
+
+      // Clear all service loader class loaded by this class loader
+      f = FieldUtils.getDeclaredField(SecurityUtil.class, "securityInfoProviders", true);
+      f.setAccessible(true);
+      ServiceLoader<SecurityInfo> securityInfoProviders = (ServiceLoader<SecurityInfo>) f.get(null);
+      securityInfoProviders.reload();
+      f.set(null, null);
+
+      cacheClass = FieldUtils.getDeclaredField(WritableComparator.class, "comparators", true);
+      cacheClass.setAccessible(true);
+      ConcurrentHashMap<Class, WritableComparator> value =
+          (ConcurrentHashMap<Class, WritableComparator>) cacheClass.get(null);
+      value.clear();
+
+    } catch (Exception e) {
+      // 日志记录或处理异常
+      LOG.warn("Failed to release references", e);
     }
   }
 
