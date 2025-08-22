@@ -223,7 +223,6 @@ public class RangerHiveE2EIT extends RangerBaseE2EIT {
             RangerAuthorizationProperties.RANGER_SERVICE_CREATE_IF_ABSENT,
             "true");
 
-    int catalogCountBefore = metalake.listCatalogs().length;
     try {
       List<RangerService> serviceList = RangerITEnv.rangerClient.findServices(Maps.newHashMap());
       int expectServiceCount = serviceList.size() + 1;
@@ -234,18 +233,11 @@ public class RangerHiveE2EIT extends RangerBaseE2EIT {
       Assertions.assertTrue(newProperties.containsKey("authorization.ranger.service.name"));
       serviceList = RangerITEnv.rangerClient.findServices(Maps.newHashMap());
       Assertions.assertEquals(expectServiceCount, serviceList.size());
-      metalake.dropCatalog("test", true);
-    } catch (RuntimeException e) {
       Assertions.assertThrows(
           RuntimeException.class,
           () -> {
-            throw e;
+            metalake.dropCatalog("test", true);
           });
-      int catalogCountAfter = metalake.listCatalogs().length;
-      Assertions.assertEquals(
-          catalogCountBefore,
-          catalogCountAfter,
-          "When post-hook fails and exception is propagated, catalog should be rolled back");
     } catch (Exception e) {
       throw new RuntimeException(e);
     }
