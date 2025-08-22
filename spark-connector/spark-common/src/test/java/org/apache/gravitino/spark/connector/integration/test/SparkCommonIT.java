@@ -184,7 +184,6 @@ public abstract class SparkCommonIT extends SparkEnvIT {
   }
 
   @Test
-  @EnabledIf("supportListTable")
   void testListTables() {
     String tableName = "t_list";
     dropTableIfExists(tableName);
@@ -384,7 +383,6 @@ public abstract class SparkCommonIT extends SparkEnvIT {
   }
 
   @Test
-  @EnabledIf("supportListTable")
   void testListTable() {
     String table1 = "list1";
     String table2 = "list2";
