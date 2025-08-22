@@ -21,9 +21,6 @@ import { defineConfig } from 'vitest/config'
 import { resolve } from 'path'
 
 export default defineConfig({
-  define: {
-    global: 'globalThis'
-  },
   test: {
     globals: true,
     environment: 'jsdom',
@@ -33,7 +30,17 @@ export default defineConfig({
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json', 'html'],
-      exclude: ['node_modules/', 'src/test/', '**/*.config.js', '**/*.d.ts', 'coverage/**']
+      exclude: [
+        'node_modules/',
+        'src/test/',
+        '**/*.config.js',
+        '**/*.d.ts',
+        'coverage/**',
+        '.next/**',
+        'src/app/**',
+        'src/components/**',
+        'src/lib/icons/**'
+      ]
     }
   },
   resolve: {

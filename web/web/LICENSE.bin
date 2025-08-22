@@ -290,7 +290,6 @@
    @mui/utils
    @mui/x-data-grid
    @mui/x-tree-view
-   @mswjs/interceptors
    @next/bundle-analyzer
    @next/env
    @next/eslint-plugin-next
@@ -558,7 +557,6 @@
    mlly
    mrmime
    ms
-   msw
    mz
    nanoid
    next

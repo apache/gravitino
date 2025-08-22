@@ -24,6 +24,18 @@ describe('OAuth Provider Factory', () => {
   let fetchMock
   let factory
 
+  // Common mock config
+  const oidcConfig = {
+    'gravitino.authenticator.oauth.provider': 'oidc',
+    'gravitino.authenticator.oauth.authority': 'https://test.example.com',
+    'gravitino.authenticator.oauth.clientId': 'test-client'
+  }
+
+  const mockSuccessResponse = config => ({
+    ok: true,
+    json: async () => config
+  })
+
   beforeEach(() => {
     vi.clearAllMocks()
 
@@ -41,15 +53,7 @@ describe('OAuth Provider Factory', () => {
 
   describe('getProvider', () => {
     it('should create OIDC provider when configured', async () => {
-      // Mock config response
-      fetchMock.mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({
-          'gravitino.authenticator.oauth.provider': 'oidc',
-          'gravitino.authenticator.oauth.authority': 'https://test.example.com',
-          'gravitino.authenticator.oauth.clientId': 'test-client'
-        })
-      })
+      fetchMock.mockResolvedValueOnce(mockSuccessResponse(oidcConfig))
 
       const provider = await factory.getProvider()
 
@@ -74,7 +78,6 @@ describe('OAuth Provider Factory', () => {
     })
 
     it('should return cached provider on subsequent calls', async () => {
-      // Mock config response
       fetchMock.mockResolvedValueOnce({
         ok: true,
         json: async () => ({
