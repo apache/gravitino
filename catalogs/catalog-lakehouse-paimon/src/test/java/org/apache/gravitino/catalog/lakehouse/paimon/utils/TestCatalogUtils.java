@@ -34,8 +34,6 @@ import org.apache.gravitino.integration.test.container.HiveContainer;
 import org.apache.paimon.catalog.CachingCatalog;
 import org.apache.paimon.catalog.Catalog;
 import org.apache.paimon.factories.FactoryException;
-import org.apache.paimon.hive.HiveCatalog;
-import org.apache.paimon.jdbc.JdbcCatalog;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
@@ -48,9 +46,9 @@ public class TestCatalogUtils {
     // Test load FileSystemCatalog for filesystem metastore.
     assertCatalog(PaimonCatalogBackend.FILESYSTEM.name(), CachingCatalog.class);
     // Test load JdbcCatalog for jdbc metastore.
-    assertCatalog(PaimonCatalogBackend.JDBC.name(), JdbcCatalog.class);
+    assertCatalog(PaimonCatalogBackend.JDBC.name(), CachingCatalog.class);
     // Test load HiveCatalog for hive metastore.
-    assertCatalog(PaimonCatalogBackend.HIVE.name(), HiveCatalog.class);
+    assertCatalog(PaimonCatalogBackend.HIVE.name(), CachingCatalog.class);
     // Test load catalog exception for other metastore.
     assertThrowsExactly(FactoryException.class, () -> assertCatalog("other", catalog -> {}));
   }

@@ -52,6 +52,7 @@ dependencies {
   compileOnly("org.apache.spark:spark-core_$scalaVersion:$sparkVersion")
   compileOnly("org.apache.spark:spark-sql_$scalaVersion:$sparkVersion")
   compileOnly("org.scala-lang.modules:scala-java8-compat_$scalaVersion:$scalaJava8CompatVersion")
+  compileOnly("org.scala-lang:scala-library:$scalaVersion")
 
   annotationProcessor(libs.lombok)
   compileOnly(libs.lombok)

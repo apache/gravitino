@@ -49,6 +49,7 @@ dependencies {
   compileOnly("org.apache.paimon:paimon-spark-$sparkMajorVersion:$paimonVersion") {
     exclude("org.apache.spark")
   }
+  compileOnly("org.scala-lang:scala-library:$scalaVersion")
 
   testImplementation(project(":api")) {
     exclude("org.apache.logging.log4j")

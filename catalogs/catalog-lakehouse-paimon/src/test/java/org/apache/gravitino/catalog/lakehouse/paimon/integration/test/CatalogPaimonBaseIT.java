@@ -656,6 +656,13 @@ public abstract class CatalogPaimonBaseIT extends BaseIT {
         .asTableCatalog()
         .alterTable(NameIdentifier.of(schemaName, tableName), TableChange.rename(alertTableName));
 
+    // enable alter column null to not null
+    catalog
+        .asTableCatalog()
+        .alterTable(
+            NameIdentifier.of(schemaName, tableName),
+            TableChange.setProperty("alter-column-null-to-not-null.disabled", "false"));
+
     // other operations.
     catalog
         .asTableCatalog()
@@ -663,7 +670,6 @@ public abstract class CatalogPaimonBaseIT extends BaseIT {
             NameIdentifier.of(schemaName, alertTableName),
             TableChange.updateComment(table_comment + "_new"),
             TableChange.setProperty("key2", "val2_new"),
-            TableChange.setProperty("alter-column-null-to-not-null.disabled", "false"),
             TableChange.removeProperty("key1"),
             TableChange.addColumn(
                 new String[] {"paimon_col_name5_for_add"}, Types.StringType.get()),
