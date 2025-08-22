@@ -218,9 +218,9 @@ public class GroupMetaService {
                   mapper ->
                       mapper.updateGroupMeta(
                           POConverters.updateGroupPOWithVersion(oldGroupPO, newEntity),
-                          oldGroupPO)), // 항상 그룹 메타데이터 업데이트
+                          oldGroupPO)),
           () -> {
-            if (!insertRoleIds.isEmpty()) { // 추가할 역할이 있을 때만 실행
+            if (!insertRoleIds.isEmpty()) {
               SessionUtils.doWithoutCommit(
                   GroupRoleRelMapper.class,
                   mapper ->
@@ -230,7 +230,7 @@ public class GroupMetaService {
             }
           },
           () -> {
-            if (!deleteRoleIds.isEmpty()) { // 삭제할 역할이 있을 때만 실행
+            if (!deleteRoleIds.isEmpty()) {
               SessionUtils.doWithoutCommit(
                   GroupRoleRelMapper.class,
                   mapper ->

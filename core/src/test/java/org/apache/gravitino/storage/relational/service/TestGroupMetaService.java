@@ -1036,19 +1036,17 @@ class TestGroupMetaService extends TestJDBCBackend {
             GroupEntity.builder()
                 .withNamespace(group.namespace())
                 .withId(group.id())
-                .withName("group_renamed") // 이름만 변경
+                .withName("group_renamed")
                 .withRoleNames(group.roleNames())
                 .withRoleIds(group.roleIds())
                 .withAuditInfo(group.auditInfo())
                 .build();
     groupMetaService.updateGroup(group1.nameIdentifier(), renameUpdater);
 
-    // 기존 이름으로는 찾을 수 없어야 함
     Assertions.assertThrows(
         NoSuchEntityException.class,
         () -> groupMetaService.getGroupByIdentifier(group1.nameIdentifier()));
 
-    // 새 이름으로는 찾을 수 있어야 함
     GroupEntity updated =
         groupMetaService.getGroupByIdentifier(
             AuthorizationUtils.ofGroup(metalakeName, "group_renamed"));
