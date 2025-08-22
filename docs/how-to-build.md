@@ -19,7 +19,7 @@ license: "This software is licensed under the Apache License version 2."
 :::info Please read the following notes before trying to build Gravitino.
 
 + Gravitino requires a minimum of JDK17 to run Gradle, so you need to install a JDK17 to launch the build environment.
-+ Gravitino itself supports using JDK 17 to build. The Gravitino Trino connector uses JDK17 to build (to avoid vendor-related issues on some platforms, Gravitino uses the specified Amazon Corretto OpenJDK 17 to build the Trino connector on macOS).
++ Gravitino itself supports using JDK 17 to build. The Gravitino Trino connector uses JDK17 to build (to avoid vendor-related issues on some platforms, It's recommended to use Amazon Corretto OpenJDK 17 to build Gravitino on macOS).
  You don't have to preinstall the specified JDK environment, as Gradle detects the JDK version needed and downloads it automatically.
 + Gravitino uses the Gradle Java Toolchain to detect and manage JDK versions, and it checks the installed JDK by running the `./gradlew javaToolchains` command. See [Gradle Java Toolchain](https://docs.gradle.org/current/userguide/toolchains.html#sec:java_toolchain).
 + Gravitino excludes all Docker-related tests by default. To run Docker-related tests, make sure you have installed Docker in your environment and either (1) set `skipDockerTests=false` in the `gradle.properties` file (or use `-PskipDockerTests=false` in the command) or (2) `export SKIP_DOCKER_TESTS=false` in the shell. Otherwise, all tests requiring Docker will be skipped.
