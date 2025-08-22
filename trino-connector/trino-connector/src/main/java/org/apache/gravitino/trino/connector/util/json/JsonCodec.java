@@ -36,6 +36,7 @@ import io.trino.spi.block.Block;
 import io.trino.spi.block.BlockEncodingSerde;
 import io.trino.spi.connector.ColumnHandle;
 import io.trino.spi.connector.ConnectorInsertTableHandle;
+import io.trino.spi.connector.ConnectorMergeTableHandle;
 import io.trino.spi.connector.ConnectorSplit;
 import io.trino.spi.connector.ConnectorTableHandle;
 import io.trino.spi.connector.ConnectorTransactionHandle;
@@ -161,6 +162,10 @@ public class JsonCodec {
     objectMapper.registerModule(
         new AbstractTypedJacksonModule<>(
             ConnectorInsertTableHandle.class, nameResolver, classResolver) {});
+
+    objectMapper.registerModule(
+        new AbstractTypedJacksonModule<>(
+            ConnectorMergeTableHandle.class, nameResolver, classResolver) {});
   }
 
   @SuppressWarnings("deprecation")

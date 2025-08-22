@@ -1,0 +1,48 @@
+-- Test MERGE operations for Iceberg tables
+-- Tests UPDATE/DELETE/INSERT functionality through MERGE statements
+
+-- Create source table for merge operations
+CREATE TABLE gt_iceberg.gt_db.merge_source (
+    id INTEGER,
+    name VARCHAR(100),
+    status VARCHAR(50),
+    updated_at TIMESTAMP
+);
+
+-- Create target table for merge operations  
+CREATE TABLE gt_iceberg.gt_db.merge_target (
+    id INTEGER,
+    name VARCHAR(100),
+    status VARCHAR(50),
+    updated_at TIMESTAMP
+);
+
+-- Insert test data into source
+INSERT INTO gt_iceberg.gt_db.merge_source VALUES
+(1, 'John Doe', 'active', TIMESTAMP '2024-01-01 10:00:00'),
+(2, 'Jane Smith', 'active', TIMESTAMP '2024-01-02 11:00:00'),
+(3, 'Bob Johnson', 'inactive', TIMESTAMP '2024-01-03 12:00:00');
+
+-- Insert test data into target  
+INSERT INTO gt_iceberg.gt_db.merge_target VALUES
+(1, 'John Doe Old', 'inactive', TIMESTAMP '2023-12-01 10:00:00'),
+(2, 'Jane Smith Old', 'inactive', TIMESTAMP '2023-12-02 11:00:00'),
+(4, 'Alice Brown', 'active', TIMESTAMP '2023-12-04 13:00:00');
+
+-- Test MERGE operation with UPDATE, DELETE, and INSERT
+MERGE INTO gt_iceberg.gt_db.merge_target t
+USING gt_iceberg.gt_db.merge_source s
+ON (t.id = s.id)
+WHEN MATCHED AND s.status = 'active' THEN
+  UPDATE SET name = s.name, status = s.status, updated_at = s.updated_at
+WHEN MATCHED AND s.status = 'inactive' THEN
+  DELETE
+WHEN NOT MATCHED THEN
+  INSERT (id, name, status, updated_at) VALUES (s.id, s.name, s.status, s.updated_at);
+
+-- Verify results
+SELECT * FROM gt_iceberg.gt_db.merge_target ORDER BY id;
+
+-- Clean up
+DROP TABLE gt_iceberg.gt_db.merge_source;
+DROP TABLE gt_iceberg.gt_db.merge_target;
