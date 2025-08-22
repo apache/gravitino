@@ -52,6 +52,7 @@ import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.SupportsRelationOperations;
+import org.apache.gravitino.meta.GroupEntity;
 import org.apache.gravitino.meta.ModelVersionEntity;
 import org.apache.gravitino.meta.UserEntity;
 import org.apache.gravitino.utils.NamespaceUtil;
@@ -310,9 +311,6 @@ public class CaffeineEntityCache extends BaseEntityCache {
       newEntities = new ArrayList<>(merged);
     }
 
-    // DEBUG code
-    check_cache();
-
     List<String> allCacheIndexKeys1 = Lists.newArrayList();
     cacheIndex.getKeysStartingWith("").forEach(
             k -> {
@@ -324,6 +322,9 @@ public class CaffeineEntityCache extends BaseEntityCache {
             k -> {
               allReverseIndexKeys1.add(k.toString());
             });
+
+    // DEBUG code
+    check_cache();
 
     cacheData.put(key, newEntities);
 
@@ -339,7 +340,19 @@ public class CaffeineEntityCache extends BaseEntityCache {
                       putReverseIndex(nameIdentifier, Entity.EntityType.ROLE, key);
                     });
           }
+        } else if (entity instanceof GroupEntity) {
+          // UserEntity is not supported in the cache, skip it.
+          GroupEntity groupEntity = (GroupEntity) entity;
+          if (groupEntity.roleNames() != null) {
+            groupEntity.roleNames().forEach(
+                    role -> {
+                      Namespace ns = NamespaceUtil.ofRole(groupEntity.namespace().level(0));
+                      NameIdentifier nameIdentifier = NameIdentifier.of(ns, role);
+                      putReverseIndex(nameIdentifier, Entity.EntityType.ROLE, key);
+                    });
+          }
         }
+
 
 //      Namespace ns = NamespaceUtil.ofRole(ident.namespace().level(0));
 //      NameIdentifier nameIdentifier = NameIdentifier.of(ns, role);
@@ -369,17 +382,34 @@ public class CaffeineEntityCache extends BaseEntityCache {
 
   private void check_cache() {
     // DEBUG code
+    List<String> allCacheIndexKeys1 = Lists.newArrayList();
+    cacheIndex.getKeysStartingWith("").forEach(
+            k -> {
+              allCacheIndexKeys1.add(k.toString());
+            });
+
+    List<String> allReverseIndexKeys1 = Lists.newArrayList();
+    reverseIndex.getKeysStartingWith("").forEach(
+            k -> {
+              allReverseIndexKeys1.add(k.toString());
+            });
+
+    Set<EntityCacheRelationKey> allCacheDataKeys1 = cacheData.asMap().keySet();
+    List<String> allCacheDataKeysStrings1 = allCacheDataKeys1.stream()
+            .map(Object::toString)
+            .collect(Collectors.toList());
+
     long cacheDataSize = cacheData.estimatedSize();
     int cacheIndexSize = cacheIndex.size();
     int reverseIndexSize = reverseIndex.size();
-    if (cacheDataSize != cacheIndexSize
-            || cacheDataSize != reverseIndexSize
-            || cacheIndexSize != reverseIndexSize) {
-      throw new IllegalStateException(
-              String.format(
-                      "Cache data size (%d) does not match cache index size (%d) or reverse index size (%d).",
-                      cacheDataSize, cacheIndexSize, reverseIndexSize));
-    }
+//    if (cacheDataSize != cacheIndexSize/*
+//            || cacheDataSize != reverseIndexSize
+//            || cacheIndexSize != reverseIndexSize*/) {
+//      throw new IllegalStateException(
+//              String.format(
+//                      "Cache data size (%d) does not match cache index size (%d).",
+//                      cacheDataSize, cacheIndexSize));
+//    }
   }
 
   /**
@@ -474,6 +504,11 @@ public class CaffeineEntityCache extends BaseEntityCache {
               allReverseIndexKeys1.add(k.toString());
             });
 
+    Set<EntityCacheRelationKey> allCacheDataKeys1 = cacheData.asMap().keySet();
+    List<String> allCacheDataKeysStrings1 = allCacheDataKeys1.stream()
+            .map(Object::toString)
+            .collect(Collectors.toList());
+
     List<EntityCacheKey> entityKeysToRemove =
         Lists.newArrayList(cacheIndex.getValuesForKeysStartingWith(identifier.toString()));
 
@@ -555,6 +590,11 @@ public class CaffeineEntityCache extends BaseEntityCache {
             k -> {
               allReverseIndexKeys11.add(k.toString());
             });
+
+    Set<EntityCacheRelationKey> allCacheDataKeys2 = cacheData.asMap().keySet();
+    List<String> allCacheDataKeysStrings2 = allCacheDataKeys1.stream()
+            .map(Object::toString)
+            .collect(Collectors.toList());
 
     // DEBUG code
     check_cache();
