@@ -90,7 +90,7 @@ public class OwnerDetails extends Command {
 
   @Override
   public Command validate() {
-    if( entityType == null ) exitWithError(ErrorMessages.UNKNOWN_ENTITY);
+    if (entityType == null) exitWithError(ErrorMessages.UNKNOWN_ENTITY);
     return this;
   }
 }
