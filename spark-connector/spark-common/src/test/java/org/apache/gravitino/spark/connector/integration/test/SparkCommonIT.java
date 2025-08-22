@@ -125,10 +125,6 @@ public abstract class SparkCommonIT extends SparkEnvIT {
 
   protected abstract boolean supportsUpdateColumnPosition();
 
-  // @todo temporarily added for: https://github.com/apache/gravitino/issues/6907, should be removed
-  // after the issue is addressed
-  protected abstract boolean supportListTable();
-
   protected boolean supportsCreateTableWithComment() {
     return true;
   }
