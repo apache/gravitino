@@ -537,6 +537,17 @@ public abstract class BaseGVFSOperations implements Closeable {
     return filesetCatalogCache.getFilesetCatalog(catalogIdent);
   }
 
+  /**
+   * Get the fileset by the fileset identifier from the cache. If the subclass does not want to use
+   * the cache, it can override this method.
+   *
+   * @param filesetIdent the fileset identifier.
+   * @return the fileset.
+   */
+  protected Fileset getFileset(NameIdentifier filesetIdent) {
+    return filesetCatalogCache.getFileset(filesetIdent);
+  }
+
   @VisibleForTesting
   Cache<Pair<NameIdentifier, String>, FileSystem> internalFileSystemCache() {
     return internalFileSystemCache;
@@ -660,13 +671,6 @@ public abstract class BaseGVFSOperations implements Closeable {
     } catch (Exception e) {
       throw new RuntimeException(e);
     }
-  }
-
-  private Fileset getFileset(NameIdentifier filesetIdent) {
-    NameIdentifier catalogIdent =
-        NameIdentifier.of(filesetIdent.namespace().level(0), filesetIdent.namespace().level(1));
-    return getFilesetCatalog(catalogIdent)
-        .loadFileset(NameIdentifier.of(filesetIdent.namespace().level(2), filesetIdent.name()));
   }
 
   private Cache<Pair<NameIdentifier, String>, FileSystem> newFileSystemCache(
