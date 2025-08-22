@@ -210,9 +210,6 @@ public class GroupMetaService {
     Set<Long> insertRoleIds = Sets.difference(newRoleIds, oldRoleIds);
     Set<Long> deleteRoleIds = Sets.difference(oldRoleIds, newRoleIds);
 
-    if (insertRoleIds.isEmpty() && deleteRoleIds.isEmpty()) {
-      return newEntity;
-    }
     try {
       SessionUtils.doMultipleWithCommit(
           () ->
@@ -221,27 +218,25 @@ public class GroupMetaService {
                   mapper ->
                       mapper.updateGroupMeta(
                           POConverters.updateGroupPOWithVersion(oldGroupPO, newEntity),
-                          oldGroupPO)),
+                          oldGroupPO)), // 항상 그룹 메타데이터 업데이트
           () -> {
-            if (insertRoleIds.isEmpty()) {
-              return;
+            if (!insertRoleIds.isEmpty()) { // 추가할 역할이 있을 때만 실행
+              SessionUtils.doWithoutCommit(
+                  GroupRoleRelMapper.class,
+                  mapper ->
+                      mapper.batchInsertGroupRoleRel(
+                          POConverters.initializeGroupRoleRelsPOWithVersion(
+                              newEntity, Lists.newArrayList(insertRoleIds))));
             }
-            SessionUtils.doWithoutCommit(
-                GroupRoleRelMapper.class,
-                mapper ->
-                    mapper.batchInsertGroupRoleRel(
-                        POConverters.initializeGroupRoleRelsPOWithVersion(
-                            newEntity, Lists.newArrayList(insertRoleIds))));
           },
           () -> {
-            if (deleteRoleIds.isEmpty()) {
-              return;
+            if (!deleteRoleIds.isEmpty()) { // 삭제할 역할이 있을 때만 실행
+              SessionUtils.doWithoutCommit(
+                  GroupRoleRelMapper.class,
+                  mapper ->
+                      mapper.softDeleteGroupRoleRelByGroupAndRoles(
+                          newEntity.id(), Lists.newArrayList(deleteRoleIds)));
             }
-            SessionUtils.doWithoutCommit(
-                GroupRoleRelMapper.class,
-                mapper ->
-                    mapper.softDeleteGroupRoleRelByGroupAndRoles(
-                        newEntity.id(), Lists.newArrayList(deleteRoleIds)));
           });
     } catch (RuntimeException re) {
       ExceptionUtils.checkSQLException(
