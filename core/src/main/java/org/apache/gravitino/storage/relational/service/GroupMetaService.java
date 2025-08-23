@@ -210,9 +210,6 @@ public class GroupMetaService {
     Set<Long> insertRoleIds = Sets.difference(newRoleIds, oldRoleIds);
     Set<Long> deleteRoleIds = Sets.difference(oldRoleIds, newRoleIds);
 
-    if (insertRoleIds.isEmpty() && deleteRoleIds.isEmpty()) {
-      return newEntity;
-    }
     try {
       SessionUtils.doMultipleWithCommit(
           () ->
@@ -223,25 +220,23 @@ public class GroupMetaService {
                           POConverters.updateGroupPOWithVersion(oldGroupPO, newEntity),
                           oldGroupPO)),
           () -> {
-            if (insertRoleIds.isEmpty()) {
-              return;
+            if (!insertRoleIds.isEmpty()) {
+              SessionUtils.doWithoutCommit(
+                  GroupRoleRelMapper.class,
+                  mapper ->
+                      mapper.batchInsertGroupRoleRel(
+                          POConverters.initializeGroupRoleRelsPOWithVersion(
+                              newEntity, Lists.newArrayList(insertRoleIds))));
             }
-            SessionUtils.doWithoutCommit(
-                GroupRoleRelMapper.class,
-                mapper ->
-                    mapper.batchInsertGroupRoleRel(
-                        POConverters.initializeGroupRoleRelsPOWithVersion(
-                            newEntity, Lists.newArrayList(insertRoleIds))));
           },
           () -> {
-            if (deleteRoleIds.isEmpty()) {
-              return;
+            if (!deleteRoleIds.isEmpty()) {
+              SessionUtils.doWithoutCommit(
+                  GroupRoleRelMapper.class,
+                  mapper ->
+                      mapper.softDeleteGroupRoleRelByGroupAndRoles(
+                          newEntity.id(), Lists.newArrayList(deleteRoleIds)));
             }
-            SessionUtils.doWithoutCommit(
-                GroupRoleRelMapper.class,
-                mapper ->
-                    mapper.softDeleteGroupRoleRelByGroupAndRoles(
-                        newEntity.id(), Lists.newArrayList(deleteRoleIds)));
           });
     } catch (RuntimeException re) {
       ExceptionUtils.checkSQLException(
