@@ -675,7 +675,7 @@ class TestGroupMetaService extends TestJDBCBackend {
     Assertions.assertEquals(
         Sets.newHashSet(role1.id(), role4.id()), Sets.newHashSet(noUpdaterGroup.roleIds()));
     Assertions.assertEquals("creator", noUpdaterGroup.auditInfo().creator());
-    Assertions.assertEquals("grantRevokeUser", noUpdaterGroup.auditInfo().lastModifier());
+    Assertions.assertEquals("noUpdateUser", noUpdaterGroup.auditInfo().lastModifier());
 
     // Delete a role, the group entity won't contain this role.
     RoleMetaService.getInstance().deleteRole(role1.nameIdentifier());

@@ -184,7 +184,6 @@ public class GroupMetaService {
   public <E extends Entity & HasIdentifier> GroupEntity updateGroup(
       NameIdentifier identifier, Function<E, E> updater) throws IOException {
     AuthorizationUtils.checkGroup(identifier);
-
     Long metalakeId =
         MetalakeMetaService.getInstance().getMetalakeIdByName(identifier.namespace().level(0));
     GroupPO oldGroupPO = getGroupPOByMetalakeIdAndName(metalakeId, identifier.name());
@@ -192,21 +191,18 @@ public class GroupMetaService {
         RoleMetaService.getInstance().listRolesByGroupId(oldGroupPO.getGroupId());
     GroupEntity oldGroupEntity =
         POConverters.fromGroupPO(oldGroupPO, rolePOs, identifier.namespace());
-
     GroupEntity newEntity = (GroupEntity) updater.apply((E) oldGroupEntity);
     Preconditions.checkArgument(
         Objects.equals(oldGroupEntity.id(), newEntity.id()),
         "The updated group entity id: %s should be same with the group entity id before: %s",
         newEntity.id(),
         oldGroupEntity.id());
-
     Set<Long> oldRoleIds =
         oldGroupEntity.roleIds() == null
             ? Sets.newHashSet()
             : Sets.newHashSet(oldGroupEntity.roleIds());
     Set<Long> newRoleIds =
         newEntity.roleIds() == null ? Sets.newHashSet() : Sets.newHashSet(newEntity.roleIds());
-
     Set<Long> insertRoleIds = Sets.difference(newRoleIds, oldRoleIds);
     Set<Long> deleteRoleIds = Sets.difference(oldRoleIds, newRoleIds);
 
@@ -243,7 +239,10 @@ public class GroupMetaService {
           re, Entity.EntityType.GROUP, newEntity.nameIdentifier().toString());
       throw re;
     }
-    return newEntity;
+    GroupPO updatedGroupPO = getGroupPOByMetalakeIdAndName(metalakeId, newEntity.name());
+    List<RolePO> updatedRolePOs =
+        RoleMetaService.getInstance().listRolesByGroupId(updatedGroupPO.getGroupId());
+    return POConverters.fromGroupPO(updatedGroupPO, updatedRolePOs, identifier.namespace());
   }
 
   public List<GroupEntity> listGroupsByNamespace(Namespace namespace, boolean allFields) {
