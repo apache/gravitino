@@ -194,3 +194,27 @@ class TestPartitioningSerdes(unittest.TestCase):
 
         serialized = PartitioningSerdes.serialize(deserialized)
         self.assertDictEqual(expected_serialized, serialized)
+
+    def test_serdes_truncate_partitioning_dto(self):
+        field_name = ["score"]
+        json_string = f"""
+        {{
+            "{PartitioningSerdes.STRATEGY}": "{Partitioning.Strategy.TRUNCATE.value}",
+            "{PartitioningSerdes.WIDTH}": 20,
+            "{PartitioningSerdes.FIELD_NAME}": {json.dumps(field_name)}
+        }}
+        """
+
+        expected_serialized = json.loads(json_string)
+        deserialized = PartitioningSerdes.deserialize(expected_serialized)
+
+        self.assertEqual(
+            Partitioning.Strategy.TRUNCATE.name.lower(), deserialized.name()
+        )
+        self.assertEqual(
+            Partitioning.Strategy.TRUNCATE.value, deserialized.strategy().value
+        )
+        self.assertListEqual(field_name, deserialized.field_name())
+
+        serialized = PartitioningSerdes.serialize(deserialized)
+        self.assertDictEqual(expected_serialized, serialized)
