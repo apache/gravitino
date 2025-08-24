@@ -172,3 +172,25 @@ class TestPartitioningSerdes(unittest.TestCase):
             self.assertListEqual(
                 partitioning_dto.field_name(), deserialized.field_name()
             )
+
+    def test_serdes_bucket_partitioning_dto(self):
+        field_names = [["score"]]
+        json_string = f"""
+        {{
+            "{PartitioningSerdes.STRATEGY}": "{Partitioning.Strategy.BUCKET.value}",
+            "{PartitioningSerdes.NUM_BUCKETS}": 10,
+            "{PartitioningSerdes.FIELD_NAMES}": {json.dumps(field_names)}
+        }}
+        """
+
+        expected_serialized = json.loads(json_string)
+        deserialized = PartitioningSerdes.deserialize(expected_serialized)
+
+        self.assertEqual(Partitioning.Strategy.BUCKET.name.lower(), deserialized.name())
+        self.assertEqual(
+            Partitioning.Strategy.BUCKET.value, deserialized.strategy().value
+        )
+        self.assertListEqual(field_names, deserialized.field_names())
+
+        serialized = PartitioningSerdes.serialize(deserialized)
+        self.assertDictEqual(expected_serialized, serialized)
