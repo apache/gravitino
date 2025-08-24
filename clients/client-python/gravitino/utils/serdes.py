@@ -59,6 +59,10 @@ class SerdesUtilsBase:
     LIST_PARTITION_LISTS: Final[str] = "lists"
     RANGE_PARTITION_UPPER: Final[str] = "upper"
     RANGE_PARTITION_LOWER: Final[str] = "lower"
+    STRATEGY: Final[str] = "strategy"
+    NUM_BUCKETS: Final[str] = "numBuckets"
+    WIDTH: Final[str] = "width"
+    ASSIGNMENTS_NAME: Final[str] = "assignments"
 
     NON_PRIMITIVE_TYPES: Final[Set[Name]] = {
         Name.STRUCT,
