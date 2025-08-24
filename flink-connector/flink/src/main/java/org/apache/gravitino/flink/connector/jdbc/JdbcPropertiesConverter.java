@@ -48,6 +48,9 @@ public abstract class JdbcPropertiesConverter implements PropertiesConverter {
     Map<String, String> flinkCatalogProperties =
         PropertiesConverter.super.toFlinkCatalogProperties(gravitinoProperties);
     String gravitinoJdbcUrl = gravitinoProperties.get(JdbcPropertiesConstants.GRAVITINO_JDBC_URL);
+    Preconditions.checkArgument(
+        gravitinoJdbcUrl != null, "Cannot create a catalog properties with null jdbc-url");
+
     // The URL in FlinkJdbcCatalog does not support database and other parameters.
     flinkCatalogProperties.put(
         JdbcPropertiesConstants.FLINK_JDBC_URL, getBaseUrlFromJdbcUrl(gravitinoJdbcUrl));
