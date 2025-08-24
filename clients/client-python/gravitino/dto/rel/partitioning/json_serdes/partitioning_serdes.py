@@ -33,6 +33,9 @@ from gravitino.dto.rel.partitioning.partitioning import (
     Partitioning,
     SingleFieldPartitioning,
 )
+from gravitino.dto.rel.partitioning.truncate_partitioning_dto import (
+    TruncatePartitioningDTO,
+)
 from gravitino.dto.rel.partitioning.year_partitioning_dto import YearPartitioningDTO
 from gravitino.utils.precondition import Precondition
 from gravitino.utils.serdes import SerdesUtilsBase
@@ -78,6 +81,13 @@ class PartitioningSerdes(SerdesUtilsBase, JsonSerializable[Partitioning]):
                 cls.NUM_BUCKETS: partitioning.num_buckets(),
                 cls.FIELD_NAMES: partitioning.field_names(),
             }
+        if strategy is Partitioning.Strategy.TRUNCATE:
+            partitioning = cast(TruncatePartitioningDTO, data_type)
+            return {
+                **result,
+                cls.WIDTH: partitioning.width(),
+                cls.FIELD_NAME: partitioning.field_name(),
+            }
 
         raise IOError(f"Unknown partitioning strategy: {strategy}")
 
@@ -103,5 +113,10 @@ class PartitioningSerdes(SerdesUtilsBase, JsonSerializable[Partitioning]):
             return BucketPartitioningDTO(
                 int(data[cls.NUM_BUCKETS]),
                 *data.get(cls.FIELD_NAMES, []),
+            )
+        if strategy is Partitioning.Strategy.TRUNCATE:
+            return TruncatePartitioningDTO(
+                int(data[cls.WIDTH]),
+                data.get(cls.FIELD_NAME, []),
             )
         raise IOError(f"Unknown partitioning strategy: {data[cls.STRATEGY]}")
