@@ -146,7 +146,8 @@ public class GravitinoConnector implements Connector {
 
   @Override
   public void commit(ConnectorTransactionHandle transactionHandle) {
-    GravitinoTransactionHandle gravitinoTransactionHandle = (GravitinoTransactionHandle) transactionHandle;
+    GravitinoTransactionHandle gravitinoTransactionHandle =
+        (GravitinoTransactionHandle) transactionHandle;
     Connector internalConnector = catalogConnectorContext.getInternalConnector();
     internalConnector.commit(gravitinoTransactionHandle.getInternalHandle());
   }
