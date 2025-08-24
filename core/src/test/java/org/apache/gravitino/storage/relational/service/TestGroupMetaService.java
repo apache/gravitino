@@ -1012,4 +1012,44 @@ class TestGroupMetaService extends TestJDBCBackend {
     }
     return count;
   }
+
+  @Test
+  void updateGroupWithoutRoleChange() throws IOException {
+    AuditInfo auditInfo =
+        AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
+    BaseMetalake metalake =
+        createBaseMakeLake(RandomIdGenerator.INSTANCE.nextId(), metalakeName, auditInfo);
+    backend.insert(metalake, false);
+
+    GroupMetaService groupMetaService = GroupMetaService.getInstance();
+
+    GroupEntity group1 =
+        createGroupEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofGroupNamespace(metalakeName),
+            "group1",
+            auditInfo);
+    groupMetaService.insertGroup(group1, false);
+
+    Function<GroupEntity, GroupEntity> renameUpdater =
+        group ->
+            GroupEntity.builder()
+                .withNamespace(group.namespace())
+                .withId(group.id())
+                .withName("group_renamed")
+                .withRoleNames(group.roleNames())
+                .withRoleIds(group.roleIds())
+                .withAuditInfo(group.auditInfo())
+                .build();
+    groupMetaService.updateGroup(group1.nameIdentifier(), renameUpdater);
+
+    Assertions.assertThrows(
+        NoSuchEntityException.class,
+        () -> groupMetaService.getGroupByIdentifier(group1.nameIdentifier()));
+
+    GroupEntity updated =
+        groupMetaService.getGroupByIdentifier(
+            AuthorizationUtils.ofGroup(metalakeName, "group_renamed"));
+    Assertions.assertEquals("group_renamed", updated.name());
+  }
 }
