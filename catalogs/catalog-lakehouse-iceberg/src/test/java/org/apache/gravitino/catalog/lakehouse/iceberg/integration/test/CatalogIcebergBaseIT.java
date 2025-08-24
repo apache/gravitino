@@ -548,9 +548,7 @@ public abstract class CatalogIcebergBaseIT extends BaseIT {
   }
 
   private void assertPartitioningAndSortOrder(
-      Transform[] expectedPartitioning,
-      SortOrder[] expectedSortOrders,
-      Table actualTable) {
+      Transform[] expectedPartitioning, SortOrder[] expectedSortOrders, Table actualTable) {
     Assertions.assertArrayEquals(expectedPartitioning, actualTable.partitioning());
     Assertions.assertEquals(expectedSortOrders.length, actualTable.sortOrder().length);
     for (int i = 0; i < expectedSortOrders.length; i++) {
