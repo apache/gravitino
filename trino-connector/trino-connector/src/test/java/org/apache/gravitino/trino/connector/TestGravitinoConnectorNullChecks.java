@@ -19,10 +19,12 @@
 package org.apache.gravitino.trino.connector;
 
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.mockito.Mockito.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 import io.trino.spi.connector.Connector;
-import io.trino.spi.connector.ConnectorTransactionHandle;
 import io.trino.spi.transaction.IsolationLevel;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.trino.connector.catalog.CatalogConnectorContext;
