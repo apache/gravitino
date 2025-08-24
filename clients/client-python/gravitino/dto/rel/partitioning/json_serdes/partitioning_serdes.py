@@ -20,6 +20,9 @@ from types import MappingProxyType
 from typing import Any, Dict, Final, cast
 
 from gravitino.api.types.json_serdes.base import JsonSerializable
+from gravitino.dto.rel.partitioning.bucket_partitioning_dto import (
+    BucketPartitioningDTO,
+)
 from gravitino.dto.rel.partitioning.day_partitioning_dto import DayPartitioningDTO
 from gravitino.dto.rel.partitioning.hour_partitioning_dto import HourPartitioningDTO
 from gravitino.dto.rel.partitioning.identity_partitioning_dto import (
@@ -68,6 +71,13 @@ class PartitioningSerdes(SerdesUtilsBase, JsonSerializable[Partitioning]):
         if strategy in cls._SINGLE_FIELD_PARTITIONING:
             partitioning = cast(SingleFieldPartitioning, data_type)
             return {**result, cls.FIELD_NAME: partitioning.field_name()}
+        if strategy is Partitioning.Strategy.BUCKET:
+            partitioning = cast(BucketPartitioningDTO, data_type)
+            return {
+                **result,
+                cls.NUM_BUCKETS: partitioning.num_buckets(),
+                cls.FIELD_NAMES: partitioning.field_names(),
+            }
 
         raise IOError(f"Unknown partitioning strategy: {strategy}")
 
@@ -89,5 +99,9 @@ class PartitioningSerdes(SerdesUtilsBase, JsonSerializable[Partitioning]):
             return cls._SINGLE_FIELD_PARTITIONING[strategy](
                 *data.get(cls.FIELD_NAME, [])
             )
-
+        if strategy is Partitioning.Strategy.BUCKET:
+            return BucketPartitioningDTO(
+                int(data[cls.NUM_BUCKETS]),
+                *data.get(cls.FIELD_NAMES, []),
+            )
         raise IOError(f"Unknown partitioning strategy: {data[cls.STRATEGY]}")
