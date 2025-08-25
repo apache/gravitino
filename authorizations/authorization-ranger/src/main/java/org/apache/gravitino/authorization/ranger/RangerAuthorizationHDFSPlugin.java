@@ -293,14 +293,14 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
    */
   @Override
   protected void removeMetadataObject(AuthorizationMetadataObject authzMetadataObject) {
-    if (authzMetadataObject.metadataObjectType() == MetadataObject.Type.SCHEMA) {
+    if (authzMetadataObject.metadataObjectType().equals(MetadataObject.Type.SCHEMA)) {
       removeSchemaMetadataObject(authzMetadataObject);
-    } else if (authzMetadataObject.metadataObjectType() == MetadataObject.Type.TABLE) {
+    } else if (authzMetadataObject.metadataObjectType().equals(MetadataObject.Type.TABLE)) {
       removeTableMetadataObject(authzMetadataObject);
-    } else if (authzMetadataObject.metadataObjectType() == MetadataObject.Type.FILESET) {
+    } else if (authzMetadataObject.metadataObjectType().equals(MetadataObject.Type.FILESET)) {
       removePolicyByMetadataObject(authzMetadataObject);
-    } else if (authzMetadataObject.metadataObjectType() == MetadataObject.Type.METALAKE
-        || authzMetadataObject.metadataObjectType() == MetadataObject.Type.CATALOG) {
+    } else if (authzMetadataObject.metadataObjectType().equals(MetadataObject.Type.METALAKE)
+        || authzMetadataObject.metadataObjectType().equals(MetadataObject.Type.CATALOG)) {
       // Do nothing
     } else {
       throw new IllegalArgumentException(

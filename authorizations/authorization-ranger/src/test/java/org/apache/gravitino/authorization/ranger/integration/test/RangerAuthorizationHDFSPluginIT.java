@@ -328,4 +328,156 @@ public class RangerAuthorizationHDFSPluginIT {
               });
         });
   }
+
+  @Test
+  public void testRemoveMetadataObject() {
+    withMockedAuthorizationUtils(
+        () -> {
+          // Test SCHEMA type removal
+          PathBasedMetadataObject schemaObject =
+              new PathBasedMetadataObject(
+                  "catalog1",
+                  "schema1",
+                  "/test/schema1",
+                  PathBasedMetadataObject.PathType.get(MetadataObject.Type.SCHEMA));
+
+          Assertions.assertDoesNotThrow(
+              () -> {
+                try {
+                  java.lang.reflect.Method removeMethod =
+                      RangerAuthorizationPlugin.class.getDeclaredMethod(
+                          "removeMetadataObject",
+                          org.apache.gravitino.authorization.AuthorizationMetadataObject.class);
+                  removeMethod.setAccessible(true);
+                  removeMethod.invoke(rangerAuthPlugin, schemaObject);
+                } catch (Exception e) {
+                  Assertions.assertTrue(e.getCause() instanceof RuntimeException);
+                }
+              });
+
+          // Test TABLE type removal
+          PathBasedMetadataObject tableObject =
+              new PathBasedMetadataObject(
+                  "catalog1.schema1",
+                  "table1",
+                  "/test/schema1/table1",
+                  PathBasedMetadataObject.PathType.get(MetadataObject.Type.TABLE));
+
+          Assertions.assertDoesNotThrow(
+              () -> {
+                try {
+                  java.lang.reflect.Method removeMethod =
+                      RangerAuthorizationPlugin.class.getDeclaredMethod(
+                          "removeMetadataObject",
+                          org.apache.gravitino.authorization.AuthorizationMetadataObject.class);
+                  removeMethod.setAccessible(true);
+                  removeMethod.invoke(rangerAuthPlugin, tableObject);
+                } catch (Exception e) {
+                  Assertions.assertTrue(e.getCause() instanceof RuntimeException);
+                }
+              });
+
+          // Test FILESET type removal
+          PathBasedMetadataObject filesetObject =
+              new PathBasedMetadataObject(
+                  "catalog1.schema1",
+                  "fileset1",
+                  "/test/schema1/fileset1",
+                  PathBasedMetadataObject.PathType.get(MetadataObject.Type.FILESET));
+
+          Assertions.assertDoesNotThrow(
+              () -> {
+                try {
+                  java.lang.reflect.Method removeMethod =
+                      RangerAuthorizationPlugin.class.getDeclaredMethod(
+                          "removeMetadataObject",
+                          org.apache.gravitino.authorization.AuthorizationMetadataObject.class);
+                  removeMethod.setAccessible(true);
+                  removeMethod.invoke(rangerAuthPlugin, filesetObject);
+                } catch (Exception e) {
+                  Assertions.assertTrue(e.getCause() instanceof RuntimeException);
+                }
+              });
+
+          // Test METALAKE type (should do nothing)
+          PathBasedMetadataObject metalakeObject =
+              new PathBasedMetadataObject(
+                  "",
+                  "metalake1",
+                  "/test",
+                  PathBasedMetadataObject.PathType.get(MetadataObject.Type.METALAKE));
+
+          Assertions.assertDoesNotThrow(
+              () -> {
+                try {
+                  java.lang.reflect.Method removeMethod =
+                      RangerAuthorizationPlugin.class.getDeclaredMethod(
+                          "removeMetadataObject",
+                          org.apache.gravitino.authorization.AuthorizationMetadataObject.class);
+                  removeMethod.setAccessible(true);
+                  removeMethod.invoke(rangerAuthPlugin, metalakeObject);
+                } catch (Exception e) {
+                  Assertions.assertTrue(e.getCause() instanceof RuntimeException);
+                }
+              });
+
+          // Test CATALOG type (should do nothing)
+          PathBasedMetadataObject catalogObject =
+              new PathBasedMetadataObject(
+                  "metalake1",
+                  "catalog1",
+                  "/test",
+                  PathBasedMetadataObject.PathType.get(MetadataObject.Type.CATALOG));
+
+          Assertions.assertDoesNotThrow(
+              () -> {
+                try {
+                  java.lang.reflect.Method removeMethod =
+                      RangerAuthorizationPlugin.class.getDeclaredMethod(
+                          "removeMetadataObject",
+                          org.apache.gravitino.authorization.AuthorizationMetadataObject.class);
+                  removeMethod.setAccessible(true);
+                  removeMethod.invoke(rangerAuthPlugin, catalogObject);
+                } catch (Exception e) {
+                  Assertions.assertTrue(e.getCause() instanceof RuntimeException);
+                }
+              });
+
+          // Test unsupported type (should throw IllegalArgumentException when creating PathType)
+          Assertions.assertThrows(
+              IllegalArgumentException.class,
+              () -> PathBasedMetadataObject.PathType.get(MetadataObject.Type.COLUMN));
+        });
+  }
+
+  @Test
+  public void testPathTypeComparison() {
+    PathBasedMetadataObject.PathType schemaPathType =
+        PathBasedMetadataObject.PathType.get(MetadataObject.Type.SCHEMA);
+    PathBasedMetadataObject.PathType tablePathType =
+        PathBasedMetadataObject.PathType.get(MetadataObject.Type.TABLE);
+
+    Assertions.assertTrue(
+        schemaPathType.equals(PathBasedMetadataObject.PathType.get(MetadataObject.Type.SCHEMA)));
+    Assertions.assertFalse(
+        schemaPathType.equals(PathBasedMetadataObject.PathType.get(MetadataObject.Type.TABLE)));
+    Assertions.assertFalse(schemaPathType.equals(tablePathType));
+
+    PathBasedMetadataObject schemaObject =
+        new PathBasedMetadataObject("catalog1", "schema1", "/test/schema1", schemaPathType);
+
+    Assertions.assertDoesNotThrow(
+        () -> {
+          try {
+            java.lang.reflect.Method removeMethod =
+                RangerAuthorizationPlugin.class.getDeclaredMethod(
+                    "removeMetadataObject",
+                    org.apache.gravitino.authorization.AuthorizationMetadataObject.class);
+            removeMethod.setAccessible(true);
+            removeMethod.invoke(rangerAuthPlugin, schemaObject);
+          } catch (Exception e) {
+            Assertions.assertTrue(e.getCause() instanceof RuntimeException);
+          }
+        });
+  }
 }
