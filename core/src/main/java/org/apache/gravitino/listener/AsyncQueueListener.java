@@ -68,6 +68,7 @@ public class AsyncQueueListener implements EventListenerPlugin {
     this.asyncProcessor = new Thread(() -> processEvents());
     this.dispatcherJoinSeconds = dispatcherJoinSeconds;
     this.highWatermarkThreshold = (int) (queueCapacity * HIGH_WATERMARK_RATIO);
+    this.lastRecordDropEventTime = Instant.EPOCH;
     asyncProcessor.setDaemon(true);
     asyncProcessor.setName(asyncQueueListenerName);
   }
