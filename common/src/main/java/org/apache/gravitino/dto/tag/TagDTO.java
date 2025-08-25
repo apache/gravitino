@@ -80,15 +80,21 @@ public class TagDTO implements Tag {
     }
 
     TagDTO tagDTO = (TagDTO) o;
+
+    boolean thisInherited = this.inherited.isPresent() && this.inherited.orElse(false);
+    boolean tagDtoInherited = tagDTO.inherited.isPresent() && tagDTO.inherited.orElse(false);
+
     return Objects.equal(name, tagDTO.name)
         && Objects.equal(comment, tagDTO.comment)
         && Objects.equal(properties, tagDTO.properties)
-        && Objects.equal(audit, tagDTO.audit);
+        && Objects.equal(audit, tagDTO.audit)
+        && Objects.equal(thisInherited, tagDtoInherited);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hashCode(name, comment, properties, audit);
+    return Objects.hashCode(
+        name, comment, properties, audit, inherited.isPresent() && inherited.orElse(false));
   }
 
   /** @return a new builder for constructing a Tag DTO. */
