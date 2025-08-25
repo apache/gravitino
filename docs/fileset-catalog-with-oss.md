@@ -366,8 +366,11 @@ If your Spark **without Hadoop environment**, you can use the following code sni
 os.environ["PYSPARK_SUBMIT_ARGS"] = "--jars /path/to/gravitino-aliyun-bundle-{gravitino-version}.jar,/path/to/gravitino-filesystem-hadoop3-runtime-{gravitino-version}.jar, --master local[1] pyspark-shell"
 ```
 
-- [`gravitino-aliyun-bundle-${gravitino-version}.jar`](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-aliyun-bundle) is the Gravitino Aliyun jar with Hadoop environment(3.3.1) and `hadoop-oss` jar.
-- [`gravitino-aliyun-${gravitino-version}.jar`](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-aliyun) is a condensed version of the Gravitino Aliyun bundle jar without Hadoop environment and `hadoop-aliyun` jar.
+- [`gravitino-aliyun-bundle-${gravitino-version}.jar`](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-aliyun-bundle) is a bundle that contains all the dependencies needed to access Aliyun OSS. 
+  It is recommended to use this JAR when your environment does not include cloud storage dependencies. You can use this bundle to 
+  access cloud storage through Gravitino directly without downloading extra dependencies.
+- [`gravitino-aliyun-${gravitino-version}.jar`](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-aliyun) is a condensed JAR. It is recommended to use this JAR when your environment can already access cloud storage.
+  It only contains Gravitino's own code and shaded basic dependencies, which can ensure that there will be no conflicts with the dependencies of cloud storage.
 -`hadoop-aliyun-3.2.0.jar` and `aliyun-sdk-oss-2.8.3.jar` can be found in the Hadoop distribution in the `${HADOOP_HOME}/share/hadoop/tools/lib` directory.
 
 Please choose the correct jar according to your environment.

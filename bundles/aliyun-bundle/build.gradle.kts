@@ -26,6 +26,7 @@ plugins {
 
 dependencies {
   implementation(project(":bundles:aliyun"))
+  implementation(libs.aliyun.credentials.sdk)
   implementation(libs.commons.collections3)
   implementation(libs.hadoop3.client.api)
   implementation(libs.hadoop3.client.runtime)
@@ -45,7 +46,7 @@ tasks.withType(ShadowJar::class.java) {
 
   // Relocate dependencies to avoid conflicts
   relocate("com.fasterxml.jackson", "org.apache.gravitino.aliyun.shaded.com.fasterxml.jackson")
-  relocate("com.google", "org.apache.gravitino.aliyun.shaded.com.google")
+  relocate("com.google.common", "org.apache.gravitino.aliyun.shaded.com.google.common")
   relocate("com.sun.activation", "org.apache.gravitino.aliyun.shaded.com.sun.activation")
   relocate("com.sun.istack", "org.apache.gravitino.aliyun.shaded.com.sun.istack")
   relocate("com.sun.jersey", "org.apache.gravitino.aliyun.shaded.com.sun.jersey")
