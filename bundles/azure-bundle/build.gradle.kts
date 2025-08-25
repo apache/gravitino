@@ -25,7 +25,10 @@ plugins {
 }
 
 dependencies {
-  implementation(project(":bundles:azure"))
+  implementation(project(":bundles:azure")) {
+    exclude(group = "commons-logging", module = "commons-logging")
+  }
+
   implementation(libs.hadoop3.abs)
   implementation(libs.hadoop3.client.api)
   implementation(libs.hadoop3.client.runtime)

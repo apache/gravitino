@@ -162,7 +162,8 @@ public class FileInfoDTO implements FileInfo {
     public FileInfoDTO build() {
       Preconditions.checkArgument(StringUtils.isNotBlank(name), "name cannot be null or empty");
       Preconditions.checkArgument(size >= 0, "size cannot be negative");
-      Preconditions.checkArgument(lastModified > 0, "lastModified must be a valid timestamp");
+      // In Azure Blob Storage, it can be 0 for newly created files.
+      Preconditions.checkArgument(lastModified >= 0, "lastModified must be a valid timestamp");
       Preconditions.checkArgument(StringUtils.isNotBlank(path), "path cannot be null or empty");
 
       return new FileInfoDTO(name, isDir, size, lastModified, path);
