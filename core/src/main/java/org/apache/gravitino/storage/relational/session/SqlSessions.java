@@ -20,6 +20,7 @@
 package org.apache.gravitino.storage.relational.session;
 
 import com.google.common.annotations.VisibleForTesting;
+import java.util.function.Consumer;
 import org.apache.ibatis.session.SqlSession;
 import org.apache.ibatis.session.TransactionIsolationLevel;
 
@@ -36,6 +37,10 @@ public final class SqlSessions {
   @VisibleForTesting
   static ThreadLocal<SqlSession> getSessions() {
     return sessions;
+  }
+
+  public static SqlSession peekSqlSession() {
+    return sessions.get();
   }
 
   /**
@@ -62,15 +67,7 @@ public final class SqlSessions {
    * thread local storage.
    */
   public static void commitAndCloseSqlSession() {
-    SqlSession sqlSession = sessions.get();
-    if (sqlSession != null) {
-      try {
-        sqlSession.commit();
-        sqlSession.close();
-      } finally {
-        sessions.remove();
-      }
-    }
+    executeAndCleanupSession(SqlSession::commit);
   }
 
   /**
@@ -78,27 +75,12 @@ public final class SqlSessions {
    * thread local storage.
    */
   public static void rollbackAndCloseSqlSession() {
-    SqlSession sqlSession = sessions.get();
-    if (sqlSession != null) {
-      try {
-        sqlSession.rollback();
-        sqlSession.close();
-      } finally {
-        sessions.remove();
-      }
-    }
+    executeAndCleanupSession(SqlSession::rollback);
   }
 
   /** Close the SqlSession object and remove it from the thread local storage. */
   public static void closeSqlSession() {
-    SqlSession sqlSession = sessions.get();
-    if (sqlSession != null) {
-      try {
-        sqlSession.close();
-      } finally {
-        sessions.remove();
-      }
-    }
+    executeAndCleanupSession(session -> {});
   }
 
   /**
@@ -110,5 +92,20 @@ public final class SqlSessions {
    */
   public static <T> T getMapper(Class<T> className) {
     return getSqlSession().getMapper(className);
+  }
+
+  private static void executeAndCleanupSession(Consumer<SqlSession> consumer) {
+    SqlSession sqlSession = sessions.get();
+
+    if (sqlSession == null) {
+      getSessions().remove();
+      return;
+    }
+
+    try (sqlSession) {
+      consumer.accept(sqlSession);
+    } finally {
+      sessions.remove();
+    }
   }
 }

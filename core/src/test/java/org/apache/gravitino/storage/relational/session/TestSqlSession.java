@@ -153,4 +153,24 @@ public class TestSqlSession {
     SqlSessions.rollbackAndCloseSqlSession();
     assertNull(SqlSessions.getSessions().get());
   }
+
+  @Test
+  public void testCommitAndCloseSqlSessionWhenCommitFails() {
+    SqlSession mockSession = Mockito.mock(SqlSession.class);
+    Mockito.doThrow(new RuntimeException("commit fail")).when(mockSession).commit();
+    SqlSessions.getSessions().set(mockSession);
+    assertThrows(RuntimeException.class, SqlSessions::commitAndCloseSqlSession);
+    Mockito.verify(mockSession).close();
+    assertNull(SqlSessions.getSessions().get());
+  }
+
+  @Test
+  public void testRollbackAndCloseSqlSessionWhenRollbackFails() {
+    SqlSession mockSession = Mockito.mock(SqlSession.class);
+    Mockito.doThrow(new RuntimeException("rollback fail")).when(mockSession).rollback();
+    SqlSessions.getSessions().set(mockSession);
+    assertThrows(RuntimeException.class, SqlSessions::rollbackAndCloseSqlSession);
+    Mockito.verify(mockSession).close();
+    assertNull(SqlSessions.getSessions().get());
+  }
 }
