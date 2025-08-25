@@ -138,7 +138,7 @@ public class GroupOperations {
                       if (owner.type() == Owner.Type.GROUP && owner.name().equals(group)) {
                         throw new IllegalArgumentException(
                             String.format(
-                                "Cannot remove group %s from metalake %s because the group is not the owner of the metalake.",
+                                "Cannot remove group %s from metalake %s because the group is the owner of the metalake.",
                                 group, metalake));
                       }
                     });

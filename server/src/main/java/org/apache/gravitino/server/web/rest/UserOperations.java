@@ -185,7 +185,7 @@ public class UserOperations {
                       if (owner.type() == Owner.Type.USER && owner.name().equals(user)) {
                         throw new IllegalArgumentException(
                             String.format(
-                                "Cannot remove user %s from metalake %s because the user is not the owner of the metalake.",
+                                "Cannot remove user %s from metalake %s because the user is the owner of the metalake.",
                                 user, metalake));
                       }
                     });
