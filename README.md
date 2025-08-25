@@ -1,3 +1,7 @@
+[![Build Status](https://github.com/SameerSalman29/gravitino/actions/workflows/main.yml/badge.svg)](https://github.com/SameerSalman29/gravitino/actions)
+[![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
+[![Open Issues](https://img.shields.io/github/issues/SameerSalman29/gravitino)](https://github.com/SameerSalman29/gravitino/issues)
+
 <!--
   Licensed to the Apache Software Foundation (ASF) under one
   or more contributor license agreements.  See the NOTICE file
