@@ -28,6 +28,7 @@ from readerwriterlock import rwlock
 
 from gravitino.api.catalog import Catalog
 from gravitino.api.credential.credential import Credential
+from gravitino.api.file.fileset import Fileset
 from gravitino.audit.caller_context import CallerContextHolder, CallerContext
 from gravitino.audit.fileset_audit_constants import FilesetAuditConstants
 from gravitino.audit.fileset_data_operation import FilesetDataOperation
@@ -137,6 +138,9 @@ class BaseGVFSOperations(ABC):
 
         self._catalog_cache = LRUCache(maxsize=100)
         self._catalog_cache_lock = rwlock.RWLockFair()
+
+        self._fileset_cache = LRUCache(maxsize=100)
+        self._fileset_cache_lock = rwlock.RWLockFair()
 
         self._enable_credential_vending = (
             False
@@ -389,9 +393,7 @@ class BaseGVFSOperations(ABC):
             self._metalake, fileset_ident.namespace().level(1)
         )
         catalog = self._get_fileset_catalog(catalog_ident)
-        fileset = catalog.as_fileset_catalog().load_fileset(
-            NameIdentifier.of(fileset_ident.namespace().level(2), fileset_ident.name())
-        )
+        fileset = self._get_fileset(fileset_ident)
         target_location_name = (
             location_name
             or fileset.properties().get(fileset.PROPERTY_DEFAULT_LOCATION_NAME)
@@ -545,5 +547,34 @@ class BaseGVFSOperations(ABC):
             catalog = self._client.load_catalog(catalog_ident.name())
             self._catalog_cache[catalog_ident] = catalog
             return catalog
+        finally:
+            write_lock.release()
+
+    def _get_fileset(self, fileset_ident: NameIdentifier):
+        read_lock = self._fileset_cache_lock.gen_rlock()
+        try:
+            read_lock.acquire()
+            cache_value: Fileset = self._fileset_cache.get(fileset_ident)
+            if cache_value is not None:
+                return cache_value
+        finally:
+            read_lock.release()
+
+        write_lock = self._fileset_cache_lock.gen_wlock()
+        try:
+            write_lock.acquire()
+            cache_value: Fileset = self._fileset_cache.get(fileset_ident)
+            if cache_value is not None:
+                return cache_value
+
+            catalog_ident: NameIdentifier = NameIdentifier.of(
+                fileset_ident.namespace().level(0), fileset_ident.namespace().level(1)
+            )
+            catalog: FilesetCatalog = self._get_fileset_catalog(catalog_ident)
+            fileset = catalog.as_fileset_catalog().load_fileset(
+                NameIdentifier.of(fileset_ident.namespace().level(2), fileset_ident.name())
+            )
+            self._fileset_cache[fileset_ident] = fileset
+            return fileset
         finally:
             write_lock.release()

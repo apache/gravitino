@@ -30,6 +30,7 @@ import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.ThreadFactory;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.client.GravitinoClient;
+import org.apache.gravitino.file.Fileset;
 import org.apache.gravitino.file.FilesetCatalog;
 
 /** A cache for fileset catalogs. */
@@ -37,10 +38,12 @@ public class FilesetCatalogCache implements Closeable {
 
   private final GravitinoClient client;
   private final Cache<NameIdentifier, FilesetCatalog> catalogCache;
+  private final Cache<NameIdentifier, Fileset> filesetCache;
 
   // Since Caffeine does not ensure that removalListener will be involved after expiration
   // We use a scheduler with one thread to clean up expired clients.
   private final ScheduledThreadPoolExecutor catalogCleanScheduler;
+  private final ScheduledThreadPoolExecutor filesetCleanScheduler;
 
   /**
    * Creates a new instance of {@link FilesetCatalogCache}.
@@ -51,7 +54,10 @@ public class FilesetCatalogCache implements Closeable {
     this.client = client;
     this.catalogCleanScheduler =
         new ScheduledThreadPoolExecutor(1, newDaemonThreadFactory("gvfs-catalog-cache-cleaner"));
+    this.filesetCleanScheduler =
+        new ScheduledThreadPoolExecutor(1, newDaemonThreadFactory("gvfs-fileset-cache-cleaner"));
     this.catalogCache = newCatalogCache(catalogCleanScheduler);
+    this.filesetCache = newFilesetCache(filesetCleanScheduler);
   }
 
   /**
@@ -70,6 +76,27 @@ public class FilesetCatalogCache implements Closeable {
     return filesetCatalog;
   }
 
+  /**
+   * Gets the fileset by the given fileset identifier.
+   *
+   * @param filesetIdent the fileset identifier.
+   * @return the fileset.
+   */
+  public Fileset getFileset(NameIdentifier filesetIdent) {
+    NameIdentifier catalogIdent =
+        NameIdentifier.of(filesetIdent.namespace().level(0), filesetIdent.namespace().level(1));
+    FilesetCatalog filesetCatalog = getFilesetCatalog(catalogIdent);
+    Fileset fileset =
+        filesetCache.get(
+            filesetIdent,
+            ident ->
+                filesetCatalog.loadFileset(
+                    NameIdentifier.of(filesetIdent.namespace().level(2), filesetIdent.name())));
+    Preconditions.checkArgument(
+        fileset != null, String.format("Loaded fileset: %s is null.", filesetIdent));
+    return fileset;
+  }
+
   private Cache<NameIdentifier, FilesetCatalog> newCatalogCache(
       ScheduledThreadPoolExecutor catalogCleanScheduler) {
     // In most scenarios, it will not read so many catalog filesets at the same time, so we can just
@@ -77,6 +104,14 @@ public class FilesetCatalogCache implements Closeable {
     return Caffeine.newBuilder()
         .maximumSize(100)
         .scheduler(Scheduler.forScheduledExecutorService(catalogCleanScheduler))
+        .build();
+  }
+
+  private Cache<NameIdentifier, Fileset> newFilesetCache(
+      ScheduledThreadPoolExecutor filesetCleanScheduler) {
+    return Caffeine.newBuilder()
+        .maximumSize(100)
+        .scheduler(Scheduler.forScheduledExecutorService(filesetCleanScheduler))
         .build();
   }
 
