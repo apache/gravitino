@@ -14,38 +14,29 @@
 # KIND, either express or implied.  See the License for the
 # specific language governing permissions and limitations
 # under the License.
-from dataclasses import field, dataclass
+
+from dataclasses import dataclass, field
 
 from dataclasses_json import config
-
-from gravitino.dto.model_version_dto import ModelVersionDTO
 from gravitino.dto.responses.base_response import BaseResponse
 from gravitino.exceptions.base import IllegalArgumentException
 
 
 @dataclass
-class ModelVersionResponse(BaseResponse):
-    """Represents a response for a model version."""
+class ModelVersionUriResponse(BaseResponse):
+    """Response for the model version uri."""
 
-    _model_version: ModelVersionDTO = field(metadata=config(field_name="modelVersion"))
+    _uri: str = field(metadata=config(field_name="uri"))
 
-    def model_version(self) -> ModelVersionDTO:
-        """Returns the model version."""
-        return self._model_version
+    def uri(self) -> str:
+        return self._uri
 
     def validate(self):
         """Validates the response data.
 
         Raises:
-            IllegalArgumentException if the model version is not set.
+            IllegalArgumentException if model version uri is not set.
         """
         super().validate()
-
-        if self._model_version is None:
-            raise IllegalArgumentException("Model version must not be null")
-        if self._model_version.version() is None:
-            raise IllegalArgumentException("Model version 'version' must not be null")
-        if self._model_version.uris() is None:
-            raise IllegalArgumentException("Model version 'uri' must not be null")
-        if self._model_version.audit_info() is None:
-            raise IllegalArgumentException("Model version 'auditInfo' must not be null")
+        if self._uri is None or len(self.uri()) == 0:
+            raise IllegalArgumentException("Model version uri must not be null")

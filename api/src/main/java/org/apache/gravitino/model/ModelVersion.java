@@ -84,9 +84,7 @@ public interface ModelVersion extends Auditable {
    * @return The URIs of the model version, the key is the name of the URI and the value is the URI
    *     of the model artifact.
    */
-  default Map<String, String> uris() {
-    throw new UnsupportedOperationException("Not implemented yet");
-  }
+  Map<String, String> uris();
 
   /**
    * The properties of the model version. The properties are key-value pairs that can be used to

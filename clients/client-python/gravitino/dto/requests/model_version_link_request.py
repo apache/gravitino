@@ -27,7 +27,7 @@ from gravitino.rest.rest_message import RESTRequest
 class ModelVersionLinkRequest(RESTRequest):
     """Represents a request to link a model version to a model."""
 
-    _uri: str = field(metadata=config(field_name="uri"))
+    _uris: Dict[str, str] = field(metadata=config(field_name="uris"))
     _comment: Optional[str] = field(metadata=config(field_name="comment"))
     _aliases: Optional[List[str]] = field(metadata=config(field_name="aliases"))
     _properties: Optional[Dict[str, str]] = field(
@@ -36,12 +36,12 @@ class ModelVersionLinkRequest(RESTRequest):
 
     def __init__(
         self,
-        uri: str,
+        uris: Dict[str, str],
         comment: Optional[str] = None,
         aliases: Optional[List[str]] = None,
         properties: Optional[Dict[str, str]] = None,
     ):
-        self._uri = uri
+        self._uris = uris
         self._comment = comment
         self._aliases = aliases
         self._properties = properties
@@ -52,10 +52,16 @@ class ModelVersionLinkRequest(RESTRequest):
         Raises:
             IllegalArgumentException if the request is invalid
         """
-        if not self._is_not_blank(self._uri):
+        if not self._uris:
             raise IllegalArgumentException(
-                '"uri" field is required and cannot be empty'
+                '"uris" field is required and cannot be empty'
             )
+
+        for key, value in self._uris.items():
+            if not self._is_not_blank(key):
+                raise IllegalArgumentException("uri name must not be null or empty")
+            if not self._is_not_blank(value):
+                raise IllegalArgumentException("uri must not be null or empty")
 
         for alias in self._aliases or []:
             if not self._is_not_blank(alias):

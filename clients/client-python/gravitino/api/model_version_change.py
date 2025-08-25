@@ -56,14 +56,36 @@ class ModelVersionChange(ABC):
         return ModelVersionChange.RemoveProperty(key)
 
     @staticmethod
-    def update_uri(uri: str):
+    def update_uri(uri: str, uri_name: str = None):
         """Creates a new model version change to update the uri of the model version.
         Args:
             uri: The new uri of the model version.
+            uri_name: The uri name of the model version to be updated.
         Returns:
             The model version change.
         """
-        return ModelVersionChange.UpdateUri(uri)
+        return ModelVersionChange.UpdateUri(uri, uri_name)
+
+    @staticmethod
+    def add_uri(uri_name: str, uri: str):
+        """Creates a new model version change to add the uri of the model version.
+        Args:
+            uri_name: The uri name of the model version to be added.
+            uri: The new uri of the model version to be added.
+        Returns:
+            The model version change.
+        """
+        return ModelVersionChange.AddUri(uri_name, uri)
+
+    @staticmethod
+    def remove_uri(uri_name: str):
+        """Creates a new model version change to remove the uri of the model version.
+        Args:
+            uri_name: The uri name of the model version to be removed.
+        Returns:
+            The model version change.
+        """
+        return ModelVersionChange.RemoveUri(uri_name)
 
     @staticmethod
     def update_aliases(aliases_to_add, aliases_to_remove):
@@ -213,8 +235,9 @@ class ModelVersionChange(ABC):
     class UpdateUri:
         """A model version change to update the URI of the model version."""
 
-        def __init__(self, new_uri: str):
+        def __init__(self, new_uri: str, uri_name: str = None):
             self._new_uri = new_uri
+            self._uri_name = uri_name
 
         def new_uri(self) -> str:
             """Retrieves the new URI of the model version.
@@ -223,9 +246,16 @@ class ModelVersionChange(ABC):
             """
             return self._new_uri
 
+        def uri_name(self) -> str:
+            """Retrieves the URI name of the model version to be updated.
+            Returns:
+                The URI name of the model version to be updated.
+            """
+            return self._uri_name
+
         def __eq__(self, other):
             """Compares this UpdateUri instance with another object for equality. Two instances are
-            considered equal if they designate the same new URI for the model version.
+            considered equal if they designate the same new URI and URI name for the model version.
             Args:
                 other: The object to compare with this instance.
             Returns:
@@ -234,23 +264,118 @@ class ModelVersionChange(ABC):
             """
             if not isinstance(other, ModelVersionChange.UpdateUri):
                 return False
-            return self.new_uri() == other.new_uri()
+            return (
+                self.new_uri() == other.new_uri()
+                and self.uri_name() == other.uri_name()
+            )
 
         def __hash__(self):
             """Generates a hash code for this UpdateUri instance. The hash code is primarily based on
-            the new URI for the model version.
+            the new URI and its name for the model version.
             Returns:
                 A hash code value for this URI update operation.
             """
-            return hash(self.new_uri())
+            return hash((self.new_uri(), self.uri_name()))
 
         def __str__(self):
             """Provides a string representation of the UpdateUri instance. This string includes the
-            class name followed by the new URI of the model version.
+            class name followed by the new URI and its name of the model version.
             Returns:
                 A string summary of this URI update operation.
             """
-            return f"UpdateUri {self._new_uri}"
+            return f"UpdateUri uriName: ({self._uri_name}) newUri: ({self._new_uri})"
+
+    class AddUri:
+        """A ModelVersionChange to add a uri of the model version."""
+
+        def __init__(self, uri_name: str, uri: str):
+            self._uri_name = uri_name
+            self._uri = uri
+
+        def uri_name(self) -> str:
+            """Retrieves the URI name of the model version to be added.
+            Returns:
+                The URI name of the model version to be added.
+            """
+            return self._uri_name
+
+        def uri(self) -> str:
+            """Retrieves the URI of the model version to be added.
+            Returns:
+                The new URI of the model version to be added.
+            """
+            return self._uri
+
+        def __eq__(self, other):
+            """Compares this AddUri instance with another object for equality. Two instances are
+            considered equal if they designate the same URI and URI name for the model version.
+            Args:
+                other: The object to compare with this instance.
+            Returns:
+                true if the given object represents an identical model version URI add operation;
+                false otherwise.
+            """
+            if not isinstance(other, ModelVersionChange.AddUri):
+                return False
+            return self.uri_name() == other.uri_name() and self.uri() == other.uri()
+
+        def __hash__(self):
+            """Generates a hash code for this AddUri instance. The hash code is primarily based on
+            the URI and its name for the model version.
+            Returns:
+                A hash code value for this URI add operation.
+            """
+            return hash((self.uri_name(), self.uri()))
+
+        def __str__(self):
+            """Provides a string representation of the AddUri instance. This string includes the
+            class name followed by the URI and its name of the model version.
+            Returns:
+                A string summary of this URI add operation.
+            """
+            return f"AddUri uriName: ({self._uri_name}) uri: ({self.uri})"
+
+    class RemoveUri:
+        """A ModelVersionChange to remove a uri of the model version."""
+
+        def __init__(self, uri_name: str):
+            self._uri_name = uri_name
+
+        def uri_name(self) -> str:
+            """Retrieves the URI name of the model version to be removed.
+            Returns:
+                The URI name of the model version to be removed.
+            """
+            return self._uri_name
+
+        def __eq__(self, other):
+            """Compares this RemoveUri instance with another object for equality. Two instances are
+            considered equal if they designate the same URI name for the model version.
+            Args:
+                other: The object to compare with this instance.
+            Returns:
+                true if the given object represents an identical model version URI remove operation;
+                false otherwise.
+            """
+            if not isinstance(other, ModelVersionChange.RemoveUri):
+                return False
+            return self.uri_name() == other.uri_name()
+
+        def __hash__(self):
+            """Generates a hash code for this RemoveUri instance. The hash code is primarily based on
+            the URI name for the model version.
+            Returns:
+                A hash code value for this URI remove operation.
+            """
+            return hash(self.uri_name())
+
+        def __str__(self):
+            """Provides a string representation of the RemoveUri instance. This string includes the
+            class name followed by the URI name of the model version.
+            Returns:
+                A string summary of this URI remove operation.
+            """
+            return f"RemoveUri uriName: ({self._uri_name})"
 
     class UpdateAliases:
         """A model version change to update the aliases of the model version."""

@@ -22,6 +22,7 @@ from gravitino.dto.responses.file_location_response import FileLocationResponse
 from gravitino.dto.responses.model_response import ModelResponse
 from gravitino.dto.responses.model_version_list_response import ModelVersionListResponse
 from gravitino.dto.responses.model_version_response import ModelVersionResponse
+from gravitino.dto.responses.model_version_uri_response import ModelVersionUriResponse
 from gravitino.exceptions.base import IllegalArgumentException
 
 
@@ -161,7 +162,7 @@ class TestResponses(unittest.TestCase):
             "modelVersion": {
                 "version": 0,
                 "aliases": ["alias1", "alias2"],
-                "uri": "http://localhost:8080",
+                "uris": {"unknown": "http://localhost:8080"},
                 "comment": "test comment",
                 "properties": {"key1": "value1"},
                 "audit": {
@@ -188,7 +189,7 @@ class TestResponses(unittest.TestCase):
             "code": 0,
             "modelVersion": {
                 "version": 0,
-                "uri": "http://localhost:8080",
+                "uris": {"unknown": "http://localhost:8080"},
                 "audit": {
                     "creator": "anonymous",
                     "createTime": "2024-04-05T10:10:35.218Z",
@@ -208,7 +209,7 @@ class TestResponses(unittest.TestCase):
         json_data = {
             "code": 0,
             "modelVersion": {
-                "uri": "http://localhost:8080",
+                "uris": {"unknown": "http://localhost:8080"},
                 "audit": {
                     "creator": "anonymous",
                     "createTime": "2024-04-05T10:10:35.218Z",
@@ -241,7 +242,7 @@ class TestResponses(unittest.TestCase):
             "code": 0,
             "modelVersion": {
                 "version": 0,
-                "uri": "http://localhost:8080",
+                "uris": {"unknown": "http://localhost:8080"},
             },
         }
         json_str = json.dumps(json_data)
@@ -249,3 +250,28 @@ class TestResponses(unittest.TestCase):
             json_str, infer_missing=True
         )
         self.assertRaises(IllegalArgumentException, resp.validate)
+
+    def test_model_version_uri_response(self):
+        json_data = {"code": 0, "uri": "s3://path/to/model"}
+        json_str = json.dumps(json_data)
+        resp: ModelVersionUriResponse = ModelVersionUriResponse.from_json(
+            json_str, infer_missing=True
+        )
+        resp.validate()
+        self.assertEqual("s3://path/to/model", resp.uri())
+
+        json_data_missing = {"code": 0, "uri": ""}
+        json_str_missing = json.dumps(json_data_missing)
+        resp_missing: ModelVersionUriResponse = ModelVersionUriResponse.from_json(
+            json_str_missing, infer_missing=True
+        )
+        self.assertRaises(IllegalArgumentException, resp_missing.validate)
+
+        json_data_missing_1 = {
+            "code": 0,
+        }
+        json_str_missing_1 = json.dumps(json_data_missing_1)
+        resp_missing_1: ModelVersionUriResponse = ModelVersionUriResponse.from_json(
+            json_str_missing_1, infer_missing=True
+        )
+        self.assertRaises(IllegalArgumentException, resp_missing_1.validate)

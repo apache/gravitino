@@ -55,6 +55,7 @@ import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.NoSuchModelException;
 import org.apache.gravitino.exceptions.NoSuchModelVersionException;
+import org.apache.gravitino.exceptions.NoSuchModelVersionURINameException;
 import org.apache.gravitino.exceptions.NoSuchPartitionException;
 import org.apache.gravitino.exceptions.NoSuchPolicyException;
 import org.apache.gravitino.exceptions.NoSuchRoleException;
@@ -1108,6 +1109,10 @@ public class ErrorHandlers {
               .getType()
               .equals(NoSuchModelVersionException.class.getSimpleName())) {
             throw new NoSuchModelVersionException(errorMsg);
+          } else if (errorResponse
+              .getType()
+              .equals(NoSuchModelVersionURINameException.class.getSimpleName())) {
+            throw new NoSuchModelVersionURINameException(errorMsg);
           } else {
             throw new NotFoundException(errorMsg);
           }
