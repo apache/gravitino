@@ -45,13 +45,43 @@ public class PostgreSQLDataTypeTransformer extends GeneralDataTypeTransformer {
       return io.trino.spi.type.VarcharType.createUnboundedVarcharType();
     } else if (Name.TIMESTAMP == type.name()) {
       Types.TimestampType timestampType = (Types.TimestampType) type;
-      if (timestampType.hasTimeZone()) {
-        return TimestampWithTimeZoneType.TIMESTAMP_TZ_MICROS;
-      } else {
-        return TimestampType.TIMESTAMP_MICROS;
+      boolean hasTimeZone = timestampType.hasTimeZone();
+      if (timestampType.hasPrecisionSet()) {
+        int precision = timestampType.precision();
+        if (precision >= TRINO_SECONDS_PRECISION && precision <= TRINO_PICOS_PRECISION) {
+          // Exceeding precision will be reduced to the maximum allowed precision of 6 (microseconds
+          // precision)
+          precision = Math.min(TRINO_MICROS_PRECISION, precision);
+          return hasTimeZone
+              ? TimestampWithTimeZoneType.createTimestampWithTimeZoneType(precision)
+              : TimestampType.createTimestampType(precision);
+        } else {
+          throw new TrinoException(
+              GravitinoErrorCode.GRAVITINO_UNSUPPORTED_GRAVITINO_DATATYPE,
+              "Unsupported timestamp precision for PostgreSQL: " + precision);
+        }
       }
+      // When precision is not set, the default precision is 3 (milliseconds precision)
+      return hasTimeZone
+          ? TimestampWithTimeZoneType.TIMESTAMP_TZ_MILLIS
+          : TimestampType.TIMESTAMP_MILLIS;
     } else if (Name.TIME == type.name()) {
-      return TimeType.TIME_MICROS;
+      Types.TimeType timeType = (Types.TimeType) type;
+      if (timeType.hasPrecisionSet()) {
+        int precision = timeType.precision();
+        if (precision >= TRINO_SECONDS_PRECISION && precision <= TRINO_PICOS_PRECISION) {
+          // Exceeding precision will be reduced to the maximum allowed precision of 6 (microseconds
+          // precision)
+          precision = Math.min(TRINO_MICROS_PRECISION, precision);
+          return TimeType.createTimeType(precision);
+        } else {
+          throw new TrinoException(
+              GravitinoErrorCode.GRAVITINO_UNSUPPORTED_GRAVITINO_DATATYPE,
+              "Unsupported time precision for PostgreSQL: " + precision);
+        }
+      }
+      // When precision is not set, the default precision is 3 (milliseconds precision)
+      return TimeType.TIME_MILLIS;
     }
 
     return super.getTrinoType(type);

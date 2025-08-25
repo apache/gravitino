@@ -88,13 +88,13 @@ public class TestDataTypeTransformer {
     Assertions.assertEquals(
         dataTypeTransformer.getGravitinoType(DateType.DATE), Types.DateType.get());
     Assertions.assertEquals(
-        dataTypeTransformer.getGravitinoType(TimeType.TIME_MILLIS), Types.TimeType.get());
+        dataTypeTransformer.getGravitinoType(TimeType.TIME_MILLIS), Types.TimeType.of(3));
     Assertions.assertEquals(
         dataTypeTransformer.getGravitinoType(TimestampType.TIMESTAMP_MILLIS),
-        Types.TimestampType.withoutTimeZone());
+        Types.TimestampType.withoutTimeZone(3));
     Assertions.assertEquals(
         dataTypeTransformer.getGravitinoType(TimestampWithTimeZoneType.TIMESTAMP_TZ_MILLIS),
-        Types.TimestampType.withTimeZone());
+        Types.TimestampType.withTimeZone(3));
 
     Assertions.assertEquals(
         dataTypeTransformer.getGravitinoType(new ArrayType(IntegerType.INTEGER)),

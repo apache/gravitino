@@ -17,9 +17,9 @@ CREATE TABLE
    f11 integer,
    f12 bigint,
    f13 date,
-   f14 time(6),
-   f15 timestamp(6),
-   f16 timestamp(6) with time zone
+   f14 time(3),
+   f15 timestamp(3),
+   f16 timestamp(3) with time zone
 )
 COMMENT ''"
 
@@ -27,7 +27,7 @@ INSERT: 1 row
 
 INSERT: 1 row
 
-"Sample text 1","Text1               ","65","123.456","7.89","12.34","false","100","1000","1000","100000","2024-01-01","08:00:00.000000","2024-01-01 08:00:00.000000","2024-01-01 08:00:00.000000 UTC"
+"Sample text 1","Text1               ","65","123.456","7.89","12.34","false","100","1000","1000","100000","2024-01-01","08:00:00.000","2024-01-01 08:00:00.000","2024-01-01 08:00:00.000 UTC"
 "","","","","","","","","","","","","","",""
 
 CREATE TABLE
@@ -45,9 +45,9 @@ CREATE TABLE
    f11 integer NOT NULL,
    f12 bigint NOT NULL,
    f13 date NOT NULL,
-   f14 time(6) NOT NULL,
-   f15 timestamp(6) NOT NULL,
-   f16 timestamp(6) with time zone NOT NULL
+   f14 time(3) NOT NULL,
+   f15 timestamp(3) NOT NULL,
+   f16 timestamp(3) with time zone NOT NULL
 )
 COMMENT ''"
 
