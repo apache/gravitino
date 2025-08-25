@@ -102,10 +102,10 @@ class GravitinoClientBase:
         server_version = self.get_server_version()
         client_version = self.get_client_version()
 
-        if client_version > server_version:
+        if not client_version.compatible_with_server_version(server_version):
             raise GravitinoRuntimeException(
                 "Gravitino does not support the case that "
-                "the client-side version is higher than the server-side version."
+                "the client-side major version is higher than the server-side version."
                 f"The client version is {client_version.version()}, and the server version {server_version.version()}"
             )
 
