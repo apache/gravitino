@@ -75,8 +75,9 @@ def _parse_args():
         "--include-tool-tags",
         type=_comma_separated_set,
         default=set(),
-        help="The tool tags to include, separated by commas, support tags:[catalog, schema, table]. "
-        "(default: empty, all tools will be included).",
+        help="The tool tags to include, separated by commas, support tags:[catalog, "
+        "schema, table, topic, model, fileset, tag, policy]. default: empty, "
+        "all tools will be included).",
     )
 
     parser.add_argument(
