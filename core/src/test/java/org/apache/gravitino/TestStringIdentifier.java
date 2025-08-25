@@ -197,4 +197,13 @@ public class TestStringIdentifier {
     String commentWithId = StringIdentifier.addToComment(identifier, comment);
     Assertions.assertEquals(comment, StringIdentifier.removeIdFromComment(commentWithId));
   }
+
+  @Test
+  public void testRemoveIdFromCommentTrimsTrailingSpaces() {
+    StringIdentifier identifier = StringIdentifier.fromId(42L);
+    String commentWithSpace = "This is a comment ";
+    String commentWithId = StringIdentifier.addToComment(identifier, commentWithSpace);
+    Assertions.assertEquals(
+        commentWithSpace.trim(), StringIdentifier.removeIdFromComment(commentWithId));
+  }
 }
