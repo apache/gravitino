@@ -96,4 +96,13 @@ public class OwnerMetaSQLProviderFactory {
       @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit) {
     return getProvider().deleteOwnerMetasByLegacyTimeline(legacyTimeline, limit);
   }
+
+  public static String selectAllOwner(
+      @Param("skipNum") Long skipNum, @Param("fetchNum") Long fetchNum) {
+    return getProvider().selectAllOwner(skipNum, fetchNum);
+  }
+
+  public static String countAllOwner() {
+    return getProvider().countAllOwner();
+  }
 }
