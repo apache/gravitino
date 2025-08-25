@@ -28,7 +28,7 @@ import org.apache.gravitino.audit.v2.SimpleFormatterV2;
 import org.apache.gravitino.config.ConfigBuilder;
 import org.apache.gravitino.config.ConfigConstants;
 import org.apache.gravitino.config.ConfigEntry;
-import org.apache.gravitino.stats.storage.MemoryPartitionStatsStorageFactory;
+import org.apache.gravitino.stats.storage.LancePartitionStatisticStorageFactory;
 
 public class Configs {
 
@@ -447,11 +447,10 @@ public class Configs {
           .checkValue(value -> value > 0, ConfigConstants.POSITIVE_NUMBER_ERROR_MSG)
           .createWithDefault(5 * 60 * 1000L); // Default is 5 minutes
 
-  // TODO: Change default value to a Lance partition statistics storage factory class
   public static final ConfigEntry<String> PARTITION_STATS_STORAGE_FACTORY_CLASS =
       new ConfigBuilder("gravitino.stats.partition.storageFactoryClass")
           .doc("The partition stats storage factory class.")
           .version(ConfigConstants.VERSION_1_0_0)
           .stringConf()
-          .createWithDefault(MemoryPartitionStatsStorageFactory.class.getCanonicalName());
+          .createWithDefault(LancePartitionStatisticStorageFactory.class.getCanonicalName());
 }
