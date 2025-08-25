@@ -20,10 +20,10 @@ package org.apache.gravitino.trino.connector.catalog.jdbc.postgresql;
 
 import io.trino.spi.session.PropertyMetadata;
 import java.util.List;
-import org.apache.gravitino.trino.connector.catalog.CatalogConnectorMetadataAdapter;
+import org.apache.gravitino.trino.connector.catalog.jdbc.JdbcConnectorMetadataAdapter;
 
 /** Transforming gravitino PostgreSQL metadata to Trino. */
-public class PostgreSQLMetadataAdapter extends CatalogConnectorMetadataAdapter {
+public class PostgreSQLMetadataAdapter extends JdbcConnectorMetadataAdapter {
 
   /**
    * Constructs a new PostgreSQLMetadataAdapter.

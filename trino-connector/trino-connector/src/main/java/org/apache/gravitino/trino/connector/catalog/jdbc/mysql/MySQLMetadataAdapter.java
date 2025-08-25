@@ -52,14 +52,14 @@ import org.apache.gravitino.catalog.property.PropertyConverter;
 import org.apache.gravitino.rel.indexes.Index;
 import org.apache.gravitino.rel.indexes.Indexes;
 import org.apache.gravitino.rel.types.Type;
-import org.apache.gravitino.trino.connector.catalog.CatalogConnectorMetadataAdapter;
 import org.apache.gravitino.trino.connector.catalog.jdbc.JdbcColumnDefaultValueConverter;
+import org.apache.gravitino.trino.connector.catalog.jdbc.JdbcConnectorMetadataAdapter;
 import org.apache.gravitino.trino.connector.metadata.GravitinoColumn;
 import org.apache.gravitino.trino.connector.metadata.GravitinoTable;
 import org.apache.logging.log4j.util.Strings;
 
 /** Transforming Apache Gravitino MySQL metadata to Trino. */
-public class MySQLMetadataAdapter extends CatalogConnectorMetadataAdapter {
+public class MySQLMetadataAdapter extends JdbcConnectorMetadataAdapter {
 
   private final PropertyConverter tableConverter;
   private final JdbcColumnDefaultValueConverter columnDefaultValueConverter;
