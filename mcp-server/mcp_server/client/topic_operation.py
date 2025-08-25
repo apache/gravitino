@@ -24,9 +24,7 @@ class TopicOperation(ABC):
     """
 
     @abstractmethod
-    async def get_list_of_topics(
-        self, catalog_name: str, schema_name: str
-    ) -> str:
+    async def list_of_topics(self, catalog_name: str, schema_name: str) -> str:
         """
         Retrieve the list of topics within a specified catalog.
 

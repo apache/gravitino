@@ -33,7 +33,7 @@ dependencies {
   implementation(project(":clients:client-java-runtime", configuration = "shadow"))
   when (sparkMajorVersion) {
     "3.5" -> {
-      val kyuubiVersion: String = libs.versions.kyuubi4spark35.get()
+      val kyuubiVersion: String = libs.versions.kyuubi4spark.get()
       implementation(project(":spark-connector:spark-3.5"))
       implementation("org.apache.kyuubi:kyuubi-spark-connector-hive_$scalaVersion:$kyuubiVersion")
     }

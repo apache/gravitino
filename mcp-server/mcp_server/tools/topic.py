@@ -20,7 +20,7 @@ from fastmcp import Context, FastMCP
 
 def load_topic_tools(mcp: FastMCP):
     @mcp.tool(tags={"topic"})
-    async def get_list_of_topic(
+    async def list_of_topics(
         ctx: Context,
         catalog_name: str,
         schema_name: str,
@@ -80,7 +80,7 @@ def load_topic_tools(mcp: FastMCP):
             ]
         """
         client = ctx.request_context.lifespan_context.rest_client()
-        return await client.as_topic_operation().get_list_of_topics(
+        return await client.as_topic_operation().list_of_topics(
             catalog_name, schema_name
         )
 

@@ -56,7 +56,7 @@ class TestFunctionArg(unittest.TestCase):
         literal_dto.validate(columns=self._columns)
 
         field_ref_dto = (
-            FieldReferenceDTO.builder().with_column_name(self._column_names).build()
+            FieldReferenceDTO.builder().with_column_name(self._column_names[0]).build()
         )
         field_ref_dto.validate(columns=self._columns)
 
