@@ -861,7 +861,7 @@ public class TestGenericModelCatalog extends TestBase {
       int version, String uri, String[] aliases, String comment, Map<String, String> properties) {
     return ModelVersionDTO.builder()
         .withVersion(version)
-        .withUri(uri)
+        .withUris(ImmutableMap.of(ModelVersion.URI_NAME_UNKNOWN, uri))
         .withAliases(aliases)
         .withComment(comment)
         .withProperties(properties)

@@ -326,7 +326,9 @@ public class ErrorResponse extends BaseResponse {
   public static ErrorResponse unsupportedOperation(String message, Throwable throwable) {
     return new ErrorResponse(
         ErrorConstants.UNSUPPORTED_OPERATION_CODE,
-        UnsupportedOperationException.class.getSimpleName(),
+        throwable == null
+            ? UnsupportedOperationException.class.getSimpleName()
+            : throwable.getClass().getSimpleName(),
         message,
         getStackTrace(throwable));
   }

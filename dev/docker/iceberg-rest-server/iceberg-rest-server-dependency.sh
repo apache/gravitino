@@ -44,12 +44,12 @@ cd ${gravitino_home}
 # prepare bundle jar
 cd ${iceberg_rest_server_dir}
 mkdir -p bundles
-cp ${gravitino_home}/bundles/gcp/build/libs/gravitino-gcp-*.jar bundles/
-cp ${gravitino_home}/bundles/aws/build/libs/gravitino-aws-*.jar bundles/
-cp ${gravitino_home}/bundles/azure/build/libs/gravitino-azure-*.jar bundles/
-cp ${gravitino_home}/bundles/aliyun-bundle/build/libs/gravitino-aliyun-bundle-*.jar bundles/
+find ${gravitino_home}/bundles/gcp/build/libs/ -name 'gravitino-gcp-*.jar' ! -name '*-empty.jar' -exec cp -v {} bundles/ \;
+find ${gravitino_home}/bundles/aws/build/libs/ -name 'gravitino-aws-*.jar' ! -name '*-empty.jar' -exec cp -v {} bundles/ \;
+find ${gravitino_home}/bundles/azure/build/libs/ -name 'gravitino-azure-*.jar' ! -name '*-empty.jar' -exec cp -v {} bundles/ \;
+find ${gravitino_home}/bundles/aliyun-bundle/build/libs/ -name 'gravitino-aliyun-bundle-*.jar' ! -name '*-empty.jar' -exec cp -v {} bundles/ \;
 
-iceberg_version="1.6.1"
+iceberg_version="1.9.2"
 
 iceberg_gcp_bundle="iceberg-gcp-bundle-${iceberg_version}.jar"
 if [ ! -f "bundles/${iceberg_gcp_bundle}" ]; then

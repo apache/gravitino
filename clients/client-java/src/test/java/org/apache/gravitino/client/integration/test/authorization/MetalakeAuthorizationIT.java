@@ -48,6 +48,10 @@ public class MetalakeAuthorizationIT extends BaseRestApiAuthorizationIT {
 
   private GravitinoAdminClient serviceAdminButNotOwnerClient;
 
+  private static String testMetalake2 = "testMetalake2";
+
+  private static String testMetalake3 = "testMetalake3";
+
   @BeforeAll
   @Override
   public void startIntegrationTest() throws Exception {
@@ -72,23 +76,27 @@ public class MetalakeAuthorizationIT extends BaseRestApiAuthorizationIT {
         "Only service admins can create metalakes, current user can't create the metalake,  you should configure it in the server configuration first",
         ForbiddenException.class,
         () -> {
-          normalUserClient.createMetalake("testMetalake2", "", new HashMap<>());
+          normalUserClient.createMetalake(testMetalake2, "", new HashMap<>());
         });
-    serviceAdminClient.createMetalake("testMetalake2", "", new HashMap<>());
-    serviceAdminClient.createMetalake("testMetalake3", "", new HashMap<>());
+    serviceAdminClient.createMetalake(testMetalake2, "", new HashMap<>());
+    serviceAdminClient.createMetalake(testMetalake3, "", new HashMap<>());
   }
 
   @Test
   @Order(2)
   public void testListMetalake() {
     assertMetalakeEquals(
-        new String[] {METALAKE, "testMetalake2", "testMetalake3"},
-        serviceAdminClient.listMetalakes());
+        new String[] {METALAKE, testMetalake2, testMetalake3}, serviceAdminClient.listMetalakes());
+    serviceAdminClient.disableMetalake(testMetalake2);
+    assertMetalakeEquals(new String[] {METALAKE}, normalUserClient.listMetalakes());
+    assertMetalakeEquals(
+        new String[] {METALAKE, testMetalake2, testMetalake3}, serviceAdminClient.listMetalakes());
+    serviceAdminClient.enableMetalake(testMetalake2);
     assertMetalakeEquals(new String[] {METALAKE}, normalUserClient.listMetalakes());
     assertMetalakeEquals(new String[] {METALAKE}, serviceAdminButNotOwnerClient.listMetalakes());
-    serviceAdminClient.loadMetalake("testMetalake2").addUser(SERVICE_ADMIN_BUT_NOT_OWNER);
+    serviceAdminClient.loadMetalake(testMetalake2).addUser(SERVICE_ADMIN_BUT_NOT_OWNER);
     assertMetalakeEquals(
-        new String[] {METALAKE, "testMetalake2"}, serviceAdminButNotOwnerClient.listMetalakes());
+        new String[] {METALAKE, testMetalake2}, serviceAdminButNotOwnerClient.listMetalakes());
     GravitinoAdminClient tempClient =
         GravitinoAdminClient.builder(serverUri).withSimpleAuth("tempUse").build();
     assertMetalakeEquals(new String[] {}, tempClient.listMetalakes());
@@ -98,28 +106,28 @@ public class MetalakeAuthorizationIT extends BaseRestApiAuthorizationIT {
   @Order(3)
   public void testLoadMetalake() {
     serviceAdminClient.loadMetalake(METALAKE);
-    serviceAdminClient.loadMetalake("testMetalake2");
-    serviceAdminClient.loadMetalake("testMetalake3");
+    serviceAdminClient.loadMetalake(testMetalake2);
+    serviceAdminClient.loadMetalake(testMetalake3);
     normalUserClient.loadMetalake(METALAKE);
     assertThrows(
         "Current user access metadata {testMetalake2}",
         ForbiddenException.class,
         () -> {
-          normalUserClient.loadMetalake("testMetalake2");
+          normalUserClient.loadMetalake(testMetalake2);
         });
     assertThrows(
         "Current user access metadata {testMetalake3}",
         ForbiddenException.class,
         () -> {
-          normalUserClient.loadMetalake("testMetalake3");
+          normalUserClient.loadMetalake(testMetalake3);
         });
     serviceAdminButNotOwnerClient.loadMetalake(METALAKE);
-    serviceAdminButNotOwnerClient.loadMetalake("testMetalake2");
+    serviceAdminButNotOwnerClient.loadMetalake(testMetalake2);
     assertThrows(
         "Current user access metadata {testMetalake3}",
         ForbiddenException.class,
         () -> {
-          serviceAdminButNotOwnerClient.loadMetalake("testMetalake3");
+          serviceAdminButNotOwnerClient.loadMetalake(testMetalake3);
         });
   }
 
@@ -131,16 +139,16 @@ public class MetalakeAuthorizationIT extends BaseRestApiAuthorizationIT {
         ForbiddenException.class,
         () -> {
           serviceAdminButNotOwnerClient.alterMetalake(
-              "testMetalake2", MetalakeChange.setProperty("key1", "value1"));
+              testMetalake2, MetalakeChange.setProperty("key1", "value1"));
         });
     assertThrows(
         "Current user access metadata {testMetalake2}",
         ForbiddenException.class,
         () -> {
           normalUserClient.alterMetalake(
-              "testMetalake2", MetalakeChange.setProperty("key1", "value1"));
+              testMetalake2, MetalakeChange.setProperty("key1", "value1"));
         });
-    serviceAdminClient.alterMetalake("testMetalake2", MetalakeChange.setProperty("key1", "value1"));
+    serviceAdminClient.alterMetalake(testMetalake2, MetalakeChange.setProperty("key1", "value1"));
   }
 
   @Test
@@ -150,15 +158,15 @@ public class MetalakeAuthorizationIT extends BaseRestApiAuthorizationIT {
         "Current user access metadata {testMetalake2}",
         ForbiddenException.class,
         () -> {
-          serviceAdminButNotOwnerClient.dropMetalake("testMetalake3", true);
+          serviceAdminButNotOwnerClient.dropMetalake(testMetalake3, true);
         });
     assertThrows(
         "Current user access metadata {testMetalake2}",
         ForbiddenException.class,
         () -> {
-          normalUserClient.dropMetalake("testMetalake3", true);
+          normalUserClient.dropMetalake(testMetalake3, true);
         });
-    serviceAdminClient.dropMetalake("testMetalake3", true);
+    serviceAdminClient.dropMetalake(testMetalake3, true);
   }
 
   private void assertMetalakeEquals(

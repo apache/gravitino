@@ -21,6 +21,8 @@ package org.apache.gravitino.catalog;
 import static org.apache.gravitino.file.Fileset.LOCATION_NAME_UNKNOWN;
 
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableSet;
+import java.util.Map;
 import org.apache.gravitino.file.Fileset;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.FilesetEntity;
@@ -50,5 +52,81 @@ public class TestEntityCombinedFileset {
     EntityCombinedFileset entityCombinedFileset = EntityCombinedFileset.of(fileset, filesetEntity);
     Assertions.assertEquals(fileset, entityCombinedFileset.fileset());
     Assertions.assertEquals(filesetEntity, entityCombinedFileset.filesetEntity());
+  }
+
+  /**
+   * Test that properties() method works correctly when hiddenProperties is not initialized. This
+   * test verifies the fix for NPE issue #8168.
+   */
+  @Test
+  void testPropertiesWithoutHiddenProperties() {
+    Fileset fileset = Mockito.mock(Fileset.class);
+    ImmutableMap<String, String> properties = ImmutableMap.of("propA", "valueA", "propB", "valueB");
+    Mockito.when(fileset.properties()).thenReturn(properties);
+
+    EntityCombinedFileset entityCombinedFileset = EntityCombinedFileset.of(fileset);
+
+    // This should not throw NPE and should return all properties
+    Assertions.assertEquals(properties, entityCombinedFileset.properties());
+  }
+
+  /** Test that properties() method correctly filters hidden properties. */
+  @Test
+  void testPropertiesWithHiddenProperties() {
+    Fileset fileset = Mockito.mock(Fileset.class);
+    ImmutableMap<String, String> properties =
+        ImmutableMap.of("propA", "valueA", "propB", "valueB", "hiddenProp", "hiddenValue");
+    Mockito.when(fileset.properties()).thenReturn(properties);
+
+    EntityCombinedFileset entityCombinedFileset =
+        EntityCombinedFileset.of(fileset).withHiddenProperties(ImmutableSet.of("hiddenProp"));
+
+    Map<String, String> result = entityCombinedFileset.properties();
+
+    // Should only contain non-hidden properties
+    Assertions.assertEquals(2, result.size());
+    Assertions.assertEquals("valueA", result.get("propA"));
+    Assertions.assertEquals("valueB", result.get("propB"));
+    Assertions.assertNull(result.get("hiddenProp"));
+  }
+
+  /** Test that withHiddenProperties() method handles null input correctly. */
+  @Test
+  void testWithHiddenPropertiesNull() {
+    Fileset fileset = Mockito.mock(Fileset.class);
+    ImmutableMap<String, String> properties = ImmutableMap.of("propA", "valueA", "propB", "valueB");
+    Mockito.when(fileset.properties()).thenReturn(properties);
+
+    EntityCombinedFileset entityCombinedFileset =
+        EntityCombinedFileset.of(fileset).withHiddenProperties(null);
+
+    // Should not throw NPE and should return all properties
+    Assertions.assertEquals(properties, entityCombinedFileset.properties());
+  }
+
+  /** Test that properties() method handles null values correctly in the property map. */
+  @Test
+  void testPropertiesWithNullValues() {
+    Fileset fileset = Mockito.mock(Fileset.class);
+    Map<String, String> propertiesWithNull =
+        ImmutableMap.<String, String>builder()
+            .put("propA", "valueA")
+            .put("propB", "valueB")
+            .build();
+
+    // Mock a map that includes null key/value (though ImmutableMap doesn't allow nulls,
+    // this simulates what might happen with other Map implementations)
+    Map<String, String> mockProperties = Mockito.mock(Map.class);
+    Mockito.when(mockProperties.entrySet()).thenReturn(propertiesWithNull.entrySet());
+    Mockito.when(fileset.properties()).thenReturn(mockProperties);
+
+    EntityCombinedFileset entityCombinedFileset = EntityCombinedFileset.of(fileset);
+
+    Map<String, String> result = entityCombinedFileset.properties();
+
+    // Should contain all valid properties (no null keys/values)
+    Assertions.assertEquals(2, result.size());
+    Assertions.assertEquals("valueA", result.get("propA"));
+    Assertions.assertEquals("valueB", result.get("propB"));
   }
 }

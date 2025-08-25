@@ -57,14 +57,14 @@ def load_tag_tool(mcp: FastMCP):
         )
 
     @mcp.tool(tags={"tag"})
-    async def get_tag_by_name(ctx: Context, name: str) -> str:
+    async def get_tag_by_name(ctx: Context, tag_name: str) -> str:
         """
         Load a tag by its name.
 
         Args:
             ctx (Context): The request context object containing lifespan context
                            and connector information.
-            name (str): Name of the tag to get
+            tag_name (str): Name of the tag to get
 
         Returns:
             str: JSON-formatted string containing the tag information
@@ -85,10 +85,10 @@ def load_tag_tool(mcp: FastMCP):
             }
         """
         client = ctx.request_context.lifespan_context.rest_client()
-        return await client.as_tag_operation().get_tag_by_name(name)
+        return await client.as_tag_operation().get_tag_by_name(tag_name)
 
     @mcp.tool(tags={"tag"})
-    async def get_list_of_tags(ctx: Context) -> str:
+    async def list_of_tags(ctx: Context) -> str:
         """
         Retrieve the list of tags within the metalake.
 
@@ -118,7 +118,7 @@ def load_tag_tool(mcp: FastMCP):
             ]
         """
         client = ctx.request_context.lifespan_context.rest_client()
-        return await client.as_tag_operation().get_list_of_tags()
+        return await client.as_tag_operation().list_of_tags()
 
     # Disable the alter_tag tool by default as it can be destructive.
     @mcp.tool(tags={"tag"}, enabled=False)
@@ -193,8 +193,7 @@ def load_tag_tool(mcp: FastMCP):
         client = ctx.request_context.lifespan_context.rest_client()
         return await client.as_tag_operation().delete_tag(name)
 
-    # Disable the associate_tag_with_metadata tool by default as it will change metadata state.
-    @mcp.tool(tags={"tag"}, enabled=False)
+    @mcp.tool(tags={"tag"})
     async def associate_tag_with_metadata(
         ctx: Context,
         metadata_full_name: str,
@@ -202,7 +201,7 @@ def load_tag_tool(mcp: FastMCP):
         tags_to_associate: list,
     ) -> str:
         """
-        Associate or disassociate tags with metadata.
+        Associate tags with metadata.
 
         Args:
             ctx (Context): The request context object containing lifespan context
@@ -241,8 +240,7 @@ def load_tag_tool(mcp: FastMCP):
             [],
         )
 
-    # Disable the disassociate_tag_from_metadata tool by default as it will change metadata state.
-    @mcp.tool(tags={"tag"}, enabled=False)
+    @mcp.tool(tags={"tag"})
     async def disassociate_tag_from_metadata(
         ctx: Context,
         metadata_full_name: str,

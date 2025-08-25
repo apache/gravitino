@@ -71,17 +71,17 @@ class FieldReferenceDTO(NamedReference, FunctionArg):
             self._field_name = field_name
             return self
 
-        def with_column_name(self, column_name: List[str]) -> FieldReferenceDTO.Builder:
+        def with_column_name(self, column_name: str) -> FieldReferenceDTO.Builder:
             """Set the column name for the field reference.
 
             Args:
-                column_name (List[str]): The column name.
+                column_name (str): The column name.
 
             Returns:
                 FieldReferenceDTO.Builder: The builder.
             """
 
-            self._field_name = column_name
+            self._field_name = [column_name]
             return self
 
         def build(self) -> FieldReferenceDTO:

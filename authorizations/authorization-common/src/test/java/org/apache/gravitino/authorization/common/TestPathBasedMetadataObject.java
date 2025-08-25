@@ -95,4 +95,15 @@ public class TestPathBasedMetadataObject {
     Assertions.assertNotEquals(recursiveObject, nonRecursiveObject);
     Assertions.assertNotEquals(recursiveObject.hashCode(), nonRecursiveObject.hashCode());
   }
+
+  @Test
+  public void testEqualsWithDifferentRecursive() {
+    PathBasedMetadataObject recursiveObject =
+        new PathBasedMetadataObject(
+            "parent", "name", "path", PathBasedMetadataObject.FILESET_PATH, true);
+    PathBasedMetadataObject recursiveObject2 =
+        new PathBasedMetadataObject(
+            "parent", "name", "path", PathBasedMetadataObject.FILESET_PATH, true);
+    Assertions.assertEquals(recursiveObject, recursiveObject2);
+  }
 }

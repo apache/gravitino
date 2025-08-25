@@ -35,7 +35,7 @@ class TestJobTool(unittest.TestCase):
     def test_list_job_templates(self):
         async def _test_list_job_templates(mcp_server):
             async with Client(mcp_server) as client:
-                result = await client.call_tool("get_list_of_job_templates")
+                result = await client.call_tool("list_of_job_templates")
                 self.assertEqual("mock_job_templates", result.content[0].text)
 
         asyncio.run(_test_list_job_templates(self.mcp))
@@ -64,13 +64,13 @@ class TestJobTool(unittest.TestCase):
 
         asyncio.run(_test_get_job_by_id(self.mcp))
 
-    def test_get_list_of_jobs(self):
-        async def _test_get_list_of_jobs(mcp_server):
+    def test_list_of_jobs(self):
+        async def _test_list_of_jobs(mcp_server):
             async with Client(mcp_server) as client:
-                result = await client.call_tool("get_list_of_jobs")
+                result = await client.call_tool("list_of_jobs")
                 self.assertEqual("mock_jobs", result.content[0].text)
 
-        asyncio.run(_test_get_list_of_jobs(self.mcp))
+        asyncio.run(_test_list_of_jobs(self.mcp))
 
     def test_run_job(self):
         async def _test_run_job(mcp_server):

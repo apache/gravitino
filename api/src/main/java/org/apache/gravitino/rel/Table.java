@@ -33,6 +33,8 @@ import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.expressions.transforms.Transforms;
 import org.apache.gravitino.rel.indexes.Index;
 import org.apache.gravitino.rel.indexes.Indexes;
+import org.apache.gravitino.stats.SupportsPartitionStatistics;
+import org.apache.gravitino.stats.SupportsStatistics;
 import org.apache.gravitino.tag.SupportsTags;
 
 /**
@@ -120,5 +122,24 @@ public interface Table extends Auditable {
    */
   default SupportsRoles supportsRoles() {
     throw new UnsupportedOperationException("Table does not support role operations.");
+  }
+
+  /**
+   * Returns the {@link SupportsStatistics} if the table supports statistics operations.
+   *
+   * @return The {@link SupportsStatistics} for the table.
+   */
+  default SupportsStatistics supportsStatistics() {
+    throw new UnsupportedOperationException("Table does not support statistics operations.");
+  }
+
+  /**
+   * Returns the {@link SupportsPartitionStatistics} if the table supports partition statistics
+   *
+   * @return The {@link SupportsPartitionStatistics} for the table.
+   */
+  default SupportsPartitionStatistics supportsPartitionStatistics() {
+    throw new UnsupportedOperationException(
+        "Table does not support partition statistics operations.");
   }
 }

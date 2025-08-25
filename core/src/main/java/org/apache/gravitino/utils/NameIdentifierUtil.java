@@ -560,4 +560,33 @@ public class NameIdentifierUtil {
   public static NameIdentifier ofStatistic(NameIdentifier entityIdent, String name) {
     return NameIdentifier.of(Namespace.fromString(entityIdent.toString()), name);
   }
+
+  /**
+   * Try to get the model {@link NameIdentifier} from the given {@link NameIdentifier}.
+   *
+   * @param ident The {@link NameIdentifier} to check.
+   * @return The model {@link NameIdentifier}
+   * @throws IllegalNameIdentifierException If the given {@link NameIdentifier} does not include
+   *     model name
+   */
+  public static NameIdentifier getModelIdentifier(NameIdentifier ident) {
+    NameIdentifier.check(
+        ident.name() != null && !ident.name().isEmpty(),
+        "The name variable in the NameIdentifier must have value.");
+    Namespace.check(
+        ident.namespace() != null
+            && !ident.namespace().isEmpty()
+            && ident.namespace().length() >= 4,
+        "ModelVersion namespace must be non-null and at least 4 level, the input namespace is %s",
+        ident.namespace());
+
+    List<String> allElems =
+        Stream.concat(Arrays.stream(ident.namespace().levels()), Stream.of(ident.name()))
+            .collect(Collectors.toList());
+    if (allElems.size() < 4) {
+      throw new IllegalNameIdentifierException(
+          "Cannot create a model NameIdentifier less than four elements.");
+    }
+    return NameIdentifier.of(allElems.get(0), allElems.get(1), allElems.get(2), allElems.get(3));
+  }
 }

@@ -20,6 +20,8 @@ import httpx
 from mcp_server.client import (
     CatalogOperation,
     GravitinoOperation,
+    ModelOperation,
+    PolicyOperation,
     SchemaOperation,
     TableOperation,
     TagOperation,
@@ -37,8 +39,14 @@ from mcp_server.client.plain.plain_rest_client_job_operation import (
 from mcp_server.client.plain.plain_rest_client_model_operation import (
     PlainRESTClientModelOperation,
 )
+from mcp_server.client.plain.plain_rest_client_policy_operation import (
+    PlainRESTClientPolicyOperation,
+)
 from mcp_server.client.plain.plain_rest_client_schema_operation import (
     PlainRESTClientSchemaOperation,
+)
+from mcp_server.client.plain.plain_rest_client_statistic_operation import (
+    PlainRESTClientStatisticOperation,
 )
 from mcp_server.client.plain.plain_rest_client_table_operation import (
     PlainRESTClientTableOperation,
@@ -52,47 +60,67 @@ from mcp_server.client.plain.plain_rest_client_topic_operation import (
 from mcp_server.client.topic_operation import TopicOperation
 
 
+# pylint: disable=too-many-instance-attributes
 class PlainRESTClientOperation(GravitinoOperation):
     def __init__(self, metalake_name: str, uri: str):
-        self.metalake_name = metalake_name
-        self.rest_client = httpx.AsyncClient(base_url=uri)
+        _rest_client = httpx.AsyncClient(base_url=uri)
+        self._catalog_operation = PlainRESTClientCatalogOperation(
+            metalake_name, _rest_client
+        )
+        self._table_operation = PlainRESTClientTableOperation(
+            metalake_name, _rest_client
+        )
+        self._schema_operation = PlainRESTClientSchemaOperation(
+            metalake_name, _rest_client
+        )
+        self._topic_operation = PlainRESTClientTopicOperation(
+            metalake_name, _rest_client
+        )
+        self._model_operation = PlainRESTClientModelOperation(
+            metalake_name, _rest_client
+        )
+        self._tag_operation = PlainRESTClientTagOperation(
+            metalake_name, _rest_client
+        )
+        self._fileset_operation = PlainRESTClientFilesetOperation(
+            metalake_name, _rest_client
+        )
+        self._job_operation = PlainRESTClientJobOperation(
+            metalake_name, _rest_client
+        )
+        self._policy_operation = PlainRESTClientPolicyOperation(
+            metalake_name, _rest_client
+        )
+        self._statistic_operation = PlainRESTClientStatisticOperation(
+            metalake_name, _rest_client
+        )
 
     def as_catalog_operation(self) -> CatalogOperation:
-        return PlainRESTClientCatalogOperation(
-            metalake_name=self.metalake_name, rest_client=self.rest_client
-        )
+        return self._catalog_operation
 
     def as_table_operation(self) -> TableOperation:
-        return PlainRESTClientTableOperation(
-            metalake_name=self.metalake_name, rest_client=self.rest_client
-        )
+        return self._table_operation
 
     def as_schema_operation(self) -> SchemaOperation:
-        return PlainRESTClientSchemaOperation(
-            metalake_name=self.metalake_name, rest_client=self.rest_client
-        )
+        return self._schema_operation
 
     def as_topic_operation(self) -> TopicOperation:
-        return PlainRESTClientTopicOperation(
-            metalake_name=self.metalake_name, rest_client=self.rest_client
-        )
+        return self._topic_operation
 
-    def as_model_operation(self):
-        return PlainRESTClientModelOperation(
-            metalake_name=self.metalake_name, rest_client=self.rest_client
-        )
+    def as_model_operation(self) -> ModelOperation:
+        return self._model_operation
 
     def as_fileset_operation(self):
-        return PlainRESTClientFilesetOperation(
-            metalake_name=self.metalake_name, rest_client=self.rest_client
-        )
+        return self._fileset_operation
 
     def as_tag_operation(self) -> TagOperation:
-        return PlainRESTClientTagOperation(
-            metalake_name=self.metalake_name, rest_client=self.rest_client
-        )
+        return self._tag_operation
 
     def as_job_operation(self) -> JobOperation:
-        return PlainRESTClientJobOperation(
-            metalake_name=self.metalake_name, rest_client=self.rest_client
-        )
+        return self._job_operation
+
+    def as_statistic_operation(self):
+        return self._statistic_operation
+
+    def as_policy_operation(self) -> PolicyOperation:
+        return self._policy_operation

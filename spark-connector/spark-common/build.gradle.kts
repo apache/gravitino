@@ -32,8 +32,7 @@ val sparkVersion: String = libs.versions.spark33.get()
 val sparkMajorVersion: String = sparkVersion.substringBeforeLast(".")
 val icebergVersion: String = libs.versions.iceberg4connector.get()
 val paimonVersion: String = libs.versions.paimon.get()
-// kyuubi hive connector for Spark 3.3 doesn't support scala 2.13
-val kyuubiVersion: String = libs.versions.kyuubi4spark34.get()
+val kyuubiVersion: String = libs.versions.kyuubi4spark.get()
 val scalaJava8CompatVersion: String = libs.versions.scala.java.compat.get()
 val scalaCollectionCompatVersion: String = libs.versions.scala.collection.compat.get()
 

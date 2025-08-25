@@ -157,9 +157,6 @@ export const providers = [
       {
         key: 'warehouse',
         value: '',
-        required: true,
-        parentField: 'catalog-backend',
-        hide: ['rest'],
         description: 'Apache Iceberg catalog warehouse config'
       },
       {

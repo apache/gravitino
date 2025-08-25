@@ -435,8 +435,18 @@ class DTOConverters {
           ((ModelVersionChange.RemoveProperty) change).property());
 
     } else if (change instanceof ModelVersionChange.UpdateUri) {
+      ModelVersionChange.UpdateUri updateUri = (ModelVersionChange.UpdateUri) change;
       return new ModelVersionUpdateRequest.UpdateModelVersionUriRequest(
-          ((ModelVersionChange.UpdateUri) change).newUri());
+          updateUri.uriName(), updateUri.newUri());
+
+    } else if (change instanceof ModelVersionChange.AddUri) {
+      ModelVersionChange.AddUri addUri = (ModelVersionChange.AddUri) change;
+      return new ModelVersionUpdateRequest.AddModelVersionUriRequest(
+          addUri.uriName(), addUri.uri());
+
+    } else if (change instanceof ModelVersionChange.RemoveUri) {
+      return new ModelVersionUpdateRequest.RemoveModelVersionUriRequest(
+          ((ModelVersionChange.RemoveUri) change).uriName());
 
     } else if (change instanceof ModelVersionChange.UpdateAliases) {
       ModelVersionChange.UpdateAliases updateAliases = (ModelVersionChange.UpdateAliases) change;

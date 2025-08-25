@@ -33,7 +33,7 @@ class PlainRESTClientJobOperation(JobOperation):
         )
         return extract_content_from_response(response, "job", {})
 
-    async def get_list_of_jobs(self, job_template_name: str) -> str:
+    async def list_of_jobs(self, job_template_name: str) -> str:
         url = f"/api/metalakes/{self.metalake_name}/jobs/runs"
         if job_template_name:
             url += f"?jobTemplateName={job_template_name}"
@@ -47,7 +47,7 @@ class PlainRESTClientJobOperation(JobOperation):
         )
         return extract_content_from_response(response, "jobTemplate", {})
 
-    async def get_list_of_job_templates(self) -> str:
+    async def list_of_job_templates(self) -> str:
         response = await self.rest_client.get(
             f"/api/metalakes/{self.metalake_name}/jobs/templates?details=true"
         )

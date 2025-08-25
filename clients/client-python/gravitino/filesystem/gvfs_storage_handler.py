@@ -285,13 +285,25 @@ class S3StorageHandler(StorageHandler):
         """Get the file system with expiration.
         :return: The file system and the expiration time
         """
-        # S3 endpoint from gravitino server, Note: the endpoint may not a real S3 endpoint
-        # it can be a simulated S3 endpoint, such as minio, so though the endpoint is not a required field
-        # for S3FileSystem, we still need to assign the endpoint to the S3FileSystem
-        s3_endpoint = catalog_props.get("s3-endpoint", None) if catalog_props else None
-        # If the s3 endpoint is not found in the fileset catalog, get it from the client options
-        if s3_endpoint is None and options:
-            s3_endpoint = options.get(GVFSConfig.GVFS_FILESYSTEM_S3_ENDPOINT)
+        # S3 endpoint from client options has a higher priority, override the endpoint from catalog properties.
+        # Note: the endpoint may not be a real S3 endpoint, it can be a simulated S3 endpoint, such as minio,
+        # so though the endpoint is not a required field for S3FileSystem, we still need to assign the endpoint
+        # to the S3FileSystem
+        s3_endpoint = None
+        if options:
+            s3_endpoint = (
+                options.get(GVFSConfig.GVFS_FILESYSTEM_S3_ENDPOINT, s3_endpoint)
+                if options
+                else None
+            )
+            if s3_endpoint is None:
+                s3_endpoint = (
+                    catalog_props.get("s3-endpoint", None) if catalog_props else None
+                )
+        else:
+            s3_endpoint = (
+                catalog_props.get("s3-endpoint", None) if catalog_props else None
+            )
 
         if credentials:
             credential = self._get_most_suitable_credential(credentials)
@@ -470,13 +482,22 @@ class OSSStorageHandler(StorageHandler):
         actual_path: Optional[str] = None,
         **kwargs,
     ) -> Tuple[int, AbstractFileSystem]:
-        # OSS endpoint from gravitino server
-        oss_endpoint = (
-            catalog_props.get("oss-endpoint", None) if catalog_props else None
-        )
-        # If the oss endpoint is not found in the fileset catalog, get it from the client options
-        if oss_endpoint is None and options:
-            oss_endpoint = options.get(GVFSConfig.GVFS_FILESYSTEM_OSS_ENDPOINT)
+        oss_endpoint = None
+        # OSS endpoint from client options has a higher priority, override the endpoint from catalog properties.
+        if options:
+            oss_endpoint = (
+                options.get(GVFSConfig.GVFS_FILESYSTEM_OSS_ENDPOINT, oss_endpoint)
+                if options
+                else None
+            )
+            if oss_endpoint is None:
+                oss_endpoint = (
+                    catalog_props.get("oss-endpoint", None) if catalog_props else None
+                )
+        else:
+            oss_endpoint = (
+                catalog_props.get("oss-endpoint", None) if catalog_props else None
+            )
 
         if credentials:
             credential = self._get_most_suitable_credential(credentials)

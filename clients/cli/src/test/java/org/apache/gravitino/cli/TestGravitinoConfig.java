@@ -21,6 +21,7 @@ package org.apache.gravitino.cli;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -45,6 +46,17 @@ public class TestGravitinoConfig {
   private static final String URL_VALUE = "http://10.0.0.1:8090";
   private static final String IGNORE_KEY = "ignore";
   private static final String IGNORE_VALUE = "true";
+  private static final String AUTH_KEY = "auth";
+  private static final String OAUTH_VALUE = "oauth";
+  private static final String KERBEROS_VALUE = "kerberos";
+  // OAuth test values
+  private static final String SERVER_URI_VALUE = "https://oauth.example.com";
+  private static final String CREDENTIAL_VALUE = "test-credential";
+  private static final String TOKEN_VALUE = "test-token";
+  private static final String SCOPE_VALUE = "test-scope";
+  // Kerberos test values
+  private static final String PRINCIPAL_VALUE = "test@EXAMPLE.COM";
+  private static final String KEYTAB_VALUE = "/path/to/test.keytab";
 
   @BeforeEach
   public void setUp() throws IOException {
@@ -183,5 +195,212 @@ public class TestGravitinoConfig {
     assertNull(config.getMetalakeName(), "Metalake should be null before reading the config file");
     assertNull(config.getGravitinoURL(), "URL should be null before reading the config file");
     assertFalse(config.getIgnore(), "Ignore should be null before reading the config file");
+  }
+
+  @Test
+  public void oAuthConfiguration() throws IOException {
+    // Create a config file with OAuth settings
+    File tempFileWithOAuth =
+        new File(System.getProperty("java.io.tmpdir") + "/oauth_config.properties");
+    Properties props = new Properties();
+    props.setProperty(AUTH_KEY, OAUTH_VALUE);
+    props.setProperty("serverURI", SERVER_URI_VALUE);
+    props.setProperty("credential", CREDENTIAL_VALUE);
+    props.setProperty("token", TOKEN_VALUE);
+    props.setProperty("scope", SCOPE_VALUE);
+
+    try (Writer writer =
+        Files.newBufferedWriter(tempFileWithOAuth.toPath(), StandardCharsets.UTF_8)) {
+      props.store(writer, "OAuth Test Config");
+    }
+
+    GravitinoConfig config = new GravitinoConfig(tempFileWithOAuth.getAbsolutePath());
+    config.read();
+
+    assertEquals(OAUTH_VALUE, config.getGravitinoAuthType(), "Auth type should be oauth");
+    assertNotNull(config.getOAuth(), "OAuth configuration should not be null");
+    assertNull(config.getKerberos(), "Kerberos configuration should be null for OAuth");
+
+    OAuthData oauth = config.getOAuth();
+    assertEquals(SERVER_URI_VALUE, oauth.getServerURI(), "OAuth server URI should match");
+    assertEquals(CREDENTIAL_VALUE, oauth.getCredential(), "OAuth credential should match");
+    assertEquals(TOKEN_VALUE, oauth.getToken(), "OAuth token should match");
+    assertEquals(SCOPE_VALUE, oauth.getScope(), "OAuth scope should match");
+
+    tempFileWithOAuth.delete();
+  }
+
+  @Test
+  public void oAuthConfigurationPartialProperties() throws IOException {
+    // Create a config file with only some OAuth properties
+    File tempFilePartialOAuth =
+        new File(System.getProperty("java.io.tmpdir") + "/partial_oauth_config.properties");
+    Properties props = new Properties();
+    props.setProperty(AUTH_KEY, OAUTH_VALUE);
+    props.setProperty("serverURI", SERVER_URI_VALUE);
+    props.setProperty("credential", CREDENTIAL_VALUE);
+    // Missing token and scope
+
+    try (Writer writer =
+        Files.newBufferedWriter(tempFilePartialOAuth.toPath(), StandardCharsets.UTF_8)) {
+      props.store(writer, "Partial OAuth Test Config");
+    }
+
+    GravitinoConfig config = new GravitinoConfig(tempFilePartialOAuth.getAbsolutePath());
+    config.read();
+
+    assertEquals(OAUTH_VALUE, config.getGravitinoAuthType(), "Auth type should be oauth");
+    assertNotNull(config.getOAuth(), "OAuth configuration should not be null");
+
+    OAuthData oauth = config.getOAuth();
+    assertEquals(SERVER_URI_VALUE, oauth.getServerURI(), "OAuth server URI should match");
+    assertEquals(CREDENTIAL_VALUE, oauth.getCredential(), "OAuth credential should match");
+    assertNull(oauth.getToken(), "OAuth token should be null when not provided");
+    assertNull(oauth.getScope(), "OAuth scope should be null when not provided");
+
+    tempFilePartialOAuth.delete();
+  }
+
+  @Test
+  public void getOAuthWithoutAuthType() throws IOException {
+    // Create a config file without auth type set to oauth
+    File tempFileWithoutOAuth =
+        new File(System.getProperty("java.io.tmpdir") + "/no_oauth_config.properties");
+    Properties props = new Properties();
+    props.setProperty(METALAKE_KEY, METALAKE_VALUE);
+    // No auth property set
+
+    try (Writer writer =
+        Files.newBufferedWriter(tempFileWithoutOAuth.toPath(), StandardCharsets.UTF_8)) {
+      props.store(writer, "No OAuth Test Config");
+    }
+
+    GravitinoConfig config = new GravitinoConfig(tempFileWithoutOAuth.getAbsolutePath());
+    config.read();
+
+    assertNull(config.getGravitinoAuthType(), "Auth type should be null when not configured");
+    assertNull(config.getOAuth(), "OAuth configuration should be null when auth type is not oauth");
+    assertNull(
+        config.getKerberos(),
+        "Kerberos configuration should be null when auth type is not kerberos");
+
+    tempFileWithoutOAuth.delete();
+  }
+
+  @Test
+  public void kerberosConfiguration() throws IOException {
+    // Create a config file with Kerberos settings
+    File tempFileWithKerberos =
+        new File(System.getProperty("java.io.tmpdir") + "/kerberos_config.properties");
+    Properties props = new Properties();
+    props.setProperty(AUTH_KEY, KERBEROS_VALUE);
+    props.setProperty("principal", PRINCIPAL_VALUE);
+    props.setProperty("keytabFile", KEYTAB_VALUE);
+
+    try (Writer writer =
+        Files.newBufferedWriter(tempFileWithKerberos.toPath(), StandardCharsets.UTF_8)) {
+      props.store(writer, "Kerberos Test Config");
+    }
+
+    GravitinoConfig config = new GravitinoConfig(tempFileWithKerberos.getAbsolutePath());
+    config.read();
+
+    assertEquals(KERBEROS_VALUE, config.getGravitinoAuthType(), "Auth type should be kerberos");
+    assertNotNull(config.getKerberos(), "Kerberos configuration should not be null");
+    assertNull(config.getOAuth(), "OAuth configuration should be null for Kerberos");
+
+    KerberosData kerberos = config.getKerberos();
+    assertEquals(PRINCIPAL_VALUE, kerberos.getPrincipal(), "Kerberos principal should match");
+    assertEquals(KEYTAB_VALUE, kerberos.getKeytabFile(), "Kerberos keytab file should match");
+
+    tempFileWithKerberos.delete();
+  }
+
+  @Test
+  public void kerberosConfigurationPartialProperties() throws IOException {
+    // Create a config file with only principal (missing keytab)
+    File tempFilePartialKerberos =
+        new File(System.getProperty("java.io.tmpdir") + "/partial_kerberos_config.properties");
+    Properties props = new Properties();
+    props.setProperty(AUTH_KEY, KERBEROS_VALUE);
+    props.setProperty("principal", PRINCIPAL_VALUE);
+    // Missing keytabFile
+
+    try (Writer writer =
+        Files.newBufferedWriter(tempFilePartialKerberos.toPath(), StandardCharsets.UTF_8)) {
+      props.store(writer, "Partial Kerberos Test Config");
+    }
+
+    GravitinoConfig config = new GravitinoConfig(tempFilePartialKerberos.getAbsolutePath());
+    config.read();
+
+    assertEquals(KERBEROS_VALUE, config.getGravitinoAuthType(), "Auth type should be kerberos");
+    assertNotNull(config.getKerberos(), "Kerberos configuration should not be null");
+
+    KerberosData kerberos = config.getKerberos();
+    assertEquals(PRINCIPAL_VALUE, kerberos.getPrincipal(), "Kerberos principal should match");
+    assertNull(kerberos.getKeytabFile(), "Kerberos keytab should be null when not provided");
+
+    tempFilePartialKerberos.delete();
+  }
+
+  @Test
+  public void getKerberosWithoutAuthType() throws IOException {
+    // Create a config file with auth type set to something other than kerberos
+    File tempFileWithoutKerberos =
+        new File(System.getProperty("java.io.tmpdir") + "/no_kerberos_config.properties");
+    Properties props = new Properties();
+    props.setProperty(AUTH_KEY, "simple"); // Different auth type
+    props.setProperty(METALAKE_KEY, METALAKE_VALUE);
+
+    try (Writer writer =
+        Files.newBufferedWriter(tempFileWithoutKerberos.toPath(), StandardCharsets.UTF_8)) {
+      props.store(writer, "No Kerberos Test Config");
+    }
+
+    GravitinoConfig config = new GravitinoConfig(tempFileWithoutKerberos.getAbsolutePath());
+    config.read();
+
+    assertEquals("simple", config.getGravitinoAuthType(), "Auth type should be simple");
+    assertNull(
+        config.getKerberos(),
+        "Kerberos configuration should be null when auth type is not kerberos");
+    assertNull(config.getOAuth(), "OAuth configuration should be null when auth type is not oauth");
+
+    tempFileWithoutKerberos.delete();
+  }
+
+  @Test
+  public void getGravitinoAuthType() throws IOException {
+    // Create a config file with auth type
+    File tempFileWithAuthType =
+        new File(System.getProperty("java.io.tmpdir") + "/auth_type_config.properties");
+    Properties props = new Properties();
+    props.setProperty(AUTH_KEY, OAUTH_VALUE);
+    props.setProperty(METALAKE_KEY, METALAKE_VALUE);
+
+    try (Writer writer =
+        Files.newBufferedWriter(tempFileWithAuthType.toPath(), StandardCharsets.UTF_8)) {
+      props.store(writer, "Auth Type Test Config");
+    }
+
+    GravitinoConfig config = new GravitinoConfig(tempFileWithAuthType.getAbsolutePath());
+    config.read();
+
+    assertEquals(
+        OAUTH_VALUE, config.getGravitinoAuthType(), "Auth type should match configured value");
+
+    tempFileWithAuthType.delete();
+  }
+
+  @Test
+  public void authTypeWithoutConfig() {
+    GravitinoConfig config = new GravitinoConfig(NON_EXISTENT_FILE_PATH);
+    config.read(); // Should handle missing file gracefully
+
+    assertNull(
+        config.getGravitinoAuthType(), "Auth type should be null when config file doesn't exist");
+    assertNull(config.getOAuth(), "OAuth should be null when config file doesn't exist");
+    assertNull(config.getKerberos(), "Kerberos should be null when config file doesn't exist");
   }
 }

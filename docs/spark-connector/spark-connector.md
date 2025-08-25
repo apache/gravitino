@@ -21,10 +21,6 @@ The Apache Gravitino Spark connector leverages the Spark DataSourceV2 interface 
 * Scala 2.12 or 2.13
 * JDK 8 or 11 or 17
 
-:::info
-Gravitino Spark connector doesn't support Scala 2.13 for Spark3.3.
-:::
-
 ## How to use it
 
 1. [Build](../how-to-build.md) or download the package ([gravitino-spark-connector-runtime-3.3](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-spark-connector-runtime-3.3), [gravitino-spark-connector-runtime-3.4](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-spark-connector-runtime-3.4), [gravitino-spark-connector-runtime-3.5](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-spark-connector-runtime-3.5)), and place it to the classpath of Spark.

@@ -19,7 +19,7 @@ from fastmcp import Context, FastMCP
 
 
 def load_metadata_tool(mcp: FastMCP):
-    @mcp.tool(tags={"metadata"})
+    @mcp.tool(tags={"tag", "policy"})
     async def metadata_type_to_fullname_formats(ctx: Context) -> dict:
         """
         Get metadata type to full name formats.

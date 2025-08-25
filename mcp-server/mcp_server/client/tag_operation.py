@@ -54,7 +54,7 @@ class TagOperation(ABC):
         pass
 
     @abstractmethod
-    async def get_list_of_tags(self) -> str:
+    async def list_of_tags(self) -> str:
         """
         Retrieve the list of tags within the metalake
 

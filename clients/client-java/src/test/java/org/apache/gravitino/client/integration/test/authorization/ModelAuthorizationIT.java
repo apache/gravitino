@@ -239,29 +239,32 @@ public class ModelAuthorizationIT extends BaseRestApiAuthorizationIT {
   @Test
   @Order(7)
   public void testListModelVersion() {
-    ModelCatalog modelCatalog = client.loadMetalake(METALAKE).loadCatalog(CATALOG).asModelCatalog();
+    GravitinoMetalake gravitinoMetalake = client.loadMetalake(METALAKE);
+    ModelCatalog modelCatalog = gravitinoMetalake.loadCatalog(CATALOG).asModelCatalog();
     Catalog catalogEntityLoadByNormalUser =
         normalUserClient.loadMetalake(METALAKE).loadCatalog(CATALOG);
     ModelCatalog modelCatalogLoadByNormalUser = catalogEntityLoadByNormalUser.asModelCatalog();
     int[] versions = modelCatalog.listModelVersions(NameIdentifier.of(SCHEMA, "model1"));
     assertEquals(2, versions.length);
-    assertThrows(
-        "Can not access metadata {" + METALAKE + "," + CATALOG + "." + SCHEMA + "model1" + "}.",
-        ForbiddenException.class,
-        () -> {
-          modelCatalogLoadByNormalUser.linkModelVersion(
-              NameIdentifier.of(SCHEMA, "model1"),
-              "uri1",
-              new String[] {"alias2"},
-              "comment2",
-              null);
-        });
+    versions = modelCatalogLoadByNormalUser.listModelVersions(NameIdentifier.of(SCHEMA, "model1"));
+    assertEquals(0, versions.length);
+    gravitinoMetalake.grantPrivilegesToRole(
+        role,
+        MetadataObjects.of(ImmutableList.of(CATALOG, SCHEMA, "model1"), MetadataObject.Type.MODEL),
+        ImmutableSet.of(Privileges.UseModel.allow()));
+    versions = modelCatalogLoadByNormalUser.listModelVersions(NameIdentifier.of(SCHEMA, "model1"));
+    assertEquals(2, versions.length);
+    gravitinoMetalake.revokePrivilegesFromRole(
+        role,
+        MetadataObjects.of(ImmutableList.of(CATALOG, SCHEMA, "model1"), MetadataObject.Type.MODEL),
+        ImmutableSet.of(Privileges.UseModel.allow()));
   }
 
   @Test
   @Order(8)
   public void testLoadModelVersion() {
-    ModelCatalog modelCatalog = client.loadMetalake(METALAKE).loadCatalog(CATALOG).asModelCatalog();
+    GravitinoMetalake gravitinoMetalake = client.loadMetalake(METALAKE);
+    ModelCatalog modelCatalog = gravitinoMetalake.loadCatalog(CATALOG).asModelCatalog();
     Catalog catalogEntityLoadByNormalUser =
         normalUserClient.loadMetalake(METALAKE).loadCatalog(CATALOG);
     ModelCatalog modelCatalogLoadByNormalUser = catalogEntityLoadByNormalUser.asModelCatalog();
@@ -273,6 +276,17 @@ public class ModelAuthorizationIT extends BaseRestApiAuthorizationIT {
         () -> {
           modelCatalogLoadByNormalUser.getModelVersion(NameIdentifier.of(SCHEMA, "model1"), 1);
         });
+
+    gravitinoMetalake.grantPrivilegesToRole(
+        role,
+        MetadataObjects.of(ImmutableList.of(CATALOG, SCHEMA, "model1"), MetadataObject.Type.MODEL),
+        ImmutableSet.of(Privileges.UseModel.allow()));
+    version = modelCatalogLoadByNormalUser.getModelVersion(NameIdentifier.of(SCHEMA, "model1"), 1);
+    assertEquals(1, version.version());
+    gravitinoMetalake.revokePrivilegesFromRole(
+        role,
+        MetadataObjects.of(ImmutableList.of(CATALOG, SCHEMA, "model1"), MetadataObject.Type.MODEL),
+        ImmutableSet.of(Privileges.UseModel.allow()));
   }
 
   @Test

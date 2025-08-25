@@ -20,6 +20,7 @@ package org.apache.gravitino.trino.connector.catalog.jdbc.postgresql;
 
 import static java.util.Collections.emptyList;
 
+import java.util.HashMap;
 import java.util.Map;
 import org.apache.gravitino.catalog.property.PropertyConverter;
 import org.apache.gravitino.trino.connector.catalog.CatalogConnectorAdapter;
@@ -45,7 +46,10 @@ public class PostgreSQLConnectorAdapter implements CatalogConnectorAdapter {
   @Override
   public Map<String, String> buildInternalConnectorConfig(GravitinoCatalog catalog)
       throws Exception {
-    return catalogConverter.gravitinoToEngineProperties(catalog.getProperties());
+    Map<String, String> trinoProperty =
+        new HashMap<>(catalogConverter.gravitinoToEngineProperties(catalog.getProperties()));
+    trinoProperty.put("postgresql.array-mapping", "AS_ARRAY");
+    return trinoProperty;
   }
 
   @Override

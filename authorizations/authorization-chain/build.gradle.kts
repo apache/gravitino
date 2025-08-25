@@ -26,7 +26,7 @@ plugins {
 
 val scalaVersion: String = project.properties["scalaVersion"] as? String ?: extra["defaultScalaVersion"].toString()
 val sparkVersion: String = libs.versions.spark35.get()
-val kyuubiVersion: String = libs.versions.kyuubi4paimon.get()
+val kyuubiVersion: String = libs.versions.kyuubi4authz.get()
 val sparkMajorVersion: String = sparkVersion.substringBeforeLast(".")
 
 dependencies {

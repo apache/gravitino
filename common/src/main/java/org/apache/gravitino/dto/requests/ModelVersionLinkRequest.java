@@ -21,6 +21,7 @@ package org.apache.gravitino.dto.requests;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Preconditions;
 import java.util.Map;
+import javax.annotation.Nullable;
 import lombok.AllArgsConstructor;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
@@ -38,8 +39,13 @@ import org.apache.gravitino.rest.RESTRequest;
 @AllArgsConstructor
 public class ModelVersionLinkRequest implements RESTRequest {
 
+  @Nullable
   @JsonProperty("uri")
   private String uri;
+
+  @Nullable
+  @JsonProperty("uris")
+  private Map<String, String> uris;
 
   @JsonProperty("aliases")
   private String[] aliases;
@@ -50,11 +56,34 @@ public class ModelVersionLinkRequest implements RESTRequest {
   @JsonProperty("properties")
   private Map<String, String> properties;
 
+  /**
+   * Constructor for ModelVersionLinkRequest.
+   *
+   * @param uri the uri of the model version.
+   * @param aliases the aliases of the model version.
+   * @param comment the comment of the model version.
+   * @param properties the properties of the model version.
+   */
+  public ModelVersionLinkRequest(
+      String uri, String[] aliases, String comment, Map<String, String> properties) {
+    this(uri, null, aliases, comment, properties);
+  }
+
+  /**
+   * Constructor for ModelVersionLinkRequest
+   *
+   * @param uris the uris of the model version.
+   * @param aliases the aliases of the model version.
+   * @param comment the comment of the model version.
+   * @param properties the properties of the model version.
+   */
+  public ModelVersionLinkRequest(
+      Map<String, String> uris, String[] aliases, String comment, Map<String, String> properties) {
+    this(null, uris, aliases, comment, properties);
+  }
+
   @Override
   public void validate() throws IllegalArgumentException {
-    Preconditions.checkArgument(
-        StringUtils.isNotBlank(uri), "\"uri\" field is required and cannot be empty");
-
     if (aliases != null && aliases.length > 0) {
       for (String alias : aliases) {
         Preconditions.checkArgument(
@@ -62,6 +91,18 @@ public class ModelVersionLinkRequest implements RESTRequest {
         Preconditions.checkArgument(
             !NumberUtils.isCreatable(alias), "alias must not be a number or a number string");
       }
+    }
+
+    if (uris == null || uris.isEmpty()) {
+      Preconditions.checkArgument(
+          StringUtils.isNotBlank(uri),
+          "\"uri\" field cannot be empty if uris field is null or empty");
+    } else {
+      uris.forEach(
+          (n, u) -> {
+            Preconditions.checkArgument(StringUtils.isNotBlank(n), "URI name must not be blank");
+            Preconditions.checkArgument(StringUtils.isNotBlank(u), "URI must not be blank");
+          });
     }
   }
 }

@@ -495,8 +495,7 @@ public abstract class CatalogIcebergBaseIT extends BaseIT {
     }
 
     // TODO add partitioning and sort order check
-    Assertions.assertEquals(partitioning.length, createdTable.partitioning().length);
-    Assertions.assertEquals(sortOrders.length, createdTable.sortOrder().length);
+    assertPartitioningAndSortOrder(partitioning, sortOrders, createdTable);
 
     Table loadTable = tableCatalog.loadTable(tableIdentifier);
     Assertions.assertEquals(tableName, loadTable.name());
@@ -511,8 +510,7 @@ public abstract class CatalogIcebergBaseIT extends BaseIT {
       assertColumn(columns[i], loadTable.columns()[i]);
     }
 
-    Assertions.assertEquals(partitioning.length, loadTable.partitioning().length);
-    Assertions.assertEquals(sortOrders.length, loadTable.sortOrder().length);
+    assertPartitioningAndSortOrder(partitioning, sortOrders, loadTable);
 
     // catalog load check
     org.apache.iceberg.Table table =
@@ -547,6 +545,19 @@ public abstract class CatalogIcebergBaseIT extends BaseIT {
                     Transforms.EMPTY_TRANSFORM,
                     distribution,
                     sortOrders));
+  }
+
+  private void assertPartitioningAndSortOrder(
+      Transform[] expectedPartitioning, SortOrder[] expectedSortOrders, Table actualTable) {
+    Assertions.assertArrayEquals(expectedPartitioning, actualTable.partitioning());
+    Assertions.assertEquals(expectedSortOrders.length, actualTable.sortOrder().length);
+    for (int i = 0; i < expectedSortOrders.length; i++) {
+      SortOrder expected = expectedSortOrders[i];
+      SortOrder actual = actualTable.sortOrder()[i];
+      Assertions.assertEquals(expected.expression().toString(), actual.expression().toString());
+      Assertions.assertEquals(expected.direction(), actual.direction());
+      Assertions.assertEquals(expected.nullOrdering(), actual.nullOrdering());
+    }
   }
 
   @Test

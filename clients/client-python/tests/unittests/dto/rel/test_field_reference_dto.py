@@ -64,6 +64,6 @@ class TestFieldReferenceDTO(unittest.TestCase):
         self.assertIsInstance(dto, FieldReferenceDTO)
         self.assertEqual(dto.field_name(), ["field_name"])
 
-        dto = FieldReferenceDTO.builder().with_column_name(["field_name"]).build()
+        dto = FieldReferenceDTO.builder().with_column_name("field_name").build()
         self.assertIsInstance(dto, FieldReferenceDTO)
         self.assertEqual(dto.field_name(), ["field_name"])
