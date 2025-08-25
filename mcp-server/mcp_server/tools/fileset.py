@@ -20,7 +20,7 @@ from fastmcp import Context, FastMCP
 
 def load_fileset_tools(mcp: FastMCP):
     @mcp.tool(tags={"fileset"})
-    async def get_list_of_filesets(
+    async def list_of_filesets(
         ctx: Context,
         catalog_name: str,
         schema_name: str,
@@ -50,7 +50,7 @@ def load_fileset_tools(mcp: FastMCP):
             ]
         """
         client = ctx.request_context.lifespan_context.rest_client()
-        return await client.as_fileset_operation().get_list_of_filesets(
+        return await client.as_fileset_operation().list_of_filesets(
             catalog_name, schema_name
         )
 
