@@ -150,8 +150,12 @@ public interface EntityStore extends Closeable {
       throws IOException, NoSuchEntityException, EntityAlreadyExistsException;
 
   <E extends Entity & HasIdentifier> E update(
-          NameIdentifier ident, Class<E> type, EntityType entityType, List<String> roles, Function<E, E> updater)
-          throws IOException, NoSuchEntityException, EntityAlreadyExistsException;
+      NameIdentifier ident,
+      Class<E> type,
+      EntityType entityType,
+      List<String> roles,
+      Function<E, E> updater)
+      throws IOException, NoSuchEntityException, EntityAlreadyExistsException;
 
   /**
    * Get the entity from the underlying storage.

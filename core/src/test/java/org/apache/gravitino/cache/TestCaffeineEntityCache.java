@@ -190,8 +190,8 @@ public class TestCaffeineEntityCache {
   @Test
   /**
    * SCENE[2] <br>
-   * CACHE1 = Role1 -> [catalog1, catalog2]  <br>
-   * CACHE2 = catalog1 -> [tab1, tab2]  <br>
+   * CACHE1 = Role1 -> [catalog1, catalog2] <br>
+   * CACHE2 = catalog1 -> [tab1, tab2] <br>
    * ACTIVE: INVALIDATE catalog1, then need to remove RECORD1 and RECORD2
    */
   void testRemoveCacheRelation2() {

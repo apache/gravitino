@@ -20,7 +20,6 @@ package org.apache.gravitino.storage.relational;
 
 import static org.apache.gravitino.Configs.ENTITY_RELATIONAL_STORE;
 
-import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
 import java.util.List;
@@ -41,7 +40,6 @@ import org.apache.gravitino.cache.CacheFactory;
 import org.apache.gravitino.cache.EntityCache;
 import org.apache.gravitino.cache.NoOpsCache;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
-import org.apache.gravitino.meta.RoleEntity;
 import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.tag.SupportsTagOperations;
 import org.apache.gravitino.utils.Executable;
@@ -121,7 +119,11 @@ public class RelationalEntityStore
 
   @Override
   public <E extends Entity & HasIdentifier> E update(
-      NameIdentifier ident, Class<E> type, Entity.EntityType entityType, List<String> roles, Function<E, E> updater)
+      NameIdentifier ident,
+      Class<E> type,
+      Entity.EntityType entityType,
+      List<String> roles,
+      Function<E, E> updater)
       throws IOException, NoSuchEntityException, EntityAlreadyExistsException {
     cache.invalidate(ident, entityType);
 
@@ -130,12 +132,12 @@ public class RelationalEntityStore
           Namespace ns = NamespaceUtil.ofRole(ident.namespace().level(0));
           NameIdentifier nameIdentifier = NameIdentifier.of(ns, role);
 
-//          RoleEntity roleEntity = RoleEntity.builder()
-//          .withId(1L)
-//          .withName(role)
-//          .withNamespace(NamespaceUtil.ofRole(ident.namespace().level(0)))
-//          .build();
-//          cache.invalidate(nameIdentifier, Entity.EntityType.ROLE);
+          //          RoleEntity roleEntity = RoleEntity.builder()
+          //          .withId(1L)
+          //          .withName(role)
+          //          .withNamespace(NamespaceUtil.ofRole(ident.namespace().level(0)))
+          //          .build();
+          //          cache.invalidate(nameIdentifier, Entity.EntityType.ROLE);
         });
 
     return backend.update(ident, entityType, updater);
