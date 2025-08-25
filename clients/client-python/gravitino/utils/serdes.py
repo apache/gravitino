@@ -53,6 +53,7 @@ class SerdesUtilsBase:
 
     PARTITION_TYPE: Final[str] = "type"
     PARTITION_NAME: Final[str] = "name"
+    PARTITION_PROPERTIES: Final[str] = "properties"
     FIELD_NAMES: Final[str] = "fieldNames"
     IDENTITY_PARTITION_VALUES: Final[str] = "values"
     LIST_PARTITION_LISTS: Final[str] = "lists"

@@ -14,33 +14,3 @@
 # KIND, either express or implied.  See the License for the
 # specific language governing permissions and limitations
 # under the License.
-
-
-from abc import abstractmethod
-from enum import Enum, unique
-
-from gravitino.api.expressions.partitions.partition import Partition
-
-
-class PartitionDTO(Partition):
-    """Represents a Partition Data Transfer Object (DTO) that implements the Partition interface."""
-
-    @unique
-    class Type(str, Enum):
-        """Type of the partition."""
-
-        RANGE = "range"
-        """The range partition type."""
-        LIST = "list"
-        """The list partition type."""
-        IDENTITY = "identity"
-        """The identity partition type."""
-
-    @abstractmethod
-    def type(self) -> Type:
-        """Gets the type of the partition.
-
-        Returns:
-            Type: The type of the partition.
-        """
-        pass  # pragma: no cover
