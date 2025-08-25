@@ -16,7 +16,7 @@
 # under the License.
 
 
-from typing import ClassVar, List, final
+from typing import ClassVar, List, Optional, final
 
 from gravitino.api.expressions.indexes.index import Index
 
@@ -50,7 +50,10 @@ class Indexes:
     @final
     class IndexImpl(Index):
         def __init__(
-            self, index_type: Index.IndexType, name: str, field_names: List[List[str]]
+            self,
+            index_type: Index.IndexType,
+            name: Optional[str],
+            field_names: List[List[str]],
         ):
             self._index_type = index_type
             self._name = name
@@ -59,7 +62,7 @@ class Indexes:
         def type(self) -> Index.IndexType:
             return self._index_type
 
-        def name(self) -> str:
+        def name(self) -> Optional[str]:
             return self._name
 
         def field_names(self) -> List[List[str]]:
