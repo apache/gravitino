@@ -88,6 +88,10 @@ public class HiveTableConverter {
           BUILDER extends BaseColumn.BaseColumnBuilder<BUILDER, COLUMN>, COLUMN extends BaseColumn>
       Column[] getColumns(Table table, BUILDER columnBuilder) {
     StorageDescriptor sd = table.getSd();
+    // Collect column names from sd.getCols() to check for duplicates
+    java.util.Set<String> columnNames =
+        sd.getCols().stream().map(f -> f.getName()).collect(java.util.stream.Collectors.toSet());
+
     return Stream.concat(
             sd.getCols().stream()
                 .map(
@@ -98,6 +102,8 @@ public class HiveTableConverter {
                             .withComment(f.getComment())
                             .build()),
             table.getPartitionKeys().stream()
+                // Filter out partition keys that already exist in sd.getCols()
+                .filter(p -> !columnNames.contains(p.getName()))
                 .map(
                     p ->
                         columnBuilder
