@@ -344,6 +344,17 @@ public class TestTagEvent {
   }
 
   @Test
+  public void testNullTagInfoDoesNotThrow() {
+    Exception ex = new Exception("boom");
+    CreateTagFailureEvent event = new CreateTagFailureEvent("user", "metalake", null, ex);
+    Assertions.assertNull(event.tagInfo());
+    Assertions.assertNull(event.identifier());
+    Assertions.assertEquals(ex, event.exception());
+    Assertions.assertEquals(OperationType.CREATE_TAG, event.operationType());
+    Assertions.assertEquals(OperationStatus.FAILURE, event.operationStatus());
+  }
+
+  @Test
   void testGetTagFailureEvent() {
     Assertions.assertThrowsExactly(
         GravitinoRuntimeException.class, () -> failureDispatcher.getTag("metalake", tag.name()));

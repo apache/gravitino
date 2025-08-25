@@ -40,7 +40,10 @@ public class CreateTagFailureEvent extends TagFailureEvent {
    *     insights into the reasons behind the operation's failure.
    */
   public CreateTagFailureEvent(String user, String metalake, TagInfo tagInfo, Exception exception) {
-    super(user, NameIdentifierUtil.ofTag(metalake, tagInfo.name()), exception);
+    super(
+        user,
+        (tagInfo == null ? null : NameIdentifierUtil.ofTag(metalake, tagInfo.name())),
+        exception);
     this.tagInfo = tagInfo;
   }
 
