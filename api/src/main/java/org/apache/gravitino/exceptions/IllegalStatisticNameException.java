@@ -22,7 +22,7 @@ import com.google.errorprone.annotations.FormatMethod;
 import com.google.errorprone.annotations.FormatString;
 
 /** An exception thrown when statistic has an illegal name */
-public class IllegalStatisticNameException extends GravitinoRuntimeException {
+public class IllegalStatisticNameException extends IllegalArgumentException {
   /**
    * Constructs a new exception with the specified detail message.
    *
@@ -31,7 +31,7 @@ public class IllegalStatisticNameException extends GravitinoRuntimeException {
    */
   @FormatMethod
   public IllegalStatisticNameException(@FormatString String message, Object... args) {
-    super(message, args);
+    super(String.format(message, args));
   }
 
   /**
@@ -44,6 +44,6 @@ public class IllegalStatisticNameException extends GravitinoRuntimeException {
   @FormatMethod
   public IllegalStatisticNameException(
       Throwable cause, @FormatString String message, Object... args) {
-    super(cause, message, args);
+    super(String.format(message, args), cause);
   }
 }

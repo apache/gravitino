@@ -59,13 +59,12 @@ public class StatisticMetaService {
   }
 
   public void batchInsertStatisticPOsOnDuplicateKeyUpdate(
-      List<StatisticEntity> statisticEntities,
-      String metalake,
-      NameIdentifier entity,
-      Entity.EntityType type) {
+      List<StatisticEntity> statisticEntities, NameIdentifier entity, Entity.EntityType type) {
     if (statisticEntities == null || statisticEntities.isEmpty()) {
       return;
     }
+
+    String metalake = NameIdentifierUtil.getMetalake(entity);
     Long metalakeId = MetalakeMetaService.getInstance().getMetalakeIdByName(metalake);
     MetadataObject object = NameIdentifierUtil.toMetadataObject(entity, type);
     Long entityId =

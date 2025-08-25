@@ -277,7 +277,7 @@ If your wants to custom your hadoop version or there is already a hadoop version
 
   <dependency>
     <groupId>org.apache.gravitino</groupId>
-    <artifactId>filesystem-hadoop3-runtime</artifactId>
+    <artifactId>gravitino-filesystem-hadoop3-runtime</artifactId>
     <version>${GRAVITINO_VERSION}</version>
   </dependency>
 
@@ -299,7 +299,7 @@ Or use the bundle jar with Hadoop environment if there is no Hadoop environment:
 
   <dependency>
     <groupId>org.apache.gravitino</groupId>
-    <artifactId>filesystem-hadoop3-runtime</artifactId>
+    <artifactId>gravitino-filesystem-hadoop3-runtime</artifactId>
     <version>${GRAVITINO_VERSION}</version>
   </dependency>
 ```
