@@ -130,19 +130,18 @@ public class GroupOperations {
       return Utils.doAs(
           httpRequest,
           () -> {
-            Owner owner =
-                ownerDispatcher
-                    .getOwner(
-                        metalake, MetadataObjects.of(null, metalake, MetadataObject.Type.METALAKE))
-                    .orElseThrow(
-                        () ->
-                            new IllegalStateException("Owner not found for metalake: " + metalake));
-            if (owner.type() == Owner.Type.GROUP && owner.name().equals(group)) {
-              throw new IllegalArgumentException(
-                  String.format(
-                      "Cannot remove group %s from metalake %s because the current user is not the owner of the metalake.",
-                      group, metalake));
-            }
+            ownerDispatcher
+                .getOwner(
+                    metalake, MetadataObjects.of(null, metalake, MetadataObject.Type.METALAKE))
+                .ifPresent(
+                    owner -> {
+                      if (owner.type() == Owner.Type.GROUP && owner.name().equals(group)) {
+                        throw new IllegalArgumentException(
+                            String.format(
+                                "Cannot remove group %s from metalake %s because the group is not the owner of the metalake.",
+                                group, metalake));
+                      }
+                    });
 
             boolean removed = accessControlManager.removeGroup(metalake, group);
             if (!removed) {

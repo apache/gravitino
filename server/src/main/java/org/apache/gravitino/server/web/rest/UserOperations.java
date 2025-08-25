@@ -177,20 +177,18 @@ public class UserOperations {
       return Utils.doAs(
           httpRequest,
           () -> {
-            Owner owner =
-                ownerManager
-                    .getOwner(
-                        metalake, MetadataObjects.of(null, metalake, MetadataObject.Type.METALAKE))
-                    .orElseThrow(
-                        () ->
-                            new IllegalStateException("Owner not found for metalake: " + metalake));
-
-            if (owner.type() == Owner.Type.USER && owner.name().equals(user)) {
-              throw new IllegalArgumentException(
-                  String.format(
-                      "Cannot remove user %s from metalake %s because the current user is not the owner of the metalake.",
-                      user, metalake));
-            }
+            ownerManager
+                .getOwner(
+                    metalake, MetadataObjects.of(null, metalake, MetadataObject.Type.METALAKE))
+                .ifPresent(
+                    owner -> {
+                      if (owner.type() == Owner.Type.USER && owner.name().equals(user)) {
+                        throw new IllegalArgumentException(
+                            String.format(
+                                "Cannot remove user %s from metalake %s because the user is not the owner of the metalake.",
+                                user, metalake));
+                      }
+                    });
 
             boolean removed = accessControlManager.removeUser(metalake, user);
             if (!removed) {
