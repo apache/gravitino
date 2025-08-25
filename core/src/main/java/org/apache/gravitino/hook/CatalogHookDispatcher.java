@@ -105,6 +105,7 @@ public class CatalogHookDispatcher implements CatalogDispatcher {
     } catch (Exception e) {
       LOG.warn("Fail to execute the post hook operations, rollback the catalog " + ident, e);
       dispatcher.dropCatalog(ident, true);
+      throw e;
     }
 
     return catalog;

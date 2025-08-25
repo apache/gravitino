@@ -238,6 +238,38 @@ public class RangerHiveE2EIT extends RangerBaseE2EIT {
       throw new RuntimeException(e);
     }
 
+    Map<String, String> rollbackFailProperties =
+        ImmutableMap.of(
+            HiveConstants.METASTORE_URIS,
+            HIVE_METASTORE_URIS,
+            IMPERSONATION_ENABLE,
+            "true",
+            AUTHORIZATION_PROVIDER,
+            "ranger",
+            RangerAuthorizationProperties.RANGER_SERVICE_TYPE,
+            "HadoopSQL",
+            RangerAuthorizationProperties.RANGER_ADMIN_URL,
+            RangerITEnv.RANGER_ADMIN_URL,
+            RangerAuthorizationProperties.RANGER_AUTH_TYPE,
+            RangerContainer.authType,
+            RangerAuthorizationProperties.RANGER_USERNAME,
+            RangerContainer.rangerUserName,
+            RangerAuthorizationProperties.RANGER_PASSWORD,
+            "invalid_password",
+            RangerAuthorizationProperties.RANGER_SERVICE_NAME,
+            "test_rollback_fail",
+            RangerAuthorizationProperties.RANGER_SERVICE_CREATE_IF_ABSENT,
+            "true");
+    Assertions.assertThrows(
+        RuntimeException.class,
+        () ->
+            metalake.createCatalog(
+                "testRollbackFail",
+                Catalog.Type.RELATIONAL,
+                provider,
+                "comment",
+                rollbackFailProperties));
+
     // Test to create a catalog with wrong properties which lacks Ranger service name,
     // It will throw RuntimeException with message that Ranger service name is required.
     Map<String, String> wrongProperties =
