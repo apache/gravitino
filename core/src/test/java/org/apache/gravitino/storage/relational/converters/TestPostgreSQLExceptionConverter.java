@@ -22,26 +22,27 @@ import java.io.IOException;
 import java.sql.SQLException;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
 
-/**
- * Exception converter to Apache Gravitino exception for PostgreSQL. The definition of error codes
- * can be found in the document: <a
- * href="https://www.postgresql.org/docs/8.4/errcodes-appendix.html">error code of PostgreSQL</a>
- */
-public class PostgreSQLExceptionConverter implements SQLExceptionConverter {
-  private static final String DUPLICATED_ENTRY_ERROR_CODE = "23505";
+public class TestPostgreSQLExceptionConverter {
 
-  @Override
-  @SuppressWarnings("FormatStringAnnotation")
-  public void toGravitinoException(SQLException sqlException, Entity.EntityType type, String name)
-      throws IOException {
-    String errorCode = sqlException.getSQLState();
-    switch (errorCode) {
-      case DUPLICATED_ENTRY_ERROR_CODE:
-        throw new EntityAlreadyExistsException(
-            sqlException, "The %s entity: %s already exists.", type.name(), name);
-      default:
-        throw new IOException(sqlException);
-    }
+  @Test
+  public void testConvertDuplicatedEntryException() {
+    SQLException sqlException = new SQLException("duplicate", "23505");
+    PostgreSQLExceptionConverter converter = new PostgreSQLExceptionConverter();
+    Assertions.assertThrows(
+        EntityAlreadyExistsException.class,
+        () -> converter.toGravitinoException(sqlException, Entity.EntityType.METALAKE, "test"),
+        String.format("The %s entity: %s already exists.", Entity.EntityType.METALAKE, "test"));
+  }
+
+  @Test
+  public void testNonNumericSqlStateHandledAsIOException() {
+    SQLException sqlException = new SQLException("error", "28P01");
+    PostgreSQLExceptionConverter converter = new PostgreSQLExceptionConverter();
+    Assertions.assertThrows(
+        IOException.class,
+        () -> converter.toGravitinoException(sqlException, Entity.EntityType.METALAKE, "test"));
   }
 }
