@@ -27,6 +27,7 @@ from mcp_server.client import (
 )
 from mcp_server.client.fileset_operation import FilesetOperation
 from mcp_server.client.job_operation import JobOperation
+from mcp_server.client.statistic_operation import StatisticOperation
 
 
 class MockOperation(GravitinoOperation):
@@ -57,6 +58,9 @@ class MockOperation(GravitinoOperation):
     def as_job_operation(self) -> JobOperation:
         return MockJobOperation()
 
+    def as_statistic_operation(self) -> StatisticOperation:
+        return MockStatisticOperation()
+
     def as_policy_operation(self) -> PolicyOperation:
         return MockPolicyOperation()
 
@@ -84,7 +88,7 @@ class MockTableOperation(TableOperation):
 
 
 class MockFilesetOperation(FilesetOperation):
-    async def get_list_of_filesets(
+    async def list_of_filesets(
         self, catalog_name: str, schema_name: str
     ) -> str:
         return "mock_filesets"
@@ -143,9 +147,7 @@ class MockPolicyOperation(PolicyOperation):
 
 
 class MockModelOperation(ModelOperation):
-    async def get_list_of_models(
-        self, catalog_name: str, schema_name: str
-    ) -> str:
+    async def list_of_models(self, catalog_name: str, schema_name: str) -> str:
         return "mock_models"
 
     async def load_model(
@@ -170,9 +172,7 @@ class MockModelOperation(ModelOperation):
 
 
 class MockTopicOperation(TopicOperation):
-    async def get_list_of_topics(
-        self, catalog_name: str, schema_name: str
-    ) -> str:
+    async def list_of_topics(self, catalog_name: str, schema_name: str) -> str:
         return "mock_topics"
 
     async def load_topic(
@@ -182,7 +182,7 @@ class MockTopicOperation(TopicOperation):
 
 
 class MockTagOperation(TagOperation):
-    async def get_list_of_tags(self) -> str:
+    async def list_of_tags(self) -> str:
         return "mock_tags"
 
     async def create_tag(
@@ -204,7 +204,7 @@ class MockTagOperation(TagOperation):
         metadata_full_name: str,
         metadata_type: str,
         tags_to_associate: list,
-        tags_to_disassociate,
+        tags_to_disassociate: list,
     ) -> str:
         return f"mock_associated_tags: {tags_to_associate} with metadata {metadata_full_name} of type {metadata_type}"
 
@@ -218,13 +218,13 @@ class MockTagOperation(TagOperation):
 
 
 class MockJobOperation(JobOperation):
-    async def get_list_of_jobs(self, job_template_name: str = "") -> str:
+    async def list_of_jobs(self, job_template_name: str = "") -> str:
         return "mock_jobs"
 
     async def get_job_by_id(self, job_id: str) -> str:
         return f"mock_job: {job_id}"
 
-    async def get_list_of_job_templates(self) -> str:
+    async def list_of_job_templates(self) -> str:
         return "mock_job_templates"
 
     async def get_job_template_by_name(self, name: str) -> str:
@@ -235,3 +235,26 @@ class MockJobOperation(JobOperation):
 
     async def cancel_job(self, job_id: str) -> str:
         return f"mock_job_cancelled: {job_id}"
+
+
+class MockStatisticOperation(StatisticOperation):
+    async def list_of_statistics(
+        self, metalake_name: str, metadata_type: str, metadata_fullname: str
+    ) -> str:
+        return f"mock_statistics: {metalake_name}, {metadata_type}, {metadata_fullname}"
+
+    # pylint: disable=R0917
+    async def list_statistic_for_partition(
+        self,
+        metalake_name: str,
+        metadata_type: str,
+        metadata_fullname: str,
+        from_partition_name: str,
+        to_partition_name: str,
+        from_inclusive: bool = True,
+        to_inclusive: bool = False,
+    ) -> str:
+        return (
+            f"mock_statistics_for_partition: {metalake_name}, {metadata_type}, {metadata_fullname},"
+            f" {from_partition_name}, {to_partition_name}, {from_inclusive}, {to_inclusive}"
+        )
