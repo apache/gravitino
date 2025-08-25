@@ -29,6 +29,7 @@ import static org.mockito.Mockito.when;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.Collections;
+import java.util.Optional;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.client.Entity;
 import javax.ws.rs.core.Application;
@@ -38,6 +39,8 @@ import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.authorization.AccessControlManager;
+import org.apache.gravitino.authorization.Owner;
+import org.apache.gravitino.authorization.OwnerDispatcher;
 import org.apache.gravitino.authorization.User;
 import org.apache.gravitino.dto.authorization.UserDTO;
 import org.apache.gravitino.dto.requests.UserAddRequest;
@@ -65,6 +68,7 @@ import org.mockito.Mockito;
 public class TestUserOperations extends BaseOperationsTest {
 
   private static final AccessControlManager manager = mock(AccessControlManager.class);
+  private static final OwnerDispatcher ownerDispatcher = mock(OwnerDispatcher.class);
 
   private static class MockServletRequestFactory extends ServletRequestFactoryBase {
     @Override
@@ -83,6 +87,7 @@ public class TestUserOperations extends BaseOperationsTest {
     Mockito.doReturn(36000L).when(config).get(TREE_LOCK_CLEAN_INTERVAL);
     FieldUtils.writeField(GravitinoEnv.getInstance(), "lockManager", new LockManager(config), true);
     FieldUtils.writeField(GravitinoEnv.getInstance(), "accessControlDispatcher", manager, true);
+    FieldUtils.writeField(GravitinoEnv.getInstance(), "ownerDispatcher", ownerDispatcher, true);
   }
 
   @Override
@@ -264,8 +269,27 @@ public class TestUserOperations extends BaseOperationsTest {
 
   @Test
   public void testRemoveUser() {
+    // Delete the metalake owner
     when(manager.removeUser(any(), any())).thenReturn(true);
+    Owner owner = mock(Owner.class);
+    when(owner.type()).thenReturn(Owner.Type.USER);
+    when(owner.name()).thenReturn("user1");
+    when(ownerDispatcher.getOwner(any(), any())).thenReturn(Optional.of(owner));
 
+    Response respOwner =
+        target("/metalakes/metalake1/users/user1")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .delete();
+    Assertions.assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), respOwner.getStatus());
+
+    ErrorResponse errorResponseOwner = respOwner.readEntity(ErrorResponse.class);
+    Assertions.assertEquals(ErrorConstants.ILLEGAL_ARGUMENTS_CODE, errorResponseOwner.getCode());
+    Assertions.assertEquals(
+        IllegalArgumentException.class.getSimpleName(), errorResponseOwner.getType());
+
+    // Delete user normally
+    when(owner.name()).thenReturn("user2");
     Response resp =
         target("/metalakes/metalake1/users/user1")
             .request(MediaType.APPLICATION_JSON_TYPE)
