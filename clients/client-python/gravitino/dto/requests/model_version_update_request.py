@@ -113,11 +113,12 @@ class ModelVersionUpdateRequest:
         """Request to update model version uri"""
 
         _new_uri: Optional[str] = field(metadata=config(field_name="newUri"))
-        """Represents a request to update the uri on a Metalake."""
+        _uri_name: Optional[str] = field(metadata=config(field_name="uriName"))
 
-        def __init__(self, new_uri: str):
+        def __init__(self, new_uri: str, uri_name: str):
             super().__init__("updateUri")
             self._new_uri = new_uri
+            self._uri_name = uri_name
 
         def new_uri(self):
             """Retrieves the new uri of the model version.
@@ -126,8 +127,15 @@ class ModelVersionUpdateRequest:
             """
             return self._new_uri
 
+        def uri_name(self):
+            """Retrieves the uri name of the model version.
+            Returns:
+                The uri name of the model version.
+            """
+            return self._uri_name
+
         def validate(self):
-            """Validates the fields of the request. Always pass."""
+            """Validates the fields of the request."""
             if not self._new_uri:
                 raise ValueError('"newUri" field is required')
 
@@ -137,7 +145,78 @@ class ModelVersionUpdateRequest:
             Returns:
                 ModelVersionChange: The ModelVersionChange object representing the update uri operation.
             """
-            return ModelVersionChange.update_uri(self._new_uri)
+            return ModelVersionChange.update_uri(self._new_uri, self._uri_name)
+
+    @dataclass
+    class AddModelVersionUriRequest(ModelVersionUpdateRequestBase):
+        """Request to add model version uri"""
+
+        _uri_name: Optional[str] = field(metadata=config(field_name="uriName"))
+        _uri: Optional[str] = field(metadata=config(field_name="uri"))
+
+        def __init__(self, uri_name: str, uri: str):
+            super().__init__("addUri")
+            self._uri_name = uri_name
+            self._uri = uri
+
+        def uri_name(self):
+            """Retrieves the uri name of the model version.
+            Returns:
+                The uri name of the model version.
+            """
+            return self._uri_name
+
+        def uri(self):
+            """Retrieves the uri of the model version.
+            Returns:
+                The uri of the model version.
+            """
+            return self._uri
+
+        def validate(self):
+            """Validates the fields of the request."""
+            if not self._uri_name:
+                raise ValueError('"uriName" field is required')
+            if not self._uri:
+                raise ValueError('"uri" field is required')
+
+        def model_version_change(self):
+            """
+            Returns a ModelVersionChange object representing the add uri operation.
+            Returns:
+                ModelVersionChange: The ModelVersionChange object representing the add uri operation.
+            """
+            return ModelVersionChange.add_uri(self._uri_name, self._uri)
+
+    @dataclass
+    class RemoveModelVersionUriRequest(ModelVersionUpdateRequestBase):
+        """Request to remove model version uri"""
+
+        _uri_name: Optional[str] = field(metadata=config(field_name="uriName"))
+
+        def __init__(self, uri_name: str):
+            super().__init__("removeUri")
+            self._uri_name = uri_name
+
+        def uri_name(self):
+            """Retrieves the uri name of the model version.
+            Returns:
+                The uri name of the model version.
+            """
+            return self._uri_name
+
+        def validate(self):
+            """Validates the fields of the request."""
+            if not self._uri_name:
+                raise ValueError('"uriName" field is required')
+
+        def model_version_change(self):
+            """
+            Returns a ModelVersionChange object representing the remove uri operation.
+            Returns:
+                ModelVersionChange: The ModelVersionChange object representing the remove uri operation.
+            """
+            return ModelVersionChange.remove_uri(self._uri_name)
 
     @dataclass
     class ModelVersionAliasesRequest(ModelVersionUpdateRequestBase):
