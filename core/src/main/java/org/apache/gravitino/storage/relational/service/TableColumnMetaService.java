@@ -100,7 +100,7 @@ public class TableColumnMetaService {
   boolean deleteColumnsByTableId(Long tableId) {
     // deleteColumns will be done in deleteTable transaction, so we don't do commit here.
     Integer result =
-        SessionUtils.doWithoutCommitAndFetchResult(
+        SessionUtils.getWithoutCommit(
             TableColumnMapper.class, mapper -> mapper.softDeleteColumnsByTableId(tableId));
     return result > 0;
   }

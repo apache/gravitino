@@ -288,12 +288,12 @@ public class GroupMetaService {
     SessionUtils.doMultipleWithCommit(
         () ->
             groupDeletedCount[0] =
-                SessionUtils.doWithoutCommitAndFetchResult(
+                SessionUtils.getWithoutCommit(
                     GroupMetaMapper.class,
                     mapper -> mapper.deleteGroupMetasByLegacyTimeline(legacyTimeline, limit)),
         () ->
             groupRoleRelDeletedCount[0] =
-                SessionUtils.doWithoutCommitAndFetchResult(
+                SessionUtils.getWithoutCommit(
                     GroupRoleRelMapper.class,
                     mapper ->
                         mapper.deleteGroupRoleRelMetasByLegacyTimeline(legacyTimeline, limit)));

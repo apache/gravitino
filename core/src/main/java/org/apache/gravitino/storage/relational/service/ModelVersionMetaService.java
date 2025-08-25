@@ -205,7 +205,7 @@ public class ModelVersionMetaService {
         // Delete model version relations first
         () ->
             modelVersionDeletedCount.set(
-                SessionUtils.doWithoutCommitAndFetchResult(
+                SessionUtils.getWithoutCommit(
                     ModelVersionMetaMapper.class,
                     mapper -> {
                       if (isVersionNumber) {
@@ -245,13 +245,13 @@ public class ModelVersionMetaService {
     SessionUtils.doMultipleWithCommit(
         () ->
             modelVersionDeletedCount[0] =
-                SessionUtils.doWithoutCommitAndFetchResult(
+                SessionUtils.getWithoutCommit(
                     ModelVersionMetaMapper.class,
                     mapper ->
                         mapper.deleteModelVersionMetasByLegacyTimeline(legacyTimeline, limit)),
         () ->
             modelVersionAliasRelDeletedCount[0] =
-                SessionUtils.doWithoutCommitAndFetchResult(
+                SessionUtils.getWithoutCommit(
                     ModelVersionAliasRelMapper.class,
                     mapper ->
                         mapper.deleteModelVersionAliasRelsByLegacyTimeline(legacyTimeline, limit)));
@@ -334,7 +334,7 @@ public class ModelVersionMetaService {
             if (isModelVersionUriUpdated) {
               // delete old model version POs first
               updateResult.addAndGet(
-                  SessionUtils.doWithoutCommitAndFetchResult(
+                  SessionUtils.getWithoutCommit(
                       ModelVersionMetaMapper.class,
                       mapper -> {
                         if (isVersionNumber) {
@@ -355,7 +355,7 @@ public class ModelVersionMetaService {
             } else {
               // update model version POs directly
               updateResult.addAndGet(
-                  SessionUtils.doWithoutCommitAndFetchResult(
+                  SessionUtils.getWithoutCommit(
                       ModelVersionMetaMapper.class,
                       mapper ->
                           mapper.updateModelVersionMeta(

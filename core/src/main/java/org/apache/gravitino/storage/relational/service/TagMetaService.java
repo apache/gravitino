@@ -140,13 +140,13 @@ public class TagMetaService {
     SessionUtils.doMultipleWithCommit(
         () ->
             tagDeletedCount[0] =
-                SessionUtils.doWithoutCommitAndFetchResult(
+                SessionUtils.getWithoutCommit(
                     TagMetaMapper.class,
                     mapper ->
                         mapper.softDeleteTagMetaByMetalakeAndTagName(metalakeName, ident.name())),
         () ->
             tagMetadataObjectRelDeletedCount[0] =
-                SessionUtils.doWithoutCommitAndFetchResult(
+                SessionUtils.getWithoutCommit(
                     TagMetadataObjectRelMapper.class,
                     mapper ->
                         mapper.softDeleteTagMetadataObjectRelsByMetalakeAndTagName(
@@ -169,7 +169,7 @@ public class TagMetaService {
               metalakeId, metadataObject.fullName(), metadataObject.type());
 
       tagPOs =
-          SessionUtils.doWithoutCommitAndFetchResult(
+          SessionUtils.getWithoutCommit(
               TagMetadataObjectRelMapper.class,
               mapper ->
                   mapper.listTagPOsByMetadataObjectIdAndType(
@@ -336,7 +336,7 @@ public class TagMetaService {
 
       // Fetch all the tags associated with the metadata object after the operation.
       List<TagPO> tagPOs =
-          SessionUtils.doWithoutCommitAndFetchResult(
+          SessionUtils.getWithoutCommit(
               TagMetadataObjectRelMapper.class,
               mapper ->
                   mapper.listTagPOsByMetadataObjectIdAndType(
@@ -359,12 +359,12 @@ public class TagMetaService {
     SessionUtils.doMultipleWithCommit(
         () ->
             tagDeletedCount[0] =
-                SessionUtils.doWithoutCommitAndFetchResult(
+                SessionUtils.getWithoutCommit(
                     TagMetaMapper.class,
                     mapper -> mapper.deleteTagMetasByLegacyTimeline(legacyTimeline, limit)),
         () ->
             tagMetadataObjectRelDeletedCount[0] =
-                SessionUtils.doWithoutCommitAndFetchResult(
+                SessionUtils.getWithoutCommit(
                     TagMetadataObjectRelMapper.class,
                     mapper -> mapper.deleteTagEntityRelsByLegacyTimeline(legacyTimeline, limit)));
 

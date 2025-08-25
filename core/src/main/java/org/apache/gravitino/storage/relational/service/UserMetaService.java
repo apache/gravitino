@@ -285,12 +285,12 @@ public class UserMetaService {
     SessionUtils.doMultipleWithCommit(
         () ->
             userDeletedCount[0] =
-                SessionUtils.doWithoutCommitAndFetchResult(
+                SessionUtils.getWithoutCommit(
                     UserMetaMapper.class,
                     mapper -> mapper.deleteUserMetasByLegacyTimeline(legacyTimeline, limit)),
         () ->
             userRoleRelDeletedCount[0] =
-                SessionUtils.doWithoutCommitAndFetchResult(
+                SessionUtils.getWithoutCommit(
                     UserRoleRelMapper.class,
                     mapper ->
                         mapper.deleteUserRoleRelMetasByLegacyTimeline(legacyTimeline, limit)));

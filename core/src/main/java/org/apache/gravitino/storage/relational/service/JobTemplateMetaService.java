@@ -117,7 +117,7 @@ public class JobTemplateMetaService {
                     mapper.softDeleteJobMetaByMetalakeAndTemplate(metalakeName, jobTemplateName)),
         () ->
             result.set(
-                SessionUtils.doWithoutCommitAndFetchResult(
+                SessionUtils.getWithoutCommit(
                     JobTemplateMetaMapper.class,
                     mapper ->
                         mapper.softDeleteJobTemplateMetaByMetalakeAndName(

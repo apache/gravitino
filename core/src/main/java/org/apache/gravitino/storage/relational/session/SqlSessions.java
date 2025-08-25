@@ -22,6 +22,8 @@ package org.apache.gravitino.storage.relational.session;
 import com.google.common.annotations.VisibleForTesting;
 import org.apache.ibatis.session.SqlSession;
 import org.apache.ibatis.session.TransactionIsolationLevel;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * SqlSessions is a utility class to maintain the MyBatis's {@link SqlSession} object. It is a
@@ -29,7 +31,9 @@ import org.apache.ibatis.session.TransactionIsolationLevel;
  * methods to commit, rollback and close the {@link SqlSession} object.
  */
 public final class SqlSessions {
+  private static final Logger LOG = LoggerFactory.getLogger(SqlSessions.class);
   private static final ThreadLocal<SqlSession> sessions = new ThreadLocal<>();
+  private static final ThreadLocal<Integer> sessionCount = ThreadLocal.withInitial(() -> 0);
 
   private SqlSessions() {}
 
@@ -38,9 +42,15 @@ public final class SqlSessions {
     return sessions;
   }
 
+  @VisibleForTesting
+  static Integer getSessionCount() {
+    return sessionCount.get();
+  }
+
   /**
    * Get the SqlSession object. If the SqlSession object is not present in the thread local, then
-   * create a new SqlSession object and set it in the thread local.
+   * create a new SqlSession object and set it in the thread local. This method also increments the
+   * session count.
    *
    * @return SqlSession object from the thread local storage.
    */
@@ -52,8 +62,8 @@ public final class SqlSessions {
               .getSqlSessionFactory()
               .openSession(TransactionIsolationLevel.READ_COMMITTED);
       sessions.set(sqlSession);
-      return sqlSession;
     }
+    sessionCount.set(sessionCount.get() + 1);
     return sqlSession;
   }
 
@@ -62,15 +72,7 @@ public final class SqlSessions {
    * thread local storage.
    */
   public static void commitAndCloseSqlSession() {
-    SqlSession sqlSession = sessions.get();
-    if (sqlSession != null) {
-      try {
-        sqlSession.commit();
-        sqlSession.close();
-      } finally {
-        sessions.remove();
-      }
-    }
+    handleSessionClose(true, false);
   }
 
   /**
@@ -78,37 +80,57 @@ public final class SqlSessions {
    * thread local storage.
    */
   public static void rollbackAndCloseSqlSession() {
-    SqlSession sqlSession = sessions.get();
-    if (sqlSession != null) {
-      try {
-        sqlSession.rollback();
-        sqlSession.close();
-      } finally {
-        sessions.remove();
-      }
-    }
+    handleSessionClose(false, true);
   }
 
   /** Close the SqlSession object and remove it from the thread local storage. */
   public static void closeSqlSession() {
-    SqlSession sqlSession = sessions.get();
-    if (sqlSession != null) {
-      try {
-        sqlSession.close();
-      } finally {
-        sessions.remove();
-      }
-    }
+    handleSessionClose(false, false);
   }
 
   /**
-   * Get the Mapper object from the SqlSession object.
+   * Get the Mapper object from the SqlSession object. This method will open a session if one is not
+   * already opened.
    *
    * @param <T> the type of the mapper interface.
    * @param className the class name of the Mapper object.
    * @return the Mapper object.
    */
   public static <T> T getMapper(Class<T> className) {
+    // getSqlSession() is called to ensure a session exists and increment the count.
     return getSqlSession().getMapper(className);
+  }
+
+  private static void handleSessionClose(boolean commit, boolean rollback) {
+    SqlSession sqlSession = sessions.get();
+    if (sqlSession == null) {
+      return;
+    }
+
+    int count = sessionCount.get() - 1;
+    sessionCount.set(count);
+
+    if (count == 0) {
+      try {
+        if (commit) {
+          sqlSession.commit();
+        } else if (rollback) {
+          sqlSession.rollback();
+        }
+        // Always close the session when the count reaches 0
+        sqlSession.close();
+      } finally {
+        sessions.remove();
+        sessionCount.remove();
+      }
+    } else if (count < 0) {
+      // This should not happen if the session management is correct.
+      // Reset the count and remove the session to avoid further issues.
+      LOG.warn(
+          "Session count is negative: {}. Resetting session count and removing session.",
+          count + 1);
+      sessions.remove();
+      sessionCount.remove();
+    }
   }
 }

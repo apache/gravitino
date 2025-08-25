@@ -137,7 +137,7 @@ public class ModelMetaService {
         // delete model meta
         () ->
             modelDeletedCount.set(
-                SessionUtils.doWithoutCommitAndFetchResult(
+                SessionUtils.getWithoutCommit(
                     ModelMetaMapper.class,
                     mapper ->
                         mapper.softDeleteModelMetaBySchemaIdAndModelName(schemaId, ident.name()))),
