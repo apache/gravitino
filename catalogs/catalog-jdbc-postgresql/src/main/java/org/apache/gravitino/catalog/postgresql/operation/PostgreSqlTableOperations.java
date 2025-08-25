@@ -100,17 +100,15 @@ public class PostgreSqlTableOperations extends JdbcTableOperations
   @Override
   public List<String> listTables(String schemaName) throws NoSuchSchemaException {
     try (Connection connection = getConnection(schemaName)) {
+      if (!schemaOperations.schemaExists(connection, schemaName)) {
+        throw new NoSuchSchemaException("No such schema: %s", schemaName);
+      }
       final List<String> names = Lists.newArrayList();
       try (ResultSet tables = getTables(connection)) {
         while (tables.next()) {
           if (Objects.equals(tables.getString("TABLE_SCHEM"), schemaName)) {
             names.add(tables.getString("TABLE_NAME"));
           }
-        }
-      }
-      if (names.isEmpty()) {
-        if (!schemaOperations.schemaExists(connection, schemaName)) {
-          throw new NoSuchSchemaException("No such schema: %s", schemaName);
         }
       }
       LOG.info("Finished listing tables size {} for database name {} ", names.size(), schemaName);
