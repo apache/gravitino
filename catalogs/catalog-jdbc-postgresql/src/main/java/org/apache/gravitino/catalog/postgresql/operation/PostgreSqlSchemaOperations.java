@@ -57,17 +57,7 @@ public class PostgreSqlSchemaOperations extends JdbcDatabaseOperations {
   @Override
   public JdbcSchema load(String schema) throws NoSuchSchemaException {
     try (Connection connection = getConnection()) {
-      ResultSet resultSet = getSchema(connection, schema);
-
-      boolean found = false;
-      while (resultSet.next()) {
-        if (Objects.equals(resultSet.getString(1), schema)) {
-          found = true;
-          break;
-        }
-      }
-
-      if (!found) {
+      if (!schemaExists(connection, schema)) {
         throw new NoSuchSchemaException("No such schema: %s", schema);
       }
 
@@ -169,6 +159,16 @@ public class PostgreSqlSchemaOperations extends JdbcDatabaseOperations {
   @Override
   protected Set<String> createSysDatabaseNameSet() {
     return ImmutableSet.of("pg_toast", "pg_catalog", "information_schema");
+  }
+
+  public boolean schemaExists(Connection connection, String schema) throws SQLException {
+    ResultSet resultSet = getSchema(connection, schema);
+    while (resultSet.next()) {
+      if (Objects.equals(resultSet.getString(1), schema)) {
+        return true;
+      }
+    }
+    return false;
   }
 
   private String getShowSchemaCommentSql(String schema) {

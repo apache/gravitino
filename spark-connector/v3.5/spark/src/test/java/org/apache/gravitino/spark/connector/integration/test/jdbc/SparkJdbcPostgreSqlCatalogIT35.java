@@ -20,10 +20,8 @@ package org.apache.gravitino.spark.connector.integration.test.jdbc;
 
 import org.apache.gravitino.spark.connector.jdbc.postgresql.GravitinoPostgreSqlCatalogSpark35;
 import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 
-@Disabled("Disabled until PG table creation is supported")
 public class SparkJdbcPostgreSqlCatalogIT35 extends SparkJdbcPostgreSqlCatalogIT {
 
   @Test

@@ -45,7 +45,9 @@ import org.apache.gravitino.catalog.jdbc.config.JdbcConfig;
 import org.apache.gravitino.catalog.jdbc.converter.JdbcColumnDefaultValueConverter;
 import org.apache.gravitino.catalog.jdbc.converter.JdbcExceptionConverter;
 import org.apache.gravitino.catalog.jdbc.converter.JdbcTypeConverter;
+import org.apache.gravitino.catalog.jdbc.operation.DatabaseOperation;
 import org.apache.gravitino.catalog.jdbc.operation.JdbcTableOperations;
+import org.apache.gravitino.catalog.jdbc.operation.RequireDatabaseOperation;
 import org.apache.gravitino.exceptions.NoSuchColumnException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchTableException;
@@ -58,7 +60,8 @@ import org.apache.gravitino.rel.indexes.Index;
 import org.apache.gravitino.rel.types.Types;
 
 /** Table operations for PostgreSQL. */
-public class PostgreSqlTableOperations extends JdbcTableOperations {
+public class PostgreSqlTableOperations extends JdbcTableOperations
+    implements RequireDatabaseOperation {
 
   public static final String PG_QUOTE = "\"";
   public static final String NEW_LINE = "\n";
@@ -72,6 +75,7 @@ public class PostgreSqlTableOperations extends JdbcTableOperations {
       "PostgreSQL does not support nested column names.";
 
   private String database;
+  private PostgreSqlSchemaOperations schemaOperations;
 
   @Override
   public void initialize(
@@ -89,17 +93,25 @@ public class PostgreSqlTableOperations extends JdbcTableOperations {
   }
 
   @Override
-  public List<String> listTables(String databaseName) throws NoSuchSchemaException {
-    try (Connection connection = getConnection(databaseName)) {
+  public void setDatabaseOperation(DatabaseOperation databaseOperation) {
+    this.schemaOperations = (PostgreSqlSchemaOperations) databaseOperation;
+  }
+
+  @Override
+  public List<String> listTables(String schemaName) throws NoSuchSchemaException {
+    try (Connection connection = getConnection(schemaName)) {
+      if (!schemaOperations.schemaExists(connection, schemaName)) {
+        throw new NoSuchSchemaException("No such schema: %s", schemaName);
+      }
       final List<String> names = Lists.newArrayList();
       try (ResultSet tables = getTables(connection)) {
         while (tables.next()) {
-          if (Objects.equals(tables.getString("TABLE_SCHEM"), databaseName)) {
+          if (Objects.equals(tables.getString("TABLE_SCHEM"), schemaName)) {
             names.add(tables.getString("TABLE_NAME"));
           }
         }
       }
-      LOG.info("Finished listing tables size {} for database name {} ", names.size(), databaseName);
+      LOG.info("Finished listing tables size {} for database name {} ", names.size(), schemaName);
       return names;
     } catch (final SQLException se) {
       throw this.exceptionMapper.toGravitinoException(se);

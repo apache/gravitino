@@ -99,11 +99,6 @@ public abstract class SparkHiveCatalogIT extends SparkCommonIT {
     return true;
   }
 
-  @Override
-  protected boolean supportListTable() {
-    return true;
-  }
-
   @Test
   void testCreateHiveFormatPartitionTable() {
     String tableName = "hive_partition_table";
