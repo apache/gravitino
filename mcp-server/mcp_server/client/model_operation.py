@@ -24,9 +24,7 @@ class ModelOperation(ABC):
     """
 
     @abstractmethod
-    async def get_list_of_models(
-        self, catalog_name: str, schema_name: str
-    ) -> str:
+    async def list_of_models(self, catalog_name: str, schema_name: str) -> str:
         """
         Retrieve the list of models within a specified catalog.
 
