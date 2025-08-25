@@ -27,14 +27,19 @@ import static org.apache.gravitino.rel.indexes.Indexes.EMPTY_INDEXES;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Maps;
+import java.lang.reflect.Field;
 import java.time.Instant;
 import java.util.Arrays;
+import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.reflect.FieldUtils;
+import org.apache.commons.lang3.reflect.MethodUtils;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.SchemaChange;
@@ -63,6 +68,7 @@ import org.apache.gravitino.rel.expressions.distributions.Distributions;
 import org.apache.gravitino.rel.expressions.sorts.SortOrder;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.indexes.Index;
+import org.apache.gravitino.utils.ClassLoaderUtils;
 import org.apache.gravitino.utils.MapUtils;
 import org.apache.gravitino.utils.PrincipalUtils;
 import org.apache.paimon.catalog.Catalog;
@@ -470,6 +476,48 @@ public class PaimonCatalogOperations implements CatalogOperations, SupportsSchem
     if (paimonCatalogOps != null) {
       try {
         paimonCatalogOps.close();
+
+        boolean testEnv = System.getenv("GRAVITINO_TEST") != null;
+        if (testEnv) {
+          LOG.info("Skip closing Paimon catalog in test env");
+          return;
+        }
+
+        ClassLoader currentClassLoader = PaimonCatalogOperations.class.getClassLoader();
+        // Clear Hadoop FileSystem stats data clearer to prevent memory leaks
+        ClassLoaderUtils.closeStatsDataClearerInFileSystem(currentClassLoader);
+
+        // Clear all thread references to the ClosableHiveCatalog class loader.
+        Thread[] threads = ClassLoaderUtils.getAllThreads();
+        for (Thread thread : threads) {
+          // Clear thread local map for webserver threads in the current class loader
+          ClassLoaderUtils.clearThreadLocalMap(thread, currentClassLoader);
+
+          // Close all threads that are using the FilesetCatalogOperations class loader
+          if (ClassLoaderUtils.runningWithClassLoader(thread, currentClassLoader)) {
+            LOG.info("Interrupting peer cache thread: {}", thread.getName());
+            thread.setContextClassLoader(null);
+            thread.interrupt();
+            try {
+              thread.join(5000);
+            } catch (InterruptedException e) {
+              LOG.warn("Failed to join peer cache thread: {}", thread.getName(), e);
+            }
+          }
+        }
+
+        // Release the LogFactory for the FilesetCatalogOperations class loader
+        ClassLoaderUtils.releaseLogFactoryInCommonLogging(currentClassLoader);
+
+        try {
+          Class<?> methodUtilsClass = Class.forName("com.amazonaws.metrics.AwsSdkMetrics");
+          MethodUtils.invokeStaticMethod(methodUtilsClass, "unregisterMetricAdminMBean");
+        } catch (Exception e) {
+          LOG.warn("Failed to unregister AWS SDK metrics admin MBean", e);
+          // This is not critical, so we just log the warning
+        }
+
+        ClassLoaderUtils.clearShutdownHooks(currentClassLoader);
       } catch (Exception e) {
         throw new RuntimeException(e);
       }
