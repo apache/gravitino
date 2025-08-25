@@ -218,6 +218,32 @@ public class TestHiveTable extends MiniHiveMetastoreService {
                     distribution,
                     sortOrders));
     Assertions.assertTrue(exception.getMessage().contains("Table already exists"));
+
+    // Test struct field with comment
+    HiveColumn structCol =
+        HiveColumn.builder()
+            .withName("struct_col")
+            .withType(
+                Types.StructType.of(
+                    Types.StructType.Field.of(
+                        "field1", Types.StringType.get(), true, "field comment")))
+            .build();
+    Column[] illegalColumns = new Column[] {structCol};
+    exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                tableCatalog.createTable(
+                    NameIdentifier.of(
+                        META_LAKE_NAME, hiveCatalog.name(), hiveSchema.name(), genRandomName()),
+                    illegalColumns,
+                    HIVE_COMMENT,
+                    properties,
+                    new Transform[0],
+                    distribution,
+                    sortOrders));
+    Assertions.assertEquals(
+        "Hive does not support comments in struct fields: field1", exception.getMessage());
   }
 
   @Test

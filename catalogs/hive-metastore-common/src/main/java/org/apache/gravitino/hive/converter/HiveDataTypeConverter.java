@@ -41,6 +41,7 @@ import static org.apache.hadoop.hive.serde2.typeinfo.TypeInfoFactory.getUnionTyp
 import static org.apache.hadoop.hive.serde2.typeinfo.TypeInfoFactory.getVarcharTypeInfo;
 import static org.apache.hadoop.hive.serde2.typeinfo.TypeInfoUtils.getTypeInfoFromTypeString;
 
+import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -116,7 +117,17 @@ public class HiveDataTypeConverter implements DataTypeConverter<TypeInfo, String
         Types.StructType structType = (Types.StructType) type;
         List<TypeInfo> typeInfos =
             Arrays.stream(structType.fields())
-                .map(t -> fromGravitino(t.type()))
+                .map(
+                    t -> {
+                      // Hive does not support comments in struct fields. This is no way to preserve
+                      // comments in struct fields when converting from Gravitino to Hive.
+                      // See: https://issues.apache.org/jira/browse/HIVE-26593
+                      Preconditions.checkArgument(
+                          t.comment() == null,
+                          "Hive does not support comments in struct fields: %s",
+                          t.name());
+                      return fromGravitino(t.type());
+                    })
                 .collect(Collectors.toList());
         List<String> names =
             Arrays.stream(structType.fields())
