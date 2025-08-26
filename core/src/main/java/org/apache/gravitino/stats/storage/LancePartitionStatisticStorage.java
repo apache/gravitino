@@ -19,6 +19,7 @@
 package org.apache.gravitino.stats.storage;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.lancedb.lance.Dataset;
@@ -66,34 +67,24 @@ import org.apache.gravitino.utils.PrincipalUtils;
 /** LancePartitionStatisticStorage is based on Lance format files. */
 public class LancePartitionStatisticStorage implements PartitionStatisticStorage {
 
-  private final String LOCATION = "location";
-  private final String DEFAULT_LOCATION = "/tmp";
-  private final String MAX_ROWS_PER_FILE = "maxRowsPerFile";
-  private final int DEFAULT_MAX_ROWS_PER_FILE = 1000000; // 10M
-  private final String MAX_BYTES_PER_FILE = "maxBytesPerFile";
-  private final int DEFAULT_MAX_BYTES_PER_FILE = 100 * 1024 * 1024; // 100 MB
-  private final String MAX_ROWS_PER_GROUP = "maxRowsPerGroup";
-  private final int DEFAULT_MAX_ROWS_PER_GROUP = 1000000; // 1M
-  private final String READ_BATCH_SIZE = "readBatchSize";
-  private final int DEFAULT_READ_BATCH_SIZE = 10000; // 10K
-  private final Map<String, String> properties;
-  private final String location;
-  private final BufferAllocator allocator;
-  private final int maxRowsPerFile;
-  private final int maxBytesPerFile;
-  private final int maxRowsPerGroup;
-  private final int readBatchSize;
-
+  private static final String LOCATION = "location";
+  private static final String DEFAULT_LOCATION = "/tmp";
+  private static final String MAX_ROWS_PER_FILE = "maxRowsPerFile";
+  private static final int DEFAULT_MAX_ROWS_PER_FILE = 1000000; // 10M
+  private static final String MAX_BYTES_PER_FILE = "maxBytesPerFile";
+  private static final int DEFAULT_MAX_BYTES_PER_FILE = 100 * 1024 * 1024; // 100 MB
+  private static final String MAX_ROWS_PER_GROUP = "maxRowsPerGroup";
+  private static final int DEFAULT_MAX_ROWS_PER_GROUP = 1000000; // 1M
+  private static final String READ_BATCH_SIZE = "readBatchSize";
+  private static final int DEFAULT_READ_BATCH_SIZE = 10000; // 10K
   // The schema is `table_id`, `partition_name`,  `statistic_name`, `statistic_value`, `audit_info`
-  private final String TABLE_ID_COLUMN = "table_id";
-  private final String PARTITION_NAME_COLUMN = "partition_name";
-  private final String STATISTIC_NAME_COLUMN = "statistic_name";
-  private final String STATISTIC_VALUE_COLUMN = "statistic_value";
-  private final String AUDIT_INFO_COLUMN = "audit_info";
+  private static final String TABLE_ID_COLUMN = "table_id";
+  private static final String PARTITION_NAME_COLUMN = "partition_name";
+  private static final String STATISTIC_NAME_COLUMN = "statistic_name";
+  private static final String STATISTIC_VALUE_COLUMN = "statistic_value";
+  private static final String AUDIT_INFO_COLUMN = "audit_info";
 
-  private final EntityStore entityStore = GravitinoEnv.getInstance().entityStore();
-
-  private final Schema schema =
+  private static final Schema SCHEMA =
       new Schema(
           Arrays.asList(
               Field.notNullable(TABLE_ID_COLUMN, new ArrowType.Int(64, false)),
@@ -102,6 +93,16 @@ public class LancePartitionStatisticStorage implements PartitionStatisticStorage
               Field.notNullable(STATISTIC_VALUE_COLUMN, new ArrowType.LargeUtf8()),
               Field.notNullable(AUDIT_INFO_COLUMN, new ArrowType.Utf8())));
 
+  private final Map<String, String> properties;
+  private final String location;
+  private final BufferAllocator allocator;
+  private final int maxRowsPerFile;
+  private final int maxBytesPerFile;
+  private final int maxRowsPerGroup;
+  private final int readBatchSize;
+
+  private final EntityStore entityStore = GravitinoEnv.getInstance().entityStore();
+
   public LancePartitionStatisticStorage(Map<String, String> properties) {
     this.properties = properties;
     this.allocator = new RootAllocator();
@@ -109,17 +110,28 @@ public class LancePartitionStatisticStorage implements PartitionStatisticStorage
     this.maxRowsPerFile =
         Integer.parseInt(
             properties.getOrDefault(MAX_ROWS_PER_FILE, String.valueOf(DEFAULT_MAX_ROWS_PER_FILE)));
+    Preconditions.checkArgument(
+        maxRowsPerFile > 0, "Lance partition statistics storage maxRowsPerFile must be positive");
+
     this.maxBytesPerFile =
         Integer.parseInt(
             properties.getOrDefault(
                 MAX_BYTES_PER_FILE, String.valueOf(DEFAULT_MAX_BYTES_PER_FILE)));
+    Preconditions.checkArgument(
+        maxBytesPerFile > 0, "Lance partition statistics storage maxBytesPerFile must be positive");
+
     this.maxRowsPerGroup =
         Integer.parseInt(
             properties.getOrDefault(
                 MAX_ROWS_PER_GROUP, String.valueOf(DEFAULT_MAX_ROWS_PER_GROUP)));
+    Preconditions.checkArgument(
+        maxRowsPerGroup > 0, "Lance partition statistics storage maxRowsPerGroup must be positive");
+
     this.readBatchSize =
         Integer.parseInt(
             properties.getOrDefault(READ_BATCH_SIZE, String.valueOf(DEFAULT_READ_BATCH_SIZE)));
+    Preconditions.checkArgument(
+        readBatchSize > 0, "Lance partition statistics storage readBatchSize must be positive");
   }
 
   @Override
@@ -188,7 +200,7 @@ public class LancePartitionStatisticStorage implements PartitionStatisticStorage
     try (Dataset datasetRead = open(fileName)) {
       List<FragmentMetadata> fragmentMetas;
       int count = 0;
-      try (VectorSchemaRoot root = VectorSchemaRoot.create(schema, allocator)) {
+      try (VectorSchemaRoot root = VectorSchemaRoot.create(SCHEMA, allocator)) {
         for (PartitionStatisticsUpdate update : updates) {
           count += update.statistics().size();
         }
@@ -406,7 +418,7 @@ public class LancePartitionStatisticStorage implements PartitionStatisticStorage
       return Dataset.open(fileName, allocator);
     } catch (IllegalArgumentException illegalArgumentException) {
       if (illegalArgumentException.getMessage().contains("was not found")) {
-        return Dataset.create(allocator, fileName, schema, new WriteParams.Builder().build());
+        return Dataset.create(allocator, fileName, SCHEMA, new WriteParams.Builder().build());
       } else {
         throw illegalArgumentException;
       }
