@@ -98,6 +98,22 @@ Changelog
   - Expose ports:
     - `9001` Iceberg REST service
 
+## Apache Gravitino MCP server image
+
+You can deploy the Gravitino MCP server with the Docker image.
+
+Container startup commands
+
+```shell
+docker run --rm -d -p 8000:8000 apache/gravitino-mcp-server:latest --metalake test --transport http --mcp-url http://0.0.0.0:8000/mcp
+```
+
+Changelog
+- apache/gravitino-mcp-server:1.0.0
+  - Supports read operations for `catalog`, `schema`, `table`, `fileset`, `model`, `policy`, `topic`, `statistic`, `job`.
+  - Supports associate&disassociate tag, policy to metadata
+  - Supports submit&cancel jobs.
+
 ## Playground Docker image
 
 You can use the [playground](https://github.com/apache/gravitino-playground) to experience the whole Gravitino system with other components.

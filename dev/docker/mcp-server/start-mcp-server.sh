@@ -20,4 +20,4 @@
 
 cd /root/mcp-server
 
-uv run mcp_server --transport=http $@
+uv run mcp_server $@

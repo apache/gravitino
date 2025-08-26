@@ -22,7 +22,6 @@ mcp_server_dir="$(dirname "${BASH_SOURCE-$0}")"
 mcp_server_dir="$(cd "${mcp_server_dir}">/dev/null; pwd)"
 gravitino_home="$(cd "${mcp_server_dir}/../../..">/dev/null; pwd)"
 
-# Prepare the Iceberg REST server packages
 cd ${gravitino_home}
 ./gradlew :mcp-server:clean
 
