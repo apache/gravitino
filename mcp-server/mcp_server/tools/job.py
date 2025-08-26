@@ -20,7 +20,7 @@ from fastmcp import Context, FastMCP
 
 def load_job_tool(mcp: FastMCP):
     @mcp.tool(tags={"job"})
-    async def get_list_of_jobs(
+    async def list_of_jobs(
         ctx: Context,
         job_template_name: str = None,
     ) -> str:
@@ -55,9 +55,7 @@ def load_job_tool(mcp: FastMCP):
                 audit: An object containing audit information, including creator and creation time.
         """
         client = ctx.request_context.lifespan_context.rest_client()
-        return await client.as_job_operation().get_list_of_jobs(
-            job_template_name
-        )
+        return await client.as_job_operation().list_of_jobs(job_template_name)
 
     @mcp.tool(tags={"job"})
     async def get_job_by_id(
@@ -93,7 +91,7 @@ def load_job_tool(mcp: FastMCP):
         return await client.as_job_operation().get_job_by_id(job_id)
 
     @mcp.tool(tags={"job"})
-    async def get_list_of_job_templates(
+    async def list_of_job_templates(
         ctx: Context,
     ) -> str:
         """
@@ -132,7 +130,7 @@ def load_job_tool(mcp: FastMCP):
                 scripts: A list of scripts associated with the job template and can be called by the executable.
         """
         client = ctx.request_context.lifespan_context.rest_client()
-        return await client.as_job_operation().get_list_of_job_templates()
+        return await client.as_job_operation().list_of_job_templates()
 
     @mcp.tool(tags={"job"})
     async def get_job_template_by_name(

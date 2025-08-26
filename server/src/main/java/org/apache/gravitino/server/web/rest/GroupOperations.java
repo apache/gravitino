@@ -33,8 +33,12 @@ import javax.ws.rs.core.Context;
 import javax.ws.rs.core.Response;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.GravitinoEnv;
+import org.apache.gravitino.MetadataObject;
+import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.authorization.AccessControlDispatcher;
+import org.apache.gravitino.authorization.Owner;
+import org.apache.gravitino.authorization.OwnerDispatcher;
 import org.apache.gravitino.dto.requests.GroupAddRequest;
 import org.apache.gravitino.dto.responses.GroupListResponse;
 import org.apache.gravitino.dto.responses.GroupResponse;
@@ -56,6 +60,7 @@ public class GroupOperations {
   private static final Logger LOG = LoggerFactory.getLogger(GroupOperations.class);
 
   private final AccessControlDispatcher accessControlManager;
+  private final OwnerDispatcher ownerDispatcher;
 
   @Context private HttpServletRequest httpRequest;
 
@@ -64,6 +69,7 @@ public class GroupOperations {
     // and Jersey injection doesn't support null value. So GroupOperations chooses to retrieve
     // accessControlManager from GravitinoEnv instead of injection here.
     this.accessControlManager = GravitinoEnv.getInstance().accessControlDispatcher();
+    this.ownerDispatcher = GravitinoEnv.getInstance().ownerDispatcher();
   }
 
   @GET
@@ -124,6 +130,19 @@ public class GroupOperations {
       return Utils.doAs(
           httpRequest,
           () -> {
+            ownerDispatcher
+                .getOwner(
+                    metalake, MetadataObjects.of(null, metalake, MetadataObject.Type.METALAKE))
+                .ifPresent(
+                    owner -> {
+                      if (owner.type() == Owner.Type.GROUP && owner.name().equals(group)) {
+                        throw new IllegalArgumentException(
+                            String.format(
+                                "Cannot remove group %s from metalake %s because the group is the owner of the metalake.",
+                                group, metalake));
+                      }
+                    });
+
             boolean removed = accessControlManager.removeGroup(metalake, group);
             if (!removed) {
               LOG.warn("Failed to remove group {} under metalake {}", group, metalake);

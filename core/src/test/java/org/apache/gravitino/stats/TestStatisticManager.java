@@ -63,6 +63,7 @@ import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.meta.SchemaVersion;
 import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.rel.types.Types;
+import org.apache.gravitino.stats.storage.MemoryPartitionStatsStorageFactory;
 import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.storage.RandomIdGenerator;
 import org.junit.jupiter.api.AfterAll;
@@ -115,6 +116,8 @@ public class TestStatisticManager {
     Mockito.when(config.get(Configs.CACHE_WEIGHER_ENABLED)).thenReturn(true);
     Mockito.when(config.get(Configs.CACHE_STATS_ENABLED)).thenReturn(false);
     Mockito.when(config.get(Configs.CACHE_IMPLEMENTATION)).thenReturn("caffeine");
+    Mockito.when(config.get(Configs.PARTITION_STATS_STORAGE_FACTORY_CLASS))
+        .thenReturn(MemoryPartitionStatsStorageFactory.class.getCanonicalName());
 
     Mockito.doReturn(100000L).when(config).get(TREE_LOCK_MAX_NODE_IN_MEMORY);
     Mockito.doReturn(1000L).when(config).get(TREE_LOCK_MIN_NODE_IN_MEMORY);
@@ -193,7 +196,7 @@ public class TestStatisticManager {
 
   @Test
   public void testStatisticLifeCycle() {
-    StatisticManager statisticManager = new StatisticManager(entityStore, idGenerator);
+    StatisticManager statisticManager = new StatisticManager(entityStore, idGenerator, config);
 
     MetadataObject tableObject =
         MetadataObjects.of(Lists.newArrayList(CATALOG, SCHEMA, TABLE), MetadataObject.Type.TABLE);
@@ -283,5 +286,108 @@ public class TestStatisticManager {
     Assertions.assertThrows(
         NoSuchMetadataObjectException.class,
         () -> statisticManager.dropStatistics(METALAKE, notExistObject, statNames));
+  }
+
+  @Test
+  public void testPartitionStatisticLifeCycle() {
+    StatisticManager statisticManager = new StatisticManager(entityStore, idGenerator, config);
+
+    MetadataObject tableObject =
+        MetadataObjects.of(Lists.newArrayList(CATALOG, SCHEMA, TABLE), MetadataObject.Type.TABLE);
+    Map<String, StatisticValue<?>> stats = Maps.newHashMap();
+    // Update statistics
+    stats.put("a", StatisticValues.stringValue("1"));
+    stats.put("b", StatisticValues.longValue(1L));
+    stats.put("c", StatisticValues.doubleValue(1.0));
+    stats.put("d", StatisticValues.booleanValue(true));
+    stats.put(
+        "e",
+        StatisticValues.listValue(
+            Lists.newArrayList(
+                StatisticValues.stringValue("1"), StatisticValues.stringValue("2"))));
+
+    Map<String, StatisticValue<?>> map = Maps.newHashMap();
+    map.put("x", StatisticValues.stringValue("1"));
+    map.put("y", StatisticValues.longValue(2L));
+    stats.put("f", StatisticValues.objectValue(map));
+    List<PartitionStatisticsUpdate> partitionStatistics = Lists.newArrayList();
+    partitionStatistics.add(PartitionStatisticsModification.update("p0", stats));
+    statisticManager.updatePartitionStatistics(METALAKE, tableObject, partitionStatistics);
+
+    List<PartitionStatistics> statistics =
+        statisticManager.listPartitionStatistics(
+            METALAKE,
+            tableObject,
+            PartitionRange.between(
+                "p0", PartitionRange.BoundType.CLOSED, "p1", PartitionRange.BoundType.OPEN));
+    Assertions.assertEquals(1, statistics.size());
+    PartitionStatistics listedPartitionStats = statistics.get(0);
+    Assertions.assertEquals(6, listedPartitionStats.statistics().length);
+    for (Statistic statistic : listedPartitionStats.statistics()) {
+      Assertions.assertTrue(
+          stats.containsKey(statistic.name()),
+          "Statistic name should be in the updated stats: " + statistic.name());
+      StatisticValue<?> value = stats.get(statistic.name());
+      Assertions.assertEquals(
+          value, statistic.value().get(), "Statistic value type mismatch: " + statistic.name());
+    }
+
+    // Update partial statistics
+    Map<String, StatisticValue<?>> expectStats = Maps.newHashMap();
+    expectStats.putAll(stats);
+    stats.clear();
+    stats.put("f", StatisticValues.longValue(2L));
+    stats.put("x", StatisticValues.longValue(2L));
+    partitionStatistics.clear();
+    partitionStatistics.add(PartitionStatisticsModification.update("p0", stats));
+
+    expectStats.put("f", StatisticValues.longValue(2L));
+    expectStats.put("x", StatisticValues.longValue(2));
+
+    statisticManager.updatePartitionStatistics(METALAKE, tableObject, partitionStatistics);
+    statistics =
+        statisticManager.listPartitionStatistics(
+            METALAKE,
+            tableObject,
+            PartitionRange.between(
+                "p0", PartitionRange.BoundType.CLOSED, "p1", PartitionRange.BoundType.OPEN));
+    Assertions.assertEquals(1, statistics.size());
+    listedPartitionStats = statistics.get(0);
+    Assertions.assertEquals(7, listedPartitionStats.statistics().length);
+    for (Statistic statistic : listedPartitionStats.statistics()) {
+      Assertions.assertTrue(
+          expectStats.containsKey(statistic.name()),
+          "Statistic name should be in the updated stats: " + statistic.name());
+      StatisticValue<?> value = expectStats.get(statistic.name());
+      Assertions.assertEquals(
+          value, statistic.value().get(), "Statistic value type mismatch: " + statistic.name());
+    }
+
+    // Drop statistics
+    expectStats.remove("a");
+    expectStats.remove("b");
+    expectStats.remove("c");
+    List<String> statNames = Lists.newArrayList("a", "b", "c");
+    List<PartitionStatisticsDrop> partitionStatisticsToDrop = Lists.newArrayList();
+    partitionStatisticsToDrop.add(PartitionStatisticsModification.drop("p0", statNames));
+    statisticManager.dropPartitionStatistics(METALAKE, tableObject, partitionStatisticsToDrop);
+    statistics =
+        statisticManager.listPartitionStatistics(
+            METALAKE,
+            tableObject,
+            PartitionRange.between(
+                "p0", PartitionRange.BoundType.CLOSED, "p1", PartitionRange.BoundType.OPEN));
+    Assertions.assertEquals(1, statistics.size());
+    listedPartitionStats = statistics.get(0);
+    Assertions.assertEquals(4, listedPartitionStats.statistics().length);
+
+    for (Statistic statistic : listedPartitionStats.statistics()) {
+      Assertions.assertTrue(
+          expectStats.containsKey(statistic.name()),
+          "Statistic name should be in the updated stats: " + statistic.name());
+      StatisticValue<?> value = expectStats.get(statistic.name());
+      Assertions.assertEquals(
+          value, statistic.value().get(), "Statistic value type mismatch: " + statistic.name());
+    }
   }
 }

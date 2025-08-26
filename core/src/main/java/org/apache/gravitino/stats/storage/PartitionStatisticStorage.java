@@ -19,6 +19,7 @@
 package org.apache.gravitino.stats.storage;
 
 import java.io.Closeable;
+import java.io.IOException;
 import java.util.List;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.stats.PartitionRange;
@@ -39,7 +40,8 @@ public interface PartitionStatisticStorage extends Closeable {
    *     name
    */
   List<PersistedPartitionStatistics> listStatistics(
-      String metalake, MetadataObject metadataObject, PartitionRange partitionRange);
+      String metalake, MetadataObject metadataObject, PartitionRange partitionRange)
+      throws IOException;
 
   /**
    * Lists statistics for a given metadata object and specific partition names. This interface may
@@ -55,7 +57,8 @@ public interface PartitionStatisticStorage extends Closeable {
    *     name
    */
   default List<PersistedPartitionStatistics> listStatistics(
-      String metalake, MetadataObject metadataObject, List<String> partitionNames) {
+      String metalake, MetadataObject metadataObject, List<String> partitionNames)
+      throws IOException {
     throw new UnsupportedOperationException(
         "Don't support listStatistics with partition names yet.");
   }
@@ -73,19 +76,21 @@ public interface PartitionStatisticStorage extends Closeable {
    * @return the number of statistics dropped, which may be less than the size of the input list if
    *     some statistics do not exist or cannot be dropped.
    */
-  int dropStatistics(String metalake, List<MetadataObjectStatisticsDrop> partitionStatisticsToDrop);
+  int dropStatistics(String metalake, List<MetadataObjectStatisticsDrop> partitionStatisticsToDrop)
+      throws IOException;
 
   /**
    * Updates statistics for a given metadata object. If the statistic exists, it will be updated; If
    * the statistic doesn't exist, it will be created. Locking guarantee: The upper layer will
    * acquire a write lock at the metadata object level. For example, if the metadata object is a
-   * table, the write lock of the table level will be held. The concrete implementation * may
-   * perform partial drops, meaning that the underlying storage system may not support transactional
+   * table, the write lock of the table level will be held. The concrete implementation may perform
+   * partial updates, meaning that the underlying storage system may not support transactional
    * update.
    *
    * @param metalake the name of the metalake
    * @param statisticsToUpdate a list of {@link MetadataObjectStatisticsUpdate} objects, each
    *     containing the metadata object and its associated statistics updates.
    */
-  void updateStatistics(String metalake, List<MetadataObjectStatisticsUpdate> statisticsToUpdate);
+  void updateStatistics(String metalake, List<MetadataObjectStatisticsUpdate> statisticsToUpdate)
+      throws IOException;
 }

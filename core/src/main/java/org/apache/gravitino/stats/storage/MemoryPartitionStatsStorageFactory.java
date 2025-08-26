@@ -20,18 +20,22 @@ package org.apache.gravitino.stats.storage;
 
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
+import com.google.common.collect.Sets;
 import java.io.IOException;
-import java.util.HashMap;
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.stream.Collectors;
 import org.apache.gravitino.MetadataObject;
+import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.stats.PartitionRange;
 import org.apache.gravitino.stats.PartitionStatisticsDrop;
 import org.apache.gravitino.stats.PartitionStatisticsUpdate;
 import org.apache.gravitino.stats.StatisticValue;
+import org.apache.gravitino.utils.PrincipalUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -63,7 +67,7 @@ public class MemoryPartitionStatsStorageFactory implements PartitionStatisticSto
         return Lists.newArrayList();
       }
 
-      Map<String, Map<String, StatisticValue<?>>> resultStats = Maps.newHashMap();
+      Map<String, List<PersistedStatistic>> resultStats = Maps.newHashMap();
       for (PersistedPartitionStatistics partitionStat : tableStats.partitionStatistics().values()) {
         String partitionName = partitionStat.partitionName();
         boolean lowerBoundSatisfied =
@@ -81,7 +85,7 @@ public class MemoryPartitionStatsStorageFactory implements PartitionStatisticSto
                 BoundDirection.UPPER);
 
         if (lowerBoundSatisfied && upperBoundSatisfied) {
-          resultStats.put(partitionName, Maps.newHashMap(partitionStat.statistics()));
+          resultStats.put(partitionName, Lists.newArrayList(partitionStat.statistics()));
         }
       }
       return resultStats.entrySet().stream()
@@ -121,11 +125,45 @@ public class MemoryPartitionStatsStorageFactory implements PartitionStatisticSto
                   .partitionStatistics()
                   .computeIfAbsent(
                       partitionName,
-                      k -> PersistedPartitionStatistics.of(partitionName, new HashMap<>()));
+                      k -> PersistedPartitionStatistics.of(partitionName, Lists.newArrayList()));
+
+          Set<String> existedStats = Sets.newHashSet();
+          // Update existed stats
+          existedPartitionStats
+              .statistics()
+              .replaceAll(
+                  stat -> {
+                    String statName = stat.name();
+                    if (partitionStats.containsKey(statName)) {
+                      existedStats.add(statName);
+                      StatisticValue<?> newValue = partitionStats.get(statName);
+                      AuditInfo auditInfo =
+                          AuditInfo.builder()
+                              .withCreator(stat.auditInfo().creator())
+                              .withCreateTime(stat.auditInfo().createTime())
+                              .withLastModifiedTime(Instant.now())
+                              .withLastModifier(PrincipalUtils.getCurrentUserName())
+                              .build();
+                      return PersistedStatistic.of(statName, newValue, auditInfo);
+                    }
+                    return stat;
+                  });
+
+          // Add new stats
           for (Map.Entry<String, StatisticValue<?>> statEntry : partitionStats.entrySet()) {
             String statName = statEntry.getKey();
-            StatisticValue<?> statValue = statEntry.getValue();
-            existedPartitionStats.statistics().put(statName, statValue);
+            if (!existedStats.contains(statName)) {
+              AuditInfo auditInfo =
+                  AuditInfo.builder()
+                      .withCreator(PrincipalUtils.getCurrentUserName())
+                      .withCreateTime(Instant.now())
+                      .withLastModifiedTime(Instant.now())
+                      .withLastModifier(PrincipalUtils.getCurrentUserName())
+                      .build();
+              PersistedStatistic newStat =
+                  PersistedStatistic.of(statName, statEntry.getValue(), auditInfo);
+              existedPartitionStats.statistics().add(newStat);
+            }
           }
         }
       }
@@ -153,14 +191,15 @@ public class MemoryPartitionStatsStorageFactory implements PartitionStatisticSto
           if (tableStats.partitionStatistics().containsKey(partStats.partitionName())) {
             PersistedPartitionStatistics persistedPartitionStatistics =
                 tableStats.partitionStatistics().get(partStats.partitionName());
-            for (String statName : partStats.statisticNames()) {
-              Map<String, StatisticValue<?>> statisticValueMap =
-                  persistedPartitionStatistics.statistics();
-              if (statisticValueMap.containsKey(statName)) {
-                statisticValueMap.remove(statName);
-                deleteCount++;
-              }
-            }
+            Set<String> statsNamesToDelete = Sets.newHashSet(partStats.statisticNames());
+            int originCount = persistedPartitionStatistics.statistics().size();
+            persistedPartitionStatistics
+                .statistics()
+                .removeIf(
+                    persistedStatistic -> statsNamesToDelete.contains(persistedStatistic.name()));
+
+            deleteCount =
+                deleteCount + (originCount - persistedPartitionStatistics.statistics().size());
             if (persistedPartitionStatistics.statistics().isEmpty()) {
               tableStats.partitionStatistics().remove(partStats.partitionName());
             }
@@ -223,7 +262,7 @@ public class MemoryPartitionStatsStorageFactory implements PartitionStatisticSto
         boolean compare(
             String targetPartitionName, String partitionName, PartitionRange.BoundType type) {
           int result = targetPartitionName.compareTo(partitionName);
-          return type == PartitionRange.BoundType.OPEN ? result > 0 : result >= 0;
+          return type == PartitionRange.BoundType.OPEN ? result < 0 : result <= 0;
         }
       },
       UPPER {
@@ -231,7 +270,7 @@ public class MemoryPartitionStatsStorageFactory implements PartitionStatisticSto
         boolean compare(
             String targetPartitionName, String partitionName, PartitionRange.BoundType type) {
           int result = targetPartitionName.compareTo(partitionName);
-          return type == PartitionRange.BoundType.OPEN ? result < 0 : result <= 0;
+          return type == PartitionRange.BoundType.OPEN ? result > 0 : result >= 0;
         }
       };
 

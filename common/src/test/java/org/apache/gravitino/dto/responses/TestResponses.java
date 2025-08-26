@@ -21,7 +21,7 @@ package org.apache.gravitino.dto.responses;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -77,7 +77,7 @@ public class TestResponses {
   void testDropped() throws IllegalArgumentException {
     DropResponse drop = new DropResponse();
 
-    assertFalse(drop.dropped());
+    assertNull(drop.dropped());
   }
 
   @Test
@@ -457,7 +457,7 @@ public class TestResponses {
             .withVersion(0)
             .withComment("model version1 comment")
             .withAliases(new String[] {"alias1", "alias2"})
-            .withUri("uri")
+            .withUris(ImmutableMap.of("n1", "u1"))
             .withProperties(ImmutableMap.of("key", "value"))
             .withAudit(
                 AuditDTO.builder().withCreator("user1").withCreateTime(Instant.now()).build())
@@ -467,7 +467,7 @@ public class TestResponses {
             .withVersion(1)
             .withComment("model version2 comment")
             .withAliases(new String[] {"alias3", "alias4"})
-            .withUri("uri")
+            .withUris(ImmutableMap.of("n2", "u2"))
             .withProperties(ImmutableMap.of("key", "value"))
             .withAudit(
                 AuditDTO.builder().withCreator("user1").withCreateTime(Instant.now()).build())
@@ -494,7 +494,7 @@ public class TestResponses {
             .withVersion(0)
             .withComment("model version comment")
             .withAliases(new String[] {"alias1", "alias2"})
-            .withUri("uri")
+            .withUris(ImmutableMap.of("n1", "u1"))
             .withProperties(props)
             .withAudit(audit)
             .build();
