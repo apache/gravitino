@@ -111,7 +111,7 @@ public class TreeLock {
           LOG.trace(
               "Node {} has been lock with '{}' lock, hold by {} with ident '{}' at {}",
               this,
-              lockType,
+              type,
               Thread.currentThread(),
               identifier,
               System.currentTimeMillis());
@@ -155,7 +155,7 @@ public class TreeLock {
         LOG.trace(
             "Node {} has been unlock with '{}' lock, hold by {} with ident '{}' for {} ms",
             this,
-            lockType,
+            type,
             Thread.currentThread(),
             identifier,
             System.currentTimeMillis() - holdStartTime);
