@@ -344,7 +344,7 @@ public class CaffeineEntityCache extends BaseEntityCache {
               .roleNames()
               .forEach(
                   role -> {
-                    Namespace ns = NamespaceUtil.ofUser(userEntity.namespace().level(0));
+                    Namespace ns = NamespaceUtil.ofRole(userEntity.namespace().level(0));
                     NameIdentifier nameIdentifier = NameIdentifier.of(ns, role);
                     putReverseIndex(nameIdentifier, Entity.EntityType.ROLE, key);
                   });
@@ -357,7 +357,7 @@ public class CaffeineEntityCache extends BaseEntityCache {
               .roleNames()
               .forEach(
                   role -> {
-                    Namespace ns = NamespaceUtil.ofGroup(groupEntity.namespace().level(0));
+                    Namespace ns = NamespaceUtil.ofRole(groupEntity.namespace().level(0));
                     NameIdentifier nameIdentifier = NameIdentifier.of(ns, role);
                     putReverseIndex(nameIdentifier, Entity.EntityType.ROLE, key);
                   });
@@ -375,6 +375,10 @@ public class CaffeineEntityCache extends BaseEntityCache {
                     // Namespace.fromString(securableObject.parent());
                     Entity.EntityType entityType = Entity.EntityType.METALAKE;
                     switch (securableObject.type()) {
+                      case METALAKE:
+                        entityType = Entity.EntityType.METALAKE;
+                        namespace = NamespaceUtil.ofMetalake();
+                        break;
                       case CATALOG:
                         entityType = Entity.EntityType.CATALOG;
                         namespace = NamespaceUtil.ofCatalog(roleEntity.namespace().level(0));
@@ -393,8 +397,7 @@ public class CaffeineEntityCache extends BaseEntityCache {
 //                        throw new IllegalStateException(
 //                            "Unprocessed securable object type: " + securableObject.type());
                     }
-                    Namespace so_namespace =
-                        Namespace.of(ArrayUtils.add(namespace.levels(), securableObject.name()));
+                    Namespace so_namespace = Namespace.of(namespace.levels());
                     NameIdentifier nameIdentifier =
                         NameIdentifier.of(so_namespace, securableObject.name());
                     putReverseIndex(nameIdentifier, entityType, key);
@@ -550,12 +553,12 @@ public class CaffeineEntityCache extends BaseEntityCache {
               allCacheIndexKeys1.add(k.toString());
             });
 
-    List<String> relationCacheIndex2 = Lists.newArrayList();
+    List<String> matchCacheIndex2 = Lists.newArrayList();
     cacheIndex
         .getKeysStartingWith(identifier.toString())
         .forEach(
             key -> {
-              relationCacheIndex2.add(key.toString());
+              matchCacheIndex2.add(key.toString());
             });
 
     List<String> allReverseIndexKeys1 = Lists.newArrayList();
@@ -642,12 +645,12 @@ public class CaffeineEntityCache extends BaseEntityCache {
               allCacheIndexKeys11.add(k.toString());
             });
 
-    List<String> relationCacheIndex21 = Lists.newArrayList();
+    List<String> matchCacheIndex21 = Lists.newArrayList();
     cacheIndex
         .getKeysStartingWith(identifier.toString())
         .forEach(
             key -> {
-              relationCacheIndex21.add(key.toString());
+              matchCacheIndex21.add(key.toString());
             });
 
     List<String> allReverseIndexKeys11 = Lists.newArrayList();
@@ -660,7 +663,7 @@ public class CaffeineEntityCache extends BaseEntityCache {
 
     Set<EntityCacheRelationKey> allCacheDataKeys2 = cacheData.asMap().keySet();
     List<String> allCacheDataKeysStrings2 =
-        allCacheDataKeys1.stream().map(Object::toString).collect(Collectors.toList());
+            allCacheDataKeys2.stream().map(Object::toString).collect(Collectors.toList());
 
     // DEBUG code
     check_cache();
