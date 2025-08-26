@@ -61,6 +61,14 @@ INSERT: 1 row
 
 <QUERY_FAILED> NULL value not allowed for NOT NULL column: f14
 
+CREATE TABLE
+
+INSERT: 1 row
+
+"[1, 2, 3, 4, 5]"
+
+DROP TABLE
+
 DROP TABLE
 
 DROP TABLE
