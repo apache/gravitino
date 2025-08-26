@@ -201,6 +201,7 @@ public abstract class SparkEnvIT extends SparkUtilIT {
             .set(GravitinoSparkConfig.GRAVITINO_URI, gravitinoUri)
             .set(GravitinoSparkConfig.GRAVITINO_METALAKE, metalakeName)
             .set(GravitinoSparkConfig.GRAVITINO_ENABLE_ICEBERG_SUPPORT, "true")
+            .set(GravitinoSparkConfig.GRAVITINO_ENABLE_PAIMON_SUPPORT, "true")
             .set("hive.exec.dynamic.partition.mode", "nonstrict")
             .set("spark.sql.warehouse.dir", warehouse)
             .set("spark.sql.session.timeZone", TIME_ZONE_UTC);
