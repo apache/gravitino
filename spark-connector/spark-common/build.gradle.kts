@@ -37,7 +37,9 @@ val scalaJava8CompatVersion: String = libs.versions.scala.java.compat.get()
 val scalaCollectionCompatVersion: String = libs.versions.scala.collection.compat.get()
 
 dependencies {
-  implementation(project(":catalogs:catalog-common"))
+  implementation(project(":catalogs:catalog-common")) {
+    exclude("org.apache.logging.log4j")
+  }
   implementation(libs.guava)
   implementation(libs.caffeine)
 

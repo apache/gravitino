@@ -127,6 +127,7 @@ jmh = "1.37"
 jcasbin = "1.81.0"
 ognl = "3.4.7"
 concurrent-trees = "2.6.0"
+jakarta-validation = "2.0.2"
 
 [libraries]
 aws-iam = { group = "software.amazon.awssdk", name = "iam", version.ref = "awssdk" }
@@ -158,6 +159,7 @@ log4j-api = { group = "org.apache.logging.log4j", name = "log4j-api", version.re
 log4j-core = { group = "org.apache.logging.log4j", name = "log4j-core", version.ref = "log4j" }
 log4j-12-api = { group = "org.apache.logging.log4j", name = "log4j-1.2-api", version.ref = "log4j" }
 log4j-layout-template-json = { group = "org.apache.logging.log4j", name = "log4j-layout-template-json", version.ref = "log4j" }
+jakarta-validation-api = { group = "jakarta.validation", name = "jakarta.validation-api", version.ref = "jakarta-validation" }
 jetty-server = { group = "org.eclipse.jetty", name = "jetty-server", version.ref = "jetty" }
 jetty-servlet = { group = "org.eclipse.jetty", name = "jetty-servlet", version.ref = "jetty" }
 jetty-servlets = { group = "org.eclipse.jetty", name = "jetty-servlets", version.ref = "jetty" }
