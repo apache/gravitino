@@ -134,7 +134,9 @@ public class LancePartitionStatisticStorage implements PartitionStatisticStorage
         readBatchSize > 0, "Lance partition statistics storage readBatchSize must be positive");
     this.properties = Maps.newHashMap();
     for (Map.Entry<String, String> entry : properties.entrySet()) {
-      this.properties.put(entry.getKey().substring(LANCE_PREFIX.length()), entry.getValue());
+      if (entry.getKey().startsWith(LANCE_PREFIX)) {
+        this.properties.put(entry.getKey().substring(LANCE_PREFIX.length()), entry.getValue());
+      }
     }
   }
 
