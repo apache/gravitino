@@ -86,15 +86,11 @@ public class FilesetCatalogCache implements Closeable {
     NameIdentifier catalogIdent =
         NameIdentifier.of(filesetIdent.namespace().level(0), filesetIdent.namespace().level(1));
     FilesetCatalog filesetCatalog = getFilesetCatalog(catalogIdent);
-    Fileset fileset =
-        filesetCache.get(
-            filesetIdent,
-            ident ->
-                filesetCatalog.loadFileset(
-                    NameIdentifier.of(filesetIdent.namespace().level(2), filesetIdent.name())));
-    Preconditions.checkArgument(
-        fileset != null, String.format("Loaded fileset: %s is null.", filesetIdent));
-    return fileset;
+    return filesetCache.get(
+        filesetIdent,
+        ident ->
+            filesetCatalog.loadFileset(
+                NameIdentifier.of(filesetIdent.namespace().level(2), filesetIdent.name())));
   }
 
   private Cache<NameIdentifier, FilesetCatalog> newCatalogCache(
@@ -110,7 +106,7 @@ public class FilesetCatalogCache implements Closeable {
   private Cache<NameIdentifier, Fileset> newFilesetCache(
       ScheduledThreadPoolExecutor filesetCleanScheduler) {
     return Caffeine.newBuilder()
-        .maximumSize(100)
+        .maximumSize(10000)
         .scheduler(Scheduler.forScheduledExecutorService(filesetCleanScheduler))
         .build();
   }
@@ -131,5 +127,6 @@ public class FilesetCatalogCache implements Closeable {
       // ignore
     }
     catalogCleanScheduler.shutdownNow();
+    filesetCleanScheduler.shutdownNow();
   }
 }

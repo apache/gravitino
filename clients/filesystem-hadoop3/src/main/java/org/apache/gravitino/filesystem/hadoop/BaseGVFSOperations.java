@@ -20,6 +20,8 @@ package org.apache.gravitino.filesystem.hadoop;
 
 import static org.apache.gravitino.file.Fileset.PROPERTY_DEFAULT_LOCATION_NAME;
 import static org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_CURRENT_LOCATION_NAME;
+import static org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_FILESET_CATALOG_CACHE_ENABLE;
+import static org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_FILESET_CATALOG_CACHE_ENABLE_DEFAULT;
 import static org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystemUtils.extractIdentifier;
 import static org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystemUtils.getConfigMap;
 import static org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystemUtils.getSubPathFromGvfsPath;
@@ -111,7 +113,9 @@ public abstract class BaseGVFSOperations implements Closeable {
 
   private final String metalakeName;
 
+  private final boolean enableFilesetCatalogCache;
   private final FilesetCatalogCache filesetCatalogCache;
+  private final GravitinoClient gravitinoClient;
 
   private final Configuration conf;
 
@@ -146,8 +150,13 @@ public abstract class BaseGVFSOperations implements Closeable {
         "'%s' is not set in the configuration",
         GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_CLIENT_METALAKE_KEY);
 
-    GravitinoClient client = GravitinoVirtualFileSystemUtils.createClient(configuration);
-    this.filesetCatalogCache = new FilesetCatalogCache(client);
+    this.gravitinoClient = GravitinoVirtualFileSystemUtils.createClient(configuration);
+    this.enableFilesetCatalogCache =
+        configuration.getBoolean(
+            FS_GRAVITINO_FILESET_CATALOG_CACHE_ENABLE,
+            FS_GRAVITINO_FILESET_CATALOG_CACHE_ENABLE_DEFAULT);
+    this.filesetCatalogCache =
+        enableFilesetCatalogCache ? new FilesetCatalogCache(gravitinoClient) : null;
 
     this.internalFileSystemCleanScheduler =
         new ScheduledThreadPoolExecutor(1, newDaemonThreadFactory("gvfs-filesystem-cache-cleaner"));
@@ -527,25 +536,32 @@ public abstract class BaseGVFSOperations implements Closeable {
   }
 
   /**
-   * Get the fileset catalog by the catalog identifier from the cache. If the subclass does not want
-   * to use the cache, it can override this method.
+   * Get the fileset catalog by the catalog identifier from the cache or load it from the server if
+   * the cache is disabled.
    *
    * @param catalogIdent the catalog identifier.
    * @return the fileset catalog.
    */
   protected FilesetCatalog getFilesetCatalog(NameIdentifier catalogIdent) {
-    return filesetCatalogCache.getFilesetCatalog(catalogIdent);
+    return enableFilesetCatalogCache
+        ? filesetCatalogCache.getFilesetCatalog(catalogIdent)
+        : gravitinoClient.loadCatalog(catalogIdent.name()).asFilesetCatalog();
   }
 
   /**
-   * Get the fileset by the fileset identifier from the cache. If the subclass does not want to use
-   * the cache, it can override this method.
+   * Get the fileset by the fileset identifier from the cache or load it from the server if the
+   * cache is disabled.
    *
    * @param filesetIdent the fileset identifier.
    * @return the fileset.
    */
   protected Fileset getFileset(NameIdentifier filesetIdent) {
-    return filesetCatalogCache.getFileset(filesetIdent);
+    return enableFilesetCatalogCache
+        ? filesetCatalogCache.getFileset(filesetIdent)
+        : getFilesetCatalog(
+                NameIdentifier.of(
+                    filesetIdent.namespace().level(0), filesetIdent.namespace().level(1)))
+            .loadFileset(NameIdentifier.of(filesetIdent.namespace().level(2), filesetIdent.name()));
   }
 
   @VisibleForTesting

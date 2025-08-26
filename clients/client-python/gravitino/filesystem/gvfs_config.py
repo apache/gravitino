@@ -76,3 +76,6 @@ class GVFSConfig:
 
     # The configuration key prefix for the client.
     GVFS_FILESYSTEM_CLIENT_CONFIG_PREFIX = "gvfs_gravitino_client_"
+
+    # The configuration key for whether to enable fileset catalog cache. The default is false.
+    GVFS_FILESYSTEM_ENABLE_FILESET_CATALOG_CACHE = "enable_fileset_catalog_cache"
