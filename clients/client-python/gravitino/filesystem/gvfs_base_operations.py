@@ -149,7 +149,7 @@ class BaseGVFSOperations(ABC):
             self._catalog_cache = LRUCache(maxsize=100)
             self._catalog_cache_lock = rwlock.RWLockFair()
 
-            self._fileset_cache = LRUCache(maxsize=100)
+            self._fileset_cache = LRUCache(maxsize=10000)
             self._fileset_cache_lock = rwlock.RWLockFair()
 
         self._enable_credential_vending = (
