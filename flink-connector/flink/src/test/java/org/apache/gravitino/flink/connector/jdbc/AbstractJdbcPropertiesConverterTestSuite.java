@@ -153,4 +153,19 @@ public abstract class AbstractJdbcPropertiesConverterTestSuite {
     Assertions.assertEquals(
         testDriver, properties.get(JdbcPropertiesConstants.GRAVITINO_JDBC_DRIVER));
   }
+
+  @Test
+  public void testToJdbcCatalogPropertiesWithoutUrl() {
+    Map<String, String> catalogPropertiesWithoutUrl = new HashMap<>(catalogProperties);
+    catalogPropertiesWithoutUrl.remove(JdbcPropertiesConstants.GRAVITINO_JDBC_URL);
+
+    IllegalArgumentException ex =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                getConverter(catalogPropertiesWithoutUrl)
+                    .toFlinkCatalogProperties(catalogPropertiesWithoutUrl));
+
+    Assertions.assertTrue(ex.getMessage().contains(JdbcPropertiesConstants.GRAVITINO_JDBC_URL));
+  }
 }
