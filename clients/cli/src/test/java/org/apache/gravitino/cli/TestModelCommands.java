@@ -1146,4 +1146,25 @@ public class TestModelCommands {
 
     Assertions.assertThrows(RuntimeException.class, commandLine::handleCommandLine);
   }
+
+  @Test
+  void testUpdateModelVersionAliasesByNullAliasAndVersion() {
+    Main.useExit = false;
+    when(mockCommandLine.hasOption(GravitinoOptions.METALAKE)).thenReturn(true);
+    when(mockCommandLine.getOptionValue(GravitinoOptions.METALAKE)).thenReturn("metalake_demo");
+    when(mockCommandLine.hasOption(GravitinoOptions.ALIAS)).thenReturn(false);
+    when(mockCommandLine.getOptionValues(GravitinoOptions.ALIAS)).thenReturn(null);
+    when(mockCommandLine.hasOption(GravitinoOptions.VERSION)).thenReturn(false);
+    when(mockCommandLine.getOptionValue(GravitinoOptions.VERSION)).thenReturn(null);
+    when(mockCommandLine.hasOption(GravitinoOptions.NEW_ALIAS)).thenReturn(true);
+    when(mockCommandLine.getOptionValues(GravitinoOptions.NEW_ALIAS))
+        .thenReturn(new String[] {"aliasA", "aliasB"});
+
+    GravitinoCommandLine commandLine =
+        spy(
+            new GravitinoCommandLine(
+                mockCommandLine, mockOptions, CommandEntities.MODEL, CommandActions.UPDATE));
+
+    Assertions.assertThrows(RuntimeException.class, commandLine::handleCommandLine);
+  }
 }

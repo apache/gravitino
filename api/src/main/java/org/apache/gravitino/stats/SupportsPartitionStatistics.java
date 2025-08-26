@@ -33,7 +33,7 @@ public interface SupportsPartitionStatistics {
    * @return a list of PartitionStatistics, where each PartitionStatistics contains the partition
    *     name and a list of statistics applicable to that partition.
    */
-  List<PartitionStatistics> listStatistics(PartitionRange range);
+  List<PartitionStatistics> listPartitionStatistics(PartitionRange range);
 
   /**
    * Updates statistics with the provided values. If the statistic exists, it will be updated with
@@ -45,7 +45,7 @@ public interface SupportsPartitionStatistics {
    *     values to be updated.
    * @throws UnmodifiableStatisticException if any of the statistics to be updated are unmodifiable
    */
-  void updateStatistics(List<PartitionStatisticsUpdate> statisticsToUpdate)
+  void updatePartitionStatistics(List<PartitionStatisticsUpdate> statisticsToUpdate)
       throws UnmodifiableStatisticException;
 
   /**
@@ -56,6 +56,6 @@ public interface SupportsPartitionStatistics {
    * @return true if the statistics were successfully dropped.
    * @throws UnmodifiableStatisticException if any of the statistics to be dropped are unmodifiable
    */
-  boolean dropStatistics(List<PartitionStatisticsDrop> statisticsToDrop)
+  boolean dropPartitionStatistics(List<PartitionStatisticsDrop> statisticsToDrop)
       throws UnmodifiableStatisticException;
 }

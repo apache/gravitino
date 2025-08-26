@@ -37,7 +37,7 @@ class JobOperation(ABC):
         pass
 
     @abstractmethod
-    async def get_list_of_jobs(self, job_template_name: str) -> str:
+    async def list_of_jobs(self, job_template_name: str) -> str:
         """
         Retrieve the list of jobs within the metalake
 
@@ -51,7 +51,7 @@ class JobOperation(ABC):
         pass
 
     @abstractmethod
-    async def get_list_of_job_templates(self) -> str:
+    async def list_of_job_templates(self) -> str:
         """
         Retrieve the list of job templates within the metalake
 
