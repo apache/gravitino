@@ -22,6 +22,8 @@ import static org.apache.gravitino.rel.expressions.transforms.Transforms.identit
 
 import java.time.Instant;
 import java.util.Optional;
+import java.util.Set;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.apache.gravitino.connector.BaseColumn;
 import org.apache.gravitino.meta.AuditInfo;
@@ -34,6 +36,7 @@ import org.apache.gravitino.rel.expressions.sorts.SortDirection;
 import org.apache.gravitino.rel.expressions.sorts.SortOrder;
 import org.apache.gravitino.rel.expressions.sorts.SortOrders;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
+import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.metastore.api.StorageDescriptor;
 import org.apache.hadoop.hive.metastore.api.Table;
 
@@ -89,8 +92,8 @@ public class HiveTableConverter {
       Column[] getColumns(Table table, BUILDER columnBuilder) {
     StorageDescriptor sd = table.getSd();
     // Collect column names from sd.getCols() to check for duplicates
-    java.util.Set<String> columnNames =
-        sd.getCols().stream().map(f -> f.getName()).collect(java.util.stream.Collectors.toSet());
+    Set<String> columnNames =
+        sd.getCols().stream().map(FieldSchema::getName).collect(Collectors.toSet());
 
     return Stream.concat(
             sd.getCols().stream()
