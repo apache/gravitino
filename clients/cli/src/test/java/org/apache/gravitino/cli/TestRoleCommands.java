@@ -405,7 +405,7 @@ class TestRoleCommands {
     Main.useExit = false;
     RoleDetails details =
         spy(new RoleDetails(mock(CommandContext.class), "metalake_demo", "admin"));
-    doThrow(new org.apache.gravitino.exceptions.NoSuchUserException("Unknown role."))
+    doThrow(new org.apache.gravitino.exceptions.NoSuchRoleException("Unknown role."))
         .when(details)
         .handle();
     when(mockCommandLine.hasOption(GravitinoOptions.METALAKE)).thenReturn(true);
