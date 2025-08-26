@@ -161,6 +161,45 @@ public class TestLancePartitionStatisticStorage {
             statisticValue.value());
         Assertions.assertNotNull(statistic.auditInfo());
       }
+
+      // Drop one statistics from partition01 and partition02
+      tableStatisticsToDrop =
+          Lists.newArrayList(
+              MetadataObjectStatisticsDrop.of(
+                  metadataObject,
+                  Lists.newArrayList(
+                      PartitionStatisticsModification.drop(
+                          "partition01", Lists.newArrayList("statistic1")),
+                      PartitionStatisticsModification.drop(
+                          "partition02", Lists.newArrayList("statistic2")))));
+      storage.dropStatistics(metalakeName, tableStatisticsToDrop);
+
+      listedStats =
+          storage.listStatistics(
+              metalakeName,
+              metadataObject,
+              PartitionRange.between(
+                  fromPartitionName,
+                  PartitionRange.BoundType.CLOSED,
+                  "partition03",
+                  PartitionRange.BoundType.OPEN));
+      Assertions.assertEquals(3, listedStats.size());
+      for (PersistedPartitionStatistics persistPartStat : listedStats) {
+        stats = persistPartStat.statistics();
+        Assertions.assertEquals(9, stats.size());
+        for (PersistedStatistic statistic : stats) {
+          partitionName = persistPartStat.partitionName();
+          String statisticName = statistic.name();
+          StatisticValue<?> statisticValue = statistic.value();
+
+          Assertions.assertTrue(
+              originData.get(metadataObject).get(partitionName).containsKey(statisticName));
+          Assertions.assertEquals(
+              originData.get(metadataObject).get(partitionName).get(statisticName).value(),
+              statisticValue.value());
+          Assertions.assertNotNull(statistic.auditInfo());
+        }
+      }
     }
 
     FileUtils.deleteDirectory(new File(location + "/" + tableEntity.id() + ".lance"));
