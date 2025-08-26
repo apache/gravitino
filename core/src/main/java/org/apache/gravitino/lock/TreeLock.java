@@ -143,6 +143,9 @@ public class TreeLock {
     if (lockType == null) {
       throw new IllegalStateException("We must lock the tree lock before unlock it.");
     }
+    if (heldLocks.isEmpty()) {
+      throw new IllegalStateException("We must hold a lock before unlocking it.");
+    }
 
     while (!heldLocks.isEmpty()) {
       Pair<TreeLockNode, LockType> pair = heldLocks.pop();
