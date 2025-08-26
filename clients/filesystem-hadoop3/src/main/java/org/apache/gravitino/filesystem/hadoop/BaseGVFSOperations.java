@@ -28,6 +28,7 @@ import static org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystemU
 
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
+import com.github.benmanes.caffeine.cache.Scheduler;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
@@ -45,6 +46,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.ServiceLoader;
 import java.util.Set;
+import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
@@ -706,6 +708,12 @@ public abstract class BaseGVFSOperations implements Closeable {
     Caffeine<Object, Object> cacheBuilder =
         Caffeine.newBuilder()
             .maximumSize(maxCapacity)
+            // Since Caffeine does not ensure that removalListener will be involved after expiration
+            // We use a scheduler with one thread to clean up expired fs.
+            .scheduler(
+                Scheduler.forScheduledExecutorService(
+                    new ScheduledThreadPoolExecutor(
+                        1, newDaemonThreadFactory("gvfs-filesystem-cache-cleaner"))))
             .removalListener(
                 (key, value, cause) -> {
                   FileSystem fs = (FileSystem) value;

@@ -21,10 +21,12 @@ package org.apache.gravitino.filesystem.hadoop;
 
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
+import com.github.benmanes.caffeine.cache.Scheduler;
 import com.google.common.base.Preconditions;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.io.Closeable;
 import java.io.IOException;
+import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.ThreadFactory;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.client.GravitinoClient;
@@ -85,11 +87,27 @@ public class FilesetCatalogCache implements Closeable {
   private Cache<NameIdentifier, FilesetCatalog> newCatalogCache() {
     // In most scenarios, it will not read so many catalog filesets at the same time, so we can just
     // set a default value for this cache.
-    return Caffeine.newBuilder().maximumSize(100).build();
+    return Caffeine.newBuilder()
+        .maximumSize(100)
+        // Since Caffeine does not ensure that removalListener will be involved after expiration
+        // We use a scheduler with one thread to clean up expired catalogs.
+        .scheduler(
+            Scheduler.forScheduledExecutorService(
+                new ScheduledThreadPoolExecutor(
+                    1, newDaemonThreadFactory("gvfs-catalog-cache-cleaner"))))
+        .build();
   }
 
   private Cache<NameIdentifier, Fileset> newFilesetCache() {
-    return Caffeine.newBuilder().maximumSize(10000).build();
+    return Caffeine.newBuilder()
+        .maximumSize(10000)
+        // Since Caffeine does not ensure that removalListener will be involved after expiration
+        // We use a scheduler with one thread to clean up expired filesets.
+        .scheduler(
+            Scheduler.forScheduledExecutorService(
+                new ScheduledThreadPoolExecutor(
+                    1, newDaemonThreadFactory("gvfs-fileset-cache-cleaner"))))
+        .build();
   }
 
   private ThreadFactory newDaemonThreadFactory(String name) {
@@ -99,6 +117,7 @@ public class FilesetCatalogCache implements Closeable {
   @Override
   public void close() throws IOException {
     catalogCache.invalidateAll();
+    filesetCache.invalidateAll();
     // close the client
     try {
       if (client != null) {
