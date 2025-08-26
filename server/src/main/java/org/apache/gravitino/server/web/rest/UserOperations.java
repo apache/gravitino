@@ -33,7 +33,11 @@ import javax.ws.rs.core.Context;
 import javax.ws.rs.core.Response;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.GravitinoEnv;
+import org.apache.gravitino.MetadataObject;
+import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.authorization.AccessControlDispatcher;
+import org.apache.gravitino.authorization.Owner;
+import org.apache.gravitino.authorization.OwnerDispatcher;
 import org.apache.gravitino.authorization.User;
 import org.apache.gravitino.dto.requests.UserAddRequest;
 import org.apache.gravitino.dto.responses.NameListResponse;
@@ -61,6 +65,7 @@ public class UserOperations {
       "METALAKE::OWNER || METALAKE::MANAGE_USERS || USER::SELF";
 
   private final AccessControlDispatcher accessControlManager;
+  private final OwnerDispatcher ownerManager;
 
   @Context private HttpServletRequest httpRequest;
 
@@ -69,6 +74,7 @@ public class UserOperations {
     // and Jersey injection doesn't support null value. So UserOperations chooses to retrieve
     // accessControlManager from GravitinoEnv instead of injection here.
     this.accessControlManager = GravitinoEnv.getInstance().accessControlDispatcher();
+    this.ownerManager = GravitinoEnv.getInstance().ownerDispatcher();
   }
 
   @GET
@@ -171,6 +177,19 @@ public class UserOperations {
       return Utils.doAs(
           httpRequest,
           () -> {
+            ownerManager
+                .getOwner(
+                    metalake, MetadataObjects.of(null, metalake, MetadataObject.Type.METALAKE))
+                .ifPresent(
+                    owner -> {
+                      if (owner.type() == Owner.Type.USER && owner.name().equals(user)) {
+                        throw new IllegalArgumentException(
+                            String.format(
+                                "Cannot remove user %s from metalake %s because the user is the owner of the metalake.",
+                                user, metalake));
+                      }
+                    });
+
             boolean removed = accessControlManager.removeUser(metalake, user);
             if (!removed) {
               LOG.warn("Failed to remove user {} under metalake {}", user, metalake);
