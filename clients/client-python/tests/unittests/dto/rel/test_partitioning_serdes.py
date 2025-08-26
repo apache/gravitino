@@ -52,6 +52,7 @@ class MockPartitionStrategy(str, Enum):
 class TestPartitioningSerdes(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
+        cls.field_names = [["createTime"], ["city"]]
         cls.field_name = [f"dummy_field_{i}" for i in range(1)]
         cls.literals = {
             PartitioningSerdes.RANGE_PARTITION_LOWER: LiteralDTO.builder()
@@ -218,3 +219,135 @@ class TestPartitioningSerdes(unittest.TestCase):
 
         serialized = PartitioningSerdes.serialize(deserialized)
         self.assertDictEqual(expected_serialized, serialized)
+
+    def test_serdes_list_partitioning_dto_invalid_assignments(self):
+        json_string = f"""
+        {{
+            "{PartitioningSerdes.STRATEGY}": "{Partitioning.Strategy.LIST.value}",
+            "{PartitioningSerdes.FIELD_NAMES}": {json.dumps(TestPartitioningSerdes.field_names)},
+            "{PartitioningSerdes.ASSIGNMENTS_NAME}": "invalid_assignments"
+        }}
+        """
+        with self.assertRaisesRegex(
+            IllegalArgumentException,
+            "Cannot parse list partitioning from non-array assignments",
+        ):
+            PartitioningSerdes.deserialize(json.loads(json_string))
+
+    def test_serdes_list_partitioning_dto_invalid_list_assignment(self):
+        json_string = f"""
+        {{
+            "{PartitioningSerdes.STRATEGY}": "{Partitioning.Strategy.LIST.value}",
+            "{PartitioningSerdes.FIELD_NAMES}": {json.dumps(TestPartitioningSerdes.field_names)},
+            "{PartitioningSerdes.ASSIGNMENTS_NAME}": [
+                {{
+                    "{PartitioningSerdes.PARTITION_TYPE}": "range",
+                    "{PartitioningSerdes.PARTITION_NAME}": "p20200321",
+                    "{PartitioningSerdes.RANGE_PARTITION_UPPER}": {{
+                        "{PartitioningSerdes.TYPE}": "literal",
+                        "{PartitioningSerdes.DATA_TYPE}": "date",
+                        "{PartitioningSerdes.LITERAL_VALUE}": "2020-03-21"
+                    }},
+                    "{PartitioningSerdes.RANGE_PARTITION_LOWER}": {{
+                        "{PartitioningSerdes.TYPE}": "literal",
+                        "{PartitioningSerdes.DATA_TYPE}": "null",
+                        "{PartitioningSerdes.LITERAL_VALUE}": "null"
+                    }}
+                }}
+            ]
+        }}
+        """
+        with self.assertRaisesRegex(
+            IllegalArgumentException,
+            "Cannot parse list partitioning from non-list assignment",
+        ):
+            PartitioningSerdes.deserialize(json.loads(json_string))
+
+    def test_serdes_list_partitioning_dto(self):
+        json_string = f"""
+        {{
+            "{PartitioningSerdes.STRATEGY}": "{Partitioning.Strategy.LIST.value}",
+            "{PartitioningSerdes.FIELD_NAMES}": {json.dumps(TestPartitioningSerdes.field_names)}
+        }}
+        """
+
+        expected_serialized = json.loads(json_string)
+        deserialized = PartitioningSerdes.deserialize(expected_serialized)
+
+        self.assertEqual(Partitioning.Strategy.LIST.name.lower(), deserialized.name())
+        self.assertEqual(
+            Partitioning.Strategy.LIST.value, deserialized.strategy().value
+        )
+        self.assertListEqual(
+            TestPartitioningSerdes.field_names, deserialized.field_names()
+        )
+
+        serialized = PartitioningSerdes.serialize(deserialized)
+        self.assertEqual(
+            expected_serialized[PartitioningSerdes.STRATEGY],
+            serialized[PartitioningSerdes.STRATEGY],
+        )
+        self.assertListEqual(
+            expected_serialized[PartitioningSerdes.FIELD_NAMES],
+            serialized[PartitioningSerdes.FIELD_NAMES],
+        )
+        self.assertEqual(
+            [],
+            serialized[PartitioningSerdes.ASSIGNMENTS_NAME],
+        )
+
+        json_string = f"""
+        {{
+            "{PartitioningSerdes.STRATEGY}": "{Partitioning.Strategy.LIST.value}",
+            "{PartitioningSerdes.FIELD_NAMES}": {json.dumps(TestPartitioningSerdes.field_names)},
+            "{PartitioningSerdes.ASSIGNMENTS_NAME}": [
+                {{
+                    "{PartitioningSerdes.PARTITION_TYPE}": "list",
+                    "{PartitioningSerdes.PARTITION_NAME}": "p202204_California",
+                    "{PartitioningSerdes.PARTITION_PROPERTIES}": {{}},
+                    "{PartitioningSerdes.LIST_PARTITION_LISTS}": [
+                        [
+                            {{
+                                "{PartitioningSerdes.TYPE}": "literal",
+                                "{PartitioningSerdes.DATA_TYPE}": "date",
+                                "{PartitioningSerdes.LITERAL_VALUE}": "2022-04-01"
+                            }},
+                            {{
+                                "{PartitioningSerdes.TYPE}": "literal",
+                                "{PartitioningSerdes.DATA_TYPE}": "string",
+                                "{PartitioningSerdes.LITERAL_VALUE}": "Los Angeles"
+                            }}
+                        ],
+                        [
+                            {{
+                                "{PartitioningSerdes.TYPE}": "literal",
+                                "{PartitioningSerdes.DATA_TYPE}": "date",
+                                "{PartitioningSerdes.LITERAL_VALUE}": "2022-04-01"
+                            }},
+                            {{
+                                "{PartitioningSerdes.TYPE}": "literal",
+                                "{PartitioningSerdes.DATA_TYPE}": "string",
+                                "{PartitioningSerdes.LITERAL_VALUE}": "San Francisco"
+                            }}
+                        ]
+                    ]
+                }}
+            ]
+        }}
+        """
+
+        expected_serialized = json.loads(json_string)
+        deserialized = PartitioningSerdes.deserialize(expected_serialized)
+        serialized = PartitioningSerdes.serialize(deserialized)
+        self.assertEqual(
+            expected_serialized[PartitioningSerdes.STRATEGY],
+            serialized[PartitioningSerdes.STRATEGY],
+        )
+        self.assertListEqual(
+            expected_serialized[PartitioningSerdes.FIELD_NAMES],
+            serialized[PartitioningSerdes.FIELD_NAMES],
+        )
+        self.assertEqual(
+            expected_serialized[PartitioningSerdes.ASSIGNMENTS_NAME],
+            serialized[PartitioningSerdes.ASSIGNMENTS_NAME],
+        )
