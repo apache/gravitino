@@ -28,7 +28,6 @@ import static org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystemU
 
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
-import com.github.benmanes.caffeine.cache.Scheduler;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
@@ -46,7 +45,6 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.ServiceLoader;
 import java.util.Set;
-import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
@@ -119,10 +117,6 @@ public abstract class BaseGVFSOperations implements Closeable {
 
   private final Configuration conf;
 
-  // Since Caffeine does not ensure that removalListener will be involved after expiration
-  // We use a scheduler with one thread to clean up expired clients.
-  private final ScheduledThreadPoolExecutor internalFileSystemCleanScheduler;
-
   // Fileset nameIdentifier-locationName Pair and its corresponding FileSystem cache, the name
   // identifier has four levels, the first level is metalake name.
   private final Cache<Pair<NameIdentifier, String>, FileSystem> internalFileSystemCache;
@@ -158,10 +152,7 @@ public abstract class BaseGVFSOperations implements Closeable {
     this.filesetCatalogCache =
         enableFilesetCatalogCache ? new FilesetCatalogCache(gravitinoClient) : null;
 
-    this.internalFileSystemCleanScheduler =
-        new ScheduledThreadPoolExecutor(1, newDaemonThreadFactory("gvfs-filesystem-cache-cleaner"));
-    this.internalFileSystemCache =
-        newFileSystemCache(configuration, internalFileSystemCleanScheduler);
+    this.internalFileSystemCache = newFileSystemCache(configuration);
 
     this.fileSystemProvidersMap = ImmutableMap.copyOf(getFileSystemProviders());
 
@@ -195,7 +186,6 @@ public abstract class BaseGVFSOperations implements Closeable {
       }
     }
     internalFileSystemCache.invalidateAll();
-    internalFileSystemCleanScheduler.shutdownNow();
 
     try {
       if (filesetCatalogCache != null) {
@@ -690,7 +680,7 @@ public abstract class BaseGVFSOperations implements Closeable {
   }
 
   private Cache<Pair<NameIdentifier, String>, FileSystem> newFileSystemCache(
-      Configuration configuration, ScheduledThreadPoolExecutor internalFileSystemCleanScheduler) {
+      Configuration configuration) {
     int maxCapacity =
         configuration.getInt(
             GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_FILESET_CACHE_MAX_CAPACITY_KEY,
@@ -716,7 +706,6 @@ public abstract class BaseGVFSOperations implements Closeable {
     Caffeine<Object, Object> cacheBuilder =
         Caffeine.newBuilder()
             .maximumSize(maxCapacity)
-            .scheduler(Scheduler.forScheduledExecutorService(internalFileSystemCleanScheduler))
             .removalListener(
                 (key, value, cause) -> {
                   FileSystem fs = (FileSystem) value;

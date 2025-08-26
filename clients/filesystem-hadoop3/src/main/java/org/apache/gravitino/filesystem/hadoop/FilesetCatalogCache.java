@@ -21,12 +21,10 @@ package org.apache.gravitino.filesystem.hadoop;
 
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
-import com.github.benmanes.caffeine.cache.Scheduler;
 import com.google.common.base.Preconditions;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.io.Closeable;
 import java.io.IOException;
-import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.ThreadFactory;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.client.GravitinoClient;
@@ -40,11 +38,6 @@ public class FilesetCatalogCache implements Closeable {
   private final Cache<NameIdentifier, FilesetCatalog> catalogCache;
   private final Cache<NameIdentifier, Fileset> filesetCache;
 
-  // Since Caffeine does not ensure that removalListener will be involved after expiration
-  // We use a scheduler with one thread to clean up expired clients.
-  private final ScheduledThreadPoolExecutor catalogCleanScheduler;
-  private final ScheduledThreadPoolExecutor filesetCleanScheduler;
-
   /**
    * Creates a new instance of {@link FilesetCatalogCache}.
    *
@@ -52,12 +45,8 @@ public class FilesetCatalogCache implements Closeable {
    */
   public FilesetCatalogCache(GravitinoClient client) {
     this.client = client;
-    this.catalogCleanScheduler =
-        new ScheduledThreadPoolExecutor(1, newDaemonThreadFactory("gvfs-catalog-cache-cleaner"));
-    this.filesetCleanScheduler =
-        new ScheduledThreadPoolExecutor(1, newDaemonThreadFactory("gvfs-fileset-cache-cleaner"));
-    this.catalogCache = newCatalogCache(catalogCleanScheduler);
-    this.filesetCache = newFilesetCache(filesetCleanScheduler);
+    this.catalogCache = newCatalogCache();
+    this.filesetCache = newFilesetCache();
   }
 
   /**
@@ -93,22 +82,14 @@ public class FilesetCatalogCache implements Closeable {
                 NameIdentifier.of(filesetIdent.namespace().level(2), filesetIdent.name())));
   }
 
-  private Cache<NameIdentifier, FilesetCatalog> newCatalogCache(
-      ScheduledThreadPoolExecutor catalogCleanScheduler) {
+  private Cache<NameIdentifier, FilesetCatalog> newCatalogCache() {
     // In most scenarios, it will not read so many catalog filesets at the same time, so we can just
     // set a default value for this cache.
-    return Caffeine.newBuilder()
-        .maximumSize(100)
-        .scheduler(Scheduler.forScheduledExecutorService(catalogCleanScheduler))
-        .build();
+    return Caffeine.newBuilder().maximumSize(100).build();
   }
 
-  private Cache<NameIdentifier, Fileset> newFilesetCache(
-      ScheduledThreadPoolExecutor filesetCleanScheduler) {
-    return Caffeine.newBuilder()
-        .maximumSize(10000)
-        .scheduler(Scheduler.forScheduledExecutorService(filesetCleanScheduler))
-        .build();
+  private Cache<NameIdentifier, Fileset> newFilesetCache() {
+    return Caffeine.newBuilder().maximumSize(10000).build();
   }
 
   private ThreadFactory newDaemonThreadFactory(String name) {
@@ -126,7 +107,5 @@ public class FilesetCatalogCache implements Closeable {
     } catch (Exception e) {
       // ignore
     }
-    catalogCleanScheduler.shutdownNow();
-    filesetCleanScheduler.shutdownNow();
   }
 }
