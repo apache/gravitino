@@ -290,7 +290,7 @@ public class TestGravitinoAdminClient extends TestBase {
 
   @Test
   public void testCheckVersionFailed() throws JsonProcessingException {
-    String version = "0.1.1";
+    String version = "-1.1.1";
     String date = "2024-01-03 12:28:33";
     String commitId = "6ef1f9d";
 
