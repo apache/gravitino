@@ -66,7 +66,7 @@ public class TestLancePartitionStatisticStorage {
 
     String location = "/tmp/test";
     Map<String, String> properties = Maps.newHashMap();
-    properties.put("location", location);
+    properties.put("lance.location", location);
 
     PartitionStatisticStorage storage = factory.create(properties);
 

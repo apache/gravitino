@@ -105,7 +105,6 @@ public class LancePartitionStatisticStorage implements PartitionStatisticStorage
   private final EntityStore entityStore = GravitinoEnv.getInstance().entityStore();
 
   public LancePartitionStatisticStorage(Map<String, String> properties) {
-    this.properties = properties;
     this.allocator = new RootAllocator();
     this.location = properties.getOrDefault(LOCATION, DEFAULT_LOCATION);
     this.maxRowsPerFile =
@@ -133,6 +132,10 @@ public class LancePartitionStatisticStorage implements PartitionStatisticStorage
             properties.getOrDefault(READ_BATCH_SIZE, String.valueOf(DEFAULT_READ_BATCH_SIZE)));
     Preconditions.checkArgument(
         readBatchSize > 0, "Lance partition statistics storage readBatchSize must be positive");
+    this.properties = Maps.newHashMap();
+    for (Map.Entry<String, String> entry : properties.entrySet()) {
+      this.properties.put(entry.getKey().substring(LANCE_PREFIX.length()), entry.getValue());
+    }
   }
 
   @Override
@@ -269,7 +272,7 @@ public class LancePartitionStatisticStorage implements PartitionStatisticStorage
                 getFilePath(tableId),
                 appendOp,
                 Optional.of(datasetRead.version()),
-                Maps.newHashMap())
+                properties)
             .close();
       }
 

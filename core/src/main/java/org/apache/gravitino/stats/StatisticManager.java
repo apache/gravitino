@@ -58,7 +58,7 @@ import org.slf4j.LoggerFactory;
 
 public class StatisticManager implements Closeable {
 
-  private static final String OPTIONS_PREFIX = "gravitino.partitionStats.";
+  private static final String OPTIONS_PREFIX = "gravitino.partition.stats.";
   private static final Logger LOG = LoggerFactory.getLogger(StatisticManager.class);
 
   private final EntityStore store;
