@@ -290,29 +290,7 @@ public class SecureFilesetCatalogOperations
     try {
       closeStatsDataClearerInFileSystem();
 
-      // Clear all thread references to the ClosableHiveCatalog class loader.
-      Thread[] threads = getAllThreads();
-      for (Thread thread : threads) {
-        // Clear thread local map for webserver threads in the current class loader. Why do we need
-        // this? Because the webserver threads are long-lived threads and will holds may thread
-        // local
-        // references to the current class loader. However, they can't be cleared as `Catalog.close`
-        // is called in the thread pool located in the Caffeine cache, which is not in the webserver
-        // threads. So we need to manually clear the thread local map for webserver threads.
-        clearThreadLocalMap(thread);
-
-        // Close all threads that are using the FilesetCatalogOperations class loader
-        if (runningWithCurrentClassLoader(thread)) {
-          LOG.info("Interrupting thread: {}", thread.getName());
-          thread.setContextClassLoader(null);
-          thread.interrupt();
-          try {
-            thread.join(5000);
-          } catch (InterruptedException e) {
-            LOG.warn("Failed to join thread: {}", thread.getName(), e);
-          }
-        }
-      }
+      stopThreadsAndClearThreadLocal();
 
       // Release the LogFactory for the FilesetCatalogOperations class loader
       unregisterLogFactory();
@@ -326,6 +304,32 @@ public class SecureFilesetCatalogOperations
       clearShutdownHooks();
     } catch (Exception e) {
       LOG.warn("Failed to clear FileSystem statistics cleaner thread", e);
+    }
+  }
+
+  private static void stopThreadsAndClearThreadLocal() {
+    // Clear all thread references to the ClosableHiveCatalog class loader and clear thread local
+    Thread[] threads = getAllThreads();
+    for (Thread thread : threads) {
+      // Clear thread local map for webserver threads in the current class loader. Why do we need
+      // this? Because the webserver threads are long-lived threads and will holds may thread
+      // local references to the current class loader. However, they can't be cleared as
+      // `Catalog.close` is called in the thread pool located in the Caffeine cache, which is not
+      // in the webserver threads. So we need to manually clear the thread local map for webserver
+      // threads.
+      clearThreadLocalMap(thread);
+
+      // Close all threads that are using the FilesetCatalogOperations class loader
+      if (runningWithCurrentClassLoader(thread)) {
+        LOG.info("Interrupting thread: {}", thread.getName());
+        thread.setContextClassLoader(null);
+        thread.interrupt();
+        try {
+          thread.join(5000);
+        } catch (InterruptedException e) {
+          LOG.warn("Failed to join thread: {}", thread.getName(), e);
+        }
+      }
     }
   }
 
@@ -390,7 +394,6 @@ public class SecureFilesetCatalogOperations
 
   private static void clearThreadLocalMap(Thread thread) {
     if (thread != null && thread.getName().startsWith("Gravitino-webserver-")) {
-      // Try to
       try {
         Field threadLocalsField = Thread.class.getDeclaredField("threadLocals");
         threadLocalsField.setAccessible(true);
