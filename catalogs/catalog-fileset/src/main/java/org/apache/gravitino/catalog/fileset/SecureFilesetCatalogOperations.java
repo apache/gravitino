@@ -288,82 +288,103 @@ public class SecureFilesetCatalogOperations
     }
 
     try {
-
       closeStatsDataClearerInFileSystem();
-
-      FileSystem.closeAll();
 
       // Clear all thread references to the ClosableHiveCatalog class loader.
       Thread[] threads = getAllThreads();
       for (Thread thread : threads) {
-        // Clear thread local map for webserver threads in the current class loader
+        // Clear thread local map for webserver threads in the current class loader. Why do we need
+        // this? Because the webserver threads are long-lived threads and will holds may thread
+        // local
+        // references to the current class loader. However, they can't be cleared as `Catalog.close`
+        // is called in the thread pool located in the Caffeine cache, which is not in the webserver
+        // threads. So we need to manually clear the thread local map for webserver threads.
         clearThreadLocalMap(thread);
 
         // Close all threads that are using the FilesetCatalogOperations class loader
         if (runningWithCurrentClassLoader(thread)) {
-          LOG.info("Interrupting peer cache thread: {}", thread.getName());
+          LOG.info("Interrupting thread: {}", thread.getName());
           thread.setContextClassLoader(null);
           thread.interrupt();
           try {
             thread.join(5000);
           } catch (InterruptedException e) {
-            LOG.warn("Failed to join peer cache thread: {}", thread.getName(), e);
+            LOG.warn("Failed to join thread: {}", thread.getName(), e);
           }
         }
       }
 
       // Release the LogFactory for the FilesetCatalogOperations class loader
-      LogFactory.release(SecureFilesetCatalogOperations.class.getClassLoader());
+      unregisterLogFactory();
 
-      // For Aws SDK metrics, unregister the metric admin MBean
-      try {
-        Class<?> methodUtilsClass = Class.forName("com.amazonaws.metrics.AwsSdkMetrics");
-        MethodUtils.invokeStaticMethod(methodUtilsClass, "unregisterMetricAdminMBean");
-      } catch (Exception e) {
-        LOG.warn("Failed to unregister AWS SDK metrics admin MBean", e);
-        // This is not critical, so we just log the warning
-      }
+      closeResourceInAWS();
 
-      // For GCS
-      try {
-        Class<?> relocatedLogFactory =
-            Class.forName("org.apache.gravitino.gcp.shaded.org.apache.commons.logging.LogFactory");
-        MethodUtils.invokeStaticMethod(
-            relocatedLogFactory, "release", SecureFilesetCatalogOperations.class.getClassLoader());
-      } catch (Exception e) {
-        LOG.warn("Failed to find GCS shaded LogFactory", e);
-      }
+      closeResourceInGCP();
 
-      // For Azure
-      try {
-        Class<?> relocatedLogFactory =
-            Class.forName(
-                "org.apache.gravitino.azure.shaded.org.apache.commons.logging.LogFactory");
-        MethodUtils.invokeStaticMethod(
-            relocatedLogFactory, "release", SecureFilesetCatalogOperations.class.getClassLoader());
-
-        // Clear timer in AbfsClientThrottlingAnalyzer
-        Class<?> abfsClientThrottlingInterceptClass =
-            Class.forName("org.apache.hadoop.fs.azurebfs.services.AbfsClientThrottlingIntercept");
-        Object abfsClientThrottlingIntercept =
-            FieldUtils.readStaticField(abfsClientThrottlingInterceptClass, "singleton", true);
-
-        Object readThrottler =
-            FieldUtils.readField(abfsClientThrottlingIntercept, "readThrottler", true);
-        Object writeThrottler =
-            FieldUtils.readField(abfsClientThrottlingIntercept, "writeThrottler", true);
-
-        Timer readTimer = (Timer) FieldUtils.readField(readThrottler, "timer", true);
-        readTimer.cancel();
-        Timer writeTimer = (Timer) FieldUtils.readField(writeThrottler, "timer", true);
-        writeTimer.cancel();
-      } catch (Exception e) {
-        LOG.warn("Failed to handle Azure file system...", e);
-      }
+      closeResourceInAzure();
 
       clearShutdownHooks();
     } catch (Exception e) {
       LOG.warn("Failed to clear FileSystem statistics cleaner thread", e);
+    }
+  }
+
+  private void unregisterLogFactory() {
+    try {
+      LogFactory.release(SecureFilesetCatalogOperations.class.getClassLoader());
+    } catch (Exception e) {
+      LOG.warn("Failed to unregister LogFactory", e);
+    }
+  }
+
+  private static void closeResourceInAzure() {
+    // For Azure
+    try {
+      Class<?> relocatedLogFactory =
+          Class.forName("org.apache.gravitino.azure.shaded.org.apache.commons.logging.LogFactory");
+      MethodUtils.invokeStaticMethod(
+          relocatedLogFactory, "release", SecureFilesetCatalogOperations.class.getClassLoader());
+
+      // Clear timer in AbfsClientThrottlingAnalyzer
+      Class<?> abfsClientThrottlingInterceptClass =
+          Class.forName("org.apache.hadoop.fs.azurebfs.services.AbfsClientThrottlingIntercept");
+      Object abfsClientThrottlingIntercept =
+          FieldUtils.readStaticField(abfsClientThrottlingInterceptClass, "singleton", true);
+
+      Object readThrottler =
+          FieldUtils.readField(abfsClientThrottlingIntercept, "readThrottler", true);
+      Object writeThrottler =
+          FieldUtils.readField(abfsClientThrottlingIntercept, "writeThrottler", true);
+
+      Timer readTimer = (Timer) FieldUtils.readField(readThrottler, "timer", true);
+      readTimer.cancel();
+      Timer writeTimer = (Timer) FieldUtils.readField(writeThrottler, "timer", true);
+      writeTimer.cancel();
+    } catch (Exception e) {
+      LOG.warn("Failed to handle Azure file system...", e);
+    }
+  }
+
+  private static void closeResourceInGCP() {
+    // For GCS
+    try {
+      Class<?> relocatedLogFactory =
+          Class.forName("org.apache.gravitino.gcp.shaded.org.apache.commons.logging.LogFactory");
+      MethodUtils.invokeStaticMethod(
+          relocatedLogFactory, "release", SecureFilesetCatalogOperations.class.getClassLoader());
+    } catch (Exception e) {
+      LOG.warn("Failed to find GCS shaded LogFactory", e);
+    }
+  }
+
+  private static void closeResourceInAWS() {
+    // For Aws SDK metrics, unregister the metric admin MBean
+    try {
+      Class<?> methodUtilsClass = Class.forName("com.amazonaws.metrics.AwsSdkMetrics");
+      MethodUtils.invokeStaticMethod(methodUtilsClass, "unregisterMetricAdminMBean");
+    } catch (Exception e) {
+      LOG.warn("Failed to unregister AWS SDK metrics admin MBean", e);
+      // This is not critical, so we just log the warning
     }
   }
 
@@ -403,19 +424,24 @@ public class SecureFilesetCatalogOperations
     }
   }
 
-  private static void closeStatsDataClearerInFileSystem()
-      throws IllegalAccessException, InterruptedException {
-    ScheduledExecutorService scheduler =
-        (ScheduledExecutorService)
-            FieldUtils.readStaticField(MutableQuantiles.class, "scheduler", true);
-    scheduler.shutdownNow();
-    Field statisticsCleanerField =
-        FieldUtils.getField(FileSystem.Statistics.class, "STATS_DATA_CLEANER", true);
-    Object statisticsCleaner = statisticsCleanerField.get(null);
-    if (statisticsCleaner != null) {
-      ((Thread) statisticsCleaner).interrupt();
-      ((Thread) statisticsCleaner).setContextClassLoader(null);
-      ((Thread) statisticsCleaner).join();
+  private static void closeStatsDataClearerInFileSystem() {
+    try {
+      ScheduledExecutorService scheduler =
+          (ScheduledExecutorService)
+              FieldUtils.readStaticField(MutableQuantiles.class, "scheduler", true);
+      scheduler.shutdownNow();
+      Field statisticsCleanerField =
+          FieldUtils.getField(FileSystem.Statistics.class, "STATS_DATA_CLEANER", true);
+      Object statisticsCleaner = statisticsCleanerField.get(null);
+      if (statisticsCleaner != null) {
+        ((Thread) statisticsCleaner).interrupt();
+        ((Thread) statisticsCleaner).setContextClassLoader(null);
+        ((Thread) statisticsCleaner).join();
+      }
+
+      FileSystem.closeAll();
+    } catch (Exception e) {
+      LOG.warn("Failed to close stats data clearer in FileSystem", e);
     }
   }
 
