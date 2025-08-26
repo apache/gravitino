@@ -20,6 +20,7 @@
 package org.apache.gravitino.storage.relational.session;
 
 import com.google.common.annotations.VisibleForTesting;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.ibatis.session.SqlSession;
 import org.apache.ibatis.session.TransactionIsolationLevel;
 import org.slf4j.Logger;
@@ -33,7 +34,8 @@ import org.slf4j.LoggerFactory;
 public final class SqlSessions {
   private static final Logger LOG = LoggerFactory.getLogger(SqlSessions.class);
   private static final ThreadLocal<SqlSession> sessions = new ThreadLocal<>();
-  private static final ThreadLocal<Integer> sessionCount = ThreadLocal.withInitial(() -> 0);
+  private static final ThreadLocal<AtomicInteger> sessionCount =
+      ThreadLocal.withInitial(() -> new AtomicInteger(0));
 
   private SqlSessions() {}
 
@@ -44,7 +46,7 @@ public final class SqlSessions {
 
   @VisibleForTesting
   static Integer getSessionCount() {
-    return sessionCount.get();
+    return sessionCount.get().get();
   }
 
   /**
@@ -63,7 +65,7 @@ public final class SqlSessions {
               .openSession(TransactionIsolationLevel.READ_COMMITTED);
       sessions.set(sqlSession);
     }
-    sessionCount.set(sessionCount.get() + 1);
+    sessionCount.get().incrementAndGet();
     return sqlSession;
   }
 
@@ -72,7 +74,7 @@ public final class SqlSessions {
    * thread local storage.
    */
   public static void commitAndCloseSqlSession() {
-    handleSessionClose(true, false);
+    handleSessionClose(true /* commit */, false /* rollback */);
   }
 
   /**
@@ -80,12 +82,12 @@ public final class SqlSessions {
    * thread local storage.
    */
   public static void rollbackAndCloseSqlSession() {
-    handleSessionClose(false, true);
+    handleSessionClose(false /* commit */, true /* rollback */);
   }
 
   /** Close the SqlSession object and remove it from the thread local storage. */
   public static void closeSqlSession() {
-    handleSessionClose(false, false);
+    handleSessionClose(false /* commit */, false /* rollback */);
   }
 
   /**
@@ -107,9 +109,7 @@ public final class SqlSessions {
       return;
     }
 
-    int count = sessionCount.get() - 1;
-    sessionCount.set(count);
-
+    int count = sessionCount.get().decrementAndGet();
     if (count == 0) {
       try {
         if (commit) {
