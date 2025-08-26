@@ -132,7 +132,8 @@ The following table lists the data types mapped from the Hive catalog to Graviti
 | `uniontype`                 | `union`             | 0.2.0         |
 
 :::info
-Since 0.6.0-incubating, the data types other than listed above are mapped to Gravitino **[External Type](./manage-relational-metadata-using-gravitino.md#external-type)** that represents an unresolvable data type from the Hive catalog.
+1. Since 0.6.0-incubating, the data types other than listed above are mapped to Gravitino **[External Type](./manage-relational-metadata-using-gravitino.md#external-type)** that represents an unresolvable data type from the Hive catalog.
+2. Since version 1.0.0, using the `struct` data type with field comments will throw an error, as it does not work for Hive tables (see [HIVE-26593](https://issues.apache.org/jira/browse/HIVE-26593)).
 :::
 
 ### Table properties

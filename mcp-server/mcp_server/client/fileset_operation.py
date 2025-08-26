@@ -24,7 +24,7 @@ class FilesetOperation(ABC):
     """
 
     @abstractmethod
-    async def get_list_of_filesets(
+    async def list_of_filesets(
         self, catalog_name: str, schema_name: str
     ) -> str:
         """

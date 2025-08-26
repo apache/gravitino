@@ -414,6 +414,7 @@ public class TestPostgreSqlTableOperations extends TestPostgreSql {
         new PostgreSqlTypeConverter(),
         new PostgreSqlColumnDefaultValueConverter(),
         config);
+    postgreSqlTableOperations.setDatabaseOperation(postgreSqlSchemaOperations);
 
     String table_1 = "table_multiple_1";
     postgreSqlTableOperations.create(
