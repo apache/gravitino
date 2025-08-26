@@ -316,7 +316,7 @@ public class GravitinoVirtualFileSystem extends FileSystem {
       return executable.execute();
     } catch (NoSuchCatalogException | CatalogNotInUseException e) {
       String message = String.format("Cannot get fileset catalog during %s", operation);
-      LOG.warn(message, operation, e);
+      LOG.warn(message, e);
       throw new FilesetPathNotFoundException(message, e);
 
     } catch (NoSuchFilesetException e) {
