@@ -117,18 +117,21 @@ public final class SqlSessions {
         } else if (rollback) {
           sqlSession.rollback();
         }
-        // Always close the session when the count reaches 0
-        sqlSession.close();
       } finally {
-        sessions.remove();
-        sessionCount.remove();
+        try {
+          // Ensure the session is always closed
+          sqlSession.close();
+        } finally {
+          // Ensure ThreadLocal is always cleaned up
+          sessions.remove();
+          sessionCount.remove();
+        }
       }
     } else if (count < 0) {
       // This should not happen if the session management is correct.
       // Reset the count and remove the session to avoid further issues.
       LOG.warn(
-          "Session count is negative: {}. Resetting session count and removing session.",
-          count + 1);
+          "Session count is negative: {}. Resetting session count and removing session.", count);
       sessions.remove();
       sessionCount.remove();
     }
