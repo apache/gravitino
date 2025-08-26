@@ -87,4 +87,10 @@ public class OwnerDetails extends Command {
       printInformation("No owner");
     }
   }
+
+  @Override
+  public Command validate() {
+    if (entityType == null) exitWithError(ErrorMessages.UNKNOWN_ENTITY);
+    return this;
+  }
 }
