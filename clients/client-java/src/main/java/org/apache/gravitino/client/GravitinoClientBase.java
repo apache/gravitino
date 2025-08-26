@@ -98,9 +98,9 @@ public abstract class GravitinoClientBase implements Closeable {
   public void checkVersion() {
     GravitinoVersion serverVersion = serverVersion();
     GravitinoVersion clientVersion = clientVersion();
-    if (clientVersion.compareTo(serverVersion) > 0) {
+    if (!clientVersion.compatibleWithServerVersion(serverVersion)) {
       throw new GravitinoRuntimeException(
-          "Gravitino does not support the case that the client-side version is higher than the server-side version."
+          "Gravitino does not support the case that the client-side major version is higher than the server-side version."
               + "The client version is %s, and the server version %s",
           clientVersion.version(), serverVersion.version());
     }
