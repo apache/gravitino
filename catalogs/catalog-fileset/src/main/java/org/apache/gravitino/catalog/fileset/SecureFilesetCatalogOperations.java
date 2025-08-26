@@ -303,7 +303,7 @@ public class SecureFilesetCatalogOperations
 
       clearShutdownHooks();
     } catch (Exception e) {
-      LOG.warn("Failed to clear FileSystem statistics cleaner thread", e);
+      LOG.warn("Failed to clear resources(Thread, ThreadLocal variants) in the class loader", e);
     }
   }
 
