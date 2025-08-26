@@ -9,7 +9,7 @@
  *
  *  http://www.apache.org/licenses/LICENSE-2.0
  *
- * Unless required by applicable law or agreed to in writing,
+ * Unless required by applicable law or agreed in writing,
  * software distributed under the License is distributed on an
  * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
  * KIND, either express or implied.  See the License for the
@@ -38,7 +38,7 @@ class TestGravitinoConnectorNullChecks {
     GravitinoConnector connector = new GravitinoConnector(mock(NameIdentifier.class), mockContext);
     assertThrows(
         NullPointerException.class,
-        () -> connector.beginTransaction(mock(IsolationLevel.class), true, true));
+        () -> connector.beginTransaction(IsolationLevel.READ_COMMITTED, true, true));
   }
 
   @Test
@@ -51,6 +51,6 @@ class TestGravitinoConnectorNullChecks {
     GravitinoConnector connector = new GravitinoConnector(mock(NameIdentifier.class), mockContext);
     assertThrows(
         NullPointerException.class,
-        () -> connector.beginTransaction(mock(IsolationLevel.class), true, true));
+        () -> connector.beginTransaction(IsolationLevel.READ_COMMITTED, true, true));
   }
 }
