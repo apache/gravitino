@@ -40,6 +40,7 @@ import org.apache.gravitino.cache.CacheFactory;
 import org.apache.gravitino.cache.EntityCache;
 import org.apache.gravitino.cache.NoOpsCache;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
+import org.apache.gravitino.meta.RoleEntity;
 import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.tag.SupportsTagOperations;
 import org.apache.gravitino.utils.Executable;
@@ -137,7 +138,7 @@ public class RelationalEntityStore
           //          .withName(role)
           //          .withNamespace(NamespaceUtil.ofRole(ident.namespace().level(0)))
           //          .build();
-          //          cache.invalidate(nameIdentifier, Entity.EntityType.ROLE);
+          cache.invalidate(nameIdentifier, Entity.EntityType.ROLE);
         });
 
     return backend.update(ident, entityType, updater);
