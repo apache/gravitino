@@ -37,8 +37,8 @@ class GenericModelVersion implements ModelVersion {
   }
 
   @Override
-  public String uri() {
-    return modelVersionDTO.uri();
+  public Map<String, String> uris() {
+    return modelVersionDTO.uris();
   }
 
   @Override

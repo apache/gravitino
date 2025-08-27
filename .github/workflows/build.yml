@@ -127,6 +127,11 @@ jobs:
         run: |
           dev/ci/util_free_space.sh
 
+      - name: Install dependencies
+        run: |
+          wget https://nz2.archive.ubuntu.com/ubuntu/pool/main/o/openssl/libssl1.1_1.1.1f-1ubuntu2_amd64.deb
+          sudo dpkg -i libssl1.1_1.1.1f-1ubuntu2_amd64.deb  
+
       - name: Build with Gradle
         run: ./gradlew build -PskipITs -PjdkVersion=${{ matrix.java-version }} -PskipDockerTests=false -x :clients:client-python:build
 
