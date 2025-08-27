@@ -171,6 +171,7 @@ Gravitino provides a Flink connector to manage metadata in a unified way. To use
 
 * [Gravitino Flink connector](./flink-connector/flink-connector.md): a complete guide to using the Gravitino Flink connector.
 
+
 ### Server administration
 
 Gravitino provides several ways to configure and manage the Gravitino server. See:
