@@ -297,7 +297,6 @@ public class TestVersioningFilter {
                     Collections.singletonList(
                         "application/vnd.gravitino.v3+json; q=0.9, application/json"))
                 .elements());
-    
     filter.doFilter(mockRequest, mockResponse, mockChain);
     verify(mockChain, never()).doFilter(any(), any());
     verify(mockResponse).sendError(HttpServletResponse.SC_NOT_ACCEPTABLE, "Unsupported version");
