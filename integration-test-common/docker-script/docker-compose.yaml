@@ -25,6 +25,7 @@ services:
     container_name: trino-ci-hive
     environment:
       - HADOOP_USER_NAME=anonymous
+      - HIVE_RUNTIME_VERSION=hive3
     entrypoint:  /bin/bash /tmp/hive/init.sh
     volumes:
       - ./init/hive:/tmp/hive
