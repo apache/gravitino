@@ -229,7 +229,7 @@ public class TestCaffeineEntityCache {
     cache.put(testMetalake);
     cache.put(testTableEntity);
 
-    cache.invalidate(testMetalake.nameIdentifier(), Entity.EntityType.CATALOG);
+    cache.invalidate(testMetalake.nameIdentifier(), Entity.EntityType.METALAKE);
 
     Assertions.assertEquals(0, cache.size());
   }
