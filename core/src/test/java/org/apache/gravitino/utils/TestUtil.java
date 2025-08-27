@@ -28,6 +28,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import org.apache.gravitino.Catalog;
+import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.authorization.AuthorizationUtils;
@@ -464,6 +465,8 @@ public class TestUtil {
    */
   public static SecurableObject getMockSecurableObject() {
     SecurableObject mockObject = mock(SecurableObject.class);
+    when(mockObject.type()).thenReturn(MetadataObject.Type.CATALOG);
+    when(mockObject.name()).thenReturn("c1");
     when(mockObject.privileges())
         .thenReturn(
             ImmutableList.of(Privileges.CreateSchema.allow(), Privileges.CreateTable.allow()));
