@@ -44,6 +44,7 @@ import org.apache.gravitino.exceptions.NoSuchRoleException;
 import org.apache.gravitino.exceptions.NoSuchUserException;
 import org.apache.gravitino.exceptions.RoleAlreadyExistsException;
 import org.apache.gravitino.exceptions.UserAlreadyExistsException;
+import org.apache.gravitino.meta.RoleEntity;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.PrincipalUtils;
 
@@ -192,7 +193,7 @@ public class AccessControlHookDispatcher implements AccessControlDispatcher {
     }
     boolean resultOfDeleteRole = dispatcher.deleteRole(metalake, role);
     if (resultOfDeleteRole && oldRole != null) {
-      notifyRoleUserRelChange(metalake, role);
+      notifyRoleUserRelChange(((RoleEntity) oldRole).id());
     }
     return resultOfDeleteRole;
   }
