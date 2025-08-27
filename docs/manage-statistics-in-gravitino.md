@@ -216,3 +216,72 @@ table.dropPartitionStatistics(statisticsToDrop);
 
 </TabItem>
 </Tabs>
+
+
+### Server configuration
+
+| Configuration item                                  | Description                                                                                                                                                                                                                       | Default value                                                              | Required                                        | Since version |
+|-----------------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|----------------------------------------------------------------------------|-------------------------------------------------|---------------|
+| `gravitino.stats.partition.storageFactoryClass`     | The storage factory class for partition statistics, which is used to store partition statistics in the different storage. The `org.apache.gravitino.stats.storage.MemoryPartitionStatsStorageFactory`  can only be used for test. | `org.apache.gravitino.stats.storage.LancePartitionStatisticStorageFactory` |  No                                             | 1.0.0         |
+
+
+If you use [Lance](https://lancedb.github.io/lance/) as the partition stats storage, you can set below options, if you have other lance storage options, you can pass it adding prefix `gravitino.stats.partition.storageOption.`.
+For example, if you set an extra property `foo` to `bar` for Lance storage option, you can add a configuration item `gravitino.stats.partition.storageOption.foo` with value `bar`.
+
+| Configuration item                                        | Description                               | Default value                  | Required                                        | Since version |
+|-----------------------------------------------------------|-------------------------------------------|--------------------------------|-------------------------------------------------|---------------|
+| `gravitino.stats.partition.storageOption.location`        | The location of Lance files               | `${GRAVITINO_HOME}/data/lance` | No                                              | 1.0.0         |
+| `gravitino.stats.partition.storageOption.maxRowsPerFile`  | The max rows per file                     | `1000000`                      | No                                              | 1.0.0         |
+| `gravitino.stats.partition.storageOption.maxBytesPerFile` | The max bytes per file                    | `100 * 1024 * 1024`            | No                                              | 1.0.0         |
+| `gravitino.stats.partition.storageOption.maxRowsPerGroup` | The max rows per group                    | `1000000`                      | No                                              | 1.0.0         |
+| `gravitino.stats.partition.storageOption.readBatchSize`   | The read batch record number when reading | `10000`                        | No                                              | 1.0.0         |
+
+### Implementation a custom partition storage
+
+You can implement a custom partition storage by implementing the interface `org.apache.gravitino.stats.storage.PartitionStatisticStorageFactory` and
+setting the configuration item `gravitino.stats.partition.storageFactoryClass` to your class name.
+
+For example:
+
+```java
+public class MyPartitionStatsStorageFactory implements PartitionStatisticStorageFactory {
+    @Override
+    public PartitionStatsStorage create(Metalake metalake, Table table, Map<String, String> options) {
+        // Create your custom PartitionStatsStorage here
+        return new MyPartitionStatsStorage(...);
+    }
+}
+```
+
+```java
+public class MyPartitionStatsStorage implements PartitionStatsStorage {
+    @Override
+    public void initialize() {
+        // Initialize your storage here
+    }
+
+    @Override
+    public void close() {
+        // Close your storage here
+    }
+
+    @Override
+    public void updatePartitionStatistics(List<PartitionStatisticsUpdate> updates) {
+        // Update partition statistics in your storage here
+    }
+
+    @Override
+    public Map<String, Map<String, StatisticValue<?>>> listPartitionStatistics(PartitionRange range) {
+        // List partition statistics from your storage here
+        return Maps.newHashMap();
+    }
+
+    @Override
+    public void dropPartitionStatistics(List<PartitionStatisticsDrop> drops) {
+        // Drop partition statistics from your storage here
+    }
+}
+```
+
+
+

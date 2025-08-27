@@ -169,6 +169,13 @@ Gravitino provides a Flink connector to manage metadata in a unified way. To use
 
 * [Gravitino Flink connector](./flink-connector/flink-connector.md): a complete guide to using the Gravitino Flink connector.
 
+### Action system
+
+Gravitino provides an action system to trigger actions when certain events happen. See:
+
+* [policy](./manage-policies-in-gravitino.md)
+* [job](./manage-jobs-in-gravitino.md)
+* [statistics](./manage-statistics-in-gravitino.md)
 
 ### Server administration
 

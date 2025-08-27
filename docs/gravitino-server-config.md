@@ -65,18 +65,7 @@ The following table lists the storage configuration items:
 | `gravitino.entity.store.relational.storagePath`    | The storage path for embedded JDBC storage implementation. It supports both absolute and relative path, if the value is a relative path, the final path is `${GRAVITINO_HOME}/${PATH_YOU_HAVA_SET}`, default value is `${GRAVITINO_HOME}/data/jdbc`     | `${GRAVITINO_HOME}/data/jdbc`                                              | No                                              | 0.6.0-incubating |
 | `gravitino.entity.store.relational.maxConnections` | The maximum number of connections for the JDBC Backend connection pool                                                                                                                                                                                  | `100`                                                                      | No                                              | 0.9.0-incubating |
 | `gravitino.entity.store.relational.maxWaitMillis`  | The maximum wait time in milliseconds for a connection from the JDBC Backend connection pool                                                                                                                                                            | `1000`                                                                     | No                                              | 0.9.0-incubating |
-| `gravitino.stats.partition.storageFactoryClass`    | The storage factory class for partition statistics, which is used to store partition statistics in the different storage. The `org.apache.gravitino.stats.storage.MemoryPartitionStatsStorageFactory`  can only be used for test.                       | `org.apache.gravitino.stats.storage.LancePartitionStatisticStorageFactory` |  No                                             | 1.0.0            |
 
-
-If you use [Lance](https://lancedb.github.io/lance/) as the partition stats storage, you can set below options, if you have other lance storage options, you can pass it adding prefix `gravitino.stats.partition.lance.`.
-
-| Configuration item                                        | Description                               | Default value                  | Required                                        | Since version |
-|-----------------------------------------------------------|-------------------------------------------|--------------------------------|-------------------------------------------------|---------------|
-| `gravitino.stats.partition.storageOption.location`        | The location of Lance files               | `${GRAVITINO_HOME}/data/lance` | No                                              | 1.0.0         |
-| `gravitino.stats.partition.storageOption.maxRowsPerFile`  | The max rows per file                     | `1000000`                      | No                                              | 1.0.0         |
-| `gravitino.stats.partition.storageOption.maxBytesPerFile` | The max bytes per file                    | `100 * 1024 * 1024`            | No                                              | 1.0.0         |
-| `gravitino.stats.partition.storageOption.maxRowsPerGroup` | The max rows per group                    | `1000000`                      | No                                              | 1.0.0         |
-| `gravitino.stats.partition.storageOption.readBatchSize`   | The read batch record number when reading | `10000`                        | No                                              | 1.0.0         |
 
 :::caution
 We strongly recommend that you change the default value of `gravitino.entity.store.relational.storagePath`, as it's under the deployment directory and future version upgrades may remove it.
