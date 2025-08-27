@@ -272,6 +272,7 @@ public class ClassLoaderUtils {
 
   /**
    * Close all resources related to the given class loader to prevent memory leaks.
+   *
    * @param classLoader the classloader to be closed
    */
   public static void closeClassLoaderResource(ClassLoader classLoader) {
