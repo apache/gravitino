@@ -89,7 +89,9 @@ class SerdesUtilsBase:
     VARCHAR_PATTERN: Final[Pattern[str]] = re.compile(r"varchar\(\s*(\d+)\s*\)")
     TIME_PATTERN: Final[Pattern[str]] = re.compile(r"time\(\s*(\d+)\s*\)")
     TIMESTAMP_PATTERN: Final[Pattern[str]] = re.compile(r"timestamp\(\s*(\d+)\s*\)")
-    TIMESTAMP_TZ_PATTERN: Final[Pattern[str]] = re.compile(r"timestamp_tz\(\s*(\d+)\s*\)")
+    TIMESTAMP_TZ_PATTERN: Final[Pattern[str]] = re.compile(
+        r"timestamp_tz\(\s*(\d+)\s*\)"
+    )
     TYPES: Final[Mapping] = MappingProxyType(
         {
             type_instance.simple_string(): type_instance
