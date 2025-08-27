@@ -64,7 +64,8 @@ public class ClassLoaderUtils {
       }
     } catch (Exception e) {
       LOG.warn(
-          "Failed to close FileSystem and MutableQuantiles statistics cleaner in IcebergCatalogOperations",
+          "Failed to close FileSystem and MutableQuantiles statistics cleaner in {}",
+          targetClassLoader,
           e);
     }
   }
@@ -92,7 +93,7 @@ public class ClassLoaderUtils {
         thread.setContextClassLoader(null);
         thread.interrupt();
         try {
-          thread.join(5000);
+          thread.join(500);
         } catch (InterruptedException e) {
           LOG.warn("Failed to join thread: {}", thread.getName(), e);
         }
@@ -119,37 +120,38 @@ public class ClassLoaderUtils {
   }
 
   private static void clearThreadLocalMap(Thread thread, ClassLoader targetClassLoader) {
-    if (thread != null && thread.getName().startsWith("Gravitino-webserver-")) {
-      // Try to
-      try {
-        Field threadLocalsField = Thread.class.getDeclaredField("threadLocals");
-        threadLocalsField.setAccessible(true);
-        Object threadLocalMap = threadLocalsField.get(thread);
+    if (thread == null || !thread.getName().startsWith("Gravitino-webserver-")) {
+      return;
+    }
 
-        if (threadLocalMap != null) {
-          Class<?> tlmClass = Class.forName("java.lang.ThreadLocal$ThreadLocalMap");
-          Field tableField = tlmClass.getDeclaredField("table");
-          tableField.setAccessible(true);
-          Object[] table = (Object[]) tableField.get(threadLocalMap);
+    try {
+      Field threadLocalsField = Thread.class.getDeclaredField("threadLocals");
+      threadLocalsField.setAccessible(true);
+      Object threadLocalMap = threadLocalsField.get(thread);
 
-          for (Object entry : table) {
-            if (entry != null) {
-              Object value = FieldUtils.readField(entry, "value", true);
-              if (value != null
-                  && value.getClass().getClassLoader() != null
-                  && value.getClass().getClassLoader() == targetClassLoader) {
-                LOG.info(
-                    "Cleaning up thread local {} for thread {} with custom class loader",
-                    value,
-                    thread.getName());
-                FieldUtils.writeField(entry, "value", null, true);
-              }
+      if (threadLocalMap != null) {
+        Class<?> tlmClass = Class.forName("java.lang.ThreadLocal$ThreadLocalMap");
+        Field tableField = tlmClass.getDeclaredField("table");
+        tableField.setAccessible(true);
+        Object[] table = (Object[]) tableField.get(threadLocalMap);
+
+        for (Object entry : table) {
+          if (entry != null) {
+            Object value = FieldUtils.readField(entry, "value", true);
+            if (value != null
+                && value.getClass().getClassLoader() != null
+                && value.getClass().getClassLoader() == targetClassLoader) {
+              LOG.info(
+                  "Cleaning up thread local {} for thread {} with custom class loader",
+                  value,
+                  thread.getName());
+              FieldUtils.writeField(entry, "value", null, true);
             }
           }
         }
-      } catch (Exception e) {
-        LOG.warn("Failed to clean up thread locals for thread {}", thread.getName(), e);
       }
+    } catch (Exception e) {
+      LOG.warn("Failed to clean up thread locals for thread {}", thread.getName(), e);
     }
   }
 
@@ -192,7 +194,7 @@ public class ClassLoaderUtils {
           Class.forName("org.apache.commons.logging.LogFactory", true, currentClassLoader);
       MethodUtils.invokeStaticMethod(logFactoryClass, "release", currentClassLoader);
     } catch (Exception e) {
-      LOG.warn("Failed to release LogFactory for IcebergCatalogOperations class loader", e);
+      LOG.warn("Failed to release LogFactory for class loader {}", currentClassLoader, e);
     }
   }
 
@@ -208,8 +210,8 @@ public class ClassLoaderUtils {
           Class.forName("com.amazonaws.metrics.AwsSdkMetrics", true, classLoader);
       MethodUtils.invokeStaticMethod(methodUtilsClass, "unregisterMetricAdminMBean");
     } catch (Exception e) {
-      LOG.warn("Failed to unregister AWS SDK metrics admin MBean", e);
-      // This is not critical, so we just log the warning
+      LOG.warn(
+          "Failed to unregister AWS SDK metrics admin MBean from class loader", classLoader, e);
     }
   }
 
@@ -223,7 +225,7 @@ public class ClassLoaderUtils {
               classLoader);
       MethodUtils.invokeStaticMethod(relocatedLogFactory, "release", classLoader);
     } catch (Exception e) {
-      LOG.warn("Failed to find GCS shaded LogFactory", e);
+      LOG.warn("Failed to find GCS shaded LogFactory in class loader {}", classLoader, e);
     }
   }
 
@@ -266,7 +268,7 @@ public class ClassLoaderUtils {
               classLoader);
       MethodUtils.invokeStaticMethod(relocatedLogFactory, "release", classLoader);
     } catch (Exception e) {
-      LOG.warn("Failed to handle Azure file system...", e);
+      LOG.warn("Failed to handle Azure file system in class loader {}", classLoader, e);
     }
   }
 
