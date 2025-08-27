@@ -70,13 +70,13 @@ The following table lists the storage configuration items:
 
 If you use [Lance](https://lancedb.github.io/lance/) as the partition stats storage, you can set below options, if you have other lance storage options, you can pass it adding prefix `gravitino.stats.partition.lance.`.
 
-| Configuration item                                | Description                               | Default value                  | Required                                        | Since version |
-|---------------------------------------------------|-------------------------------------------|--------------------------------|-------------------------------------------------|---------------|
-| `gravitino.stats.partition.lance.location`        | The location of Lance files               | `${GRAVITINO_HOME}/data/lance` | No                                              | 1.0.0         |
-| `gravitino.stats.partition.lance.maxRowsPerFile`  | The max rows per file                     | `1000000`                      | No                                              | 1.0.0         |
-| `gravitino.stats.partition.lance.maxBytesPerFile` | The max bytes per file                    | `100 * 1024 * 1024`            | No                                              | 1.0.0         |
-| `gravitino.stats.partition.lance.maxRowsPerGroup` | The max rows per group                    | `1000000`                      | No                                              | 1.0.0         |
-| `gravitino.stats.partition.lance.readBatchSize`   | The read batch record number when reading | `10000`                        | No                                              | 1.0.0         |
+| Configuration item                                        | Description                               | Default value                  | Required                                        | Since version |
+|-----------------------------------------------------------|-------------------------------------------|--------------------------------|-------------------------------------------------|---------------|
+| `gravitino.stats.partition.storageOption.location`        | The location of Lance files               | `${GRAVITINO_HOME}/data/lance` | No                                              | 1.0.0         |
+| `gravitino.stats.partition.storageOption.maxRowsPerFile`  | The max rows per file                     | `1000000`                      | No                                              | 1.0.0         |
+| `gravitino.stats.partition.storageOption.maxBytesPerFile` | The max bytes per file                    | `100 * 1024 * 1024`            | No                                              | 1.0.0         |
+| `gravitino.stats.partition.storageOption.maxRowsPerGroup` | The max rows per group                    | `1000000`                      | No                                              | 1.0.0         |
+| `gravitino.stats.partition.storageOption.readBatchSize`   | The read batch record number when reading | `10000`                        | No                                              | 1.0.0         |
 
 :::caution
 We strongly recommend that you change the default value of `gravitino.entity.store.relational.storagePath`, as it's under the deployment directory and future version upgrades may remove it.

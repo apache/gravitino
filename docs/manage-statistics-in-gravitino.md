@@ -21,7 +21,7 @@ Statistics only support the custom statistics, which names must start with `cust
 Gravitino will support build-in statistics in the future.
 
 
-## Table Statistic operations
+## Metadata object Statistic operations
 
 ### Update metadata object statistics
 
@@ -186,7 +186,7 @@ table.listPartitionStatistics(range);
 
 You can drop the statistics of specified partitions by providing the statistics keys.
 
-The request path for REST API is `/api/metalakes/{metalake}/objects/{metadataObjectType}/{metadataObjectName}/statistics/partitions`.
+The request path for REST API is `/api/metalakes/{metalake}/objects/table/{metadataObjectName}/statistics/partitions`.
 
 <Tabs groupId='language' queryString>
 <TabItem value="shell" label="Shell">
