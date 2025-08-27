@@ -113,8 +113,7 @@ public abstract class BaseGVFSOperations implements Closeable {
 
   private final String metalakeName;
 
-  private final boolean enableFilesetCatalogCache;
-  private final FilesetCatalogCache filesetCatalogCache;
+  private final Optional<FilesetMetadataCache> filesetMetadataCache;
   private final GravitinoClient gravitinoClient;
 
   private final Configuration conf;
@@ -147,12 +146,14 @@ public abstract class BaseGVFSOperations implements Closeable {
         GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_CLIENT_METALAKE_KEY);
 
     this.gravitinoClient = GravitinoVirtualFileSystemUtils.createClient(configuration);
-    this.enableFilesetCatalogCache =
+    boolean enableFilesetCatalogCache =
         configuration.getBoolean(
             FS_GRAVITINO_FILESET_CATALOG_CACHE_ENABLE,
             FS_GRAVITINO_FILESET_CATALOG_CACHE_ENABLE_DEFAULT);
-    this.filesetCatalogCache =
-        enableFilesetCatalogCache ? new FilesetCatalogCache(gravitinoClient) : null;
+    this.filesetMetadataCache =
+        enableFilesetCatalogCache
+            ? Optional.of(new FilesetMetadataCache(gravitinoClient))
+            : Optional.empty();
 
     this.internalFileSystemCache = newFileSystemCache(configuration);
 
@@ -190,8 +191,8 @@ public abstract class BaseGVFSOperations implements Closeable {
     internalFileSystemCache.invalidateAll();
 
     try {
-      if (filesetCatalogCache != null) {
-        filesetCatalogCache.close();
+      if (filesetMetadataCache.isPresent()) {
+        filesetMetadataCache.get().close();
       }
     } catch (IOException e) {
       // ignore
@@ -535,9 +536,9 @@ public abstract class BaseGVFSOperations implements Closeable {
    * @return the fileset catalog.
    */
   protected FilesetCatalog getFilesetCatalog(NameIdentifier catalogIdent) {
-    return enableFilesetCatalogCache
-        ? filesetCatalogCache.getFilesetCatalog(catalogIdent)
-        : gravitinoClient.loadCatalog(catalogIdent.name()).asFilesetCatalog();
+    return filesetMetadataCache
+        .map(cache -> cache.getFilesetCatalog(catalogIdent))
+        .orElseGet(() -> gravitinoClient.loadCatalog(catalogIdent.name()).asFilesetCatalog());
   }
 
   /**
@@ -548,12 +549,15 @@ public abstract class BaseGVFSOperations implements Closeable {
    * @return the fileset.
    */
   protected Fileset getFileset(NameIdentifier filesetIdent) {
-    return enableFilesetCatalogCache
-        ? filesetCatalogCache.getFileset(filesetIdent)
-        : getFilesetCatalog(
-                NameIdentifier.of(
-                    filesetIdent.namespace().level(0), filesetIdent.namespace().level(1)))
-            .loadFileset(NameIdentifier.of(filesetIdent.namespace().level(2), filesetIdent.name()));
+    return filesetMetadataCache
+        .map(cache -> cache.getFileset(filesetIdent))
+        .orElseGet(
+            () ->
+                getFilesetCatalog(
+                        NameIdentifier.of(
+                            filesetIdent.namespace().level(0), filesetIdent.namespace().level(1)))
+                    .loadFileset(
+                        NameIdentifier.of(filesetIdent.namespace().level(2), filesetIdent.name())));
   }
 
   @VisibleForTesting

@@ -79,7 +79,7 @@ class BaseGVFSOperations(ABC):
 
     ENV_CURRENT_LOCATION_NAME_ENV_VAR_DEFAULT = "CURRENT_LOCATION_NAME"
     ENABLE_CREDENTIAL_VENDING_DEFAULT = False
-    ENABLE_FILESET_CATALOG_CACHE_DEFAULT = False
+    ENABLE_FILESET_METADATA_CACHE_DEFAULT = False
 
     def __init__(
         self,
@@ -137,15 +137,15 @@ class BaseGVFSOperations(ABC):
         self._filesystem_cache = TTLCache(maxsize=cache_size, ttl=cache_expired_time)
         self._cache_lock = rwlock.RWLockFair()
 
-        self._enable_fileset_catalog_cache = (
-            self.ENABLE_FILESET_CATALOG_CACHE_DEFAULT
+        self._enable_fileset_metadata_cache = (
+            self.ENABLE_FILESET_METADATA_CACHE_DEFAULT
             if options is None
             else options.get(
-                GVFSConfig.GVFS_FILESYSTEM_ENABLE_FILESET_CATALOG_CACHE,
-                self.ENABLE_FILESET_CATALOG_CACHE_DEFAULT
+                GVFSConfig.GVFS_FILESYSTEM_ENABLE_FILESET_METADATA_CACHE,
+                self.ENABLE_FILESET_METADATA_CACHE_DEFAULT
             )
         )
-        if self._enable_fileset_catalog_cache:
+        if self._enable_fileset_metadata_cache:
             self._catalog_cache = LRUCache(maxsize=100)
             self._catalog_cache_lock = rwlock.RWLockFair()
 
@@ -539,7 +539,7 @@ class BaseGVFSOperations(ABC):
             CallerContextHolder.remove()
 
     def _get_fileset_catalog(self, catalog_ident: NameIdentifier):
-        if not self._enable_fileset_catalog_cache:
+        if not self._enable_fileset_metadata_cache:
             return self._client.load_catalog(catalog_ident.name())
 
         read_lock = self._catalog_cache_lock.gen_rlock()
@@ -564,7 +564,7 @@ class BaseGVFSOperations(ABC):
             write_lock.release()
 
     def _get_fileset(self, fileset_ident: NameIdentifier):
-        if not self._enable_fileset_catalog_cache:
+        if not self._enable_fileset_metadata_cache:
             catalog_ident: NameIdentifier = NameIdentifier.of(
                 fileset_ident.namespace().level(0), fileset_ident.namespace().level(1)
             )

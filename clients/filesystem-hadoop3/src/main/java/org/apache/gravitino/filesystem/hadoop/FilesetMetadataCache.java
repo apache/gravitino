@@ -34,18 +34,18 @@ import org.apache.gravitino.file.Fileset;
 import org.apache.gravitino.file.FilesetCatalog;
 
 /** A cache for fileset catalogs. */
-public class FilesetCatalogCache implements Closeable {
+public class FilesetMetadataCache implements Closeable {
 
   private final GravitinoClient client;
   private final Cache<NameIdentifier, FilesetCatalog> catalogCache;
   private final Cache<NameIdentifier, Fileset> filesetCache;
 
   /**
-   * Creates a new instance of {@link FilesetCatalogCache}.
+   * Creates a new instance of {@link FilesetMetadataCache}.
    *
    * @param client the Gravitino client.
    */
-  public FilesetCatalogCache(GravitinoClient client) {
+  public FilesetMetadataCache(GravitinoClient client) {
     this.client = client;
     this.catalogCache = newCatalogCache();
     this.filesetCache = newFilesetCache();
