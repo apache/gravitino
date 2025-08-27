@@ -23,7 +23,7 @@ Gravitino will support build-in statistics in the future.
 
 ## Metadata object Statistic operations
 
-### Update metadata object statistics
+### Update statistics of metadata objects
 
 You can update the statistics of a metadata object by providing the statistics key and value.
 Now only table statistics can be updated.
@@ -83,7 +83,7 @@ table.listStatistics();
 </TabItem>
 </Tabs>
 
-### Drop statistics of metadata object
+### Drop statistics of metadata objects
 
 You can drop the statistics of a metadata object by providing the statistics keys.
 Now only table statistics can be dropped.
