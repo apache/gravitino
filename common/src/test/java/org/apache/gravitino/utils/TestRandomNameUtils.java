@@ -19,26 +19,27 @@
 
 package org.apache.gravitino.utils;
 
-import org.apache.commons.lang3.StringUtils;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
 
-import java.util.UUID;
+class TestRandomNameUtils {
+  @Test
+  public void testGeneratedNameStartsWithPrefix() {
+    String prefix = "testPrefix";
+    String result = RandomNameUtils.genRandomName(prefix);
 
-/** Tools to generate random values. */
-public class RandomNameUtils {
-  private RandomNameUtils() {
-    throw new IllegalStateException("Utility class");
+    Assertions.assertTrue(result.startsWith(prefix + "_"));
   }
 
-  /**
-   * Generate a random string with the prefix.
-   *
-   * @param prefix Prefix of the random value.
-   * @return A random string value.
-   */
-  public static String genRandomName(String prefix) {
-    if (StringUtils.isBlank(prefix)) {
-      throw new IllegalArgumentException("Prefix cannot be null or empty");
-    }
-    return prefix + "_" + UUID.randomUUID().toString().replace("-", "").substring(0, 8);
+  @Test
+  public void testNullPrefixThrowsIllegalArgumentException() {
+    Assertions.assertThrowsExactly(
+        IllegalArgumentException.class, () -> RandomNameUtils.genRandomName(null));
+  }
+
+  @Test
+  public void testBlankPrefixThrowsIllegalArgumentException() {
+    Assertions.assertThrowsExactly(
+        IllegalArgumentException.class, () -> RandomNameUtils.genRandomName("   "));
   }
 }
