@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.trino.connector.system.storedprocdure;
+package org.apache.gravitino.trino.connector.system.storedprocedure;
 
 import io.trino.spi.TrinoException;
 import io.trino.spi.procedure.Procedure;
