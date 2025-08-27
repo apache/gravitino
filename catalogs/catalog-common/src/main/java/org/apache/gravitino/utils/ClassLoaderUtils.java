@@ -39,7 +39,7 @@ public class ClassLoaderUtils {
    *
    * @param targetClassLoader the classloader where Hadoop FileSystem is loaded
    */
-  public static void closeStatsDataClearerInFileSystem(ClassLoader targetClassLoader) {
+  private static void closeStatsDataClearerInFileSystem(ClassLoader targetClassLoader) {
     try {
       Class<?> FileSystem =
           Class.forName("org.apache.hadoop.fs.FileSystem", true, targetClassLoader);
@@ -81,7 +81,7 @@ public class ClassLoaderUtils {
    * will not be stopped when the catalog is closed.
    * </pre>
    */
-  public static void stopThreadsAndClearThreadLocalVariables(ClassLoader classLoader) {
+  private static void stopThreadsAndClearThreadLocalVariables(ClassLoader classLoader) {
     Thread[] threads = getAllThreads();
     for (Thread thread : threads) {
       // First clear thread local variables
@@ -161,7 +161,7 @@ public class ClassLoaderUtils {
    *
    * @param targetClassLoader the classloader where the shutdown hooks are registered.
    */
-  public static void clearShutdownHooks(ClassLoader targetClassLoader) {
+  private static void clearShutdownHooks(ClassLoader targetClassLoader) {
     try {
       Class<?> shutdownHooks = Class.forName("java.lang.ApplicationShutdownHooks");
       IdentityHashMap<Thread, Thread> hooks =
@@ -185,7 +185,7 @@ public class ClassLoaderUtils {
    *
    * @param currentClassLoader the classloader where the commons-logging is loaded.
    */
-  public static void releaseLogFactoryInCommonLogging(ClassLoader currentClassLoader) {
+  private static void releaseLogFactoryInCommonLogging(ClassLoader currentClassLoader) {
     // Release the LogFactory for the FilesetCatalogOperations class loader
     try {
       Class<?> logFactoryClass =
@@ -201,7 +201,7 @@ public class ClassLoaderUtils {
    *
    * @param classLoader the classloader where AWS SDK is loaded
    */
-  public static void closeResourceInAWS(ClassLoader classLoader) {
+  private static void closeResourceInAWS(ClassLoader classLoader) {
     // For Aws SDK metrics, unregister the metric admin MBean
     try {
       Class<?> methodUtilsClass =
@@ -213,7 +213,7 @@ public class ClassLoaderUtils {
     }
   }
 
-  public static void closeResourceInGCP(ClassLoader classLoader) {
+  private static void closeResourceInGCP(ClassLoader classLoader) {
     // For GCS
     try {
       Class<?> relocatedLogFactory =
@@ -236,7 +236,7 @@ public class ClassLoaderUtils {
    *
    * @param classLoader the classloader where Azure Blob File System is loaded
    */
-  public static void closeResourceInAzure(ClassLoader classLoader) {
+  private static void closeResourceInAzure(ClassLoader classLoader) {
     try {
       // Clear timer in AbfsClientThrottlingAnalyzer
       Class<?> abfsClientThrottlingInterceptClass =
@@ -267,6 +267,45 @@ public class ClassLoaderUtils {
       MethodUtils.invokeStaticMethod(relocatedLogFactory, "release", classLoader);
     } catch (Exception e) {
       LOG.warn("Failed to handle Azure file system...", e);
+    }
+  }
+
+  /**
+   * Close all resources related to the given class loader to prevent memory leaks.
+   * @param classLoader the classloader to be closed
+   */
+  public static void closeClassLoaderResource(ClassLoader classLoader) {
+    boolean testEnv = System.getenv("GRAVITINO_TEST") != null;
+    if (testEnv) {
+      // In test environment, we do not need to clean up class loader related stuff
+      return;
+    }
+
+    try {
+      // Clear statics threads in FileSystem and close all FileSystem instances.
+      closeStatsDataClearerInFileSystem(classLoader);
+
+      // Stop all threads with the current class loader and clear their threadLocal variables for
+      // jetty threads that are loaded by the current class loader.
+      // For example, thread local `threadData` in FileSystem#StatisticsDataCleaner is created
+      // within jetty thread with the current class loader. However, there are clear by
+      // `catalog.close` in ForkJoinPool in CaffeineCache, in this case, the thread local variable
+      // will not be cleared, so we need to clear them manually here.
+      stopThreadsAndClearThreadLocalVariables(classLoader);
+
+      // Release the LogFactory for the classloader, each classloader has its own LogFactory
+      // instance.
+      releaseLogFactoryInCommonLogging(classLoader);
+
+      closeResourceInAWS(classLoader);
+
+      closeResourceInGCP(classLoader);
+
+      closeResourceInAzure(classLoader);
+
+      clearShutdownHooks(classLoader);
+    } catch (Exception e) {
+      LOG.warn("Failed to clear resources(Thread, ThreadLocal variants) in the class loader", e);
     }
   }
 }

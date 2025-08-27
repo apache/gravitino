@@ -20,13 +20,6 @@
 package org.apache.gravitino.catalog.fileset;
 
 import static org.apache.gravitino.file.Fileset.PROPERTY_DEFAULT_LOCATION_NAME;
-import static org.apache.gravitino.utils.ClassLoaderUtils.clearShutdownHooks;
-import static org.apache.gravitino.utils.ClassLoaderUtils.closeResourceInAWS;
-import static org.apache.gravitino.utils.ClassLoaderUtils.closeResourceInAzure;
-import static org.apache.gravitino.utils.ClassLoaderUtils.closeResourceInGCP;
-import static org.apache.gravitino.utils.ClassLoaderUtils.closeStatsDataClearerInFileSystem;
-import static org.apache.gravitino.utils.ClassLoaderUtils.releaseLogFactoryInCommonLogging;
-import static org.apache.gravitino.utils.ClassLoaderUtils.stopThreadsAndClearThreadLocalVariables;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
@@ -72,6 +65,7 @@ import org.apache.gravitino.file.FilesetCatalog;
 import org.apache.gravitino.file.FilesetChange;
 import org.apache.gravitino.meta.FilesetEntity;
 import org.apache.gravitino.meta.SchemaEntity;
+import org.apache.gravitino.utils.ClassLoaderUtils;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.PrincipalUtils;
 import org.slf4j.Logger;
@@ -279,39 +273,7 @@ public class SecureFilesetCatalogOperations
 
     UserContext.cleanAllUserContext();
 
-    closeClassLoaderResource();
-  }
-
-  private void closeClassLoaderResource() {
-    boolean testEnv = System.getenv("GRAVITINO_TEST") != null;
-    if (testEnv) {
-      // In test environment, we do not need to clean up class loader related stuff
-      return;
-    }
-
-    ClassLoader currentClassLoader = SecureFilesetCatalogOperations.class.getClassLoader();
-    try {
-      // Clear statics threads in FileSystem and close all FileSystem instances.
-      closeStatsDataClearerInFileSystem(currentClassLoader);
-
-      // Stop all threads with the current class loader and clear their threadLocal variables for
-      // jetty threads that are loaded by the current class loader.
-      stopThreadsAndClearThreadLocalVariables(currentClassLoader);
-
-      // Release the LogFactory for the classloader, each classloader has its own LogFactory
-      // instance.
-      releaseLogFactoryInCommonLogging(currentClassLoader);
-
-      closeResourceInAWS(currentClassLoader);
-
-      closeResourceInGCP(currentClassLoader);
-
-      closeResourceInAzure(currentClassLoader);
-
-      clearShutdownHooks(currentClassLoader);
-    } catch (Exception e) {
-      LOG.warn("Failed to clear resources(Thread, ThreadLocal variants) in the class loader", e);
-    }
+    ClassLoaderUtils.closeClassLoaderResource(this.getClass().getClassLoader());
   }
 
   @Override
