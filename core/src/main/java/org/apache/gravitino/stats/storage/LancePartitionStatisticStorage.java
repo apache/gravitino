@@ -29,6 +29,7 @@ import com.lancedb.lance.FragmentOperation;
 import com.lancedb.lance.WriteParams;
 import com.lancedb.lance.ipc.LanceScanner;
 import com.lancedb.lance.ipc.ScanOptions;
+import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
@@ -69,7 +70,8 @@ public class LancePartitionStatisticStorage implements PartitionStatisticStorage
   private static final String LANCE_PREFIX = "lance.";
 
   private static final String LOCATION = LANCE_PREFIX + "location";
-  private static final String DEFAULT_LOCATION = "/tmp";
+  private static final String DEFAULT_LOCATION =
+      String.join(File.separator, System.getenv("GRAVITINO_HOME"), "data", "lance");;
   private static final String MAX_ROWS_PER_FILE = LANCE_PREFIX + "maxRowsPerFile";
   private static final int DEFAULT_MAX_ROWS_PER_FILE = 1000000; // 10M
   private static final String MAX_BYTES_PER_FILE = LANCE_PREFIX + "maxBytesPerFile";
