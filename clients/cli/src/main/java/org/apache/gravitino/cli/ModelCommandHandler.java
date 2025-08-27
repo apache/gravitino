@@ -19,6 +19,7 @@
 
 package org.apache.gravitino.cli;
 
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import java.util.List;
 import java.util.Map;
@@ -27,6 +28,9 @@ import org.apache.gravitino.cli.commands.Command;
 
 /** Handles the command execution for Models based on command type and the command line options. */
 public class ModelCommandHandler extends CommandHandler {
+  private static final String DELIMITER = ",";
+  private static final String KEY_VALUE_SEPARATOR = "=";
+
   private final GravitinoCommandLine gravitinoCommandLine;
   private final CommandLine line;
   private final String command;
@@ -160,15 +164,23 @@ public class ModelCommandHandler extends CommandHandler {
 
   /** Handles the "UPDATE" command. */
   private void handleUpdateCommand() {
-    if (line.hasOption(GravitinoOptions.URI)) {
+    if (line.hasOption(GravitinoOptions.URIS)) {
       String[] alias = line.getOptionValues(GravitinoOptions.ALIAS);
-      String uri = line.getOptionValue(GravitinoOptions.URI);
+      Map<String, String> uris = getUrisFromLime(line);
       String linkComment = line.getOptionValue(GravitinoOptions.COMMENT);
       String[] linkProperties = line.getOptionValues(CommandActions.PROPERTIES);
       Map<String, String> linkPropertityMap = new Properties().parse(linkProperties);
       gravitinoCommandLine
           .newLinkModel(
-              context, metalake, catalog, schema, model, uri, alias, linkComment, linkPropertityMap)
+              context,
+              metalake,
+              catalog,
+              schema,
+              model,
+              uris,
+              alias,
+              linkComment,
+              linkPropertityMap)
           .validate()
           .handle();
     }
@@ -190,7 +202,7 @@ public class ModelCommandHandler extends CommandHandler {
           .handle();
     }
 
-    if (!line.hasOption(GravitinoOptions.URI)
+    if (!line.hasOption(GravitinoOptions.URIS)
         && line.hasOption(GravitinoOptions.COMMENT)
         && (line.hasOption(GravitinoOptions.ALIAS) || line.hasOption(GravitinoOptions.VERSION))) {
       String comment = line.getOptionValue(GravitinoOptions.COMMENT);
@@ -316,5 +328,20 @@ public class ModelCommandHandler extends CommandHandler {
     return line.hasOption(GravitinoOptions.ALIAS)
         ? getOneAlias(line.getOptionValues(GravitinoOptions.ALIAS))
         : null;
+  }
+
+  private Map<String, String> getUrisFromLime(CommandLine line) {
+    String input = line.getOptionValue(GravitinoOptions.URIS);
+    ImmutableMap.Builder<String, String> uris = ImmutableMap.builder();
+    if (input != null) {
+      String[] pairs = input.split(DELIMITER);
+      for (String pair : pairs) {
+        String[] keyValue = pair.split(KEY_VALUE_SEPARATOR, 2);
+        if (keyValue.length == 2) {
+          uris.put(keyValue[0].trim(), keyValue[1].trim());
+        }
+      }
+    }
+    return uris.build();
   }
 }

@@ -73,7 +73,7 @@ class ModelVersionInfoListResponse(BaseResponse):
                 raise IllegalArgumentException(
                     "Model version 'version' must not be null"
                 )
-            if version.uri() is None:
+            if version.uris() is None:
                 raise IllegalArgumentException("Model version 'uri' must not be null")
             if version.audit_info() is None:
                 raise IllegalArgumentException(
