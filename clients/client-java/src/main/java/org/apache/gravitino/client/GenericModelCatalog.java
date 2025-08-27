@@ -250,9 +250,7 @@ class GenericModelCatalog extends BaseSchemaCatalog implements ModelCatalog {
 
     NameIdentifier modelFullIdent = modelFullNameIdentifier(ident);
     Map<String, String> queryParam =
-        uriName == null
-            ? Collections.emptyMap()
-            : ImmutableMap.of("uriName", RESTUtils.encodeString(uriName));
+        uriName == null ? Collections.emptyMap() : ImmutableMap.of("uriName", uriName);
     ModelVersionUriResponse resp =
         restClient.get(
             formatModelVersionRequestPath(modelFullIdent) + "/versions/" + version + "/uri",
@@ -272,9 +270,7 @@ class GenericModelCatalog extends BaseSchemaCatalog implements ModelCatalog {
 
     NameIdentifier modelFullIdent = modelFullNameIdentifier(ident);
     Map<String, String> queryParam =
-        uriName == null
-            ? Collections.emptyMap()
-            : ImmutableMap.of("uriName", RESTUtils.encodeString(uriName));
+        uriName == null ? Collections.emptyMap() : ImmutableMap.of("uriName", uriName);
     ModelVersionUriResponse resp =
         restClient.get(
             formatModelVersionRequestPath(modelFullIdent)

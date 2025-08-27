@@ -93,7 +93,3 @@ variable-naming-style=snake_case
 
 # Naming Style for Module
 module-naming-style=snake_case
-
-[DESIGN]
-# Maximum number of return statements allowed in a function
-max-returns=10

@@ -706,6 +706,7 @@ class GenericModelCatalog(BaseSchemaCatalog):
 
         raise ValueError(f"Unknown change type: {type(change).__name__}")
 
+    # pylint: disable=too-many-return-statements
     @staticmethod
     def to_model_version_update_request(change: ModelVersionChange):
         if isinstance(change, ModelVersionChange.UpdateComment):
