@@ -20,25 +20,25 @@
 package org.apache.gravitino.catalog.fileset;
 
 import static org.apache.gravitino.file.Fileset.PROPERTY_DEFAULT_LOCATION_NAME;
+import static org.apache.gravitino.utils.ClassLoaderUtils.clearShutdownHooks;
+import static org.apache.gravitino.utils.ClassLoaderUtils.closeResourceInAWS;
+import static org.apache.gravitino.utils.ClassLoaderUtils.closeResourceInAzure;
+import static org.apache.gravitino.utils.ClassLoaderUtils.closeResourceInGCP;
+import static org.apache.gravitino.utils.ClassLoaderUtils.closeStatsDataClearerInFileSystem;
+import static org.apache.gravitino.utils.ClassLoaderUtils.releaseLogFactoryInCommonLogging;
+import static org.apache.gravitino.utils.ClassLoaderUtils.stopThreadsAndClearThreadLocalVariables;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.io.IOException;
-import java.lang.reflect.Field;
 import java.util.Collections;
-import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
-import java.util.Timer;
-import java.util.concurrent.ScheduledExecutorService;
 import java.util.stream.Collectors;
 import javax.security.auth.Subject;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.commons.lang3.reflect.FieldUtils;
-import org.apache.commons.lang3.reflect.MethodUtils;
-import org.apache.commons.logging.LogFactory;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityStore;
@@ -74,8 +74,6 @@ import org.apache.gravitino.meta.FilesetEntity;
 import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.PrincipalUtils;
-import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.metrics2.lib.MutableQuantiles;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -281,209 +279,38 @@ public class SecureFilesetCatalogOperations
 
     UserContext.cleanAllUserContext();
 
+    closeClassLoaderResource();
+  }
+
+  private void closeClassLoaderResource() {
     boolean testEnv = System.getenv("GRAVITINO_TEST") != null;
     if (testEnv) {
       // In test environment, we do not need to clean up class loader related stuff
       return;
     }
 
+    ClassLoader currentClassLoader = SecureFilesetCatalogOperations.class.getClassLoader();
     try {
-      closeStatsDataClearerInFileSystem();
+      // Clear statics threads in FileSystem and close all FileSystem instances.
+      closeStatsDataClearerInFileSystem(currentClassLoader);
 
-      stopThreadsAndClearThreadLocal();
+      // Stop all threads with the current class loader and clear their threadLocal variables for
+      // jetty threads that are loaded by the current class loader.
+      stopThreadsAndClearThreadLocalVariables(currentClassLoader);
 
-      // Release the LogFactory for the FilesetCatalogOperations class loader
-      unregisterLogFactory();
+      // Release the LogFactory for the classloader, each classloader has its own LogFactory
+      // instance.
+      releaseLogFactoryInCommonLogging(currentClassLoader);
 
-      closeResourceInAWS();
+      closeResourceInAWS(currentClassLoader);
 
-      closeResourceInGCP();
+      closeResourceInGCP(currentClassLoader);
 
-      closeResourceInAzure();
+      closeResourceInAzure(currentClassLoader);
 
-      clearShutdownHooks();
+      clearShutdownHooks(currentClassLoader);
     } catch (Exception e) {
       LOG.warn("Failed to clear resources(Thread, ThreadLocal variants) in the class loader", e);
-    }
-  }
-
-  private static void stopThreadsAndClearThreadLocal() {
-    // Clear all thread references to the ClosableHiveCatalog class loader and clear thread local
-    Thread[] threads = getAllThreads();
-    for (Thread thread : threads) {
-      // Clear thread local map for webserver threads in the current class loader. Why do we need
-      // this? Because the webserver threads are long-lived threads and will holds may thread
-      // local references to the current class loader. However, they can't be cleared as
-      // `Catalog.close` is called in the thread pool located in the Caffeine cache, which is not
-      // in the webserver threads. So we need to manually clear the thread local map for webserver
-      // threads.
-      clearThreadLocalMap(thread);
-
-      // Close all threads that are using the FilesetCatalogOperations class loader
-      if (runningWithCurrentClassLoader(thread)) {
-        LOG.info("Interrupting thread: {}", thread.getName());
-        thread.setContextClassLoader(null);
-        thread.interrupt();
-        try {
-          thread.join(5000);
-        } catch (InterruptedException e) {
-          LOG.warn("Failed to join thread: {}", thread.getName(), e);
-        }
-      }
-    }
-  }
-
-  private void unregisterLogFactory() {
-    try {
-      LogFactory.release(SecureFilesetCatalogOperations.class.getClassLoader());
-    } catch (Exception e) {
-      LOG.warn("Failed to unregister LogFactory", e);
-    }
-  }
-
-  private static void closeResourceInAzure() {
-    // For Azure
-    try {
-      Class<?> relocatedLogFactory =
-          Class.forName("org.apache.gravitino.azure.shaded.org.apache.commons.logging.LogFactory");
-      MethodUtils.invokeStaticMethod(
-          relocatedLogFactory, "release", SecureFilesetCatalogOperations.class.getClassLoader());
-
-      // Clear timer in AbfsClientThrottlingAnalyzer
-      Class<?> abfsClientThrottlingInterceptClass =
-          Class.forName("org.apache.hadoop.fs.azurebfs.services.AbfsClientThrottlingIntercept");
-      Object abfsClientThrottlingIntercept =
-          FieldUtils.readStaticField(abfsClientThrottlingInterceptClass, "singleton", true);
-
-      Object readThrottler =
-          FieldUtils.readField(abfsClientThrottlingIntercept, "readThrottler", true);
-      Object writeThrottler =
-          FieldUtils.readField(abfsClientThrottlingIntercept, "writeThrottler", true);
-
-      Timer readTimer = (Timer) FieldUtils.readField(readThrottler, "timer", true);
-      readTimer.cancel();
-      Timer writeTimer = (Timer) FieldUtils.readField(writeThrottler, "timer", true);
-      writeTimer.cancel();
-    } catch (Exception e) {
-      LOG.warn("Failed to handle Azure file system...", e);
-    }
-  }
-
-  private static void closeResourceInGCP() {
-    // For GCS
-    try {
-      Class<?> relocatedLogFactory =
-          Class.forName("org.apache.gravitino.gcp.shaded.org.apache.commons.logging.LogFactory");
-      MethodUtils.invokeStaticMethod(
-          relocatedLogFactory, "release", SecureFilesetCatalogOperations.class.getClassLoader());
-    } catch (Exception e) {
-      LOG.warn("Failed to find GCS shaded LogFactory", e);
-    }
-  }
-
-  private static void closeResourceInAWS() {
-    // For Aws SDK metrics, unregister the metric admin MBean
-    try {
-      Class<?> methodUtilsClass = Class.forName("com.amazonaws.metrics.AwsSdkMetrics");
-      MethodUtils.invokeStaticMethod(methodUtilsClass, "unregisterMetricAdminMBean");
-    } catch (Exception e) {
-      LOG.warn("Failed to unregister AWS SDK metrics admin MBean", e);
-      // This is not critical, so we just log the warning
-    }
-  }
-
-  private static void clearThreadLocalMap(Thread thread) {
-    if (thread != null && thread.getName().startsWith("Gravitino-webserver-")) {
-      try {
-        Field threadLocalsField = Thread.class.getDeclaredField("threadLocals");
-        threadLocalsField.setAccessible(true);
-        Object threadLocalMap = threadLocalsField.get(thread);
-
-        if (threadLocalMap != null) {
-          Class<?> tlmClass = Class.forName("java.lang.ThreadLocal$ThreadLocalMap");
-          Field tableField = tlmClass.getDeclaredField("table");
-          tableField.setAccessible(true);
-          Object[] table = (Object[]) tableField.get(threadLocalMap);
-
-          for (Object entry : table) {
-            if (entry != null) {
-              Object value = FieldUtils.readField(entry, "value", true);
-              if (value != null
-                  && value.getClass().getClassLoader() != null
-                  && value.getClass().getClassLoader()
-                      == SecureFilesetCatalogOperations.class.getClassLoader()) {
-                LOG.info(
-                    "Cleaning up thread local {} for thread {} with custom class loader",
-                    value,
-                    thread.getName());
-                FieldUtils.writeField(entry, "value", null, true);
-              }
-            }
-          }
-        }
-      } catch (Exception e) {
-        LOG.warn("Failed to clean up thread locals for thread {}", thread.getName(), e);
-      }
-    }
-  }
-
-  private static void closeStatsDataClearerInFileSystem() {
-    try {
-      ScheduledExecutorService scheduler =
-          (ScheduledExecutorService)
-              FieldUtils.readStaticField(MutableQuantiles.class, "scheduler", true);
-      scheduler.shutdownNow();
-      Field statisticsCleanerField =
-          FieldUtils.getField(FileSystem.Statistics.class, "STATS_DATA_CLEANER", true);
-      Object statisticsCleaner = statisticsCleanerField.get(null);
-      if (statisticsCleaner != null) {
-        ((Thread) statisticsCleaner).interrupt();
-        ((Thread) statisticsCleaner).setContextClassLoader(null);
-        ((Thread) statisticsCleaner).join();
-      }
-
-      FileSystem.closeAll();
-    } catch (Exception e) {
-      LOG.warn("Failed to close stats data clearer in FileSystem", e);
-    }
-  }
-
-  private static Thread[] getAllThreads() {
-    ThreadGroup rootGroup = Thread.currentThread().getThreadGroup();
-    ThreadGroup parentGroup;
-    while ((parentGroup = rootGroup.getParent()) != null) {
-      rootGroup = parentGroup;
-    }
-
-    Thread[] threads = new Thread[rootGroup.activeCount()];
-    while (rootGroup.enumerate(threads, true) == threads.length) {
-      threads = new Thread[threads.length * 2];
-    }
-    return threads;
-  }
-
-  private static boolean runningWithCurrentClassLoader(Thread thread) {
-    return thread != null
-        && thread.getContextClassLoader() == FilesetCatalogOperations.class.getClassLoader();
-  }
-
-  public static void clearShutdownHooks() {
-    try {
-      Class<?> shutdownHooks = Class.forName("java.lang.ApplicationShutdownHooks");
-      IdentityHashMap<Thread, Thread> hooks =
-          (IdentityHashMap<Thread, Thread>)
-              FieldUtils.readStaticField(shutdownHooks, "hooks", true);
-
-      hooks
-          .entrySet()
-          .removeIf(
-              entry -> {
-                Thread thread = entry.getKey();
-                return thread.getContextClassLoader()
-                    == FilesetCatalogOperations.class.getClassLoader();
-              });
-    } catch (Exception e) {
-      LOG.warn("Failed to clean shutdown hooks", e);
     }
   }
 
