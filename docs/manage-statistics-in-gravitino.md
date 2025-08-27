@@ -246,7 +246,7 @@ For example:
 ```java
 public class MyPartitionStatsStorageFactory implements PartitionStatisticStorageFactory {
     @Override
-    public PartitionStatsStorage create(Metalake metalake, Table table, Map<String, String> options) {
+    public PartitionStatisticStorage create(Map<String, String> options) {
         // Create your custom PartitionStatsStorage here
         return new MyPartitionStatsStorage(...);
     }
@@ -254,11 +254,8 @@ public class MyPartitionStatsStorageFactory implements PartitionStatisticStorage
 ```
 
 ```java
-public class MyPartitionStatsStorage implements PartitionStatsStorage {
-    @Override
-    public void initialize() {
-        // Initialize your storage here
-    }
+public class MyPartitionStatsStorage implements PartitionStatisticStorage {
+
 
     @Override
     public void close() {
@@ -266,18 +263,19 @@ public class MyPartitionStatsStorage implements PartitionStatsStorage {
     }
 
     @Override
-    public void updatePartitionStatistics(List<PartitionStatisticsUpdate> updates) {
+    public void updateStatistics(String metalake, List<MetadataObjectStatisticsUpdate> updates) {
         // Update partition statistics in your storage here
     }
 
     @Override
-    public Map<String, Map<String, StatisticValue<?>>> listPartitionStatistics(PartitionRange range) {
+    public List<PersistedPartitionStatistics> listStatistics(
+            String metalake, MetadataObject metadataObject, PartitionRange range) {
         // List partition statistics from your storage here
         return Maps.newHashMap();
     }
 
     @Override
-    public void dropPartitionStatistics(List<PartitionStatisticsDrop> drops) {
+    public int dropStatistics(String metalake, List<MetadataObjectStatisticsDrop> drops) {    
         // Drop partition statistics from your storage here
     }
 }
