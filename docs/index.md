@@ -186,6 +186,12 @@ Gravitino provides security configurations for Gravitino, including HTTPS, authe
 * [Access Control](./security/access-control.md): provides access control configurations.
 * [CORS](./security/how-to-use-cors.md): provides CORS configurations.
 
+### Gravitino MCP server
+
+Gravitino MCP server provides the ability to manage Gravitino metadata for AI tools.
+
+* [Gravitino MCP server](./gravitino-mcp-server.md): a complete guide to using the Gravitino MCP server.
+
 ### Programming guides
 
 * [Gravitino Open API](./api/rest/gravitino-rest-api): provides the complete Open API definition of Gravitino.
