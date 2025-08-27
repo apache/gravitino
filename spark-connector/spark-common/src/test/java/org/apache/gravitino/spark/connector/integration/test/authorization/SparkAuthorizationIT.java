@@ -118,6 +118,8 @@ public abstract class SparkAuthorizationIT extends BaseIT {
   @Override
   public void stopIntegrationTest() throws IOException, InterruptedException {
     containerSuite.close();
+    setEnv("SPARK_USER", AuthConstants.ANONYMOUS_USER);
+    // HADOOP_USER_NAME will be set by spark auto.
     setEnv("HADOOP_USER_NAME", AuthConstants.ANONYMOUS_USER);
     normalUserSparkSession.close();
     super.stopIntegrationTest();
@@ -170,7 +172,7 @@ public abstract class SparkAuthorizationIT extends BaseIT {
             .set(GravitinoSparkConfig.GRAVITINO_URI, gravitinoUri)
             .set(GravitinoSparkConfig.GRAVITINO_METALAKE, METALAKE)
             .set("spark.sql.session.timeZone", TIME_ZONE_UTC);
-    setEnv("HADOOP_USER_NAME", NORMAL_USER);
+    setEnv("SPARK_USER", NORMAL_USER);
     normalUserSparkSession =
         SparkSession.builder()
             .master("local[1]")
