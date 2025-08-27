@@ -87,6 +87,8 @@ Gravitino currently supports the following catalogs:
 * [**OceanBase catalog**](./jdbc-oceanbase-catalog.md)
 * [**StarRocks catalog**](./jdbc-starrocks-catalog.md)
 
+If you want to operate table and partition statistics, you can refer to the [document](./manage-statistics-in-gravitino.md).
+
 **Fileset catalogs:**
 
 * [**Fileset catalog**](./fileset-catalog.md)
