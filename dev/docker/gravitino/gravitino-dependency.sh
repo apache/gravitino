@@ -80,7 +80,7 @@ cp "${gravitino_staging_dir}/${pg_driver}" "${gravitino_package_dir}/catalogs/jd
 cp "${gravitino_staging_dir}/${pg_driver}" "${gravitino_package_dir}/catalogs/lakehouse-iceberg/libs/"
 cp "${gravitino_staging_dir}/${pg_driver}" "${gravitino_iceberg_rest_dir}"
 
-iceberg_version="1.6.1"
+iceberg_version="1.9.2"
 iceberg_aws_bundle="iceberg-aws-bundle-${iceberg_version}.jar"
 wget "https://repo1.maven.org/maven2/org/apache/iceberg/iceberg-aws-bundle/${iceberg_version}/${iceberg_aws_bundle}" -O "${gravitino_staging_dir}/${iceberg_aws_bundle}"
 cp "${gravitino_staging_dir}/${iceberg_aws_bundle}" "${gravitino_iceberg_rest_dir}"
@@ -99,16 +99,18 @@ mkdir -p "${gravitino_dir}/packages/gravitino/bin"
 cp "${gravitino_dir}/rewrite_gravitino_server_config.py" "${gravitino_dir}/packages/gravitino/bin/"
 cp "${gravitino_dir}/start-gravitino.sh" "${gravitino_dir}/packages/gravitino/bin/"
 
-# Copy the Aliyun, AWS, GCP and Azure bundles to the Fileset catalog libs
-cp ${gravitino_home}/bundles/aliyun-bundle/build/libs/*.jar "${gravitino_dir}/packages/gravitino/catalogs/fileset/libs"
-cp ${gravitino_home}/bundles/aws-bundle/build/libs/*.jar "${gravitino_dir}/packages/gravitino/catalogs/fileset/libs"
-cp ${gravitino_home}/bundles/gcp-bundle/build/libs/*.jar "${gravitino_dir}/packages/gravitino/catalogs/fileset/libs"
-cp ${gravitino_home}/bundles/azure-bundle/build/libs/*.jar "${gravitino_dir}/packages/gravitino/catalogs/fileset/libs"
+fileset_lib_dir="${gravitino_dir}/packages/gravitino/catalogs/fileset/libs"
 
-cp ${gravitino_home}/bundles/aws/build/libs/*.jar "${gravitino_iceberg_rest_dir}"
-cp ${gravitino_home}/bundles/gcp/build/libs/*.jar "${gravitino_iceberg_rest_dir}"
-cp ${gravitino_home}/bundles/azure/build/libs/*.jar "${gravitino_iceberg_rest_dir}"
-cp ${gravitino_home}/bundles/aliyun-bundle/build/libs/*.jar "${gravitino_iceberg_rest_dir}"
+# Copy the Aliyun, AWS, GCP and Azure bundles to the Fileset catalog libs
+find ${gravitino_home}/bundles/aliyun-bundle/build/libs/ -name 'gravitino-aliyun-bundle-*.jar' ! -name '*-empty.jar' -exec cp -v {} "${fileset_lib_dir}" \;
+find ${gravitino_home}/bundles/aws-bundle/build/libs/ -name 'gravitino-aws-*.jar' ! -name '*-empty.jar' -exec cp -v {} "${fileset_lib_dir}" \;
+find ${gravitino_home}/bundles/gcp-bundle/build/libs/ -name 'gravitino-gcp-*.jar' ! -name '*-empty.jar' -exec cp -v {} "${fileset_lib_dir}" \;
+find ${gravitino_home}/bundles/azure-bundle/build/libs/ -name 'gravitino-azure-*.jar' ! -name '*-empty.jar' -exec cp -v {} "${fileset_lib_dir}" \;
+
+find ${gravitino_home}/bundles/gcp/build/libs/ -name 'gravitino-gcp-*.jar' ! -name '*-empty.jar' -exec cp -v {} "${gravitino_iceberg_rest_dir}" \;
+find ${gravitino_home}/bundles/aws/build/libs/ -name 'gravitino-aws-*.jar' ! -name '*-empty.jar' -exec cp -v {} "${gravitino_iceberg_rest_dir}" \;
+find ${gravitino_home}/bundles/azure/build/libs/ -name 'gravitino-azure-*.jar' ! -name '*-empty.jar' -exec cp -v {} "${gravitino_iceberg_rest_dir}" \;
+find ${gravitino_home}/bundles/aliyun-bundle/build/libs/ -name 'gravitino-aliyun-bundle-*.jar' ! -name '*-empty.jar' -exec cp -v {} "${gravitino_iceberg_rest_dir}" \;
 
 download_gcs_connector
 

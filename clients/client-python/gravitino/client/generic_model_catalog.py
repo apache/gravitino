@@ -45,6 +45,7 @@ from gravitino.dto.responses.model_version_list_response import (
     ModelVersionListResponse,
 )
 from gravitino.dto.responses.model_version_response import ModelVersionResponse
+from gravitino.dto.responses.model_version_uri_response import ModelVersionUriResponse
 from gravitino.exceptions.handlers.model_error_handler import MODEL_ERROR_HANDLER
 from gravitino.name_identifier import NameIdentifier
 from gravitino.namespace import Namespace
@@ -450,20 +451,11 @@ class GenericModelCatalog(BaseSchemaCatalog):
             NoSuchModelException: If the model does not exist.
             ModelVersionAliasesAlreadyExistException: If the aliases of the model version already exist.
         """
-        self._check_model_ident(model_ident)
+        uris = {ModelVersion.URI_NAME_UNKNOWN: uri} if uri else {}
 
-        model_full_ident = self._model_full_identifier(model_ident)
-
-        request = ModelVersionLinkRequest(uri, comment, aliases, properties)
-        request.validate()
-
-        resp = self.rest_client.post(
-            f"{self._format_model_version_request_path(model_full_ident)}/versions",
-            request,
-            error_handler=MODEL_ERROR_HANDLER,
+        return self.link_model_version_with_multiple_uris(
+            model_ident, uris, aliases, comment, properties
         )
-        base_resp = BaseResponse.from_json(resp.body, infer_missing=True)
-        base_resp.validate()
 
     def link_model_version_with_multiple_uris(
         self,
@@ -491,7 +483,20 @@ class GenericModelCatalog(BaseSchemaCatalog):
             NoSuchModelException: If the model does not exist.
             ModelVersionAliasesAlreadyExistException: If the aliases of the model version already exist.
         """
-        raise NotImplementedError("Not supported yet")
+        self._check_model_ident(model_ident)
+
+        model_full_ident = self._model_full_identifier(model_ident)
+
+        request = ModelVersionLinkRequest(uris, comment, aliases, properties)
+        request.validate()
+
+        resp = self.rest_client.post(
+            f"{self._format_model_version_request_path(model_full_ident)}/versions",
+            request,
+            error_handler=MODEL_ERROR_HANDLER,
+        )
+        base_resp = BaseResponse.from_json(resp.body, infer_missing=True)
+        base_resp.validate()
 
     def get_model_version_uri(
         self, model_ident: NameIdentifier, version: int, uri_name: str = None
@@ -510,7 +515,25 @@ class GenericModelCatalog(BaseSchemaCatalog):
         Returns:
             The URI of the model version.
         """
-        raise NotImplementedError("Not supported yet")
+        self._check_model_ident(model_ident)
+
+        model_full_ident = self._model_full_identifier(model_ident)
+        params = {}
+        if uri_name is not None:
+            params["uriName"] = encode_string(uri_name)
+
+        resp = self.rest_client.get(
+            f"{self._format_model_version_request_path(model_full_ident)}/versions/{version}/uri",
+            params=params,
+            error_handler=MODEL_ERROR_HANDLER,
+        )
+
+        model_version_uri_resp = ModelVersionUriResponse.from_json(
+            resp.body, infer_missing=True
+        )
+        model_version_uri_resp.validate()
+
+        return model_version_uri_resp.uri()
 
     def get_model_version_uri_by_alias(
         self, model_ident: NameIdentifier, alias: str, uri_name: str = None
@@ -529,7 +552,25 @@ class GenericModelCatalog(BaseSchemaCatalog):
         Returns:
             The URI of the model version.
         """
-        raise NotImplementedError("Not supported yet")
+        self._check_model_ident(model_ident)
+
+        model_full_ident = self._model_full_identifier(model_ident)
+        params = {}
+        if uri_name is not None:
+            params["uriName"] = encode_string(uri_name)
+
+        resp = self.rest_client.get(
+            f"{self._format_model_version_request_path(model_full_ident)}/aliases/{encode_string(alias)}/uri",
+            params=params,
+            error_handler=MODEL_ERROR_HANDLER,
+        )
+
+        model_version_uri_resp = ModelVersionUriResponse.from_json(
+            resp.body, infer_missing=True
+        )
+        model_version_uri_resp.validate()
+
+        return model_version_uri_resp.uri()
 
     def delete_model_version(self, model_ident: NameIdentifier, version: int) -> bool:
         """Delete the model version from the catalog. If the model version does not exist, return false.
@@ -608,9 +649,10 @@ class GenericModelCatalog(BaseSchemaCatalog):
         Returns:
             The registered model object.
         """
-        model = self.register_model(ident, comment, properties)
-        self.link_model_version(ident, uri, aliases, comment, properties)
-        return model
+        uris = {ModelVersion.URI_NAME_UNKNOWN: uri} if uri else {}
+        return self.register_model_version_with_multiple_uris(
+            ident, uris, aliases, comment, properties
+        )
 
     def register_model_version_with_multiple_uris(
         self,
@@ -664,6 +706,7 @@ class GenericModelCatalog(BaseSchemaCatalog):
 
         raise ValueError(f"Unknown change type: {type(change).__name__}")
 
+    # pylint: disable=too-many-return-statements
     @staticmethod
     def to_model_version_update_request(change: ModelVersionChange):
         if isinstance(change, ModelVersionChange.UpdateComment):
@@ -683,7 +726,17 @@ class GenericModelCatalog(BaseSchemaCatalog):
 
         if isinstance(change, ModelVersionChange.UpdateUri):
             return ModelVersionUpdateRequest.UpdateModelVersionUriRequest(
-                change.new_uri()
+                change.new_uri(), change.uri_name()
+            )
+
+        if isinstance(change, ModelVersionChange.AddUri):
+            return ModelVersionUpdateRequest.AddModelVersionUriRequest(
+                change.uri_name(), change.uri()
+            )
+
+        if isinstance(change, ModelVersionChange.RemoveUri):
+            return ModelVersionUpdateRequest.RemoveModelVersionUriRequest(
+                change.uri_name()
             )
 
         if isinstance(change, ModelVersionChange.UpdateAliases):

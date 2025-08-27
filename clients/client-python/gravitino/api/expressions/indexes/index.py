@@ -18,7 +18,7 @@
 
 from abc import ABC, abstractmethod
 from enum import Enum, unique
-from typing import List
+from typing import List, Optional
 
 
 class Index(ABC):
@@ -60,11 +60,11 @@ class Index(ABC):
         pass  # pragma: no cover
 
     @abstractmethod
-    def name(self) -> str:
+    def name(self) -> Optional[str]:
         """Returns the name of the index.
 
         Returns:
-            str: The name of the index.
+            Optional[str]: The name of the index.
         """
         pass  # pragma: no cover
 

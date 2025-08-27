@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.catalog;
 
+import java.util.Collections;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -33,7 +34,7 @@ public final class EntityCombinedFileset implements Fileset {
   private final FilesetEntity filesetEntity;
 
   // Sets of properties that should be hidden from the user.
-  private Set<String> hiddenProperties;
+  private Set<String> hiddenProperties = Collections.emptySet();
 
   private EntityCombinedFileset(Fileset fileset, FilesetEntity filesetEntity) {
     this.fileset = fileset;
@@ -57,7 +58,7 @@ public final class EntityCombinedFileset implements Fileset {
   }
 
   public EntityCombinedFileset withHiddenProperties(Set<String> hiddenProperties) {
-    this.hiddenProperties = hiddenProperties;
+    this.hiddenProperties = hiddenProperties != null ? hiddenProperties : Collections.emptySet();
     return this;
   }
 

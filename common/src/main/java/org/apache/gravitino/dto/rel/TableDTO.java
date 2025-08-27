@@ -296,6 +296,8 @@ public class TableDTO implements Table {
     public TableDTO build() {
       Preconditions.checkArgument(name != null && !name.isEmpty(), "name cannot be null or empty");
       Preconditions.checkArgument(audit != null, "audit cannot be null");
+      Preconditions.checkArgument(
+          columns != null && columns.length > 0, "columns cannot be null or empty");
 
       return new TableDTO(
           name,

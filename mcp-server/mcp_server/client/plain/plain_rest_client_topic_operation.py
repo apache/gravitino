@@ -27,9 +27,7 @@ class PlainRESTClientTopicOperation(TopicOperation):
         self.metalake_name = metalake_name
         self.rest_client = rest_client
 
-    async def get_list_of_topics(
-        self, catalog_name: str, schema_name: str
-    ) -> str:
+    async def list_of_topics(self, catalog_name: str, schema_name: str) -> str:
         response = await self.rest_client.get(
             f"/api/metalakes/{self.metalake_name}/catalogs/{catalog_name}/schemas/{schema_name}/topics"
         )

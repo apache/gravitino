@@ -16,18 +16,13 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.trino.connector.system.storedprocdure;
+package org.apache.gravitino.stats.storage;
 
-import io.trino.spi.procedure.Procedure;
+import java.util.Map;
 
-/** Gravitino System stored procedure interfaces */
-public abstract class GravitinoStoredProcedure {
-
-  /**
-   * Return the definition of the stored procedure.
-   *
-   * @return the {@link Procedure} instance
-   * @throws Exception if creation of the procedure fails
-   */
-  public abstract Procedure createStoredProcedure() throws Exception;
+public class LancePartitionStatisticStorageFactory implements PartitionStatisticStorageFactory {
+  @Override
+  public PartitionStatisticStorage create(Map<String, String> properties) {
+    return new LancePartitionStatisticStorage(properties);
+  }
 }

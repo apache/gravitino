@@ -23,7 +23,7 @@ class PlainRESTClientFilesetOperation(FilesetOperation):
         self.metalake_name = metalake_name
         self.rest_client = rest_client
 
-    async def get_list_of_filesets(
+    async def list_of_filesets(
         self, catalog_name: str, schema_name: str
     ) -> str:
         response = await self.rest_client.get(

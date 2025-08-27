@@ -37,7 +37,7 @@ public class LinkModel extends Command {
   protected final String catalog;
   protected final String schema;
   protected final String model;
-  protected final String uri;
+  protected final Map<String, String> uris;
   protected final String[] alias;
   protected final String comment;
   protected final Map<String, String> properties;
@@ -50,7 +50,7 @@ public class LinkModel extends Command {
    * @param catalog The name of the catalog.
    * @param schema The name of schema.
    * @param model The name of model.
-   * @param uri The URI of the model version artifact.
+   * @param uris The URIs of the model version artifact.
    * @param alias The aliases of the model version.
    * @param comment The comment of the model version.
    * @param properties The properties of the model version.
@@ -61,7 +61,7 @@ public class LinkModel extends Command {
       String catalog,
       String schema,
       String model,
-      String uri,
+      Map<String, String> uris,
       String[] alias,
       String comment,
       Map<String, String> properties) {
@@ -70,7 +70,7 @@ public class LinkModel extends Command {
     this.catalog = catalog;
     this.schema = schema;
     this.model = model;
-    this.uri = uri;
+    this.uris = uris;
     this.alias = alias;
     this.comment = comment;
     this.properties = properties;
@@ -84,7 +84,7 @@ public class LinkModel extends Command {
     try {
       GravitinoClient client = buildClient(metalake);
       ModelCatalog modelCatalog = client.loadCatalog(catalog).asModelCatalog();
-      modelCatalog.linkModelVersion(name, uri, alias, comment, properties);
+      modelCatalog.linkModelVersion(name, uris, alias, comment, properties);
     } catch (NoSuchMetalakeException err) {
       exitWithError(ErrorMessages.UNKNOWN_METALAKE);
     } catch (NoSuchCatalogException err) {
@@ -100,12 +100,14 @@ public class LinkModel extends Command {
     }
 
     printResults(
-        "Linked model " + model + " to " + uri + " with aliases " + Arrays.toString(alias));
+        "Linked model " + model + " to " + uris + " with aliases " + Arrays.toString(alias));
   }
 
   @Override
   public Command validate() {
-    if (uri == null) exitWithError(ErrorMessages.MISSING_URI);
+    if (uris == null || uris.isEmpty()) {
+      exitWithError(ErrorMessages.MISSING_URIS);
+    }
     return super.validate();
   }
 }

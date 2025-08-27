@@ -24,6 +24,7 @@ import static org.junit.Assert.assertThrows;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -397,5 +398,29 @@ class TestRoleCommands {
         .newDeleteRole(any(CommandContext.class), eq("metalake_demo"), any());
     String output = new String(errContent.toByteArray(), StandardCharsets.UTF_8).trim();
     assertEquals(output, ErrorMessages.MISSING_ROLE);
+  }
+
+  @Test
+  void testRoleDetailsCommandNoSuchUserExceptionShowsUnknownRole() {
+    Main.useExit = false;
+    RoleDetails details =
+        spy(new RoleDetails(mock(CommandContext.class), "metalake_demo", "admin"));
+    doThrow(new org.apache.gravitino.exceptions.NoSuchRoleException("Unknown role."))
+        .when(details)
+        .handle();
+    when(mockCommandLine.hasOption(GravitinoOptions.METALAKE)).thenReturn(true);
+    when(mockCommandLine.getOptionValue(GravitinoOptions.METALAKE)).thenReturn("metalake_demo");
+    when(mockCommandLine.hasOption(GravitinoOptions.ROLE)).thenReturn(true);
+    when(mockCommandLine.getOptionValues(GravitinoOptions.ROLE)).thenReturn(new String[] {"admin"});
+    GravitinoCommandLine commandLine =
+        spy(
+            new GravitinoCommandLine(
+                mockCommandLine, mockOptions, CommandEntities.ROLE, CommandActions.DETAILS));
+    doReturn(details)
+        .when(commandLine)
+        .newRoleDetails(any(CommandContext.class), eq("metalake_demo"), eq("admin"));
+    doReturn(details).when(details).validate();
+    RuntimeException thrown = assertThrows(RuntimeException.class, commandLine::handleCommandLine);
+    assertEquals(org.apache.gravitino.cli.ErrorMessages.UNKNOWN_ROLE, thrown.getMessage());
   }
 }

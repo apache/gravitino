@@ -250,15 +250,13 @@ public interface ModelCatalog {
    * @throws NoSuchModelException If the model does not exist.
    * @throws ModelVersionAliasesAlreadyExistException If the aliases already exist in the model.
    */
-  default void linkModelVersion(
+  void linkModelVersion(
       NameIdentifier ident,
       Map<String, String> uris,
       String[] aliases,
       String comment,
       Map<String, String> properties)
-      throws NoSuchModelException, ModelVersionAliasesAlreadyExistException {
-    throw new UnsupportedOperationException("Not supported yet");
-  }
+      throws NoSuchModelException, ModelVersionAliasesAlreadyExistException;
 
   /**
    * Get the URI of the model artifact with a specified version number and URI name.
@@ -269,10 +267,8 @@ public interface ModelCatalog {
    * @throws NoSuchModelVersionException If the model version does not exist.
    * @return The URI of the model version.
    */
-  default String getModelVersionUri(NameIdentifier ident, int version, String uriName)
-      throws NoSuchModelVersionException, NoSuchModelVersionURINameException {
-    throw new UnsupportedOperationException("Not supported yet");
-  }
+  String getModelVersionUri(NameIdentifier ident, int version, String uriName)
+      throws NoSuchModelVersionException, NoSuchModelVersionURINameException;
 
   /**
    * Get the URI of the model artifact with a specified version alias and URI name.
@@ -283,10 +279,8 @@ public interface ModelCatalog {
    * @throws NoSuchModelVersionException If the model version does not exist.
    * @return The URI of the model version.
    */
-  default String getModelVersionUri(NameIdentifier ident, String alias, String uriName)
-      throws NoSuchModelVersionException, NoSuchModelVersionURINameException {
-    throw new UnsupportedOperationException("Not supported yet");
-  }
+  String getModelVersionUri(NameIdentifier ident, String alias, String uriName)
+      throws NoSuchModelVersionException, NoSuchModelVersionURINameException;
 
   /**
    * Delete the model version by the {@link NameIdentifier} and version number. If the model version
