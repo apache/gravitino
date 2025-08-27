@@ -67,18 +67,17 @@ import org.apache.gravitino.utils.PrincipalUtils;
 
 /** LancePartitionStatisticStorage is based on Lance format files. */
 public class LancePartitionStatisticStorage implements PartitionStatisticStorage {
-  private static final String LANCE_PREFIX = "lance.";
 
-  private static final String LOCATION = LANCE_PREFIX + "location";
+  private static final String LOCATION = "location";
   private static final String DEFAULT_LOCATION =
-      String.join(File.separator, System.getenv("GRAVITINO_HOME"), "data", "lance");;
-  private static final String MAX_ROWS_PER_FILE = LANCE_PREFIX + "maxRowsPerFile";
+      String.join(File.separator, System.getenv("GRAVITINO_HOME"), "data", "lance");
+  private static final String MAX_ROWS_PER_FILE = "maxRowsPerFile";
   private static final int DEFAULT_MAX_ROWS_PER_FILE = 1000000; // 10M
-  private static final String MAX_BYTES_PER_FILE = LANCE_PREFIX + "maxBytesPerFile";
+  private static final String MAX_BYTES_PER_FILE = "maxBytesPerFile";
   private static final int DEFAULT_MAX_BYTES_PER_FILE = 100 * 1024 * 1024; // 100 MB
-  private static final String MAX_ROWS_PER_GROUP = LANCE_PREFIX + "maxRowsPerGroup";
+  private static final String MAX_ROWS_PER_GROUP = "maxRowsPerGroup";
   private static final int DEFAULT_MAX_ROWS_PER_GROUP = 1000000; // 1M
-  private static final String READ_BATCH_SIZE = LANCE_PREFIX + "readBatchSize";
+  private static final String READ_BATCH_SIZE = "readBatchSize";
   private static final int DEFAULT_READ_BATCH_SIZE = 10000; // 10K
   // The schema is `table_id`, `partition_name`,  `statistic_name`, `statistic_value`, `audit_info`
   private static final String TABLE_ID_COLUMN = "table_id";
@@ -134,12 +133,7 @@ public class LancePartitionStatisticStorage implements PartitionStatisticStorage
             properties.getOrDefault(READ_BATCH_SIZE, String.valueOf(DEFAULT_READ_BATCH_SIZE)));
     Preconditions.checkArgument(
         readBatchSize > 0, "Lance partition statistics storage readBatchSize must be positive");
-    this.properties = Maps.newHashMap();
-    for (Map.Entry<String, String> entry : properties.entrySet()) {
-      if (entry.getKey().startsWith(LANCE_PREFIX)) {
-        this.properties.put(entry.getKey().substring(LANCE_PREFIX.length()), entry.getValue());
-      }
-    }
+    this.properties = properties;
   }
 
   @Override
