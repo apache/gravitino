@@ -19,9 +19,8 @@
 
 package org.apache.gravitino.utils;
 
-import org.apache.commons.lang3.StringUtils;
-
 import java.util.UUID;
+import org.apache.commons.lang3.StringUtils;
 
 /** Tools to generate random values. */
 public class RandomNameUtils {
