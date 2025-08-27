@@ -23,9 +23,10 @@ Gravitino will support build-in statistics in the future.
 
 ## Table Statistic operations
 
-### Update table statistics
+### Update metadata object statistics
 
-You can update the statistics of a table by providing the statistics key and value.
+You can update the statistics of a metadata object by providing the statistics key and value.
+Now only table statistics can be updated.
 
 The request path for REST API is `/api/metalakes/{metalake}/objects/{metadataObjectType}/{metadataObjectName}/statistics`.
 
@@ -55,9 +56,10 @@ table.updateStatistics(updateStatistics);
 </TabItem>
 </Tabs>
 
-### List statistics of tables
+### List statistics of metadata objects
 
-You can list all the statistics of a table.
+You can list all the statistics of a metadata object.
+Now only table statistics can be listed.
 
 The request path for REST API is `/api/metalakes/{metalake}/objects/{metadataObjectType}/{metadataObjectName}/statistics`.
 
@@ -81,9 +83,10 @@ table.listStatistics();
 </TabItem>
 </Tabs>
 
-### Drop statistics of tables
+### Drop statistics of metadata object
 
-You can drop the statistics of a table by providing the statistics keys.
+You can drop the statistics of a metadata object by providing the statistics keys.
+Now only table statistics can be dropped.
 
 The request path for REST API is `/api/metalakes/{metalake}/objects/{metadataObjectType}/{metadataObjectName}/statistics`.
 
@@ -115,7 +118,7 @@ table.dropStatistics(statisticsToDrop);
 
 You can update the statistics of a partition by providing the statistics key and value.
 
-The request path for REST API is `/api/metalakes/{metalake}/objects/{metadataObjectType}/{metadataObjectName}/statistics/partitions`.
+The request path for REST API is `/api/metalakes/{metalake}/objects/table/{metadataObjectName}/statistics/partitions`.
 
 <Tabs groupId='language' queryString>
 <TabItem value="shell" label="Shell">
@@ -155,7 +158,7 @@ You can list the statistics of specified partitions.
 You can specify a range of partitions by providing the `from` and `to` parameters,
 and whether the range is inclusive or not using `fromInclusive` and `toInclusive` parameters.
 
-The request path for REST API is `/api/metalakes/{metalake}/objects/{metadataObjectType}/{metadataObjectName}/statistics/partitions`.
+The request path for REST API is `/api/metalakes/{metalake}/objects/table/{metadataObjectName}/statistics/partitions`.
 
 <Tabs groupId='language' queryString>
 <TabItem value="shell" label="Shell">
