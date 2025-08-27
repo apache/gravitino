@@ -1000,11 +1000,11 @@ public class TestableCommandLine {
       String catalog,
       String schema,
       String model,
-      String uri,
+      Map<String, String> uris,
       String[] alias,
       String comment,
       Map<String, String> properties) {
     return new LinkModel(
-        context, metalake, catalog, schema, model, uri, alias, comment, properties);
+        context, metalake, catalog, schema, model, uris, alias, comment, properties);
   }
 }
