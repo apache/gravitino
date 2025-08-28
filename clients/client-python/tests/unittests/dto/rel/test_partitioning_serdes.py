@@ -351,3 +351,124 @@ class TestPartitioningSerdes(unittest.TestCase):
             expected_serialized[PartitioningSerdes.ASSIGNMENTS_NAME],
             serialized[PartitioningSerdes.ASSIGNMENTS_NAME],
         )
+
+    def test_serdes_range_partitioning_dto_invalid_assignments(self):
+        json_string = f"""
+        {{
+            "{PartitioningSerdes.STRATEGY}": "{Partitioning.Strategy.RANGE.value}",
+            "{PartitioningSerdes.FIELD_NAME}": {json.dumps(TestPartitioningSerdes.field_name)},
+            "{PartitioningSerdes.ASSIGNMENTS_NAME}": "invalid_assignments"
+        }}
+        """
+        with self.assertRaisesRegex(
+            IllegalArgumentException,
+            "Cannot parse range partitioning from non-array assignments",
+        ):
+            PartitioningSerdes.deserialize(json.loads(json_string))
+
+    def test_serdes_range_partitioning_dto_invalid_range_assignment(self):
+        json_string = f"""
+        {{
+            "{PartitioningSerdes.STRATEGY}": "{Partitioning.Strategy.RANGE.value}",
+            "{PartitioningSerdes.FIELD_NAME}": {json.dumps(TestPartitioningSerdes.field_name)},
+            "{PartitioningSerdes.ASSIGNMENTS_NAME}": [
+                {{
+                    "{PartitioningSerdes.PARTITION_TYPE}": "list",
+                    "{PartitioningSerdes.PARTITION_NAME}": "p202204_California",
+                    "{PartitioningSerdes.PARTITION_PROPERTIES}": {{}},
+                    "{PartitioningSerdes.LIST_PARTITION_LISTS}": [
+                        [
+                            {{
+                                "{PartitioningSerdes.TYPE}": "literal",
+                                "{PartitioningSerdes.DATA_TYPE}": "date",
+                                "{PartitioningSerdes.LITERAL_VALUE}": "2022-04-01"
+                            }},
+                            {{
+                                "{PartitioningSerdes.TYPE}": "literal",
+                                "{PartitioningSerdes.DATA_TYPE}": "string",
+                                "{PartitioningSerdes.LITERAL_VALUE}": "Los Angeles"
+                            }}
+                        ]
+                    ]
+                }}
+            ]
+        }}
+        """
+        with self.assertRaisesRegex(
+            IllegalArgumentException,
+            "Cannot parse range partitioning from non-range assignment",
+        ):
+            PartitioningSerdes.deserialize(json.loads(json_string))
+
+    def test_serdes_range_partitioning_dto(self):
+        json_string = f"""
+        {{
+            "{PartitioningSerdes.STRATEGY}": "{Partitioning.Strategy.RANGE.value}",
+            "{PartitioningSerdes.FIELD_NAME}": {json.dumps(TestPartitioningSerdes.field_name)}
+        }}
+        """
+
+        expected_serialized = json.loads(json_string)
+        deserialized = PartitioningSerdes.deserialize(expected_serialized)
+
+        self.assertEqual(Partitioning.Strategy.RANGE.name.lower(), deserialized.name())
+        self.assertEqual(
+            Partitioning.Strategy.RANGE.value, deserialized.strategy().value
+        )
+        self.assertListEqual(
+            TestPartitioningSerdes.field_name, deserialized.field_name()
+        )
+
+        serialized = PartitioningSerdes.serialize(deserialized)
+        self.assertEqual(
+            expected_serialized[PartitioningSerdes.STRATEGY],
+            serialized[PartitioningSerdes.STRATEGY],
+        )
+        self.assertListEqual(
+            expected_serialized[PartitioningSerdes.FIELD_NAME],
+            serialized[PartitioningSerdes.FIELD_NAME],
+        )
+        self.assertEqual(
+            [],
+            serialized[PartitioningSerdes.ASSIGNMENTS_NAME],
+        )
+
+        json_string = f"""
+        {{
+            "{PartitioningSerdes.STRATEGY}": "{Partitioning.Strategy.RANGE.value}",
+            "{PartitioningSerdes.FIELD_NAME}": {json.dumps(TestPartitioningSerdes.field_name)},
+            "{PartitioningSerdes.ASSIGNMENTS_NAME}": [
+                {{
+                    "{PartitioningSerdes.PARTITION_TYPE}": "range",
+                    "{PartitioningSerdes.PARTITION_NAME}": "p20200321",
+                    "{PartitioningSerdes.RANGE_PARTITION_UPPER}": {{
+                        "{PartitioningSerdes.TYPE}": "literal",
+                        "{PartitioningSerdes.DATA_TYPE}": "date",
+                        "{PartitioningSerdes.LITERAL_VALUE}": "2020-03-21"
+                    }},
+                    "{PartitioningSerdes.RANGE_PARTITION_LOWER}": {{
+                        "{PartitioningSerdes.TYPE}": "literal",
+                        "{PartitioningSerdes.DATA_TYPE}": "null",
+                        "{PartitioningSerdes.LITERAL_VALUE}": "null"
+                    }},
+                    "{PartitioningSerdes.PARTITION_PROPERTIES}": {{"key": "value"}}
+                }}
+            ]
+        }}
+        """
+
+        expected_serialized = json.loads(json_string)
+        deserialized = PartitioningSerdes.deserialize(expected_serialized)
+        serialized = PartitioningSerdes.serialize(deserialized)
+        self.assertEqual(
+            expected_serialized[PartitioningSerdes.STRATEGY],
+            serialized[PartitioningSerdes.STRATEGY],
+        )
+        self.assertListEqual(
+            expected_serialized[PartitioningSerdes.FIELD_NAME],
+            serialized[PartitioningSerdes.FIELD_NAME],
+        )
+        self.assertEqual(
+            expected_serialized[PartitioningSerdes.ASSIGNMENTS_NAME],
+            serialized[PartitioningSerdes.ASSIGNMENTS_NAME],
+        )
