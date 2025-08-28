@@ -167,7 +167,7 @@ public class CaffeineEntityCache extends BaseEntityCache {
       NameIdentifier ident, Entity.EntityType type, SupportsRelationOperations.Type relType) {
     checkArguments(ident, type, relType);
 
-    return withLock(() -> invalidateEntities(ident));
+    return withLock(() -> invalidateEntities(ident, type, Optional.of(relType)));
   }
 
   /** {@inheritDoc} */
@@ -175,7 +175,7 @@ public class CaffeineEntityCache extends BaseEntityCache {
   public boolean invalidate(NameIdentifier ident, Entity.EntityType type) {
     checkArguments(ident, type);
 
-    return withLock(() -> invalidateEntities(ident));
+    return withLock(() -> invalidateEntities(ident, type, Optional.empty()));
   }
 
   /** {@inheritDoc} */
@@ -431,10 +431,28 @@ public class CaffeineEntityCache extends BaseEntityCache {
    *
    * @param identifier The identifier of the entity to invalidate
    */
-  private boolean invalidateEntities(NameIdentifier identifier) {
+  private boolean invalidateEntities(
+      NameIdentifier identifier,
+      Entity.EntityType type,
+      Optional<SupportsRelationOperations.Type> relTypeOpt) {
     Queue<EntityCacheKey> queue = new ArrayDeque<>();
 
-    cacheIndex.getValuesForKeysStartingWith(identifier.toString()).forEach(queue::offer);
+    EntityCacheKey valueForExactKey;
+    if (relTypeOpt.isEmpty()) {
+      valueForExactKey =
+          cacheIndex.getValueForExactKey(EntityCacheRelationKey.of(identifier, type).toString());
+    } else {
+      valueForExactKey =
+          cacheIndex.getValueForExactKey(
+              EntityCacheRelationKey.of(identifier, type, relTypeOpt.get()).toString());
+    }
+
+    if (valueForExactKey == null) {
+      // no key to remove
+      return false;
+    }
+
+    queue.offer(valueForExactKey);
 
     while (!queue.isEmpty()) {
       EntityCacheKey currentKeyToRemove = queue.poll();
@@ -442,14 +460,17 @@ public class CaffeineEntityCache extends BaseEntityCache {
       cacheData.invalidate(currentKeyToRemove);
       cacheIndex.remove(currentKeyToRemove.toString());
 
+      List<EntityCacheKey> relatedEntityKeysToRemove =
+          Lists.newArrayList(
+              cacheIndex.getValuesForKeysStartingWith(currentKeyToRemove.toString()));
+      relatedEntityKeysToRemove.forEach(queue::offer);
+
       // look up from reverse index to go to next depth
       List<EntityCacheKey> reverseKeysToRemove =
-          Lists.newArrayList(reverseIndex.getValuesForKeysStartingWith(identifier.toString()));
+          Lists.newArrayList(
+              reverseIndex.getValuesForKeysStartingWith(currentKeyToRemove.toString()));
       reverseKeysToRemove.forEach(
           key -> {
-            // If the key is the same as the entity key, we can remove it from the cache.
-            //                  cacheData.invalidate(key);
-            //                  cacheIndex.remove(key.toString());
             // Remove from reverse index
             // Convert EntityCacheRelationKey to EntityCacheKey
             EntityCacheKey reverseKey = EntityCacheKey.of(key.identifier(), key.entityType());
@@ -462,12 +483,6 @@ public class CaffeineEntityCache extends BaseEntityCache {
           });
 
       reverseKeysToRemove.forEach(queue::offer);
-
-      List<EntityCacheKey> relatedEntityKeysToRemove =
-          Lists.newArrayList(
-              cacheIndex.getValuesForKeysStartingWith(currentKeyToRemove.toString()));
-
-      relatedEntityKeysToRemove.forEach(queue::offer);
     }
 
     return true;
