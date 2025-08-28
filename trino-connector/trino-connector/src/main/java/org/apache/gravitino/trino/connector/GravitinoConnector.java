@@ -65,10 +65,11 @@ public class GravitinoConnector implements Connector {
   public ConnectorTransactionHandle beginTransaction(
       IsolationLevel isolationLevel, boolean readOnly, boolean autoCommit) {
     Connector internalConnector = catalogConnectorContext.getInternalConnector();
+    Preconditions.checkNotNull(internalConnector, "Internal connector must not be null");
 
     ConnectorTransactionHandle internalTransactionHandler =
         internalConnector.beginTransaction(isolationLevel, readOnly, autoCommit);
-    Preconditions.checkNotNull(internalConnector);
+    Preconditions.checkNotNull(internalTransactionHandler, "Transaction handler must not be null");
 
     return new GravitinoTransactionHandle(internalTransactionHandler);
   }
