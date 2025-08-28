@@ -30,28 +30,25 @@ import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.ThreadFactory;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.client.GravitinoClient;
+import org.apache.gravitino.file.Fileset;
 import org.apache.gravitino.file.FilesetCatalog;
 
 /** A cache for fileset catalogs. */
-public class FilesetCatalogCache implements Closeable {
+public class FilesetMetadataCache implements Closeable {
 
   private final GravitinoClient client;
   private final Cache<NameIdentifier, FilesetCatalog> catalogCache;
-
-  // Since Caffeine does not ensure that removalListener will be involved after expiration
-  // We use a scheduler with one thread to clean up expired clients.
-  private final ScheduledThreadPoolExecutor catalogCleanScheduler;
+  private final Cache<NameIdentifier, Fileset> filesetCache;
 
   /**
-   * Creates a new instance of {@link FilesetCatalogCache}.
+   * Creates a new instance of {@link FilesetMetadataCache}.
    *
    * @param client the Gravitino client.
    */
-  public FilesetCatalogCache(GravitinoClient client) {
+  public FilesetMetadataCache(GravitinoClient client) {
     this.client = client;
-    this.catalogCleanScheduler =
-        new ScheduledThreadPoolExecutor(1, newDaemonThreadFactory("gvfs-catalog-cache-cleaner"));
-    this.catalogCache = newCatalogCache(catalogCleanScheduler);
+    this.catalogCache = newCatalogCache();
+    this.filesetCache = newFilesetCache();
   }
 
   /**
@@ -70,13 +67,46 @@ public class FilesetCatalogCache implements Closeable {
     return filesetCatalog;
   }
 
-  private Cache<NameIdentifier, FilesetCatalog> newCatalogCache(
-      ScheduledThreadPoolExecutor catalogCleanScheduler) {
+  /**
+   * Gets the fileset by the given fileset identifier.
+   *
+   * @param filesetIdent the fileset identifier.
+   * @return the fileset.
+   */
+  public Fileset getFileset(NameIdentifier filesetIdent) {
+    NameIdentifier catalogIdent =
+        NameIdentifier.of(filesetIdent.namespace().level(0), filesetIdent.namespace().level(1));
+    FilesetCatalog filesetCatalog = getFilesetCatalog(catalogIdent);
+    return filesetCache.get(
+        filesetIdent,
+        ident ->
+            filesetCatalog.loadFileset(
+                NameIdentifier.of(filesetIdent.namespace().level(2), filesetIdent.name())));
+  }
+
+  private Cache<NameIdentifier, FilesetCatalog> newCatalogCache() {
     // In most scenarios, it will not read so many catalog filesets at the same time, so we can just
     // set a default value for this cache.
     return Caffeine.newBuilder()
         .maximumSize(100)
-        .scheduler(Scheduler.forScheduledExecutorService(catalogCleanScheduler))
+        // Since Caffeine does not ensure that removalListener will be involved after expiration
+        // We use a scheduler with one thread to clean up expired catalogs.
+        .scheduler(
+            Scheduler.forScheduledExecutorService(
+                new ScheduledThreadPoolExecutor(
+                    1, newDaemonThreadFactory("gvfs-catalog-cache-cleaner"))))
+        .build();
+  }
+
+  private Cache<NameIdentifier, Fileset> newFilesetCache() {
+    return Caffeine.newBuilder()
+        .maximumSize(10000)
+        // Since Caffeine does not ensure that removalListener will be involved after expiration
+        // We use a scheduler with one thread to clean up expired filesets.
+        .scheduler(
+            Scheduler.forScheduledExecutorService(
+                new ScheduledThreadPoolExecutor(
+                    1, newDaemonThreadFactory("gvfs-fileset-cache-cleaner"))))
         .build();
   }
 
@@ -87,6 +117,7 @@ public class FilesetCatalogCache implements Closeable {
   @Override
   public void close() throws IOException {
     catalogCache.invalidateAll();
+    filesetCache.invalidateAll();
     // close the client
     try {
       if (client != null) {
@@ -95,6 +126,5 @@ public class FilesetCatalogCache implements Closeable {
     } catch (Exception e) {
       // ignore
     }
-    catalogCleanScheduler.shutdownNow();
   }
 }
