@@ -80,6 +80,7 @@ import org.apache.gravitino.metrics.MetricsSystem;
 import org.apache.gravitino.metrics.source.JVMMetricsSource;
 import org.apache.gravitino.policy.PolicyDispatcher;
 import org.apache.gravitino.policy.PolicyManager;
+import org.apache.gravitino.stats.StatisticManager;
 import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.tag.TagDispatcher;
@@ -146,6 +147,7 @@ public class GravitinoEnv {
   private OwnerDispatcher ownerDispatcher;
   private FutureGrantManager futureGrantManager;
   private GravitinoAuthorizer gravitinoAuthorizer;
+  private StatisticManager statisticManager;
 
   protected GravitinoEnv() {}
 
@@ -413,6 +415,10 @@ public class GravitinoEnv {
     return jobOperationDispatcher;
   }
 
+  public StatisticManager statisticManager() {
+    return statisticManager;
+  }
+
   public void start() {
     metricsSystem.start();
     eventListenerManager.start();
@@ -463,6 +469,14 @@ public class GravitinoEnv {
         jobOperationDispatcher = null;
       } catch (Exception e) {
         LOG.warn("Failed to close JobOperationDispatcher", e);
+      }
+    }
+
+    if (statisticManager != null) {
+      try {
+        statisticManager.close();
+      } catch (Exception e) {
+        LOG.warn("Failed to close StatisticManager", e);
       }
     }
 
@@ -557,6 +571,7 @@ public class GravitinoEnv {
     ModelNormalizeDispatcher modelNormalizeDispatcher =
         new ModelNormalizeDispatcher(modelHookDispatcher, catalogManager);
     this.modelDispatcher = new ModelEventDispatcher(eventBus, modelNormalizeDispatcher);
+    this.statisticManager = new StatisticManager(entityStore, idGenerator, config);
 
     // Create and initialize access control related modules
     boolean enableAuthorization = config.get(Configs.ENABLE_AUTHORIZATION);

@@ -58,7 +58,6 @@ import org.apache.gravitino.dto.messaging.TopicDTO;
 import org.apache.gravitino.dto.model.ModelDTO;
 import org.apache.gravitino.dto.model.ModelVersionDTO;
 import org.apache.gravitino.dto.policy.PolicyContentDTO;
-import org.apache.gravitino.dto.policy.PolicyDTO;
 import org.apache.gravitino.dto.rel.ColumnDTO;
 import org.apache.gravitino.dto.rel.DistributionDTO;
 import org.apache.gravitino.dto.rel.SortOrderDTO;
@@ -84,6 +83,7 @@ import org.apache.gravitino.dto.rel.partitions.IdentityPartitionDTO;
 import org.apache.gravitino.dto.rel.partitions.ListPartitionDTO;
 import org.apache.gravitino.dto.rel.partitions.PartitionDTO;
 import org.apache.gravitino.dto.rel.partitions.RangePartitionDTO;
+import org.apache.gravitino.dto.stats.StatisticDTO;
 import org.apache.gravitino.dto.tag.MetadataObjectDTO;
 import org.apache.gravitino.dto.tag.TagDTO;
 import org.apache.gravitino.file.FileInfo;
@@ -94,7 +94,6 @@ import org.apache.gravitino.job.SparkJobTemplate;
 import org.apache.gravitino.messaging.Topic;
 import org.apache.gravitino.model.Model;
 import org.apache.gravitino.model.ModelVersion;
-import org.apache.gravitino.policy.Policy;
 import org.apache.gravitino.policy.PolicyContent;
 import org.apache.gravitino.policy.PolicyContents;
 import org.apache.gravitino.rel.Column;
@@ -119,6 +118,7 @@ import org.apache.gravitino.rel.partitions.Partition;
 import org.apache.gravitino.rel.partitions.Partitions;
 import org.apache.gravitino.rel.partitions.RangePartition;
 import org.apache.gravitino.rel.types.Types;
+import org.apache.gravitino.stats.Statistic;
 import org.apache.gravitino.tag.Tag;
 
 /** Utility class for converting between DTOs and domain objects. */
@@ -537,31 +537,6 @@ public class DTOConverters {
   }
 
   /**
-   * Converts a Policy to a PolicyDTO.
-   *
-   * @param policy The policy to be converted.
-   * @param inherited The inherited flag.
-   * @return The policy DTO.
-   */
-  public static PolicyDTO toDTO(Policy policy, Optional<Boolean> inherited) {
-    PolicyDTO.Builder builder =
-        PolicyDTO.builder()
-            .withName(policy.name())
-            .withComment(policy.comment())
-            .withPolicyType(policy.policyType())
-            .withEnabled(policy.enabled())
-            .withExclusive(policy.exclusive())
-            .withInheritable(policy.inheritable())
-            .withSupportedObjectTypes(policy.supportedObjectTypes())
-            .withContent(toDTO(policy.content()))
-            .withInherited(inherited)
-            .withAudit(toDTO(policy.auditInfo()))
-            .withInherited(inherited);
-
-    return builder.build();
-  }
-
-  /**
    * Converts a PolicyContent to a PolicyContentDTO.
    *
    * @param policyContent The policyContent to be converted.
@@ -580,6 +555,7 @@ public class DTOConverters {
       PolicyContents.CustomContent customContent = (PolicyContents.CustomContent) policyContent;
       return PolicyContentDTO.CustomContentDTO.builder()
           .withCustomRules(customContent.customRules())
+          .withSupportedObjectTypes(customContent.supportedObjectTypes())
           .withProperties(customContent.properties())
           .build();
     }
@@ -744,7 +720,7 @@ public class DTOConverters {
         .withVersion(modelVersion.version())
         .withComment(modelVersion.comment())
         .withAliases(modelVersion.aliases())
-        .withUri(modelVersion.uri())
+        .withUris(modelVersion.uris())
         .withProperties(modelVersion.properties())
         .withAudit(toDTO(modelVersion.auditInfo()))
         .build();
@@ -865,6 +841,30 @@ public class DTOConverters {
       return new GroupDTO[0];
     }
     return Arrays.stream(groups).map(DTOConverters::toDTO).toArray(GroupDTO[]::new);
+  }
+
+  /**
+   * Converts an array of statistics to an array of StatisticDTOs.
+   *
+   * @param statistics The statistics to be converted.
+   * @return The array of StatisticDTOs.
+   */
+  public static StatisticDTO[] toDTOs(Statistic[] statistics) {
+    if (ArrayUtils.isEmpty(statistics)) {
+      return new StatisticDTO[0];
+    }
+
+    return Arrays.stream(statistics)
+        .map(
+            statistic ->
+                StatisticDTO.builder()
+                    .withName(statistic.name())
+                    .withValue(statistic.value())
+                    .withModifiable(statistic.modifiable())
+                    .withReserved(statistic.reserved())
+                    .withAudit(toDTO(statistic.auditInfo()))
+                    .build())
+        .toArray(StatisticDTO[]::new);
   }
 
   /**
@@ -1259,7 +1259,10 @@ public class DTOConverters {
     if (policyContentDTO instanceof PolicyContentDTO.CustomContentDTO) {
       PolicyContentDTO.CustomContentDTO customContentDTO =
           (PolicyContentDTO.CustomContentDTO) policyContentDTO;
-      return PolicyContents.custom(customContentDTO.customRules(), customContentDTO.properties());
+      return PolicyContents.custom(
+          customContentDTO.customRules(),
+          customContentDTO.supportedObjectTypes(),
+          customContentDTO.properties());
     }
 
     throw new IllegalArgumentException(

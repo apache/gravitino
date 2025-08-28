@@ -114,7 +114,9 @@ public class UpdateModelVersionAliases extends Command {
     if (alias != null && version != null) {
       exitWithError("Cannot specify both alias and version");
     }
-
+    if (alias == null && version == null) {
+      exitWithError("Either alias or version must be specified");
+    }
     return this;
   }
 }

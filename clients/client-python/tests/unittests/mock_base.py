@@ -42,7 +42,9 @@ def mock_load_metalake():
         _properties={"k": "v"},
         _audit=audit_dto,
     )
-    return GravitinoMetalake(metalake_dto)
+    return GravitinoMetalake(
+        metalake_dto, HTTPClient("http://localhost:9090", is_debug=True)
+    )
 
 
 def mock_load_catalog(name: str):

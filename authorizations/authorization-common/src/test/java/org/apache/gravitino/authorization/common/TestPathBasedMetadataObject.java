@@ -54,25 +54,56 @@ public class TestPathBasedMetadataObject {
     PathBasedMetadataObject pathBasedMetadataObject1 =
         new PathBasedMetadataObject("parent", "name", "path", PathBasedMetadataObject.FILESET_PATH);
     Assertions.assertEquals(
-        "MetadataObject: [fullName=parent.name],  [path=path], [type=PATH]",
+        "MetadataObject: [fullName=parent.name],  [path=path], [type=PATH], [recursive=true]",
         pathBasedMetadataObject1.toString());
 
     PathBasedMetadataObject pathBasedMetadataObject2 =
         new PathBasedMetadataObject("parent", "name", null, PathBasedMetadataObject.FILESET_PATH);
     Assertions.assertEquals(
-        "MetadataObject: [fullName=parent.name],  [path=null], [type=PATH]",
+        "MetadataObject: [fullName=parent.name],  [path=null], [type=PATH], [recursive=true]",
         pathBasedMetadataObject2.toString());
 
     PathBasedMetadataObject pathBasedMetadataObject3 =
         new PathBasedMetadataObject(null, "name", null, PathBasedMetadataObject.FILESET_PATH);
     Assertions.assertEquals(
-        "MetadataObject: [fullName=name],  [path=null], [type=PATH]",
+        "MetadataObject: [fullName=name],  [path=null], [type=PATH], [recursive=true]",
         pathBasedMetadataObject3.toString());
 
     PathBasedMetadataObject pathBasedMetadataObject4 =
         new PathBasedMetadataObject(null, "name", "path", PathBasedMetadataObject.FILESET_PATH);
     Assertions.assertEquals(
-        "MetadataObject: [fullName=name],  [path=path], [type=PATH]",
+        "MetadataObject: [fullName=name],  [path=path], [type=PATH], [recursive=true]",
         pathBasedMetadataObject4.toString());
+
+    PathBasedMetadataObject pathBasedMetadataObject5 =
+        new PathBasedMetadataObject(
+            null, "name", "path", PathBasedMetadataObject.FILESET_PATH, false);
+    Assertions.assertEquals(
+        "MetadataObject: [fullName=name],  [path=path], [type=PATH], [recursive=false]",
+        pathBasedMetadataObject5.toString());
+  }
+
+  @Test
+  void testRecursiveFlagAffectsEquality() {
+    PathBasedMetadataObject recursiveObject =
+        new PathBasedMetadataObject(
+            "parent", "name", "path", PathBasedMetadataObject.FILESET_PATH, true);
+    PathBasedMetadataObject nonRecursiveObject =
+        new PathBasedMetadataObject(
+            "parent", "name", "path", PathBasedMetadataObject.FILESET_PATH, false);
+
+    Assertions.assertNotEquals(recursiveObject, nonRecursiveObject);
+    Assertions.assertNotEquals(recursiveObject.hashCode(), nonRecursiveObject.hashCode());
+  }
+
+  @Test
+  public void testEqualsWithDifferentRecursive() {
+    PathBasedMetadataObject recursiveObject =
+        new PathBasedMetadataObject(
+            "parent", "name", "path", PathBasedMetadataObject.FILESET_PATH, true);
+    PathBasedMetadataObject recursiveObject2 =
+        new PathBasedMetadataObject(
+            "parent", "name", "path", PathBasedMetadataObject.FILESET_PATH, true);
+    Assertions.assertEquals(recursiveObject, recursiveObject2);
   }
 }

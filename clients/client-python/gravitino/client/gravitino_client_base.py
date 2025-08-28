@@ -57,9 +57,13 @@ class GravitinoClientBase:
         check_version: bool = True,
         auth_data_provider: AuthDataProvider = None,
         request_headers: dict = None,
+        client_config: dict = None,
     ):
         self._rest_client = HTTPClient(
-            uri, auth_data_provider=auth_data_provider, request_headers=request_headers
+            uri,
+            auth_data_provider=auth_data_provider,
+            request_headers=request_headers,
+            client_config=client_config,
         )
         if check_version:
             self.check_version()
@@ -98,10 +102,10 @@ class GravitinoClientBase:
         server_version = self.get_server_version()
         client_version = self.get_client_version()
 
-        if client_version > server_version:
+        if not client_version.compatible_with_server_version(server_version):
             raise GravitinoRuntimeException(
                 "Gravitino does not support the case that "
-                "the client-side version is higher than the server-side version."
+                "the client-side major version is higher than the server-side version."
                 f"The client version is {client_version.version()}, and the server version {server_version.version()}"
             )
 

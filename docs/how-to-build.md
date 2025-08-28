@@ -12,14 +12,14 @@ license: "This software is licensed under the Apache License version 2."
 
 + Linux or macOS operating system
 + Git
-+ A Java Development Kit, version 8 to 17, installed in your environment to launch Gradle
++ A Java Development Kit, version 17, installed in your environment to launch Gradle
 + Python 3.8, 3.9, 3.10, 3.11, or 3.12 to build the Gravitino Python client
 + Optionally, Docker to run integration tests
 
 :::info Please read the following notes before trying to build Gravitino.
 
-+ Gravitino requires a minimum of JDK8 and supports up to JDK17 to run Gradle, so you need to install a JDK, version 8 to 17, to launch the build environment.
-+ Gravitino itself supports using JDK 8, 11, or 17 to build. The Gravitino Trino connector uses JDK17 to build (to avoid vendor-related issues on some platforms, Gravitino uses the specified Amazon Corretto OpenJDK 17 to build the Trino connector on macOS).
++ Gravitino requires a minimum of JDK17 to run Gradle, so you need to install a JDK17 to launch the build environment.
++ Gravitino itself supports using JDK 17 to build. The Gravitino Trino connector uses JDK17 to build (to avoid vendor-related issues on some platforms, It's recommended to use Amazon Corretto OpenJDK 17 to build Gravitino on macOS).
  You don't have to preinstall the specified JDK environment, as Gradle detects the JDK version needed and downloads it automatically.
 + Gravitino uses the Gradle Java Toolchain to detect and manage JDK versions, and it checks the installed JDK by running the `./gradlew javaToolchains` command. See [Gradle Java Toolchain](https://docs.gradle.org/current/userguide/toolchains.html#sec:java_toolchain).
 + Gravitino excludes all Docker-related tests by default. To run Docker-related tests, make sure you have installed Docker in your environment and either (1) set `skipDockerTests=false` in the `gradle.properties` file (or use `-PskipDockerTests=false` in the command) or (2) `export SKIP_DOCKER_TESTS=false` in the shell. Otherwise, all tests requiring Docker will be skipped.
@@ -43,18 +43,6 @@ license: "This software is licensed under the Apache License version 2."
    ```shell
    cd gravitino
    ./gradlew build
-   ```
-
-   The default specified JDK version is 8, but if you want to use JDK 11 or 17 to build, modify the property `jdkVersion` to 11 or 17 in the `gradle.properties` file, or specify the version with `-P`, like:
-
-   ```shell
-   ./gradlew build -PjdkVersion=11
-   ```
-
-   Or:
-
-   ```shell
-   ./gradlew build -PjdkVersion=17
    ```
 
   The `./gradlew build` command builds all the Gravitino components, including the Gravitino server, Java and Python clients, Trino and Spark connectors, and more.
@@ -100,7 +88,7 @@ license: "This software is licensed under the Apache License version 2."
  
   You can add `-x test` to skip the tests using `./gradlew build -x test`.
 
-  The built Gravitino libraries are Java 8 compatible and verified under the Java 8, 11, and 17 environments. You can use Java 8, 11, or 17 runtimes to run the Gravitino server, no matter which JDK version was used to build the project.
+  The built Gravitino libraries are Java 17 compatible and verified under 17 environments. You can use Java 17 runtimes to run the Gravitino server, no matter which JDK version was used to build the project.
 
   The built jars are under the modules `build/libs` directory. You can publish them in your Maven repository for use in your project.
   :::
@@ -177,7 +165,7 @@ sudo apt install apt-transport-https ca-certificates curl software-properties-co
 
 Updating the package list ensures you have the latest information on the newest versions of packages and dependencies. Installing the necessary packages lets your system download and manage additional software securely.
 
-### Download and setup Java SDK 17 (11 or 8 also works)
+### Download and setup Java SDK 17
 
 **On Ubuntu (WSL):**
 
@@ -187,10 +175,10 @@ Updating the package list ensures you have the latest information on the newest 
    vim ~/.bashrc
    ```
 
-2. Add the following lines at the end of the file. Replace `/usr/lib/jvm/java-11-openjdk-amd64` with your actual Java installation path:
+2. Add the following lines at the end of the file. Replace `/usr/lib/jvm/java-17-openjdk-amd64` with your actual Java installation path:
 
    ```sh
-   export JAVA_HOME="/usr/lib/jvm/java-11-openjdk-amd64"
+   export JAVA_HOME="/usr/lib/jvm/java-17-openjdk-amd64"
    export PATH=$PATH:$JAVA_HOME/bin
    ```
 

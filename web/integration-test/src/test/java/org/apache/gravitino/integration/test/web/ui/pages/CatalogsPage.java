@@ -134,6 +134,12 @@ public class CatalogsPage extends BaseWebIT {
   @FindBy(xpath = "//div[@data-refer='tab-details-panel']")
   public WebElement tabDetailsContent;
 
+  @FindBy(xpath = "//button[@data-refer='tab-files']")
+  public WebElement tabFilesBtn;
+
+  @FindBy(xpath = "//div[@data-refer='tab-files-panel']")
+  public WebElement tabFilesContent;
+
   @FindBy(xpath = "//div[@data-refer='details-drawer']")
   public WebElement detailsDrawer;
 
@@ -574,6 +580,16 @@ public class CatalogsPage extends BaseWebIT {
     }
   }
 
+  public boolean verifyShowFilesContent() {
+    try {
+      String files = tabFilesContent.getAttribute("hidden");
+      return Objects.equals(files, null);
+    } catch (Exception e) {
+      LOG.error(e.getMessage(), e);
+      return false;
+    }
+  }
+
   public boolean verifyShowCatalogDetails(String name, String hiveMetastoreUris)
       throws InterruptedException {
     try {
@@ -768,7 +784,8 @@ public class CatalogsPage extends BaseWebIT {
 
   public boolean verifyTableColumns() {
     try {
-      List<String> columns = Arrays.asList("Name", "Type", "Nullable", "AutoIncrement", "Comment");
+      List<String> columns =
+          Arrays.asList("Name", "Type", "Nullable", "AutoIncrement", "Default Value", "Comment");
 
       List<WebElement> columnHeadersRows =
           columnHeaders.findElements(By.xpath("./div[@role='columnheader']"));

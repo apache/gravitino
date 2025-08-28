@@ -122,7 +122,7 @@ public class TestGravitinoInterceptionService {
           errorResponse.getMessage());
 
       // Verify correct HTTP status
-      assertEquals(Response.Status.FORBIDDEN.getStatusCode(), response.getStatus());
+      assertEquals(Response.Status.INTERNAL_SERVER_ERROR.getStatusCode(), response.getStatus());
     }
   }
 

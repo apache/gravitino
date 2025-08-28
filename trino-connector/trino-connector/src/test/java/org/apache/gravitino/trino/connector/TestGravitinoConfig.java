@@ -20,9 +20,11 @@ package org.apache.gravitino.trino.connector;
 
 import static org.apache.gravitino.trino.connector.GravitinoErrorCode.GRAVITINO_MISSING_CONFIG;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.google.common.collect.ImmutableMap;
 import io.trino.spi.TrinoException;
+import java.util.Map;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.jupiter.api.Test;
@@ -83,5 +85,31 @@ public class TestGravitinoConfig {
     GravitinoConfig configWithSkipValidation = new GravitinoConfig(configMapWithSkipValidation);
 
     assertEquals(configWithSkipValidation.isSkipTrinoVersionValidation(), true);
+  }
+
+  @Test
+  public void testGravitinoConfigWithClientConfig() {
+    String gravitinoUrl = "http://127.0.0.1:8000";
+    String metalake = "user_001";
+    ImmutableMap<String, String> configMap =
+        ImmutableMap.of("gravitino.uri", gravitinoUrl, "gravitino.metalake", metalake);
+    GravitinoConfig config = new GravitinoConfig(configMap);
+
+    assertTrue(config.getClientConfig().isEmpty());
+
+    ImmutableMap<String, String> configMapWithClientConfig =
+        ImmutableMap.of(
+            "gravitino.uri",
+            gravitinoUrl,
+            "gravitino.metalake",
+            metalake,
+            "gravitino.client.socketTimeoutMs",
+            "10000",
+            "gravitino.client.connectionTimeoutMs",
+            "20000");
+    GravitinoConfig configWithClientConfig = new GravitinoConfig(configMapWithClientConfig);
+    Map<String, String> clientConfig = configWithClientConfig.getClientConfig();
+    assertEquals(clientConfig.get("gravitino.client.socketTimeoutMs"), "10000");
+    assertEquals(clientConfig.get("gravitino.client.connectionTimeoutMs"), "20000");
   }
 }

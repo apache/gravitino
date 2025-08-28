@@ -20,6 +20,7 @@
 package org.apache.gravitino.server.authentication;
 
 import io.jsonwebtoken.SignatureAlgorithm;
+import java.util.List;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.config.ConfigBuilder;
 import org.apache.gravitino.config.ConfigConstants;
@@ -128,12 +129,14 @@ public interface OAuthConfig {
           .stringConf()
           .create();
 
-  ConfigEntry<String> PRINCIPAL_FIELD =
-      new ConfigBuilder(OAUTH_CONFIG_PREFIX + "principalField")
-          .doc("JWT claim field to use as principal identity (e.g., 'sub', 'client_id', 'appid')")
+  ConfigEntry<List<String>> PRINCIPAL_FIELDS =
+      new ConfigBuilder(OAUTH_CONFIG_PREFIX + "principalFields")
+          .doc(
+              "JWT claim field(s) to use as principal identity. Comma-separated list for fallback in order (e.g., 'preferred_username,email,sub').")
           .version(ConfigConstants.VERSION_1_0_0)
           .stringConf()
-          .createWithDefault("sub");
+          .toSequence()
+          .createWithDefault(java.util.Arrays.asList("sub"));
 
   ConfigEntry<String> TOKEN_VALIDATOR_CLASS =
       new ConfigBuilder(OAUTH_CONFIG_PREFIX + "tokenValidatorClass")

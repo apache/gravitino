@@ -239,6 +239,6 @@ public class TestLineUtil {
     when(mockColumn1.dataType()).thenReturn(Types.StringType.get());
     when(mockColumn1.defaultValue()).thenReturn(FunctionExpression.of("date", field("b")));
 
-    Assertions.assertEquals("date([b])", LineUtil.getDefaultValue(mockColumn1));
+    Assertions.assertEquals("date(b)", LineUtil.getDefaultValue(mockColumn1));
   }
 }

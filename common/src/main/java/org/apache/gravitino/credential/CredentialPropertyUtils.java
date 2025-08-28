@@ -47,25 +47,28 @@ public class CredentialPropertyUtils {
   static final String ICEBERG_ADLS_ACCOUNT_KEY = "adls.auth.shared-key.account.key";
 
   private static Map<String, String> icebergCredentialPropertyMap =
-      ImmutableMap.of(
-          GCSTokenCredential.GCS_TOKEN_NAME,
-          ICEBERG_GCS_TOKEN,
-          S3SecretKeyCredential.GRAVITINO_S3_STATIC_ACCESS_KEY_ID,
-          ICEBERG_S3_ACCESS_KEY_ID,
-          S3SecretKeyCredential.GRAVITINO_S3_STATIC_SECRET_ACCESS_KEY,
-          ICEBERG_S3_SECRET_ACCESS_KEY,
-          S3TokenCredential.GRAVITINO_S3_TOKEN,
-          ICEBERG_S3_TOKEN,
-          OSSTokenCredential.GRAVITINO_OSS_TOKEN,
-          ICEBERG_OSS_SECURITY_TOKEN,
-          OSSTokenCredential.GRAVITINO_OSS_SESSION_ACCESS_KEY_ID,
-          ICEBERG_OSS_ACCESS_KEY_ID,
-          OSSTokenCredential.GRAVITINO_OSS_SESSION_SECRET_ACCESS_KEY,
-          ICEBERG_OSS_ACCESS_KEY_SECRET,
-          AzureAccountKeyCredential.GRAVITINO_AZURE_STORAGE_ACCOUNT_NAME,
-          ICEBERG_ADLS_ACCOUNT_NAME,
-          AzureAccountKeyCredential.GRAVITINO_AZURE_STORAGE_ACCOUNT_KEY,
-          ICEBERG_ADLS_ACCOUNT_KEY);
+      ImmutableMap.<String, String>builder()
+          .put(GCSTokenCredential.GCS_TOKEN_NAME, ICEBERG_GCS_TOKEN)
+          .put(S3SecretKeyCredential.GRAVITINO_S3_STATIC_ACCESS_KEY_ID, ICEBERG_S3_ACCESS_KEY_ID)
+          .put(
+              S3SecretKeyCredential.GRAVITINO_S3_STATIC_SECRET_ACCESS_KEY,
+              ICEBERG_S3_SECRET_ACCESS_KEY)
+          .put(S3TokenCredential.GRAVITINO_S3_TOKEN, ICEBERG_S3_TOKEN)
+          .put(OSSTokenCredential.GRAVITINO_OSS_TOKEN, ICEBERG_OSS_SECURITY_TOKEN)
+          .put(OSSTokenCredential.GRAVITINO_OSS_SESSION_ACCESS_KEY_ID, ICEBERG_OSS_ACCESS_KEY_ID)
+          .put(
+              OSSTokenCredential.GRAVITINO_OSS_SESSION_SECRET_ACCESS_KEY,
+              ICEBERG_OSS_ACCESS_KEY_SECRET)
+          .put(
+              AzureAccountKeyCredential.GRAVITINO_AZURE_STORAGE_ACCOUNT_NAME,
+              ICEBERG_ADLS_ACCOUNT_NAME)
+          .put(
+              AzureAccountKeyCredential.GRAVITINO_AZURE_STORAGE_ACCOUNT_KEY,
+              ICEBERG_ADLS_ACCOUNT_KEY)
+          .put(AwsIrsaCredential.ACCESS_KEY_ID, ICEBERG_S3_ACCESS_KEY_ID)
+          .put(AwsIrsaCredential.SECRET_ACCESS_KEY, ICEBERG_S3_SECRET_ACCESS_KEY)
+          .put(AwsIrsaCredential.SESSION_TOKEN, ICEBERG_S3_TOKEN)
+          .build();
 
   /**
    * Transforms a specific credential into a map of Iceberg properties.
@@ -78,7 +81,8 @@ public class CredentialPropertyUtils {
         || credential instanceof S3SecretKeyCredential
         || credential instanceof OSSTokenCredential
         || credential instanceof OSSSecretKeyCredential
-        || credential instanceof AzureAccountKeyCredential) {
+        || credential instanceof AzureAccountKeyCredential
+        || credential instanceof AwsIrsaCredential) {
       return transformProperties(credential.credentialInfo(), icebergCredentialPropertyMap);
     }
 

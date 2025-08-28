@@ -33,6 +33,7 @@ import io.trino.spi.type.ArrayType;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 import org.apache.gravitino.trino.connector.catalog.HasPropertyMeta;
 
 /**
@@ -72,9 +73,16 @@ public class MySQLPropertyMeta implements HasPropertyMeta {
 
   /** Property name for auto-incrementing columns. */
   public static final String AUTO_INCREMENT = "auto_increment";
+  /** Property name for the default value of columns. */
+  public static final String DEFAULT = "default";
 
   private static final List<PropertyMetadata<?>> COLUMN_PROPERTY_META =
-      ImmutableList.of(booleanProperty(AUTO_INCREMENT, "The auto increment column", false, false));
+      ImmutableList.of(
+          booleanProperty(AUTO_INCREMENT, "The auto increment column", false, false),
+          stringProperty(DEFAULT, "The default value of column", null, false));
+
+  private static final List<String> filterColumnProperties =
+      ImmutableList.of(AUTO_INCREMENT, DEFAULT);
 
   @Override
   public List<PropertyMetadata<?>> getTablePropertyMetadata() {
@@ -129,5 +137,40 @@ public class MySQLPropertyMeta implements HasPropertyMeta {
     }
 
     return uniqueKeyMapBuilder.build();
+  }
+
+  /**
+   * Extract auto increment property from column properties
+   *
+   * @param columnProperties column properties
+   * @return auto increment property
+   */
+  public static boolean isAutoIncrement(Map<String, Object> columnProperties) {
+    Preconditions.checkArgument(columnProperties != null, "columnProperties is null");
+    return (boolean) columnProperties.getOrDefault(MySQLPropertyMeta.AUTO_INCREMENT, false);
+  }
+
+  /**
+   * Extract default value property from column properties
+   *
+   * @param columnProperties column properties
+   * @return default value property
+   */
+  public static String getDefaultValue(Map<String, Object> columnProperties) {
+    Preconditions.checkArgument(columnProperties != null, "columnProperties is null");
+    return (String) columnProperties.get(MySQLPropertyMeta.DEFAULT);
+  }
+
+  /**
+   * Filter specified property from column properties
+   *
+   * @param columnProperties column properties
+   * @return column properties
+   */
+  public static Map<String, Object> filterColumnProperties(Map<String, Object> columnProperties) {
+    Preconditions.checkArgument(columnProperties != null, "columnProperties is null");
+    return columnProperties.entrySet().stream()
+        .filter(entry -> !filterColumnProperties.contains(entry.getKey()))
+        .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
   }
 }

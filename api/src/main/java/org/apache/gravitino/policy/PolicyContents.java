@@ -18,8 +18,11 @@
  */
 package org.apache.gravitino.policy;
 
+import com.google.common.collect.ImmutableSet;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
+import org.apache.gravitino.MetadataObject;
 
 /** Utility class for creating instances of {@link PolicyContent}. */
 public class PolicyContents {
@@ -28,11 +31,15 @@ public class PolicyContents {
    * Creates a custom policy content with the given rules and properties.
    *
    * @param rules The custom rules of the policy.
+   * @param supportedObjectTypes The set of metadata object types that the policy can be applied to.
    * @param properties The additional properties of the policy.
    * @return A new instance of {@link PolicyContent} with the specified rules and properties.
    */
-  public static PolicyContent custom(Map<String, Object> rules, Map<String, String> properties) {
-    return new CustomContent(rules, properties);
+  public static PolicyContent custom(
+      Map<String, Object> rules,
+      Set<MetadataObject.Type> supportedObjectTypes,
+      Map<String, String> properties) {
+    return new CustomContent(rules, supportedObjectTypes, properties);
   }
 
   private PolicyContents() {}
@@ -43,21 +50,31 @@ public class PolicyContents {
    */
   public static class CustomContent implements PolicyContent {
     private final Map<String, Object> customRules;
+    private final Set<MetadataObject.Type> supportedObjectTypes;
     private final Map<String, String> properties;
 
     /** Default constructor for Jackson deserialization only. */
     private CustomContent() {
-      this(null, null);
+      this(null, null, null);
     }
 
     /**
      * Constructor for CustomContent.
      *
      * @param customRules the custom rules of the policy
+     * @param supportedObjectTypes the set of metadata object types that the policy can be applied
+     *     to
      * @param properties the additional properties of the policy
      */
-    private CustomContent(Map<String, Object> customRules, Map<String, String> properties) {
+    private CustomContent(
+        Map<String, Object> customRules,
+        Set<MetadataObject.Type> supportedObjectTypes,
+        Map<String, String> properties) {
       this.customRules = customRules;
+      this.supportedObjectTypes =
+          supportedObjectTypes == null
+              ? ImmutableSet.of()
+              : ImmutableSet.copyOf(supportedObjectTypes);
       this.properties = properties;
     }
 
@@ -71,13 +88,13 @@ public class PolicyContents {
     }
 
     @Override
-    public Map<String, String> properties() {
-      return properties;
+    public Set<MetadataObject.Type> supportedObjectTypes() {
+      return supportedObjectTypes;
     }
 
     @Override
-    public void validate() throws IllegalArgumentException {
-      // nothing to validate for custom content
+    public Map<String, String> properties() {
+      return properties;
     }
 
     @Override
@@ -85,17 +102,25 @@ public class PolicyContents {
       if (!(o instanceof CustomContent)) return false;
       CustomContent that = (CustomContent) o;
       return Objects.equals(customRules, that.customRules)
-          && Objects.equals(properties, that.properties);
+          && Objects.equals(properties, that.properties)
+          && Objects.equals(supportedObjectTypes, that.supportedObjectTypes);
     }
 
     @Override
     public int hashCode() {
-      return Objects.hash(customRules, properties);
+      return Objects.hash(customRules, properties, supportedObjectTypes);
     }
 
     @Override
     public String toString() {
-      return "CustomContent{" + "customRules=" + customRules + ", properties=" + properties + '}';
+      return "CustomContent{"
+          + "customRules="
+          + customRules
+          + ", properties="
+          + properties
+          + ", supportedObjectTypes="
+          + supportedObjectTypes
+          + '}';
     }
   }
 }
