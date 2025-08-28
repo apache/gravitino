@@ -180,7 +180,7 @@ public class TableMetaService {
       SessionUtils.doMultipleWithCommit(
           () ->
               updateResult.set(
-                  SessionUtils.doWithoutCommitAndFetchResult(
+                  SessionUtils.getWithoutCommit(
                       TableMetaMapper.class,
                       mapper -> mapper.updateTableMeta(newTablePO, oldTablePO))),
           () -> {
@@ -217,7 +217,7 @@ public class TableMetaService {
     SessionUtils.doMultipleWithCommit(
         () ->
             deleteResult.set(
-                SessionUtils.doWithoutCommitAndFetchResult(
+                SessionUtils.getWithoutCommit(
                     TableMetaMapper.class,
                     mapper -> mapper.softDeleteTableMetasByTableId(tableId))),
         () -> {

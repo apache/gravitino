@@ -17,7 +17,7 @@
 
 
 from abc import abstractmethod
-from enum import Enum
+from enum import Enum, unique
 
 from gravitino.api.expressions.partitions.partition import Partition
 
@@ -25,7 +25,8 @@ from gravitino.api.expressions.partitions.partition import Partition
 class PartitionDTO(Partition):
     """Represents a Partition Data Transfer Object (DTO) that implements the Partition interface."""
 
-    class Type(Enum):
+    @unique
+    class Type(str, Enum):
         """Type of the partition."""
 
         RANGE = "range"

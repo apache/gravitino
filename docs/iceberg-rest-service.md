@@ -378,7 +378,7 @@ You can access different catalogs by setting the `warehouse` to the catalog name
 
 ### Other Apache Iceberg catalog properties
 
-You can add other properties defined in [Iceberg catalog properties](https://iceberg.apache.org/docs/1.6.1/configuration/#catalog-properties).
+You can add other properties defined in [Iceberg catalog properties](https://iceberg.apache.org/docs/1.9.2/configuration/#catalog-properties).
 The `clients` property for example:
 
 | Configuration item               | Description                          | Default value | Required |
@@ -439,7 +439,7 @@ Normally you will see the output like `{"defaults":{},"overrides":{}}%`.
 
 ### Deploying Apache Spark with Apache Iceberg support
 
-Follow the [Spark Iceberg start guide](https://iceberg.apache.org/docs/1.6.1/spark-getting-started/) to set up Apache Spark's and Apache Iceberg's environment.
+Follow the [Spark Iceberg start guide](https://iceberg.apache.org/docs/1.9.2/spark-getting-started/) to set up Apache Spark's and Apache Iceberg's environment.
 
 ### Starting the Apache Spark client with the Apache Iceberg REST catalog
 

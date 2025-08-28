@@ -34,6 +34,13 @@ public class PathBasedCredentialContext implements CredentialContext {
   @NotNull private final Set<String> readPaths;
   @NotNull private final String userName;
 
+  /**
+   * Constructor for PathBasedCredentialContext.
+   *
+   * @param userName the name of the user
+   * @param writePaths the set of paths that the user can write to
+   * @param readPaths the set of paths that the user can read from
+   */
   public PathBasedCredentialContext(
       String userName, Set<String> writePaths, Set<String> readPaths) {
     Preconditions.checkNotNull(userName, "User name should not be null");
@@ -49,10 +56,20 @@ public class PathBasedCredentialContext implements CredentialContext {
     return userName;
   }
 
+  /**
+   * Get the set of paths that the user can write to.
+   *
+   * @return set of paths that the user can write to
+   */
   public Set<String> getWritePaths() {
     return writePaths;
   }
 
+  /**
+   * Get the set of paths that the user can read from.
+   *
+   * @return set of paths that the user can read from
+   */
   public Set<String> getReadPaths() {
     return readPaths;
   }

@@ -266,11 +266,11 @@ public class TestModelMetaService extends TestJDBCBackend {
     ModelEntity updatedModel =
         ModelEntity.builder()
             .withId(modelEntity.id())
-            .withName(newComment)
+            .withName(modelEntity.name())
             .withNamespace(modelEntity.namespace())
             .withLatestVersion(modelEntity.latestVersion())
             .withAuditInfo(modelEntity.auditInfo())
-            .withComment(modelEntity.comment())
+            .withComment(newComment)
             .withProperties(modelEntity.properties())
             .build();
 
@@ -309,7 +309,7 @@ public class TestModelMetaService extends TestJDBCBackend {
     ModelEntity updatedModel =
         ModelEntity.builder()
             .withId(modelEntity.id())
-            .withName(modelEntity.comment())
+            .withName(modelEntity.name())
             .withNamespace(modelEntity.namespace())
             .withLatestVersion(modelEntity.latestVersion())
             .withAuditInfo(modelEntity.auditInfo())

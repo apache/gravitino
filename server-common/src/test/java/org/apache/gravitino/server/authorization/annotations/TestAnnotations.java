@@ -23,7 +23,6 @@ import java.lang.reflect.Method;
 import java.lang.reflect.Parameter;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.MetadataObject;
-import org.apache.gravitino.authorization.Privilege;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -48,33 +47,11 @@ public class TestAnnotations {
   // 1. ResourceAuthorizeApi
   // 2. AuthorizationExpression
   static class TestAuthorizeAnnotationClass {
-    @AuthorizationMetadataPrivileges(
-        privileges = {Privilege.Name.CREATE_CATALOG, Privilege.Name.USE_CATALOG},
-        metadataType = MetadataObject.Type.CATALOG)
-    public void testAuthedMethodUseResourceType() {}
 
     @AuthorizationExpression(
         expression = "CATALOG::CREATE_TABLE || TABLE::CREATE_TABLE",
         accessMetadataType = MetadataObject.Type.METALAKE)
     public void testAuthedMethodUseExpression() {}
-  }
-
-  @Test
-  void testAuthorizeApiWithResourceType() throws NoSuchMethodException {
-    Class<TestAuthorizeAnnotationClass> testClass = TestAuthorizeAnnotationClass.class;
-    Method method = testClass.getMethod("testAuthedMethodUseResourceType");
-
-    boolean hasAnnotation = method.isAnnotationPresent(AuthorizationMetadataPrivileges.class);
-    Assertions.assertTrue(hasAnnotation);
-
-    AuthorizationMetadataPrivileges annotation =
-        method.getAnnotation(AuthorizationMetadataPrivileges.class);
-    Assertions.assertNotNull(annotation);
-
-    Assertions.assertArrayEquals(
-        new Privilege.Name[] {Privilege.Name.CREATE_CATALOG, Privilege.Name.USE_CATALOG},
-        annotation.privileges());
-    Assertions.assertEquals(MetadataObject.Type.CATALOG, annotation.metadataType());
   }
 
   @Test

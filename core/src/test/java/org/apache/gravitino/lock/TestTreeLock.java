@@ -102,4 +102,11 @@ class TestTreeLock {
     Mockito.verify(mockNode2, Mockito.never()).unlock(Mockito.any());
     Mockito.verify(mockNode3, Mockito.never()).unlock(Mockito.any());
   }
+
+  @Test
+  void testDoubleUnlockThrows() {
+    lock.lock(LockType.READ);
+    lock.unlock();
+    assertThrows(IllegalStateException.class, () -> lock.unlock());
+  }
 }

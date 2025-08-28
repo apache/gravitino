@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.trino.connector.system.storedprocdure;
+package org.apache.gravitino.trino.connector.system.storedprocedure;
 
 import static io.trino.spi.type.VarcharType.VARCHAR;
 
