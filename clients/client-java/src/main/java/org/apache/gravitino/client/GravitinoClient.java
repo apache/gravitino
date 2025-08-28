@@ -576,6 +576,7 @@ public class GravitinoClient extends GravitinoClientBase
   @Override
   public MetadataObject[] listMetadataObjectsForTags(String[] tagNames) throws NoSuchTagException {
     return getMetalake().listMetadataObjectsForTags(tagNames);
+  }
 
   public List<JobTemplate> listJobTemplates() {
     return getMetalake().listJobTemplates();

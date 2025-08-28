@@ -764,7 +764,9 @@ public class TestGravitinoMetalake extends TestBase {
 
     MetadataObject[] emptyResult = gravitinoClient.listMetadataObjectsForTags(tagNames);
     Assertions.assertEquals(0, emptyResult.length);
+  }
 
+  @Test
   public void testListPolicies() throws JsonProcessingException {
     String path = "/api/metalakes/" + metalakeName + "/policies";
 

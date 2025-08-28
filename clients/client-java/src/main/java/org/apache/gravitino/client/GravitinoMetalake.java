@@ -78,11 +78,11 @@ import org.apache.gravitino.dto.responses.EntityListResponse;
 import org.apache.gravitino.dto.responses.ErrorResponse;
 import org.apache.gravitino.dto.responses.GroupListResponse;
 import org.apache.gravitino.dto.responses.GroupResponse;
-import org.apache.gravitino.dto.responses.MetadataObjectListResponse;
 import org.apache.gravitino.dto.responses.JobListResponse;
 import org.apache.gravitino.dto.responses.JobResponse;
 import org.apache.gravitino.dto.responses.JobTemplateListResponse;
 import org.apache.gravitino.dto.responses.JobTemplateResponse;
+import org.apache.gravitino.dto.responses.MetadataObjectListResponse;
 import org.apache.gravitino.dto.responses.NameListResponse;
 import org.apache.gravitino.dto.responses.OwnerResponse;
 import org.apache.gravitino.dto.responses.PolicyListResponse;
@@ -595,6 +595,7 @@ public class GravitinoMetalake extends MetalakeDTO
             ErrorHandlers.tagErrorHandler());
     resp.validate();
     return resp.getMetadataObjects();
+  }
 
   /**
    * List all the policies under the current metalake.
