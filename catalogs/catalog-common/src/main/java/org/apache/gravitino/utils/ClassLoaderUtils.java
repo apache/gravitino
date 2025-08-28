@@ -211,7 +211,7 @@ public class ClassLoaderUtils {
       MethodUtils.invokeStaticMethod(methodUtilsClass, "unregisterMetricAdminMBean");
     } catch (Exception e) {
       LOG.warn(
-          "Failed to unregister AWS SDK metrics admin MBean from class loader", classLoader, e);
+          "Failed to unregister AWS SDK metrics admin MBean from class loader {}", classLoader, e);
     }
   }
 
