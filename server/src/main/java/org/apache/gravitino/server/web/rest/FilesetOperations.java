@@ -23,9 +23,6 @@ import static org.apache.gravitino.file.Fileset.LOCATION_NAME_UNKNOWN;
 import com.codahale.metrics.annotation.ResponseMetered;
 import com.codahale.metrics.annotation.Timed;
 import com.google.common.collect.ImmutableMap;
-import java.io.UnsupportedEncodingException;
-import java.net.URLDecoder;
-import java.nio.charset.StandardCharsets;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
@@ -44,7 +41,8 @@ import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.Response;
-import org.apache.commons.lang3.StringUtils;
+import org.apache.gravitino.Config;
+import org.apache.gravitino.Configs;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
@@ -88,9 +86,12 @@ public class FilesetOperations {
 
   @Context private HttpServletRequest httpRequest;
 
+  private final boolean enableAPICompatibility;
+
   @Inject
-  public FilesetOperations(FilesetDispatcher dispatcher) {
+  public FilesetOperations(FilesetDispatcher dispatcher, Config config) {
     this.dispatcher = dispatcher;
+    this.enableAPICompatibility = config.get(Configs.SERVER_REST_API_COMPATIBILITY_ENABLE);
   }
 
   @GET
@@ -234,21 +235,17 @@ public class FilesetOperations {
       @PathParam("schema") @AuthorizationMetadata(type = Entity.EntityType.SCHEMA) String schema,
       @PathParam("fileset") @AuthorizationMetadata(type = Entity.EntityType.FILESET) String fileset,
       @QueryParam("sub_path") @DefaultValue("/") String subPath,
-      @QueryParam("location_name") String locationName)
-      throws UnsupportedEncodingException {
+      @QueryParam("location_name") String locationName) {
+    String decodedSubPath = enableAPICompatibility ? RESTUtils.decodeString(subPath) : subPath;
+
     LOG.info(
         "Received list files request: {}.{}.{}.{}, subPath: {}, locationName:{}",
         metalake,
         catalog,
         schema,
         fileset,
-        subPath,
+        decodedSubPath,
         locationName);
-
-    final String decodedSubPath =
-        StringUtils.isNotBlank(subPath)
-            ? URLDecoder.decode(subPath, StandardCharsets.UTF_8.name())
-            : subPath;
 
     try {
       return Utils.doAs(
@@ -264,7 +261,7 @@ public class FilesetOperations {
                 catalog,
                 schema,
                 fileset,
-                subPath,
+                decodedSubPath,
                 locationName);
             return response;
           });
@@ -368,14 +365,17 @@ public class FilesetOperations {
       @PathParam("fileset") @AuthorizationMetadata(type = Entity.EntityType.FILESET) String fileset,
       @QueryParam("sub_path") @NotNull String subPath,
       @QueryParam("location_name") String locationName) {
+    String decodedSubPath = enableAPICompatibility ? RESTUtils.decodeString(subPath) : subPath;
+    String decodedLocationName =
+        enableAPICompatibility ? RESTUtils.decodeString(locationName) : locationName;
     LOG.info(
         "Received get file location request: {}.{}.{}.{}, sub path:{}, location name:{}",
         metalake,
         catalog,
         schema,
         fileset,
-        RESTUtils.decodeString(subPath),
-        Optional.ofNullable(locationName).map(RESTUtils::decodeString).orElse(null));
+        decodedSubPath,
+        decodedLocationName);
     try {
       return Utils.doAs(
           httpRequest,
@@ -389,10 +389,7 @@ public class FilesetOperations {
               CallerContext.CallerContextHolder.set(context);
             }
             String actualFileLocation =
-                dispatcher.getFileLocation(
-                    ident,
-                    RESTUtils.decodeString(subPath),
-                    Optional.ofNullable(locationName).map(RESTUtils::decodeString).orElse(null));
+                dispatcher.getFileLocation(ident, decodedSubPath, decodedLocationName);
             return Utils.ok(new FileLocationResponse(actualFileLocation));
           });
     } catch (Exception e) {
