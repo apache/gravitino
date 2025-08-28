@@ -39,6 +39,8 @@ import org.apache.gravitino.meta.UserEntity;
  */
 public class ReverseIndexCache {
   private final RadixTree<EntityCacheKey> reverseIndex;
+  /** Registers a reverse index processor for a specific entity class. */
+  private final Map<Class<? extends Entity>, ReverseIndexRule> reverseIndexRules = new HashMap<>();
 
   public ReverseIndexCache() {
     this.reverseIndex = new ConcurrentRadixTree<>(new DefaultCharArrayNodeFactory());
@@ -84,9 +86,6 @@ public class ReverseIndexCache {
       put(nameIdent, entity.type(), key);
     }
   }
-
-  /** Registers a processor for a specific entity class. */
-  private final Map<Class<? extends Entity>, ReverseIndexRule> reverseIndexRules = new HashMap<>();
 
   public void registerReverseRule(Class<? extends Entity> entityClass, ReverseIndexRule rule) {
     reverseIndexRules.put(entityClass, rule);
