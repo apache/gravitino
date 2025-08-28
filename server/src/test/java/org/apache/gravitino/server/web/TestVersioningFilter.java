@@ -259,4 +259,46 @@ public class TestVersioningFilter {
     assertTrue(actualHeaderNames.contains("Header2"));
     assertTrue(actualHeaderNames.contains("CustomHeader"));
   }
+
+  @Test
+  public void testDoFilterWithHeaderContainingValidVersionAsSubstring() throws Exception {
+    VersioningFilter filter = new VersioningFilter();
+    FilterChain mockChain = mock(FilterChain.class);
+    HttpServletRequest mockRequest = mock(HttpServletRequest.class);
+    HttpServletResponse mockResponse = mock(HttpServletResponse.class);
+    when(mockRequest.getHeaders("Accept"))
+        .thenReturn(
+            new Vector<>(
+                    Collections.singletonList(
+                        "application/vnd.gravitino.v1+json, application/json"))
+                .elements());
+
+    filter.doFilter(mockRequest, mockResponse, mockChain);
+    verify(mockChain).doFilter(any(), any());
+
+    reset(mockChain, mockResponse);
+
+    when(mockRequest.getHeaders("Accept"))
+        .thenReturn(
+            new Vector<>(
+                    Collections.singletonList(
+                        "application/vnd.gravitino.v2+json, application/json"))
+                .elements());
+
+    filter.doFilter(mockRequest, mockResponse, mockChain);
+    verify(mockChain, never()).doFilter(any(), any());
+    verify(mockResponse).sendError(HttpServletResponse.SC_NOT_ACCEPTABLE, "Unsupported version");
+
+    reset(mockChain, mockResponse);
+
+    when(mockRequest.getHeaders("Accept"))
+        .thenReturn(
+            new Vector<>(
+                    Collections.singletonList(
+                        "application/vnd.gravitino.v3+json; q=0.9, application/json"))
+                .elements());
+    filter.doFilter(mockRequest, mockResponse, mockChain);
+    verify(mockChain, never()).doFilter(any(), any());
+    verify(mockResponse).sendError(HttpServletResponse.SC_NOT_ACCEPTABLE, "Unsupported version");
+  }
 }
