@@ -594,7 +594,7 @@ tasks.rat {
     "**/NOTICE.*",
     "**/trino-ci-testset",
     "ROADMAP.md",
-    "GETTING_STARTED.md"
+    "GETTING_STARTED.md",
     "clients/cli/src/main/resources/*.txt",
     "clients/client-python/venv/*",
     "clients/client-python/docs/build",
