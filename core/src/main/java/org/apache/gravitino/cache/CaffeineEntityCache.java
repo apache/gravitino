@@ -30,11 +30,13 @@ import com.googlecode.concurrenttrees.radix.ConcurrentRadixTree;
 import com.googlecode.concurrenttrees.radix.RadixTree;
 import com.googlecode.concurrenttrees.radix.node.concrete.DefaultCharArrayNodeFactory;
 import java.io.IOException;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Queue;
 import java.util.Set;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.ExecutorService;
@@ -357,12 +359,20 @@ public class CaffeineEntityCache extends BaseEntityCache {
    *
    * @param identifier The identifier of the entity to invalidate
    */
-  private boolean invalidateEntities(NameIdentifier identifier) {
+  private boolean invalidateEntitiesOld(NameIdentifier identifier) {
     List<EntityCacheKey> entityKeysToRemove =
         Lists.newArrayList(cacheIndex.getValuesForKeysStartingWith(identifier.toString()));
 
     Map<EntityCacheRelationKey, List<Entity>> relationEnitiesMap =
         cacheData.getAllPresent(entityKeysToRemove);
+
+    // first invalidate this entity
+    EntityCacheKey currentKey = cacheIndex.getValueForExactKey(identifier.toString());
+    if (currentKey != null) {
+      // already removed
+      cacheData.invalidate(currentKey);
+      cacheIndex.remove(currentKey.toString());
+    }
 
     // SCENE[1]
     // RECORD1 = Role1 -> [catalog1, catalog2]
@@ -378,7 +388,7 @@ public class CaffeineEntityCache extends BaseEntityCache {
               entity -> {
                 NameIdentifier child = getNameIdentifier(entity);
                 if (!child.equals(identifier)) {
-                  invalidateEntities(child);
+                  invalidateEntitiesOld(child);
                 }
               });
         });
@@ -414,6 +424,53 @@ public class CaffeineEntityCache extends BaseEntityCache {
     entityKeysToRemove.forEach(key -> cacheIndex.remove(key.toString()));
 
     return !entityKeysToRemove.isEmpty();
+  }
+
+  /**
+   * Invalidate entities with iterative BFS algorithm.
+   *
+   * @param identifier The identifier of the entity to invalidate
+   */
+  private boolean invalidateEntities(NameIdentifier identifier) {
+    Queue<EntityCacheKey> queue = new ArrayDeque<>();
+
+    cacheIndex.getValuesForKeysStartingWith(identifier.toString()).forEach(queue::offer);
+
+    while (!queue.isEmpty()) {
+      EntityCacheKey currentKeyToRemove = queue.poll();
+
+      cacheData.invalidate(currentKeyToRemove);
+      cacheIndex.remove(currentKeyToRemove.toString());
+
+      // look up from reverse index to go to next depth
+      List<EntityCacheKey> reverseKeysToRemove =
+          Lists.newArrayList(reverseIndex.getValuesForKeysStartingWith(identifier.toString()));
+      reverseKeysToRemove.forEach(
+          key -> {
+            // If the key is the same as the entity key, we can remove it from the cache.
+            //                  cacheData.invalidate(key);
+            //                  cacheIndex.remove(key.toString());
+            // Remove from reverse index
+            // Convert EntityCacheRelationKey to EntityCacheKey
+            EntityCacheKey reverseKey = EntityCacheKey.of(key.identifier(), key.entityType());
+            reverseIndex
+                .getKeysStartingWith(reverseKey.toString())
+                .forEach(
+                    reverseIndexKey -> {
+                      reverseIndex.remove(reverseIndexKey.toString());
+                    });
+          });
+
+      reverseKeysToRemove.forEach(queue::offer);
+
+      List<EntityCacheKey> relatedEntityKeysToRemove =
+          Lists.newArrayList(
+              cacheIndex.getValuesForKeysStartingWith(currentKeyToRemove.toString()));
+
+      relatedEntityKeysToRemove.forEach(queue::offer);
+    }
+
+    return true;
   }
 
   /**
