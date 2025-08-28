@@ -68,10 +68,10 @@ public class ReverseIndexCache {
       NameIdentifier nameIdentifier, Entity.EntityType type, EntityCacheRelationKey key) {
     EntityCacheKey entityCacheKey = EntityCacheKey.of(nameIdentifier, type);
     String strEntityCacheKey = entityCacheKey.toString();
-    List<EntityCacheKey> entityKeysToRemove =
+    List<EntityCacheKey> entityKeys =
         Lists.newArrayList(reverseIndex.getValuesForKeysStartingWith(strEntityCacheKey));
     String strEntityCacheKeyNo =
-        String.format("%s-%d", strEntityCacheKey, entityKeysToRemove.size());
+        String.format("%s-%d", strEntityCacheKey, entityKeys.size());
     reverseIndex.put(strEntityCacheKeyNo, key);
   }
 
