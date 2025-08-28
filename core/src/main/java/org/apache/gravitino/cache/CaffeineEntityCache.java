@@ -47,6 +47,8 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
+import java.util.stream.StreamSupport;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.Entity;
@@ -437,10 +439,15 @@ public class CaffeineEntityCache extends BaseEntityCache {
       Optional<SupportsRelationOperations.Type> relTypeOpt) {
     Queue<EntityCacheKey> queue = new ArrayDeque<>();
 
+    LOG.debug(
+        "cacheIndex: {}",
+        StreamSupport.stream(cacheIndex.getValuesForKeysStartingWith("").spliterator(), false)
+            .toList());
+
     EntityCacheKey valueForExactKey;
     if (relTypeOpt.isEmpty()) {
       valueForExactKey =
-          cacheIndex.getValueForExactKey(EntityCacheRelationKey.of(identifier, type).toString());
+          cacheIndex.getValueForExactKey(EntityCacheKey.of(identifier, type).toString());
     } else {
       valueForExactKey =
           cacheIndex.getValueForExactKey(
@@ -456,19 +463,29 @@ public class CaffeineEntityCache extends BaseEntityCache {
 
     while (!queue.isEmpty()) {
       EntityCacheKey currentKeyToRemove = queue.poll();
+      LOG.debug(
+          "currentKeyToRemove: {}, identifier: {}, type: {}",
+          currentKeyToRemove,
+          currentKeyToRemove.identifier(),
+          currentKeyToRemove.entityType());
 
       cacheData.invalidate(currentKeyToRemove);
       cacheIndex.remove(currentKeyToRemove.toString());
 
+      // Remove related entity keys
+      // e.g.
       List<EntityCacheKey> relatedEntityKeysToRemove =
           Lists.newArrayList(
-              cacheIndex.getValuesForKeysStartingWith(currentKeyToRemove.toString()));
+              cacheIndex.getValuesForKeysStartingWith(currentKeyToRemove.identifier().toString()));
+      LOG.debug("relatedEntitKeysToRemove: {}", StringUtils.join(relatedEntityKeysToRemove, ", "));
       relatedEntityKeysToRemove.forEach(queue::offer);
 
       // look up from reverse index to go to next depth
       List<EntityCacheKey> reverseKeysToRemove =
           Lists.newArrayList(
-              reverseIndex.getValuesForKeysStartingWith(currentKeyToRemove.toString()));
+              reverseIndex.getValuesForKeysStartingWith(
+                  currentKeyToRemove.identifier().toString()));
+      LOG.debug("reverseKeys: {}", StringUtils.join(reverseKeysToRemove, ", "));
       reverseKeysToRemove.forEach(
           key -> {
             // Remove from reverse index
