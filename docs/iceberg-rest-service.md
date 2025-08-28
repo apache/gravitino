@@ -375,7 +375,7 @@ gravitino.iceberg-rest.gravitino-uri = http://127.0.0.1:8090
 gravitino.iceberg-rest.gravitino-metalake = test
 ```
 
-You can access different catalogs by setting the `warehouse` to the catalog name in Gravitino server in the client side, if `default-catalog-name` is set, you could access this catalog without specifying `warehouse` explicitly.
+You can access different catalogs by setting the `warehouse` to the catalog name in Gravitino server in the client side. If `default-catalog-name` is set to a catalog name created by Gravitino server, you could access this catalog without specifying `warehouse` explicitly.
 
 ### Other Apache Iceberg catalog properties
 
