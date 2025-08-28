@@ -23,11 +23,11 @@ Gravitino will support build-in statistics in the future.
 Statistics are used by query engine for cost-based optimization (CBO). Meanwhile, statistics can also
 be used for metadata action systems to trigger some jobs, such as compaction, data archive, etc.
 
-You can define statistics and add the policy related the statistics, users analyze the statistics
+You can define statistics and add policies based on the statistics, users analyze the statistics
 and policy to decide the next action.
 
-Now, Gravitino won't handle the computation of the statistics, you need to compute the statistics
-and update it to Gravitino by yourself. Gravitino can't judge the expiration of the statistics,
+Now, Gravitino doesn't handle the computation of the statistics, you need to compute the statistics
+and update them to Gravitino by yourself. Gravitino can't judge the expiration of the statistics,
 You need to guarantee the statistics are fresh.
 
 
