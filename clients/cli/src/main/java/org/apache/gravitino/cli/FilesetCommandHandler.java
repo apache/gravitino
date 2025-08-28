@@ -189,6 +189,11 @@ public class FilesetCommandHandler extends CommandHandler {
 
   /** Handles the "UPDATE" command. */
   private void handleUpdateCommand() {
+    if (!line.hasOption(GravitinoOptions.COMMENT) && !line.hasOption(GravitinoOptions.RENAME)) {
+      System.err.println(ErrorMessages.MISSING_COMMENT_AND_RENAME);
+      Main.exit(-1);
+    }
+
     if (line.hasOption(GravitinoOptions.COMMENT)) {
       String comment = line.getOptionValue(GravitinoOptions.COMMENT);
       gravitinoCommandLine
