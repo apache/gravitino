@@ -13,25 +13,25 @@ import TabItem from '@theme/TabItem';
 
 Starting from 1.0.0, Gravitino introduces statistics of tables and partitions.
 
-This document provides a brief introduction by using both Gravitino Java client and
+This document provides a brief introduction using both Gravitino Java client and
 REST APIs. If you want to know more about the statistics system in Gravitino, please refer to the
 Javadoc and REST API documentation.
 
 Statistics only support the custom statistics, which names must start with `custom-`.
-Gravitino will support build-in statistics in the future.
+Gravitino will support built-in statistics in the future.
 
-Statistics are used by query engine for cost-based optimization (CBO). Meanwhile, statistics can also
-be used for metadata action systems to trigger some jobs, such as compaction, data archive, etc.
+The query engine uses statistics for cost-based optimization (CBO). Meanwhile, statistics can also
+be used for metadata action systems to trigger some jobs, such as compaction, data archiving, etc.
 
-You can define statistics and add policies based on the statistics, users analyze the statistics
+You can define statistics and add policies based on the statistics. Users can analyze the statistics
 and policy to decide the next action.
 
-Now, Gravitino doesn't handle the computation of the statistics, you need to compute the statistics
-and update them to Gravitino by yourself. Gravitino can't judge the expiration of the statistics,
-You need to guarantee the statistics are fresh.
+Currently, Gravitino doesn't handle the computation of the statistics, you need to compute the statistics
+and update them to Gravitino. Gravitino can't judge the expiration of the statistics, 
+You need to ensure the statistics are up-to-date.
 
 
-## Metadata object Statistic operations
+## Metadata object statistic operations
 
 ### Update statistics of metadata objects
 
@@ -167,7 +167,7 @@ table.updatePartitionStatistics(statisticsToUpdate);
 
 You can list the statistics of specified partitions.
 You can specify a range of partitions by providing the `from` and `to` parameters,
-and whether the range is inclusive or not using `fromInclusive` and `toInclusive` parameters.
+and whether the range is inclusive or , not using `fromInclusive` and `toInclusive` parameters.
 
 The request path for REST API is `/api/metalakes/{metalake}/objects/table/{metadataObjectName}/statistics/partitions`.
 
@@ -231,24 +231,24 @@ table.dropPartitionStatistics(statisticsToDrop);
 
 ### Server configuration
 
-| Configuration item                                  | Description                                                                                                                                                                                                                       | Default value                                                              | Required                                        | Since version |
-|-----------------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|----------------------------------------------------------------------------|-------------------------------------------------|---------------|
-| `gravitino.stats.partition.storageFactoryClass`     | The storage factory class for partition statistics, which is used to store partition statistics in the different storage. The `org.apache.gravitino.stats.storage.MemoryPartitionStatsStorageFactory`  can only be used for test. | `org.apache.gravitino.stats.storage.LancePartitionStatisticStorageFactory` |  No                                             | 1.0.0         |
+| Configuration item                                  | Description                                                                                                                                                                                                                          | Default value                                                              | Required                                        | Since version |
+|-----------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|----------------------------------------------------------------------------|-------------------------------------------------|---------------|
+| `gravitino.stats.partition.storageFactoryClass`     | The storage factory class for partition statistics, which is used to store partition statistics in the different storage. The `org.apache.gravitino.stats.storage.MemoryPartitionStatsStorageFactory`  can only be used for testing. | `org.apache.gravitino.stats.storage.LancePartitionStatisticStorageFactory` |  No                                             | 1.0.0         |
 
 
-If you use [Lance](https://lancedb.github.io/lance/) as the partition stats storage, you can set below options, if you have other lance storage options, you can pass it adding prefix `gravitino.stats.partition.storageOption.`.
+If you use [Lance](https://lancedb.github.io/lance/) as the partition statistics storage, you can set the options below, if you have other lance storage options, you can pass it by adding prefix `gravitino.stats.partition.storageOption.`.
 For example, if you set an extra property `foo` to `bar` for Lance storage option, you can add a configuration item `gravitino.stats.partition.storageOption.foo` with value `bar`.
 
 For Lance remote storage, you can refer to the document [here](https://lancedb.github.io/lance/usage/storage/).
 
 
-| Configuration item                                        | Description                               | Default value                  | Required                                        | Since version |
-|-----------------------------------------------------------|-------------------------------------------|--------------------------------|-------------------------------------------------|---------------|
-| `gravitino.stats.partition.storageOption.location`        | The location of Lance files               | `${GRAVITINO_HOME}/data/lance` | No                                              | 1.0.0         |
-| `gravitino.stats.partition.storageOption.maxRowsPerFile`  | The max rows per file                     | `1000000`                      | No                                              | 1.0.0         |
-| `gravitino.stats.partition.storageOption.maxBytesPerFile` | The max bytes per file                    | `100 * 1024 * 1024`            | No                                              | 1.0.0         |
-| `gravitino.stats.partition.storageOption.maxRowsPerGroup` | The max rows per group                    | `1000000`                      | No                                              | 1.0.0         |
-| `gravitino.stats.partition.storageOption.readBatchSize`   | The read batch record number when reading | `10000`                        | No                                              | 1.0.0         |
+| Configuration item                                        | Description                          | Default value                  | Required                                        | Since version |
+|-----------------------------------------------------------|--------------------------------------|--------------------------------|-------------------------------------------------|---------------|
+| `gravitino.stats.partition.storageOption.location`        | The location of Lance files          | `${GRAVITINO_HOME}/data/lance` | No                                              | 1.0.0         |
+| `gravitino.stats.partition.storageOption.maxRowsPerFile`  | The maximum rows per file            | `1000000`                      | No                                              | 1.0.0         |
+| `gravitino.stats.partition.storageOption.maxBytesPerFile` | The maximum bytes per file           | `104857600`                    | No                                              | 1.0.0         |
+| `gravitino.stats.partition.storageOption.maxRowsPerGroup` | The maximum rows per group           | `1000000`                      | No                                              | 1.0.0         |
+| `gravitino.stats.partition.storageOption.readBatchSize`   | The batch record number when reading | `10000`                        | No                                              | 1.0.0         |
 
 ### Implementation a custom partition storage
 
