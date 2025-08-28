@@ -367,7 +367,9 @@ public class FilesetOperations {
       @QueryParam("location_name") String locationName) {
     String decodedSubPath = enableAPICompatibility ? RESTUtils.decodeString(subPath) : subPath;
     String decodedLocationName =
-        enableAPICompatibility ? RESTUtils.decodeString(locationName) : locationName;
+        enableAPICompatibility
+            ? Optional.ofNullable(locationName).map(RESTUtils::decodeString).orElse(null)
+            : locationName;
     LOG.info(
         "Received get file location request: {}.{}.{}.{}, sub path:{}, location name:{}",
         metalake,
