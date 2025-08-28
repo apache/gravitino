@@ -86,12 +86,13 @@ class PermissionManager {
               UserEntity.class,
               Entity.EntityType.USER,
               userEntity -> {
-                if (store instanceof EntityCache relationalStore) {
+                if (store instanceof EntityCache) {
+                  EntityCache cache = (EntityCache) store;
                   roles.forEach(
                           roleName -> {
                             Namespace namespaceRole = NamespaceUtil.ofRole(metalake);
                             NameIdentifier nameIdentifierRole = NameIdentifier.of(namespaceRole, roleName);
-                            relationalStore.invalidate(nameIdentifierRole, Entity.EntityType.ROLE);
+                            cache.invalidate(nameIdentifierRole, Entity.EntityType.ROLE);
                           });
                 }
 
