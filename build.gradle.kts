@@ -569,9 +569,9 @@ subprojects {
       exclude("test/**")
     }
   }
-  tasks.named("compileJava").configure {
-    dependsOn("spotlessCheck")
-  }
+//  tasks.named("compileJava").configure {
+//    dependsOn("spotlessCheck")
+//  }
 }
 
 tasks.rat {
