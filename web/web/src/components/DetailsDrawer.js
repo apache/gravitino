@@ -160,10 +160,7 @@ const DetailsDrawer = props => {
                           className={'twc-py-[0.7rem] twc-truncate twc-max-w-[134px]'}
                           data-refer={`uris-name-${name}`}
                         >
-                          <Tooltip
-                            title={<span data-refer={`tip-uris-name-${name}`}>{name}</span>}
-                            placement='bottom'
-                          >
+                          <Tooltip title={<span data-refer={`tip-uris-name-${name}`}>{name}</span>} placement='bottom'>
                             {name}
                           </Tooltip>
                         </TableCell>
@@ -173,11 +170,7 @@ const DetailsDrawer = props => {
                           data-prev-refer={`uris-name-${name}`}
                         >
                           <Tooltip
-                            title={
-                              <span data-prev-refer={`uris-uri-${name}`}>
-                                {drawerData.uris[name]}
-                              </span>
-                            }
+                            title={<span data-prev-refer={`uris-uri-${name}`}>{drawerData.uris[name]}</span>}
                             placement='bottom'
                           >
                             {drawerData.uris[name]}

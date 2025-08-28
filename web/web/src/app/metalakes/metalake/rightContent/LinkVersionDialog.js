@@ -61,16 +61,17 @@ const defaultValues = {
 
 const schema = yup.object().shape({
   uris: yup
-      .array()
-      .of(
-        yup.object().shape({
-          uri: yup.string().when('name', {
-            is: name => !!name || name === 'default',
-            then: schema => schema.required(),
-            otherwise: schema => schema
-          })
+    .array()
+    .of(
+      yup.object().shape({
+        uri: yup.string().when('name', {
+          is: name => !!name || name === 'default',
+          then: schema => schema.required(),
+          otherwise: schema => schema
         })
-      ).test('unique', 'Uri name must be unique', (uris, ctx) => {
+      })
+    )
+    .test('unique', 'Uri name must be unique', (uris, ctx) => {
       const values = uris?.filter(l => !!l.name).map(l => l.name)
       const duplicates = values.filter((value, index, self) => self.indexOf(value) !== index)
 
@@ -201,7 +202,11 @@ const LinkVersionDialog = props => {
     name: 'aliases'
   })
 
-  const { fields: uris, append: appendUri, remove: removeUri } = useFieldArray({
+  const {
+    fields: uris,
+    append: appendUri,
+    remove: removeUri
+  } = useFieldArray({
     control,
     name: 'uris'
   })
@@ -298,7 +303,9 @@ const LinkVersionDialog = props => {
       setCacheData(data)
       setValue('comment', data.comment)
 
-      const uris = data.uris ? Object.entries(data.uris).map(([name, uri]) => ({ name, uri })) : [{ name: 'default', uri: data.uri || '' }]
+      const uris = data.uris
+        ? Object.entries(data.uris).map(([name, uri]) => ({ name, uri }))
+        : [{ name: 'default', uri: data.uri || '' }]
       setValue('uris', uris)
       const aliases = data.aliases.map(alias => ({ name: alias }))
       setValue(`aliases`, aliases)
@@ -366,9 +373,7 @@ const LinkVersionDialog = props => {
                                 label={`Name ${index + 1}`}
                                 data-refer={`uris-name-${index}`}
                                 error={!!errors.uris?.[index]?.name || !!errors.uris?.message}
-                                helperText={
-                                  errors.uris?.[index]?.name?.message || errors.uris?.message
-                                }
+                                helperText={errors.uris?.[index]?.name?.message || errors.uris?.message}
                                 fullWidth
                               />
                             )}
@@ -385,13 +390,8 @@ const LinkVersionDialog = props => {
                                 onChange={onChange}
                                 label={`URI ${index + 1}`}
                                 data-refer={`uris-uri-${index}`}
-                                error={
-                                  !!errors.uris?.[index]?.uri || !!errors.uris?.message
-                                }
-                                helperText={
-                                  errors.uris?.[index]?.uri?.message ||
-                                  errors.uris?.message
-                                }
+                                error={!!errors.uris?.[index]?.uri || !!errors.uris?.message}
+                                helperText={errors.uris?.[index]?.uri?.message || errors.uris?.message}
                                 fullWidth
                               />
                             )}
@@ -427,9 +427,7 @@ const LinkVersionDialog = props => {
                   </Grid>
                 )
               })}
-              {errors.uris && (
-                <FormHelperText sx={{ color: 'error.main' }}>{errors.uris.message}</FormHelperText>
-              )}
+              {errors.uris && <FormHelperText sx={{ color: 'error.main' }}>{errors.uris.message}</FormHelperText>}
             </Grid>
 
             <Grid item xs={12}>

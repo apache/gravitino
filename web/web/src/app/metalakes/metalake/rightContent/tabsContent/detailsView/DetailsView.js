@@ -210,10 +210,7 @@ const DetailsView = () => {
                           className={'twc-py-[0.7rem] twc-truncate twc-max-w-[134px]'}
                           data-refer={`uris-name-${name}`}
                         >
-                          <Tooltip
-                            title={<span data-refer={`tip-uris-name-${name}`}>{name}</span>}
-                            placement='bottom'
-                          >
+                          <Tooltip title={<span data-refer={`tip-uris-name-${name}`}>{name}</span>} placement='bottom'>
                             {name}
                           </Tooltip>
                         </TableCell>
@@ -223,11 +220,7 @@ const DetailsView = () => {
                           data-prev-refer={`uris-name-${name}`}
                         >
                           <Tooltip
-                            title={
-                              <span data-prev-refer={`uris-name-${name}`}>
-                                {activatedItem?.uris[name]}
-                              </span>
-                            }
+                            title={<span data-prev-refer={`uris-name-${name}`}>{activatedItem?.uris[name]}</span>}
                             placement='bottom'
                           >
                             {activatedItem?.uris[name]}

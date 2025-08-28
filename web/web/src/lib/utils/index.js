@@ -84,18 +84,17 @@ export const genUpdates = (originalData, newData) => {
 
   const originalAliases = originalData.aliases || []
   const newAliases = newData.aliases || []
-  
+
   const aliasesToAdd = newAliases.filter(alias => !originalAliases.includes(alias))
   const aliasesToRemove = originalAliases.filter(alias => !newAliases.includes(alias))
-  
+
   if (aliasesToAdd.length > 0 || aliasesToRemove.length > 0) {
-    updates.push({ 
-      '@type': 'updateAliases', 
-      aliasesToAdd: aliasesToAdd, 
-      aliasesToRemove: aliasesToRemove 
+    updates.push({
+      '@type': 'updateAliases',
+      aliasesToAdd: aliasesToAdd,
+      aliasesToRemove: aliasesToRemove
     })
   }
-
 
   if (originalData.comment !== newData.comment) {
     updates.push({ '@type': 'updateComment', newComment: newData.comment })
