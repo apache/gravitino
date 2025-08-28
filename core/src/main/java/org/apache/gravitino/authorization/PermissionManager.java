@@ -34,6 +34,9 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.MetadataObject;
+import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.Namespace;
+import org.apache.gravitino.cache.EntityCache;
 import org.apache.gravitino.exceptions.IllegalRoleException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchGroupException;
@@ -45,6 +48,8 @@ import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.GroupEntity;
 import org.apache.gravitino.meta.RoleEntity;
 import org.apache.gravitino.meta.UserEntity;
+import org.apache.gravitino.storage.relational.RelationalEntityStore;
+import org.apache.gravitino.utils.NamespaceUtil;
 import org.apache.gravitino.utils.PrincipalUtils;
 import org.glassfish.jersey.internal.guava.Sets;
 import org.slf4j.Logger;
@@ -80,8 +85,16 @@ class PermissionManager {
               AuthorizationUtils.ofUser(metalake, user),
               UserEntity.class,
               Entity.EntityType.USER,
-              roles,
               userEntity -> {
+                if (store instanceof EntityCache relationalStore) {
+                  roles.forEach(
+                          roleName -> {
+                            Namespace namespaceRole = NamespaceUtil.ofRole(metalake);
+                            NameIdentifier nameIdentifierRole = NameIdentifier.of(namespaceRole, roleName);
+                            relationalStore.invalidate(nameIdentifierRole, Entity.EntityType.ROLE);
+                          });
+                }
+
                 List<RoleEntity> roleEntities = Lists.newArrayList();
                 if (userEntity.roleNames() != null) {
                   for (String role : userEntity.roleNames()) {

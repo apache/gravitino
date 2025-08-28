@@ -117,24 +117,6 @@ public class RelationalEntityStore
     cache.put(e);
   }
 
-  @Override
-  public <E extends Entity & HasIdentifier> E update(
-      NameIdentifier ident,
-      Class<E> type,
-      Entity.EntityType entityType,
-      List<String> roles,
-      Function<E, E> updater)
-      throws IOException, NoSuchEntityException, EntityAlreadyExistsException {
-    roles.forEach(
-        roleName -> {
-          Namespace namespaceRole = NamespaceUtil.ofRole(ident.namespace().level(0));
-          NameIdentifier nameIdentifierRole = NameIdentifier.of(namespaceRole, roleName);
-          cache.invalidate(nameIdentifierRole, Entity.EntityType.ROLE);
-        });
-
-    return update(ident, type, entityType, updater);
-  }
-
   public <E extends Entity & HasIdentifier> E update(
       NameIdentifier ident, Class<E> type, Entity.EntityType entityType, Function<E, E> updater)
       throws IOException, NoSuchEntityException, EntityAlreadyExistsException {
