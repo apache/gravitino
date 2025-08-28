@@ -147,6 +147,7 @@ class BaseGVFSOperations(ABC):
             )
         )
         self._current_location_name = self._init_current_location_name()
+        self._kwargs = kwargs
 
     @property
     def current_location_name(self):
@@ -519,6 +520,7 @@ class BaseGVFSOperations(ABC):
                 fileset_catalog.properties(),
                 self._options,
                 actual_file_location,
+                **self._kwargs,
             )
             self._filesystem_cache[(name_identifier, location_name)] = new_cache_value
             return new_cache_value[1]
