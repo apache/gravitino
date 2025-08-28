@@ -75,30 +75,30 @@ class PartitioningSerdes(SerdesUtilsBase, JsonSerializable[Partitioning]):
         result = {cls.STRATEGY: strategy.name.lower()}
 
         if strategy in cls._SINGLE_FIELD_PARTITIONING:
-            partitioning = cast(SingleFieldPartitioning, data_type)
-            return {**result, cls.FIELD_NAME: partitioning.field_name()}
+            dto = cast(SingleFieldPartitioning, data_type)
+            return {**result, cls.FIELD_NAME: dto.field_name()}
         if strategy is Partitioning.Strategy.BUCKET:
-            partitioning = cast(BucketPartitioningDTO, data_type)
+            dto = cast(BucketPartitioningDTO, data_type)
             return {
                 **result,
-                cls.NUM_BUCKETS: partitioning.num_buckets(),
-                cls.FIELD_NAMES: partitioning.field_names(),
+                cls.NUM_BUCKETS: dto.num_buckets(),
+                cls.FIELD_NAMES: dto.field_names(),
             }
         if strategy is Partitioning.Strategy.TRUNCATE:
-            partitioning = cast(TruncatePartitioningDTO, data_type)
+            dto = cast(TruncatePartitioningDTO, data_type)
             return {
                 **result,
-                cls.WIDTH: partitioning.width(),
-                cls.FIELD_NAME: partitioning.field_name(),
+                cls.WIDTH: dto.width(),
+                cls.FIELD_NAME: dto.field_name(),
             }
         if strategy is Partitioning.Strategy.LIST:
-            partitioning = cast(ListPartitioningDTO, data_type)
+            dto = cast(ListPartitioningDTO, data_type)
             return {
                 **result,
-                cls.FIELD_NAMES: partitioning.field_names(),
+                cls.FIELD_NAMES: dto.field_names(),
                 cls.ASSIGNMENTS_NAME: [
                     SerdesUtils.write_partition(list_partition_dto)
-                    for list_partition_dto in partitioning.assignments()
+                    for list_partition_dto in dto.assignments()
                 ],
             }
 
