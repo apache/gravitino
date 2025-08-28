@@ -97,9 +97,6 @@ public class ReverseIndexCache {
     if (rule != null) {
       rule.indexEntity(entity, key, this);
     }
-
-    // Common processing for all entities
-    put(entity, key);
   }
 
   /** Functional interface for processing reverse index rules. */
