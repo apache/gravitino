@@ -24,14 +24,20 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
+import java.io.IOException;
+import java.net.URISyntaxException;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.Base64;
 import java.util.HashMap;
 import java.util.List;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.auth.AuthConstants;
 import org.apache.gravitino.authorization.Owner;
 import org.apache.gravitino.authorization.Privileges;
 import org.apache.gravitino.authorization.SecurableObject;
@@ -44,6 +50,13 @@ import org.apache.gravitino.file.FilesetChange;
 import org.apache.gravitino.integration.test.container.ContainerSuite;
 import org.apache.gravitino.integration.test.container.HiveContainer;
 import org.apache.gravitino.integration.test.util.GravitinoITUtils;
+import org.apache.http.HttpHeaders;
+import org.apache.http.client.methods.CloseableHttpResponse;
+import org.apache.http.client.methods.HttpGet;
+import org.apache.http.client.utils.URIBuilder;
+import org.apache.http.impl.client.CloseableHttpClient;
+import org.apache.http.impl.client.HttpClients;
+import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.MethodOrderer;
 import org.junit.jupiter.api.Order;
@@ -62,6 +75,7 @@ public class FilesetAuthorizationIT extends BaseRestApiAuthorizationIT {
 
   private String role = "role";
   private String defaultBaseLocation;
+  protected CloseableHttpClient httpClient;
 
   @BeforeAll
   public void startIntegrationTest() throws Exception {
@@ -101,6 +115,15 @@ public class FilesetAuthorizationIT extends BaseRestApiAuthorizationIT {
         () -> {
           catalogLoadByNormalUser.asSchemas().loadSchema(SCHEMA);
         });
+
+    httpClient = HttpClients.createDefault();
+  }
+
+  @AfterAll
+  public void closeHttpClient() throws IOException {
+    if (httpClient != null) {
+      httpClient.close();
+    }
   }
 
   @Test
@@ -260,10 +283,50 @@ public class FilesetAuthorizationIT extends BaseRestApiAuthorizationIT {
         NORMAL_USER,
         Owner.Type.USER);
     filesetCatalogNormalUser.getFileLocation(NameIdentifier.of(SCHEMA, "fileset1"), "/test");
+    // reset
+    gravitinoMetalake.setOwner(
+        MetadataObjects.of(
+            ImmutableList.of(CATALOG, SCHEMA, "fileset1"), MetadataObject.Type.FILESET),
+        USER,
+        Owner.Type.USER);
   }
 
   @Test
   @Order(6)
+  public void testListFiles() throws IOException {
+    GravitinoMetalake gravitinoMetalake = client.loadMetalake(METALAKE);
+    FilesetCatalog filesetCatalogNormalUser =
+        normalUserClient.loadMetalake(METALAKE).loadCatalog(CATALOG).asFilesetCatalog();
+    // reset privilege
+    gravitinoMetalake.revokePrivilegesFromRole(
+        role,
+        MetadataObjects.of(
+            ImmutableList.of(CATALOG, SCHEMA, "fileset1"), MetadataObject.Type.FILESET),
+        ImmutableSet.of(Privileges.WriteFileset.allow(), Privileges.ReadFileset.allow()));
+
+    // normal user cannot alter fileset1 (no privilege)
+    assertThrows(
+        String.format("Can not access metadata {%s.%s.%s}.", CATALOG, SCHEMA, "fileset1"),
+        ForbiddenException.class,
+        () -> getFileInfos("fileset1", "/test", "", NORMAL_USER));
+    // grant normal user owner privilege on fileset4
+    gravitinoMetalake.setOwner(
+        MetadataObjects.of(
+            ImmutableList.of(CATALOG, SCHEMA, "fileset1"), MetadataObject.Type.FILESET),
+        NORMAL_USER,
+        Owner.Type.USER);
+    filesetCatalogNormalUser.getFileLocation(NameIdentifier.of(SCHEMA, "fileset1"), "/test");
+    getFileInfos("fileset1", "/test", "", NORMAL_USER);
+    // reset
+    gravitinoMetalake.setOwner(
+        MetadataObjects.of(
+            ImmutableList.of(CATALOG, SCHEMA, "fileset1"), MetadataObject.Type.FILESET),
+        USER,
+        Owner.Type.USER);
+  }
+
+  @Test
+  @Order(7)
   public void testDropFileset() {
     GravitinoMetalake gravitinoMetalake = client.loadMetalake(METALAKE);
     FilesetCatalog filesetCatalogNormalUser =
@@ -311,5 +374,51 @@ public class FilesetAuthorizationIT extends BaseRestApiAuthorizationIT {
 
   private String storageLocation(String filesetName) {
     return defaultBaseLocation() + "/" + filesetName;
+  }
+
+  private void getFileInfos(String fileset, String subPath, String locationName, String user)
+      throws IOException {
+    String targetPath =
+        "/api/metalakes/"
+            + METALAKE
+            + "/catalogs/"
+            + CATALOG
+            + "/schemas/"
+            + SCHEMA
+            + "/filesets/"
+            + fileset
+            + "/files";
+
+    URIBuilder uriBuilder;
+    try {
+      uriBuilder = new URIBuilder(serverUri + targetPath);
+    } catch (URISyntaxException e) {
+      throw new IOException("Error constructing URI: " + serverUri + targetPath, e);
+    }
+
+    if (!StringUtils.isBlank(subPath)) {
+      uriBuilder.addParameter("subPath", subPath);
+    }
+    if (!StringUtils.isBlank(locationName)) {
+      uriBuilder.addParameter("locationName", locationName);
+    }
+
+    HttpGet httpGet;
+    try {
+      httpGet = new HttpGet(uriBuilder.build());
+      String authorization =
+          (AuthConstants.AUTHORIZATION_BASIC_HEADER
+              + new String(
+                  Base64.getEncoder().encode(user.getBytes(StandardCharsets.UTF_8)),
+                  StandardCharsets.UTF_8));
+      httpGet.addHeader(HttpHeaders.AUTHORIZATION, authorization);
+    } catch (URISyntaxException e) {
+      throw new IOException("Failed to build URI with query parameters: " + uriBuilder, e);
+    }
+    try (CloseableHttpResponse httpResponse = httpClient.execute(httpGet)) {
+      if (httpResponse.getStatusLine().getStatusCode() == 403) {
+        throw new ForbiddenException("Can not get files");
+      }
+    }
   }
 }

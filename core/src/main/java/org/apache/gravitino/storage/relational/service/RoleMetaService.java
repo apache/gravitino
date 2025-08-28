@@ -336,23 +336,23 @@ public class RoleMetaService {
     SessionUtils.doMultipleWithCommit(
         () ->
             roleDeletedCount[0] =
-                SessionUtils.doWithoutCommitAndFetchResult(
+                SessionUtils.getWithoutCommit(
                     RoleMetaMapper.class,
                     mapper -> mapper.deleteRoleMetasByLegacyTimeline(legacyTimeline, limit)),
         () ->
             userRoleRelDeletedCount[0] =
-                SessionUtils.doWithoutCommitAndFetchResult(
+                SessionUtils.getWithoutCommit(
                     UserRoleRelMapper.class,
                     mapper -> mapper.deleteUserRoleRelMetasByLegacyTimeline(legacyTimeline, limit)),
         () ->
             groupRoleRelDeletedCount[0] =
-                SessionUtils.doWithoutCommitAndFetchResult(
+                SessionUtils.getWithoutCommit(
                     GroupRoleRelMapper.class,
                     mapper ->
                         mapper.deleteGroupRoleRelMetasByLegacyTimeline(legacyTimeline, limit)),
         () ->
             securableObjectsCount[0] =
-                SessionUtils.doWithoutCommitAndFetchResult(
+                SessionUtils.getWithoutCommit(
                     SecurableObjectMapper.class,
                     mapper ->
                         mapper.deleteSecurableObjectsByLegacyTimeline(legacyTimeline, limit)));

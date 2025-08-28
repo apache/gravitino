@@ -25,7 +25,7 @@ class PlainRESTClientTagOperation(TagOperation):
         self.metalake_name = metalake_name
         self.rest_client = rest_client
 
-    async def get_list_of_tags(self) -> str:
+    async def list_of_tags(self) -> str:
         response = await self.rest_client.get(
             f"/api/metalakes/{self.metalake_name}/tags?details=true"
         )

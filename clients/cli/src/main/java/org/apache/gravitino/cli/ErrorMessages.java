@@ -62,7 +62,7 @@ public class ErrorMessages {
   public static final String MISSING_PROPERTY_AND_VALUE = "Missing --property and --value options.";
   public static final String MISSING_ROLE = "Missing --role option.";
   public static final String MISSING_TAG = "Missing --tag option.";
-  public static final String MISSING_URI = "Missing --uri option.";
+  public static final String MISSING_URIS = "Missing --uris option.";
   public static final String MISSING_USER = "Missing --user option.";
   public static final String MISSING_VALUE = "Missing --value option.";
 
