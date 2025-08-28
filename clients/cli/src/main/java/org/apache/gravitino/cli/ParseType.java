@@ -38,7 +38,7 @@ public class ParseType {
    * @throws IllegalArgumentException if the data type format is unsupported or malformed
    */
   public static ParsedType parseBasicType(String datatype) {
-    Pattern pattern = Pattern.compile("^(\\w+)\\((\\d+)(?:,(\\d+))?\\)$");
+    Pattern pattern = Pattern.compile("^(\\w+)\\(\\s*(\\d+)\\s*(?:,\\s*(\\d+)\\s*)?\\)$");
     Matcher matcher = pattern.matcher(datatype);
 
     if (matcher.matches()) {
