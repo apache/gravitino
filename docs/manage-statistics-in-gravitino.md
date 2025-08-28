@@ -20,6 +20,16 @@ Javadoc and REST API documentation.
 Statistics only support the custom statistics, which names must start with `custom-`.
 Gravitino will support build-in statistics in the future.
 
+Statistics are used by query engine for cost-based optimization (CBO). Meanwhile, statistics can also
+be used for metadata action systems to trigger some jobs, such as compaction, data archive, etc.
+
+You can define statistics and add the policy related the statistics, users analyze the statistics
+and policy to decide the next action.
+
+Now, Gravitino won't handle the computation of the statistics, you need to compute the statistics
+and update it to Gravitino by yourself. Gravitino can't judge the expiration of the statistics,
+You need to guarantee the statistics are fresh.
+
 
 ## Metadata object Statistic operations
 
@@ -37,7 +47,7 @@ The request path for REST API is `/api/metalakes/{metalake}/objects/{metadataObj
 curl -X PUT -H "Accept: application/vnd.gravitino.v1+json" \
 -H "Content-Type: application/json" -d '{
   "updates" : {
-      "custom-k1":"v1"
+      "custom-tableLastModifiedTime": "20250128",
   }
 }' http://localhost:8090/api/metalakes/metalake/objects/table/catalog.schema.table/statistics
 ```
@@ -116,7 +126,8 @@ table.dropStatistics(statisticsToDrop);
 
 ### Update statistics of partitions
 
-You can update the statistics of a partition by providing the statistics key and value.
+You can update the statistics of a partition by providing the statistics key and value. If the statistics
+already exist, it will be updated; otherwise, a new statistic will be created.
 
 The request path for REST API is `/api/metalakes/{metalake}/objects/table/{metadataObjectName}/statistics/partitions`.
 
@@ -227,6 +238,9 @@ table.dropPartitionStatistics(statisticsToDrop);
 
 If you use [Lance](https://lancedb.github.io/lance/) as the partition stats storage, you can set below options, if you have other lance storage options, you can pass it adding prefix `gravitino.stats.partition.storageOption.`.
 For example, if you set an extra property `foo` to `bar` for Lance storage option, you can add a configuration item `gravitino.stats.partition.storageOption.foo` with value `bar`.
+
+For Lance remote storage, you can refer to the document [here](https://lancedb.github.io/lance/usage/storage/).
+
 
 | Configuration item                                        | Description                               | Default value                  | Required                                        | Since version |
 |-----------------------------------------------------------|-------------------------------------------|--------------------------------|-------------------------------------------------|---------------|
