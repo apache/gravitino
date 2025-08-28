@@ -79,19 +79,16 @@ public class CaffeineEntityCache extends BaseEntityCache {
   private static final Logger LOG = LoggerFactory.getLogger(CaffeineEntityCache.class.getName());
   private final ReentrantLock opLock = new ReentrantLock();
 
-  /** Cache data structure. cacheData[0] = Role1-KEY -> [catalog1, catalog2] */
+  /** Cache data structure. */
   private final Cache<EntityCacheRelationKey, List<Entity>> cacheData;
 
   /**
-   * Cache reverse index structure. cacheData[0] = Role1 -> [catalog1, catalog2] cacheData[1] =
-   * catalog1 -> [tab1, tab2] reverseIndex[0] = catalog1-KEY -> Role1 reverseIndex[1] = catalog2-KEY
-   * -> Role1 reverseIndex[3] = tab1-KEY -> catalog1 reverseIndex[4] = tab2-KEY -> catalog1
+   * Cache reverse index structure.
    */
   private ReverseIndexCache reverseIndex;
 
   /**
-   * Cache Index structure. cacheData[0] = Role1 -> [catalog1, catalog2] cacheData[1] = catalog1 ->
-   * [tab1, tab2] cacheIndex[0] = Role1-KEY -> Role1 cacheIndex[1] = Role1-KEY -> Role1
+   * Cache Index structure.
    */
   private RadixTree<EntityCacheRelationKey> cacheIndex;
 
