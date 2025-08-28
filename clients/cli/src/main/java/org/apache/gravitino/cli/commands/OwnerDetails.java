@@ -16,6 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
+
 package org.apache.gravitino.cli.commands;
 
 import java.util.Optional;
@@ -35,7 +36,7 @@ public class OwnerDetails extends Command {
   protected final String entity;
   protected final MetadataObject.Type entityType;
 
-   /**
+  /**
    * Displays the owner of an entity.
    *
    * @param context The command context.
