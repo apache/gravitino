@@ -37,7 +37,9 @@ import org.apache.gravitino.exceptions.GroupAlreadyExistsException;
 import org.apache.gravitino.exceptions.IllegalMetadataObjectException;
 import org.apache.gravitino.exceptions.IllegalPrivilegeException;
 import org.apache.gravitino.exceptions.IllegalRoleException;
+import org.apache.gravitino.exceptions.IllegalStatisticNameException;
 import org.apache.gravitino.exceptions.InUseException;
+import org.apache.gravitino.exceptions.JobTemplateAlreadyExistsException;
 import org.apache.gravitino.exceptions.MetalakeAlreadyExistsException;
 import org.apache.gravitino.exceptions.MetalakeInUseException;
 import org.apache.gravitino.exceptions.MetalakeNotInUseException;
@@ -46,12 +48,16 @@ import org.apache.gravitino.exceptions.ModelVersionAliasesAlreadyExistException;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchFilesetException;
 import org.apache.gravitino.exceptions.NoSuchGroupException;
+import org.apache.gravitino.exceptions.NoSuchJobException;
+import org.apache.gravitino.exceptions.NoSuchJobTemplateException;
 import org.apache.gravitino.exceptions.NoSuchLocationNameException;
 import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.NoSuchModelException;
 import org.apache.gravitino.exceptions.NoSuchModelVersionException;
+import org.apache.gravitino.exceptions.NoSuchModelVersionURINameException;
 import org.apache.gravitino.exceptions.NoSuchPartitionException;
+import org.apache.gravitino.exceptions.NoSuchPolicyException;
 import org.apache.gravitino.exceptions.NoSuchRoleException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchTableException;
@@ -64,6 +70,8 @@ import org.apache.gravitino.exceptions.NonEmptySchemaException;
 import org.apache.gravitino.exceptions.NotFoundException;
 import org.apache.gravitino.exceptions.NotInUseException;
 import org.apache.gravitino.exceptions.PartitionAlreadyExistsException;
+import org.apache.gravitino.exceptions.PolicyAlreadyAssociatedException;
+import org.apache.gravitino.exceptions.PolicyAlreadyExistsException;
 import org.apache.gravitino.exceptions.RESTException;
 import org.apache.gravitino.exceptions.RoleAlreadyExistsException;
 import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
@@ -72,6 +80,7 @@ import org.apache.gravitino.exceptions.TagAlreadyAssociatedException;
 import org.apache.gravitino.exceptions.TagAlreadyExistsException;
 import org.apache.gravitino.exceptions.TopicAlreadyExistsException;
 import org.apache.gravitino.exceptions.UnauthorizedException;
+import org.apache.gravitino.exceptions.UnmodifiableStatisticException;
 import org.apache.gravitino.exceptions.UserAlreadyExistsException;
 
 /**
@@ -207,6 +216,15 @@ public class ErrorHandlers {
   }
 
   /**
+   * Creates an error handler specific to policy operations.
+   *
+   * @return A Consumer representing the policy error handler.
+   */
+  public static Consumer<ErrorResponse> policyErrorHandler() {
+    return PolicyErrorHandler.INSTANCE;
+  }
+
+  /**
    * Creates an error handler specific to credential operations.
    *
    * @return A Consumer representing the credential error handler.
@@ -231,6 +249,24 @@ public class ErrorHandlers {
    */
   public static Consumer<ErrorResponse> modelErrorHandler() {
     return ModelErrorHandler.INSTANCE;
+  }
+
+  /**
+   * Creates an error handler specific to job and job template operations.
+   *
+   * @return A Consumer representing the job error handler.
+   */
+  public static Consumer<ErrorResponse> jobErrorHandler() {
+    return JobErrorHandler.INSTANCE;
+  }
+
+  /**
+   * Creates an error handler specific to Statistics operations.
+   *
+   * @return A Consumer representing the Statistics error handler.
+   */
+  public static Consumer<ErrorResponse> statisticsErrorHandler() {
+    return StatisticsErrorHandler.INSTANCE;
   }
 
   private ErrorHandlers() {}
@@ -968,6 +1004,52 @@ public class ErrorHandlers {
     }
   }
 
+  /** Error handler specific to policy operations. */
+  @SuppressWarnings("FormatStringAnnotation")
+  private static class PolicyErrorHandler extends RestErrorHandler {
+
+    private static final PolicyErrorHandler INSTANCE = new PolicyErrorHandler();
+
+    @Override
+    public void accept(ErrorResponse errorResponse) {
+      String errorMessage = formatErrorMessage(errorResponse);
+
+      switch (errorResponse.getCode()) {
+        case ErrorConstants.ILLEGAL_ARGUMENTS_CODE:
+          throw new IllegalArgumentException(errorMessage);
+
+        case ErrorConstants.NOT_FOUND_CODE:
+          if (errorResponse.getType().equals(NoSuchMetalakeException.class.getSimpleName())) {
+            throw new NoSuchMetalakeException(errorMessage);
+          } else if (errorResponse.getType().equals(NoSuchPolicyException.class.getSimpleName())) {
+            throw new NoSuchPolicyException(errorMessage);
+          } else {
+            throw new NotFoundException(errorMessage);
+          }
+
+        case ErrorConstants.ALREADY_EXISTS_CODE:
+          if (errorResponse.getType().equals(PolicyAlreadyExistsException.class.getSimpleName())) {
+            throw new PolicyAlreadyExistsException(errorMessage);
+          } else if (errorResponse
+              .getType()
+              .equals(PolicyAlreadyAssociatedException.class.getSimpleName())) {
+            throw new PolicyAlreadyAssociatedException(errorMessage);
+          } else {
+            throw new AlreadyExistsException(errorMessage);
+          }
+
+        case ErrorConstants.NOT_IN_USE_CODE:
+          throw new MetalakeNotInUseException(errorMessage);
+
+        case ErrorConstants.INTERNAL_ERROR_CODE:
+          throw new RuntimeException(errorMessage);
+
+        default:
+          super.accept(errorResponse);
+      }
+    }
+  }
+
   /** Error handler specific to Owner operations. */
   @SuppressWarnings("FormatStringAnnotation")
   private static class OwnerErrorHandler extends RestErrorHandler {
@@ -1027,6 +1109,10 @@ public class ErrorHandlers {
               .getType()
               .equals(NoSuchModelVersionException.class.getSimpleName())) {
             throw new NoSuchModelVersionException(errorMsg);
+          } else if (errorResponse
+              .getType()
+              .equals(NoSuchModelVersionURINameException.class.getSimpleName())) {
+            throw new NoSuchModelVersionURINameException(errorMsg);
           } else {
             throw new NotFoundException(errorMsg);
           }
@@ -1067,6 +1153,125 @@ public class ErrorHandlers {
     }
   }
 
+  /** Error handler specific to job and job template operations. */
+  @SuppressWarnings("FormatStringAnnotation")
+  private static class JobErrorHandler extends RestErrorHandler {
+
+    private static final JobErrorHandler INSTANCE = new JobErrorHandler();
+
+    @Override
+    public void accept(ErrorResponse errorResponse) {
+      String errorMsg = formatErrorMessage(errorResponse);
+
+      switch (errorResponse.getCode()) {
+        case ErrorConstants.ILLEGAL_ARGUMENTS_CODE:
+          throw new IllegalArgumentException(errorMsg);
+
+        case ErrorConstants.NOT_FOUND_CODE:
+          if (errorResponse.getType().equals(NoSuchMetalakeException.class.getSimpleName())) {
+            throw new NoSuchMetalakeException(errorMsg);
+          } else if (errorResponse
+              .getType()
+              .equals(NoSuchJobTemplateException.class.getSimpleName())) {
+            throw new NoSuchJobTemplateException(errorMsg);
+          } else if (errorResponse.getType().equals(NoSuchJobException.class.getSimpleName())) {
+            throw new NoSuchJobException(errorMsg);
+          } else {
+            throw new NotFoundException(errorMsg);
+          }
+
+        case ErrorConstants.ALREADY_EXISTS_CODE:
+          throw new JobTemplateAlreadyExistsException(errorMsg);
+
+        case ErrorConstants.FORBIDDEN_CODE:
+          throw new ForbiddenException(errorMsg);
+
+        case ErrorConstants.INTERNAL_ERROR_CODE:
+          throw new RuntimeException(errorMsg);
+
+        case ErrorConstants.NOT_IN_USE_CODE:
+          if (errorResponse.getType().equals(MetalakeNotInUseException.class.getSimpleName())) {
+            throw new MetalakeNotInUseException(errorMsg);
+
+          } else {
+            throw new NotInUseException(errorMsg);
+          }
+
+        case ErrorConstants.IN_USE_CODE:
+          throw new InUseException(errorMsg);
+
+        default:
+          super.accept(errorResponse);
+      }
+    }
+  }
+
+  /** Error handler specific to Statistics operations. */
+  @SuppressWarnings("FormatStringAnnotation")
+  private static class StatisticsErrorHandler extends RestErrorHandler {
+
+    private static final StatisticsErrorHandler INSTANCE = new StatisticsErrorHandler();
+
+    @Override
+    public void accept(ErrorResponse errorResponse) {
+      String errorMessage = formatErrorMessage(errorResponse);
+
+      switch (errorResponse.getCode()) {
+        case ErrorConstants.ILLEGAL_ARGUMENTS_CODE:
+          if (errorResponse.getType().equals(IllegalStatisticNameException.class.getSimpleName())) {
+            throw new IllegalStatisticNameException(errorMessage);
+          } else {
+            throw new IllegalArgumentException(errorMessage);
+          }
+
+        case ErrorConstants.NOT_FOUND_CODE:
+          if (errorResponse.getType().equals(NoSuchSchemaException.class.getSimpleName())) {
+            throw new NoSuchSchemaException(errorMessage);
+          } else if (errorResponse.getType().equals(NoSuchTableException.class.getSimpleName())) {
+            throw new NoSuchTableException(errorMessage);
+          } else if (errorResponse
+              .getType()
+              .equals(NoSuchMetadataObjectException.class.getSimpleName())) {
+            throw new NoSuchMetadataObjectException(errorMessage);
+          } else {
+            throw new NotFoundException(errorMessage);
+          }
+
+        case ErrorConstants.UNSUPPORTED_OPERATION_CODE:
+          if (errorResponse
+              .getType()
+              .equals(UnmodifiableStatisticException.class.getSimpleName())) {
+            throw new UnmodifiableStatisticException(errorMessage);
+          } else {
+            throw new UnsupportedOperationException(errorMessage);
+          }
+
+        case ErrorConstants.FORBIDDEN_CODE:
+          throw new ForbiddenException(errorMessage);
+
+        case ErrorConstants.INTERNAL_ERROR_CODE:
+          throw new RuntimeException(errorMessage);
+
+        case ErrorConstants.NOT_IN_USE_CODE:
+          if (errorResponse.getType().equals(CatalogNotInUseException.class.getSimpleName())) {
+            throw new CatalogNotInUseException(errorMessage);
+          } else if (errorResponse
+              .getType()
+              .equals(MetalakeNotInUseException.class.getSimpleName())) {
+            throw new MetalakeNotInUseException(errorMessage);
+          } else {
+            throw new NotInUseException(errorMessage);
+          }
+
+        case ErrorConstants.IN_USE_CODE:
+          throw new InUseException(errorMessage);
+
+        default:
+          super.accept(errorResponse);
+      }
+    }
+  }
+
   /** Generic error handler for REST requests. */
   private static class RestErrorHandler extends ErrorHandler {
     private static final ErrorHandler INSTANCE = new RestErrorHandler();
@@ -1085,6 +1290,9 @@ public class ErrorHandlers {
 
     @Override
     public void accept(ErrorResponse errorResponse) {
+      if (errorResponse.getCode() == ErrorConstants.FORBIDDEN_CODE) {
+        throw new ForbiddenException("Forbidden error :%s", errorResponse.getMessage());
+      }
       throw new RESTException("Unable to process: %s", formatErrorMessage(errorResponse));
     }
   }

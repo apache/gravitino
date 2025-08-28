@@ -46,6 +46,28 @@ Gravitino doesn't support metadata authentication. It means that Gravitino won't
 
 ### Authorization
 
+#### Build-in Authorization
+
+Gravitino provides built-in metadata authorization. You can enable the built-in metadata authorization through the following configuration.
+
+```
+gravitino.authorization.enable = true
+```
+
+You can close the built-in metadata authorization through the following configuration.
+
+```
+gravitino.authorization.impl = org.apache.gravitino.server.authorization.PassThroughAuthorizer
+```
+
+:::info
+
+Built-in metadata authorization depends on the authentication feature. To use the built-in metadata authorization, authentication must be enabled and privileges must be granted to users.You can see the privileges required for different REST APIs in the [API required conditions](##API required conditions).
+
+:::
+
+#### Authorization push down
+
 Gravitino also provides a set of authorization frameworks to interact with different underlying data source
 authorization systems (e.g., MySQL's own access control management and the Apache Ranger access control management system for big data)
 in accordance with its own authorization model and methodology.
@@ -968,7 +990,7 @@ The following table lists the required privileges for each API.
 | list fileset                | First, you should have the privilege to load the catalog and the schema. Then, you are one of the owners of the schema, catalog, metalake can see all the filesets, others can see the filesets which they can load                           |
 | load fileset                | First, you should have the privilege to load the catalog and the schema. Then, you are one of the owners of the fileset, schema, metalake, catalog or have either `READ_FILESET` or `WRITE_FILESET` on the fileset, schema, catalog, metalake |
 | register model              | First, you should have the privilege to load the catalog and the schema. Then, you have `CREATE_MODEL` on the metalake, catalog, schema or are the owner of the metalake, catalog, schema                                                     |
-| link model version          | First, you should have the privilege to load the catalog and the schema. Then, you have `CREATE_MODEL_VERSION` on the metalake, catalog, schema or are the owner of the metalake, catalog, schema                                             |
+| link model version          | First, you should have the privilege to load the catalog, the schema and the model. Then, you have `CREATE_MODEL_VERSION` on the metalake, catalog, schema, model or are the owner of the metalake, catalog, schema, model                    |
 | alter model                 | First, you should have the privilege to load the catalog and the schema. Then, you are one of the owners of the model, schema, catalog, metalake                                                                                              |
 | drop model                  | First, you should have the privilege to load the catalog and the schema. Then, you are one of the owners of the model, schema, catalog, metalake                                                                                              |
 | list model                  | First, you should have the privilege to load the catalog and the schema. Then the owner of the schema, catalog, metalake can see all the models, others can see the models which they can load                                                |

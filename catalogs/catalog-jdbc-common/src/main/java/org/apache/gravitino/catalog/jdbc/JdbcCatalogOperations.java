@@ -50,6 +50,7 @@ import org.apache.gravitino.catalog.jdbc.converter.JdbcTypeConverter;
 import org.apache.gravitino.catalog.jdbc.operation.DatabaseOperation;
 import org.apache.gravitino.catalog.jdbc.operation.JdbcDatabaseOperations;
 import org.apache.gravitino.catalog.jdbc.operation.JdbcTableOperations;
+import org.apache.gravitino.catalog.jdbc.operation.RequireDatabaseOperation;
 import org.apache.gravitino.catalog.jdbc.operation.TableOperation;
 import org.apache.gravitino.catalog.jdbc.utils.DataSourceUtils;
 import org.apache.gravitino.connector.CatalogInfo;
@@ -170,6 +171,9 @@ public class JdbcCatalogOperations implements CatalogOperations, SupportsSchemas
     this.databaseOperation.initialize(dataSource, exceptionConverter, resultConf);
     this.tableOperation.initialize(
         dataSource, exceptionConverter, jdbcTypeConverter, columnDefaultValueConverter, resultConf);
+    if (tableOperation instanceof RequireDatabaseOperation) {
+      ((RequireDatabaseOperation) tableOperation).setDatabaseOperation(databaseOperation);
+    }
   }
 
   /** Closes the Jdbc catalog and releases the associated client pool. */

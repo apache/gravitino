@@ -23,25 +23,40 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableSet;
+import java.io.IOException;
+import java.net.URISyntaxException;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.Base64;
 import java.util.HashMap;
 import java.util.List;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.auth.AuthConstants;
 import org.apache.gravitino.authorization.Owner;
 import org.apache.gravitino.authorization.Privileges;
 import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.authorization.SecurableObjects;
 import org.apache.gravitino.client.GravitinoMetalake;
+import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.file.Fileset;
 import org.apache.gravitino.file.FilesetCatalog;
 import org.apache.gravitino.file.FilesetChange;
 import org.apache.gravitino.integration.test.container.ContainerSuite;
 import org.apache.gravitino.integration.test.container.HiveContainer;
 import org.apache.gravitino.integration.test.util.GravitinoITUtils;
+import org.apache.http.HttpHeaders;
+import org.apache.http.client.methods.CloseableHttpResponse;
+import org.apache.http.client.methods.HttpGet;
+import org.apache.http.client.utils.URIBuilder;
+import org.apache.http.impl.client.CloseableHttpClient;
+import org.apache.http.impl.client.HttpClients;
+import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.MethodOrderer;
 import org.junit.jupiter.api.Order;
@@ -60,6 +75,7 @@ public class FilesetAuthorizationIT extends BaseRestApiAuthorizationIT {
 
   private String role = "role";
   private String defaultBaseLocation;
+  protected CloseableHttpClient httpClient;
 
   @BeforeAll
   public void startIntegrationTest() throws Exception {
@@ -74,7 +90,7 @@ public class FilesetAuthorizationIT extends BaseRestApiAuthorizationIT {
     // try to load the schema as normal user, expect failure
     assertThrows(
         "Can not access metadata {" + CATALOG + "." + SCHEMA + "}.",
-        RuntimeException.class,
+        ForbiddenException.class,
         () -> {
           normalUserClient
               .loadMetalake(METALAKE)
@@ -95,10 +111,19 @@ public class FilesetAuthorizationIT extends BaseRestApiAuthorizationIT {
     assertEquals(CATALOG, catalogLoadByNormalUser.name());
     assertThrows(
         "Can not access metadata {" + CATALOG + "." + SCHEMA + "}.",
-        RuntimeException.class,
+        ForbiddenException.class,
         () -> {
           catalogLoadByNormalUser.asSchemas().loadSchema(SCHEMA);
         });
+
+    httpClient = HttpClients.createDefault();
+  }
+
+  @AfterAll
+  public void closeHttpClient() throws IOException {
+    if (httpClient != null) {
+      httpClient.close();
+    }
   }
 
   @Test
@@ -120,7 +145,7 @@ public class FilesetAuthorizationIT extends BaseRestApiAuthorizationIT {
         normalUserClient.loadMetalake(METALAKE).loadCatalog(CATALOG).asFilesetCatalog();
     assertThrows(
         "Can not access metadata {" + CATALOG + "." + SCHEMA + "}.",
-        RuntimeException.class,
+        ForbiddenException.class,
         () -> {
           filesetCatalogNormalUser.createFileset(
               //              NameIdentifier.of(SCHEMA, "fileset2"),
@@ -186,9 +211,9 @@ public class FilesetAuthorizationIT extends BaseRestApiAuthorizationIT {
     // normal user can load fileset2 and fileset3, but not fileset1
     assertThrows(
         String.format("Can not access metadata {%s.%s.%s}.", CATALOG, SCHEMA, "fileset1"),
-        RuntimeException.class,
+        ForbiddenException.class,
         () -> {
-          filesetCatalogNormalUser.loadFileset(NameIdentifier.of(CATALOG, SCHEMA, "fileset1"));
+          filesetCatalogNormalUser.loadFileset(NameIdentifier.of(SCHEMA, "fileset1"));
         });
     Fileset fileset2 = filesetCatalogNormalUser.loadFileset(NameIdentifier.of(SCHEMA, "fileset2"));
     assertEquals("fileset2", fileset2.name());
@@ -216,7 +241,7 @@ public class FilesetAuthorizationIT extends BaseRestApiAuthorizationIT {
     // normal user cannot alter fileset1 (no privilege)
     assertThrows(
         String.format("Can not access metadata {%s.%s.%s}.", CATALOG, SCHEMA, "fileset1"),
-        RuntimeException.class,
+        ForbiddenException.class,
         () -> {
           filesetCatalogNormalUser.alterFileset(
               NameIdentifier.of(SCHEMA, "fileset1"), FilesetChange.setProperty("key", "value"));
@@ -237,14 +262,19 @@ public class FilesetAuthorizationIT extends BaseRestApiAuthorizationIT {
     GravitinoMetalake gravitinoMetalake = client.loadMetalake(METALAKE);
     FilesetCatalog filesetCatalogNormalUser =
         normalUserClient.loadMetalake(METALAKE).loadCatalog(CATALOG).asFilesetCatalog();
+    // reset privilege
+    gravitinoMetalake.revokePrivilegesFromRole(
+        role,
+        MetadataObjects.of(
+            ImmutableList.of(CATALOG, SCHEMA, "fileset1"), MetadataObject.Type.FILESET),
+        ImmutableSet.of(Privileges.WriteFileset.allow(), Privileges.ReadFileset.allow()));
 
     // normal user cannot alter fileset1 (no privilege)
     assertThrows(
         String.format("Can not access metadata {%s.%s.%s}.", CATALOG, SCHEMA, "fileset1"),
-        RuntimeException.class,
+        ForbiddenException.class,
         () -> {
-          filesetCatalogNormalUser.getFileLocation(
-              NameIdentifier.of(METALAKE, CATALOG, SCHEMA, "fileset1"), "/test");
+          filesetCatalogNormalUser.getFileLocation(NameIdentifier.of(SCHEMA, "fileset1"), "/test");
         });
     // grant normal user owner privilege on fileset4
     gravitinoMetalake.setOwner(
@@ -253,10 +283,50 @@ public class FilesetAuthorizationIT extends BaseRestApiAuthorizationIT {
         NORMAL_USER,
         Owner.Type.USER);
     filesetCatalogNormalUser.getFileLocation(NameIdentifier.of(SCHEMA, "fileset1"), "/test");
+    // reset
+    gravitinoMetalake.setOwner(
+        MetadataObjects.of(
+            ImmutableList.of(CATALOG, SCHEMA, "fileset1"), MetadataObject.Type.FILESET),
+        USER,
+        Owner.Type.USER);
   }
 
   @Test
   @Order(6)
+  public void testListFiles() throws IOException {
+    GravitinoMetalake gravitinoMetalake = client.loadMetalake(METALAKE);
+    FilesetCatalog filesetCatalogNormalUser =
+        normalUserClient.loadMetalake(METALAKE).loadCatalog(CATALOG).asFilesetCatalog();
+    // reset privilege
+    gravitinoMetalake.revokePrivilegesFromRole(
+        role,
+        MetadataObjects.of(
+            ImmutableList.of(CATALOG, SCHEMA, "fileset1"), MetadataObject.Type.FILESET),
+        ImmutableSet.of(Privileges.WriteFileset.allow(), Privileges.ReadFileset.allow()));
+
+    // normal user cannot alter fileset1 (no privilege)
+    assertThrows(
+        String.format("Can not access metadata {%s.%s.%s}.", CATALOG, SCHEMA, "fileset1"),
+        ForbiddenException.class,
+        () -> getFileInfos("fileset1", "/test", "", NORMAL_USER));
+    // grant normal user owner privilege on fileset4
+    gravitinoMetalake.setOwner(
+        MetadataObjects.of(
+            ImmutableList.of(CATALOG, SCHEMA, "fileset1"), MetadataObject.Type.FILESET),
+        NORMAL_USER,
+        Owner.Type.USER);
+    filesetCatalogNormalUser.getFileLocation(NameIdentifier.of(SCHEMA, "fileset1"), "/test");
+    getFileInfos("fileset1", "/test", "", NORMAL_USER);
+    // reset
+    gravitinoMetalake.setOwner(
+        MetadataObjects.of(
+            ImmutableList.of(CATALOG, SCHEMA, "fileset1"), MetadataObject.Type.FILESET),
+        USER,
+        Owner.Type.USER);
+  }
+
+  @Test
+  @Order(7)
   public void testDropFileset() {
     GravitinoMetalake gravitinoMetalake = client.loadMetalake(METALAKE);
     FilesetCatalog filesetCatalogNormalUser =
@@ -270,7 +340,7 @@ public class FilesetAuthorizationIT extends BaseRestApiAuthorizationIT {
     // normal user cannot drop fileset1
     assertThrows(
         String.format("Can not access metadata {%s.%s.%s}.", CATALOG, SCHEMA, "fileset1"),
-        RuntimeException.class,
+        ForbiddenException.class,
         () -> {
           filesetCatalogNormalUser.dropFileset(NameIdentifier.of(SCHEMA, "fileset1"));
         });
@@ -304,5 +374,51 @@ public class FilesetAuthorizationIT extends BaseRestApiAuthorizationIT {
 
   private String storageLocation(String filesetName) {
     return defaultBaseLocation() + "/" + filesetName;
+  }
+
+  private void getFileInfos(String fileset, String subPath, String locationName, String user)
+      throws IOException {
+    String targetPath =
+        "/api/metalakes/"
+            + METALAKE
+            + "/catalogs/"
+            + CATALOG
+            + "/schemas/"
+            + SCHEMA
+            + "/filesets/"
+            + fileset
+            + "/files";
+
+    URIBuilder uriBuilder;
+    try {
+      uriBuilder = new URIBuilder(serverUri + targetPath);
+    } catch (URISyntaxException e) {
+      throw new IOException("Error constructing URI: " + serverUri + targetPath, e);
+    }
+
+    if (!StringUtils.isBlank(subPath)) {
+      uriBuilder.addParameter("subPath", subPath);
+    }
+    if (!StringUtils.isBlank(locationName)) {
+      uriBuilder.addParameter("locationName", locationName);
+    }
+
+    HttpGet httpGet;
+    try {
+      httpGet = new HttpGet(uriBuilder.build());
+      String authorization =
+          (AuthConstants.AUTHORIZATION_BASIC_HEADER
+              + new String(
+                  Base64.getEncoder().encode(user.getBytes(StandardCharsets.UTF_8)),
+                  StandardCharsets.UTF_8));
+      httpGet.addHeader(HttpHeaders.AUTHORIZATION, authorization);
+    } catch (URISyntaxException e) {
+      throw new IOException("Failed to build URI with query parameters: " + uriBuilder, e);
+    }
+    try (CloseableHttpResponse httpResponse = httpClient.execute(httpGet)) {
+      if (httpResponse.getStatusLine().getStatusCode() == 403) {
+        throw new ForbiddenException("Can not get files");
+      }
+    }
   }
 }

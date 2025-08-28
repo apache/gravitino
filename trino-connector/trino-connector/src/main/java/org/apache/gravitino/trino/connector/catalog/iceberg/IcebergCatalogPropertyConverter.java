@@ -41,6 +41,8 @@ public class IcebergCatalogPropertyConverter extends CatalogPropertyConverter {
 
   private static final Set<String> HIVE_BACKEND_REQUIRED_PROPERTIES = Set.of("uri");
 
+  private static final Set<String> REST_BACKEND_REQUIRED_PROPERTIES = Set.of("uri");
+
   @Override
   public Map<String, String> gravitinoToEngineProperties(Map<String, String> properties) {
     Map<String, String> stringStringMap;
@@ -52,11 +54,17 @@ public class IcebergCatalogPropertyConverter extends CatalogPropertyConverter {
       case "jdbc":
         stringStringMap = buildJDBCBackendProperties(properties);
         break;
+      case "rest":
+        stringStringMap = buildRestBackendProperties(properties);
+        break;
       default:
         throw new UnsupportedOperationException("Unsupported backend type: " + backend);
     }
-    stringStringMap.putAll(super.gravitinoToEngineProperties(properties));
-    return stringStringMap;
+    Map<String, String> config = new HashMap<>();
+    // The order of put operations determines the priority of parameters.
+    config.putAll(super.gravitinoToEngineProperties(properties));
+    config.putAll(stringStringMap);
+    return config;
   }
 
   private Map<String, String> buildHiveBackendProperties(Map<String, String> properties) {
@@ -102,6 +110,21 @@ public class IcebergCatalogPropertyConverter extends CatalogPropertyConverter {
         "iceberg.jdbc-catalog.catalog-name",
         IcebergPropertiesUtils.getCatalogBackendName(properties));
 
+    return jdbcProperties;
+  }
+
+  private Map<String, String> buildRestBackendProperties(Map<String, String> properties) {
+    Set<String> missingProperty =
+        Sets.difference(REST_BACKEND_REQUIRED_PROPERTIES, properties.keySet());
+    if (!missingProperty.isEmpty()) {
+      throw new TrinoException(
+          GravitinoErrorCode.GRAVITINO_MISSING_REQUIRED_PROPERTY,
+          "Missing required property for Rest backend: " + missingProperty);
+    }
+
+    Map<String, String> jdbcProperties = new HashMap<>();
+    jdbcProperties.put("iceberg.catalog.type", "rest");
+    jdbcProperties.put("iceberg.rest-catalog.uri", properties.get(IcebergConstants.URI));
     return jdbcProperties;
   }
 }

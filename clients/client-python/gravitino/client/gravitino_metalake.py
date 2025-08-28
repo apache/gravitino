@@ -20,16 +20,29 @@ from typing import List, Dict
 
 from gravitino.api.catalog import Catalog
 from gravitino.api.catalog_change import CatalogChange
+from gravitino.api.job.job_handle import JobHandle
+from gravitino.api.job.job_template import JobTemplate
+from gravitino.api.job.supports_jobs import SupportsJobs
 from gravitino.client.dto_converters import DTOConverters
+from gravitino.client.generic_job_handle import GenericJobHandle
 from gravitino.dto.metalake_dto import MetalakeDTO
 from gravitino.dto.requests.catalog_create_request import CatalogCreateRequest
 from gravitino.dto.requests.catalog_set_request import CatalogSetRequest
 from gravitino.dto.requests.catalog_updates_request import CatalogUpdatesRequest
+from gravitino.dto.requests.job_run_request import JobRunRequest
+from gravitino.dto.requests.job_template_register_request import (
+    JobTemplateRegisterRequest,
+)
 from gravitino.dto.responses.catalog_list_response import CatalogListResponse
 from gravitino.dto.responses.catalog_response import CatalogResponse
 from gravitino.dto.responses.drop_response import DropResponse
 from gravitino.dto.responses.entity_list_response import EntityListResponse
+from gravitino.dto.responses.job_list_response import JobListResponse
+from gravitino.dto.responses.job_response import JobResponse
+from gravitino.dto.responses.job_template_list_response import JobTemplateListResponse
+from gravitino.dto.responses.job_template_response import JobTemplateResponse
 from gravitino.exceptions.handlers.catalog_error_handler import CATALOG_ERROR_HANDLER
+from gravitino.exceptions.handlers.job_error_handler import JOB_ERROR_HANDLER
 from gravitino.rest.rest_utils import encode_string
 from gravitino.utils import HTTPClient
 
@@ -37,7 +50,7 @@ from gravitino.utils import HTTPClient
 logger = logging.getLogger(__name__)
 
 
-class GravitinoMetalake(MetalakeDTO):
+class GravitinoMetalake(MetalakeDTO, SupportsJobs):
     """
     Gravitino Metalake is the top-level metadata repository for users. It contains a list of catalogs
     as sub-level metadata collections. With GravitinoMetalake, users can list, create, load,
@@ -47,6 +60,8 @@ class GravitinoMetalake(MetalakeDTO):
     rest_client: HTTPClient
 
     API_METALAKES_CATALOGS_PATH = "api/metalakes/{}/catalogs/{}"
+    API_METALAKES_JOB_TEMPLATES_PATH = "api/metalakes/{}/jobs/templates"
+    API_METALAKES_JOB_RUNS_PATH = "api/metalakes/{}/jobs/runs"
 
     def __init__(self, metalake: MetalakeDTO = None, client: HTTPClient = None):
         super().__init__(
@@ -255,3 +270,194 @@ class GravitinoMetalake(MetalakeDTO):
         self.rest_client.patch(
             url, json=catalog_disable_request, error_handler=CATALOG_ERROR_HANDLER
         )
+
+    def list_job_templates(self) -> List[JobTemplate]:
+        """List all the registered job templates in Gravitino.
+
+        Returns:
+            List of job templates.
+        """
+        params = {"details": "true"}
+        url = self.API_METALAKES_JOB_TEMPLATES_PATH.format(encode_string(self.name()))
+        response = self.rest_client.get(
+            url, params=params, error_handler=JOB_ERROR_HANDLER
+        )
+        resp = JobTemplateListResponse.from_json(response.body, infer_missing=True)
+        resp.validate()
+
+        return [
+            DTOConverters.from_job_template_dto(dto) for dto in resp.job_templates()
+        ]
+
+    def register_job_template(self, job_template: JobTemplate) -> None:
+        """Register a job template with the specified job template to Gravitino. The registered
+        job template will be maintained in Gravitino, allowing it to be executed later.
+
+        Args:
+            job_template: The job template to register.
+
+        Raises:
+            JobTemplateAlreadyExists: If a job template with the same name already exists.
+        """
+        url = self.API_METALAKES_JOB_TEMPLATES_PATH.format(encode_string(self.name()))
+        req = JobTemplateRegisterRequest(
+            DTOConverters.to_job_template_dto(job_template)
+        )
+
+        self.rest_client.post(url, json=req, error_handler=JOB_ERROR_HANDLER)
+
+    def get_job_template(self, job_template_name: str) -> JobTemplate:
+        """Retrieves a job template by its name.
+
+        Args:
+            job_template_name: The name of the job template to retrieve.
+
+        Returns:
+            The job template if found, otherwise raises an exception.
+
+        Raises:
+            NoSuchJobTemplateException: If no job template with the specified name exists.
+        """
+        if not job_template_name or not job_template_name.strip():
+            raise ValueError("Job template name cannot be null or empty")
+
+        url = (
+            f"{self.API_METALAKES_JOB_TEMPLATES_PATH.format(encode_string(self.name()))}/"
+            f"{encode_string(job_template_name)}"
+        )
+        response = self.rest_client.get(url, error_handler=JOB_ERROR_HANDLER)
+        resp = JobTemplateResponse.from_json(response.body, infer_missing=True)
+        resp.validate()
+
+        return DTOConverters.from_job_template_dto(resp.job_template())
+
+    def delete_job_template(self, job_template_name: str) -> bool:
+        """
+        Deletes a job template by its name. This will remove the job template from Gravitino, and it
+        will no longer be available for execution. Only when all the jobs associated with this job
+        template are completed, failed or cancelled, the job template can be deleted successfully,
+        otherwise it will throw InUseException. Returns false if the job template to be deleted does
+        not exist.
+
+        The deletion of a job template will also delete all the jobs associated with this template.
+
+        Args:
+            job_template_name: The name of the job template to delete.
+
+        Returns:
+            bool: True if the job template was deleted successfully, False if the job template
+            does not exist.
+
+        Raises:
+            InUseException: If the job template is currently in use by any jobs, it cannot be deleted.
+        """
+        if not job_template_name or not job_template_name.strip():
+            raise ValueError("Job template name cannot be null or empty")
+
+        url = (
+            f"{self.API_METALAKES_JOB_TEMPLATES_PATH.format(encode_string(self.name()))}/"
+            f"{encode_string(job_template_name)}"
+        )
+        response = self.rest_client.delete(url, error_handler=JOB_ERROR_HANDLER)
+
+        drop_response = DropResponse.from_json(response.body, infer_missing=True)
+        drop_response.validate()
+
+        return drop_response.dropped()
+
+    def list_jobs(self, job_template_name: str = None) -> List[JobHandle]:
+        """List all the jobs under this metalake.
+
+        Args:
+            job_template_name: The name of the job template to filter jobs by. If None, all jobs are listed.
+
+        Returns:
+            A list of JobHandle objects representing the jobs.
+        """
+        params = (
+            {"jobTemplateName": encode_string(job_template_name)}
+            if job_template_name
+            else {}
+        )
+        url = self.API_METALAKES_JOB_RUNS_PATH.format(encode_string(self.name()))
+        response = self.rest_client.get(
+            url, params=params, error_handler=JOB_ERROR_HANDLER
+        )
+        resp = JobListResponse.from_json(response.body, infer_missing=True)
+        resp.validate()
+
+        return [GenericJobHandle(dto) for dto in resp.jobs()]
+
+    def get_job(self, job_id: str) -> JobHandle:
+        """Retrieves a job by its ID.
+
+        Args:
+            job_id: The ID of the job to retrieve.
+
+        Returns:
+            The JobHandle representing the job if found, otherwise raises an exception.
+
+        Raises:
+            NoSuchJobException: If no job with the specified ID exists.
+        """
+        if not job_id or not job_id.strip():
+            raise ValueError("Job ID cannot be null or empty")
+
+        url = (
+            f"{self.API_METALAKES_JOB_RUNS_PATH.format(encode_string(self.name()))}"
+            f"/{encode_string(job_id)}"
+        )
+        response = self.rest_client.get(url, error_handler=JOB_ERROR_HANDLER)
+        resp = JobResponse.from_json(response.body, infer_missing=True)
+        resp.validate()
+
+        return GenericJobHandle(resp.job())
+
+    def run_job(self, job_template_name: str, job_conf: Dict[str, str]) -> JobHandle:
+        """Runs a job based on the specified job template and configuration.
+
+        Args:
+            job_template_name: The name of the job template to use for running the job.
+            job_conf: A dictionary containing the configuration for the job.
+
+        Returns:
+            A JobHandle representing the started job.
+
+        Raises:
+            NoSuchJobTemplateException: If no job template with the specified name exists.
+        """
+        url = f"{self.API_METALAKES_JOB_RUNS_PATH.format(encode_string(self.name()))}"
+        request = JobRunRequest(job_template_name, job_conf)
+
+        response = self.rest_client.post(
+            url, json=request, error_handler=JOB_ERROR_HANDLER
+        )
+        resp = JobResponse.from_json(response.body, infer_missing=True)
+        resp.validate()
+
+        return GenericJobHandle(resp.job())
+
+    def cancel_job(self, job_id: str) -> JobHandle:
+        """Cancels a job by its ID.
+
+        Args:
+            job_id: The ID of the job to cancel.
+
+        Returns:
+            A JobHandle representing the cancelled job.
+
+        Raises:
+            NoSuchJobException: If no job with the specified ID exists.
+        """
+        if not job_id or not job_id.strip():
+            raise ValueError("Job ID cannot be null or empty")
+
+        url = (
+            f"{self.API_METALAKES_JOB_RUNS_PATH.format(encode_string(self.name()))}"
+            f"/{encode_string(job_id)}"
+        )
+        response = self.rest_client.post(url, error_handler=JOB_ERROR_HANDLER)
+        resp = JobResponse.from_json(response.body, infer_missing=True)
+        resp.validate()
+
+        return GenericJobHandle(resp.job())

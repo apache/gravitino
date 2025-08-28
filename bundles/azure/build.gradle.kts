@@ -26,12 +26,13 @@ plugins {
 
 dependencies {
   compileOnly(project(":api"))
-  compileOnly(project(":catalogs:catalog-fileset"))
-  compileOnly(project(":core"))
   compileOnly(libs.hadoop3.abs)
   compileOnly(libs.hadoop3.client.api)
   compileOnly(libs.hadoop3.client.runtime)
 
+  implementation(project(":common")) {
+    exclude("*")
+  }
   implementation(project(":catalogs:catalog-common")) {
     exclude("*")
   }
@@ -70,7 +71,8 @@ tasks.withType(ShadowJar::class.java) {
   relocate("com.google", "org.apache.gravitino.azure.shaded.com.google.common")
   relocate("com.microsoft.aad", "org.apache.gravitino.azure.shaded.com.microsoft.aad")
   relocate("com.nimbusds", "org.apache.gravitino.azure.shaded.com.nimbusds")
-  relocate("com.sun", "org.apache.gravitino.azure.shaded.com.sun")
+  relocate("com.sun.jna", "org.apache.gravitino.azure.shaded.com.sun.jna")
+  relocate("com.sun.xml", "org.apache.gravitino.azure.shaded.com.sun.xml")
   relocate("io.netty", "org.apache.gravitino.azure.shaded.io.netty")
   relocate("net.minidev", "org.apache.gravitino.azure.shaded.net.minidev")
   relocate("net.jcip.annotations", "org.apache.gravitino.azure.shaded.net.jcip.annotations")

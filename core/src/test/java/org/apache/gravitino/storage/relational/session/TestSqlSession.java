@@ -134,23 +134,29 @@ public class TestSqlSession {
   public void testOpenAndCloseSqlSession() {
     SqlSession session = SqlSessions.getSqlSession();
     assertNotNull(session);
+    assertEquals(1, SqlSessions.getSessionCount());
     SqlSessions.closeSqlSession();
     assertNull(SqlSessions.getSessions().get());
+    assertEquals(0, SqlSessions.getSessionCount());
   }
 
   @Test
   public void testOpenAndCommitAndCloseSqlSession() {
     SqlSession session = SqlSessions.getSqlSession();
     assertNotNull(session);
+    assertEquals(1, SqlSessions.getSessionCount());
     SqlSessions.commitAndCloseSqlSession();
     assertNull(SqlSessions.getSessions().get());
+    assertEquals(0, SqlSessions.getSessionCount());
   }
 
   @Test
   public void testOpenAndRollbackAndCloseSqlSession() {
     SqlSession session = SqlSessions.getSqlSession();
     assertNotNull(session);
+    assertEquals(1, SqlSessions.getSessionCount());
     SqlSessions.rollbackAndCloseSqlSession();
     assertNull(SqlSessions.getSessions().get());
+    assertEquals(0, SqlSessions.getSessionCount());
   }
 }

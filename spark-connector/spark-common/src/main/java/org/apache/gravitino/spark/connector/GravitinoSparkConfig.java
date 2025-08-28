@@ -28,6 +28,7 @@ public class GravitinoSparkConfig {
   public static final String GRAVITINO_METALAKE = GRAVITINO_PREFIX + "metalake";
   public static final String GRAVITINO_ENABLE_ICEBERG_SUPPORT =
       GRAVITINO_PREFIX + "enableIcebergSupport";
+  public static final String GRAVITINO_CLIENT_CONFIG_PREFIX = GRAVITINO_PREFIX + "client.";
 
   public static final String GRAVITINO_AUTH_TYPE =
       GRAVITINO_PREFIX + AuthProperties.GRAVITINO_CLIENT_AUTH_TYPE;

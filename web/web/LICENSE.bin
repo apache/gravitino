@@ -217,6 +217,7 @@
    doctrine
    eslint-visitor-keys
    human-signals
+   oidc-client-ts
    ts-interface-checker
    typescript
 
@@ -331,6 +332,12 @@
    @typescript-eslint/types
    @typescript-eslint/typescript-estree
    @typescript-eslint/visitor-keys
+   @vitest/coverage-v8
+   @vitest/expect
+   @vitest/runner
+   @vitest/snapshot
+   @vitest/spy
+   @vitest/utils
    @xobotyi/scrollbar-width
    acorn
    acorn-jsx
@@ -520,6 +527,7 @@
    js-cookie
    js-tokens
    js-yaml
+   jsdom
    json-buffer
    json-schema-traverse
    json-stable-stringify-without-jsonify
@@ -716,6 +724,7 @@
    update-browserslist-db
    use-sync-external-store
    util-deprecate
+   vitest
    webpack-bundle-analyzer
    which-boxed-primitive
    which-builtin-type

@@ -102,8 +102,17 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
       String metalake,
       MetadataObject metadataObject,
       Privilege.Name privilege) {
-    return allowInternalAuthorizer.authorizeInternal(
-        principal, metalake, metadataObject, privilege.name());
+    boolean result =
+        allowInternalAuthorizer.authorizeInternal(
+            principal, metalake, metadataObject, privilege.name());
+    LOG.debug(
+        "principal {},metalake {},metadata object {},privilege {}, result {}",
+        principal,
+        metalake,
+        metadataObject,
+        privilege,
+        result);
+    return result;
   }
 
   @Override
@@ -112,14 +121,32 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
       String metalake,
       MetadataObject metadataObject,
       Privilege.Name privilege) {
-    return denyInternalAuthorizer.authorizeInternal(
-        principal, metalake, metadataObject, privilege.name());
+    boolean result =
+        denyInternalAuthorizer.authorizeInternal(
+            principal, metalake, metadataObject, privilege.name());
+    LOG.debug(
+        "principal {},metalake {},metadata object {},privilege {},deny result {}",
+        principal,
+        metalake,
+        metadataObject,
+        privilege,
+        result);
+    return result;
   }
 
   @Override
   public boolean isOwner(Principal principal, String metalake, MetadataObject metadataObject) {
-    return allowInternalAuthorizer.authorizeInternal(
-        principal, metalake, metadataObject, AuthConstants.OWNER);
+    boolean result =
+        allowInternalAuthorizer.authorizeInternal(
+            principal, metalake, metadataObject, AuthConstants.OWNER);
+    LOG.debug(
+        "principal {},metalake {},metadata object {},privilege {},deny result {}",
+        principal,
+        metalake,
+        metadataObject,
+        "OWNER",
+        result);
+    return result;
   }
 
   @Override
@@ -136,7 +163,12 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
       return false;
     }
     try {
-      return GravitinoEnv.getInstance().accessControlDispatcher().getUser(metalake, currentUserName)
+      return GravitinoEnv.getInstance()
+              .entityStore()
+              .get(
+                  NameIdentifierUtil.ofUser(metalake, currentUserName),
+                  Entity.EntityType.USER,
+                  UserEntity.class)
           != null;
     } catch (Exception e) {
       LOG.warn("Can not get user {} in metalake {}", currentUserName, metalake, e);
@@ -154,14 +186,7 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
       try {
         Long roleId =
             MetadataIdConverter.getID(
-                MetadataObjects.of(
-                    String.join(
-                        ".",
-                        nameIdentifier.namespace().level(1),
-                        nameIdentifier.namespace().level(2)),
-                    nameIdentifier.name(),
-                    MetadataObject.Type.ROLE),
-                metalake);
+                NameIdentifierUtil.toMetadataObject(nameIdentifier, type), metalake);
         UserEntity userEntity = getUserEntity(currentUserName, metalake);
         Long userId = userEntity.id();
         loadRolePrivilege(metalake, currentUserName, userId);
@@ -338,16 +363,17 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
 
     for (RoleEntity role : entities) {
       Long roleId = role.id();
+      allowEnforcer.addRoleForUser(String.valueOf(userId), String.valueOf(roleId));
+      denyEnforcer.addRoleForUser(String.valueOf(userId), String.valueOf(roleId));
+      if (loadedRoles.contains(roleId)) {
+        continue;
+      }
       role =
           entityStore.get(
               NameIdentifierUtil.ofRole(metalake, role.name()),
               Entity.EntityType.ROLE,
               RoleEntity.class);
-      if (loadedRoles.contains(roleId)) {
-        continue;
-      }
-      allowEnforcer.addRoleForUser(String.valueOf(userId), String.valueOf(roleId));
-      denyEnforcer.addRoleForUser(String.valueOf(userId), String.valueOf(roleId));
+
       loadPolicyByRoleEntity(role);
       loadedRoles.add(roleId);
     }

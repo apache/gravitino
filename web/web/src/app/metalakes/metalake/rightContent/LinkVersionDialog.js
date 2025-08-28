@@ -226,7 +226,6 @@ const LinkVersionDialog = props => {
           })
         } else {
           const reqData = { updates: genUpdates(cacheData, schemaData) }
-          console.log('reqData', reqData)
 
           if (reqData.updates.length !== 0) {
             dispatch(
@@ -264,9 +263,8 @@ const LinkVersionDialog = props => {
       setValue('uri', data.uri)
       setValue('comment', data.comment)
 
-      data.aliases.forEach((alias, index) => {
-        setValue(`aliases.${index}.name`, alias)
-      })
+      const aliases = data.aliases.map(alias => ({ name: alias }))
+      setValue(`aliases`, aliases)
 
       const propsItems = Object.entries(properties).map(([key, value]) => {
         return {

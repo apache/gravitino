@@ -41,8 +41,10 @@ import org.apache.gravitino.storage.relational.mapper.ModelMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.ModelVersionAliasRelMapper;
 import org.apache.gravitino.storage.relational.mapper.ModelVersionMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.OwnerMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.PolicyMetadataObjectRelMapper;
 import org.apache.gravitino.storage.relational.mapper.SchemaMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.SecurableObjectMapper;
+import org.apache.gravitino.storage.relational.mapper.StatisticMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.TableColumnMapper;
 import org.apache.gravitino.storage.relational.mapper.TableMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.TagMetadataObjectRelMapper;
@@ -243,6 +245,10 @@ public class SchemaMetaService {
                     mapper -> mapper.softDeleteTagMetadataObjectRelsBySchemaId(schemaId)),
             () ->
                 SessionUtils.doWithoutCommit(
+                    PolicyMetadataObjectRelMapper.class,
+                    mapper -> mapper.softDeletePolicyMetadataObjectRelsBySchemaId(schemaId)),
+            () ->
+                SessionUtils.doWithoutCommit(
                     ModelVersionAliasRelMapper.class,
                     mapper -> mapper.softDeleteModelVersionAliasRelsBySchemaId(schemaId)),
             () ->
@@ -252,7 +258,11 @@ public class SchemaMetaService {
             () ->
                 SessionUtils.doWithoutCommit(
                     ModelMetaMapper.class,
-                    mapper -> mapper.softDeleteModelMetasBySchemaId(schemaId)));
+                    mapper -> mapper.softDeleteModelMetasBySchemaId(schemaId)),
+            () ->
+                SessionUtils.doWithoutCommit(
+                    StatisticMetaMapper.class,
+                    mapper -> mapper.softDeleteStatisticsBySchemaId(schemaId)));
       } else {
         List<TableEntity> tableEntities =
             TableMetaService.getInstance()
@@ -310,6 +320,16 @@ public class SchemaMetaService {
                     TagMetadataObjectRelMapper.class,
                     mapper ->
                         mapper.softDeleteTagMetadataObjectRelsByMetadataObject(
+                            schemaId, MetadataObject.Type.SCHEMA.name())),
+            () ->
+                SessionUtils.doWithoutCommit(
+                    StatisticMetaMapper.class,
+                    mapper -> mapper.softDeleteStatisticsByEntityId(schemaId)),
+            () ->
+                SessionUtils.doWithoutCommit(
+                    PolicyMetadataObjectRelMapper.class,
+                    mapper ->
+                        mapper.softDeletePolicyMetadataObjectRelsByMetadataObject(
                             schemaId, MetadataObject.Type.SCHEMA.name())));
       }
     }

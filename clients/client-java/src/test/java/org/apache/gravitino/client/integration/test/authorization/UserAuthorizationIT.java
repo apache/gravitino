@@ -31,6 +31,8 @@ import org.apache.gravitino.authorization.Privileges;
 import org.apache.gravitino.authorization.User;
 import org.apache.gravitino.client.GravitinoAdminClient;
 import org.apache.gravitino.client.GravitinoMetalake;
+import org.apache.gravitino.exceptions.ForbiddenException;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.MethodOrderer;
 import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Tag;
@@ -46,7 +48,7 @@ public class UserAuthorizationIT extends BaseRestApiAuthorizationIT {
   public void testCreateUser() {
     assertThrows(
         "Current user can not access metadata {testMetalake}",
-        RuntimeException.class,
+        ForbiddenException.class,
         () -> {
           normalUserClient.loadMetalake(METALAKE).addUser("user1");
         });
@@ -65,6 +67,14 @@ public class UserAuthorizationIT extends BaseRestApiAuthorizationIT {
           "user1",
         },
         usersLoadByUser1);
+    String[] usernames = client.loadMetalake(METALAKE).listUserNames();
+    Assertions.assertArrayEquals(new String[] {USER, NORMAL_USER, "user1", "user2"}, usernames);
+    String[] usernamesLoadByUser1 = getClientByUser("user1").loadMetalake(METALAKE).listUserNames();
+    Assertions.assertArrayEquals(
+        new String[] {
+          "user1",
+        },
+        usernamesLoadByUser1);
   }
 
   @Test
@@ -74,7 +84,7 @@ public class UserAuthorizationIT extends BaseRestApiAuthorizationIT {
     user1Client.loadMetalake(METALAKE).getUser("user1");
     assertThrows(
         "Current user can not get user.",
-        RuntimeException.class,
+        ForbiddenException.class,
         () -> {
           user1Client.loadMetalake(METALAKE).getUser("user2");
         });
@@ -88,13 +98,13 @@ public class UserAuthorizationIT extends BaseRestApiAuthorizationIT {
     GravitinoAdminClient user1Client = getClientByUser("user1");
     assertThrows(
         "Current user can not get user",
-        RuntimeException.class,
+        ForbiddenException.class,
         () -> {
           user1Client.loadMetalake(METALAKE).removeUser("user2");
         });
     assertThrows(
         "Current user can not get user.",
-        RuntimeException.class,
+        ForbiddenException.class,
         () -> {
           user1Client.loadMetalake(METALAKE).removeUser("user1");
         });

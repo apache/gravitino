@@ -126,13 +126,17 @@ public class AccessControlHookDispatcher implements AccessControlDispatcher {
   @Override
   public Group grantRolesToGroup(String metalake, List<String> roles, String group)
       throws NoSuchGroupException, IllegalRoleException, NoSuchMetalakeException {
-    return dispatcher.grantRolesToGroup(metalake, roles, group);
+    Group grantedGroup = dispatcher.grantRolesToGroup(metalake, roles, group);
+    notifyRoleUserRelChange(metalake, roles);
+    return grantedGroup;
   }
 
   @Override
   public Group revokeRolesFromGroup(String metalake, List<String> roles, String group)
       throws NoSuchGroupException, IllegalRoleException, NoSuchMetalakeException {
-    return dispatcher.revokeRolesFromGroup(metalake, roles, group);
+    Group revokedGroup = dispatcher.revokeRolesFromGroup(metalake, roles, group);
+    notifyRoleUserRelChange(metalake, roles);
+    return revokedGroup;
   }
 
   @Override

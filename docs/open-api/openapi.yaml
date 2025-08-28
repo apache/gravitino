@@ -65,6 +65,15 @@ paths:
   /metalakes/{metalake}/objects/{metadataObjectType}/{metadataObjectFullName}/tags:
     $ref: "./tags.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1objects~1%7BmetadataObjectType%7D~1%7BmetadataObjectFullName%7D~1tags"
 
+  /metalakes/{metalake}/policies:
+    $ref: "./policies.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1policies"
+
+  /metalakes/{metalake}/policies/{policy}:
+    $ref: "./policies.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1policies~1%7Bpolicy%7D"
+
+  /metalakes/{metalake}/policies/{policy}/objects:
+    $ref: "./policies.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1policies~1%7Bpolicy%7D~1objects"
+
   /metalakes/{metalake}/objects/{metadataObjectType}/{metadataObjectFullName}/roles:
     $ref: "./roles.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1objects~1%7BmetadataObjectType%7D~1%7BmetadataObjectFullName%7D~1roles"
 
@@ -101,7 +110,7 @@ paths:
   /metalakes/{metalake}/catalogs/{catalog}/schemas/{schema}/tables/{table}:
     $ref: "./tables.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1catalogs~1%7Bcatalog%7D~1schemas~1%7Bschema%7D~1tables~1%7Btable%7D"
 
-  /metalaskes/{metalake}/catalogs/{catalog}/schemas/{schema}/tables/{table}/partitions:
+  /metalakes/{metalake}/catalogs/{catalog}/schemas/{schema}/tables/{table}/partitions:
     $ref: "./partitions.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1catalogs~1%7Bcatalog%7D~1schemas~1%7Bschema%7D~1tables~1%7Btable%7D~1partitions"
 
   /metalakes/{metalake}/catalogs/{catalog}/schemas/{schema}/tables/{table}/partitions/{partition}:
@@ -178,6 +187,18 @@ paths:
 
   /lineage:
     $ref: "./lineage.yaml#/paths/~1lineage"
+
+  /metalakes/{metalake}/jobs/templates:
+    $ref: "./jobs.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1jobs~1templates"
+
+  /metalakes/{metalake}/jobs/templates/{jobTemplate}:
+    $ref: "./jobs.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1jobs~1templates~1%7BjobTemplate%7D"
+
+  /metalakes/{metalake}/jobs/runs:
+    $ref: "./jobs.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1jobs~1runs"
+
+  /metalakes/{metalake}/jobs/runs/{jobId}:
+    $ref: "./jobs.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1jobs~1runs~1%7BjobId%7D"
 
 components:
   schemas:
@@ -463,6 +484,14 @@ components:
       name: tag
       in: path
       description: The name of the tag
+      required: true
+      schema:
+        type: string
+
+    policy:
+      name: policy
+      in: path
+      description: The name of the policy
       required: true
       schema:
         type: string

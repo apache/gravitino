@@ -92,7 +92,7 @@ public class OceanBaseColumnDefaultValueConverter extends JdbcColumnDefaultValue
       case JdbcTypeConverter.DATE:
         return Literals.dateLiteral(LocalDate.parse(columnDefaultValue, DATE_FORMATTER));
       case JdbcTypeConverter.TIME:
-        return Literals.timeLiteral(LocalTime.parse(columnDefaultValue, DATE_TIME_FORMATTER));
+        return Literals.timeLiteral(LocalTime.parse(columnDefaultValue, TIME_FORMATTER));
       case JdbcTypeConverter.TIMESTAMP:
       case OceanBaseTypeConverter.DATETIME:
         return CURRENT_TIMESTAMP.matcher(columnDefaultValue).matches()

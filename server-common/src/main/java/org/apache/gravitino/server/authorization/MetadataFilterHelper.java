@@ -17,10 +17,12 @@
 
 package org.apache.gravitino.server.authorization;
 
+import java.lang.reflect.Array;
 import java.security.Principal;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.function.Function;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.Entity;
@@ -101,6 +103,39 @@ public class MetadataFilterHelper {
   }
 
   /**
+   * Call {@link AuthorizationExpressionEvaluator} to filter the metadata list
+   *
+   * @param metalake metalake
+   * @param expression expression
+   * @param entityType entity type
+   * @param entities entities
+   * @param toNameIdentifier convert to NameIdentifier
+   * @return Filtered Metadata Entity
+   * @param <E> Entity class
+   */
+  public static <E> E[] filterByExpression(
+      String metalake,
+      String expression,
+      Entity.EntityType entityType,
+      E[] entities,
+      Function<E, NameIdentifier> toNameIdentifier) {
+    if (!enableAuthorization()) {
+      return entities;
+    }
+    AuthorizationExpressionEvaluator authorizationExpressionEvaluator =
+        new AuthorizationExpressionEvaluator(expression);
+    return Arrays.stream(entities)
+        .filter(
+            entity -> {
+              NameIdentifier nameIdentifier = toNameIdentifier.apply(entity);
+              Map<Entity.EntityType, NameIdentifier> nameIdentifierMap =
+                  spiltMetadataNames(metalake, entityType, nameIdentifier);
+              return authorizationExpressionEvaluator.evaluate(nameIdentifierMap);
+            })
+        .toArray(size -> (E[]) Array.newInstance(entities.getClass().getComponentType(), size));
+  }
+
+  /**
    * Extract the parent metadata from NameIdentifier. For example, when given a Table
    * NameIdentifier, it returns a map containing the Table itself along with its parent Schema and
    * Catalog.
@@ -137,6 +172,15 @@ public class MetadataFilterHelper {
         nameIdentifierMap.put(
             Entity.EntityType.CATALOG, NameIdentifierUtil.getCatalogIdentifier(nameIdentifier));
         break;
+      case MODEL_VERSION:
+        nameIdentifierMap.put(Entity.EntityType.MODEL_VERSION, nameIdentifier);
+        nameIdentifierMap.put(
+            Entity.EntityType.MODEL, NameIdentifierUtil.getModelIdentifier(nameIdentifier));
+        nameIdentifierMap.put(
+            Entity.EntityType.SCHEMA, NameIdentifierUtil.getSchemaIdentifier(nameIdentifier));
+        nameIdentifierMap.put(
+            Entity.EntityType.CATALOG, NameIdentifierUtil.getCatalogIdentifier(nameIdentifier));
+        break;
       case TOPIC:
         nameIdentifierMap.put(Entity.EntityType.TOPIC, nameIdentifier);
         nameIdentifierMap.put(
@@ -151,9 +195,17 @@ public class MetadataFilterHelper {
         nameIdentifierMap.put(
             Entity.EntityType.CATALOG, NameIdentifierUtil.getCatalogIdentifier(nameIdentifier));
         break;
-      default:
+      case METALAKE:
         nameIdentifierMap.put(entityType, nameIdentifier);
         break;
+      case ROLE:
+        nameIdentifierMap.put(entityType, nameIdentifier);
+        break;
+      case USER:
+        nameIdentifierMap.put(entityType, nameIdentifier);
+        break;
+      default:
+        throw new IllegalArgumentException("Unsupported entity type: " + entityType);
     }
     return nameIdentifierMap;
   }

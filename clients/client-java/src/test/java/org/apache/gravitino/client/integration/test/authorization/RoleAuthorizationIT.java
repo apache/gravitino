@@ -25,6 +25,7 @@ import java.util.HashMap;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.authorization.Privileges;
+import org.apache.gravitino.exceptions.ForbiddenException;
 import org.junit.jupiter.api.MethodOrderer;
 import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Tag;
@@ -45,11 +46,11 @@ public class RoleAuthorizationIT extends BaseRestApiAuthorizationIT {
     // normal user can not create role
     assertThrows(
         "Current user can not create role.",
-        RuntimeException.class,
+        ForbiddenException.class,
         () -> {
           normalUserClient
               .loadMetalake(METALAKE)
-              .createRole("role2", new HashMap<>(), Collections.emptyList());
+              .createRole("role4", new HashMap<>(), Collections.emptyList());
         });
     client.loadMetalake(METALAKE).grantRolesToUser(ImmutableList.of("role1"), NORMAL_USER);
     client
@@ -70,7 +71,7 @@ public class RoleAuthorizationIT extends BaseRestApiAuthorizationIT {
     String[] roleNames = client.loadMetalake(METALAKE).listRoleNames();
     assertArrayEquals(new String[] {"role1", "role2", "role3", "role4"}, roleNames);
     roleNames = normalUserClient.loadMetalake(METALAKE).listRoleNames();
-    assertArrayEquals(new String[] {"role1"}, roleNames);
+    assertArrayEquals(new String[] {"role1", "role4"}, roleNames);
   }
 
   @Test
@@ -84,21 +85,15 @@ public class RoleAuthorizationIT extends BaseRestApiAuthorizationIT {
     // normal user can not get role
     assertThrows(
         "Current user can not create role.",
-        RuntimeException.class,
+        ForbiddenException.class,
         () -> {
           normalUserClient.loadMetalake(METALAKE).getRole("role2");
         });
     assertThrows(
         "Current user can not create role.",
-        RuntimeException.class,
+        ForbiddenException.class,
         () -> {
           normalUserClient.loadMetalake(METALAKE).getRole("role3");
-        });
-    assertThrows(
-        "Current user can not create role.",
-        RuntimeException.class,
-        () -> {
-          normalUserClient.loadMetalake(METALAKE).getRole("role4");
         });
   }
 
@@ -108,37 +103,30 @@ public class RoleAuthorizationIT extends BaseRestApiAuthorizationIT {
     // normal user can not delete role
     assertThrows(
         "Current user can not create role.",
-        RuntimeException.class,
+        ForbiddenException.class,
         () -> {
           normalUserClient.loadMetalake(METALAKE).deleteRole("role1");
         });
     assertThrows(
         "Current user can not create role.",
-        RuntimeException.class,
+        ForbiddenException.class,
         () -> {
           normalUserClient.loadMetalake(METALAKE).deleteRole("role2");
         });
     assertThrows(
         "Current user can not create role.",
-        RuntimeException.class,
+        ForbiddenException.class,
         () -> {
           normalUserClient.loadMetalake(METALAKE).deleteRole("role3");
-        });
-    assertThrows(
-        "Current user can not create role.",
-        RuntimeException.class,
-        () -> {
-          normalUserClient.loadMetalake(METALAKE).deleteRole("role4");
         });
     // owner can delete role
     client.loadMetalake(METALAKE).deleteRole("role1");
     client.loadMetalake(METALAKE).deleteRole("role2");
     client.loadMetalake(METALAKE).deleteRole("role3");
-    client.loadMetalake(METALAKE).deleteRole("role4");
     // normal user can not create role after delete role
     assertThrows(
         "Current user can not create role.",
-        RuntimeException.class,
+        ForbiddenException.class,
         () -> {
           normalUserClient
               .loadMetalake(METALAKE)

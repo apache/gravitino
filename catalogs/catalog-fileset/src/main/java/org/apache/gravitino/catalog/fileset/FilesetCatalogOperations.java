@@ -18,7 +18,6 @@
  */
 package org.apache.gravitino.catalog.fileset;
 
-import static org.apache.gravitino.catalog.fileset.FilesetCatalogPropertiesMetadata.CACHE_VALUE_NOT_SET;
 import static org.apache.gravitino.connector.BaseCatalog.CATALOG_BYPASS_PREFIX;
 import static org.apache.gravitino.file.Fileset.LOCATION_NAME_UNKNOWN;
 import static org.apache.gravitino.file.Fileset.PROPERTY_CATALOG_PLACEHOLDER;
@@ -36,7 +35,6 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.Arrays;
@@ -52,6 +50,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.Entity;
@@ -96,6 +95,7 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.awaitility.Awaitility;
 import org.awaitility.core.ConditionTimeoutException;
 import org.slf4j.Logger;
@@ -119,7 +119,7 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
 
   @VisibleForTesting Map<String, Path> catalogStorageLocations;
 
-  private Map<String, String> conf;
+  @VisibleForTesting Map<String, String> conf;
 
   private CatalogInfo catalogInfo;
 
@@ -129,8 +129,77 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
 
   private boolean disableFSOps;
 
+  @VisibleForTesting ScheduledThreadPoolExecutor scheduler;
+  @VisibleForTesting Cache<FileSystemCacheKey, FileSystem> fileSystemCache;
+
   FilesetCatalogOperations(EntityStore store) {
     this.store = store;
+    scheduler =
+        new ScheduledThreadPoolExecutor(
+            1,
+            new ThreadFactoryBuilder()
+                .setDaemon(true)
+                .setNameFormat("file-system-cache-for-fileset" + "-%d")
+                .build());
+
+    this.fileSystemCache =
+        Caffeine.newBuilder()
+            .expireAfterAccess(1, TimeUnit.HOURS)
+            .removalListener(
+                (ignored, value, cause) -> {
+                  try {
+                    ((FileSystem) value).close();
+                  } catch (IOException e) {
+                    LOG.warn("Failed to close FileSystem instance in cache", e);
+                  }
+                })
+            .scheduler(Scheduler.forScheduledExecutorService(scheduler))
+            .build();
+  }
+
+  static class FileSystemCacheKey {
+    // When the path is a path without scheme such as 'file','hdfs', etc., then the scheme and
+    // authority are both null
+    @Nullable private final String scheme;
+    @Nullable private final String authority;
+    private final Map<String, String> conf;
+    private final String currentUser;
+
+    FileSystemCacheKey(String scheme, String authority, Map<String, String> conf) {
+      this.scheme = scheme;
+      this.authority = authority;
+      this.conf = conf;
+
+      try {
+        this.currentUser = UserGroupInformation.getCurrentUser().getShortUserName();
+      } catch (IOException e) {
+        throw new RuntimeException("Failed to get current user", e);
+      }
+    }
+
+    @Override
+    public boolean equals(Object o) {
+      if (this == o) {
+        return true;
+      }
+      if (!(o instanceof FileSystemCacheKey)) {
+        return false;
+      }
+      FileSystemCacheKey that = (FileSystemCacheKey) o;
+      return conf.equals(that.conf)
+          && (scheme == null ? that.scheme == null : scheme.equals(that.scheme))
+          && (authority == null ? that.authority == null : authority.equals(that.authority))
+          && currentUser.equals(that.currentUser);
+    }
+
+    @Override
+    public int hashCode() {
+      int result = conf.hashCode();
+      result = 31 * result + (scheme == null ? 0 : scheme.hashCode());
+      result = 31 * result + (authority == null ? 0 : authority.hashCode());
+      result = 31 * result + currentUser.hashCode();
+      return result;
+    }
   }
 
   public FilesetCatalogOperations() {
@@ -242,9 +311,12 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
     }
 
     String actualPath = getFileLocation(filesetIdent, subPath, locationName);
-    Path formalizedPath = formalizePath(new Path(actualPath), conf);
 
-    FileSystem fs = getFileSystem(formalizedPath, conf);
+    FileSystem fileSystem = getFileSystemWithCache(new Path(actualPath), conf);
+    Path formalizedPath =
+        new Path(actualPath).makeQualified(fileSystem.getUri(), fileSystem.getWorkingDirectory());
+
+    FileSystem fs = getFileSystemWithCache(formalizedPath, conf);
     if (!fs.exists(formalizedPath)) {
       throw new IllegalArgumentException(
           String.format(
@@ -367,10 +439,22 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
       try {
         // formalize the path to avoid path without scheme, uri, authority, etc.
         for (Map.Entry<String, Path> entry : filesetPaths.entrySet()) {
-          Path formalizePath = formalizePath(entry.getValue(), conf);
-          filesetPathsBuilder.put(entry.getKey(), formalizePath);
 
-          FileSystem fs = getFileSystem(formalizePath, conf);
+          FileSystem tmpFs = getFileSystemWithCache(entry.getValue(), conf);
+          Path formalizePath =
+              entry.getValue().makeQualified(tmpFs.getUri(), tmpFs.getWorkingDirectory());
+
+          filesetPathsBuilder.put(entry.getKey(), formalizePath);
+          FileSystem fs = getFileSystemWithCache(formalizePath, conf);
+
+          if (fs.exists(formalizePath) && fs.getFileStatus(formalizePath).isFile()) {
+            throw new IllegalArgumentException(
+                "Fileset location cannot be a file: "
+                    + formalizePath
+                    + ", location name: "
+                    + entry.getKey());
+          }
+
           if (!fs.exists(formalizePath)) {
             if (!fs.mkdirs(formalizePath)) {
               throw new RuntimeException(
@@ -474,7 +558,9 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
             && !properties.isEmpty()
             && properties.containsKey(PROPERTY_DEFAULT_LOCATION_NAME)
             && filesetPaths.containsKey(properties.get(PROPERTY_DEFAULT_LOCATION_NAME)),
-        "Default location name must be set and must be one of the fileset locations, "
+        "The fileset property "
+            + PROPERTY_DEFAULT_LOCATION_NAME
+            + " must be set and must be one of the fileset locations, "
             + "location names: "
             + filesetPaths.keySet()
             + ", default location name: "
@@ -536,7 +622,7 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
         storageLocations.forEach(
             (locationName, location) -> {
               try {
-                FileSystem fs = getFileSystem(location, conf);
+                FileSystem fs = getFileSystemWithCache(location, conf);
                 if (fs.exists(location)) {
                   if (!fs.delete(location, true)) {
                     LOG.warn(
@@ -604,24 +690,6 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
           "Location name %s does not exist in fileset %s", targetLocationName, ident);
     }
 
-    boolean isSingleFile = false;
-    if (disableFSOps) {
-      LOG.warn(
-          "Filesystem operations are disabled in the server side, we cannot check if the "
-              + "storage location mounts to a directory or single file, we assume it is a directory"
-              + "(in most of the cases). If it happens to be a single file, then the generated "
-              + "file location may be a wrong path. Please avoid using Fileset to manage a single"
-              + " file path.");
-    } else {
-      isSingleFile = checkSingleFile(fileset, targetLocationName);
-    }
-
-    // if the storage location is a single file, it cannot have sub path to access.
-    if (isSingleFile && StringUtils.isNotBlank(processedSubPath)) {
-      throw new GravitinoRuntimeException(
-          "Sub path should always be blank, because the fileset only mounts a single file.");
-    }
-
     // do checks for some data operations.
     if (hasCallerContext()) {
       Map<String, String> contextMap = CallerContext.CallerContextHolder.get().context();
@@ -637,14 +705,8 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
         FilesetDataOperation dataOperation = FilesetDataOperation.valueOf(operation);
         switch (dataOperation) {
           case RENAME:
-            // Fileset only mounts a single file, the storage location of the fileset cannot be
-            // renamed; Otherwise the metadata in the Gravitino server may be inconsistent.
-            if (isSingleFile) {
-              throw new GravitinoRuntimeException(
-                  "Cannot rename the fileset: %s which only mounts to a single file.", ident);
-            }
-            // if the sub path is blank, it cannot be renamed,
-            // otherwise the metadata in the Gravitino server may be inconsistent.
+            // if the sub path is blank, it cannot be renamed otherwise the metadata in the
+            // Gravitino server may be inconsistent.
             if (StringUtils.isBlank(processedSubPath)
                 || (processedSubPath.startsWith(SLASH) && processedSubPath.length() == 1)) {
               throw new GravitinoRuntimeException(
@@ -658,13 +720,12 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
     }
 
     String fileLocation;
-    // 1. if the storage location is a single file, we pass the storage location directly
-    // 2. if the processed sub path is blank, we pass the storage location directly
-    if (isSingleFile || StringUtils.isBlank(processedSubPath)) {
+    // If the processed sub path is blank, we pass the storage location directly
+    if (StringUtils.isBlank(processedSubPath)) {
       fileLocation = fileset.storageLocations().get(targetLocationName);
     } else {
       // the processed sub path always starts with "/" if it is not blank,
-      // so we can safely remove the tailing slash if storage location ends with "/".
+      // so we can safely remove the tailing slash if the storage location ends with "/".
       String storageLocation =
           removeTrailingSlash(fileset.storageLocations().get(targetLocationName));
       fileLocation = String.format("%s%s", storageLocation, processedSubPath);
@@ -692,7 +753,15 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
         (locationName, schemaPath) -> {
           if (schemaPath != null && !containsPlaceholder(schemaPath.toString())) {
             try {
-              FileSystem fs = getFileSystem(schemaPath, conf);
+              FileSystem fs = getFileSystemWithCache(schemaPath, conf);
+              if (fs.exists(schemaPath) && fs.getFileStatus(schemaPath).isFile()) {
+                throw new IllegalArgumentException(
+                    "Fileset schema location cannot be a file: "
+                        + schemaPath
+                        + ", location name: "
+                        + locationName);
+              }
+
               if (!fs.exists(schemaPath)) {
                 if (!fs.mkdirs(schemaPath)) {
                   // Fail the operation when failed to create the schema path.
@@ -797,7 +866,7 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
                           (locationName, location) -> {
                             try {
                               Path filesetPath = new Path(location);
-                              FileSystem fs = getFileSystem(filesetPath, conf);
+                              FileSystem fs = getFileSystemWithCache(filesetPath, conf);
                               if (fs.exists(filesetPath)) {
                                 if (!fs.delete(filesetPath, true)) {
                                   LOG.warn(
@@ -827,7 +896,7 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
         schemaPaths.forEach(
             (locationName, schemaPath) -> {
               try {
-                FileSystem fs = getFileSystem(schemaPath, conf);
+                FileSystem fs = getFileSystemWithCache(schemaPath, conf);
                 if (fs.exists(schemaPath)) {
                   FileStatus[] statuses = fs.listStatus(schemaPath);
                   if (statuses.length == 0) {
@@ -896,42 +965,23 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
   @Override
   public void close() throws IOException {
     // do nothing
-  }
-
-  private Cache<NameIdentifier, FilesetImpl> initializeFilesetCache(Map<String, String> config) {
-    Caffeine<Object, Object> cacheBuilder =
-        Caffeine.newBuilder()
-            .removalListener(
-                (k, v, c) -> LOG.info("Evicting fileset {} from cache due to {}", k, c))
-            .scheduler(
-                Scheduler.forScheduledExecutorService(
-                    new ScheduledThreadPoolExecutor(
-                        1,
-                        new ThreadFactoryBuilder()
-                            .setDaemon(true)
-                            .setNameFormat("fileset-cleaner-%d")
-                            .build())));
-
-    Long cacheEvictionIntervalInMs =
-        (Long)
-            propertiesMetadata
-                .catalogPropertiesMetadata()
-                .getOrDefault(
-                    config, FilesetCatalogPropertiesMetadata.FILESET_CACHE_EVICTION_INTERVAL_MS);
-    if (cacheEvictionIntervalInMs != CACHE_VALUE_NOT_SET) {
-      cacheBuilder.expireAfterAccess(cacheEvictionIntervalInMs, TimeUnit.MILLISECONDS);
+    if (scheduler != null) {
+      scheduler.shutdownNow();
     }
 
-    Long cacheMaxSize =
-        (Long)
-            propertiesMetadata
-                .catalogPropertiesMetadata()
-                .getOrDefault(config, FilesetCatalogPropertiesMetadata.FILESET_CACHE_MAX_SIZE);
-    if (cacheMaxSize != CACHE_VALUE_NOT_SET) {
-      cacheBuilder.maximumSize(cacheMaxSize);
+    if (fileSystemCache != null) {
+      fileSystemCache
+          .asMap()
+          .forEach(
+              (k, v) -> {
+                try {
+                  v.close();
+                } catch (IOException e) {
+                  LOG.warn("Failed to close FileSystem instance in cache", e);
+                }
+              });
+      fileSystemCache.cleanUp();
     }
-
-    return cacheBuilder.build();
   }
 
   private void validateLocationHierarchy(
@@ -1000,6 +1050,24 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
             }
 
             checkPlaceholderValue(v);
+
+            if (!disableFSOps && !containsPlaceholder(v)) {
+              Path path = new Path(v);
+              FileSystem fs = getFileSystemWithCache(path, conf);
+              try {
+                if (fs.exists(path) && fs.getFileStatus(path).isFile()) {
+                  throw new IllegalArgumentException(
+                      "Fileset catalog location cannot be a file: "
+                          + v
+                          + ", location name: "
+                          + locationName);
+                }
+              } catch (IOException e) {
+                throw new RuntimeException(
+                    "Failed to check if fileset catalog location exists: " + v, e);
+              }
+            }
+
             catalogStorageLocations.put(locationName, new Path((ensureTrailingSlash(v))));
           }
         });
@@ -1248,21 +1316,20 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
         && !CallerContext.CallerContextHolder.get().context().isEmpty();
   }
 
-  private boolean checkSingleFile(Fileset fileset, String locationName) {
-    try {
-      Path locationPath = new Path(fileset.storageLocations().get(locationName));
-      return getFileSystem(locationPath, conf).getFileStatus(locationPath).isFile();
-    } catch (FileNotFoundException e) {
-      // We should always return false here, same with the logic in `FileSystem.isFile(Path f)`.
-      return false;
-    } catch (IOException e) {
-      throw new GravitinoRuntimeException(
-          e,
-          "Exception occurs when checking whether fileset: %s "
-              + "mounts a single file with location name: %s",
-          fileset.name(),
-          locationName);
-    }
+  @VisibleForTesting
+  FileSystem getFileSystemWithCache(Path path, Map<String, String> conf) {
+    String scheme = path.toUri().getScheme();
+    String authority = path.toUri().getAuthority();
+    return fileSystemCache.get(
+        new FileSystemCacheKey(scheme, authority, conf),
+        cacheKey -> {
+          try {
+            return getFileSystem(path, conf);
+          } catch (IOException e) {
+            throw new GravitinoRuntimeException(
+                e, "Failed to get FileSystem for fileset: path: %s, conf: %s", path, conf);
+          }
+        });
   }
 
   private String buildGVFSFilePath(

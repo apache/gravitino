@@ -44,6 +44,8 @@ import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.when;
 
+import com.github.benmanes.caffeine.cache.Caffeine;
+import com.github.benmanes.caffeine.cache.Scheduler;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import java.io.File;
@@ -56,6 +58,8 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ScheduledThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.apache.commons.io.FileUtils;
@@ -71,6 +75,7 @@ import org.apache.gravitino.Namespace;
 import org.apache.gravitino.Schema;
 import org.apache.gravitino.SchemaChange;
 import org.apache.gravitino.StringIdentifier;
+import org.apache.gravitino.UserPrincipal;
 import org.apache.gravitino.audit.CallerContext;
 import org.apache.gravitino.audit.FilesetAuditConstants;
 import org.apache.gravitino.audit.FilesetDataOperation;
@@ -96,6 +101,7 @@ import org.apache.gravitino.storage.relational.service.CatalogMetaService;
 import org.apache.gravitino.storage.relational.service.MetalakeMetaService;
 import org.apache.gravitino.storage.relational.service.SchemaMetaService;
 import org.apache.gravitino.utils.NameIdentifierUtil;
+import org.apache.gravitino.utils.PrincipalUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
@@ -1377,8 +1383,8 @@ public class TestFilesetCatalogOperations {
       CallerContext callerContext = CallerContext.builder().withContext(contextMap).build();
       CallerContext.CallerContextHolder.set(callerContext);
 
-      Assertions.assertThrows(
-          GravitinoRuntimeException.class, () -> ops.getFileLocation(filesetIdent, subPath));
+      // We have removed the check for single file in getFileLocation method.
+      Assertions.assertDoesNotThrow(() -> ops.getFileLocation(filesetIdent, subPath));
     } finally {
       CallerContext.CallerContextHolder.remove();
     }
@@ -1426,6 +1432,21 @@ public class TestFilesetCatalogOperations {
 
     try (FilesetCatalogOperations mockOps = Mockito.mock(FilesetCatalogOperations.class)) {
       mockOps.hadoopConf = new Configuration();
+      mockOps.conf = Maps.newHashMap();
+      mockOps.scheduler = new ScheduledThreadPoolExecutor(1);
+      mockOps.fileSystemCache =
+          Caffeine.newBuilder()
+              .expireAfterAccess(1000 * 60 * 60 /* 1 hour */, TimeUnit.MILLISECONDS)
+              .removalListener(
+                  (ignored, value, cause) -> {
+                    try {
+                      ((FileSystem) value).close();
+                    } catch (IOException e) {
+                      // Ignore
+                    }
+                  })
+              .scheduler(Scheduler.forScheduledExecutorService(mockOps.scheduler))
+              .build();
       when(mockOps.loadFileset(filesetIdent)).thenReturn(mockFileset);
       when(mockOps.getConf()).thenReturn(Maps.newHashMap());
       String subPath = "/test/test.parquet";
@@ -1433,10 +1454,68 @@ public class TestFilesetCatalogOperations {
       when(mockOps.getFileLocation(filesetIdent, subPath, null)).thenCallRealMethod();
       when(mockOps.getFileSystem(Mockito.any(), Mockito.any()))
           .thenReturn(FileSystem.getLocal(new Configuration()));
+      when(mockOps.getFileSystemWithCache(Mockito.any(), Mockito.any())).thenCallRealMethod();
       String fileLocation = mockOps.getFileLocation(filesetIdent, subPath);
       Assertions.assertEquals(
           String.format("%s%s", mockFileset.storageLocation(), subPath.substring(1)), fileLocation);
+
+      FileSystem fs1 =
+          mockOps.getFileSystemWithCache(new Path("file:///dir1/subdir/file1"), mockOps.getConf());
+
+      FileSystem fs2 =
+          mockOps.getFileSystemWithCache(new Path("file:///dir1/subdir/file2"), mockOps.getConf());
+
+      Assertions.assertSame(fs1, fs2);
     }
+  }
+
+  @Test
+  public void testCreateSchemaWithDifferentUser() throws Exception {
+    // Create schema with user "alice"
+    UserPrincipal principal = new UserPrincipal("alice");
+    Schema schemaCreatedByAlice =
+        PrincipalUtils.doAs(
+            principal,
+            () -> {
+              final long testId = generateTestId();
+              final String schemaName = "schema" + testId;
+              final String comment = "comment" + testId;
+              final String schemaPath = TEST_ROOT_PATH + "/" + schemaName;
+              return createSchema(testId, schemaName, comment, null, schemaPath, false);
+            });
+
+    Assertions.assertNotNull(schemaCreatedByAlice);
+    Assertions.assertEquals("alice", schemaCreatedByAlice.auditInfo().creator());
+
+    UserPrincipal bobPrincipal = new UserPrincipal("bob");
+    Schema schemaCreatedByBob =
+        PrincipalUtils.doAs(
+            bobPrincipal,
+            () -> {
+              final long testId = generateTestId();
+              final String schemaName = "schema" + testId;
+              final String comment = "comment" + testId;
+              final String schemaPath = TEST_ROOT_PATH + "/" + schemaName;
+              // Create schema with user "bob"
+              return createSchema(testId, schemaName, comment, null, schemaPath, false);
+            });
+    Assertions.assertNotNull(schemaCreatedByBob);
+    Assertions.assertEquals("bob", schemaCreatedByBob.auditInfo().creator());
+
+    UserPrincipal lucyPrincipal = new UserPrincipal("lucy");
+    Schema schemaCreatedByLucy =
+        PrincipalUtils.doAs(
+            lucyPrincipal,
+            () -> {
+              final long testId = generateTestId();
+              final String schemaName = "schema" + testId;
+              final String comment = "comment" + testId;
+              final String schemaPath = TEST_ROOT_PATH + "/" + schemaName;
+              // Create schema with user "lucy"
+              return createSchema(testId, schemaName, comment, null, schemaPath, false);
+            });
+    Assertions.assertNotNull(schemaCreatedByLucy);
+    Assertions.assertEquals("lucy", schemaCreatedByLucy.auditInfo().creator());
   }
 
   @Test
@@ -1728,7 +1807,7 @@ public class TestFilesetCatalogOperations {
           exception
               .getMessage()
               .contains(
-                  "Default location name must be set and must be one of the fileset locations"),
+                  "The fileset property default-location-name must be set and must be one of the fileset locations"),
           "Exception message: " + exception.getMessage());
     }
   }

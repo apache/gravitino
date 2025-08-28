@@ -14,6 +14,16 @@ To connect to PostgreSQL, you need:
 - PostgreSQL 10.x or higher.
 - Network access from the Trino coordinator and workers to PostgreSQL. Port 5432 is the default port.
 
+## Case sensitivity
+
+PostgreSQL treats unquoted identifiers as case insensitive.
+For example, the table name MyTable is equivalent to mytable and MYTABLE.
+
+However, if you create a table with quoted identifiers, such as "MyTable", it becomes case sensitive and must be referenced exactly as "MyTable".
+
+When using the Gravitino Trino connector with PostgreSQL, you must use unquoted identifiers to avoid case sensitivity issues.
+Otherwise, schema names, table names or column names containing uppercase letters may not be found.
+
 ## Create table
 
 At present, the Apache Gravitino Trino connector only supports basic PostgreSQL table creation statements, which involve fields, null allowances, and comments. However, it does not support advanced features like primary keys, indexes, default values, and auto-increment.

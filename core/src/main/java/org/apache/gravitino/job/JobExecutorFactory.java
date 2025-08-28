@@ -19,17 +19,25 @@
 package org.apache.gravitino.job;
 
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableMap;
 import java.util.Map;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.connector.job.JobExecutor;
+import org.apache.gravitino.job.local.LocalJobExecutor;
+import org.apache.gravitino.job.local.LocalJobExecutorConfigs;
 
 public class JobExecutorFactory {
 
-  private static final String JOB_EXECUTOR_CONF_PREFIX = "gravitino.executor.";
+  private static final String JOB_EXECUTOR_CONF_PREFIX = "gravitino.jobExecutor.";
 
   private static final String JOB_EXECUTOR_CLASS_SUFFIX = ".class";
+
+  private static final Map<String, String> BUILTIN_EXECUTORS =
+      ImmutableMap.of(
+          LocalJobExecutorConfigs.LOCAL_JOB_EXECUTOR_NAME,
+          LocalJobExecutor.class.getCanonicalName());
 
   private JobExecutorFactory() {
     // Private constructor to prevent instantiation
@@ -37,9 +45,15 @@ public class JobExecutorFactory {
 
   public static JobExecutor create(Config config) {
     String jobExecutorName = config.get(Configs.JOB_EXECUTOR);
-    String jobExecutorClassKey =
-        JOB_EXECUTOR_CONF_PREFIX + jobExecutorName + JOB_EXECUTOR_CLASS_SUFFIX;
-    String clzName = config.getRawString(jobExecutorClassKey);
+    String clzName;
+    if (BUILTIN_EXECUTORS.containsKey(jobExecutorName)) {
+      clzName = BUILTIN_EXECUTORS.get(jobExecutorName);
+    } else {
+      String jobExecutorClassKey =
+          JOB_EXECUTOR_CONF_PREFIX + jobExecutorName + JOB_EXECUTOR_CLASS_SUFFIX;
+      clzName = config.getRawString(jobExecutorClassKey);
+    }
+
     Preconditions.checkArgument(
         StringUtils.isNotBlank(clzName),
         "Job executor class name must be specified for job executor: %s",
