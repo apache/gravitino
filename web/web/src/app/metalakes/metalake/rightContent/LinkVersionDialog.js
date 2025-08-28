@@ -50,16 +50,41 @@ import { groupBy } from 'lodash-es'
 import { keyRegex } from '@/lib/utils/regex'
 import { useSearchParams } from 'next/navigation'
 import { useAppSelector } from '@/lib/hooks/useStore'
+import clsx from 'clsx'
 
 const defaultValues = {
-  uri: '',
+  uris: [{ name: 'default', uri: '' }],
   aliases: [{ name: '' }],
   comment: '',
   propItems: []
 }
 
 const schema = yup.object().shape({
-  uri: yup.string().required(),
+  uris: yup
+      .array()
+      .of(
+        yup.object().shape({
+          uri: yup.string().when('name', {
+            is: name => !!name || name === 'default',
+            then: schema => schema.required(),
+            otherwise: schema => schema
+          })
+        })
+      ).test('unique', 'Uri name must be unique', (uris, ctx) => {
+      const values = uris?.filter(l => !!l.name).map(l => l.name)
+      const duplicates = values.filter((value, index, self) => self.indexOf(value) !== index)
+
+      if (duplicates.length > 0) {
+        const duplicateIndex = values.lastIndexOf(duplicates[0])
+
+        return ctx.createError({
+          path: `uris.${duplicateIndex}.name`,
+          message: 'This URI name is duplicated'
+        })
+      }
+
+      return true
+    }),
   aliases: yup
     .array()
     .of(
@@ -176,6 +201,11 @@ const LinkVersionDialog = props => {
     name: 'aliases'
   })
 
+  const { fields: uris, append: appendUri, remove: removeUri } = useFieldArray({
+    control,
+    name: 'uris'
+  })
+
   const watchAliases = watch('aliases')
 
   const handleClose = () => {
@@ -210,7 +240,13 @@ const LinkVersionDialog = props => {
         }, {})
 
         const schemaData = {
-          uri: data.uri,
+          uris: data.uris.reduce((acc, item) => {
+            if (item.name && item.uri) {
+              acc[item.name] = item.uri
+            }
+
+            return acc
+          }, {}),
           aliases: data.aliases.map(alias => alias.name).filter(aliasName => aliasName),
           comment: data.comment,
           properties
@@ -260,9 +296,10 @@ const LinkVersionDialog = props => {
       const { properties = {} } = data
 
       setCacheData(data)
-      setValue('uri', data.uri)
       setValue('comment', data.comment)
 
+      const uris = data.uris ? Object.entries(data.uris).map(([name, uri]) => ({ name, uri })) : [{ name: 'default', uri: data.uri || '' }]
+      setValue('uris', uris)
       const aliases = data.aliases.map(alias => ({ name: alias }))
       setValue(`aliases`, aliases)
 
@@ -304,24 +341,95 @@ const LinkVersionDialog = props => {
 
           <Grid container spacing={6}>
             <Grid item xs={12}>
-              <FormControl fullWidth>
-                <Controller
-                  name='uri'
-                  control={control}
-                  rules={{ required: true }}
-                  render={({ field: { value, onChange } }) => (
-                    <TextField
-                      value={value}
-                      label='URI'
-                      onChange={onChange}
-                      placeholder=''
-                      error={Boolean(errors.uri)}
-                      data-refer='link-uri-field'
-                    />
-                  )}
-                />
-                {errors.uri && <FormHelperText sx={{ color: 'error.main' }}>{errors.uri.message}</FormHelperText>}
-              </FormControl>
+              <Typography sx={{ mb: 2 }} variant='body2'>
+                Uris
+              </Typography>
+              {uris.map((field, index) => {
+                return (
+                  <Grid key={index} item xs={12} sx={{ '& + &': { mt: 2 } }}>
+                    <FormControl fullWidth>
+                      <Box
+                        key={field.id}
+                        sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1 }}
+                        data-refer={`uris-${index}`}
+                      >
+                        <Box className={clsx(uris.length === 1 && uris[index]?.name === 'default' ? 'twc-hidden' : '')}>
+                          <Controller
+                            name={`uris.${index}.name`}
+                            control={control}
+                            render={({ field: { value, onChange } }) => (
+                              <TextField
+                                {...field}
+                                value={value}
+                                onChange={onChange}
+                                disabled={uris?.[index]?.name === 'default'}
+                                label={`Name ${index + 1}`}
+                                data-refer={`uris-name-${index}`}
+                                error={!!errors.uris?.[index]?.name || !!errors.uris?.message}
+                                helperText={
+                                  errors.uris?.[index]?.name?.message || errors.uris?.message
+                                }
+                                fullWidth
+                              />
+                            )}
+                          />
+                        </Box>
+                        <Box sx={{ flexGrow: 1 }}>
+                          <Controller
+                            name={`uris.${index}.uri`}
+                            control={control}
+                            render={({ field: { value, onChange } }) => (
+                              <TextField
+                                {...field}
+                                value={value}
+                                onChange={onChange}
+                                label={`URI ${index + 1}`}
+                                data-refer={`uris-uri-${index}`}
+                                error={
+                                  !!errors.uris?.[index]?.uri || !!errors.uris?.message
+                                }
+                                helperText={
+                                  errors.uris?.[index]?.uri?.message ||
+                                  errors.uris?.message
+                                }
+                                fullWidth
+                              />
+                            )}
+                          />
+                        </Box>
+                        <Box>
+                          {index === 0 ? (
+                            <Box sx={{ minWidth: 40 }}>
+                              <IconButton
+                                sx={{ cursor: 'pointer' }}
+                                onClick={() => {
+                                  appendUri({ name: '', uri: '' })
+                                }}
+                              >
+                                <Icon icon='mdi:plus-circle-outline' />
+                              </IconButton>
+                            </Box>
+                          ) : (
+                            <Box sx={{ minWidth: 40 }}>
+                              <IconButton
+                                sx={{ cursor: 'pointer' }}
+                                onClick={() => {
+                                  removeUri(index)
+                                }}
+                              >
+                                <Icon icon='mdi:minus-circle-outline' />
+                              </IconButton>
+                            </Box>
+                          )}
+                        </Box>
+                      </Box>
+                    </FormControl>
+                  </Grid>
+                )
+              })}
+              {errors.uris && (
+                <FormHelperText sx={{ color: 'error.main' }}>{errors.uris.message}</FormHelperText>
+              )}
             </Grid>
 
             <Grid item xs={12}>
@@ -345,7 +453,6 @@ const LinkVersionDialog = props => {
                                   field.onChange(event)
                                   trigger('aliases')
                                 }}
-                                disabled={type === 'update'}
                                 label={`Alias ${index + 1}`}
                                 error={!!errors.aliases?.[index]?.name || !!errors.aliases?.message}
                                 helperText={errors.aliases?.[index]?.name?.message || errors.aliases?.message}
@@ -360,7 +467,6 @@ const LinkVersionDialog = props => {
                               <IconButton
                                 sx={{ cursor: type === 'update' ? 'not-allowed' : 'pointer' }}
                                 onClick={() => {
-                                  if (type === 'update') return
                                   append({ name: '' })
                                 }}
                               >
@@ -372,7 +478,6 @@ const LinkVersionDialog = props => {
                               <IconButton
                                 sx={{ cursor: type === 'update' ? 'not-allowed' : 'pointer' }}
                                 onClick={() => {
-                                  if (type === 'update') return
                                   remove(index)
                                 }}
                               >
