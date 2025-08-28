@@ -34,12 +34,14 @@ from gravitino.dto.rel.partitioning.partitioning import (
     Partitioning,
     SingleFieldPartitioning,
 )
+from gravitino.dto.rel.partitioning.range_partitioning_dto import RangePartitioningDTO
 from gravitino.dto.rel.partitioning.truncate_partitioning_dto import (
     TruncatePartitioningDTO,
 )
 from gravitino.dto.rel.partitioning.year_partitioning_dto import YearPartitioningDTO
 from gravitino.dto.rel.partitions.json_serdes._helper.serdes_utils import SerdesUtils
 from gravitino.dto.rel.partitions.list_partition_dto import ListPartitionDTO
+from gravitino.dto.rel.partitions.range_partition_dto import RangePartitionDTO
 from gravitino.utils.precondition import Precondition
 from gravitino.utils.serdes import SerdesUtilsBase
 
@@ -101,6 +103,16 @@ class PartitioningSerdes(SerdesUtilsBase, JsonSerializable[Partitioning]):
                     for list_partition_dto in dto.assignments()
                 ],
             }
+        if strategy is Partitioning.Strategy.RANGE:
+            dto = cast(RangePartitioningDTO, data_type)
+            return {
+                **result,
+                cls.FIELD_NAME: dto.field_name(),
+                cls.ASSIGNMENTS_NAME: [
+                    SerdesUtils.write_partition(range_partition_dto)
+                    for range_partition_dto in dto.assignments()
+                ],
+            }
 
         raise IOError(f"Unknown partitioning strategy: {strategy}")
 
@@ -148,5 +160,21 @@ class PartitioningSerdes(SerdesUtilsBase, JsonSerializable[Partitioning]):
                 )
                 assignments.append(partition_dto)
             return ListPartitioningDTO(field_names, assignments)
+        if strategy is Partitioning.Strategy.RANGE:
+            fields = data[cls.FIELD_NAME]
+            assignments_data = data.get(cls.ASSIGNMENTS_NAME, [])
+            Precondition.check_argument(
+                isinstance(assignments_data, list),
+                f"Cannot parse range partitioning from non-array assignments: {assignments_data}",
+            )
+            assignments = []
+            for assignment in assignments_data:
+                partition_dto = SerdesUtils.read_partition(assignment)
+                Precondition.check_argument(
+                    isinstance(partition_dto, RangePartitionDTO),
+                    f"Cannot parse range partitioning from non-range assignment: {assignment}",
+                )
+                assignments.append(partition_dto)
+            return RangePartitioningDTO(fields, assignments)
 
         raise IOError(f"Unknown partitioning strategy: {data[cls.STRATEGY]}")
