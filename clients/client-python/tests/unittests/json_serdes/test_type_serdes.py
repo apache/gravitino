@@ -46,6 +46,12 @@ class TestTypeSerdes(unittest.TestCase):
                 "fixed(10)": Types.FixedType.of(10),
                 "char(10)": Types.FixedCharType.of(10),
                 "varchar(10)": Types.VarCharType.of(10),
+                "time(6)": Types.TimeType.of(6),
+                "time(3)": Types.TimeType.of(3),
+                "timestamp(6)": Types.TimestampType.without_time_zone(6),
+                "timestamp(0)": Types.TimestampType.without_time_zone(0),
+                "timestamp_tz(6)": Types.TimestampType.with_time_zone(6),
+                "timestamp_tz(3)": Types.TimestampType.with_time_zone(3),
             },
         }
 
@@ -323,3 +329,68 @@ class TestTypeSerdes(unittest.TestCase):
             TypeSerdes.deserialize,
             data=invalid_data,
         )
+
+    def test_time_type_precision_serialization(self):
+        """Test the serialization and deserialization of time type precision"""
+        # Test TimeType with precision
+        time_with_precision = Types.TimeType.of(6)
+        serialized = TypeSerdes.serialize(time_with_precision)
+        self.assertEqual(serialized, "time(6)")
+
+        deserialized = TypeSerdes.deserialize(serialized)
+        self.assertEqual(deserialized, time_with_precision)
+        self.assertTrue(deserialized.has_precision_set())
+        self.assertEqual(deserialized.precision(), 6)
+
+        # Test TimestampType with precision (without timezone)
+        timestamp_with_precision = Types.TimestampType.without_time_zone(3)
+        serialized = TypeSerdes.serialize(timestamp_with_precision)
+        self.assertEqual(serialized, "timestamp(3)")
+
+        deserialized = TypeSerdes.deserialize(serialized)
+        self.assertEqual(deserialized, timestamp_with_precision)
+        self.assertTrue(deserialized.has_precision_set())
+        self.assertEqual(deserialized.precision(), 3)
+        self.assertFalse(deserialized.has_time_zone())
+
+        # Test TimestampType with precision (with timezone)
+        timestamp_tz_with_precision = Types.TimestampType.with_time_zone(9)
+        serialized = TypeSerdes.serialize(timestamp_tz_with_precision)
+        self.assertEqual(serialized, "timestamp_tz(9)")
+
+        deserialized = TypeSerdes.deserialize(serialized)
+        self.assertEqual(deserialized, timestamp_tz_with_precision)
+        self.assertTrue(deserialized.has_precision_set())
+        self.assertEqual(deserialized.precision(), 9)
+        self.assertTrue(deserialized.has_time_zone())
+
+    def test_backward_compatibility(self):
+        """Test forward compatibility - Time types without precision should work properly"""
+        # Test TimeType without precision
+        time_without_precision = Types.TimeType.get()
+        serialized = TypeSerdes.serialize(time_without_precision)
+        self.assertEqual(serialized, "time")
+
+        deserialized = TypeSerdes.deserialize(serialized)
+        self.assertEqual(deserialized, time_without_precision)
+        self.assertFalse(deserialized.has_precision_set())
+
+        # Test TimestampType without precision (without timezone)
+        timestamp_without_precision = Types.TimestampType.without_time_zone()
+        serialized = TypeSerdes.serialize(timestamp_without_precision)
+        self.assertEqual(serialized, "timestamp")
+
+        deserialized = TypeSerdes.deserialize(serialized)
+        self.assertEqual(deserialized, timestamp_without_precision)
+        self.assertFalse(deserialized.has_precision_set())
+        self.assertFalse(deserialized.has_time_zone())
+
+        # Test TimestampType without precision (with timezone)
+        timestamp_tz_without_precision = Types.TimestampType.with_time_zone()
+        serialized = TypeSerdes.serialize(timestamp_tz_without_precision)
+        self.assertEqual(serialized, "timestamp_tz")
+
+        deserialized = TypeSerdes.deserialize(serialized)
+        self.assertEqual(deserialized, timestamp_tz_without_precision)
+        self.assertFalse(deserialized.has_precision_set())
+        self.assertTrue(deserialized.has_time_zone())
