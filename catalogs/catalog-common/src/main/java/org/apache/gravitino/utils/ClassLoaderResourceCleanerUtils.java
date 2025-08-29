@@ -28,11 +28,57 @@ import org.apache.commons.lang3.reflect.MethodUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class ClassLoaderUtils {
+/**
+ * Utility class to clean up resources related to a specific class loader to prevent memory leaks.
+ * Gravitino will create a new class loader for each catalog and release it when there exist any
+ * changes to the catalog. So, it's important to clean up resources related to the class loader to
+ * prevent memory leaks.
+ */
+public class ClassLoaderResourceCleanerUtils {
 
-  private static final Logger LOG = LoggerFactory.getLogger(ClassLoaderUtils.class);
+  private static final Logger LOG = LoggerFactory.getLogger(ClassLoaderResourceCleanerUtils.class);
 
-  private ClassLoaderUtils() {}
+  private ClassLoaderResourceCleanerUtils() {}
+
+  /**
+   * Close all resources related to the given class loader to prevent memory leaks.
+   *
+   * @param classLoader the classloader to be closed
+   */
+  public static void closeClassLoaderResource(ClassLoader classLoader) {
+    boolean testEnv = System.getenv("GRAVITINO_TEST") != null;
+    if (testEnv) {
+      // In test environment, we do not need to clean up class loader related stuff
+      return;
+    }
+
+    try {
+      // Clear statics threads in FileSystem and close all FileSystem instances.
+      closeStatsDataClearerInFileSystem(classLoader);
+
+      // Stop all threads with the current class loader and clear their threadLocal variables for
+      // jetty threads that are loaded by the current class loader.
+      // For example, thread local `threadData` in FileSystem#StatisticsDataCleaner is created
+      // within jetty thread with the current class loader. However, there are clear by
+      // `catalog.close` in ForkJoinPool in CaffeineCache, in this case, the thread local variable
+      // will not be cleared, so we need to clear them manually here.
+      stopThreadsAndClearThreadLocalVariables(classLoader);
+
+      // Release the LogFactory for the classloader, each classloader has its own LogFactory
+      // instance.
+      releaseLogFactoryInCommonLogging(classLoader);
+
+      closeResourceInAWS(classLoader);
+
+      closeResourceInGCP(classLoader);
+
+      closeResourceInAzure(classLoader);
+
+      clearShutdownHooks(classLoader);
+    } catch (Exception e) {
+      LOG.warn("Failed to clear resources(threads, thread local variants) in the class loader", e);
+    }
+  }
 
   /**
    * Close the stats data clearer thread in Hadoop FileSystem to prevent memory leaks when using
@@ -269,46 +315,6 @@ public class ClassLoaderUtils {
       MethodUtils.invokeStaticMethod(relocatedLogFactory, "release", classLoader);
     } catch (Exception e) {
       LOG.warn("Failed to handle Azure file system in class loader {}", classLoader, e);
-    }
-  }
-
-  /**
-   * Close all resources related to the given class loader to prevent memory leaks.
-   *
-   * @param classLoader the classloader to be closed
-   */
-  public static void closeClassLoaderResource(ClassLoader classLoader) {
-    boolean testEnv = System.getenv("GRAVITINO_TEST") != null;
-    if (testEnv) {
-      // In test environment, we do not need to clean up class loader related stuff
-      return;
-    }
-
-    try {
-      // Clear statics threads in FileSystem and close all FileSystem instances.
-      closeStatsDataClearerInFileSystem(classLoader);
-
-      // Stop all threads with the current class loader and clear their threadLocal variables for
-      // jetty threads that are loaded by the current class loader.
-      // For example, thread local `threadData` in FileSystem#StatisticsDataCleaner is created
-      // within jetty thread with the current class loader. However, there are clear by
-      // `catalog.close` in ForkJoinPool in CaffeineCache, in this case, the thread local variable
-      // will not be cleared, so we need to clear them manually here.
-      stopThreadsAndClearThreadLocalVariables(classLoader);
-
-      // Release the LogFactory for the classloader, each classloader has its own LogFactory
-      // instance.
-      releaseLogFactoryInCommonLogging(classLoader);
-
-      closeResourceInAWS(classLoader);
-
-      closeResourceInGCP(classLoader);
-
-      closeResourceInAzure(classLoader);
-
-      clearShutdownHooks(classLoader);
-    } catch (Exception e) {
-      LOG.warn("Failed to clear resources(Thread, ThreadLocal variants) in the class loader", e);
     }
   }
 }

@@ -65,7 +65,7 @@ import org.apache.gravitino.file.FilesetCatalog;
 import org.apache.gravitino.file.FilesetChange;
 import org.apache.gravitino.meta.FilesetEntity;
 import org.apache.gravitino.meta.SchemaEntity;
-import org.apache.gravitino.utils.ClassLoaderUtils;
+import org.apache.gravitino.utils.ClassLoaderResourceCleanerUtils;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.PrincipalUtils;
 import org.slf4j.Logger;
@@ -273,7 +273,7 @@ public class SecureFilesetCatalogOperations
 
     UserContext.cleanAllUserContext();
 
-    ClassLoaderUtils.closeClassLoaderResource(this.getClass().getClassLoader());
+    ClassLoaderResourceCleanerUtils.closeClassLoaderResource(this.getClass().getClassLoader());
   }
 
   @Override
