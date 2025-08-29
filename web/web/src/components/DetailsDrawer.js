@@ -134,6 +134,57 @@ const DetailsDrawer = props => {
           </Grid>
         )}
 
+        {drawerData.uris && (
+          <Grid item xs={12} sx={{ mb: [0, 5] }}>
+            <Typography variant='body2' sx={{ mb: 2 }}>
+              URI(s)
+            </Typography>
+
+            <TableContainer>
+              <Table>
+                <TableHead
+                  sx={{
+                    backgroundColor: theme => theme.palette.action.hover
+                  }}
+                >
+                  <TableRow>
+                    <TableCell sx={{ py: 2 }}>Name</TableCell>
+                    <TableCell sx={{ py: 2 }}>URI</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody data-refer='details-props-table'>
+                  {Object.keys(drawerData.uris).map((name, index) => {
+                    return (
+                      <TableRow key={index} data-refer={`details-props-index-${index}`}>
+                        <TableCell
+                          className={'twc-py-[0.7rem] twc-truncate twc-max-w-[134px]'}
+                          data-refer={`uris-name-${name}`}
+                        >
+                          <Tooltip title={<span data-refer={`tip-uris-name-${name}`}>{name}</span>} placement='bottom'>
+                            {name}
+                          </Tooltip>
+                        </TableCell>
+                        <TableCell
+                          className={'twc-py-[0.7rem] twc-truncate twc-max-w-[134px]'}
+                          data-refer={`uris-uri-${drawerData.uris[name]}`}
+                          data-prev-refer={`uris-name-${name}`}
+                        >
+                          <Tooltip
+                            title={<span data-prev-refer={`uris-uri-${name}`}>{drawerData.uris[name]}</span>}
+                            placement='bottom'
+                          >
+                            {drawerData.uris[name]}
+                          </Tooltip>
+                        </TableCell>
+                      </TableRow>
+                    )
+                  })}
+                </TableBody>
+              </Table>
+            </TableContainer>
+          </Grid>
+        )}
+
         {drawerData.aliases && (
           <Grid item xs={12} md={6} sx={{ mb: [0, 5] }}>
             <Typography variant='body2' sx={{ mb: 2 }}>
