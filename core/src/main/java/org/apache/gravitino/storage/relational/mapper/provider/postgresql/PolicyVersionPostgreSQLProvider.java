@@ -58,8 +58,10 @@ public class PolicyVersionPostgreSQLProvider extends PolicyVersionBaseSQLProvide
         + POLICY_VERSION_TABLE_NAME
         + " SET deleted_at = floor(extract(epoch from((current_timestamp -"
         + " timestamp '1970-01-01 00:00:00')*1000)))"
+        + " WHERE id IN (SELECT id FROM "
+        + POLICY_VERSION_TABLE_NAME
         + " WHERE policy_id = #{policyId} AND version < #{versionRetentionLine}"
-        + " AND deleted_at = 0 LIMIT #{limit}";
+        + " AND deleted_at = 0 LIMIT #{limit})";
   }
 
   @Override
