@@ -31,9 +31,10 @@ import org.slf4j.LoggerFactory;
 /**
  * Reverse index rules for different entity types. This class defines how to process reverse
  * indexing for UserEntity, GroupEntity, and RoleEntity. <br>
- * For example: - UserEntity role is {metalake-name}.system.user.{user-name}:USER-{serial-number} -
- * UserEntity role is {metalake-name}.system.group.{group-name}:GROUP-{serial-number} - RoleEntity
- * role is {metalake-name}.system.role.{role-name}:ROLE-{serial-number} - {serial-number}: Because
+ * For example: <br>
+ * - UserEntity role is {metalake-name}.system.user.{user-name}:USER-{serial-number} <br>
+ * - GroupEntity role is {metalake-name}.system.group.{group-name}:GROUP-{serial-number} <br>
+ * - RoleEntity role is {metalake-name}.system.role.{role-name}:ROLE-{serial-number} <br>
  */
 public class ReverseIndexRules {
   private static final Logger LOG = LoggerFactory.getLogger(ReverseIndexRules.class.getName());
