@@ -34,7 +34,9 @@ import {
   IconButton,
   InputLabel,
   TextField,
-  Typography
+  Typography,
+  Tooltip,
+  Switch
 } from '@mui/material'
 
 import Icon from '@/components/Icon'
@@ -53,7 +55,7 @@ import { useAppSelector } from '@/lib/hooks/useStore'
 import clsx from 'clsx'
 
 const defaultValues = {
-  uris: [{ name: 'default', uri: '' }],
+  uris: [{ name: '', uri: '', defaultUri: true }],
   aliases: [{ name: '' }],
   comment: '',
   propItems: []
@@ -65,7 +67,7 @@ const schema = yup.object().shape({
     .of(
       yup.object().shape({
         uri: yup.string().when('name', {
-          is: name => !!name || name === 'default',
+          is: name => !!name,
           then: schema => schema.required(),
           otherwise: schema => schema
         })
@@ -154,6 +156,9 @@ const LinkVersionDialog = props => {
     resolver: yupResolver(schema)
   })
 
+  const defaultUriProps = watch('propItems').filter(item => item.defaultUri)[0]
+  const urisItems = watch('uris')
+
   const handleFormChange = ({ index, event }) => {
     let data = [...innerProps]
     data[index][event.target.name] = event.target.value
@@ -195,6 +200,15 @@ const LinkVersionDialog = props => {
     data.splice(index, 1)
     setInnerProps(data)
     setValue('propItems', data)
+  }
+
+  const onChangeDefaultUri = ({ index, event }) => {
+    fields.forEach((item, i) => {
+      if (i !== index) {
+        setValue(`uris.${i}.defaultUri`, false)
+      }
+    })
+    setValue(`uris.${index}.defaultUri`, event.target.checked)
   }
 
   const { fields, append, remove } = useFieldArray({
@@ -248,6 +262,9 @@ const LinkVersionDialog = props => {
           uris: data.uris.reduce((acc, item) => {
             if (item.name && item.uri) {
               acc[item.name] = item.uri
+              if (item.defaultUri && !properties['default-uri-name']) {
+                properties['default-uri-name'] = item.name
+              }
             }
 
             return acc
@@ -303,9 +320,13 @@ const LinkVersionDialog = props => {
       setCacheData(data)
       setValue('comment', data.comment)
 
-      const uris = data.uris
-        ? Object.entries(data.uris).map(([name, uri]) => ({ name, uri }))
-        : [{ name: 'default', uri: data.uri || '' }]
+      const uris =
+        data.uris &&
+        Object.entries(data.uris).map(([name, uri]) => ({
+          name,
+          uri,
+          defaultUri: properties['default-uri-name'] === name
+        }))
       setValue('uris', uris)
       const aliases = data.aliases.map(alias => ({ name: alias }))
       setValue(`aliases`, aliases)
@@ -360,7 +381,7 @@ const LinkVersionDialog = props => {
                         sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1 }}
                         data-refer={`uris-${index}`}
                       >
-                        <Box className={clsx(uris.length === 1 && uris[index]?.name === 'default' ? 'twc-hidden' : '')}>
+                        <Box className={clsx(uris.length === 1 && uris[index]?.name === 'unknown' ? 'twc-hidden' : '')}>
                           <Controller
                             name={`uris.${index}.name`}
                             control={control}
@@ -369,7 +390,6 @@ const LinkVersionDialog = props => {
                                 {...field}
                                 value={value}
                                 onChange={onChange}
-                                disabled={uris?.[index]?.name === 'default'}
                                 label={`Name ${index + 1}`}
                                 data-refer={`uris-name-${index}`}
                                 error={!!errors.uris?.[index]?.name || !!errors.uris?.message}
@@ -397,6 +417,24 @@ const LinkVersionDialog = props => {
                             )}
                           />
                         </Box>
+                        {!defaultUriProps && urisItems.length > 1 && urisItems[0].name && urisItems[0].uri && (
+                          <Box>
+                            <Controller
+                              name={`uris.${index}.defaultUri`}
+                              control={control}
+                              render={({ field: { value, onChange } }) => (
+                                <Tooltip title='Default URI' placement='top'>
+                                  <Switch
+                                    checked={value}
+                                    onChange={event => onChangeDefaultUri({ index, event })}
+                                    disabled={type === 'update'}
+                                    size='small'
+                                  />
+                                </Tooltip>
+                              )}
+                            />
+                          </Box>
+                        )}
                         <Box>
                           {index === 0 ? (
                             <Box sx={{ minWidth: 40 }}>
