@@ -440,7 +440,7 @@ To verify whether the service has started:
 curl  http://127.0.0.1:9001/iceberg/v1/config
 ```
 
-Normally you will see the output like `{"defaults":{},"overrides":{}, "endpoints":["GET /v1/{prefix}/namespaces", xx]}%`.
+Normally you will see the output like `{"defaults":{},"overrides":{}, "endpoints":["GET /v1/{prefix}/namespaces", ...]}%`.
 
 ## Exploring the Apache Gravitino Iceberg REST catalog service with Apache Spark
 
