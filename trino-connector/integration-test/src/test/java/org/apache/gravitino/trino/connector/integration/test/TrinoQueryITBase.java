@@ -70,15 +70,25 @@ public class TrinoQueryITBase {
 
   private static BaseIT baseIT;
 
+  protected int trinoWorkerNum = 0;
+
+  public TrinoQueryITBase() {}
+
+  public TrinoQueryITBase(int trinoWorkerNum) {
+    this.trinoWorkerNum = trinoWorkerNum;
+  }
+
   private void setEnv() throws Exception {
     baseIT = new BaseIT();
     if (autoStart) {
       baseIT.startIntegrationTest();
       gravitinoClient = baseIT.getGravitinoClient();
       gravitinoUri = String.format("http://127.0.0.1:%d", baseIT.getGravitinoServerPort());
+      // The creation of a metalake must be completed before the Trino cluster is deployed.
+      createMetalake();
 
       trinoITContainers = ContainerSuite.getTrinoITContainers();
-      trinoITContainers.launch(baseIT.getGravitinoServerPort());
+      trinoITContainers.launch(baseIT.getGravitinoServerPort(), trinoWorkerNum);
 
       trinoUri = trinoITContainers.getTrinoUri();
       hiveMetastoreUri = trinoITContainers.getHiveMetastoreUri();
@@ -103,7 +113,10 @@ public class TrinoQueryITBase {
 
     setEnv();
     trinoQueryRunner = new TrinoQueryRunner(trinoUri);
-    createMetalake();
+
+    if (!autoStart) {
+      createMetalake();
+    }
 
     started = true;
   }

@@ -22,7 +22,7 @@ set -ex
 trino_conf_dir="$(dirname "${BASH_SOURCE-$0}")"
 trino_conf_dir="$(cd "${trino_conf_dir}">/dev/null; pwd)"
 
-cp "$trino_conf_dir/config/config.properties" /etc/trino/config.properties
+cp "$trino_conf_dir/config/config-worker.properties" /etc/trino/config.properties
 cp "$trino_conf_dir/config/jvm.config" /etc/trino/jvm.config
 cp "$trino_conf_dir/config/log4j2.properties" /etc/trino/log4j2.properties
 cp "$trino_conf_dir/config/node.properties" /etc/trino/node.properties
@@ -38,11 +38,6 @@ sed -i "s/GRAVITINO_METALAKE_NAME/${GRAVITINO_METALAKE_NAME}/g" /etc/trino/catal
 # Update `node.id=NODE_ID` in the `/conf/node.properties`
 sed -i "s/NODE_ID/${RANDOM}-${RANDOM}-${RANDOM}-${RANDOM}-${RANDOM}/g" /etc/trino/node.properties
 
-if [[ "${TRINO_WORKER_NUM}" -gt 0 ]]; then
-  # Deploy a distributed cluster, so update `node-scheduler.include-coordinator` to `false` in the`/conf/config.properties`
-  sed -i "s/node-scheduler.include-coordinator=true/node-scheduler.include-coordinator=false/g" /etc/trino/config.properties
-fi
-
 # mkdir `node.data-dir` in the `/conf/node.properties`
 mkdir -p /tmp/data
 
@@ -53,19 +48,4 @@ if [[ "${num_of_gravitino_connector}" -ne 1 ]]; then
   exit 1
 fi
 
-nohup /usr/lib/trino/bin/run-trino &
-
-counter=0
-while [ $counter -le 300 ]; do
-  counter=$((counter + 1))
-  trino_ready=$(trino --execute  "SHOW CATALOGS LIKE 'gravitino'" | wc -l)
-  if [ "$trino_ready" -eq 0 ];
-  then
-    echo "Wait for the initialization of services"
-    sleep 1;
-  else
-    # persist the container
-    tail -f /dev/null
-  fi
-done
-exit 1
+/usr/lib/trino/bin/run-trino
