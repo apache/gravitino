@@ -1,0 +1,508 @@
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+
+---
+
+paths:
+
+  /metalakes/{metalake}/objects/{metadataObjectType}/{metadataObjectFullName}/statistics:
+    parameters:
+      - $ref: "./openapi.yaml#/components/parameters/metalake"
+      - $ref: "./openapi.yaml#/components/parameters/metadataObjectType"
+      - $ref: "./openapi.yaml#/components/parameters/metadataObjectFullName"
+
+    get:
+      tags:
+        - statistics
+      summary: List statistics
+      operationId: listStatistics
+
+      responses:
+        "200":
+            description: Returns the statistics for the specified metadata object
+            content:
+              application/vnd.gravitino.v1+json:
+                schema:
+                  $ref: "#/components/responses/StatisticListResponse"
+                examples:
+                  StatisticListResponse:
+                    $ref: "#/components/examples/StatisticListResponse"
+        "404":
+          description: Not Found - The specified metadata object doesn't exist
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+              examples:
+                NoSuchMetadataObjectException:
+                  $ref: "#/components/examples/NoSuchMetadataObjectException"
+        "5xx":
+          $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
+
+    post:
+      tags:
+        - statistics
+      summary: Drop statistics
+      operationId: dropStatistics
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StatisticsDropRequest"
+
+      responses:
+        "200":
+          $ref: "./openapi.yaml#/components/responses/DropResponse"
+        "400":
+          description: Bad Request - The request contains illegal statistic names
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+              examples:
+                IllegalStatisticNameException:
+                  $ref: "#/components/examples/IllegalStatisticNameException"
+        "404":
+          description: Not Found - The specified metadata object doesn't exist
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+              examples:
+                NoSuchMetadataObjectException:
+                  $ref: "#/components/examples/NoSuchMetadataObjectException"
+        "405":
+          description: Method Not Allowed - The specified statistic is unmodifiable
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+              examples:
+                UnmodifiableStatisticException:
+                  $ref: "#/components/examples/UnmodifiableStatisticException"
+        "5xx":
+          $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
+
+    put:
+      tags:
+        - statistics
+      summary: Update statistics
+      operationId: updateStatistics
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StatisticsUpdateRequest"
+
+      responses:
+        "200":
+          $ref: "./openapi.yaml#/components/responses/BaseResponse"
+        "400":
+          description: Bad Request - The request contains illegal statistic names
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+              examples:
+                IllegalStatisticNameException:
+                  $ref: "#/components/examples/IllegalStatisticNameException"
+        "404":
+          description: Not Found - The specified metadata object doesn't exist
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+              examples:
+                NoSuchMetadataObjectException:
+                  $ref: "#/components/examples/NoSuchMetadataObjectException"
+        "405":
+          description: Method Not Allowed - The specified statistic is unmodifiable
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+              examples:
+                UnmodifiableStatisticException:
+                  $ref: "#/components/examples/UnmodifiableStatisticException"
+        "5xx":
+          $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
+
+  /metalakes/{metalake}/objects/{metadataObjectType}/{metadataObjectFullName}/statistics/partitions:
+    parameters:
+      - $ref: "./openapi.yaml#/components/parameters/metalake"
+      - $ref: "./openapi.yaml#/components/parameters/metadataObjectType"
+      - $ref: "./openapi.yaml#/components/parameters/metadataObjectFullName"
+
+    get:
+      tags:
+        - partition-statistics
+      summary: List partition statistics
+      operationId: listPartitionStatistics
+      parameters:
+        - $ref: "#/components/parameters/from"
+        - $ref: "#/components/parameters/to"
+        - $ref: "#/components/parameters/fromInclusive"
+        - $ref: "#/components/parameters/toInclusive"
+      responses:
+        "200":
+            description: Returns the partition statistics for the specified metadata object
+            content:
+              application/vnd.gravitino.v1+json:
+                schema:
+                  $ref: "#/components/responses/PartitionStatisticsListResponse"
+                examples:
+                  PartitionStatisticsListResponse:
+                    $ref: "#/components/examples/PartitionStatisticListResponse"
+        "400":
+          $ref: "./openapi.yaml#/components/responses/BadRequestErrorResponse"
+        "404":
+          description: Not Found - The specified metadata object doesn't exist
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+              examples:
+                NoSuchMetadataObjectException:
+                  $ref: "#/components/examples/NoSuchMetadataObjectException"
+        "5xx":
+          $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
+
+    post:
+      tags:
+        - partition-statistics
+      summary: Drop partition statistics
+      operationId: dropPartitionStatistics
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PartitionStatisticsDropRequest"
+
+      responses:
+        "200":
+          $ref: "./openapi.yaml#/components/responses/DropResponse"
+        "400":
+          description: Bad Request - The request contains illegal statistic names
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+              examples:
+                IllegalStatisticNameException:
+                  $ref: "#/components/examples/IllegalStatisticNameException"
+        "404":
+          description: Not Found - The specified metadata object doesn't exist
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+              examples:
+                NoSuchMetadataObjectException:
+                  $ref: "#/components/examples/NoSuchMetadataObjectException"
+        "405":
+          description: Method Not Allowed - The specified statistic is unmodifiable
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+              examples:
+                UnmodifiableStatisticException:
+                  $ref: "#/components/examples/UnmodifiableStatisticException"
+        "5xx":
+          $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
+
+    put:
+      tags:
+        - partition-statistics
+      summary: Update partition statistics
+      operationId: updatePartitionStatistics
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PartitionStatisticsUpdateRequest"
+
+      responses:
+        "200":
+          $ref: "./openapi.yaml#/components/responses/BaseResponse"
+        "400":
+          description: Bad Request - The request contains illegal statistic names
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+              examples:
+                IllegalStatisticNameException:
+                  $ref: "#/components/examples/IllegalStatisticNameException"
+        "404":
+          description: Not Found - The specified metadata object doesn't exist
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+              examples:
+                NoSuchMetadataObjectException:
+                  $ref: "#/components/examples/NoSuchMetadataObjectException"
+        "405":
+          description: Method Not Allowed - The specified statistic is unmodifiable
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+              examples:
+                UnmodifiableStatisticException:
+                  $ref: "#/components/examples/UnmodifiableStatisticException"
+        "5xx":
+          $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
+
+
+components:
+  parameters:
+    from:
+      name: from
+      in: query
+      description: The lower partition name
+      required: false
+      schema:
+        type: string
+
+    to:
+      name: to
+      in: query
+      description: The upper partition name
+      required: false
+      schema:
+        type: string
+
+    fromInclusive:
+      name: fromInclusive
+      in: query
+      description: Whether the lower partition name is inclusive
+      required: false
+      schema:
+        type: boolean
+
+    toInclusive:
+      name: toInclusive
+      in: query
+      description: Whether the upper partition name is inclusive
+      required: false
+      schema:
+        type: string
+
+
+  schemas:
+    StatisticsDropRequest:
+      type: object
+      required:
+        - names
+      properties:
+        names:
+          type: array
+          items:
+            type: string
+          description: The names of the statistics to drop for the metadata object
+
+    StatisticsUpdateRequest:
+      type: object
+      required:
+        - updates
+      properties:
+          updates:
+            type: object
+            additionalProperties: {}
+            description: The statistics to update for each partition
+
+    PartitionStatisticsDropRequest:
+        type: object
+        required:
+            - drops
+        properties:
+            drops:
+              type: array
+              items:
+                $ref: "#/components/schemas/PartitionStatisticsDrop"
+              description: The list of partition statistics to drop
+
+    PartitionStatisticsDrop:
+        type: object
+        required:
+            - partitionName
+            - statisticNames
+        properties:
+            partitionName:
+              type: string
+              description: The name of the partition
+            statisticNames:
+              type: array
+              items:
+                type: string
+              description: The names of the statistics to drop for the partition
+
+
+    PartitionStatisticsUpdateRequest:
+      type: object
+      required:
+        - updates
+      properties:
+        updates:
+          type: array
+          items:
+            $ref: "#/components/schemas/PartitionStatisticsUpdate"
+          description: The list of partition statistics to update
+
+    PartitionStatisticsUpdate:
+        type: object
+        required:
+            - partitionName
+            - statistics
+        properties:
+            partitionName:
+              type: string
+              description: The name of the partition
+            statistics:
+              type: object
+              additionalProperties: {}
+              description: The statistics to update for the partition
+
+
+  responses:
+    StatisticListResponse:
+        type: object
+        properties:
+            code:
+              type: integer
+              format: int32
+              description: Status code of the response
+              enum:
+                - 0
+            statistics:
+              type: object
+              additionalProperties: {}
+              description: A map of statistic names to their values for the metadata object
+
+
+    PartitionStatisticsListResponse:
+        type: object
+        properties:
+            code:
+              type: integer
+              format: int32
+              description: Status code of the response
+              enum:
+                - 0
+            partitionStatistics:
+              type: object
+              additionalProperties:
+                type: object
+                additionalProperties: {}
+              description: A map of partition names to their statistics (which is a map of statistic names to their values)
+
+  examples:
+    StatisticsDropRequest:
+      value: {
+        "names": [ "row_count", "file_size" ]
+      }
+
+    StatisticsUpdateRequest:
+      value: {
+        "stats": {
+          "row_count": "1000",
+          "file_size": "500MB"
+        }
+      }
+
+    PartitionStatisticsDropRequest:
+      value: {
+        "drops": [
+          {
+            "partitionName": "2023-10-01",
+            "statisticNames": [ "row_count", "file_size" ]
+          }
+        ]
+      }
+
+    PartitionStatisticUpdateRequest:
+      value: {
+        "updates": [
+          {
+            "partitionName": "2023-10-01",
+            "stats": {
+              "row_count": "500",
+              "file_size": "250MB"
+            }
+          }
+        ]
+      }
+
+    StatisticListResponse:
+        value: {
+            "code": 0,
+            "statistics": {
+                "row_count": "1000",
+                "file_size": "500MB"
+            }
+        }
+
+
+    PartitionStatisticListResponse:
+        value: {
+            "code": 0,
+            "partitionStatistics": {
+                "2023-10-01": {
+                    "row_count": "500",
+                    "file_size": "250MB"
+                },
+                "2023-10-02": {
+                    "row_count": "600",
+                    "file_size": "300MB"
+                }
+            }
+        }
+
+    NoSuchMetadataObjectException:
+      value: {
+        "code": 1003,
+        "type": "NoSuchMetadataObjectException",
+        "message": "Metadata object does not exist",
+        "stack": [
+          "org.apache.gravitino.exceptions.NoSuchMetadataObjectException: Metadata object does not exist",
+          "..."
+        ]
+      }
+
+    IllegalStatisticNameException:
+      value: {
+        "code": 1001,
+        "type": "IllegalStatisticNameException",
+        "message": "Custom statistic name must start with 'custom-'",
+        "stack": [
+          "org.apache.gravitino.exceptions.IllegalStatisticNameException: Custom statistic name must start with 'custom-'",
+          "..."
+        ]
+      }
+
+    UnmodifiableStatisticException:
+      value: {
+        "code": 1006,
+        "type": "UnmodifiableStatisticException",
+        "message": "Statistic is unmodifiable",
+        "stack": [
+          "org.apache.gravitino.exceptions.UnmodifiableStatisticException: Statistic is unmodifiable",
+          "..."
+        ]
+      }
