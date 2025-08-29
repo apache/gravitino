@@ -103,6 +103,15 @@ public class MySQLDataTypeTransformer extends GeneralDataTypeTransformer {
       return Types.VarCharType.of(length);
     } else if (typeClass == JSON_TYPE.getClass()) {
       return Types.ExternalType.of(MySQLExternalDataType.JSON.getMysqlTypeName());
+    } else if (io.trino.spi.type.TimeType.class.isAssignableFrom(typeClass)) {
+      // MySQL only supports time type with second (0) precision
+      return Types.TimeType.of(TRINO_SECONDS_PRECISION);
+    } else if (io.trino.spi.type.TimestampType.class.isAssignableFrom(typeClass)) {
+      // MySQL only supports timestamp type (without time zone) with second (0) precision
+      return Types.TimestampType.withoutTimeZone(TRINO_SECONDS_PRECISION);
+    } else if (io.trino.spi.type.TimestampWithTimeZoneType.class.isAssignableFrom(typeClass)) {
+      // MySQL only supports timestamp with time zone type with second (0) precision
+      return Types.TimestampType.withTimeZone(TRINO_SECONDS_PRECISION);
     }
 
     return super.getGravitinoType(type);

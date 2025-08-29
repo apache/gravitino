@@ -20,6 +20,7 @@
 package org.apache.gravitino.trino.connector.catalog.hive;
 
 import io.trino.spi.TrinoException;
+import io.trino.spi.type.TimestampType;
 import io.trino.spi.type.VarcharType;
 import org.apache.gravitino.rel.types.Type;
 import org.apache.gravitino.rel.types.Types;
@@ -39,6 +40,8 @@ public class HiveDataTypeTransformer extends GeneralDataTypeTransformer {
       throw new TrinoException(
           GravitinoErrorCode.GRAVITINO_UNSUPPORTED_GRAVITINO_DATATYPE,
           "Unsupported gravitino datatype: " + type);
+    } else if (Type.Name.TIMESTAMP == type.name()) {
+      return TimestampType.TIMESTAMP_MILLIS;
     }
     return super.getTrinoType(type);
   }
@@ -72,6 +75,10 @@ public class HiveDataTypeTransformer extends GeneralDataTypeTransformer {
       }
 
       return Types.FixedCharType.of(charType.getLength());
+    } else if (io.trino.spi.type.TimestampType.class.isAssignableFrom(typeClass)) {
+      // When creating a table in Hive, the timestamp data type only supports not specifying
+      // precision, with the default precision being 3 (milliseconds precision)
+      return Types.TimestampType.withoutTimeZone();
     }
 
     return super.getGravitinoType(type);
