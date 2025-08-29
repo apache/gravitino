@@ -287,7 +287,7 @@ public class PolicyOperations {
           });
 
     } catch (Exception e) {
-      return ExceptionHandlers.handlePolicyException(OperationType.LIST, "", policyName, e);
+      return ExceptionHandlers.handlePolicyException(OperationType.LIST, "", metalake, e);
     }
   }
 
