@@ -146,6 +146,9 @@ public class GCSTokenProvider implements CredentialProvider {
   @VisibleForTesting
   // Remove the first '/', and append `/` if the path does not end with '/'.
   static String normalizeUriPath(String resourcePath) {
+    if (resourcePath.isEmpty() || "/".equals(resourcePath)) {
+      return "";
+    }
     if (resourcePath.startsWith("/")) {
       resourcePath = resourcePath.substring(1);
     }
