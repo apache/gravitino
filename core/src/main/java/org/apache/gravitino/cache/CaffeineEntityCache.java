@@ -350,12 +350,6 @@ public class CaffeineEntityCache extends BaseEntityCache {
     return (Caffeine<KEY, VALUE>) builder;
   }
 
-  private NameIdentifier getNameIdentifier(Entity entity) {
-    NameIdentifier nameIdent =
-        NameIdentifier.of(((HasIdentifier) entity).namespace(), ((HasIdentifier) entity).name());
-    return nameIdent;
-  }
-
   /**
    * Invalidates the entities by the given cache key.
    *
@@ -376,10 +370,7 @@ public class CaffeineEntityCache extends BaseEntityCache {
       cacheIndex.remove(currentKey.toString());
     }
 
-    // SCENE[1]
-    // RECORD1 = Role1 -> [catalog1, catalog2]
-    // RECORD2 = catalog1 -> [tab1, tab2]
-    // INVALIDATE Role1, then need to remove RECORD1 and RECORD2
+    // Remove child entities
     relationEnitiesMap.forEach(
         (key, entities) -> {
           if (key.relationType() == null) {
@@ -388,22 +379,14 @@ public class CaffeineEntityCache extends BaseEntityCache {
           }
           entities.forEach(
               entity -> {
-                NameIdentifier child = getNameIdentifier(entity);
+                NameIdentifier child = ((HasIdentifier) entity).nameIdentifier();
                 if (!child.equals(identifier)) {
                   invalidateEntitiesOld(child);
                 }
               });
         });
 
-    // SCENE[2]
-    // RECORD1 = Role1 -> [catalog1, catalog2]
-    // RECORD2 = catalog1 -> [tab1, tab2]
-    // INVALIDATE catalog1, then need to remove RECORD1 and RECORD2
-    //
-    // SCENE[3]
-    // RECORD1 = Metadata1 -> []
-    // RECORD2 = Metadata1.Catalog1.tab1 -> []
-    // INVALIDATE Metadata1, then need to remove RECORD1 and RECORD2
+    // Remove relation entities by reverse index
     List<EntityCacheKey> reverseKeysToRemove =
         Lists.newArrayList(reverseIndex.getValuesForKeysStartingWith(identifier.toString()));
     reverseKeysToRemove.forEach(
