@@ -53,6 +53,8 @@ import org.apache.gravitino.trino.connector.metadata.GravitinoTable;
 /** Transforming Apache Gravitino Hive metadata to Trino. */
 public class HiveMetadataAdapter extends CatalogConnectorMetadataAdapter {
 
+  public static final String MERGE_ROW_ID = "$row_id";
+
   private final PropertyConverter tableConverter;
   private final PropertyConverter schemaConverter;
 
@@ -248,5 +250,15 @@ public class HiveMetadataAdapter extends CatalogConnectorMetadataAdapter {
         columnMetadataList,
         properties,
         Optional.ofNullable(gravitinoTable.getComment()));
+  }
+
+  /**
+   * Get the column handle name that will generate row IDs for the merge operation.
+   *
+   * @return the column handle name for row IDs
+   */
+  @Override
+  public String getMergeRowIdColumnHandleName() {
+    return MERGE_ROW_ID;
   }
 }
