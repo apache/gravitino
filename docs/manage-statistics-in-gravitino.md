@@ -23,8 +23,11 @@ Gravitino will support built-in statistics in the future.
 The query engine uses statistics for cost-based optimization (CBO). Meanwhile, statistics can also
 be used for metadata action systems to trigger some jobs, such as compaction, data archiving, etc.
 
-You can define statistics and add policies based on the statistics. Users can analyze the statistics
-and policy to decide the next action.
+You can create statistics. And then you can create policies based on statistics. Users can analyze the statistics
+and policies to decide the next action. For example,
+you can create a statistic named `custom-tableLastModifiedTime` to record the last modified time of a table.
+Then you can create a policy to check if the table hasn't been modified for a long time, and archive the table data to
+cold storage.
 
 Currently, Gravitino doesn't handle the computation of the statistics, you need to compute the statistics
 and update them to Gravitino. Gravitino can't judge the expiration of the statistics, 
@@ -167,7 +170,7 @@ table.updatePartitionStatistics(statisticsToUpdate);
 
 You can list the statistics of specified partitions.
 You can specify a range of partitions by providing the `from` and `to` parameters,
-and whether the range is inclusive or not, using `fromInclusive` and `toInclusive` parameters.
+and whether the range is inclusive using `fromInclusive` and `toInclusive` parameters.
 
 The request path for REST API is `/api/metalakes/{metalake}/objects/table/{metadataObjectName}/statistics/partitions`.
 
