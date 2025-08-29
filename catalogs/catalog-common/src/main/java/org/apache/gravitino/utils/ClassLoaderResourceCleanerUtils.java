@@ -76,7 +76,7 @@ public class ClassLoaderResourceCleanerUtils {
 
       clearShutdownHooks(classLoader);
     } catch (Exception e) {
-      LOG.warn("Failed to clear resources(threads, thread local variants) in the class loader", e);
+      LOG.warn("Failed to clear resources(threads, thread local variables) in the class loader", e);
     }
   }
 
