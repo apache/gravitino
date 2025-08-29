@@ -114,7 +114,9 @@ class TestGvfsWithS3(TestGvfsWithHDFS):
             name=cls.metalake_name, comment="", properties={}
         )
         cls.gravitino_client = GravitinoClient(
-            uri="http://localhost:8090", metalake_name=cls.metalake_name
+            uri="http://localhost:8090",
+            metalake_name=cls.metalake_name,
+            client_config={"gravitino_client_request_timeout": 180},
         )
 
         cls.config = {}
@@ -264,6 +266,7 @@ class TestGvfsWithS3(TestGvfsWithHDFS):
 
         fs.rm_file(rmdir_file)
 
+    # pylint: disable=W0212
     def test_mkdir(self):
         mkdir_dir = self.fileset_gvfs_location + "/test_mkdir"
         mkdir_actual_dir = self.fileset_storage_location + "/test_mkdir"
@@ -271,8 +274,14 @@ class TestGvfsWithS3(TestGvfsWithHDFS):
             server_uri="http://localhost:8090",
             metalake_name=self.metalake_name,
             options=self.options,
+            config_kwargs={"s3": {"addressing_style": "virtual"}},
             **self.conf,
         )
+
+        fs.operations._catalog_cache.clear()
+        s3_fs = fs.operations._get_actual_filesystem(mkdir_dir, None)
+        config_kwargs = s3_fs.config_kwargs
+        self.assertEqual("virtual", config_kwargs.get("s3").get("addressing_style"))
 
         # it actually takes no effect.
         self.check_mkdir(mkdir_dir, mkdir_actual_dir, fs)
