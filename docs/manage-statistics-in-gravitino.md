@@ -167,7 +167,7 @@ table.updatePartitionStatistics(statisticsToUpdate);
 
 You can list the statistics of specified partitions.
 You can specify a range of partitions by providing the `from` and `to` parameters,
-and whether the range is inclusive or , not using `fromInclusive` and `toInclusive` parameters.
+and whether the range is inclusive or not, using `fromInclusive` and `toInclusive` parameters.
 
 The request path for REST API is `/api/metalakes/{metalake}/objects/table/{metadataObjectName}/statistics/partitions`.
 
@@ -294,6 +294,3 @@ public class MyPartitionStatsStorage implements PartitionStatisticStorage {
     }
 }
 ```
-
-
-
