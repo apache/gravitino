@@ -87,18 +87,18 @@ public class ClassLoaderResourceCleanerUtils {
    */
   private static void closeStatsDataClearerInFileSystem(ClassLoader targetClassLoader) {
     try {
-      Class<?> FileSystem =
+      Class<?> fileSystemClass =
           Class.forName("org.apache.hadoop.fs.FileSystem", true, targetClassLoader);
-      MethodUtils.invokeStaticMethod(FileSystem, "closeAll");
+      MethodUtils.invokeStaticMethod(fileSystemClass, "closeAll");
 
-      Class<?> MutableQuantiles =
+      Class<?> mutableQuantilesClass =
           Class.forName("org.apache.hadoop.metrics2.lib.MutableQuantiles", true, targetClassLoader);
       Class<?> statisticsClass =
           Class.forName("org.apache.hadoop.fs.FileSystem$Statistics", true, targetClassLoader);
 
       ScheduledExecutorService scheduler =
           (ScheduledExecutorService)
-              FieldUtils.readStaticField(MutableQuantiles, "scheduler", true);
+              FieldUtils.readStaticField(mutableQuantilesClass, "scheduler", true);
       scheduler.shutdownNow();
       Field statisticsCleanerField =
           FieldUtils.getField(statisticsClass, "STATS_DATA_CLEANER", true);
@@ -252,9 +252,9 @@ public class ClassLoaderResourceCleanerUtils {
   private static void closeResourceInAWS(ClassLoader classLoader) {
     // For Aws SDK metrics, unregister the metric admin MBean
     try {
-      Class<?> methodUtilsClass =
+      Class<?> awsSdkMetricsClass =
           Class.forName("com.amazonaws.metrics.AwsSdkMetrics", true, classLoader);
-      MethodUtils.invokeStaticMethod(methodUtilsClass, "unregisterMetricAdminMBean");
+      MethodUtils.invokeStaticMethod(awsSdkMetricsClass, "unregisterMetricAdminMBean");
     } catch (Exception e) {
       LOG.warn(
           "Failed to unregister AWS SDK metrics admin MBean from class loader {}", classLoader, e);
