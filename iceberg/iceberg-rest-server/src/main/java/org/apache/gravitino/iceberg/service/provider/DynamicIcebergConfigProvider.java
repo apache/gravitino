@@ -45,8 +45,10 @@ import org.apache.gravitino.utils.MapUtils;
  * <p>The catalogName is iceberg_catalog
  */
 public class DynamicIcebergConfigProvider implements IcebergConfigProvider {
+
   private String gravitinoMetalake;
   private String gravitinoUri;
+  private Optional<String> defaultDynamicCatalogName;
   private Map<String, String> properties;
 
   private volatile GravitinoClient client;
@@ -63,6 +65,9 @@ public class DynamicIcebergConfigProvider implements IcebergConfigProvider {
 
     this.gravitinoMetalake = metalake;
     this.gravitinoUri = uri;
+    this.defaultDynamicCatalogName =
+        Optional.ofNullable(
+            properties.get(IcebergConstants.ICEBERG_REST_DEFAULT_DYNAMIC_CATALOG_NAME));
     this.properties = properties;
   }
 
@@ -70,10 +75,19 @@ public class DynamicIcebergConfigProvider implements IcebergConfigProvider {
   public Optional<IcebergConfig> getIcebergCatalogConfig(String catalogName) {
     Preconditions.checkArgument(
         StringUtils.isNotBlank(catalogName), "blank catalogName is illegal");
-    Preconditions.checkArgument(
-        !IcebergConstants.ICEBERG_REST_DEFAULT_CATALOG.equals(catalogName),
-        IcebergConstants.ICEBERG_REST_DEFAULT_CATALOG + " is illegal in gravitino-based-provider");
-
+    if (catalogName.equals(IcebergConstants.ICEBERG_REST_DEFAULT_CATALOG)) {
+      catalogName =
+          defaultDynamicCatalogName.orElseThrow(
+              () ->
+                  new IllegalArgumentException(
+                      String.format(
+                          "For dynamic config provider, Please use `%s` in iceberg client side to specify "
+                              + "the catalog name or setting `%s` in REST server side to specify the "
+                              + "default catalog name.",
+                          IcebergConstants.WAREHOUSE,
+                          IcebergConfig.ICEBERG_CONFIG_PREFIX
+                              + IcebergConstants.ICEBERG_REST_DEFAULT_DYNAMIC_CATALOG_NAME)));
+    }
     Catalog catalog;
     try {
       catalog = getGravitinoClient().loadMetalake(gravitinoMetalake).loadCatalog(catalogName);
