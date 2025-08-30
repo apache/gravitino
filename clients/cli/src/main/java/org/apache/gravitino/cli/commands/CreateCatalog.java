@@ -71,7 +71,7 @@ public class CreateCatalog extends Command {
           comment,
           properties);
     } catch (NoSuchMetalakeException err) {
-      exitWithError(ErrorMessages.METALAKE_EXISTS);
+      exitWithError(ErrorMessages.UNKNOWN_METALAKE);
     } catch (CatalogAlreadyExistsException err) {
       exitWithError(ErrorMessages.CATALOG_EXISTS);
     } catch (Exception exp) {
