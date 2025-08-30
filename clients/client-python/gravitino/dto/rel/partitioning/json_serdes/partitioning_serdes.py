@@ -136,6 +136,18 @@ class PartitioningSerdes(SerdesUtilsBase, JsonSerializable[Partitioning]):
 
     @classmethod
     def deserialize(cls, data: Dict[str, Any]) -> Partitioning:
+        """Deserialize the given JSON data to the corresponding Partitioning object.
+
+        Args:
+            data (Dict[str, Any]): The JSON data object to be deserialized.
+
+        Returns:
+            Partitioning: The deserialized result.
+
+        Raises:
+            IllegalArgumentException: If there's illegal arguments in the given JSON data.
+        """
+
         Precondition.check_argument(
             isinstance(data, dict) and len(data) > 0,
             f"Cannot parse partitioning from invalid JSON: {data}",
