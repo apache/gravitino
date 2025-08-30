@@ -29,10 +29,8 @@ dependencies {
   compileOnly(libs.hadoop3.client.api)
   compileOnly(libs.hadoop3.client.runtime)
   compileOnly(libs.hadoop3.oss)
+  compileOnly(project(":common"))
 
-  implementation(project(":common")) {
-    exclude("*")
-  }
   implementation(project(":catalogs:catalog-common")) {
     exclude("*")
   }
@@ -63,6 +61,7 @@ dependencies {
 
   testImplementation(project(":api"))
   testImplementation(project(":core"))
+  testImplementation(project(":common"))
   testImplementation(libs.junit.jupiter.api)
   testImplementation(libs.junit.jupiter.params)
   testRuntimeOnly(libs.junit.jupiter.engine)
