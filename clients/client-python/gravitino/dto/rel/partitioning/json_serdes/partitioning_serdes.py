@@ -20,10 +20,16 @@ from types import MappingProxyType
 from typing import Any, Dict, Final, cast
 
 from gravitino.api.types.json_serdes.base import JsonSerializable
+from gravitino.dto.rel.expressions.json_serdes._helper.serdes_utils import (
+    SerdesUtils as ExpressionSerdesUtils,
+)
 from gravitino.dto.rel.partitioning.bucket_partitioning_dto import (
     BucketPartitioningDTO,
 )
 from gravitino.dto.rel.partitioning.day_partitioning_dto import DayPartitioningDTO
+from gravitino.dto.rel.partitioning.function_partitioning_dto import (
+    FunctionPartitioningDTO,
+)
 from gravitino.dto.rel.partitioning.hour_partitioning_dto import HourPartitioningDTO
 from gravitino.dto.rel.partitioning.identity_partitioning_dto import (
     IdentityPartitioningDTO,
@@ -39,7 +45,9 @@ from gravitino.dto.rel.partitioning.truncate_partitioning_dto import (
     TruncatePartitioningDTO,
 )
 from gravitino.dto.rel.partitioning.year_partitioning_dto import YearPartitioningDTO
-from gravitino.dto.rel.partitions.json_serdes._helper.serdes_utils import SerdesUtils
+from gravitino.dto.rel.partitions.json_serdes._helper.serdes_utils import (
+    SerdesUtils as PartitionSerdesUtils,
+)
 from gravitino.dto.rel.partitions.list_partition_dto import ListPartitionDTO
 from gravitino.dto.rel.partitions.range_partition_dto import RangePartitionDTO
 from gravitino.utils.precondition import Precondition
@@ -99,7 +107,7 @@ class PartitioningSerdes(SerdesUtilsBase, JsonSerializable[Partitioning]):
                 **result,
                 cls.FIELD_NAMES: dto.field_names(),
                 cls.ASSIGNMENTS_NAME: [
-                    SerdesUtils.write_partition(list_partition_dto)
+                    PartitionSerdesUtils.write_partition(list_partition_dto)
                     for list_partition_dto in dto.assignments()
                 ],
             }
@@ -109,8 +117,18 @@ class PartitioningSerdes(SerdesUtilsBase, JsonSerializable[Partitioning]):
                 **result,
                 cls.FIELD_NAME: dto.field_name(),
                 cls.ASSIGNMENTS_NAME: [
-                    SerdesUtils.write_partition(range_partition_dto)
+                    PartitionSerdesUtils.write_partition(range_partition_dto)
                     for range_partition_dto in dto.assignments()
+                ],
+            }
+        if strategy is Partitioning.Strategy.FUNCTION:
+            dto = cast(FunctionPartitioningDTO, data_type)
+            return {
+                **result,
+                cls.FUNCTION_NAME: dto.function_name(),
+                cls.FUNCTION_ARGS: [
+                    ExpressionSerdesUtils.write_function_arg(function_arg)
+                    for function_arg in dto.args()
                 ],
             }
 
@@ -153,7 +171,7 @@ class PartitioningSerdes(SerdesUtilsBase, JsonSerializable[Partitioning]):
             )
             assignments = []
             for assignment in assignments_data:
-                partition_dto = SerdesUtils.read_partition(assignment)
+                partition_dto = PartitionSerdesUtils.read_partition(assignment)
                 Precondition.check_argument(
                     isinstance(partition_dto, ListPartitionDTO),
                     f"Cannot parse list partitioning from non-list assignment: {assignment}",
@@ -169,12 +187,23 @@ class PartitioningSerdes(SerdesUtilsBase, JsonSerializable[Partitioning]):
             )
             assignments = []
             for assignment in assignments_data:
-                partition_dto = SerdesUtils.read_partition(assignment)
+                partition_dto = PartitionSerdesUtils.read_partition(assignment)
                 Precondition.check_argument(
                     isinstance(partition_dto, RangePartitionDTO),
                     f"Cannot parse range partitioning from non-range assignment: {assignment}",
                 )
                 assignments.append(partition_dto)
             return RangePartitioningDTO(fields, assignments)
+        if strategy is Partitioning.Strategy.FUNCTION:
+            function_name = data[cls.FUNCTION_NAME]
+            Precondition.check_argument(
+                data.get(cls.FUNCTION_ARGS) is not None,
+                f"Cannot parse function partitioning from missing function args: {data}",
+            )
+            args = [
+                ExpressionSerdesUtils.read_function_arg(arg)
+                for arg in data[cls.FUNCTION_ARGS]
+            ]
+            return FunctionPartitioningDTO(function_name, *args)
 
         raise IOError(f"Unknown partitioning strategy: {data[cls.STRATEGY]}")
