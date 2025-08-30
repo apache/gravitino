@@ -25,7 +25,9 @@ plugins {
 }
 
 dependencies {
-  implementation(project(":bundles:gcp"))
+  implementation(project(":bundles:gcp")) {
+    exclude(group = "commons-logging", module = "commons-logging")
+  }
   implementation(libs.hadoop3.client.api)
   implementation(libs.hadoop3.client.runtime)
   implementation(libs.hadoop3.gcs)
