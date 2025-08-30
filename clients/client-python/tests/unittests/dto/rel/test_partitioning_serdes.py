@@ -21,6 +21,7 @@ from enum import Enum
 from unittest.mock import patch
 
 from gravitino.api.types.types import Types
+from gravitino.dto.rel.expressions.field_reference_dto import FieldReferenceDTO
 from gravitino.dto.rel.expressions.literal_dto import LiteralDTO
 from gravitino.dto.rel.partitioning.bucket_partitioning_dto import BucketPartitioningDTO
 from gravitino.dto.rel.partitioning.day_partitioning_dto import DayPartitioningDTO
@@ -471,4 +472,69 @@ class TestPartitioningSerdes(unittest.TestCase):
         self.assertEqual(
             expected_serialized[PartitioningSerdes.ASSIGNMENTS_NAME],
             serialized[PartitioningSerdes.ASSIGNMENTS_NAME],
+        )
+
+    def test_serdes_function_partitioning_dto_invalid_args(self):
+        json_string = f"""
+        {{
+            "{PartitioningSerdes.STRATEGY}": "{Partitioning.Strategy.FUNCTION.value}",
+            "{PartitioningSerdes.FUNCTION_NAME}": "dummy_func_name"
+        }}
+        """
+
+        with self.assertRaisesRegex(
+            IllegalArgumentException,
+            "Cannot parse function partitioning from missing function args",
+        ):
+            PartitioningSerdes.deserialize(json.loads(json_string))
+
+    def test_serdes_function_partitioning_dto(self):
+        field_arg = FieldReferenceDTO.builder().with_column_name("dt").build()
+        literal_arg = (
+            LiteralDTO.builder()
+            .with_data_type(Types.StringType.get())
+            .with_value("Asia/Shanghai")
+            .build()
+        )
+        json_string = f"""
+        {{
+            "{PartitioningSerdes.STRATEGY}": "{Partitioning.Strategy.FUNCTION.value}",
+            "{PartitioningSerdes.FUNCTION_NAME}": "to_date",
+            "{PartitioningSerdes.FUNCTION_ARGS}": [
+                {{
+                    "{PartitioningSerdes.TYPE}": "field",
+                    "{PartitioningSerdes.FIELD_NAME}": ["dt"]
+                }},
+                {{
+                    "{PartitioningSerdes.TYPE}": "literal",
+                    "{PartitioningSerdes.DATA_TYPE}": "string",
+                    "{PartitioningSerdes.LITERAL_VALUE}": "Asia/Shanghai"
+                }}
+            ]
+        }}
+        """
+
+        expected_serialized = json.loads(json_string)
+        deserialized = PartitioningSerdes.deserialize(expected_serialized)
+
+        self.assertIsInstance(deserialized, FunctionPartitioningDTO)
+        self.assertEqual("to_date", deserialized.function_name())
+        self.assertEqual(deserialized.function_name(), deserialized.name())
+        self.assertEqual(
+            Partitioning.Strategy.FUNCTION.value, deserialized.strategy().value
+        )
+        self.assertListEqual([field_arg, literal_arg], deserialized.args())
+
+        serialized = PartitioningSerdes.serialize(deserialized)
+        self.assertEqual(
+            expected_serialized[PartitioningSerdes.STRATEGY],
+            serialized[PartitioningSerdes.STRATEGY],
+        )
+        self.assertEqual(
+            expected_serialized[PartitioningSerdes.FUNCTION_NAME],
+            serialized[PartitioningSerdes.FUNCTION_NAME],
+        )
+        self.assertListEqual(
+            expected_serialized[PartitioningSerdes.FUNCTION_ARGS],
+            serialized[PartitioningSerdes.FUNCTION_ARGS],
         )
