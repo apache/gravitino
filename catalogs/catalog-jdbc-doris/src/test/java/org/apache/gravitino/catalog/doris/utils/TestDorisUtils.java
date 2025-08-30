@@ -185,4 +185,18 @@ public class TestDorisUtils {
     Distribution distribution2 = DorisUtils.extractDistributionInfoFromSql(createTableSqlWithAuto);
     assertEquals(distribution2.number(), -1);
   }
+
+  @Test
+  public void testDistributionWithoutBucketClauseDefaultsToOne() {
+    String createTableSql =
+        "CREATE TABLE `testTable` (\n`col1` date NOT NULL\n) ENGINE=OLAP\n PARTITION BY RANGE(`col1`)\n()\n DISTRIBUTED BY HASH(`col1`)";
+    Distribution distribution = DorisUtils.extractDistributionInfoFromSql(createTableSql);
+    assertEquals(distribution.number(), 1);
+
+    String createTableSqlWithEmptyBuckets =
+        "CREATE TABLE `testTable` (\n`col1` date NOT NULL\n) ENGINE=OLAP\n PARTITION BY RANGE(`col1`)\n()\n DISTRIBUTED BY HASH(`col1`) BUCKETS";
+    Distribution distribution2 =
+        DorisUtils.extractDistributionInfoFromSql(createTableSqlWithEmptyBuckets);
+    assertEquals(distribution2.number(), 1);
+  }
 }
