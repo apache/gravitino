@@ -69,6 +69,7 @@ class SerdesUtilsBase:
     INDEX_TYPE: Final[str] = "indexType"
     INDEX_NAME: Final[str] = "name"
     INDEX_FIELD_NAMES: Final[str] = "fieldNames"
+    NUMBER: Final[str] = "number"
 
     NON_PRIMITIVE_TYPES: Final[Set[Name]] = {
         Name.STRUCT,
