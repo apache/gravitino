@@ -18,28 +18,33 @@
  */
 package org.apache.gravitino.authorization.ranger.reference;
 
-import java.io.IOException;
-import java.text.SimpleDateFormat;
+import static org.junit.Assert.assertEquals;
+
+import java.io.StringWriter;
 import java.util.Date;
 import java.util.TimeZone;
 import org.codehaus.jackson.JsonGenerator;
-import org.codehaus.jackson.map.JsonSerializer;
-import org.codehaus.jackson.map.SerializerProvider;
+import org.codehaus.jackson.map.ObjectMapper;
+import org.junit.Test;
 
-/**
- * Used to serialize Java.util.Date, which is not a common JSON type, so we have to create a custom
- * serialize method
- */
-// apache/ranger/security-admin/src/main/java/org/apache/ranger/defines/JsonDateSerializer.java
-public class JsonDateSerializer extends JsonSerializer<Date> {
-  private static final String DATE_FORMAT = "yyyy-MM-dd'T'HH:mm:ss'Z'";
+public class TestJsonDateSerializer {
 
-  @Override
-  public void serialize(Date date, JsonGenerator gen, SerializerProvider provider)
-      throws IOException {
-    SimpleDateFormat formatter = new SimpleDateFormat(DATE_FORMAT);
-    formatter.setTimeZone(TimeZone.getTimeZone("UTC"));
-    String formattedDate = formatter.format(date);
-    gen.writeString(formattedDate);
+  @Test
+  @SuppressWarnings("JavaUtilDate")
+  public void testSerializeUsesUtcTimezone() throws Exception {
+    TimeZone original = TimeZone.getDefault();
+    try {
+      TimeZone.setDefault(TimeZone.getTimeZone("GMT+8"));
+      JsonDateSerializer serializer = new JsonDateSerializer();
+      ObjectMapper mapper = new ObjectMapper();
+      StringWriter writer = new StringWriter();
+      JsonGenerator generator = mapper.getJsonFactory().createJsonGenerator(writer);
+      Date date = new Date(0L);
+      serializer.serialize(date, generator, mapper.getSerializerProvider());
+      generator.flush();
+      assertEquals("\"1970-01-01T00:00:00Z\"", writer.toString());
+    } finally {
+      TimeZone.setDefault(original);
+    }
   }
 }
