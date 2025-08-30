@@ -511,6 +511,7 @@ public class IcebergCatalogOperations implements CatalogOperations, SupportsSche
                           .withType(column.dataType())
                           .withComment(column.comment())
                           .withNullable(column.nullable())
+                          .withAuditInfo(AuditInfo.EMPTY)
                           .build())
               .toArray(IcebergColumn[]::new);
 

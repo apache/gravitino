@@ -534,16 +534,19 @@ public class TestHiveTable extends MiniHiveMetastoreService {
               .withName("col_3_new")
               .withType(Types.StringType.get())
               .withComment(null)
+              .withAuditInfo(AuditInfo.EMPTY)
               .build(),
           HiveColumn.builder()
               .withName("col_1")
               .withType(Types.IntegerType.get())
               .withComment(HIVE_COMMENT + "_new")
+              .withAuditInfo(AuditInfo.EMPTY)
               .build(),
           HiveColumn.builder()
               .withName("col_2")
               .withType(Types.DateType.get())
               .withComment(HIVE_COMMENT)
+              .withAuditInfo(AuditInfo.EMPTY)
               .build()
         };
     Assertions.assertArrayEquals(expected, alteredTable.columns());

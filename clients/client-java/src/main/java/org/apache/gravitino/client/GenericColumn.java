@@ -20,6 +20,7 @@ package org.apache.gravitino.client;
 
 import com.google.common.collect.Lists;
 import java.util.Objects;
+import org.apache.gravitino.Audit;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.exceptions.NoSuchTagException;
@@ -106,6 +107,11 @@ public class GenericColumn implements Column, SupportsTags {
   @Override
   public Expression defaultValue() {
     return internalColumn.defaultValue();
+  }
+
+  @Override
+  public Audit auditInfo() {
+    return internalColumn.auditInfo();
   }
 
   @Override

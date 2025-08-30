@@ -40,6 +40,7 @@ final class BaseColumnExtension extends BaseColumn {
       column.comment = comment;
       column.dataType = dataType;
       column.nullable = nullable;
+      column.auditInfo = auditInfo;
       return column;
     }
   }

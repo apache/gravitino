@@ -22,6 +22,8 @@ import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
 import java.util.Map;
 import java.util.Objects;
+import org.apache.gravitino.Audit;
+import org.apache.gravitino.Auditable;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.annotation.Evolving;
 import org.apache.gravitino.rel.expressions.Expression;
@@ -38,7 +40,7 @@ import org.apache.gravitino.tag.SupportsTags;
  * Table#columns()} a default value and a generation expression.
  */
 @Evolving
-public interface Column {
+public interface Column extends Auditable {
 
   /**
    * A default value that indicates the default value is not set. This is used in {@link
@@ -199,6 +201,11 @@ public interface Column {
     @Override
     public Expression defaultValue() {
       return defaultValue;
+    }
+
+    @Override
+    public Audit auditInfo() {
+      return null;
     }
 
     @Override

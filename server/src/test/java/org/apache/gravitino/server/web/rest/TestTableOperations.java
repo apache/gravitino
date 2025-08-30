@@ -929,6 +929,12 @@ public class TestTableOperations extends BaseOperationsTest {
     when(column.dataType()).thenReturn(type);
     when(column.comment()).thenReturn(comment);
     when(column.nullable()).thenReturn(nullable);
+
+    Audit mockAudit = mock(Audit.class);
+    when(mockAudit.creator()).thenReturn("gravitino");
+    when(mockAudit.createTime()).thenReturn(Instant.now());
+    when(column.auditInfo()).thenReturn(mockAudit);
+
     return column;
   }
 
@@ -940,6 +946,12 @@ public class TestTableOperations extends BaseOperationsTest {
     when(column.comment()).thenReturn(comment);
     when(column.nullable()).thenReturn(nullable);
     when(column.autoIncrement()).thenReturn(autoIncrement);
+
+    Audit mockAudit = mock(Audit.class);
+    when(mockAudit.creator()).thenReturn("gravitino");
+    when(mockAudit.createTime()).thenReturn(Instant.now());
+    when(column.auditInfo()).thenReturn(mockAudit);
+
     return column;
   }
 

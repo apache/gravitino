@@ -44,6 +44,7 @@ public class IcebergColumn extends BaseColumn {
       icebergColumn.dataType = dataType;
       icebergColumn.nullable = nullable;
       icebergColumn.defaultValue = defaultValue == null ? DEFAULT_VALUE_NOT_SET : defaultValue;
+      icebergColumn.auditInfo = auditInfo;
       return icebergColumn;
     }
   }

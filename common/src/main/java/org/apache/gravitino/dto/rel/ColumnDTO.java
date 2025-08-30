@@ -25,6 +25,8 @@ import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import com.google.common.base.Preconditions;
 import lombok.EqualsAndHashCode;
 import lombok.ToString;
+import org.apache.gravitino.Audit;
+import org.apache.gravitino.dto.AuditDTO;
 import org.apache.gravitino.dto.rel.expressions.LiteralDTO;
 import org.apache.gravitino.json.JsonUtils;
 import org.apache.gravitino.rel.Column;
@@ -117,6 +119,11 @@ public class ColumnDTO implements Column {
   @Override
   public Expression defaultValue() {
     return defaultValue;
+  }
+
+  @Override
+  public Audit auditInfo() {
+    return AuditDTO.builder().build();
   }
 
   /**

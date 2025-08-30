@@ -372,6 +372,7 @@ public class PaimonCatalogOperations implements CatalogOperations, SupportsSchem
                               .withNullable(column.nullable())
                               .withAutoIncrement(column.autoIncrement())
                               .withDefaultValue(column.defaultValue())
+                              .withAuditInfo(AuditInfo.EMPTY)
                               .build();
                         })
                     .toArray(GravitinoPaimonColumn[]::new))

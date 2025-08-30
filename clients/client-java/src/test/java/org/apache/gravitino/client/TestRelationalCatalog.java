@@ -743,6 +743,8 @@ public class TestRelationalCatalog extends TestBase {
                   expected.columns()[i].autoIncrement(), actual.columns()[i].autoIncrement());
               Assertions.assertEquals(
                   expected.columns()[i].defaultValue(), actual.columns()[i].defaultValue());
+              Assertions.assertEquals(
+                  expected.columns()[i].auditInfo(), actual.columns()[i].auditInfo());
             });
     Assertions.assertArrayEquals(expected.partitioning(), actual.partitioning());
   }
