@@ -41,6 +41,7 @@ import javax.ws.rs.core.Response;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Audit;
 import org.apache.gravitino.Config;
+import org.apache.gravitino.Configs;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.audit.CallerContext;
@@ -86,6 +87,8 @@ public class TestFilesetOperations extends BaseOperationsTest {
     }
   }
 
+  private static Config config = mock(Config.class);
+
   private FilesetOperationDispatcher dispatcher = mock(FilesetOperationDispatcher.class);
 
   private final String metalake = "metalake1";
@@ -96,10 +99,10 @@ public class TestFilesetOperations extends BaseOperationsTest {
 
   @BeforeAll
   public static void setup() throws IllegalAccessException {
-    Config config = mock(Config.class);
     Mockito.doReturn(100000L).when(config).get(TREE_LOCK_MAX_NODE_IN_MEMORY);
     Mockito.doReturn(1000L).when(config).get(TREE_LOCK_MIN_NODE_IN_MEMORY);
     Mockito.doReturn(36000L).when(config).get(TREE_LOCK_CLEAN_INTERVAL);
+    Mockito.doReturn(false).when(config).get(Configs.SERVER_REST_API_COMPATIBILITY_ENABLE);
     FieldUtils.writeField(GravitinoEnv.getInstance(), "lockManager", new LockManager(config), true);
   }
 
@@ -119,6 +122,7 @@ public class TestFilesetOperations extends BaseOperationsTest {
           @Override
           protected void configure() {
             bind(dispatcher).to(FilesetDispatcher.class).ranked(2);
+            bind(config).to(Config.class).ranked(2);
             bindFactory(MockServletRequestFactory.class).to(HttpServletRequest.class);
           }
         });

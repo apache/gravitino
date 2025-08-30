@@ -24,6 +24,7 @@ import java.util.HashSet;
 import java.util.Properties;
 import javax.inject.Singleton;
 import javax.servlet.Servlet;
+import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.catalog.CatalogDispatcher;
@@ -139,6 +140,7 @@ public class GravitinoServer extends ResourceConfig {
             bind(gravitinoEnv.tableDispatcher()).to(TableDispatcher.class).ranked(1);
             bind(gravitinoEnv.partitionDispatcher()).to(PartitionDispatcher.class).ranked(1);
             bind(gravitinoEnv.filesetDispatcher()).to(FilesetDispatcher.class).ranked(1);
+            bind(gravitinoEnv.config()).to(Config.class).ranked(1);
             bind(gravitinoEnv.topicDispatcher()).to(TopicDispatcher.class).ranked(1);
             bind(gravitinoEnv.tagDispatcher()).to(TagDispatcher.class).ranked(1);
             bind(gravitinoEnv.policyDispatcher()).to(PolicyDispatcher.class).ranked(1);

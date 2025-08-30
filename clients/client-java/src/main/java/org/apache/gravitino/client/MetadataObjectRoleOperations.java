@@ -23,6 +23,7 @@ import java.util.Locale;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.authorization.SupportsRoles;
 import org.apache.gravitino.dto.responses.NameListResponse;
+import org.apache.gravitino.rest.RESTUtils;
 
 class MetadataObjectRoleOperations implements SupportsRoles {
 
@@ -36,9 +37,9 @@ class MetadataObjectRoleOperations implements SupportsRoles {
     this.roleRequestPath =
         String.format(
             "api/metalakes/%s/objects/%s/%s/roles",
-            metalakeName,
+            RESTUtils.encodeString(metalakeName),
             metadataObject.type().name().toLowerCase(Locale.ROOT),
-            metadataObject.fullName());
+            RESTUtils.encodeString(metadataObject.fullName()));
   }
 
   @Override

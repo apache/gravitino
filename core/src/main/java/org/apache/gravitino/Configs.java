@@ -453,4 +453,14 @@ public class Configs {
           .version(ConfigConstants.VERSION_1_0_0)
           .stringConf()
           .createWithDefault(LancePartitionStatisticStorageFactory.class.getCanonicalName());
+
+  public static final ConfigEntry<Boolean> SERVER_REST_API_COMPATIBILITY_ENABLE =
+      new ConfigBuilder("gravitino.server.api.enableCompatibility")
+          .doc(
+              "Enable the API compatibility mode for REST API, this configuration is an internal"
+                  + " configuration used for REST API backward compatibility. It is only for Fileset"
+                  + " get-file-location and list-fileset-files APIs to be compatible with 1.0- client.")
+          .version(ConfigConstants.VERSION_1_0_0)
+          .booleanConf()
+          .createWithDefault(false);
 }
