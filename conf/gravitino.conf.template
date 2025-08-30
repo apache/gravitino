@@ -61,7 +61,7 @@ gravitino.catalog.cache.evictionIntervalMs = 3600000
 
 # THE CONFIGURATION FOR Gravitino Entity Cache
 # Whether to enable the cached Entity store.
-gravitino.cache.enabled = true
+gravitino.cache.enabled = false
 # Maximum number of entries allowed in the cache (effective only when weighted eviction is disabled).
 gravitino.cache.maxEntries = 10000
 # Time-to-live (TTL) for each cache entry after it is written, in milliseconds.

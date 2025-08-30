@@ -30,10 +30,13 @@ import com.googlecode.concurrenttrees.radix.ConcurrentRadixTree;
 import com.googlecode.concurrenttrees.radix.RadixTree;
 import com.googlecode.concurrenttrees.radix.node.concrete.DefaultCharArrayNodeFactory;
 import java.io.IOException;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Queue;
 import java.util.Set;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.ExecutorService;
@@ -44,6 +47,8 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
+import java.util.stream.StreamSupport;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.Entity;
@@ -78,11 +83,18 @@ public class CaffeineEntityCache extends BaseEntityCache {
   private static final Logger LOG = LoggerFactory.getLogger(CaffeineEntityCache.class.getName());
   private final ReentrantLock opLock = new ReentrantLock();
 
-  /** Cache part */
-  private final Cache<EntityCacheKey, List<Entity>> cacheData;
+  /** Cache data structure. */
+  private final Cache<EntityCacheRelationKey, List<Entity>> cacheData;
 
-  /** Index part */
-  private RadixTree<EntityCacheKey> cacheIndex;
+  /**
+   * Cache reverse index structure.
+   */
+  private ReverseIndexCache reverseIndex;
+
+  /**
+   * Cache Index structure.
+   */
+  private RadixTree<EntityCacheRelationKey> cacheIndex;
 
   private ScheduledExecutorService scheduler;
 
@@ -94,6 +106,7 @@ public class CaffeineEntityCache extends BaseEntityCache {
   public CaffeineEntityCache(Config cacheConfig) {
     super(cacheConfig);
     this.cacheIndex = new ConcurrentRadixTree<>(new DefaultCharArrayNodeFactory());
+    this.reverseIndex = new ReverseIndexCache();
 
     Caffeine<EntityCacheKey, List<Entity>> cacheDataBuilder = newBaseBuilder(cacheConfig);
 
@@ -133,7 +146,7 @@ public class CaffeineEntityCache extends BaseEntityCache {
     checkArguments(nameIdentifier, identType, relType);
 
     List<Entity> entitiesFromCache =
-        cacheData.getIfPresent(EntityCacheKey.of(nameIdentifier, identType, relType));
+        cacheData.getIfPresent(EntityCacheRelationKey.of(nameIdentifier, identType, relType));
     return Optional.ofNullable(entitiesFromCache).map(BaseEntityCache::convertEntities);
   }
 
@@ -143,7 +156,7 @@ public class CaffeineEntityCache extends BaseEntityCache {
       NameIdentifier ident, Entity.EntityType type) {
     checkArguments(ident, type);
 
-    List<Entity> entitiesFromCache = cacheData.getIfPresent(EntityCacheKey.of(ident, type));
+    List<Entity> entitiesFromCache = cacheData.getIfPresent(EntityCacheRelationKey.of(ident, type));
 
     return Optional.ofNullable(entitiesFromCache)
         .filter(l -> !l.isEmpty())
@@ -156,7 +169,7 @@ public class CaffeineEntityCache extends BaseEntityCache {
       NameIdentifier ident, Entity.EntityType type, SupportsRelationOperations.Type relType) {
     checkArguments(ident, type, relType);
 
-    return withLock(() -> invalidateEntities(ident));
+    return withLock(() -> invalidateEntities(ident, type, Optional.of(relType)));
   }
 
   /** {@inheritDoc} */
@@ -164,7 +177,7 @@ public class CaffeineEntityCache extends BaseEntityCache {
   public boolean invalidate(NameIdentifier ident, Entity.EntityType type) {
     checkArguments(ident, type);
 
-    return withLock(() -> invalidateEntities(ident));
+    return withLock(() -> invalidateEntities(ident, type, Optional.empty()));
   }
 
   /** {@inheritDoc} */
@@ -172,14 +185,14 @@ public class CaffeineEntityCache extends BaseEntityCache {
   public boolean contains(
       NameIdentifier ident, Entity.EntityType type, SupportsRelationOperations.Type relType) {
     checkArguments(ident, type, relType);
-    return cacheData.getIfPresent(EntityCacheKey.of(ident, type, relType)) != null;
+    return cacheData.getIfPresent(EntityCacheRelationKey.of(ident, type, relType)) != null;
   }
 
   /** {@inheritDoc} */
   @Override
   public boolean contains(NameIdentifier ident, Entity.EntityType type) {
     checkArguments(ident, type);
-    return cacheData.getIfPresent(EntityCacheKey.of(ident, type)) != null;
+    return cacheData.getIfPresent(EntityCacheRelationKey.of(ident, type)) != null;
   }
 
   /** {@inheritDoc} */
@@ -194,6 +207,7 @@ public class CaffeineEntityCache extends BaseEntityCache {
     withLock(
         () -> {
           cacheData.invalidateAll();
+          reverseIndex = new ReverseIndexCache();
           cacheIndex = new ConcurrentRadixTree<>(new DefaultCharArrayNodeFactory());
         });
   }
@@ -214,7 +228,7 @@ public class CaffeineEntityCache extends BaseEntityCache {
           }
 
           syncEntitiesToCache(
-              EntityCacheKey.of(ident, type, relType),
+              EntityCacheRelationKey.of(ident, type, relType),
               entities.stream().map(e -> (Entity) e).collect(Collectors.toList()));
         });
   }
@@ -228,7 +242,8 @@ public class CaffeineEntityCache extends BaseEntityCache {
         () -> {
           invalidateOnKeyChange(entity);
           NameIdentifier identifier = getIdentFromEntity(entity);
-          EntityCacheKey entityCacheKey = EntityCacheKey.of(identifier, entity.type());
+          EntityCacheRelationKey entityCacheKey =
+              EntityCacheRelationKey.of(identifier, entity.type());
 
           syncEntitiesToCache(entityCacheKey, Lists.newArrayList(entity));
         });
@@ -272,6 +287,7 @@ public class CaffeineEntityCache extends BaseEntityCache {
   protected void invalidateExpiredItem(EntityCacheKey key) {
     withLock(
         () -> {
+          reverseIndex.remove(key);
           cacheIndex.remove(key.toString());
         });
   }
@@ -283,7 +299,7 @@ public class CaffeineEntityCache extends BaseEntityCache {
    * @param key The key of the entities.
    * @param newEntities The new entities to sync to the cache.
    */
-  private void syncEntitiesToCache(EntityCacheKey key, List<Entity> newEntities) {
+  private void syncEntitiesToCache(EntityCacheRelationKey key, List<Entity> newEntities) {
     List<Entity> existingEntities = cacheData.getIfPresent(key);
 
     if (existingEntities != null && key.relationType() != null) {
@@ -293,6 +309,10 @@ public class CaffeineEntityCache extends BaseEntityCache {
     }
 
     cacheData.put(key, newEntities);
+
+    for (Entity entity : newEntities) {
+      reverseIndex.indexEntity(entity, key);
+    }
 
     if (cacheData.policy().getIfPresentQuietly(key) != null) {
       cacheIndex.put(key.toString(), key);
@@ -335,14 +355,123 @@ public class CaffeineEntityCache extends BaseEntityCache {
    *
    * @param identifier The identifier of the entity to invalidate
    */
-  private boolean invalidateEntities(NameIdentifier identifier) {
+  private boolean invalidateEntitiesOld(NameIdentifier identifier) {
     List<EntityCacheKey> entityKeysToRemove =
         Lists.newArrayList(cacheIndex.getValuesForKeysStartingWith(identifier.toString()));
+
+    Map<EntityCacheRelationKey, List<Entity>> relationEnitiesMap =
+        cacheData.getAllPresent(entityKeysToRemove);
+
+    // first invalidate this entity
+    EntityCacheKey currentKey = cacheIndex.getValueForExactKey(identifier.toString());
+    if (currentKey != null) {
+      // already removed
+      cacheData.invalidate(currentKey);
+      cacheIndex.remove(currentKey.toString());
+    }
+
+    // Remove child entities
+    relationEnitiesMap.forEach(
+        (key, entities) -> {
+          if (key.relationType() == null) {
+            // If the relation type is null, it means it's a single entity, we can skip it.
+            return;
+          }
+          entities.forEach(
+              entity -> {
+                NameIdentifier child = ((HasIdentifier) entity).nameIdentifier();
+                if (!child.equals(identifier)) {
+                  invalidateEntitiesOld(child);
+                }
+              });
+        });
+
+    // Remove relation entities by reverse index
+    List<EntityCacheKey> reverseKeysToRemove =
+        Lists.newArrayList(reverseIndex.getValuesForKeysStartingWith(identifier.toString()));
+    reverseKeysToRemove.forEach(
+        key -> {
+          // If the key is the same as the entity key, we can remove it from the cache.
+          cacheData.invalidate(key);
+          cacheIndex.remove(key.toString());
+          // Remove from reverse index
+          // Convert EntityCacheRelationKey to EntityCacheKey
+          EntityCacheKey reverseKey = EntityCacheKey.of(key.identifier(), key.entityType());
+          reverseIndex
+              .getKeysStartingWith(reverseKey.toString())
+              .forEach(
+                  reverseIndexKey -> {
+                    reverseIndex.remove(reverseIndexKey.toString());
+                  });
+        });
 
     cacheData.invalidateAll(entityKeysToRemove);
     entityKeysToRemove.forEach(key -> cacheIndex.remove(key.toString()));
 
     return !entityKeysToRemove.isEmpty();
+  }
+
+  /**
+   * Invalidate entities with iterative BFS algorithm.
+   *
+   * @param identifier The identifier of the entity to invalidate
+   */
+  private boolean invalidateEntities(
+      NameIdentifier identifier,
+      Entity.EntityType type,
+      Optional<SupportsRelationOperations.Type> relTypeOpt) {
+    Queue<EntityCacheKey> queue = new ArrayDeque<>();
+
+    EntityCacheKey valueForExactKey;
+    if (relTypeOpt.isEmpty()) {
+      valueForExactKey =
+          cacheIndex.getValueForExactKey(EntityCacheKey.of(identifier, type).toString());
+    } else {
+      valueForExactKey =
+          cacheIndex.getValueForExactKey(
+              EntityCacheRelationKey.of(identifier, type, relTypeOpt.get()).toString());
+    }
+
+    if (valueForExactKey == null) {
+      // No key to remove
+      return false;
+    }
+
+    queue.offer(valueForExactKey);
+
+    while (!queue.isEmpty()) {
+      EntityCacheKey currentKeyToRemove = queue.poll();
+
+      cacheData.invalidate(currentKeyToRemove);
+      cacheIndex.remove(currentKeyToRemove.toString());
+
+      // Remove related entity keys
+      List<EntityCacheKey> relatedEntityKeysToRemove =
+          Lists.newArrayList(
+              cacheIndex.getValuesForKeysStartingWith(currentKeyToRemove.identifier().toString()));
+      relatedEntityKeysToRemove.forEach(queue::offer);
+
+      // Look up from reverse index to go to next depth
+      List<EntityCacheKey> reverseKeysToRemove =
+          Lists.newArrayList(
+              reverseIndex.getValuesForKeysStartingWith(
+                  currentKeyToRemove.identifier().toString()));
+      reverseKeysToRemove.forEach(
+          key -> {
+            // Remove from reverse index
+            // Convert EntityCacheRelationKey to EntityCacheKey
+            reverseIndex
+                .getKeysStartingWith(key.toString())
+                .forEach(
+                    reverseIndexKey -> {
+                      reverseIndex.remove(reverseIndexKey.toString());
+                    });
+          });
+
+      reverseKeysToRemove.forEach(queue::offer);
+    }
+
+    return true;
   }
 
   /**
