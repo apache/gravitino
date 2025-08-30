@@ -63,6 +63,9 @@ class SerdesUtilsBase:
     NUM_BUCKETS: Final[str] = "numBuckets"
     WIDTH: Final[str] = "width"
     ASSIGNMENTS_NAME: Final[str] = "assignments"
+    SORT_TERM: Final[str] = "sortTerm"
+    DIRECTION: Final[str] = "direction"
+    NULL_ORDERING: Final[str] = "nullOrdering"
 
     NON_PRIMITIVE_TYPES: Final[Set[Name]] = {
         Name.STRUCT,
