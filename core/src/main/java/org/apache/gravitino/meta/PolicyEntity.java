@@ -132,7 +132,6 @@ public class PolicyEntity implements Entity, Auditable, HasIdentifier {
   public void validate() throws IllegalArgumentException {
     Entity.super.validate();
     validatePolicy();
-    content().validate();
   }
 
   @Override
