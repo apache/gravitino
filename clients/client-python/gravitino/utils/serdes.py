@@ -66,6 +66,9 @@ class SerdesUtilsBase:
     SORT_TERM: Final[str] = "sortTerm"
     DIRECTION: Final[str] = "direction"
     NULL_ORDERING: Final[str] = "nullOrdering"
+    INDEX_TYPE: Final[str] = "indexType"
+    INDEX_NAME: Final[str] = "name"
+    INDEX_FIELD_NAMES: Final[str] = "fieldNames"
 
     NON_PRIMITIVE_TYPES: Final[Set[Name]] = {
         Name.STRUCT,
