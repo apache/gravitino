@@ -1,0 +1,22 @@
+CREATE SCHEMA
+
+CREATE TABLE
+
+INSERT: 2 rows
+
+"bob","14"
+"tom","12"
+
+UPDATE: 1 row
+
+"bob_update","14"
+"tom","12"
+
+UPDATE: 2 rows
+
+"nancy","12"
+"nancy","14"
+
+DROP TABLE
+
+DROP SCHEMA
