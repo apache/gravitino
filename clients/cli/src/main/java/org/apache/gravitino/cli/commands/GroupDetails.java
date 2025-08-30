@@ -24,8 +24,8 @@ import org.apache.gravitino.authorization.Group;
 import org.apache.gravitino.cli.CommandContext;
 import org.apache.gravitino.cli.ErrorMessages;
 import org.apache.gravitino.client.GravitinoClient;
+import org.apache.gravitino.exceptions.NoSuchGroupException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
-import org.apache.gravitino.exceptions.NoSuchUserException;
 
 public class GroupDetails extends Command {
 
@@ -57,7 +57,7 @@ public class GroupDetails extends Command {
       roles = groupObject.roles();
     } catch (NoSuchMetalakeException err) {
       exitWithError(ErrorMessages.UNKNOWN_METALAKE);
-    } catch (NoSuchUserException err) {
+    } catch (NoSuchGroupException err) {
       exitWithError(ErrorMessages.UNKNOWN_GROUP);
     } catch (Exception exp) {
       exitWithError(exp.getMessage());
