@@ -218,7 +218,7 @@ public class TestPaimonCatalogOps {
         IllegalArgumentException.class, () -> assertUpdateColumnPosition(5, defaultPos()));
     // Test NullPointerException with UpdateColumnPosition for after non-existent column.
     assertThrowsExactly(
-        NullPointerException.class, () -> assertUpdateColumnPosition(1, after("col_5")));
+        IllegalArgumentException.class, () -> assertUpdateColumnPosition(1, after("col_5")));
   }
 
   @Test
@@ -227,7 +227,7 @@ public class TestPaimonCatalogOps {
         table -> {
           DataField dataField = table.rowType().getFields().get(0);
           assertEquals("col_1", dataField.name());
-          assertEquals(DataTypes.BIGINT(), dataField.type());
+          assertEquals(DataTypes.BIGINT().notNull(), dataField.type());
         },
         updateColumnType(getFieldName("col_1"), Types.LongType.get()));
     assertColumnNotExist(updateColumnType(getFieldName("col_5"), Types.ShortType.get()));
@@ -420,6 +420,8 @@ public class TestPaimonCatalogOps {
                             .build()),
                     ArrayType.class.getSimpleName())
                 .comment(COMMENT)
+                .primaryKey("col_1")
+                .option("alter-column-null-to-not-null.disabled", "false")
                 .options(OPTIONS)
                 .build());
     paimonCatalogOps.createTable(tableInfo.getKey(), tableInfo.getValue());
