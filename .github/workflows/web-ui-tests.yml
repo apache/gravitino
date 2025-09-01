@@ -1,0 +1,53 @@
+name: Web UI Tests
+
+on:
+  push:
+    branches: [ "main", "branch-*" ]
+    paths:
+      - 'web/web/**'
+      - '.github/workflows/web-ui-tests.yml'
+  pull_request:
+    branches: [ "main", "branch-*" ]
+    paths:
+      - 'web/web/**'
+      - '.github/workflows/web-ui-tests.yml'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Setup pnpm
+      uses: pnpm/action-setup@v4
+      with:
+        version: 9
+    
+    - name: Setup Node.js 20
+      uses: actions/setup-node@v4
+      with:
+        node-version: 20
+        cache: 'pnpm'
+        cache-dependency-path: 'web/web/pnpm-lock.yaml'
+    
+    - name: Install dependencies
+      working-directory: web/web
+      run: pnpm install --frozen-lockfile
+    
+    - name: Run linting
+      working-directory: web/web
+      run: pnpm lint
+    
+    - name: Run prettier check
+      working-directory: web/web
+      run: pnpm prettier:check
+    
+    - name: Run tests
+      working-directory: web/web
+      run: pnpm test:coverage
+
+    - name: Build application
+      working-directory: web/web
+      run: pnpm build

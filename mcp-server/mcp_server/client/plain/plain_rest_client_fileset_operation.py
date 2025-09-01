@@ -23,7 +23,7 @@ class PlainRESTClientFilesetOperation(FilesetOperation):
         self.metalake_name = metalake_name
         self.rest_client = rest_client
 
-    async def get_list_of_filesets(
+    async def list_of_filesets(
         self, catalog_name: str, schema_name: str
     ) -> str:
         response = await self.rest_client.get(
@@ -39,6 +39,7 @@ class PlainRESTClientFilesetOperation(FilesetOperation):
         )
         return response.json().get("fileset", {})
 
+    # pylint: disable=too-many-positional-arguments
     async def list_files_in_fileset(
         self,
         catalog_name: str,
@@ -48,6 +49,7 @@ class PlainRESTClientFilesetOperation(FilesetOperation):
         sub_path: str = "/",
     ) -> str:
         response = await self.rest_client.get(
-            f"/api/metalakes/{self.metalake_name}/catalogs/{catalog_name}/schemas/{schema_name}/filesets/{fileset_name}/files?sub_path={sub_path}&location_name={location_name}"
+            f"/api/metalakes/{self.metalake_name}/catalogs/{catalog_name}/schemas/{schema_name}"
+            f"/filesets/{fileset_name}/files?sub_path={sub_path}&location_name={location_name}"
         )
         return response.json().get("files", [])

@@ -51,6 +51,7 @@ public class ErrorMessages {
 
   public static final String MALFORMED_NAME = "Malformed entity name.";
   public static final String MISSING_COLUMN_FILE = "Missing --columnfile option.";
+  public static final String MISSING_COMMENT_AND_RENAME = "Missing --comment and --rename options.";
   public static final String MISSING_DATATYPE = "Missing --datatype option.";
   public static final String MISSING_ENTITIES = "Missing required entity names: ";
 
@@ -62,7 +63,7 @@ public class ErrorMessages {
   public static final String MISSING_PROPERTY_AND_VALUE = "Missing --property and --value options.";
   public static final String MISSING_ROLE = "Missing --role option.";
   public static final String MISSING_TAG = "Missing --tag option.";
-  public static final String MISSING_URI = "Missing --uri option.";
+  public static final String MISSING_URIS = "Missing --uris option.";
   public static final String MISSING_USER = "Missing --user option.";
   public static final String MISSING_VALUE = "Missing --value option.";
 

@@ -35,6 +35,7 @@ from gravitino.dto.responses.model_version_list_response import (
     ModelVersionListResponse,
 )
 from gravitino.dto.responses.model_version_response import ModelVersionResponse
+from gravitino.dto.responses.model_version_uri_response import ModelVersionUriResponse
 from gravitino.namespace import Namespace
 from gravitino.utils import Response
 from tests.unittests import mock_base
@@ -274,7 +275,7 @@ class TestModelCatalogApi(unittest.TestCase):
         model_versions_dto = [
             ModelVersionDTO(
                 _version=0,
-                _uri="http://localhost:8090",
+                _uris={"unknown": "http://localhost:8090"},
                 _aliases=["alias1", "alias2"],
                 _comment="this is test",
                 _properties={"k": "v"},
@@ -325,7 +326,7 @@ class TestModelCatalogApi(unittest.TestCase):
 
         model_version_dto = ModelVersionDTO(
             _version=1,
-            _uri="http://localhost:8090",
+            _uris={"unknown": "http://localhost:8090"},
             _aliases=["alias1", "alias2"],
             _comment="new comment",
             _properties={"k": "v"},
@@ -363,7 +364,7 @@ class TestModelCatalogApi(unittest.TestCase):
         ## test with response
         model_version_dto = ModelVersionDTO(
             _version=1,
-            _uri="http://localhost:8090",
+            _uris={"unknown": "http://localhost:8090"},
             _aliases=["alias1", "alias2"],
             _comment="this is test",
             _properties={"k": "v"},
@@ -390,7 +391,7 @@ class TestModelCatalogApi(unittest.TestCase):
         ## test with empty response
         model_version_dto = ModelVersionDTO(
             _version=1,
-            _uri="http://localhost:8090",
+            _uris={"unknown": "http://localhost:8090"},
             _aliases=None,
             _comment=None,
             _properties=None,
@@ -425,7 +426,7 @@ class TestModelCatalogApi(unittest.TestCase):
         ## test with response
         model_version_dto = ModelVersionDTO(
             _version=1,
-            _uri="http://localhost:8090",
+            _uris={"unknown": "http://localhost:8090"},
             _aliases=["alias1", "alias2"],
             _comment="this is test",
             _properties={"k": "v"},
@@ -448,6 +449,74 @@ class TestModelCatalogApi(unittest.TestCase):
                     {"k": "v"},
                 )
             )
+
+    def test_link_model_version_with_multiple_uris(self, *mock_method):
+        gravitino_client = GravitinoClient(
+            uri="http://localhost:8090", metalake_name=self._metalake_name
+        )
+        catalog = gravitino_client.load_catalog(self._catalog_name)
+
+        model_ident = NameIdentifier.of("schema", "model1")
+
+        ## test with response
+        model_version_dto = ModelVersionDTO(
+            _version=1,
+            _uris={"default-uri-name": "http://localhost:8090"},
+            _aliases=["alias1", "alias2"],
+            _comment="this is test",
+            _properties={"k": "v"},
+            _audit=AuditDTO(_creator="test", _create_time="2022-01-01T00:00:00Z"),
+        )
+        model_resp = ModelVersionResponse(_model_version=model_version_dto, _code=0)
+        json_str = model_resp.to_json()
+        mock_resp = self._mock_http_response(json_str)
+
+        with patch(
+            "gravitino.utils.http_client.HTTPClient.post",
+            return_value=mock_resp,
+        ):
+            self.assertIsNone(
+                catalog.as_model_catalog().link_model_version_with_multiple_uris(
+                    model_ident,
+                    {"default-uri-name": "http://localhost:8090"},
+                    ["alias1", "alias2"],
+                    "this is test",
+                    {"k": "v"},
+                )
+            )
+
+    def test_get_model_version_uri(self, *mock_method):
+        gravitino_client = GravitinoClient(
+            uri="http://localhost:8090", metalake_name=self._metalake_name
+        )
+        catalog = gravitino_client.load_catalog(self._catalog_name)
+
+        model_ident = NameIdentifier.of("schema", "model1")
+        version = 1
+        alias = "alias1"
+
+        ## test with response
+        model_version_uri_resp = ModelVersionUriResponse(
+            _code=0, _uri="s3://path/to/model"
+        )
+        json_str = model_version_uri_resp.to_json()
+        mock_resp = self._mock_http_response(json_str)
+
+        with patch(
+            "gravitino.utils.http_client.HTTPClient.get",
+            return_value=mock_resp,
+        ):
+            model_version_uri = catalog.as_model_catalog().get_model_version_uri(
+                model_ident, version, "uri_name"
+            )
+            self.assertEqual("s3://path/to/model", model_version_uri)
+
+            model_version_uri = (
+                catalog.as_model_catalog().get_model_version_uri_by_alias(
+                    model_ident, alias, "uri_name"
+                )
+            )
+            self.assertEqual("s3://path/to/model", model_version_uri)
 
     def test_delete_model_version(self, *mock_method):
         gravitino_client = GravitinoClient(

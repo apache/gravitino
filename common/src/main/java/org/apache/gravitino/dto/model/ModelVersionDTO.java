@@ -48,6 +48,9 @@ public class ModelVersionDTO implements ModelVersion {
   @JsonProperty("uri")
   private String uri;
 
+  @JsonProperty("uris")
+  private Map<String, String> uris;
+
   @JsonProperty("properties")
   private Map<String, String> properties;
 
@@ -75,8 +78,8 @@ public class ModelVersionDTO implements ModelVersion {
   }
 
   @Override
-  public String uri() {
-    return uri;
+  public Map<String, String> uris() {
+    return uris;
   }
 
   @Override
@@ -98,7 +101,7 @@ public class ModelVersionDTO implements ModelVersion {
     private int version;
     private String comment;
     private String[] aliases;
-    private String uri;
+    private Map<String, String> uris;
     private Map<String, String> properties;
     private AuditDTO audit;
 
@@ -136,13 +139,13 @@ public class ModelVersionDTO implements ModelVersion {
     }
 
     /**
-     * Sets the URI of the model version.
+     * Sets the URIs of the model version.
      *
-     * @param uri The URI.
+     * @param uris The URIs.
      * @return The builder.
      */
-    public Builder withUri(String uri) {
-      this.uri = uri;
+    public Builder withUris(Map<String, String> uris) {
+      this.uris = uris;
       return this;
     }
 
@@ -175,10 +178,24 @@ public class ModelVersionDTO implements ModelVersion {
      */
     public ModelVersionDTO build() {
       Preconditions.checkArgument(version >= 0, "Version must be non-negative");
-      Preconditions.checkArgument(StringUtils.isNotBlank(uri), "URI cannot be null or empty");
       Preconditions.checkArgument(audit != null, "Audit cannot be null");
+      Preconditions.checkArgument(
+          uris != null && !uris.isEmpty(),
+          "At least one URI needs to be set for the model version");
+      uris.forEach(
+          (n, u) -> {
+            Preconditions.checkArgument(StringUtils.isNotBlank(n), "URI name must not be blank");
+            Preconditions.checkArgument(StringUtils.isNotBlank(u), "URI must not be blank");
+          });
 
-      return new ModelVersionDTO(version, comment, aliases, uri, properties, audit);
+      return new ModelVersionDTO(
+          version,
+          comment,
+          aliases,
+          uris.get(ModelVersion.URI_NAME_UNKNOWN),
+          uris,
+          properties,
+          audit);
     }
   }
 }

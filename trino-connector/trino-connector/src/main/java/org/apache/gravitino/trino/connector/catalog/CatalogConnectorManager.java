@@ -111,7 +111,10 @@ public class CatalogConnectorManager {
   public void config(GravitinoConfig config, GravitinoAdminClient client) {
     this.config = Preconditions.checkNotNull(config, "config is not null");
     if (client == null) {
-      this.gravitinoClient = GravitinoAdminClient.builder(config.getURI()).build();
+      this.gravitinoClient =
+          GravitinoAdminClient.builder(config.getURI())
+              .withClientConfig(config.getClientConfig())
+              .build();
     } else {
       this.gravitinoClient = client;
     }
@@ -240,6 +243,12 @@ public class CatalogConnectorManager {
                     loadCatalog(gravitinoCatalog);
                   }
                 }
+              } catch (UnsupportedOperationException e) {
+                LOG.warn(
+                    "Unsupported catalog type for catalog {} in metalake {}: {}",
+                    catalogName,
+                    metalake.name(),
+                    e.getMessage());
               } catch (Exception e) {
                 LOG.error(
                     "Failed to load metalake {}'s catalog {}.", metalake.name(), catalogName, e);

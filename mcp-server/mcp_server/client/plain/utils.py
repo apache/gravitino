@@ -18,6 +18,8 @@
 import json
 import logging
 
+from mcp_server.client.plain.exception import GravitinoException
+
 
 def extract_content_from_response(response, field: str, default="") -> str:
     response_json = response.json()
@@ -31,5 +33,5 @@ def _handle_gravitino_exception(response: dict):
         t = response.get("type", "")
         message = response.get("message", "")
         error_message = f"Error code: {error_code}, Error type: {t}, Error message: {message}"
-        logging.warn(error_message)
-        raise Exception(error_message)
+        logging.warning(error_message)
+        raise GravitinoException(error_message)

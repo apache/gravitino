@@ -27,9 +27,7 @@ class PlainRESTClientModelOperation(ModelOperation):
         self.metalake_name = metalake_name
         self.rest_client = rest_client
 
-    async def get_list_of_models(
-        self, catalog_name: str, schema_name: str
-    ) -> str:
+    async def list_of_models(self, catalog_name: str, schema_name: str) -> str:
         response = await self.rest_client.get(
             f"/api/metalakes/{self.metalake_name}/catalogs/{catalog_name}/schemas/{schema_name}/models"
         )
@@ -47,7 +45,8 @@ class PlainRESTClientModelOperation(ModelOperation):
         self, catalog_name: str, schema_name: str, model_name: str
     ) -> str:
         response = await self.rest_client.get(
-            f"/api/metalakes/{self.metalake_name}/catalogs/{catalog_name}/schemas/{schema_name}/models/{model_name}/versions?details=true"
+            f"/api/metalakes/{self.metalake_name}/catalogs/{catalog_name}/schemas/{schema_name}/models/{model_name}"
+            f"/versions?details=true"
         )
         return response.json().get("infos", [])
 
@@ -55,7 +54,8 @@ class PlainRESTClientModelOperation(ModelOperation):
         self, catalog_name: str, schema_name: str, model_name: str, version: int
     ) -> str:
         response = await self.rest_client.get(
-            f"/api/metalakes/{self.metalake_name}/catalogs/{catalog_name}/schemas/{schema_name}/models/{model_name}/versions/{version}"
+            f"/api/metalakes/{self.metalake_name}/catalogs/{catalog_name}/schemas/{schema_name}/models/{model_name}"
+            f"/versions/{version}"
         )
         return response.json().get("modelVersion", {})
 
@@ -63,6 +63,7 @@ class PlainRESTClientModelOperation(ModelOperation):
         self, catalog_name: str, schema_name: str, model_name: str, alias: str
     ) -> str:
         response = await self.rest_client.get(
-            f"/api/metalakes/{self.metalake_name}/catalogs/{catalog_name}/schemas/{schema_name}/models/{model_name}/aliases/{alias}"
+            f"/api/metalakes/{self.metalake_name}/catalogs/{catalog_name}/schemas/{schema_name}/models/{model_name}/"
+            f"aliases/{alias}"
         )
         return response.json().get("modelVersion", {})

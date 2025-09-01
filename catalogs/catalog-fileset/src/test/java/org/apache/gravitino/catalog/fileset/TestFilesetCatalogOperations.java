@@ -75,6 +75,7 @@ import org.apache.gravitino.Namespace;
 import org.apache.gravitino.Schema;
 import org.apache.gravitino.SchemaChange;
 import org.apache.gravitino.StringIdentifier;
+import org.apache.gravitino.UserPrincipal;
 import org.apache.gravitino.audit.CallerContext;
 import org.apache.gravitino.audit.FilesetAuditConstants;
 import org.apache.gravitino.audit.FilesetDataOperation;
@@ -100,6 +101,7 @@ import org.apache.gravitino.storage.relational.service.CatalogMetaService;
 import org.apache.gravitino.storage.relational.service.MetalakeMetaService;
 import org.apache.gravitino.storage.relational.service.SchemaMetaService;
 import org.apache.gravitino.utils.NameIdentifierUtil;
+import org.apache.gravitino.utils.PrincipalUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
@@ -1468,6 +1470,55 @@ public class TestFilesetCatalogOperations {
   }
 
   @Test
+  public void testCreateSchemaWithDifferentUser() throws Exception {
+    // Create schema with user "alice"
+    UserPrincipal principal = new UserPrincipal("alice");
+    Schema schemaCreatedByAlice =
+        PrincipalUtils.doAs(
+            principal,
+            () -> {
+              final long testId = generateTestId();
+              final String schemaName = "schema" + testId;
+              final String comment = "comment" + testId;
+              final String schemaPath = TEST_ROOT_PATH + "/" + schemaName;
+              return createSchema(testId, schemaName, comment, null, schemaPath, false);
+            });
+
+    Assertions.assertNotNull(schemaCreatedByAlice);
+    Assertions.assertEquals("alice", schemaCreatedByAlice.auditInfo().creator());
+
+    UserPrincipal bobPrincipal = new UserPrincipal("bob");
+    Schema schemaCreatedByBob =
+        PrincipalUtils.doAs(
+            bobPrincipal,
+            () -> {
+              final long testId = generateTestId();
+              final String schemaName = "schema" + testId;
+              final String comment = "comment" + testId;
+              final String schemaPath = TEST_ROOT_PATH + "/" + schemaName;
+              // Create schema with user "bob"
+              return createSchema(testId, schemaName, comment, null, schemaPath, false);
+            });
+    Assertions.assertNotNull(schemaCreatedByBob);
+    Assertions.assertEquals("bob", schemaCreatedByBob.auditInfo().creator());
+
+    UserPrincipal lucyPrincipal = new UserPrincipal("lucy");
+    Schema schemaCreatedByLucy =
+        PrincipalUtils.doAs(
+            lucyPrincipal,
+            () -> {
+              final long testId = generateTestId();
+              final String schemaName = "schema" + testId;
+              final String comment = "comment" + testId;
+              final String schemaPath = TEST_ROOT_PATH + "/" + schemaName;
+              // Create schema with user "lucy"
+              return createSchema(testId, schemaName, comment, null, schemaPath, false);
+            });
+    Assertions.assertNotNull(schemaCreatedByLucy);
+    Assertions.assertEquals("lucy", schemaCreatedByLucy.auditInfo().creator());
+  }
+
+  @Test
   public void testLocationPlaceholdersWithException() throws IOException {
     // test empty placeholder value
     final long testId = generateTestId();
@@ -1756,7 +1807,7 @@ public class TestFilesetCatalogOperations {
           exception
               .getMessage()
               .contains(
-                  "Default location name must be set and must be one of the fileset locations"),
+                  "The fileset property default-location-name must be set and must be one of the fileset locations"),
           "Exception message: " + exception.getMessage());
     }
   }

@@ -22,6 +22,8 @@ import static org.apache.gravitino.rel.expressions.transforms.Transforms.identit
 
 import java.time.Instant;
 import java.util.Optional;
+import java.util.Set;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.apache.gravitino.connector.BaseColumn;
 import org.apache.gravitino.meta.AuditInfo;
@@ -34,6 +36,7 @@ import org.apache.gravitino.rel.expressions.sorts.SortDirection;
 import org.apache.gravitino.rel.expressions.sorts.SortOrder;
 import org.apache.gravitino.rel.expressions.sorts.SortOrders;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
+import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.metastore.api.StorageDescriptor;
 import org.apache.hadoop.hive.metastore.api.Table;
 
@@ -88,6 +91,10 @@ public class HiveTableConverter {
           BUILDER extends BaseColumn.BaseColumnBuilder<BUILDER, COLUMN>, COLUMN extends BaseColumn>
       Column[] getColumns(Table table, BUILDER columnBuilder) {
     StorageDescriptor sd = table.getSd();
+    // Collect column names from sd.getCols() to check for duplicates
+    Set<String> columnNames =
+        sd.getCols().stream().map(FieldSchema::getName).collect(Collectors.toSet());
+
     return Stream.concat(
             sd.getCols().stream()
                 .map(
@@ -98,6 +105,8 @@ public class HiveTableConverter {
                             .withComment(f.getComment())
                             .build()),
             table.getPartitionKeys().stream()
+                // Filter out partition keys that already exist in sd.getCols()
+                .filter(p -> !columnNames.contains(p.getName()))
                 .map(
                     p ->
                         columnBuilder

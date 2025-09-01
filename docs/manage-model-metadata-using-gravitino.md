@@ -553,6 +553,62 @@ catalog.as_model_catalog().link_model_version(model_ident=NameIdentifier.of("mod
 
 The comment and properties of ModelVersion can be different from the model.
 
+You can also link a ModelVersion with multiple model URIs. The URIs is a map of URI name to URI. 
+
+If you associate only one URI with a ModelVersion and do not specify a URI name
+(as introduced in the previous paragraph), Gravitino will automatically generate a default URI name "unknown".
+
+The following is an example of linking a ModelVersion with multiple model URIs:
+
+<Tabs groupId="language" queryString>
+<TabItem value="shell" label="Shell">
+
+```shell
+curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
+-H "Content-Type: application/json" -d '{
+  "uris": {
+    "s3": "s3://path/to/model",
+    "hdfs": "hdfs://path/to/model"
+  },
+  "aliases": ["alias1", "alias2"],
+  "comment": "This is version 0",
+  "properties": {
+    "k1": "v1"
+  }
+}' http://localhost:8090/api/metalakes/example/catalogs/model_catalog/schemas/model_schema/models/example_model/versions
+```
+
+</TabItem>
+<TabItem value="java" label="Java">
+
+```java
+// ...
+Catalog catalog = gravitinoClient.loadCatalog("model_catalog");
+catalog.asModelCatalog().linkModelVersion(
+    NameIdentifier.of("model_schema", "example_model"),
+    ImmutableMap.of("s3", "s3://path/to/model", "hdfs", "hdfs://path/to/model"),
+    new String[] {"alias1", "alias2"},
+    "This is version 0",
+    ImmutableMap.of("k1", "v1"));
+```
+
+</TabItem>
+<TabItem value="python" label="Python">
+
+```python
+gravitino_client: GravitinoClient = GravitinoClient(uri="http://localhost:8090", metalake_name="example")
+
+catalog: Catalog = gravitino_client.load_catalog(name="model_catalog")
+catalog.as_model_catalog().link_model_version_with_multiple_uris(model_ident=NameIdentifier.of("model_schema", "example_model"),
+                                                                 uris={"s3": "s3://path/to/model", "hdfs": "hdfs://path/to/model"},
+                                                                 aliases=["alias1", "alias2"],
+                                                                 comment="This is version 0",
+                                                                 properties={"k1": "v1"})
+```
+
+</TabItem>
+</Tabs>
+
 ### Get a ModelVersion
 
 You can get a ModelVersion by sending a `GET` request to the `/api/metalakes/{metalake_name}
@@ -631,6 +687,160 @@ model_version: ModelVersion = catalog.as_model_catalog().get_model_version_by_al
 </TabItem>
 </Tabs>
 
+### Get ModelVersion URI
+
+You can get the URI of a ModelVersion by sending a `GET` request to the `/api/metalakes/{metalake_name}
+/catalogs/{catalog_name}/schemas/{schema_name}/models/{model_name}/versions/{version_number}/uri?uriName={uriName}`
+endpoint or by using the Gravitino Java/Python client. The following is an example of getting
+the URI of a ModelVersion:
+
+<Tabs groupId="language" queryString>
+<TabItem value="shell" label="Shell">
+
+```shell
+curl -X GET -H "Accept: application/vnd.gravitino.v1+json" \
+-H "Content-Type: application/json" \
+http://localhost:8090/api/metalakes/example/catalogs/model_catalog/schemas/model_schema/models/example_model/versions/0/uri?uriName=s3
+```
+
+</TabItem>
+<TabItem value="java" label="Java">
+
+```java
+// ...
+Catalog catalog = gravitinoClient.loadCatalog("model_catalog");
+catalog.asModelCatalog().getModelVersionUri(NameIdentifier.of("model_schema", "example_model"), 0, "s3");
+// ...
+```
+
+</TabItem>
+<TabItem value="python" label="Python">
+
+```python
+gravitino_client: GravitinoClient = GravitinoClient(uri="http://localhost:8090", metalake_name="example")
+
+catalog: Catalog = gravitino_client.load_catalog(name="model_catalog")
+catalog.as_model_catalog().get_model_version_uri(model_ident=NameIdentifier.of("model_schema", "example_model"), version=0, uri_name="s3")
+```
+
+</TabItem>
+</Tabs>
+
+The param `uriName` is not required. If it is not specified, Gravitino will obtain 
+the corresponding URI based on the `default-uri-name` property set in the Model or ModelVersion.
+You can refer to [Model Properties](./model-catalog.md#Model properties) and
+[ModelVersion properties](./model-catalog.md#ModelVersion properties) for more details.
+If the `default-uri-name` property is not set in either the model or the model version, 
+an `IllegalArgumentException` will be thrown.
+
+The following is an example of getting the URI of a ModelVersion without specifying the uriName:
+
+<Tabs groupId="language" queryString>
+<TabItem value="shell" label="Shell">
+
+```shell
+curl -X GET -H "Accept: application/vnd.gravitino.v1+json" \
+-H "Content-Type: application/json" \
+http://localhost:8090/api/metalakes/example/catalogs/model_catalog/schemas/model_schema/models/example_model/versions/0/uri
+```
+
+</TabItem>
+<TabItem value="java" label="Java">
+
+```java
+// ...
+Catalog catalog = gravitinoClient.loadCatalog("model_catalog");
+catalog.asModelCatalog().getModelVersionUri(NameIdentifier.of("model_schema", "example_model"), 0, null);
+// ...
+```
+
+</TabItem>
+<TabItem value="python" label="Python">
+
+```python
+gravitino_client: GravitinoClient = GravitinoClient(uri="http://localhost:8090", metalake_name="example")
+
+catalog: Catalog = gravitino_client.load_catalog(name="model_catalog")
+catalog.as_model_catalog().get_model_version_uri(model_ident=NameIdentifier.of("model_schema", "example_model"), version=0)
+```
+
+</TabItem>
+</Tabs>
+
+### Get ModelVersion URI by alias
+
+You can also get the URI of a ModelVersion by sending a `GET` request to the `/api/metalakes/{metalake_name}
+/catalogs/{catalog_name}/schemas/{schema_name}/models/{model_name}/aliases/{alias}/uri?uriName={uriName}`
+endpoint or by using the Gravitino Java/Python client. The following is an example of getting
+the URI of a ModelVersion:
+
+<Tabs groupId="language" queryString>
+<TabItem value="shell" label="Shell">
+
+```shell
+curl -X GET -H "Accept: application/vnd.gravitino.v1+json" \
+-H "Content-Type: application/json" \
+http://localhost:8090/api/metalakes/example/catalogs/model_catalog/schemas/model_schema/models/example_model/aliases/alias1/uri?uriName=s3
+```
+
+</TabItem>
+<TabItem value="java" label="Java">
+
+```java
+// ...
+Catalog catalog = gravitinoClient.loadCatalog("model_catalog");
+catalog.asModelCatalog().getModelVersionUri(NameIdentifier.of("model_schema", "example_model"), "alias", "s3");
+// ...
+```
+
+</TabItem>
+<TabItem value="python" label="Python">
+
+```python
+gravitino_client: GravitinoClient = GravitinoClient(uri="http://localhost:8090", metalake_name="example")
+
+catalog: Catalog = gravitino_client.load_catalog(name="model_catalog")
+catalog.as_model_catalog().get_model_version_uri_by_alias(model_ident=NameIdentifier.of("model_schema", "example_model"), alias="alias1", uri_name="s3")
+```
+
+</TabItem>
+</Tabs>
+
+Similarly, The param `uriName` is not required.
+The following is an example of getting the URI of a ModelVersion by alias without specifying the uriName:
+
+<Tabs groupId="language" queryString>
+<TabItem value="shell" label="Shell">
+
+```shell
+curl -X GET -H "Accept: application/vnd.gravitino.v1+json" \
+-H "Content-Type: application/json" \
+http://localhost:8090/api/metalakes/example/catalogs/model_catalog/schemas/model_schema/models/example_model/aliases/alias1/uri
+```
+
+</TabItem>
+<TabItem value="java" label="Java">
+
+```java
+// ...
+Catalog catalog = gravitinoClient.loadCatalog("model_catalog");
+catalog.asModelCatalog().getModelVersionUri(NameIdentifier.of("model_schema", "example_model"), "alias", null);
+// ...
+```
+
+</TabItem>
+<TabItem value="python" label="Python">
+
+```python
+gravitino_client: GravitinoClient = GravitinoClient(uri="http://localhost:8090", metalake_name="example")
+
+catalog: Catalog = gravitino_client.load_catalog(name="model_catalog")
+catalog.as_model_catalog().get_model_version_uri_by_alias(model_ident=NameIdentifier.of("model_schema", "example_model"), alias="alias1")
+```
+
+</TabItem>
+</Tabs>
+
 ### Alter a ModelVersion
 
 You can modify a modelVersion's metadata (e.g. update uri, update comment, or modify properties) 
@@ -651,7 +861,17 @@ cat <<EOF >model.json
     },
     {
       "@type": "updateUri",
+      "uriName": "uri_name",
       "newUri": "new_uri"
+    },
+    {
+      "@type": "addUri",
+      "uriName": "uri_name",
+      "uri": "uri"
+    },
+    {
+      "@type": "removeUri",
+      "uriName": "uri_name"
     },
     {
       "@type": "setProperty",
@@ -698,7 +918,9 @@ ModelCatalog modelCatalog = catalog.asModelCatalog();
 // Define modifications
 ModelVersionChange[] changes = {
      ModelVersionChange.updateComment("Updated comment of model version"),
-     ModelVersionChange.updateUri("new_uri"),
+     ModelVersionChange.updateUri("uri_name", "new_uri"),
+     ModelVersionChange.addUri("uri_name", "new_uri"),
+     ModelVersionChange.removeUri("uri_name"),
      ModelVersionChange.setProperty("key", "value"),
      ModelVersionChange.removeProperty("key"),
      ModelVersionChange.updateAliases(new String[] {"alias1", "alias2"}, new String[] {"alias3"})
@@ -726,7 +948,9 @@ model_catalog = client.load_catalog(name="mycatalog").as_model_catalog()
 # Define modifications
 changes = (
     ModelVersionChange.update_comment("Updated comment of model version"),
-    ModelVersionChange.update_uri("new_uri"),
+    ModelVersionChange.update_uri("new_uri", "uri_name"),
+    ModelVersionChange.add_uri("uri_name", "uri"),
+    ModelVersionChange.remove_uri("uri_name"),
     ModelVersionChange.set_property("k2", "v2"),
     ModelVersionChange.remove_property("k1"),
     ModelVersionChange.update_aliases(["alias1", "alias2"], ["alias3"])
@@ -743,13 +967,15 @@ updated_model = model_catalog.alter_model_version(
 
 #### Supported modifications
 
-| Operation           | JSON Example                                                                                   | Java Method                                                                                    | Python Method                                                         |
-|---------------------|------------------------------------------------------------------------------------------------|------------------------------------------------------------------------------------------------|-----------------------------------------------------------------------|
-| **Update uri**      | `{"@type":"updateUri","newName":"new_uri"}`                                                    | `ModelVersionChange.updateUri("new_uri")`                                                      | `ModelVersionChange.update_uri("new_uri")`                            |
-| **Update comment**  | `{"@type":"updateComment","newComment":"new_comment"}`                                         | `ModelVersionChange.updateComment("new_comment")`                                              | `ModelVersionChange.update_comment("new_comment")`                    |
-| **Set property**    | `{"@type":"setProperty","property":"key","value":"value"}`                                     | `ModelVersionChange.setProperty("key", "value")`                                               | `ModelVersionChange.set_property("key", "value")`                     |
-| **Remove property** | `{"@type":"removeProperty","property":"key"}`                                                  | `ModelVersionChange.removeProperty("key")`                                                     | `ModelVersionChange.remove_property("key")`                           |
-| **Update Aliases**  | `{"@type": "updateAliases","aliasesToAdd": ["alias1","alias2"],"aliasesToRemove": ["alias3"]}` | `ModelVersionChange.updateAliases(new String[] {"alias1", "alias2"}, new String[] {"alias3"})` | `ModelVersionChange.update_aliases(["alias1", "alias2"], ["alias3"])` |
+| Operation           | JSON Example                                                                                | Java Method                                                                                    | Python Method                                                         |
+|---------------------|---------------------------------------------------------------------------------------------|------------------------------------------------------------------------------------------------|-----------------------------------------------------------------------|
+| **Update uri**      | `{"@type":"updateUri","newName":"new_uri","uriName":"uri_name"}`                            | `ModelVersionChange.updateUri("uri_name", "new_uri")`                                          | `ModelVersionChange.update_uri("new_uri", "uri_name")`                |
+| **Update comment**  | `{"@type":"updateComment","newComment":"new_comment"}`                                      | `ModelVersionChange.updateComment("new_comment")`                                              | `ModelVersionChange.update_comment("new_comment")`                    |
+| **Set property**    | `{"@type":"setProperty","property":"key","value":"value"}`                                  | `ModelVersionChange.setProperty("key", "value")`                                               | `ModelVersionChange.set_property("key", "value")`                     |
+| **Remove property** | `{"@type":"removeProperty","property":"key"}`                                               | `ModelVersionChange.removeProperty("key")`                                                     | `ModelVersionChange.remove_property("key")`                           |
+| **Update Aliases**  | `{"@type":"updateAliases","aliasesToAdd":["alias1","alias2"],"aliasesToRemove":["alias3"]}` | `ModelVersionChange.updateAliases(new String[] {"alias1", "alias2"}, new String[] {"alias3"})` | `ModelVersionChange.update_aliases(["alias1", "alias2"], ["alias3"])` |
+| **Add uri**         | `{"@type":"addUri","uriName":"uri_name","uri":"uri"}`                                       | `ModelVersionChange.addUri("uri_name", "new_uri")`                                             | `ModelVersionChange.add_uri("uri_name", "uri")`                       |
+| **Remove uri**      | `{"@type":"removeUri","uriName":"uri_name"}`                                                | `ModelVersionChange.removeUri("uri_name")`                                                     | `ModelVersionChange.remove_uri("uri_name")`                           |
 
 :::note
 - Multiple modifications can be applied in a single request.
@@ -777,7 +1003,17 @@ cat <<EOF >model.json
     },
     {
       "@type": "updateUri",
+      "uriName": "uri_name",
       "newUri": "new_uri"
+    },
+    {
+      "@type": "addUri",
+      "uriName": "uri_name",
+      "uri": "uri"
+    },
+    {
+      "@type": "removeUri",
+      "uriName": "uri_name"
     },
     {
       "@type": "setProperty",
@@ -823,8 +1059,10 @@ ModelCatalog modelCatalog = catalog.asModelCatalog();
 
 // Define modifications
 ModelVersionChange[] changes = {
-     ModelVersionChange.updateComment("Updated comment of model version"),
-     ModelVersionChange.updateUri("new_uri"),
+     ModelVersionChange.updateComment("Updated comment of model version"), 
+     ModelVersionChange.updateUri("uri_name", "new_uri"),
+     ModelVersionChange.addUri("uri_name", "new_uri"),
+     ModelVersionChange.removeUri("uri_name"),
      ModelVersionChange.setProperty("key", "value"),
      ModelVersionChange.removeProperty("key"),
      ModelVersionChange.updateAliases(new String[] {"alias1", "alias2"}, new String[] {"alias3"})
@@ -852,7 +1090,9 @@ model_catalog = client.load_catalog(name="mycatalog").as_model_catalog()
 # Define modifications
 changes = (
     ModelVersionChange.update_comment("Updated comment of model version"),
-    ModelVersionChange.update_uri("new_uri"),
+    ModelVersionChange.update_uri("new_uri", "uri_name"),
+    ModelVersionChange.add_uri("uri_name", "uri"),
+    ModelVersionChange.remove_uri("uri_name"),
     ModelVersionChange.set_property("k2", "v2"),
     ModelVersionChange.remove_property("k1"),
     ModelVersionChange.update_aliases(["alias1", "alias2"], ["alias3"])
@@ -869,13 +1109,15 @@ updated_model = model_catalog.alter_model_version_by_alias(
 
 #### Supported modifications
 
-| Operation           | JSON Example                                                                                   | Java Method                                                                                    | Python Method                                                         |
-|---------------------|------------------------------------------------------------------------------------------------|------------------------------------------------------------------------------------------------|-----------------------------------------------------------------------|
-| **Update uri**      | `{"@type":"updateUri","newName":"new_uri"}`                                                    | `ModelVersionChange.updateUri("new_uri")`                                                      | `ModelVersionChange.update_uri("new_uri")`                            |
-| **Update comment**  | `{"@type":"updateComment","newComment":"new_comment"}`                                         | `ModelVersionChange.updateComment("new_comment")`                                              | `ModelVersionChange.update_comment("new_comment")`                    |
-| **Set property**    | `{"@type":"setProperty","property":"key","value":"value"}`                                     | `ModelVersionChange.setProperty("key", "value")`                                               | `ModelVersionChange.set_property("key", "value")`                     |
-| **Remove property** | `{"@type":"removeProperty","property":"key"}`                                                  | `ModelVersionChange.removeProperty("key")`                                                     | `ModelVersionChange.remove_property("key")`                           |
-| **Update Aliases**  | `{"@type": "updateAliases","aliasesToAdd": ["alias1","alias2"],"aliasesToRemove": ["alias3"]}` | `ModelVersionChange.updateAliases(new String[] {"alias1", "alias2"}, new String[] {"alias3"})` | `ModelVersionChange.update_aliases(["alias1", "alias2"], ["alias3"])` |
+| Operation           | JSON Example                                                                                | Java Method                                                                                    | Python Method                                                         |
+|---------------------|---------------------------------------------------------------------------------------------|------------------------------------------------------------------------------------------------|-----------------------------------------------------------------------|
+| **Update uri**      | `{"@type":"updateUri","newName":"new_uri","uriName":"uri_name"}`                            | `ModelVersionChange.updateUri("new_uri")`                                                      | `ModelVersionChange.update_uri("new_uri")`                            |
+| **Update comment**  | `{"@type":"updateComment","newComment":"new_comment"}`                                      | `ModelVersionChange.updateComment("new_comment")`                                              | `ModelVersionChange.update_comment("new_comment")`                    |
+| **Set property**    | `{"@type":"setProperty","property":"key","value":"value"}`                                  | `ModelVersionChange.setProperty("key", "value")`                                               | `ModelVersionChange.set_property("key", "value")`                     |
+| **Remove property** | `{"@type":"removeProperty","property":"key"}`                                               | `ModelVersionChange.removeProperty("key")`                                                     | `ModelVersionChange.remove_property("key")`                           |
+| **Update Aliases**  | `{"@type":"updateAliases","aliasesToAdd":["alias1","alias2"],"aliasesToRemove":["alias3"]}` | `ModelVersionChange.updateAliases(new String[] {"alias1", "alias2"}, new String[] {"alias3"})` | `ModelVersionChange.update_aliases(["alias1", "alias2"], ["alias3"])` |
+| **Add uri**         | `{"@type":"addUri","uriName":"uri_name","uri":"uri"}`                                       | `ModelVersionChange.addUri("uri_name", "new_uri")`                                             | `ModelVersionChange.add_uri("uri_name", "uri")`                       |
+| **Remove uri**      | `{"@type":"removeUri","uriName":"uri_name"}`                                                | `ModelVersionChange.removeUri("uri_name")`                                                     | `ModelVersionChange.remove_uri("uri_name")`                           |
 
 
 :::note

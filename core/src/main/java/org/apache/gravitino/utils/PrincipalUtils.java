@@ -27,9 +27,14 @@ import java.util.Set;
 import javax.security.auth.Subject;
 import org.apache.gravitino.UserPrincipal;
 import org.apache.gravitino.auth.AuthConstants;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 @SuppressWarnings("removal")
 public class PrincipalUtils {
+
+  private static final Logger LOG = LoggerFactory.getLogger(PrincipalUtils.class);
+
   private PrincipalUtils() {}
 
   public static <T> T doAs(Principal principal, PrivilegedExceptionAction<T> action)
@@ -44,6 +49,9 @@ public class PrincipalUtils {
       Throwable cause = pae.getCause();
       Throwables.propagateIfPossible(cause, Exception.class);
       throw new RuntimeException("doAs method occurs an unexpected exception", pae);
+    } catch (Error t) {
+      LOG.warn("doAs method occurs an unexpected error", t);
+      throw new RuntimeException("doAs method occurs an unexpected exception", t);
     }
   }
 

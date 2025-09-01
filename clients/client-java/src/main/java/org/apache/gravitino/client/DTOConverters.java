@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.client;
 
+import static org.apache.gravitino.dto.util.DTOConverters.toDTO;
 import static org.apache.gravitino.dto.util.DTOConverters.toFunctionArg;
 
 import java.util.Collection;
@@ -43,6 +44,7 @@ import org.apache.gravitino.dto.requests.FilesetUpdateRequest;
 import org.apache.gravitino.dto.requests.MetalakeUpdateRequest;
 import org.apache.gravitino.dto.requests.ModelUpdateRequest;
 import org.apache.gravitino.dto.requests.ModelVersionUpdateRequest;
+import org.apache.gravitino.dto.requests.PolicyUpdateRequest;
 import org.apache.gravitino.dto.requests.SchemaUpdateRequest;
 import org.apache.gravitino.dto.requests.TableUpdateRequest;
 import org.apache.gravitino.dto.requests.TagUpdateRequest;
@@ -54,6 +56,7 @@ import org.apache.gravitino.job.SparkJobTemplate;
 import org.apache.gravitino.messaging.TopicChange;
 import org.apache.gravitino.model.ModelChange;
 import org.apache.gravitino.model.ModelVersionChange;
+import org.apache.gravitino.policy.PolicyChange;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.TableChange;
 import org.apache.gravitino.rel.expressions.Expression;
@@ -366,6 +369,27 @@ class DTOConverters {
     }
   }
 
+  static PolicyUpdateRequest toPolicyUpdateRequest(PolicyChange change) {
+    if (change instanceof PolicyChange.RenamePolicy) {
+      return new PolicyUpdateRequest.RenamePolicyRequest(
+          ((PolicyChange.RenamePolicy) change).getNewName());
+
+    } else if (change instanceof PolicyChange.UpdatePolicyComment) {
+      return new PolicyUpdateRequest.UpdatePolicyCommentRequest(
+          ((PolicyChange.UpdatePolicyComment) change).getNewComment());
+
+    } else if (change instanceof PolicyChange.UpdateContent) {
+      PolicyChange.UpdateContent updateContent = (PolicyChange.UpdateContent) change;
+      String policyType = updateContent.getPolicyType();
+      return new PolicyUpdateRequest.UpdatePolicyContentRequest(
+          policyType, toDTO(updateContent.getContent()));
+
+    } else {
+      throw new IllegalArgumentException(
+          "Unknown change type: " + change.getClass().getSimpleName());
+    }
+  }
+
   static ModelUpdateRequest toModelUpdateRequest(ModelChange change) {
     if (change instanceof ModelChange.RenameModel) {
       return new ModelUpdateRequest.RenameModelRequest(
@@ -411,8 +435,18 @@ class DTOConverters {
           ((ModelVersionChange.RemoveProperty) change).property());
 
     } else if (change instanceof ModelVersionChange.UpdateUri) {
+      ModelVersionChange.UpdateUri updateUri = (ModelVersionChange.UpdateUri) change;
       return new ModelVersionUpdateRequest.UpdateModelVersionUriRequest(
-          ((ModelVersionChange.UpdateUri) change).newUri());
+          updateUri.uriName(), updateUri.newUri());
+
+    } else if (change instanceof ModelVersionChange.AddUri) {
+      ModelVersionChange.AddUri addUri = (ModelVersionChange.AddUri) change;
+      return new ModelVersionUpdateRequest.AddModelVersionUriRequest(
+          addUri.uriName(), addUri.uri());
+
+    } else if (change instanceof ModelVersionChange.RemoveUri) {
+      return new ModelVersionUpdateRequest.RemoveModelVersionUriRequest(
+          ((ModelVersionChange.RemoveUri) change).uriName());
 
     } else if (change instanceof ModelVersionChange.UpdateAliases) {
       ModelVersionChange.UpdateAliases updateAliases = (ModelVersionChange.UpdateAliases) change;

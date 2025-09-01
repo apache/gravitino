@@ -20,7 +20,7 @@ from fastmcp import Context, FastMCP
 
 def load_model_tools(mcp: FastMCP):
     @mcp.tool(tags={"model"})
-    async def get_list_of_models(
+    async def list_of_models(
         ctx: Context,
         catalog_name: str,
         schema_name: str,
@@ -62,7 +62,7 @@ def load_model_tools(mcp: FastMCP):
             ]
         """
         client = ctx.request_context.lifespan_context.rest_client()
-        return await client.as_model_operation().get_list_of_models(
+        return await client.as_model_operation().list_of_models(
             catalog_name, schema_name
         )
 
@@ -121,7 +121,8 @@ def load_model_tools(mcp: FastMCP):
             model_name (str): The name of the model to list versions for.
 
         Returns:
-            str: A JSON string containing model version information. The string represents an array of version information.
+            str: A JSON string containing model version information. The string
+                represents an array of version information.
 
         Example Return Value:
             [

@@ -22,6 +22,7 @@ import com.google.common.base.Preconditions;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.TreeMap;
 import org.apache.gravitino.rel.types.Type;
 import org.apache.gravitino.rel.types.Types;
 
@@ -291,7 +292,11 @@ public class StatisticValues {
     private ObjectValue(Map<String, StatisticValue<?>> valueMap) {
       Preconditions.checkArgument(
           valueMap != null && !valueMap.isEmpty(), "Values cannot be null or empty");
-      this.valueMap = valueMap;
+      if (valueMap instanceof TreeMap) {
+        this.valueMap = valueMap;
+      } else {
+        this.valueMap = new TreeMap<>(valueMap);
+      }
     }
 
     @Override

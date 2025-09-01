@@ -19,8 +19,8 @@
 
 package org.apache.gravitino.cli;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
@@ -32,6 +32,7 @@ import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.google.common.collect.ImmutableMap;
 import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
@@ -56,7 +57,6 @@ import org.apache.gravitino.cli.commands.UpdateModelVersionAliases;
 import org.apache.gravitino.cli.commands.UpdateModelVersionComment;
 import org.apache.gravitino.cli.commands.UpdateModelVersionUri;
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.testcontainers.shaded.com.google.common.base.Joiner;
@@ -443,8 +443,8 @@ public class TestModelCommands {
     when(mockCommandLine.getOptionValue(GravitinoOptions.METALAKE)).thenReturn("metalake_demo");
     when(mockCommandLine.hasOption(GravitinoOptions.NAME)).thenReturn(true);
     when(mockCommandLine.getOptionValue(GravitinoOptions.NAME)).thenReturn("catalog.schema.model");
-    when(mockCommandLine.hasOption(GravitinoOptions.URI)).thenReturn(true);
-    when(mockCommandLine.getOptionValue(GravitinoOptions.URI)).thenReturn("file:///tmp/file");
+    when(mockCommandLine.hasOption(GravitinoOptions.URIS)).thenReturn(true);
+    when(mockCommandLine.getOptionValue(GravitinoOptions.URIS)).thenReturn("n1=u1,n2=u2");
     when(mockCommandLine.hasOption(GravitinoOptions.ALIAS)).thenReturn(false);
     GravitinoCommandLine commandLine =
         spy(
@@ -459,7 +459,7 @@ public class TestModelCommands {
             eq("catalog"),
             eq("schema"),
             eq("model"),
-            eq("file:///tmp/file"),
+            eq(ImmutableMap.of("n1", "u1", "n2", "u2")),
             isNull(),
             isNull(),
             argThat(Map::isEmpty));
@@ -475,8 +475,8 @@ public class TestModelCommands {
     when(mockCommandLine.getOptionValue(GravitinoOptions.METALAKE)).thenReturn("metalake_demo");
     when(mockCommandLine.hasOption(GravitinoOptions.NAME)).thenReturn(true);
     when(mockCommandLine.getOptionValue(GravitinoOptions.NAME)).thenReturn("catalog.schema.model");
-    when(mockCommandLine.hasOption(GravitinoOptions.URI)).thenReturn(true);
-    when(mockCommandLine.getOptionValue(GravitinoOptions.URI)).thenReturn("file:///tmp/file");
+    when(mockCommandLine.hasOption(GravitinoOptions.URIS)).thenReturn(true);
+    when(mockCommandLine.getOptionValue(GravitinoOptions.URIS)).thenReturn("n1=u1,n2=u2");
     when(mockCommandLine.hasOption(GravitinoOptions.ALIAS)).thenReturn(true);
     when(mockCommandLine.getOptionValues(GravitinoOptions.ALIAS))
         .thenReturn(new String[] {"aliasA", "aliasB"});
@@ -493,7 +493,7 @@ public class TestModelCommands {
             eq("catalog"),
             eq("schema"),
             eq("model"),
-            eq("file:///tmp/file"),
+            eq(ImmutableMap.of("n1", "u1", "n2", "u2")),
             argThat(
                 argument ->
                     argument.length == 2
@@ -527,7 +527,7 @@ public class TestModelCommands {
     assertThrows(RuntimeException.class, spyLinkModel::validate);
     verify(spyLinkModel, never()).handle();
     String output = new String(errContent.toByteArray(), StandardCharsets.UTF_8).trim();
-    assertEquals(ErrorMessages.MISSING_URI, output);
+    assertEquals(ErrorMessages.MISSING_URIS, output);
   }
 
   @Test
@@ -537,8 +537,8 @@ public class TestModelCommands {
     when(mockCommandLine.getOptionValue(GravitinoOptions.METALAKE)).thenReturn("metalake_demo");
     when(mockCommandLine.hasOption(GravitinoOptions.NAME)).thenReturn(true);
     when(mockCommandLine.getOptionValue(GravitinoOptions.NAME)).thenReturn("catalog.schema.model");
-    when(mockCommandLine.hasOption(GravitinoOptions.URI)).thenReturn(true);
-    when(mockCommandLine.getOptionValue(GravitinoOptions.URI)).thenReturn("file:///tmp/file");
+    when(mockCommandLine.hasOption(GravitinoOptions.URIS)).thenReturn(true);
+    when(mockCommandLine.getOptionValue(GravitinoOptions.URIS)).thenReturn("n1=u1,n2=u2");
     when(mockCommandLine.hasOption(GravitinoOptions.ALIAS)).thenReturn(true);
     when(mockCommandLine.getOptionValues(GravitinoOptions.ALIAS))
         .thenReturn(new String[] {"aliasA", "aliasB"});
@@ -560,7 +560,7 @@ public class TestModelCommands {
             eq("catalog"),
             eq("schema"),
             eq("model"),
-            eq("file:///tmp/file"),
+            eq(ImmutableMap.of("n1", "u1", "n2", "u2")),
             argThat(
                 argument ->
                     argument.length == 2
@@ -783,7 +783,7 @@ public class TestModelCommands {
             new GravitinoCommandLine(
                 mockCommandLine, mockOptions, CommandEntities.MODEL, CommandActions.UPDATE));
 
-    Assertions.assertThrows(RuntimeException.class, commandLine::handleCommandLine);
+    assertThrows(RuntimeException.class, commandLine::handleCommandLine);
   }
 
   @Test
@@ -878,7 +878,7 @@ public class TestModelCommands {
             new GravitinoCommandLine(
                 mockCommandLine, mockOptions, CommandEntities.MODEL, CommandActions.SET));
 
-    Assertions.assertThrows(RuntimeException.class, commandLine::handleCommandLine);
+    assertThrows(RuntimeException.class, commandLine::handleCommandLine);
   }
 
   @Test
@@ -965,7 +965,7 @@ public class TestModelCommands {
             new GravitinoCommandLine(
                 mockCommandLine, mockOptions, CommandEntities.MODEL, CommandActions.REMOVE));
 
-    Assertions.assertThrows(RuntimeException.class, commandLine::handleCommandLine);
+    assertThrows(RuntimeException.class, commandLine::handleCommandLine);
   }
 
   @Test
@@ -1052,7 +1052,7 @@ public class TestModelCommands {
             new GravitinoCommandLine(
                 mockCommandLine, mockOptions, CommandEntities.MODEL, CommandActions.UPDATE));
 
-    Assertions.assertThrows(RuntimeException.class, commandLine::handleCommandLine);
+    assertThrows(RuntimeException.class, commandLine::handleCommandLine);
   }
 
   @Test
@@ -1144,6 +1144,27 @@ public class TestModelCommands {
             new GravitinoCommandLine(
                 mockCommandLine, mockOptions, CommandEntities.MODEL, CommandActions.UPDATE));
 
-    Assertions.assertThrows(RuntimeException.class, commandLine::handleCommandLine);
+    assertThrows(RuntimeException.class, commandLine::handleCommandLine);
+  }
+
+  @Test
+  void testUpdateModelVersionAliasesByNullAliasAndVersion() {
+    Main.useExit = false;
+    when(mockCommandLine.hasOption(GravitinoOptions.METALAKE)).thenReturn(true);
+    when(mockCommandLine.getOptionValue(GravitinoOptions.METALAKE)).thenReturn("metalake_demo");
+    when(mockCommandLine.hasOption(GravitinoOptions.ALIAS)).thenReturn(false);
+    when(mockCommandLine.getOptionValues(GravitinoOptions.ALIAS)).thenReturn(null);
+    when(mockCommandLine.hasOption(GravitinoOptions.VERSION)).thenReturn(false);
+    when(mockCommandLine.getOptionValue(GravitinoOptions.VERSION)).thenReturn(null);
+    when(mockCommandLine.hasOption(GravitinoOptions.NEW_ALIAS)).thenReturn(true);
+    when(mockCommandLine.getOptionValues(GravitinoOptions.NEW_ALIAS))
+        .thenReturn(new String[] {"aliasA", "aliasB"});
+
+    GravitinoCommandLine commandLine =
+        spy(
+            new GravitinoCommandLine(
+                mockCommandLine, mockOptions, CommandEntities.MODEL, CommandActions.UPDATE));
+
+    assertThrows(RuntimeException.class, commandLine::handleCommandLine);
   }
 }
