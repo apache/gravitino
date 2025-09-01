@@ -38,7 +38,7 @@ val scalaCollectionCompatVersion: String = libs.versions.scala.collection.compat
 
 dependencies {
   implementation(project(":catalogs:catalog-common")) {
-    exclude("org.apache.logging.log4j")
+    exclude("*")
   }
   implementation(libs.guava)
   implementation(libs.caffeine)
