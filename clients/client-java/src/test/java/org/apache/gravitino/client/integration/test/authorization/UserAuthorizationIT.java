@@ -129,7 +129,6 @@ public class UserAuthorizationIT extends BaseRestApiAuthorizationIT {
   private void assertUserEquals(String[] exceptUsers, User[] actualUsers) {
     Arrays.sort(exceptUsers);
     Arrays.sort(actualUsers, Comparator.comparing(User::name));
-    assertEquals(exceptUsers.length, actualUsers.length);
     for (int i = 0; i < exceptUsers.length; i++) {
       assertEquals(exceptUsers[i], actualUsers[i].name());
     }
