@@ -52,32 +52,28 @@ public class ClassLoaderResourceCleanerUtils {
       return;
     }
 
-    try {
-      // Clear statics threads in FileSystem and close all FileSystem instances.
-      closeStatsDataClearerInFileSystem(classLoader);
+    // Clear statics threads in FileSystem and close all FileSystem instances.
+    closeStatsDataClearerInFileSystem(classLoader);
 
-      // Stop all threads with the current class loader and clear their threadLocal variables for
-      // jetty threads that are loaded by the current class loader.
-      // For example, thread local `threadData` in FileSystem#StatisticsDataCleaner is created
-      // within jetty thread with the current class loader. However, there are clear by
-      // `catalog.close` in ForkJoinPool in CaffeineCache, in this case, the thread local variable
-      // will not be cleared, so we need to clear them manually here.
-      stopThreadsAndClearThreadLocalVariables(classLoader);
+    // Stop all threads with the current class loader and clear their threadLocal variables for
+    // jetty threads that are loaded by the current class loader.
+    // For example, thread local `threadData` in FileSystem#StatisticsDataCleaner is created
+    // within jetty thread with the current class loader. However, there are clear by
+    // `catalog.close` in ForkJoinPool in CaffeineCache, in this case, the thread local variable
+    // will not be cleared, so we need to clear them manually here.
+    stopThreadsAndClearThreadLocalVariables(classLoader);
 
-      // Release the LogFactory for the classloader, each classloader has its own LogFactory
-      // instance.
-      releaseLogFactoryInCommonLogging(classLoader);
+    // Release the LogFactory for the classloader, each classloader has its own LogFactory
+    // instance.
+    releaseLogFactoryInCommonLogging(classLoader);
 
-      closeResourceInAWS(classLoader);
+    closeResourceInAWS(classLoader);
 
-      closeResourceInGCP(classLoader);
+    closeResourceInGCP(classLoader);
 
-      closeResourceInAzure(classLoader);
+    closeResourceInAzure(classLoader);
 
-      clearShutdownHooks(classLoader);
-    } catch (Exception e) {
-      LOG.warn("Failed to clear resources(threads, thread local variables) in the class loader", e);
-    }
+    clearShutdownHooks(classLoader);
   }
 
   /**
