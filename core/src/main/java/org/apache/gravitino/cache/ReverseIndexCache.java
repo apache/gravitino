@@ -38,7 +38,7 @@ import org.apache.gravitino.meta.UserEntity;
  * efficiently store and retrieve relationships between entities based on their keys.
  */
 public class ReverseIndexCache {
-  private final RadixTree<EntityCacheKey> reverseIndex;
+  private RadixTree<EntityCacheKey> reverseIndex;
   /** Registers a reverse index processor for a specific entity class. */
   private final Map<Class<? extends Entity>, ReverseIndexRule> reverseIndexRules = new HashMap<>();
 
@@ -48,6 +48,10 @@ public class ReverseIndexCache {
     registerReverseRule(UserEntity.class, ReverseIndexRules.USER_REVERSE_RULE);
     registerReverseRule(GroupEntity.class, ReverseIndexRules.GROUP_REVERSE_RULE);
     registerReverseRule(RoleEntity.class, ReverseIndexRules.ROLE_REVERSE_RULE);
+  }
+
+  public void clean() {
+    this.reverseIndex = new ConcurrentRadixTree<>(new DefaultCharArrayNodeFactory());
   }
 
   public boolean remove(EntityCacheKey key) {
