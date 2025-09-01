@@ -171,18 +171,31 @@ public class MetadataFilterHelper {
         () -> {
           List<CompletableFuture<E>> futures = new ArrayList<>();
           for (E entity : entities) {
+            Principal currentPrincipal = PrincipalUtils.getCurrentPrincipal();
             futures.add(
                 CompletableFuture.supplyAsync(
-                    () -> {
-                      AuthorizationExpressionEvaluator authorizationExpressionEvaluator =
-                          new AuthorizationExpressionEvaluator(expression);
-                      NameIdentifier nameIdentifier = toNameIdentifier.apply(entity);
-                      Map<Entity.EntityType, NameIdentifier> nameIdentifierMap =
-                          spiltMetadataNames(metalake, entityType, nameIdentifier);
-                      return authorizationExpressionEvaluator.evaluate(nameIdentifierMap)
-                          ? entity
-                          : null;
-                    },
+                    RequestAuthorizationCache.threadLocalTransmitWrapper(
+                        () -> {
+                          try {
+                            return PrincipalUtils.doAs(
+                                currentPrincipal,
+                                () -> {
+                                  AuthorizationExpressionEvaluator
+                                      authorizationExpressionEvaluator =
+                                          new AuthorizationExpressionEvaluator(expression);
+                                  NameIdentifier nameIdentifier = toNameIdentifier.apply(entity);
+                                  Map<Entity.EntityType, NameIdentifier> nameIdentifierMap =
+                                      spiltMetadataNames(metalake, entityType, nameIdentifier);
+                                  return authorizationExpressionEvaluator.evaluate(
+                                          nameIdentifierMap)
+                                      ? entity
+                                      : null;
+                                });
+                          } catch (Exception e) {
+                            LOG.error("GravitinoAuthorize error:{}", e.getMessage(), e);
+                            return null;
+                          }
+                        }),
                     executor));
           }
           return futures.stream()
