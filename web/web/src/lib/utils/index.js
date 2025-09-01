@@ -63,6 +63,39 @@ export const genUpdates = (originalData, newData) => {
     updates.push({ '@type': 'updateUri', newUri: newData.uri })
   }
 
+  const originalUris = originalData.uris || {}
+  const newUris = newData.uris || {}
+
+  for (const key in originalUris) {
+    if (!(key in newUris)) {
+      updates.push({ '@type': 'removeUri', uriName: key })
+    }
+  }
+
+  for (const key in newUris) {
+    if (originalUris[key] !== newUris[key]) {
+      if (originalUris[key] === undefined) {
+        updates.push({ '@type': 'addUri', uriName: key, uri: newUris[key] })
+      } else {
+        updates.push({ '@type': 'updateUri', uriName: key, newUri: newUris[key] })
+      }
+    }
+  }
+
+  const originalAliases = originalData.aliases || []
+  const newAliases = newData.aliases || []
+
+  const aliasesToAdd = newAliases.filter(alias => !originalAliases.includes(alias))
+  const aliasesToRemove = originalAliases.filter(alias => !newAliases.includes(alias))
+
+  if (aliasesToAdd.length > 0 || aliasesToRemove.length > 0) {
+    updates.push({
+      '@type': 'updateAliases',
+      aliasesToAdd: aliasesToAdd,
+      aliasesToRemove: aliasesToRemove
+    })
+  }
+
   if (originalData.comment !== newData.comment) {
     updates.push({ '@type': 'updateComment', newComment: newData.comment })
   }
