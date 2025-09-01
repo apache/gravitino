@@ -152,6 +152,10 @@ public class SparkPartitionUtils {
         return Float.parseFloat(hivePartitionValue);
       } else if (dataType instanceof DecimalType) {
         return Decimal.apply(hivePartitionValue);
+      } else if (dataType instanceof VarcharType) {
+        return UTF8String.fromString(hivePartitionValue);
+      } else if (dataType instanceof CharType) {
+        return UTF8String.fromString(hivePartitionValue);
       } else {
         throw new UnsupportedOperationException("Unsupported partition type: " + dataType);
       }

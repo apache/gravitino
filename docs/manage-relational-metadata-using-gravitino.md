@@ -28,6 +28,8 @@ For more details, please refer to the related doc.
 - [**Apache Paimon**](./lakehouse-paimon-catalog.md)
 - [**Apache Hudi**](./lakehouse-hudi-catalog.md)
 
+If you want to operate table and partition statistics, you can refer to the [document](./manage-statistics-in-gravitino.md).
+
 Assuming:
 
  - Gravitino has just started, and the host and port is [http://localhost:8090](http://localhost:8090).

@@ -714,4 +714,24 @@ class TestFilesetCommands {
     // Should not throw exception when managed property is present
     Assertions.assertDoesNotThrow(spyCreateFileset::validate);
   }
+
+  @Test
+  void testUpdateFilesetCommandWithoutOptions() {
+    Main.useExit = false;
+
+    when(mockCommandLine.hasOption(GravitinoOptions.METALAKE)).thenReturn(true);
+    when(mockCommandLine.getOptionValue(GravitinoOptions.METALAKE)).thenReturn("metalake_demo");
+    when(mockCommandLine.hasOption(GravitinoOptions.NAME)).thenReturn(true);
+    when(mockCommandLine.getOptionValue(GravitinoOptions.NAME))
+        .thenReturn("catalog.schema.fileset");
+
+    GravitinoCommandLine commandLine =
+        new GravitinoCommandLine(
+            mockCommandLine, mockOptions, CommandEntities.FILESET, CommandActions.UPDATE);
+
+    assertThrows(RuntimeException.class, commandLine::handleCommandLine);
+    String errOutput = new String(errContent.toByteArray(), StandardCharsets.UTF_8).trim();
+
+    assertEquals(ErrorMessages.MISSING_COMMENT_AND_RENAME, errOutput);
+  }
 }

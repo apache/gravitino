@@ -224,11 +224,15 @@ public class FilesetOperations {
   @Produces("application/vnd.gravitino.v1+json")
   @Timed(name = "list-fileset-files." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "list-fileset-files", absolute = true)
+  @AuthorizationExpression(
+      expression = loadFilesetAuthorizationExpression,
+      accessMetadataType = MetadataObject.Type.FILESET)
   public Response listFiles(
-      @PathParam("metalake") String metalake,
-      @PathParam("catalog") String catalog,
-      @PathParam("schema") String schema,
-      @PathParam("fileset") String fileset,
+      @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
+          String metalake,
+      @PathParam("catalog") @AuthorizationMetadata(type = Entity.EntityType.CATALOG) String catalog,
+      @PathParam("schema") @AuthorizationMetadata(type = Entity.EntityType.SCHEMA) String schema,
+      @PathParam("fileset") @AuthorizationMetadata(type = Entity.EntityType.FILESET) String fileset,
       @QueryParam("sub_path") @DefaultValue("/") String subPath,
       @QueryParam("location_name") String locationName)
       throws UnsupportedEncodingException {
