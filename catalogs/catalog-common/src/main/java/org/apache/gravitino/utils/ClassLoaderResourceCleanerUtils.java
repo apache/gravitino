@@ -53,7 +53,8 @@ public class ClassLoaderResourceCleanerUtils {
     }
 
     // Clear statics threads in FileSystem and close all FileSystem instances.
-    closeStatsDataClearerInFileSystem(classLoader);
+    executeAndCatch(
+        ClassLoaderResourceCleanerUtils::closeStatsDataClearerInFileSystem, classLoader);
 
     // Stop all threads with the current class loader and clear their threadLocal variables for
     // jetty threads that are loaded by the current class loader.
@@ -61,19 +62,20 @@ public class ClassLoaderResourceCleanerUtils {
     // within jetty thread with the current class loader. However, there are clear by
     // `catalog.close` in ForkJoinPool in CaffeineCache, in this case, the thread local variable
     // will not be cleared, so we need to clear them manually here.
-    stopThreadsAndClearThreadLocalVariables(classLoader);
+    executeAndCatch(
+        ClassLoaderResourceCleanerUtils::stopThreadsAndClearThreadLocalVariables, classLoader);
 
     // Release the LogFactory for the classloader, each classloader has its own LogFactory
     // instance.
-    releaseLogFactoryInCommonLogging(classLoader);
+    executeAndCatch(ClassLoaderResourceCleanerUtils::releaseLogFactoryInCommonLogging, classLoader);
 
-    closeResourceInAWS(classLoader);
+    executeAndCatch(ClassLoaderResourceCleanerUtils::closeResourceInAWS, classLoader);
 
-    closeResourceInGCP(classLoader);
+    executeAndCatch(ClassLoaderResourceCleanerUtils::closeResourceInGCP, classLoader);
 
-    closeResourceInAzure(classLoader);
+    executeAndCatch(ClassLoaderResourceCleanerUtils::closeResourceInAzure, classLoader);
 
-    clearShutdownHooks(classLoader);
+    executeAndCatch(ClassLoaderResourceCleanerUtils::clearShutdownHooks, classLoader);
   }
 
   /**
@@ -81,34 +83,27 @@ public class ClassLoaderResourceCleanerUtils {
    *
    * @param targetClassLoader the classloader where Hadoop FileSystem is loaded
    */
-  private static void closeStatsDataClearerInFileSystem(ClassLoader targetClassLoader) {
-    try {
-      Class<?> fileSystemClass =
-          Class.forName("org.apache.hadoop.fs.FileSystem", true, targetClassLoader);
-      MethodUtils.invokeStaticMethod(fileSystemClass, "closeAll");
+  private static void closeStatsDataClearerInFileSystem(ClassLoader targetClassLoader)
+      throws Exception {
+    Class<?> fileSystemClass =
+        Class.forName("org.apache.hadoop.fs.FileSystem", true, targetClassLoader);
+    MethodUtils.invokeStaticMethod(fileSystemClass, "closeAll");
 
-      Class<?> mutableQuantilesClass =
-          Class.forName("org.apache.hadoop.metrics2.lib.MutableQuantiles", true, targetClassLoader);
-      Class<?> statisticsClass =
-          Class.forName("org.apache.hadoop.fs.FileSystem$Statistics", true, targetClassLoader);
+    Class<?> mutableQuantilesClass =
+        Class.forName("org.apache.hadoop.metrics2.lib.MutableQuantiles", true, targetClassLoader);
+    Class<?> statisticsClass =
+        Class.forName("org.apache.hadoop.fs.FileSystem$Statistics", true, targetClassLoader);
 
-      ScheduledExecutorService scheduler =
-          (ScheduledExecutorService)
-              FieldUtils.readStaticField(mutableQuantilesClass, "scheduler", true);
-      scheduler.shutdownNow();
-      Field statisticsCleanerField =
-          FieldUtils.getField(statisticsClass, "STATS_DATA_CLEANER", true);
-      Object statisticsCleaner = statisticsCleanerField.get(null);
-      if (statisticsCleaner != null) {
-        ((Thread) statisticsCleaner).interrupt();
-        ((Thread) statisticsCleaner).setContextClassLoader(null);
-        ((Thread) statisticsCleaner).join();
-      }
-    } catch (Exception e) {
-      LOG.warn(
-          "Failed to close FileSystem and MutableQuantiles statistics cleaner in {}",
-          targetClassLoader,
-          e);
+    ScheduledExecutorService scheduler =
+        (ScheduledExecutorService)
+            FieldUtils.readStaticField(mutableQuantilesClass, "scheduler", true);
+    scheduler.shutdownNow();
+    Field statisticsCleanerField = FieldUtils.getField(statisticsClass, "STATS_DATA_CLEANER", true);
+    Object statisticsCleaner = statisticsCleanerField.get(null);
+    if (statisticsCleaner != null) {
+      ((Thread) statisticsCleaner).interrupt();
+      ((Thread) statisticsCleaner).setContextClassLoader(null);
+      ((Thread) statisticsCleaner).join();
     }
   }
 
@@ -205,23 +200,18 @@ public class ClassLoaderResourceCleanerUtils {
    *
    * @param targetClassLoader the classloader where the shutdown hooks are registered.
    */
-  private static void clearShutdownHooks(ClassLoader targetClassLoader) {
-    try {
-      Class<?> shutdownHooks = Class.forName("java.lang.ApplicationShutdownHooks");
-      IdentityHashMap<Thread, Thread> hooks =
-          (IdentityHashMap<Thread, Thread>)
-              FieldUtils.readStaticField(shutdownHooks, "hooks", true);
+  private static void clearShutdownHooks(ClassLoader targetClassLoader) throws Exception {
+    Class<?> shutdownHooks = Class.forName("java.lang.ApplicationShutdownHooks");
+    IdentityHashMap<Thread, Thread> hooks =
+        (IdentityHashMap<Thread, Thread>) FieldUtils.readStaticField(shutdownHooks, "hooks", true);
 
-      hooks
-          .entrySet()
-          .removeIf(
-              entry -> {
-                Thread thread = entry.getKey();
-                return thread.getContextClassLoader() == targetClassLoader;
-              });
-    } catch (Exception e) {
-      LOG.warn("Failed to clean shutdown hooks", e);
-    }
+    hooks
+        .entrySet()
+        .removeIf(
+            entry -> {
+              Thread thread = entry.getKey();
+              return thread.getContextClassLoader() == targetClassLoader;
+            });
   }
 
   /**
@@ -229,15 +219,12 @@ public class ClassLoaderResourceCleanerUtils {
    *
    * @param currentClassLoader the classloader where the commons-logging is loaded.
    */
-  private static void releaseLogFactoryInCommonLogging(ClassLoader currentClassLoader) {
+  private static void releaseLogFactoryInCommonLogging(ClassLoader currentClassLoader)
+      throws Exception {
     // Release the LogFactory for the FilesetCatalogOperations class loader
-    try {
-      Class<?> logFactoryClass =
-          Class.forName("org.apache.commons.logging.LogFactory", true, currentClassLoader);
-      MethodUtils.invokeStaticMethod(logFactoryClass, "release", currentClassLoader);
-    } catch (Exception e) {
-      LOG.warn("Failed to release LogFactory for class loader {}", currentClassLoader, e);
-    }
+    Class<?> logFactoryClass =
+        Class.forName("org.apache.commons.logging.LogFactory", true, currentClassLoader);
+    MethodUtils.invokeStaticMethod(logFactoryClass, "release", currentClassLoader);
   }
 
   /**
@@ -245,30 +232,21 @@ public class ClassLoaderResourceCleanerUtils {
    *
    * @param classLoader the classloader where AWS SDK is loaded
    */
-  private static void closeResourceInAWS(ClassLoader classLoader) {
+  private static void closeResourceInAWS(ClassLoader classLoader) throws Exception {
     // For Aws SDK metrics, unregister the metric admin MBean
-    try {
-      Class<?> awsSdkMetricsClass =
-          Class.forName("com.amazonaws.metrics.AwsSdkMetrics", true, classLoader);
-      MethodUtils.invokeStaticMethod(awsSdkMetricsClass, "unregisterMetricAdminMBean");
-    } catch (Exception e) {
-      LOG.warn(
-          "Failed to unregister AWS SDK metrics admin MBean from class loader {}", classLoader, e);
-    }
+    Class<?> awsSdkMetricsClass =
+        Class.forName("com.amazonaws.metrics.AwsSdkMetrics", true, classLoader);
+    MethodUtils.invokeStaticMethod(awsSdkMetricsClass, "unregisterMetricAdminMBean");
   }
 
-  private static void closeResourceInGCP(ClassLoader classLoader) {
+  private static void closeResourceInGCP(ClassLoader classLoader) throws Exception {
     // For GCS
-    try {
-      Class<?> relocatedLogFactory =
-          Class.forName(
-              "org.apache.gravitino.gcp.shaded.org.apache.commons.logging.LogFactory",
-              true,
-              classLoader);
-      MethodUtils.invokeStaticMethod(relocatedLogFactory, "release", classLoader);
-    } catch (Exception e) {
-      LOG.warn("Failed to find GCS shaded LogFactory in class loader {}", classLoader, e);
-    }
+    Class<?> relocatedLogFactory =
+        Class.forName(
+            "org.apache.gravitino.gcp.shaded.org.apache.commons.logging.LogFactory",
+            true,
+            classLoader);
+    MethodUtils.invokeStaticMethod(relocatedLogFactory, "release", classLoader);
   }
 
   /**
@@ -280,37 +258,46 @@ public class ClassLoaderResourceCleanerUtils {
    *
    * @param classLoader the classloader where Azure Blob File System is loaded
    */
-  private static void closeResourceInAzure(ClassLoader classLoader) {
+  private static void closeResourceInAzure(ClassLoader classLoader) throws Exception {
+    // Clear timer in AbfsClientThrottlingAnalyzer
+    Class<?> abfsClientThrottlingInterceptClass =
+        Class.forName(
+            "org.apache.hadoop.fs.azurebfs.services.AbfsClientThrottlingIntercept",
+            true,
+            classLoader);
+    Object abfsClientThrottlingIntercept =
+        FieldUtils.readStaticField(abfsClientThrottlingInterceptClass, "singleton", true);
+
+    Object readThrottler =
+        FieldUtils.readField(abfsClientThrottlingIntercept, "readThrottler", true);
+    Object writeThrottler =
+        FieldUtils.readField(abfsClientThrottlingIntercept, "writeThrottler", true);
+
+    Timer readTimer = (Timer) FieldUtils.readField(readThrottler, "timer", true);
+    readTimer.cancel();
+    Timer writeTimer = (Timer) FieldUtils.readField(writeThrottler, "timer", true);
+    writeTimer.cancel();
+
+    // Release the LogFactory for the Azure shaded commons logging which has been relocated
+    // by the Azure SDK
+    Class<?> relocatedLogFactory =
+        Class.forName(
+            "org.apache.gravitino.azure.shaded.org.apache.commons.logging.LogFactory",
+            true,
+            classLoader);
+    MethodUtils.invokeStaticMethod(relocatedLogFactory, "release", classLoader);
+  }
+
+  @FunctionalInterface
+  private interface ThrowableConsumer<T> {
+    void accept(T t) throws Exception;
+  }
+
+  private static <T> void executeAndCatch(ThrowableConsumer<T> consumer, T value) {
     try {
-      // Clear timer in AbfsClientThrottlingAnalyzer
-      Class<?> abfsClientThrottlingInterceptClass =
-          Class.forName(
-              "org.apache.hadoop.fs.azurebfs.services.AbfsClientThrottlingIntercept",
-              true,
-              classLoader);
-      Object abfsClientThrottlingIntercept =
-          FieldUtils.readStaticField(abfsClientThrottlingInterceptClass, "singleton", true);
-
-      Object readThrottler =
-          FieldUtils.readField(abfsClientThrottlingIntercept, "readThrottler", true);
-      Object writeThrottler =
-          FieldUtils.readField(abfsClientThrottlingIntercept, "writeThrottler", true);
-
-      Timer readTimer = (Timer) FieldUtils.readField(readThrottler, "timer", true);
-      readTimer.cancel();
-      Timer writeTimer = (Timer) FieldUtils.readField(writeThrottler, "timer", true);
-      writeTimer.cancel();
-
-      // Release the LogFactory for the Azure shaded commons logging which has been relocated
-      // by the Azure SDK
-      Class<?> relocatedLogFactory =
-          Class.forName(
-              "org.apache.gravitino.azure.shaded.org.apache.commons.logging.LogFactory",
-              true,
-              classLoader);
-      MethodUtils.invokeStaticMethod(relocatedLogFactory, "release", classLoader);
+      consumer.accept(value);
     } catch (Exception e) {
-      LOG.warn("Failed to handle Azure file system in class loader {}", classLoader, e);
+      LOG.warn("Failed to execute consumer: ", e);
     }
   }
 }
