@@ -80,9 +80,9 @@ public class ReverseIndexCache {
     String strEntityCacheKey = entityCacheKey.toString();
     List<EntityCacheKey> entityKeys =
         Lists.newArrayList(reverseIndex.getValuesForKeysStartingWith(strEntityCacheKey));
-    String strEntityCacheKeyNo =
+    String strEntityCacheKeySerialNumber =
         String.format("%s-%d", strEntityCacheKey, entityKeys.size());
-    reverseIndex.put(strEntityCacheKeyNo, key);
+    reverseIndex.put(strEntityCacheKeySerialNumber, key);
   }
 
   public void put(Entity entity, EntityCacheRelationKey key) {
