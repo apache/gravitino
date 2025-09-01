@@ -48,7 +48,6 @@ import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.GroupEntity;
 import org.apache.gravitino.meta.RoleEntity;
 import org.apache.gravitino.meta.UserEntity;
-import org.apache.gravitino.storage.relational.RelationalEntityStore;
 import org.apache.gravitino.utils.NamespaceUtil;
 import org.apache.gravitino.utils.PrincipalUtils;
 import org.glassfish.jersey.internal.guava.Sets;
@@ -89,11 +88,12 @@ class PermissionManager {
                 if (store instanceof EntityCache) {
                   EntityCache cache = (EntityCache) store;
                   roles.forEach(
-                          roleName -> {
-                            Namespace namespaceRole = NamespaceUtil.ofRole(metalake);
-                            NameIdentifier nameIdentifierRole = NameIdentifier.of(namespaceRole, roleName);
-                            cache.invalidate(nameIdentifierRole, Entity.EntityType.ROLE);
-                          });
+                      roleName -> {
+                        Namespace namespaceRole = NamespaceUtil.ofRole(metalake);
+                        NameIdentifier nameIdentifierRole =
+                            NameIdentifier.of(namespaceRole, roleName);
+                        cache.invalidate(nameIdentifierRole, Entity.EntityType.ROLE);
+                      });
                 }
 
                 List<RoleEntity> roleEntities = Lists.newArrayList();

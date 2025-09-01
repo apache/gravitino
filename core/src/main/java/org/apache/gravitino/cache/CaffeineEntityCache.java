@@ -33,7 +33,6 @@ import java.io.IOException;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Queue;
@@ -47,8 +46,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
-import java.util.stream.StreamSupport;
-import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.Entity;
@@ -86,14 +83,10 @@ public class CaffeineEntityCache extends BaseEntityCache {
   /** Cache data structure. */
   private final Cache<EntityCacheRelationKey, List<Entity>> cacheData;
 
-  /**
-   * Cache reverse index structure.
-   */
+  /** Cache reverse index structure. */
   private ReverseIndexCache reverseIndex;
 
-  /**
-   * Cache Index structure.
-   */
+  /** Cache Index structure. */
   private RadixTree<EntityCacheRelationKey> cacheIndex;
 
   private ScheduledExecutorService scheduler;
@@ -300,8 +293,7 @@ public class CaffeineEntityCache extends BaseEntityCache {
    * @param newEntities The new entities to sync to the cache.
    */
   private void syncEntitiesToCache(EntityCacheRelationKey key, List<Entity> newEntities) {
-    if (key.relationType() != null)
-      return;
+    if (key.relationType() != null) return;
 
     List<Entity> existingEntities = cacheData.getIfPresent(key);
 

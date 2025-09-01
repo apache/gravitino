@@ -43,7 +43,6 @@ import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.tag.SupportsTagOperations;
 import org.apache.gravitino.utils.Executable;
-import org.apache.gravitino.utils.NamespaceUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
