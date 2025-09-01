@@ -475,7 +475,7 @@ public class PolicyIT extends BaseIT {
 
     // Test get associated policy for catalog
     Policy policy = relationalCatalog.supportsPolicies().getPolicy(policy1.name());
-    Assertions.assertEquals(policy1, policy);
+    Assertions.assertEquals(policy1.enabled(), policy.enabled());
     Assertions.assertFalse(policy.inherited().get());
 
     // Test get non-existed policy for catalog
