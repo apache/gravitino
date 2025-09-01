@@ -89,8 +89,7 @@ public class ReverseIndexCache {
     Preconditions.checkArgument(entity != null, "EntityCacheRelationKey cannot be null");
 
     if (entity instanceof HasIdentifier) {
-      NameIdentifier nameIdent =
-          NameIdentifier.of(((HasIdentifier) entity).namespace(), ((HasIdentifier) entity).name());
+      NameIdentifier nameIdent = ((HasIdentifier) entity).nameIdentifier();
       put(nameIdent, entity.type(), key);
     }
   }
