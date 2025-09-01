@@ -207,7 +207,7 @@ public class CaffeineEntityCache extends BaseEntityCache {
     withLock(
         () -> {
           cacheData.invalidateAll();
-          reverseIndex = new ReverseIndexCache();
+          reverseIndex.clean();
           cacheIndex = new ConcurrentRadixTree<>(new DefaultCharArrayNodeFactory());
         });
   }
@@ -351,67 +351,6 @@ public class CaffeineEntityCache extends BaseEntityCache {
     }
 
     return (Caffeine<KEY, VALUE>) builder;
-  }
-
-  /**
-   * Invalidates the entities by the given cache key.
-   *
-   * @param identifier The identifier of the entity to invalidate
-   */
-  private boolean invalidateEntitiesOld(NameIdentifier identifier) {
-    List<EntityCacheKey> entityKeysToRemove =
-        Lists.newArrayList(cacheIndex.getValuesForKeysStartingWith(identifier.toString()));
-
-    Map<EntityCacheRelationKey, List<Entity>> relationEnitiesMap =
-        cacheData.getAllPresent(entityKeysToRemove);
-
-    // first invalidate this entity
-    EntityCacheKey currentKey = cacheIndex.getValueForExactKey(identifier.toString());
-    if (currentKey != null) {
-      // already removed
-      cacheData.invalidate(currentKey);
-      cacheIndex.remove(currentKey.toString());
-    }
-
-    // Remove child entities
-    relationEnitiesMap.forEach(
-        (key, entities) -> {
-          if (key.relationType() == null) {
-            // If the relation type is null, it means it's a single entity, we can skip it.
-            return;
-          }
-          entities.forEach(
-              entity -> {
-                NameIdentifier child = ((HasIdentifier) entity).nameIdentifier();
-                if (!child.equals(identifier)) {
-                  invalidateEntitiesOld(child);
-                }
-              });
-        });
-
-    // Remove relation entities by reverse index
-    List<EntityCacheKey> reverseKeysToRemove =
-        Lists.newArrayList(reverseIndex.getValuesForKeysStartingWith(identifier.toString()));
-    reverseKeysToRemove.forEach(
-        key -> {
-          // If the key is the same as the entity key, we can remove it from the cache.
-          cacheData.invalidate(key);
-          cacheIndex.remove(key.toString());
-          // Remove from reverse index
-          // Convert EntityCacheRelationKey to EntityCacheKey
-          EntityCacheKey reverseKey = EntityCacheKey.of(key.identifier(), key.entityType());
-          reverseIndex
-              .getKeysStartingWith(reverseKey.toString())
-              .forEach(
-                  reverseIndexKey -> {
-                    reverseIndex.remove(reverseIndexKey.toString());
-                  });
-        });
-
-    cacheData.invalidateAll(entityKeysToRemove);
-    entityKeysToRemove.forEach(key -> cacheIndex.remove(key.toString()));
-
-    return !entityKeysToRemove.isEmpty();
   }
 
   /**
