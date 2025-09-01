@@ -244,9 +244,6 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
               catalog = null;
               return null;
             });
-        // Let hooks close first before classLoader close, so that the hook can
-        // release any resources that the catalog might be using.
-        Thread.sleep(500);
       } catch (Exception e) {
         LOG.warn("Failed to close catalog", e);
       }
