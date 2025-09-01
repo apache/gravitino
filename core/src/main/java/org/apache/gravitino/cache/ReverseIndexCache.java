@@ -66,6 +66,10 @@ public class ReverseIndexCache {
     return reverseIndex.remove(key);
   }
 
+  public int size() {
+    return reverseIndex.size();
+  }
+
   public void put(
       NameIdentifier nameIdentifier, Entity.EntityType type, EntityCacheRelationKey key) {
     EntityCacheKey entityCacheKey = EntityCacheKey.of(nameIdentifier, type);

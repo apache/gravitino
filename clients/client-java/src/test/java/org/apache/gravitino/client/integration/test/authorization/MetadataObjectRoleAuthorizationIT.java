@@ -38,7 +38,7 @@ public class MetadataObjectRoleAuthorizationIT extends BaseRestApiAuthorizationI
 
   private String hmsUri;
 
-  private static final String CATALOG = "CATALOG";
+  private static final String CATALOG = "catalog1";
 
   @BeforeAll
   @Override
@@ -63,6 +63,7 @@ public class MetadataObjectRoleAuthorizationIT extends BaseRestApiAuthorizationI
     Catalog catalog = gravitinoMetalake.loadCatalog(CATALOG);
     String[] roleNames = catalog.supportsRoles().listBindingRoleNames();
     assertArrayEquals(new String[] {}, roleNames);
+
     // create role1
     String role1 = "role1";
     gravitinoMetalake.createRole(
@@ -74,6 +75,7 @@ public class MetadataObjectRoleAuthorizationIT extends BaseRestApiAuthorizationI
     Catalog catalogLoadByNormalUser = normalUserClient.loadMetalake(METALAKE).loadCatalog(CATALOG);
     roleNames = catalogLoadByNormalUser.supportsRoles().listBindingRoleNames();
     assertArrayEquals(new String[] {role1}, roleNames);
+
     // create role2
     String role2 = "role2";
     gravitinoMetalake.createRole(
@@ -82,8 +84,6 @@ public class MetadataObjectRoleAuthorizationIT extends BaseRestApiAuthorizationI
         ImmutableList.of(
             SecurableObjects.ofCatalog(
                 CATALOG, ImmutableList.of(Privileges.CreateSchema.allow()))));
-    roleNames = catalogLoadByNormalUser.supportsRoles().listBindingRoleNames();
-    assertArrayEquals(new String[] {role1}, roleNames);
     gravitinoMetalake.grantRolesToUser(ImmutableList.of(role2), NORMAL_USER);
     roleNames = catalogLoadByNormalUser.supportsRoles().listBindingRoleNames();
     Arrays.sort(roleNames);

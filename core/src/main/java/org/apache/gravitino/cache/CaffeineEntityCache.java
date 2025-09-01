@@ -300,6 +300,9 @@ public class CaffeineEntityCache extends BaseEntityCache {
    * @param newEntities The new entities to sync to the cache.
    */
   private void syncEntitiesToCache(EntityCacheRelationKey key, List<Entity> newEntities) {
+    if (key.relationType() != null)
+      return;
+
     List<Entity> existingEntities = cacheData.getIfPresent(key);
 
     if (existingEntities != null && key.relationType() != null) {
