@@ -29,13 +29,13 @@ import org.apache.gravitino.EntityAlreadyExistsException;
  * href="https://www.postgresql.org/docs/8.4/errcodes-appendix.html">error code of PostgreSQL</a>
  */
 public class PostgreSQLExceptionConverter implements SQLExceptionConverter {
-  private static final int DUPLICATED_ENTRY_ERROR_CODE = 23505;
+  private static final String DUPLICATED_ENTRY_ERROR_CODE = "23505";
 
   @Override
   @SuppressWarnings("FormatStringAnnotation")
   public void toGravitinoException(SQLException sqlException, Entity.EntityType type, String name)
       throws IOException {
-    int errorCode = Integer.valueOf(sqlException.getSQLState());
+    String errorCode = sqlException.getSQLState();
     switch (errorCode) {
       case DUPLICATED_ENTRY_ERROR_CODE:
         throw new EntityAlreadyExistsException(

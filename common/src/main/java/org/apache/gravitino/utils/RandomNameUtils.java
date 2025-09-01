@@ -20,6 +20,7 @@
 package org.apache.gravitino.utils;
 
 import java.util.UUID;
+import org.apache.commons.lang3.StringUtils;
 
 /** Tools to generate random values. */
 public class RandomNameUtils {
@@ -34,6 +35,9 @@ public class RandomNameUtils {
    * @return A random string value.
    */
   public static String genRandomName(String prefix) {
+    if (StringUtils.isBlank(prefix)) {
+      throw new IllegalArgumentException("Prefix cannot be null or empty");
+    }
     return prefix + "_" + UUID.randomUUID().toString().replace("-", "").substring(0, 8);
   }
 }

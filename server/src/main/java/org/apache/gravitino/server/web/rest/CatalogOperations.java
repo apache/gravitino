@@ -333,9 +333,10 @@ public class CatalogOperations {
             boolean dropped = catalogDispatcher.dropCatalog(ident, force);
             if (!dropped) {
               LOG.warn("Failed to drop catalog {} under metalake {}", catalogName, metalakeName);
+            } else {
+              LOG.info("Catalog dropped: {}.{}", metalakeName, catalogName);
             }
             Response response = Utils.ok(new DropResponse(dropped));
-            LOG.info("Catalog dropped: {}.{}", metalakeName, catalogName);
             return response;
           });
     } catch (Exception e) {

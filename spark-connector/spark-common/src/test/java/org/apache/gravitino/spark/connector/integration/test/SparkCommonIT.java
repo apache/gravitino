@@ -125,9 +125,9 @@ public abstract class SparkCommonIT extends SparkEnvIT {
 
   protected abstract boolean supportsUpdateColumnPosition();
 
-  // @todo temporarily added for: https://github.com/apache/gravitino/issues/6907, should be removed
-  // after the issue is addressed
-  protected abstract boolean supportListTable();
+  protected boolean supportsCreateTableWithComment() {
+    return true;
+  }
 
   protected SparkTableInfoChecker getTableInfoChecker() {
     return SparkTableInfoChecker.create();
@@ -184,7 +184,6 @@ public abstract class SparkCommonIT extends SparkEnvIT {
   }
 
   @Test
-  @EnabledIf("supportListTable")
   void testListTables() {
     String tableName = "t_list";
     dropTableIfExists(tableName);
@@ -323,6 +322,7 @@ public abstract class SparkCommonIT extends SparkEnvIT {
   }
 
   @Test
+  @EnabledIf("supportsCreateTableWithComment")
   void testCreateTableWithComment() {
     String tableName = "comment_table";
     dropTableIfExists(tableName);
@@ -383,7 +383,6 @@ public abstract class SparkCommonIT extends SparkEnvIT {
   }
 
   @Test
-  @EnabledIf("supportListTable")
   void testListTable() {
     String table1 = "list1";
     String table2 = "list2";

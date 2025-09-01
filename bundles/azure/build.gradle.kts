@@ -26,12 +26,13 @@ plugins {
 
 dependencies {
   compileOnly(project(":api"))
-  compileOnly(project(":catalogs:catalog-fileset"))
-  compileOnly(project(":core"))
   compileOnly(libs.hadoop3.abs)
   compileOnly(libs.hadoop3.client.api)
   compileOnly(libs.hadoop3.client.runtime)
 
+  implementation(project(":common")) {
+    exclude("*")
+  }
   implementation(project(":catalogs:catalog-common")) {
     exclude("*")
   }

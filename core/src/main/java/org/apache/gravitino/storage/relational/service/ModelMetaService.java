@@ -137,7 +137,7 @@ public class ModelMetaService {
         // delete model meta
         () ->
             modelDeletedCount.set(
-                SessionUtils.doWithoutCommitAndFetchResult(
+                SessionUtils.getWithoutCommit(
                     ModelMetaMapper.class,
                     mapper ->
                         mapper.softDeleteModelMetaBySchemaIdAndModelName(schemaId, ident.name()))),
@@ -260,7 +260,7 @@ public class ModelMetaService {
                       POConverters.updateModelPO(oldModelPO, newEntity), oldModelPO));
     } catch (RuntimeException re) {
       ExceptionUtils.checkSQLException(
-          re, Entity.EntityType.CATALOG, newEntity.nameIdentifier().toString());
+          re, Entity.EntityType.MODEL, newEntity.nameIdentifier().toString());
       throw re;
     }
 
