@@ -554,6 +554,10 @@ catalog.as_model_catalog().link_model_version(model_ident=NameIdentifier.of("mod
 The comment and properties of ModelVersion can be different from the model.
 
 You can also link a ModelVersion with multiple model URIs. The URIs is a map of URI name to URI. 
+
+If you associate only one URI with a ModelVersion and do not specify a URI name
+(as introduced in the previous paragraph), Gravitino will automatically generate a default URI name "unknown".
+
 The following is an example of linking a ModelVersion with multiple model URIs:
 
 <Tabs groupId="language" queryString>
@@ -722,6 +726,47 @@ catalog.as_model_catalog().get_model_version_uri(model_ident=NameIdentifier.of("
 </TabItem>
 </Tabs>
 
+The param `uriName` is not required. If it is not specified, Gravitino will obtain 
+the corresponding URI based on the `default-uri-name` property set in the Model or ModelVersion.
+You can refer to [Model Properties](./model-catalog.md#Model properties) and
+[ModelVersion properties](./model-catalog.md#ModelVersion properties) for more details.
+If the `default-uri-name` property is not set in either the model or the model version, 
+an `IllegalArgumentException` will be thrown.
+
+The following is an example of getting the URI of a ModelVersion without specifying the uriName:
+
+<Tabs groupId="language" queryString>
+<TabItem value="shell" label="Shell">
+
+```shell
+curl -X GET -H "Accept: application/vnd.gravitino.v1+json" \
+-H "Content-Type: application/json" \
+http://localhost:8090/api/metalakes/example/catalogs/model_catalog/schemas/model_schema/models/example_model/versions/0/uri
+```
+
+</TabItem>
+<TabItem value="java" label="Java">
+
+```java
+// ...
+Catalog catalog = gravitinoClient.loadCatalog("model_catalog");
+catalog.asModelCatalog().getModelVersionUri(NameIdentifier.of("model_schema", "example_model"), 0, null);
+// ...
+```
+
+</TabItem>
+<TabItem value="python" label="Python">
+
+```python
+gravitino_client: GravitinoClient = GravitinoClient(uri="http://localhost:8090", metalake_name="example")
+
+catalog: Catalog = gravitino_client.load_catalog(name="model_catalog")
+catalog.as_model_catalog().get_model_version_uri(model_ident=NameIdentifier.of("model_schema", "example_model"), version=0)
+```
+
+</TabItem>
+</Tabs>
+
 ### Get ModelVersion URI by alias
 
 You can also get the URI of a ModelVersion by sending a `GET` request to the `/api/metalakes/{metalake_name}
@@ -756,6 +801,41 @@ gravitino_client: GravitinoClient = GravitinoClient(uri="http://localhost:8090",
 
 catalog: Catalog = gravitino_client.load_catalog(name="model_catalog")
 catalog.as_model_catalog().get_model_version_uri_by_alias(model_ident=NameIdentifier.of("model_schema", "example_model"), alias="alias1", uri_name="s3")
+```
+
+</TabItem>
+</Tabs>
+
+Similarly, The param `uriName` is not required.
+The following is an example of getting the URI of a ModelVersion by alias without specifying the uriName:
+
+<Tabs groupId="language" queryString>
+<TabItem value="shell" label="Shell">
+
+```shell
+curl -X GET -H "Accept: application/vnd.gravitino.v1+json" \
+-H "Content-Type: application/json" \
+http://localhost:8090/api/metalakes/example/catalogs/model_catalog/schemas/model_schema/models/example_model/aliases/alias1/uri
+```
+
+</TabItem>
+<TabItem value="java" label="Java">
+
+```java
+// ...
+Catalog catalog = gravitinoClient.loadCatalog("model_catalog");
+catalog.asModelCatalog().getModelVersionUri(NameIdentifier.of("model_schema", "example_model"), "alias", null);
+// ...
+```
+
+</TabItem>
+<TabItem value="python" label="Python">
+
+```python
+gravitino_client: GravitinoClient = GravitinoClient(uri="http://localhost:8090", metalake_name="example")
+
+catalog: Catalog = gravitino_client.load_catalog(name="model_catalog")
+catalog.as_model_catalog().get_model_version_uri_by_alias(model_ident=NameIdentifier.of("model_schema", "example_model"), alias="alias1")
 ```
 
 </TabItem>
