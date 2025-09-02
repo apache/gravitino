@@ -199,7 +199,7 @@ public class MetadataFilterHelper {
                     executor));
           }
           return futures.stream()
-              .map(CompletableFuture::join) // 获取每个结果
+              .map(CompletableFuture::join)
               .filter(Objects::nonNull)
               .toArray(
                   size -> (E[]) Array.newInstance(entities.getClass().getComponentType(), size));
