@@ -105,7 +105,6 @@ public class TestJcasbinAuthorizer {
   @BeforeAll
   public static void setup() throws IOException {
     OwnerMetaService ownerMetaService = mock(OwnerMetaService.class);
-    when(ownerMetaService.countAllOwner()).thenReturn(0L);
     ownerMetaServiceMockedStatic = mockStatic(OwnerMetaService.class);
     ownerMetaServiceMockedStatic.when(OwnerMetaService::getInstance).thenReturn(ownerMetaService);
     jcasbinAuthorizer = new JcasbinAuthorizer();

@@ -196,24 +196,4 @@ public class OwnerMetaBaseSQLProvider {
         + OWNER_TABLE_NAME
         + " WHERE deleted_at > 0 AND deleted_at < #{legacyTimeline} LIMIT #{limit}";
   }
-
-  public String selectAllOwner(@Param("skipNum") Long skipNum, @Param("fetchNum") Long fetchNum) {
-    return "SELECT "
-        + "id as id,"
-        + "metalake_id as metalakeId,"
-        + "owner_id as ownerId,"
-        + "owner_type as OwnerType,"
-        + "metadata_object_id as metadataObjectId,"
-        + "metadata_object_type as metadataObjectType,"
-        + " audit_info as auditInfo,"
-        + "current_version as currentVersion,"
-        + "last_version as lastVersion "
-        + "FROM "
-        + OWNER_TABLE_NAME
-        + " WHERE deleted_at =0 order by id limit #{skipNum},#{fetchNum}";
-  }
-
-  public String countAllOwner() {
-    return "SELECT count(*) " + "FROM " + OWNER_TABLE_NAME + " WHERE deleted_at =0 ";
-  }
 }

@@ -18,7 +18,6 @@
  */
 package org.apache.gravitino.storage.relational.mapper;
 
-import java.util.List;
 import org.apache.gravitino.storage.relational.po.GroupPO;
 import org.apache.gravitino.storage.relational.po.OwnerRelPO;
 import org.apache.gravitino.storage.relational.po.UserPO;
@@ -52,12 +51,6 @@ public interface OwnerMetaMapper {
   GroupPO selectGroupOwnerMetaByMetadataObjectIdAndType(
       @Param("metadataObjectId") Long metadataObjectId,
       @Param("metadataObjectType") String metadataObjectType);
-
-  @SelectProvider(type = OwnerMetaSQLProviderFactory.class, method = "selectAllOwner")
-  List<OwnerRelPO> selectAllOwner(@Param("skipNum") Long skipNum, @Param("fetchNum") Long fetchNum);
-
-  @SelectProvider(type = OwnerMetaSQLProviderFactory.class, method = "countAllOwner")
-  long countAllOwner();
 
   @InsertProvider(type = OwnerMetaSQLProviderFactory.class, method = "insertOwnerRel")
   void insertOwnerRel(@Param("ownerRelPO") OwnerRelPO ownerRelPO);
