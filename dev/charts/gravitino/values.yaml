@@ -193,19 +193,19 @@ icebergRest:
   catalogBackend: memory
   ## The warehouse directory of Iceberg catalog for Iceberg REST service
   ##
-  warehouse: "/tmp"
-  ## Name of the backend Iceberg catalog for Iceberg REST service
+  warehouse: /tmp
+  ## Name of the Iceberg catalog backend
   ##
   # catalogBackendName: memory
-  ## URI for connecting to the backend catalog (e.g., Hive Metastore Thrift URI)
+  ## URI for connecting to the catalog backend (e.g., Hive Metastore Thrift URI)
   ##
   # uri: thrift://localhost:9083
-  ## JDBC connection configuration for catalog backend (if applicable)
+  ## JDBC connection configuration for jdbc catalog backend (if applicable)
   ##
   # jdbc:
   #   user: "user name"
   #   password: "password"
-  #   ## Whether to initialize the JDBC database schema
+  #   ## Whether to initialize the Iceberg meta tables in RDBMS
   #   ##
   #   initialize: True
   #   ## JDBC driver class name
@@ -214,7 +214,7 @@ icebergRest:
   ## Implementation class for Iceberg file I/O operations
   ##
   # ioImpl: "org.apache.iceberg.azure.adlsv2.ADLSFileIO"
-  ## Comma-separated list of credential provider classes
+  ## Comma-separated list of credential providers.
   ##
   # credentialProviders: "s3-token"
   ## S3 storage configuration
