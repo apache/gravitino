@@ -104,7 +104,6 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
     allowInternalAuthorizer = new InternalAuthorizer(allowEnforcer);
     denyEnforcer = new SyncedEnforcer(getModel("/jcasbin_model.conf"), new GravitinoAdapter());
     denyInternalAuthorizer = new InternalAuthorizer(denyEnforcer);
-    initializeOwnerAsync();
   }
 
   private Model getModel(String modelFilePath) {

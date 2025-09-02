@@ -20,6 +20,7 @@
 package org.apache.gravitino.cache;
 
 import org.apache.gravitino.Entity;
+import org.apache.gravitino.NameIdentifier;
 
 /**
  * {@code EntityCache} is a cache interface in Gravitino designed to accelerate metadata access for
@@ -82,4 +83,10 @@ public interface EntityCache extends SupportsEntityStoreCache, SupportsRelationE
   interface ThrowingRunnable<E extends Exception> {
     void run() throws E;
   }
+
+  <E, T extends Exception> E withCacheReadLock(
+      NameIdentifier nameIdentifier, ThrowingSupplier<E, T> action) throws T;
+
+  <E, T extends Exception> E withCacheWriteLock(
+      NameIdentifier nameIdentifier, ThrowingSupplier<E, T> action) throws T;
 }

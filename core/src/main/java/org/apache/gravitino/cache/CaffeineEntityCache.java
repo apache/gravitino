@@ -41,6 +41,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
@@ -86,6 +87,8 @@ public class CaffeineEntityCache extends BaseEntityCache {
 
   private ScheduledExecutorService scheduler;
 
+  private SegmentedLock segmentedLock;
+
   /**
    * Constructs a new {@link CaffeineEntityCache}.
    *
@@ -117,7 +120,7 @@ public class CaffeineEntityCache extends BaseEntityCache {
             });
 
     this.cacheData = cacheDataBuilder.build();
-
+    segmentedLock = new SegmentedLock(200);
     if (cacheConfig.get(Configs.CACHE_STATS_ENABLED)) {
       this.scheduler = Executors.newSingleThreadScheduledExecutor();
       startCacheStatsMonitor();
@@ -156,7 +159,7 @@ public class CaffeineEntityCache extends BaseEntityCache {
       NameIdentifier ident, Entity.EntityType type, SupportsRelationOperations.Type relType) {
     checkArguments(ident, type, relType);
 
-    return withLock(() -> invalidateEntities(ident));
+    return withWriteLock(ident, () -> invalidateEntities(ident));
   }
 
   /** {@inheritDoc} */
@@ -164,7 +167,7 @@ public class CaffeineEntityCache extends BaseEntityCache {
   public boolean invalidate(NameIdentifier ident, Entity.EntityType type) {
     checkArguments(ident, type);
 
-    return withLock(() -> invalidateEntities(ident));
+    return withWriteLock(ident, () -> invalidateEntities(ident));
   }
 
   /** {@inheritDoc} */
@@ -207,7 +210,8 @@ public class CaffeineEntityCache extends BaseEntityCache {
       List<E> entities) {
     checkArguments(ident, type, relType);
     Preconditions.checkArgument(entities != null, "Entities cannot be null");
-    withLock(
+    withWriteLock(
+        ident,
         () -> {
           if (entities.isEmpty()) {
             return;
@@ -223,8 +227,9 @@ public class CaffeineEntityCache extends BaseEntityCache {
   @Override
   public <E extends Entity & HasIdentifier> void put(E entity) {
     Preconditions.checkArgument(entity != null, "Entity cannot be null");
-
-    withLock(
+    NameIdentifier ident = getIdentFromEntity(entity);
+    withWriteLock(
+        ident,
         () -> {
           invalidateOnKeyChange(entity);
           NameIdentifier identifier = getIdentFromEntity(entity);
@@ -260,6 +265,24 @@ public class CaffeineEntityCache extends BaseEntityCache {
     Preconditions.checkArgument(action != null, "Action cannot be null");
 
     return withLockAndThrow(action);
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public <E, T extends Exception> E withCacheReadLock(
+      NameIdentifier nameIdentifier, ThrowingSupplier<E, T> action) throws T {
+    Preconditions.checkArgument(action != null, "Action cannot be null");
+
+    return withReadLockAndThrow(nameIdentifier, action);
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public <E, T extends Exception> E withCacheWriteLock(
+      NameIdentifier nameIdentifier, ThrowingSupplier<E, T> action) throws T {
+    Preconditions.checkArgument(action != null, "Action cannot be null");
+
+    return withWriteLockAndThrow(nameIdentifier, action);
   }
 
   /**
@@ -364,20 +387,59 @@ public class CaffeineEntityCache extends BaseEntityCache {
     }
   }
 
-  /**
-   * Runs the given action with the lock and returns the result.
-   *
-   * @param action The action to run with the lock
-   * @param <T> The type of the result
-   * @return The result of the action
-   */
-  private <T> T withLock(Supplier<T> action) {
+  private void withReadLock(NameIdentifier nameIdentifier, Runnable action) {
     try {
-      opLock.lockInterruptibly();
+      Lock lock = segmentedLock.readLock(nameIdentifier);
+      lock.lockInterruptibly();
+      try {
+        action.run();
+      } finally {
+        lock.unlock();
+      }
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+      throw new IllegalStateException("Thread was interrupted while waiting for lock", e);
+    }
+  }
+
+  private void withWriteLock(NameIdentifier nameIdentifier, Runnable action) {
+    try {
+      Lock lock = segmentedLock.writeLock(nameIdentifier);
+      lock.lockInterruptibly();
+      try {
+        action.run();
+      } finally {
+        lock.unlock();
+      }
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+      throw new IllegalStateException("Thread was interrupted while waiting for lock", e);
+    }
+  }
+
+  private <T> T withReadLock(NameIdentifier nameIdentifier, Supplier<T> action) {
+    try {
+      Lock lock = segmentedLock.readLock(nameIdentifier);
+      lock.lockInterruptibly();
       try {
         return action.get();
       } finally {
-        opLock.unlock();
+        lock.unlock();
+      }
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+      throw new IllegalStateException("Thread was interrupted while waiting for lock", e);
+    }
+  }
+
+  private <T> T withWriteLock(NameIdentifier nameIdentifier, Supplier<T> action) {
+    try {
+      Lock lock = segmentedLock.writeLock(nameIdentifier);
+      lock.lockInterruptibly();
+      try {
+        return action.get();
+      } finally {
+        lock.unlock();
       }
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
@@ -404,6 +466,49 @@ public class CaffeineEntityCache extends BaseEntityCache {
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
       throw new IllegalStateException("Thread was interrupted while waiting for lock", e);
+    }
+  }
+
+  private <T, E extends Exception> T withReadLockAndThrow(
+      NameIdentifier identifier, ThrowingSupplier<T, E> action) throws E {
+    try {
+      Lock lock = segmentedLock.readLock(identifier);
+      lock.lockInterruptibly();
+      try {
+        return action.get();
+      } finally {
+        lock.unlock();
+      }
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+      throw new IllegalStateException("Thread was interrupted while waiting for lock", e);
+    }
+  }
+
+  private <T, E extends Exception> T withWriteLockAndThrow(
+      NameIdentifier identifier, ThrowingSupplier<T, E> action) throws E {
+    try {
+      Lock lock = segmentedLock.writeLock(identifier);
+      lock.lockInterruptibly();
+      try {
+        return action.get();
+      } finally {
+        lock.unlock();
+      }
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+      throw new IllegalStateException("Thread was interrupted while waiting for lock", e);
+    }
+  }
+
+  private <E extends Exception> void withReadLockAndThrow(
+      NameIdentifier identifier, ThrowingRunnable<E> action) throws E {
+    Lock lock = segmentedLock.readLock(identifier);
+    lock.lock();
+    try {
+      action.run();
+    } finally {
+      lock.unlock();
     }
   }
 

@@ -90,6 +90,18 @@ public class NoOpsCache extends BaseEntityCache {
     }
   }
 
+  @Override
+  public <E, T extends Exception> E withCacheReadLock(
+      NameIdentifier nameIdentifier, ThrowingSupplier<E, T> action) throws T {
+    return null;
+  }
+
+  @Override
+  public <E, T extends Exception> E withCacheWriteLock(
+      NameIdentifier nameIdentifier, ThrowingSupplier<E, T> action) throws T {
+    return null;
+  }
+
   /** {@inheritDoc} */
   @Override
   public <E extends Entity & HasIdentifier> Optional<E> getIfPresent(
