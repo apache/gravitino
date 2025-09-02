@@ -194,19 +194,20 @@ icebergRest:
   ## The warehouse directory of Iceberg catalog for Iceberg REST service
   ##
   warehouse: "gs://strato-iceberg/test"
-  # uri: thrift://localhost:9083
   # catalogBackendName: memory
+  # uri: thrift://localhost:9083
   # jdbc:
   #   user: ""
   #   password: ""
   #   initialize: True
   #   driver: "com.mysql.cj.jdbc.Driver"
   # ## Storage
-  ioImpl: "org.apache.iceberg.gcp.gcs.GCSFileIO"
-  credentialProviders: "gcs-token"
+  # ioImpl: "org.apache.iceberg.aws.s3.S3FileIO"
+  # credentialProviders: "s3-token"
   # s3:
   #   accessKeyId: ""
   #   secretAccessKey: ""
+  #   s3PathStyleAccess: "true"
   #   roleArn: ""
   #   endpoint: ""
   #   region: ""
@@ -225,6 +226,11 @@ icebergRest:
   #   tenantId: ""
   #   clientId: ""
   #   clientSecret: ""
+  # catalogConfigProvider: "static-config-provider"
+  # dynamicConfigProvider:
+  #   uri: "http://localhost:8090"
+  #   metalake: "test"
+  #   defaultCatalogName: "catalog name"
 
 ## Authentication mechanisms configuration. Support simple, OAuth and Kerberos.
 ##
