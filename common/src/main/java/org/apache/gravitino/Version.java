@@ -35,7 +35,8 @@ public class Version {
   public static final String CLIENT_VERSION_HEADER = "X-Client-Version";
 
   private static final int VERSION_PART_NUMBER = 3;
-  private static final Pattern PATTERN = Pattern.compile("^(\\d+)\\.(\\d+)\\.(\\d+)(?:[-].+)?$");
+  private static final Pattern PATTERN =
+      Pattern.compile("^(\\d+)\\.(\\d+)\\.(\\d+)(?:-.*|\\.([a-zA-Z].*))?$");
 
   private static final Version INSTANCE = new Version();
 
