@@ -48,7 +48,8 @@ public interface EntityCache extends SupportsEntityStoreCache, SupportsRelationE
    * @param <E> The type of exception that may be thrown
    * @throws E if the action throws an exception of type E
    */
-  <E extends Exception> void withCacheLock(ThrowingRunnable<E> action) throws E;
+  <E extends Exception> void withCacheLock(
+      NameIdentifier nameIdentifier, ThrowingRunnable<E> action) throws E;
 
   /**
    * Executes the given action within a cache context and returns the result.
@@ -59,7 +60,8 @@ public interface EntityCache extends SupportsEntityStoreCache, SupportsRelationE
    * @param <T> The type of the result
    * @throws E if the action throws an exception of type E
    */
-  <T, E extends Exception> T withCacheLock(ThrowingSupplier<T, E> action) throws E;
+  <T, E extends Exception> T withCacheLock(
+      NameIdentifier nameIdentifier, ThrowingSupplier<T, E> action) throws E;
 
   /**
    * A functional interface that represents a supplier that may throw an exception.
@@ -83,10 +85,4 @@ public interface EntityCache extends SupportsEntityStoreCache, SupportsRelationE
   interface ThrowingRunnable<E extends Exception> {
     void run() throws E;
   }
-
-  <E, T extends Exception> E withCacheReadLock(
-      NameIdentifier nameIdentifier, ThrowingSupplier<E, T> action) throws T;
-
-  <E, T extends Exception> E withCacheWriteLock(
-      NameIdentifier nameIdentifier, ThrowingSupplier<E, T> action) throws T;
 }

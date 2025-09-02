@@ -128,7 +128,7 @@ public class RelationalEntityStore
   public <E extends Entity & HasIdentifier> E get(
       NameIdentifier ident, Entity.EntityType entityType, Class<E> e)
       throws NoSuchEntityException, IOException {
-    return cache.withCacheWriteLock(
+    return cache.withCacheLock(
         ident,
         () -> {
           Optional<E> entityFromCache = cache.getIfPresent(ident, entityType);
@@ -211,6 +211,7 @@ public class RelationalEntityStore
       Type relType, NameIdentifier nameIdentifier, Entity.EntityType identType, boolean allFields)
       throws IOException {
     return cache.withCacheLock(
+        nameIdentifier,
         () -> {
           Optional<List<E>> entities = cache.getIfPresent(relType, nameIdentifier, identType);
           if (entities.isPresent()) {

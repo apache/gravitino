@@ -60,7 +60,8 @@ public class NoOpsCache extends BaseEntityCache {
 
   /** {@inheritDoc} */
   @Override
-  public <E extends Exception> void withCacheLock(ThrowingRunnable<E> action) throws E {
+  public <E extends Exception> void withCacheLock(
+      NameIdentifier nameIdentifier, ThrowingRunnable<E> action) throws E {
     try {
       opLock.lockInterruptibly();
       try {
@@ -74,30 +75,8 @@ public class NoOpsCache extends BaseEntityCache {
     }
   }
 
-  /** {@inheritDoc} */
   @Override
-  public <T, E extends Exception> T withCacheLock(ThrowingSupplier<T, E> action) throws E {
-    try {
-      opLock.lockInterruptibly();
-      try {
-        return action.get();
-      } finally {
-        opLock.unlock();
-      }
-    } catch (InterruptedException e) {
-      Thread.currentThread().interrupt();
-      throw new IllegalStateException("Thread was interrupted while waiting for lock", e);
-    }
-  }
-
-  @Override
-  public <E, T extends Exception> E withCacheReadLock(
-      NameIdentifier nameIdentifier, ThrowingSupplier<E, T> action) throws T {
-    return null;
-  }
-
-  @Override
-  public <E, T extends Exception> E withCacheWriteLock(
+  public <E, T extends Exception> E withCacheLock(
       NameIdentifier nameIdentifier, ThrowingSupplier<E, T> action) throws T {
     return null;
   }

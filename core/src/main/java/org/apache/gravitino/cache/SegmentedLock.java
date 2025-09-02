@@ -17,33 +17,36 @@
 
 package org.apache.gravitino.cache;
 
-import java.util.concurrent.locks.Lock;
-import java.util.concurrent.locks.ReadWriteLock;
-import java.util.concurrent.locks.ReentrantReadWriteLock;
+import java.util.concurrent.locks.ReentrantLock;
 import org.apache.gravitino.NameIdentifier;
 
 /** A segmented lock manager based on NameIdentifier hash. */
 public class SegmentedLock {
-  private final ReadWriteLock[] locks;
+  private final ReentrantLock[] locks;
 
   public SegmentedLock(int numSegments) {
-    locks = new ReentrantReadWriteLock[numSegments];
+    locks = new ReentrantLock[numSegments];
     for (int i = 0; i < numSegments; i++) {
-      locks[i] = new ReentrantReadWriteLock();
+      locks[i] = new ReentrantLock();
     }
   }
 
-  public ReadWriteLock getLock(NameIdentifier ident) {
+  public ReentrantLock getLock(NameIdentifier ident) {
     int hash = ident.hashCode();
     int segmentIndex = Math.abs(hash % locks.length);
     return locks[segmentIndex];
   }
 
-  public Lock readLock(NameIdentifier ident) {
-    return getLock(ident).readLock();
-  }
-
-  public Lock writeLock(NameIdentifier ident) {
-    return getLock(ident).writeLock();
+  public void withAllLock(Runnable action) {
+    for (ReentrantLock lock : locks) {
+      lock.lock();
+    }
+    try {
+      action.run();
+    } finally {
+      for (ReentrantLock lock : locks) {
+        lock.unlock();
+      }
+    }
   }
 }
