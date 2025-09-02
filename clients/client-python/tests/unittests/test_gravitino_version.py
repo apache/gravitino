@@ -197,13 +197,21 @@ class TestGravitinoVersion(unittest.TestCase):
         version2 = GravitinoVersion(VersionDTO("1.6.0", "2023-01-01", "1234567"))
         self.assertTrue(version1.compatible_with_server_version(version2))
 
+        version1 = GravitinoVersion(VersionDTO("1.6.1", "2023-01-01", "1234567"))
+        version2 = GravitinoVersion(VersionDTO("1.6.2", "2023-01-01", "1234567"))
+        self.assertTrue(version1.compatible_with_server_version(version2))
+
+        version1 = GravitinoVersion(VersionDTO("1.6.2", "2023-01-01", "1234567"))
+        version2 = GravitinoVersion(VersionDTO("1.6.1", "2023-01-01", "1234567"))
+        self.assertTrue(version1.compatible_with_server_version(version2))
+
         version1 = GravitinoVersion(VersionDTO("1.6.0", "2023-01-01", "1234567"))
         version2 = GravitinoVersion(VersionDTO("2.6.1", "2023-01-01", "1234567"))
         self.assertTrue(version1.compatible_with_server_version(version2))
 
         version1 = GravitinoVersion(VersionDTO("1.6.0", "2023-01-01", "1234567"))
         version2 = GravitinoVersion(VersionDTO("1.4.0", "2023-01-01", "1234567"))
-        self.assertTrue(version1.compatible_with_server_version(version2))
+        self.assertFalse(version1.compatible_with_server_version(version2))
 
         version1 = GravitinoVersion(VersionDTO("1.6.0", "2023-01-01", "1234567"))
         version2 = GravitinoVersion(VersionDTO("0.6.0", "2023-01-01", "1234567"))
