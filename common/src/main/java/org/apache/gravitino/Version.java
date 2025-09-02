@@ -18,19 +18,29 @@
  */
 package org.apache.gravitino;
 
+import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.Properties;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.dto.VersionDTO;
 import org.apache.gravitino.exceptions.GravitinoRuntimeException;
 
 /** Retrieve the version and build information from the building process */
 public class Version {
 
+  /** The HTTP header to send the client version */
+  public static final String CLIENT_VERSION_HEADER = "X-Client-Version";
+
+  private static final int VERSION_PART_NUMBER = 3;
+  private static final Pattern PATTERN = Pattern.compile("^(\\d+)\\.(\\d+)\\.(\\d+)(?:[-].+)?$");
+
   private static final Version INSTANCE = new Version();
 
-  private VersionInfo versionInfo;
-  private VersionDTO versionDTO;
+  private final VersionInfo versionInfo;
+  private final VersionDTO versionDTO;
 
   private Version() {
     Properties projectProperties = new Properties();
@@ -67,6 +77,27 @@ public class Version {
   /** @return the current version DTO */
   public static VersionDTO getCurrentVersionDTO() {
     return INSTANCE.versionDTO;
+  }
+
+  /**
+   * Parse the version number from a version string
+   *
+   * @param versionString the version string to parse
+   * @return an array of integers representing the version number
+   */
+  public static int[] parseVersionNumber(String versionString) {
+    Preconditions.checkArgument(
+        StringUtils.isNotBlank(versionString), "Version string is null or empty");
+
+    Matcher matcher = PATTERN.matcher(versionString);
+    if (matcher.matches()) {
+      int[] versionNumbers = new int[VERSION_PART_NUMBER];
+      for (int i = 0; i < VERSION_PART_NUMBER; i++) {
+        versionNumbers[i] = Integer.parseInt(matcher.group(i + 1));
+      }
+      return versionNumbers;
+    }
+    throw new GravitinoRuntimeException("Invalid version string " + versionString);
   }
 
   /** Store version information */

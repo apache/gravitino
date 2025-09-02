@@ -196,7 +196,7 @@ class FilesetCatalog(BaseSchemaCatalog, SupportsCredentials):
         full_namespace = self._get_fileset_full_namespace(ident.namespace())
 
         req = FilesetCreateRequest(
-            name=encode_string(ident.name()),
+            name=ident.name(),
             comment=comment,
             fileset_type=fileset_type,
             storage_locations=storage_locations,
@@ -300,10 +300,10 @@ class FilesetCatalog(BaseSchemaCatalog, SupportsCredentials):
         try:
             caller_context: CallerContext = CallerContextHolder.get()
             params = {
-                "sub_path": encode_string(sub_path),
+                "sub_path": sub_path,
             }
             if location_name is not None:
-                params["location_name"] = encode_string(location_name)
+                params["location_name"] = location_name
 
             resp = self.rest_client.get(
                 self.format_file_location_request_path(full_namespace, ident.name()),
