@@ -118,7 +118,7 @@ public class CaffeineEntityCache extends BaseEntityCache {
             });
 
     this.cacheData = cacheDataBuilder.build();
-    segmentedLock = new SegmentedLock(200);
+    segmentedLock = new SegmentedLock(256);
     if (cacheConfig.get(Configs.CACHE_STATS_ENABLED)) {
       this.scheduler = Executors.newSingleThreadScheduledExecutor();
       startCacheStatsMonitor();
