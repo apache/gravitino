@@ -135,8 +135,8 @@ public class TestGravitinoVersion {
 
   @Test
   void testVersionCompatibility() {
-    GravitinoVersion version1 = new GravitinoVersion("2.5.3", "2023-01-01", "1234567");
-    GravitinoVersion version2 = new GravitinoVersion("2.5.4", "2023-01-01", "1234567");
+    GravitinoVersion version1 = new GravitinoVersion("2.6.3", "2023-01-01", "1234567");
+    GravitinoVersion version2 = new GravitinoVersion("2.6.4", "2023-01-01", "1234567");
     assertTrue(version1.compatibleWithServerVersion(version2));
 
     version1 = new GravitinoVersion("2.6.3", "2023-01-01", "1234567");
@@ -144,12 +144,16 @@ public class TestGravitinoVersion {
     assertTrue(version1.compatibleWithServerVersion(version2));
 
     version1 = new GravitinoVersion("2.6.3", "2023-01-01", "1234567");
-    version2 = new GravitinoVersion("2.5.4", "2023-01-01", "1234567");
+    version2 = new GravitinoVersion("2.6.2", "2023-01-01", "1234567");
     assertTrue(version1.compatibleWithServerVersion(version2));
 
     version1 = new GravitinoVersion("2.6.3", "2023-01-01", "1234567");
     version2 = new GravitinoVersion("3.5.4", "2023-01-01", "1234567");
     assertTrue(version1.compatibleWithServerVersion(version2));
+
+    version1 = new GravitinoVersion("2.6.3", "2023-01-01", "1234567");
+    version2 = new GravitinoVersion("2.5.3", "2023-01-01", "1234567");
+    assertFalse(version1.compatibleWithServerVersion(version2));
 
     version1 = new GravitinoVersion("3.6.3", "2023-01-01", "1234567");
     version2 = new GravitinoVersion("2.5.4", "2023-01-01", "1234567");
