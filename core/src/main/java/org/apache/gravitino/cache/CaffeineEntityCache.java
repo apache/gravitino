@@ -356,15 +356,11 @@ public class CaffeineEntityCache extends BaseEntityCache {
       Optional<SupportsRelationOperations.Type> relTypeOpt) {
     Queue<EntityCacheKey> queue = new ArrayDeque<>();
 
-    EntityCacheKey valueForExactKey;
-    if (relTypeOpt.isEmpty()) {
-      valueForExactKey =
-          cacheIndex.getValueForExactKey(EntityCacheKey.of(identifier, type).toString());
-    } else {
-      valueForExactKey =
-          cacheIndex.getValueForExactKey(
-              EntityCacheRelationKey.of(identifier, type, relTypeOpt.get()).toString());
-    }
+    EntityCacheKey valueForExactKey = cacheIndex.getValueForExactKey(
+            relTypeOpt.isEmpty()
+                    ? EntityCacheKey.of(identifier, type).toString()
+                    : EntityCacheRelationKey.of(identifier, type, relTypeOpt.get()).toString()
+    );
 
     if (valueForExactKey == null) {
       // No key to remove
@@ -383,7 +379,7 @@ public class CaffeineEntityCache extends BaseEntityCache {
       List<EntityCacheKey> relatedEntityKeysToRemove =
           Lists.newArrayList(
               cacheIndex.getValuesForKeysStartingWith(currentKeyToRemove.identifier().toString()));
-      relatedEntityKeysToRemove.forEach(queue::offer);
+      queue.addAll(relatedEntityKeysToRemove);
 
       // Look up from reverse index to go to next depth
       List<EntityCacheKey> reverseKeysToRemove =
