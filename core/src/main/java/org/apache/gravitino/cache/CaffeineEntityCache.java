@@ -356,7 +356,7 @@ public class CaffeineEntityCache extends BaseEntityCache {
    * @param action The action to run with the lock
    */
   private void withLock(Runnable action) {
-    segmentedLock.withAllLock(action);
+    segmentedLock.withAllLocks(action);
   }
 
   private void withLock(NameIdentifier nameIdentifier, Runnable action) {
@@ -374,9 +374,17 @@ public class CaffeineEntityCache extends BaseEntityCache {
     }
   }
 
-  private <T> T withLock(NameIdentifier nameIdentifier, Supplier<T> action) {
+  /**
+   * Runs the given action with the lock and returns the result.
+   *
+   * @param identifier nameIdentifier
+   * @param action The action to run with the lock
+   * @param <T> The type of the result
+   * @return The result of the action
+   */
+  private <T> T withLock(NameIdentifier identifier, Supplier<T> action) {
     try {
-      Lock lock = segmentedLock.getLock(nameIdentifier);
+      Lock lock = segmentedLock.getLock(identifier);
       lock.lockInterruptibly();
       try {
         return action.get();
@@ -414,6 +422,14 @@ public class CaffeineEntityCache extends BaseEntityCache {
     }
   }
 
+  /**
+   * Runs the given action with the lock and throws the exception if it occurs.
+   *
+   * @param identifier nameIdentifier
+   * @param action The action to run with the lock
+   * @param <E> The type of the exception
+   * @throws E If an exception occurs during the action
+   */
   private <E extends Exception> void withLockAndThrow(
       NameIdentifier identifier, ThrowingRunnable<E> action) throws E {
     Lock lock = segmentedLock.getLock(identifier);

@@ -49,8 +49,6 @@ import org.apache.gravitino.meta.RoleEntity;
 import org.apache.gravitino.meta.UserEntity;
 import org.apache.gravitino.server.authorization.MetadataIdConverter;
 import org.apache.gravitino.server.authorization.RequestAuthorizationCache;
-import org.apache.gravitino.server.authorization.policy.OwnerPolicyAsyncLoader;
-import org.apache.gravitino.storage.relational.po.OwnerRelPO;
 import org.apache.gravitino.utils.MetadataObjectUtil;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.PrincipalUtils;

@@ -17,10 +17,22 @@
 
 package org.apache.gravitino.cache;
 
+import com.google.common.base.Preconditions;
 import java.util.concurrent.locks.ReentrantLock;
 import org.apache.gravitino.NameIdentifier;
 
-/** A segmented lock manager based on NameIdentifier hash. */
+/**
+ * A segmented lock manager that reduces lock contention by distributing locks across multiple
+ * segments based on the hash code of a {@link NameIdentifier}.
+ *
+ * <p>Instead of using a single global lock, this class uses an array of {@link ReentrantLock}
+ * instances. Each identifier is mapped to a specific lock using its hash code modulo the number of
+ * segments. This allows concurrent operations on identifiers that map to different segments,
+ * improving overall throughput in high-concurrency scenarios.
+ *
+ * <p>This implementation is thread-safe and immutable after construction. The number of segments
+ * remains fixed for the lifetime of the instance.
+ */
 public class SegmentedLock {
   private final ReentrantLock[] locks;
 
@@ -31,13 +43,36 @@ public class SegmentedLock {
     }
   }
 
+  /**
+   * Returns the lock associated with the given identifier. The lock is determined by computing the
+   * hash code of the identifier and mapping it to a segment using modulo arithmetic.
+   *
+   * <p>Note: {@link NameIdentifier#hashCode()} is assumed to provide a reasonably uniform
+   * distribution to ensure balanced lock utilization.
+   *
+   * @param ident the identifier to map to a lock; must not be null
+   * @return the {@link ReentrantLock} associated with the identifier
+   */
   public ReentrantLock getLock(NameIdentifier ident) {
+    Preconditions.checkNotNull(ident, "NameIdentifier can not be null.");
     int hash = ident.hashCode();
     int segmentIndex = Math.abs(hash % locks.length);
     return locks[segmentIndex];
   }
 
-  public void withAllLock(Runnable action) {
+  /**
+   * Executes the given action with all locks acquired. This method acquires all segment locks in
+   * sequence before running the action, and ensures all locks are released afterward, even if the
+   * action throws an exception.
+   *
+   * <p>This is useful for operations that need global consistency across all segments, such as
+   * clearing all cached entries or performing a global snapshot. Use sparingly, as it blocks all
+   * other operations.
+   *
+   * @param action the task to execute; must not be null
+   * @throws NullPointerException if {@code action} is null
+   */
+  public void withAllLocks(Runnable action) {
     for (ReentrantLock lock : locks) {
       lock.lock();
     }
