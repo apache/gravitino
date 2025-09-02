@@ -21,6 +21,8 @@ package org.apache.gravitino;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.nio.file.Files;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Optional;
 import java.util.Properties;
@@ -149,5 +151,26 @@ public class TestConfig {
     config.set(intConf, Optional.of(2));
     intValue = config.get(intConf);
     Assertions.assertEquals(Optional.of(2), intValue);
+  }
+
+  @Test
+  public void testTrimmedValues() {
+    Map<String, String> props = new HashMap<>();
+
+    props.put("int.key", " 1 ");
+    ConfigEntry<Integer> intEntry = new ConfigBuilder("int.key").intConf();
+    Assertions.assertEquals(1, intEntry.readFrom(props));
+
+    props.put("long.key", " 2 ");
+    ConfigEntry<Long> longEntry = new ConfigBuilder("long.key").longConf();
+    Assertions.assertEquals(2L, longEntry.readFrom(props));
+
+    props.put("double.key", " 3.5 ");
+    ConfigEntry<Double> doubleEntry = new ConfigBuilder("double.key").doubleConf();
+    Assertions.assertEquals(3.5d, doubleEntry.readFrom(props));
+
+    props.put("boolean.key", " true ");
+    ConfigEntry<Boolean> boolEntry = new ConfigBuilder("boolean.key").booleanConf();
+    Assertions.assertTrue(boolEntry.readFrom(props));
   }
 }

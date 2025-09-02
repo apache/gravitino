@@ -79,7 +79,9 @@ public class FilesetVersionPostgreSQLProvider extends FilesetVersionBaseSQLProvi
         + VERSION_TABLE_NAME
         + " SET deleted_at = floor(extract(epoch from((current_timestamp -"
         + " timestamp '1970-01-01 00:00:00')*1000)))"
-        + " WHERE fileset_id = #{filesetId} AND version <= #{versionRetentionLine} AND deleted_at = 0 LIMIT #{limit}";
+        + " WHERE id IN (SELECT id FROM "
+        + VERSION_TABLE_NAME
+        + " WHERE fileset_id = #{filesetId} AND version <= #{versionRetentionLine} AND deleted_at = 0 LIMIT #{limit})";
   }
 
   @Override
