@@ -18,20 +18,19 @@
  */
 package org.apache.gravitino.authorization.ranger.reference;
 
-import static org.junit.Assert.assertEquals;
-
 import java.io.StringWriter;
 import java.util.Date;
 import java.util.TimeZone;
 import org.codehaus.jackson.JsonGenerator;
 import org.codehaus.jackson.map.ObjectMapper;
-import org.junit.Test;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
 
+@SuppressWarnings("JavaUtilDate")
 public class TestJsonDateSerializer {
 
   @Test
-  @SuppressWarnings("JavaUtilDate")
-  public void testSerializeUsesUtcTimezone() throws Exception {
+  public void testSerializerUsesUtcTimezone() throws Exception {
     TimeZone original = TimeZone.getDefault();
     try {
       TimeZone.setDefault(TimeZone.getTimeZone("GMT+8"));
@@ -42,7 +41,7 @@ public class TestJsonDateSerializer {
       Date date = new Date(0L);
       serializer.serialize(date, generator, mapper.getSerializerProvider());
       generator.flush();
-      assertEquals("\"1970-01-01T00:00:00Z\"", writer.toString());
+      Assertions.assertEquals("\"1970-01-01T00:00:00Z\"", writer.toString());
     } finally {
       TimeZone.setDefault(original);
     }
