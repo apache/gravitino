@@ -57,12 +57,11 @@ public class GravitinoVersion extends VersionDTO {
    * Check if the current version is compatible with the server version.
    *
    * @param serverVersion the server version to check compatibility with
-   * @return true if the client current major version is less than or equal to the server's major
-   *     version
+   * @return true if the client current major version is less than or equal to the server's version
    */
   public boolean compatibleWithServerVersion(GravitinoVersion serverVersion) {
     int[] left = getVersionNumber();
     int[] right = serverVersion.getVersionNumber();
-    return left[0] <= right[0];
+    return left[0] < right[0] || (left[0] == right[0] && left[1] <= right[1]);
   }
 }
