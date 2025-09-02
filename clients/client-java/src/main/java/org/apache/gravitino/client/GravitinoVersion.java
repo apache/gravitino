@@ -53,21 +53,15 @@ public class GravitinoVersion extends VersionDTO implements Comparable {
     throw new GravitinoRuntimeException("Invalid version string " + version());
   }
 
-  @Override
-  public int compareTo(Object o) {
-    if (!(o instanceof GravitinoVersion)) {
-      return 1;
-    }
-    GravitinoVersion other = (GravitinoVersion) o;
-
+  /**
+   * Check if the current version is compatible with the server version.
+   *
+   * @param serverVersion the server version to check compatibility with
+   * @return true if the client current major version is less than or equal to the server's version
+   */
+  public boolean compatibleWithServerVersion(GravitinoVersion serverVersion) {
     int[] left = getVersionNumber();
-    int[] right = other.getVersionNumber();
-    for (int i = 0; i < VERSION_PART_NUMBER; i++) {
-      int v = left[i] - right[i];
-      if (v != 0) {
-        return v;
-      }
-    }
-    return 0;
+    int[] right = serverVersion.getVersionNumber();
+    return left[0] < right[0] || (left[0] == right[0] && left[1] <= right[1]);
   }
 }
