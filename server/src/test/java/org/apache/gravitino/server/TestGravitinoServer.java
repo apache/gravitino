@@ -112,8 +112,6 @@ public class TestGravitinoServer {
   @Test
   public void testInitializeWithLoadFromFileException() throws Exception {
     ServerConfig config = new ServerConfig();
-
-    // TODO: Exception due to environment variable not set. Is this the right exception?
     assertThrows(IllegalArgumentException.class, () -> config.loadFromFile("config"));
   }
 }
