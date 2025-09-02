@@ -352,7 +352,7 @@ If your Spark **without Hadoop environment**, you can use the following code sni
 os.environ["PYSPARK_SUBMIT_ARGS"] = "--jars /path/to/gravitino-gcp-bundle-{gravitino-version}.jar,/path/to/gravitino-filesystem-hadoop3-runtime-{gravitino-version}.jar, --master local[1] pyspark-shell"
 ```
 
-If Spark can't start with the above configuration, you can try to set the jars to the classpath directly:
+If Spark can't start with the above configuration (no Hadoop environment available and use bundle jar), you can try to set the jars to the classpath directly:
 
 
 ```python
