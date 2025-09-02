@@ -193,15 +193,15 @@ icebergRest:
   catalogBackend: memory
   ## The warehouse directory of Iceberg catalog for Iceberg REST service
   ##
-  warehouse: "s3://strato-iceberg/test"
+  warehouse: "/tmp"
   ## Name of the backend Iceberg catalog for Iceberg REST service
   ##
   # catalogBackendName: memory
-  # ## URI for connecting to the backend catalog (e.g., Hive Metastore Thrift URI)
-  # ##
+  ## URI for connecting to the backend catalog (e.g., Hive Metastore Thrift URI)
+  ##
   # uri: thrift://localhost:9083
-  # ## JDBC connection configuration for catalog backend (if applicable)
-  # ##
+  ## JDBC connection configuration for catalog backend (if applicable)
+  ##
   # jdbc:
   #   user: "user name"
   #   password: "password"
@@ -211,52 +211,54 @@ icebergRest:
   #   ## JDBC driver class name
   #   ##
   #   driver: "com.mysql.cj.jdbc.Driver"
-  # ## Implementation class for file I/O operations
-  # ##
-  # ioImpl: "org.apache.iceberg.aws.s3.S3FileIO"
-  # ## Comma-separated list of credential provider classes
-  # ##
+  ## Implementation class for Iceberg file I/O operations
+  ##
+  # ioImpl: "org.apache.iceberg.azure.adlsv2.ADLSFileIO"
+  ## Comma-separated list of credential provider classes
+  ##
   # credentialProviders: "s3-token"
-  # ## S3 storage configuration
-  # ##
+  ## S3 storage configuration
+  ##
   # s3:
-  #   accessKeyId: "access key"
-  #   secretAccessKey: "secret key"
+  #   accessKeyId: ""
+  #   secretAccessKey: ""
   #   ## Whether to use path-style access instead of virtual hosted-style access
   #   ##
-  #   pathStyleAccess: "true"
-  #   roleArn: ""
-  #   endpoint: ""
-  #   region: ""
-  #   externalId: ""
-  #   tokenServiceEndpoint: ""
-  # ## OSS storage configuration
-  # ##
+  #   pathStyleAccess:
+  #   roleArn:
+  #   endpoint:
+  #   region:
+  #   externalId:
+  #   tokenServiceEndpoint:
+  ## OSS storage configuration
+  ##
   # oss:
-  #   accessKeyId: "access key"
-  #   secretAccessKey: "secret key"
+  #   accessKeyId: ""
+  #   secretAccessKey: ""
   #   endpoint: ""
   #   region: ""
-  #   roleArn: ""
-  #   externalId: ""
-  # ## Azure Blob Storage configuration
-  # ##
+  #   roleArn:
+  #   externalId:
+  ## Azure Blob Storage configuration
+  ##
   # azure:
   #   storageAccountName: ""
   #   storageAccountKey: ""
   #   tenantId: ""
   #   clientId: ""
   #   clientSecret: ""
-  # ## Catalog configuration provider class name
-  # ##
+  ## No need to configure extra Google Cloud Storage configuration
+  ##
+  ## Catalog configuration provider class name
+  ##
   # catalogConfigProvider: "static-config-provider"
-  # ## Dynamic configuration provider settings
-  # ##
+  ## Dynamic configuration provider settings
+  ##
   # dynamicConfigProvider:
-  #   ## URI of the dynamic configuration service
+  #   ## URI of the Gravitino server
   #   ##
   #   uri: "http://localhost:8090"
-  #   ## Name of the metalake to use
+  #   ## Name of the metalake
   #   ##
   #   metalake: "test"
   #   ## Default catalog name for operations
