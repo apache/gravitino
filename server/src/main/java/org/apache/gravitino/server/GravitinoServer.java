@@ -198,14 +198,7 @@ public class GravitinoServer extends ResourceConfig {
 
   public static void main(String[] args) {
     LOG.info("Starting Gravitino Server");
-    String confPath = "";
-	if (System.getenv("GRAVITINO_TEST") != null) {
-		if (args.length < 1) {
-			LOG.error("Missing argument for GRAVITINO_TEST conf path.");
-			System.exit(1);
-		}
-		confPath = args[0];
-	}
+    String confPath = System.getenv("GRAVITINO_TEST") == null ? "" : args[0];
     ServerConfig serverConfig = loadConfig(confPath);
     GravitinoServer server = new GravitinoServer(serverConfig, GravitinoEnv.getInstance());
 
