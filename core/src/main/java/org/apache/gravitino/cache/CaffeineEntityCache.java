@@ -356,11 +356,11 @@ public class CaffeineEntityCache extends BaseEntityCache {
       Optional<SupportsRelationOperations.Type> relTypeOpt) {
     Queue<EntityCacheKey> queue = new ArrayDeque<>();
 
-    EntityCacheKey valueForExactKey = cacheIndex.getValueForExactKey(
+    EntityCacheKey valueForExactKey =
+        cacheIndex.getValueForExactKey(
             relTypeOpt.isEmpty()
-                    ? EntityCacheKey.of(identifier, type).toString()
-                    : EntityCacheRelationKey.of(identifier, type, relTypeOpt.get()).toString()
-    );
+                ? EntityCacheKey.of(identifier, type).toString()
+                : EntityCacheRelationKey.of(identifier, type, relTypeOpt.get()).toString());
 
     if (valueForExactKey == null) {
       // No key to remove
