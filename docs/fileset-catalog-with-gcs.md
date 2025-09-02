@@ -354,7 +354,6 @@ os.environ["PYSPARK_SUBMIT_ARGS"] = "--jars /path/to/gravitino-gcp-bundle-{gravi
 
 If Spark can't start with the above configuration (no Hadoop environment available and use bundle jar), you can try to set the jars to the classpath directly:
 
-
 ```python
 jars_path = (
     "/path/to/gravitino-gcp-bundle-{gravitino-version}.jar:"
@@ -367,7 +366,6 @@ os.environ["PYSPARK_SUBMIT_ARGS"] = (
     '--master local[1] pyspark-shell'
 )
 ```
-
 
 - [`gravitino-gcp-bundle-${gravitino-version}.jar`](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-gcp-bundle) is the Gravitino GCP jar with Hadoop environment(3.3.1) and `gcs-connector`.
 - [`gravitino-gcp-${gravitino-version}.jar`](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-gcp) is a condensed version of the Gravitino GCP bundle jar without Hadoop environment and [`gcs-connector`](https://github.com/GoogleCloudDataproc/hadoop-connectors/releases/download/v2.2.22/gcs-connector-hadoop3-2.2.22-shaded.jar) 

@@ -363,7 +363,6 @@ os.environ["PYSPARK_SUBMIT_ARGS"] = "--jars /path/to/gravitino-azure-bundle-{gra
 ```
 If Spark can't start with the above configuration (no Hadoop environment available and use bundle jar), you can try to set the jars to the classpath directly:
 
-
 ```python
 jars_path = (
     "/path/to/gravitino-azure-bundle-{gravitino-version}.jar:"
@@ -380,7 +379,6 @@ os.environ["PYSPARK_SUBMIT_ARGS"] = (
 - [`gravitino-azure-bundle-${gravitino-version}.jar`](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-azure-bundle) is the Gravitino ADLS jar with Hadoop environment(3.3.1), `hadoop-azure.jar` and all packages needed to access ADLS.
 - [`gravitino-azure-${gravitino-version}.jar`](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-azure) is a condensed version of the Gravitino ADLS bundle jar without Hadoop environment and `hadoop-azure.jar`.
 - `hadoop-azure-3.2.0.jar` and `azure-storage-7.0.0.jar` can be found in the Hadoop distribution in the `${HADOOP_HOME}/share/hadoop/tools/lib` directory.
-
 
 Please choose the correct jar according to your environment.
 
