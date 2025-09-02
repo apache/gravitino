@@ -70,6 +70,7 @@ class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
         :param options: Options for the GravitinoVirtualFileSystem
         :param kwargs: Extra args for super filesystem
         """
+        self._kwargs = dict(kwargs)
         self._hook = self._get_hook_class(options)
         self._hook.initialize(options)
         self._operations = self._get_gvfs_operations_class(
@@ -459,6 +460,7 @@ class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
             server_uri=server_uri,
             metalake_name=metalake_name,
             options=options,
+            **self._kwargs,
         )
 
 
