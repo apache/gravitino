@@ -34,7 +34,8 @@ class TestMetalake(unittest.TestCase):
             request_headers=expected_headers,
         )
         self.assertEqual(
-            expected_headers["k1"], gravitino_admin_client._rest_client.request_headers["k1"]
+            expected_headers["k1"],
+            gravitino_admin_client._rest_client.request_headers["k1"],
         )
 
         gravitino_client = GravitinoClient(
