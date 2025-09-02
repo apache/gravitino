@@ -23,7 +23,6 @@ from unittest.mock import patch
 from gravitino.api.types.types import Types
 from gravitino.dto.rel.expressions.field_reference_dto import FieldReferenceDTO
 from gravitino.dto.rel.expressions.literal_dto import LiteralDTO
-from gravitino.dto.rel.partitioning.bucket_partitioning_dto import BucketPartitioningDTO
 from gravitino.dto.rel.partitioning.day_partitioning_dto import DayPartitioningDTO
 from gravitino.dto.rel.partitioning.function_partitioning_dto import (
     FunctionPartitioningDTO,
@@ -35,13 +34,8 @@ from gravitino.dto.rel.partitioning.identity_partitioning_dto import (
 from gravitino.dto.rel.partitioning.json_serdes.partitioning_serdes import (
     PartitioningSerdes,
 )
-from gravitino.dto.rel.partitioning.list_partitioning_dto import ListPartitioningDTO
 from gravitino.dto.rel.partitioning.month_partitioning_dto import MonthPartitioningDTO
 from gravitino.dto.rel.partitioning.partitioning import Partitioning
-from gravitino.dto.rel.partitioning.range_partitioning_dto import RangePartitioningDTO
-from gravitino.dto.rel.partitioning.truncate_partitioning_dto import (
-    TruncatePartitioningDTO,
-)
 from gravitino.dto.rel.partitioning.year_partitioning_dto import YearPartitioningDTO
 from gravitino.exceptions.base import IllegalArgumentException
 
@@ -53,34 +47,13 @@ class MockPartitionStrategy(str, Enum):
 class TestPartitioningSerdes(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.field_names = [["createTime"], ["city"]]
         cls.field_name = [f"dummy_field_{i}" for i in range(1)]
-        cls.literals = {
-            PartitioningSerdes.RANGE_PARTITION_LOWER: LiteralDTO.builder()
-            .with_data_type(Types.IntegerType.get())
-            .with_value("0")
-            .build(),
-            PartitioningSerdes.RANGE_PARTITION_UPPER: LiteralDTO.builder()
-            .with_data_type(Types.IntegerType.get())
-            .with_value("100")
-            .build(),
-        }
         cls.single_field_partitioning_dtos = {
             Partitioning.Strategy.IDENTITY: IdentityPartitioningDTO(*cls.field_name),
             Partitioning.Strategy.YEAR: YearPartitioningDTO(*cls.field_name),
             Partitioning.Strategy.MONTH: MonthPartitioningDTO(*cls.field_name),
             Partitioning.Strategy.DAY: DayPartitioningDTO(*cls.field_name),
             Partitioning.Strategy.HOUR: HourPartitioningDTO(*cls.field_name),
-        }
-        cls.non_single_field_partitioning_dtos = {
-            Partitioning.Strategy.BUCKET: BucketPartitioningDTO(10, cls.field_name),
-            Partitioning.Strategy.FUNCTION: FunctionPartitioningDTO(
-                "func_name",
-                *cls.literals.values(),
-            ),
-            Partitioning.Strategy.LIST: ListPartitioningDTO([cls.field_name]),
-            Partitioning.Strategy.RANGE: RangePartitioningDTO(cls.field_name),
-            Partitioning.Strategy.TRUNCATE: TruncatePartitioningDTO(10, cls.field_name),
         }
 
     def test_serialize_invalid_strategy(self):
@@ -142,47 +115,104 @@ class TestPartitioningSerdes(unittest.TestCase):
                 serialized[PartitioningSerdes.FIELD_NAME],
             )
 
-    def test_deserialize_single_field_partitioning_dto(self):
-        for partitioning_dto in self.single_field_partitioning_dtos.values():
-            serialized = PartitioningSerdes.serialize(partitioning_dto)
-            deserialized = PartitioningSerdes.deserialize(serialized)
+    def test_deserialize_identity_partitioning_dto(self):
+        partitioning_dto = self.single_field_partitioning_dtos[
+            Partitioning.Strategy.IDENTITY
+        ]
+        json_string = """
+        {
+            "strategy": "identity",
+            "fieldName": ["dummy_field_0"]
+        }
+        """
+        deserialized = PartitioningSerdes.deserialize(json.loads(json_string))
 
-            self.assertEqual(partitioning_dto.name(), deserialized.name())
-            self.assertEqual(
-                partitioning_dto.strategy().value, deserialized.strategy().value
-            )
-            self.assertListEqual(
-                partitioning_dto.field_name(), deserialized.field_name()
-            )
+        self.assertEqual(partitioning_dto.name(), deserialized.name())
+        self.assertEqual(
+            partitioning_dto.strategy().value, deserialized.strategy().value
+        )
+        self.assertListEqual(partitioning_dto.field_name(), deserialized.field_name())
 
-    def test_deserialize_single_field_partitioning_dto_from_json_string(self):
-        for strategy, partitioning_dto in self.single_field_partitioning_dtos.items():
-            json_string = f"""
-            {{
-                "{PartitioningSerdes.STRATEGY}": "{strategy.value}",
-                "{PartitioningSerdes.FIELD_NAME}": {json.dumps(partitioning_dto.field_name())}
-            }}
-            """
+    def test_deserialize_year_partitioning_dto(self):
+        partitioning_dto = self.single_field_partitioning_dtos[
+            Partitioning.Strategy.YEAR
+        ]
+        json_string = """
+        {
+            "strategy": "year",
+            "fieldName": ["dummy_field_0"]
+        }
+        """
+        deserialized = PartitioningSerdes.deserialize(json.loads(json_string))
 
-            expected_serialized = json.loads(json_string)
-            deserialized = PartitioningSerdes.deserialize(expected_serialized)
+        self.assertEqual(partitioning_dto.name(), deserialized.name())
+        self.assertEqual(
+            partitioning_dto.strategy().value, deserialized.strategy().value
+        )
+        self.assertListEqual(partitioning_dto.field_name(), deserialized.field_name())
 
-            self.assertEqual(partitioning_dto.name(), deserialized.name())
-            self.assertEqual(
-                partitioning_dto.strategy().value, deserialized.strategy().value
-            )
-            self.assertListEqual(
-                partitioning_dto.field_name(), deserialized.field_name()
-            )
+    def test_deserialize_month_partitioning_dto(self):
+        partitioning_dto = self.single_field_partitioning_dtos[
+            Partitioning.Strategy.MONTH
+        ]
+        json_string = """
+        {
+            "strategy": "month",
+            "fieldName": ["dummy_field_0"]
+        }
+        """
+        deserialized = PartitioningSerdes.deserialize(json.loads(json_string))
+
+        self.assertEqual(partitioning_dto.name(), deserialized.name())
+        self.assertEqual(
+            partitioning_dto.strategy().value, deserialized.strategy().value
+        )
+        self.assertListEqual(partitioning_dto.field_name(), deserialized.field_name())
+
+    def test_deserialize_day_partitioning_dto(self):
+        partitioning_dto = self.single_field_partitioning_dtos[
+            Partitioning.Strategy.DAY
+        ]
+        json_string = """
+        {
+            "strategy": "day",
+            "fieldName": ["dummy_field_0"]
+        }
+        """
+        deserialized = PartitioningSerdes.deserialize(json.loads(json_string))
+
+        self.assertEqual(partitioning_dto.name(), deserialized.name())
+        self.assertEqual(
+            partitioning_dto.strategy().value, deserialized.strategy().value
+        )
+        self.assertListEqual(partitioning_dto.field_name(), deserialized.field_name())
+
+    def test_deserialize_hour_partitioning_dto(self):
+        partitioning_dto = self.single_field_partitioning_dtos[
+            Partitioning.Strategy.HOUR
+        ]
+        json_string = """
+        {
+            "strategy": "hour",
+            "fieldName": ["dummy_field_0"]
+        }
+        """
+        deserialized = PartitioningSerdes.deserialize(json.loads(json_string))
+
+        self.assertEqual(partitioning_dto.name(), deserialized.name())
+        self.assertEqual(
+            partitioning_dto.strategy().value, deserialized.strategy().value
+        )
+        self.assertListEqual(partitioning_dto.field_name(), deserialized.field_name())
 
     def test_serdes_bucket_partitioning_dto(self):
         field_names = [["score"]]
-        json_string = f"""
-        {{
-            "{PartitioningSerdes.STRATEGY}": "{Partitioning.Strategy.BUCKET.value}",
-            "{PartitioningSerdes.NUM_BUCKETS}": 10,
-            "{PartitioningSerdes.FIELD_NAMES}": {json.dumps(field_names)}
-        }}
+        json_string = """
+        {
+            "strategy": "bucket",
+            "numBuckets": 10,
+            "fieldNames": [["score"]]
+        }
         """
 
         expected_serialized = json.loads(json_string)
@@ -199,12 +229,12 @@ class TestPartitioningSerdes(unittest.TestCase):
 
     def test_serdes_truncate_partitioning_dto(self):
         field_name = ["score"]
-        json_string = f"""
-        {{
-            "{PartitioningSerdes.STRATEGY}": "{Partitioning.Strategy.TRUNCATE.value}",
-            "{PartitioningSerdes.WIDTH}": 20,
-            "{PartitioningSerdes.FIELD_NAME}": {json.dumps(field_name)}
-        }}
+        json_string = """
+        {
+            "strategy": "truncate",
+            "width": 20,
+            "fieldName": ["score"]
+        }
         """
 
         expected_serialized = json.loads(json_string)
@@ -222,12 +252,12 @@ class TestPartitioningSerdes(unittest.TestCase):
         self.assertDictEqual(expected_serialized, serialized)
 
     def test_serdes_list_partitioning_dto_invalid_assignments(self):
-        json_string = f"""
-        {{
-            "{PartitioningSerdes.STRATEGY}": "{Partitioning.Strategy.LIST.value}",
-            "{PartitioningSerdes.FIELD_NAMES}": {json.dumps(TestPartitioningSerdes.field_names)},
-            "{PartitioningSerdes.ASSIGNMENTS_NAME}": "invalid_assignments"
-        }}
+        json_string = """
+        {
+            "strategy": "list",
+            "fieldNames": [["createTime"], ["city"]],
+            "assignments": "invalid_assignments"
+        }
         """
         with self.assertRaisesRegex(
             IllegalArgumentException,
@@ -236,27 +266,27 @@ class TestPartitioningSerdes(unittest.TestCase):
             PartitioningSerdes.deserialize(json.loads(json_string))
 
     def test_serdes_list_partitioning_dto_invalid_list_assignment(self):
-        json_string = f"""
-        {{
-            "{PartitioningSerdes.STRATEGY}": "{Partitioning.Strategy.LIST.value}",
-            "{PartitioningSerdes.FIELD_NAMES}": {json.dumps(TestPartitioningSerdes.field_names)},
-            "{PartitioningSerdes.ASSIGNMENTS_NAME}": [
-                {{
-                    "{PartitioningSerdes.PARTITION_TYPE}": "range",
-                    "{PartitioningSerdes.PARTITION_NAME}": "p20200321",
-                    "{PartitioningSerdes.RANGE_PARTITION_UPPER}": {{
-                        "{PartitioningSerdes.TYPE}": "literal",
-                        "{PartitioningSerdes.DATA_TYPE}": "date",
-                        "{PartitioningSerdes.LITERAL_VALUE}": "2020-03-21"
-                    }},
-                    "{PartitioningSerdes.RANGE_PARTITION_LOWER}": {{
-                        "{PartitioningSerdes.TYPE}": "literal",
-                        "{PartitioningSerdes.DATA_TYPE}": "null",
-                        "{PartitioningSerdes.LITERAL_VALUE}": "null"
-                    }}
-                }}
+        json_string = """
+        {
+            "strategy": "list",
+            "fieldNames": [["createTime"], ["city"]],
+            "assignments": [
+                {
+                    "type": "range",
+                    "name": "p20200321",
+                    "upper": {
+                        "type": "literal",
+                        "dataType": "date",
+                        "value": "2020-03-21"
+                    },
+                    "lower": {
+                        "type": "literal",
+                        "dataType": "null",
+                        "value": "null"
+                    }
+                }
             ]
-        }}
+        }
         """
         with self.assertRaisesRegex(
             IllegalArgumentException,
@@ -265,11 +295,12 @@ class TestPartitioningSerdes(unittest.TestCase):
             PartitioningSerdes.deserialize(json.loads(json_string))
 
     def test_serdes_list_partitioning_dto(self):
-        json_string = f"""
-        {{
-            "{PartitioningSerdes.STRATEGY}": "{Partitioning.Strategy.LIST.value}",
-            "{PartitioningSerdes.FIELD_NAMES}": {json.dumps(TestPartitioningSerdes.field_names)}
-        }}
+        field_names = [["createTime"], ["city"]]
+        json_string = """
+        {
+            "strategy": "list",
+            "fieldNames": [["createTime"], ["city"]]
+        }
         """
 
         expected_serialized = json.loads(json_string)
@@ -279,9 +310,7 @@ class TestPartitioningSerdes(unittest.TestCase):
         self.assertEqual(
             Partitioning.Strategy.LIST.value, deserialized.strategy().value
         )
-        self.assertListEqual(
-            TestPartitioningSerdes.field_names, deserialized.field_names()
-        )
+        self.assertListEqual(field_names, deserialized.field_names())
 
         serialized = PartitioningSerdes.serialize(deserialized)
         self.assertEqual(
@@ -297,44 +326,44 @@ class TestPartitioningSerdes(unittest.TestCase):
             serialized[PartitioningSerdes.ASSIGNMENTS_NAME],
         )
 
-        json_string = f"""
-        {{
-            "{PartitioningSerdes.STRATEGY}": "{Partitioning.Strategy.LIST.value}",
-            "{PartitioningSerdes.FIELD_NAMES}": {json.dumps(TestPartitioningSerdes.field_names)},
-            "{PartitioningSerdes.ASSIGNMENTS_NAME}": [
-                {{
-                    "{PartitioningSerdes.PARTITION_TYPE}": "list",
-                    "{PartitioningSerdes.PARTITION_NAME}": "p202204_California",
-                    "{PartitioningSerdes.PARTITION_PROPERTIES}": {{}},
-                    "{PartitioningSerdes.LIST_PARTITION_LISTS}": [
+        json_string = """
+        {
+            "strategy": "list",
+            "fieldNames": [["createTime"], ["city"]],
+            "assignments": [
+                {
+                    "type": "list",
+                    "name": "p202204_California",
+                    "properties": {},
+                    "lists": [
                         [
-                            {{
-                                "{PartitioningSerdes.TYPE}": "literal",
-                                "{PartitioningSerdes.DATA_TYPE}": "date",
-                                "{PartitioningSerdes.LITERAL_VALUE}": "2022-04-01"
-                            }},
-                            {{
-                                "{PartitioningSerdes.TYPE}": "literal",
-                                "{PartitioningSerdes.DATA_TYPE}": "string",
-                                "{PartitioningSerdes.LITERAL_VALUE}": "Los Angeles"
-                            }}
+                            {
+                                "type": "literal",
+                                "dataType": "date",
+                                "value": "2022-04-01"
+                            },
+                            {
+                                "type": "literal",
+                                "dataType": "string",
+                                "value": "Los Angeles"
+                            }
                         ],
                         [
-                            {{
-                                "{PartitioningSerdes.TYPE}": "literal",
-                                "{PartitioningSerdes.DATA_TYPE}": "date",
-                                "{PartitioningSerdes.LITERAL_VALUE}": "2022-04-01"
-                            }},
-                            {{
-                                "{PartitioningSerdes.TYPE}": "literal",
-                                "{PartitioningSerdes.DATA_TYPE}": "string",
-                                "{PartitioningSerdes.LITERAL_VALUE}": "San Francisco"
-                            }}
+                            {
+                                "type": "literal",
+                                "dataType": "date",
+                                "value": "2022-04-01"
+                            },
+                            {
+                                "type": "literal",
+                                "dataType": "string",
+                                "value": "San Francisco"
+                            }
                         ]
                     ]
-                }}
+                }
             ]
-        }}
+        }
         """
 
         expected_serialized = json.loads(json_string)
@@ -354,12 +383,12 @@ class TestPartitioningSerdes(unittest.TestCase):
         )
 
     def test_serdes_range_partitioning_dto_invalid_assignments(self):
-        json_string = f"""
-        {{
-            "{PartitioningSerdes.STRATEGY}": "{Partitioning.Strategy.RANGE.value}",
-            "{PartitioningSerdes.FIELD_NAME}": {json.dumps(TestPartitioningSerdes.field_name)},
-            "{PartitioningSerdes.ASSIGNMENTS_NAME}": "invalid_assignments"
-        }}
+        json_string = """
+        {
+            "strategy": "range",
+            "fieldName": ["dummy_field_0"],
+            "assignments": "invalid_assignments"
+        }
         """
         with self.assertRaisesRegex(
             IllegalArgumentException,
@@ -368,32 +397,32 @@ class TestPartitioningSerdes(unittest.TestCase):
             PartitioningSerdes.deserialize(json.loads(json_string))
 
     def test_serdes_range_partitioning_dto_invalid_range_assignment(self):
-        json_string = f"""
-        {{
-            "{PartitioningSerdes.STRATEGY}": "{Partitioning.Strategy.RANGE.value}",
-            "{PartitioningSerdes.FIELD_NAME}": {json.dumps(TestPartitioningSerdes.field_name)},
-            "{PartitioningSerdes.ASSIGNMENTS_NAME}": [
-                {{
-                    "{PartitioningSerdes.PARTITION_TYPE}": "list",
-                    "{PartitioningSerdes.PARTITION_NAME}": "p202204_California",
-                    "{PartitioningSerdes.PARTITION_PROPERTIES}": {{}},
-                    "{PartitioningSerdes.LIST_PARTITION_LISTS}": [
+        json_string = """
+        {
+            "strategy": "range",
+            "fieldName": ["dummy_field_0"],
+            "assignments": [
+                {
+                    "type": "list",
+                    "name": "p202204_California",
+                    "properties": {},
+                    "lists": [
                         [
-                            {{
-                                "{PartitioningSerdes.TYPE}": "literal",
-                                "{PartitioningSerdes.DATA_TYPE}": "date",
-                                "{PartitioningSerdes.LITERAL_VALUE}": "2022-04-01"
-                            }},
-                            {{
-                                "{PartitioningSerdes.TYPE}": "literal",
-                                "{PartitioningSerdes.DATA_TYPE}": "string",
-                                "{PartitioningSerdes.LITERAL_VALUE}": "Los Angeles"
-                            }}
+                            {
+                                "type": "literal",
+                                "dataType": "date",
+                                "value": "2022-04-01"
+                            },
+                            {
+                                "type": "literal",
+                                "dataType": "string",
+                                "value": "Los Angeles"
+                            }
                         ]
                     ]
-                }}
+                }
             ]
-        }}
+        }
         """
         with self.assertRaisesRegex(
             IllegalArgumentException,
@@ -402,11 +431,11 @@ class TestPartitioningSerdes(unittest.TestCase):
             PartitioningSerdes.deserialize(json.loads(json_string))
 
     def test_serdes_range_partitioning_dto(self):
-        json_string = f"""
-        {{
-            "{PartitioningSerdes.STRATEGY}": "{Partitioning.Strategy.RANGE.value}",
-            "{PartitioningSerdes.FIELD_NAME}": {json.dumps(TestPartitioningSerdes.field_name)}
-        }}
+        json_string = """
+        {
+            "strategy": "range",
+            "fieldName": ["dummy_field_0"]
+        }
         """
 
         expected_serialized = json.loads(json_string)
@@ -434,28 +463,28 @@ class TestPartitioningSerdes(unittest.TestCase):
             serialized[PartitioningSerdes.ASSIGNMENTS_NAME],
         )
 
-        json_string = f"""
-        {{
-            "{PartitioningSerdes.STRATEGY}": "{Partitioning.Strategy.RANGE.value}",
-            "{PartitioningSerdes.FIELD_NAME}": {json.dumps(TestPartitioningSerdes.field_name)},
-            "{PartitioningSerdes.ASSIGNMENTS_NAME}": [
-                {{
-                    "{PartitioningSerdes.PARTITION_TYPE}": "range",
-                    "{PartitioningSerdes.PARTITION_NAME}": "p20200321",
-                    "{PartitioningSerdes.RANGE_PARTITION_UPPER}": {{
-                        "{PartitioningSerdes.TYPE}": "literal",
-                        "{PartitioningSerdes.DATA_TYPE}": "date",
-                        "{PartitioningSerdes.LITERAL_VALUE}": "2020-03-21"
-                    }},
-                    "{PartitioningSerdes.RANGE_PARTITION_LOWER}": {{
-                        "{PartitioningSerdes.TYPE}": "literal",
-                        "{PartitioningSerdes.DATA_TYPE}": "null",
-                        "{PartitioningSerdes.LITERAL_VALUE}": "null"
-                    }},
-                    "{PartitioningSerdes.PARTITION_PROPERTIES}": {{"key": "value"}}
-                }}
+        json_string = """
+        {
+            "strategy": "range",
+            "fieldName": ["dummy_field_0"],
+            "assignments": [
+                {
+                    "type": "range",
+                    "name": "p20200321",
+                    "upper": {
+                        "type": "literal",
+                        "dataType": "date",
+                        "value": "2020-03-21"
+                    },
+                    "lower": {
+                        "type": "literal",
+                        "dataType": "null",
+                        "value": "null"
+                    },
+                    "properties": {"key": "value"}
+                }
             ]
-        }}
+        }
         """
 
         expected_serialized = json.loads(json_string)
@@ -475,11 +504,11 @@ class TestPartitioningSerdes(unittest.TestCase):
         )
 
     def test_serdes_function_partitioning_dto_invalid_args(self):
-        json_string = f"""
-        {{
-            "{PartitioningSerdes.STRATEGY}": "{Partitioning.Strategy.FUNCTION.value}",
-            "{PartitioningSerdes.FUNCTION_NAME}": "dummy_func_name"
-        }}
+        json_string = """
+        {
+            "strategy": "function",
+            "funcName": "dummy_func_name"
+        }
         """
 
         with self.assertRaisesRegex(
@@ -496,22 +525,22 @@ class TestPartitioningSerdes(unittest.TestCase):
             .with_value("Asia/Shanghai")
             .build()
         )
-        json_string = f"""
-        {{
-            "{PartitioningSerdes.STRATEGY}": "{Partitioning.Strategy.FUNCTION.value}",
-            "{PartitioningSerdes.FUNCTION_NAME}": "to_date",
-            "{PartitioningSerdes.FUNCTION_ARGS}": [
-                {{
-                    "{PartitioningSerdes.TYPE}": "field",
-                    "{PartitioningSerdes.FIELD_NAME}": ["dt"]
-                }},
-                {{
-                    "{PartitioningSerdes.TYPE}": "literal",
-                    "{PartitioningSerdes.DATA_TYPE}": "string",
-                    "{PartitioningSerdes.LITERAL_VALUE}": "Asia/Shanghai"
-                }}
+        json_string = """
+        {
+            "strategy": "function",
+            "funcName": "to_date",
+            "funcArgs": [
+                {
+                    "type": "field",
+                    "fieldName": ["dt"]
+                },
+                {
+                    "type": "literal",
+                    "dataType": "string",
+                    "value": "Asia/Shanghai"
+                }
             ]
-        }}
+        }
         """
 
         expected_serialized = json.loads(json_string)
