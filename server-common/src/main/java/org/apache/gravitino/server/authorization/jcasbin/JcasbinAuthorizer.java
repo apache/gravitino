@@ -480,30 +480,6 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
     }
   }
 
-  /** Async initialize owner */
-  private void initializeOwnerAsync() {
-    OwnerPolicyAsyncLoader loader = OwnerPolicyAsyncLoader.create(executor);
-    loader.loadAllOwnerAsync(
-        100,
-        (ownerRels) -> {
-          for (OwnerRelPO ownerRel : ownerRels) {
-            String ownerType = ownerRel.getOwnerType();
-            if ("user".equalsIgnoreCase(ownerType)) {
-              Long metadataObjectId = ownerRel.getMetadataObjectId();
-              ImmutableList<String> policy =
-                  ImmutableList.of(
-                      String.valueOf(ownerRel.getOwnerId()),
-                      ownerRel.getMetadataObjectType(),
-                      String.valueOf(metadataObjectId),
-                      AuthConstants.OWNER,
-                      AuthConstants.ALLOW);
-              allowEnforcer.addPolicy(policy);
-              loadedOwners.add(metadataObjectId);
-            }
-          }
-        });
-  }
-
   private void loadPolicyByRoleEntity(RoleEntity roleEntity) {
     String metalake = NameIdentifierUtil.getMetalake(roleEntity.nameIdentifier());
     List<SecurableObject> securableObjects = roleEntity.securableObjects();
