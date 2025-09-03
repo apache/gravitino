@@ -26,6 +26,7 @@ import org.apache.gravitino.credential.Credential;
 import org.apache.gravitino.credential.SupportsCredentials;
 import org.apache.gravitino.dto.responses.CredentialResponse;
 import org.apache.gravitino.dto.util.DTOConverters;
+import org.apache.gravitino.rest.RESTUtils;
 
 /**
  * The implementation of {@link SupportsCredentials}. This interface will be composited into
@@ -43,9 +44,9 @@ class MetadataObjectCredentialOperations implements SupportsCredentials {
     this.credentialRequestPath =
         String.format(
             "api/metalakes/%s/objects/%s/%s/credentials",
-            metalakeName,
+            RESTUtils.encodeString(metalakeName),
             metadataObject.type().name().toLowerCase(Locale.ROOT),
-            metadataObject.fullName());
+            RESTUtils.encodeString(metadataObject.fullName()));
   }
 
   @Override
