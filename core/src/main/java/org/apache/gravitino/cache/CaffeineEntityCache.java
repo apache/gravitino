@@ -396,7 +396,7 @@ public class CaffeineEntityCache extends BaseEntityCache {
                     });
           });
 
-      queue.addAll(relatedEntityKeysToRemove);
+      queue.addAll(reverseKeysToRemove);
     }
 
     return true;
