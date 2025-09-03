@@ -89,9 +89,7 @@ public class EntityCacheRelationKey extends EntityCacheKey {
     if (!(obj instanceof EntityCacheRelationKey)) return false;
     EntityCacheRelationKey other = (EntityCacheRelationKey) obj;
 
-    return Objects.equals(super.identifier(), other.identifier())
-        && Objects.equals(super.entityType(), other.entityType())
-        && Objects.equals(relationType, other.relationType);
+    return super.equals(obj) && Objects.equals(relationType, other.relationType);
   }
 
   /**

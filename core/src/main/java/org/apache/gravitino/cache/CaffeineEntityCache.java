@@ -200,8 +200,6 @@ public class CaffeineEntityCache extends BaseEntityCache {
     withLock(
         () -> {
           cacheData.invalidateAll();
-          reverseIndex.clean();
-          cacheIndex = new ConcurrentRadixTree<>(new DefaultCharArrayNodeFactory());
         });
   }
 
@@ -398,7 +396,7 @@ public class CaffeineEntityCache extends BaseEntityCache {
                     });
           });
 
-      reverseKeysToRemove.forEach(queue::offer);
+      queue.addAll(relatedEntityKeysToRemove);
     }
 
     return true;
