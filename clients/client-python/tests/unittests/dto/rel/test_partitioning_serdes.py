@@ -69,7 +69,7 @@ class TestPartitioningSerdes(unittest.TestCase):
             )
 
     def test_deserialize_invalid_json(self):
-        invalid_partitioning_data = (None, "invalid_data", {})
+        invalid_partitioning_data = (None, "invalid_data")
 
         for invalid_data in invalid_partitioning_data:
             with self.assertRaisesRegex(
@@ -77,28 +77,39 @@ class TestPartitioningSerdes(unittest.TestCase):
             ):
                 PartitioningSerdes.deserialize(invalid_data)
 
+        invalid_json_string = "{}"
+        with self.assertRaisesRegex(
+            IllegalArgumentException, "Cannot parse partitioning from invalid JSON"
+        ):
+            PartitioningSerdes.deserialize(json.loads(invalid_json_string))
+
     def test_deserialize_invalid_strategy(self):
         """Tests missing strategy and unknown partitioning strategy."""
 
-        invalid_data_base = {
-            PartitioningSerdes.FIELD_NAME: self.field_name,
+        missing_strategy_json_string = """
+        {
+            "fieldName": ["dummy_field_0"]
         }
-        invalid_strategy_data = {
-            PartitioningSerdes.STRATEGY: "invalid_strategy",
-            **invalid_data_base,
+        """
+
+        invalid_strategy_json_string = """
+        {
+            "strategy": "invalid_strategy",
+            "fieldName": ["dummy_field_0"]
         }
+        """
 
         with self.assertRaisesRegex(
             IllegalArgumentException,
             "Cannot parse partitioning from missing strategy",
         ):
-            PartitioningSerdes.deserialize(invalid_data_base)
+            PartitioningSerdes.deserialize(json.loads(missing_strategy_json_string))
 
         with self.assertRaisesRegex(
             IOError,
             "Unknown partitioning strategy",
         ):
-            PartitioningSerdes.deserialize(invalid_strategy_data)
+            PartitioningSerdes.deserialize(json.loads(invalid_strategy_json_string))
 
     def test_serialize_single_field_partitioning_dto(self):
         for partitioning_dto in self.single_field_partitioning_dtos.values():
