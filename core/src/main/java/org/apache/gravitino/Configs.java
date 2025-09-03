@@ -358,7 +358,7 @@ public class Configs {
           .doc("Whether to enable the cached Entity store.")
           .version(ConfigConstants.VERSION_1_0_0)
           .booleanConf()
-          .createWithDefault(false);
+          .createWithDefault(true);
 
   // Maximum number of entries in the cache
   public static final ConfigEntry<Integer> CACHE_MAX_ENTRIES =

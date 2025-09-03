@@ -204,11 +204,6 @@ allprojects {
             "[-PtestMode=embedded] or [-PtestMode=deploy]."
         )
       }
-
-      // enable entity cache or not
-      val enableEntityCache = project.properties["enableEntityCache"] as? String ?: "false"
-      param.systemProperty("enableEntityCache", enableEntityCache)
-
       param.useJUnitPlatform()
       val skipUTs = project.hasProperty("skipTests")
       if (skipUTs) {

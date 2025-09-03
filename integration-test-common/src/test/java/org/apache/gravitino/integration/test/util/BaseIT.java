@@ -100,8 +100,6 @@ public class BaseIT {
 
   public String testMode = "";
 
-  public String enableEntityCache = "";
-
   protected Map<String, String> customConfigs = new HashMap<>();
 
   protected boolean ignoreIcebergRestService = true;
@@ -298,16 +296,6 @@ public class BaseIT {
             : System.getProperty(ITUtils.TEST_MODE);
 
     LOG.info("Running Gravitino Server in {} mode", testMode);
-
-    enableEntityCache =
-        System.getProperty(ITUtils.ENABLE_ENTITY_CACHE) == null
-            ? "false"
-            : System.getProperty(ITUtils.ENABLE_ENTITY_CACHE);
-    if (enableEntityCache.equals("true")) {
-      customConfigs.put(Configs.CACHE_ENABLED.getKey(), "true");
-    }
-
-    LOG.info("Cache Enabled ? {}", enableEntityCache);
 
     if ("MySQL".equalsIgnoreCase(System.getenv("jdbcBackend"))) {
       // Start MySQL docker instance.

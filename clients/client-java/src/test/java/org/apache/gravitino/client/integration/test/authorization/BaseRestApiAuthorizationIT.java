@@ -52,6 +52,8 @@ public class BaseRestApiAuthorizationIT extends BaseIT {
             USER,
             Configs.ENABLE_AUTHORIZATION.getKey(),
             "true",
+            Configs.CACHE_ENABLED.getKey(),
+            "false",
             Configs.AUTHENTICATORS.getKey(),
             "simple"));
     putServiceAdmin();
