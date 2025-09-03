@@ -116,6 +116,7 @@ public class RelationalEntityStore
     cache.put(e);
   }
 
+  @Override
   public <E extends Entity & HasIdentifier> E update(
       NameIdentifier ident, Class<E> type, Entity.EntityType entityType, Function<E, E> updater)
       throws IOException, NoSuchEntityException, EntityAlreadyExistsException {
