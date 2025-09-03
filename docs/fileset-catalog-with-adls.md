@@ -306,7 +306,7 @@ Or use the bundle jar with Hadoop environment if there is no Hadoop environment:
 
 ### Using Spark to access the fileset
 
-The following code snippet shows how to use **PySpark 3.1.3 with Hadoop environment(Hadoop 3.2.0)** to access the fileset:
+The following code snippet shows how to use **PySpark 3.1.3 with Hadoop environment(Hadoop 3.2.0)** and JDK8 to access the fileset:
 
 Before running the following code, you need to install required packages:
 
@@ -326,8 +326,10 @@ metalake_name = "test"
 catalog_name = "your_adls_catalog"
 schema_name = "your_adls_schema"
 fileset_name = "your_adls_fileset"
-
+# JDK8
 os.environ["PYSPARK_SUBMIT_ARGS"] = "--jars /path/to/gravitino-azure-{gravitino-version}.jar,/path/to/gravitino-filesystem-hadoop3-runtime-{gravitino-version}.jar,/path/to/hadoop-azure-3.2.0.jar,/path/to/azure-storage-7.0.0.jar,/path/to/wildfly-openssl-1.0.4.Final.jar --master local[1] pyspark-shell"
+# JDK17
+os.environ["PYSPARK_SUBMIT_ARGS"] = "--jars /path/to/gravitino-azure-{gravitino-version}.jar,/path/to/gravitino-filesystem-hadoop3-runtime-{gravitino-version}.jar,/path/to/hadoop-azure-3.2.0.jar,/path/to/azure-storage-7.0.0.jar,/path/to/wildfly-openssl-1.0.4.Final.jar --conf \"spark.driver.extraJavaOptions=--add-opens=java.base/sun.nio.ch=ALL-UNNAMED\" --conf \"spark.executor.extraJavaOptions=--add-opens=java.base/sun.nio.ch=ALL-UNNAMED\" --master local[1] pyspark-shell"
 spark = SparkSession.builder
     .appName("adls_fileset_test")
     .config("spark.hadoop.fs.AbstractFileSystem.gvfs.impl", "org.apache.gravitino.filesystem.hadoop.Gvfs")
@@ -335,7 +337,7 @@ spark = SparkSession.builder
     .config("spark.hadoop.fs.gravitino.server.uri", "http://localhost:8090")
     .config("spark.hadoop.fs.gravitino.client.metalake", "test")
     .config("spark.hadoop.azure-storage-account-name", "azure_account_name")
-    .config("spark.hadoop.azure-storage-account-key", "azure_account_name")
+    .config("spark.hadoop.azure-storage-account-key", "azure_account_key")
     .config("spark.hadoop.fs.azure.skipUserGroupMetadataDuringInitialization", "true")
     .config("spark.driver.memory", "2g")
     .config("spark.driver.port", "2048")
@@ -359,11 +361,24 @@ If your Spark **without Hadoop environment**, you can use the following code sni
 
 os.environ["PYSPARK_SUBMIT_ARGS"] = "--jars /path/to/gravitino-azure-bundle-{gravitino-version}.jar,/path/to/gravitino-filesystem-hadoop3-runtime-{gravitino-version}.jar --master local[1] pyspark-shell"
 ```
+If Spark can't start with the above configuration (no Hadoop environment available and use bundle jar), you can try to set the jars to the classpath directly:
 
-- [`gravitino-azure-bundle-${gravitino-version}.jar`](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-azure-bundle) is the Gravitino ADLS jar with Hadoop environment(3.3.1) and `hadoop-azure` jar.
-- [`gravitino-azure-${gravitino-version}.jar`](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-azure) is a condensed version of the Gravitino ADLS bundle jar without Hadoop environment and `hadoop-azure` jar.
+```python
+jars_path = (
+    "/path/to/gravitino-azure-bundle-{gravitino-version}.jar:"
+    "/path/to/gravitino-filesystem-hadoop3-runtime-{gravitino-version}.jar"
+)
+
+os.environ["PYSPARK_SUBMIT_ARGS"] = (
+    f'--conf "spark.driver.extraClassPath={jars_path}" '
+    f'--conf "spark.executor.extraClassPath={jars_path}" '
+    '--master local[1] pyspark-shell'
+)
+```
+
+- [`gravitino-azure-bundle-${gravitino-version}.jar`](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-azure-bundle) is the Gravitino ADLS jar with Hadoop environment(3.3.1), `hadoop-azure.jar` and all packages needed to access ADLS.
+- [`gravitino-azure-${gravitino-version}.jar`](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-azure) is a condensed version of the Gravitino ADLS bundle jar without Hadoop environment and `hadoop-azure.jar`.
 - `hadoop-azure-3.2.0.jar` and `azure-storage-7.0.0.jar` can be found in the Hadoop distribution in the `${HADOOP_HOME}/share/hadoop/tools/lib` directory.
-
 
 Please choose the correct jar according to your environment.
 
