@@ -85,17 +85,6 @@ class PermissionManager {
               UserEntity.class,
               Entity.EntityType.USER,
               userEntity -> {
-                if (store instanceof EntityCache) {
-                  EntityCache cache = (EntityCache) store;
-                  roles.forEach(
-                      roleName -> {
-                        Namespace namespaceRole = NamespaceUtil.ofRole(metalake);
-                        NameIdentifier nameIdentifierRole =
-                            NameIdentifier.of(namespaceRole, roleName);
-                        cache.invalidate(nameIdentifierRole, Entity.EntityType.ROLE);
-                      });
-                }
-
                 List<RoleEntity> roleEntities = Lists.newArrayList();
                 if (userEntity.roleNames() != null) {
                   for (String role : userEntity.roleNames()) {
