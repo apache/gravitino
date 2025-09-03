@@ -28,7 +28,7 @@ CREATE TABLE gt_db2.tb02 (
 
 INSERT INTO gt_db2.tb02(name, salary) VALUES ('bob', 14), ('tom', 12), ('bob', 15);
 
-SELECT * FROM gt_db2.tb02 ORDER BY name;
+SELECT * FROM gt_db2.tb02 ORDER BY salary;
 
 DELETE FROM gt_db2.tb02 WHERE name='bob';
 
