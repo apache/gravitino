@@ -82,4 +82,24 @@ public class TestAuditInfo {
     Assertions.assertEquals("first", first.creator());
     Assertions.assertEquals("second", second.creator());
   }
+
+  @Test
+  public void testMergeDoesNotOverwriteWithNull() {
+    Instant now = Instant.now();
+    AuditInfo original =
+        AuditInfo.builder()
+            .withCreator("creator")
+            .withCreateTime(now)
+            .withLastModifier("modifier")
+            .withLastModifiedTime(now)
+            .build();
+    AuditInfo other = AuditInfo.builder().withLastModifier("new").build();
+
+    original.merge(other, true);
+
+    Assertions.assertEquals("creator", original.creator());
+    Assertions.assertEquals(now, original.createTime());
+    Assertions.assertEquals("new", original.lastModifier());
+    Assertions.assertEquals(now, original.lastModifiedTime());
+  }
 }
