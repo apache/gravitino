@@ -37,7 +37,7 @@ import org.slf4j.LoggerFactory;
  * - RoleEntity role is {metalake-name}.system.role.{role-name}:ROLE-{serial-number} <br>
  */
 public class ReverseIndexRules {
-  private static final Logger LOG = LoggerFactory.getLogger(ReverseIndexRules.class.getName());
+  private static final Logger LOG = LoggerFactory.getLogger(ReverseIndexRules.class);
 
   /** UserEntity reverse index processor */
   public static final ReverseIndexCache.ReverseIndexRule USER_REVERSE_RULE =

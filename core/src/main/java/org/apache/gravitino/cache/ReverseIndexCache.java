@@ -50,10 +50,6 @@ public class ReverseIndexCache {
     registerReverseRule(RoleEntity.class, ReverseIndexRules.ROLE_REVERSE_RULE);
   }
 
-  public void clean() {
-    this.reverseIndex = new ConcurrentRadixTree<>(new DefaultCharArrayNodeFactory());
-  }
-
   public boolean remove(EntityCacheKey key) {
     return reverseIndex.remove(key.toString());
   }
@@ -108,7 +104,7 @@ public class ReverseIndexCache {
 
   /** Functional interface for processing reverse index rules. */
   @FunctionalInterface
-  public interface ReverseIndexRule {
+  interface ReverseIndexRule {
     void indexEntity(Entity entity, EntityCacheRelationKey key, ReverseIndexCache cache);
   }
 }
