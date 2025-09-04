@@ -31,8 +31,11 @@ import org.apache.gravitino.exceptions.NoSuchSchemaException;
 /** List the properties of a schema. */
 public class ListSchemaProperties extends ListProperties {
 
+  /** The name of the metalake. */
   protected final String metalake;
+  /** The name of the catalog. */
   protected final String catalog;
+  /** The name of the schema. */
   protected final String schema;
 
   /**

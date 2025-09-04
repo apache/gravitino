@@ -28,7 +28,7 @@ import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.HelpFormatter;
 import org.apache.commons.cli.Options;
 
-/* Gravitino Command line */
+/** Gravitino Command line */
 public class GravitinoCommandLine extends TestableCommandLine {
 
   private final CommandLine line;
@@ -36,7 +36,9 @@ public class GravitinoCommandLine extends TestableCommandLine {
   private final String entity;
   private final String command;
 
-  public static final String CMD = "gcli"; // recommended name
+  /** Name of the command line tool. */
+  public static final String CMD = "gcli";
+  /** Default URL for the Gravitino server. */
   public static final String DEFAULT_URL = "http://localhost:8090";
   // This joiner is used to join multiple outputs to be displayed, e.g. roles or groups
 

@@ -39,14 +39,21 @@ import org.apache.gravitino.client.GravitinoClientBase;
 import org.apache.gravitino.client.KerberosTokenProvider;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 
-/* The base for all commands. */
+/** The base for all commands. */
 public abstract class Command {
+  /** The table output format */
   public static final String OUTPUT_FORMAT_TABLE = "table";
+  /** The plain output format */
   public static final String OUTPUT_FORMAT_PLAIN = "plain";
+  /** The joiner for comma-separated values */
   public static final Joiner COMMA_JOINER = Joiner.on(", ").skipNulls();
 
+  /** The authentication mode to be used (e.g. "simple") */
   protected static String authentication = null;
+  /** The username associated with the authentication mode */
   protected static String userName = null;
+  /** The command context */
+  protected final CommandContext context;
 
   private static final String SIMPLE_AUTH = "simple";
   private static final String OAUTH_AUTH = "oauth";
@@ -55,8 +62,6 @@ public abstract class Command {
   private final String url;
   private final boolean ignoreVersions;
   private final String outputFormat;
-
-  protected final CommandContext context;
 
   /**
    * Command constructor.
