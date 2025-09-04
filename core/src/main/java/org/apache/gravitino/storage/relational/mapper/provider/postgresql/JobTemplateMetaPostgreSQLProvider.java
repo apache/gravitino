@@ -33,7 +33,7 @@ public class JobTemplateMetaPostgreSQLProvider extends JobTemplateMetaBaseSQLPro
     return "UPDATE "
         + JobTemplateMetaMapper.TABLE_NAME
         + " SET deleted_at = floor(extract(epoch from(current_timestamp -"
-        + " timestamp '1970-01-01 00:00:00'))*1000) "
+        + " timestamp '1970-01-01 00:00:00'))*1000)"
         + " WHERE metalake_id IN ("
         + " SELECT metalake_id FROM "
         + MetalakeMetaMapper.TABLE_NAME
@@ -46,7 +46,7 @@ public class JobTemplateMetaPostgreSQLProvider extends JobTemplateMetaBaseSQLPro
     return "UPDATE "
         + JobTemplateMetaMapper.TABLE_NAME
         + " SET deleted_at = floor(extract(epoch from(current_timestamp -"
-        + " timestamp '1970-01-01 00:00:00'))*1000) "
+        + " timestamp '1970-01-01 00:00:00'))*1000)"
         + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0";
   }
 
