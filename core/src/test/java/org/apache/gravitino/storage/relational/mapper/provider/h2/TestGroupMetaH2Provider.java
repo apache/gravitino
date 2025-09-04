@@ -25,59 +25,110 @@ import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.ResultSet;
 import java.sql.Statement;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
 public class TestGroupMetaH2Provider {
 
+  private static final String DB_CONNECTION_URL = "jdbc:h2:mem:test;MODE=MYSQL;DB_CLOSE_DELAY=-1";
+  private static final String DB_USER = "sa";
+  private static final String DB_PASSWORD = "";
+
+  private static Connection connection;
+  private static Statement statement;
+  private static GroupMetaH2Provider groupMetaH2Provider;
+
+  @BeforeAll
+  public static void setUp() throws Exception {
+    connection = DriverManager.getConnection(DB_CONNECTION_URL, DB_USER, DB_PASSWORD);
+    statement = connection.createStatement();
+    groupMetaH2Provider = new GroupMetaH2Provider();
+    createSchema(statement);
+  }
+
+  private static void createSchema(Statement statement) throws Exception {
+    statement.execute(
+        "CREATE TABLE IF NOT EXISTS group_meta ("
+            + "group_id BIGINT, "
+            + "group_name VARCHAR(255), "
+            + "metalake_id BIGINT, "
+            + "audit_info VARCHAR(255), "
+            + "current_version BIGINT, "
+            + "last_version BIGINT, "
+            + "deleted_at BIGINT)");
+    statement.execute(
+        "CREATE TABLE IF NOT EXISTS role_meta ("
+            + "role_id BIGINT, "
+            + "role_name VARCHAR(255), "
+            + "deleted_at BIGINT)");
+    statement.execute(
+        "CREATE TABLE IF NOT EXISTS group_role_rel ("
+            + "group_id BIGINT, "
+            + "role_id BIGINT, "
+            + "deleted_at BIGINT)");
+  }
+
   @Test
   public void testListExtendedGroupPOsByMetalakeIdWithoutRoles() throws Exception {
-    try (Connection conn = DriverManager.getConnection("jdbc:h2:mem:test;MODE=MYSQL", "sa", "");
-        Statement stmt = conn.createStatement()) {
-      stmt.execute(
-          "CREATE TABLE group_meta (group_id BIGINT, group_name VARCHAR(255), metalake_id BIGINT, "
-              + "audit_info VARCHAR(255), current_version BIGINT, last_version BIGINT, deleted_at BIGINT)");
-      stmt.execute(
-          "CREATE TABLE group_role_rel (group_id BIGINT, role_id BIGINT, deleted_at BIGINT)");
-      stmt.execute(
-          "CREATE TABLE role_meta (role_id BIGINT, role_name VARCHAR(255), deleted_at BIGINT)");
-
-      stmt.execute("INSERT INTO group_meta VALUES (1, 'g1', 1, 'audit', 0, 0, 0)");
-
-      GroupMetaH2Provider provider = new GroupMetaH2Provider();
-      String sql = provider.listExtendedGroupPOsByMetalakeId(1L).replace("#{metalakeId}", "1");
-      try (ResultSet rs = stmt.executeQuery(sql)) {
-        rs.next();
-        assertEquals("[]", rs.getString("roleNames"));
-        assertEquals("[]", rs.getString("roleIds"));
-      }
+    statement.execute("INSERT INTO group_meta VALUES (1, 'g1', 1, 'audit', 0, 0, 0)");
+    String sql =
+        groupMetaH2Provider.listExtendedGroupPOsByMetalakeId(1L).replace("#{metalakeId}", "1");
+    try (ResultSet rs = statement.executeQuery(sql)) {
+      rs.next();
+      assertEquals("[]", rs.getString("roleNames"));
+      assertEquals("[]", rs.getString("roleIds"));
     }
   }
 
   @Test
   public void testListExtendedGroupPOsByMetalakeIdWithRoles() throws Exception {
-    try (Connection conn = DriverManager.getConnection("jdbc:h2:mem:test;MODE=MYSQL", "sa", "");
-        Statement stmt = conn.createStatement()) {
-      stmt.execute(
-          "CREATE TABLE group_meta (group_id BIGINT, group_name VARCHAR(255), metalake_id BIGINT, "
-              + "audit_info VARCHAR(255), current_version BIGINT, last_version BIGINT, deleted_at BIGINT)");
-      stmt.execute(
-          "CREATE TABLE group_role_rel (group_id BIGINT, role_id BIGINT, deleted_at BIGINT)");
-      stmt.execute(
-          "CREATE TABLE role_meta (role_id BIGINT, role_name VARCHAR(255), deleted_at BIGINT)");
+    statement.execute("INSERT INTO group_meta VALUES (2, 'g2', 2, 'audit2', 0, 0, 0)");
+    statement.execute("INSERT INTO role_meta VALUES (1, 'role1', 0)");
+    statement.execute("INSERT INTO role_meta VALUES (2, 'role2', 0)");
+    statement.execute("INSERT INTO group_role_rel VALUES (2, 1, 0)");
+    statement.execute("INSERT INTO group_role_rel VALUES (2, 2, 0)");
 
-      stmt.execute("INSERT INTO group_meta VALUES (2, 'g2', 1, 'audit2', 0, 0, 0)");
-      stmt.execute("INSERT INTO role_meta VALUES (1, 'foo', 0)");
-      stmt.execute("INSERT INTO role_meta VALUES (2, 'bar', 0)");
-      stmt.execute("INSERT INTO group_role_rel VALUES (2, 1, 0)");
-      stmt.execute("INSERT INTO group_role_rel VALUES (2, 2, 0)");
-
-      GroupMetaH2Provider provider = new GroupMetaH2Provider();
-      String sql = provider.listExtendedGroupPOsByMetalakeId(1L).replace("#{metalakeId}", "1");
-      try (ResultSet rs = stmt.executeQuery(sql)) {
-        rs.next();
-        assertEquals("[\"foo\",\"bar\"]", rs.getString("roleNames"));
-        assertEquals("[\"1\",\"2\"]", rs.getString("roleIds"));
-      }
+    String sql =
+        groupMetaH2Provider.listExtendedGroupPOsByMetalakeId(2L).replace("#{metalakeId}", "2");
+    try (ResultSet rs = statement.executeQuery(sql)) {
+      rs.next();
+      assertEquals("[\"role1\",\"role2\"]", rs.getString("roleNames"));
+      assertEquals("[\"1\",\"2\"]", rs.getString("roleIds"));
     }
+  }
+
+  @Test
+  public void testListExtendedGroupPOsByMetalakeIdWithInvalidRoles() throws Exception {
+    statement.execute("INSERT INTO group_meta VALUES (3, 'g3', 3, 'audit3', 0, 0, 0)");
+    statement.execute("INSERT INTO role_meta VALUES (3, 'role3', 0)");
+    statement.execute("INSERT INTO role_meta VALUES (4, '', 0)");
+    statement.execute("INSERT INTO role_meta VALUES (5, null, 0)");
+    statement.execute("INSERT INTO role_meta VALUES (null, 'role6', 0)");
+    statement.execute("INSERT INTO group_role_rel VALUES (3, 3, 0)");
+    statement.execute("INSERT INTO group_role_rel VALUES (3, 4, 0)");
+    statement.execute("INSERT INTO group_role_rel VALUES (3, 5, 0)");
+    statement.execute("INSERT INTO group_role_rel VALUES (3, null, 0)");
+
+    String sql =
+        groupMetaH2Provider.listExtendedGroupPOsByMetalakeId(3L).replace("#{metalakeId}", "3");
+    try (ResultSet rs = statement.executeQuery(sql)) {
+      rs.next();
+      assertEquals("[\"role3\"]", rs.getString("roleNames"));
+      assertEquals("[\"3\",\"4\",\"5\"]", rs.getString("roleIds"));
+    }
+  }
+
+  @AfterAll
+  public static void tearDown() throws Exception {
+    dropSchema(statement);
+    statement.close();
+    connection.close();
+  }
+
+  private static void dropSchema(Statement statement) throws Exception {
+    statement.execute("DROP TABLE IF EXISTS group_role_rel");
+    statement.execute("DROP TABLE IF EXISTS role_meta");
+    statement.execute("DROP TABLE IF EXISTS group_meta");
   }
 }
