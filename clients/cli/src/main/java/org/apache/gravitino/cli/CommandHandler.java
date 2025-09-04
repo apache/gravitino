@@ -20,10 +20,17 @@
 package org.apache.gravitino.cli;
 
 import com.google.common.base.Joiner;
+import com.google.common.collect.ImmutableList;
 import java.util.List;
 
 public abstract class CommandHandler {
   public static final Joiner COMMA_JOINER = Joiner.on(", ").skipNulls();
+  public static final List<GravitinoOptions.CommandOptions> COMMON_OPTIONS =
+      ImmutableList.of(
+          GravitinoOptions.CommandOptions.URL,
+          GravitinoOptions.CommandOptions.LOGIN,
+          GravitinoOptions.CommandOptions.IGNORE,
+          GravitinoOptions.CommandOptions.QUIET);
 
   protected abstract void handle();
 
