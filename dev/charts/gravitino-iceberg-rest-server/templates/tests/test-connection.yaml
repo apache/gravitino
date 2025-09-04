@@ -39,7 +39,7 @@ spec:
 
           while [ $attempt -lt $max_attempts ]; do
             response=$(curl -X GET -H "Content-Type: application/json" http://${SERVICE_NAME}:${SERVICE_PORT}/iceberg/v1/config)
-            if echo "$response" | grep -q "{\"defaults\":{},\"overrides\":{}}"; then
+            if echo "$response" | grep -q "endpoints"; then
               success=true
               break
             else
