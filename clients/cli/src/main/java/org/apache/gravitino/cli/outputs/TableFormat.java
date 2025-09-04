@@ -71,6 +71,7 @@ import org.apache.gravitino.tag.Tag;
  * numbers - Data limiting and sorting
  */
 public abstract class TableFormat<T> extends BaseOutputFormat<T> {
+  /** Default padding size for column alignment. */
   public static final int PADDING = 1;
 
   /**

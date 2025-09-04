@@ -33,18 +33,30 @@ import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.rel.TableChange;
 import org.apache.gravitino.rel.types.Type;
 
+/** Represents the command for adding a new column to a table. */
 public class AddColumn extends Command {
 
+  /** The name of the metalake. */
   protected final String metalake;
+  /** The name of the catalog. */
   protected final String catalog;
+  /** The name of the schema. */
   protected final String schema;
+  /** The name of the table. */
   protected final String table;
+  /** The name of the new column. */
   protected final String column;
+  /** The data type of the new column. */
   protected final String datatype;
+  /** The comment for the column (optional). */
   protected final String comment;
+  /** The position of the column (optional). */
   protected final String position;
+  /** True if the column can be null, false if it cannot be (optional). */
   protected final boolean nullable;
+  /** True if the column auto increments (optional). */
   protected final boolean autoIncrement;
+  /** Default value of the column (optional). */
   protected final String defaultValue;
 
   /**

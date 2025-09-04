@@ -32,14 +32,23 @@ import org.apache.gravitino.exceptions.NoSuchModelException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.model.ModelCatalog;
 
+/** Represents link a model */
 public class LinkModel extends Command {
+  /** The name of the metalake. */
   protected final String metalake;
+  /** The name of the catalog. */
   protected final String catalog;
+  /** The name of schema. */
   protected final String schema;
+  /** The name of model. */
   protected final String model;
+  /** The URIs of the model version artifact. */
   protected final Map<String, String> uris;
+  /** The aliases of the model version. */
   protected final String[] alias;
+  /** The comment of the model version. */
   protected final String comment;
+  /** The properties of the model version. */
   protected final Map<String, String> properties;
 
   /**

@@ -28,9 +28,10 @@ import org.apache.gravitino.cli.ErrorMessages;
 import org.apache.gravitino.client.GravitinoClient;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 
-/* Lists all users in a metalake. */
+/** Lists all users in a metalake. */
 public class ListUsers extends Command {
 
+  /** The name of the metalake. */
   protected final String metalake;
 
   /**
