@@ -35,6 +35,9 @@ class TestGroupMetaH2Provider {
   private static final String DB_CONNECTION_URL = "jdbc:h2:mem:test;MODE=MYSQL;DB_CLOSE_DELAY=-1";
   private static final String DB_USER = "sa";
   private static final String DB_PASSWORD = "";
+  private static final String COLUMN_LABEL_ROLE_NAMES = "roleNames";
+  private static final String COLUMN_LABEL_ROLE_IDS = "roleIds";
+  private static final String QUERY_PARAM_METALAKE_ID = "#{metalakeId}";
 
   private static Connection connection;
   private static Statement statement;
@@ -74,11 +77,13 @@ class TestGroupMetaH2Provider {
   void testListExtendedGroupPOsByMetalakeIdWithoutRoles() throws SQLException {
     statement.execute("INSERT INTO group_meta VALUES (1, 'g1', 1, 'audit', 0, 0, 0)");
     String sql =
-        groupMetaH2Provider.listExtendedGroupPOsByMetalakeId(1L).replace("#{metalakeId}", "1");
+        groupMetaH2Provider
+            .listExtendedGroupPOsByMetalakeId(1L)
+            .replace(QUERY_PARAM_METALAKE_ID, "1");
     try (ResultSet rs = statement.executeQuery(sql)) {
       rs.next();
-      assertEquals("[]", rs.getString("roleNames"));
-      assertEquals("[]", rs.getString("roleIds"));
+      assertEquals("[]", rs.getString(COLUMN_LABEL_ROLE_NAMES));
+      assertEquals("[]", rs.getString(COLUMN_LABEL_ROLE_IDS));
     }
   }
 
@@ -91,11 +96,13 @@ class TestGroupMetaH2Provider {
     statement.execute("INSERT INTO group_role_rel VALUES (2, 2, 0)");
 
     String sql =
-        groupMetaH2Provider.listExtendedGroupPOsByMetalakeId(2L).replace("#{metalakeId}", "2");
+        groupMetaH2Provider
+            .listExtendedGroupPOsByMetalakeId(2L)
+            .replace(QUERY_PARAM_METALAKE_ID, "2");
     try (ResultSet rs = statement.executeQuery(sql)) {
       rs.next();
-      assertEquals("[\"role1\",\"role2\"]", rs.getString("roleNames"));
-      assertEquals("[\"1\",\"2\"]", rs.getString("roleIds"));
+      assertEquals("[\"role1\",\"role2\"]", rs.getString(COLUMN_LABEL_ROLE_NAMES));
+      assertEquals("[\"1\",\"2\"]", rs.getString(COLUMN_LABEL_ROLE_IDS));
     }
   }
 
@@ -112,11 +119,13 @@ class TestGroupMetaH2Provider {
     statement.execute("INSERT INTO group_role_rel VALUES (3, null, 0)");
 
     String sql =
-        groupMetaH2Provider.listExtendedGroupPOsByMetalakeId(3L).replace("#{metalakeId}", "3");
+        groupMetaH2Provider
+            .listExtendedGroupPOsByMetalakeId(3L)
+            .replace(QUERY_PARAM_METALAKE_ID, "3");
     try (ResultSet rs = statement.executeQuery(sql)) {
       rs.next();
-      assertEquals("[\"role3\"]", rs.getString("roleNames"));
-      assertEquals("[\"3\",\"4\",\"5\"]", rs.getString("roleIds"));
+      assertEquals("[\"role3\"]", rs.getString(COLUMN_LABEL_ROLE_NAMES));
+      assertEquals("[\"3\",\"4\",\"5\"]", rs.getString(COLUMN_LABEL_ROLE_IDS));
     }
   }
 
