@@ -21,6 +21,7 @@ package org.apache.gravitino.cli;
 
 import org.apache.gravitino.rel.TableChange;
 
+/** Converts a position string to the appropriate position. */
 public class PositionConverter {
 
   /**
