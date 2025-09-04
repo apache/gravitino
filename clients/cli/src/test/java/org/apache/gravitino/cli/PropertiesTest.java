@@ -181,4 +181,28 @@ public class PropertiesTest {
     assertEquals("value2", result.get("key1"), "Last value should overwrite previous ones");
     assertEquals("value3", result.get("key2"));
   }
+
+  @Test
+  public void testDelimiterWithRegexSpecialChar() {
+    Properties properties = new Properties("|", "=");
+    String[] input = {"key1=value1|key2=value2"};
+
+    Map<String, String> result = properties.parse(input);
+
+    assertEquals(2, result.size());
+    assertEquals("value1", result.get("key1"));
+    assertEquals("value2", result.get("key2"));
+  }
+
+  @Test
+  public void testSeparatorWithRegexSpecialChar() {
+    Properties properties = new Properties(",", "|");
+    String[] input = {"key1|value1,key2|value2"};
+
+    Map<String, String> result = properties.parse(input);
+
+    assertEquals(2, result.size());
+    assertEquals("value1", result.get("key1"));
+    assertEquals("value2", result.get("key2"));
+  }
 }

@@ -21,6 +21,7 @@ package org.apache.gravitino.cli;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.regex.Pattern;
 
 /**
  * A utility class to parse a delimited list of name-value pairs into a List of key-value entries.
@@ -45,8 +46,8 @@ public class Properties {
    * @param keyValueSeparator The separator used to distinguish keys from values in each pair.
    */
   public Properties(String delimiter, String keyValueSeparator) {
-    this.delimiter = delimiter;
-    this.keyValueSeparator = keyValueSeparator;
+    this.delimiter = Pattern.quote(delimiter);
+    this.keyValueSeparator = Pattern.quote(keyValueSeparator);
   }
 
   /**
