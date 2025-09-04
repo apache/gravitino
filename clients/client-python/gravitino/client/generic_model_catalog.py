@@ -160,7 +160,7 @@ class GenericModelCatalog(BaseSchemaCatalog):
 
         model_full_ns = self._model_full_namespace(ident.namespace())
         model_req = ModelRegisterRequest(
-            name=encode_string(ident.name()), comment=comment, properties=properties
+            name=ident.name(), comment=comment, properties=properties
         )
         model_req.validate()
 
@@ -520,7 +520,7 @@ class GenericModelCatalog(BaseSchemaCatalog):
         model_full_ident = self._model_full_identifier(model_ident)
         params = {}
         if uri_name is not None:
-            params["uriName"] = encode_string(uri_name)
+            params["uriName"] = uri_name
 
         resp = self.rest_client.get(
             f"{self._format_model_version_request_path(model_full_ident)}/versions/{version}/uri",
@@ -557,7 +557,7 @@ class GenericModelCatalog(BaseSchemaCatalog):
         model_full_ident = self._model_full_identifier(model_ident)
         params = {}
         if uri_name is not None:
-            params["uriName"] = encode_string(uri_name)
+            params["uriName"] = uri_name
 
         resp = self.rest_client.get(
             f"{self._format_model_version_request_path(model_full_ident)}/aliases/{encode_string(alias)}/uri",
