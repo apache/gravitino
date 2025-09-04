@@ -29,7 +29,7 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
-public class TestGroupMetaH2Provider {
+class TestGroupMetaH2Provider {
 
   private static final String DB_CONNECTION_URL = "jdbc:h2:mem:test;MODE=MYSQL;DB_CLOSE_DELAY=-1";
   private static final String DB_USER = "sa";
@@ -40,7 +40,7 @@ public class TestGroupMetaH2Provider {
   private static GroupMetaH2Provider groupMetaH2Provider;
 
   @BeforeAll
-  public static void setUp() throws Exception {
+  static void setUp() throws Exception {
     connection = DriverManager.getConnection(DB_CONNECTION_URL, DB_USER, DB_PASSWORD);
     statement = connection.createStatement();
     groupMetaH2Provider = new GroupMetaH2Provider();
@@ -70,7 +70,7 @@ public class TestGroupMetaH2Provider {
   }
 
   @Test
-  public void testListExtendedGroupPOsByMetalakeIdWithoutRoles() throws Exception {
+  void testListExtendedGroupPOsByMetalakeIdWithoutRoles() throws Exception {
     statement.execute("INSERT INTO group_meta VALUES (1, 'g1', 1, 'audit', 0, 0, 0)");
     String sql =
         groupMetaH2Provider.listExtendedGroupPOsByMetalakeId(1L).replace("#{metalakeId}", "1");
@@ -82,7 +82,7 @@ public class TestGroupMetaH2Provider {
   }
 
   @Test
-  public void testListExtendedGroupPOsByMetalakeIdWithRoles() throws Exception {
+  void testListExtendedGroupPOsByMetalakeIdWithRoles() throws Exception {
     statement.execute("INSERT INTO group_meta VALUES (2, 'g2', 2, 'audit2', 0, 0, 0)");
     statement.execute("INSERT INTO role_meta VALUES (1, 'role1', 0)");
     statement.execute("INSERT INTO role_meta VALUES (2, 'role2', 0)");
@@ -99,7 +99,7 @@ public class TestGroupMetaH2Provider {
   }
 
   @Test
-  public void testListExtendedGroupPOsByMetalakeIdWithInvalidRoles() throws Exception {
+  void testListExtendedGroupPOsByMetalakeIdWithInvalidRoles() throws Exception {
     statement.execute("INSERT INTO group_meta VALUES (3, 'g3', 3, 'audit3', 0, 0, 0)");
     statement.execute("INSERT INTO role_meta VALUES (3, 'role3', 0)");
     statement.execute("INSERT INTO role_meta VALUES (4, '', 0)");
@@ -120,7 +120,7 @@ public class TestGroupMetaH2Provider {
   }
 
   @AfterAll
-  public static void tearDown() throws Exception {
+  static void tearDown() throws Exception {
     dropSchema(statement);
     statement.close();
     connection.close();
