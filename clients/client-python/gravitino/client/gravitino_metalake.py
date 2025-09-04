@@ -81,7 +81,7 @@ class GravitinoMetalake(MetalakeDTO, SupportsJobs):
         Returns:
             A list of the catalog names under this metalake.
         """
-        url = f"api/metalakes/{self.name()}/catalogs"
+        url = f"api/metalakes/{encode_string(self.name())}/catalogs"
         response = self.rest_client.get(url, error_handler=CATALOG_ERROR_HANDLER)
         entity_list = EntityListResponse.from_json(response.body, infer_missing=True)
         entity_list.validate()
@@ -97,7 +97,7 @@ class GravitinoMetalake(MetalakeDTO, SupportsJobs):
             A list of Catalog under the specified namespace.
         """
         params = {"details": "true"}
-        url = f"api/metalakes/{self.name()}/catalogs"
+        url = f"api/metalakes/{encode_string(self.name())}/catalogs"
         response = self.rest_client.get(
             url, params=params, error_handler=CATALOG_ERROR_HANDLER
         )
@@ -374,11 +374,7 @@ class GravitinoMetalake(MetalakeDTO, SupportsJobs):
         Returns:
             A list of JobHandle objects representing the jobs.
         """
-        params = (
-            {"jobTemplateName": encode_string(job_template_name)}
-            if job_template_name
-            else {}
-        )
+        params = {"jobTemplateName": job_template_name} if job_template_name else {}
         url = self.API_METALAKES_JOB_RUNS_PATH.format(encode_string(self.name()))
         response = self.rest_client.get(
             url, params=params, error_handler=JOB_ERROR_HANDLER
