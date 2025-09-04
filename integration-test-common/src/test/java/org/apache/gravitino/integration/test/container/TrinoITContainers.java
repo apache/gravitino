@@ -49,10 +49,18 @@ public class TrinoITContainers implements AutoCloseable {
   }
 
   public void launch(int gravitinoServerPort) throws Exception {
+    launch(gravitinoServerPort, "hive2", false);
+  }
+
+  public void launch(
+      int gravitinoServerPort, String hiveRuntimeVersion, boolean isTrinoConnectorTest)
+      throws Exception {
     shutdown();
 
     Map<String, String> env = new HashMap<>();
     env.put("GRAVITINO_SERVER_PORT", String.valueOf(gravitinoServerPort));
+    env.put("HIVE_RUNTIME_VERSION", hiveRuntimeVersion);
+    env.put("TRINO_CONNECTOR_TEST", String.valueOf(isTrinoConnectorTest));
     if (System.getProperty("gravitino.log.path") != null) {
       env.put("GRAVITINO_LOG_PATH", System.getProperty("gravitino.log.path"));
     }

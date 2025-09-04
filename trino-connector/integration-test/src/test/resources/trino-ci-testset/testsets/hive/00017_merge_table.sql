@@ -3,18 +3,18 @@ INSERT INTO gt_hive.gt_hive_test_acid.test_merge VALUES (1, 'bob', 12), (2, 'tom
 
 SELECT * FROM gt_hive.gt_hive_test_acid.test_merge ORDER BY id;
 
-CREATE SCHEMA gt_hive.gt_db2;
+CREATE SCHEMA gt_hive.gt_hive_test_merge;
 
-CREATE TABLE gt_hive.gt_db2.tb01 (
+CREATE TABLE gt_hive.gt_hive_test_merge.tb01 (
     name varchar,
     salary int
 );
 
-INSERT INTO gt_hive.gt_db2.tb01(name, salary) VALUES ('bob', 14), ('tom', 12), ('nancy', 17);
+INSERT INTO gt_hive.gt_hive_test_merge.tb01(name, salary) VALUES ('bob', 14), ('tom', 12), ('nancy', 17);
 
-SELECT * FROM gt_hive.gt_db2.tb01 ORDER BY name;
+SELECT * FROM gt_hive.gt_hive_test_merge.tb01 ORDER BY name;
 
-MERGE INTO gt_hive.gt_hive_test_acid.test_merge t USING gt_hive.gt_db2.tb01 s
+MERGE INTO gt_hive.gt_hive_test_acid.test_merge t USING gt_hive.gt_hive_test_merge.tb01 s
     ON (t.name = s.name)
     WHEN MATCHED AND s.name = 'bob'
         THEN DELETE
@@ -27,6 +27,6 @@ MERGE INTO gt_hive.gt_hive_test_acid.test_merge t USING gt_hive.gt_db2.tb01 s
 
 SELECT * FROM gt_hive.gt_hive_test_acid.test_merge ORDER BY name;
 
-DROP TABLE gt_hive.gt_db2.tb01
+DROP TABLE gt_hive.gt_hive_test_merge.tb01
 
-DROP SCHEMA gt_hive.gt_db2
+DROP SCHEMA gt_hive.gt_hive_test_merge

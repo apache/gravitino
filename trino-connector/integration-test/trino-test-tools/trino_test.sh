@@ -23,16 +23,6 @@ export GRAVITINO_HOME=$GRAVITINO_ROOT_DIR
 export GRAVITINO_TEST=true
 export HADOOP_USER_NAME=anonymous
 
-# When connecting to a Hive metastore version 3.x,
-# the Hive connector supports reading from and writing to insert-only and ACID tables,
-# with full support for partitioning and bucketing
-export HIVE_RUNTIME_VERSION=hive3
-
-# Whether a Trino connector test or not
-# Only Trino connector test will create Hive ACID table when deploy Hive with
-# `/integration-test-common/docker-script/init/hive/init.sh`
-export TRINO_CONNECTOR_TEST=true
-
 echo $GRAVITINO_ROOT_DIR
 cd $GRAVITINO_ROOT_DIR
 
