@@ -75,7 +75,7 @@ public class PolicyMetaPostgreSQLProvider extends PolicyMetaBaseSQLProvider {
         + " metalake_id = #{policyPO.metalakeId},"
         + " audit_info = #{policyPO.auditInfo},"
         + " current_version = #{policyPO.currentVersion},"
-        + " last_version = #{policyPO.lastVersion}"
+        + " last_version = #{policyPO.lastVersion},"
         + " deleted_at = #{policyPO.deletedAt}";
   }
 }

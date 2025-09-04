@@ -114,7 +114,7 @@ gcs_properties = gravitino_client.create_catalog(name="test_catalog",
 
 ### Step2: Create a schema
 
-Once you have created a Fileset catalog with GCS, you can create a schema. The following example shows how to create a schema:
+Once you’ve created a Fileset catalog with GCS, you can create a schema. The following example shows how to create a schema:
 
 <Tabs groupId="language" queryString>
 <TabItem value="shell" label="Shell">
@@ -297,7 +297,7 @@ Or use the bundle jar with Hadoop environment if there is no Hadoop environment:
 
 ### Using Spark to access the fileset
 
-The following code snippet shows how to use **PySpark 3.1.3 with Hadoop environment(Hadoop 3.2.0)** to access the fileset:
+The following code snippet shows how to use **PySpark 3.1.3 with Hadoop environment(Hadoop 3.2.0)** and JDK8 to access the fileset:
 
 Before running the following code, you need to install required packages:
 
@@ -318,7 +318,10 @@ catalog_name = "your_gcs_catalog"
 schema_name = "your_gcs_schema"
 fileset_name = "your_gcs_fileset"
 
+# JDK8
 os.environ["PYSPARK_SUBMIT_ARGS"] = "--jars /path/to/gravitino-gcp-{gravitino-version}.jar,/path/to/gravitino-filesystem-hadoop3-runtime-{gravitino-version}.jar,/path/to/gcs-connector-hadoop3-2.2.22-shaded.jar --master local[1] pyspark-shell"
+# JDK17
+os.environ["PYSPARK_SUBMIT_ARGS"] = "--jars /path/to/gravitino-gcp-{gravitino-version}.jar,/path/to/gravitino-filesystem-hadoop3-runtime-{gravitino-version}.jar,/path/to/gcs-connector-hadoop3-2.2.22-shaded.jar --conf \"spark.driver.extraJavaOptions=--add-opens=java.base/sun.nio.ch=ALL-UNNAMED\" --conf \"spark.executor.extraJavaOptions=--add-opens=java.base/sun.nio.ch=ALL-UNNAMED\" --master local[1] pyspark-shell"
 spark = SparkSession.builder
     .appName("gcs_fielset_test")
     .config("spark.hadoop.fs.AbstractFileSystem.gvfs.impl", "org.apache.gravitino.filesystem.hadoop.Gvfs")
@@ -347,6 +350,21 @@ If your Spark **without Hadoop environment**, you can use the following code sni
 ## Replace the following code snippet with the above code snippet with the same environment variables
 
 os.environ["PYSPARK_SUBMIT_ARGS"] = "--jars /path/to/gravitino-gcp-bundle-{gravitino-version}.jar,/path/to/gravitino-filesystem-hadoop3-runtime-{gravitino-version}.jar, --master local[1] pyspark-shell"
+```
+
+If Spark can't start with the above configuration (no Hadoop environment available and use bundle jar), you can try to set the jars to the classpath directly:
+
+```python
+jars_path = (
+    "/path/to/gravitino-gcp-bundle-{gravitino-version}.jar:"
+    "/path/to/gravitino-filesystem-hadoop3-runtime-{gravitino-version}.jar"
+)
+
+os.environ["PYSPARK_SUBMIT_ARGS"] = (
+    f'--conf "spark.driver.extraClassPath={jars_path}" '
+    f'--conf "spark.executor.extraClassPath={jars_path}" '
+    '--master local[1] pyspark-shell'
+)
 ```
 
 - [`gravitino-gcp-bundle-${gravitino-version}.jar`](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-gcp-bundle) is the Gravitino GCP jar with Hadoop environment(3.3.1) and `gcs-connector`.

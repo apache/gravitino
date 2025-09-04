@@ -25,7 +25,12 @@ plugins {
 }
 
 dependencies {
-  implementation(project(":bundles:azure"))
+  implementation(project(":bundles:azure")) {
+    // There is already a dependency on commons-logging v1.2 in hadoop-azure, so exclude the one
+    // from the bundle.
+    exclude(group = "commons-logging", module = "commons-logging")
+  }
+
   implementation(libs.hadoop3.abs)
   implementation(libs.hadoop3.client.api)
   implementation(libs.hadoop3.client.runtime)
