@@ -221,16 +221,16 @@ public class TrinoQueryTestTool {
         }
       }
 
-      int trinoWorkerNum = 0;
       String trinoWorkerNumConfig = commandLine.getOptionValue("trino_worker_num", "0");
       try {
-        trinoWorkerNum = Integer.parseInt(trinoWorkerNumConfig);
+        int trinoWorkerNum = Integer.parseInt(trinoWorkerNumConfig);
         if (trinoWorkerNum < 0) {
           System.out.println(
               "The value of trino_worker_num must be greater than zero, current value is: "
                   + trinoWorkerNumConfig);
           System.exit(1);
         }
+        TrinoQueryIT.trinoWorkerNum = trinoWorkerNum;
       } catch (Exception e) {
         System.out.println(
             "The value of trino_worker_num must be an integer value, current value is: "
@@ -243,7 +243,7 @@ public class TrinoQueryTestTool {
       TrinoQueryITBase.autoStart = autoStart;
       TrinoQueryITBase.autoStartGravitino = autoStartGravitino;
 
-      TrinoQueryIT testerRunner = new TrinoQueryIT(trinoWorkerNum);
+      TrinoQueryIT testerRunner = new TrinoQueryIT();
       testerRunner.setup();
 
       if (commandLine.hasOption("gen_output")) {
