@@ -320,7 +320,7 @@ fileset_name = "your_gcs_fileset"
 
 # JDK8
 os.environ["PYSPARK_SUBMIT_ARGS"] = "--jars /path/to/gravitino-gcp-{gravitino-version}.jar,/path/to/gravitino-filesystem-hadoop3-runtime-{gravitino-version}.jar,/path/to/gcs-connector-hadoop3-2.2.22-shaded.jar --master local[1] pyspark-shell"
-# JDK17
+# JDK17, PySpark 3.1.3 with Hadoop 3.2.0 is not compatible with JDK17, we can't run Spark with JDK17 directly, but the following configuration may help if you use PySpark 3.3.3 or above
 os.environ["PYSPARK_SUBMIT_ARGS"] = "--jars /path/to/gravitino-gcp-{gravitino-version}.jar,/path/to/gravitino-filesystem-hadoop3-runtime-{gravitino-version}.jar,/path/to/gcs-connector-hadoop3-2.2.22-shaded.jar --conf \"spark.driver.extraJavaOptions=--add-opens=java.base/sun.nio.ch=ALL-UNNAMED\" --conf \"spark.executor.extraJavaOptions=--add-opens=java.base/sun.nio.ch=ALL-UNNAMED\" --master local[1] pyspark-shell"
 spark = SparkSession.builder
     .appName("gcs_fielset_test")
