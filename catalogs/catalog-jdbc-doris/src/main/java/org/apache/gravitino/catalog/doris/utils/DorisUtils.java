@@ -223,6 +223,10 @@ public final class DorisUtils {
     int bucketNum = 1;
     if (matcher.find(5)) {
       String bucketValue = matcher.group(5);
+      // If a bucket group is missing, fall back to default (1)
+      if (bucketValue == null || bucketValue.trim().isEmpty()) {
+        return bucketNum;
+      }
       // Use -1 to indicate auto bucket.
       bucketNum =
           bucketValue.trim().toUpperCase().equals("AUTO")
