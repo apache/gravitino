@@ -24,12 +24,14 @@ import com.google.common.base.Splitter;
 import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.io.UnsupportedEncodingException;
 import java.net.ServerSocket;
 import java.net.URLDecoder;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.Map;
 import java.util.Random;
+import org.apache.gravitino.exceptions.GravitinoRuntimeException;
 
 /**
  * Referred from Apache Iceberg's RESTUtil implementation
@@ -100,7 +102,11 @@ public class RESTUtils {
    */
   public static String encodeString(String toEncode) {
     Preconditions.checkArgument(toEncode != null, "Invalid string to encode: null");
-    return URLEncoder.encode(toEncode, StandardCharsets.UTF_8);
+    try {
+      return URLEncoder.encode(toEncode, StandardCharsets.UTF_8.name());
+    } catch (UnsupportedEncodingException e) {
+      throw new GravitinoRuntimeException("Failed to encode string: %s", toEncode);
+    }
   }
 
   /**
@@ -113,7 +119,11 @@ public class RESTUtils {
    */
   public static String decodeString(String encoded) {
     Preconditions.checkArgument(encoded != null, "Invalid string to decode: null");
-    return URLDecoder.decode(encoded, StandardCharsets.UTF_8);
+    try {
+      return URLDecoder.decode(encoded, StandardCharsets.UTF_8.name());
+    } catch (UnsupportedEncodingException e) {
+      throw new GravitinoRuntimeException("Failed to decode string: %s", encoded);
+    }
   }
 
   /**
