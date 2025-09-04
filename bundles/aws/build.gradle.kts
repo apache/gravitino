@@ -64,7 +64,6 @@ tasks.withType(ShadowJar::class.java) {
   relocate("com.google.common", "org.apache.gravitino.aws.shaded.com.google.common")
   relocate("com.google.errorprone", "org.apache.gravitino.aws.shaded.com.google.errorprone")
   relocate("com.google.thirdparty", "org.apache.gravitino.aws.shaded.com.google.thirdparty")
-  relocate("io.netty", "org.apache.gravitino.aws.shaded.io.netty")
   relocate("org.apache.commons", "org.apache.gravitino.aws.shaded.org.apache.commons")
   relocate("org.apache.http", "org.apache.gravitino.aws.shaded.org.apache.http")
   relocate("org.checkerframework", "org.apache.gravitino.aws.shaded.org.checkerframework")
