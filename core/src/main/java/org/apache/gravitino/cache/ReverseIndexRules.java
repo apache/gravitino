@@ -91,14 +91,48 @@ public class ReverseIndexRules {
                         entityType = Entity.EntityType.CATALOG;
                         namespace = NamespaceUtil.ofCatalog(roleEntity.namespace().level(0));
                         break;
+                      case SCHEMA:
+                        entityType = Entity.EntityType.SCHEMA;
+                        Namespace nsSchema = Namespace.fromString(securableObject.parent());
+                        namespace =
+                            NamespaceUtil.ofSchema(
+                                roleEntity.namespace().level(0), nsSchema.level(0));
+                        break;
+                      case TABLE:
+                        entityType = Entity.EntityType.TABLE;
+                        Namespace nsTable = Namespace.fromString(securableObject.parent());
+                        namespace =
+                            NamespaceUtil.ofTable(
+                                roleEntity.namespace().level(0),
+                                nsTable.level(0),
+                                nsTable.level(1));
+                        break;
+                      case TOPIC:
+                        entityType = Entity.EntityType.TOPIC;
+                        Namespace nsTopic = Namespace.fromString(securableObject.parent());
+                        namespace =
+                            NamespaceUtil.ofTopic(
+                                roleEntity.namespace().level(0),
+                                nsTopic.level(0),
+                                nsTopic.level(1));
+                        break;
+                      case MODEL:
+                        entityType = Entity.EntityType.MODEL;
+                        Namespace nsModel = Namespace.fromString(securableObject.parent());
+                        namespace =
+                            NamespaceUtil.ofModel(
+                                roleEntity.namespace().level(0),
+                                nsModel.level(0),
+                                nsModel.level(1));
+                        break;
                       case FILESET:
                         entityType = Entity.EntityType.FILESET;
-                        Namespace nsParent = Namespace.fromString(securableObject.parent());
+                        Namespace nsFileset = Namespace.fromString(securableObject.parent());
                         namespace =
                             NamespaceUtil.ofFileset(
                                 roleEntity.namespace().level(0),
-                                nsParent.level(0),
-                                nsParent.level(1));
+                                nsFileset.level(0),
+                                nsFileset.level(1));
                         break;
                       default:
                         LOG.info("Unprocessed securable object type: " + securableObject.type());
