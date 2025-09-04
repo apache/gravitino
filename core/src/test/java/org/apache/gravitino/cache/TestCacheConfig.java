@@ -29,7 +29,7 @@ public class TestCacheConfig {
   void testDefaultCacheConfig() {
     Config config = new Config(false) {};
     Assertions.assertFalse(config.get(Configs.CACHE_STATS_ENABLED));
-    Assertions.assertFalse(config.get(Configs.CACHE_ENABLED));
+    Assertions.assertTrue(config.get(Configs.CACHE_ENABLED));
     Assertions.assertTrue(config.get(Configs.CACHE_WEIGHER_ENABLED));
     Assertions.assertEquals(10_000, config.get(Configs.CACHE_MAX_ENTRIES));
     Assertions.assertEquals(3_600_000L, config.get(Configs.CACHE_EXPIRATION_TIME));
