@@ -126,7 +126,7 @@ jobs:
 
       - uses: actions/setup-java@v4
         with:
-          java-version: '8'
+          java-version: '17'
           distribution: 'temurin'
 
       - name: Build and Push the Docker image
