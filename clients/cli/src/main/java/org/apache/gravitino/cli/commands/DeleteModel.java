@@ -32,10 +32,15 @@ import org.apache.gravitino.exceptions.NoSuchSchemaException;
 /** Deletes an existing model. */
 public class DeleteModel extends Command {
 
+  /** The name of the metalake. */
   protected final String metalake;
+  /** The name of the catalog. */
   protected final String catalog;
+  /** The name of the schema. */
   protected final String schema;
+  /** The name of the model. */
   protected final String model;
+  /** Whether to force the deletion. */
   protected final boolean force;
 
   /**

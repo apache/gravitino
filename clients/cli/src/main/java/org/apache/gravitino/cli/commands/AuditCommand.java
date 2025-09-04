@@ -22,6 +22,7 @@ package org.apache.gravitino.cli.commands;
 import org.apache.gravitino.Audit;
 import org.apache.gravitino.cli.CommandContext;
 
+/** Base class for commands that display audit information. */
 public abstract class AuditCommand extends Command {
 
   /** @param context The command context. */
