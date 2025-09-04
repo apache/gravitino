@@ -29,10 +29,14 @@ import org.apache.gravitino.client.GravitinoClient;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.NoSuchTagException;
 
+/** Represents delete a tag */
 public class DeleteTag extends Command {
 
+  /** The name of the metalake. */
   protected final String metalake;
+  /** The array of the tags. */
   protected final String[] tags;
+  /** The force flag. */
   protected final boolean force;
 
   /**
