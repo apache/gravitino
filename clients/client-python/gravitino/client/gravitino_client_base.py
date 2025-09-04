@@ -51,15 +51,25 @@ class GravitinoClientBase:
     API_METALAKES_IDENTIFIER_PATH = f"{API_METALAKES_LIST_PATH}/"
     """The REST API path prefix for load a specific metalake"""
 
+    CLIENT_VERSION_HEADER = "X-Client-Version"
+
     def __init__(
         self,
         uri: str,
         check_version: bool = True,
         auth_data_provider: AuthDataProvider = None,
         request_headers: dict = None,
+        client_config: dict = None,
     ):
+        new_headers = request_headers.copy() if request_headers else {}
+        client_version = self.get_client_version().version()
+        if client_version is not None:
+            new_headers[self.CLIENT_VERSION_HEADER] = client_version.strip()
         self._rest_client = HTTPClient(
-            uri, auth_data_provider=auth_data_provider, request_headers=request_headers
+            uri,
+            auth_data_provider=auth_data_provider,
+            request_headers=new_headers,
+            client_config=client_config,
         )
         if check_version:
             self.check_version()
@@ -98,7 +108,7 @@ class GravitinoClientBase:
         server_version = self.get_server_version()
         client_version = self.get_client_version()
 
-        if client_version > server_version:
+        if not client_version.compatible_with_server_version(server_version):
             raise GravitinoRuntimeException(
                 "Gravitino does not support the case that "
                 "the client-side version is higher than the server-side version."

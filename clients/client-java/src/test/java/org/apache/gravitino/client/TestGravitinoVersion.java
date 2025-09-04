@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.client;
 
+import static org.junit.Assert.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -107,6 +108,12 @@ public class TestGravitinoVersion {
     assertEquals(9, versionNumber[1]);
     assertEquals(0, versionNumber[2]);
 
+    version = new GravitinoVersion("1.0.0.dev0", "2023-01-01", "1234567");
+    versionNumber = version.getVersionNumber();
+    assertEquals(1, versionNumber[0]);
+    assertEquals(0, versionNumber[1]);
+    assertEquals(0, versionNumber[2]);
+
     // Test an invalid the version string with 2 part
     version = new GravitinoVersion("2.5", "2023-01-01", "1234567");
     assertThrows(GravitinoRuntimeException.class, version::getVersionNumber);
@@ -133,25 +140,29 @@ public class TestGravitinoVersion {
   }
 
   @Test
-  void testVersionCompare() {
-    GravitinoVersion version1 = new GravitinoVersion("2.5.3", "2023-01-01", "1234567");
-    // test equal
-    GravitinoVersion version2 = new GravitinoVersion("2.5.3", "2023-01-01", "1234567");
-    assertEquals(0, version1.compareTo(version2));
+  void testVersionCompatibility() {
+    GravitinoVersion version1 = new GravitinoVersion("2.6.3", "2023-01-01", "1234567");
+    GravitinoVersion version2 = new GravitinoVersion("2.6.4", "2023-01-01", "1234567");
+    assertTrue(version1.compatibleWithServerVersion(version2));
 
-    // test less than
-    version1 = new GravitinoVersion("2.5.3", "2023-01-01", "1234567");
+    version1 = new GravitinoVersion("2.6.3", "2023-01-01", "1234567");
+    version2 = new GravitinoVersion("2.6.3", "2023-01-01", "1234567");
+    assertTrue(version1.compatibleWithServerVersion(version2));
+
+    version1 = new GravitinoVersion("2.6.3", "2023-01-01", "1234567");
+    version2 = new GravitinoVersion("2.6.2", "2023-01-01", "1234567");
+    assertTrue(version1.compatibleWithServerVersion(version2));
+
+    version1 = new GravitinoVersion("2.6.3", "2023-01-01", "1234567");
+    version2 = new GravitinoVersion("3.5.4", "2023-01-01", "1234567");
+    assertTrue(version1.compatibleWithServerVersion(version2));
+
+    version1 = new GravitinoVersion("2.6.3", "2023-01-01", "1234567");
+    version2 = new GravitinoVersion("2.5.3", "2023-01-01", "1234567");
+    assertFalse(version1.compatibleWithServerVersion(version2));
+
+    version1 = new GravitinoVersion("3.6.3", "2023-01-01", "1234567");
     version2 = new GravitinoVersion("2.5.4", "2023-01-01", "1234567");
-    assertTrue(version1.compareTo(version2) < 0);
-
-    // test greater than
-    version1 = new GravitinoVersion("2.5.3", "2023-01-01", "1234567");
-    version2 = new GravitinoVersion("2.5.2", "2023-01-01", "1234567");
-    assertTrue(version1.compareTo(version2) > 0);
-
-    // test equal with suffix
-    version1 = new GravitinoVersion("2.5.3", "2023-01-01", "1234567");
-    version2 = new GravitinoVersion("2.5.3-SNAPSHOT", "2023-01-01", "1234567");
-    assertEquals(0, version1.compareTo(version2));
+    assertFalse(version1.compatibleWithServerVersion(version2));
   }
 }

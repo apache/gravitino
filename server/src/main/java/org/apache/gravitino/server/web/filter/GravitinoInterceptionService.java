@@ -28,6 +28,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import javax.ws.rs.PathParam;
 import javax.ws.rs.core.Response;
 import org.aopalliance.intercept.ConstructorInterceptor;
 import org.aopalliance.intercept.MethodInterceptor;
@@ -42,11 +43,16 @@ import org.apache.gravitino.server.authorization.expression.AuthorizationExpress
 import org.apache.gravitino.server.web.Utils;
 import org.apache.gravitino.server.web.rest.CatalogOperations;
 import org.apache.gravitino.server.web.rest.FilesetOperations;
+import org.apache.gravitino.server.web.rest.GroupOperations;
 import org.apache.gravitino.server.web.rest.MetalakeOperations;
 import org.apache.gravitino.server.web.rest.ModelOperations;
+import org.apache.gravitino.server.web.rest.OwnerOperations;
+import org.apache.gravitino.server.web.rest.PermissionOperations;
+import org.apache.gravitino.server.web.rest.RoleOperations;
 import org.apache.gravitino.server.web.rest.SchemaOperations;
 import org.apache.gravitino.server.web.rest.TableOperations;
 import org.apache.gravitino.server.web.rest.TopicOperations;
+import org.apache.gravitino.server.web.rest.UserOperations;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.PrincipalUtils;
 import org.glassfish.hk2.api.Descriptor;
@@ -72,7 +78,12 @@ public class GravitinoInterceptionService implements InterceptionService {
             TableOperations.class.getName(),
             ModelOperations.class.getName(),
             TopicOperations.class.getName(),
-            FilesetOperations.class.getName()));
+            FilesetOperations.class.getName(),
+            UserOperations.class.getName(),
+            GroupOperations.class.getName(),
+            PermissionOperations.class.getName(),
+            RoleOperations.class.getName(),
+            OwnerOperations.class.getName()));
   }
 
   @Override
@@ -113,9 +124,11 @@ public class GravitinoInterceptionService implements InterceptionService {
           Object[] args = methodInvocation.getArguments();
           Map<Entity.EntityType, NameIdentifier> metadataContext =
               extractNameIdentifierFromParameters(parameters, args);
+          Map<String, Object> pathParams = extractPathParamsFromParameters(parameters, args);
           AuthorizationExpressionEvaluator authorizationExpressionEvaluator =
               new AuthorizationExpressionEvaluator(expression);
-          boolean authorizeResult = authorizationExpressionEvaluator.evaluate(metadataContext);
+          boolean authorizeResult =
+              authorizationExpressionEvaluator.evaluate(metadataContext, pathParams);
           if (!authorizeResult) {
             MetadataObject.Type type = expressionAnnotation.accessMetadataType();
             NameIdentifier accessMetadataName =
@@ -144,9 +157,8 @@ public class GravitinoInterceptionService implements InterceptionService {
             currentUser,
             methodName,
             ex);
-        return Utils.forbidden(
-            "Authorization failed due to system internal error. Please contact administrator.",
-            null);
+        return Utils.internalError(
+            "Authorization failed due to system internal error. Please contact administrator.", ex);
       }
     }
 
@@ -156,23 +168,27 @@ public class GravitinoInterceptionService implements InterceptionService {
         String currentUser,
         String methodName) {
       String contextualMessage;
+      String accessMetadataMessage =
+          accessMetadataName != null
+              ? String.format("on metadata '%s'", accessMetadataName.name())
+              : "";
       if (StringUtils.isNotBlank(errorMessage)) {
         contextualMessage =
             String.format(
-                "User '%s' is not authorized to perform operation '%s' on metadata '%s': %s",
-                currentUser, methodName, accessMetadataName.name(), errorMessage);
+                "User '%s' is not authorized to perform operation '%s' %s: %s",
+                currentUser, methodName, accessMetadataMessage, errorMessage);
       } else {
         contextualMessage =
             String.format(
-                "User '%s' is not authorized to perform operation '%s' on metadata '%s'",
-                currentUser, methodName, accessMetadataName.name());
+                "User '%s' is not authorized to perform operation '%s' %s",
+                currentUser, methodName, accessMetadataMessage);
       }
       return Utils.forbidden(contextualMessage, null);
     }
 
     private Map<Entity.EntityType, NameIdentifier> extractNameIdentifierFromParameters(
         Parameter[] parameters, Object[] args) {
-      Map<Entity.EntityType, String> metadatas = new HashMap<>();
+      Map<Entity.EntityType, String> entities = new HashMap<>();
       Map<Entity.EntityType, NameIdentifier> nameIdentifierMap = new HashMap<>();
       for (int i = 0; i < parameters.length; i++) {
         Parameter parameter = parameters[i];
@@ -181,16 +197,16 @@ public class GravitinoInterceptionService implements InterceptionService {
         if (authorizeResource == null) {
           continue;
         }
-        MetadataObject.Type type = authorizeResource.type();
-        metadatas.put(Entity.EntityType.valueOf(type.name()), String.valueOf(args[i]));
+        Entity.EntityType type = authorizeResource.type();
+        entities.put(type, String.valueOf(args[i]));
       }
-      String metalake = metadatas.get(Entity.EntityType.METALAKE);
-      String catalog = metadatas.get(Entity.EntityType.CATALOG);
-      String schema = metadatas.get(Entity.EntityType.SCHEMA);
-      String table = metadatas.get(Entity.EntityType.TABLE);
-      String topic = metadatas.get(Entity.EntityType.TOPIC);
-      String fileset = metadatas.get(Entity.EntityType.FILESET);
-      metadatas.forEach(
+      String metalake = entities.get(Entity.EntityType.METALAKE);
+      String catalog = entities.get(Entity.EntityType.CATALOG);
+      String schema = entities.get(Entity.EntityType.SCHEMA);
+      String table = entities.get(Entity.EntityType.TABLE);
+      String topic = entities.get(Entity.EntityType.TOPIC);
+      String fileset = entities.get(Entity.EntityType.FILESET);
+      entities.forEach(
           (type, metadata) -> {
             switch (type) {
               case CATALOG:
@@ -218,20 +234,49 @@ public class GravitinoInterceptionService implements InterceptionService {
                     NameIdentifierUtil.ofFileset(metalake, catalog, schema, fileset));
                 break;
               case MODEL:
-                String model = metadatas.get(Entity.EntityType.MODEL);
+                String model = entities.get(Entity.EntityType.MODEL);
                 nameIdentifierMap.put(
                     Entity.EntityType.MODEL,
-                    NameIdentifierUtil.ofModel(metadata, catalog, schema, model));
+                    NameIdentifierUtil.ofModel(metalake, catalog, schema, model));
                 break;
               case METALAKE:
                 nameIdentifierMap.put(
                     Entity.EntityType.METALAKE, NameIdentifierUtil.ofMetalake(metalake));
+                break;
+              case USER:
+                nameIdentifierMap.put(
+                    Entity.EntityType.USER,
+                    NameIdentifierUtil.ofUser(metadata, entities.get(Entity.EntityType.USER)));
+                break;
+              case GROUP:
+                nameIdentifierMap.put(
+                    Entity.EntityType.GROUP,
+                    NameIdentifierUtil.ofGroup(metalake, entities.get(Entity.EntityType.GROUP)));
+                break;
+              case ROLE:
+                nameIdentifierMap.put(
+                    Entity.EntityType.ROLE,
+                    NameIdentifierUtil.ofRole(metalake, entities.get(Entity.EntityType.ROLE)));
                 break;
               default:
                 break;
             }
           });
       return nameIdentifierMap;
+    }
+
+    private Map<String, Object> extractPathParamsFromParameters(
+        Parameter[] parameters, Object[] args) {
+      Map<String, Object> pathParams = new HashMap<>();
+      for (int i = 0; i < parameters.length; i++) {
+        Parameter parameter = parameters[i];
+        PathParam pathParam = parameter.getAnnotation(PathParam.class);
+        if (pathParam == null) {
+          continue;
+        }
+        pathParams.put("p_" + pathParam.value(), args[i]);
+      }
+      return pathParams;
     }
   }
 

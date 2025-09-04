@@ -36,9 +36,13 @@ import org.apache.gravitino.messaging.Topic;
 import org.apache.gravitino.model.Model;
 import org.apache.gravitino.rel.Table;
 
+/** Represents add tags for an entity. */
 public class TagEntity extends Command {
+  /** The name of the metalake. */
   protected final String metalake;
+  /** The name of the entity. */
   protected final FullName name;
+  /** The list of the tags to add. */
   protected final String[] tags;
 
   /**
@@ -88,14 +92,14 @@ public class TagEntity extends Command {
             entity = fileset;
             Fileset gFileset =
                 catalogObject.asFilesetCatalog().loadFileset(FullNameUtil.toFileset(name));
-            gFileset.supportsTags().associateTags(tags, null);
+            tagsToAdd = gFileset.supportsTags().associateTags(tags, null);
             break;
 
           case MESSAGING:
             String topic = name.getTopicName();
             entity = topic;
             Topic gTopic = catalogObject.asTopicCatalog().loadTopic(FullNameUtil.toTopic(name));
-            gTopic.supportsTags().associateTags(tags, null);
+            tagsToAdd = gTopic.supportsTags().associateTags(tags, null);
             break;
 
           default:

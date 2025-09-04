@@ -31,9 +31,14 @@ import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.Response;
+import org.apache.gravitino.Entity;
 import org.apache.gravitino.GravitinoEnv;
+import org.apache.gravitino.MetadataObject;
+import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.authorization.AccessControlDispatcher;
+import org.apache.gravitino.authorization.Owner;
+import org.apache.gravitino.authorization.OwnerDispatcher;
 import org.apache.gravitino.dto.requests.GroupAddRequest;
 import org.apache.gravitino.dto.responses.GroupListResponse;
 import org.apache.gravitino.dto.responses.GroupResponse;
@@ -42,6 +47,8 @@ import org.apache.gravitino.dto.responses.RemoveResponse;
 import org.apache.gravitino.dto.util.DTOConverters;
 import org.apache.gravitino.metrics.MetricNames;
 import org.apache.gravitino.server.authorization.NameBindings;
+import org.apache.gravitino.server.authorization.annotations.AuthorizationExpression;
+import org.apache.gravitino.server.authorization.annotations.AuthorizationMetadata;
 import org.apache.gravitino.server.web.Utils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -53,6 +60,7 @@ public class GroupOperations {
   private static final Logger LOG = LoggerFactory.getLogger(GroupOperations.class);
 
   private final AccessControlDispatcher accessControlManager;
+  private final OwnerDispatcher ownerDispatcher;
 
   @Context private HttpServletRequest httpRequest;
 
@@ -61,6 +69,7 @@ public class GroupOperations {
     // and Jersey injection doesn't support null value. So GroupOperations chooses to retrieve
     // accessControlManager from GravitinoEnv instead of injection here.
     this.accessControlManager = GravitinoEnv.getInstance().accessControlDispatcher();
+    this.ownerDispatcher = GravitinoEnv.getInstance().ownerDispatcher();
   }
 
   @GET
@@ -86,7 +95,11 @@ public class GroupOperations {
   @Produces("application/vnd.gravitino.v1+json")
   @Timed(name = "add-group." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "add-group", absolute = true)
-  public Response addGroup(@PathParam("metalake") String metalake, GroupAddRequest request) {
+  @AuthorizationExpression(expression = "METALAKE::OWNER || METALAKE::MANAGE_GROUPS")
+  public Response addGroup(
+      @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
+          String metalake,
+      GroupAddRequest request) {
     try {
       return Utils.doAs(
           httpRequest,
@@ -108,12 +121,28 @@ public class GroupOperations {
   @Produces("application/vnd.gravitino.v1+json")
   @Timed(name = "remove-group." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "remove-group", absolute = true)
+  @AuthorizationExpression(expression = "METALAKE::OWNER || METALAKE::MANAGE_GROUPS")
   public Response removeGroup(
-      @PathParam("metalake") String metalake, @PathParam("group") String group) {
+      @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
+          String metalake,
+      @PathParam("group") String group) {
     try {
       return Utils.doAs(
           httpRequest,
           () -> {
+            ownerDispatcher
+                .getOwner(
+                    metalake, MetadataObjects.of(null, metalake, MetadataObject.Type.METALAKE))
+                .ifPresent(
+                    owner -> {
+                      if (owner.type() == Owner.Type.GROUP && owner.name().equals(group)) {
+                        throw new IllegalArgumentException(
+                            String.format(
+                                "Cannot remove group %s from metalake %s because the group is the owner of the metalake.",
+                                group, metalake));
+                      }
+                    });
+
             boolean removed = accessControlManager.removeGroup(metalake, group);
             if (!removed) {
               LOG.warn("Failed to remove group {} under metalake {}", group, metalake);

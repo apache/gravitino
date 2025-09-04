@@ -139,7 +139,7 @@ public class FilesetCommandHandler extends CommandHandler {
   /** Handles the "CREATE" command. */
   private void handleCreateCommand() {
     String comment = line.getOptionValue(GravitinoOptions.COMMENT);
-    String[] properties = line.getOptionValues(CommandActions.PROPERTIES);
+    String[] properties = line.getOptionValues(GravitinoOptions.PROPERTIES);
     Map<String, String> propertyMap = new Properties().parse(properties);
     gravitinoCommandLine
         .newCreateFileset(context, metalake, catalog, schema, fileset, comment, propertyMap)
@@ -189,6 +189,11 @@ public class FilesetCommandHandler extends CommandHandler {
 
   /** Handles the "UPDATE" command. */
   private void handleUpdateCommand() {
+    if (!line.hasOption(GravitinoOptions.COMMENT) && !line.hasOption(GravitinoOptions.RENAME)) {
+      System.err.println(ErrorMessages.MISSING_COMMENT_AND_RENAME);
+      Main.exit(-1);
+    }
+
     if (line.hasOption(GravitinoOptions.COMMENT)) {
       String comment = line.getOptionValue(GravitinoOptions.COMMENT);
       gravitinoCommandLine

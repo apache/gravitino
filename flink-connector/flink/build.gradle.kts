@@ -30,7 +30,7 @@ var paimonVersion: String = libs.versions.paimon.get()
 val flinkVersion: String = libs.versions.flink.get()
 val flinkMajorVersion: String = flinkVersion.substringBeforeLast(".")
 
-val icebergVersion: String = libs.versions.iceberg.get()
+val icebergVersion: String = libs.versions.iceberg4connector.get()
 
 // The Flink only support scala 2.12, and all scala api will be removed in a future version.
 // You can find more detail at the following issues:
@@ -41,10 +41,6 @@ val scalaVersion: String = "2.12"
 val artifactName = "${rootProject.name}-flink-${flinkMajorVersion}_$scalaVersion"
 
 dependencies {
-  implementation(project(":core")) {
-    exclude("org.apache.logging.log4j")
-    exclude("org.opensearch.client")
-  }
   implementation(project(":catalogs:catalog-common")) {
     exclude("org.apache.logging.log4j")
   }

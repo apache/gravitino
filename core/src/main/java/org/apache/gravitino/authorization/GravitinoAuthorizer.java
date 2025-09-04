@@ -50,6 +50,12 @@ public interface GravitinoAuthorizer extends Closeable {
       MetadataObject metadataObject,
       Privilege.Name privilege);
 
+  boolean deny(
+      Principal principal,
+      String metalake,
+      MetadataObject metadataObject,
+      Privilege.Name privilege);
+
   /**
    * Determine whether the user is the Owner of a certain metadata object.
    *
@@ -65,9 +71,17 @@ public interface GravitinoAuthorizer extends Closeable {
    *
    * @return authorization result
    */
-  default boolean isServiceAdmin() {
-    return true;
-  }
+  boolean isServiceAdmin();
+
+  /**
+   * Determine whether the user accessing is oneself, or whether the group being accessed contains
+   * oneself.
+   *
+   * @param type user or group
+   * @param nameIdentifier name of user or group
+   * @return authorization result
+   */
+  boolean isSelf(Entity.EntityType type, NameIdentifier nameIdentifier);
 
   /**
    * Determine whether the user is the metalake user
@@ -75,9 +89,27 @@ public interface GravitinoAuthorizer extends Closeable {
    * @param metalake metalake
    * @return authorization result
    */
-  default boolean isMetalakeUser(String metalake) {
-    return true;
-  };
+  boolean isMetalakeUser(String metalake);
+
+  /**
+   * Determine whether the user can set owner
+   *
+   * @param metalake metalake
+   * @param type metadata type
+   * @param fullName metadata full name
+   * @return authorization result
+   */
+  boolean hasSetOwnerPermission(String metalake, String type, String fullName);
+
+  /**
+   * Determine whether the user can grant or revoke privilege for metadata
+   *
+   * @param metalake metalake
+   * @param type metadata type
+   * @param fullName metadata full name
+   * @return authorization result
+   */
+  boolean hasMetadataPrivilegePermission(String metalake, String type, String fullName);
 
   /**
    * When the permissions of a role change, it is necessary to notify the GravitinoAuthorizer in
@@ -85,7 +117,7 @@ public interface GravitinoAuthorizer extends Closeable {
    *
    * @param roleId The role id;
    */
-  default void handleRolePrivilegeChange(Long roleId) {};
+  void handleRolePrivilegeChange(Long roleId);
 
   /**
    * When the permissions of a role change, it is necessary to notify the GravitinoAuthorizer in
@@ -118,6 +150,6 @@ public interface GravitinoAuthorizer extends Closeable {
    * @param nameIdentifier The metadata name identifier;
    * @param type entity type
    */
-  default void handleMetadataOwnerChange(
-      String metalake, Long oldOwnerId, NameIdentifier nameIdentifier, Entity.EntityType type) {};
+  void handleMetadataOwnerChange(
+      String metalake, Long oldOwnerId, NameIdentifier nameIdentifier, Entity.EntityType type);
 }

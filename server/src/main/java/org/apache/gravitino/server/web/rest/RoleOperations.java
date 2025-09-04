@@ -34,9 +34,11 @@ import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.Response;
+import org.apache.gravitino.Entity;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
+import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.authorization.AccessControlDispatcher;
 import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.authorization.Privilege;
@@ -45,16 +47,20 @@ import org.apache.gravitino.authorization.SecurableObjects;
 import org.apache.gravitino.dto.authorization.PrivilegeDTO;
 import org.apache.gravitino.dto.authorization.SecurableObjectDTO;
 import org.apache.gravitino.dto.requests.RoleCreateRequest;
-import org.apache.gravitino.dto.responses.DeleteResponse;
+import org.apache.gravitino.dto.responses.DropResponse;
 import org.apache.gravitino.dto.responses.NameListResponse;
 import org.apache.gravitino.dto.responses.RoleResponse;
 import org.apache.gravitino.dto.util.DTOConverters;
 import org.apache.gravitino.exceptions.IllegalMetadataObjectException;
 import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
 import org.apache.gravitino.metrics.MetricNames;
+import org.apache.gravitino.server.authorization.MetadataFilterHelper;
 import org.apache.gravitino.server.authorization.NameBindings;
+import org.apache.gravitino.server.authorization.annotations.AuthorizationExpression;
+import org.apache.gravitino.server.authorization.annotations.AuthorizationMetadata;
 import org.apache.gravitino.server.web.Utils;
 import org.apache.gravitino.utils.MetadataObjectUtil;
+import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -81,6 +87,22 @@ public class RoleOperations {
           httpRequest,
           () -> {
             String[] names = accessControlManager.listRoleNames(metalake);
+            names =
+                Arrays.stream(names)
+                    .filter(
+                        role -> {
+                          NameIdentifier[] nameIdentifiers =
+                              new NameIdentifier[] {NameIdentifierUtil.ofRole(metalake, role)};
+                          return MetadataFilterHelper.filterByExpression(
+                                      metalake,
+                                      "METALAKE::OWNER || ROLE::OWNER || ROLE::SELF",
+                                      Entity.EntityType.ROLE,
+                                      nameIdentifiers)
+                                  .length
+                              > 0;
+                        })
+                    .collect(Collectors.toList())
+                    .toArray(new String[0]);
             return Utils.ok(new NameListResponse(names));
           });
     } catch (Exception e) {
@@ -93,7 +115,11 @@ public class RoleOperations {
   @Produces("application/vnd.gravitino.v1+json")
   @Timed(name = "get-role." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "get-role", absolute = true)
-  public Response getRole(@PathParam("metalake") String metalake, @PathParam("role") String role) {
+  @AuthorizationExpression(expression = "METALAKE::OWNER || ROLE::OWNER || ROLE::SELF")
+  public Response getRole(
+      @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
+          String metalake,
+      @PathParam("role") @AuthorizationMetadata(type = Entity.EntityType.ROLE) String role) {
     try {
       return Utils.doAs(
           httpRequest,
@@ -110,7 +136,11 @@ public class RoleOperations {
   @Produces("application/vnd.gravitino.v1+json")
   @Timed(name = "create-role." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "create-role", absolute = true)
-  public Response createRole(@PathParam("metalake") String metalake, RoleCreateRequest request) {
+  @AuthorizationExpression(expression = "METALAKE::OWNER || METALAKE::CREATE_ROLE")
+  public Response createRole(
+      @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
+          String metalake,
+      RoleCreateRequest request) {
     try {
 
       return Utils.doAs(
@@ -177,8 +207,11 @@ public class RoleOperations {
   @Produces("application/vnd.gravitino.v1+json")
   @Timed(name = "delete-role." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "delete-role", absolute = true)
+  @AuthorizationExpression(expression = "METALAKE::OWNER || ROLE::OWNER")
   public Response deleteRole(
-      @PathParam("metalake") String metalake, @PathParam("role") String role) {
+      @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
+          String metalake,
+      @PathParam("role") @AuthorizationMetadata(type = Entity.EntityType.ROLE) String role) {
     try {
       return Utils.doAs(
           httpRequest,
@@ -187,7 +220,7 @@ public class RoleOperations {
             if (!deleted) {
               LOG.warn("Failed to delete role {} under metalake {}", role, metalake);
             }
-            return Utils.ok(new DeleteResponse(deleted));
+            return Utils.ok(new DropResponse(deleted, deleted));
           });
     } catch (Exception e) {
       return ExceptionHandlers.handleRoleException(OperationType.DELETE, role, metalake, e);

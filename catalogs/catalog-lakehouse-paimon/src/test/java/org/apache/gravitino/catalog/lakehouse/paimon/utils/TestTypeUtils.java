@@ -61,8 +61,20 @@ public class TestTypeUtils {
                 DataTypes.DECIMAL(8, 3),
                 DataTypes.DATE(),
                 DataTypes.TIME(),
+                DataTypes.TIME(0),
+                DataTypes.TIME(3),
+                DataTypes.TIME(6),
+                DataTypes.TIME(9),
                 DataTypes.TIMESTAMP(),
+                DataTypes.TIMESTAMP(0),
+                DataTypes.TIMESTAMP(3),
+                DataTypes.TIMESTAMP(6),
+                DataTypes.TIMESTAMP(9),
                 DataTypes.TIMESTAMP_WITH_LOCAL_TIME_ZONE(),
+                DataTypes.TIMESTAMP_WITH_LOCAL_TIME_ZONE(0),
+                DataTypes.TIMESTAMP_WITH_LOCAL_TIME_ZONE(3),
+                DataTypes.TIMESTAMP_WITH_LOCAL_TIME_ZONE(6),
+                DataTypes.TIMESTAMP_WITH_LOCAL_TIME_ZONE(9),
                 DataTypes.STRING(),
                 DataTypes.VARCHAR(10),
                 DataTypes.CHAR(10),
@@ -98,6 +110,22 @@ public class TestTypeUtils {
             Types.NullType.get(),
             Types.UnparsedType.of("unparsed"))
         .forEach(this::checkUnsupportedType);
+  }
+
+  @Test
+  void testToPaimonTypeNullability() {
+    assertEquals(
+        DataTypes.ARRAY(DataTypes.INT().notNull()),
+        toPaimonType(Types.ListType.of(Types.IntegerType.get(), false)));
+    assertEquals(
+        DataTypes.ARRAY(DataTypes.INT().nullable()),
+        toPaimonType(Types.ListType.of(Types.IntegerType.get(), true)));
+    assertEquals(
+        DataTypes.MAP(DataTypes.STRING(), DataTypes.INT().notNull()),
+        toPaimonType(Types.MapType.of(Types.StringType.get(), Types.IntegerType.get(), false)));
+    assertEquals(
+        DataTypes.MAP(DataTypes.STRING(), DataTypes.INT().nullable()),
+        toPaimonType(Types.MapType.of(Types.StringType.get(), Types.IntegerType.get(), true)));
   }
 
   private Type toGravitinoDataType(DataType dataType) {

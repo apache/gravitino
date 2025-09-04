@@ -17,7 +17,7 @@ jobs:
         with:
           fetch-depth: 0
       - name: Cherry pick into branch-0.8
-        uses: carloscastrojumo/github-cherry-pick-action@v1.0.9
+        uses: carloscastrojumo/github-cherry-pick-action@503773289f4a459069c832dc628826685b75b4b3
         with:
           branch: branch-0.8
           labels: |
@@ -36,13 +36,31 @@ jobs:
         with:
           fetch-depth: 0
       - name: Cherry pick into branch-0.9
-        uses: carloscastrojumo/github-cherry-pick-action@v1.0.9
+        uses: carloscastrojumo/github-cherry-pick-action@503773289f4a459069c832dc628826685b75b4b3
         with:
           branch: branch-0.9
           labels: |
             cherry-pick
           reviewers: |
-            jerqi         
+            jerqi
+
+  cherry_pick_branch_1_0:
+    runs-on: ubuntu-latest
+    name: Cherry pick into branch_1.0
+    if: ${{ contains(github.event.pull_request.labels.*.name, 'branch-1.0') && github.event.pull_request.merged == true }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Cherry pick into branch-1.0
+        uses: carloscastrojumo/github-cherry-pick-action@503773289f4a459069c832dc628826685b75b4b3
+        with:
+          branch: branch-1.0
+          labels: |
+            cherry-pick
+          reviewers: |
+            jerryshao
 
 env:
   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

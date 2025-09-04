@@ -28,6 +28,7 @@ import org.apache.gravitino.audit.v2.SimpleFormatterV2;
 import org.apache.gravitino.config.ConfigBuilder;
 import org.apache.gravitino.config.ConfigConstants;
 import org.apache.gravitino.config.ConfigEntry;
+import org.apache.gravitino.stats.storage.LancePartitionStatisticStorageFactory;
 
 public class Configs {
 
@@ -290,7 +291,7 @@ public class Configs {
           .doc("Metadata authorization implementation")
           .version(ConfigConstants.VERSION_1_0_0)
           .stringConf()
-          .createWithDefault("org.apache.gravitino.server.authorization.PassThroughAuthorizer");
+          .createWithDefault("org.apache.gravitino.server.authorization.jcasbin.JcasbinAuthorizer");
 
   public static final ConfigEntry<List<String>> SERVICE_ADMINS =
       new ConfigBuilder("gravitino.authorization.serviceAdmins")
@@ -412,5 +413,44 @@ public class Configs {
           .doc("Directory for managing staging files when running jobs.")
           .version(ConfigConstants.VERSION_1_0_0)
           .stringConf()
+          .checkValue(StringUtils::isNotBlank, ConfigConstants.NOT_BLANK_ERROR_MSG)
           .createWithDefault("/tmp/gravitino/jobs/staging");
+
+  public static final ConfigEntry<String> JOB_EXECUTOR =
+      new ConfigBuilder("gravitino.job.executor")
+          .doc(
+              "The executor to run jobs, by default it is 'local', user can implement their own "
+                  + "executor and set it here.")
+          .version(ConfigConstants.VERSION_1_0_0)
+          .stringConf()
+          .checkValue(StringUtils::isNotBlank, ConfigConstants.NOT_BLANK_ERROR_MSG)
+          .createWithDefault("local");
+
+  public static final ConfigEntry<Long> JOB_STAGING_DIR_KEEP_TIME_IN_MS =
+      new ConfigBuilder("gravitino.job.stagingDirKeepTimeInMs")
+          .doc(
+              "The time in milliseconds to keep the staging files of the finished job in the job"
+                  + " staging directory. The minimum recommended value is 10 minutes if you're "
+                  + "not testing.")
+          .version(ConfigConstants.VERSION_1_0_0)
+          .longConf()
+          .checkValue(value -> value > 0, ConfigConstants.POSITIVE_NUMBER_ERROR_MSG)
+          .createWithDefault(7 * 24 * 3600 * 1000L); // Default is 7 days
+
+  public static final ConfigEntry<Long> JOB_STATUS_PULL_INTERVAL_IN_MS =
+      new ConfigBuilder("gravitino.job.statusPullIntervalInMs")
+          .doc(
+              "The interval in milliseconds to pull the job status from the job executor. The "
+                  + "minimum recommended value is 1 minute if you're not testing.")
+          .version(ConfigConstants.VERSION_1_0_0)
+          .longConf()
+          .checkValue(value -> value > 0, ConfigConstants.POSITIVE_NUMBER_ERROR_MSG)
+          .createWithDefault(5 * 60 * 1000L); // Default is 5 minutes
+
+  public static final ConfigEntry<String> PARTITION_STATS_STORAGE_FACTORY_CLASS =
+      new ConfigBuilder("gravitino.stats.partition.storageFactoryClass")
+          .doc("The partition stats storage factory class.")
+          .version(ConfigConstants.VERSION_1_0_0)
+          .stringConf()
+          .createWithDefault(LancePartitionStatisticStorageFactory.class.getCanonicalName());
 }

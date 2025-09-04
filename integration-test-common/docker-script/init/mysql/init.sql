@@ -118,66 +118,110 @@ INSERT INTO gt_mysql_test_all_type.demo (
     ST_GeomFromText('POINT(10 20)'),        -- point_col
     ST_GeomFromText('LINESTRING(0 0, 10 10)') -- geometry_col
 );
-CREATE DATABASE gt_mysql_test_index;
-CREATE TABLE gt_mysql_test_index.demo_with_one_primary_key
-(
-    key1 INT PRIMARY KEY,
-    col1 INT
+CREATE DATABASE gt_mysql_test_column_properties;
+/*
++----------------+-------------------------------------+------+-----+---------------------+-------------------+
+| Field          | Type                                | Null | Key | Default             | Extra             |
++----------------+-------------------------------------+------+-----+---------------------+-------------------+
+| col_bit        | bit(1)                              | YES  |     | b'1'                |                   |
+| col_tinyint    | tinyint                             | YES  |     | 0                   |                   |
+| col_smallint   | smallint                            | YES  |     | -1                  |                   |
+| col_mediumint  | mediumint                           | YES  |     | 100                 |                   |
+| col_int        | int                                 | YES  |     | 1                   |                   |
+| col_bigint     | bigint                              | YES  |     | 9999999             |                   |
+| col_float      | float                               | YES  |     | 0                   |                   |
+| col_double     | double                              | YES  |     | 1.23456             |                   |
+| col_decimal    | decimal(10,2)                       | YES  |     | 100.50              |                   |
+| col_date       | date                                | YES  |     | 2000-01-01          |                   |
+| col_time       | time                                | YES  |     | 12:30:01            |                   |
+| col_datetime   | datetime                            | YES  |     | 2025-01-01 00:00:01 |                   |
+| col_timestamp  | timestamp                           | NO   |     | 2025-01-01 00:00:01 |                   |
+| col_year       | year                                | YES  |     | 2025                |                   |
+| col_char       | char(10)                            | YES  |     | abc                 |                   |
+| col_varchar    | varchar(100)                        | YES  |     | Hello               |                   |
+| col_tinytext   | tinytext                            | YES  |     | NULL                |                   |
+| col_text       | text                                | YES  |     | NULL                |                   |
+| col_mediumtext | mediumtext                          | YES  |     | NULL                |                   |
+| col_longtext   | longtext                            | YES  |     | NULL                |                   |
+| col_binary     | binary(5)                           | YES  |     | 0x61                |                   |
+| col_varbinary  | varbinary(100)                      | YES  |     | 0x62696E617279      |                   |
+| col_blob       | blob                                | YES  |     | NULL                |                   |
+| col_mediumblob | mediumblob                          | YES  |     | NULL                |                   |
+| col_longblob   | longblob                            | YES  |     | NULL                |                   |
+| col_enum       | enum('active','inactive','pending') | YES  |     | pending             |                   |
+| col_set        | set('red','green','blue')           | YES  |     | green,blue          |                   |
+| col_json       | json                                | YES  |     | NULL                |                   |
+| col_boolean    | tinyint(1)                          | YES  |     | 1                   |                   |
+| col_geometry   | geometry                            | YES  |     | NULL                |                   |
+| col_point      | point                               | YES  |     | point(0,0)          | DEFAULT_GENERATED |
++----------------+-------------------------------------+------+-----+---------------------+-------------------+
+*/
+CREATE TABLE gt_mysql_test_column_properties.demo_all_data_types_default_value (
+    -- 整数类型
+    col_bit BIT DEFAULT b'1',
+    col_tinyint TINYINT DEFAULT 0,
+    col_smallint SMALLINT DEFAULT -1,
+    col_mediumint MEDIUMINT DEFAULT 100,
+    col_int INT DEFAULT 1,
+    col_bigint BIGINT DEFAULT 9999999,
+    -- 浮点与精确小数
+    col_float FLOAT DEFAULT 0.0,
+    col_double DOUBLE DEFAULT 1.23456,
+    col_decimal DECIMAL(10, 2) DEFAULT 100.50,
+    -- 日期与时间
+    col_date DATE DEFAULT '2000-01-01',
+    col_time TIME DEFAULT '12:30:01',
+    col_datetime DATETIME DEFAULT '2025-01-01 00:00:01',
+    col_timestamp TIMESTAMP DEFAULT '2025-01-01 00:00:01',
+    col_year YEAR DEFAULT 2025,
+    -- 字符串类型
+    col_char CHAR(10) DEFAULT 'abc',
+    col_varchar VARCHAR(100) DEFAULT 'Hello',
+    col_tinytext TINYTEXT DEFAULT NULL,
+    col_text TEXT DEFAULT NULL,
+    col_mediumtext MEDIUMTEXT DEFAULT NULL,
+    col_longtext LONGTEXT DEFAULT NULL,
+    -- 二进制数据
+    col_binary BINARY(5) DEFAULT 'a',
+    col_varbinary VARBINARY(100) DEFAULT 'binary',
+    col_blob BLOB DEFAULT NULL,
+    col_mediumblob MEDIUMBLOB DEFAULT NULL,
+    col_longblob LONGBLOB DEFAULT NULL,
+    -- 特殊类型
+    col_enum ENUM('active', 'inactive', 'pending') DEFAULT 'pending',
+    col_set SET('red', 'green', 'blue') DEFAULT 'green,blue',
+    col_json JSON DEFAULT NULL,
+    col_boolean BOOLEAN DEFAULT TRUE,
+    -- 空间数据类型
+    col_geometry GEOMETRY DEFAULT NULL,
+    col_point POINT DEFAULT (POINT(0, 0))
 );
-CREATE TABLE gt_mysql_test_index.demo_with_two_primary_key
+/*
++------------------+--------------+------+-----+-------------------------------+-------------------+
+| Field            | Type         | Null | Key | Default                       | Extra             |
++------------------+--------------+------+-----+-------------------------------+-------------------+
+| int_col_2        | int          | YES  |     | rand()                        | DEFAULT_GENERATED |
+| varchar200_col_1 | varchar(200) | YES  |     | curdate()                     | DEFAULT_GENERATED |
+| varchar200_col_2 | varchar(200) | YES  |     | now()                         | DEFAULT_GENERATED |
+| datetime_col_1   | datetime     | YES  |     | CURRENT_TIMESTAMP             | DEFAULT_GENERATED |
+| datetime_col_2   | datetime     | YES  |     | CURRENT_TIMESTAMP             | DEFAULT_GENERATED |
+| date_col_1       | date         | YES  |     | curdate()                     | DEFAULT_GENERATED |
+| date_col_2       | date         | YES  |     | (curdate() + interval 1 year) | DEFAULT_GENERATED |
+| date_col_3       | date         | YES  |     | curdate()                     | DEFAULT_GENERATED |
+| timestamp_col_1  | timestamp    | NO   |     | CURRENT_TIMESTAMP             | DEFAULT_GENERATED |
+| timestamp_col_2  | timestamp(6) | NO   |     | CURRENT_TIMESTAMP(6)          | DEFAULT_GENERATED |
++------------------+--------------+------+-----+-------------------------------+-------------------+
+*/
+CREATE TABLE gt_mysql_test_column_properties.demo_default_value_with_expression
 (
-    key1 INT,
-    key2 INT,
-    col1 INT,
-    primary key (key2, key1)
-);
-CREATE TABLE gt_mysql_test_index.demo_with_one_unique_key
-(
-    key1 INT,
-    col1 INT,
-    unique key unique_key1 (key1)
-);
-CREATE TABLE gt_mysql_test_index.demo_with_one_unique_key_1
-(
-    key1 INT,
-    key2 INT,
-    col1 INT,
-    unique key unique_key1 (key2, key1)
-);
-CREATE TABLE gt_mysql_test_index.demo_with_two_unique_key
-(
-    key1 INT,
-    key2 INT,
-    col1 INT,
-    unique key unique_key1 (key1),
-    unique key unique_key2 (key2)
-);
-CREATE TABLE gt_mysql_test_index.demo_with_two_unique_key_1
-(
-    key1 INT,
-    key2 INT,
-    key3 INT,
-    col1 INT,
-    unique key unique_key1 (key1),
-    unique key unique_key2 (key3, key2)
-);
-CREATE TABLE gt_mysql_test_index.demo_with_primary_key_and_unique_key
-(
-    key1 INT,
-    key2 INT,
-    col1 INT,
-    primary key (key1),
-    unique key unique_key1 (key2)
-);
-CREATE TABLE gt_mysql_test_index.demo_with_primary_key_and_unique_key_1
-(
-    key1 INT,
-    key2 INT,
-    key3 INT,
-    key4 INT,
-    key5 INT,
-    col1 INT,
-    primary key (key5, key1),
-    unique key unique_key1 (key2),
-    unique key unique_key2 (key4, key3)
+  int_col_2 int default (rand()),
+  varchar200_col_1 varchar(200) default (curdate()),
+  varchar200_col_2 varchar(200) default (CURRENT_TIMESTAMP),
+  datetime_col_1 datetime default CURRENT_TIMESTAMP,
+  datetime_col_2 datetime default current_timestamp,
+  date_col_1 date default (CURRENT_DATE),
+  date_col_2 date DEFAULT (CURRENT_DATE + INTERVAL 1 YEAR),
+  date_col_3 date DEFAULT (CURRENT_DATE),
+  timestamp_col_1 timestamp default CURRENT_TIMESTAMP,
+  timestamp_col_2 timestamp(6) default CURRENT_TIMESTAMP(6)
 );

@@ -30,15 +30,16 @@ repositories {
 val scalaVersion: String = project.properties["scalaVersion"] as? String ?: extra["defaultScalaVersion"].toString()
 val sparkVersion: String = libs.versions.spark33.get()
 val sparkMajorVersion: String = sparkVersion.substringBeforeLast(".")
-val icebergVersion: String = libs.versions.iceberg4spark.get()
+val icebergVersion: String = libs.versions.iceberg4connector.get()
 val paimonVersion: String = libs.versions.paimon.get()
-// kyuubi hive connector for Spark 3.3 doesn't support scala 2.13
-val kyuubiVersion: String = libs.versions.kyuubi4spark34.get()
+val kyuubiVersion: String = libs.versions.kyuubi4spark.get()
 val scalaJava8CompatVersion: String = libs.versions.scala.java.compat.get()
 val scalaCollectionCompatVersion: String = libs.versions.scala.collection.compat.get()
 
 dependencies {
-  implementation(project(":catalogs:catalog-common"))
+  implementation(project(":catalogs:catalog-common")) {
+    exclude("org.apache.logging.log4j")
+  }
   implementation(libs.guava)
   implementation(libs.caffeine)
 

@@ -56,6 +56,20 @@ public class TestTopicAuthorizationExpression {
     assertTrue(
         mockEvaluator.getResult(
             ImmutableSet.of("SCHEMA::CREATE_TOPIC", "SCHEMA::USE_SCHEMA", "CATALOG::USE_CATALOG")));
+    assertFalse(
+        mockEvaluator.getResult(
+            ImmutableSet.of(
+                "SCHEMA::CREATE_TOPIC",
+                "METALAKE::DENY_CREATE_TOPIC",
+                "SCHEMA::USE_SCHEMA",
+                "CATALOG::USE_CATALOG")));
+    assertFalse(
+        mockEvaluator.getResult(
+            ImmutableSet.of(
+                "SCHEMA::DENY_CREATE_TOPIC",
+                "METALAKE::CREATE_TOPIC",
+                "SCHEMA::USE_SCHEMA",
+                "CATALOG::USE_CATALOG")));
   }
 
   @Test
@@ -102,6 +116,20 @@ public class TestTopicAuthorizationExpression {
     assertTrue(
         mockEvaluator.getResult(
             ImmutableSet.of("SCHEMA::OWNER", "SCHEMA::USE_SCHEMA", "CATALOG::USE_CATALOG")));
+    assertFalse(
+        mockEvaluator.getResult(
+            ImmutableSet.of(
+                "SCHEMA::OWNER",
+                "SCHEMA::USE_SCHEMA",
+                "CATALOG::USE_CATALOG",
+                "METALAKE::DENY_USE_CATALOG")));
+    assertFalse(
+        mockEvaluator.getResult(
+            ImmutableSet.of(
+                "SCHEMA::OWNER",
+                "SCHEMA::DENY_USE_SCHEMA",
+                "CATALOG::DENY_USE_CATALOG",
+                "METALAKE::USE_CATALOG")));
   }
 
   @Test
@@ -144,6 +172,20 @@ public class TestTopicAuthorizationExpression {
     assertTrue(
         mockEvaluator.getResult(
             ImmutableSet.of("SCHEMA::OWNER", "SCHEMA::USE_SCHEMA", "CATALOG::USE_CATALOG")));
+    assertFalse(
+        mockEvaluator.getResult(
+            ImmutableSet.of(
+                "SCHEMA::OWNER",
+                "SCHEMA::USE_SCHEMA",
+                "CATALOG::USE_CATALOG",
+                "METALAKE::DENY_USE_CATALOG")));
+    assertFalse(
+        mockEvaluator.getResult(
+            ImmutableSet.of(
+                "SCHEMA::OWNER",
+                "SCHEMA::DENY_USE_SCHEMA",
+                "CATALOG::DENY_USE_CATALOG",
+                "METALAKE::USE_CATALOG")));
   }
 
   @Test
@@ -182,5 +224,19 @@ public class TestTopicAuthorizationExpression {
     assertTrue(
         mockEvaluator.getResult(
             ImmutableSet.of("SCHEMA::OWNER", "SCHEMA::USE_SCHEMA", "CATALOG::USE_CATALOG")));
+    assertFalse(
+        mockEvaluator.getResult(
+            ImmutableSet.of(
+                "SCHEMA::OWNER",
+                "SCHEMA::USE_SCHEMA",
+                "CATALOG::USE_CATALOG",
+                "METALAKE::DENY_USE_CATALOG")));
+    assertFalse(
+        mockEvaluator.getResult(
+            ImmutableSet.of(
+                "SCHEMA::OWNER",
+                "SCHEMA::DENY_USE_SCHEMA",
+                "CATALOG::DENY_USE_CATALOG",
+                "METALAKE::USE_CATALOG")));
   }
 }

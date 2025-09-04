@@ -29,6 +29,7 @@ guava = "32.1.3-jre"
 lombok = "1.18.20"
 slf4j = "2.0.9"
 log4j = "2.24.3"
+lance = "0.31.0"
 jetty = "9.4.51.v20230217"
 jersey = "2.41"
 mockito = "4.11.0"
@@ -43,7 +44,10 @@ hadoop3-aliyun = "3.3.1"
 hadoop-minikdc = "3.3.1"
 htrace-core4 = "4.1.0-incubating"
 httpclient = "4.4.1"
-httpclient5 = "5.2.1"
+httpclient5 = "5.4.4"
+httpcore5 = "5.3.4"
+micrometer-core = "1.12.2"
+jackson-dataformat-yaml = "2.16.1"
 mockserver = "5.15.0"
 commons-csv = "1.12.0"
 commons-lang3 = "3.14.0"
@@ -55,22 +59,21 @@ commons-collections3 = "3.2.2"
 commons-configuration1 = "1.6"
 commons-dbcp2 = "2.11.0"
 caffeine = "2.9.3"
-iceberg = '1.6.1' # used for Gravitino Iceberg catalog and Iceberg REST service
-iceberg4spark = "1.4.1" # used for compile spark connector
+iceberg = '1.9.2' # used for Gravitino Iceberg catalog and Iceberg REST service
+iceberg4connector = "1.6.1" # used for compile connectors like Spark, Flink, etc
 paimon = '0.8.0'
 spark33 = "3.3.4"
 spark34 = "3.4.3"
 spark35 = "3.5.1"
-kyuubi4spark33 = "1.7.4"
-kyuubi4spark34 = "1.8.2"
-kyuubi4spark35 = "1.10.2"
-kyuubi4paimon = "1.10.2"
+kyuubi4spark = "1.10.2"
+kyuubi4authz = "1.10.2"
 trino = '435'
 scala-collection-compat = "2.7.0"
 scala-java-compat = "1.0.2"
 sqlite-jdbc = "3.42.0.0"
 testcontainers = "1.20.6"
 jwt = "0.11.1"
+nimbus-jose-jwt = "9.37.3"
 jline = "3.21.0"
 okhttp3 = "4.11.0"
 opencsv = "2.3"
@@ -125,6 +128,7 @@ jmh = "1.37"
 jcasbin = "1.81.0"
 ognl = "3.4.7"
 concurrent-trees = "2.6.0"
+jakarta-validation = "2.0.2"
 
 [libraries]
 aws-iam = { group = "software.amazon.awssdk", name = "iam", version.ref = "awssdk" }
@@ -140,13 +144,14 @@ jackson-databind = { group = "com.fasterxml.jackson.core", name = "jackson-datab
 jackson-annotations = { group = "com.fasterxml.jackson.core", name = "jackson-annotations", version.ref = "jackson" }
 jackson-datatype-jdk8 = { group = "com.fasterxml.jackson.datatype", name = "jackson-datatype-jdk8", version.ref = "jackson" }
 jackson-datatype-jsr310 = { group = "com.fasterxml.jackson.datatype", name = "jackson-datatype-jsr310", version.ref = "jackson" }
+jackson-dataformat-yaml = { group = "com.fasterxml.jackson.dataformat", name = "jackson-dataformat-yaml", version.ref = "jackson-dataformat-yaml" }
 guava = { group = "com.google.guava", name = "guava", version.ref = "guava" }
 kerby-core = { group = "org.apache.kerby", name = "kerb-core", version.ref = "kerby"}
 kerby-simplekdc = { group = "org.apache.kerby", name = "kerb-simplekdc", version.ref = "kerby"}
 lombok = { group = "org.projectlombok", name = "lombok", version.ref = "lombok" }
 junit-jupiter-api = { group = "org.junit.jupiter", name = "junit-jupiter-api", version.ref = "junit" }
 junit-jupiter-params = { group = "org.junit.jupiter", name = "junit-jupiter-params", version.ref = "junit" }
-junit-jupiter-engine = { group = "org.junit.jupiter", name = "junit-jupiter-engine"}
+junit-jupiter-engine = { group = "org.junit.jupiter", name = "junit-jupiter-engine", version.ref = "junit" }
 slf4j-api = { group = "org.slf4j", name = "slf4j-api", version.ref = "slf4j" }
 slf4j-simple = { group = "org.slf4j", name = "slf4j-simple", version.ref = "slf4j" }
 slf4j-jdk14 = { group = "org.slf4j", name = "slf4j-jdk14", version = "1.7.30" }
@@ -155,6 +160,8 @@ log4j-api = { group = "org.apache.logging.log4j", name = "log4j-api", version.re
 log4j-core = { group = "org.apache.logging.log4j", name = "log4j-core", version.ref = "log4j" }
 log4j-12-api = { group = "org.apache.logging.log4j", name = "log4j-1.2-api", version.ref = "log4j" }
 log4j-layout-template-json = { group = "org.apache.logging.log4j", name = "log4j-layout-template-json", version.ref = "log4j" }
+lance = { group = "com.lancedb", name = "lance-core", version.ref = "lance" }
+jakarta-validation-api = { group = "jakarta.validation", name = "jakarta.validation-api", version.ref = "jakarta-validation" }
 jetty-server = { group = "org.eclipse.jetty", name = "jetty-server", version.ref = "jetty" }
 jetty-servlet = { group = "org.eclipse.jetty", name = "jetty-servlet", version.ref = "jetty" }
 jetty-servlets = { group = "org.eclipse.jetty", name = "jetty-servlets", version.ref = "jetty" }
@@ -194,6 +201,9 @@ airlift-json = { group = "io.airlift", name = "json", version.ref = "airlift-jso
 airlift-resolver = { group = "io.airlift.resolver", name = "resolver", version.ref = "airlift-resolver"}
 httpclient = { group = "org.apache.httpcomponents", name = "httpclient", version.ref = "httpclient" }
 httpclient5 = { group = "org.apache.httpcomponents.client5", name = "httpclient5", version.ref = "httpclient5" }
+httpcore5 = { group = "org.apache.httpcomponents.core5", name = "httpcore5", version.ref = "httpcore5" }
+micrometer-core = { group = "io.micrometer", name = "micrometer-core", version.ref = "micrometer-core" }
+
 mockserver-netty = { group = "org.mock-server", name = "mockserver-netty", version.ref = "mockserver" }
 mockserver-client-java = { group = "org.mock-server", name = "mockserver-client-java", version.ref = "mockserver" }
 commons-csv = { group = "org.apache.commons", name = "commons-csv", version.ref = "commons-csv" }
@@ -238,6 +248,7 @@ trino-jdbc = { group = "io.trino", name = "trino-jdbc", version.ref = "trino" }
 jwt-api = { group = "io.jsonwebtoken", name = "jjwt-api", version.ref = "jwt"}
 jwt-impl = { group = "io.jsonwebtoken", name = "jjwt-impl", version.ref = "jwt"}
 jwt-gson = { group = "io.jsonwebtoken", name = "jjwt-gson", version.ref = "jwt"}
+nimbus-jose-jwt = { group = "com.nimbusds", name = "nimbus-jose-jwt", version.ref = "nimbus-jose-jwt"}
 metrics-core = { group = "io.dropwizard.metrics", name = "metrics-core", version.ref = "metrics" }
 metrics-jersey2 = { group = "io.dropwizard.metrics", name = "metrics-jersey2", version.ref = "metrics" }
 metrics-jvm = { group = "io.dropwizard.metrics", name = "metrics-jvm", version.ref = "metrics" }

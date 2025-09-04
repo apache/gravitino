@@ -312,19 +312,19 @@ public class TestPostgreSqlTableOperations extends TestPostgreSql {
     columns.add(
         JdbcColumn.builder()
             .withName("col_8")
-            .withType(Types.TimeType.get())
+            .withType(Types.TimeType.of(6))
             .withNullable(false)
             .build());
     columns.add(
         JdbcColumn.builder()
             .withName("col_9")
-            .withType(Types.TimestampType.withoutTimeZone())
+            .withType(Types.TimestampType.withoutTimeZone(6))
             .withNullable(false)
             .build());
     columns.add(
         JdbcColumn.builder()
             .withName("col_10")
-            .withType(Types.TimestampType.withTimeZone())
+            .withType(Types.TimestampType.withTimeZone(6))
             .withNullable(false)
             .build());
     columns.add(
@@ -414,6 +414,7 @@ public class TestPostgreSqlTableOperations extends TestPostgreSql {
         new PostgreSqlTypeConverter(),
         new PostgreSqlColumnDefaultValueConverter(),
         config);
+    postgreSqlTableOperations.setDatabaseOperation(postgreSqlSchemaOperations);
 
     String table_1 = "table_multiple_1";
     postgreSqlTableOperations.create(
@@ -751,5 +752,36 @@ public class TestPostgreSqlTableOperations extends TestPostgreSql {
             updateColumnAutoIncrement, "table_test");
     Assertions.assertEquals(
         "ALTER TABLE \"table_test\" ALTER COLUMN  \"col_2\" DROP IDENTITY;", sql);
+  }
+
+  @Test
+  public void testCalculateDatetimePrecision() {
+    Assertions.assertNull(
+        TABLE_OPERATIONS.calculateDatetimePrecision("DATE", 10, -1),
+        "DATE type should return 0 precision");
+
+    Assertions.assertEquals(
+        0,
+        TABLE_OPERATIONS.calculateDatetimePrecision("TIME", 10, 0),
+        "TIME type should return 0 precision");
+
+    Assertions.assertEquals(
+        3,
+        TABLE_OPERATIONS.calculateDatetimePrecision("TIMETZ", 23, 3),
+        "TIMESTAMP type should return 0 precision");
+
+    Assertions.assertEquals(
+        6,
+        TABLE_OPERATIONS.calculateDatetimePrecision("TIMESTAMP", 26, 6),
+        "TIMESTAMP type should return 0 precision");
+
+    Assertions.assertEquals(
+        1,
+        TABLE_OPERATIONS.calculateDatetimePrecision("TIMESTAMPTZ", 19, 1),
+        "Lower case type name should work");
+
+    Assertions.assertNull(
+        TABLE_OPERATIONS.calculateDatetimePrecision("VARCHAR", 50, 0),
+        "Non-datetime type should return 0 precision");
   }
 }

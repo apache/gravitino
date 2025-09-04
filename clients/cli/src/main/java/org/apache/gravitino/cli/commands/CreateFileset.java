@@ -20,6 +20,7 @@
 package org.apache.gravitino.cli.commands;
 
 import java.util.Map;
+import java.util.Optional;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.cli.CommandContext;
 import org.apache.gravitino.cli.ErrorMessages;
@@ -29,13 +30,21 @@ import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.file.Fileset;
+import org.apache.gravitino.utils.MapUtils;
 
+/** Represents create a new fileset command. */
 public class CreateFileset extends Command {
+  /** The name of the metalake. */
   protected final String metalake;
+  /** The name of the catalog. */
   protected final String catalog;
+  /** The name of the schema. */
   protected final String schema;
+  /** The name of the fileset. */
   protected final String fileset;
+  /** The fileset's comment. */
   protected final String comment;
+  /** The catalog's properties. */
   protected final Map<String, String> properties;
 
   /**
@@ -70,8 +79,12 @@ public class CreateFileset extends Command {
   @Override
   public void handle() {
     NameIdentifier name = NameIdentifier.of(schema, fileset);
-    boolean managed = properties.get("managed").equals("true");
-    String location = properties.get("location");
+    boolean managed =
+        Optional.ofNullable(properties.get("managed")).map("true"::equals).orElse(false);
+    Map<String, String> storageLocations = MapUtils.getPrefixMap(properties, "location-", true);
+    Map<String, String> propertiesWithoutLocation =
+        MapUtils.getMapWithoutPrefix(properties, "location-");
+
     Fileset.Type filesetType = managed ? Fileset.Type.MANAGED : Fileset.Type.EXTERNAL;
 
     try {
@@ -79,7 +92,8 @@ public class CreateFileset extends Command {
       client
           .loadCatalog(catalog)
           .asFilesetCatalog()
-          .createFileset(name, comment, filesetType, location, null);
+          .createMultipleLocationFileset(
+              name, comment, filesetType, storageLocations, propertiesWithoutLocation);
     } catch (NoSuchMetalakeException err) {
       exitWithError(ErrorMessages.UNKNOWN_METALAKE);
     } catch (NoSuchCatalogException err) {
@@ -93,5 +107,14 @@ public class CreateFileset extends Command {
     }
 
     printInformation(fileset + " created");
+  }
+
+  @Override
+  public Command validate() {
+    if (!properties.containsKey("managed")) {
+      exitWithError("Missing property 'managed'");
+    }
+
+    return this;
   }
 }

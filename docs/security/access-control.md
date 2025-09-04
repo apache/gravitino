@@ -46,6 +46,28 @@ Gravitino doesn't support metadata authentication. It means that Gravitino won't
 
 ### Authorization
 
+#### Build-in Authorization
+
+Gravitino provides built-in metadata authorization. You can enable the built-in metadata authorization through the following configuration.
+
+```
+gravitino.authorization.enable = true
+```
+
+You can close the built-in metadata authorization through the following configuration.
+
+```
+gravitino.authorization.impl = org.apache.gravitino.server.authorization.PassThroughAuthorizer
+```
+
+:::info
+
+Built-in metadata authorization depends on the authentication feature. To use the built-in metadata authorization, authentication must be enabled and privileges must be granted to users.You can see the privileges required for different REST APIs in the [API required conditions](##API required conditions).
+
+:::
+
+#### Authorization push down
+
 Gravitino also provides a set of authorization frameworks to interact with different underlying data source
 authorization systems (e.g., MySQL's own access control management and the Apache Ranger access control management system for big data)
 in accordance with its own authorization model and methodology.
@@ -209,21 +231,30 @@ and `USE_SCHEMA` privileges on its parent schema.
 | MODIFY_TABLE | Metalake, Catalog, Schema, Table  | Select data from a data, write data to a table or modify the table schema |
 | SELECT_TABLE | Metalake, Catalog, Schema, Table  | Select data from a table                                                  |
 
+DENY `MODIFY_TABLE` won't deny the `SELECT_TABLE` operation if the user has the privilege to `ALLOW SELECT_TABLE` on the table.
+DENY `SELECT_TABLE` won‘t deny the `MODIFY_TABLE` operation if the user has the privilege `ALLOW MODIFY_TABLE` on the table. 
+
 ### Topic privileges
 
-| Name          | Supports Securable Object        | Operation                                 |
-|---------------|----------------------------------|-------------------------------------------|
-| CREATE_TOPIC  | Metalake, Catalog, Schema        | Create a topic                            |
-| PRODUCE_TOPIC | Metalake, Catalog, Schema, Topic | Produce a topic (including alter a topic) |
-| CONSUME_TOPIC | Metalake, Catalog, Schema, Topic | Consume a topic                           |
+| Name          | Supports Securable Object        | Operation                                             |
+|---------------|----------------------------------|-------------------------------------------------------|
+| CREATE_TOPIC  | Metalake, Catalog, Schema        | Create a topic                                        |
+| PRODUCE_TOPIC | Metalake, Catalog, Schema, Topic | Consume and produce a topic (including alter a topic) |
+| CONSUME_TOPIC | Metalake, Catalog, Schema, Topic | Consume a topic                                       |
+
+DENY `PRODUCE_TOPIC` won't deny the `COMSUME_TOPIC` operation if the user has the privilege to `ALLOW CONSUME_TOPIC` on the topic.
+DENY `CONSUME_TOPIC` won‘t deny the `PRODUCE_TOPIC` operation if the user has the privilege `ALLOW PRODUCE_TOPIC` on the topic.
 
 ### Fileset privileges
 
-| Name           | Supports Securable Object          | Operation                                   |
-|----------------|------------------------------------|---------------------------------------------|
-| CREATE_FILESET | Metalake, Catalog, Schema          | Create a fileset                            |
-| WRITE_FILESET  | Metalake, Catalog, Schema, Fileset | Write a fileset (including alter a fileset) |
-| READ_FILESET   | Metalake, Catalog, Schema, Fileset | read a fileset                              |
+| Name           | Supports Securable Object          | Operation                                            |
+|----------------|------------------------------------|------------------------------------------------------|
+| CREATE_FILESET | Metalake, Catalog, Schema          | Create a fileset                                     |
+| WRITE_FILESET  | Metalake, Catalog, Schema, Fileset | Read and write a fileset (including alter a fileset) |
+| READ_FILESET   | Metalake, Catalog, Schema, Fileset | Read a fileset                                       |
+
+DENY `READ_FILESET` won't deny the `WRITE_FILESET` operation if the user has the privilege to `ALLOW WRITE_FILESET` on the fileset.
+DENY `WRITE_FILESET` won‘t deny the `READ_FILESET` operation if the user has the privilege `ALLOW READ_FILESET` on the fileset.
 
 ### Model privileges
 
@@ -922,3 +953,70 @@ You can follow the steps to achieve the authorization of Gravitino.
 12. `Staff` creates a table `mysql_table` under the schema `mysql_db`.
 
 13. `Staff` can use Gravitino connector to query the tables from different catalogs.
+
+## API required conditions
+
+The following table lists the required privileges for each API.
+
+| API                         | Required Conditions(s)                                                                                                                                                                                                                        |
+|-----------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| create metalake             | The user must be the service admins, configured in the server configurations.                                                                                                                                                                 |
+| load metalake               | The user is in the metalake                                                                                                                                                                                                                   |
+| alter metalake              | The owner of the metalake                                                                                                                                                                                                                     |
+| drop metalake               | The owner of the metalake                                                                                                                                                                                                                     | 
+| create catalog              | `CREATE_CATALOG` on the metalake or the owner of the metalake                                                                                                                                                                                 |
+| alter catalog               | The owner of the catalog, metalake                                                                                                                                                                                                            |
+| drop catalog                | The owner of the catalog, metalake                                                                                                                                                                                                            |
+| list catalog                | The owner of the metalake can see all the catalogs, others can see the catalogs which they can load                                                                                                                                           |
+| load catalog                | The one of owners of the metalake, catalog or have `USE_CATALOG` on the metalake,catalog                                                                                                                                                      |
+| create schema               | `CREATE_SCHEMA` and `USE_CATALOG` on the metalake, catalog or the owner of the metalake, catalog.                                                                                                                                             |
+| alter schema                | First, you should have the privilege to load the catalog. Then, you are one of the owners of the schema, catalog, metalake                                                                                                                    |
+| drop schema                 | First, you should have the privilege to load the catalog. Then, you are one of the owners of the schema, catalog, metalake                                                                                                                    |
+| list schema                 | First, you should have the privilege to load the catalog. Then, the owner of the metalake, catalog can see all the schemas, others can see the schemas which they can load.                                                                   |
+| load schema                 | First, you should have the privilege to load the catalog. Then, you are the owner of the metalake, catalog, schema or have `USE_SCHEMA` on the metalake, catalog, schema.                                                                     |
+| create table                | First, you should have the privilege to load the catalog and the schema. `CREATE_TABLE` on the metalake, catalog, schema or the owner of the metalake, catalog, schema                                                                        |
+| alter table                 | First, you should have the privilege to load the catalog and the schema. Then, you are one of the owners of the table, schema,catalog, metalake or have `MODIFY_TABLE` on the table, schema, catalog, metalake                                |
+| drop table                  | First, you should have the privilege to load the catalog and the schema. Then, you are one of the owners of the table, schema, catalog, metalake                                                                                              |
+| list table                  | First, you should have the privilege to load the catalog and the schema. Then, the owner of the schema, catalog, metalake can see all the tables, others can see the tables which they can load                                               |
+| load table                  | First, you should have the privilege to load the catalog and the schema. Then, you are one of the owners of the table, schema, metalake, catalog or have either `SELECT_TABLE` or `MODIFY_TABLE` on the table, schema, catalog, metalake      |
+| create topic                | First, you should have the privilege to load the catalog and the schema. Then, you have `CREATE_TOPIC` on the metalake, catalog, schema or are the owner of the metalake, catalog, schema                                                     |
+| alter topic                 | First, you should have the privilege to load the catalog and the schema. Then, you are one of the owners of the topic, schema,catalog, metalake or have `PRODUCE_TOPIC` on the topic, schema, catalog, metalake                               |
+| drop topic                  | First, you should have the privilege to load the catalog and the schema. Then, you are one of the owners of the topic, schema, catalog, metalake                                                                                              |
+| list topic                  | First, you should have the privilege to load the catalog and the schema. Then, the owner of the schema, catalog, metalake can see all the topics, others can see the topics which they can load                                               |
+| load topic                  | First, you should have the privilege to load the catalog and the schema. Then, you are one of the owners of the topic, schema, metalake, catalog or  have either `CONSUME_TOPIC` or `PRODUCE_TOPIC` on the topic, schema, catalog, metalake   |
+| create fileset              | First, you should have the privilege to load the catalog and the schema. Then, you have`CREATE_FILESET` on the metalake, catalog, schema or are the owner of the metalake, catalog, schema                                                    |
+| alter fileset               | First, you should have the privilege to load the catalog and the schema. Then, you are one of the owners of the fileset, schema,catalog, metalake or `WRITE_FILESET` on the fileset, schema, catalog, metalake                                |
+| drop fileset                | First, you should have the privilege to load the catalog and the schema. Then, you are one of the owners of the fileset, schema, catalog, metalake                                                                                            |
+| list fileset                | First, you should have the privilege to load the catalog and the schema. Then, you are one of the owners of the schema, catalog, metalake can see all the filesets, others can see the filesets which they can load                           |
+| load fileset                | First, you should have the privilege to load the catalog and the schema. Then, you are one of the owners of the fileset, schema, metalake, catalog or have either `READ_FILESET` or `WRITE_FILESET` on the fileset, schema, catalog, metalake |
+| list file                   | First, you should have the privilege to load the catalog and the schema. Then, you are one of the owners of the fileset, schema, metalake, catalog or have either `READ_FILESET` or `WRITE_FILESET` on the fileset, schema, catalog, metalake |
+| register model              | First, you should have the privilege to load the catalog and the schema. Then, you have `CREATE_MODEL` on the metalake, catalog, schema or are the owner of the metalake, catalog, schema                                                     |
+| link model version          | First, you should have the privilege to load the catalog, the schema and the model. Then, you have `CREATE_MODEL_VERSION` on the metalake, catalog, schema, model or are the owner of the metalake, catalog, schema, model                    |
+| alter model                 | First, you should have the privilege to load the catalog and the schema. Then, you are one of the owners of the model, schema, catalog, metalake                                                                                              |
+| drop model                  | First, you should have the privilege to load the catalog and the schema. Then, you are one of the owners of the model, schema, catalog, metalake                                                                                              |
+| list model                  | First, you should have the privilege to load the catalog and the schema. Then the owner of the schema, catalog, metalake can see all the models, others can see the models which they can load                                                |
+| load model                  | First, you should have the privilege to load the catalog and the schema. Then, you are one of the owners of the model, schema, metalake, catalog or have `USE_MODEL on the model, schema, catalog, metalake                                   |
+| list model version          | First, you should have the privilege to load the catalog and the schema. Then, you are one of the owners of the model, schema, catalog, metalake or have `USE_MODEL on the model, schema, catalog, metalake                                   |
+| load model version          | First, you should have the privilege to load the catalog and the schema. Then, you are one of the owners of the model, schema, metalake, catalog or have `USE_MODEL on the model, schema, catalog, metalake                                   |
+| load model version by alias | First, you should have the privilege to load the catalog and the schema. Then, you are one of the owners of the model, schema, metalake, catalog or have `USE_MODEL on the model, schema, catalog, metalake                                   |
+| delete model version        | First, you should have the privilege to load the catalog and the schema. Then, you are one of the owners of the model, schema, metalake, catalog.                                                                                             |
+| alter model version         | First, you should have the privilege to load the catalog and the schema. Then, you are one of the owners of the model, schema, metalake, catalog.                                                                                             |
+| delete model version alias  | First, you should have the privilege to load the catalog and the schema. Then, you are one of the owners of the model, schema, metalake, catalog.                                                                                             |
+| add user                    | `MANAGE_USERS` on the metalake  or the owner of the metalake                                                                                                                                                                                  |
+| delete user                 | `MANAGE_USERS` on the metalake  or the owner of the metalake                                                                                                                                                                                  |
+| get user                    | `MANAGE_USERS` on the metalake  or the owner of the metalake or himself                                                                                                                                                                       |
+| list users                  | `MANAGE_USERS` on the metalake  or the owner of the metalake can see all the users, others can see himself                                                                                                                                    |
+| add group                   | `MANAGE_GROUPS` on the metalake or the owner of the metalake                                                                                                                                                                                  |
+| delete group                | `MANAGE_GROUPS` on the metalake or the owner of the metalake                                                                                                                                                                                  |
+| get group                   | `MANAGE_GROUPS` on the metalake or the owner of the metalake or his groups                                                                                                                                                                    |
+| list groups                 | `MANAGE_GROUPS` on the metalake or the owner of the metalake can see all the groups, others can see his group                                                                                                                                 |
+| create role                 | `CREATE_ROLE` on the metalake or the owner of the metalake                                                                                                                                                                                    |
+| delete role                 | The owner of the metalake or the role                                                                                                                                                                                                         |
+| get role                    | The owner of the metalake or the role. others can see his granted or owned roles.                                                                                                                                                             |
+| list roles                  | The owner of the metalake can see all the roles. Others can see his granted roles or owned roles.                                                                                                                                             |
+| grant role                  | `MANAGE_GRANTS` on the metalake                                                                                                                                                                                                               |
+| revoke role                 | `MANAGE_GRANTS` on the metalake                                                                                                                                                                                                               |
+| grant privilege             | `MANAGE_GRANTS` on the metalake or the owner of the securable object                                                                                                                                                                          |
+| revoke privilege            | `MANAGE_GRANTS` on the metalake or the owner of the securable object                                                                                                                                                                          |
+| set owner                   | The owner of the securable object                                                                                                                                                                                                             |
+

@@ -20,12 +20,11 @@ package org.apache.gravitino.server.web.rest;
 
 import com.codahale.metrics.annotation.ResponseMetered;
 import com.codahale.metrics.annotation.Timed;
-import com.google.common.collect.Lists;
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
+import java.util.Set;
 import javax.inject.Inject;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.DefaultValue;
@@ -51,6 +50,7 @@ import org.apache.gravitino.metrics.MetricNames;
 import org.apache.gravitino.server.web.Utils;
 import org.apache.gravitino.tag.Tag;
 import org.apache.gravitino.tag.TagDispatcher;
+import org.glassfish.jersey.internal.guava.Sets;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -163,7 +163,7 @@ public class MetadataObjectTagOperations {
                 MetadataObjects.parse(
                     fullName, MetadataObject.Type.valueOf(type.toUpperCase(Locale.ROOT)));
 
-            List<TagDTO> tags = Lists.newArrayList();
+            Set<TagDTO> tags = Sets.newHashSet();
             Tag[] nonInheritedTags = tagDispatcher.listTagsInfoForMetadataObject(metalake, object);
             if (ArrayUtils.isNotEmpty(nonInheritedTags)) {
               Collections.addAll(
@@ -197,9 +197,8 @@ public class MetadataObjectTagOperations {
               return Utils.ok(new TagListResponse(tags.toArray(new TagDTO[0])));
 
             } else {
-              // Due to same name tag will be associated to both parent and child objects, so we
-              // need to deduplicate the tag names.
-              String[] tagNames = tags.stream().map(TagDTO::name).distinct().toArray(String[]::new);
+              // We have used Set to avoid duplicate tag names
+              String[] tagNames = tags.stream().map(TagDTO::name).toArray(String[]::new);
 
               LOG.info(
                   "List {} tags for object type: {}, full name: {} under metalake: {}",

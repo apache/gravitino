@@ -57,7 +57,7 @@ import org.apache.gravitino.dto.authorization.PrivilegeDTO;
 import org.apache.gravitino.dto.authorization.RoleDTO;
 import org.apache.gravitino.dto.authorization.SecurableObjectDTO;
 import org.apache.gravitino.dto.requests.RoleCreateRequest;
-import org.apache.gravitino.dto.responses.DeleteResponse;
+import org.apache.gravitino.dto.responses.DropResponse;
 import org.apache.gravitino.dto.responses.ErrorConstants;
 import org.apache.gravitino.dto.responses.ErrorResponse;
 import org.apache.gravitino.dto.responses.NameListResponse;
@@ -78,14 +78,13 @@ import org.apache.gravitino.rest.RESTUtils;
 import org.apache.gravitino.utils.MetadataObjectUtil;
 import org.glassfish.hk2.utilities.binding.AbstractBinder;
 import org.glassfish.jersey.server.ResourceConfig;
-import org.glassfish.jersey.test.JerseyTest;
 import org.glassfish.jersey.test.TestProperties;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 
-public class TestRoleOperations extends JerseyTest {
+public class TestRoleOperations extends BaseOperationsTest {
 
   private static final AccessControlManager manager = mock(AccessControlManager.class);
   private static final MetalakeDispatcher metalakeDispatcher = mock(MetalakeDispatcher.class);
@@ -455,9 +454,9 @@ public class TestRoleOperations extends JerseyTest {
             .delete();
 
     Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp.getStatus());
-    DeleteResponse deleteResponse = resp.readEntity(DeleteResponse.class);
-    Assertions.assertEquals(0, deleteResponse.getCode());
-    Assertions.assertTrue(deleteResponse.deleted());
+    DropResponse dropResponse = resp.readEntity(DropResponse.class);
+    Assertions.assertEquals(0, dropResponse.getCode());
+    Assertions.assertTrue(dropResponse.dropped());
 
     // Test when failed to delete role
     when(manager.deleteRole(any(), any())).thenReturn(false);
@@ -468,9 +467,9 @@ public class TestRoleOperations extends JerseyTest {
             .delete();
 
     Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp2.getStatus());
-    DeleteResponse deleteResponse2 = resp2.readEntity(DeleteResponse.class);
-    Assertions.assertEquals(0, deleteResponse2.getCode());
-    Assertions.assertFalse(deleteResponse2.deleted());
+    DropResponse dropResponse2 = resp2.readEntity(DropResponse.class);
+    Assertions.assertEquals(0, dropResponse2.getCode());
+    Assertions.assertFalse(dropResponse2.dropped());
 
     doThrow(new RuntimeException("mock error")).when(manager).deleteRole(any(), any());
     Response resp3 =

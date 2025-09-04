@@ -17,6 +17,8 @@
 import unittest
 
 from gravitino import GravitinoAdminClient, GravitinoClient
+from gravitino.client.gravitino_client_config import GravitinoClientConfig
+from gravitino.constants.timeout import TIMEOUT
 from tests.unittests import mock_base
 
 
@@ -32,7 +34,8 @@ class TestMetalake(unittest.TestCase):
             request_headers=expected_headers,
         )
         self.assertEqual(
-            expected_headers, gravitino_admin_client._rest_client.request_headers
+            expected_headers["k1"],
+            gravitino_admin_client._rest_client.request_headers["k1"],
         )
 
         gravitino_client = GravitinoClient(
@@ -41,5 +44,51 @@ class TestMetalake(unittest.TestCase):
             request_headers=expected_headers,
         )
         self.assertEqual(
-            expected_headers, gravitino_client._rest_client.request_headers
+            expected_headers["k1"], gravitino_client._rest_client.request_headers["k1"]
+        )
+
+    def test_gravitino_client_timeout(self, *mock_methods):
+        gravitino_admin_client = GravitinoAdminClient(
+            uri="http://localhost:8090",
+        )
+        self.assertEqual(TIMEOUT, gravitino_admin_client._rest_client.timeout)
+
+        gravitino_admin_client = GravitinoAdminClient(
+            uri="http://localhost:8090",
+            client_config={"gravitino_client_request_timeout": 60},
+        )
+        self.assertEqual(60, gravitino_admin_client._rest_client.timeout)
+
+        gravitino_client = GravitinoClient(
+            uri="http://localhost:8090",
+            metalake_name="test",
+            client_config={"gravitino_client_request_timeout": 60},
+        )
+        self.assertEqual(60, gravitino_client._rest_client.timeout)
+
+    def test_invalid_gravitino_client_config(self, *mock_methods):
+        # test invalid config
+        self.assertRaisesRegex(
+            ValueError,
+            "Invalid property for client: gravitino_client_request_timeout_xxxxxx",
+            GravitinoClientConfig.build_from_properties,
+            {"gravitino_client_request_timeout_xxxxxx": 1},
+        )
+
+        client_config = GravitinoClientConfig.build_from_properties(
+            {"gravitino_client_request_timeout": -1}
+        )
+        self.assertRaisesRegex(
+            ValueError,
+            "Value '-1' for key 'gravitino_client_request_timeout' is invalid. The value must be a positive number",
+            client_config.get_client_request_timeout,
+        )
+
+        client_config = GravitinoClientConfig.build_from_properties(
+            {"gravitino_client_request_timeout": "a"}
+        )
+        self.assertRaisesRegex(
+            ValueError,
+            "Value 'a' for key 'gravitino_client_request_timeout' must be an integer",
+            client_config.get_client_request_timeout,
         )

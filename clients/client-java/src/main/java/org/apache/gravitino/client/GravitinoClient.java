@@ -41,18 +41,31 @@ import org.apache.gravitino.exceptions.GroupAlreadyExistsException;
 import org.apache.gravitino.exceptions.IllegalMetadataObjectException;
 import org.apache.gravitino.exceptions.IllegalPrivilegeException;
 import org.apache.gravitino.exceptions.IllegalRoleException;
+import org.apache.gravitino.exceptions.InUseException;
+import org.apache.gravitino.exceptions.JobTemplateAlreadyExistsException;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchGroupException;
+import org.apache.gravitino.exceptions.NoSuchJobException;
+import org.apache.gravitino.exceptions.NoSuchJobTemplateException;
 import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
+import org.apache.gravitino.exceptions.NoSuchPolicyException;
 import org.apache.gravitino.exceptions.NoSuchRoleException;
 import org.apache.gravitino.exceptions.NoSuchTagException;
 import org.apache.gravitino.exceptions.NoSuchUserException;
 import org.apache.gravitino.exceptions.NonEmptyEntityException;
 import org.apache.gravitino.exceptions.NotFoundException;
+import org.apache.gravitino.exceptions.PolicyAlreadyExistsException;
 import org.apache.gravitino.exceptions.RoleAlreadyExistsException;
 import org.apache.gravitino.exceptions.TagAlreadyExistsException;
 import org.apache.gravitino.exceptions.UserAlreadyExistsException;
+import org.apache.gravitino.job.JobHandle;
+import org.apache.gravitino.job.JobTemplate;
+import org.apache.gravitino.job.SupportsJobs;
+import org.apache.gravitino.policy.Policy;
+import org.apache.gravitino.policy.PolicyChange;
+import org.apache.gravitino.policy.PolicyContent;
+import org.apache.gravitino.policy.PolicyOperations;
 import org.apache.gravitino.tag.Tag;
 import org.apache.gravitino.tag.TagChange;
 import org.apache.gravitino.tag.TagOperations;
@@ -65,7 +78,7 @@ import org.apache.gravitino.tag.TagOperations;
  * API.
  */
 public class GravitinoClient extends GravitinoClientBase
-    implements SupportsCatalogs, TagOperations {
+    implements SupportsCatalogs, TagOperations, SupportsJobs, PolicyOperations {
 
   private final GravitinoMetalake metalake;
 
@@ -78,6 +91,7 @@ public class GravitinoClient extends GravitinoClientBase
    * @param checkVersion Whether to check the version of the Gravitino server. Gravitino does not
    *     support the case that the client-side version is higher than the server-side version.
    * @param headers The base header for Gravitino API.
+   * @param properties A map of properties (key-value pairs) used to configure the Gravitino client.
    * @throws NoSuchMetalakeException if the metalake with specified name does not exist.
    */
   private GravitinoClient(
@@ -85,8 +99,9 @@ public class GravitinoClient extends GravitinoClientBase
       String metalakeName,
       AuthDataProvider authDataProvider,
       boolean checkVersion,
-      Map<String, String> headers) {
-    super(uri, authDataProvider, checkVersion, headers);
+      Map<String, String> headers,
+      Map<String, String> properties) {
+    super(uri, authDataProvider, checkVersion, headers, properties);
     this.metalake = loadMetalake(metalakeName);
   }
 
@@ -558,6 +573,96 @@ public class GravitinoClient extends GravitinoClientBase
     return getMetalake().deleteTag(name);
   }
 
+  @Override
+  public List<JobTemplate> listJobTemplates() {
+    return getMetalake().listJobTemplates();
+  }
+
+  @Override
+  public void registerJobTemplate(JobTemplate jobTemplate)
+      throws JobTemplateAlreadyExistsException {
+    getMetalake().registerJobTemplate(jobTemplate);
+  }
+
+  @Override
+  public JobTemplate getJobTemplate(String jobTemplateName) throws NoSuchJobTemplateException {
+    return getMetalake().getJobTemplate(jobTemplateName);
+  }
+
+  @Override
+  public boolean deleteJobTemplate(String jobTemplateName) throws InUseException {
+    return getMetalake().deleteJobTemplate(jobTemplateName);
+  }
+
+  @Override
+  public List<JobHandle> listJobs(String jobTemplateName) throws NoSuchJobTemplateException {
+    return getMetalake().listJobs(jobTemplateName);
+  }
+
+  @Override
+  public List<JobHandle> listJobs() {
+    return getMetalake().listJobs();
+  }
+
+  @Override
+  public JobHandle runJob(String jobTemplateName, Map<String, String> jobConf)
+      throws NoSuchJobTemplateException {
+    return getMetalake().runJob(jobTemplateName, jobConf);
+  }
+
+  @Override
+  public JobHandle getJob(String jobId) throws NoSuchJobException {
+    return getMetalake().getJob(jobId);
+  }
+
+  @Override
+  public JobHandle cancelJob(String jobId) throws NoSuchJobException {
+    return getMetalake().cancelJob(jobId);
+  }
+
+  @Override
+  public String[] listPolicies() throws NoSuchMetalakeException {
+    return getMetalake().listPolicies();
+  }
+
+  @Override
+  public Policy[] listPolicyInfos() throws NoSuchMetalakeException {
+    return getMetalake().listPolicyInfos();
+  }
+
+  @Override
+  public Policy getPolicy(String name) throws NoSuchPolicyException {
+    return getMetalake().getPolicy(name);
+  }
+
+  @Override
+  public Policy createPolicy(
+      String name, String type, String comment, boolean enabled, PolicyContent content)
+      throws PolicyAlreadyExistsException {
+    return getMetalake().createPolicy(name, type, comment, enabled, content);
+  }
+
+  @Override
+  public void enablePolicy(String name) throws NoSuchPolicyException {
+    getMetalake().enablePolicy(name);
+  }
+
+  @Override
+  public void disablePolicy(String name) throws NoSuchPolicyException {
+    getMetalake().disablePolicy(name);
+  }
+
+  @Override
+  public Policy alterPolicy(String name, PolicyChange... changes)
+      throws NoSuchPolicyException, IllegalArgumentException {
+    return getMetalake().alterPolicy(name, changes);
+  }
+
+  @Override
+  public boolean deletePolicy(String name) {
+    return getMetalake().deletePolicy(name);
+  }
+
   /** Builder class for constructing a GravitinoClient. */
   public static class ClientBuilder extends GravitinoClientBase.Builder<GravitinoClient> {
 
@@ -599,7 +704,8 @@ public class GravitinoClient extends GravitinoClientBase
           metalakeName != null && !metalakeName.isEmpty(),
           "The argument 'metalakeName' must be a valid name");
 
-      return new GravitinoClient(uri, metalakeName, authDataProvider, checkVersion, headers);
+      return new GravitinoClient(
+          uri, metalakeName, authDataProvider, checkVersion, headers, properties);
     }
   }
 }

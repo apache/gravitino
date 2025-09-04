@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.catalog.postgresql;
 
+import java.util.Set;
 import org.apache.gravitino.connector.capability.Capability;
 import org.apache.gravitino.connector.capability.CapabilityResult;
 
@@ -35,13 +36,22 @@ public class PostgreSqlCatalogCapability implements Capability {
    */
   public static final String POSTGRESQL_NAME_PATTERN = "^[_a-zA-Z\\p{L}/][\\w\\p{L}-$/=]{0,62}$";
 
+  /** Reserved schema and table names in PostgreSQL that cannot be used for user-defined schemas. */
+  private static final Set<String> POSTGRESQL_RESERVED_WORDS =
+      Set.of("pg_catalog", "information_schema");
+
   @Override
   public CapabilityResult specificationOnName(Scope scope, String name) {
-    // TODO: Validate the name against reserved words
     if (!name.matches(POSTGRESQL_NAME_PATTERN)) {
       return CapabilityResult.unsupported(
           String.format("The %s name '%s' is illegal.", scope, name));
     }
+
+    if (scope == Scope.SCHEMA && POSTGRESQL_RESERVED_WORDS.contains(name.toLowerCase())) {
+      return CapabilityResult.unsupported(
+          String.format("The %s name '%s' is reserved and cannot be used.", scope, name));
+    }
+
     return CapabilityResult.SUPPORTED;
   }
 }

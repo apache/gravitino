@@ -19,15 +19,11 @@
 package org.apache.gravitino.client;
 
 import com.google.common.annotations.VisibleForTesting;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
+import org.apache.gravitino.Version;
 import org.apache.gravitino.dto.VersionDTO;
-import org.apache.gravitino.exceptions.GravitinoRuntimeException;
 
 /** Apache Gravitino version information. */
-public class GravitinoVersion extends VersionDTO implements Comparable {
-
-  private static final int VERSION_PART_NUMBER = 3;
+public class GravitinoVersion extends VersionDTO {
 
   @VisibleForTesting
   GravitinoVersion(String version, String compileDate, String gitCommit) {
@@ -41,33 +37,18 @@ public class GravitinoVersion extends VersionDTO implements Comparable {
   @VisibleForTesting
   /** @return parse the version number for a version string */
   int[] getVersionNumber() {
-    Pattern pattern = Pattern.compile("^(\\d+)\\.(\\d+)\\.(\\d+)(?:[-].+)?$");
-    Matcher matcher = pattern.matcher(version());
-    if (matcher.matches()) {
-      int[] versionNumbers = new int[VERSION_PART_NUMBER];
-      for (int i = 0; i < VERSION_PART_NUMBER; i++) {
-        versionNumbers[i] = Integer.parseInt(matcher.group(i + 1));
-      }
-      return versionNumbers;
-    }
-    throw new GravitinoRuntimeException("Invalid version string " + version());
+    return Version.parseVersionNumber(version());
   }
 
-  @Override
-  public int compareTo(Object o) {
-    if (!(o instanceof GravitinoVersion)) {
-      return 1;
-    }
-    GravitinoVersion other = (GravitinoVersion) o;
-
+  /**
+   * Check if the current version is compatible with the server version.
+   *
+   * @param serverVersion the server version to check compatibility with
+   * @return true if the client current major version is less than or equal to the server's version
+   */
+  public boolean compatibleWithServerVersion(GravitinoVersion serverVersion) {
     int[] left = getVersionNumber();
-    int[] right = other.getVersionNumber();
-    for (int i = 0; i < VERSION_PART_NUMBER; i++) {
-      int v = left[i] - right[i];
-      if (v != 0) {
-        return v;
-      }
-    }
-    return 0;
+    int[] right = serverVersion.getVersionNumber();
+    return left[0] < right[0] || (left[0] == right[0] && left[1] <= right[1]);
   }
 }

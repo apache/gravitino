@@ -21,6 +21,7 @@ package org.apache.gravitino.client;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Maps;
 import java.io.IOException;
@@ -29,8 +30,11 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.nio.charset.StandardCharsets;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
+import org.apache.commons.lang3.StringUtils;
+import org.apache.gravitino.Version;
 import org.apache.gravitino.auth.AuthConstants;
 import org.apache.gravitino.dto.responses.ErrorResponse;
 import org.apache.gravitino.exceptions.RESTException;
@@ -39,10 +43,13 @@ import org.apache.gravitino.rest.RESTResponse;
 import org.apache.gravitino.rest.RESTUtils;
 import org.apache.hc.client5.http.classic.methods.HttpUriRequest;
 import org.apache.hc.client5.http.classic.methods.HttpUriRequestBase;
+import org.apache.hc.client5.http.config.ConnectionConfig;
 import org.apache.hc.client5.http.impl.classic.CloseableHttpClient;
 import org.apache.hc.client5.http.impl.classic.CloseableHttpResponse;
 import org.apache.hc.client5.http.impl.classic.HttpClientBuilder;
 import org.apache.hc.client5.http.impl.classic.HttpClients;
+import org.apache.hc.client5.http.impl.io.PoolingHttpClientConnectionManagerBuilder;
+import org.apache.hc.client5.http.io.HttpClientConnectionManager;
 import org.apache.hc.core5.http.ContentType;
 import org.apache.hc.core5.http.Header;
 import org.apache.hc.core5.http.HttpHeaders;
@@ -97,17 +104,22 @@ public class HTTPClient implements RESTClient {
    * @param objectMapper The ObjectMapper used for JSON serialization and deserialization.
    * @param authDataProvider The provider of authentication data.
    * @param beforeConnectHandler The function to be executed before connecting to the server.
+   * @param properties A map of properties (key-value pairs) used to configure the HTTP client.
    */
   private HTTPClient(
       String uri,
       Map<String, String> baseHeaders,
       ObjectMapper objectMapper,
       AuthDataProvider authDataProvider,
-      Runnable beforeConnectHandler) {
+      Runnable beforeConnectHandler,
+      Map<String, String> properties) {
     this.uri = uri;
     this.mapper = objectMapper;
+    GravitinoClientConfiguration clientConfiguration =
+        GravitinoClientConfiguration.buildFromProperties(properties);
 
     HttpClientBuilder clientBuilder = HttpClients.custom();
+    clientBuilder.setConnectionManager(configureConnectionManager(clientConfiguration));
 
     if (baseHeaders != null) {
       clientBuilder.setDefaultHeaders(
@@ -194,7 +206,6 @@ public class HTTPClient implements RESTClient {
   private void throwFailure(
       CloseableHttpResponse response, String responseBody, Consumer<ErrorResponse> errorHandler) {
     ErrorResponse errorResponse = null;
-
     if (responseBody != null) {
       try {
         if (errorHandler instanceof ErrorHandler) {
@@ -223,7 +234,6 @@ public class HTTPClient implements RESTClient {
     }
 
     errorHandler.accept(errorResponse);
-
     // Throw an exception in case the provided error handler does not throw.
     throw new RESTException("Unhandled error: %s", errorResponse);
   }
@@ -672,7 +682,14 @@ public class HTTPClient implements RESTClient {
     // Some systems require the Content-Type header to be set even for empty-bodied requests to
     // avoid failures.
     request.setHeader(HttpHeaders.CONTENT_TYPE, bodyMimeType);
+    // Set the API version header
     request.setHeader(HttpHeaders.ACCEPT, VERSION_HEADER);
+
+    // Set the client version header
+    if (StringUtils.isNotBlank(Version.getCurrentVersion().version)) {
+      request.setHeader(Version.CLIENT_VERSION_HEADER, Version.getCurrentVersion().version);
+    }
+
     if (requestHeaders != null) {
       requestHeaders.forEach(request::setHeader);
     }
@@ -701,6 +718,27 @@ public class HTTPClient implements RESTClient {
     return new Builder(properties);
   }
 
+  private static HttpClientConnectionManager configureConnectionManager(
+      GravitinoClientConfiguration clientConfiguration) {
+    PoolingHttpClientConnectionManagerBuilder connectionManagerBuilder =
+        PoolingHttpClientConnectionManagerBuilder.create();
+    ConnectionConfig connectionConfig = configureConnectionConfig(clientConfiguration);
+    connectionManagerBuilder.setDefaultConnectionConfig(connectionConfig);
+    return connectionManagerBuilder.build();
+  }
+
+  @VisibleForTesting
+  static ConnectionConfig configureConnectionConfig(
+      GravitinoClientConfiguration clientConfiguration) {
+    ConnectionConfig.Builder connConfigBuilder = ConnectionConfig.custom();
+    connConfigBuilder.setConnectTimeout(
+        clientConfiguration.getClientConnectionTimeoutMs(), TimeUnit.MILLISECONDS);
+    connConfigBuilder.setSocketTimeout(
+        clientConfiguration.getClientSocketTimeoutMs(), TimeUnit.MILLISECONDS);
+
+    return connConfigBuilder.build();
+  }
+
   /**
    * Builder class for configuring and creating instances of HTTPClient.
    *
@@ -708,7 +746,6 @@ public class HTTPClient implements RESTClient {
    * URI, request headers, and ObjectMapper.
    */
   public static class Builder {
-    @SuppressWarnings("UnusedVariable")
     private final Map<String, String> properties;
 
     private final Map<String, String> baseHeaders = Maps.newHashMap();
@@ -797,7 +834,8 @@ public class HTTPClient implements RESTClient {
      */
     public HTTPClient build() {
 
-      return new HTTPClient(uri, baseHeaders, mapper, authDataProvider, beforeConnectHandler);
+      return new HTTPClient(
+          uri, baseHeaders, mapper, authDataProvider, beforeConnectHandler, properties);
     }
   }
 

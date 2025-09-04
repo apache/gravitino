@@ -28,12 +28,14 @@ from readerwriterlock import rwlock
 
 from gravitino.api.catalog import Catalog
 from gravitino.api.credential.credential import Credential
+from gravitino.api.file.fileset import Fileset
 from gravitino.audit.caller_context import CallerContextHolder, CallerContext
 from gravitino.audit.fileset_audit_constants import FilesetAuditConstants
 from gravitino.audit.fileset_data_operation import FilesetDataOperation
 from gravitino.audit.internal_client_type import InternalClientType
 from gravitino.client.fileset_catalog import FilesetCatalog
 from gravitino.client.generic_fileset import GenericFileset
+from gravitino.client.gravitino_client_config import GravitinoClientConfig
 from gravitino.exceptions.base import (
     GravitinoRuntimeException,
     NoSuchLocationNameException,
@@ -77,6 +79,7 @@ class BaseGVFSOperations(ABC):
 
     ENV_CURRENT_LOCATION_NAME_ENV_VAR_DEFAULT = "CURRENT_LOCATION_NAME"
     ENABLE_CREDENTIAL_VENDING_DEFAULT = False
+    ENABLE_FILESET_METADATA_CACHE_DEFAULT = False
 
     def __init__(
         self,
@@ -101,8 +104,22 @@ class BaseGVFSOperations(ABC):
                 )
             }
         )
+
+        client_config = (
+            None
+            if options is None
+            else {
+                key.replace(
+                    GVFSConfig.GVFS_FILESYSTEM_CLIENT_CONFIG_PREFIX,
+                    GravitinoClientConfig.GRAVITINO_CLIENT_CONFIG_PREFIX,
+                ): value
+                for key, value in options.items()
+                if key.startswith(GVFSConfig.GVFS_FILESYSTEM_CLIENT_CONFIG_PREFIX)
+            }
+        )
+
         self._client = create_client(
-            options, server_uri, metalake_name, request_headers
+            options, server_uri, metalake_name, request_headers, client_config
         )
 
         cache_size = (
@@ -120,8 +137,20 @@ class BaseGVFSOperations(ABC):
         self._filesystem_cache = TTLCache(maxsize=cache_size, ttl=cache_expired_time)
         self._cache_lock = rwlock.RWLockFair()
 
-        self._catalog_cache = LRUCache(maxsize=100)
-        self._catalog_cache_lock = rwlock.RWLockFair()
+        self._enable_fileset_metadata_cache = (
+            self.ENABLE_FILESET_METADATA_CACHE_DEFAULT
+            if options is None
+            else options.get(
+                GVFSConfig.GVFS_FILESYSTEM_ENABLE_FILESET_METADATA_CACHE,
+                self.ENABLE_FILESET_METADATA_CACHE_DEFAULT,
+            )
+        )
+        if self._enable_fileset_metadata_cache:
+            self._catalog_cache = LRUCache(maxsize=100)
+            self._catalog_cache_lock = rwlock.RWLockFair()
+
+            self._fileset_cache = LRUCache(maxsize=10000)
+            self._fileset_cache_lock = rwlock.RWLockFair()
 
         self._enable_credential_vending = (
             False
@@ -132,6 +161,7 @@ class BaseGVFSOperations(ABC):
             )
         )
         self._current_location_name = self._init_current_location_name()
+        self._kwargs = kwargs
 
     @property
     def current_location_name(self):
@@ -374,9 +404,7 @@ class BaseGVFSOperations(ABC):
             self._metalake, fileset_ident.namespace().level(1)
         )
         catalog = self._get_fileset_catalog(catalog_ident)
-        fileset = catalog.as_fileset_catalog().load_fileset(
-            NameIdentifier.of(fileset_ident.namespace().level(2), fileset_ident.name())
-        )
+        fileset = self._get_fileset(fileset_ident)
         target_location_name = (
             location_name
             or fileset.properties().get(fileset.PROPERTY_DEFAULT_LOCATION_NAME)
@@ -504,6 +532,7 @@ class BaseGVFSOperations(ABC):
                 fileset_catalog.properties(),
                 self._options,
                 actual_file_location,
+                **self._kwargs,
             )
             self._filesystem_cache[(name_identifier, location_name)] = new_cache_value
             return new_cache_value[1]
@@ -512,6 +541,9 @@ class BaseGVFSOperations(ABC):
             CallerContextHolder.remove()
 
     def _get_fileset_catalog(self, catalog_ident: NameIdentifier):
+        if not self._enable_fileset_metadata_cache:
+            return self._client.load_catalog(catalog_ident.name())
+
         read_lock = self._catalog_cache_lock.gen_rlock()
         try:
             read_lock.acquire()
@@ -530,5 +562,47 @@ class BaseGVFSOperations(ABC):
             catalog = self._client.load_catalog(catalog_ident.name())
             self._catalog_cache[catalog_ident] = catalog
             return catalog
+        finally:
+            write_lock.release()
+
+    def _get_fileset(self, fileset_ident: NameIdentifier):
+        if not self._enable_fileset_metadata_cache:
+            catalog_ident: NameIdentifier = NameIdentifier.of(
+                fileset_ident.namespace().level(0), fileset_ident.namespace().level(1)
+            )
+            catalog: FilesetCatalog = self._get_fileset_catalog(catalog_ident)
+            return catalog.as_fileset_catalog().load_fileset(
+                NameIdentifier.of(
+                    fileset_ident.namespace().level(2), fileset_ident.name()
+                )
+            )
+
+        read_lock = self._fileset_cache_lock.gen_rlock()
+        try:
+            read_lock.acquire()
+            cache_value: Fileset = self._fileset_cache.get(fileset_ident)
+            if cache_value is not None:
+                return cache_value
+        finally:
+            read_lock.release()
+
+        write_lock = self._fileset_cache_lock.gen_wlock()
+        try:
+            write_lock.acquire()
+            cache_value: Fileset = self._fileset_cache.get(fileset_ident)
+            if cache_value is not None:
+                return cache_value
+
+            catalog_ident: NameIdentifier = NameIdentifier.of(
+                fileset_ident.namespace().level(0), fileset_ident.namespace().level(1)
+            )
+            catalog: FilesetCatalog = self._get_fileset_catalog(catalog_ident)
+            fileset = catalog.as_fileset_catalog().load_fileset(
+                NameIdentifier.of(
+                    fileset_ident.namespace().level(2), fileset_ident.name()
+                )
+            )
+            self._fileset_cache[fileset_ident] = fileset
+            return fileset
         finally:
             write_lock.release()

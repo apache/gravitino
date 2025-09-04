@@ -61,17 +61,19 @@ public abstract class GravitinoClientBase implements Closeable {
    * @param authDataProvider The provider of the data which is used for authentication.
    * @param checkVersion Whether to check the version of the Gravitino server.
    * @param headers The base header of the Gravitino API.
+   * @param properties A map of properties (key-value pairs) used to configure the Gravitino client.
    */
   protected GravitinoClientBase(
       String uri,
       AuthDataProvider authDataProvider,
       boolean checkVersion,
-      Map<String, String> headers) {
+      Map<String, String> headers,
+      Map<String, String> properties) {
     ObjectMapper mapper = ObjectMapperProvider.objectMapper();
 
     if (checkVersion) {
       this.restClient =
-          HTTPClient.builder(Collections.emptyMap())
+          HTTPClient.builder(properties)
               .uri(uri)
               .withAuthDataProvider(authDataProvider)
               .withObjectMapper(mapper)
@@ -81,7 +83,7 @@ public abstract class GravitinoClientBase implements Closeable {
 
     } else {
       this.restClient =
-          HTTPClient.builder(Collections.emptyMap())
+          HTTPClient.builder(properties)
               .uri(uri)
               .withAuthDataProvider(authDataProvider)
               .withObjectMapper(mapper)
@@ -98,9 +100,9 @@ public abstract class GravitinoClientBase implements Closeable {
   public void checkVersion() {
     GravitinoVersion serverVersion = serverVersion();
     GravitinoVersion clientVersion = clientVersion();
-    if (clientVersion.compareTo(serverVersion) > 0) {
+    if (!clientVersion.compatibleWithServerVersion(serverVersion)) {
       throw new GravitinoRuntimeException(
-          "Gravitino does not support the case that the client-side version is higher than the server-side version."
+          "Gravitino does not support the case that the client-side version is higher than the server version."
               + "The client version is %s, and the server version %s",
           clientVersion.version(), serverVersion.version());
     }
@@ -208,6 +210,8 @@ public abstract class GravitinoClientBase implements Closeable {
     protected boolean checkVersion = true;
     /** The request base header for the Gravitino API. */
     protected Map<String, String> headers = ImmutableMap.of();
+    /** A map of properties (key-value pairs) used to configure the Gravitino client. */
+    protected Map<String, String> properties = ImmutableMap.of();
 
     /**
      * The constructor for the Builder class.
@@ -302,6 +306,20 @@ public abstract class GravitinoClientBase implements Closeable {
     public Builder<T> withHeaders(Map<String, String> headers) {
       if (headers != null) {
         this.headers = ImmutableMap.copyOf(headers);
+      }
+      return this;
+    }
+
+    /**
+     * Set base client config for Gravitino Client.
+     *
+     * @param properties A map of properties (key-value pairs) used to configure the Gravitino
+     *     client.
+     * @return This Builder instance for method chaining.
+     */
+    public Builder<T> withClientConfig(Map<String, String> properties) {
+      if (properties != null) {
+        this.properties = ImmutableMap.copyOf(properties);
       }
       return this;
     }

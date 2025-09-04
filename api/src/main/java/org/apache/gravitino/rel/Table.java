@@ -25,6 +25,7 @@ import org.apache.gravitino.Auditable;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.annotation.Evolving;
 import org.apache.gravitino.authorization.SupportsRoles;
+import org.apache.gravitino.policy.SupportsPolicies;
 import org.apache.gravitino.rel.expressions.distributions.Distribution;
 import org.apache.gravitino.rel.expressions.distributions.Distributions;
 import org.apache.gravitino.rel.expressions.sorts.SortOrder;
@@ -32,6 +33,8 @@ import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.expressions.transforms.Transforms;
 import org.apache.gravitino.rel.indexes.Index;
 import org.apache.gravitino.rel.indexes.Indexes;
+import org.apache.gravitino.stats.SupportsPartitionStatistics;
+import org.apache.gravitino.stats.SupportsStatistics;
 import org.apache.gravitino.tag.SupportsTags;
 
 /**
@@ -106,10 +109,37 @@ public interface Table extends Auditable {
   }
 
   /**
+   * @return The {@link SupportsPolicies} if the table supports policy operations.
+   * @throws UnsupportedOperationException If the table does not support policy operations.
+   */
+  default SupportsPolicies supportsPolicies() {
+    throw new UnsupportedOperationException("Table does not support policy operations.");
+  }
+
+  /**
    * @return The {@link SupportsRoles} if the table supports role operations.
    * @throws UnsupportedOperationException If the table does not support role operations.
    */
   default SupportsRoles supportsRoles() {
     throw new UnsupportedOperationException("Table does not support role operations.");
+  }
+
+  /**
+   * Returns the {@link SupportsStatistics} if the table supports statistics operations.
+   *
+   * @return The {@link SupportsStatistics} for the table.
+   */
+  default SupportsStatistics supportsStatistics() {
+    throw new UnsupportedOperationException("Table does not support statistics operations.");
+  }
+
+  /**
+   * Returns the {@link SupportsPartitionStatistics} if the table supports partition statistics
+   *
+   * @return The {@link SupportsPartitionStatistics} for the table.
+   */
+  default SupportsPartitionStatistics supportsPartitionStatistics() {
+    throw new UnsupportedOperationException(
+        "Table does not support partition statistics operations.");
   }
 }

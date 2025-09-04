@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.catalog.mysql;
 
+import java.util.Set;
 import org.apache.gravitino.connector.capability.Capability;
 import org.apache.gravitino.connector.capability.CapabilityResult;
 
@@ -39,13 +40,22 @@ public class MysqlCatalogCapability implements Capability {
    */
   public static final String MYSQL_NAME_PATTERN = "^[\\w\\p{L}-$/=]{1,64}$";
 
+  /** Reserved schema andtable names in MySQL that cannot be used for user-defined schemas. */
+  private static final Set<String> MYSQL_RESERVED_SCHEMAS =
+      Set.of("mysql", "information_schema", "performance_schema", "sys");
+
   @Override
   public CapabilityResult specificationOnName(Scope scope, String name) {
-    // TODO: Validate the name against reserved words
     if (!name.matches(MYSQL_NAME_PATTERN)) {
       return CapabilityResult.unsupported(
           String.format("The %s name '%s' is illegal.", scope, name));
     }
+
+    if (scope == Scope.SCHEMA && MYSQL_RESERVED_SCHEMAS.contains(name.toLowerCase())) {
+      return CapabilityResult.unsupported(
+          String.format("The %s name '%s' is reserved and cannot be used.", scope, name));
+    }
+
     return CapabilityResult.SUPPORTED;
   }
 }

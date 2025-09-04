@@ -19,9 +19,13 @@
 
 package org.apache.gravitino.lineage;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.type.TypeReference;
+import io.openlineage.client.OpenLineage;
 import io.openlineage.server.OpenLineage.Job;
 import io.openlineage.server.OpenLineage.Run;
 import io.openlineage.server.OpenLineage.RunEvent;
+import org.apache.gravitino.server.web.ObjectMapperProvider;
 
 public class Utils {
   private Utils() {}
@@ -34,5 +38,12 @@ public class Utils {
   public static String getJobName(RunEvent event) {
     Job job = event.getJob();
     return job == null ? "Unknown" : job.getName();
+  }
+
+  public static OpenLineage.RunEvent getClientRunEvent(RunEvent event)
+      throws JsonProcessingException {
+    String value = ObjectMapperProvider.objectMapper().writeValueAsString(event);
+    return ObjectMapperProvider.objectMapper()
+        .readValue(value, new TypeReference<OpenLineage.RunEvent>() {});
   }
 }

@@ -25,11 +25,14 @@ import org.apache.gravitino.cli.CommandContext;
 import org.apache.gravitino.cli.ErrorMessages;
 import org.apache.gravitino.client.GravitinoClient;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
-import org.apache.gravitino.exceptions.NoSuchUserException;
+import org.apache.gravitino.exceptions.NoSuchRoleException;
 
+/** Represents the detail information of a role. */
 public class RoleDetails extends Command {
 
+  /** The name of the metalake. */
   protected String metalake;
+  /** The name of the role. */
   protected String role;
 
   /**
@@ -55,8 +58,8 @@ public class RoleDetails extends Command {
       objects = client.getRole(role).securableObjects();
     } catch (NoSuchMetalakeException err) {
       exitWithError(ErrorMessages.UNKNOWN_METALAKE);
-    } catch (NoSuchUserException err) {
-      exitWithError(ErrorMessages.UNKNOWN_GROUP);
+    } catch (NoSuchRoleException err) {
+      exitWithError(ErrorMessages.UNKNOWN_ROLE);
     } catch (Exception exp) {
       exitWithError(exp.getMessage());
     }

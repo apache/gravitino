@@ -129,8 +129,10 @@ public class TestIcebergCatalogPropertyConverter {
   @SuppressWarnings("unchecked")
   public void testBuildConnectorPropertiesWithMySqlBackEnd() throws Exception {
     String name = "test_catalog";
+    // trino.bypass properties will be skipped when the catalog properties is defined by Gravitino
     Map<String, String> properties =
         ImmutableMap.<String, String>builder()
+            .put("trino.bypass.iceberg.jdbc-catalog.connection-url", "skip_value")
             .put("uri", "jdbc:mysql://%s:3306/metastore_db?createDatabaseIfNotExist=true")
             .put("catalog-backend", "jdbc")
             .put("warehouse", "://tmp/warehouse")
@@ -140,6 +142,7 @@ public class TestIcebergCatalogPropertyConverter {
             .put("unknown-key", "1")
             .put("trino.bypass.iceberg.unknown-key", "1")
             .put("trino.bypass.iceberg.table-statistics-enabled", "true")
+            .put("trino.bypass.iceberg.jdbc-catalog.connection-user", "skip_value")
             .build();
     Catalog mockCatalog =
         TestGravitinoCatalog.mockCatalog(

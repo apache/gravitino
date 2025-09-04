@@ -337,7 +337,39 @@ public class Types {
       return INSTANCE;
     }
 
-    private TimeType() {}
+    /**
+     * @param precision The precision of the time type.
+     * @return A {@link TimeType} with the given precision.
+     */
+    public static TimeType of(int precision) {
+      Preconditions.checkArgument(
+          precision >= MIN_ALLOWED_PRECISION && precision <= MAX_ALLOWED_PRECISION,
+          "precision must be in range [%s, %s]: precision: %s",
+          MIN_ALLOWED_PRECISION,
+          MAX_ALLOWED_PRECISION,
+          precision);
+      return new TimeType(precision);
+    }
+
+    private final int precision;
+
+    private TimeType() {
+      this(DATE_TIME_PRECISION_NOT_SET);
+    }
+
+    private TimeType(int precision) {
+      this.precision = precision;
+    }
+
+    /** @return The precision of the time type. */
+    public int precision() {
+      return precision;
+    }
+
+    /** @return True if the time type has precision set, false otherwise. */
+    public boolean hasPrecisionSet() {
+      return precision != DATE_TIME_PRECISION_NOT_SET;
+    }
 
     @Override
     public Name name() {
@@ -346,7 +378,25 @@ public class Types {
 
     @Override
     public String simpleString() {
-      return "time";
+      return hasPrecisionSet() ? String.format("time(%d)", precision) : "time";
+    }
+
+    @Override
+    public boolean equals(Object o) {
+      if (this == o) return true;
+      if (!(o instanceof TimeType)) return false;
+      TimeType that = (TimeType) o;
+      return precision == that.precision;
+    }
+
+    @Override
+    public int hashCode() {
+      return precision;
+    }
+
+    @Override
+    public String toString() {
+      return "TimeType{" + "precision=" + precision + '}';
     }
   }
 
@@ -355,25 +405,69 @@ public class Types {
     private static final TimestampType INSTANCE_WITHOUT_TIME_ZONE = new TimestampType(false);
     private static final TimestampType INSTANCE_WITH_TIME_ZONE = new TimestampType(true);
 
-    /** @return A {@link TimestampType} with time zone. */
-    public static TimestampType withTimeZone() {
-      return INSTANCE_WITH_TIME_ZONE;
-    }
-
     /** @return A {@link TimestampType} without time zone. */
     public static TimestampType withoutTimeZone() {
       return INSTANCE_WITHOUT_TIME_ZONE;
     }
 
+    /** @return A {@link TimestampType} with time zone. */
+    public static TimestampType withTimeZone() {
+      return INSTANCE_WITH_TIME_ZONE;
+    }
+
+    /**
+     * @param precision The precision of the timestamp type.
+     * @return A {@link TimestampType} with the given precision and without time zone.
+     */
+    public static TimestampType withoutTimeZone(int precision) {
+      Preconditions.checkArgument(
+          precision >= MIN_ALLOWED_PRECISION && precision <= MAX_ALLOWED_PRECISION,
+          "precision must be in range [%s, %s]: precision: %s",
+          MIN_ALLOWED_PRECISION,
+          MAX_ALLOWED_PRECISION,
+          precision);
+      return new TimestampType(false, precision);
+    }
+
+    /**
+     * @param precision The precision of the timestamp type.
+     * @return A {@link TimestampType} with the given precision and time zone.
+     */
+    public static TimestampType withTimeZone(int precision) {
+      Preconditions.checkArgument(
+          precision >= MIN_ALLOWED_PRECISION && precision <= MAX_ALLOWED_PRECISION,
+          "precision must be in range [%s, %s]: precision: %s",
+          MIN_ALLOWED_PRECISION,
+          MAX_ALLOWED_PRECISION,
+          precision);
+      return new TimestampType(true, precision);
+    }
+
     private final boolean withTimeZone;
+    private final int precision;
 
     private TimestampType(boolean withTimeZone) {
+      this(withTimeZone, DATE_TIME_PRECISION_NOT_SET);
+    }
+
+    private TimestampType(boolean withTimeZone, int precision) {
       this.withTimeZone = withTimeZone;
+      this.precision = precision;
     }
 
     /** @return True if the timestamp type has time zone, false otherwise. */
     public boolean hasTimeZone() {
       return withTimeZone;
+    }
+
+    /** @return The precision of the timestamp type. */
+    public int precision() {
+      return precision;
+    }
+
+    /** @return True if the timestamp type has precision set, false otherwise. */
+    public boolean hasPrecisionSet() {
+      return precision != DATE_TIME_PRECISION_NOT_SET;
     }
 
     @Override
@@ -384,7 +478,29 @@ public class Types {
     /** @return The simple string representation of the timestamp type. */
     @Override
     public String simpleString() {
-      return withTimeZone ? "timestamp_tz" : "timestamp";
+      return hasPrecisionSet()
+          ? withTimeZone
+              ? String.format("timestamp_tz(%d)", precision)
+              : String.format("timestamp(%d)", precision)
+          : withTimeZone ? "timestamp_tz" : "timestamp";
+    }
+
+    @Override
+    public boolean equals(Object o) {
+      if (this == o) return true;
+      if (!(o instanceof TimestampType)) return false;
+      TimestampType that = (TimestampType) o;
+      return withTimeZone == that.withTimeZone && precision == that.precision;
+    }
+
+    @Override
+    public int hashCode() {
+      return Objects.hash(withTimeZone, precision);
+    }
+
+    @Override
+    public String toString() {
+      return "TimestampType{" + "withTimeZone=" + withTimeZone + ", precision=" + precision + '}';
     }
   }
 
@@ -980,7 +1096,9 @@ public class Types {
 
     @Override
     public String simpleString() {
-      return "map<" + keyType.simpleString() + "," + valueType.simpleString() + ">";
+      return valueNullable
+          ? "map<" + keyType.simpleString() + "," + valueType.simpleString() + ">"
+          : "map<" + keyType.simpleString() + "," + valueType.simpleString() + ", NOT NULL>";
     }
 
     @Override

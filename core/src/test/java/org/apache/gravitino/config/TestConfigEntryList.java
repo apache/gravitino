@@ -145,19 +145,6 @@ public class TestConfigEntryList {
             .create();
     Assertions.assertThrows(
         IllegalArgumentException.class, () -> testConfNoDefault.readFrom(configMap));
-
-    // To test checkValue before calling `toSequence`
-    ConfigEntry<List<String>> testConfWithoutDefault =
-        new ConfigBuilder("gravitino.test.empty.check")
-            .doc("test")
-            .internal()
-            .stringConf()
-            .checkValue(value -> !value.isEmpty(), "error")
-            .toSequence()
-            .create();
-    testConfWithoutDefault.writeTo(configMap, Lists.newArrayList(""));
-    Assertions.assertThrows(
-        IllegalArgumentException.class, () -> testConfWithoutDefault.readFrom(configMap));
   }
 
   @Test
@@ -171,5 +158,35 @@ public class TestConfigEntryList {
     Assertions.assertDoesNotThrow(
         () -> testConf.writeTo(configMapEmpty, Lists.newArrayList(1, null, 2)));
     Assertions.assertEquals("1,2", configMapEmpty.get("gravitino.seq.null"));
+  }
+
+  @Test
+  public void testSequenceParsing_trimsAndIgnoresEmptyElements() {
+    ConfigEntry<List<String>> conf =
+        new ConfigBuilder("gravitino.test.seq.trim")
+            .doc("test")
+            .internal()
+            .stringConf()
+            .toSequence()
+            .create();
+
+    conf.writeTo(configMapEmpty, Lists.newArrayList(" A", "B ", "", " C", "   ", "D", " E F "));
+    List<String> valueList = conf.readFrom(configMapEmpty);
+    Assertions.assertEquals(Lists.newArrayList("A", "B", "C", "D", "E F"), valueList);
+  }
+
+  @Test
+  public void testBlankOnlyInput_returnsEmptyList() {
+    ConfigEntry<List<String>> conf =
+        new ConfigBuilder("gravitino.test.seq.blank")
+            .doc("test")
+            .internal()
+            .stringConf()
+            .toSequence()
+            .create();
+
+    conf.writeTo(configMapEmpty, Lists.newArrayList("   ", "\t", ""));
+    List<String> res = conf.readFrom(configMapEmpty);
+    Assertions.assertTrue(res.isEmpty());
   }
 }

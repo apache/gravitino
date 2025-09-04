@@ -197,4 +197,30 @@ public class TestStringIdentifier {
     String commentWithId = StringIdentifier.addToComment(identifier, comment);
     Assertions.assertEquals(comment, StringIdentifier.removeIdFromComment(commentWithId));
   }
+
+  @Test
+  public void testRemoveIdFromCommentTrimsTrailingSpaces() {
+    StringIdentifier identifier = StringIdentifier.fromId(42L);
+    String commentWithSpace = "This is a comment ";
+    String commentWithId = StringIdentifier.addToComment(identifier, commentWithSpace);
+    Assertions.assertEquals(
+        commentWithSpace.trim(), StringIdentifier.removeIdFromComment(commentWithId));
+  }
+
+  @Test
+  public void testAddToCommentAvoidsDuplicateSpace() {
+    String commentWithSpace1 = "This is a comment ";
+    StringIdentifier identifier1 = StringIdentifier.fromId(1L);
+    String commentWithId1 = StringIdentifier.addToComment(identifier1, commentWithSpace1);
+    Assertions.assertEquals(
+        commentWithSpace1.trim() + " (From Gravitino, DO NOT EDIT: " + identifier1 + ")",
+        commentWithId1);
+
+    String commentWithSpace2 = "  This is a comment ";
+    StringIdentifier identifier2 = StringIdentifier.fromId(2L);
+    String commentWithId2 = StringIdentifier.addToComment(identifier2, commentWithSpace2);
+    Assertions.assertEquals(
+        commentWithSpace2.trim() + " (From Gravitino, DO NOT EDIT: " + identifier2 + ")",
+        commentWithId2);
+  }
 }

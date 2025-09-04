@@ -22,9 +22,6 @@ CREATE TABLE IF NOT EXISTS `policy_meta` (
     `policy_name` VARCHAR(128) NOT NULL COMMENT 'policy name',
     `policy_type` VARCHAR(64) NOT NULL COMMENT 'policy type',
     `metalake_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'metalake id',
-    `inheritable` TINYINT(1) NOT NULL COMMENT 'whether the policy is inheritable, 0 is not inheritable, 1 is inheritable',
-    `exclusive` TINYINT(1) NOT NULL COMMENT 'whether the policy is exclusive, 0 is not exclusive, 1 is exclusive',
-    `supported_object_types` TEXT NOT NULL COMMENT 'supported object types',
     `audit_info` MEDIUMTEXT NOT NULL COMMENT 'policy audit info',
     `current_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'policy current version',
     `last_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'policy last version',
@@ -44,7 +41,7 @@ CREATE TABLE IF NOT EXISTS `policy_version_info` (
     `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'policy deleted at',
     PRIMARY KEY (`id`),
     UNIQUE KEY `uk_pod_ver_del` (`policy_id`, `version`, `deleted_at`),
-    KEY `idx_mid` (`metalake_id`),
+    KEY `idx_mid` (`metalake_id`)
 ) ENGINE=InnoDB;
 
 CREATE TABLE IF NOT EXISTS `policy_relation_meta` (
@@ -68,3 +65,52 @@ ALTER TABLE `model_version_info` DROP INDEX `uk_mid_ver_del`;
 ALTER TABLE `model_version_info` ADD CONSTRAINT `uk_mid_ver_uri_del` UNIQUE (`model_id`, `version`, `model_version_uri_name`, `deleted_at`);
 -- remove the default value for model_version_uri_name
 ALTER TABLE `model_version_info` ALTER COLUMN `model_version_uri_name` DROP DEFAULT;
+
+CREATE TABLE IF NOT EXISTS `statistic_meta` (
+    `id` BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT COMMENT 'auto increment id',
+    `statistic_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'statistic id',
+    `statistic_name` VARCHAR(128) NOT NULL COMMENT 'statistic name',
+    `metalake_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'metalake id',
+    `statistic_value` MEDIUMTEXT NOT NULL COMMENT 'statistic value',
+    `metadata_object_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'metadata object id',
+    `metadata_object_type` VARCHAR(64) NOT NULL COMMENT 'metadata object type',
+    `audit_info` MEDIUMTEXT NOT NULL COMMENT 'statistic audit info',
+    `current_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'statistic current version',
+    `last_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'statistic last version',
+    `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'statistic deleted at',
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_si_mi_mo_del` (`statistic_name`, `metadata_object_id`, `deleted_at`),
+    KEY `idx_stid` (`statistic_id`),
+    KEY `idx_moid` (`metadata_object_id`)
+) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS `job_template_meta` (
+    `job_template_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'job template id',
+    `job_template_name` VARCHAR(128) NOT NULL COMMENT 'job template name',
+    `metalake_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'metalake id',
+    `job_template_comment` TEXT DEFAULT NULL COMMENT 'job template comment',
+    `job_template_content` MEDIUMTEXT NOT NULL COMMENT 'job template content',
+    `audit_info` MEDIUMTEXT NOT NULL COMMENT 'job template audit info',
+    `current_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'job template current version',
+    `last_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'job template last version',
+    `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'job template deleted at',
+    PRIMARY KEY (`job_template_id`),
+    UNIQUE KEY `uk_mid_jtn_del` (`metalake_id`, `job_template_name`, `deleted_at`)
+) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS `job_run_meta` (
+    `job_run_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'job run id',
+    `job_template_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'job template id',
+    `metalake_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'metalake id',
+    `job_execution_id` varchar(256) NOT NULL COMMENT 'job execution id',
+    `job_run_status` varchar(64) NOT NULL COMMENT 'job run status',
+    `job_finished_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'job finished at',
+    `audit_info` MEDIUMTEXT NOT NULL COMMENT 'job run audit info',
+    `current_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'job run current version',
+    `last_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'job run last version',
+    `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'job run deleted at',
+    PRIMARY KEY (`job_run_id`),
+    UNIQUE KEY `uk_mid_jei_del` (`metalake_id`, `job_execution_id`, `deleted_at`),
+    KEY `idx_job_template_id` (`job_template_id`),
+    KEY `idx_job_execution_id` (`job_execution_id`)
+) ENGINE=InnoDB;

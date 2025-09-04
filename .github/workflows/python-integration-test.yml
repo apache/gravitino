@@ -16,7 +16,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: dorny/paths-filter@v3.0.2
+      - uses: dorny/paths-filter@de90cc6fb38fc0963ad72b210f1f284cd68cea36
         id: filter
         with:
           filters: |
@@ -48,7 +48,7 @@ jobs:
     needs: changes
     if: needs.changes.outputs.source_changes == 'true'
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 90
     strategy:
       matrix:
         # Integration test for AMD64 architecture
@@ -73,7 +73,7 @@ jobs:
         run: |
           ./gradlew compileDistribution -x test -PjdkVersion=${{ matrix.java-version }}
 
-          for pythonVersion in "3.8" "3.9" "3.10" "3.11" "3.12"
+          for pythonVersion in "3.9" "3.10" "3.11" "3.12"
           do
             echo "Use Python version ${pythonVersion} to test the Python client."
             ./gradlew -PjdkVersion=${{ matrix.java-version }} -PpythonVersion=${pythonVersion} -PskipDockerTests=false :clients:client-python:test

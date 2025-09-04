@@ -71,6 +71,7 @@ import org.apache.gravitino.tag.Tag;
  * numbers - Data limiting and sorting
  */
 public abstract class TableFormat<T> extends BaseOutputFormat<T> {
+  /** Default padding size for column alignment. */
   public static final int PADDING = 1;
 
   /**
@@ -351,9 +352,7 @@ public abstract class TableFormat<T> extends BaseOutputFormat<T> {
       osw.write(right);
     }
 
-    if (lineSeparator != null) {
-      osw.write(System.lineSeparator());
-    }
+    osw.write(lineSeparator != null ? lineSeparator : System.lineSeparator());
   }
 
   /**
@@ -434,7 +433,7 @@ public abstract class TableFormat<T> extends BaseOutputFormat<T> {
       osw.write(right);
     }
 
-    osw.write(lineSeparator);
+    osw.write(lineSeparator != null ? lineSeparator : System.lineSeparator());
   }
 
   /**

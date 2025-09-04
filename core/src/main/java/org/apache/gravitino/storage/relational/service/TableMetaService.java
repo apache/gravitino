@@ -33,7 +33,9 @@ import org.apache.gravitino.Namespace;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.storage.relational.mapper.OwnerMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.PolicyMetadataObjectRelMapper;
 import org.apache.gravitino.storage.relational.mapper.SecurableObjectMapper;
+import org.apache.gravitino.storage.relational.mapper.StatisticMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.TableMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.TagMetadataObjectRelMapper;
 import org.apache.gravitino.storage.relational.po.ColumnPO;
@@ -178,7 +180,7 @@ public class TableMetaService {
       SessionUtils.doMultipleWithCommit(
           () ->
               updateResult.set(
-                  SessionUtils.doWithoutCommitAndFetchResult(
+                  SessionUtils.getWithoutCommit(
                       TableMetaMapper.class,
                       mapper -> mapper.updateTableMeta(newTablePO, oldTablePO))),
           () -> {
@@ -215,7 +217,7 @@ public class TableMetaService {
     SessionUtils.doMultipleWithCommit(
         () ->
             deleteResult.set(
-                SessionUtils.doWithoutCommitAndFetchResult(
+                SessionUtils.getWithoutCommit(
                     TableMetaMapper.class,
                     mapper -> mapper.softDeleteTableMetasByTableId(tableId))),
         () -> {
@@ -239,6 +241,13 @@ public class TableMetaService {
             SessionUtils.doWithoutCommit(
                 TagMetadataObjectRelMapper.class,
                 mapper -> mapper.softDeleteTagMetadataObjectRelsByTableId(tableId));
+
+            SessionUtils.doWithoutCommit(
+                StatisticMetaMapper.class,
+                mapper -> mapper.softDeleteStatisticsByEntityId(tableId));
+            SessionUtils.doWithoutCommit(
+                PolicyMetadataObjectRelMapper.class,
+                mapper -> mapper.softDeletePolicyMetadataObjectRelsByTableId(tableId));
           }
         });
 

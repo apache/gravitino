@@ -66,7 +66,7 @@ public class SqlSessionFactoryHelper {
     BasicDataSource dataSource = new BasicDataSource();
     String jdbcUrl = config.get(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_URL);
     String driverClass = config.get(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_DRIVER);
-    JdbcUrlUtils.validateJdbcConfig(jdbcUrl, driverClass, config.getAllConfig());
+    JdbcUrlUtils.validateJdbcConfig(driverClass, jdbcUrl, config.getAllConfig());
 
     JDBCBackendType jdbcType = JDBCBackendType.fromURI(jdbcUrl);
     dataSource.setUrl(jdbcUrl);
@@ -107,7 +107,7 @@ public class SqlSessionFactoryHelper {
     configuration.setDatabaseId(jdbcType.name().toLowerCase());
     ServiceLoader<MapperPackageProvider> loader = ServiceLoader.load(MapperPackageProvider.class);
     for (MapperPackageProvider provider : loader) {
-      configuration.addMappers(provider.getPackageName());
+      provider.getMapperClasses().forEach(configuration::addMapper);
     }
 
     // Create the SqlSessionFactory object, it is a singleton object

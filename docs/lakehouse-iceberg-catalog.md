@@ -18,7 +18,7 @@ Apache Gravitino provides the ability to manage Apache Iceberg metadata.
 ### Requirements and limitations
 
 :::info
-Builds with Apache Iceberg `1.6.1`. The Apache Iceberg table format version is `2` by default.
+Builds with Apache Iceberg `1.9.2`. The Apache Iceberg table format version is `2` by default.
 :::
 
 ## Catalog
@@ -63,6 +63,7 @@ If you have a JDBC Iceberg catalog prior, you must set `catalog-backend-name` to
 
 :::caution
 You must download the corresponding JDBC driver and place it to the `catalogs/lakehouse-iceberg/libs` directory If you are using JDBC backend.
+If you are using multiple JDBC catalog backends, setting `jdbc-initialize` to true may not take effect for RDMS like `Mysql`, you should create Iceberg meta tables explicitly.
 :::
 
 #### S3
@@ -232,25 +233,25 @@ If you doesn't specify distribution expressions, the table distribution will be 
 
 ### Table column types
 
-| Gravitino Type              | Apache Iceberg Type         |
-|-----------------------------|-----------------------------|
-| `Struct`                    | `Struct`                    |
-| `Map`                       | `Map`                       |
-| `List`                      | `Array`                     |
-| `Boolean`                   | `Boolean`                   |
-| `Integer`                   | `Integer`                   |
-| `Long`                      | `Long`                      |
-| `Float`                     | `Float`                     |
-| `Double`                    | `Double`                    |
-| `String`                    | `String`                    |
-| `Date`                      | `Date`                      |
-| `Time`                      | `Time`                      |
-| `TimestampType withZone`    | `TimestampType withZone`    |
-| `TimestampType withoutZone` | `TimestampType withoutZone` |
-| `Decimal`                   | `Decimal`                   |
-| `Fixed`                     | `Fixed`                     |
-| `Binary`                    | `Binary`                    |
-| `UUID`                      | `UUID`                      |
+| Gravitino Type    | Apache Iceberg Type         |
+|-------------------|-----------------------------|
+| `Struct`          | `Struct`                    |
+| `Map`             | `Map`                       |
+| `List`            | `Array`                     |
+| `Boolean`         | `Boolean`                   |
+| `Integer`         | `Integer`                   |
+| `Long`            | `Long`                      |
+| `Float`           | `Float`                     |
+| `Double`          | `Double`                    |
+| `String`          | `String`                    |
+| `Date`            | `Date`                      |
+| `Time(6)`         | `Time`                      |
+| `Timestamp(6)`    | `TimestampType withZone`    |
+| `Timestamp_tz(6)` | `TimestampType withoutZone` |
+| `Decimal`         | `Decimal`                   |
+| `Fixed`           | `Fixed`                     |
+| `Binary`          | `Binary`                    |
+| `UUID`            | `UUID`                      |
 
 :::info
 Apache Iceberg doesn't support Gravitino `Varchar` `Fixedchar` `Byte` `Short` `Union` type.

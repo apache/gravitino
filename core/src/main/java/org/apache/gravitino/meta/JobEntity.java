@@ -36,6 +36,11 @@ public class JobEntity implements Entity, Auditable, HasIdentifier {
 
   public static final Field ID =
       Field.required("id", Long.class, "The unique id of the job entity.");
+  public static final Field JOB_EXECUTION_ID =
+      Field.required(
+          "job_execution_id",
+          String.class,
+          "The unique execution id of the job, used for tracking.");
   public static final Field STATUS =
       Field.required("status", JobHandle.Status.class, "The status of the job.");
   public static final Field TEMPLATE_NAME =
@@ -43,12 +48,16 @@ public class JobEntity implements Entity, Auditable, HasIdentifier {
   public static final Field AUDIT_INFO =
       Field.required(
           "audit_info", AuditInfo.class, "The audit details of the job template entity.");
+  public static final Field FINISHED_AT =
+      Field.optional("job_finished_at", Long.class, "The time when the job finished execution.");
 
   private Long id;
+  private String jobExecutionId;
   private JobHandle.Status status;
   private String jobTemplateName;
   private Namespace namespace;
   private AuditInfo auditInfo;
+  private Long finishedAt;
 
   private JobEntity() {}
 
@@ -56,15 +65,21 @@ public class JobEntity implements Entity, Auditable, HasIdentifier {
   public Map<Field, Object> fields() {
     Map<Field, Object> fields = Maps.newHashMap();
     fields.put(ID, id);
+    fields.put(JOB_EXECUTION_ID, jobExecutionId);
     fields.put(TEMPLATE_NAME, jobTemplateName);
     fields.put(STATUS, status);
     fields.put(AUDIT_INFO, auditInfo);
+    fields.put(FINISHED_AT, finishedAt);
     return Collections.unmodifiableMap(fields);
   }
 
   @Override
   public Long id() {
     return id;
+  }
+
+  public String jobExecutionId() {
+    return jobExecutionId;
   }
 
   @Override
@@ -83,6 +98,10 @@ public class JobEntity implements Entity, Auditable, HasIdentifier {
 
   public String jobTemplateName() {
     return jobTemplateName;
+  }
+
+  public Long finishedAt() {
+    return finishedAt;
   }
 
   @Override
@@ -106,6 +125,7 @@ public class JobEntity implements Entity, Auditable, HasIdentifier {
 
     JobEntity that = (JobEntity) o;
     return Objects.equals(id, that.id)
+        && Objects.equals(jobExecutionId, that.jobExecutionId)
         && Objects.equals(status, that.status)
         && Objects.equals(jobTemplateName, that.jobTemplateName)
         && Objects.equals(namespace, that.namespace)
@@ -114,7 +134,7 @@ public class JobEntity implements Entity, Auditable, HasIdentifier {
 
   @Override
   public int hashCode() {
-    return Objects.hash(id, namespace, status, jobTemplateName, auditInfo);
+    return Objects.hash(id, jobExecutionId, namespace, status, jobTemplateName, auditInfo);
   }
 
   public static Builder builder() {
@@ -130,6 +150,11 @@ public class JobEntity implements Entity, Auditable, HasIdentifier {
 
     public Builder withId(Long id) {
       jobEntity.id = id;
+      return this;
+    }
+
+    public Builder withJobExecutionId(String jobExecutionId) {
+      jobEntity.jobExecutionId = jobExecutionId;
       return this;
     }
 
@@ -150,6 +175,11 @@ public class JobEntity implements Entity, Auditable, HasIdentifier {
 
     public Builder withAuditInfo(AuditInfo auditInfo) {
       jobEntity.auditInfo = auditInfo;
+      return this;
+    }
+
+    public Builder withFinishedAt(Long finishedAt) {
+      jobEntity.finishedAt = finishedAt;
       return this;
     }
 

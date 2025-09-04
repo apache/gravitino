@@ -25,6 +25,7 @@ import java.io.IOException;
 import java.util.List;
 import java.util.Optional;
 import java.util.function.Function;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.Entity;
@@ -225,6 +226,17 @@ public class RelationalEntityStore
   }
 
   @Override
+  public <E extends Entity & HasIdentifier> E getEntityByRelation(
+      Type relType,
+      NameIdentifier srcIdentifier,
+      Entity.EntityType srcType,
+      NameIdentifier destEntityIdent)
+      throws IOException, NoSuchEntityException {
+    // todo: support cache
+    return backend.getEntityByRelation(relType, srcIdentifier, srcType, destEntityIdent);
+  }
+
+  @Override
   public void insertRelation(
       SupportsRelationOperations.Type relType,
       NameIdentifier srcIdentifier,
@@ -235,5 +247,31 @@ public class RelationalEntityStore
       throws IOException {
     cache.invalidate(srcIdentifier, srcType, relType);
     backend.insertRelation(relType, srcIdentifier, srcType, dstIdentifier, dstType, override);
+  }
+
+  @Override
+  public <E extends Entity & HasIdentifier> List<E> updateEntityRelations(
+      Type relType,
+      NameIdentifier srcEntityIdent,
+      Entity.EntityType srcEntityType,
+      NameIdentifier[] destEntitiesToAdd,
+      NameIdentifier[] destEntitiesToRemove)
+      throws IOException, NoSuchEntityException, EntityAlreadyExistsException {
+    cache.invalidate(srcEntityIdent, srcEntityType, relType);
+    return backend.updateEntityRelations(
+        relType, srcEntityIdent, srcEntityType, destEntitiesToAdd, destEntitiesToRemove);
+  }
+
+  @Override
+  public int batchDelete(
+      List<Pair<NameIdentifier, Entity.EntityType>> entitiesToDelete, boolean cascade)
+      throws IOException {
+    return backend.batchDelete(entitiesToDelete, cascade);
+  }
+
+  @Override
+  public <E extends Entity & HasIdentifier> void batchPut(List<E> entities, boolean overwritten)
+      throws IOException, EntityAlreadyExistsException {
+    backend.batchPut(entities, overwritten);
   }
 }

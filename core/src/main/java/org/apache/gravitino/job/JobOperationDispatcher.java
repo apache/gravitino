@@ -19,7 +19,9 @@
 
 package org.apache.gravitino.job;
 
+import java.io.Closeable;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import org.apache.gravitino.exceptions.InUseException;
 import org.apache.gravitino.exceptions.JobTemplateAlreadyExistsException;
@@ -29,7 +31,7 @@ import org.apache.gravitino.meta.JobEntity;
 import org.apache.gravitino.meta.JobTemplateEntity;
 
 /** The interface for job operation dispatcher. */
-public interface JobOperationDispatcher {
+public interface JobOperationDispatcher extends Closeable {
 
   /**
    * Lists all the job templates in the specified metalake.
@@ -93,9 +95,25 @@ public interface JobOperationDispatcher {
    */
   JobEntity getJob(String metalake, String jobId) throws NoSuchJobException;
 
-  // TODO. Implement the runJob and cancelJob methods in another PR.
-  //  JobEntity runJob(String metalake, String jobTemplateName, Map<String, String> jobConf)
-  //      throws NoSuchJobTemplateException;
-  //
-  //  JobEntity cancelJob(String metalake, String jobId) throws NoSuchJobException;
+  /**
+   * Runs a job based on the specified job template and configuration in the specified metalake.
+   *
+   * @param metalake the name of the metalake
+   * @param jobTemplateName the name of the job template to use for running the job
+   * @param jobConf the runtime configuration for the job, which contains key-value pairs
+   * @return the job entity representing the job
+   * @throws NoSuchJobTemplateException if no job template with the specified name exists
+   */
+  JobEntity runJob(String metalake, String jobTemplateName, Map<String, String> jobConf)
+      throws NoSuchJobTemplateException;
+
+  /**
+   * Cancels a job by its ID in the specified metalake.
+   *
+   * @param metalake the name of the metalake
+   * @param jobId the ID of the job to cancel
+   * @return the job entity representing the job after cancellation
+   * @throws NoSuchJobException if no job with the specified ID exists
+   */
+  JobEntity cancelJob(String metalake, String jobId) throws NoSuchJobException;
 }

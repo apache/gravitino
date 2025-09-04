@@ -29,6 +29,7 @@ import static org.mockito.Mockito.when;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.Collections;
+import java.util.Optional;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.client.Entity;
 import javax.ws.rs.core.Application;
@@ -40,6 +41,8 @@ import org.apache.gravitino.Config;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.authorization.AccessControlManager;
 import org.apache.gravitino.authorization.Group;
+import org.apache.gravitino.authorization.Owner;
+import org.apache.gravitino.authorization.OwnerDispatcher;
 import org.apache.gravitino.dto.authorization.GroupDTO;
 import org.apache.gravitino.dto.requests.GroupAddRequest;
 import org.apache.gravitino.dto.responses.ErrorConstants;
@@ -57,16 +60,16 @@ import org.apache.gravitino.meta.GroupEntity;
 import org.apache.gravitino.rest.RESTUtils;
 import org.glassfish.hk2.utilities.binding.AbstractBinder;
 import org.glassfish.jersey.server.ResourceConfig;
-import org.glassfish.jersey.test.JerseyTest;
 import org.glassfish.jersey.test.TestProperties;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 
-public class TestGroupOperations extends JerseyTest {
+public class TestGroupOperations extends BaseOperationsTest {
 
   private static final AccessControlManager manager = mock(AccessControlManager.class);
+  private static final OwnerDispatcher ownerDispatcher = mock(OwnerDispatcher.class);
 
   private static class MockServletRequestFactory extends ServletRequestFactoryBase {
     @Override
@@ -85,6 +88,7 @@ public class TestGroupOperations extends JerseyTest {
     Mockito.doReturn(36000L).when(config).get(TREE_LOCK_CLEAN_INTERVAL);
     FieldUtils.writeField(GravitinoEnv.getInstance(), "lockManager", new LockManager(config), true);
     FieldUtils.writeField(GravitinoEnv.getInstance(), "accessControlDispatcher", manager, true);
+    FieldUtils.writeField(GravitinoEnv.getInstance(), "ownerDispatcher", ownerDispatcher, true);
   }
 
   @Override
@@ -353,8 +357,27 @@ public class TestGroupOperations extends JerseyTest {
 
   @Test
   public void testRemoveGroup() {
+    // Delete the metalake owner
     when(manager.removeGroup(any(), any())).thenReturn(true);
+    Owner owner = mock(Owner.class);
+    when(owner.type()).thenReturn(Owner.Type.GROUP);
+    when(owner.name()).thenReturn("group1");
+    when(ownerDispatcher.getOwner(any(), any())).thenReturn(Optional.of(owner));
 
+    Response respOwner =
+        target("/metalakes/metalake1/groups/group1")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .delete();
+    Assertions.assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), respOwner.getStatus());
+
+    ErrorResponse errorResponseOwner = respOwner.readEntity(ErrorResponse.class);
+    Assertions.assertEquals(ErrorConstants.ILLEGAL_ARGUMENTS_CODE, errorResponseOwner.getCode());
+    Assertions.assertEquals(
+        IllegalArgumentException.class.getSimpleName(), errorResponseOwner.getType());
+
+    // Delete group normally
+    when(owner.name()).thenReturn("user2");
     Response resp =
         target("/metalakes/metalake1/groups/group1")
             .request(MediaType.APPLICATION_JSON_TYPE)

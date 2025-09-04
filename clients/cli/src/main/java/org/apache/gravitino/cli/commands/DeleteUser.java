@@ -27,10 +27,14 @@ import org.apache.gravitino.client.GravitinoClient;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.NoSuchUserException;
 
+/** Delete delete a user of a metalake. */
 public class DeleteUser extends Command {
 
+  /** The name of the metalake. */
   protected final String metalake;
+  /** The name of the user. */
   protected final String user;
+  /** Whether to force the deletion. */
   protected final boolean force;
 
   /**

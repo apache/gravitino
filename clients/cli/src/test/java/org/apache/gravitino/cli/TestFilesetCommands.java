@@ -36,6 +36,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
+import java.util.Map;
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.Options;
 import org.apache.gravitino.cli.commands.CreateFileset;
@@ -48,6 +49,7 @@ import org.apache.gravitino.cli.commands.SetFilesetProperty;
 import org.apache.gravitino.cli.commands.UpdateFilesetComment;
 import org.apache.gravitino.cli.commands.UpdateFilesetName;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -151,6 +153,27 @@ class TestFilesetCommands {
     doReturn(mockCreate).when(mockCreate).validate();
     commandLine.handleCommandLine();
     verify(mockCreate).handle();
+  }
+
+  @Test
+  void testCreateFilesetCommandWithoutManagedType() {
+    Main.useExit = false;
+    when(mockCommandLine.hasOption(GravitinoOptions.METALAKE)).thenReturn(true);
+    when(mockCommandLine.getOptionValue(GravitinoOptions.METALAKE)).thenReturn("metalake_demo");
+    when(mockCommandLine.hasOption(GravitinoOptions.NAME)).thenReturn(true);
+    when(mockCommandLine.getOptionValue(GravitinoOptions.NAME))
+        .thenReturn("catalog.schema.fileset");
+    when(mockCommandLine.hasOption(GravitinoOptions.COMMENT)).thenReturn(true);
+    when(mockCommandLine.getOptionValue(GravitinoOptions.COMMENT)).thenReturn("comment");
+    when(mockCommandLine.hasOption(GravitinoOptions.PROPERTIES)).thenReturn(true);
+    when(mockCommandLine.getOptionValues(GravitinoOptions.PROPERTIES))
+        .thenReturn(new String[] {"key1=value1", "key2=value2"});
+    GravitinoCommandLine commandLine =
+        spy(
+            new GravitinoCommandLine(
+                mockCommandLine, mockOptions, CommandEntities.FILESET, CommandActions.CREATE));
+
+    Assertions.assertThrowsExactly(RuntimeException.class, commandLine::handleCommandLine);
   }
 
   @Test
@@ -540,5 +563,175 @@ class TestFilesetCommands {
             + "\n"
             + ErrorMessages.MISSING_ENTITIES
             + Joiner.on(", ").join(Arrays.asList(CommandEntities.FILESET)));
+  }
+
+  @Test
+  void testCreateFilesetCommandWithManagedProperty() {
+    CreateFileset mockCreate = mock(CreateFileset.class);
+    when(mockCommandLine.hasOption(GravitinoOptions.METALAKE)).thenReturn(true);
+    when(mockCommandLine.getOptionValue(GravitinoOptions.METALAKE)).thenReturn("metalake_demo");
+    when(mockCommandLine.hasOption(GravitinoOptions.NAME)).thenReturn(true);
+    when(mockCommandLine.getOptionValue(GravitinoOptions.NAME))
+        .thenReturn("catalog.schema.fileset");
+    when(mockCommandLine.hasOption(GravitinoOptions.COMMENT)).thenReturn(true);
+    when(mockCommandLine.getOptionValue(GravitinoOptions.COMMENT)).thenReturn("comment");
+    when(mockCommandLine.hasOption(GravitinoOptions.PROPERTIES)).thenReturn(true);
+    when(mockCommandLine.getOptionValues(GravitinoOptions.PROPERTIES))
+        .thenReturn(new String[] {"managed=true", "key2=value2"});
+
+    GravitinoCommandLine commandLine =
+        spy(
+            new GravitinoCommandLine(
+                mockCommandLine, mockOptions, CommandEntities.FILESET, CommandActions.CREATE));
+    doReturn(mockCreate)
+        .when(commandLine)
+        .newCreateFileset(
+            any(CommandContext.class),
+            eq("metalake_demo"),
+            eq("catalog"),
+            eq("schema"),
+            eq("fileset"),
+            eq("comment"),
+            any());
+    doReturn(mockCreate).when(mockCreate).validate();
+    commandLine.handleCommandLine();
+    verify(mockCreate).handle();
+  }
+
+  @Test
+  void testCreateFilesetWithMissingManagedPropertyNPE() {
+    Main.useExit = false;
+    CommandContext mockContext = mock(CommandContext.class);
+    when(mockContext.url()).thenReturn(GravitinoCommandLine.DEFAULT_URL);
+
+    Map<String, String> propertiesWithoutManaged = new java.util.HashMap<>();
+    propertiesWithoutManaged.put("key1", "value1");
+    propertiesWithoutManaged.put("key2", "value2");
+
+    CreateFileset spyCreateFileset =
+        spy(
+            new CreateFileset(
+                mockContext,
+                "metalake_demo",
+                "catalog",
+                "schema",
+                "fileset",
+                "comment",
+                propertiesWithoutManaged));
+
+    assertThrows(RuntimeException.class, spyCreateFileset::validate);
+    verify(spyCreateFileset, never()).handle();
+    String errOutput = new String(errContent.toByteArray(), StandardCharsets.UTF_8).trim();
+    assertEquals("Missing property 'managed'", errOutput);
+  }
+
+  @Test
+  void testCreateFilesetWithNullPropertiesNPE() {
+    Main.useExit = false;
+    CommandContext mockContext = mock(CommandContext.class);
+    when(mockContext.url()).thenReturn(GravitinoCommandLine.DEFAULT_URL);
+
+    CreateFileset spyCreateFileset =
+        spy(
+            new CreateFileset(
+                mockContext, "metalake_demo", "catalog", "schema", "fileset", "comment", null));
+
+    assertThrows(RuntimeException.class, spyCreateFileset::validate);
+    verify(spyCreateFileset, never()).handle();
+  }
+
+  @Test
+  void testCreateFilesetWithEmptyPropertiesNPE() {
+    Main.useExit = false;
+    CommandContext mockContext = mock(CommandContext.class);
+    when(mockContext.url()).thenReturn(GravitinoCommandLine.DEFAULT_URL);
+
+    Map<String, String> emptyProperties = new java.util.HashMap<>();
+
+    CreateFileset spyCreateFileset =
+        spy(
+            new CreateFileset(
+                mockContext,
+                "metalake_demo",
+                "catalog",
+                "schema",
+                "fileset",
+                "comment",
+                emptyProperties));
+
+    assertThrows(RuntimeException.class, spyCreateFileset::validate);
+    verify(spyCreateFileset, never()).handle();
+    String errOutput = new String(errContent.toByteArray(), StandardCharsets.UTF_8).trim();
+    assertEquals("Missing property 'managed'", errOutput);
+  }
+
+  @Test
+  void testCreateFilesetWithManagedTrueProperty() {
+    Main.useExit = false;
+    CommandContext mockContext = mock(CommandContext.class);
+    when(mockContext.url()).thenReturn(GravitinoCommandLine.DEFAULT_URL);
+
+    Map<String, String> propertiesWithManagedTrue = new java.util.HashMap<>();
+    propertiesWithManagedTrue.put("managed", "true");
+    propertiesWithManagedTrue.put("key1", "value1");
+
+    CreateFileset spyCreateFileset =
+        spy(
+            new CreateFileset(
+                mockContext,
+                "metalake_demo",
+                "catalog",
+                "schema",
+                "fileset",
+                "comment",
+                propertiesWithManagedTrue));
+
+    // Should not throw exception when managed property is present
+    Assertions.assertDoesNotThrow(spyCreateFileset::validate);
+  }
+
+  @Test
+  void testCreateFilesetWithManagedFalseProperty() {
+    Main.useExit = false;
+    CommandContext mockContext = mock(CommandContext.class);
+    when(mockContext.url()).thenReturn(GravitinoCommandLine.DEFAULT_URL);
+
+    Map<String, String> propertiesWithManagedFalse = new java.util.HashMap<>();
+    propertiesWithManagedFalse.put("managed", "false");
+    propertiesWithManagedFalse.put("key1", "value1");
+
+    CreateFileset spyCreateFileset =
+        spy(
+            new CreateFileset(
+                mockContext,
+                "metalake_demo",
+                "catalog",
+                "schema",
+                "fileset",
+                "comment",
+                propertiesWithManagedFalse));
+
+    // Should not throw exception when managed property is present
+    Assertions.assertDoesNotThrow(spyCreateFileset::validate);
+  }
+
+  @Test
+  void testUpdateFilesetCommandWithoutOptions() {
+    Main.useExit = false;
+
+    when(mockCommandLine.hasOption(GravitinoOptions.METALAKE)).thenReturn(true);
+    when(mockCommandLine.getOptionValue(GravitinoOptions.METALAKE)).thenReturn("metalake_demo");
+    when(mockCommandLine.hasOption(GravitinoOptions.NAME)).thenReturn(true);
+    when(mockCommandLine.getOptionValue(GravitinoOptions.NAME))
+        .thenReturn("catalog.schema.fileset");
+
+    GravitinoCommandLine commandLine =
+        new GravitinoCommandLine(
+            mockCommandLine, mockOptions, CommandEntities.FILESET, CommandActions.UPDATE);
+
+    assertThrows(RuntimeException.class, commandLine::handleCommandLine);
+    String errOutput = new String(errContent.toByteArray(), StandardCharsets.UTF_8).trim();
+
+    assertEquals(ErrorMessages.MISSING_COMMENT_AND_RENAME, errOutput);
   }
 }
