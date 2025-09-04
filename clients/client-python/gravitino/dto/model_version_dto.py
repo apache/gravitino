@@ -31,7 +31,7 @@ class ModelVersionDTO(ModelVersion, DataClassJsonMixin):
     _version: int = field(metadata=config(field_name="version"))
     _comment: Optional[str] = field(metadata=config(field_name="comment"))
     _aliases: Optional[List[str]] = field(metadata=config(field_name="aliases"))
-    _uri: str = field(metadata=config(field_name="uri"))
+    _uris: Dict[str, str] = field(metadata=config(field_name="uris"))
     _properties: Optional[Dict[str, str]] = field(
         metadata=config(field_name="properties")
     )
@@ -46,11 +46,8 @@ class ModelVersionDTO(ModelVersion, DataClassJsonMixin):
     def aliases(self) -> Optional[List[str]]:
         return self._aliases
 
-    def uri(self) -> str:
-        return self._uri
-
     def uris(self) -> Dict[str, str]:
-        raise NotImplementedError("Not supported yet")
+        return self._uris
 
     def properties(self) -> Optional[Dict[str, str]]:
         return self._properties

@@ -22,7 +22,7 @@ import com.google.errorprone.annotations.FormatMethod;
 import com.google.errorprone.annotations.FormatString;
 
 /** An exception thrown when users modify an unmodifiable statistic */
-public class UnmodifiableStatisticException extends GravitinoRuntimeException {
+public class UnmodifiableStatisticException extends UnsupportedOperationException {
   /**
    * Constructs a new exception with the specified detail message.
    *
@@ -31,7 +31,7 @@ public class UnmodifiableStatisticException extends GravitinoRuntimeException {
    */
   @FormatMethod
   public UnmodifiableStatisticException(@FormatString String message, Object... args) {
-    super(message, args);
+    super(String.format(message, args));
   }
 
   /**
@@ -44,6 +44,6 @@ public class UnmodifiableStatisticException extends GravitinoRuntimeException {
   @FormatMethod
   public UnmodifiableStatisticException(
       Throwable cause, @FormatString String message, Object... args) {
-    super(cause, message, args);
+    super(String.format(message, args), cause);
   }
 }

@@ -30,10 +30,14 @@ import org.apache.gravitino.client.GravitinoClient;
 import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 
+/** Represents the detail information of an owner of an entity. */
 public class OwnerDetails extends Command {
 
+  /** The name of the metalake. */
   protected final String metalake;
+  /** The name of the entity. */
   protected final String entity;
+  /** The type of the entity. */
   protected final MetadataObject.Type entityType;
 
   /**
@@ -67,6 +71,10 @@ public class OwnerDetails extends Command {
   /** Displays the owner of an entity. */
   @Override
   public void handle() {
+    if (entityType == null) {
+      exitWithError(ErrorMessages.UNKNOWN_ENTITY);
+    }
+
     Optional<Owner> owner = Optional.empty();
     MetadataObject metadata = MetadataObjects.parse(entity, entityType);
 
@@ -86,5 +94,11 @@ public class OwnerDetails extends Command {
     } else {
       printInformation("No owner");
     }
+  }
+
+  @Override
+  public Command validate() {
+    if (entityType == null) exitWithError(ErrorMessages.UNKNOWN_ENTITY);
+    return this;
   }
 }

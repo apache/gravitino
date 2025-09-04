@@ -77,3 +77,11 @@ class GravitinoVersion(VersionDTO):
         if self.patch != other.patch:
             return False
         return True
+
+    def compatible_with_server_version(self, server_version) -> bool:
+        """
+        Check if the current version is compatible with the server version.
+        Compatibility is defined such that the client major version is less than or equal
+        to the server major version.
+        """
+        return (self.major, self.minor) <= (server_version.major, server_version.minor)

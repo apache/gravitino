@@ -1,0 +1,852 @@
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+
+---
+
+paths:
+
+  /metalakes/{metalake}/policies:
+    parameters:
+      - $ref: "./openapi.yaml#/components/parameters/metalake"
+    get:
+      tags:
+        - policy
+      summary: List policies (names)
+      operationId: listPolicies
+      parameters:
+        - $ref: "#/components/parameters/details"
+      responses:
+        "200":
+          description: Returns the list of policy objects if {details} is true, otherwise returns the list of policy names
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                oneOf:
+                  - $ref: "./openapi.yaml#/components/schemas/NameListResponse"
+                  - $ref: "#/components/schemas/PolicyListResponse"
+              examples:
+                NameListResponse:
+                  $ref: "#/components/examples/NameListResponse"
+                PolicyListResponse:
+                  $ref: "#/components/examples/PolicyListResponse"
+        "400":
+          $ref: "./openapi.yaml#/components/responses/BadRequestErrorResponse"
+        "404":
+          description: Not Found - The specified metalake does not exist
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+              examples:
+                NoSuchMetalakeException:
+                  $ref: "./metalakes.yaml#/components/examples/NoSuchMetalakeException"
+        "5xx":
+          $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
+
+    post:
+      tags:
+        - policy
+      summary: Create policy
+      operationId: createPolicy
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PolicyCreateRequest"
+            examples:
+              PolicyCreate:
+                $ref: "#/components/examples/PolicyCreate"
+
+      responses:
+        "200":
+          description: Returns the created policy object
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "#/components/schemas/PolicyResponse"
+              examples:
+                PolicyResponse:
+                  $ref: "#/components/examples/PolicyResponse"
+        "409":
+          description: Conflict - The target policy already exists in the specified metalake
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+              examples:
+                PolicyAlreadyExistsException:
+                  $ref: "#/components/examples/PolicyAlreadyExistsException"
+        "5xx":
+          $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
+
+  /metalakes/{metalake}/policies/{policy}:
+    parameters:
+      - $ref: "./openapi.yaml#/components/parameters/metalake"
+      - $ref: "./openapi.yaml#/components/parameters/policy"
+
+    get:
+      tags:
+        - policy
+      summary: Get policy
+      operationId: getPolicy
+      description: Returns the specified policy information in the specified metalake
+      responses:
+        "200":
+          description: Returns the policy object
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "#/components/schemas/PolicyResponse"
+              examples:
+                PolicyResponse:
+                  $ref: "#/components/examples/PolicyResponse"
+        "404":
+          description: Not Found - The specified policy does not exist in the specified metalake
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+              examples:
+                NoSuchMetalakeException:
+                  $ref: "./metalakes.yaml#/components/examples/NoSuchMetalakeException"
+                NoSuchPolicyException:
+                  $ref: "#/components/examples/NoSuchPolicyException"
+        "5xx":
+          $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
+
+    put:
+      tags:
+        - policy
+      summary: Update policy
+      operationId: alterPolicy
+      description: Alters the specified policy information in the specified metalake
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PolicyUpdatesRequest"
+      responses:
+        "200":
+            description: Returns the updated policy object
+            content:
+              application/vnd.gravitino.v1+json:
+                schema:
+                  $ref: "#/components/schemas/PolicyResponse"
+                examples:
+                  PolicyResponse:
+                    $ref: "#/components/examples/PolicyResponse"
+        "404":
+          description: Not Found - The specified policy does not exist in the specified metalake
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+              examples:
+                NoSuchMetalakeException:
+                  $ref: "./metalakes.yaml#/components/examples/NoSuchMetalakeException"
+                NoSuchPolicyException:
+                  $ref: "#/components/examples/NoSuchPolicyException"
+        "5xx":
+          $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
+
+    patch:
+      tags:
+        - policy
+      summary: Enable or disable a policy
+      operationId: setPolicy
+      description: Enable or disable a policy in the specified metalake
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PolicySetRequest"
+      responses:
+        "200":
+          $ref: "./openapi.yaml#/components/responses/BaseResponse"
+        "404":
+          description: Not Found - The specified policy does not exist in the specified metalake
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+              examples:
+                NoSuchMetalakeException:
+                  $ref: "./metalakes.yaml#/components/examples/NoSuchMetalakeException"
+                NoSuchPolicyException:
+                  $ref: "#/components/examples/NoSuchPolicyException"
+        "5xx":
+          $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
+
+    delete:
+      tags:
+        - policy
+      summary: Delete policy
+      operationId: deletePolicy
+      responses:
+        "200":
+          $ref: "./openapi.yaml#/components/responses/DropResponse"
+        "400":
+          $ref: "./openapi.yaml#/components/responses/BadRequestErrorResponse"
+        "5xx":
+          $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
+
+
+  /metalakes/{metalake}/objects/{metadataObjectType}/{metadataObjectFullName}/policies:
+    parameters:
+      - $ref: "./openapi.yaml#/components/parameters/metalake"
+      - $ref: "./openapi.yaml#/components/parameters/metadataObjectType"
+      - $ref: "./openapi.yaml#/components/parameters/metadataObjectFullName"
+    get:
+      tags:
+        - policy
+      summary: List policies (names) for metadata object
+      operationId: listPoliciesForMetadataObject
+      parameters:
+        - $ref: "#/components/parameters/details"
+      responses:
+        "200":
+          description: Returns the list of policy objects associated with specified metadata object if {details} is true, otherwise returns the list of policy name
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                oneOf:
+                  - $ref: "./openapi.yaml#/components/schemas/NameListResponse"
+                  - $ref: "#/components/schemas/PolicyListResponse"
+              examples:
+                NameListResponse:
+                  $ref: "#/components/examples/NameListResponse"
+                PolicyListResponse:
+                  $ref: "#/components/examples/PolicyListResponse"
+        "400":
+          $ref: "./openapi.yaml#/components/responses/BadRequestErrorResponse"
+        "404":
+          description: Not Found - The specified metalake does not exist
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+              examples:
+                NoSuchMetalakeException:
+                  $ref: "./metalakes.yaml#/components/examples/NoSuchMetalakeException"
+        "5xx":
+          $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
+
+    post:
+      tags:
+        - policy
+      summary: Associate policies with metadata object
+      description: Associate and disassociate policies with metadata object, please be aware that supported metadata objects are CATALOG, SCHEMA, TABLE, FILESET, TOPIC, COLUMN
+      operationId: associatePoliciesForObject
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PoliciesAssociateRequest"
+            examples:
+              PolicyAssociate:
+                $ref: "#/components/examples/PolicyAssociate"
+      responses:
+        "200":
+          description: Returns the list of policy names associated with the specified metadata object
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/NameListResponse"
+              examples:
+                NameListResponse:
+                  $ref: "#/components/examples/NameListResponse"
+        "404":
+          description: Not Found - The specified metalake does not exist
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+              examples:
+                NoSuchMetalakeException:
+                  $ref: "./metalakes.yaml#/components/examples/NoSuchMetalakeException"
+        "409":
+          description: Conflict - The target policy already associated with the specified metadata object
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+              examples:
+                PolicyAlreadyAssociatedException:
+                  $ref: "#/components/examples/PolicyAlreadyAssociatedException"
+        "5xx":
+          $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
+
+
+  /metalakes/{metalake}/objects/{metadataObjectType}/{metadataObjectFullName}/policies/{policy}:
+    parameters:
+      - $ref: "./openapi.yaml#/components/parameters/metalake"
+      - $ref: "./openapi.yaml#/components/parameters/metadataObjectType"
+      - $ref: "./openapi.yaml#/components/parameters/metadataObjectFullName"
+      - $ref: "./openapi.yaml#/components/parameters/policy"
+    get:
+      tags:
+        - policy
+      summary: Get policy for metadata object
+      operationId: getPolicyForObject
+      parameters:
+        - $ref: "#/components/parameters/details"
+      responses:
+        "200":
+          description: Returns the policy object associated with specified metadata object
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "#/components/schemas/PolicyResponse"
+              examples:
+                PolicyResponse:
+                  $ref: "#/components/examples/PolicyResponse"
+        "400":
+          $ref: "./openapi.yaml#/components/responses/BadRequestErrorResponse"
+        "404":
+          description: Not Found - The specified metalake does not exist or the specified policy is not associated with the specified metadata object
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+              examples:
+                NoSuchPolicyException:
+                  $ref: "#/components/examples/NoSuchPolicyException"
+                NoSuchMetalakeException:
+                  $ref: "./metalakes.yaml#/components/examples/NoSuchMetalakeException"
+        "5xx":
+          $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
+
+
+  /metalakes/{metalake}/policies/{policy}/objects:
+    parameters:
+      - $ref: "./openapi.yaml#/components/parameters/metalake"
+      - $ref: "./openapi.yaml#/components/parameters/policy"
+    get:
+      tags:
+        - policy
+      summary: list metadata objects for policy
+      operationId: listMetadataObjectsForPolicy
+      responses:
+        "200":
+          description: Returns the list of metadata objects associated with specified policy
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "#/components/schemas/MetadataObjectListResponse"
+              examples:
+                PolicyResponse:
+                  $ref: "#/components/examples/MetadataObjectListResponse"
+        "400":
+          $ref: "./openapi.yaml#/components/responses/BadRequestErrorResponse"
+        "404":
+          description: Not Found - The specified policy does not exist
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+              examples:
+                NoSuchPolicyException:
+                  $ref: "#/components/examples/NoSuchPolicyException"
+        "5xx":
+          $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
+
+
+components:
+  parameters:
+    details:
+      name: details
+      in: query
+      description: Include detailed information about the policy
+      required: false
+      schema:
+        type: boolean
+        default: false
+
+  schemas:
+
+    PolicyContentBase:
+      type: object
+      description: A base content structure for policies
+      required:
+        - supportedObjectTypes
+      properties:
+        supportedObjectTypes:
+          type: array
+          description: The types of metadata objects this policy content can be applied to.
+          minItems: 1
+          items:
+            type: string
+            enum: [ "CATALOG", "SCHEMA", "TABLE", "FILESET", "TOPIC", "MODEL" ]
+        properties:
+          type: object
+          description: A map of string-to-string properties for the policy content.
+          additionalProperties:
+            type: string
+          example:
+            "key1": "value1"
+            "key2": "value2"
+
+    CustomPolicyContent:
+      type: object
+      description: Content for a custom policy type.
+      allOf:
+        - $ref: '#/components/schemas/PolicyContentBase'
+        - type: object
+          properties:
+            customRules:
+              type: object
+              description: A map of custom rules where the key is the rule name and the value can be of any type.
+              additionalProperties: { }
+              example:
+                rule1: "rule1"
+                rule2: 123
+
+    PolicyBase:
+      type: object
+      description: A basic policy without content
+      required:
+        - name
+        - policyType
+        - enabled
+        - audit
+      properties:
+        name:
+          type: string
+          description: The name of the policy
+        comment:
+          type: string
+          description: A comment about the policy
+          nullable: true
+        policyType:
+          type: string
+          description: The type of the policy
+        enabled:
+          type: boolean
+          description: Whether the policy is enabled
+        audit:
+          $ref: "./openapi.yaml#/components/schemas/Audit"
+        inherited:
+          type: boolean
+          description: Whether the policy is inherited from the parent metadata object
+          nullable: true
+
+    CustomPolicy:
+      description: A policy with custom content
+      allOf:
+        - $ref: '#/components/schemas/PolicyBase'
+        - type: object
+          required:
+            - content
+          properties:
+            content:
+              $ref: '#/components/schemas/CustomPolicyContent'
+
+    Policy:
+      type: object
+      description: A basic policy without content
+      oneOf:
+        - $ref: '#/components/schemas/CustomPolicy'
+      discriminator:
+        propertyName: policyType
+        mapping:
+          custom: '#/components/schemas/CustomPolicy'
+
+    PolicyListResponse:
+      type: object
+      properties:
+        code:
+          type: integer
+          format: int32
+          description: Status code of the response
+          enum:
+            - 0
+        policies:
+          type: array
+          description: A list of policy objects
+          items:
+            $ref: "#/components/schemas/Policy"
+
+    MetadataObject:
+      type: object
+      description: A metadata object
+      properties:
+        fullName:
+          type: string
+          description: The name of the metadata object, separated by dots
+        type:
+          type: string
+          description: The type of the metadata object
+          enum:
+            - "CATALOG"
+            - "SCHEMA"
+            - "TABLE"
+            - "FILESET"
+            - "TOPIC"
+            - "MODEL"
+            - "COLUMN"
+
+    PolicyCreateRequestBase:
+      type: object
+      description: A base policy create request without content
+      required:
+        - name
+        - policyType
+      properties:
+        name:
+          type: string
+          description: The name of the policy
+        comment:
+          type: string
+          description: A comment for the policy
+          nullable: true
+        policyType:
+          type: string
+          description: The type of the policy
+        enabled:
+          type: boolean
+          description: Whether the policy is enabled
+          default: true
+
+    CustomPolicyCreateRequest:
+      description: A request to create a policy with a custom content structure.
+      allOf:
+        - $ref: '#/components/schemas/PolicyCreateRequestBase'
+        - type: object
+          required:
+            - content
+          properties:
+            content:
+              $ref: '#/components/schemas/CustomPolicyContent'
+
+    PolicyCreateRequest:
+      description: A request to create a policy.
+      type: object
+      oneOf:
+        - $ref: '#/components/schemas/CustomPolicyCreateRequest'
+      discriminator:
+        propertyName: policyType
+        mapping:
+          custom: '#/components/schemas/CustomPolicyCreateRequest'
+
+
+    PolicyUpdatesRequest:
+      type: object
+      required:
+        - updates
+      properties:
+        updates:
+          type: array
+          items:
+            $ref: "#/components/schemas/PolicyUpdateRequest"
+
+    PolicyUpdateRequest:
+      oneOf:
+        - $ref: "#/components/schemas/RenamePolicyRequest"
+        - $ref: "#/components/schemas/UpdatePolicyCommentRequest"
+        - $ref: "#/components/schemas/UpdatePolicyContentRequest"
+      discriminator:
+        propertyName: "@type"
+        mapping:
+          rename: "#/components/schemas/RenamePolicyRequest"
+          updateComment: "#/components/schemas/UpdatePolicyCommentRequest"
+          updateContent: "#/components/schemas/UpdatePolicyContentRequest"
+
+    RenamePolicyRequest:
+      type: object
+      required:
+        - "@type"
+        - newName
+      properties:
+        "@type":
+          type: string
+          enum:
+            - rename
+        newName:
+          type: string
+          description: The new name of the policy
+      example: {
+        "@type": "rename",
+        "newName": "my_policy_new"
+      }
+
+    PolicySetRequest:
+      type: object
+      properties:
+        enable:
+          type: boolean
+          description: Whether to enable or disable the policy
+
+    UpdatePolicyCommentRequest:
+      type: object
+      required:
+        - "@type"
+        - newComment
+      properties:
+        "@type":
+          type: string
+          enum:
+            - updateComment
+        newComment:
+          type: string
+          description: The new comment of the policy
+      example: {
+        "@type": "updateComment",
+        "newComment": "This is my new policy comment"
+      }
+
+    UpdatePolicyContentRequest:
+      type: object
+      required:
+        - "@type"
+        - policyType
+        - newContent
+      properties:
+        "@type":
+          type: string
+          enum:
+            - updateContent
+        policyType:
+          type: string
+          description: The type of the policy
+        newContent:
+          type: object
+          description: The new content of the policy, its structure depends on the 'policyType'.
+          oneOf:
+              - $ref: '#/components/schemas/CustomPolicyContent'
+          discriminator:
+            propertyName: policyType
+            mapping:
+              custom: '#/components/schemas/CustomPolicyContent'
+      example: {
+        "@type": "updateContent",
+        "policyType": "custom",
+        "newContent": {
+          "customRules": {
+            "rule1": 456
+          },
+          "supportedObjectTypes": [
+              "CATALOG",
+              "SCHEMA",
+              "TABLE",
+              "FILESET",
+              "TOPIC",
+              "MODEL"
+          ],
+          "properties": {
+            "key1": "new_value1",
+            "key2": "new_value2"
+          }
+        }
+      }
+
+    PoliciesAssociateRequest:
+      type: object
+      properties:
+        policiesToAdd:
+          type: array
+          items:
+            type: string
+          description: The policies to add
+          nullable: true
+        policiesToRemove:
+          type: array
+          items:
+            type: string
+          description: The policies to remove
+          nullable: true
+
+    PolicyResponse:
+      type: object
+      properties:
+        code:
+          type: integer
+          format: int32
+          description: Status code of the response
+          enum:
+            - 0
+        policy:
+          $ref: "#/components/schemas/Policy"
+
+    MetadataObjectListResponse:
+      type: object
+      properties:
+        code:
+          type: integer
+          format: int32
+          description: Status code of the response
+          enum:
+            - 0
+        metadataObjects:
+          type: array
+          description: A list of metadata objects
+          items:
+            $ref: "#/components/schemas/MetadataObject"
+
+  examples:
+    NameListResponse:
+      value: {
+        "code": 0,
+        "names": ["my_policy1", "my_policy2"]
+      }
+
+    PolicyListResponse:
+      value: {
+        "code": 0,
+        "policies": [
+          {
+            "name": "my_policy1",
+            "comment": "This is a test policy",
+            "policyType": "custom",
+            "enabled": false,
+            "content": {
+              "customRules": {
+                "rule1": 123
+              },
+              "supportedObjectTypes": [
+                "CATALOG",
+                "SCHEMA",
+                "TABLE",
+                "FILESET",
+                "TOPIC",
+                "MODEL"
+              ],
+              "properties": {
+                "key1": "value1"
+              }
+            },
+            "inherited": null,
+            "audit": {
+              "creator": "anonymous",
+              "createTime": "2025-08-04T10:29:23.463Z"
+            }
+          }
+        ]
+      }
+
+    PolicyCreate:
+      value: {
+        "name": "my_policy1",
+        "comment": "This is a test policy",
+        "policyType": "custom",
+        "enabled": false,
+        "content": {
+          "customRules": {
+            "rule1": 123
+          },
+          "supportedObjectTypes": [
+            "CATALOG",
+            "SCHEMA",
+            "TABLE",
+            "FILESET",
+            "TOPIC",
+            "MODEL"
+          ],
+          "properties": {
+            "key1": "value1"
+          }
+        }
+      }
+
+    PolicyAssociate:
+      value: {
+        "policiesToAdd": ["my_policy1", "my_policy2"],
+        "policiesToRemove": ["my_policy3"]
+      }
+
+    PolicyResponse:
+      value: {
+        "code": 0,
+        "policy": {
+          "name": "my_policy1",
+          "comment": "This is a test policy",
+          "policyType": "custom",
+          "enabled": false,
+          "content": {
+            "customRules": {
+              "rule1": 123
+            },
+            "supportedObjectTypes": [
+              "SCHEMA",
+              "TABLE",
+              "MODEL",
+              "TOPIC",
+              "FILESET",
+              "CATALOG"
+            ],
+            "properties": {
+              "key1": "value1"
+            }
+          },
+          "inherited": null,
+          "audit": {
+            "creator": "anonymous",
+            "createTime": "2025-08-04T10:29:23.463Z"
+          }
+        }
+      }
+
+    MetadataObjectListResponse:
+      value: {
+        "code": 0,
+        "metadataObjects": [
+          {
+            "type": "CATALOG",
+            "fullName":"my_catalog",
+          },
+          {
+            "type": "SCHEMA",
+            "fullName":"my_catalog.my_schema",
+          },
+          {
+            "type": "TABLE",
+            "fullName":"my_catalog.my_schema.my_table",
+          }
+        ]
+      }
+
+    PolicyAlreadyExistsException:
+      value: {
+        "code": 1004,
+        "type": "PolicyAlreadyExistsException",
+        "message": "Failed to operate policy(s) [my_policy] operation [CREATE], reason [PolicyAlreadyExistsException]",
+        "stack": [
+          "org.apache.gravitino.exceptions.PolicyAlreadyExistsException: Gag my_policy already exists",
+          "..."
+        ]
+      }
+
+    PolicyAlreadyAssociatedException:
+      value: {
+        "code": 1004,
+        "type": "PolicyAlreadyAssociatedException",
+        "message": "Failed to operate policy(s) [my_policy] operation [ASSOCIATE] under metalake [my_test_metalake], reason [PolicyAlreadyAssociatedException]",
+        "stack": [
+          "org.apache.gravitino.exceptions.PolicyAlreadyAssociatedException: Policy my_policy already associated",
+          "..."
+        ]
+      }
+
+    NoSuchPolicyException:
+      value: {
+        "code": 1003,
+        "type": "NoSuchPolicyException",
+        "message": "Failed to operate policy(s) [my_policy] operation [LOAD] under metalake [my_test_metalake], reason [NoSuchPolicyException]",
+        "stack": [
+          "org.apache.gravitino.exceptions.NoSuchPolicyException: Policy my_policy does not exist",
+          "..."
+        ]
+      }

@@ -25,7 +25,10 @@ plugins {
 }
 
 dependencies {
-  implementation(project(":bundles:gcp"))
+  implementation(project(":bundles:gcp")) {
+    // There is already a dependency on commons-logging v1.2 in hadoop-gcs, so exclude the one.
+    exclude(group = "commons-logging", module = "commons-logging")
+  }
   implementation(libs.hadoop3.client.api)
   implementation(libs.hadoop3.client.runtime)
   implementation(libs.hadoop3.gcs)

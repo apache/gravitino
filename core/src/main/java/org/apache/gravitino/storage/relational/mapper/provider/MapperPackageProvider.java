@@ -18,16 +18,18 @@
  */
 package org.apache.gravitino.storage.relational.mapper.provider;
 
+import java.util.List;
+
 /**
- * A Service Provider Interface (SPI) for providing package names that contain MyBatis Mapper
- * interfaces. Implementations of this interface allow for the automatic discovery and registration
- * of mappers from different modules.
+ * A Service Provider Interface (SPI) to provide a list of MyBatis Mapper interfaces.
+ * Implementations of this interface allow for the automatic discovery and registration of mappers
+ * from different modules.
  */
 public interface MapperPackageProvider {
   /**
-   * Returns the package name where MyBatis Mapper interfaces are located.
+   * Get a list of MyBatis Mapper classes to register into MyBatis configuration.
    *
-   * @return A string representing the package name to be scanned.
+   * @return a list of MyBatis Mapper classes
    */
-  String getPackageName();
+  List<Class<?>> getMapperClasses();
 }

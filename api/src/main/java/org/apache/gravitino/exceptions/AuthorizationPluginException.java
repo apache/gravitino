@@ -32,7 +32,7 @@ public class AuthorizationPluginException extends GravitinoRuntimeException {
    */
   @FormatMethod
   public AuthorizationPluginException(@FormatString String message, Object... args) {
-    super(String.format(message, args));
+    super(message, args);
   }
 
   /**

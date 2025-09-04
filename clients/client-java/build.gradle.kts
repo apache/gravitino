@@ -24,7 +24,9 @@ plugins {
 
 dependencies {
   implementation(project(":api"))
-  implementation(project(":common"))
+  implementation(project(":common")) {
+    exclude(group = "org.apache.logging.log4j")
+  }
   implementation(libs.jackson.databind)
   implementation(libs.jackson.annotations)
   implementation(libs.jackson.datatype.jdk8)

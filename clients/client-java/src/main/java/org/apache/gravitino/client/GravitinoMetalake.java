@@ -73,7 +73,6 @@ import org.apache.gravitino.dto.requests.UserAddRequest;
 import org.apache.gravitino.dto.responses.BaseResponse;
 import org.apache.gravitino.dto.responses.CatalogListResponse;
 import org.apache.gravitino.dto.responses.CatalogResponse;
-import org.apache.gravitino.dto.responses.DeleteResponse;
 import org.apache.gravitino.dto.responses.DropResponse;
 import org.apache.gravitino.dto.responses.EntityListResponse;
 import org.apache.gravitino.dto.responses.ErrorResponse;
@@ -176,7 +175,7 @@ public class GravitinoMetalake extends MetalakeDTO
 
     EntityListResponse resp =
         restClient.get(
-            String.format("api/metalakes/%s/catalogs", this.name()),
+            String.format("api/metalakes/%s/catalogs", RESTUtils.encodeString(this.name())),
             EntityListResponse.class,
             Collections.emptyMap(),
             ErrorHandlers.catalogErrorHandler());
@@ -198,7 +197,7 @@ public class GravitinoMetalake extends MetalakeDTO
     params.put("details", "true");
     CatalogListResponse resp =
         restClient.get(
-            String.format("api/metalakes/%s/catalogs", this.name()),
+            String.format("api/metalakes/%s/catalogs", RESTUtils.encodeString(this.name())),
             params,
             CatalogListResponse.class,
             Collections.emptyMap(),
@@ -221,7 +220,10 @@ public class GravitinoMetalake extends MetalakeDTO
 
     CatalogResponse resp =
         restClient.get(
-            String.format(API_METALAKES_CATALOGS_PATH, this.name(), catalogName),
+            String.format(
+                API_METALAKES_CATALOGS_PATH,
+                RESTUtils.encodeString(this.name()),
+                RESTUtils.encodeString(catalogName)),
             CatalogResponse.class,
             Collections.emptyMap(),
             ErrorHandlers.catalogErrorHandler());
@@ -256,7 +258,7 @@ public class GravitinoMetalake extends MetalakeDTO
 
     CatalogResponse resp =
         restClient.post(
-            String.format("api/metalakes/%s/catalogs", this.name()),
+            String.format("api/metalakes/%s/catalogs", RESTUtils.encodeString(this.name())),
             req,
             CatalogResponse.class,
             Collections.emptyMap(),
@@ -1017,18 +1019,18 @@ public class GravitinoMetalake extends MetalakeDTO
    * @throws RuntimeException If deleting the Role encounters storage issues.
    */
   public boolean deleteRole(String role) throws NoSuchMetalakeException {
-    DeleteResponse resp =
+    DropResponse resp =
         restClient.delete(
             String.format(
                 API_METALAKES_ROLES_PATH,
                 RESTUtils.encodeString(this.name()),
                 RESTUtils.encodeString(role)),
-            DeleteResponse.class,
+            DropResponse.class,
             Collections.emptyMap(),
             ErrorHandlers.roleErrorHandler());
     resp.validate();
 
-    return resp.deleted();
+    return resp.dropped();
   }
 
   /**
@@ -1473,7 +1475,7 @@ public class GravitinoMetalake extends MetalakeDTO
     JobListResponse resp =
         restClient.get(
             String.format(API_METALAKES_JOB_PATH, RESTUtils.encodeString(this.name())),
-            ImmutableMap.of("jobTemplateName", RESTUtils.encodeString(jobTemplateName)),
+            ImmutableMap.of("jobTemplateName", jobTemplateName),
             JobListResponse.class,
             Collections.emptyMap(),
             ErrorHandlers.jobErrorHandler());

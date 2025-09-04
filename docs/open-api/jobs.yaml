@@ -1,0 +1,726 @@
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+
+---
+
+paths:
+
+  /metalakes/{metalake}/jobs/templates:
+    parameters:
+      - $ref: "./openapi.yaml#/components/parameters/metalake"
+    get:
+      tags:
+        - job
+      summary: List job templates (names)
+      operationId: listJobTemplates
+      description: Returns the list of job templates in the specified metalake
+      parameters:
+        - $ref: "#/components/parameters/details"
+      responses:
+        "200":
+          description: Returns the list of job template objects if {details} is true, otherwise returns the list of job template names
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                oneOf:
+                  - $ref: "./openapi.yaml#/components/schemas/NameListResponse"
+                  - $ref: "#/components/responses/JobTemplateListResponse"
+              examples:
+                NameListResponse:
+                  $ref: "#/components/examples/NameListResponse"
+                JobTemplateListResponse:
+                  $ref: "#/components/examples/JobTemplateListResponse"
+        "400":
+          $ref: "./openapi.yaml#/components/responses/BadRequestErrorResponse"
+        "404":
+          description: Not Found - The specified metalake does not exist
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+              examples:
+                NoSuchMetalakeException:
+                  $ref: "./metalakes.yaml#/components/examples/NoSuchMetalakeException"
+        "5xx":
+          $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
+
+    post:
+      tags:
+        - job
+      summary: Register a job template
+      operationId: registerJobTemplate
+      description: Registers a job template in the specified metalake
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/requests/JobTemplateRegisterRequest"
+            examples:
+              JobTemplateRegisterRequest:
+                $ref: "#/components/examples/JobTemplateRegisterRequest"
+
+      responses:
+        "200":
+          $ref: "./openapi.yaml#/components/responses/BaseResponse"
+        "409":
+          description: Conflict - The target job template already exists in the specified metalake
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+              examples:
+                JobTemplateAlreadyExistsException:
+                  $ref: "#/components/examples/JobTemplateAlreadyExistsException"
+        "5xx":
+          $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
+
+
+  /metalakes/{metalake}/jobs/templates/{jobTemplate}:
+    parameters:
+      - $ref: "./openapi.yaml#/components/parameters/metalake"
+      - $ref: "#/components/parameters/jobTemplate"
+
+    get:
+      tags:
+        - job
+      summary: Get job template
+      operationId: getJobTemplate
+      description: Returns the specified job template information in the specified metalake
+      responses:
+        "200":
+          description: Returns the job template object
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "#/components/responses/JobTemplateResponse"
+                examples:
+                  JobTemplateResponse:
+                    $ref: "#/components/examples/JobTemplateResponse"
+        "404":
+          description: Not Found - The specified job template does not exist in the specified metalake
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+              examples:
+                NoSuchMetalakeException:
+                  $ref: "./metalakes.yaml#/components/examples/NoSuchMetalakeException"
+                NoSuchJobTemplateException:
+                  $ref: "#/components/examples/NoSuchJobTemplateException"
+        "5xx":
+          $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
+
+    delete:
+      tags:
+        - job
+      summary: Delete job template
+      operationId: deleteJobTemplate
+      responses:
+        "200":
+          $ref: "./openapi.yaml#/components/responses/DropResponse"
+        "400":
+          $ref: "./openapi.yaml#/components/responses/BadRequestErrorResponse"
+        "5xx":
+          $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
+
+  /metalakes/{metalake}/jobs/runs:
+    parameters:
+      - $ref: "./openapi.yaml#/components/parameters/metalake"
+    get:
+      tags:
+        - job
+      summary: List jobs
+      operationId: listJobs
+      parameters:
+        - $ref: "#/components/parameters/jobTemplateName"
+      responses:
+        "200":
+          description: Returns the list of job objects
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "#/components/responses/JobListResponse"
+              examples:
+                JobListResponse:
+                  $ref: "#/components/examples/JobListResponse"
+        "400":
+          $ref: "./openapi.yaml#/components/responses/BadRequestErrorResponse"
+        "404":
+          description: Not Found - The specified metalake does not exist
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+              examples:
+                NoSuchMetalakeException:
+                  $ref: "./metalakes.yaml#/components/examples/NoSuchMetalakeException"
+        "5xx":
+          $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
+
+    post:
+      tags:
+        - job
+      summary: run a job
+      operationId: runJob
+      description: Runs a job based on the specified job template in the specified metalake
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/requests/JobRunRequest"
+            examples:
+              JobRunRequest:
+                $ref: "#/components/examples/JobRunRequest"
+
+      responses:
+        "200":
+          description: Returns the empty response with status code 0
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "#/components/responses/JobResponse"
+        "404":
+          description: Not Found - The specified job template does not exist in the specified metalake
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+              examples:
+                JobTemplateAlreadyExistsException:
+                  $ref: "#/components/examples/NoSuchJobTemplateException"
+        "5xx":
+          $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
+
+
+  /metalakes/{metalake}/jobs/runs/{jobId}:
+    parameters:
+      - $ref: "./openapi.yaml#/components/parameters/metalake"
+      - $ref: "#/components/parameters/jobId"
+
+    get:
+      tags:
+        - job
+      summary: Get job
+      operationId: getJob
+      description: Returns the specified job information in the specified metalake
+      responses:
+        "200":
+          description: Returns the job object
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "#/components/responses/JobResponse"
+                examples:
+                  JobResponse:
+                    $ref: "#/components/examples/JobResponse"
+        "404":
+          description: Not Found - The specified job does not exist in the specified metalake
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+              examples:
+                NoSuchMetalakeException:
+                  $ref: "./metalakes.yaml#/components/examples/NoSuchMetalakeException"
+                NoSuchJobException:
+                  $ref: "#/components/examples/NoSuchJobException"
+        "5xx":
+          $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
+
+    post:
+      tags:
+        - job
+      summary: Cancel job
+      operationId: cancelJob
+      description: Cancels the specified job in the specified metalake
+      responses:
+        "200":
+          description: Returns the job object
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "#/components/responses/JobResponse"
+                examples:
+                  JobResponse:
+                    $ref: "#/components/examples/JobResponse"
+        "404":
+          description: Not Found - The specified job does not exist in the specified metalake
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+              examples:
+                NoSuchMetalakeException:
+                  $ref: "./metalakes.yaml#/components/examples/NoSuchMetalakeException"
+                NoSuchJobException:
+                  $ref: "#/components/examples/NoSuchJobException"
+        "5xx":
+          $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
+
+
+components:
+  parameters:
+    details:
+      name: details
+      in: query
+      description: Include detailed information about the job template
+      required: false
+      schema:
+        type: boolean
+        default: false
+    jobTemplate:
+      name: jobTemplate
+      in: path
+      description: The name of the job template
+      required: true
+      schema:
+        type: string
+    jobTemplateName:
+      name: jobTemplateName
+      in: query
+      description: list the jobs by the job template name
+      required: false
+      schema:
+        type: string
+        default: ""
+    jobId:
+      name: jobId
+      in: path
+      description: The unique identifier of the job
+      required: true
+      schema:
+        type: string
+
+  schemas:
+
+    JobTemplate:
+      oneOf:
+        - $ref: "#/components/schemas/ShellJobTemplate"
+        - $ref: "#/components/schemas/SparkJobTemplate"
+      discriminator:
+        propertyName: jobType
+        mapping:
+          shell: "#/components/schemas/ShellJobTemplate"
+          spark: "#/components/schemas/SparkJobTemplate"
+
+    ShellJobTemplate:
+      type: object
+      description: A job template object for shell jobs
+      required:
+        - name
+        - jobType
+        - executable
+      properties:
+        name:
+          type: string
+          description: The name of the job template
+        jobType:
+          type: string
+          description: The type of the job template
+          enum:
+            - "shell"
+        comment:
+          type: string
+          description: A comment about the job template
+          nullable: true
+        executable:
+          type: string
+          description: The executable command of the job template
+        arguments:
+          type: array
+          description: The arguments of the job template
+          items:
+            type: string
+          nullable: true
+        environments:
+          type: object
+          description: Configured string to string map of environment variables for the job template
+          default: { }
+          additionalProperties:
+            type: string
+        customFields:
+          type: object
+          description: Configured string to string map of custom fields for the job template
+          default: { }
+          additionalProperties:
+            type: string
+        scripts:
+            type: array
+            description: The scripts of the job template
+            items:
+                type: string
+            nullable: true
+        audit:
+          $ref: "./openapi.yaml#/components/schemas/Audit"
+
+    SparkJobTemplate:
+        type: object
+        description: A job template object for Spark jobs
+        required:
+          - name
+          - jobType
+          - mainClass
+        properties:
+          name:
+            type: string
+            description: The name of the job template
+          jobType:
+            type: string
+            description: The type of the job template
+            enum:
+              - "spark"
+          comment:
+            type: string
+            description: A comment about the job template
+            nullable: true
+          executable:
+            type: string
+            description: The executable command of the job template
+          arguments:
+            type: array
+            description: The arguments of the job template
+            items:
+              type: string
+            nullable: true
+          environments:
+            type: object
+            description: Configured string to string map of environment variables for the job template
+            default: { }
+            additionalProperties:
+              type: string
+          customFields:
+            type: object
+            description: Configured string to string map of custom fields for the job template
+            default: { }
+            additionalProperties:
+              type: string
+          mainClass:
+            type: string
+            description: The main class of the Spark job template
+          jars:
+            type: array
+            description: The JAR files of the Spark job template
+            items:
+              type: string
+            nullable: true
+          files:
+            type: array
+            description: The files of the Spark job template
+            items:
+              type: string
+            nullable: true
+          archives:
+            type: array
+            description: The archives of the Spark job template
+            items:
+              type: string
+            nullable: true
+          configs:
+            type: object
+            description: Configured string to string map of Spark configurations for the job template
+            default: { }
+            additionalProperties:
+              type: string
+          audit:
+            $ref: "./openapi.yaml#/components/schemas/Audit"
+
+    Job:
+        type: object
+        description: A job object
+        required:
+          - jobId
+          - jobTemplateName
+          - status
+          - audit
+        properties:
+          jobId:
+            type: string
+            description: The unique identifier of the job
+          jobTemplateName:
+            type: string
+            description: The name of the job template used to create the job
+          status:
+            type: string
+            description: The status of the job
+            enum:
+              - "queued"
+              - "started"
+              - "failed"
+              - "succeeded"
+              - "cancelling"
+              - "canceled"
+          audit:
+            $ref: "./openapi.yaml#/components/schemas/Audit"
+
+  requests:
+
+    JobTemplateRegisterRequest:
+      type: object
+      required:
+        - jobTemplate
+      properties:
+        jobTemplate:
+          $ref: "#/components/schemas/JobTemplate"
+
+    JobRunRequest:
+      type: object
+      required:
+        - jobTemplateName
+      properties:
+        jobTemplateName:
+          type: string
+          description: The name of the job template to run
+        jobConf:
+          type: object
+          description: The job configuration for the job run
+          default: { }
+          additionalProperties:
+            type: string
+
+  responses:
+    JobTemplateListResponse:
+      type: object
+      properties:
+        code:
+          type: integer
+          format: int32
+          description: Status code of the response
+          enum:
+            - 0
+        jobTemplates:
+          type: array
+          description: A list of job template objects
+          items:
+            $ref: "#/components/schemas/JobTemplate"
+
+    JobTemplateResponse:
+      type: object
+      properties:
+        code:
+          type: integer
+          format: int32
+          description: Status code of the response
+          enum:
+            - 0
+        jobTemplate:
+          $ref: "#/components/schemas/JobTemplate"
+
+    JobListResponse:
+      type: object
+      properties:
+        code:
+          type: integer
+          format: int32
+          description: Status code of the response
+          enum:
+            - 0
+        jobs:
+          type: array
+          description: A list of job objects
+          items:
+            $ref: "#/components/schemas/Job"
+
+    JobResponse:
+      type: object
+      properties:
+        code:
+          type: integer
+          format: int32
+          description: Status code of the response
+          enum:
+            - 0
+        job:
+          $ref: "#/components/schemas/Job"
+
+  examples:
+    NameListResponse:
+      value: {
+        "code": 0,
+        "names": ["my_template1", "my_template2"]
+      }
+
+    JobTemplateListResponse:
+      value: {
+        "code": 0,
+        "jobTemplates": [
+          {
+            "arguments": [
+              "{{arg1}}",
+              "{{arg2}}"
+            ],
+            "audit": {
+              "createTime": "2025-08-12T02:14:28.205023Z",
+              "creator": "anonymous"
+            },
+            "comment": "Test shell job template",
+            "customFields": { },
+            "environments": {
+              "ENV_VAR": "{{env_var}}"
+            },
+            "executable": "/var/folders/90/v1d9hxsd6pj8m0jnn6f22tkr0000gn/T/tmpy65fiugc/test-job.sh",
+            "jobType": "shell",
+            "name": "test_run_get",
+            "scripts": [
+              "/var/folders/90/v1d9hxsd6pj8m0jnn6f22tkr0000gn/T/tmpy65fiugc/common.sh"
+            ]
+          },
+          {
+            "arguments": [
+              "--arg1",
+              "{{arg2}}"
+            ],
+            "audit": {
+              "createTime": "2025-08-12T02:14:28.205023Z",
+              "creator": "anonymous"
+            },
+            "comment": "Test spark job template",
+            "customFields": { },
+            "environments": {
+              "ENV_VAR": "{{env_var}}"
+            },
+            "executable": "/var/folders/90/v1d9hxsd6pj8m0jnn6f22tkr0000gn/T/tmpy65fiugc/spark-demo.jar",
+            "jobType": "spark",
+            "name": "test_run_get_spark",
+            "mainClass": "org.apache.spark.examples.SparkPi",
+            "jars": [
+              "/var/folders/90/v1d9hxsd6pj8m0jnn6f22tkr0000gn/T/tmpy65fiugc/spark-job.jar"
+            ]
+          }
+        ]
+      }
+
+    JobTemplateRegisterRequest:
+      value: {
+        "jobTemplate": {
+          "name": "test_run_get",
+          "jobType": "shell",
+          "comment": "Test shell job template",
+          "executable": "/var/folders/90/v1d9hxsd6pj8m0jnn6f22tkr0000gn/T/tmpy65fiugc/test-job.sh",
+          "arguments": ["{{arg1}}", "{{arg2}}"],
+          "environments": {
+            "ENV_VAR": "{{env_var}}"
+          },
+          "customFields": { },
+          "scripts": [
+            "/var/folders/90/v1d9hxsd6pj8m0jnn6f22tkr0000gn/T/tmpy65fiugc/common.sh"
+          ]
+        }
+      }
+
+    JobRunRequest:
+      value: {
+        "jobTemplateName": "test_run_get",
+        "jobConf": {
+          "arg1": "value1",
+          "arg2": "value2"
+        }
+      }
+
+    JobTemplateResponse:
+      value: {
+        "code": 0,
+        "jobTemplate": {
+          "name": "test_run_get",
+          "jobType": "shell",
+          "comment": "Test shell job template",
+          "executable": "/var/folders/90/v1d9hxsd6pj8m0jnn6f22tkr0000gn/T/tmpy65fiugc/test-job.sh",
+          "arguments": ["{{arg1}}", "{{arg2}}"],
+          "environments": {
+            "ENV_VAR": "{{env_var}}"
+          },
+          "customFields": { },
+          "scripts": [
+            "/var/folders/90/v1d9hxsd6pj8m0jnn6f22tkr0000gn/T/tmpy65fiugc/common.sh"
+          ],
+          "audit": {
+            "createTime": "2025-08-12T02:14:28.205023Z",
+            "creator": "anonymous"
+          }
+        }
+      }
+
+    JobListResponse:
+      value: {
+        "code": 0,
+          "jobs": [
+            {
+              "jobId": "job-12345",
+              "jobTemplateName": "test_run_get",
+              "status": "succeeded",
+              "audit": {
+                "createTime": "2025-08-12T02:14:28.205023Z",
+                "creator": "anonymous"
+              }
+            },
+            {
+              "jobId": "job-67890",
+              "jobTemplateName": "test_run_get_spark",
+              "status": "failed",
+              "audit": {
+                "createTime": "2025-08-12T02:14:28.205023Z",
+                "creator": "anonymous"
+              }
+            }
+          ]
+        }
+
+    JobResponse:
+      value: {
+        "code": 0,
+        "job": {
+          "jobId": "job-12345",
+          "jobTemplateName": "test_run_get",
+          "status": "succeeded",
+          "audit": {
+            "createTime": "2025-08-12T02:14:28.205023Z",
+            "creator": "anonymous"
+          }
+        }
+      }
+
+    JobTemplateAlreadyExistsException:
+      value: {
+        "code": 1004,
+        "type": "JobTemplateAlreadyExistsException",
+        "message": "Failed to operate job template(s) [my_job] operation [REGISTER], reason [JobTemplateAlreadyExistsException]",
+        "stack": [
+          "org.apache.gravitino.exceptions.JobTemplateAlreadyExistsException: job template xxx already exists",
+          "..."
+        ]
+      }
+
+    NoSuchJobTemplateException:
+      value: {
+        "code": 1003,
+        "type": "NoSuchJobTemplateException",
+        "message": "Failed to operate job template(s) [my_job] operation [GET] under metalake [my_test_metalake], reason [NoSuchJobTemplateException]",
+        "stack": [
+          "org.apache.gravitino.exceptions.NoSuchJobTemplateException: Job template xxx does not exist",
+          "..."
+        ]
+      }
+
+    NoSuchJobException:
+      value: {
+        "code": 1003,
+        "type": "NoSuchJobException",
+        "message": "Failed to operate job(s) [my_job] operation [GET] under metalake [my_test_metalake], reason [NoSuchJobException]",
+        "stack": [
+          "org.apache.gravitino.exceptions.NoSuchJobException: Job xxx does not exist",
+          "..."
+        ]
+      }
