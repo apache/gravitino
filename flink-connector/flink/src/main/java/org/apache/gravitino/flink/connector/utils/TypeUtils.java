@@ -36,6 +36,13 @@ import org.apache.gravitino.rel.types.Types;
 
 public class TypeUtils {
 
+  // Flink supports time/timestamp precision from 0 to 9 (nanosecond precision).
+  // @see
+  // https://nightlies.apache.org/flink/flink-docs-release-2.1/docs/dev/table/types/#date-and-time
+  protected static final int FLINK_SECONDS_PRECISION = 0;
+  protected static final int FLINK_MICROS_PRECISION = 6;
+  protected static final int FLINK_NANOS_PRECISION = 9;
+
   private TypeUtils() {}
 
   public static Type toGravitinoType(LogicalType logicalType) {
@@ -68,9 +75,15 @@ public class TypeUtils {
       case DATE:
         return Types.DateType.get();
       case TIME_WITHOUT_TIME_ZONE:
-        return Types.TimeType.get();
+        org.apache.flink.table.types.logical.TimeType timeType =
+            (org.apache.flink.table.types.logical.TimeType) logicalType;
+        int timePrecision = timeType.getPrecision();
+        return Types.TimeType.of(timePrecision);
       case TIMESTAMP_WITHOUT_TIME_ZONE:
-        return Types.TimestampType.withoutTimeZone();
+        org.apache.flink.table.types.logical.TimestampType timestampType =
+            (org.apache.flink.table.types.logical.TimestampType) logicalType;
+        int timestampPrecision = timestampType.getPrecision();
+        return Types.TimestampType.withoutTimeZone(timestampPrecision);
       case INTERVAL_YEAR_MONTH:
         return Types.IntervalYearType.get();
       case INTERVAL_DAY_TIME:
@@ -78,8 +91,15 @@ public class TypeUtils {
       case FLOAT:
         return Types.FloatType.get();
       case TIMESTAMP_WITH_LOCAL_TIME_ZONE:
+        org.apache.flink.table.types.logical.LocalZonedTimestampType localZonedTimestampType =
+            (org.apache.flink.table.types.logical.LocalZonedTimestampType) logicalType;
+        int localZonedPrecision = localZonedTimestampType.getPrecision();
+        return Types.TimestampType.withTimeZone(localZonedPrecision);
       case TIMESTAMP_WITH_TIME_ZONE:
-        return Types.TimestampType.withTimeZone();
+        org.apache.flink.table.types.logical.ZonedTimestampType zonedTimestampType =
+            (org.apache.flink.table.types.logical.ZonedTimestampType) logicalType;
+        int zonedPrecision = zonedTimestampType.getPrecision();
+        return Types.TimestampType.withTimeZone(zonedPrecision);
       case ARRAY:
         ArrayType arrayType = (ArrayType) logicalType;
         Type elementType = toGravitinoType(arrayType.getElementType());
@@ -155,10 +175,20 @@ public class TypeUtils {
         return DataTypes.DATE();
       case TIMESTAMP:
         Types.TimestampType timestampType = (Types.TimestampType) gravitinoType;
+        int precision = FLINK_MICROS_PRECISION;
+        if (timestampType.hasPrecisionSet()) {
+          precision = timestampType.precision();
+          if (precision < FLINK_SECONDS_PRECISION || precision > FLINK_NANOS_PRECISION) {
+            throw new UnsupportedOperationException(
+                "Unsupported timestamp precision for Flink: "
+                    + precision
+                    + ". Flink supports precision from 0 to 9.");
+          }
+        }
         if (timestampType.hasTimeZone()) {
-          return DataTypes.TIMESTAMP_LTZ();
+          return DataTypes.TIMESTAMP_LTZ(precision);
         } else {
-          return DataTypes.TIMESTAMP();
+          return DataTypes.TIMESTAMP(precision);
         }
       case LIST:
         Types.ListType listType = (Types.ListType) gravitinoType;
@@ -188,7 +218,18 @@ public class TypeUtils {
       case NULL:
         return DataTypes.NULL();
       case TIME:
-        return DataTypes.TIME();
+        Types.TimeType timeType = (Types.TimeType) gravitinoType;
+        int timePrecision = FLINK_SECONDS_PRECISION;
+        if (timeType.hasPrecisionSet()) {
+          timePrecision = timeType.precision();
+          if (timePrecision < FLINK_SECONDS_PRECISION || timePrecision > FLINK_NANOS_PRECISION) {
+            throw new UnsupportedOperationException(
+                "Unsupported time precision for Flink: "
+                    + timePrecision
+                    + ". Flink supports precision from 0 to 9.");
+          }
+        }
+        return DataTypes.TIME(timePrecision);
       case INTERVAL_YEAR:
         return DataTypes.INTERVAL(DataTypes.YEAR());
       case INTERVAL_DAY:
