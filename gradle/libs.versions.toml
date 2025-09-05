@@ -17,7 +17,7 @@
 # under the License.
 #
 [versions]
-awssdk = "2.28.3"
+awssdk = "2.29.52"
 azure-identity = "1.13.1"
 azure-storage-file-datalake = "12.20.0"
 reactor-netty-http = "1.2.1"
