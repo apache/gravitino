@@ -88,6 +88,7 @@ services:
       - GRAVITINO_METALAKE_NAME=test
       - HIVE_HOST_IP=hive
       - TRINO_WORKER_NUM=${TRINO_WORKER_NUM:-0}
+      - TRINO_ROLE=coordinator
     entrypoint:  /bin/bash /tmp/trino/init.sh
     volumes:
       - ./init/trino:/tmp/trino
@@ -106,6 +107,8 @@ services:
         condition: service_healthy
       mysql:
         condition: service_healthy
+      trino-worker:
+        condition: service_healthy
 
   trino-worker:
     image: trinodb/trino:435
@@ -119,7 +122,8 @@ services:
       - GRAVITINO_HOST_PORT=${GRAVITINO_SERVER_PORT:-8090}
       - GRAVITINO_METALAKE_NAME=test
       - HIVE_HOST_IP=hive
-    entrypoint:  /bin/bash /tmp/trino/init-worker.sh
+      - TRINO_ROLE=worker
+    entrypoint:  /bin/bash /tmp/trino/init.sh
     volumes:
       - ./init/trino:/tmp/trino
       - ../../trino-connector/trino-connector/build/libs:/usr/lib/trino/plugin/gravitino
