@@ -135,7 +135,8 @@ public class ReverseIndexRules {
                                 nsFileset.level(1));
                         break;
                       default:
-                        LOG.info("Unprocessed securable object type: " + securableObject.type());
+                        throw new UnsupportedOperationException(
+                            "Don't support securable object type: " + securableObject.type());
                     }
                     Namespace so_namespace = Namespace.of(namespace.levels());
                     NameIdentifier nameIdentifier =
