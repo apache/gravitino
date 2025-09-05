@@ -135,10 +135,10 @@ public class ReverseIndexRules {
                         throw new UnsupportedOperationException(
                             "Don't support securable object type: " + securableObject.type());
                     }
-                    Namespace so_namespace = Namespace.of(namespace.levels());
-                    NameIdentifier nameIdentifier =
-                        NameIdentifier.of(so_namespace, securableObject.name());
-                    reverseIndexCache.put(nameIdentifier, entityType, key);
+                    Namespace securableObjectNamespace = Namespace.of(namespace.levels());
+                    NameIdentifier securableObjectIdent =
+                        NameIdentifier.of(securableObjectNamespace, securableObject.name());
+                    reverseIndexCache.put(securableObjectIdent, entityType, key);
                   });
         }
       };
