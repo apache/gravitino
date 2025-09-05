@@ -408,6 +408,15 @@ public class Configs {
           .checkValue(StringUtils::isNotBlank, ConfigConstants.NOT_BLANK_ERROR_MSG)
           .createWithDefault("caffeine");
 
+  // Number of lock segments for cache concurrency optimization
+  public static final ConfigEntry<Integer> CACHE_LOCK_SEGMENTS =
+      new ConfigBuilder("gravitino.cache.lockSegments")
+          .doc("Number of lock segments for cache concurrency optimization.")
+          .version(ConfigConstants.VERSION_1_0_0)
+          .intConf()
+          .checkValue(value -> value > 0, "Lock segments must be positive")
+          .createWithDefault(16);
+
   public static final ConfigEntry<String> JOB_STAGING_DIR =
       new ConfigBuilder("gravitino.job.stagingDir")
           .doc("Directory for managing staging files when running jobs.")
