@@ -19,6 +19,7 @@
 
 package org.apache.gravitino.cli;
 
+import com.google.common.base.Preconditions;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.regex.Pattern;
@@ -30,13 +31,13 @@ import java.util.regex.Pattern;
  * delimiter and key-value separator can be customized.
  */
 public class Properties {
-  private String delimiter;
-  private String keyValueSeparator;
+  private Pattern delimiterPattern;
+  private Pattern keyValueSeparatorPattern;
 
   /** Default constructor, sets the delimiter to "," and the key-value separator to "=". */
   public Properties() {
-    this.delimiter = ",";
-    this.keyValueSeparator = "=";
+    this.delimiterPattern = Pattern.compile(",");
+    this.keyValueSeparatorPattern = Pattern.compile("=");
   }
 
   /**
@@ -46,8 +47,13 @@ public class Properties {
    * @param keyValueSeparator The separator used to distinguish keys from values in each pair.
    */
   public Properties(String delimiter, String keyValueSeparator) {
-    this.delimiter = Pattern.quote(delimiter);
-    this.keyValueSeparator = Pattern.quote(keyValueSeparator);
+    Preconditions.checkArgument(
+        delimiter != null && !delimiter.isEmpty(), "delimiter cannot be null or empty");
+    Preconditions.checkArgument(
+        keyValueSeparator != null && !keyValueSeparator.isEmpty(),
+        "keyValueSeparator cannot be null or empty");
+    this.delimiterPattern = Pattern.compile(Pattern.quote(delimiter));
+    this.keyValueSeparatorPattern = Pattern.compile(Pattern.quote(keyValueSeparator));
   }
 
   /**
@@ -64,11 +70,17 @@ public class Properties {
 
     if (inputs != null) {
       for (String input : inputs) {
+        if (input == null || input.isEmpty()) {
+          continue;
+        }
         // Split the input by the delimiter into key-value pairs
-        String[] pairs = input.split(delimiter);
+        String[] pairs = delimiterPattern.split(input);
         for (String pair : pairs) {
+          if (pair.isEmpty()) {
+            continue;
+          }
           // Split each key-value pair by the separator
-          String[] keyValue = pair.split(keyValueSeparator, 2);
+          String[] keyValue = keyValueSeparatorPattern.split(pair, 2);
           if (keyValue.length == 2) {
             map.put(keyValue[0].trim(), keyValue[1].trim());
           }
