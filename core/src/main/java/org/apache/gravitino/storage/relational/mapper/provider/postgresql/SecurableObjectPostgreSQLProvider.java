@@ -39,8 +39,8 @@ public class SecurableObjectPostgreSQLProvider extends SecurableObjectBaseSQLPro
     return "<script>"
         + "UPDATE "
         + SECURABLE_OBJECT_TABLE_NAME
-        + " SET deleted_at = floor(extract(epoch from((current_timestamp -"
-        + " timestamp '1970-01-01 00:00:00')*1000)))"
+        + " SET deleted_at = floor(extract(epoch from(current_timestamp -"
+        + " timestamp '1970-01-01 00:00:00'))*1000)"
         + " WHERE FALSE "
         + "<foreach collection='securableObjects' item='item' separator=' '>"
         + " OR (metadata_object_id = #{item.metadataObjectId} AND"
@@ -53,8 +53,8 @@ public class SecurableObjectPostgreSQLProvider extends SecurableObjectBaseSQLPro
   public String softDeleteSecurableObjectsByRoleId(Long roleId) {
     return "UPDATE "
         + SECURABLE_OBJECT_TABLE_NAME
-        + " SET deleted_at = floor(extract(epoch from((current_timestamp -"
-        + " timestamp '1970-01-01 00:00:00')*1000)))"
+        + " SET deleted_at = floor(extract(epoch from(current_timestamp -"
+        + " timestamp '1970-01-01 00:00:00'))*1000)"
         + " WHERE role_id = #{roleId} AND deleted_at = 0";
   }
 
@@ -62,8 +62,8 @@ public class SecurableObjectPostgreSQLProvider extends SecurableObjectBaseSQLPro
   public String softDeleteSecurableObjectsByMetalakeId(Long metalakeId) {
     return "UPDATE "
         + SECURABLE_OBJECT_TABLE_NAME
-        + " ob SET deleted_at = floor(extract(epoch from((current_timestamp -"
-        + " timestamp '1970-01-01 00:00:00')*1000)))"
+        + " ob SET deleted_at = floor(extract(epoch from(current_timestamp -"
+        + " timestamp '1970-01-01 00:00:00'))*1000)"
         + " WHERE exists (SELECT * from "
         + ROLE_TABLE_NAME
         + " ro WHERE ro.metalake_id = #{metalakeId} AND ro.role_id = ob.role_id"
@@ -76,8 +76,8 @@ public class SecurableObjectPostgreSQLProvider extends SecurableObjectBaseSQLPro
       @Param("metadataObjectType") String metadataObjectType) {
     return "UPDATE "
         + SECURABLE_OBJECT_TABLE_NAME
-        + " SET deleted_at = floor(extract(epoch from((current_timestamp -"
-        + " timestamp '1970-01-01 00:00:00')*1000)))"
+        + " SET deleted_at = floor(extract(epoch from(current_timestamp -"
+        + " timestamp '1970-01-01 00:00:00'))*1000)"
         + " WHERE metadata_object_id = #{metadataObjectId} AND deleted_at = 0 AND type = #{metadataObjectType}";
   }
 
@@ -85,8 +85,8 @@ public class SecurableObjectPostgreSQLProvider extends SecurableObjectBaseSQLPro
   public String softDeleteObjectRelsByCatalogId(@Param("catalogId") Long catalogId) {
     return "UPDATE "
         + SECURABLE_OBJECT_TABLE_NAME
-        + " sect SET deleted_at = floor(extract(epoch from((current_timestamp -"
-        + " timestamp '1970-01-01 00:00:00')*1000)))"
+        + " sect SET deleted_at = floor(extract(epoch from(current_timestamp -"
+        + " timestamp '1970-01-01 00:00:00'))*1000)"
         + " WHERE sect.deleted_at = 0 AND EXISTS ("
         + " SELECT ct.catalog_id FROM "
         + CatalogMetaMapper.TABLE_NAME
@@ -124,8 +124,8 @@ public class SecurableObjectPostgreSQLProvider extends SecurableObjectBaseSQLPro
   public String softDeleteObjectRelsBySchemaId(@Param("schemaId") Long schemaId) {
     return "UPDATE "
         + SECURABLE_OBJECT_TABLE_NAME
-        + " sect SET deleted_at = floor(extract(epoch from((current_timestamp -"
-        + " timestamp '1970-01-01 00:00:00')*1000)))"
+        + " sect SET deleted_at = floor(extract(epoch from(current_timestamp -"
+        + " timestamp '1970-01-01 00:00:00'))*1000)"
         + " WHERE sect.deleted_at = 0 AND EXISTS ("
         + " SELECT st.schema_id FROM "
         + SchemaMetaMapper.TABLE_NAME

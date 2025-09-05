@@ -49,6 +49,15 @@ public class IcebergDataTypeTransformer extends GeneralDataTypeTransformer {
             "Iceberg does not support the datatype VARCHAR with length");
       }
       return Types.StringType.get();
+    } else if (io.trino.spi.type.TimeType.class.isAssignableFrom(typeClass)) {
+      // Iceberg only supports time type with microsecond (6) precision
+      return Types.TimeType.of(TRINO_MICROS_PRECISION);
+    } else if (io.trino.spi.type.TimestampType.class.isAssignableFrom(typeClass)) {
+      // Iceberg only supports timestamp type (without time zone) with microsecond (6) precision
+      return Types.TimestampType.withoutTimeZone(TRINO_MICROS_PRECISION);
+    } else if (io.trino.spi.type.TimestampWithTimeZoneType.class.isAssignableFrom(typeClass)) {
+      // Iceberg only supports timestamp with time zone type with microsecond (6) precision
+      return Types.TimestampType.withTimeZone(TRINO_MICROS_PRECISION);
     }
 
     return super.getGravitinoType(type);
