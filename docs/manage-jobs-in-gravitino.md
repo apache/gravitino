@@ -99,9 +99,6 @@ Please note that:
 
 The `spark` job template is used to run Spark jobs, it is a Spark application JAR file for now.
 
-**Note** that the Spark job support is still under development, in 1.0.0, it only supports
-registering a Spark job template, running a Spark job is not supported yet.
-
 The template is defined as follows:
 
 ```json
