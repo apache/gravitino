@@ -88,7 +88,9 @@ public class TestIcebergConfig extends IcebergTestBase {
             IcebergConstants.AWS_S3_REGION,
             "us-west-2",
             IcebergConstants.ICEBERG_OSS_ENDPOINT,
-            "https://oss-endpoint.example.com");
+            "https://oss-endpoint.example.com",
+            IcebergConstants.ICEBERG_S3_PATH_STYLE_ACCESS,
+            "true");
     Assertions.assertEquals(expectedConfig, response.defaults());
     Assertions.assertEquals(0, response.overrides().size());
   }
