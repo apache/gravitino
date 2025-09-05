@@ -30,10 +30,13 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.collect.ImmutableList;
 import java.io.IOException;
+import java.lang.reflect.Field;
 import java.security.Principal;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.Executor;
 import java.util.stream.Collectors;
+import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.GravitinoEnv;
@@ -51,7 +54,9 @@ import org.apache.gravitino.meta.RoleEntity;
 import org.apache.gravitino.meta.SchemaVersion;
 import org.apache.gravitino.meta.UserEntity;
 import org.apache.gravitino.server.authorization.MetadataIdConverter;
+import org.apache.gravitino.server.authorization.RequestAuthorizationCache;
 import org.apache.gravitino.storage.relational.po.SecurableObjectPO;
+import org.apache.gravitino.storage.relational.service.OwnerMetaService;
 import org.apache.gravitino.storage.relational.utils.POConverters;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
@@ -91,21 +96,29 @@ public class TestJcasbinAuthorizer {
 
   private static MockedStatic<MetadataIdConverter> metadataIdConverterMockedStatic;
 
+  private static MockedStatic<OwnerMetaService> ownerMetaServiceMockedStatic;
+
   private static JcasbinAuthorizer jcasbinAuthorizer;
 
   private static ObjectMapper objectMapper = new ObjectMapper();
 
   @BeforeAll
   public static void setup() throws IOException {
+    OwnerMetaService ownerMetaService = mock(OwnerMetaService.class);
+    ownerMetaServiceMockedStatic = mockStatic(OwnerMetaService.class);
+    ownerMetaServiceMockedStatic.when(OwnerMetaService::getInstance).thenReturn(ownerMetaService);
     jcasbinAuthorizer = new JcasbinAuthorizer();
     jcasbinAuthorizer.initialize();
+
     principalUtilsMockedStatic = mockStatic(PrincipalUtils.class);
     metadataIdConverterMockedStatic = mockStatic(MetadataIdConverter.class);
     gravitinoEnvMockedStatic = mockStatic(GravitinoEnv.class);
     gravitinoEnvMockedStatic.when(GravitinoEnv::getInstance).thenReturn(gravitinoEnv);
+
     principalUtilsMockedStatic
         .when(PrincipalUtils::getCurrentPrincipal)
         .thenReturn(new UserPrincipal(USERNAME));
+    principalUtilsMockedStatic.when(() -> PrincipalUtils.doAs(any(), any())).thenCallRealMethod();
     metadataIdConverterMockedStatic
         .when(() -> MetadataIdConverter.getID(any(), eq(METALAKE)))
         .thenReturn(CATALOG_ID);
@@ -138,10 +151,17 @@ public class TestJcasbinAuthorizer {
     if (metadataIdConverterMockedStatic != null) {
       metadataIdConverterMockedStatic.close();
     }
+    if (ownerMetaServiceMockedStatic != null) {
+      ownerMetaServiceMockedStatic.close();
+    }
+    if (gravitinoEnvMockedStatic != null) {
+      gravitinoEnvMockedStatic.close();
+    }
   }
 
   @Test
   public void testAuthorize() throws IOException {
+    makeCompletableFutureUseCurrentThread(jcasbinAuthorizer);
     Principal currentPrincipal = PrincipalUtils.getCurrentPrincipal();
     assertFalse(doAuthorize(currentPrincipal));
     RoleEntity allowRole =
@@ -228,19 +248,23 @@ public class TestJcasbinAuthorizer {
     assertFalse(doAuthorizeOwner(currentPrincipal));
   }
 
-  private boolean doAuthorize(Principal currentPrincipal) {
-    return jcasbinAuthorizer.authorize(
-        currentPrincipal,
-        "testMetalake",
-        MetadataObjects.of(null, "testCatalog", MetadataObject.Type.CATALOG),
-        USE_CATALOG);
+  private Boolean doAuthorize(Principal currentPrincipal) {
+    return RequestAuthorizationCache.executeWithThreadCache(
+        () ->
+            jcasbinAuthorizer.authorize(
+                currentPrincipal,
+                "testMetalake",
+                MetadataObjects.of(null, "testCatalog", MetadataObject.Type.CATALOG),
+                USE_CATALOG));
   }
 
-  private boolean doAuthorizeOwner(Principal currentPrincipal) {
-    return jcasbinAuthorizer.isOwner(
-        currentPrincipal,
-        "testMetalake",
-        MetadataObjects.of(null, "testCatalog", MetadataObject.Type.CATALOG));
+  private Boolean doAuthorizeOwner(Principal currentPrincipal) {
+    return RequestAuthorizationCache.executeWithThreadCache(
+        () ->
+            jcasbinAuthorizer.isOwner(
+                currentPrincipal,
+                "testMetalake",
+                MetadataObjects.of(null, "testCatalog", MetadataObject.Type.CATALOG)));
   }
 
   private static UserEntity getUserEntity() {
@@ -311,5 +335,17 @@ public class TestJcasbinAuthorizer {
   private static SecurableObject getDenySecurableObject() {
     return POConverters.fromSecurableObjectPO(
         "testCatalog2", getDenySecurableObjectPO(), MetadataObject.Type.CATALOG);
+  }
+
+  private static void makeCompletableFutureUseCurrentThread(JcasbinAuthorizer jcasbinAuthorizer) {
+    try {
+      Executor currentThread = Runnable::run;
+      Class<JcasbinAuthorizer> jcasbinAuthorizerClass = JcasbinAuthorizer.class;
+      Field field = jcasbinAuthorizerClass.getDeclaredField("executor");
+      field.setAccessible(true);
+      FieldUtils.writeField(field, jcasbinAuthorizer, currentThread);
+    } catch (Exception e) {
+      throw new RuntimeException(e);
+    }
   }
 }

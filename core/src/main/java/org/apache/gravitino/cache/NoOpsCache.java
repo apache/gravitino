@@ -60,7 +60,8 @@ public class NoOpsCache extends BaseEntityCache {
 
   /** {@inheritDoc} */
   @Override
-  public <E extends Exception> void withCacheLock(ThrowingRunnable<E> action) throws E {
+  public <E extends Exception> void withCacheLock(
+      NameIdentifier nameIdentifier, ThrowingRunnable<E> action) throws E {
     try {
       opLock.lockInterruptibly();
       try {
@@ -76,7 +77,8 @@ public class NoOpsCache extends BaseEntityCache {
 
   /** {@inheritDoc} */
   @Override
-  public <T, E extends Exception> T withCacheLock(ThrowingSupplier<T, E> action) throws E {
+  public <T, E extends Exception> T withCacheLock(
+      NameIdentifier nameIdentifier, ThrowingSupplier<T, E> action) throws E {
     try {
       opLock.lockInterruptibly();
       try {
