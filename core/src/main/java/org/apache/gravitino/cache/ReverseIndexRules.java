@@ -25,8 +25,6 @@ import org.apache.gravitino.meta.GroupEntity;
 import org.apache.gravitino.meta.RoleEntity;
 import org.apache.gravitino.meta.UserEntity;
 import org.apache.gravitino.utils.NamespaceUtil;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Reverse index rules for different entity types. This class defines how to process reverse
@@ -37,7 +35,6 @@ import org.slf4j.LoggerFactory;
  * - RoleEntity role is {metalake-name}.system.role.{role-name}:ROLE-{serial-number} <br>
  */
 public class ReverseIndexRules {
-  private static final Logger LOG = LoggerFactory.getLogger(ReverseIndexRules.class);
 
   /** UserEntity reverse index processor */
   public static final ReverseIndexCache.ReverseIndexRule USER_REVERSE_RULE =
