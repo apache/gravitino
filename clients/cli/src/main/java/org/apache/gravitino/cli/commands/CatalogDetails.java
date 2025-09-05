@@ -26,9 +26,12 @@ import org.apache.gravitino.client.GravitinoClient;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 
+/** Represents the detail information of a catalog. */
 public class CatalogDetails extends Command {
 
+  /** The name of the metalake. */
   protected final String metalake;
+  /** The name of the catalog. */
   protected final String catalog;
 
   /**

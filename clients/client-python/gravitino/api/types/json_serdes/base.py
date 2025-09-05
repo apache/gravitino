@@ -20,23 +20,32 @@ from typing import Generic, TypeVar, Union
 
 from dataclasses_json.core import Json
 
+from gravitino.api.expressions.distributions.distribution import Distribution
 from gravitino.api.expressions.expression import Expression
+from gravitino.api.expressions.indexes.index import Index
+from gravitino.api.expressions.sorts.sort_order import SortOrder
 from gravitino.api.types.types import Type
+from gravitino.dto.rel.partitioning.partitioning import Partitioning
 from gravitino.dto.rel.partitions.partition_dto import PartitionDTO
 
-GravitinoTypeT = TypeVar("GravitinoTypeT", bound=Union[Expression, Type, PartitionDTO])
+_GravitinoTypeT = TypeVar(
+    "_GravitinoTypeT",
+    bound=Union[
+        Expression, Type, Partitioning, PartitionDTO, Distribution, Index, SortOrder
+    ],
+)
 
 
-class JsonSerializable(ABC, Generic[GravitinoTypeT]):
+class JsonSerializable(ABC, Generic[_GravitinoTypeT]):
     """Customized generic Serializer for DataClassJson."""
 
     @classmethod
     @abstractmethod
-    def serialize(cls, data_type: GravitinoTypeT) -> Json:
+    def serialize(cls, data_type: _GravitinoTypeT) -> Json:
         """To serialize the given `data`.
 
         Args:
-            data (GravitinoTypeT): The data to be serialized.
+            data (_GravitinoTypeT): The data to be serialized.
 
         Returns:
             Json: The serialized data.
@@ -45,13 +54,13 @@ class JsonSerializable(ABC, Generic[GravitinoTypeT]):
 
     @classmethod
     @abstractmethod
-    def deserialize(cls, data: Json) -> GravitinoTypeT:
+    def deserialize(cls, data: Json) -> _GravitinoTypeT:
         """To deserialize the given `data`.
 
         Args:
             data (Json): The data to be deserialized.
 
         Returns:
-            GravitinoTypeT: The deserialized data.
+            _GravitinoTypeT: The deserialized data.
         """
         pass
