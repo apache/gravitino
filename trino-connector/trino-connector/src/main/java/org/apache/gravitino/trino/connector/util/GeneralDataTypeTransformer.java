@@ -59,6 +59,7 @@ public class GeneralDataTypeTransformer {
   // @see
   // https://trino.io/docs/current/language/types.html#date-and-time
   protected static final int TRINO_SECONDS_PRECISION = 0;
+  protected static final int TRINO_MILLIS_PRECISION = 3;
   protected static final int TRINO_MICROS_PRECISION = 6;
   protected static final int TRINO_PICOS_PRECISION = 12;
 

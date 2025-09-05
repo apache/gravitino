@@ -76,8 +76,18 @@ public class HiveDataTypeTransformer extends GeneralDataTypeTransformer {
 
       return Types.FixedCharType.of(charType.getLength());
     } else if (io.trino.spi.type.TimestampType.class.isAssignableFrom(typeClass)) {
-      // When creating a table in Hive, the timestamp data type only supports not specifying
-      // precision, with the default precision being 3 (milliseconds precision)
+      // When creating a table in Hive, the timestamp data type only supports timestamp and
+      // timestamp(3)
+      // with the precision being 3 (milliseconds precision)
+      io.trino.spi.type.TimestampType timestampType = (io.trino.spi.type.TimestampType) type;
+      int precision = timestampType.getPrecision();
+      if (precision != TRINO_MILLIS_PRECISION) {
+        throw new TrinoException(
+            GravitinoErrorCode.GRAVITINO_ILLEGAL_ARGUMENT,
+            "Incorrect timestamp precision for timestamp("
+                + precision
+                + "), the configured precision is MILLISECONDS;");
+      }
       return Types.TimestampType.withoutTimeZone();
     }
 
