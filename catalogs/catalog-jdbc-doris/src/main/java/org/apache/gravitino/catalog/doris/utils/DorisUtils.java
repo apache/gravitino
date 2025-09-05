@@ -221,7 +221,7 @@ public final class DorisUtils {
 
   private static int extractBucketNum(Matcher matcher) {
     int bucketNum = 1;
-    if (matcher.find(5)) {
+    if (matcher.group(5) != null) {
       String bucketValue = matcher.group(5);
       // Use -1 to indicate auto bucket.
       bucketNum =

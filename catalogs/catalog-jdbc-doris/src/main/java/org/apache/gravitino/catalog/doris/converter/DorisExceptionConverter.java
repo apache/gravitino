@@ -49,6 +49,7 @@ public class DorisExceptionConverter extends JdbcExceptionConverter {
   static final int CODE_OTHER = 1105;
   static final int CODE_DELETE_NON_EXISTING_PARTITION = 1507;
   static final int CODE_PARTITION_ALREADY_EXISTS = 1517;
+  static final int CODE_BUCKETS_AUTO_NOT_SUPPORTED = 1064;
 
   private static final String DATABASE_ALREADY_EXISTS_PATTERN_STRING =
       ".*?detailMessage = Can't create database '.*?'; database exists";
@@ -83,6 +84,12 @@ public class DorisExceptionConverter extends JdbcExceptionConverter {
   private static final Pattern PARTITION_ALREADY_EXISTS_PARTITION =
       Pattern.compile(PARTITION_ALREADY_EXISTS_STRING);
 
+  private static final String BUCKETS_AUTO_NOT_SUPPORTED_STRING =
+      ".*?syntax error.*AUTO.*|.*?You have an error in your SQL syntax.*AUTO.*|.*?errCode = 2, detailMessage = Syntax error.*AUTO.*";
+
+  private static final Pattern BUCKETS_AUTO_NOT_SUPPORTED_PATTERN =
+      Pattern.compile(BUCKETS_AUTO_NOT_SUPPORTED_STRING, Pattern.CASE_INSENSITIVE);
+
   @SuppressWarnings("FormatStringAnnotation")
   @Override
   public GravitinoRuntimeException toGravitinoException(SQLException se) {
@@ -109,6 +116,15 @@ public class DorisExceptionConverter extends JdbcExceptionConverter {
         return new NoSuchPartitionException(se, se.getMessage());
       case CODE_PARTITION_ALREADY_EXISTS:
         return new PartitionAlreadyExistsException(se, se.getMessage());
+      case CODE_BUCKETS_AUTO_NOT_SUPPORTED:
+        String bucketsAutoMessage =
+            String.format(
+                "BUCKETS AUTO is not supported in this version of Apache Doris (requires Doris 1.2.2+). "
+                    + "BUCKETS AUTO was introduced in Doris 1.2.2. "
+                    + "Please either upgrade to Doris 1.2.2+ or specify a specific bucket number instead of AUTO. "
+                    + "Original error: %s",
+                se.getMessage());
+        return new GravitinoRuntimeException(se, bucketsAutoMessage);
       default:
         if (se.getMessage() != null && se.getMessage().contains("Access denied")) {
           return new ConnectionFailedException(se, se.getMessage());
@@ -145,6 +161,11 @@ public class DorisExceptionConverter extends JdbcExceptionConverter {
     if (PARTITION_ALREADY_EXISTS_PARTITION.matcher(message).matches()) {
       return CODE_PARTITION_ALREADY_EXISTS;
     }
+
+    if (BUCKETS_AUTO_NOT_SUPPORTED_PATTERN.matcher(message).matches()) {
+      return CODE_BUCKETS_AUTO_NOT_SUPPORTED;
+    }
+
     return CODE_OTHER;
   }
 }
