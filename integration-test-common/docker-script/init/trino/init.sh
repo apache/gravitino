@@ -22,9 +22,9 @@ set -ex
 trino_conf_dir="$(dirname "${BASH_SOURCE-$0}")"
 trino_conf_dir="$(cd "${trino_conf_dir}">/dev/null; pwd)"
 
-cp "$trino_conf_dir/config/config.properties" /etc/trino/config.properties
 cp "$trino_conf_dir/config/jvm.config" /etc/trino/jvm.config
 cp "$trino_conf_dir/config/log4j2.properties" /etc/trino/log4j2.properties
+cp "$trino_conf_dir/config/node.properties" /etc/trino/node.properties
 cp "$trino_conf_dir/config/catalog/gravitino.properties" /etc/trino/catalog/gravitino.properties
 
 # Copy the MYSQL driver to iceberg connector
@@ -34,7 +34,22 @@ cp /usr/lib/trino/plugin/mysql/mysql-connector-j-8.2.0.jar /usr/lib/trino/plugin
 sed -i "s/GRAVITINO_HOST_IP:GRAVITINO_HOST_PORT/${GRAVITINO_HOST_IP}:${GRAVITINO_HOST_PORT}/g" /etc/trino/catalog/gravitino.properties
 # Update `gravitino.metalake = GRAVITINO_METALAKE_NAME` in the `conf/catalog/gravitino.properties`
 sed -i "s/GRAVITINO_METALAKE_NAME/${GRAVITINO_METALAKE_NAME}/g" /etc/trino/catalog/gravitino.properties
+# Update `node.id=NODE_ID` in the `/conf/node.properties`
+sed -i "s/NODE_ID/${RANDOM}-${RANDOM}-${RANDOM}-${RANDOM}-${RANDOM}/g" /etc/trino/node.properties
 
+# Update `/conf/config.properties`
+if [[ "${TRINO_ROLE}" == "coordinator" ]]; then
+  cp "$trino_conf_dir/config/config.properties" /etc/trino/config.properties
+  if [[ "${TRINO_WORKER_NUM}" -gt 0 ]]; then
+    # Deploy a distributed cluster, so update `node-scheduler.include-coordinator` to `false` in the`/conf/config.properties`
+    sed -i "s/node-scheduler.include-coordinator=true/node-scheduler.include-coordinator=false/g" /etc/trino/config.properties
+  fi
+else
+  cp "$trino_conf_dir/config/config-worker.properties" /etc/trino/config.properties
+fi
+
+# mkdir `node.data-dir` in the `/conf/node.properties`
+mkdir -p /tmp/data
 
 # Check the number of Gravitino connector plugins present in the Trino plugin directory
 num_of_gravitino_connector=$(ls /usr/lib/trino/plugin/gravitino | grep gravitino-trino-connector-* | wc -l)
@@ -43,19 +58,24 @@ if [[ "${num_of_gravitino_connector}" -ne 1 ]]; then
   exit 1
 fi
 
-nohup /usr/lib/trino/bin/run-trino &
+# Container start up
+if [[ "${TRINO_ROLE}" == "coordinator" ]]; then
+  nohup /usr/lib/trino/bin/run-trino &
 
-counter=0
-while [ $counter -le 300 ]; do
-  counter=$((counter + 1))
-  trino_ready=$(trino --execute  "SHOW CATALOGS LIKE 'gravitino'" | wc -l)
-  if [ "$trino_ready" -eq 0 ];
-  then
-    echo "Wait for the initialization of services"
-    sleep 1;
-  else
-    # persist the container
-    tail -f /dev/null
-  fi
-done
-exit 1
+  counter=0
+  while [ $counter -le 300 ]; do
+    counter=$((counter + 1))
+    trino_ready=$(trino --execute  "SHOW CATALOGS LIKE 'gravitino'" | wc -l)
+    if [ "$trino_ready" -eq 0 ];
+    then
+      echo "Wait for the initialization of services"
+      sleep 1;
+    else
+      # persist the container
+      tail -f /dev/null
+    fi
+  done
+  exit 1
+else
+  /usr/lib/trino/bin/run-trino
+fi

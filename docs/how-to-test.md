@@ -65,6 +65,7 @@ To deploy the Gravitino server locally to run the integration tests, follow thes
    integration tests in the `distribution` directory.
 4. Use the `bash trino-connector/integration-test/trino-test-tools/trino_test.sh` command to run all the
    Trino test sets in the `trino-connector/integration-test/src/test/resources/trino-ci-testset/testsets` directory.
+   Specify the `--trino_worker_num` parameter to make the Trino test sets run in a distributed environment.
 
 ## Skip tests
 
