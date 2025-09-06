@@ -322,59 +322,166 @@ class Types:
 
     class TimeType(DateTimeType):
         _instance: Types.TimeType = None
+        _precision: int
 
-        def __new__(cls):
-            if cls._instance is None:
-                cls._instance = super(Types.TimeType, cls).__new__(cls)
-                cls._instance.__init__()
-            return cls._instance
+        def __new__(cls, precision: int = None):
+            if precision is None:
+                # Forward compatibility: Use singleton when there is no precision parameter
+                if cls._instance is None:
+                    cls._instance = super(Types.TimeType, cls).__new__(cls)
+                    cls._instance.__init__()
+                return cls._instance
+            # Create a new instance when the precision parameter is present
+            return super(Types.TimeType, cls).__new__(cls)
+
+        def __init__(self, precision: int = None):
+            if hasattr(self, "_initialized"):
+                return
+            super().__init__()
+            self._precision = (
+                precision if precision is not None else self.DATE_TIME_PRECISION_NOT_SET
+            )
+            self._initialized = True
 
         @classmethod
         def get(cls) -> Types.TimeType:
+            """Returns the default TimeType instance (without precision)"""
             return cls()
+
+        @classmethod
+        def of(cls, precision: int) -> Types.TimeType:
+            """Create a TimeType instance with the specified precision"""
+            if not (
+                cls.MIN_ALLOWED_PRECISION <= precision <= cls.MAX_ALLOWED_PRECISION
+            ):
+                raise ValueError(
+                    f"precision must be in range "
+                    f"[{cls.MIN_ALLOWED_PRECISION}, {cls.MAX_ALLOWED_PRECISION}]: "
+                    f"precision: {precision}"
+                )
+            return cls(precision)
+
+        def precision(self) -> int:
+            """Returns the precision of the time type"""
+            return self._precision
+
+        def has_precision_set(self) -> bool:
+            """Returns whether the time type has precision set"""
+            return self._precision != self.DATE_TIME_PRECISION_NOT_SET
 
         def name(self) -> Name:
             return Name.TIME
 
         def simple_string(self) -> str:
-            return "time"
+            return f"time({self._precision})" if self.has_precision_set() else "time"
+
+        def __eq__(self, other):
+            if not isinstance(other, Types.TimeType):
+                return False
+            return self._precision == other._precision
+
+        def __hash__(self):
+            return hash(self._precision)
 
     class TimestampType(DateTimeType):
         _instance_with_tz: Types.TimestampType = None
         _instance_without_tz: Types.TimestampType = None
         _with_time_zone: bool
+        _precision: int
 
-        def __new__(cls, with_time_zone: bool):
-            if with_time_zone:
-                if cls._instance_with_tz is None:
-                    cls._instance_with_tz = super(Types.TimestampType, cls).__new__(cls)
-                    cls._instance_with_tz.__init__(with_time_zone)
-                return cls._instance_with_tz
-            if cls._instance_without_tz is None:
-                cls._instance_without_tz = super(Types.TimestampType, cls).__new__(cls)
-                cls._instance_without_tz.__init__(with_time_zone)
-            return cls._instance_without_tz
+        def __new__(cls, with_time_zone: bool, precision: int = None):
+            if precision is None:
+                # Use singleton when there is no precision parameter
+                if with_time_zone:
+                    if cls._instance_with_tz is None:
+                        cls._instance_with_tz = super(Types.TimestampType, cls).__new__(
+                            cls
+                        )
+                        cls._instance_with_tz.__init__(with_time_zone)
+                    return cls._instance_with_tz
+                if cls._instance_without_tz is None:
+                    cls._instance_without_tz = super(Types.TimestampType, cls).__new__(
+                        cls
+                    )
+                    cls._instance_without_tz.__init__(with_time_zone)
+                return cls._instance_without_tz
+            # Create a new instance when the precision parameter is present
+            return super(Types.TimestampType, cls).__new__(cls)
+
+        def __init__(self, with_time_zone: bool, precision: int = None):
+            if hasattr(self, "_initialized"):
+                return
+            super().__init__()
+            self._with_time_zone = with_time_zone
+            self._precision = (
+                precision if precision is not None else self.DATE_TIME_PRECISION_NOT_SET
+            )
+            self._initialized = True
 
         @classmethod
-        def with_time_zone(cls) -> Types.TimestampType:
+        def with_time_zone(cls, precision: int = None) -> Types.TimestampType:
+            """Create TimestampType with Timezone"""
+            if precision is not None:
+                if not (
+                    cls.MIN_ALLOWED_PRECISION <= precision <= cls.MAX_ALLOWED_PRECISION
+                ):
+                    raise ValueError(
+                        f"precision must be in range "
+                        f"[{cls.MIN_ALLOWED_PRECISION}, {cls.MAX_ALLOWED_PRECISION}]: "
+                        f"precision: {precision}"
+                    )
+                return cls(True, precision)
             return cls(True)
 
         @classmethod
-        def without_time_zone(cls) -> Types.TimestampType:
+        def without_time_zone(cls, precision: int = None) -> Types.TimestampType:
+            """Create TimestampType without Timezone"""
+            if precision is not None:
+                if not (
+                    cls.MIN_ALLOWED_PRECISION <= precision <= cls.MAX_ALLOWED_PRECISION
+                ):
+                    raise ValueError(
+                        f"precision must be in range "
+                        f"[{cls.MIN_ALLOWED_PRECISION}, {cls.MAX_ALLOWED_PRECISION}]: "
+                        f"precision: {precision}"
+                    )
+                return cls(False, precision)
             return cls(False)
 
-        def __init__(self, with_time_zone: bool):
-            self._with_time_zone = with_time_zone
-            super().__init__()
-
         def has_time_zone(self) -> bool:
+            """Returns whether the timestamp type has a timezone"""
             return self._with_time_zone
+
+        def precision(self) -> int:
+            """Returns the precision of the timestamp type"""
+            return self._precision
+
+        def has_precision_set(self) -> bool:
+            """Returns whether the precision is set for the timestamp type"""
+            return self._precision != self.DATE_TIME_PRECISION_NOT_SET
 
         def name(self) -> Name:
             return Name.TIMESTAMP
 
         def simple_string(self) -> str:
+            if self.has_precision_set():
+                return (
+                    f"timestamp_tz({self._precision})"
+                    if self._with_time_zone
+                    else f"timestamp({self._precision})"
+                )
             return "timestamp_tz" if self._with_time_zone else "timestamp"
+
+        def __eq__(self, other):
+            if not isinstance(other, Types.TimestampType):
+                return False
+            return (
+                self._with_time_zone == other._with_time_zone
+                and self._precision == other._precision
+            )
+
+        def __hash__(self):
+            return hash((self._with_time_zone, self._precision))
 
     class IntervalYearType(IntervalType):
         """The interval year type in Gravitino."""
