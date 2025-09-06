@@ -37,6 +37,7 @@ import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.CatalogEntity;
 import org.apache.gravitino.meta.ColumnEntity;
 import org.apache.gravitino.meta.FilesetEntity;
+import org.apache.gravitino.meta.GroupEntity;
 import org.apache.gravitino.meta.ModelEntity;
 import org.apache.gravitino.meta.ModelVersionEntity;
 import org.apache.gravitino.meta.RoleEntity;
@@ -61,7 +62,8 @@ public class MetadataIdConverter {
           MetadataObject.Type.FILESET, Entity.EntityType.FILESET,
           MetadataObject.Type.TOPIC, Entity.EntityType.TOPIC,
           MetadataObject.Type.COLUMN, Entity.EntityType.COLUMN,
-          MetadataObject.Type.ROLE, Entity.EntityType.ROLE);
+          MetadataObject.Type.ROLE, Entity.EntityType.ROLE,
+          MetadataObject.Type.GROUP, Entity.EntityType.GROUP);
   // Maps metadata type to capability scope
   private static final Map<MetadataObject.Type, Capability.Scope> METADATA_SCOPE_MAPPING =
       ImmutableMap.of(
@@ -85,7 +87,7 @@ public class MetadataIdConverter {
           .put(Entity.EntityType.MODEL_VERSION, ModelVersionEntity.class)
           .put(Entity.EntityType.COLUMN, ColumnEntity.class)
           .put(Entity.EntityType.USER, UserEntity.class)
-          .put(Entity.EntityType.GROUP, Entity.class)
+          .put(Entity.EntityType.GROUP, GroupEntity.class)
           .put(Entity.EntityType.ROLE, RoleEntity.class)
           .build();
 
