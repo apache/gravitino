@@ -83,7 +83,6 @@ tasks.withType(ShadowJar::class.java) {
   relocate("com.google", "org.apache.gravitino.aliyun.shaded.com.google.common")
   relocate("com.sun.activation", "org.apache.gravitino.aliyun.shaded.com.sun.activation")
   relocate("com.sun.istack", "org.apache.gravitino.aliyun.shaded.com.sun.istack")
-  relocate("com.sun.jersey", "org.apache.gravitino.aliyun.shaded.com.sun.jersey")
   relocate("com.sun.xml", "org.apache.gravitino.aliyun.shaded.com.sun.xml")
   relocate("okhttp3", "org.apache.gravitino.aliyun.shaded.okhttp3")
   relocate("okio", "org.apache.gravitino.aliyun.shaded.okio")
@@ -91,7 +90,6 @@ tasks.withType(ShadowJar::class.java) {
   relocate("org.apache.http", "org.apache.gravitino.aliyun.shaded.org.apache.http")
   relocate("org.checkerframework", "org.apache.gravitino.aliyun.shaded.org.checkerframework")
   relocate("org.jacoco.agent.rt", "org.apache.gravitino.aliyun.shaded.org.jacoco.agent.rt")
-  relocate("org.jdom", "org.apache.gravitino.aliyun.shaded.org.jdom")
 
   mergeServiceFiles()
 }
