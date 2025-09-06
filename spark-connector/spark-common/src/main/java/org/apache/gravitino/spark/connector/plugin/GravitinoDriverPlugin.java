@@ -67,6 +67,10 @@ public class GravitinoDriverPlugin implements DriverPlugin {
   private static final Logger LOG = LoggerFactory.getLogger(GravitinoDriverPlugin.class);
 
   @VisibleForTesting
+  static final String PAIMON_SPARK_EXTENSIONS =
+      "org.apache.paimon.spark.extensions.PaimonSparkSessionExtensions";
+
+  @VisibleForTesting
   static final String ICEBERG_SPARK_EXTENSIONS =
       "org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions";
 
@@ -74,8 +78,11 @@ public class GravitinoDriverPlugin implements DriverPlugin {
   private final List<String> gravitinoIcebergExtensions =
       Arrays.asList(
           GravitinoIcebergSparkSessionExtensions.class.getName(), ICEBERG_SPARK_EXTENSIONS);
+  private final List<String> gravitinoPaimonExtensions = Arrays.asList(PAIMON_SPARK_EXTENSIONS);
+
   private final List<String> gravitinoDriverExtensions = new ArrayList<>();
   private boolean enableIcebergSupport = false;
+  private boolean enablePaimonSupport = false;
 
   @Override
   public Map<String, String> init(SparkContext sc, PluginContext pluginContext) {
@@ -94,8 +101,14 @@ public class GravitinoDriverPlugin implements DriverPlugin {
 
     this.enableIcebergSupport =
         conf.getBoolean(GravitinoSparkConfig.GRAVITINO_ENABLE_ICEBERG_SUPPORT, false);
+    this.enablePaimonSupport =
+        conf.getBoolean(GravitinoSparkConfig.GRAVITINO_ENABLE_PAIMON_SUPPORT, false);
     if (enableIcebergSupport) {
       gravitinoDriverExtensions.addAll(gravitinoIcebergExtensions);
+    }
+
+    if (enablePaimonSupport) {
+      gravitinoDriverExtensions.addAll(gravitinoPaimonExtensions);
     }
 
     this.catalogManager =

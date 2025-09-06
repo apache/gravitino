@@ -69,6 +69,6 @@ public class CatalogPaimonFileSystemIT extends CatalogPaimonBaseIT {
     // load schema check, database properties is empty for Paimon FilesystemCatalog.
     Schema schema = schemas.loadSchema(schemaIdent.name());
     Assertions.assertTrue(schema.properties().isEmpty());
-    Assertions.assertTrue(paimonCatalog.loadDatabaseProperties(schemaIdent.name()).isEmpty());
+    Assertions.assertTrue(paimonCatalog.getDatabase(schemaIdent.name()).options().isEmpty());
   }
 }
