@@ -47,6 +47,7 @@ public class HiveColumn extends BaseColumn {
       hiveColumn.dataType = dataType;
       hiveColumn.nullable = nullable;
       hiveColumn.defaultValue = defaultValue == null ? DEFAULT_VALUE_NOT_SET : defaultValue;
+      hiveColumn.auditInfo = auditInfo;
       return hiveColumn;
     }
   }

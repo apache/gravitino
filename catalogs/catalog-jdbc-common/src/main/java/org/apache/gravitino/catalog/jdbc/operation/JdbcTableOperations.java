@@ -637,7 +637,8 @@ public abstract class JdbcTableOperations implements TableOperation {
         .withType(typeConverter.toGravitino(typeBean))
         .withComment(StringUtils.isEmpty(comment) ? null : comment)
         .withNullable(nullable)
-        .withDefaultValue(defaultValue);
+        .withDefaultValue(defaultValue)
+        .withAuditInfo(AuditInfo.EMPTY);
   }
 
   /**

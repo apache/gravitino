@@ -34,6 +34,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.catalog.jdbc.JdbcColumn;
 import org.apache.gravitino.catalog.jdbc.JdbcTable;
 import org.apache.gravitino.exceptions.GravitinoRuntimeException;
+import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.TableChange;
 import org.apache.gravitino.rel.expressions.distributions.Distributions;
@@ -65,6 +66,7 @@ public class TestMysqlTableOperations extends TestMysql {
             .withType(VARCHAR)
             .withComment("test_comment")
             .withNullable(true)
+            .withAuditInfo(AuditInfo.EMPTY)
             .build());
     columns.add(
         JdbcColumn.builder()
@@ -72,6 +74,7 @@ public class TestMysqlTableOperations extends TestMysql {
             .withType(INT)
             .withNullable(false)
             .withComment("set primary key")
+            .withAuditInfo(AuditInfo.EMPTY)
             .build());
     columns.add(
         JdbcColumn.builder()
@@ -79,6 +82,7 @@ public class TestMysqlTableOperations extends TestMysql {
             .withType(INT)
             .withNullable(true)
             .withDefaultValue(Literals.NULL)
+            .withAuditInfo(AuditInfo.EMPTY)
             .build());
     columns.add(
         JdbcColumn.builder()
@@ -86,6 +90,7 @@ public class TestMysqlTableOperations extends TestMysql {
             .withType(VARCHAR)
             .withDefaultValue(Literals.of("hello world", VARCHAR))
             .withNullable(false)
+            .withAuditInfo(AuditInfo.EMPTY)
             .build());
     Map<String, String> properties = new HashMap<>();
     properties.put(MYSQL_AUTO_INCREMENT_OFFSET_KEY, "10");
@@ -125,6 +130,7 @@ public class TestMysqlTableOperations extends TestMysql {
             .withComment("new_add")
             .withNullable(true)
             .withDefaultValue(Literals.of("hello test", VARCHAR))
+            .withAuditInfo(AuditInfo.EMPTY)
             .build();
     TABLE_OPERATIONS.alterTable(
         TEST_DB_NAME.toString(),
@@ -814,6 +820,7 @@ public class TestMysqlTableOperations extends TestMysql {
               .withType(Types.DecimalType.of(10, 2))
               .withComment("test_decimal")
               .withNullable(false)
+              .withAuditInfo(AuditInfo.EMPTY)
               .build()
         },
         "test_comment",
@@ -842,18 +849,21 @@ public class TestMysqlTableOperations extends TestMysql {
           .withComment("id")
           .withAutoIncrement(true)
           .withNullable(false)
+          .withAuditInfo(AuditInfo.EMPTY)
           .build(),
       JdbcColumn.builder()
           .withName("col_2")
           .withType(Types.VarCharType.of(255))
           .withComment("city")
           .withNullable(false)
+          .withAuditInfo(AuditInfo.EMPTY)
           .build(),
       JdbcColumn.builder()
           .withName("col_3")
           .withType(Types.VarCharType.of(255))
           .withComment("name")
           .withNullable(false)
+          .withAuditInfo(AuditInfo.EMPTY)
           .build()
     };
     // Test create increment key for unique index.

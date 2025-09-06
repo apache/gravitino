@@ -33,6 +33,7 @@ import org.apache.gravitino.catalog.lakehouse.hudi.HudiSchema;
 import org.apache.gravitino.catalog.lakehouse.hudi.HudiTable;
 import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.hive.hms.MiniHiveMetastoreService;
+import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.types.Types;
 import org.apache.hadoop.hive.conf.HiveConf;
@@ -155,30 +156,43 @@ public class TestHudiHMSBackendOps extends MiniHiveMetastoreService {
         HudiColumn.builder()
             .withName("_hoodie_commit_time")
             .withType(Types.StringType.get())
+            .withAuditInfo(AuditInfo.EMPTY)
             .build(),
         columns[0]);
     Assertions.assertEquals(
         HudiColumn.builder()
             .withName("_hoodie_commit_seqno")
             .withType(Types.StringType.get())
+            .withAuditInfo(AuditInfo.EMPTY)
             .build(),
         columns[1]);
     Assertions.assertEquals(
         HudiColumn.builder()
             .withName("_hoodie_record_key")
             .withType(Types.StringType.get())
+            .withAuditInfo(AuditInfo.EMPTY)
             .build(),
         columns[2]);
     Assertions.assertEquals(
         HudiColumn.builder()
             .withName("_hoodie_partition_path")
             .withType(Types.StringType.get())
+            .withAuditInfo(AuditInfo.EMPTY)
             .build(),
         columns[3]);
     Assertions.assertEquals(
-        HudiColumn.builder().withName("_hoodie_file_name").withType(Types.StringType.get()).build(),
+        HudiColumn.builder()
+            .withName("_hoodie_file_name")
+            .withType(Types.StringType.get())
+            .withAuditInfo(AuditInfo.EMPTY)
+            .build(),
         columns[4]);
     Assertions.assertEquals(
-        HudiColumn.builder().withName("ts").withType(Types.LongType.get()).build(), columns[5]);
+        HudiColumn.builder()
+            .withName("ts")
+            .withType(Types.LongType.get())
+            .withAuditInfo(AuditInfo.EMPTY)
+            .build(),
+        columns[5]);
   }
 }

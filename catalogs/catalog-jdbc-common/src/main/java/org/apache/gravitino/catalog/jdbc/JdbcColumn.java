@@ -48,6 +48,7 @@ public class JdbcColumn extends BaseColumn {
       // by other ways(e.g. integration test), we still need to handle the null case.
       jdbcColumn.defaultValue = defaultValue == null ? DEFAULT_VALUE_NOT_SET : defaultValue;
       jdbcColumn.autoIncrement = autoIncrement;
+      jdbcColumn.auditInfo = auditInfo;
       return jdbcColumn;
     }
   }

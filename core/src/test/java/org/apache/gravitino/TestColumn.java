@@ -65,6 +65,7 @@ public class TestColumn extends BaseColumn {
       column.nullable = nullable;
       column.autoIncrement = autoIncrement;
       column.defaultValue = defaultValue;
+      column.auditInfo = auditInfo;
 
       return column;
     }
