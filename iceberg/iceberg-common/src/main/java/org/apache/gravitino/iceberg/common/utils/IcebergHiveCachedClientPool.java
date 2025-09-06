@@ -261,6 +261,6 @@ public class IcebergHiveCachedClientPool
   public void close() throws IOException {
     clientPoolCache.asMap().forEach((key, value) -> value.close());
     clientPoolCache.invalidateAll();
-    scheduledExecutorService.shutdownNow();
+    if (scheduledExecutorService != null) scheduledExecutorService.shutdownNow();
   }
 }
