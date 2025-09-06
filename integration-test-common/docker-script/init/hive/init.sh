@@ -19,4 +19,20 @@
 IP=$(hostname -I | awk '{print $1}')
 sed -i "s|<value>hdfs://__REPLACE__HOST_NAME:9000|<value>hdfs://${IP}:9000|g" ${HIVE_TMP_CONF_DIR}/hive-site.xml
 
-/bin/bash /usr/local/sbin/start.sh
+if [[ "$TRINO_CONNECTOR_TEST" == "true" ]]
+then
+  echo "Trino connector test will create Hive ACID table."
+  /bin/bash /usr/local/sbin/start.sh &
+  # wait Hive metastore server start
+  until (ps -ef | grep -q "HiveMetaStore") && \
+        (ss -tuln | grep -q ':9083'); do
+     sleep 3
+  done
+  # create Hive ACID table
+  hive -f /tmp/hive/init.sql
+  # persist the container
+  tail -f /dev/null
+else
+  /bin/bash /usr/local/sbin/start.sh
+fi
+
