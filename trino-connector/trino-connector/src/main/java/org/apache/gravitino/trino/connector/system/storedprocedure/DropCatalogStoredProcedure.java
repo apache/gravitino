@@ -97,7 +97,7 @@ public class DropCatalogStoredProcedure extends GravitinoStoredProcedure {
             GravitinoErrorCode.GRAVITINO_CATALOG_NOT_EXISTS,
             "Catalog " + NameIdentifier.of(metalake, catalogName) + " not exists.");
       }
-      catalogConnector.getMetalake().dropCatalog(catalogName, true);
+      catalogConnector.getMetalake().dropCatalog(catalogName, ignoreNotExist);
 
       catalogConnectorManager.loadMetalakeSync();
 
