@@ -21,7 +21,7 @@ from gravitino.api.table_change import TableChange
 
 
 class TestTableChange(unittest.TestCase):
-    def test_rename(self):
+    def test_table_change_rename(self):
         rename1, rename2 = (
             TableChange.rename(f"New table name {i + 1}") for i in range(2)
         )
@@ -31,7 +31,7 @@ class TestTableChange(unittest.TestCase):
         self.assertFalse(rename1 == "invalid_rename")
         self.assertTrue(rename1 == TableChange.rename("New table name 1"))
 
-    def test_update_comment(self):
+    def test_table_change_update_comment(self):
         new_comment1, new_comment2 = (
             TableChange.update_comment(f"New comment {i + 1}") for i in range(2)
         )
@@ -42,3 +42,20 @@ class TestTableChange(unittest.TestCase):
         self.assertFalse(new_comment1 == new_comment2)
         self.assertFalse(new_comment1 == "invalid_update_comment")
         self.assertTrue(new_comment1 == TableChange.update_comment("New comment 1"))
+
+    def test_table_change_set_property(self):
+        new_property1, new_property2 = (
+            TableChange.set_property(f"new_property_{i + 1}", str(i + 1))
+            for i in range(2)
+        )
+        self.assertEqual(new_property1.get_property(), "new_property_1")
+        self.assertEqual(new_property1.get_value(), "1")
+        self.assertEqual(
+            str(new_property1),
+            f"SETPROPERTY {new_property1.get_property()} {new_property1.get_value()}",
+        )
+        self.assertFalse(new_property1 == new_property2)
+        self.assertFalse(new_property1 == "invalid_set_property")
+        self.assertTrue(
+            new_property1 == TableChange.set_property("new_property_1", "1")
+        )
