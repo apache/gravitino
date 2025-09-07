@@ -16,6 +16,10 @@
 # under the License.
 
 from abc import ABC
+from dataclasses import dataclass, field
+from typing import final
+
+from dataclasses_json import config
 
 
 class TableChange(ABC):
@@ -24,3 +28,33 @@ class TableChange(ABC):
     The `TableChange` interface defines the public API for managing tables in a schema.
     If the catalog implementation supports tables, it must implement this interface.
     """
+
+    @staticmethod
+    def rename(new_name: str) -> "RenameTable":
+        """Create a `TableChange` for renaming a table.
+
+        Args:
+            new_name: The new table name.
+
+        Returns:
+            RenameTable: A `TableChange` for the rename.
+        """
+        return TableChange.RenameTable(new_name)
+
+    @final
+    @dataclass(frozen=True)
+    class RenameTable:
+        """A `TableChange` to rename a table."""
+
+        _new_name: str = field(metadata=config(field_name="new_name"))
+
+        def get_new_name(self) -> str:
+            """Retrieves the new name for the table.
+
+            Returns:
+                str: The new name of the table.
+            """
+            return self._new_name
+
+        def __str__(self):
+            return f"RENAMETABLE {self._new_name}"
