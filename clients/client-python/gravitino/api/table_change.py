@@ -41,6 +41,18 @@ class TableChange(ABC):
         """
         return TableChange.RenameTable(new_name)
 
+    @staticmethod
+    def update_comment(new_comment: str) -> "UpdateComment":
+        """Create a `TableChange` for updating the comment.
+
+        Args:
+            new_comment: The new comment.
+
+        Returns:
+            UpdateComment: A `TableChange` for the update.
+        """
+        return TableChange.UpdateComment(new_comment)
+
     @final
     @dataclass(frozen=True)
     class RenameTable:
@@ -58,3 +70,21 @@ class TableChange(ABC):
 
         def __str__(self):
             return f"RENAMETABLE {self._new_name}"
+
+    @final
+    @dataclass(frozen=True)
+    class UpdateComment:
+        """A `TableChange` to update a table's comment."""
+
+        _new_comment: str = field(metadata=config(field_name="new_comment"))
+
+        def get_new_comment(self) -> str:
+            """Retrieves the new comment for the table.
+
+            Returns:
+                str: The new comment of the table.
+            """
+            return self._new_comment
+
+        def __str__(self):
+            return f"UPDATECOMMENT {self._new_comment}"
