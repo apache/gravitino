@@ -53,6 +53,21 @@ class TableChange(ABC):
         """
         return TableChange.UpdateComment(new_comment)
 
+    @staticmethod
+    def set_property(property_name: str, value: str) -> "SetProperty":
+        """Create a `TableChange` for setting a table property.
+
+        If the property already exists, it will be replaced with the new value.
+
+        Args:
+            property_name (str): The property name.
+            value (str): The new property value.
+
+        Returns:
+            SetProperty: A `TableChange` for the addition.
+        """
+        return TableChange.SetProperty(property_name, value)
+
     @final
     @dataclass(frozen=True)
     class RenameTable:
@@ -88,3 +103,30 @@ class TableChange(ABC):
 
         def __str__(self):
             return f"UPDATECOMMENT {self._new_comment}"
+
+    @final
+    @dataclass(frozen=True)
+    class SetProperty:
+        """A `TableChange` to set a table property."""
+
+        _property: str = field(metadata=config(field_name="property"))
+        _value: str = field(metadata=config(field_name="value"))
+
+        def get_property(self) -> str:
+            """Retrieves the name of the property.
+
+            Returns:
+                str: The name of the property.
+            """
+            return self._property
+
+        def get_value(self) -> str:
+            """Retrieves the value of the property.
+
+            Returns:
+                str: The value of the property.
+            """
+            return self._value
+
+        def __str__(self):
+            return f"SETPROPERTY {self._property} {self._value}"
