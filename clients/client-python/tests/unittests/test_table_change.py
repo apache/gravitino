@@ -30,3 +30,15 @@ class TestTableChange(unittest.TestCase):
         self.assertFalse(rename1 == rename2)
         self.assertFalse(rename1 == "invalid_rename")
         self.assertTrue(rename1 == TableChange.rename("New table name 1"))
+
+    def test_update_comment(self):
+        new_comment1, new_comment2 = (
+            TableChange.update_comment(f"New comment {i + 1}") for i in range(2)
+        )
+        self.assertEqual(new_comment1.get_new_comment(), "New comment 1")
+        self.assertEqual(
+            str(new_comment1), f"UPDATECOMMENT {new_comment1.get_new_comment()}"
+        )
+        self.assertFalse(new_comment1 == new_comment2)
+        self.assertFalse(new_comment1 == "invalid_update_comment")
+        self.assertTrue(new_comment1 == TableChange.update_comment("New comment 1"))
