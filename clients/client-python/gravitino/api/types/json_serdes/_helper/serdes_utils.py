@@ -201,6 +201,22 @@ class SerdesUtils(SerdesUtilsBase):
         if varchar_matched:
             return Types.VarCharType.of(length=int(varchar_matched.group(1)))
 
+        time_matched = cls.TIME_PATTERN.match(type_string)
+        if time_matched:
+            return Types.TimeType.of(precision=int(time_matched.group(1)))
+
+        timestamp_matched = cls.TIMESTAMP_PATTERN.match(type_string)
+        if timestamp_matched:
+            return Types.TimestampType.without_time_zone(
+                precision=int(timestamp_matched.group(1))
+            )
+
+        timestamp_tz_matched = cls.TIMESTAMP_TZ_PATTERN.match(type_string)
+        if timestamp_tz_matched:
+            return Types.TimestampType.with_time_zone(
+                precision=int(timestamp_tz_matched.group(1))
+            )
+
         return Types.UnparsedType.of(type_string)
 
     @classmethod
