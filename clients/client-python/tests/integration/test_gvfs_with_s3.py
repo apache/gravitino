@@ -279,6 +279,7 @@ class TestGvfsWithS3(TestGvfsWithHDFS):
         )
 
         if fs.operations._enable_fileset_metadata_cache:
+            fs.operations._fileset_cache.clear()
             fs.operations._catalog_cache.clear()
 
         s3_fs = fs.operations._get_actual_filesystem(mkdir_dir, None)
