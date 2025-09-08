@@ -59,3 +59,13 @@ class TestTableChange(unittest.TestCase):
         self.assertTrue(
             new_property1 == TableChange.set_property("new_property_1", "1")
         )
+
+    def test_table_change_remove_property(self):
+        property1, property2 = (
+            TableChange.remove_property(f"property_{i + 1}") for i in range(2)
+        )
+        self.assertEqual(property1.get_property(), "property_1")
+        self.assertEqual(str(property1), f"REMOVEPROPERTY {property1.get_property()}")
+        self.assertFalse(property1 == property2)
+        self.assertFalse(property1 == "invalid_remove_property")
+        self.assertTrue(property1 == TableChange.remove_property("property_1"))
