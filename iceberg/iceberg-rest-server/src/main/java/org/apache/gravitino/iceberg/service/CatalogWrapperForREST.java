@@ -59,7 +59,8 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
           IcebergConstants.IO_IMPL,
           IcebergConstants.AWS_S3_REGION,
           IcebergConstants.ICEBERG_S3_ENDPOINT,
-          IcebergConstants.ICEBERG_OSS_ENDPOINT);
+          IcebergConstants.ICEBERG_OSS_ENDPOINT,
+          IcebergConstants.ICEBERG_S3_PATH_STYLE_ACCESS);
 
   @SuppressWarnings("deprecation")
   private static Map<String, String> deprecatedProperties =

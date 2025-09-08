@@ -184,5 +184,11 @@ public class TestDorisUtils {
         "CREATE TABLE `testTable` (\n`col1` date NOT NULL\n) ENGINE=OLAP\n PARTITION BY RANGE(`col1`)\n()\n DISTRIBUTED BY HASH(`col1`) BUCKETS AUTO";
     Distribution distribution2 = DorisUtils.extractDistributionInfoFromSql(createTableSqlWithAuto);
     assertEquals(distribution2.number(), -1);
+
+    String createTableSqlWithRandomAuto =
+        "CREATE TABLE `testTable` (\n`col1` date NOT NULL\n) ENGINE=OLAP\n PARTITION BY RANGE(`col1`)\n()\n DISTRIBUTED BY RANDOM BUCKETS AUTO";
+    Distribution distribution3 =
+        DorisUtils.extractDistributionInfoFromSql(createTableSqlWithRandomAuto);
+    assertEquals(distribution3.number(), -1);
   }
 }

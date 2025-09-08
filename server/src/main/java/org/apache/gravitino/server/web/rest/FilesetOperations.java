@@ -23,9 +23,6 @@ import static org.apache.gravitino.file.Fileset.LOCATION_NAME_UNKNOWN;
 import com.codahale.metrics.annotation.ResponseMetered;
 import com.codahale.metrics.annotation.Timed;
 import com.google.common.collect.ImmutableMap;
-import java.io.UnsupportedEncodingException;
-import java.net.URLDecoder;
-import java.nio.charset.StandardCharsets;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
@@ -44,7 +41,6 @@ import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.Response;
-import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
@@ -234,8 +230,7 @@ public class FilesetOperations {
       @PathParam("schema") @AuthorizationMetadata(type = Entity.EntityType.SCHEMA) String schema,
       @PathParam("fileset") @AuthorizationMetadata(type = Entity.EntityType.FILESET) String fileset,
       @QueryParam("sub_path") @DefaultValue("/") String subPath,
-      @QueryParam("location_name") String locationName)
-      throws UnsupportedEncodingException {
+      @QueryParam("location_name") String locationName) {
     LOG.info(
         "Received list files request: {}.{}.{}.{}, subPath: {}, locationName:{}",
         metalake,
@@ -245,15 +240,14 @@ public class FilesetOperations {
         subPath,
         locationName);
 
-    final String decodedSubPath =
-        StringUtils.isNotBlank(subPath)
-            ? URLDecoder.decode(subPath, StandardCharsets.UTF_8.name())
-            : subPath;
-
     try {
       return Utils.doAs(
           httpRequest,
           () -> {
+            int[] clientVersion = Utils.getClientVersion(httpRequest);
+            boolean isV1PlusClient = clientVersion == null || clientVersion[0] >= 1;
+            String decodedSubPath = isV1PlusClient ? subPath : RESTUtils.decodeString(subPath);
+
             NameIdentifier filesetIdent =
                 NameIdentifierUtil.ofFileset(metalake, catalog, schema, fileset);
             FileInfo[] files = dispatcher.listFiles(filesetIdent, locationName, decodedSubPath);
@@ -264,7 +258,7 @@ public class FilesetOperations {
                 catalog,
                 schema,
                 fileset,
-                subPath,
+                decodedSubPath,
                 locationName);
             return response;
           });
@@ -374,12 +368,20 @@ public class FilesetOperations {
         catalog,
         schema,
         fileset,
-        RESTUtils.decodeString(subPath),
-        Optional.ofNullable(locationName).map(RESTUtils::decodeString).orElse(null));
+        subPath,
+        locationName);
     try {
       return Utils.doAs(
           httpRequest,
           () -> {
+            int[] clientVersion = Utils.getClientVersion(httpRequest);
+            boolean isV1PlusClient = clientVersion == null || clientVersion[0] >= 1;
+            String decodedSubPath = isV1PlusClient ? subPath : RESTUtils.decodeString(subPath);
+            String decodedLocationName =
+                isV1PlusClient
+                    ? locationName
+                    : Optional.ofNullable(locationName).map(RESTUtils::decodeString).orElse(null);
+
             NameIdentifier ident = NameIdentifierUtil.ofFileset(metalake, catalog, schema, fileset);
             Map<String, String> filteredAuditHeaders = Utils.filterFilesetAuditHeaders(httpRequest);
             // set the audit info into the thread local context
@@ -389,10 +391,7 @@ public class FilesetOperations {
               CallerContext.CallerContextHolder.set(context);
             }
             String actualFileLocation =
-                dispatcher.getFileLocation(
-                    ident,
-                    RESTUtils.decodeString(subPath),
-                    Optional.ofNullable(locationName).map(RESTUtils::decodeString).orElse(null));
+                dispatcher.getFileLocation(ident, decodedSubPath, decodedLocationName);
             return Utils.ok(new FileLocationResponse(actualFileLocation));
           });
     } catch (Exception e) {

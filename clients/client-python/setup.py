@@ -36,7 +36,7 @@ setup(
     maintainer_email="dev@gravitino.apache.org",
     license="Apache-2.0",
     url="https://github.com/apache/gravitino",
-    python_requires=">=3.8",
+    python_requires=">=3.9",
     keywords="Data, AI, metadata, catalog",
     packages=find_packages(exclude=["tests*", "scripts*"]),
     project_urls={
@@ -49,7 +49,6 @@ setup(
     classifiers=[
         "License :: OSI Approved :: Apache Software License",
         "Operating System :: OS Independent",
-        "Programming Language :: Python :: 3.8",
         "Programming Language :: Python :: 3.9",
         "Programming Language :: Python :: 3.10",
         "Programming Language :: Python :: 3.11",
