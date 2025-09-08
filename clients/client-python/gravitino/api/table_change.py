@@ -68,6 +68,20 @@ class TableChange(ABC):
         """
         return TableChange.SetProperty(property_name, value)
 
+    @staticmethod
+    def remove_property(property_name: str) -> "RemoveProperty":
+        """Create a `TableChange` for removing a table property.
+
+        If the property does not exist, the change will succeed.
+
+        Args:
+            property_name (str): The property name.
+
+        Returns:
+            RemoveProperty: A `TableChange` for the addition.
+        """
+        return TableChange.RemoveProperty(property_name)
+
     @final
     @dataclass(frozen=True)
     class RenameTable:
@@ -130,3 +144,24 @@ class TableChange(ABC):
 
         def __str__(self):
             return f"SETPROPERTY {self._property} {self._value}"
+
+    @final
+    @dataclass(frozen=True)
+    class RemoveProperty:
+        """A `TableChange` to remove a table property.
+
+        If the property does not exist, the change should succeed.
+        """
+
+        _property: str = field(metadata=config(field_name="property"))
+
+        def get_property(self) -> str:
+            """Retrieves the name of the property to be removed from the table.
+
+            Returns:
+                str: The name of the property scheduled for removal.
+            """
+            return self._property
+
+        def __str__(self):
+            return f"REMOVEPROPERTY {self._property}"
