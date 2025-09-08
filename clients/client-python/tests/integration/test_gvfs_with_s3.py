@@ -278,7 +278,9 @@ class TestGvfsWithS3(TestGvfsWithHDFS):
             **self.conf,
         )
 
-        fs.operations._catalog_cache.clear()
+        # As #8254 introduces a switch to initialize cache for catalog, by default
+        # it's disabled, so here we don't need to clear the cache any more.
+        # fs.operations._catalog_cache.clear()
         s3_fs = fs.operations._get_actual_filesystem(mkdir_dir, None)
         config_kwargs = s3_fs.config_kwargs
         self.assertEqual("virtual", config_kwargs.get("s3").get("addressing_style"))
