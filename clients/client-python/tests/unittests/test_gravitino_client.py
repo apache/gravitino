@@ -34,7 +34,8 @@ class TestMetalake(unittest.TestCase):
             request_headers=expected_headers,
         )
         self.assertEqual(
-            expected_headers, gravitino_admin_client._rest_client.request_headers
+            expected_headers["k1"],
+            gravitino_admin_client._rest_client.request_headers["k1"],
         )
 
         gravitino_client = GravitinoClient(
@@ -43,7 +44,7 @@ class TestMetalake(unittest.TestCase):
             request_headers=expected_headers,
         )
         self.assertEqual(
-            expected_headers, gravitino_client._rest_client.request_headers
+            expected_headers["k1"], gravitino_client._rest_client.request_headers["k1"]
         )
 
     def test_gravitino_client_timeout(self, *mock_methods):

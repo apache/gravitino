@@ -32,12 +32,20 @@ import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.TableAlreadyExistsException;
 import org.apache.gravitino.rel.Column;
 
+/** Represents the command for creating a new table. */
 public class CreateTable extends Command {
+
+  /** The name of the metalake. */
   protected final String metalake;
+  /** The name of the catalog. */
   protected final String catalog;
+  /** The name of the schema. */
   protected final String schema;
+  /** The name of the table. */
   protected final String table;
+  /** The path of the file containing the CSV column info. */
   protected final String columnFile;
+  /** The table's comment. */
   protected final String comment;
 
   /**

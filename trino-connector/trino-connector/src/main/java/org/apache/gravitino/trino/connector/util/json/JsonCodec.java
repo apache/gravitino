@@ -52,8 +52,8 @@ import org.apache.gravitino.trino.connector.GravitinoConnectorPluginManager;
  * Provides functionality for handling various Trino-specific types and plugin classes.
  */
 public class JsonCodec {
-  private static ObjectMapper mapper;
-  private static Type jsonType;
+  private static volatile ObjectMapper mapper;
+  private static volatile Type jsonType;
 
   private static ObjectMapper buildMapper(ClassLoader classLoader) {
     try {

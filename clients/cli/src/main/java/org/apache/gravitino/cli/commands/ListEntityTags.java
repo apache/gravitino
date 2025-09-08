@@ -35,10 +35,12 @@ import org.apache.gravitino.messaging.Topic;
 import org.apache.gravitino.model.Model;
 import org.apache.gravitino.rel.Table;
 
-/* Lists all tags in a metalake. */
+/** Lists all tags in a metalake. */
 public class ListEntityTags extends Command {
 
+  /** The name of the metalake. */
   protected String metalake;
+  /** The name of the entity. */
   protected FullName name;
 
   /**

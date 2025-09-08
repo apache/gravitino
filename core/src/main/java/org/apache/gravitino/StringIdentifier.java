@@ -168,7 +168,8 @@ public class StringIdentifier {
       return String.format(STRING_COMMENT_FORMAT, "", STRING_COMMENT, stringId.toString());
     }
 
-    return String.format(STRING_COMMENT_FORMAT, comment + " ", STRING_COMMENT, stringId.toString());
+    return String.format(
+        STRING_COMMENT_FORMAT, comment.trim() + " ", STRING_COMMENT, stringId.toString());
   }
 
   public static StringIdentifier fromComment(String comment) {

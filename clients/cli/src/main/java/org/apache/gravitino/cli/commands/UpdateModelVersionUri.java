@@ -32,11 +32,17 @@ import org.apache.gravitino.model.ModelVersionChange;
 
 /** Update the uri of a model version. */
 public class UpdateModelVersionUri extends Command {
+  /** The metalake name. */
   protected final String metalake;
+  /** The catalog name. */
   protected final String catalog;
+  /** The schema name. */
   protected final String schema;
+  /** The model name. */
   protected final String model;
+  /** The version number. */
   protected final Integer version;
+
   private final String alias;
   private final String uri;
 

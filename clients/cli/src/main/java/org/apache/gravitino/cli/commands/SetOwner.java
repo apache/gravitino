@@ -29,12 +29,18 @@ import org.apache.gravitino.client.GravitinoClient;
 import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 
+/** Represents set the owner of an entity */
 public class SetOwner extends Command {
 
+  /** The name of the command. */
   protected final String metalake;
+  /** The name of the entity. */
   protected final String entity;
+  /** The type of the entity. */
   protected final MetadataObject.Type entityType;
+  /** The new owner. */
   protected final String owner;
+  /** True if the owner is a group, false if it is not. */
   protected final boolean isGroup;
 
   /**

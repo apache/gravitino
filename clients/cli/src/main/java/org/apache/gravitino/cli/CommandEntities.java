@@ -26,17 +26,29 @@ import java.util.HashSet;
  * Gravitino CLI. It also can validate if a given entity is a valid entity.
  */
 public class CommandEntities {
+  /** Represents the Metalake entity. */
   public static final String METALAKE = "metalake";
+  /** Represents the Catalog entity. */
   public static final String CATALOG = "catalog";
+  /** Represents the Schema entity. */
   public static final String SCHEMA = "schema";
+  /** Represents the Table entity. */
   public static final String TABLE = "table";
+  /** Represents the Column entity. */
   public static final String COLUMN = "column";
+  /** Represents the User entity. */
   public static final String USER = "user";
+  /** Represents the Group entity. */
   public static final String GROUP = "group";
+  /** Represents the Tag entity. */
   public static final String TAG = "tag";
+  /** Represents the Topic entity. */
   public static final String TOPIC = "topic";
+  /** Represents the Fileset entity. */
   public static final String FILESET = "fileset";
+  /** Represents the Role entity. */
   public static final String ROLE = "role";
+  /** Represents the Model entity. */
   public static final String MODEL = "model";
 
   private static final HashSet<String> VALID_ENTITIES = new HashSet<>();

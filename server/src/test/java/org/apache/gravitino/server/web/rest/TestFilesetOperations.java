@@ -43,6 +43,7 @@ import org.apache.gravitino.Audit;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.Version;
 import org.apache.gravitino.audit.CallerContext;
 import org.apache.gravitino.audit.FilesetAuditConstants;
 import org.apache.gravitino.audit.FilesetDataOperation;
@@ -82,6 +83,7 @@ public class TestFilesetOperations extends BaseOperationsTest {
     public HttpServletRequest get() {
       HttpServletRequest request = mock(HttpServletRequest.class);
       when(request.getRemoteUser()).thenReturn(null);
+      when(request.getHeader(Version.CLIENT_VERSION_HEADER)).thenReturn(null);
       return request;
     }
   }

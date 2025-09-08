@@ -34,6 +34,14 @@ Support for the following alter table operations:
 The Gravitino Trino connector supports most SELECT statements, allowing the execution of queries successfully.
 Currently, it doesn't support certain query optimizations, such as indexes and pushdowns.
 
+## Update
+
+Only `UPDATE` statements with constant assignments and predicates are supported. See also [UPDATE limitation](https://trino.io/docs/current/connector/mysql.html#update-limitation).
+
+## Delete
+
+If the `WHERE` clause is specified, only the matching rows are deleted. Otherwise, all rows from the table are deleted. See also [DELETE limitation](https://trino.io/docs/current/connector/mysql.html#delete-limitation).
+
 ## Table and Schema properties
 
 MySQL's schemas cannot support properties.
@@ -208,6 +216,19 @@ Insert data into the table `table_01` from select:
 
 ```sql
 INSERT INTO mysql_test.database_01.table_01 (name, salary) SELECT * FROM "test.mysql_test".database_01.table_01;
+```
+
+Update the table `table_01`:
+
+```sql
+UPDATE mysql_test.database_01.table_01 SET name = 'ice_update' WHERE salary = 12;
+```
+
+Delete the table `table_01`:
+
+```sql
+DELETE FROM mysql_test.database_01.table_01 WHERE salary = 12;
+DELETE FROM mysql_test.database_01.table_01;
 ```
 
 ### Querying data

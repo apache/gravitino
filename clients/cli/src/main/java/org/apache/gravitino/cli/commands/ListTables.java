@@ -30,6 +30,7 @@ import org.apache.gravitino.rel.TableCatalog;
 /** List the names of all tables in a schema. */
 public class ListTables extends TableCommand {
 
+  /** The name of the schema. */
   protected final String schema;
 
   /**

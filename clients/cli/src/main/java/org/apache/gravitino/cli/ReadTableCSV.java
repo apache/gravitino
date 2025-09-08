@@ -34,6 +34,7 @@ import org.apache.commons.csv.CSVParser;
 import org.apache.commons.csv.CSVRecord;
 import org.apache.gravitino.rel.Column;
 
+/** This class reads a CSV file and converts it to a list of columns. */
 public class ReadTableCSV {
 
   private enum ExpectedColumns {
@@ -56,6 +57,12 @@ public class ReadTableCSV {
     }
   }
 
+  /**
+   * Converts a CSV file to a list of columns.
+   *
+   * @param tableData a map of column names to lists of values
+   * @return a list of columns
+   */
   public Column[] columns(Map<String, List<String>> tableData) {
     List<String> names = tableData.get(ExpectedColumns.NAME.getName());
     List<String> datatypes = tableData.get(ExpectedColumns.DATATYPE.getName());
@@ -94,6 +101,12 @@ public class ReadTableCSV {
     return columns;
   }
 
+  /**
+   * Parses a CSV file and returns a map of column names to lists of values.
+   *
+   * @param csvFile the CSV file to parse
+   * @return a map of column names to lists of values
+   */
   public Map<String, List<String>> parse(String csvFile) {
 
     // Initialize a Map to store each column's values in a list
