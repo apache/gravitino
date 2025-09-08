@@ -91,17 +91,78 @@ class TestTypes(unittest.TestCase):
         self.assertEqual(instance.simple_string(), "date")
 
     def test_time_type(self):
+        # Test TimeType without precision
         instance: Types.TimeType = Types.TimeType.get()
         self.assertEqual(instance.name(), Name.TIME)
         self.assertEqual(instance.simple_string(), "time")
+        self.assertFalse(instance.has_precision_set())
+        self.assertEqual(
+            instance.precision(), Types.TimeType.DATE_TIME_PRECISION_NOT_SET
+        )
+
+        # Test TimeType with precision
+        time_with_precision = Types.TimeType.of(6)
+        self.assertEqual(time_with_precision.name(), Name.TIME)
+        self.assertEqual(time_with_precision.simple_string(), "time(6)")
+        self.assertTrue(time_with_precision.has_precision_set())
+        self.assertEqual(time_with_precision.precision(), 6)
+
+        # Test Precision Range Verification
+        with self.assertRaises(ValueError):
+            Types.TimeType.of(-1)
+        with self.assertRaises(ValueError):
+            Types.TimeType.of(13)
+
+        time_with_precision_2 = Types.TimeType.of(6)
+        self.assertEqual(time_with_precision, time_with_precision_2)
+        self.assertEqual(hash(time_with_precision), hash(time_with_precision_2))
+
+        time_different_precision = Types.TimeType.of(3)
+        self.assertNotEqual(time_with_precision, time_different_precision)
 
     def test_timestamp_type(self):
+        # Test TimestampType without precision
         instance_with_tz = Types.TimestampType.with_time_zone()
         instance_without_tz = Types.TimestampType.without_time_zone()
         self.assertTrue(instance_with_tz.has_time_zone())
         self.assertFalse(instance_without_tz.has_time_zone())
         self.assertEqual(instance_with_tz.simple_string(), "timestamp_tz")
         self.assertEqual(instance_without_tz.simple_string(), "timestamp")
+        self.assertFalse(instance_with_tz.has_precision_set())
+        self.assertFalse(instance_without_tz.has_precision_set())
+
+        # Test TimestampType with precision (with timezone)
+        timestamp_tz_with_precision = Types.TimestampType.with_time_zone(6)
+        self.assertTrue(timestamp_tz_with_precision.has_time_zone())
+        self.assertTrue(timestamp_tz_with_precision.has_precision_set())
+        self.assertEqual(timestamp_tz_with_precision.precision(), 6)
+        self.assertEqual(timestamp_tz_with_precision.simple_string(), "timestamp_tz(6)")
+
+        # Test TimestampType with precision (without timezone)
+        timestamp_with_precision = Types.TimestampType.without_time_zone(3)
+        self.assertFalse(timestamp_with_precision.has_time_zone())
+        self.assertTrue(timestamp_with_precision.has_precision_set())
+        self.assertEqual(timestamp_with_precision.precision(), 3)
+        self.assertEqual(timestamp_with_precision.simple_string(), "timestamp(3)")
+
+        # Test Precision Range Verification
+        with self.assertRaises(ValueError):
+            Types.TimestampType.with_time_zone(-1)
+        with self.assertRaises(ValueError):
+            Types.TimestampType.without_time_zone(13)
+
+        timestamp_tz_with_precision_2 = Types.TimestampType.with_time_zone(6)
+        self.assertEqual(timestamp_tz_with_precision, timestamp_tz_with_precision_2)
+        self.assertEqual(
+            hash(timestamp_tz_with_precision), hash(timestamp_tz_with_precision_2)
+        )
+
+        # Different precision or timezone should not be equal
+        timestamp_different_precision = Types.TimestampType.with_time_zone(3)
+        self.assertNotEqual(timestamp_tz_with_precision, timestamp_different_precision)
+
+        timestamp_different_tz = Types.TimestampType.without_time_zone(6)
+        self.assertNotEqual(timestamp_tz_with_precision, timestamp_different_tz)
 
     def test_interval_types(self):
         year_instance: Types.IntervalYearType = Types.IntervalYearType.get()
