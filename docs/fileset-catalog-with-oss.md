@@ -333,6 +333,7 @@ catalog_name = "your_oss_catalog"
 schema_name = "your_oss_schema"
 fileset_name = "your_oss_fileset"
 
+# JDK8 as follows, JDK17 will be slightly different, you need to add '--conf \"spark.driver.extraJavaOptions=--add-opens=java.base/sun.nio.ch=ALL-UNNAMED\" --conf \"spark.executor.extraJavaOptions=--add-opens=java.base/sun.nio.ch=ALL-UNNAMED\"' to the submit args.
 os.environ["PYSPARK_SUBMIT_ARGS"] = (
     "--jars /path/to/gravitino-aliyun-{gravitino-version}.jar,"
     "/path/to/gravitino-filesystem-hadoop3-runtime-{gravitino-version}.jar,"
