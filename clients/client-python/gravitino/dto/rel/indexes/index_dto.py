@@ -61,7 +61,7 @@ class IndexDTO(Index):
             return False
         return (
             self._index_type is other.type()
-            and self._name is other.name()
+            and self._name == other.name()
             and self._field_names == other.field_names()
         )
 
