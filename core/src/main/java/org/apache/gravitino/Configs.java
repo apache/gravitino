@@ -411,10 +411,18 @@ public class Configs {
   // Number of lock segments for cache concurrency optimization
   public static final ConfigEntry<Integer> CACHE_LOCK_SEGMENTS =
       new ConfigBuilder("gravitino.cache.lockSegments")
-          .doc("Number of lock segments for cache concurrency optimization.")
+          .doc(
+              "Number of lock segments for cache concurrency optimization. "
+                  + "This configuration controls the granularity of locking in the cache system. "
+                  + "Instead of using a single global lock, Gravitino uses Guava's Striped<Lock> "
+                  + "to divide locks into segments, allowing concurrent access to different cache "
+                  + "entries while maintaining thread safety. Higher values reduce lock contention "
+                  + "but increase memory overhead. The actual number of segments will be rounded "
+                  + "up to the nearest power of 2 for optimal performance. "
+                  + "See: https://github.com/google/guava/wiki/StripedExplained")
           .version(ConfigConstants.VERSION_1_0_0)
           .intConf()
-          .checkValue(value -> value > 0, "Lock segments must be positive")
+          .checkValue(value -> value > 0, "Lock segments must be positive.")
           .createWithDefault(16);
 
   public static final ConfigEntry<String> JOB_STAGING_DIR =

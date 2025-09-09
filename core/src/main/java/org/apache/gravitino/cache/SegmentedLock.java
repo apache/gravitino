@@ -84,12 +84,14 @@ public class SegmentedLock {
     Lock lock = getSegmentLock(key);
     try {
       lock.lockInterruptibly();
-      action.run();
+      try {
+        action.run();
+      } finally {
+        lock.unlock();
+      }
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
       throw new RuntimeException("Thread was interrupted while waiting for lock", e);
-    } finally {
-      lock.unlock();
     }
   }
 
@@ -108,12 +110,14 @@ public class SegmentedLock {
     Lock lock = getSegmentLock(key);
     try {
       lock.lockInterruptibly();
-      return action.get();
+      try {
+        return action.get();
+      } finally {
+        lock.unlock();
+      }
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
       throw new RuntimeException("Thread was interrupted while waiting for lock", e);
-    } finally {
-      lock.unlock();
     }
   }
 
@@ -134,12 +138,14 @@ public class SegmentedLock {
     Lock lock = getSegmentLock(key);
     try {
       lock.lockInterruptibly();
-      return action.get();
+      try {
+        return action.get();
+      } finally {
+        lock.unlock();
+      }
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
       throw new IllegalStateException("Thread was interrupted while waiting for lock", e);
-    } finally {
-      lock.unlock();
     }
   }
 
@@ -158,12 +164,14 @@ public class SegmentedLock {
     Lock lock = getSegmentLock(key);
     try {
       lock.lockInterruptibly();
-      action.run();
+      try {
+        action.run();
+      } finally {
+        lock.unlock();
+      }
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
       throw new IllegalStateException("Thread was interrupted while waiting for lock", e);
-    } finally {
-      lock.unlock();
     }
   }
 
@@ -188,32 +196,6 @@ public class SegmentedLock {
       }
     } finally {
       // Clear state first, then signal completion
-      globalOperationLatch.set(null);
-      latch.countDown();
-    }
-  }
-
-  /**
-   * Executes a global clearing operation with exclusive access to all segments and returns result.
-   *
-   * @param action The clearing action to execute
-   * @param <T> Result type
-   * @return Action result
-   */
-  public <T> T withGlobalLock(java.util.function.Supplier<T> action) {
-    // Create a new CountDownLatch for this operation
-    CountDownLatch latch = new CountDownLatch(1);
-
-    // Atomically set the latch, fail if another operation is already in progress
-    if (!globalOperationLatch.compareAndSet(null, latch)) {
-      throw new IllegalStateException("Global operation already in progress");
-    }
-
-    try {
-      synchronized (this) {
-        return action.get();
-      }
-    } finally {
       globalOperationLatch.set(null);
       latch.countDown();
     }

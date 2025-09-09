@@ -296,20 +296,6 @@ public class TestSegmentedLock {
   }
 
   @Test
-  void testGlobalClearing() {
-    SegmentedLock lock = new SegmentedLock(4);
-    AtomicInteger counter = new AtomicInteger(0);
-
-    // Test basic global clearing
-    lock.withGlobalLock(() -> counter.incrementAndGet());
-    assertEquals(1, counter.get());
-
-    // Test global clearing with return value
-    String result = lock.withGlobalLock(() -> "clearing result");
-    assertEquals("clearing result", result);
-  }
-
-  @Test
   void testGlobalClearingBlocksOtherOperations() throws InterruptedException {
     SegmentedLock lock = new SegmentedLock(4);
     AtomicInteger counter = new AtomicInteger(0);

@@ -116,6 +116,7 @@ public class TestStatisticManager {
     Mockito.when(config.get(Configs.CACHE_WEIGHER_ENABLED)).thenReturn(true);
     Mockito.when(config.get(Configs.CACHE_STATS_ENABLED)).thenReturn(false);
     Mockito.when(config.get(Configs.CACHE_IMPLEMENTATION)).thenReturn("caffeine");
+    Mockito.when(config.get(Configs.CACHE_LOCK_SEGMENTS)).thenReturn(16);
     Mockito.when(config.get(Configs.PARTITION_STATS_STORAGE_FACTORY_CLASS))
         .thenReturn(MemoryPartitionStatsStorageFactory.class.getCanonicalName());
 
