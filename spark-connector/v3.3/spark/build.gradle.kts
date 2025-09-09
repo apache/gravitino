@@ -37,6 +37,26 @@ val scalaJava8CompatVersion: String = libs.versions.scala.java.compat.get()
 val scalaCollectionCompatVersion: String = libs.versions.scala.collection.compat.get()
 val artifactName = "${rootProject.name}-spark-${sparkMajorVersion}_$scalaVersion"
 
+val excludedPackage = listOf("org/apache/gravitino/spark/connector/paimon/**", "org/apache/gravitino/spark/connector/integration/test/paimon/**")
+sourceSets {
+  main {
+    java {
+      srcDirs("src/main/java")
+      if (scalaVersion != "2.12") {
+        exclude(excludedPackage)
+      }
+    }
+  }
+  test {
+    java {
+      srcDirs("src/test/java")
+      if (scalaVersion != "2.12") {
+        exclude(excludedPackage)
+      }
+    }
+  }
+}
+
 dependencies {
   implementation(project(":spark-connector:spark-common"))
   if (scalaVersion == "2.12") {
@@ -88,7 +108,9 @@ dependencies {
   testImplementation(project(":spark-connector:spark-common", "testArtifacts")) {
     exclude("com.fasterxml.jackson")
   }
-  testImplementation(project(":spark-connector:spark-common_2.12", "testArtifacts"))
+  if (scalaVersion == "2.12") {
+    testImplementation(project(":spark-connector:spark-common_2.12", "testArtifacts"))
+  }
 
   testImplementation(libs.hive2.common) {
     exclude("com.sun.jersey")
