@@ -165,3 +165,95 @@ class TableChange(ABC):
 
         def __str__(self):
             return f"REMOVEPROPERTY {self._property}"
+
+    class ColumnPosition(ABC):
+        """The interface for all column positions.
+
+        Column positions are used to specify the position of a column when adding
+        a new column to a table.
+        """
+
+        @staticmethod
+        def first() -> "First":
+            """The first position of `ColumnPosition` instance.
+
+            Returns:
+                First:
+                    The first position of `ColumnPosition` instance.
+            """
+            return First()
+
+        @staticmethod
+        def after(column: str) -> "After":
+            """Returns the position after the given column.
+
+            Args:
+                column:
+                    The name of the reference column to place the new column after.
+
+            Returns:
+                After:
+                    The position after the given column.
+            """
+            return After(column)
+
+        @staticmethod
+        def default_pos() -> "Default":
+            """Returns the default position of `ColumnPosition` instance.
+
+            Returns:
+                Default:
+                    The default position of `ColumnPosition` instance.
+            """
+            return Default()
+
+
+@final
+@dataclass(frozen=True)
+class First(TableChange.ColumnPosition):
+    """Column position FIRST.
+
+    It means the specified column should be the first column. Note that, the specified column
+    may be a nested field, and then FIRST means this field should be the first one within the
+    struct.
+    """
+
+    def __str__(self):
+        return "FIRST"
+
+
+@final
+@dataclass(frozen=True)
+class After(TableChange.ColumnPosition):
+    """Column position AFTER
+
+    It means the specified column should be put after the given `column`.
+    Note that, the specified column may be a nested field, and then the given `column`
+    refers to a field in the same struct.
+    """
+
+    _column: str = field(metadata=config(field_name="column"))
+
+    def get_column(self) -> str:
+        """Retrieves the name of the reference column after which the specified column will be placed.
+
+        Returns:
+            str: The name of the reference column.
+        """
+        return self._column
+
+    def __str__(self):
+        return f"AFTER {self._column}"
+
+
+@final
+@dataclass(frozen=True)
+class Default(TableChange.ColumnPosition):
+    """Column position DEFAULT.
+
+    It means the position of the column was ignored by the user, and should be determined
+    by the catalog implementation.
+    """
+
+    def __str__(self):
+        return "DEFAULT"
