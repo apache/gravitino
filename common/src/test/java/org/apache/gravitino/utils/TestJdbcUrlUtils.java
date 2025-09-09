@@ -141,5 +141,13 @@ public class TestJdbcUrlUtils {
 
     Assertions.assertThrowsExactly(
         IllegalArgumentException.class, () -> JdbcUrlUtils.validateJdbcConfig(null, null, null));
+
+    Assertions.assertThrowsExactly(
+        IllegalArgumentException.class,
+        () -> JdbcUrlUtils.validateJdbcConfig("", "jdbc:postgresql://localhost:0000/test", null));
+
+    Assertions.assertThrowsExactly(
+        IllegalArgumentException.class,
+        () -> JdbcUrlUtils.validateJdbcConfig("testDriver", "", null));
   }
 }

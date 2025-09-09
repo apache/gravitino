@@ -24,6 +24,7 @@ import java.net.URLDecoder;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.exceptions.GravitinoRuntimeException;
 
 /**
@@ -69,8 +70,8 @@ public class JdbcUrlUtils {
    * @param all the JDBC configuration properties
    */
   public static void validateJdbcConfig(String driver, String url, Map<String, String> all) {
-    Preconditions.checkArgument(driver != null, "Driver class name cannot be null");
-    Preconditions.checkArgument(url != null, "JDBC URL cannot be null");
+    Preconditions.checkArgument(StringUtils.isNotBlank(driver), "Driver class name cannot be null");
+    Preconditions.checkArgument(StringUtils.isNotBlank(url), "JDBC URL cannot be null");
 
     String lowerUrl = url.toLowerCase();
     String decodedUrl = recursiveDecode(lowerUrl);
