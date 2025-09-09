@@ -70,8 +70,8 @@ public class JdbcUrlUtils {
    * @param all the JDBC configuration properties
    */
   public static void validateJdbcConfig(String driver, String url, Map<String, String> all) {
-    Preconditions.checkArgument(StringUtils.isNotBlank(driver), "Driver class name cannot be null");
-    Preconditions.checkArgument(StringUtils.isNotBlank(url), "JDBC URL cannot be null");
+    Preconditions.checkArgument(StringUtils.isNotBlank(driver), "Driver class name can't be blank");
+    Preconditions.checkArgument(StringUtils.isNotBlank(url), "JDBC URL can't be blank");
 
     String lowerUrl = url.toLowerCase();
     String decodedUrl = recursiveDecode(lowerUrl);
