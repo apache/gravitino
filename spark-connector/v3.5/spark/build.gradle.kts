@@ -211,3 +211,7 @@ tasks.clean {
   delete("metastore_db")
   delete("spark-warehouse")
 }
+
+tasks.named<Jar>("sourcesJar") {
+  duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+}

@@ -23,6 +23,10 @@ plugins {
   alias(libs.plugins.shadow)
 }
 
+tasks.named<Jar>("sourcesJar") {
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+}
+
 repositories {
   mavenCentral()
 }
@@ -59,9 +63,6 @@ sourceSets {
 
 dependencies {
   implementation(project(":spark-connector:spark-common"))
-  if (scalaVersion == "2.12") {
-    implementation(project(":spark-connector:spark-common_2.12"))
-  }
   compileOnly("org.apache.kyuubi:kyuubi-spark-connector-hive_$scalaVersion:$kyuubiVersion")
   compileOnly("org.apache.spark:spark-catalyst_$scalaVersion:$sparkVersion") {
     exclude("com.fasterxml.jackson")
@@ -107,9 +108,6 @@ dependencies {
   }
   testImplementation(project(":spark-connector:spark-common", "testArtifacts")) {
     exclude("com.fasterxml.jackson")
-  }
-  if (scalaVersion == "2.12") {
-    testImplementation(project(":spark-connector:spark-common_2.12", "testArtifacts"))
   }
 
   testImplementation(libs.hive2.common) {
