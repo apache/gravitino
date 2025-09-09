@@ -69,3 +69,16 @@ class TestTableChange(unittest.TestCase):
         self.assertFalse(property1 == property2)
         self.assertFalse(property1 == "invalid_remove_property")
         self.assertTrue(property1 == TableChange.remove_property("property_1"))
+
+    def test_column_position(self):
+        first = TableChange.ColumnPosition.first()
+        after = TableChange.ColumnPosition.after("column")
+        default_pos = TableChange.ColumnPosition.default_pos()
+
+        self.assertIsInstance(first, TableChange.ColumnPosition)
+        self.assertIsInstance(after, TableChange.ColumnPosition)
+        self.assertIsInstance(default_pos, TableChange.ColumnPosition)
+        self.assertEqual(after.get_column(), "column")
+        self.assertEqual(str(first), "FIRST")
+        self.assertEqual(str(after), "AFTER column")
+        self.assertEqual(str(default_pos), "DEFAULT")
