@@ -84,9 +84,23 @@ sed -i".tmp1" 's/version = .*$/version = '"$RELEASE_VERSION"'/g' gradle.properti
 sed -i".tmp2" 's/    version=.*$/    version="'"$PYGRAVITINO_RELEASE_VERSION"'",/g' clients/client-python/setup.py
 sed -i".tmp3" 's/^version = .*$/version = \"'"$RELEASE_VERSION"'\"/g' clients/filesystem-fuse/Cargo.toml
 sed -i".tmp4" 's/^appVersion: .*$/appVersion: '"$RELEASE_VERSION"'/g' dev/charts/gravitino/Chart.yaml
-sed -i".tmp5" '34s/  tag: .*$/  tag: '"$RELEASE_VERSION"'/g' dev/charts/gravitino/values.yaml
+
+if [[ $(sed -n '34p' dev/charts/gravitino/values.yaml) =~ ^"  tag: " ]]; then
+  sed -i".tmp5" '34s/  tag: .*$/  tag: '"$RELEASE_VERSION"'/g' dev/charts/gravitino/values.yaml
+else
+  echo "Error: Could not find 'tag:' in line 34 of dev/charts/gravitino/values.yaml"
+  exit 1
+fi
+
 sed -i".tmp6" 's/^appVersion: .*$/appVersion: '"$RELEASE_VERSION"'/g' dev/charts/gravitino-iceberg-rest-server/Chart.yaml
-sed -i".tmp7" '24s/  tag: .*$/  tag: '"$RELEASE_VERSION"'/g' dev/charts/gravitino-iceberg-rest-server/values.yaml
+
+if [[ $(sed -n '24p' dev/charts/gravitino-iceberg-rest-server/values.yaml) =~ ^"  tag: " ]]; then
+  sed -i".tmp7" '24s/  tag: .*$/  tag: '"$RELEASE_VERSION"'/g' dev/charts/gravitino-iceberg-rest-server/values.yaml
+else
+  echo "Error: Could not find 'tag:' in line 24 of dev/charts/gravitino-iceberg-rest-server/values.yaml"
+  exit 1
+fi
+
 sed -i".tmp8" 's/^version = .*$/version = "'"$PYGRAVITINO_RELEASE_VERSION"'"/g' mcp-server/pyproject.toml
 
 CHART_VERSION=$(grep -e '^version: .*' dev/charts/gravitino/Chart.yaml | cut -d':' -f2 | sed 's/^ *//;s/ *$//')
