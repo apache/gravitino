@@ -103,12 +103,11 @@ public class GravitinoDriverPlugin implements DriverPlugin {
         conf.getBoolean(GravitinoSparkConfig.GRAVITINO_ENABLE_ICEBERG_SUPPORT, false);
     this.enablePaimonSupport =
         conf.getBoolean(GravitinoSparkConfig.GRAVITINO_ENABLE_PAIMON_SUPPORT, false);
-    if (enableIcebergSupport) {
-      gravitinoDriverExtensions.addAll(gravitinoIcebergExtensions);
-    }
-
     if (enablePaimonSupport) {
       gravitinoDriverExtensions.addAll(gravitinoPaimonExtensions);
+    }
+    if (enableIcebergSupport) {
+      gravitinoDriverExtensions.addAll(gravitinoIcebergExtensions);
     }
 
     this.catalogManager =
