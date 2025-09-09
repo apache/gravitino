@@ -25,7 +25,6 @@ import java.util.Map;
 import org.apache.gravitino.spark.connector.integration.test.SparkCommonIT;
 import org.apache.gravitino.spark.connector.integration.test.util.SparkTableInfo;
 import org.apache.gravitino.spark.connector.integration.test.util.SparkTableInfoChecker;
-import org.apache.gravitino.spark.connector.paimon.PaimonPropertiesConstants;
 import org.apache.hadoop.fs.Path;
 import org.apache.spark.sql.types.DataTypes;
 import org.junit.jupiter.api.Assertions;
@@ -89,7 +88,7 @@ public abstract class SparkPaimonCatalogIT extends SparkCommonIT {
   @Override
   protected String getTableLocation(SparkTableInfo table) {
     Map<String, String> tableProperties = table.getTableProperties();
-    return tableProperties.get(PaimonPropertiesConstants.PAIMON_TABLE_LOCATION);
+    return tableProperties.get("path");
   }
 
   @Test

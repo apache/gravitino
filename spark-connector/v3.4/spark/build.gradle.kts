@@ -39,6 +39,9 @@ val artifactName = "${rootProject.name}-spark-${sparkMajorVersion}_$scalaVersion
 
 dependencies {
   implementation(project(":spark-connector:spark-common"))
+  if (scalaVersion == "2.12") {
+    implementation(project(":spark-connector:spark-common_2.12"))
+  }
   compileOnly("org.apache.kyuubi:kyuubi-spark-connector-hive_$scalaVersion:$kyuubiVersion")
   compileOnly("org.apache.spark:spark-catalyst_$scalaVersion:$sparkVersion") {
     exclude("com.fasterxml.jackson")
@@ -86,6 +89,7 @@ dependencies {
   testImplementation(project(":spark-connector:spark-common", "testArtifacts")) {
     exclude("com.fasterxml.jackson")
   }
+  testImplementation(project(":spark-connector:spark-common_2.12", "testArtifacts"))
 
   testImplementation(libs.hive2.common) {
     exclude("com.sun.jersey")
