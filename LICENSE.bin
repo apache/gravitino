@@ -382,10 +382,7 @@
    Lance
    JCasbin
    OGNL
-   Apache Flink
-   Apache Flink JDBC
    Google FlatBuffers
-   Google FindBugs
    IPAddress
 
    This product bundles various third-party components also under the
@@ -494,3 +491,5 @@
 
    AOP Alliance
    XZ For Java
+   HdrHistogram
+   LatencyUtils
