@@ -36,7 +36,7 @@ import org.apache.ibatis.annotations.Param;
 public class PolicyMetadataObjectRelPostgreSQLProvider
     extends PolicyMetadataObjectRelBaseSQLProvider {
   private static final String DELETED_AT_NOW_EXPRESSION =
-      " floor(extract(epoch from((current_timestamp - timestamp '1970-01-01 00:00:00')*1000))) ";
+      " floor(extract(epoch from(current_timestamp - timestamp '1970-01-01 00:00:00')) * 1000)";
 
   @Override
   public String softDeletePolicyMetadataObjectRelsByMetalakeAndPolicyName(

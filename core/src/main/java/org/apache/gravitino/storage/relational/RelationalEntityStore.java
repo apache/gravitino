@@ -216,8 +216,9 @@ public class RelationalEntityStore
             return entities.get();
           }
 
+          // Use allFields=true to cache complete entities
           List<E> backendEntities =
-              backend.listEntitiesByRelation(relType, nameIdentifier, identType, allFields);
+              backend.listEntitiesByRelation(relType, nameIdentifier, identType, true);
 
           cache.put(nameIdentifier, identType, relType, backendEntities);
 

@@ -40,4 +40,4 @@ maintainers:
 name: gravitino
 sources:
   - https://github.com/apache/gravitino
-version: 1.0.2
+version: 1.0.3

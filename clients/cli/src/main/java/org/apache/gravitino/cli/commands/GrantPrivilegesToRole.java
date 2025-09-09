@@ -36,9 +36,13 @@ import org.apache.gravitino.exceptions.NoSuchRoleException;
 /** Grants one or more privileges. */
 public class GrantPrivilegesToRole extends MetadataCommand {
 
+  /** The name of the metalake. */
   protected final String metalake;
+  /** The name of the role. */
   protected final String role;
+  /** The full name of the entity. */
   protected final FullName entity;
+  /** The list of privileges. */
   protected final String[] privileges;
 
   /**

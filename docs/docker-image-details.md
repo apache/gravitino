@@ -20,6 +20,9 @@ docker run --rm -d -p 8090:8090 -p 9001:9001 apache/gravitino:0.7.0-incubating
 Changelog
 
 
+- apache/gravitino:1.0.0
+  - Based on Gravitino 1.0.0, you can know more information from 1.0.0 [release notes](https://github.com/apache/gravitino/releases/tag/v1.0.0).
+
 - apache/gravitino:0.9.1
   - Based on Gravitino 0.9.1, you can know more information from 0.9.1 [release notes](https://github.com/apache/gravitino/releases/tag/v0.9.1).
 
@@ -69,6 +72,10 @@ docker run --rm -d -p 9001:9001 apache/gravitino-iceberg-rest:0.7.0-incubating
 ```
 
 Changelog
+- apache/gravitino-iceberg-rest:1.0.0
+  - Upgrade Iceberg version to 1.9
+  - Supports to specify the catalog name using warehouse parameter
+
 - apache/gravitino-iceberg-rest:0.9.1
   - Fix the issue that Iceberg REST server fail to start when enabling OAuth.
   - Add the documents for the StarRocks and Apache Doris using IRC
@@ -139,6 +146,9 @@ Changelog
 
 Changelog
 
+
+- apache/gravitino-playground:trino-435-gravitino-1.0.0
+  - Use Gravitino release 1.0.0 Dockerfile to build the image.
 
 - apache/gravitino-playground:trino-435-gravitino-0.9.1
   - Use Gravitino release 0.9.1 Dockerfile to build the image.

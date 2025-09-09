@@ -29,10 +29,8 @@ dependencies {
   compileOnly(libs.hadoop3.client.api)
   compileOnly(libs.hadoop3.client.runtime)
   compileOnly(libs.hadoop3.gcs)
+  compileOnly(project(":common"))
 
-  implementation(project(":common")) {
-    exclude("*")
-  }
   implementation(project(":catalogs:catalog-common")) {
     exclude("*")
   }
@@ -47,6 +45,7 @@ dependencies {
 
   testImplementation(project(":api"))
   testImplementation(project(":core"))
+  testImplementation(project(":common"))
   testImplementation(libs.junit.jupiter.api)
   testImplementation(libs.junit.jupiter.params)
   testRuntimeOnly(libs.junit.jupiter.engine)
@@ -62,17 +61,13 @@ tasks.withType(ShadowJar::class.java) {
   }
 
   // Relocate dependencies to avoid conflicts
-  relocate("com.fasterxml", "org.apache.gravitino.gcp.shaded.com.fasterxml")
   relocate("com.google.api", "org.apache.gravitino.gcp.shaded.com.google.api")
   relocate("com.google.auth", "org.apache.gravitino.gcp.shaded.com.google.auth")
   relocate("com.google.auto", "org.apache.gravitino.gcp.shaded.com.google.auto")
   relocate("com.google.common", "org.apache.gravitino.gcp.shaded.com.google.common")
   relocate("com.google.errorprone", "org.apache.gravitino.gcp.shaded.com.google.errorprone")
   relocate("com.google.gson", "org.apache.gravitino.gcp.shaded.com.google.gson")
-  relocate("com.google.iam", "org.apache.gravitino.gcp.shaded.com.google.iam")
   relocate("com.google.j2objc", "org.apache.gravitino.gcp.shaded.com.google.j2objc")
-  relocate("com.google.longrunning", "org.apache.gravitino.gcp.shaded.com.google.longrunning")
-  relocate("com.google.protobuf", "org.apache.gravitino.gcp.shaded.com.google.protobuf")
   relocate("com.google.thirdparty", "org.apache.gravitino.gcp.shaded.com.google.thirdparty")
   relocate("io.grpc", "org.apache.gravitino.gcp.shaded.io.grpc")
   relocate("io.opencensus", "org.apache.gravitino.gcp.shaded.io.opencensus")
@@ -80,7 +75,6 @@ tasks.withType(ShadowJar::class.java) {
   relocate("org.apache.http", "org.apache.gravitino.gcp.shaded.org.apache.http")
   relocate("org.apache.httpcomponents", "org.apache.gravitino.gcp.shaded.org.apache.httpcomponents")
   relocate("org.checkerframework", "org.apache.gravitino.gcp.shaded.org.checkerframework")
-  relocate("org.eclipse.jetty", "org.apache.gravitino.gcp.shaded.org.eclipse.jetty")
 
   mergeServiceFiles()
 }

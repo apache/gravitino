@@ -32,9 +32,13 @@ import org.apache.gravitino.file.Fileset;
 /** List the properties of a fileset. */
 public class ListFilesetProperties extends ListProperties {
 
+  /** The name of the metalake. */
   protected final String metalake;
+  /** The name of the catalog. */
   protected final String catalog;
+  /** The name of the schema. */
   protected final String schema;
+  /** The name of the fileset. */
   protected final String fileset;
 
   /**

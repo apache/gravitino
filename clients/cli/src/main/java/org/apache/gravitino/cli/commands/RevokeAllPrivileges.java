@@ -40,8 +40,11 @@ import org.apache.gravitino.exceptions.NoSuchRoleException;
 /** Revokes all privileges from a role to an entity or all entities. */
 public class RevokeAllPrivileges extends MetadataCommand {
 
+  /** The name of the metalake. */
   protected final String metalake;
+  /** The name of the role. */
   protected final String role;
+  /** The full name of the entity. */
   protected final FullName entity;
 
   /**

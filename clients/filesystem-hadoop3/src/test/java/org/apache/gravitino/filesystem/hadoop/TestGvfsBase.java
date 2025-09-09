@@ -331,7 +331,7 @@ public class TestGvfsBase extends GravitinoMockServerBase {
       // test proxied local fs, should not get the same fs
       FileLocationResponse fileLocationResponse = new FileLocationResponse(localPath.toString());
       Map<String, String> queryParams = new HashMap<>();
-      queryParams.put("sub_path", RESTUtils.encodeString(""));
+      queryParams.put("sub_path", "");
       buildMockResource(Method.GET, locationPath, queryParams, null, fileLocationResponse, SC_OK);
       buildMockResourceForCredential(filesetName, localPath.toString());
 
@@ -375,7 +375,7 @@ public class TestGvfsBase extends GravitinoMockServerBase {
     try (FileSystem fs = filesetPath1.getFileSystem(configuration1)) {
       FileLocationResponse fileLocationResponse = new FileLocationResponse(localPath1.toString());
       Map<String, String> queryParams = new HashMap<>();
-      queryParams.put("sub_path", RESTUtils.encodeString(""));
+      queryParams.put("sub_path", "");
       buildMockResource(Method.GET, locationPath1, queryParams, null, fileLocationResponse, SC_OK);
       buildMockResourceForCredential("fileset1", localPath1.toString());
       FileSystemTestUtils.mkdirs(filesetPath1, fs);
@@ -432,7 +432,7 @@ public class TestGvfsBase extends GravitinoMockServerBase {
           ImmutableMap.of(PROPERTY_DEFAULT_LOCATION_NAME, "location1"));
       FileLocationResponse fileLocationResponse = new FileLocationResponse(localPath + "/test.txt");
       Map<String, String> queryParams = new HashMap<>();
-      queryParams.put("sub_path", RESTUtils.encodeString("/test.txt"));
+      queryParams.put("sub_path", "/test.txt");
       buildMockResource(Method.GET, locationPath, queryParams, null, fileLocationResponse, SC_OK);
       buildMockResourceForCredential(filesetName, localPath + "/test.txt");
 
@@ -488,7 +488,7 @@ public class TestGvfsBase extends GravitinoMockServerBase {
       // test managed fileset append
       FileLocationResponse fileLocationResponse = new FileLocationResponse(localPath + "/test.txt");
       Map<String, String> queryParams = new HashMap<>();
-      queryParams.put("sub_path", RESTUtils.encodeString("/test.txt"));
+      queryParams.put("sub_path", "/test.txt");
       buildMockResource(Method.GET, locationPath, queryParams, null, fileLocationResponse, SC_OK);
       buildMockResourceForCredential(filesetName, localPath + "/test.txt");
 
@@ -550,13 +550,13 @@ public class TestGvfsBase extends GravitinoMockServerBase {
       FileLocationResponse fileLocationResponse =
           new FileLocationResponse(localPath + "/rename_src");
       Map<String, String> queryParams = new HashMap<>();
-      queryParams.put("sub_path", RESTUtils.encodeString("/rename_src"));
+      queryParams.put("sub_path", "/rename_src");
       buildMockResource(Method.GET, locationPath, queryParams, null, fileLocationResponse, SC_OK);
 
       FileLocationResponse fileLocationResponse1 =
           new FileLocationResponse(localPath + "/rename_dst2");
       Map<String, String> queryParams1 = new HashMap<>();
-      queryParams1.put("sub_path", RESTUtils.encodeString("/rename_dst2"));
+      queryParams1.put("sub_path", "/rename_dst2");
       buildMockResource(Method.GET, locationPath, queryParams1, null, fileLocationResponse1, SC_OK);
       buildMockResourceForCredential(filesetName, localPath + "/rename_dst2");
 
@@ -627,7 +627,7 @@ public class TestGvfsBase extends GravitinoMockServerBase {
       FileLocationResponse fileLocationResponse =
           new FileLocationResponse(localPath + "/test_delete");
       Map<String, String> queryParams = new HashMap<>();
-      queryParams.put("sub_path", RESTUtils.encodeString("/test_delete"));
+      queryParams.put("sub_path", "/test_delete");
       buildMockResource(Method.GET, locationPath, queryParams, null, fileLocationResponse, SC_OK);
       buildMockResourceForCredential(filesetName, localPath + "/test_delete");
 
@@ -674,7 +674,7 @@ public class TestGvfsBase extends GravitinoMockServerBase {
 
       FileLocationResponse fileLocationResponse = new FileLocationResponse(localPath.toString());
       Map<String, String> queryParams = new HashMap<>();
-      queryParams.put("sub_path", RESTUtils.encodeString(""));
+      queryParams.put("sub_path", "");
       buildMockResource(Method.GET, locationPath, queryParams, null, fileLocationResponse, SC_OK);
       buildMockResourceForCredential(filesetName, localPath.toString());
 
@@ -719,7 +719,7 @@ public class TestGvfsBase extends GravitinoMockServerBase {
 
       FileLocationResponse fileLocationResponse = new FileLocationResponse(localPath.toString());
       Map<String, String> queryParams = new HashMap<>();
-      queryParams.put("sub_path", RESTUtils.encodeString(""));
+      queryParams.put("sub_path", "");
       buildMockResource(Method.GET, locationPath, queryParams, null, fileLocationResponse, SC_OK);
       buildMockResourceForCredential(filesetName, localPath.toString());
 
@@ -770,7 +770,7 @@ public class TestGvfsBase extends GravitinoMockServerBase {
       FileLocationResponse fileLocationResponse =
           new FileLocationResponse(localPath + "/test_mkdirs");
       Map<String, String> queryParams = new HashMap<>();
-      queryParams.put("sub_path", RESTUtils.encodeString("/test_mkdirs"));
+      queryParams.put("sub_path", "/test_mkdirs");
       buildMockResource(Method.GET, locationPath, queryParams, null, fileLocationResponse, SC_OK);
       buildMockResourceForCredential(filesetName, localPath + "/test_mkdirs");
 
@@ -896,7 +896,7 @@ public class TestGvfsBase extends GravitinoMockServerBase {
 
       FileLocationResponse fileLocationResponse = new FileLocationResponse(localPath.toString());
       Map<String, String> queryParams = new HashMap<>();
-      queryParams.put("sub_path", RESTUtils.encodeString(""));
+      queryParams.put("sub_path", "");
       buildMockResource(Method.GET, locationPath, queryParams, null, fileLocationResponse, SC_OK);
       buildMockResourceForCredential(filesetName, localPath.toString());
 
@@ -921,7 +921,7 @@ public class TestGvfsBase extends GravitinoMockServerBase {
 
       FileLocationResponse fileLocationResponse = new FileLocationResponse(localPath.toString());
       Map<String, String> queryParams = new HashMap<>();
-      queryParams.put("sub_path", RESTUtils.encodeString(""));
+      queryParams.put("sub_path", "");
       buildMockResource(Method.GET, locationPath, queryParams, null, fileLocationResponse, SC_OK);
       buildMockResourceForCredential(filesetName, localPath.toString());
 
@@ -965,7 +965,7 @@ public class TestGvfsBase extends GravitinoMockServerBase {
         (GravitinoVirtualFileSystem) managedFilesetPath.getFileSystem(conf)) {
 
       Map<String, String> queryParams = new HashMap<>();
-      queryParams.put("sub_path", RESTUtils.encodeString(""));
+      queryParams.put("sub_path", "");
       ErrorResponse errResp =
           ErrorResponse.notFound(NoSuchFilesetException.class.getSimpleName(), "fileset not found");
       buildMockResource(Method.GET, locationPath, queryParams, null, errResp, SC_NOT_FOUND);

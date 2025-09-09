@@ -32,8 +32,11 @@ import org.apache.gravitino.exceptions.NoSuchUserException;
 
 /** Removes all roles from a group or user. */
 public class RemoveAllRoles extends Command {
+  /** The name of the metalake. */
   protected final String metalake;
+  /** The name of the group or user. */
   protected final String entity;
+  /** The type of the entity (group or user). */
   protected final String entityType;
 
   /**
