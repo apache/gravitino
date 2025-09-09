@@ -1133,4 +1133,43 @@ public class TestOceanBaseTableOperations extends TestOceanBase {
         operationsWithOceanBaseDriver.calculateDatetimePrecision("TIME", 10, 0),
         "TIME type should return precision for OceanBase driver");
   }
+
+  @Test
+  public void testAlterTableSkipsEmptySql() {
+    String tableName = RandomStringUtils.randomAlphabetic(16).toLowerCase() + "_skip_empty_sql";
+    List<JdbcColumn> columns = new ArrayList<>();
+    columns.add(
+        JdbcColumn.builder()
+            .withName("col_1")
+            .withType(Types.IntegerType.get())
+            .withNullable(false)
+            .build());
+
+    // Create table
+    TABLE_OPERATIONS.create(
+        TEST_DB_NAME,
+        tableName,
+        columns.toArray(new JdbcColumn[0]),
+        "test_table",
+        Collections.emptyMap(),
+        null,
+        Distributions.NONE,
+        Indexes.EMPTY_INDEXES);
+
+    // Alter table with one valid change and one empty SQL change
+    TableChange validChange = TableChange.updateColumnComment(new String[] {"col_1"}, "Updated comment");
+    TableChange emptyChange = new TableChange() {
+        @Override
+        public String toString() {
+            return "EmptyChange";
+        }
+    };
+
+    Assertions.assertDoesNotThrow(() ->
+        TABLE_OPERATIONS.alterTable(TEST_DB_NAME, tableName, emptyChange, validChange));
+
+    // Verify the valid change was applied
+    JdbcTable table = TABLE_OPERATIONS.load(TEST_DB_NAME, tableName);
+    Assertions.assertEquals("Updated comment", table.columns()[0].comment());
+  }
 }
