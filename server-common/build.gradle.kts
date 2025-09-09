@@ -45,6 +45,7 @@ dependencies {
   implementation(libs.jackson.databind)
   implementation(libs.jcasbin) {
     exclude(group = "com.fasterxml.jackson.core", module = "jackson-databind")
+    exclude(group = "org.slf4j", module = "slf4j-api")
   }
   implementation(libs.ognl)
   implementation(libs.prometheus.servlet)
