@@ -1157,16 +1157,18 @@ public class TestOceanBaseTableOperations extends TestOceanBase {
         Indexes.EMPTY_INDEXES);
 
     // Alter table with one valid change and one empty SQL change
-    TableChange validChange = TableChange.updateColumnComment(new String[] {"col_1"}, "Updated comment");
-    TableChange emptyChange = new TableChange() {
-        @Override
-        public String toString() {
+    TableChange validChange =
+        TableChange.updateColumnComment(new String[] {"col_1"}, "Updated comment");
+    TableChange emptyChange =
+        new TableChange() {
+          @Override
+          public String toString() {
             return "EmptyChange";
-        }
-    };
+          }
+        };
 
-    Assertions.assertDoesNotThrow(() ->
-        TABLE_OPERATIONS.alterTable(TEST_DB_NAME, tableName, emptyChange, validChange));
+    Assertions.assertDoesNotThrow(
+        () -> TABLE_OPERATIONS.alterTable(TEST_DB_NAME, tableName, emptyChange, validChange));
 
     // Verify the valid change was applied
     JdbcTable table = TABLE_OPERATIONS.load(TEST_DB_NAME, tableName);
