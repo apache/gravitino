@@ -379,6 +379,14 @@
    npgall concurrent-trees
    reyerizo jcstress-gradle-plugin
    melix jmh-gradle-plugin
+   Lance
+   JCasbin
+   OGNL
+   Apache Flink
+   Apache Flink JDBC
+   Google FlatBuffers
+   Google FindBugs
+   IPAddress
 
    This product bundles various third-party components also under the
    Apache Software Foundation License 1.1
