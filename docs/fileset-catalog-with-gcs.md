@@ -297,12 +297,12 @@ Or use the bundle jar with Hadoop environment if there is no Hadoop environment:
 
 ### Using Spark to access the fileset
 
-The following code snippet shows how to use **PySpark 3.1.3 with Hadoop environment(Hadoop 3.2.0)** and JDK8 to access the fileset:
+The following code snippet shows how to use **PySpark 3.5.0 with Hadoop environment(Hadoop 3.3.4)** to access the fileset:
 
 Before running the following code, you need to install required packages:
 
 ```bash
-pip install pyspark==3.1.3
+pip install pyspark==3.5.0
 pip install apache-gravitino==${GRAVITINO_VERSION}
 ```
 Then you can run the following code:
@@ -318,10 +318,8 @@ catalog_name = "your_gcs_catalog"
 schema_name = "your_gcs_schema"
 fileset_name = "your_gcs_fileset"
 
-# JDK8
+# JDK8 as follows, JDK17 will be slightly different, you need to add '--conf \"spark.driver.extraJavaOptions=--add-opens=java.base/sun.nio.ch=ALL-UNNAMED\" --conf \"spark.executor.extraJavaOptions=--add-opens=java.base/sun.nio.ch=ALL-UNNAMED\"' to the submit args.
 os.environ["PYSPARK_SUBMIT_ARGS"] = "--jars /path/to/gravitino-gcp-{gravitino-version}.jar,/path/to/gravitino-filesystem-hadoop3-runtime-{gravitino-version}.jar,/path/to/gcs-connector-hadoop3-2.2.22-shaded.jar --master local[1] pyspark-shell"
-# JDK17
-os.environ["PYSPARK_SUBMIT_ARGS"] = "--jars /path/to/gravitino-gcp-{gravitino-version}.jar,/path/to/gravitino-filesystem-hadoop3-runtime-{gravitino-version}.jar,/path/to/gcs-connector-hadoop3-2.2.22-shaded.jar --conf \"spark.driver.extraJavaOptions=--add-opens=java.base/sun.nio.ch=ALL-UNNAMED\" --conf \"spark.executor.extraJavaOptions=--add-opens=java.base/sun.nio.ch=ALL-UNNAMED\" --master local[1] pyspark-shell"
 spark = SparkSession.builder
     .appName("gcs_fielset_test")
     .config("spark.hadoop.fs.AbstractFileSystem.gvfs.impl", "org.apache.gravitino.filesystem.hadoop.Gvfs")
