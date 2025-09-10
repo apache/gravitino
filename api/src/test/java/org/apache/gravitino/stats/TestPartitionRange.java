@@ -43,7 +43,7 @@ public class TestPartitionRange {
     Assertions.assertFalse(range2.upperPartitionName().isPresent());
     Assertions.assertTrue(range2.lowerPartitionName().isPresent());
     Assertions.assertEquals("lower", range2.lowerPartitionName().get());
-    Assertions.assertEquals(defaultSortOrder, defaultSortOrder);
+    Assertions.assertEquals(defaultSortOrder, range2.comparator());
     Assertions.assertEquals(PartitionRange.BoundType.CLOSED, range2.lowerBoundType().get());
 
     PartitionRange range3 =

@@ -19,10 +19,12 @@
 
 package org.apache.gravitino.utils;
 
+import com.google.common.base.Preconditions;
 import java.net.URLDecoder;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.exceptions.GravitinoRuntimeException;
 
 /**
@@ -68,18 +70,19 @@ public class JdbcUrlUtils {
    * @param all the JDBC configuration properties
    */
   public static void validateJdbcConfig(String driver, String url, Map<String, String> all) {
+    Preconditions.checkArgument(StringUtils.isNotBlank(driver), "Driver class name can't be blank");
+    Preconditions.checkArgument(StringUtils.isNotBlank(url), "JDBC URL can't be blank");
+
     String lowerUrl = url.toLowerCase();
     String decodedUrl = recursiveDecode(lowerUrl);
 
     // As H2 is only used for testing, we do not check unsafe parameters for H2.
-    if (driver != null) {
-      if (decodedUrl.startsWith("jdbc:mysql")) {
-        checkUnsafeParameters(decodedUrl, all, UNSAFE_MYSQL_PARAMETERS, "MySQL");
-      } else if (decodedUrl.startsWith("jdbc:mariadb")) {
-        checkUnsafeParameters(decodedUrl, all, UNSAFE_MYSQL_PARAMETERS, "MariaDB");
-      } else if (decodedUrl.startsWith("jdbc:postgresql")) {
-        checkUnsafeParameters(decodedUrl, all, UNSAFE_POSTGRES_PARAMETERS, "PostgreSQL");
-      }
+    if (decodedUrl.startsWith("jdbc:mysql")) {
+      checkUnsafeParameters(decodedUrl, all, UNSAFE_MYSQL_PARAMETERS, "MySQL");
+    } else if (decodedUrl.startsWith("jdbc:mariadb")) {
+      checkUnsafeParameters(decodedUrl, all, UNSAFE_MYSQL_PARAMETERS, "MariaDB");
+    } else if (decodedUrl.startsWith("jdbc:postgresql")) {
+      checkUnsafeParameters(decodedUrl, all, UNSAFE_POSTGRES_PARAMETERS, "PostgreSQL");
     }
   }
 

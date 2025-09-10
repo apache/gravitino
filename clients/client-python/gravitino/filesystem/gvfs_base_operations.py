@@ -142,7 +142,7 @@ class BaseGVFSOperations(ABC):
             if options is None
             else options.get(
                 GVFSConfig.GVFS_FILESYSTEM_ENABLE_FILESET_METADATA_CACHE,
-                self.ENABLE_FILESET_METADATA_CACHE_DEFAULT
+                self.ENABLE_FILESET_METADATA_CACHE_DEFAULT,
             )
         )
         if self._enable_fileset_metadata_cache:
@@ -161,6 +161,7 @@ class BaseGVFSOperations(ABC):
             )
         )
         self._current_location_name = self._init_current_location_name()
+        self._kwargs = kwargs
 
     @property
     def current_location_name(self):
@@ -531,6 +532,7 @@ class BaseGVFSOperations(ABC):
                 fileset_catalog.properties(),
                 self._options,
                 actual_file_location,
+                **self._kwargs,
             )
             self._filesystem_cache[(name_identifier, location_name)] = new_cache_value
             return new_cache_value[1]
@@ -570,7 +572,9 @@ class BaseGVFSOperations(ABC):
             )
             catalog: FilesetCatalog = self._get_fileset_catalog(catalog_ident)
             return catalog.as_fileset_catalog().load_fileset(
-                NameIdentifier.of(fileset_ident.namespace().level(2), fileset_ident.name())
+                NameIdentifier.of(
+                    fileset_ident.namespace().level(2), fileset_ident.name()
+                )
             )
 
         read_lock = self._fileset_cache_lock.gen_rlock()
@@ -594,7 +598,9 @@ class BaseGVFSOperations(ABC):
             )
             catalog: FilesetCatalog = self._get_fileset_catalog(catalog_ident)
             fileset = catalog.as_fileset_catalog().load_fileset(
-                NameIdentifier.of(fileset_ident.namespace().level(2), fileset_ident.name())
+                NameIdentifier.of(
+                    fileset_ident.namespace().level(2), fileset_ident.name()
+                )
             )
             self._fileset_cache[fileset_ident] = fileset
             return fileset

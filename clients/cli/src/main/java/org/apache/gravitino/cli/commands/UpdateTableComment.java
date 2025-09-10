@@ -32,10 +32,15 @@ import org.apache.gravitino.rel.TableChange;
 /** Update the comment of a table. */
 public class UpdateTableComment extends Command {
 
+  /** The name of the metalake. */
   protected final String metalake;
+  /** The name of the catalog. */
   protected final String catalog;
+  /** The name of the schema. */
   protected final String schema;
+  /** The name of the table. */
   protected final String table;
+  /** The new comment for the table. */
   protected final String comment;
 
   /**

@@ -30,8 +30,11 @@ import org.apache.gravitino.exceptions.NoSuchUserException;
 /** Removes a role from a group. */
 public class RemoveRoleFromGroup extends Command {
 
+  /** The name of the metalake. */
   protected String metalake;
+  /** The name of the group. */
   protected String group;
+  /** The name of the role. */
   protected String role;
 
   /**

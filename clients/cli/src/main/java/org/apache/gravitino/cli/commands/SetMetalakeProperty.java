@@ -28,8 +28,11 @@ import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 /** Set a property of a metalake. */
 public class SetMetalakeProperty extends Command {
 
+  /** The name of the metalake. */
   protected final String metalake;
+  /** The name of the property. */
   protected final String property;
+  /** The value of the property. */
   protected final String value;
 
   /**

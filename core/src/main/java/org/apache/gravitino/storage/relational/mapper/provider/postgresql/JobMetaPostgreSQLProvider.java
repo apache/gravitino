@@ -64,8 +64,8 @@ public class JobMetaPostgreSQLProvider extends JobMetaBaseSQLProvider {
       @Param("jobTemplateName") String jobTemplateName) {
     return "UPDATE "
         + JobMetaMapper.TABLE_NAME
-        + " SET deleted_at = floor(extract(epoch from((current_timestamp -"
-        + " timestamp '1970-01-01 00:00:00')*1000))) "
+        + " SET deleted_at = floor(extract(epoch from(current_timestamp -"
+        + " timestamp '1970-01-01 00:00:00'))*1000)"
         + " WHERE metalake_id IN ("
         + " SELECT metalake_id FROM "
         + MetalakeMetaMapper.TABLE_NAME
@@ -81,16 +81,16 @@ public class JobMetaPostgreSQLProvider extends JobMetaBaseSQLProvider {
   public String softDeleteJobMetasByMetalakeId(@Param("metalakeId") Long metalakeId) {
     return "UPDATE "
         + JobMetaMapper.TABLE_NAME
-        + " SET deleted_at = floor(extract(epoch from((current_timestamp -"
-        + " timestamp '1970-01-01 00:00:00')*1000))) "
+        + " SET deleted_at = floor(extract(epoch from(current_timestamp -"
+        + " timestamp '1970-01-01 00:00:00'))*1000)"
         + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0";
   }
 
   public String softDeleteJobMetaByRunId(@Param("jobRunId") Long jobRunId) {
     return "UPDATE "
         + JobMetaMapper.TABLE_NAME
-        + " SET deleted_at = floor(extract(epoch from((current_timestamp -"
-        + " timestamp '1970-01-01 00:00:00')*1000))) "
+        + " SET deleted_at = floor(extract(epoch from(current_timestamp -"
+        + " timestamp '1970-01-01 00:00:00'))*1000)"
         + " WHERE job_run_id = #{jobRunId} AND deleted_at = 0";
   }
 
@@ -98,8 +98,8 @@ public class JobMetaPostgreSQLProvider extends JobMetaBaseSQLProvider {
   public String softDeleteJobMetasByLegacyTimeline(@Param("legacyTimeline") Long legacyTimeline) {
     return "UPDATE "
         + JobMetaMapper.TABLE_NAME
-        + " SET deleted_at = floor(extract(epoch from((current_timestamp -"
-        + " timestamp '1970-01-01 00:00:00')*1000))) "
+        + " SET deleted_at = floor(extract(epoch from(current_timestamp -"
+        + " timestamp '1970-01-01 00:00:00'))*1000)"
         + " WHERE job_finished_at < #{legacyTimeline} AND job_finished_at > 0 AND deleted_at = 0";
   }
 

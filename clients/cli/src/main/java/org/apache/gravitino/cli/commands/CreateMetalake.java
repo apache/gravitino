@@ -24,8 +24,11 @@ import org.apache.gravitino.cli.ErrorMessages;
 import org.apache.gravitino.client.GravitinoAdminClient;
 import org.apache.gravitino.exceptions.MetalakeAlreadyExistsException;
 
+/** Represents create a new metalake */
 public class CreateMetalake extends Command {
+  /** The name of the metalake. */
   protected final String metalake;
+  /** The metalake's comment. */
   protected final String comment;
 
   /**

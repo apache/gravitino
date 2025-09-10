@@ -22,11 +22,20 @@ package org.apache.gravitino.cli;
 import com.google.common.base.Joiner;
 import java.util.List;
 
+/** The base class for command handlers. */
 public abstract class CommandHandler {
+  /** The joiner for comma-separated values. */
   public static final Joiner COMMA_JOINER = Joiner.on(", ").skipNulls();
 
+  /** Handles the command. */
   protected abstract void handle();
 
+  /**
+   * Checks if the given list of entities is empty. If it is, prints an error message and exits the
+   * program with status -1.
+   *
+   * @param entities the list of entities to check
+   */
   protected void checkEntities(List<String> entities) {
     if (!entities.isEmpty()) {
       System.err.println(ErrorMessages.MISSING_ENTITIES + COMMA_JOINER.join(entities));

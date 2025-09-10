@@ -62,7 +62,6 @@ import org.apache.gravitino.exceptions.NoSuchLocationNameException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NotFoundException;
 import org.apache.gravitino.file.Fileset;
-import org.apache.gravitino.rest.RESTUtils;
 import org.apache.hc.core5.http.Method;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
@@ -439,7 +438,7 @@ public class TestFilesetCatalog extends TestBase {
             FilesetCatalog.formatFileLocationRequestPath(
                 Namespace.of(metalakeName, catalogName, "schema1"), fileset.name()));
     Map<String, String> queryParams = new HashMap<>();
-    queryParams.put("sub_path", RESTUtils.encodeString(mockSubPath));
+    queryParams.put("sub_path", mockSubPath);
 
     String mockFileLocation =
         String.format("file:/fileset/%s/%s/%s/%s", catalogName, "schema1", "fileset1", mockSubPath);
@@ -531,7 +530,7 @@ public class TestFilesetCatalog extends TestBase {
             FilesetCatalog.formatFileLocationRequestPath(
                 Namespace.of(metalakeName, catalogName, "schema1"), fileset.name()));
     Map<String, String> queryParams = new HashMap<>();
-    queryParams.put("sub_path", RESTUtils.encodeString(mockSubPath));
+    queryParams.put("sub_path", mockSubPath);
     String mockFileLocation =
         String.format("file:/fileset/%s/%s/%s/%s", catalogName, "schema1", "fileset1", mockSubPath);
     FileLocationResponse resp = new FileLocationResponse(mockFileLocation);

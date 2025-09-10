@@ -30,8 +30,8 @@ public class ModelVersionAliasRelPostgreSQLProvider extends ModelVersionAliasRel
       @Param("schemaId") Long schemaId, @Param("modelName") String modelName) {
     return "UPDATE "
         + ModelVersionAliasRelMapper.TABLE_NAME
-        + " mvar SET deleted_at = floor(extract(epoch from((current_timestamp -"
-        + " timestamp '1970-01-01 00:00:00')*1000)))"
+        + " mvar SET deleted_at = floor(extract(epoch from(current_timestamp -"
+        + " timestamp '1970-01-01 00:00:00'))*1000)"
         + " WHERE mvar.model_id = ("
         + " SELECT mm.model_id FROM "
         + ModelMetaMapper.TABLE_NAME
@@ -44,8 +44,8 @@ public class ModelVersionAliasRelPostgreSQLProvider extends ModelVersionAliasRel
       @Param("modelId") Long modelId, @Param("modelVersion") Integer modelVersion) {
     return "UPDATE "
         + ModelVersionAliasRelMapper.TABLE_NAME
-        + " SET deleted_at = floor(extract(epoch from((current_timestamp -"
-        + " timestamp '1970-01-01 00:00:00')*1000)))"
+        + " SET deleted_at = floor(extract(epoch from(current_timestamp -"
+        + " timestamp '1970-01-01 00:00:00'))*1000)"
         + " WHERE model_id = #{modelId} AND model_version = #{modelVersion} AND deleted_at = 0";
   }
 
@@ -54,8 +54,8 @@ public class ModelVersionAliasRelPostgreSQLProvider extends ModelVersionAliasRel
       @Param("modelId") Long modelId, @Param("alias") String alias) {
     return "UPDATE "
         + ModelVersionAliasRelMapper.TABLE_NAME
-        + " SET deleted_at = floor(extract(epoch from((current_timestamp -"
-        + " timestamp '1970-01-01 00:00:00')*1000)))"
+        + " SET deleted_at = floor(extract(epoch from(current_timestamp -"
+        + " timestamp '1970-01-01 00:00:00'))*1000)"
         + " WHERE model_id = #{modelId} AND model_version = ("
         + " SELECT model_version FROM "
         + ModelVersionAliasRelMapper.TABLE_NAME
@@ -67,8 +67,8 @@ public class ModelVersionAliasRelPostgreSQLProvider extends ModelVersionAliasRel
   public String softDeleteModelVersionAliasRelsBySchemaId(@Param("schemaId") Long schemaId) {
     return "UPDATE "
         + ModelVersionAliasRelMapper.TABLE_NAME
-        + " SET deleted_at = floor(extract(epoch from((current_timestamp -"
-        + " timestamp '1970-01-01 00:00:00')*1000)))"
+        + " SET deleted_at = floor(extract(epoch from(current_timestamp -"
+        + " timestamp '1970-01-01 00:00:00'))*1000)"
         + " WHERE model_id IN ("
         + " SELECT model_id FROM "
         + ModelMetaMapper.TABLE_NAME
@@ -79,8 +79,8 @@ public class ModelVersionAliasRelPostgreSQLProvider extends ModelVersionAliasRel
   public String softDeleteModelVersionAliasRelsByCatalogId(@Param("catalogId") Long catalogId) {
     return "UPDATE "
         + ModelVersionAliasRelMapper.TABLE_NAME
-        + " SET deleted_at = floor(extract(epoch from((current_timestamp -"
-        + " timestamp '1970-01-01 00:00:00')*1000)))"
+        + " SET deleted_at = floor(extract(epoch from(current_timestamp -"
+        + " timestamp '1970-01-01 00:00:00'))*1000)"
         + " WHERE model_id IN ("
         + " SELECT model_id FROM "
         + ModelMetaMapper.TABLE_NAME
@@ -91,8 +91,8 @@ public class ModelVersionAliasRelPostgreSQLProvider extends ModelVersionAliasRel
   public String softDeleteModelVersionAliasRelsByMetalakeId(@Param("metalakeId") Long metalakeId) {
     return "UPDATE "
         + ModelVersionAliasRelMapper.TABLE_NAME
-        + " SET deleted_at = floor(extract(epoch from((current_timestamp -"
-        + " timestamp '1970-01-01 00:00:00')*1000)))"
+        + " SET deleted_at = floor(extract(epoch from(current_timestamp -"
+        + " timestamp '1970-01-01 00:00:00'))*1000)"
         + " WHERE model_id IN ("
         + " SELECT model_id FROM "
         + ModelMetaMapper.TABLE_NAME

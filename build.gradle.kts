@@ -594,6 +594,7 @@ tasks.rat {
     "**/NOTICE.*",
     "**/trino-ci-testset",
     "ROADMAP.md",
+    "GETTING_STARTED.md",
     "clients/cli/src/main/resources/*.txt",
     "clients/client-python/venv/*",
     "clients/client-python/docs/build",
@@ -866,7 +867,8 @@ tasks {
         it.name != "hive-metastore-common" &&
         it.name != "integration-test" &&
         it.name != "trino-connector" &&
-        it.parent?.name != "bundles"
+        it.parent?.name != "bundles" &&
+        it.name != "mcp-server"
       ) {
         from(it.configurations.runtimeClasspath)
         into("distribution/package/libs")
@@ -897,7 +899,8 @@ tasks {
         it.name != "hive-metastore-common" &&
         it.name != "docs" &&
         it.name != "hadoop-common" &&
-        it.parent?.name != "bundles"
+        it.parent?.name != "bundles" &&
+        it.name != "mcp-server"
       ) {
         dependsOn("${it.name}:build")
         from("${it.name}/build/libs") {
