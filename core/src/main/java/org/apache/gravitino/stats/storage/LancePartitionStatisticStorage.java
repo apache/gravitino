@@ -330,6 +330,13 @@ public class LancePartitionStatisticStorage implements PartitionStatisticStorage
       root.allocateNew();
       int index = 0;
 
+      UInt8Vector tableIdVector = (UInt8Vector) root.getVector(TABLE_ID_COLUMN);
+      VarCharVector partitionNameVector = (VarCharVector) root.getVector(PARTITION_NAME_COLUMN);
+      VarCharVector statisticNameVector = (VarCharVector) root.getVector(STATISTIC_NAME_COLUMN);
+      LargeVarCharVector statisticValueVector =
+              (LargeVarCharVector) root.getVector(STATISTIC_VALUE_COLUMN);
+      VarCharVector auditInfoVector = (VarCharVector) root.getVector(AUDIT_INFO_COLUMN);
+
       for (PartitionStatisticsUpdate updatePartitionStatistic : updates) {
         String partitionName = updatePartitionStatistic.partitionName();
         for (Map.Entry<String, StatisticValue<?>> statistic :
@@ -337,13 +344,6 @@ public class LancePartitionStatisticStorage implements PartitionStatisticStorage
           String statisticName = statistic.getKey();
           String statisticValue =
               JsonUtils.anyFieldMapper().writeValueAsString(statistic.getValue());
-
-          UInt8Vector tableIdVector = (UInt8Vector) root.getVector(TABLE_ID_COLUMN);
-          VarCharVector partitionNameVector = (VarCharVector) root.getVector(PARTITION_NAME_COLUMN);
-          VarCharVector statisticNameVector = (VarCharVector) root.getVector(STATISTIC_NAME_COLUMN);
-          LargeVarCharVector statisticValueVector =
-              (LargeVarCharVector) root.getVector(STATISTIC_VALUE_COLUMN);
-          VarCharVector auditInfoVector = (VarCharVector) root.getVector(AUDIT_INFO_COLUMN);
 
           tableIdVector.set(index, tableId);
           partitionNameVector.setSafe(index, partitionName.getBytes(StandardCharsets.UTF_8));
