@@ -245,21 +245,24 @@ nexusPublishing {
 }
 
 fun configureSparkConnectorExcludes(project: Project) {
-  if (scalaVersion != "2.12") {
-    val excludedPackages = listOf(
-      "org/apache/gravitino/spark/connector/paimon/**",
-      "org/apache/gravitino/spark/connector/integration/test/paimon/**"
-    )
+  project.afterEvaluate {
+    if (scalaVersion != "2.12") {
+      println("doing configureSparkConnectorExcludes")
+      val excludedPackages = listOf(
+        "org/apache/gravitino/spark/connector/paimon/**",
+        "org/apache/gravitino/spark/connector/integration/test/paimon/**"
+      )
 
-    sourceSets {
-      main {
-        java {
-          exclude(excludedPackages)
+      sourceSets {
+        main {
+          java {
+            exclude(excludedPackages)
+          }
         }
-      }
-      test {
-        java {
-          exclude(excludedPackages)
+        test {
+          java {
+            exclude(excludedPackages)
+          }
         }
       }
     }
