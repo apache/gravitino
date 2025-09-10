@@ -263,10 +263,6 @@ fun configureSparkConnectorExcludes(project: Project) {
         }
       }
     }
-
-    tasks.named<Jar>("sourcesJar") {
-      duplicatesStrategy = DuplicatesStrategy.EXCLUDE
-    }
   }
 }
 

@@ -179,3 +179,7 @@ configurations {
 artifacts {
   add("testArtifacts", testJar)
 }
+
+tasks.named<Jar>("sourcesJar") {
+  duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+}
