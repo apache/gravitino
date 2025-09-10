@@ -21,6 +21,7 @@ import java.security.Principal;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Function;
 import java.util.function.Supplier;
 import org.apache.gravitino.MetadataObject;
@@ -45,7 +46,7 @@ public class RequestAuthorizationCache {
       new ThreadLocal<>();
 
   /** Used to determine whether the role has already been loaded. */
-  private static final ThreadLocal<BooleanHolder> hasLoadedRoleThreadLocal = new ThreadLocal<>();
+  private static final ThreadLocal<AtomicBoolean> hasLoadedRoleThreadLocal = new ThreadLocal<>();
 
   /**
    * Wrap the authorization method with this method to prevent threadlocal leakage.
@@ -71,7 +72,7 @@ public class RequestAuthorizationCache {
   public static <T> Supplier<T> threadLocalTransmitWrapper(Supplier<T> supplier) {
     Map<AuthorizationContext, Boolean> tempAllowAuthorizer = allowAuthorizerThreadCache.get();
     Map<AuthorizationContext, Boolean> tempDenyAuthorizer = denyAuthorizerThreadCache.get();
-    BooleanHolder tempRoleLoadedThread = hasLoadedRoleThreadLocal.get();
+    AtomicBoolean tempRoleLoadedThread = hasLoadedRoleThreadLocal.get();
     Principal currentPrincipal = PrincipalUtils.getCurrentPrincipal();
 
     return () -> {
@@ -91,16 +92,16 @@ public class RequestAuthorizationCache {
   }
 
   public static void loadRole(Runnable runnable) {
-    BooleanHolder hasLoadedRole = hasLoadedRoleThreadLocal.get();
+    AtomicBoolean hasLoadedRole = hasLoadedRoleThreadLocal.get();
     if (hasLoadedRole == null) {
       runnable.run();
       return;
     }
-    if (hasLoadedRole.isBool()) {
+    if (hasLoadedRole.get()) {
       return;
     }
     runnable.run();
-    hasLoadedRole.setBool(true);
+    hasLoadedRole.set(true);
   }
 
   /**
@@ -158,30 +159,13 @@ public class RequestAuthorizationCache {
   private static void start() {
     allowAuthorizerThreadCache.set(new ConcurrentHashMap<>());
     denyAuthorizerThreadCache.set(new ConcurrentHashMap<>());
-    hasLoadedRoleThreadLocal.set(new BooleanHolder());
+    hasLoadedRoleThreadLocal.set(new AtomicBoolean());
   }
 
   private static void end() {
     allowAuthorizerThreadCache.remove();
     denyAuthorizerThreadCache.remove();
     hasLoadedRoleThreadLocal.remove();
-  }
-
-  /**
-   * Boolean cannot be passed to other threads; use a BooleanHolder to hold a reference to the
-   * Boolean object, ensuring the Boolean value can be correctly and accurately passed between
-   * threads.
-   */
-  private static class BooleanHolder {
-    Boolean bool;
-
-    public Boolean isBool() {
-      return bool != null && bool;
-    }
-
-    public void setBool(Boolean bool) {
-      this.bool = bool;
-    }
   }
 
   public static class AuthorizationContext {
