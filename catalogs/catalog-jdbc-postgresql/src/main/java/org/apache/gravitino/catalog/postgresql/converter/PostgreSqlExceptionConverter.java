@@ -44,8 +44,12 @@ public class PostgreSqlExceptionConverter extends JdbcExceptionConverter {
           return new NoSuchSchemaException(se.getMessage(), se);
         case "42P01":
           return new NoSuchTableException(se.getMessage(), se);
-        default:
+        default: {
+          if (se.getSQLState().startsWith("08")) {
+            return new ConnectionFailedException(se.getMessage(), se);
+          }
           return new GravitinoRuntimeException(se.getMessage(), se);
+        }
       }
     } else {
       if (se.getMessage() != null && se.getMessage().contains("password authentication failed")) {
