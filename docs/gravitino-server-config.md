@@ -102,7 +102,6 @@ gravitino.cache.lockSegments=16
 
 - `gravitino.cache.enableWeigher`: When enabled, eviction is based on weight and `maxEntries` will be ignored.
 - `gravitino.cache.expireTimeInMs`: Controls the cache TTL in milliseconds.
-- `gravitino.cache.lockSegments`: Controls the number of lock segments used for cache concurrency optimization. The default value of 16.
 - If `gravitino.cache.enableStats` is enabled, Gravitino will log cache statistics (hit count, miss count, load failures, etc.) every 5 minutes at the Info level.
 
 #### Eviction strategies

@@ -19,6 +19,7 @@
 
 package org.apache.gravitino.cache;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.util.concurrent.Striped;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicReference;
@@ -219,6 +220,7 @@ public class SegmentedLock {
   }
 
   /** Checks if a global operation is currently in progress. */
+  @VisibleForTesting
   public boolean isClearing() {
     return globalOperationLatch.get() != null;
   }
