@@ -36,24 +36,9 @@ val kyuubiVersion: String = libs.versions.kyuubi4spark.get()
 val scalaJava8CompatVersion: String = libs.versions.scala.java.compat.get()
 val scalaCollectionCompatVersion: String = libs.versions.scala.collection.compat.get()
 
-val excludedPackage = listOf("org/apache/gravitino/spark/connector/paimon/**", "org/apache/gravitino/spark/connector/integration/test/paimon/**")
-sourceSets {
-  main {
-    java {
-      srcDirs("src/main/java")
-      if (scalaVersion != "2.12") {
-        exclude(excludedPackage)
-      }
-    }
-  }
-  test {
-    java {
-      srcDirs("src/test/java")
-      if (scalaVersion != "2.12") {
-        exclude(excludedPackage)
-      }
-    }
-  }
+if (hasProperty("configureSparkConnectorExcludes")) {
+  val configureFunc = properties["configureSparkConnectorExcludes"] as? (Project) -> Unit
+  configureFunc?.invoke(project)
 }
 
 dependencies {
@@ -193,8 +178,4 @@ configurations {
 
 artifacts {
   add("testArtifacts", testJar)
-}
-
-tasks.named<Jar>("sourcesJar") {
-  duplicatesStrategy = DuplicatesStrategy.EXCLUDE
 }
