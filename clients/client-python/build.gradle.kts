@@ -16,8 +16,6 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-import de.undercouch.gradle.tasks.download.Download
-import de.undercouch.gradle.tasks.download.Verify
 import io.github.piyushroshan.python.VenvTask
 import java.net.HttpURLConnection
 import java.net.URL
