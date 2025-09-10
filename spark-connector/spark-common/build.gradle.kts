@@ -55,13 +55,11 @@ dependencies {
   compileOnly("org.apache.spark:spark-core_$scalaVersion:$sparkVersion")
   compileOnly("org.apache.spark:spark-sql_$scalaVersion:$sparkVersion")
   compileOnly("org.scala-lang.modules:scala-java8-compat_$scalaVersion:$scalaJava8CompatVersion")
-  if (scalaVersion == "2.12") {
-    compileOnly("org.apache.paimon:paimon-spark-$sparkMajorVersion:$paimonVersion") {
-      exclude("org.apache.spark")
-    }
-    testImplementation("org.apache.paimon:paimon-spark-$sparkMajorVersion:$paimonVersion") {
-      exclude("org.apache.spark")
-    }
+  compileOnly("org.apache.paimon:paimon-spark-$sparkMajorVersion:$paimonVersion") {
+    exclude("org.apache.spark")
+  }
+  testImplementation("org.apache.paimon:paimon-spark-$sparkMajorVersion:$paimonVersion") {
+    exclude("org.apache.spark")
   }
 
   annotationProcessor(libs.lombok)

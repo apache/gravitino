@@ -49,13 +49,11 @@ dependencies {
     exclude("com.fasterxml.jackson")
   }
   compileOnly("org.apache.iceberg:iceberg-spark-runtime-${sparkMajorVersion}_$scalaVersion:$icebergVersion")
-  if (scalaVersion == "2.12") {
-    compileOnly("org.apache.paimon:paimon-spark-$sparkMajorVersion:$paimonVersion") {
-      exclude("org.apache.spark")
-    }
-    testImplementation("org.apache.paimon:paimon-spark-$sparkMajorVersion:$paimonVersion") {
-      exclude("org.apache.spark")
-    }
+  compileOnly("org.apache.paimon:paimon-spark-$sparkMajorVersion:$paimonVersion") {
+    exclude("org.apache.spark")
+  }
+  testImplementation("org.apache.paimon:paimon-spark-$sparkMajorVersion:$paimonVersion") {
+    exclude("org.apache.spark")
   }
 
   testImplementation(project(":api")) {
