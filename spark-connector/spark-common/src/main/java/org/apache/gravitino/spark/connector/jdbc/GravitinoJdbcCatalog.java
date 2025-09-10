@@ -85,7 +85,7 @@ public class GravitinoJdbcCatalog extends BaseCatalog {
   public void createNamespace(String[] namespace, Map<String, String> metadata)
       throws NamespaceAlreadyExistsException {
     Map<String, String> properties = Maps.newHashMap();
-    if (!metadata.isEmpty()) {
+    if (metadata != null && !metadata.isEmpty()) {
       metadata.forEach(
           (k, v) -> {
             switch (k) {
