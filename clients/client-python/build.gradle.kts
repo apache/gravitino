@@ -24,7 +24,6 @@ import java.net.URL
 
 plugins {
   id("io.github.piyushroshan.python-gradle-miniforge-plugin") version "1.0.0"
-  id("de.undercouch.download") version "5.6.0"
 }
 
 pythonPlugin {

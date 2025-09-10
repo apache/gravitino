@@ -108,7 +108,7 @@ class TestGvfsWithHDFS(IntegrationTestEnv):
         build_path = os.environ.get("PYTHON_BUILD_PATH")
         dest_dir = os.path.join(build_path, "tmp")
         os.makedirs(dest_dir, exist_ok=True)
-        cls.hdfs_container.get_tar_from_dock(
+        cls.hdfs_container.get_tar_from_docker(
             f"/opt/{BaseHadoopEnvironment.BASE_DIR_NAME}", dest_dir
         )
         # init hadoop env
@@ -253,7 +253,7 @@ class TestGvfsWithHDFS(IntegrationTestEnv):
             logger.info(
                 "Drop metalake %s[%s]",
                 cls.metalake_name,
-                cls.gravitino_admin_client.drop_metalake(cls.metalake_name),
+                cls.gravitino_admin_client.drop_metalake(cls.metalake_name, force=True),
             )
         except GravitinoRuntimeException as e:
             logger.warning("Failed to drop metalake %s: %s", cls.metalake_name, str(e))

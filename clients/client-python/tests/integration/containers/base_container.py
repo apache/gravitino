@@ -91,7 +91,7 @@ class BaseContainer:
     def get_ip(self):
         return self._ip
 
-    def get_tar_from_dock(self, src_path: str, dest_path: str):
+    def get_tar_from_docker(self, src_path: str, dest_path: str):
         """Copies a file or directory from the container to the host as a tar archive.
 
         Args:
