@@ -47,6 +47,7 @@ fun waitForServerIsReady(host: String = "http://localhost", port: Int = 8090, ti
   val urlString = "$host:$port/metrics"
   val successPattern = Regex("\"version\"\\s*:")
 
+  println("Waiting for server to be ready at $urlString (timeout: ${timeout / 1000}s)...")
   while (true) {
     try {
       val url = URL(urlString)
@@ -59,6 +60,8 @@ fun waitForServerIsReady(host: String = "http://localhost", port: Int = 8090, ti
       if (responseCode == 200) {
         val response = connection.inputStream.bufferedReader().use { it.readText() }
         if (successPattern.containsMatchIn(response)) {
+          val duration = System.currentTimeMillis() - startTime
+          println("\nServer is ready! Took ${duration / 1000.0} seconds.")
           return  // If this succeeds, the API is up and running
         } else {
           exception = RuntimeException("API returned unexpected response: $response")
@@ -74,6 +77,10 @@ fun waitForServerIsReady(host: String = "http://localhost", port: Int = 8090, ti
     if (System.currentTimeMillis() - startTime > timeout) {
       throw RuntimeException("Timed out waiting for API to be available", exception)
     }
+
+    // Print a dot to indicate waiting
+    print(".")
+    System.out.flush() // Ensure the dot is printed immediately
     Thread.sleep(500)  // Wait for 0.5 second before checking again
   }
 }
@@ -191,6 +198,17 @@ tasks {
     onlyIfModified(true)
     src(hadoopDownloadUrl)
     dest(layout.buildDirectory.dir("tmp"))
+    quiet(false)
+
+    doFirst {
+      println("Starting task 'downloadHadoopPack'...")
+      ext["startTime"] = System.currentTimeMillis()
+    }
+    doLast {
+      val startTime = ext["startTime"] as Long
+      val duration = System.currentTimeMillis() - startTime
+      println("Task 'downloadHadoopPack' finished in ${duration / 1000.0} seconds.")
+    }
   }
 
   val verifyHadoopPack by registering(Verify::class) {
@@ -198,6 +216,16 @@ tasks {
     src(layout.buildDirectory.file("tmp/${hadoopPackName}"))
     algorithm("MD5")
     checksum("3455bb57e4b4906bbea67b58cca78fa8")
+
+    doFirst {
+      println("Starting task 'verifyHadoopPack'...")
+      ext["startTime"] = System.currentTimeMillis()
+    }
+    doLast {
+      val startTime = ext["startTime"] as Long
+      val duration = System.currentTimeMillis() - startTime
+      println("Task 'verifyHadoopPack' finished in ${duration} ms.")
+    }
   }
 
   val integrationTest by registering(VenvTask::class) {
@@ -205,13 +233,13 @@ tasks {
       gravitinoServer("start")
     }
 
-    venvExec = "coverage"
-    args = listOf("run", "--branch", "-m", "unittest")
+    venvExec = "python"
+    args = listOf("-m", "unittest")
     workingDir = projectDir.resolve("./tests/integration")
     val dockerTest = project.rootProject.extra["dockerTest"] as? Boolean ?: false
     val envMap = mapOf<String, Any>().toMutableMap()
     if (dockerTest) {
-      dependsOn("verifyHadoopPack")
+      dependsOn(verifyHadoopPack)
       envMap.putAll(mapOf(
         "HADOOP_VERSION" to hadoopVersion,
         "PYTHON_BUILD_PATH" to project.rootDir.path + "/clients/client-python/build"
@@ -233,8 +261,6 @@ tasks {
     doLast {
       gravitinoServer("stop")
     }
-
-    finalizedBy(integrationCoverageReport)
   }
 
   val unitCoverageReport by registering(VenvTask::class){
@@ -244,8 +270,8 @@ tasks {
   }
 
   val unitTests by registering(VenvTask::class) {
-    venvExec = "coverage"
-    args = listOf("run", "--branch", "-m", "unittest")
+    venvExec = "python"
+    args = listOf("-m", "unittest")
     workingDir = projectDir.resolve("./tests/unittests")
 
     environment = mapOf(
@@ -253,8 +279,6 @@ tasks {
       // modules from the client-python directory.
       "PYTHONPATH" to "${project.rootDir.path}/clients/client-python"
     )
-
-    finalizedBy(unitCoverageReport)
   }
 
   val test by registering(VenvTask::class) {
