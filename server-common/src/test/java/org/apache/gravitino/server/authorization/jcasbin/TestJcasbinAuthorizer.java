@@ -37,7 +37,6 @@ import java.util.List;
 import java.util.concurrent.Executor;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.reflect.FieldUtils;
-import org.apache.gravitino.Config;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.GravitinoEnv;
@@ -54,6 +53,7 @@ import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.RoleEntity;
 import org.apache.gravitino.meta.SchemaVersion;
 import org.apache.gravitino.meta.UserEntity;
+import org.apache.gravitino.server.ServerConfig;
 import org.apache.gravitino.server.authorization.MetadataIdConverter;
 import org.apache.gravitino.server.authorization.RequestAuthorizationCache;
 import org.apache.gravitino.storage.relational.po.SecurableObjectPO;
@@ -99,8 +99,6 @@ public class TestJcasbinAuthorizer {
 
   private static MockedStatic<OwnerMetaService> ownerMetaServiceMockedStatic;
 
-  private static Config config = mock(Config.class);
-
   private static JcasbinAuthorizer jcasbinAuthorizer;
 
   private static ObjectMapper objectMapper = new ObjectMapper();
@@ -110,14 +108,11 @@ public class TestJcasbinAuthorizer {
     OwnerMetaService ownerMetaService = mock(OwnerMetaService.class);
     ownerMetaServiceMockedStatic = mockStatic(OwnerMetaService.class);
     ownerMetaServiceMockedStatic.when(OwnerMetaService::getInstance).thenReturn(ownerMetaService);
-    jcasbinAuthorizer = new JcasbinAuthorizer();
-    jcasbinAuthorizer.initialize();
-
-    principalUtilsMockedStatic = mockStatic(PrincipalUtils.class);
-    metadataIdConverterMockedStatic = mockStatic(MetadataIdConverter.class);
     gravitinoEnvMockedStatic = mockStatic(GravitinoEnv.class);
     gravitinoEnvMockedStatic.when(GravitinoEnv::getInstance).thenReturn(gravitinoEnv);
-    when(gravitinoEnv.config()).thenReturn(config);
+    when(gravitinoEnv.config()).thenReturn(new ServerConfig());
+    principalUtilsMockedStatic = mockStatic(PrincipalUtils.class);
+    metadataIdConverterMockedStatic = mockStatic(MetadataIdConverter.class);
     principalUtilsMockedStatic
         .when(PrincipalUtils::getCurrentPrincipal)
         .thenReturn(new UserPrincipal(USERNAME));
@@ -132,6 +127,8 @@ public class TestJcasbinAuthorizer {
             eq(Entity.EntityType.USER),
             eq(UserEntity.class)))
         .thenReturn(getUserEntity());
+    jcasbinAuthorizer = new JcasbinAuthorizer();
+    jcasbinAuthorizer.initialize();
     BaseMetalake baseMetalake =
         BaseMetalake.builder()
             .withId(USER_METALAKE_ID)
