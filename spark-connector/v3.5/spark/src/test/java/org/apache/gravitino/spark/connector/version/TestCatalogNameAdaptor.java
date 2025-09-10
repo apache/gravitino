@@ -34,7 +34,7 @@ public class TestCatalogNameAdaptor {
 
     String paimonCatalogName = CatalogNameAdaptor.getCatalogName("lakehouse-paimon");
     Assertions.assertEquals(
-        "org.apache.gravitino.spark.connector.paimon.GravitinoPaimonCatalogSpark33",
+        "org.apache.gravitino.spark.connector.paimon.GravitinoPaimonCatalogSpark35",
         paimonCatalogName);
   }
 }
