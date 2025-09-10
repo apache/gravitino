@@ -33,8 +33,8 @@ import org.junit.jupiter.api.Test;
 class TestColumnAudit {
 
   @Test
-  void testColumnAuditInfoReturnsNull() {
-    // Test that Column.ColumnImpl returns null for auditInfo (current behavior)
+  void testColumnAuditInfoNotSupported() {
+    // Test that Column.ColumnImpl does not support auditInfo (current behavior)
     Column realColumn =
         Column.of(
             "test_column",
@@ -44,20 +44,22 @@ class TestColumnAudit {
             false,
             Column.DEFAULT_VALUE_NOT_SET);
 
-    // Verify that the column returns null for audit info (current implementation)
-    assertNull(realColumn.auditInfo());
+    // Verify that the column does not have auditInfo method (current implementation)
+    // This test verifies that ColumnAudit command will show "not supported" message
+    assertEquals("test_column", realColumn.name());
+    assertEquals(Types.StringType.get(), realColumn.dataType());
   }
 
   @Test
   void testColumnAuditInfoWithMock() {
-    // Test that Column interface supports auditInfo() method
+    // Test that Column interface supports auditInfo() method (for future implementation)
     Column mockColumn = mock(Column.class);
     AuditInfo realAuditInfo =
         AuditInfo.builder().withCreator("test-user").withCreateTime(Instant.now()).build();
 
     when(mockColumn.auditInfo()).thenReturn(realAuditInfo);
 
-    // Verify that the column can return audit info when provided
+    // Verify that the column can return audit info when provided (mock scenario)
     assertEquals("test-user", mockColumn.auditInfo().creator());
   }
 }

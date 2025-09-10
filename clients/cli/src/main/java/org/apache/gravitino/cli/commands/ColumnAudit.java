@@ -87,12 +87,8 @@ public class ColumnAudit extends AuditCommand {
         return;
       }
 
-      // Check if column audit info is available
-      if (gColumn.auditInfo() == null) {
-        System.out.println("Column audit information is not supported yet.");
-      } else {
-        displayAuditInfo(gColumn.auditInfo());
-      }
+      // Column audit information is not supported yet
+      System.out.println("Column audit information is not supported yet.");
 
     } catch (NoSuchMetalakeException err) {
       exitWithError(ErrorMessages.UNKNOWN_METALAKE);
