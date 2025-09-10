@@ -1107,4 +1107,3 @@ tasks.register("release") {
 
   dependsOn(subprojects.map { it.tasks.named("build") })
 }
-
