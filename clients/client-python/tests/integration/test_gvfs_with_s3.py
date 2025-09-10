@@ -278,7 +278,10 @@ class TestGvfsWithS3(TestGvfsWithHDFS):
             **self.conf,
         )
 
-        fs.operations._catalog_cache.clear()
+        if fs.operations._enable_fileset_metadata_cache:
+            fs.operations._fileset_cache.clear()
+            fs.operations._catalog_cache.clear()
+
         s3_fs = fs.operations._get_actual_filesystem(mkdir_dir, None)
         config_kwargs = s3_fs.config_kwargs
         self.assertEqual("virtual", config_kwargs.get("s3").get("addressing_style"))

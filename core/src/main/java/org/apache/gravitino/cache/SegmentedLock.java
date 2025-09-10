@@ -6,7 +6,9 @@
  * to you under the Apache License, Version 2.0 (the
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
+ *
  *  http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing,
  * software distributed under the License is distributed on an
  * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
@@ -17,71 +19,218 @@
 
 package org.apache.gravitino.cache;
 
-import com.google.common.base.Preconditions;
-import java.util.concurrent.locks.ReentrantLock;
-import org.apache.gravitino.NameIdentifier;
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.util.concurrent.Striped;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.locks.Lock;
 
 /**
- * A segmented lock manager that reduces lock contention by distributing locks across multiple
- * segments based on the hash code of a {@link NameIdentifier}.
- *
- * <p>Instead of using a single global lock, this class uses an array of {@link ReentrantLock}
- * instances. Each identifier is mapped to a specific lock using its hash code modulo the number of
- * segments. This allows concurrent operations on identifiers that map to different segments,
- * improving overall throughput in high-concurrency scenarios.
- *
- * <p>This implementation is thread-safe and immutable after construction. The number of segments
- * remains fixed for the lifetime of the instance.
+ * Segmented lock for improved concurrency. Divides locks into segments to reduce contention.
+ * Supports global clearing operations that require exclusive access to all segments.
  */
 public class SegmentedLock {
-  private final ReentrantLock[] locks;
+  private final Striped<Lock> stripedLocks;
+  private static final Object NULL_KEY = new Object();
 
+  /** CountDownLatch for global operations - null when no operation is in progress */
+  private final AtomicReference<CountDownLatch> globalOperationLatch = new AtomicReference<>();
+
+  /**
+   * Creates a SegmentedLock with the specified number of segments. Guava's Striped automatically
+   * rounds up to the nearest power of 2 for optimal performance.
+   *
+   * @param numSegments Number of segments (must be positive)
+   * @throws IllegalArgumentException if numSegments is not positive
+   */
   public SegmentedLock(int numSegments) {
-    locks = new ReentrantLock[numSegments];
-    for (int i = 0; i < numSegments; i++) {
-      locks[i] = new ReentrantLock();
+    if (numSegments <= 0) {
+      throw new IllegalArgumentException(
+          "Number of segments must be positive, got: " + numSegments);
     }
+
+    this.stripedLocks = Striped.lock(numSegments);
   }
 
   /**
-   * Returns the lock associated with the given identifier. The lock is determined by computing the
-   * hash code of the identifier and mapping it to a segment using modulo arithmetic.
+   * Gets the segment lock for the given key.
    *
-   * <p>Note: {@link NameIdentifier#hashCode()} is assumed to provide a reasonably uniform
-   * distribution to ensure balanced lock utilization.
-   *
-   * @param ident the identifier to map to a lock; must not be null
-   * @return the {@link ReentrantLock} associated with the identifier
+   * @param key Object to determine the segment
+   * @return Segment lock for the key
    */
-  public ReentrantLock getLock(NameIdentifier ident) {
-    Preconditions.checkNotNull(ident, "NameIdentifier can not be null.");
-    int hash = ident.hashCode();
-    int segmentIndex = Math.abs(hash % locks.length);
-    return locks[segmentIndex];
+  public Lock getSegmentLock(Object key) {
+    return stripedLocks.get(normalizeKey(key));
   }
 
   /**
-   * Executes the given action with all locks acquired. This method acquires all segment locks in
-   * sequence before running the action, and ensures all locks are released afterward, even if the
-   * action throws an exception.
+   * Normalizes the key to handle null values consistently.
    *
-   * <p>This is useful for operations that need global consistency across all segments, such as
-   * clearing all cached entries or performing a global snapshot. Use sparingly, as it blocks all
-   * other operations.
-   *
-   * @param action the task to execute; must not be null
-   * @throws NullPointerException if {@code action} is null
+   * @param key The input key
+   * @return Normalized key (never null)
    */
-  public void withAllLocks(Runnable action) {
-    for (ReentrantLock lock : locks) {
-      lock.lock();
-    }
+  private Object normalizeKey(Object key) {
+    return key != null ? key : NULL_KEY;
+  }
+
+  /**
+   * Runs action with segment lock for the given key. Will wait if a global clearing operation is in
+   * progress.
+   *
+   * @param key Key to determine segment
+   * @param action Action to run
+   * @throws RuntimeException if interrupted
+   */
+  public void withLock(Object key, Runnable action) {
+    waitForGlobalComplete();
+    Lock lock = getSegmentLock(key);
     try {
-      action.run();
-    } finally {
-      for (ReentrantLock lock : locks) {
+      lock.lockInterruptibly();
+      try {
+        action.run();
+      } finally {
         lock.unlock();
       }
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+      throw new RuntimeException("Thread was interrupted while waiting for lock", e);
     }
+  }
+
+  /**
+   * Runs action with segment lock and returns result. Will wait if a global clearing operation is
+   * in progress.
+   *
+   * @param key Key to determine segment
+   * @param action Action to run
+   * @param <T> Result type
+   * @return Action result
+   * @throws RuntimeException if interrupted
+   */
+  public <T> T withLock(Object key, java.util.function.Supplier<T> action) {
+    waitForGlobalComplete();
+    Lock lock = getSegmentLock(key);
+    try {
+      lock.lockInterruptibly();
+      try {
+        return action.get();
+      } finally {
+        lock.unlock();
+      }
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+      throw new RuntimeException("Thread was interrupted while waiting for lock", e);
+    }
+  }
+
+  /**
+   * Runs action with segment lock for the given key. Will wait if a global clearing operation is in
+   * progress.
+   *
+   * @param key Key to determine segment
+   * @param action Action to run
+   * @param <T> Result type
+   * @param <E> Exception type
+   * @return Action result
+   * @throws E Exception
+   */
+  public <T, E extends Exception> T withLockAndThrow(
+      Object key, EntityCache.ThrowingSupplier<T, E> action) throws E {
+    waitForGlobalComplete();
+    Lock lock = getSegmentLock(key);
+    try {
+      lock.lockInterruptibly();
+      try {
+        return action.get();
+      } finally {
+        lock.unlock();
+      }
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+      throw new IllegalStateException("Thread was interrupted while waiting for lock", e);
+    }
+  }
+
+  /**
+   * Runs action with segment lock for the given key. Will wait if a global clearing operation is in
+   * progress.
+   *
+   * @param key Key to determine segment
+   * @param action Action to run
+   * @param <E> Exception type
+   * @throws E Exception
+   */
+  public <E extends Exception> void withLockAndThrow(
+      Object key, EntityCache.ThrowingRunnable<E> action) throws E {
+    waitForGlobalComplete();
+    Lock lock = getSegmentLock(key);
+    try {
+      lock.lockInterruptibly();
+      try {
+        action.run();
+      } finally {
+        lock.unlock();
+      }
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+      throw new IllegalStateException("Thread was interrupted while waiting for lock", e);
+    }
+  }
+
+  /**
+   * Executes a global clearing operation with exclusive access to all segments. This method sets
+   * the clearing flag and ensures no other operations can proceed until the clearing is complete.
+   *
+   * @param action The clearing action to execute
+   */
+  public void withGlobalLock(Runnable action) {
+    // Create a new CountDownLatch for this operation
+    CountDownLatch latch = new CountDownLatch(1);
+
+    // Atomically set the latch, fail if another operation is already in progress
+    if (!globalOperationLatch.compareAndSet(null, latch)) {
+      throw new IllegalStateException("Global operation already in progress");
+    }
+
+    try {
+      synchronized (this) {
+        action.run();
+      }
+    } finally {
+      // Clear state first, then signal completion
+      globalOperationLatch.set(null);
+      latch.countDown();
+    }
+  }
+
+  /**
+   * Waits for any ongoing global operation to complete. This method is called by regular operations
+   * to ensure they don't interfere with global operations.
+   */
+  private void waitForGlobalComplete() {
+    CountDownLatch latch = globalOperationLatch.get();
+    if (latch != null) {
+      try {
+        latch.await();
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+        throw new RuntimeException(
+            "Thread was interrupted while waiting for global operation to complete", e);
+      }
+    }
+  }
+
+  /** Checks if a global operation is currently in progress. */
+  @VisibleForTesting
+  public boolean isClearing() {
+    return globalOperationLatch.get() != null;
+  }
+
+  /**
+   * Returns number of lock segments.
+   *
+   * @return Number of segments
+   */
+  public int getNumSegments() {
+    return stripedLocks.size();
   }
 }

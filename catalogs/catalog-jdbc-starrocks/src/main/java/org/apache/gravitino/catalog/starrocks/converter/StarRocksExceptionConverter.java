@@ -23,6 +23,7 @@ import java.sql.SQLException;
 import org.apache.gravitino.catalog.jdbc.converter.JdbcExceptionConverter;
 import org.apache.gravitino.exceptions.ConnectionFailedException;
 import org.apache.gravitino.exceptions.GravitinoRuntimeException;
+import org.apache.gravitino.exceptions.IllegalPropertyException;
 import org.apache.gravitino.exceptions.NoSuchColumnException;
 import org.apache.gravitino.exceptions.NoSuchPartitionException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
@@ -47,6 +48,7 @@ public class StarRocksExceptionConverter extends JdbcExceptionConverter {
   static final int CODE_NO_SUCH_COLUMN = 1054;
   static final int CODE_DELETE_NON_EXISTING_PARTITION = 1507;
   static final int CODE_PARTITION_ALREADY_EXISTS = 1517;
+  static final int CODE_GENERIC_ERROR = 5064;
 
   @SuppressWarnings("FormatStringAnnotation")
   @Override
@@ -72,6 +74,11 @@ public class StarRocksExceptionConverter extends JdbcExceptionConverter {
         return new NoSuchPartitionException(se, se.getMessage());
       case CODE_PARTITION_ALREADY_EXISTS:
         return new PartitionAlreadyExistsException(se, se.getMessage());
+      case CODE_GENERIC_ERROR:
+        if (se.getMessage() != null && se.getMessage().contains("Unknown properties")) {
+          return new IllegalPropertyException(se, se.getMessage());
+        }
+        return new GravitinoRuntimeException(se, se.getMessage());
       default:
         if (se.getMessage() != null && se.getMessage().contains("Access denied")) {
           return new ConnectionFailedException(se, se.getMessage());
