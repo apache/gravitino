@@ -38,6 +38,7 @@ import org.apache.gravitino.Namespace;
 import org.apache.gravitino.SupportsRelationOperations;
 import org.apache.gravitino.cache.CacheFactory;
 import org.apache.gravitino.cache.EntityCache;
+import org.apache.gravitino.cache.EntityCacheRelationKey;
 import org.apache.gravitino.cache.NoOpsCache;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.meta.TagEntity;
@@ -129,6 +130,7 @@ public class RelationalEntityStore
       NameIdentifier ident, Entity.EntityType entityType, Class<E> e)
       throws NoSuchEntityException, IOException {
     return cache.withCacheLock(
+        EntityCacheRelationKey.of(ident, entityType),
         () -> {
           Optional<E> entityFromCache = cache.getIfPresent(ident, entityType);
           if (entityFromCache.isPresent()) {
@@ -210,6 +212,7 @@ public class RelationalEntityStore
       Type relType, NameIdentifier nameIdentifier, Entity.EntityType identType, boolean allFields)
       throws IOException {
     return cache.withCacheLock(
+        EntityCacheRelationKey.of(nameIdentifier, identType, relType),
         () -> {
           Optional<List<E>> entities = cache.getIfPresent(relType, nameIdentifier, identType);
           if (entities.isPresent()) {
