@@ -245,16 +245,16 @@ For example, if you set an extra property `foo` to `bar` for Lance storage optio
 For Lance remote storage, you can refer to the document [here](https://lancedb.github.io/lance/usage/storage/).
 
 
-| Configuration item                                                   | Description                          | Default value                  | Required                                        | Since version |
-|----------------------------------------------------------------------|--------------------------------------|--------------------------------|-------------------------------------------------|---------------|
-| `gravitino.stats.partition.storageOption.location`                   | The location of Lance files          | `${GRAVITINO_HOME}/data/lance` | No                                              | 1.0.0         |
-| `gravitino.stats.partition.storageOption.maxRowsPerFile`             | The maximum rows per file            | `1000000`                      | No                                              | 1.0.0         |
-| `gravitino.stats.partition.storageOption.maxBytesPerFile`            | The maximum bytes per file           | `104857600`                    | No                                              | 1.0.0         |
-| `gravitino.stats.partition.storageOption.maxRowsPerGroup`            | The maximum rows per group           | `1000000`                      | No                                              | 1.0.0         |
-| `gravitino.stats.partition.storageOption.readBatchSize`              | The batch record number when reading | `10000`                        | No                                              | 1.0.0         |
-| `gravitino.stats.partition.storageOption.datasetCacheSize`           | size of dataset cache for Lance      | `10000`                        | No                                              | 1.0.0         |
-| `gravitino.stats.partition.storageOption.metadataFileCacheSizeBytes` | The Lance's metadata file cache size | `104857600`                    | No                                              | 1.0.0         |
-| `gravitino.stats.partition.storageOption.indexCacheSizeBytes`        | The Lance's index cache size         | `104857600`                    | No                                              | 1.0.0         |
+| Configuration item                                                   | Description                          | Default value                  | Required | Since version |
+|----------------------------------------------------------------------|--------------------------------------|--------------------------------|----------|---------------|
+| `gravitino.stats.partition.storageOption.location`                   | The location of Lance files          | `${GRAVITINO_HOME}/data/lance` | No       | 1.0.0         |
+| `gravitino.stats.partition.storageOption.maxRowsPerFile`             | The maximum rows per file            | `1000000`                      | No       | 1.0.0         |
+| `gravitino.stats.partition.storageOption.maxBytesPerFile`            | The maximum bytes per file           | `104857600`                    | No       | 1.0.0         |
+| `gravitino.stats.partition.storageOption.maxRowsPerGroup`            | The maximum rows per group           | `1000000`                      | No       | 1.0.0         |
+| `gravitino.stats.partition.storageOption.readBatchSize`              | The batch record number when reading | `10000`                        | No       | 1.0.0         |
+| `gravitino.stats.partition.storageOption.datasetCacheSize`           | size of dataset cache for Lance      | `10000`                        | No       | 1.0.0         |
+| `gravitino.stats.partition.storageOption.metadataFileCacheSizeBytes` | The Lance's metadata file cache size | `104857600`                    | No       | 1.0.0         |
+| `gravitino.stats.partition.storageOption.indexCacheSizeBytes`        | The Lance's index cache size         | `104857600`                    | No       | 1.0.0         |
 
 ### Implementation a custom partition storage
 
