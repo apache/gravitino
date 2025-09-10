@@ -296,7 +296,7 @@ public interface AccessControlDispatcher {
    */
   Role grantPrivilegeToRole(
       String metalake, String role, MetadataObject object, Set<Privilege> privileges)
-      throws NoSuchGroupException, NoSuchRoleException;
+      throws NoSuchMetalakeException, NoSuchRoleException;
 
   /**
    * Revoke privileges from a role.
