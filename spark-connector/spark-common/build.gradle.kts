@@ -37,28 +37,9 @@ val scalaJava8CompatVersion: String = libs.versions.scala.java.compat.get()
 val scalaCollectionCompatVersion: String = libs.versions.scala.collection.compat.get()
 
 if (hasProperty("configureSparkConnectorExcludes")) {
-  print("configureSparkConnectorExcludes!!")
   val configureFunc = properties["configureSparkConnectorExcludes"] as? (Project) -> Unit
   configureFunc?.invoke(project)
 }
-
-val excludedPackages = listOf(
-  "org/apache/gravitino/spark/connector/paimon/**",
-  "org/apache/gravitino/spark/connector/integration/test/paimon/**"
-)
-
-// sourceSets {
-//  main {
-//    java {
-//      exclude(excludedPackages)
-//    }
-//  }
-//  test {
-//    java {
-//      exclude(excludedPackages)
-//    }
-//  }
-// }
 
 dependencies {
   implementation(project(":catalogs:catalog-common")) {
@@ -205,17 +186,4 @@ tasks.named<Jar>("sourcesJar") {
   duplicatesStrategy = DuplicatesStrategy.EXCLUDE
 }
 
-tasks.register("printSourceSets") {
-  doLast {
-    sourceSets.forEach { sourceSet ->
-      println("[${sourceSet.name}]")
-      println("--> Source directories: ${sourceSet.allJava.srcDirs}")
-      sourceSet.java.excludes.forEach { exclude ->
-        println("--> Java exclude pattern: $exclude")
-      }
-      println("--> Resources directories: ${sourceSet.resources.srcDirs}")
-      println("--> Output classes directories: ${sourceSet.output.classesDirs.files}")
-      println("----------------------------------------")
-    }
-  }
-}
+
