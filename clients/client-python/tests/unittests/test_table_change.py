@@ -17,7 +17,9 @@
 
 import unittest
 
+from gravitino.api.column import Column
 from gravitino.api.table_change import TableChange
+from gravitino.api.types.types import Types
 
 
 class TestTableChange(unittest.TestCase):
@@ -82,3 +84,65 @@ class TestTableChange(unittest.TestCase):
         self.assertEqual(str(first), "FIRST")
         self.assertEqual(str(after), "AFTER column")
         self.assertEqual(str(default_pos), "DEFAULT")
+
+    def test_add_column(self):
+        add_col_mandatory = TableChange.add_column(["col1"], Types.StringType.get())
+        self.assertListEqual(add_col_mandatory.get_field_name(), ["col1"])
+        self.assertListEqual(add_col_mandatory.field_name(), ["col1"])
+        self.assertEqual(add_col_mandatory.get_data_type(), Types.StringType.get())
+        self.assertIsNone(add_col_mandatory.get_comment())
+        self.assertIsNone(add_col_mandatory.get_position())
+        self.assertTrue(add_col_mandatory.is_nullable())
+        self.assertFalse(add_col_mandatory.is_auto_increment())
+        self.assertEqual(
+            add_col_mandatory.get_default_value(), Column.DEFAULT_VALUE_NOT_SET
+        )
+
+    def test_add_column_with_position(self):
+        field_name = ["Full Name", "First Name"]
+        data_type = Types.StringType.get()
+        comment = "First or given name"
+        position = TableChange.ColumnPosition.after("Address")
+        add_column = TableChange.add_column(field_name, data_type, comment, position)
+        self.assertListEqual(add_column.get_field_name(), field_name)
+        self.assertEqual(add_column.get_data_type(), data_type)
+        self.assertEqual(add_column.get_comment(), comment)
+        self.assertEqual(add_column.get_position(), position)
+        self.assertTrue(add_column.is_nullable())
+        self.assertFalse(add_column.is_auto_increment())
+        self.assertEqual(add_column.get_default_value(), Column.DEFAULT_VALUE_NOT_SET)
+
+    def test_add_column_with_null_comment_and_position(self):
+        field_name = ["Middle Name"]
+        data_type = Types.StringType.get()
+        add_column = TableChange.add_column(field_name, data_type, None, None)
+        self.assertListEqual(add_column.get_field_name(), field_name)
+        self.assertEqual(add_column.get_data_type(), data_type)
+        self.assertIsNone(add_column.get_comment())
+        self.assertIsNone(add_column.get_position())
+        self.assertTrue(add_column.is_nullable())
+        self.assertFalse(add_column.is_auto_increment())
+        self.assertEqual(add_column.get_default_value(), Column.DEFAULT_VALUE_NOT_SET)
+
+    def test_add_column_equal_and_hash(self):
+        field_name = ["Name"]
+        another_field_name = ["First Name"]
+        data_type = Types.StringType.get()
+        comment = "Person name"
+        add_columns = [
+            TableChange.add_column(field_name, data_type, comment) for _ in range(2)
+        ]
+        add_column_dict = {add_columns[i]: i for i in range(2)}
+
+        self.assertTrue(add_columns[0] == add_columns[1])
+        self.assertTrue(add_columns[1] == add_columns[0])
+        self.assertEqual(len(add_column_dict), 1)
+        self.assertEqual(add_column_dict[add_columns[0]], 1)
+
+        another_add_column = TableChange.add_column(
+            another_field_name, data_type, comment
+        )
+        add_column_dict = {add_columns[0]: 0, another_add_column: 1}
+        self.assertFalse(add_columns[0] == another_add_column)
+        self.assertFalse(another_add_column == add_columns[0])
+        self.assertEqual(len(add_column_dict), 2)
