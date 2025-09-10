@@ -53,4 +53,13 @@ public class TestCredentialCacheKey {
     CredentialCacheKey key4 = new CredentialCacheKey("s3-token1", context);
     Assertions.assertFalse(cache.contains(key4));
   }
+
+  @Test
+  void testToStringContainsSpaceBetweenFields() {
+    PathBasedCredentialContext context =
+        new PathBasedCredentialContext("user", ImmutableSet.of(), ImmutableSet.of());
+    CredentialCacheKey key = new CredentialCacheKey("s3-token", context);
+
+    Assertions.assertTrue(key.toString().contains("credentialType: s3-token credentialContext:"));
+  }
 }
