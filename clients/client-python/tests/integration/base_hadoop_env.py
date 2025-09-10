@@ -47,7 +47,7 @@ class BaseHadoopEnvironment:
 
     @classmethod
     def _unzip_hadoop_pack(cls):
-        hadoop_pack = f"{PYTHON_BUILD_PATH}/tmp/hadoop-{HADOOP_VERSION}.tar.gz"
+        hadoop_pack = f"{PYTHON_BUILD_PATH}/tmp/hadoop-{HADOOP_VERSION}.tar"
         unzip_dir = f"{PYTHON_BUILD_PATH}/hadoop"
         logger.info("Unzip hadoop pack from %s.", hadoop_pack)
         # unzip the pack
@@ -71,10 +71,9 @@ class BaseHadoopEnvironment:
         logger.info("Configure hadoop environment.")
         os.putenv("HADOOP_USER_NAME", "anonymous")
         os.putenv("HADOOP_HOME", f"{PYTHON_BUILD_PATH}/hadoop/hadoop-{HADOOP_VERSION}")
-        os.putenv(
-            "HADOOP_CONF_DIR",
-            f"{PYTHON_BUILD_PATH}/hadoop/hadoop-{HADOOP_VERSION}/etc/hadoop",
-        )
+        conf_path = f"{PYTHON_BUILD_PATH}/hadoop/hadoop-{HADOOP_VERSION}/etc/hadoop"
+        os.putenv("HADOOP_CONF_DIR", conf_path)
+        shutil.rmtree(conf_path)
         hadoop_shell_path = (
             f"{PYTHON_BUILD_PATH}/hadoop/hadoop-{HADOOP_VERSION}/bin/hadoop"
         )
@@ -86,11 +85,17 @@ class BaseHadoopEnvironment:
                 text=True,
                 check=True,
             )
-            if result.returncode == 0:
-                os.putenv("CLASSPATH", str(result.stdout))
+            classpath = ""
+            for line in result.stdout.splitlines():
+                if line.strip().startswith("/"):
+                    classpath = line.strip()
+                    break
+
+            if classpath:
+                os.putenv("CLASSPATH", classpath)
             else:
                 raise GravitinoRuntimeException(
-                    f"Command failed with return code is not 0, stdout: {result.stdout}, stderr:{result.stderr}"
+                    f"Could not parse classpath from 'hadoop classpath --glob' command output: {result.stdout}"
                 )
         except subprocess.CalledProcessError as e:
             raise GravitinoRuntimeException(

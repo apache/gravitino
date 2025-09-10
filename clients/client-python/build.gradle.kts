@@ -239,7 +239,7 @@ tasks {
     val dockerTest = project.rootProject.extra["dockerTest"] as? Boolean ?: false
     val envMap = mapOf<String, Any>().toMutableMap()
     if (dockerTest) {
-      dependsOn(verifyHadoopPack)
+      // dependsOn(verifyHadoopPack)
       envMap.putAll(mapOf(
         "HADOOP_VERSION" to hadoopVersion,
         "PYTHON_BUILD_PATH" to project.rootDir.path + "/clients/client-python/build"

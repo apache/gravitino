@@ -105,6 +105,10 @@ class TestGvfsWithHDFS(IntegrationTestEnv):
         cls.hdfs_container = HDFSContainer()
         hdfs_container_ip = cls.hdfs_container.get_ip()
         # init hadoop env
+        build_path = os.environ.get("PYTHON_BUILD_PATH")
+        dest_dir = os.path.join(build_path, "tmp")
+        os.makedirs(dest_dir, exist_ok=True)
+        cls.hdfs_container.get_tar_from_dock("/opt/hadoop-2.7.3", dest_dir)
         BaseHadoopEnvironment.init_hadoop_env()
         cls.config = {
             "gravitino.bypass.fs.defaultFS": f"hdfs://{hdfs_container_ip}:9000"
