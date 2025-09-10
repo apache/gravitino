@@ -34,6 +34,7 @@ import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.gravitino.Configs;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.GravitinoEnv;
@@ -87,17 +88,20 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
    */
   private Set<Long> loadedOwners = ConcurrentHashMap.newKeySet();
 
-  private static Executor executor =
-      Executors.newFixedThreadPool(
-          50,
-          runnable -> {
-            Thread thread = new Thread(runnable);
-            thread.setName("GravitinoAuthorizer-ThreadPool-" + thread.getId());
-            return thread;
-          });
+  private Executor executor = null;
 
   @Override
   public void initialize() {
+    executor =
+        Executors.newFixedThreadPool(
+            GravitinoEnv.getInstance()
+                .config()
+                .get(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_MAX_CONNECTIONS),
+            runnable -> {
+              Thread thread = new Thread(runnable);
+              thread.setName("GravitinoAuthorizer-ThreadPool-" + thread.getId());
+              return thread;
+            });
     allowEnforcer = new SyncedEnforcer(getModel("/jcasbin_model.conf"), new GravitinoAdapter());
     allowInternalAuthorizer = new InternalAuthorizer(allowEnforcer);
     denyEnforcer = new SyncedEnforcer(getModel("/jcasbin_model.conf"), new GravitinoAdapter());

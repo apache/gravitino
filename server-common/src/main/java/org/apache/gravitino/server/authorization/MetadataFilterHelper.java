@@ -50,14 +50,7 @@ import org.slf4j.LoggerFactory;
 public class MetadataFilterHelper {
 
   private static final Logger LOG = LoggerFactory.getLogger(MetadataFilterHelper.class);
-  private static Executor executor =
-      Executors.newFixedThreadPool(
-          50,
-          runnable -> {
-            Thread thread = new Thread(runnable);
-            thread.setName("MetadataFilterHelper-ThreadPool-" + thread.getId());
-            return thread;
-          });
+  private static Executor executor = null;
 
   private MetadataFilterHelper() {}
 
@@ -77,6 +70,7 @@ public class MetadataFilterHelper {
     if (!enableAuthorization()) {
       return metadataList;
     }
+    checkExecutor();
     GravitinoAuthorizer gravitinoAuthorizer =
         GravitinoAuthorizerProvider.getInstance().getGravitinoAuthorizer();
     Principal currentPrincipal = PrincipalUtils.getCurrentPrincipal();
@@ -110,6 +104,7 @@ public class MetadataFilterHelper {
     if (!enableAuthorization()) {
       return nameIdentifiers;
     }
+    checkExecutor();
     return RequestAuthorizationCache.executeWithThreadCache(
         () -> {
           List<CompletableFuture<NameIdentifier>> futures = new ArrayList<>();
@@ -167,6 +162,7 @@ public class MetadataFilterHelper {
     if (!enableAuthorization()) {
       return entities;
     }
+    checkExecutor();
     return RequestAuthorizationCache.executeWithThreadCache(
         () -> {
           List<CompletableFuture<E>> futures = new ArrayList<>();
@@ -284,5 +280,24 @@ public class MetadataFilterHelper {
   private static boolean enableAuthorization() {
     Config config = GravitinoEnv.getInstance().config();
     return config != null && config.get(Configs.ENABLE_AUTHORIZATION);
+  }
+
+  private static void checkExecutor() {
+    if (executor == null) {
+      synchronized (MetadataFilterHelper.class) {
+        if (executor == null) {
+          executor =
+              Executors.newFixedThreadPool(
+                  GravitinoEnv.getInstance()
+                      .config()
+                      .get(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_MAX_CONNECTIONS),
+                  runnable -> {
+                    Thread thread = new Thread(runnable);
+                    thread.setName("MetadataFilterHelper-ThreadPool-" + thread.getId());
+                    return thread;
+                  });
+        }
+      }
+    }
   }
 }
