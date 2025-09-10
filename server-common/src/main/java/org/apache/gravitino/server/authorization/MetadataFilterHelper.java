@@ -288,11 +288,10 @@ public class MetadataFilterHelper {
         if (executor == null) {
           executor =
               Executors.newFixedThreadPool(
-                  GravitinoEnv.getInstance()
-                      .config()
-                      .get(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_MAX_CONNECTIONS),
+                  GravitinoEnv.getInstance().config().get(Configs.AUTHORIZATION_CONCURRENT_NUMBER),
                   runnable -> {
                     Thread thread = new Thread(runnable);
+                    thread.setDaemon(true);
                     thread.setName("MetadataFilterHelper-ThreadPool-" + thread.getId());
                     return thread;
                   });

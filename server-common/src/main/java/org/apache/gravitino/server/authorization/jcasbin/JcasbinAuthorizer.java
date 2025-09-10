@@ -32,6 +32,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
+import java.util.concurrent.ThreadPoolExecutor;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Configs;
@@ -94,9 +95,7 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
   public void initialize() {
     executor =
         Executors.newFixedThreadPool(
-            GravitinoEnv.getInstance()
-                .config()
-                .get(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_MAX_CONNECTIONS),
+            GravitinoEnv.getInstance().config().get(Configs.AUTHORIZATION_CONCURRENT_NUMBER),
             runnable -> {
               Thread thread = new Thread(runnable);
               thread.setName("GravitinoAuthorizer-ThreadPool-" + thread.getId());
@@ -329,7 +328,14 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
   }
 
   @Override
-  public void close() throws IOException {}
+  public void close() throws IOException {
+    if (executor != null) {
+      if (executor instanceof ThreadPoolExecutor) {
+        ThreadPoolExecutor threadPoolExecutor = (ThreadPoolExecutor) executor;
+        threadPoolExecutor.shutdown();
+      }
+    }
+  }
 
   private class InternalAuthorizer {
 

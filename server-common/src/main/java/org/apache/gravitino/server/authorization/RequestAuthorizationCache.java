@@ -58,7 +58,7 @@ public class RequestAuthorizationCache {
   public static <T> T executeWithThreadCache(Supplier<T> supplier) {
     start();
     T result = threadLocalTransmitWrapper(supplier).get();
-    end();
+    stop();
     return result;
   }
 
@@ -162,7 +162,7 @@ public class RequestAuthorizationCache {
     hasLoadedRoleThreadLocal.set(new AtomicBoolean());
   }
 
-  private static void end() {
+  private static void stop() {
     allowAuthorizerThreadCache.remove();
     denyAuthorizerThreadCache.remove();
     hasLoadedRoleThreadLocal.remove();
