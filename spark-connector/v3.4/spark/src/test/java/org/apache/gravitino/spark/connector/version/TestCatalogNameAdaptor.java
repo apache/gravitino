@@ -32,7 +32,9 @@ public class TestCatalogNameAdaptor {
     String icebergCatalogName = CatalogNameAdaptor.getCatalogName("lakehouse-iceberg");
     Assertions.assertEquals(GravitinoIcebergCatalogSpark34.class.getName(), icebergCatalogName);
 
-    // String paimonCatalogName = CatalogNameAdaptor.getCatalogName("lakehouse-paimon");
-    // Assertions.assertEquals(GravitinoPaimonCatalogSpark34.class.getName(), paimonCatalogName);
+    String paimonCatalogName = CatalogNameAdaptor.getCatalogName("lakehouse-paimon");
+    Assertions.assertEquals(
+        "org.apache.gravitino.spark.connector.paimon.GravitinoPaimonCatalogSpark34",
+        paimonCatalogName);
   }
 }

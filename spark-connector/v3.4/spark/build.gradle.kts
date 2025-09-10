@@ -37,24 +37,9 @@ val scalaJava8CompatVersion: String = libs.versions.scala.java.compat.get()
 val scalaCollectionCompatVersion: String = libs.versions.scala.collection.compat.get()
 val artifactName = "${rootProject.name}-spark-${sparkMajorVersion}_$scalaVersion"
 
-val excludedPackage = listOf("org/apache/gravitino/spark/connector/paimon/**", "org/apache/gravitino/spark/connector/integration/test/paimon/**")
-sourceSets {
-  main {
-    java {
-      srcDirs("src/main/java")
-      if (scalaVersion != "2.12") {
-        exclude(excludedPackage)
-      }
-    }
-  }
-  test {
-    java {
-      srcDirs("src/test/java")
-      if (scalaVersion != "2.12") {
-        exclude(excludedPackage)
-      }
-    }
-  }
+if (hasProperty("configureSparkConnectorExcludes")) {
+  val configureFunc = properties["configureSparkConnectorExcludes"] as? (Project) -> Unit
+  configureFunc?.invoke(project)
 }
 
 dependencies {
@@ -65,8 +50,13 @@ dependencies {
   }
   compileOnly(project(":clients:client-java-runtime", configuration = "shadow"))
   compileOnly("org.apache.iceberg:iceberg-spark-runtime-${sparkMajorVersion}_$scalaVersion:$icebergVersion")
-  compileOnly("org.apache.paimon:paimon-spark-$sparkMajorVersion:$paimonVersion") {
-    exclude("org.apache.spark")
+  if (scalaVersion == "2.12") {
+    compileOnly("org.apache.paimon:paimon-spark-$sparkMajorVersion:$paimonVersion") {
+      exclude("org.apache.spark")
+    }
+    testImplementation("org.apache.paimon:paimon-spark-$sparkMajorVersion:$paimonVersion") {
+      exclude("org.apache.spark")
+    }
   }
 
   testImplementation(project(":api")) {
@@ -150,9 +140,6 @@ dependencies {
   testImplementation("org.apache.iceberg:iceberg-core:$icebergVersion")
   testImplementation("org.apache.iceberg:iceberg-spark-runtime-${sparkMajorVersion}_$scalaVersion:$icebergVersion")
   testImplementation("org.apache.iceberg:iceberg-hive-metastore:$icebergVersion")
-  testImplementation("org.apache.paimon:paimon-spark-$sparkMajorVersion:$paimonVersion") {
-    exclude("org.apache.spark")
-  }
   testImplementation("org.apache.kyuubi:kyuubi-spark-connector-hive_$scalaVersion:$kyuubiVersion")
   // include spark-sql,spark-catalyst,hive-common,hdfs-client
   testImplementation("org.apache.spark:spark-hive_$scalaVersion:$sparkVersion") {
