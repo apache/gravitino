@@ -164,6 +164,7 @@ public class TestKafkaCatalogOperations extends KafkaClusterEmbedded {
     Mockito.when(config.get(Configs.CACHE_WEIGHER_ENABLED)).thenReturn(true);
     Mockito.when(config.get(Configs.CACHE_STATS_ENABLED)).thenReturn(false);
     Mockito.when(config.get(Configs.CACHE_IMPLEMENTATION)).thenReturn("caffeine");
+    Mockito.when(config.get(Configs.CACHE_LOCK_SEGMENTS)).thenReturn(16);
 
     // Mock
     MetalakeMetaService metalakeMetaService = MetalakeMetaService.getInstance();
