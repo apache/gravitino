@@ -51,7 +51,6 @@ public class MetadataObjectUtil {
           .put(MetadataObject.Type.COLUMN, Entity.EntityType.COLUMN)
           .put(MetadataObject.Type.ROLE, Entity.EntityType.ROLE)
           .put(MetadataObject.Type.MODEL, Entity.EntityType.MODEL)
-          .put(MetadataObject.Type.GROUP, Entity.EntityType.GROUP)
           .build();
 
   private MetadataObjectUtil() {}
@@ -112,7 +111,6 @@ public class MetadataObjectUtil {
       case FILESET:
       case COLUMN:
       case MODEL:
-      case GROUP:
         String fullName = DOT.join(metalakeName, metadataObject.fullName());
         return NameIdentifier.parse(fullName);
       default:
@@ -192,8 +190,6 @@ public class MetadataObjectUtil {
         } catch (NoSuchRoleException nsr) {
           throw checkNotNull(exceptionToThrowSupplier).get();
         }
-        break;
-      case GROUP:
         break;
 
       default:

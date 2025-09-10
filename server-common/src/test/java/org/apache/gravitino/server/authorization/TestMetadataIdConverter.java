@@ -89,7 +89,7 @@ public class TestMetadataIdConverter {
   }
 
   @Test
-  void testConvert() throws IOException, IllegalAccessException {
+  void testConvert() throws IllegalAccessException {
     CatalogManager mockCatalogManager = mock(CatalogManager.class);
     Object originalCatalogManager =
         FieldUtils.readDeclaredField(GravitinoEnv.getInstance(), "catalogManager", true);
@@ -144,6 +144,12 @@ public class TestMetadataIdConverter {
                   MetadataIdConverter.normalizeCaseSensitive(
                       eq(ident7), eq(Capability.Scope.TOPIC), eq(mockCatalogManager)))
           .thenReturn(ident7);
+      mockedStatic
+          .when(
+              () ->
+                  MetadataIdConverter.normalizeCaseSensitive(
+                      eq(ident8), eq(null), eq(mockCatalogManager)))
+          .thenReturn(ident8);
 
       Long metalakeConvertedId =
           MetadataIdConverter.getID(
@@ -177,9 +183,6 @@ public class TestMetadataIdConverter {
               MetadataObjects.of(
                   ImmutableList.of("catalog", "schema", "topic"), MetadataObject.Type.TOPIC),
               "metalake");
-      Long groupConvertedId =
-          MetadataIdConverter.getID(
-              MetadataObjects.of(ImmutableList.of("group"), MetadataObject.Type.GROUP), "metalake");
 
       Assertions.assertEquals(1L, metalakeConvertedId);
       Assertions.assertEquals(2L, catalogConvertedId);
@@ -188,7 +191,6 @@ public class TestMetadataIdConverter {
       Assertions.assertEquals(5L, modelConvertedId);
       Assertions.assertEquals(6L, filesetConvertedId);
       Assertions.assertEquals(7L, topicConvertedId);
-      Assertions.assertEquals(8L, groupConvertedId);
     } finally {
       FieldUtils.writeDeclaredField(
           GravitinoEnv.getInstance(), "catalogManager", originalCatalogManager, true);
