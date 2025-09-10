@@ -244,6 +244,31 @@ nexusPublishing {
   packageGroup.set("org.apache.gravitino")
 }
 
+fun configureSparkConnectorExcludes(project: Project) {
+  project.afterEvaluate {
+    if (scalaVersion != "2.12") {
+      println("doing configureSparkConnectorExcludes")
+      val excludedPackages = listOf(
+        "org/apache/gravitino/spark/connector/paimon/**",
+        "org/apache/gravitino/spark/connector/integration/test/paimon/**"
+      )
+
+      sourceSets {
+        main {
+          java {
+            exclude(excludedPackages)
+          }
+        }
+        test {
+          java {
+            exclude(excludedPackages)
+          }
+        }
+      }
+    }
+  }
+}
+
 subprojects {
   // Gravitino Python client project didn't need to apply the java plugin
   if (project.name == "client-python") {
@@ -258,6 +283,8 @@ subprojects {
     mavenCentral()
     mavenLocal()
   }
+
+  extensions.extraProperties.set("configureSparkConnectorExcludes", ::configureSparkConnectorExcludes)
 
   fun compatibleWithJDK8(project: Project): Boolean {
     val isReleaseRun = gradle.startParameter.taskNames.any { it == "release" || it == "publish" || it == "publishToMavenLocal" }
