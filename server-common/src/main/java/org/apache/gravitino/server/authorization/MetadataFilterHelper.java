@@ -50,7 +50,7 @@ import org.slf4j.LoggerFactory;
 public class MetadataFilterHelper {
 
   private static final Logger LOG = LoggerFactory.getLogger(MetadataFilterHelper.class);
-  private static Executor executor = null;
+  private static volatile Executor executor = null;
 
   private MetadataFilterHelper() {}
 
