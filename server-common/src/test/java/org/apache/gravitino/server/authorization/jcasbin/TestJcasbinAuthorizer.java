@@ -37,6 +37,7 @@ import java.util.List;
 import java.util.concurrent.Executor;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.reflect.FieldUtils;
+import org.apache.gravitino.Config;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.GravitinoEnv;
@@ -98,6 +99,8 @@ public class TestJcasbinAuthorizer {
 
   private static MockedStatic<OwnerMetaService> ownerMetaServiceMockedStatic;
 
+  private static Config config = mock(Config.class);
+
   private static JcasbinAuthorizer jcasbinAuthorizer;
 
   private static ObjectMapper objectMapper = new ObjectMapper();
@@ -114,7 +117,7 @@ public class TestJcasbinAuthorizer {
     metadataIdConverterMockedStatic = mockStatic(MetadataIdConverter.class);
     gravitinoEnvMockedStatic = mockStatic(GravitinoEnv.class);
     gravitinoEnvMockedStatic.when(GravitinoEnv::getInstance).thenReturn(gravitinoEnv);
-
+    when(gravitinoEnv.config()).thenReturn(config);
     principalUtilsMockedStatic
         .when(PrincipalUtils::getCurrentPrincipal)
         .thenReturn(new UserPrincipal(USERNAME));
