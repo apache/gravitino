@@ -25,7 +25,10 @@ from dataclasses_json import DataClassJsonMixin, config
 
 from gravitino.api.expressions.sorts.null_ordering import NullOrdering
 from gravitino.api.expressions.sorts.sort_direction import SortDirection
+from gravitino.api.types.types import Types
 from gravitino.dto.rel.expressions.field_reference_dto import FieldReferenceDTO
+from gravitino.dto.rel.expressions.func_expression_dto import FuncExpressionDTO
+from gravitino.dto.rel.expressions.literal_dto import LiteralDTO
 from gravitino.dto.rel.json_serdes.sort_order_serdes import SortOrderSerdes
 from gravitino.dto.rel.sort_order_dto import SortOrderDTO
 from gravitino.exceptions.base import IllegalArgumentException
@@ -97,6 +100,59 @@ class TestSortOrderSerdes(unittest.TestCase):
         )
         self.assertIs(sort_orders[0].null_ordering(), NullOrdering.NULLS_FIRST)
         self.assertIs(sort_orders[0].direction(), SortDirection.ASCENDING)
+
+        serialized = mock_data_class.to_json()
+        self.assertDictEqual(json.loads(json_string), json.loads(serialized))
+
+    def test_sort_order_serdes_function_sort_term(self):
+        json_string = """
+        {
+            "sortOrders": [
+                {
+                    "sortTerm": {
+                        "type": "function",
+                        "funcName": "date_trunc",
+                        "funcArgs": [
+                            {
+                                "type": "literal",
+                                "dataType": "string",
+                                "value": "year"
+                            },
+                            {
+                                "type": "field",
+                                "fieldName": ["birthday"]
+                            }
+                        ]
+                    },
+                    "direction": "desc",
+                    "nullOrdering": "nulls_last"
+                }
+            ]
+        }
+        """
+
+        mock_data_class = MockDataClass.from_json(json_string)
+        sort_orders = mock_data_class.sort_orders
+        self.assertEqual(len(sort_orders), 1)
+        self.assertIsInstance(sort_orders[0], SortOrderDTO)
+        deserialized_func_dto = cast(FuncExpressionDTO, sort_orders[0].sort_term())
+        expected_func_dto = (
+            FuncExpressionDTO.builder()
+            .with_function_name("date_trunc")
+            .with_function_args(
+                [
+                    LiteralDTO.builder()
+                    .with_data_type(Types.StringType())
+                    .with_value("year")
+                    .build(),
+                    FieldReferenceDTO.builder().with_field_name(["birthday"]).build(),
+                ]
+            )
+            .build()
+        )
+        self.assertTrue(deserialized_func_dto == expected_func_dto)
+        self.assertIs(sort_orders[0].null_ordering(), NullOrdering.NULLS_LAST)
+        self.assertIs(sort_orders[0].direction(), SortDirection.DESCENDING)
 
         serialized = mock_data_class.to_json()
         self.assertDictEqual(json.loads(json_string), json.loads(serialized))
