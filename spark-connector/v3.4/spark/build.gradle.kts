@@ -54,9 +54,6 @@ dependencies {
     compileOnly("org.apache.paimon:paimon-spark-$sparkMajorVersion:$paimonVersion") {
       exclude("org.apache.spark")
     }
-    testImplementation("org.apache.paimon:paimon-spark-$sparkMajorVersion:$paimonVersion") {
-      exclude("org.apache.spark")
-    }
   }
 
   testImplementation(project(":api")) {
@@ -140,6 +137,11 @@ dependencies {
   testImplementation("org.apache.iceberg:iceberg-core:$icebergVersion")
   testImplementation("org.apache.iceberg:iceberg-spark-runtime-${sparkMajorVersion}_$scalaVersion:$icebergVersion")
   testImplementation("org.apache.iceberg:iceberg-hive-metastore:$icebergVersion")
+  if (scalaVersion == "2.12") {
+    testImplementation("org.apache.paimon:paimon-spark-$sparkMajorVersion:$paimonVersion") {
+      exclude("org.apache.spark")
+    }
+  }
   testImplementation("org.apache.kyuubi:kyuubi-spark-connector-hive_$scalaVersion:$kyuubiVersion")
   // include spark-sql,spark-catalyst,hive-common,hdfs-client
   testImplementation("org.apache.spark:spark-hive_$scalaVersion:$sparkVersion") {
