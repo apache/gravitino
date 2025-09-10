@@ -334,7 +334,7 @@ public class LancePartitionStatisticStorage implements PartitionStatisticStorage
       VarCharVector partitionNameVector = (VarCharVector) root.getVector(PARTITION_NAME_COLUMN);
       VarCharVector statisticNameVector = (VarCharVector) root.getVector(STATISTIC_NAME_COLUMN);
       LargeVarCharVector statisticValueVector =
-              (LargeVarCharVector) root.getVector(STATISTIC_VALUE_COLUMN);
+          (LargeVarCharVector) root.getVector(STATISTIC_VALUE_COLUMN);
       VarCharVector auditInfoVector = (VarCharVector) root.getVector(AUDIT_INFO_COLUMN);
 
       for (PartitionStatisticsUpdate updatePartitionStatistic : updates) {
