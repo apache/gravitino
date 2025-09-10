@@ -47,6 +47,7 @@ fun waitForServerIsReady(host: String = "http://localhost", port: Int = 8090, ti
   val urlString = "$host:$port/metrics"
   val successPattern = Regex("\"version\"\\s*:")
 
+  println("Waiting for server to be ready at $urlString (timeout: ${timeout / 1000}s)...")
   while (true) {
     try {
       val url = URL(urlString)
@@ -59,6 +60,8 @@ fun waitForServerIsReady(host: String = "http://localhost", port: Int = 8090, ti
       if (responseCode == 200) {
         val response = connection.inputStream.bufferedReader().use { it.readText() }
         if (successPattern.containsMatchIn(response)) {
+          val duration = System.currentTimeMillis() - startTime
+          println("\nServer is ready! Took ${duration / 1000.0} seconds.")
           return  // If this succeeds, the API is up and running
         } else {
           exception = RuntimeException("API returned unexpected response: $response")
@@ -74,6 +77,10 @@ fun waitForServerIsReady(host: String = "http://localhost", port: Int = 8090, ti
     if (System.currentTimeMillis() - startTime > timeout) {
       throw RuntimeException("Timed out waiting for API to be available", exception)
     }
+
+    // Print a dot to indicate waiting
+    print(".")
+    System.out.flush() // Ensure the dot is printed immediately
     Thread.sleep(500)  // Wait for 0.5 second before checking again
   }
 }
@@ -151,10 +158,6 @@ fun generatePypiProjectHomePage() {
   }
 }
 
-val hadoopVersion = "2.7.3"
-val hadoopPackName = "hadoop-${hadoopVersion}.tar.gz"
-val hadoopDirName = "hadoop-${hadoopVersion}"
-val hadoopDownloadUrl = "https://archive.apache.org/dist/hadoop/core/hadoop-${hadoopVersion}/${hadoopPackName}"
 tasks {
   val pipInstall by registering(VenvTask::class) {
     venvExec = "pip"
@@ -186,20 +189,6 @@ tasks {
     args = listOf("scripts/generate_version.py")
   }
 
-  val downloadHadoopPack by registering(Download::class) {
-    dependsOn(build)
-    onlyIfModified(true)
-    src(hadoopDownloadUrl)
-    dest(layout.buildDirectory.dir("tmp"))
-  }
-
-  val verifyHadoopPack by registering(Verify::class) {
-    dependsOn(downloadHadoopPack)
-    src(layout.buildDirectory.file("tmp/${hadoopPackName}"))
-    algorithm("MD5")
-    checksum("3455bb57e4b4906bbea67b58cca78fa8")
-  }
-
   val integrationTest by registering(VenvTask::class) {
     doFirst {
       gravitinoServer("start")
@@ -211,9 +200,7 @@ tasks {
     val dockerTest = project.rootProject.extra["dockerTest"] as? Boolean ?: false
     val envMap = mapOf<String, Any>().toMutableMap()
     if (dockerTest) {
-      dependsOn("verifyHadoopPack")
       envMap.putAll(mapOf(
-        "HADOOP_VERSION" to hadoopVersion,
         "PYTHON_BUILD_PATH" to project.rootDir.path + "/clients/client-python/build"
       ))
     }
@@ -233,8 +220,6 @@ tasks {
     doLast {
       gravitinoServer("stop")
     }
-
-    finalizedBy(integrationCoverageReport)
   }
 
   val unitCoverageReport by registering(VenvTask::class){
