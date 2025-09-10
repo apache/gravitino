@@ -185,5 +185,3 @@ artifacts {
 tasks.named<Jar>("sourcesJar") {
   duplicatesStrategy = DuplicatesStrategy.EXCLUDE
 }
-
-
