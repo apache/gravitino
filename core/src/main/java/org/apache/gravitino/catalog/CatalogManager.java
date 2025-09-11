@@ -76,7 +76,6 @@ import org.apache.gravitino.StringIdentifier;
 import org.apache.gravitino.connector.BaseCatalog;
 import org.apache.gravitino.connector.CatalogOperations;
 import org.apache.gravitino.connector.HasPropertyMetadata;
-import org.apache.gravitino.connector.PropertyEntry;
 import org.apache.gravitino.connector.SupportsSchemas;
 import org.apache.gravitino.connector.authorization.BaseAuthorization;
 import org.apache.gravitino.connector.capability.Capability;
@@ -103,6 +102,7 @@ import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.TableCatalog;
 import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.utils.IsolatedClassLoader;
+import org.apache.gravitino.utils.IsolatedClassLoader.ClassLoaderCacheKey;
 import org.apache.gravitino.utils.PrincipalUtils;
 import org.apache.gravitino.utils.ThrowableFunction;
 import org.slf4j.Logger;
@@ -1012,22 +1012,6 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
     }
   }
 
-  private Set<String> getHiddenPropertyNames(CatalogEntity entity) {
-    Map<String, String> conf = entity.getProperties();
-    String provider = entity.getProvider();
-
-    try (IsolatedClassLoader classLoader = createClassLoader(provider, conf)) {
-      BaseCatalog<?> catalog = createBaseCatalog(classLoader, entity);
-      return classLoader.withClassLoader(
-          cl ->
-              catalog.catalogPropertiesMetadata().propertyEntries().values().stream()
-                  .filter(PropertyEntry::isHidden)
-                  .map(PropertyEntry::getName)
-                  .collect(Collectors.toSet()),
-          RuntimeException.class);
-    }
-  }
-
   private BaseCatalog<?> createBaseCatalog(IsolatedClassLoader classLoader, CatalogEntity entity) {
     // Load Catalog class instance
     BaseCatalog<?> catalog = createCatalogInstance(classLoader, entity.getProvider());
@@ -1042,7 +1026,17 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
       String catalogConfPath = buildConfPath(conf, provider);
       ArrayList<String> libAndResourcesPaths = Lists.newArrayList(catalogPkgPath, catalogConfPath);
       BaseAuthorization.buildAuthorizationPkgPath(conf).ifPresent(libAndResourcesPaths::add);
-      return IsolatedClassLoader.buildClassLoader(libAndResourcesPaths);
+      String packagePath = conf.get(Catalog.PROPERTY_PACKAGE);
+
+      synchronized (IsolatedClassLoader.CLASSLOADER_CACHE) {
+        IsolatedClassLoader isolatedClassLoader =
+            IsolatedClassLoader.CLASSLOADER_CACHE.computeIfAbsent(
+                ClassLoaderCacheKey.of(provider, packagePath, conf),
+                k -> IsolatedClassLoader.buildClassLoader(libAndResourcesPaths));
+
+        isolatedClassLoader.getRefCount().incrementAndGet();
+        return isolatedClassLoader;
+      }
     } else {
       // This will use the current class loader, it is mainly used for test.
       return new IsolatedClassLoader(

@@ -18,7 +18,12 @@
  */
 package org.apache.gravitino.utils;
 
+import com.google.common.base.Objects;
+import com.google.common.collect.BiMap;
+import com.google.common.collect.HashBiMap;
 import com.google.common.collect.Lists;
+import com.google.common.collect.Maps;
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.io.Closeable;
 import java.io.File;
 import java.io.InputStream;
@@ -27,7 +32,15 @@ import java.net.URL;
 import java.net.URLClassLoader;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
+import java.util.concurrent.ScheduledThreadPoolExecutor;
+import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
+import javax.annotation.Nonnull;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.JavaVersion;
 import org.apache.commons.lang3.SystemUtils;
@@ -55,6 +68,90 @@ public class IsolatedClassLoader implements Closeable {
 
   private final ClassLoader baseClassLoader;
 
+  // Reference count to track the number of users of this class loader.
+  private AtomicInteger refCount = new AtomicInteger(0);
+
+  // Last access time in milliseconds. This value is used to determine when to clean up the class
+  // loader when refCount drops to zero.
+  private long lastAccessTime = Long.MAX_VALUE;
+
+  public static final BiMap<ClassLoaderCacheKey, IsolatedClassLoader> CLASSLOADER_CACHE =
+      Maps.synchronizedBiMap(HashBiMap.create());
+
+  public static final ScheduledThreadPoolExecutor CLASS_LOADER_CLEANER =
+      new ScheduledThreadPoolExecutor(1, newDaemonThreadFactory());
+
+  static {
+    CLASS_LOADER_CLEANER.scheduleAtFixedRate(
+        () -> {
+          synchronized (CLASSLOADER_CACHE) {
+            if (CLASSLOADER_CACHE.isEmpty()) {
+              return;
+            }
+
+            Iterator<Entry<ClassLoaderCacheKey, IsolatedClassLoader>> iterator =
+                CLASSLOADER_CACHE.entrySet().iterator();
+            while (iterator.hasNext()) {
+              Entry<ClassLoaderCacheKey, IsolatedClassLoader> entry = iterator.next();
+              IsolatedClassLoader classLoader = entry.getValue();
+              // If the class loader is not used for more than 60 seconds, we clean it up.
+              // TODO make 60000 configurable.
+              if (classLoader.getRefCount().get() <= 0
+                  && (System.currentTimeMillis() - classLoader.lastAccessTime) > 60000) {
+                iterator.remove();
+                classLoader.close();
+                classLoader.classLoader = null;
+                LOG.info("Cleaned up classloader for key: {}", entry.getKey());
+              }
+            }
+          }
+        },
+        10,
+        10,
+        TimeUnit.SECONDS);
+  }
+
+  public static class ClassLoaderCacheKey {
+    private final String provider;
+    private final String packagePath;
+    private final Map<String, String> options;
+
+    private ClassLoaderCacheKey(String provider, String packagePath, Map<String, String> options) {
+      this.provider = provider;
+      this.packagePath = packagePath;
+      this.options = options;
+    }
+
+    public static ClassLoaderCacheKey of(
+        String provider, String packagePath, Map<String, String> options) {
+      return new ClassLoaderCacheKey(provider, packagePath, options);
+    }
+
+    public static ClassLoaderCacheKey of(String provider, String packagePath) {
+      return new ClassLoaderCacheKey(provider, packagePath, Collections.emptyMap());
+    }
+
+    @Override
+    public boolean equals(Object o) {
+      if (this == o) {
+        return true;
+      }
+      if (o == null || !(o instanceof ClassLoaderCacheKey)) {
+        return false;
+      }
+
+      ClassLoaderCacheKey that = (ClassLoaderCacheKey) o;
+      return Objects.equal(provider, that.provider)
+          && Objects.equal(packagePath, that.packagePath)
+          && Objects.equal(options, that.options);
+    }
+
+    @Override
+    public int hashCode() {
+      return Objects.hashCode(provider, packagePath, options);
+    }
+  }
+
   /**
    * Constructs an IsolatedClassLoader with the provided parameters.
    *
@@ -69,6 +166,18 @@ public class IsolatedClassLoader implements Closeable {
     this.sharedClasses = sharedClasses;
     this.barrierClasses = barrierClasses;
     this.baseClassLoader = Thread.currentThread().getContextClassLoader();
+  }
+
+  @Nonnull
+  public AtomicInteger getRefCount() {
+    return refCount;
+  }
+
+  private static ThreadFactory newDaemonThreadFactory() {
+    return new ThreadFactoryBuilder()
+        .setDaemon(true)
+        .setNameFormat("IsolateClassloader-cleaner" + "-%d")
+        .build();
   }
 
   /**
@@ -150,8 +259,12 @@ public class IsolatedClassLoader implements Closeable {
   public void close() {
     try {
       if (classLoader != null) {
-        classLoader.close();
-        classLoader = null;
+        // We will not close the class loader immediately as it may be used by later calls. If
+        // the class loader is not used for more than 60 seconds, we will clean it up in the
+        // background.
+        if (refCount.decrementAndGet() <= 0) {
+          lastAccessTime = System.currentTimeMillis();
+        }
       }
     } catch (Exception e) {
       LOG.warn("Failed to close classloader", e);
