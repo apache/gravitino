@@ -60,6 +60,77 @@ icebergRest:
   catalogBackend: memory
   ## The warehouse directory of Iceberg catalog for Iceberg REST service
   warehouse: /tmp/
+  # warehouse: s3://iceberg-test/iceberg-docker
+  ## Name of the Iceberg catalog backend
+  ##
+  # catalogBackendName: memory
+  ## URI for connecting to the catalog backend (e.g., Hive Metastore Thrift URI)
+  ##
+  # uri: thrift://localhost:9083
+  ## JDBC connection configuration for jdbc catalog backend (if applicable)
+  ##
+  # jdbc:
+  #   user: "user name"
+  #   password: "password"
+  #   ## Whether to initialize the Iceberg meta tables in RDBMS
+  #   ##
+  #   initialize: True
+  #   ## JDBC driver class name
+  #   ##
+  #   driver: "com.mysql.cj.jdbc.Driver"
+  ## Implementation class for Iceberg file I/O operations
+  ##
+  # ioImpl: "org.apache.iceberg.aws.s3.S3FileIO"
+  ## Comma-separated list of credential providers.
+  ##
+  # credentialProviders: "s3-token"
+  ## S3 storage configuration
+  ##
+  # s3:
+  #   accessKeyId: ""
+  #   secretAccessKey: ""
+  #   ## Whether to use path-style access instead of virtual hosted-style access
+  #   ##
+  #   pathStyleAccess:
+  #   roleArn:
+  #   endpoint:
+  #   region:
+  #   externalId:
+  #   tokenServiceEndpoint:
+  ## OSS storage configuration
+  ##
+  # oss:
+  #   accessKeyId: ""
+  #   secretAccessKey: ""
+  #   endpoint: ""
+  #   region: ""
+  #   roleArn:
+  #   externalId:
+  ## Azure Blob Storage configuration
+  ##
+  # azure:
+  #   storageAccountName: ""
+  #   storageAccountKey: ""
+  #   tenantId: ""
+  #   clientId: ""
+  #   clientSecret: ""
+  ## No need to configure extra Google Cloud Storage configuration
+  ##
+  ## Catalog configuration provider class name
+  ##
+  # catalogConfigProvider: "static-config-provider"
+  ## Dynamic configuration provider settings
+  ##
+  # dynamicConfigProvider:
+  #   ## URI of the Gravitino server
+  #   ##
+  #   uri: "http://localhost:8090"
+  #   ## Name of the metalake
+  #   ##
+  #   metalake: "test"
+  #   ## Default catalog name for operations
+  #   ##
+  #   defaultCatalogName: "catalog name"
 
 # Rest backend configs.
 additionalConfigItems: {}

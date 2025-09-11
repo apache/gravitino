@@ -70,6 +70,14 @@ public class TrinoQueryITBase {
 
   private static BaseIT baseIT;
 
+  protected int trinoWorkerNum = 0;
+
+  public TrinoQueryITBase() {}
+
+  public TrinoQueryITBase(int trinoWorkerNum) {
+    this.trinoWorkerNum = trinoWorkerNum;
+  }
+
   private void setEnv() throws Exception {
     baseIT = new BaseIT();
     if (autoStart) {
@@ -78,7 +86,7 @@ public class TrinoQueryITBase {
       gravitinoUri = String.format("http://127.0.0.1:%d", baseIT.getGravitinoServerPort());
 
       trinoITContainers = ContainerSuite.getTrinoITContainers();
-      trinoITContainers.launch(baseIT.getGravitinoServerPort());
+      trinoITContainers.launch(baseIT.getGravitinoServerPort(), trinoWorkerNum);
 
       trinoUri = trinoITContainers.getTrinoUri();
       hiveMetastoreUri = trinoITContainers.getHiveMetastoreUri();

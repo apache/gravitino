@@ -165,15 +165,15 @@ public class GravitinoVirtualFileSystemConfiguration {
       ImmutableList.of(FS_GRAVITINO_CLIENT_METALAKE_KEY, FS_GRAVITINO_CLIENT_AUTH_TYPE_KEY);
 
   /**
-   * The configuration key for whether to enable fileset catalog cache. The default is false. Note
-   * that this cache causes a side effect: if you modify the fileset or fileset catalog metadata,
-   * the client can not see the latest changes.
+   * The configuration key for whether to enable fileset and catalog cache. The default is false.
+   * Note that this cache causes a side effect: if you modify the fileset or fileset catalog
+   * metadata, the client can not see the latest changes.
    */
-  public static final String FS_GRAVITINO_FILESET_CATALOG_CACHE_ENABLE =
-      "fs.gravitino.filesetCatalog.cache.enable";
+  public static final String FS_GRAVITINO_FILESET_METADATA_CACHE_ENABLE =
+      "fs.gravitino.filesetMetadataCache.cache.enable";
 
-  /** The default value for whether to enable fileset catalog cache. */
-  public static final boolean FS_GRAVITINO_FILESET_CATALOG_CACHE_ENABLE_DEFAULT = false;
+  /** The default value for whether to enable fileset and catalog cache. */
+  public static final boolean FS_GRAVITINO_FILESET_METADATA_CACHE_ENABLE_DEFAULT = false;
 
   private GravitinoVirtualFileSystemConfiguration() {}
 }

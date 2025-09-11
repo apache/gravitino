@@ -41,7 +41,11 @@ dependencies {
   implementation(libs.concurrent.trees)
   implementation(libs.guava)
   implementation(libs.h2db)
-  implementation(libs.lance)
+  implementation(libs.lance) {
+    exclude(group = "com.fasterxml.jackson.core", module = "*") // provided by gravitino
+    exclude(group = "com.fasterxml.jackson.datatype", module = "*") // provided by gravitino
+    exclude(group = "commons-codec", module = "commons-codec") // provided by jcasbin
+  }
   implementation(libs.mybatis)
 
   annotationProcessor(libs.lombok)
