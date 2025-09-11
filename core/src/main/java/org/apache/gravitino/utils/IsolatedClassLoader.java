@@ -36,10 +36,12 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Set;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.Collectors;
 import javax.annotation.Nonnull;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.JavaVersion;
@@ -116,10 +118,22 @@ public class IsolatedClassLoader implements Closeable {
     private final String packagePath;
     private final Map<String, String> options;
 
+    // Configurable that can decide which class loader to use. For example, we may
+    // want to use different class loader for different authentication methods, then
+    // we can add "auth.method" to the useful options. Currently, only `provider` and `package`
+    // are used, please refer to `ClassLoaderCacheKey`.
+    private static final Set<String> CLASS_LOADER_AFFECT_OPTIONS = Set.of();
+
+    private Map<String, String> extractUsefulOptions(Map<String, String> options) {
+      return options.entrySet().stream()
+          .filter(e -> CLASS_LOADER_AFFECT_OPTIONS.contains(e.getKey()))
+          .collect(Collectors.toMap(Entry::getKey, Entry::getValue));
+    }
+
     private ClassLoaderCacheKey(String provider, String packagePath, Map<String, String> options) {
       this.provider = provider;
       this.packagePath = packagePath;
-      this.options = options;
+      this.options = extractUsefulOptions(options);
     }
 
     public static ClassLoaderCacheKey of(
