@@ -127,6 +127,24 @@ class TableChange(ABC):
             default_value,
         )
 
+    @staticmethod
+    def rename_column(field_name: list[str], new_name: str) -> "RenameColumn":
+        """Create a `TableChange` for renaming a field.
+
+        The name is used to find the field to rename. The new name will replace the **leaf field
+        name**. For example, `rename_column(["a", "b", "c"], "x")` should produce column **a.b.x**.
+
+        If the field does not exist, the change will result in an `IllegalArgumentException`.
+
+        Args:
+            field_name (list[str]): The current field name.
+            new_name (str): The new name.
+
+        Returns:
+            RenameColumn: A TableChange for the rename.
+        """
+        return RenameColumn(field_name, new_name)
+
     @final
     @dataclass(frozen=True)
     class RenameTable:
@@ -425,3 +443,40 @@ class AddColumn(TableChange.ColumnChange):
         )
         result = hash(base_tuple)
         return 31 * result + hash(tuple(self._field_name))
+
+
+@final
+@dataclass(frozen=True)
+class RenameColumn(TableChange.ColumnChange):
+    """A `TableChange` to rename a field.
+
+    The name is used to find the field to rename. The new name will replace the **leaf field name**.
+    For example, `rename_column("a.b.c", "x")` should produce column **a.b.x**.
+
+    If the field does not exist, the change must result in an `IllegalArgumentException`.
+    """
+
+    _field_name: list[str] = field(metadata=config(field_name="field_name"))
+    _new_name: str = field(metadata=config(field_name="new_name"))
+
+    def get_field_name(self) -> list[str]:
+        """Retrieves the hierarchical field name of the column to be renamed.
+
+        Returns:
+            list[str]: The field name of the column to be renamed.
+        """
+        return self._field_name
+
+    def get_new_name(self) -> str:
+        """Retrieves the new name for the column.
+
+        Returns:
+            str: The new name of the column.
+        """
+        return self._new_name
+
+    def field_name(self) -> list[str]:
+        return self._field_name
+
+    def __hash__(self) -> int:
+        return hash((tuple(self._field_name), self._new_name))
