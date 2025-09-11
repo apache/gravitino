@@ -250,7 +250,7 @@ public class TestLancePartitionStatisticStorage {
       objectUpdates.add(MetadataObjectStatisticsUpdate.of(metadata, updates));
     }
     storage.updateStatistics(metalakeName, objectUpdates);
-    Assertions.assertEquals(1, storage.getCache().estimatedSize());
+    Assertions.assertEquals(1, storage.getDatasetCache().estimatedSize());
 
     String fromPartitionName =
         "partition" + String.format("%0" + String.valueOf(partitions).length() + "d", 0);
@@ -267,7 +267,7 @@ public class TestLancePartitionStatisticStorage {
                 toPartitionName,
                 PartitionRange.BoundType.OPEN));
     Assertions.assertEquals(1, listedStats.size());
-    Assertions.assertEquals(1, storage.getCache().estimatedSize());
+    Assertions.assertEquals(1, storage.getDatasetCache().estimatedSize());
 
     String targetPartitionName = "partition00";
     for (PersistedPartitionStatistics persistStat : listedStats) {
@@ -299,7 +299,7 @@ public class TestLancePartitionStatisticStorage {
                         targetPartitionName, Lists.newArrayList("statistic0")))));
 
     storage.dropStatistics(metalakeName, tableStatisticsToDrop);
-    Assertions.assertEquals(1, storage.getCache().estimatedSize());
+    Assertions.assertEquals(1, storage.getDatasetCache().estimatedSize());
 
     listedStats =
         storage.listStatistics(
@@ -311,7 +311,7 @@ public class TestLancePartitionStatisticStorage {
                 toPartitionName,
                 PartitionRange.BoundType.OPEN));
     Assertions.assertEquals(1, listedStats.size());
-    Assertions.assertEquals(1, storage.getCache().estimatedSize());
+    Assertions.assertEquals(1, storage.getDatasetCache().estimatedSize());
 
     for (PersistedPartitionStatistics partitionStat : listedStats) {
       String partitionName = partitionStat.partitionName();
@@ -342,7 +342,7 @@ public class TestLancePartitionStatisticStorage {
                       PartitionStatisticsModification.drop(
                           "partition02", Lists.newArrayList("statistic2")))));
       storage.dropStatistics(metalakeName, tableStatisticsToDrop);
-      Assertions.assertEquals(1, storage.getCache().estimatedSize());
+      Assertions.assertEquals(1, storage.getDatasetCache().estimatedSize());
 
       listedStats =
           storage.listStatistics(
@@ -354,7 +354,7 @@ public class TestLancePartitionStatisticStorage {
                   "partition03",
                   PartitionRange.BoundType.OPEN));
       Assertions.assertEquals(3, listedStats.size());
-      Assertions.assertEquals(1, storage.getCache().estimatedSize());
+      Assertions.assertEquals(1, storage.getDatasetCache().estimatedSize());
       for (PersistedPartitionStatistics persistPartStat : listedStats) {
         stats = persistPartStat.statistics();
         Assertions.assertEquals(9, stats.size());
