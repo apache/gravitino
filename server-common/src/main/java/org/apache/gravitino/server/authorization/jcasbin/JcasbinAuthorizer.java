@@ -183,7 +183,7 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
       UserEntity userEntity = getUserEntity(principal.getName(), metalake);
       userId = userEntity.id();
       metadataId = MetadataIdConverter.getID(metadataObject, metalake);
-      result = Objects.equals(metadataId, ownerRel.get(userId));
+      result = Objects.equals(userId, ownerRel.get(metadataId));
     } catch (Exception e) {
       LOG.debug("Can not get entity id", e);
       result = false;
