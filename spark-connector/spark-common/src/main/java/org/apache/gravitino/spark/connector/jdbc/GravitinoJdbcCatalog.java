@@ -21,7 +21,6 @@ package org.apache.gravitino.spark.connector.jdbc;
 
 import com.google.common.collect.Maps;
 import java.util.Map;
-
 import org.apache.commons.collections4.MapUtils;
 import org.apache.gravitino.spark.connector.PropertiesConverter;
 import org.apache.gravitino.spark.connector.SparkTransformConverter;
