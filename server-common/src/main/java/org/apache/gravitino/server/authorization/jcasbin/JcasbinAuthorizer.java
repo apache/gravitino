@@ -52,8 +52,6 @@ import org.apache.gravitino.meta.RoleEntity;
 import org.apache.gravitino.meta.UserEntity;
 import org.apache.gravitino.server.authorization.MetadataIdConverter;
 import org.apache.gravitino.server.authorization.RequestAuthorizationCache;
-import org.apache.gravitino.server.authorization.policy.OwnerPolicyAsyncLoader;
-import org.apache.gravitino.storage.relational.po.OwnerRelPO;
 import org.apache.gravitino.utils.MetadataObjectUtil;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.PrincipalUtils;
@@ -110,7 +108,6 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
     allowInternalAuthorizer = new InternalAuthorizer(allowEnforcer);
     denyEnforcer = new SyncedEnforcer(getModel("/jcasbin_model.conf"), new GravitinoAdapter());
     denyInternalAuthorizer = new InternalAuthorizer(denyEnforcer);
-    initializeOwnerAsync();
   }
 
   private Model getModel(String modelFilePath) {
@@ -491,22 +488,5 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
             condition.name().toLowerCase());
       }
     }
-  }
-
-  /** Async initialize owner */
-  private void initializeOwnerAsync() {
-    OwnerPolicyAsyncLoader loader = OwnerPolicyAsyncLoader.create(executor);
-    loader.loadAllOwnerAsync(
-        100,
-        (ownerRels) -> {
-          for (OwnerRelPO ownerRelPO : ownerRels) {
-            String ownerType = ownerRelPO.getOwnerType();
-            if ("user".equalsIgnoreCase(ownerType)) {
-              Long metadataObjectId = ownerRelPO.getMetadataObjectId();
-              ownerRel.put(ownerRelPO.getMetalakeId(), ownerRelPO.getOwnerId());
-              loadedOwners.add(metadataObjectId);
-            }
-          }
-        });
   }
 }
