@@ -93,9 +93,9 @@ public class LancePartitionStatisticStorage implements PartitionStatisticStorage
   private static final String DATASET_CACHE_SIZE = "datasetCacheSize";
   private static final int DEFAULT_DATASET_CACHE_SIZE = 0;
   private static final String METADATA_FILE_CACHE_SIZE = "metadataFileCacheSizeBytes";
-  private static final long DEFAULT_METADATA_FILE_CACHE_SIZE = 100L * 1024 * 1024; // 100MB
+  private static final long DEFAULT_METADATA_FILE_CACHE_SIZE = 100L * 1024; // 100KB
   private static final String INDEX_CACHE_SIZE = "indexCacheSizeBytes";
-  private static final long DEFAULT_INDEX_CACHE_SIZE = 100L * 1024 * 1024; // 100MB
+  private static final long DEFAULT_INDEX_CACHE_SIZE = 100L * 1024; // 100KB
   // The schema is `table_id`, `partition_name`,  `statistic_name`, `statistic_value`, `audit_info`
   private static final String TABLE_ID_COLUMN = "table_id";
   private static final String PARTITION_NAME_COLUMN = "partition_name";
