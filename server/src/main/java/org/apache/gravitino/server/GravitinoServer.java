@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.server;
 
+import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.IOException;
 import java.util.HashSet;
@@ -198,12 +199,10 @@ public class GravitinoServer extends ResourceConfig {
 
   public static void main(String[] args) {
     LOG.info("Starting Gravitino Server");
+
     String confPath = "";
     if (System.getenv("GRAVITINO_TEST") != null) {
-      if (args.length < 1) {
-        LOG.error("Missing argument for GRAVITINO_TEST conf path.");
-        System.exit(1);
-      }
+      Preconditions.checkArgument(args.length >= 1, "Missing conf path argument");
       confPath = args[0];
     }
     ServerConfig serverConfig = loadConfig(confPath);
