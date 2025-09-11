@@ -20,8 +20,8 @@ package org.apache.gravitino.filesystem.hadoop;
 
 import static org.apache.gravitino.file.Fileset.PROPERTY_DEFAULT_LOCATION_NAME;
 import static org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_CURRENT_LOCATION_NAME;
-import static org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_FILESET_CATALOG_CACHE_ENABLE;
-import static org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_FILESET_CATALOG_CACHE_ENABLE_DEFAULT;
+import static org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_FILESET_METADATA_CACHE_ENABLE;
+import static org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_FILESET_METADATA_CACHE_ENABLE_DEFAULT;
 import static org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystemUtils.extractIdentifier;
 import static org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystemUtils.getConfigMap;
 import static org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystemUtils.getSubPathFromGvfsPath;
@@ -148,8 +148,8 @@ public abstract class BaseGVFSOperations implements Closeable {
     this.gravitinoClient = GravitinoVirtualFileSystemUtils.createClient(configuration);
     boolean enableFilesetCatalogCache =
         configuration.getBoolean(
-            FS_GRAVITINO_FILESET_CATALOG_CACHE_ENABLE,
-            FS_GRAVITINO_FILESET_CATALOG_CACHE_ENABLE_DEFAULT);
+            FS_GRAVITINO_FILESET_METADATA_CACHE_ENABLE,
+            FS_GRAVITINO_FILESET_METADATA_CACHE_ENABLE_DEFAULT);
     this.filesetMetadataCache =
         enableFilesetCatalogCache
             ? Optional.of(new FilesetMetadataCache(gravitinoClient))
