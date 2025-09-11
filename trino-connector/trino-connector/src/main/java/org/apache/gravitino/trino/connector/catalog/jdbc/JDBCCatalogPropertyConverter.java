@@ -56,7 +56,7 @@ public class JDBCCatalogPropertyConverter extends CatalogPropertyConverter {
   /** Set of required properties for JDBC connection. */
   public static final Set<String> REQUIRED_PROPERTIES =
       Sets.newHashSet(
-          JDBC_CONNECTION_PASSWORD_KEY, JDBC_CONNECTION_USER_KEY, JDBC_CONNECTION_PASSWORD_KEY);
+          JDBC_CONNECTION_URL_KEY, JDBC_CONNECTION_USER_KEY, JDBC_CONNECTION_PASSWORD_KEY);
 
   @Override
   public TreeBidiMap<String, String> engineToGravitinoMapping() {
