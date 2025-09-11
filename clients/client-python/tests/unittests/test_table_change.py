@@ -146,3 +146,38 @@ class TestTableChange(unittest.TestCase):
         self.assertFalse(add_columns[0] == another_add_column)
         self.assertFalse(another_add_column == add_columns[0])
         self.assertEqual(len(add_column_dict), 2)
+
+    def test_rename_column(self):
+        field_name = ["Last Name"]
+        new_name = "Family Name"
+        rename_column = TableChange.rename_column(field_name, new_name)
+        self.assertListEqual(rename_column.get_field_name(), field_name)
+        self.assertListEqual(rename_column.field_name(), field_name)
+        self.assertEqual(rename_column.get_new_name(), new_name)
+
+    def test_rename_nested_column(self):
+        field_name = ["Name", "First Name"]
+        new_name = "Name.first"
+        rename_column = TableChange.rename_column(field_name, new_name)
+        self.assertListEqual(rename_column.field_name(), field_name)
+        self.assertEqual(rename_column.get_new_name(), new_name)
+
+    def test_column_rename_equal_and_hash(self):
+        field_name = ["Name"]
+        another_field_name = ["First Name"]
+        new_name = "Family Name"
+        rename_columns = [
+            TableChange.rename_column(field_name, new_name) for _ in range(2)
+        ]
+        rename_column_dict = {rename_columns[i]: i for i in range(2)}
+
+        self.assertTrue(rename_columns[0] == rename_columns[1])
+        self.assertTrue(rename_columns[1] == rename_columns[0])
+        self.assertEqual(len(rename_column_dict), 1)
+        self.assertEqual(rename_column_dict[rename_columns[0]], 1)
+
+        another_rename_column = TableChange.rename_column(another_field_name, new_name)
+        rename_column_dict = {rename_columns[0]: 0, another_rename_column: 1}
+        self.assertFalse(rename_columns[0] == another_rename_column)
+        self.assertFalse(another_rename_column == rename_columns[0])
+        self.assertEqual(len(rename_column_dict), 2)
