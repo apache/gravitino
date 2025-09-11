@@ -283,7 +283,7 @@ docker run -dti -p 8080:8080 -e KC_BOOTSTRAP_ADMIN_USERNAME=admin -e KC_BOOTSTRA
 
     ![create-realm.png](../assets/security/create-realm.png)
 
-4. Get the `gravitinorealm` public key, which is the <the default signing key> in gravitino.conf
+4. Get the `gravitinorealm` public key, which is the `<the default signing key>` in gravitino.conf
    Access `http://localhost:8080/realms/gravitinorealm` in browser
 
    ![realm-public-key.png](../assets/security/realm-public-key.png)
@@ -364,4 +364,4 @@ Use the access token to make requests to the Gravitino server
 
 ```shell
 curl -v -X GET -H "Accept: application/vnd.gravitino.v1+json" -H "Content-Type: application/json" -H "Authorization: Bearer <access_token>" http://localhost:8090/api/version
-``` 
+```
