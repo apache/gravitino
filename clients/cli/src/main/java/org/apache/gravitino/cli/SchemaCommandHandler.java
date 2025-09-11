@@ -24,6 +24,7 @@ import java.util.List;
 import org.apache.commons.cli.CommandLine;
 import org.apache.gravitino.cli.commands.Command;
 
+/** Handler for the "schema" command. */
 public class SchemaCommandHandler extends CommandHandler {
 
   private final GravitinoCommandLine gravitinoCommandLine;

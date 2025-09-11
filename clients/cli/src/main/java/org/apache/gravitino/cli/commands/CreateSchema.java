@@ -26,10 +26,15 @@ import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
 
+/** Represents create a schema */
 public class CreateSchema extends Command {
+  /** The name of the metalake. */
   protected final String metalake;
+  /** The name of the catalog. */
   protected final String catalog;
+  /** The name of the schema. */
   protected final String schema;
+  /** The schema's comment. */
   protected final String comment;
 
   /**

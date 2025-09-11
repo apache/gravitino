@@ -46,6 +46,7 @@ import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.CatalogEntity;
 import org.apache.gravitino.meta.ColumnEntity;
 import org.apache.gravitino.meta.FilesetEntity;
+import org.apache.gravitino.meta.GroupEntity;
 import org.apache.gravitino.meta.ModelEntity;
 import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.meta.SchemaVersion;
@@ -68,6 +69,7 @@ public class TestMetadataIdConverter {
   private NameIdentifier ident5;
   private NameIdentifier ident6;
   private NameIdentifier ident7;
+  private NameIdentifier ident8;
 
   // Test Entities
   private BaseMetalake entity1;
@@ -77,6 +79,7 @@ public class TestMetadataIdConverter {
   private ModelEntity entity5;
   private FilesetEntity entity6;
   private TopicEntity entity7;
+  private GroupEntity entity8;
 
   @BeforeAll
   void initTest() throws IOException {
@@ -86,7 +89,7 @@ public class TestMetadataIdConverter {
   }
 
   @Test
-  void testConvert() throws IOException, IllegalAccessException {
+  void testConvert() throws IllegalAccessException {
     CatalogManager mockCatalogManager = mock(CatalogManager.class);
     Object originalCatalogManager =
         FieldUtils.readDeclaredField(GravitinoEnv.getInstance(), "catalogManager", true);
@@ -141,6 +144,12 @@ public class TestMetadataIdConverter {
                   MetadataIdConverter.normalizeCaseSensitive(
                       eq(ident7), eq(Capability.Scope.TOPIC), eq(mockCatalogManager)))
           .thenReturn(ident7);
+      mockedStatic
+          .when(
+              () ->
+                  MetadataIdConverter.normalizeCaseSensitive(
+                      eq(ident8), eq(null), eq(mockCatalogManager)))
+          .thenReturn(ident8);
 
       Long metalakeConvertedId =
           MetadataIdConverter.getID(
@@ -198,6 +207,7 @@ public class TestMetadataIdConverter {
     ident5 = NameIdentifier.of("metalake", "catalog", "schema", "model");
     ident6 = NameIdentifier.of("metalake", "catalog", "schema", "fileset");
     ident7 = NameIdentifier.of("metalake", "catalog", "schema", "topic");
+    ident8 = NameIdentifier.of("metalake", "group");
   }
 
   private void initTestEntities() {
@@ -217,6 +227,7 @@ public class TestMetadataIdConverter {
     entity7 =
         getTestTopicEntity(
             7L, "topic", Namespace.of("metalake", "catalog", "schema"), "test_topic");
+    entity8 = getTestGroupEntity(8L, "group", Namespace.of("metalake"));
   }
 
   private void initMockCache() throws IOException {
@@ -229,6 +240,7 @@ public class TestMetadataIdConverter {
     when(mockStore.get(ident5, Entity.EntityType.MODEL, ModelEntity.class)).thenReturn(entity5);
     when(mockStore.get(ident6, Entity.EntityType.FILESET, FilesetEntity.class)).thenReturn(entity6);
     when(mockStore.get(ident7, Entity.EntityType.TOPIC, TopicEntity.class)).thenReturn(entity7);
+    when(mockStore.get(ident8, Entity.EntityType.GROUP, GroupEntity.class)).thenReturn(entity8);
   }
 
   private BaseMetalake getTestMetalake(long id, String name, String comment) {
@@ -336,6 +348,15 @@ public class TestMetadataIdConverter {
         .withAuditInfo(getTestAuditInfo())
         .withComment(comment)
         .withProperties(ImmutableMap.of())
+        .build();
+  }
+
+  private GroupEntity getTestGroupEntity(long id, String name, Namespace namespace) {
+    return GroupEntity.builder()
+        .withId(id)
+        .withName(name)
+        .withNamespace(namespace)
+        .withAuditInfo(getTestAuditInfo())
         .build();
   }
 }

@@ -53,9 +53,9 @@ class MetadataObjectTagOperations implements SupportsTags {
     this.tagRequestPath =
         String.format(
             "api/metalakes/%s/objects/%s/%s/tags",
-            metalakeName,
+            RESTUtils.encodeString(metalakeName),
             metadataObject.type().name().toLowerCase(Locale.ROOT),
-            metadataObject.fullName());
+            RESTUtils.encodeString(metadataObject.fullName()));
   }
 
   @Override

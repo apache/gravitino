@@ -26,11 +26,20 @@ import org.apache.commons.cli.DefaultParser;
 import org.apache.commons.cli.Options;
 import org.apache.commons.cli.ParseException;
 
-/* Entry point for the Gravitino command line. */
+/** Entry point for the Gravitino command line. */
 public class Main {
 
+  /**
+   * Flag to indicate whether to use {@link System#exit(int)} or throw a {@link RuntimeException}
+   * when exiting the application.
+   */
   public static boolean useExit = true;
 
+  /**
+   * Main entry point for the Gravitino command line.
+   *
+   * @param args the command line arguments
+   */
   public static void main(String[] args) {
     CommandLineParser parser = new DefaultParser();
     Options options = new GravitinoOptions().options();

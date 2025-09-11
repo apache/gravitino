@@ -30,8 +30,8 @@ public class TopicMetaPostgreSQLProvider extends TopicMetaBaseSQLProvider {
   public String softDeleteTopicMetasByTopicId(Long topicId) {
     return "UPDATE "
         + TABLE_NAME
-        + " SET deleted_at = floor(extract(epoch from((current_timestamp -"
-        + " timestamp '1970-01-01 00:00:00')*1000)))"
+        + " SET deleted_at = floor(extract(epoch from(current_timestamp -"
+        + " timestamp '1970-01-01 00:00:00'))*1000)"
         + " WHERE topic_id = #{topicId} AND deleted_at = 0";
   }
 
@@ -39,8 +39,8 @@ public class TopicMetaPostgreSQLProvider extends TopicMetaBaseSQLProvider {
   public String softDeleteTopicMetasByCatalogId(Long catalogId) {
     return "UPDATE "
         + TABLE_NAME
-        + " SET deleted_at = floor(extract(epoch from((current_timestamp -"
-        + " timestamp '1970-01-01 00:00:00')*1000))) "
+        + " SET deleted_at = floor(extract(epoch from(current_timestamp -"
+        + " timestamp '1970-01-01 00:00:00'))*1000)"
         + " WHERE catalog_id = #{catalogId} AND deleted_at = 0";
   }
 
@@ -48,8 +48,8 @@ public class TopicMetaPostgreSQLProvider extends TopicMetaBaseSQLProvider {
   public String softDeleteTopicMetasByMetalakeId(Long metalakeId) {
     return "UPDATE "
         + TABLE_NAME
-        + " SET deleted_at = floor(extract(epoch from((current_timestamp -"
-        + " timestamp '1970-01-01 00:00:00')*1000)))"
+        + " SET deleted_at = floor(extract(epoch from(current_timestamp -"
+        + " timestamp '1970-01-01 00:00:00'))*1000)"
         + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0";
   }
 
@@ -57,8 +57,8 @@ public class TopicMetaPostgreSQLProvider extends TopicMetaBaseSQLProvider {
   public String softDeleteTopicMetasBySchemaId(Long schemaId) {
     return "UPDATE "
         + TABLE_NAME
-        + " SET deleted_at = floor(extract(epoch from((current_timestamp -"
-        + " timestamp '1970-01-01 00:00:00')*1000))) "
+        + " SET deleted_at = floor(extract(epoch from(current_timestamp -"
+        + " timestamp '1970-01-01 00:00:00'))*1000)"
         + " WHERE schema_id = #{schemaId} AND deleted_at = 0";
   }
 

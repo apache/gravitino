@@ -23,7 +23,7 @@ import com.google.common.base.Preconditions;
 import org.apache.commons.cli.CommandLine;
 import org.apache.gravitino.cli.commands.Command;
 
-/* Context for a command */
+/** Context for a command */
 public class CommandContext {
   private final boolean force;
   private final boolean ignoreVersions;

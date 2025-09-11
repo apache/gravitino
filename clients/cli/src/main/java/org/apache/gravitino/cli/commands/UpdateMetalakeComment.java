@@ -28,7 +28,9 @@ import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 /** Update the comment of a metalake. */
 public class UpdateMetalakeComment extends Command {
 
+  /** The name of the metalake. */
   protected final String metalake;
+  /** The new metalake comment. */
   protected final String comment;
 
   /**

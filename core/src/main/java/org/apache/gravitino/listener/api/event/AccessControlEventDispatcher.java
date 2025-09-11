@@ -421,7 +421,7 @@ public class AccessControlEventDispatcher implements AccessControlDispatcher {
   @Override
   public Role grantPrivilegeToRole(
       String metalake, String role, MetadataObject object, Set<Privilege> privileges)
-      throws NoSuchGroupException, NoSuchRoleException {
+      throws NoSuchMetalakeException, NoSuchRoleException {
     String initiator = PrincipalUtils.getCurrentUserName();
 
     eventBus.dispatchEvent(

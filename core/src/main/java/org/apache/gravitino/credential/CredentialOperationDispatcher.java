@@ -112,7 +112,17 @@ public class CredentialOperationDispatcher extends OperationDispatcher {
                   }
                   return new PathBasedCredentialContext(
                       PrincipalUtils.getCurrentUserName(), writePaths, readPaths);
-                }));
+                },
+                CredentialOperationDispatcher::mergeContexts));
+  }
+
+  private static PathBasedCredentialContext mergeContexts(
+      CredentialContext oldValue, CredentialContext newValue) {
+    PathBasedCredentialContext oldContext = (PathBasedCredentialContext) oldValue;
+    PathBasedCredentialContext newContext = (PathBasedCredentialContext) newValue;
+    oldContext.getWritePaths().addAll(newContext.getWritePaths());
+    oldContext.getReadPaths().addAll(newContext.getReadPaths());
+    return oldContext;
   }
 
   @SuppressWarnings("UnusedVariable")

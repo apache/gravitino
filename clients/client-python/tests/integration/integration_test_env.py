@@ -41,8 +41,8 @@ def get_gravitino_server_version(**kwargs):
         response.raise_for_status()  # raise an exception for bad status codes
         response.close()
         return True
-    except requests.exceptions.RequestException:
-        logger.warning("Failed to access the Gravitino server")
+    except requests.exceptions.RequestException as e:
+        logger.warning("Failed to access the Gravitino server: %s", e)
         return False
 
 
