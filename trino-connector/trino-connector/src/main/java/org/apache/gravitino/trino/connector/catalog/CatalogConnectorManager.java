@@ -171,7 +171,6 @@ public class CatalogConnectorManager {
       }
     } catch (Exception e) {
       LOG.error("Error when loading metalake", e);
-      System.exit(-1);
     }
   }
 
