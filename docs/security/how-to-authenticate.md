@@ -105,6 +105,9 @@ GravitinoClient client = GravitinoClient.builder(uri)
 
 ### Server configuration
 
+Gravitino server and Gravitino Iceberg REST server use the same configuration items, you doesn't need to add `gravitino.iceberg-rest` prefix for Gravitino Iceberg REST server.
+
+
 | Configuration item                                | Description                                                                                                                                                                                                                                                | Default value     | Required                                   | Since version    |
 |---------------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-------------------|--------------------------------------------|------------------|
 | `gravitino.authenticator`                         | It is deprecated since Gravitino 0.6.0. Please use `gravitino.authenticators` instead.                                                                                                                                                                     | `simple`          | No                                         | 0.3.0            |
