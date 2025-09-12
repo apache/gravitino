@@ -275,6 +275,7 @@ public class CaffeineEntityCache extends BaseEntityCache {
       EntityCacheKey key, EntityCache.ThrowingSupplier<E, T> action) throws T {
     Preconditions.checkArgument(key != null, "Key cannot be null");
     Preconditions.checkArgument(action != null, "Action cannot be null");
+
     return segmentedLock.withLockAndThrow(key, action);
   }
 
