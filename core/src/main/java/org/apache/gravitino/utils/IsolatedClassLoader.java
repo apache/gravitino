@@ -101,6 +101,7 @@ public class IsolatedClassLoader implements Closeable {
               if (classLoader.getRefCount().get() <= 0
                   && (System.currentTimeMillis() - classLoader.lastAccessTime) > 60000) {
                 iterator.remove();
+                ClassLoaderResourceCleanerUtils.closeClassLoaderResource(classLoader.classLoader);
                 classLoader.close();
                 classLoader.classLoader = null;
                 LOG.info("Cleaned up classloader for key: {}", entry.getKey());
