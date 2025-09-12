@@ -46,6 +46,7 @@ dependencies {
     exclude(group = "com.fasterxml.jackson.datatype", module = "*")
   }
   implementation(libs.mybatis)
+  implementation(libs.mysql.driver)
 
   annotationProcessor(libs.lombok)
 
