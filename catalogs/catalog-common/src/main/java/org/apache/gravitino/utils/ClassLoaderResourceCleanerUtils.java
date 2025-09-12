@@ -63,6 +63,7 @@ public class ClassLoaderResourceCleanerUtils {
 
     switch (provider) {
       case "lakehouse-iceberg":
+        // Treat hive as lakehouse for resource cleanup purposes.
       case "hive":
       case "lakehouse-hudi":
       case "lakehouse-paimon":
