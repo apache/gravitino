@@ -35,7 +35,13 @@ public class PostgreSqlExceptionConverter extends JdbcExceptionConverter {
   private static final String INVALID_SCHEMA_NAME = "3D000";
   private static final String INVALID_SCHEMA = "3F000";
   private static final String UNDEFINED_TABLE = "42P01";
-  private static final String CONNECTION_EXCEPTION = "08"; // class code
+
+  /**
+   * SQLSTATE '08' is the class code of connection exceptions See <a
+   * href="https://www.postgresql.org/docs/current/errcodes-appendix.html#ERRCODES-TABLE">PostgreSQL
+   * errcodes appendix</a>.
+   */
+  private static final String CONNECTION_EXCEPTION = "08";
 
   @SuppressWarnings("FormatStringAnnotation")
   @Override
