@@ -364,19 +364,17 @@ curl \
 
 Use the access token to make requests to the Gravitino server
 
-Note: The 'Accept: application/vnd.gravitino.v1+json' header is required only for the **web/REST API**.  
-For the **IRC service**, omit this header to avoid  errors.
 
-For Rest Service:
+For Gravitino server:
 
 ```shell
 curl -v -X GET -H "Accept: application/vnd.gravitino.v1+json" -H "Content-Type: application/json" -H "Authorization: Bearer <access_token>" http://localhost:8090/api/version
 ```
 
-For IRC Service:
+For Gravitino Iceberg REST Service, the 'Accept: application/vnd.gravitino.v1+json' header is not required,  you could use following command:
 
 ```shell
-curl -v -X GET -H "Content-Type: application/json" -H "Authorization: Bearer <access_token>" http://localhost:8090/api/version
+curl -v -X GET -H "Content-Type: application/json" -H "Authorization: Bearer <access_token>" http://127.0.0.1:9001/iceberg/v1/config
 ```
 
 
