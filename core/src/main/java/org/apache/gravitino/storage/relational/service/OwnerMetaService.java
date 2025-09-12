@@ -21,9 +21,12 @@ package org.apache.gravitino.storage.relational.service;
 import java.util.Collections;
 import java.util.Optional;
 import org.apache.gravitino.Entity;
+import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.authorization.AuthorizationUtils;
+import org.apache.gravitino.meta.BaseMetalake;
+import org.apache.gravitino.storage.MetadataIdConverter;
 import org.apache.gravitino.storage.relational.mapper.OwnerMetaMapper;
 import org.apache.gravitino.storage.relational.po.GroupPO;
 import org.apache.gravitino.storage.relational.po.OwnerRelPO;
@@ -44,9 +47,19 @@ public class OwnerMetaService {
   }
 
   public Optional<Entity> getOwner(NameIdentifier identifier, Entity.EntityType type) {
-    long metalakeId =
-        MetalakeMetaService.getInstance()
-            .getMetalakeIdByName(NameIdentifierUtil.getMetalake(identifier));
+    long metalakeId;
+    try {
+      metalakeId =
+          GravitinoEnv.getInstance()
+              .entityStore()
+              .get(
+                  NameIdentifierUtil.ofMetalake(NameIdentifierUtil.getMetalake(identifier)),
+                  Entity.EntityType.METALAKE,
+                  BaseMetalake.class)
+              .id();
+    } catch (Exception e) {
+      throw new RuntimeException(e);
+    }
     Long entityId = getEntityId(metalakeId, identifier, type);
 
     UserPO userPO =
@@ -117,8 +130,7 @@ public class OwnerMetaService {
             .getGroupIdByMetalakeIdAndName(metalakeId, identifier.name());
       default:
         MetadataObject object = NameIdentifierUtil.toMetadataObject(identifier, type);
-        return MetadataObjectService.getMetadataObjectId(
-            metalakeId, object.fullName(), object.type());
+        return MetadataIdConverter.getID(object, NameIdentifierUtil.getMetalake(identifier));
     }
   }
 }
