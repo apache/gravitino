@@ -20,7 +20,11 @@
 package org.apache.gravitino.utils;
 
 import java.lang.reflect.Field;
+import java.sql.Driver;
+import java.sql.DriverManager;
+import java.sql.SQLException;
 import java.util.IdentityHashMap;
+import java.util.Map;
 import java.util.Timer;
 import java.util.concurrent.ScheduledExecutorService;
 import org.apache.commons.lang3.reflect.FieldUtils;
@@ -45,13 +49,49 @@ public class ClassLoaderResourceCleanerUtils {
    *
    * @param classLoader the classloader to be closed
    */
-  public static void closeClassLoaderResource(ClassLoader classLoader) {
+  public static void closeClassLoaderResource(ClassLoader classLoader, Map<String, String> conf) {
     boolean testEnv = System.getenv("GRAVITINO_TEST") != null;
     if (testEnv) {
       // In test environment, we do not need to clean up class loader related stuff
       return;
     }
 
+    String provider = conf.get("provider");
+    if (provider == null) {
+      return;
+    }
+
+    switch (provider) {
+      case "lakehouse-iceberg":
+      case "hive":
+      case "lakehouse-hudi":
+      case "lakehouse-paimon":
+        closeLakeHouseResource(classLoader);
+        return;
+      case "jdbc-mysql":
+      case "jdbc-starrocks":
+      case "jdbc-doris":
+      case "jdbc-oceanbase":
+        closeMySQLProtocolCompatibleClassLoaderResource(classLoader);
+        return;
+
+      case "jdbc-postgres":
+        // Postgres JDBC driver has a known memory leak issue with its internal
+        // org.postgresql.util.GTRef class that uses a static cache to store
+        // references to database objects. This can lead to memory leaks when
+        // using multiple class loaders.
+        closePostgreSQLClassLoader(classLoader);
+        return;
+      case "fileset":
+        closeFilesetResource(classLoader);
+        return;
+      default:
+        // Other providers do not need special handling
+        LOG.info("No special resource to clean for provider: {}", provider);
+    }
+  }
+
+  private static void closeFilesetResource(ClassLoader classLoader) {
     // Clear statics threads in FileSystem and close all FileSystem instances.
     executeAndCatch(
         ClassLoaderResourceCleanerUtils::closeStatsDataClearerInFileSystem, classLoader);
@@ -76,6 +116,66 @@ public class ClassLoaderResourceCleanerUtils {
     executeAndCatch(ClassLoaderResourceCleanerUtils::closeResourceInAzure, classLoader);
 
     executeAndCatch(ClassLoaderResourceCleanerUtils::clearShutdownHooks, classLoader);
+  }
+
+  // Hive is not lakehouse strictly.
+  private static void closeLakeHouseResource(ClassLoader classLoader) {
+    // Clear statics threads in FileSystem and close all FileSystem instances.
+    executeAndCatch(
+        ClassLoaderResourceCleanerUtils::closeStatsDataClearerInFileSystem, classLoader);
+
+    // Stop all threads with the current class loader and clear their threadLocal variables for
+    // jetty threads that are loaded by the current class loader.
+    // For example, thread local `threadData` in FileSystem#StatisticsDataCleaner is created
+    // within jetty thread with the current class loader. However, there are clear by
+    // `catalog.close` in ForkJoinPool in CaffeineCache, in this case, the thread local variable
+    // will not be cleared, so we need to clear them manually here.
+    executeAndCatch(
+        ClassLoaderResourceCleanerUtils::stopThreadsAndClearThreadLocalVariables, classLoader);
+
+    // Release the LogFactory for the classloader, each classloader has its own LogFactory
+    // instance.
+    executeAndCatch(ClassLoaderResourceCleanerUtils::releaseLogFactoryInCommonLogging, classLoader);
+
+    // This will clear thread in AWS SDK if we store data in S3.
+    executeAndCatch(ClassLoaderResourceCleanerUtils::closeResourceInAWS, classLoader);
+
+    executeAndCatch(ClassLoaderResourceCleanerUtils::clearShutdownHooks, classLoader);
+  }
+
+  private static void closePostgreSQLClassLoader(ClassLoader classLoader) {
+    try {
+      // Unload the PostgreSQL driver, only Unload the driver if it is loaded by
+      // IsolatedClassLoader.
+      Driver pgDriver = DriverManager.getDriver("jdbc:postgresql://dummy_address:12345/");
+      deregisterDriver(pgDriver, classLoader);
+    } catch (Exception e) {
+      LOG.warn("Failed to deregister PostgreSQL driver", e);
+    }
+  }
+
+  private static void closeMySQLProtocolCompatibleClassLoaderResource(ClassLoader classLoader) {
+    try {
+      // Close thread AbandonedConnectionCleanupThread
+      Class.forName("com.mysql.cj.jdbc.AbandonedConnectionCleanupThread")
+          .getMethod("uncheckedShutdown")
+          .invoke(null);
+      LOG.info("AbandonedConnectionCleanupThread has been shutdown...");
+
+      // Unload the MySQL driver, only Unload the driver if it is loaded by
+      // IsolatedClassLoader.
+      Driver mysqlDriver = DriverManager.getDriver("jdbc:mysql://dumpy_address");
+      deregisterDriver(mysqlDriver, classLoader);
+    } catch (Exception e) {
+      LOG.warn("Failed to shutdown AbandonedConnectionCleanupThread or deregister MySQL driver", e);
+    }
+  }
+
+  private static void deregisterDriver(Driver driver, ClassLoader classLoader) throws SQLException {
+    if (driver.getClass().getClassLoader() == classLoader) {
+      DriverManager.deregisterDriver(driver);
+      LOG.info("Driver {} has been deregistered...", driver);
+    }
   }
 
   /**

@@ -102,8 +102,9 @@ import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.TableCatalog;
 import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.utils.IsolatedClassLoader;
-import org.apache.gravitino.utils.IsolatedClassLoader.ClassLoaderCacheKey;
 import org.apache.gravitino.utils.PrincipalUtils;
+import org.apache.gravitino.utils.ReusableIsolatedClassLoader;
+import org.apache.gravitino.utils.ReusableIsolatedClassLoader.ClassLoaderCacheKey;
 import org.apache.gravitino.utils.ThrowableFunction;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -1028,13 +1029,16 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
       BaseAuthorization.buildAuthorizationPkgPath(conf).ifPresent(libAndResourcesPaths::add);
       String packagePath = conf.get(Catalog.PROPERTY_PACKAGE);
 
-      synchronized (IsolatedClassLoader.CLASSLOADER_CACHE) {
+      synchronized (ReusableIsolatedClassLoader.CLASSLOADER_CACHE) {
         IsolatedClassLoader isolatedClassLoader =
-            IsolatedClassLoader.CLASSLOADER_CACHE.computeIfAbsent(
+            ReusableIsolatedClassLoader.CLASSLOADER_CACHE.computeIfAbsent(
                 ClassLoaderCacheKey.of(provider, packagePath, conf),
-                k -> IsolatedClassLoader.buildClassLoader(libAndResourcesPaths));
+                k -> ReusableIsolatedClassLoader.buildClassLoader(libAndResourcesPaths, conf));
 
-        isolatedClassLoader.getRefCount().incrementAndGet();
+        if (isolatedClassLoader instanceof ReusableIsolatedClassLoader) {
+          ((ReusableIsolatedClassLoader) isolatedClassLoader).markAccess();
+        }
+
         return isolatedClassLoader;
       }
     } else {

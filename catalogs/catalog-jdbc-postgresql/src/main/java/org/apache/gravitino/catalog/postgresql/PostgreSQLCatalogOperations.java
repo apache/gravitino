@@ -18,8 +18,6 @@
  */
 package org.apache.gravitino.catalog.postgresql;
 
-import java.sql.Driver;
-import java.sql.DriverManager;
 import org.apache.gravitino.catalog.jdbc.JdbcCatalogOperations;
 import org.apache.gravitino.catalog.jdbc.converter.JdbcColumnDefaultValueConverter;
 import org.apache.gravitino.catalog.jdbc.converter.JdbcExceptionConverter;
@@ -46,13 +44,5 @@ public class PostgreSQLCatalogOperations extends JdbcCatalogOperations {
   @Override
   public void close() {
     super.close();
-    try {
-      // Unload the PostgreSQL driver, only Unload the driver if it is loaded by
-      // IsolatedClassLoader.
-      Driver pgDriver = DriverManager.getDriver("jdbc:postgresql://dummy_address:12345/");
-      deregisterDriver(pgDriver);
-    } catch (Exception e) {
-      LOG.warn("Failed to deregister PostgreSQL driver", e);
-    }
   }
 }
