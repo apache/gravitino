@@ -47,7 +47,6 @@ dependencies {
     exclude(group = "commons-codec", module = "commons-codec") // provided by jcasbin
   }
   implementation(libs.mybatis)
-  implementation(libs.mysql.driver)
 
   annotationProcessor(libs.lombok)
 
