@@ -523,7 +523,7 @@ public class LancePartitionStatisticStorage implements PartitionStatisticStorage
                       });
 
               // Ensure dataset uses the latest version
-              if (newlyCreated.get()) {
+              if (!newlyCreated.get()) {
                 cachedDataset.checkoutLatest();
               }
 
