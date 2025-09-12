@@ -175,11 +175,11 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
 
   @Override
   public boolean isOwner(Principal principal, String metalake, MetadataObject metadataObject) {
-    Long metadataId = MetadataIdConverter.getID(metadataObject, metalake);
-    loadOwnerPolicy(metalake, metadataObject, metadataId);
     Long userId;
     boolean result;
     try {
+      Long metadataId = MetadataIdConverter.getID(metadataObject, metalake);
+      loadOwnerPolicy(metalake, metadataObject, metadataId);
       UserEntity userEntity = getUserEntity(principal.getName(), metalake);
       userId = userEntity.id();
       metadataId = MetadataIdConverter.getID(metadataObject, metalake);
