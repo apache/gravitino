@@ -75,7 +75,7 @@ public class ClassLoaderResourceCleanerUtils {
         closeMySQLProtocolCompatibleClassLoaderResource(classLoader);
         return;
 
-      case "jdbc-postgres":
+      case "jdbc-postgresql":
         // Postgres JDBC driver has a known memory leak issue with its internal
         // org.postgresql.util.GTRef class that uses a static cache to store
         // references to database objects. This can lead to memory leaks when
