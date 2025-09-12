@@ -244,10 +244,9 @@ nexusPublishing {
   packageGroup.set("org.apache.gravitino")
 }
 
-fun configureSparkConnectorExcludes(project: Project) {
+fun excludePackagesForSparkConnector(project: Project) {
   project.afterEvaluate {
     if (scalaVersion != "2.12") {
-      println("doing configureSparkConnectorExcludes")
       val excludedPackages = listOf(
         "org/apache/gravitino/spark/connector/paimon/**",
         "org/apache/gravitino/spark/connector/integration/test/paimon/**"
@@ -309,7 +308,7 @@ subprojects {
 
     return false
   }
-  extensions.extraProperties.set("configureSparkConnectorExcludes", ::configureSparkConnectorExcludes)
+  extensions.extraProperties.set("excludePackagesForSparkConnector", ::excludePackagesForSparkConnector)
 
   tasks.register("printJvm") {
     group = "help"

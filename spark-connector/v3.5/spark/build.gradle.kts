@@ -37,8 +37,8 @@ val scalaJava8CompatVersion: String = libs.versions.scala.java.compat.get()
 val scalaCollectionCompatVersion: String = libs.versions.scala.collection.compat.get()
 val artifactName = "${rootProject.name}-spark-${sparkMajorVersion}_$scalaVersion"
 
-if (hasProperty("configureSparkConnectorExcludes")) {
-  val configureFunc = properties["configureSparkConnectorExcludes"] as? (Project) -> Unit
+if (hasProperty("excludePackagesForSparkConnector")) {
+  val configureFunc = properties["excludePackagesForSparkConnector"] as? (Project) -> Unit
   configureFunc?.invoke(project)
 }
 

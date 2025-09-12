@@ -36,8 +36,8 @@ val kyuubiVersion: String = libs.versions.kyuubi4spark.get()
 val scalaJava8CompatVersion: String = libs.versions.scala.java.compat.get()
 val scalaCollectionCompatVersion: String = libs.versions.scala.collection.compat.get()
 
-if (hasProperty("configureSparkConnectorExcludes")) {
-  val configureFunc = properties["configureSparkConnectorExcludes"] as? (Project) -> Unit
+if (hasProperty("excludePackagesForSparkConnector")) {
+  val configureFunc = properties["excludePackagesForSparkConnector"] as? (Project) -> Unit
   configureFunc?.invoke(project)
 }
 
