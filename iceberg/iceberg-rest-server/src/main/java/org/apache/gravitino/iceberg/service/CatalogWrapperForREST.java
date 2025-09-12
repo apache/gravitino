@@ -45,7 +45,10 @@ import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.exceptions.ServiceUnavailableException;
 import org.apache.iceberg.rest.requests.CreateTableRequest;
+import org.apache.iceberg.rest.responses.ImmutableLoadViewResponse;
 import org.apache.iceberg.rest.responses.LoadTableResponse;
+import org.apache.iceberg.rest.responses.LoadViewResponse;
+import org.apache.iceberg.view.ViewMetadata;
 
 /** Process Iceberg REST specific operations, like credential vending. */
 public class CatalogWrapperForREST extends IcebergCatalogWrapper {
@@ -99,6 +102,14 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
     return loadTableResponse;
   }
 
+  public LoadViewResponse loadView(TableIdentifier identifier, boolean requestCredential) {
+    LoadViewResponse loadViewResponse = super.loadView(identifier);
+    if (requestCredential) {
+      return injectCredentialConfigForView(identifier, loadViewResponse);
+    }
+    return loadViewResponse;
+  }
+
   @Override
   public void close() {
     if (catalogCredentialManager != null) {
@@ -141,6 +152,41 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
         .addAllConfig(getCatalogConfigToClient())
         .addAllConfig(credentialConfig)
         .build();
+  }
+
+  private LoadViewResponse injectCredentialConfigForView(
+      TableIdentifier viewIdentifier, LoadViewResponse loadViewResponse) {
+    ViewMetadata viewMetadata = loadViewResponse.metadata();
+    String[] path =
+        Stream.of(
+                viewMetadata.location(),
+                viewMetadata.properties().getOrDefault(TableProperties.WRITE_DATA_LOCATION, ""),
+                viewMetadata.properties().getOrDefault(TableProperties.WRITE_METADATA_LOCATION, ""))
+            .filter(StringUtils::isNotBlank)
+            .toArray(String[]::new);
+
+    PathBasedCredentialContext context =
+        new PathBasedCredentialContext(
+            PrincipalUtils.getCurrentUserName(), ImmutableSet.copyOf(path), Collections.emptySet());
+    Credential credential = catalogCredentialManager.getCredential(context);
+    if (credential == null) {
+      throw new ServiceUnavailableException("Couldn't generate credential, %s", context);
+    }
+
+    LOG.info(
+        "Generate credential: {} for Iceberg view: {}",
+        credential.credentialType(),
+        viewIdentifier);
+
+    Map<String, String> credentialConfig = CredentialPropertyUtils.toIcebergProperties(credential);
+
+    // Create a new config map with all the necessary configurations
+    Map<String, String> newConfig = new HashMap<>();
+    newConfig.putAll(loadViewResponse.config());
+    newConfig.putAll(getCatalogConfigToClient());
+    newConfig.putAll(credentialConfig);
+
+    return ImmutableLoadViewResponse.builder().from(loadViewResponse).config(newConfig).build();
   }
 
   @VisibleForTesting

@@ -64,7 +64,7 @@ public class IcebergViewOperationExecutor implements IcebergViewOperationDispatc
   public LoadViewResponse loadView(IcebergRequestContext context, TableIdentifier viewIdentifier) {
     return icebergCatalogWrapperManager
         .getCatalogWrapper(context.catalogName())
-        .loadView(viewIdentifier);
+        .loadView(viewIdentifier, context.requestCredentialVending());
   }
 
   @Override

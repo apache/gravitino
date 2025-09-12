@@ -40,7 +40,7 @@ import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
-import org.apache.commons.lang3.StringUtils;
+import org.apache.gravitino.iceberg.service.IcebergAccessDelegationUtil;
 import org.apache.gravitino.iceberg.service.IcebergExceptionMapper;
 import org.apache.gravitino.iceberg.service.IcebergObjectMapper;
 import org.apache.gravitino.iceberg.service.IcebergRestUtils;
@@ -68,7 +68,8 @@ public class IcebergTableOperations {
   private static final Logger LOG = LoggerFactory.getLogger(IcebergTableOperations.class);
 
   @VisibleForTesting
-  public static final String X_ICEBERG_ACCESS_DELEGATION = "X-Iceberg-Access-Delegation";
+  public static final String X_ICEBERG_ACCESS_DELEGATION =
+      IcebergAccessDelegationUtil.X_ICEBERG_ACCESS_DELEGATION;
 
   private IcebergMetricsManager icebergMetricsManager;
 
@@ -119,7 +120,7 @@ public class IcebergTableOperations {
       @Encoded() @PathParam("namespace") String namespace,
       CreateTableRequest createTableRequest,
       @HeaderParam(X_ICEBERG_ACCESS_DELEGATION) String accessDelegation) {
-    boolean isCredentialVending = isCredentialVending(accessDelegation);
+    boolean isCredentialVending = IcebergAccessDelegationUtil.isCredentialVending(accessDelegation);
     String catalogName = IcebergRestUtils.getCatalogName(prefix);
     Namespace icebergNS = RESTUtil.decodeNamespace(namespace);
     LOG.info(
@@ -227,7 +228,7 @@ public class IcebergTableOperations {
       @HeaderParam(X_ICEBERG_ACCESS_DELEGATION) String accessDelegation) {
     String catalogName = IcebergRestUtils.getCatalogName(prefix);
     Namespace icebergNS = RESTUtil.decodeNamespace(namespace);
-    boolean isCredentialVending = isCredentialVending(accessDelegation);
+    boolean isCredentialVending = IcebergAccessDelegationUtil.isCredentialVending(accessDelegation);
     LOG.info(
         "Load Iceberg table, catalog: {}, namespace: {}, table: {}, access delegation: {}, "
             + "credential vending: {}",
@@ -329,26 +330,6 @@ public class IcebergTableOperations {
     } catch (JsonProcessingException e) {
       LOG.warn("Serialize update table request failed", e);
       return updateTableRequest.toString();
-    }
-  }
-
-  private boolean isCredentialVending(String accessDelegation) {
-    if (StringUtils.isBlank(accessDelegation)) {
-      return false;
-    }
-    if ("vended-credentials".equalsIgnoreCase(accessDelegation)) {
-      return true;
-    }
-    if ("remote-signing".equalsIgnoreCase(accessDelegation)) {
-      throw new UnsupportedOperationException(
-          "Gravitino IcebergRESTServer doesn't support remote signing");
-    } else {
-      throw new IllegalArgumentException(
-          X_ICEBERG_ACCESS_DELEGATION
-              + ": "
-              + accessDelegation
-              + " is illegal, Iceberg REST spec supports: [vended-credentials,remote-signing], "
-              + "Gravitino Iceberg REST server supports: vended-credentials");
     }
   }
 }
