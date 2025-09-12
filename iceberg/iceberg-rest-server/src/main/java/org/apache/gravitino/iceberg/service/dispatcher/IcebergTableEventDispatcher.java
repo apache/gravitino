@@ -52,6 +52,7 @@ import org.apache.iceberg.rest.requests.CreateTableRequest;
 import org.apache.iceberg.rest.requests.RenameTableRequest;
 import org.apache.iceberg.rest.requests.UpdateTableRequest;
 import org.apache.iceberg.rest.responses.ListTablesResponse;
+import org.apache.iceberg.rest.responses.LoadCredentialsResponse;
 import org.apache.iceberg.rest.responses.LoadTableResponse;
 
 /**
@@ -229,5 +230,34 @@ public class IcebergTableEventDispatcher implements IcebergTableOperationDispatc
     }
     eventBus.dispatchEvent(
         new IcebergRenameTableEvent(context, gravitinoNameIdentifier, renameTableRequest));
+  }
+
+  /**
+   * Get credentials for an Iceberg table.
+   *
+   * @param context Iceberg REST request context information.
+   * @param tableIdentifier The Iceberg table identifier.
+   * @return A {@link org.apache.iceberg.rest.responses.LoadCredentialsResponse} object containing
+   *     the credentials.
+   */
+  @Override
+  public LoadCredentialsResponse getTableCredentials(
+      IcebergRequestContext context, TableIdentifier tableIdentifier) {
+    NameIdentifier gravitinoNameIdentifier =
+        IcebergRestUtils.getGravitinoNameIdentifier(
+            metalakeName, context.catalogName(), tableIdentifier);
+    eventBus.dispatchEvent(new IcebergLoadTablePreEvent(context, gravitinoNameIdentifier));
+    LoadCredentialsResponse loadCredentialsResponse;
+    try {
+      loadCredentialsResponse =
+          icebergTableOperationDispatcher.getTableCredentials(context, tableIdentifier);
+    } catch (Exception e) {
+      eventBus.dispatchEvent(new IcebergLoadTableFailureEvent(context, gravitinoNameIdentifier, e));
+      throw e;
+    }
+    // Note: Currently there is no dedicated IcebergLoadCredentialsEvent event, reusing
+    // IcebergLoadTableEvent
+    eventBus.dispatchEvent(new IcebergLoadTableEvent(context, gravitinoNameIdentifier, null));
+    return loadCredentialsResponse;
   }
 }
