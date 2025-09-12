@@ -362,8 +362,14 @@ curl \
   "http://localhost:8080/realms/gravitinorealm/protocol/openid-connect/token"
 ```
 
-Use the access token to make requests to the Gravitino server
+Use the access token to make requests to the Gravitino server:
 
 ```shell
 curl -v -X GET -H "Accept: application/vnd.gravitino.v1+json" -H "Content-Type: application/json" -H "Authorization: Bearer <access_token>" http://localhost:8090/api/version
+```
+
+For Gravitino Iceberg REST Service, the 'Accept: application/vnd.gravitino.v1+json' header is not required,  you could use following command:
+
+```shell
+curl -v -X GET -H "Content-Type: application/json" -H "Authorization: Bearer <access_token>" http://127.0.0.1:9001/iceberg/v1/config
 ```
