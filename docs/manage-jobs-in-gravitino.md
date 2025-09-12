@@ -2,7 +2,10 @@
 title: "Manage jobs in Gravitino"
 slug: /manage-jobs-in-gravitino
 date: 2025-08-13
-keywords: job, job template, gravitino
+keywords:
+  - job
+  - job template
+  - gravitino
 license: "This software is licensed under the Apache License version 2."
 ---
 

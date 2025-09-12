@@ -23,7 +23,6 @@ from gravitino.api.types.types import Types
 from gravitino.dto.rel.column_dto import ColumnDTO
 from gravitino.dto.rel.expressions.field_reference_dto import FieldReferenceDTO
 from gravitino.dto.rel.sort_order_dto import SortOrderDTO
-from gravitino.exceptions.base import IllegalArgumentException
 
 
 class TestSortOrderDTO(unittest.TestCase):
@@ -54,11 +53,6 @@ class TestSortOrderDTO(unittest.TestCase):
         self.assertEqual(SortOrderDTO.EMPTY_NAMED_REFERENCE, [])
 
     def test_sort_order_dto_init(self):
-        with self.assertRaisesRegex(
-            IllegalArgumentException, "expression cannot be null"
-        ):
-            SortOrderDTO(None, SortDirection.ASCENDING, NullOrdering.NULLS_FIRST)
-
         self.sort_order_dto.validate(self.columns)
         self.assertTrue(self.sort_order_dto.sort_term() == self.field_ref_dto)
         self.assertIs(self.sort_order_dto.direction(), SortDirection.ASCENDING)

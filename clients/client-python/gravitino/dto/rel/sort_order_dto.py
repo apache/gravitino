@@ -15,7 +15,7 @@
 # specific language governing permissions and limitations
 # under the License.
 
-from typing import ClassVar, List
+from typing import ClassVar
 
 from gravitino.api.expressions.expression import Expression
 from gravitino.api.expressions.sorts.null_ordering import NullOrdering
@@ -23,18 +23,17 @@ from gravitino.api.expressions.sorts.sort_direction import SortDirection
 from gravitino.api.expressions.sorts.sort_order import SortOrder
 from gravitino.dto.rel.column_dto import ColumnDTO
 from gravitino.dto.rel.expressions.function_arg import FunctionArg
-from gravitino.utils.precondition import Precondition
 
 
 class SortOrderDTO(SortOrder):
     """Data Transfer Object for SortOrder.
 
     Attributes:
-        EMPTY_SORT (List[SortOrderDTO]):
+        EMPTY_SORT (list[SortOrderDTO]):
             An empty array of SortOrderDTO.
     """
 
-    EMPTY_SORT: ClassVar[List["SortOrderDTO"]] = []
+    EMPTY_SORT: ClassVar[list["SortOrderDTO"]] = []
 
     def __init__(
         self,
@@ -42,17 +41,9 @@ class SortOrderDTO(SortOrder):
         direction: SortDirection,
         null_ordering: NullOrdering,
     ):
-        Precondition.check_argument(sort_term is not None, "expression cannot be null")
-
         self._sort_term = sort_term
-        self._direction = (
-            direction if direction is not None else SortDirection.ASCENDING
-        )
-        self._null_ordering = (
-            null_ordering
-            if null_ordering is not None
-            else direction.default_null_ordering()
-        )
+        self._direction = direction
+        self._null_ordering = null_ordering
 
     def sort_term(self) -> FunctionArg:
         """Returns the sort term.
@@ -71,11 +62,11 @@ class SortOrderDTO(SortOrder):
     def null_ordering(self):
         return self._null_ordering
 
-    def validate(self, columns: List[ColumnDTO]) -> None:
+    def validate(self, columns: list[ColumnDTO]) -> None:
         """Validates the sort order.
 
         Args:
-            columns (List[ColumnDTO]):
+            columns (list[ColumnDTO]):
                 The column DTOs to validate against.
 
         Raises:
