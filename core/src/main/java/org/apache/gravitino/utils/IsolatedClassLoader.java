@@ -19,7 +19,6 @@
 package org.apache.gravitino.utils;
 
 import com.google.common.collect.Lists;
-import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.io.Closeable;
 import java.io.File;
 import java.io.InputStream;
@@ -29,7 +28,6 @@ import java.net.URLClassLoader;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
-import java.util.concurrent.ThreadFactory;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.JavaVersion;
 import org.apache.commons.lang3.SystemUtils;
@@ -71,13 +69,6 @@ public class IsolatedClassLoader implements Closeable {
     this.sharedClasses = sharedClasses;
     this.barrierClasses = barrierClasses;
     this.baseClassLoader = Thread.currentThread().getContextClassLoader();
-  }
-
-  private static ThreadFactory newDaemonThreadFactory() {
-    return new ThreadFactoryBuilder()
-        .setDaemon(true)
-        .setNameFormat("IsolateClassloader-cleaner" + "-%d")
-        .build();
   }
 
   /**
