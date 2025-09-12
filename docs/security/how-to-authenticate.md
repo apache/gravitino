@@ -364,7 +364,6 @@ curl \
 
 Use the access token to make requests to the Gravitino server
 
-
 For Gravitino server:
 
 ```shell
@@ -376,5 +375,3 @@ For Gravitino Iceberg REST Service, the 'Accept: application/vnd.gravitino.v1+js
 ```shell
 curl -v -X GET -H "Content-Type: application/json" -H "Authorization: Bearer <access_token>" http://127.0.0.1:9001/iceberg/v1/config
 ```
-
-
