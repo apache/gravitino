@@ -239,17 +239,14 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
         EntityStore entityStore = GravitinoEnv.getInstance().entityStore();
         NameIdentifier userNameIdentifier =
             NameIdentifierUtil.ofUser(metalake, PrincipalUtils.getCurrentUserName());
-        List<RoleEntity> entities;
-
-        entities =
+        List<RoleEntity> entities =
             entityStore
                 .relationOperations()
                 .listEntitiesByRelation(
                     SupportsRelationOperations.Type.ROLE_USER_REL,
                     userNameIdentifier,
                     Entity.EntityType.USER);
-        return entities.stream()
-            .anyMatch(roleEntity -> Objects.equals(roleEntity.id(), String.valueOf(roleId)));
+        return entities.stream().anyMatch(roleEntity -> Objects.equals(roleEntity.id(), roleId));
 
       } catch (Exception e) {
         LOG.warn("can not get user id or role id.", e);
