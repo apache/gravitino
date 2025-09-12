@@ -62,11 +62,16 @@ Currently, it doesn't support certain query optimizations, such as pushdown and 
 
 ### Update
 
-Not support.
+`UPDATE` is only supported for table using v2 or higher of the Iceberg specification. 
 
 ### Delete
 
-Not support.
+Support the deletion of entire partitions and deletion of individual rows for table using v2 or higher of the Iceberg specification.
+See also [Delete limitation](https://trino.io/docs/current/connector/iceberg.html#data-management).
+
+### Merge
+
+`MERGE` is only supported for table using v2 or higher of the Iceberg specification.
 
 ## Table and Schema properties
 
@@ -190,6 +195,33 @@ Insert data into the table `table_01` from select:
 
 ```sql
 INSERT INTO iceberg_test.database_01.table_01 (name, salary) SELECT * FROM iceberg_test.database_01.table_01;
+```
+
+Update data into the table `table_01`:
+
+```sql
+UPDATE iceberg_test.database_01.table_01 SET name='ice_update' WHERE salary=12;
+```
+
+Delete data into the table `table_01`:
+
+```sql
+DELETE FROM iceberg_test.database_01.table_01 WHERE name='ice';
+```
+
+Merge data into the table `table_01`:
+
+```sql
+MERGE INTO iceberg_test.database_01.table_01 t USING iceberg_test.database_01.table_02 s
+    ON (t.name = s.name)
+    WHEN MATCHED AND s.name = 'bob'
+        THEN DELETE
+    WHEN MATCHED
+        THEN UPDATE
+            SET salary = s.salary + t.salary
+    WHEN NOT MATCHED
+        THEN INSERT (name, salary)
+              VALUES (s.name, s.salary);
 ```
 
 ### Querying data
