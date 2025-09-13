@@ -93,6 +93,8 @@ public class Configs {
 
   public static final int DEFAULT_RELATIONAL_JDBC_BACKEND_MAX_CONNECTIONS = 100;
 
+  public static final int DEFAULT_AUTHORIZATION_CONCURRENT_NUMBER = 100;
+
   public static final long DEFAULT_RELATIONAL_JDBC_BACKEND_MAX_WAIT_MILLISECONDS = 1000L;
 
   public static final int GARBAGE_COLLECTOR_SINGLE_DELETION_LIMIT = 100;
@@ -292,6 +294,13 @@ public class Configs {
           .version(ConfigConstants.VERSION_1_0_0)
           .stringConf()
           .createWithDefault("org.apache.gravitino.server.authorization.jcasbin.JcasbinAuthorizer");
+
+  public static final ConfigEntry<Integer> AUTHORIZATION_CONCURRENT_NUMBER =
+      new ConfigBuilder("gravitino.authorization.concurrentNumber")
+          .doc("Concurrent number of metadata authorization requests")
+          .version(ConfigConstants.VERSION_1_0_0)
+          .intConf()
+          .createWithDefault(DEFAULT_AUTHORIZATION_CONCURRENT_NUMBER);
 
   public static final ConfigEntry<List<String>> SERVICE_ADMINS =
       new ConfigBuilder("gravitino.authorization.serviceAdmins")
