@@ -352,3 +352,29 @@ class TestTableChange(unittest.TestCase):
         self.assertFalse(update_column_positions[0] == another_update_column_position)
         self.assertFalse(another_update_column_position == update_column_positions[0])
         self.assertEqual(len(update_column_position_dict), 2)
+
+    def test_delete_column(self):
+        field_name_data = [["existing_column"], ["nested", "existing_column"]]
+        if_exists_data = [True, False]
+        for field_name, if_exists in zip(field_name_data, if_exists_data):
+            delete_column = TableChange.delete_column(field_name, if_exists)
+            self.assertListEqual(delete_column.field_name(), field_name)
+            self.assertListEqual(delete_column.get_field_name(), field_name)
+            self.assertEqual(delete_column.get_if_exists(), if_exists)
+
+    def test_delete_column_equal_and_hash(self):
+        field_name = ["Column A"]
+        if_exists = True
+        delete_columns = [
+            TableChange.delete_column(field_name, if_exists) for _ in range(2)
+        ]
+        delete_column_dict = {delete_columns[i]: i for i in range(2)}
+        self.assertTrue(delete_columns[0] == delete_columns[1])
+        self.assertTrue(delete_columns[1] == delete_columns[0])
+        self.assertEqual(len(delete_column_dict), 1)
+
+        another_delete_column = TableChange.delete_column(["Column B"], if_exists)
+        delete_column_dict = {delete_columns[0]: 0, another_delete_column: 1}
+        self.assertFalse(delete_columns[0] == another_delete_column)
+        self.assertFalse(another_delete_column == delete_columns[0])
+        self.assertEqual(len(delete_column_dict), 2)
