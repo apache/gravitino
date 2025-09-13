@@ -378,3 +378,47 @@ class TestTableChange(unittest.TestCase):
         self.assertFalse(delete_columns[0] == another_delete_column)
         self.assertFalse(another_delete_column == delete_columns[0])
         self.assertEqual(len(delete_column_dict), 2)
+
+    def test_update_column_nullability(self):
+        field_name_data = [["existing_column"], ["nested", "existing_column"]]
+        nullable_data = [True, False]
+        for field_name, nullable in zip(field_name_data, nullable_data):
+            update_column_nullability = TableChange.update_column_nullability(
+                field_name, nullable
+            )
+            self.assertListEqual(update_column_nullability.field_name(), field_name)
+            self.assertListEqual(update_column_nullability.get_field_name(), field_name)
+            self.assertEqual(update_column_nullability.get_nullable(), nullable)
+
+    def test_update_column_nullability_equal_and_hash(self):
+        field_name = ["Column A"]
+        nullable = True
+        update_column_nullabilities = [
+            TableChange.update_column_nullability(field_name, nullable)
+            for _ in range(2)
+        ]
+        update_column_nullability_dict = {
+            update_column_nullabilities[i]: i for i in range(2)
+        }
+        self.assertTrue(
+            update_column_nullabilities[0] == update_column_nullabilities[1]
+        )
+        self.assertTrue(
+            update_column_nullabilities[1] == update_column_nullabilities[0]
+        )
+        self.assertEqual(len(update_column_nullability_dict), 1)
+
+        another_update_column_nullability = TableChange.update_column_nullability(
+            ["Column B"], False
+        )
+        update_column_nullability_dict = {
+            update_column_nullabilities[0]: 0,
+            another_update_column_nullability: 1,
+        }
+        self.assertFalse(
+            update_column_nullabilities[0] == another_update_column_nullability
+        )
+        self.assertFalse(
+            another_update_column_nullability == update_column_nullabilities[0]
+        )
+        self.assertEqual(len(update_column_nullability_dict), 2)
