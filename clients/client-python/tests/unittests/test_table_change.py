@@ -283,3 +283,36 @@ class TestTableChange(unittest.TestCase):
         self.assertFalse(update_column_types[0] == another_update_column_type)
         self.assertFalse(another_update_column_type == update_column_types[0])
         self.assertEqual(len(update_column_type_dict), 2)
+
+    def test_update_column_comment(self):
+        field_name_data = [["First Name"], ["nested", "Last Name"]]
+        comment_data = ["First or given name", "Last or family name"]
+        for field_name, comment in zip(field_name_data, comment_data):
+            update_column_comment = TableChange.update_column_comment(
+                field_name, comment
+            )
+            self.assertListEqual(update_column_comment.field_name(), field_name)
+            self.assertListEqual(update_column_comment.get_field_name(), field_name)
+            self.assertEqual(update_column_comment.get_new_comment(), comment)
+
+    def test_update_column_comment_equal_and_hash(self):
+        field_name = ["First Name"]
+        comment = "First or given name"
+        update_column_comments = [
+            TableChange.update_column_comment(field_name, comment) for _ in range(2)
+        ]
+        update_column_comment_dict = {update_column_comments[i]: i for i in range(2)}
+        self.assertTrue(update_column_comments[0] == update_column_comments[1])
+        self.assertTrue(update_column_comments[1] == update_column_comments[0])
+        self.assertEqual(len(update_column_comment_dict), 1)
+
+        another_update_column_comment = TableChange.update_column_comment(
+            ["Last Name"], "Last or family name"
+        )
+        update_column_comment_dict = {
+            update_column_comments[0]: 0,
+            another_update_column_comment: 1,
+        }
+        self.assertFalse(update_column_comments[0] == another_update_column_comment)
+        self.assertFalse(another_update_column_comment == update_column_comments[0])
+        self.assertEqual(len(update_column_comment_dict), 2)
