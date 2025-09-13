@@ -17,12 +17,14 @@
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
+from itertools import chain
 from typing import Optional, final
 
 from dataclasses_json import config
 
 from gravitino.api.column import Column
 from gravitino.api.expressions.expression import Expression
+from gravitino.api.expressions.indexes.index import Index
 from gravitino.api.types.type import Type
 
 
@@ -257,6 +259,24 @@ class TableChange(ABC):
         """
         return UpdateColumnNullability(field_name, nullable)
 
+    @staticmethod
+    def add_index(
+        index_type: Index.IndexType,
+        name: str,
+        field_names: list[list[str]],
+    ) -> "AddIndex":
+        """Create a `TableChange` for adding an index.
+
+        Args:
+            index_type (Index.IndexType): The type of the index.
+            name (str): The name of the index.
+            field_names (list[list[str]]): The field names of the index.
+
+        Returns:
+            TableChange: A `TableChange` for the add index.
+        """
+        return TableChange.AddIndex(index_type, name, field_names)
+
     @final
     @dataclass(frozen=True)
     class RenameTable:
@@ -340,6 +360,51 @@ class TableChange(ABC):
 
         def __str__(self):
             return f"REMOVEPROPERTY {self._property}"
+
+    @final
+    @dataclass(frozen=True)
+    class AddIndex:
+        """A TableChange to add an index.
+
+        Add an index key based on the type and field name passed in as well as the name.
+        """
+
+        _type: Index.IndexType = field(metadata=config(field_name="type"))
+        _name: str = field(metadata=config(field_name="name"))
+        _field_names: list[list[str]] = field(metadata=config(field_name="field_names"))
+
+        def get_type(self) -> Index.IndexType:
+            """Retrieves the type of the index.
+
+            Returns:
+                IndexType: The type of the index.
+            """
+            return self._type
+
+        def get_name(self) -> str:
+            """Retrieves the name of the index.
+
+            Returns:
+                str: The name of the index.
+            """
+            return self._name
+
+        def get_field_names(self) -> list[list[str]]:
+            """Retrieves the field names of the index.
+
+            Returns:
+                list[list[str]]: The field names of the index.
+            """
+            return self._field_names
+
+        def __hash__(self) -> int:
+            return hash(
+                (
+                    self._type,
+                    self._name,
+                    *chain.from_iterable(self._field_names),
+                )
+            )
 
     class ColumnPosition(ABC):
         """The interface for all column positions.
