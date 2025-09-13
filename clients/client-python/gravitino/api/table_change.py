@@ -221,6 +221,23 @@ class TableChange(ABC):
         """
         return UpdateColumnPosition(field_name, new_position)
 
+    @staticmethod
+    def delete_column(field_name: list[str], if_exists: bool) -> "DeleteColumn":
+        """Create a `TableChange` for deleting a field.
+
+        If the field does not exist, the change will result in an `IllegalArgumentException`
+        unless `if_exists` is true.
+
+        Args:
+            field_name (list[str]): Field name of the column to delete.
+            if_exists (bool): If true, silence the error if column does not exist during drop.
+                Otherwise, an `IllegalArgumentException` will be thrown.
+
+        Returns:
+            TableChange: A `TableChange` for the delete.
+        """
+        return DeleteColumn(field_name, if_exists)
+
     @final
     @dataclass(frozen=True)
     class RenameTable:
@@ -681,3 +698,37 @@ class UpdateColumnPosition(TableChange.ColumnChange):
 
     def __hash__(self) -> int:
         return hash((*self._field_name, self._position))
+
+
+@final
+@dataclass(frozen=True)
+class DeleteColumn(TableChange.ColumnChange):
+    """A TableChange to delete a field.
+
+    If the field does not exist, the change must result in an `IllegalArgumentException`.
+    """
+
+    _field_name: list[str] = field(metadata=config(field_name="field_name"))
+    _if_exists: bool = field(metadata=config(field_name="if_exists"))
+
+    def field_name(self) -> list[str]:
+        return self._field_name
+
+    def get_field_name(self) -> list[str]:
+        """Retrieves the field name of the column to be deleted.
+
+        Returns:
+            list[str]: A list of strings representing the field name.
+        """
+        return self._field_name
+
+    def get_if_exists(self) -> bool:
+        """Checks if the field should be deleted only if it exists.
+
+        Returns:
+            bool: `True` if the field should be deleted only if it exists; `False` otherwise.
+        """
+        return self._if_exists
+
+    def __hash__(self) -> int:
+        return hash((*self._field_name, self._if_exists))
