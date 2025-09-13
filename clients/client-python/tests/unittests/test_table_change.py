@@ -18,6 +18,7 @@
 import unittest
 
 from gravitino.api.column import Column
+from gravitino.api.expressions.literals.literals import Literals
 from gravitino.api.table_change import TableChange
 from gravitino.api.types.types import Types
 
@@ -181,3 +182,71 @@ class TestTableChange(unittest.TestCase):
         self.assertFalse(rename_columns[0] == another_rename_column)
         self.assertFalse(another_rename_column == rename_columns[0])
         self.assertEqual(len(rename_column_dict), 2)
+
+    def test_update_column_default_value(self):
+        field_name_data = [["existing_column"], ["nested", "existing_column"]]
+        new_default_value = Literals.of("Default Value", Types.VarCharType.of(255))
+
+        for field_name in field_name_data:
+            update_column_default_value = TableChange.update_column_default_value(
+                field_name, new_default_value
+            )
+            self.assertListEqual(update_column_default_value.field_name(), field_name)
+            self.assertEqual(
+                update_column_default_value.get_new_default_value(), new_default_value
+            )
+
+        update_column_default_value = TableChange.update_column_default_value(
+            field_name_data[0], Column.DEFAULT_VALUE_NOT_SET
+        )
+        self.assertListEqual(
+            update_column_default_value.field_name(), field_name_data[0]
+        )
+        self.assertEqual(
+            update_column_default_value.get_new_default_value(),
+            Column.DEFAULT_VALUE_NOT_SET,
+        )
+
+    def test_update_column_default_value_equal_and_hash(self):
+        field_name = ["existing_column"]
+        new_default_value = Literals.of("Default Value", Types.VarCharType.of(255))
+        update_column_default_values = [
+            TableChange.update_column_default_value(field_name, new_default_value)
+            for _ in range(2)
+        ]
+        update_column_default_value_dict = {
+            update_column_default_values[i]: i for i in range(2)
+        }
+
+        self.assertTrue(
+            update_column_default_values[0] == update_column_default_values[1]
+        )
+        self.assertTrue(
+            update_column_default_values[1] == update_column_default_values[0]
+        )
+        self.assertEqual(len(update_column_default_value_dict), 1)
+        self.assertEqual(
+            update_column_default_value_dict[update_column_default_values[0]], 1
+        )
+
+        update_column_default_values = [
+            TableChange.update_column_default_value(
+                field_name, Column.DEFAULT_VALUE_NOT_SET
+            )
+            for _ in range(2)
+        ]
+
+        update_column_default_value_dict = {
+            update_column_default_values[i]: i for i in range(2)
+        }
+
+        self.assertTrue(
+            update_column_default_values[0] == update_column_default_values[1]
+        )
+        self.assertTrue(
+            update_column_default_values[1] == update_column_default_values[0]
+        )
+        self.assertEqual(len(update_column_default_value_dict), 1)
+        self.assertEqual(
+            update_column_default_value_dict[update_column_default_values[0]], 1
+        )
