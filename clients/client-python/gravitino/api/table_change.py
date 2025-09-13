@@ -486,20 +486,21 @@ class AddColumn(TableChange.ColumnChange):
         return self._field_name
 
     def __hash__(self) -> int:
-        base_tuple = (
-            self._data_type,
-            self._comment,
-            self._position,
-            self._nullable,
-            self._auto_increment,
+        return hash(
             (
-                tuple(self._default_value)
-                if self._default_value == Column.DEFAULT_VALUE_NOT_SET
-                else self._default_value
-            ),
+                *self._field_name,
+                self._data_type,
+                self._comment,
+                self._position,
+                self._nullable,
+                self._auto_increment,
+                (
+                    tuple(self._default_value)
+                    if self._default_value == Column.DEFAULT_VALUE_NOT_SET
+                    else self._default_value
+                ),
+            )
         )
-        result = hash(base_tuple)
-        return 31 * result + hash(tuple(self._field_name))
 
 
 @final
@@ -536,7 +537,7 @@ class RenameColumn(TableChange.ColumnChange):
         return self._field_name
 
     def __hash__(self) -> int:
-        return hash((tuple(self._field_name), self._new_name))
+        return hash((*self._field_name, self._new_name))
 
 
 @final
@@ -563,7 +564,7 @@ class UpdateColumnDefaultValue(TableChange.ColumnChange):
     def __hash__(self) -> int:
         return hash(
             (
-                tuple(self._field_name),
+                *self._field_name,
                 (
                     tuple(self._new_default_value)
                     if self._new_default_value == Column.DEFAULT_VALUE_NOT_SET
@@ -596,7 +597,7 @@ class UpdateColumnType(TableChange.ColumnChange):
         return self._new_data_type
 
     def __hash__(self) -> int:
-        return hash((tuple(self._field_name), self._new_data_type))
+        return hash((*self._field_name, self._new_data_type))
 
 
 @final
