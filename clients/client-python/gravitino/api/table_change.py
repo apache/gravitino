@@ -238,6 +238,25 @@ class TableChange(ABC):
         """
         return DeleteColumn(field_name, if_exists)
 
+    @staticmethod
+    def update_column_nullability(
+        field_name: list[str], nullable: bool
+    ) -> "UpdateColumnNullability":
+        """Create a `TableChange` for updating the nullability of a field.
+
+        The name is used to find the field to update.
+
+        If the field does not exist, the change will result in an `IllegalArgumentException`.
+
+        Args:
+            field_name (list[str]): The field name of the column to update.
+            nullable (bool): The new nullability.
+
+        Returns:
+            TableChange: A `TableChange` for the update.
+        """
+        return UpdateColumnNullability(field_name, nullable)
+
     @final
     @dataclass(frozen=True)
     class RenameTable:
@@ -732,3 +751,39 @@ class DeleteColumn(TableChange.ColumnChange):
 
     def __hash__(self) -> int:
         return hash((*self._field_name, self._if_exists))
+
+
+@final
+@dataclass(frozen=True)
+class UpdateColumnNullability(TableChange.ColumnChange):
+    """A TableChange to update the nullability of a field.
+
+    The field names are used to find the field to update.
+
+    If the field does not exist, the change must result in an `IllegalArgumentException`.
+    """
+
+    _field_name: list[str] = field(metadata=config(field_name="field_name"))
+    _nullable: bool = field(metadata=config(field_name="nullable"))
+
+    def field_name(self) -> list[str]:
+        return self._field_name
+
+    def get_field_name(self) -> list[str]:
+        """Retrieves the field name of the column whose nullability is being updated.
+
+        Returns:
+            list[str]: A list of strings representing the field name.
+        """
+        return self._field_name
+
+    def get_nullable(self) -> bool:
+        """Checks if the column is nullable.
+
+        Returns:
+            bool: `True` if the column is nullable; `False` otherwise.
+        """
+        return self._nullable
+
+    def __hash__(self) -> int:
+        return hash((*self._field_name, self._nullable))
