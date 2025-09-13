@@ -19,6 +19,8 @@
 
 package org.apache.gravitino.listener.api.event;
 
+import static java.util.Objects.requireNonNull;
+
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.annotation.DeveloperApi;
@@ -39,7 +41,8 @@ public final class ListTopicFailureEvent extends TopicFailureEvent {
    * @param exception The exception encountered during the attempt to list topics.
    */
   public ListTopicFailureEvent(String user, Namespace namespace, Exception exception) {
-    super(user, NameIdentifier.of(namespace.levels()), exception);
+    super(user, NameIdentifier.of(requireNonNull(namespace, "namespace must not be null").levels()),
+          exception);
     this.namespace = namespace;
   }
 

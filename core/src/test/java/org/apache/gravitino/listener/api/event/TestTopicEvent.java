@@ -244,6 +244,17 @@ public class TestTopicEvent {
     Assertions.assertEquals(OperationStatus.FAILURE, event.operationStatus());
   }
 
+  @Test
+  void testListTopicFailureEventWithNullNamespace() {
+    NullPointerException exception =
+      Assertions.assertThrowsExactly(
+          NullPointerException.class,
+          () -> new ListTopicFailureEvent("user", null, new Exception("boom")));
+
+    Assertions.assertEquals("namespace must not be null", exception.getMessage());
+  }
+
+
   private void checkTopicInfo(TopicInfo topicInfo, Topic topic) {
     Assertions.assertEquals(topic.name(), topicInfo.name());
     Assertions.assertEquals(topic.properties(), topicInfo.properties());
