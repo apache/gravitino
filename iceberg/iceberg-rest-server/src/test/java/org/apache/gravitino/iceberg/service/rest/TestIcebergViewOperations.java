@@ -29,6 +29,10 @@ import javax.ws.rs.client.Entity;
 import javax.ws.rs.core.Application;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+import javax.ws.rs.core.Response.Status;
+import org.apache.gravitino.credential.Credential;
+import org.apache.gravitino.iceberg.service.IcebergAccessDelegationUtil;
+import org.apache.gravitino.iceberg.service.extension.DummyCredentialProvider;
 import org.apache.gravitino.listener.api.event.Event;
 import org.apache.gravitino.listener.api.event.IcebergCreateViewEvent;
 import org.apache.gravitino.listener.api.event.IcebergCreateViewFailureEvent;
@@ -260,6 +264,30 @@ public class TestIcebergViewOperations extends IcebergNamespaceTestBase {
     verifyRenameViewFail(namespace, "rename_foo2", "rename_foo3", 409);
   }
 
+  @ParameterizedTest
+  @MethodSource("org.apache.gravitino.iceberg.service.rest.IcebergRestTestUtil#testNamespaces")
+  void testLoadViewWithCredentialVending(Namespace namespace) {
+    verifyCreateNamespaceSucc(namespace);
+
+    // create the view
+    String viewName = "load_with_credential_vending";
+    verifyCreateViewSucc(namespace, viewName);
+
+    // load the view without credential vending
+    Response response = doLoadView(namespace, viewName);
+    Assertions.assertEquals(Status.OK.getStatusCode(), response.getStatus());
+    LoadViewResponse loadViewResponse = response.readEntity(LoadViewResponse.class);
+    Assertions.assertTrue(!loadViewResponse.config().containsKey(Credential.CREDENTIAL_TYPE));
+
+    // load the view with credential vending
+    response = doLoadViewWithCredentialVending(namespace, viewName);
+    Assertions.assertEquals(Status.OK.getStatusCode(), response.getStatus());
+    loadViewResponse = response.readEntity(LoadViewResponse.class);
+    Assertions.assertEquals(
+        DummyCredentialProvider.DUMMY_CREDENTIAL_TYPE,
+        loadViewResponse.config().get(Credential.CREDENTIAL_TYPE));
+  }
+
   private Response doCreateView(Namespace ns, String name) {
     CreateViewRequest createViewRequest =
         ImmutableCreateViewRequest.builder()
@@ -284,6 +312,12 @@ public class TestIcebergViewOperations extends IcebergNamespaceTestBase {
 
   private Response doLoadView(Namespace ns, String name) {
     return getViewClientBuilder(ns, Optional.of(name)).get();
+  }
+
+  private Response doLoadViewWithCredentialVending(Namespace ns, String name) {
+    return getViewClientBuilder(ns, Optional.of(name))
+        .header(IcebergAccessDelegationUtil.X_ICEBERG_ACCESS_DELEGATION, "vended-credentials")
+        .get();
   }
 
   private void verifyLoadViewSucc(Namespace ns, String name) {

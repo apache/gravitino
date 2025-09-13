@@ -30,6 +30,7 @@ import javax.ws.rs.DELETE;
 import javax.ws.rs.Encoded;
 import javax.ws.rs.GET;
 import javax.ws.rs.HEAD;
+import javax.ws.rs.HeaderParam;
 import javax.ws.rs.POST;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
@@ -37,6 +38,7 @@ import javax.ws.rs.Produces;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+import org.apache.gravitino.iceberg.service.IcebergAccessDelegationUtil;
 import org.apache.gravitino.iceberg.service.IcebergExceptionMapper;
 import org.apache.gravitino.iceberg.service.IcebergObjectMapper;
 import org.apache.gravitino.iceberg.service.IcebergRestUtils;
@@ -134,18 +136,27 @@ public class IcebergViewOperations {
   public Response loadView(
       @PathParam("prefix") String prefix,
       @Encoded() @PathParam("namespace") String namespace,
-      @PathParam("view") String view) {
+      @PathParam("view") String view,
+      @HeaderParam(IcebergAccessDelegationUtil.X_ICEBERG_ACCESS_DELEGATION)
+          String accessDelegation) {
     String catalogName = IcebergRestUtils.getCatalogName(prefix);
     Namespace icebergNS = RESTUtil.decodeNamespace(namespace);
+    boolean isCredentialVending = IcebergAccessDelegationUtil.isCredentialVending(accessDelegation);
     LOG.info(
-        "Load Iceberg view, catalog: {}, namespace: {}, view: {}", catalogName, icebergNS, view);
+        "Load Iceberg view, catalog: {}, namespace: {}, view: {}, access delegation: {}, "
+            + "credential vending: {}",
+        catalogName,
+        icebergNS,
+        view,
+        accessDelegation,
+        isCredentialVending);
     try {
       return Utils.doAs(
           httpRequest,
           () -> {
             TableIdentifier viewIdentifier = TableIdentifier.of(icebergNS, view);
             IcebergRequestContext context =
-                new IcebergRequestContext(httpServletRequest(), catalogName);
+                new IcebergRequestContext(httpServletRequest(), catalogName, isCredentialVending);
             LoadViewResponse loadViewResponse =
                 viewOperationDispatcher.loadView(context, viewIdentifier);
             return IcebergRestUtils.ok(loadViewResponse);

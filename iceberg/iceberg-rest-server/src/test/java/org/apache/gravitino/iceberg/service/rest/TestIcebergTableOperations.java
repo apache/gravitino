@@ -32,6 +32,7 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.Response.Status;
 import org.apache.gravitino.credential.Credential;
+import org.apache.gravitino.iceberg.service.IcebergAccessDelegationUtil;
 import org.apache.gravitino.iceberg.service.extension.DummyCredentialProvider;
 import org.apache.gravitino.listener.api.event.Event;
 import org.apache.gravitino.listener.api.event.IcebergCreateTableEvent;
@@ -331,7 +332,7 @@ public class TestIcebergTableOperations extends IcebergNamespaceTestBase {
     CreateTableRequest createTableRequest =
         CreateTableRequest.builder().withName(name).withSchema(tableSchema).build();
     return getTableClientBuilder(ns, Optional.empty())
-        .header(IcebergTableOperations.X_ICEBERG_ACCESS_DELEGATION, "vended-credentials")
+        .header(IcebergAccessDelegationUtil.X_ICEBERG_ACCESS_DELEGATION, "vended-credentials")
         .post(Entity.entity(createTableRequest, MediaType.APPLICATION_JSON_TYPE));
   }
 
@@ -366,7 +367,7 @@ public class TestIcebergTableOperations extends IcebergNamespaceTestBase {
 
   private Response doLoadTableWithCredentialVending(Namespace ns, String name) {
     return getTableClientBuilder(ns, Optional.of(name))
-        .header(IcebergTableOperations.X_ICEBERG_ACCESS_DELEGATION, "vended-credentials")
+        .header(IcebergAccessDelegationUtil.X_ICEBERG_ACCESS_DELEGATION, "vended-credentials")
         .get();
   }
 
