@@ -145,6 +145,25 @@ class TableChange(ABC):
         """
         return RenameColumn(field_name, new_name)
 
+    @staticmethod
+    def update_column_default_value(
+        field_name: list[str], new_default_value: Expression
+    ) -> "UpdateColumnDefaultValue":
+        """Create a `TableChange` for updating the default value of a field.
+
+        The name is used to find the field to update.
+
+        If the field does not exist, the change will result in an `IllegalArgumentException`.
+
+        Args:
+            field_name (list[str]): The field name of the column to update.
+            new_default_value (Expression): The new default value.
+
+        Returns:
+            TableChange: A `TableChange` for the update.
+        """
+        return UpdateColumnDefaultValue(field_name, new_default_value)
+
     @final
     @dataclass(frozen=True)
     class RenameTable:
@@ -480,3 +499,37 @@ class RenameColumn(TableChange.ColumnChange):
 
     def __hash__(self) -> int:
         return hash((tuple(self._field_name), self._new_name))
+
+
+@final
+@dataclass(frozen=True)
+class UpdateColumnDefaultValue(TableChange.ColumnChange):
+    """A `TableChange` to update the default value of a field.
+
+    The field names are used to find the field to update.
+
+    If the field does not exist, the change must result in an `IllegalArgumentException`.
+    """
+
+    _field_name: list[str] = field(metadata=config(field_name="field_name"))
+    _new_default_value: Expression = field(
+        metadata=config(field_name="new_default_value")
+    )
+
+    def field_name(self) -> list[str]:
+        return self._field_name
+
+    def get_new_default_value(self) -> Expression:
+        return self._new_default_value
+
+    def __hash__(self) -> int:
+        return hash(
+            (
+                tuple(self._field_name),
+                (
+                    tuple(self._new_default_value)
+                    if self._new_default_value == Column.DEFAULT_VALUE_NOT_SET
+                    else self._new_default_value
+                ),
+            )
+        )
