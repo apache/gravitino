@@ -476,3 +476,48 @@ class TestTableChange(unittest.TestCase):
         self.assertFalse(delete_indexes[0] == another_delete_index)
         self.assertFalse(another_delete_index == delete_indexes[0])
         self.assertEqual(len(delete_index_dict), 2)
+
+    def test_update_column_auto_increment(self):
+        field_name_data = [["existing_column"], ["nested", "existing_column"]]
+        auto_increment_data = [True, False]
+        for field_name, auto_increment in zip(field_name_data, auto_increment_data):
+            update_column_auto_increment = TableChange.update_column_auto_increment(
+                field_name, auto_increment
+            )
+            self.assertListEqual(update_column_auto_increment.field_name(), field_name)
+            self.assertEqual(
+                update_column_auto_increment.get_auto_increment(), auto_increment
+            )
+
+    def test_update_column_auto_increment_equal_and_hash(self):
+        field_name = ["Column A"]
+        auto_increment = True
+        update_column_auto_increments = [
+            TableChange.update_column_auto_increment(field_name, auto_increment)
+            for _ in range(2)
+        ]
+        update_column_auto_increment_dict = {
+            update_column_auto_increments[i]: i for i in range(2)
+        }
+        self.assertTrue(
+            update_column_auto_increments[0] == update_column_auto_increments[1]
+        )
+        self.assertTrue(
+            update_column_auto_increments[1] == update_column_auto_increments[0]
+        )
+        self.assertEqual(len(update_column_auto_increment_dict), 1)
+
+        another_update_column_auto_increment = TableChange.update_column_auto_increment(
+            ["Column B"], False
+        )
+        update_column_auto_increment_dict = {
+            update_column_auto_increments[0]: 0,
+            another_update_column_auto_increment: 1,
+        }
+        self.assertFalse(
+            update_column_auto_increments[0] == another_update_column_auto_increment
+        )
+        self.assertFalse(
+            another_update_column_auto_increment == update_column_auto_increments[0]
+        )
+        self.assertEqual(len(update_column_auto_increment_dict), 2)
