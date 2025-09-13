@@ -452,3 +452,27 @@ class TestTableChange(unittest.TestCase):
         self.assertFalse(add_indexes[0] == another_add_index)
         self.assertFalse(another_add_index == add_indexes[0])
         self.assertEqual(len(add_index_dict), 2)
+
+    def test_delete_index(self):
+        index_name = "index_name"
+        if_exists = True
+        delete_index = TableChange.delete_index(index_name, if_exists)
+        self.assertEqual(delete_index.get_name(), index_name)
+        self.assertEqual(delete_index.is_if_exists(), if_exists)
+
+    def test_delete_index_equal_and_hash(self):
+        index_name = "index_name"
+        if_exists = True
+        delete_indexes = [
+            TableChange.delete_index(index_name, if_exists) for _ in range(2)
+        ]
+        delete_index_dict = {delete_indexes[i]: i for i in range(2)}
+        self.assertTrue(delete_indexes[0] == delete_indexes[1])
+        self.assertTrue(delete_indexes[1] == delete_indexes[0])
+        self.assertEqual(len(delete_index_dict), 1)
+
+        another_delete_index = TableChange.delete_index("another_index_name", if_exists)
+        delete_index_dict = {delete_indexes[0]: 0, another_delete_index: 1}
+        self.assertFalse(delete_indexes[0] == another_delete_index)
+        self.assertFalse(another_delete_index == delete_indexes[0])
+        self.assertEqual(len(delete_index_dict), 2)
