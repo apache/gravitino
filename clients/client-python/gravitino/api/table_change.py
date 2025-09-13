@@ -202,6 +202,25 @@ class TableChange(ABC):
         """
         return UpdateColumnComment(field_name, new_comment)
 
+    @staticmethod
+    def update_column_position(
+        field_name: list[str], new_position: "TableChange.ColumnPosition"
+    ) -> "UpdateColumnPosition":
+        """Create a `TableChange` for updating the position of a field.
+
+        The name is used to find the field to update.
+
+        If the field does not exist, the change will result in an `IllegalArgumentException`.
+
+        Args:
+            field_name (list[str]): The field name of the column to update.
+            new_position (TableChange.ColumnPosition): The new position.
+
+        Returns:
+            TableChange: A `TableChange` for the update.
+        """
+        return UpdateColumnPosition(field_name, new_position)
+
     @final
     @dataclass(frozen=True)
     class RenameTable:
@@ -624,3 +643,41 @@ class UpdateColumnComment(TableChange.ColumnChange):
 
     def __hash__(self) -> int:
         return hash((*self._field_name, self._new_comment))
+
+
+@final
+@dataclass(frozen=True)
+class UpdateColumnPosition(TableChange.ColumnChange):
+    """A TableChange to update the position of a field.
+
+    The field names are used to find the field to update.
+
+    If the field does not exist, the change must result in an `IllegalArgumentException`.
+    """
+
+    _field_name: list[str] = field(metadata=config(field_name="field_name"))
+    _position: TableChange.ColumnPosition = field(
+        metadata=config(field_name="position")
+    )
+
+    def field_name(self) -> list[str]:
+        return self._field_name
+
+    def get_field_name(self) -> list[str]:
+        """Retrieves the field name of the column whose position is being updated.
+
+        Returns:
+            list[str]: A list of strings representing the field name.
+        """
+        return self._field_name
+
+    def get_position(self) -> TableChange.ColumnPosition:
+        """Retrieves the new position for the column.
+
+        Returns:
+            TableChange.ColumnPosition: The new position of the column.
+        """
+        return self._position
+
+    def __hash__(self) -> int:
+        return hash((*self._field_name, self._position))
