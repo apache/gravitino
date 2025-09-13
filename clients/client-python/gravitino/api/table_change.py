@@ -183,6 +183,25 @@ class TableChange(ABC):
         """
         return UpdateColumnType(field_name, new_data_type)
 
+    @staticmethod
+    def update_column_comment(
+        field_name: list[str], new_comment: str
+    ) -> "UpdateColumnComment":
+        """Create a `TableChange` for updating the comment of a field.
+
+        The name is used to find the field to update.
+
+        If the field does not exist, the change will result in an `IllegalArgumentException`.
+
+        Args:
+            field_name (list[str]): The field name of the column to update.
+            new_comment (str): The new comment.
+
+        Returns:
+            TableChange: A `TableChange` for the update.
+        """
+        return UpdateColumnComment(field_name, new_comment)
+
     @final
     @dataclass(frozen=True)
     class RenameTable:
@@ -578,3 +597,29 @@ class UpdateColumnType(TableChange.ColumnChange):
 
     def __hash__(self) -> int:
         return hash((tuple(self._field_name), self._new_data_type))
+
+
+@final
+@dataclass(frozen=True)
+class UpdateColumnComment(TableChange.ColumnChange):
+    """A `TableChange` to update the comment of a field.
+
+    The field names are used to find the field to update.
+
+    If the field does not exist, the change must result in an `IllegalArgumentException`.
+    """
+
+    _field_name: list[str] = field(metadata=config(field_name="field_name"))
+    _new_comment: str = field(metadata=config(field_name="new_comment"))
+
+    def field_name(self) -> list[str]:
+        return self._field_name
+
+    def get_field_name(self) -> list[str]:
+        return self._field_name
+
+    def get_new_comment(self) -> str:
+        return self._new_comment
+
+    def __hash__(self) -> int:
+        return hash((*self._field_name, self._new_comment))
