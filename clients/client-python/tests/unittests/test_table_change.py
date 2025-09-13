@@ -316,3 +316,39 @@ class TestTableChange(unittest.TestCase):
         self.assertFalse(update_column_comments[0] == another_update_column_comment)
         self.assertFalse(another_update_column_comment == update_column_comments[0])
         self.assertEqual(len(update_column_comment_dict), 2)
+
+    def test_update_column_position(self):
+        field_name_data = [["First Name"], ["nested", "Last Name"]]
+        position_data = [
+            TableChange.ColumnPosition.first(),
+            TableChange.ColumnPosition.after("First Name"),
+        ]
+        for field_name, position in zip(field_name_data, position_data):
+            update_column_position = TableChange.update_column_position(
+                field_name, position
+            )
+            self.assertListEqual(update_column_position.field_name(), field_name)
+            self.assertListEqual(update_column_position.get_field_name(), field_name)
+            self.assertEqual(update_column_position.get_position(), position)
+
+    def test_update_column_position_equal_and_hash(self):
+        field_name = ["First Name"]
+        position = TableChange.ColumnPosition.first()
+        update_column_positions = [
+            TableChange.update_column_position(field_name, position) for _ in range(2)
+        ]
+        update_column_position_dict = {update_column_positions[i]: i for i in range(2)}
+        self.assertTrue(update_column_positions[0] == update_column_positions[1])
+        self.assertTrue(update_column_positions[1] == update_column_positions[0])
+        self.assertEqual(len(update_column_position_dict), 1)
+
+        another_update_column_position = TableChange.update_column_position(
+            ["Last Name"], TableChange.ColumnPosition.after("First Name")
+        )
+        update_column_position_dict = {
+            update_column_positions[0]: 0,
+            another_update_column_position: 1,
+        }
+        self.assertFalse(update_column_positions[0] == another_update_column_position)
+        self.assertFalse(another_update_column_position == update_column_positions[0])
+        self.assertEqual(len(update_column_position_dict), 2)
