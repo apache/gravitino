@@ -19,20 +19,13 @@
 
 package org.apache.gravitino.catalog.jdbc;
 
-import java.sql.Driver;
-import java.sql.DriverManager;
 import org.apache.gravitino.catalog.jdbc.converter.JdbcColumnDefaultValueConverter;
 import org.apache.gravitino.catalog.jdbc.converter.JdbcExceptionConverter;
 import org.apache.gravitino.catalog.jdbc.converter.JdbcTypeConverter;
 import org.apache.gravitino.catalog.jdbc.operation.JdbcDatabaseOperations;
 import org.apache.gravitino.catalog.jdbc.operation.JdbcTableOperations;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 public class MySQLProtocolCompatibleCatalogOperations extends JdbcCatalogOperations {
-  private static final Logger LOG =
-      LoggerFactory.getLogger(MySQLProtocolCompatibleCatalogOperations.class);
-
   private static final int MYSQL_JDBC_DRIVER_MINIMAL_SUPPORT_VERSION = 8;
 
   public MySQLProtocolCompatibleCatalogOperations(
@@ -63,20 +56,5 @@ public class MySQLProtocolCompatibleCatalogOperations extends JdbcCatalogOperati
   @Override
   public void close() {
     super.close();
-
-    try {
-      // Close thread AbandonedConnectionCleanupThread
-      Class.forName("com.mysql.cj.jdbc.AbandonedConnectionCleanupThread")
-          .getMethod("uncheckedShutdown")
-          .invoke(null);
-      LOG.info("AbandonedConnectionCleanupThread has been shutdown...");
-
-      // Unload the MySQL driver, only Unload the driver if it is loaded by
-      // IsolatedClassLoader.
-      Driver mysqlDriver = DriverManager.getDriver("jdbc:mysql://dumpy_address");
-      deregisterDriver(mysqlDriver);
-    } catch (Exception e) {
-      LOG.warn("Failed to shutdown AbandonedConnectionCleanupThread or deregister MySQL driver", e);
-    }
   }
 }
