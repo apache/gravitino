@@ -18,6 +18,7 @@
 import unittest
 
 from gravitino.api.column import Column
+from gravitino.api.expressions.indexes.index import Index
 from gravitino.api.expressions.literals.literals import Literals
 from gravitino.api.table_change import TableChange
 from gravitino.api.types.types import Types
@@ -422,3 +423,32 @@ class TestTableChange(unittest.TestCase):
             another_update_column_nullability == update_column_nullabilities[0]
         )
         self.assertEqual(len(update_column_nullability_dict), 2)
+
+    def test_add_index(self):
+        index_name = "index_name"
+        field_names = [["id"]]
+        index_type = Index.IndexType.PRIMARY_KEY
+        add_index = TableChange.add_index(index_type, index_name, field_names)
+        self.assertEqual(add_index.get_name(), index_name)
+        self.assertListEqual(add_index.get_field_names(), field_names)
+        self.assertIs(add_index.get_type(), index_type)
+
+    def test_add_index_equal_and_hash(self):
+        index_name = "index_name"
+        field_names = [["Column A"], ["Column B"]]
+        index_type = Index.IndexType.UNIQUE_KEY
+        add_indexes = [
+            TableChange.add_index(index_type, index_name, field_names) for _ in range(2)
+        ]
+        add_index_dict = {add_indexes[i]: i for i in range(2)}
+        self.assertTrue(add_indexes[0] == add_indexes[1])
+        self.assertTrue(add_indexes[1] == add_indexes[0])
+        self.assertEqual(len(add_index_dict), 1)
+
+        another_add_index = TableChange.add_index(
+            Index.IndexType.PRIMARY_KEY, "another_index_name", [["id"]]
+        )
+        add_index_dict = {add_indexes[0]: 0, another_add_index: 1}
+        self.assertFalse(add_indexes[0] == another_add_index)
+        self.assertFalse(another_add_index == add_indexes[0])
+        self.assertEqual(len(add_index_dict), 2)
