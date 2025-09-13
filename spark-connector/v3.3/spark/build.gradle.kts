@@ -37,6 +37,11 @@ val scalaJava8CompatVersion: String = libs.versions.scala.java.compat.get()
 val scalaCollectionCompatVersion: String = libs.versions.scala.collection.compat.get()
 val artifactName = "${rootProject.name}-spark-${sparkMajorVersion}_$scalaVersion"
 
+if (hasProperty("excludePackagesForSparkConnector")) {
+  val configureFunc = properties["excludePackagesForSparkConnector"] as? (Project) -> Unit
+  configureFunc?.invoke(project)
+}
+
 dependencies {
   implementation(project(":spark-connector:spark-common"))
   compileOnly("org.apache.kyuubi:kyuubi-spark-connector-hive_$scalaVersion:$kyuubiVersion")
@@ -44,8 +49,10 @@ dependencies {
     exclude("com.fasterxml.jackson")
   }
   compileOnly("org.apache.iceberg:iceberg-spark-runtime-${sparkMajorVersion}_$scalaVersion:$icebergVersion")
-  compileOnly("org.apache.paimon:paimon-spark-$sparkMajorVersion:$paimonVersion") {
-    exclude("org.apache.spark")
+  if (scalaVersion == "2.12") {
+    compileOnly("org.apache.paimon:paimon-spark-$sparkMajorVersion:$paimonVersion") {
+      exclude("org.apache.spark")
+    }
   }
 
   testImplementation(project(":api")) {
@@ -130,8 +137,10 @@ dependencies {
   testImplementation("org.apache.iceberg:iceberg-core:$icebergVersion")
   testImplementation("org.apache.iceberg:iceberg-spark-runtime-${sparkMajorVersion}_$scalaVersion:$icebergVersion")
   testImplementation("org.apache.iceberg:iceberg-hive-metastore:$icebergVersion")
-  testImplementation("org.apache.paimon:paimon-spark-$sparkMajorVersion:$paimonVersion") {
-    exclude("org.apache.spark")
+  if (scalaVersion == "2.12") {
+    testImplementation("org.apache.paimon:paimon-spark-$sparkMajorVersion:$paimonVersion") {
+      exclude("org.apache.spark")
+    }
   }
   testImplementation("org.apache.kyuubi:kyuubi-spark-connector-hive_$scalaVersion:$kyuubiVersion")
   // include spark-sql,spark-catalyst,hive-common,hdfs-client
@@ -188,4 +197,8 @@ tasks.clean {
   delete("derby.log")
   delete("metastore_db")
   delete("spark-warehouse")
+}
+
+tasks.named<Jar>("sourcesJar") {
+  duplicatesStrategy = DuplicatesStrategy.EXCLUDE
 }
