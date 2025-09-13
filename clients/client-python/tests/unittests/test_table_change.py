@@ -250,3 +250,36 @@ class TestTableChange(unittest.TestCase):
         self.assertEqual(
             update_column_default_value_dict[update_column_default_values[0]], 1
         )
+
+    def test_update_column_type(self):
+        field_name_data = [["existing_column"], ["nested", "existing_column"]]
+        data_type = Types.StringType.get()
+        for field_name in field_name_data:
+            update_column_type = TableChange.update_column_type(field_name, data_type)
+            self.assertListEqual(update_column_type.field_name(), field_name)
+            self.assertListEqual(update_column_type.get_field_name(), field_name)
+            self.assertTrue(update_column_type.get_new_data_type() == data_type)
+
+    def test_update_column_type_equal_and_hash(self):
+        field_name = ["First Name"]
+        data_type = Types.StringType.get()
+        update_column_types = [
+            TableChange.update_column_type(field_name, data_type) for _ in range(2)
+        ]
+        update_column_type_dict = {update_column_types[i]: i for i in range(2)}
+
+        self.assertTrue(update_column_types[0] == update_column_types[1])
+        self.assertTrue(update_column_types[1] == update_column_types[0])
+        self.assertEqual(len(update_column_type_dict), 1)
+        self.assertEqual(update_column_type_dict[update_column_types[0]], 1)
+
+        another_update_column_type = TableChange.update_column_type(
+            ["Last Name"], data_type
+        )
+        update_column_type_dict = {
+            update_column_types[0]: 0,
+            another_update_column_type: 1,
+        }
+        self.assertFalse(update_column_types[0] == another_update_column_type)
+        self.assertFalse(another_update_column_type == update_column_types[0])
+        self.assertEqual(len(update_column_type_dict), 2)
