@@ -277,6 +277,20 @@ class TableChange(ABC):
         """
         return TableChange.AddIndex(index_type, name, field_names)
 
+    @staticmethod
+    def delete_index(name: str, if_exists: bool) -> "DeleteIndex":
+        """Create a `TableChange` for deleting an index.
+
+        Args:
+            name (str): The name of the index to be dropped.
+            if_exists (bool): If true, silence the error if column does not exist during drop.
+                Otherwise, an `IllegalArgumentException` will be thrown.
+
+        Returns:
+            TableChange: A `TableChange` for the delete index.
+        """
+        return TableChange.DeleteIndex(name, if_exists)
+
     @final
     @dataclass(frozen=True)
     class RenameTable:
@@ -405,6 +419,33 @@ class TableChange(ABC):
                     *chain.from_iterable(self._field_names),
                 )
             )
+
+    @final
+    @dataclass(frozen=True)
+    class DeleteIndex:
+        """A `TableChange` to delete an index.
+
+        If the index does not exist, the change must result in an `IllegalArgumentException`.
+        """
+
+        _name: str = field(metadata=config(field_name="name"))
+        _if_exists: bool = field(metadata=config(field_name="if_exists"))
+
+        def get_name(self) -> str:
+            """Retrieves the name of the index to be deleted.
+
+            Returns:
+                str: The name of the index to be deleted.
+            """
+            return self._name
+
+        def is_if_exists(self) -> bool:
+            """Retrieves the value of the `if_exists` flag.
+
+            Returns:
+                bool: True if the index should be deleted if it exists, False otherwise.
+            """
+            return self._if_exists
 
     class ColumnPosition(ABC):
         """The interface for all column positions.
