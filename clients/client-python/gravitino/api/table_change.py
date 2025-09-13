@@ -291,6 +291,25 @@ class TableChange(ABC):
         """
         return TableChange.DeleteIndex(name, if_exists)
 
+    @staticmethod
+    def update_column_auto_increment(
+        field_name: list[str], auto_increment: bool
+    ) -> "UpdateColumnAutoIncrement":
+        """Create a `TableChange` for updating the autoIncrement of a field.
+
+        The name is used to find the field to update.
+
+        If the field does not exist, the change will result in an `IllegalArgumentException`.
+
+        Args:
+            field_name (list[str]): The field name of the column to update.
+            auto_increment (bool): The new autoIncrement.
+
+        Returns:
+            TableChange: A `TableChange` for the update.
+        """
+        return UpdateColumnAutoIncrement(field_name, auto_increment)
+
     @final
     @dataclass(frozen=True)
     class RenameTable:
@@ -893,3 +912,31 @@ class UpdateColumnNullability(TableChange.ColumnChange):
 
     def __hash__(self) -> int:
         return hash((*self._field_name, self._nullable))
+
+
+@final
+@dataclass(frozen=True)
+class UpdateColumnAutoIncrement(TableChange.ColumnChange):
+    """A TableChange to update the `autoIncrement` of a field.
+
+    The field names are used to find the field to update.
+
+    If the field does not exist, the change must result in an `IllegalArgumentException`.
+    """
+
+    _field_name: list[str] = field(metadata=config(field_name="field_name"))
+    _auto_increment: bool = field(metadata=config(field_name="auto_increment"))
+
+    def field_name(self) -> list[str]:
+        return self._field_name
+
+    def get_auto_increment(self) -> bool:
+        """Checks if the column is `autoIncrement`.
+
+        Returns:
+            bool: `True` if the column is `autoIncrement`; `False` otherwise.
+        """
+        return self._auto_increment
+
+    def __hash__(self) -> int:
+        return hash((*self._field_name, self._auto_increment))
