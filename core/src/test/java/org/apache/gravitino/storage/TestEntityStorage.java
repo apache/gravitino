@@ -33,6 +33,7 @@ import static org.apache.gravitino.Configs.RELATIONAL_ENTITY_STORE;
 import static org.apache.gravitino.Configs.STORE_DELETE_AFTER_TIME;
 import static org.apache.gravitino.Configs.VERSION_RETENTION_COUNT;
 import static org.apache.gravitino.file.Fileset.LOCATION_NAME_UNKNOWN;
+import static org.apache.gravitino.storage.relational.TestJDBCBackend.createRoleEntity;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
@@ -65,6 +66,7 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.authorization.Privileges;
+import org.apache.gravitino.authorization.Role;
 import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.authorization.SecurableObjects;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
@@ -98,6 +100,7 @@ import org.apache.gravitino.storage.relational.converters.MySQLExceptionConverte
 import org.apache.gravitino.storage.relational.converters.PostgreSQLExceptionConverter;
 import org.apache.gravitino.storage.relational.converters.SQLExceptionConverterFactory;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
+import org.apache.gravitino.utils.NamespaceUtil;
 import org.apache.ibatis.session.SqlSession;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
@@ -148,6 +151,7 @@ public class TestEntityStorage {
     Mockito.when(config.get(Configs.CACHE_WEIGHER_ENABLED)).thenReturn(true);
     Mockito.when(config.get(Configs.CACHE_STATS_ENABLED)).thenReturn(false);
     Mockito.when(config.get(Configs.CACHE_IMPLEMENTATION)).thenReturn("caffeine");
+    Mockito.when(config.get(Configs.CACHE_LOCK_SEGMENTS)).thenReturn(16);
 
     BaseIT baseIT = new BaseIT();
 
@@ -2571,5 +2575,71 @@ public class TestEntityStorage {
     List<Pair<Long, Pair<Long, Long>>> deleteResult =
         listAllColumnWithEntityId(entityId, entityType);
     deleteResult.forEach(p -> Assertions.assertTrue(p.getRight().getRight() > 0));
+  }
+
+  @ParameterizedTest
+  @MethodSource("storageProvider")
+  void testInvalidRelationCache(String type) throws Exception {
+    Config config = Mockito.mock(Config.class);
+    init(type, config);
+
+    AuditInfo auditInfo =
+        AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
+
+    try (EntityStore store = EntityStoreFactory.createEntityStore(config)) {
+      store.initialize(config);
+
+      BaseMetalake metalake =
+          createBaseMakeLake(RandomIdGenerator.INSTANCE.nextId(), "metalake", auditInfo);
+      store.put(metalake, false);
+
+      CatalogEntity catalog =
+          createCatalog(
+              RandomIdGenerator.INSTANCE.nextId(),
+              NamespaceUtil.ofCatalog("metalake"),
+              "catalog",
+              auditInfo);
+      store.put(catalog, false);
+
+      // Insert a role
+      RoleEntity role =
+          createRoleEntity(
+              RandomIdGenerator.INSTANCE.nextId(),
+              AuthorizationUtils.ofRoleNamespace("metalake"),
+              "role",
+              auditInfo,
+              "catalog");
+      store.put(role, false);
+
+      // Get a role
+      Role oldRole = store.get(role.nameIdentifier(), Entity.EntityType.ROLE, RoleEntity.class);
+
+      // Rename the catalog that the role is associated with
+      CatalogEntity updatedCatalog =
+          CatalogEntity.builder()
+              .withId(catalog.id())
+              .withNamespace(catalog.namespace())
+              .withName("newCatalogName")
+              .withAuditInfo(auditInfo)
+              .withComment(catalog.getComment())
+              .withProperties(catalog.getProperties())
+              .withType(catalog.getType())
+              .withProvider(catalog.getProvider())
+              .build();
+      store.update(
+          catalog.nameIdentifier(),
+          CatalogEntity.class,
+          Entity.EntityType.CATALOG,
+          e -> updatedCatalog);
+
+      // Now try to get the role again, it should reflect the updated catalog name
+      Role newRow = store.get(role.nameIdentifier(), Entity.EntityType.ROLE, RoleEntity.class);
+      Assertions.assertNotEquals(oldRole, newRow);
+      Assertions.assertNotEquals(oldRole.securableObjects(), newRow.securableObjects());
+      List<SecurableObject> securableObjects = newRow.securableObjects();
+      Assertions.assertEquals(1, securableObjects.size());
+      Assertions.assertEquals("newCatalogName", securableObjects.get(0).name());
+      destroy(type);
+    }
   }
 }

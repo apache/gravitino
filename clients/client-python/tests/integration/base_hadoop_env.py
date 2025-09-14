@@ -25,11 +25,11 @@ from gravitino.exceptions.base import GravitinoRuntimeException
 
 logger = logging.getLogger(__name__)
 
-HADOOP_VERSION = os.environ.get("HADOOP_VERSION")
-PYTHON_BUILD_PATH = os.environ.get("PYTHON_BUILD_PATH")
-
 
 class BaseHadoopEnvironment:
+    PYTHON_BUILD_PATH = os.environ.get("PYTHON_BUILD_PATH")
+    BASE_DIR_NAME = "hadoop-2.7.3"
+
     @classmethod
     def init_hadoop_env(cls):
         cls._unzip_hadoop_pack()
@@ -39,16 +39,16 @@ class BaseHadoopEnvironment:
     @classmethod
     def clear_hadoop_env(cls):
         try:
-            shutil.rmtree(f"{PYTHON_BUILD_PATH}/hadoop")
+            shutil.rmtree(f"{cls.PYTHON_BUILD_PATH}/hadoop")
         except Exception as e:
             raise GravitinoRuntimeException(
-                f"Failed to delete dir '{PYTHON_BUILD_PATH}/hadoop': {e}"
+                f"Failed to delete dir '{cls.PYTHON_BUILD_PATH}/hadoop': {e}"
             ) from e
 
     @classmethod
     def _unzip_hadoop_pack(cls):
-        hadoop_pack = f"{PYTHON_BUILD_PATH}/tmp/hadoop-{HADOOP_VERSION}.tar.gz"
-        unzip_dir = f"{PYTHON_BUILD_PATH}/hadoop"
+        hadoop_pack = f"{cls.PYTHON_BUILD_PATH}/tmp/{cls.BASE_DIR_NAME}.tar"
+        unzip_dir = f"{cls.PYTHON_BUILD_PATH}/hadoop"
         logger.info("Unzip hadoop pack from %s.", hadoop_pack)
         # unzip the pack
         if os.path.exists(unzip_dir):
@@ -70,13 +70,13 @@ class BaseHadoopEnvironment:
     def _configure_hadoop_environment(cls):
         logger.info("Configure hadoop environment.")
         os.putenv("HADOOP_USER_NAME", "anonymous")
-        os.putenv("HADOOP_HOME", f"{PYTHON_BUILD_PATH}/hadoop/hadoop-{HADOOP_VERSION}")
-        os.putenv(
-            "HADOOP_CONF_DIR",
-            f"{PYTHON_BUILD_PATH}/hadoop/hadoop-{HADOOP_VERSION}/etc/hadoop",
-        )
+        os.putenv("HADOOP_HOME", f"{cls.PYTHON_BUILD_PATH}/hadoop/{cls.BASE_DIR_NAME}")
+        conf_path = f"{cls.PYTHON_BUILD_PATH}/hadoop/{cls.BASE_DIR_NAME}/etc/hadoop"
+        os.putenv("HADOOP_CONF_DIR", conf_path)
+        # clean up the conf dir brought by the docker container, using default is enough
+        shutil.rmtree(conf_path)
         hadoop_shell_path = (
-            f"{PYTHON_BUILD_PATH}/hadoop/hadoop-{HADOOP_VERSION}/bin/hadoop"
+            f"{cls.PYTHON_BUILD_PATH}/hadoop/{cls.BASE_DIR_NAME}/bin/hadoop"
         )
         # get the classpath
         try:
@@ -86,11 +86,18 @@ class BaseHadoopEnvironment:
                 text=True,
                 check=True,
             )
-            if result.returncode == 0:
-                os.putenv("CLASSPATH", str(result.stdout))
+            classpath = ""
+            # there are some warning messages in the stdout, we need to parse the classpath line
+            for line in result.stdout.splitlines():
+                if line.strip().startswith("/"):
+                    classpath = line.strip()
+                    break
+
+            if classpath:
+                os.putenv("CLASSPATH", classpath)
             else:
                 raise GravitinoRuntimeException(
-                    f"Command failed with return code is not 0, stdout: {result.stdout}, stderr:{result.stderr}"
+                    f"Could not parse classpath from 'hadoop classpath --glob' command output: {result.stdout}"
                 )
         except subprocess.CalledProcessError as e:
             raise GravitinoRuntimeException(

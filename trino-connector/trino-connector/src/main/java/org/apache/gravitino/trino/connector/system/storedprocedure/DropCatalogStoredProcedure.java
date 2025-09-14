@@ -80,7 +80,8 @@ public class DropCatalogStoredProcedure extends GravitinoStoredProcedure {
    * Drops the specified catalog.
    *
    * @param catalogName the name of the catalog to drop
-   * @param ignoreNotExist whether to ignore if the catalog does not exist
+   * @param ignoreNotExist whether to ignore if the catalog does not exist (only checked when the
+   *     catalog cannot be found initially)
    * @throws TrinoException if the catalog does not exist and ignoreNotExist is false
    */
   public void dropCatalog(String catalogName, boolean ignoreNotExist) {
@@ -97,6 +98,8 @@ public class DropCatalogStoredProcedure extends GravitinoStoredProcedure {
             GravitinoErrorCode.GRAVITINO_CATALOG_NOT_EXISTS,
             "Catalog " + NameIdentifier.of(metalake, catalogName) + " not exists.");
       }
+      // Always ignore "ignoreNotExist" inside Metalake.dropCatalog()
+      // because we already handled the null check above.
       catalogConnector.getMetalake().dropCatalog(catalogName, true);
 
       catalogConnectorManager.loadMetalakeSync();

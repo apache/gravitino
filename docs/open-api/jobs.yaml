@@ -66,7 +66,7 @@ paths:
       description: Registers a job template in the specified metalake
       requestBody:
         content:
-          application/json:
+          application/vnd.gravitino.v1+json:
             schema:
               $ref: "#/components/requests/JobTemplateRegisterRequest"
             examples:
@@ -107,9 +107,9 @@ paths:
             application/vnd.gravitino.v1+json:
               schema:
                 $ref: "#/components/responses/JobTemplateResponse"
-                examples:
-                  JobTemplateResponse:
-                    $ref: "#/components/examples/JobTemplateResponse"
+              examples:
+                JobTemplateResponse:
+                  $ref: "#/components/examples/JobTemplateResponse"
         "404":
           description: Not Found - The specified job template does not exist in the specified metalake
           content:
@@ -224,9 +224,9 @@ paths:
             application/vnd.gravitino.v1+json:
               schema:
                 $ref: "#/components/responses/JobResponse"
-                examples:
-                  JobResponse:
-                    $ref: "#/components/examples/JobResponse"
+              examples:
+                JobResponse:
+                  $ref: "#/components/examples/JobResponse"
         "404":
           description: Not Found - The specified job does not exist in the specified metalake
           content:
@@ -254,9 +254,9 @@ paths:
             application/vnd.gravitino.v1+json:
               schema:
                 $ref: "#/components/responses/JobResponse"
-                examples:
-                  JobResponse:
-                    $ref: "#/components/examples/JobResponse"
+              examples:
+                JobResponse:
+                  $ref: "#/components/examples/JobResponse"
         "404":
           description: Not Found - The specified job does not exist in the specified metalake
           content:

@@ -81,23 +81,14 @@ To create a distribution(bucketed) table, you should use the following three com
 
 ```java
 Distributions.of(Strategy.HASH, 4, NamedReference.field("score"));
-```
 
-</TabItem>
-
-<TabItem value="java" label="Java">
-if you want to use auto distribution, you can use the following code, it will set the number is -1.
-
-```java
+// if you want to use auto distribution, you can use the following code, it will set the number is -1.
 // Auto distribution with strategy and fields
 Distributions.auto(Strategy.HASH, NamedReference.field("score"));
 ```
 </TabItem>
 
 </Tabs>
-
-
-
 
 ## Sort ordering
 
