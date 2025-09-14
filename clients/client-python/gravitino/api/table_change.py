@@ -435,7 +435,7 @@ class TableChange(ABC):
                 (
                     self._type,
                     self._name,
-                    *chain.from_iterable(self._field_names),
+                    *sorted(chain.from_iterable(self._field_names)),
                 )
             )
 
@@ -668,7 +668,7 @@ class AddColumn(TableChange.ColumnChange):
     def __hash__(self) -> int:
         return hash(
             (
-                *self._field_name,
+                *sorted(self._field_name),
                 self._data_type,
                 self._comment,
                 self._position,
@@ -717,7 +717,7 @@ class RenameColumn(TableChange.ColumnChange):
         return self._field_name
 
     def __hash__(self) -> int:
-        return hash((*self._field_name, self._new_name))
+        return hash((*sorted(self._field_name), self._new_name))
 
 
 @final
@@ -744,7 +744,7 @@ class UpdateColumnDefaultValue(TableChange.ColumnChange):
     def __hash__(self) -> int:
         return hash(
             (
-                *self._field_name,
+                *sorted(self._field_name),
                 (
                     tuple(self._new_default_value)
                     if self._new_default_value == Column.DEFAULT_VALUE_NOT_SET
@@ -777,7 +777,7 @@ class UpdateColumnType(TableChange.ColumnChange):
         return self._new_data_type
 
     def __hash__(self) -> int:
-        return hash((*self._field_name, self._new_data_type))
+        return hash((*sorted(self._field_name), self._new_data_type))
 
 
 @final
@@ -803,7 +803,7 @@ class UpdateColumnComment(TableChange.ColumnChange):
         return self._new_comment
 
     def __hash__(self) -> int:
-        return hash((*self._field_name, self._new_comment))
+        return hash((*sorted(self._field_name), self._new_comment))
 
 
 @final
@@ -841,7 +841,7 @@ class UpdateColumnPosition(TableChange.ColumnChange):
         return self._position
 
     def __hash__(self) -> int:
-        return hash((*self._field_name, self._position))
+        return hash((*sorted(self._field_name), self._position))
 
 
 @final
@@ -875,7 +875,7 @@ class DeleteColumn(TableChange.ColumnChange):
         return self._if_exists
 
     def __hash__(self) -> int:
-        return hash((*self._field_name, self._if_exists))
+        return hash((*sorted(self._field_name), self._if_exists))
 
 
 @final
@@ -911,7 +911,7 @@ class UpdateColumnNullability(TableChange.ColumnChange):
         return self._nullable
 
     def __hash__(self) -> int:
-        return hash((*self._field_name, self._nullable))
+        return hash((*sorted(self._field_name), self._nullable))
 
 
 @final
@@ -939,4 +939,4 @@ class UpdateColumnAutoIncrement(TableChange.ColumnChange):
         return self._auto_increment
 
     def __hash__(self) -> int:
-        return hash((*self._field_name, self._auto_increment))
+        return hash((*sorted(self._field_name), self._auto_increment))
