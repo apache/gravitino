@@ -30,10 +30,13 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.collect.ImmutableList;
 import java.io.IOException;
+import java.lang.reflect.Field;
 import java.security.Principal;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.Executor;
 import java.util.stream.Collectors;
+import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.GravitinoEnv;
@@ -158,6 +161,7 @@ public class TestJcasbinAuthorizer {
 
   @Test
   public void testAuthorize() throws IOException {
+    makeCompletableFutureUseCurrentThread(jcasbinAuthorizer);
     Principal currentPrincipal = PrincipalUtils.getCurrentPrincipal();
     assertFalse(doAuthorize(currentPrincipal));
     RoleEntity allowRole =
@@ -328,5 +332,17 @@ public class TestJcasbinAuthorizer {
   private static SecurableObject getDenySecurableObject() {
     return POConverters.fromSecurableObjectPO(
         "testCatalog2", getDenySecurableObjectPO(), MetadataObject.Type.CATALOG);
+  }
+
+  private static void makeCompletableFutureUseCurrentThread(JcasbinAuthorizer jcasbinAuthorizer) {
+    try {
+      Executor currentThread = Runnable::run;
+      Class<JcasbinAuthorizer> jcasbinAuthorizerClass = JcasbinAuthorizer.class;
+      Field field = jcasbinAuthorizerClass.getDeclaredField("executor");
+      field.setAccessible(true);
+      FieldUtils.writeField(field, jcasbinAuthorizer, currentThread);
+    } catch (Exception e) {
+      throw new RuntimeException(e);
+    }
   }
 }
