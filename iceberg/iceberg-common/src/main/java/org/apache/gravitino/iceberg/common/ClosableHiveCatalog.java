@@ -26,10 +26,11 @@ import java.util.List;
 import net.sf.cglib.proxy.Enhancer;
 import net.sf.cglib.proxy.MethodInterceptor;
 import org.apache.iceberg.Schema;
+import org.apache.iceberg.Transaction;
 import org.apache.iceberg.catalog.Catalog;
 import org.apache.iceberg.catalog.TableIdentifier;
+import org.apache.iceberg.exceptions.AlreadyExistsException;
 import org.apache.iceberg.hive.HiveCatalog;
-import org.apache.iceberg.view.BaseMetastoreViewCatalog;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -88,19 +89,22 @@ public class ClosableHiveCatalog extends HiveCatalog implements Closeable {
   }
 
   public Catalog.TableBuilder buildTable(TableIdentifier identifier, Schema schema) {
-    ViewAwareTableBuilder builder = new ViewAwareTableBuilder(identifier, schema);
+    ExtendedViewAwareTableBuilderExtended builder =
+        new ExtendedViewAwareTableBuilderExtended(identifier, schema);
     ViewAwareTableBuilderProxy proxy =
         new ViewAwareTableBuilderProxy(builder, this.proxy != null ? this.proxy : this);
-    ViewAwareTableBuilder r = proxy.getProxy(new Object[] {this, identifier, schema});
+    ExtendedViewAwareTableBuilderExtended r =
+        proxy.getProxy(new Object[] {this, identifier, schema});
     return r;
   }
 
   public static class ViewAwareTableBuilderProxy implements MethodInterceptor {
-    private final ViewAwareTableBuilder target;
+    private final ExtendedViewAwareTableBuilderExtended target;
     private final ClosableHiveCatalog closableHiveCatalogProxy;
 
     public ViewAwareTableBuilderProxy(
-        ViewAwareTableBuilder target, ClosableHiveCatalog closableHiveCatalogProxy) {
+        ExtendedViewAwareTableBuilderExtended target,
+        ClosableHiveCatalog closableHiveCatalogProxy) {
       this.target = target;
       this.closableHiveCatalogProxy = closableHiveCatalogProxy;
     }
@@ -140,7 +144,7 @@ public class ClosableHiveCatalog extends HiveCatalog implements Closeable {
       return methodProxy.invoke(target, objects);
     }
 
-    public ViewAwareTableBuilder getProxy(Object[] args) {
+    public ExtendedViewAwareTableBuilderExtended getProxy(Object[] args) {
       Enhancer e = new Enhancer();
       e.setClassLoader(target.getClass().getClassLoader());
       e.setSuperclass(target.getClass());
@@ -148,14 +152,33 @@ public class ClosableHiveCatalog extends HiveCatalog implements Closeable {
 
       Class<?>[] argClass =
           new Class[] {ClosableHiveCatalog.class, TableIdentifier.class, Schema.class};
-      return (ViewAwareTableBuilder) e.create(argClass, args);
+      return (ExtendedViewAwareTableBuilderExtended) e.create(argClass, args);
     }
   }
 
-  public class ViewAwareTableBuilder
-      extends BaseMetastoreViewCatalog.BaseMetastoreViewCatalogTableBuilder {
-    public ViewAwareTableBuilder(TableIdentifier identifier, Schema schema) {
+  public class ExtendedViewAwareTableBuilderExtended
+      extends ExtendedBaseMetastoreViewCatalogTableBuilder {
+    public ExtendedViewAwareTableBuilderExtended(TableIdentifier identifier, Schema schema) {
       super(identifier, schema);
+    }
+  }
+
+  protected class ExtendedBaseMetastoreViewCatalogTableBuilder
+      extends BaseMetastoreCatalogTableBuilder {
+    private final TableIdentifier identifier;
+
+    public ExtendedBaseMetastoreViewCatalogTableBuilder(TableIdentifier identifier, Schema schema) {
+      super(identifier, schema);
+      this.identifier = identifier;
+    }
+
+    @Override
+    public Transaction replaceTransaction() {
+      if (viewExists(identifier)) {
+        throw new AlreadyExistsException("View with same name already exists: %s", identifier);
+      }
+
+      return super.replaceTransaction();
     }
   }
 }
