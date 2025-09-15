@@ -46,6 +46,7 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.SupportsRelationOperations;
 import org.apache.gravitino.UserPrincipal;
+import org.apache.gravitino.authorization.AuthorizationRequestContext;
 import org.apache.gravitino.authorization.Privilege;
 import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.meta.AuditInfo;
@@ -55,7 +56,6 @@ import org.apache.gravitino.meta.SchemaVersion;
 import org.apache.gravitino.meta.UserEntity;
 import org.apache.gravitino.server.ServerConfig;
 import org.apache.gravitino.server.authorization.MetadataIdConverter;
-import org.apache.gravitino.server.authorization.RequestAuthorizationCache;
 import org.apache.gravitino.storage.relational.po.SecurableObjectPO;
 import org.apache.gravitino.storage.relational.service.OwnerMetaService;
 import org.apache.gravitino.storage.relational.utils.POConverters;
@@ -249,22 +249,19 @@ public class TestJcasbinAuthorizer {
   }
 
   private Boolean doAuthorize(Principal currentPrincipal) {
-    return RequestAuthorizationCache.executeWithThreadCache(
-        () ->
-            jcasbinAuthorizer.authorize(
-                currentPrincipal,
-                "testMetalake",
-                MetadataObjects.of(null, "testCatalog", MetadataObject.Type.CATALOG),
-                USE_CATALOG));
+    return jcasbinAuthorizer.authorize(
+        currentPrincipal,
+        "testMetalake",
+        MetadataObjects.of(null, "testCatalog", MetadataObject.Type.CATALOG),
+        USE_CATALOG,
+        new AuthorizationRequestContext());
   }
 
   private Boolean doAuthorizeOwner(Principal currentPrincipal) {
-    return RequestAuthorizationCache.executeWithThreadCache(
-        () ->
-            jcasbinAuthorizer.isOwner(
-                currentPrincipal,
-                "testMetalake",
-                MetadataObjects.of(null, "testCatalog", MetadataObject.Type.CATALOG)));
+    return jcasbinAuthorizer.isOwner(
+        currentPrincipal,
+        "testMetalake",
+        MetadataObjects.of(null, "testCatalog", MetadataObject.Type.CATALOG));
   }
 
   private static UserEntity getUserEntity() {

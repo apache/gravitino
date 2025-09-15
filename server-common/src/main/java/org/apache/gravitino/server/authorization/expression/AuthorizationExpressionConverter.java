@@ -83,13 +83,15 @@ public class AuthorizationExpressionConverter {
             String privilegeOrExpression = matcher.group(2);
             String replacement;
             if (AuthConstants.OWNER.equals(privilegeOrExpression)) {
-              replacement = String.format("authorizer.isOwner(principal,METALAKE_NAME,%s)", type);
+              replacement =
+                  String.format(
+                      "authorizer.isOwner(principal,METALAKE_NAME,%s,authorizationContext)", type);
             } else if (privilegeOrExpression.startsWith(DENY_PREFIX)) {
               String privilege = privilegeOrExpression.substring(5);
               replacement =
                   String.format(
                       "authorizer.deny(principal,METALAKE_NAME,%s,"
-                          + "@org.apache.gravitino.authorization.Privilege\\$Name@%s)",
+                          + "@org.apache.gravitino.authorization.Privilege\\$Name@%s,authorizationContext)",
                       type, privilege);
             } else if (AuthConstants.SELF.equals(privilegeOrExpression)) {
               replacement =
@@ -100,7 +102,7 @@ public class AuthorizationExpressionConverter {
               replacement =
                   String.format(
                       "authorizer.authorize(principal,METALAKE_NAME,%s,"
-                          + "@org.apache.gravitino.authorization.Privilege\\$Name@%s)",
+                          + "@org.apache.gravitino.authorization.Privilege\\$Name@%s,authorizationContext)",
                       type, privilegeOrExpression);
             }
 
