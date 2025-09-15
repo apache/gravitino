@@ -106,9 +106,6 @@ public class AuthorizationRequestContext {
       if (!(o instanceof AuthorizationKey)) {
         return false;
       }
-      if (getClass() != o.getClass()) {
-        return false;
-      }
       AuthorizationKey that = (AuthorizationKey) o;
       return Objects.equals(principal, that.principal)
           && Objects.equals(metalake, that.metalake)
