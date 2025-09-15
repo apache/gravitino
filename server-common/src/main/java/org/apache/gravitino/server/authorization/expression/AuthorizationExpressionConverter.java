@@ -83,9 +83,7 @@ public class AuthorizationExpressionConverter {
             String privilegeOrExpression = matcher.group(2);
             String replacement;
             if (AuthConstants.OWNER.equals(privilegeOrExpression)) {
-              replacement =
-                  String.format(
-                      "authorizer.isOwner(principal,METALAKE_NAME,%s,authorizationContext)", type);
+              replacement = String.format("authorizer.isOwner(principal,METALAKE_NAME,%s)", type);
             } else if (privilegeOrExpression.startsWith(DENY_PREFIX)) {
               String privilege = privilegeOrExpression.substring(5);
               replacement =
