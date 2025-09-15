@@ -141,6 +141,10 @@ public class GravitinoDriverPlugin implements DriverPlugin {
                   && !enableIcebergSupport) {
                 return;
               }
+              if ("lakehouse-paimon".equals(provider.toLowerCase(Locale.ROOT))
+                  && !enablePaimonSupport) {
+                return;
+              }
               try {
                 registerCatalog(sparkConf, catalogName, provider);
               } catch (Exception e) {
