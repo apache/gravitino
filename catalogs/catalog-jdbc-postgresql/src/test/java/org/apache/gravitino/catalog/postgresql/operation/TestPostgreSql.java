@@ -24,6 +24,7 @@ import java.util.HashMap;
 import java.util.Map;
 import org.apache.gravitino.catalog.jdbc.TestJdbc;
 import org.apache.gravitino.catalog.jdbc.config.JdbcConfig;
+import org.apache.gravitino.catalog.jdbc.operation.RequireDatabaseOperation;
 import org.apache.gravitino.catalog.postgresql.converter.PostgreSqlColumnDefaultValueConverter;
 import org.apache.gravitino.catalog.postgresql.converter.PostgreSqlExceptionConverter;
 import org.apache.gravitino.catalog.postgresql.converter.PostgreSqlTypeConverter;
@@ -63,6 +64,9 @@ public class TestPostgreSql extends TestJdbc {
           new PostgreSqlTypeConverter(),
           new PostgreSqlColumnDefaultValueConverter(),
           config);
+      if (TABLE_OPERATIONS instanceof RequireDatabaseOperation) {
+        ((RequireDatabaseOperation) TABLE_OPERATIONS).setDatabaseOperation(DATABASE_OPERATIONS);
+      }
       DATABASE_OPERATIONS.create(TEST_DB_NAME, null, null);
     } catch (URISyntaxException e) {
       throw new RuntimeException(e);

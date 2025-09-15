@@ -43,7 +43,7 @@ import java.io.IOException;
 import java.util.Collections;
 import java.util.List;
 import java.util.Set;
-import org.apache.gravitino.trino.connector.system.storedprocdure.GravitinoStoredProcedureFactory;
+import org.apache.gravitino.trino.connector.system.storedprocedure.GravitinoStoredProcedureFactory;
 import org.apache.gravitino.trino.connector.system.table.GravitinoSystemTableFactory;
 
 /**

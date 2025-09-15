@@ -46,6 +46,10 @@ public class SparkPartitionUtils {
   private SparkPartitionUtils() {}
 
   public static Literal<?> toGravitinoLiteral(InternalRow ident, int ordinal, DataType sparkType) {
+    if (ident.isNullAt(ordinal)) {
+      return Literals.NULL;
+    }
+
     if (sparkType instanceof ByteType) {
       return Literals.byteLiteral(ident.getByte(ordinal));
     } else if (sparkType instanceof ShortType) {
@@ -148,6 +152,10 @@ public class SparkPartitionUtils {
         return Float.parseFloat(hivePartitionValue);
       } else if (dataType instanceof DecimalType) {
         return Decimal.apply(hivePartitionValue);
+      } else if (dataType instanceof VarcharType) {
+        return UTF8String.fromString(hivePartitionValue);
+      } else if (dataType instanceof CharType) {
+        return UTF8String.fromString(hivePartitionValue);
       } else {
         throw new UnsupportedOperationException("Unsupported partition type: " + dataType);
       }

@@ -47,6 +47,10 @@ public class IcebergCatalogPropertyConverter extends CatalogPropertyConverter {
   public Map<String, String> gravitinoToEngineProperties(Map<String, String> properties) {
     Map<String, String> stringStringMap;
     String backend = properties.get("catalog-backend");
+    if (backend == null)
+      throw new TrinoException(
+          GravitinoErrorCode.GRAVITINO_MISSING_REQUIRED_PROPERTY,
+          "Missing required property 'catalog-backend'");
     switch (backend) {
       case "hive":
         stringStringMap = buildHiveBackendProperties(properties);

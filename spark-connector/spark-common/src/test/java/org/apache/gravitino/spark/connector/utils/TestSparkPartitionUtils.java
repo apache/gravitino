@@ -22,13 +22,16 @@ package org.apache.gravitino.spark.connector.utils;
 import java.time.LocalDate;
 import org.apache.gravitino.rel.expressions.literals.Literal;
 import org.apache.gravitino.rel.expressions.literals.Literals;
+import org.apache.gravitino.rel.types.Types;
 import org.apache.spark.sql.catalyst.InternalRow;
 import org.apache.spark.sql.catalyst.expressions.GenericInternalRow;
+import org.apache.spark.sql.types.CharType;
 import org.apache.spark.sql.types.DataType;
 import org.apache.spark.sql.types.DataTypes;
 import org.apache.spark.sql.types.Metadata;
 import org.apache.spark.sql.types.StructField;
 import org.apache.spark.sql.types.StructType;
+import org.apache.spark.sql.types.VarcharType;
 import org.apache.spark.unsafe.types.UTF8String;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -46,6 +49,8 @@ public class TestSparkPartitionUtils {
   float floatValue = 3.14f;
   double doubleValue = 3.1415926535;
   UTF8String stringValue = UTF8String.fromString("Hello World");
+  UTF8String varcharValue = UTF8String.fromString("abc");
+  UTF8String charValue = UTF8String.fromString("xy");
   int date = 0;
   private InternalRow internalRow =
       new GenericInternalRow(
@@ -58,7 +63,9 @@ public class TestSparkPartitionUtils {
             floatValue,
             doubleValue,
             stringValue,
-            date
+            date,
+            varcharValue,
+            charValue,
           });
   private Literal[] literals =
       new Literals.LiteralImpl[] {
@@ -71,6 +78,8 @@ public class TestSparkPartitionUtils {
         Literals.doubleLiteral(doubleValue),
         Literals.stringLiteral(stringValue.toString()),
         Literals.dateLiteral(LocalDate.of(1970, 1, 1)),
+        Literals.varcharLiteral(5, varcharValue.toString()),
+        Literals.of(charValue, Types.FixedCharType.of(2)),
       };
   private String[] hivePartitionValues = {
     "true",
@@ -81,7 +90,9 @@ public class TestSparkPartitionUtils {
     "3.14",
     "3.1415926535",
     "Hello World",
-    "1970-01-01"
+    "1970-01-01",
+    "abc",
+    "xy"
   };
   StructType schema =
       new StructType(
@@ -94,7 +105,9 @@ public class TestSparkPartitionUtils {
             new StructField("float", DataTypes.FloatType, false, Metadata.empty()),
             new StructField("double", DataTypes.DoubleType, false, Metadata.empty()),
             new StructField("string", DataTypes.StringType, false, Metadata.empty()),
-            new StructField("date", DataTypes.DateType, false, Metadata.empty())
+            new StructField("date", DataTypes.DateType, false, Metadata.empty()),
+            new StructField("varchar5", VarcharType.apply(5), false, Metadata.empty()),
+            new StructField("char2", CharType.apply(2), false, Metadata.empty()),
           });
 
   @Test
@@ -149,5 +162,22 @@ public class TestSparkPartitionUtils {
         () ->
             SparkPartitionUtils.getSparkPartitionValue(
                 "1970-01-01 00:00:00", DataTypes.TimestampType));
+  }
+
+  @Test
+  void testToGravitinoLiteralWithMixedNullAndNonNull() {
+    GenericInternalRow mixedRow =
+        new GenericInternalRow(new Object[] {null, UTF8String.fromString("test"), 42});
+
+    Assertions.assertEquals(
+        Literals.NULL, SparkPartitionUtils.toGravitinoLiteral(mixedRow, 0, DataTypes.StringType));
+
+    Assertions.assertEquals(
+        Literals.stringLiteral("test"),
+        SparkPartitionUtils.toGravitinoLiteral(mixedRow, 1, DataTypes.StringType));
+
+    Assertions.assertEquals(
+        Literals.integerLiteral(42),
+        SparkPartitionUtils.toGravitinoLiteral(mixedRow, 2, DataTypes.IntegerType));
   }
 }

@@ -22,10 +22,13 @@ For more details, please refer to the related doc.
 - [**MySQL**](./jdbc-mysql-catalog.md)
 - [**PostgreSQL**](./jdbc-postgresql-catalog.md)
 - [**Apache Doris**](./jdbc-doris-catalog.md)
+- [**StarRocks**](./jdbc-starrocks-catalog.md)
 - [**OceanBase**](./jdbc-oceanbase-catalog.md)
 - [**Apache Iceberg**](./lakehouse-iceberg-catalog.md)
 - [**Apache Paimon**](./lakehouse-paimon-catalog.md)
 - [**Apache Hudi**](./lakehouse-hudi-catalog.md)
+
+If you want to operate table and partition statistics, you can refer to the [document](./manage-statistics-in-gravitino.md).
 
 Assuming:
 
@@ -118,6 +121,7 @@ Currently, Gravitino supports the following catalog providers:
 | `jdbc-postgresql`   | [PostgreSQL catalog property](./jdbc-postgresql-catalog.md#catalog-properties) |
 | `jdbc-doris`        | [Doris catalog property](./jdbc-doris-catalog.md#catalog-properties)           |
 | `jdbc-oceanbase`    | [OceanBase catalog property](./jdbc-oceanbase-catalog.md#catalog-properties)   |
+| `jdbc-starrocks`    | [StarRocks catalog property](./jdbc-starrocks-catalog.md#catalog-properties)   |
 
 ### Load a catalog
 
@@ -501,6 +505,7 @@ Currently, Gravitino supports the following schema property:
 | `jdbc-postgresql`   | [PostgreSQL schema property](./jdbc-postgresql-catalog.md#schema-properties) |
 | `jdbc-doris`        | [Doris schema property](./jdbc-doris-catalog.md#schema-properties)           |
 | `jdbc-oceanbase`    | [OceanBase schema property](./jdbc-oceanbase-catalog.md#schema-properties)   |
+| `jdbc-starrocks`    | [StarRocks schema property](./jdbc-starrocks-catalog.md#schema-properties)   |
 
 ### Load a schema
 
@@ -984,6 +989,7 @@ The following is a table of the column default value that Gravitino supports for
 | `jdbc-postgresql`   | &#10004;                |
 | `jdbc-doris`        | &#10004;                |
 | `jdbc-oceanbase`    | &#10004;                |
+| `jdbc-starrocks`    | &#10004;                |
 
 #### Table column auto-increment
 
@@ -1000,6 +1006,7 @@ The following table shows the column auto-increment that Gravitino supports for 
 | `jdbc-postgresql`   | &#10004;                                                                         |
 | `jdbc-doris`        | &#10008;                                                                         |
 | `jdbc-oceanbase`    | &#10004;([limitations](./jdbc-oceanbase-catalog.md#table-column-auto-increment)) |
+| `jdbc-starrocks`    | &#10004;                                                                         |
 
 #### Table property and type mapping
 
@@ -1015,6 +1022,7 @@ The following is the table property that Gravitino supports:
 | `jdbc-postgresql`   | [PostgreSQL table property](./jdbc-postgresql-catalog.md#table-properties)  | [PostgreSQL type mapping](./jdbc-postgresql-catalog.md#table-column-types) |
 | `jdbc-doris`        | [Doris table property](./jdbc-doris-catalog.md#table-properties)            | [Doris type mapping](./jdbc-doris-catalog.md#table-column-types)           |
 | `jdbc-oceanbase`    | [OceanBase table property](./jdbc-oceanbase-catalog.md#table-properties)    | [OceanBase type mapping](./jdbc-oceanbase-catalog.md#table-column-types)   |
+| `jdbc-starrocks`    | [StarRocks table property](./jdbc-starrocks-catalog.md#table-properties)    | [StarRocks type mapping](./jdbc-starrocks-catalog.md#table-column-types)   |
 
 #### Table partitioning, distribution, sort ordering and indexes
 

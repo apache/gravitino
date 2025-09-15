@@ -26,7 +26,9 @@ import org.apache.gravitino.rel.expressions.sorts.SortOrder;
 /** Displays the details of a table's sort order. */
 public class TableSortOrder extends TableCommand {
 
+  /** The name of the schema. */
   protected final String schema;
+  /** The name of the table. */
   protected final String table;
 
   /**

@@ -29,11 +29,12 @@ import com.google.common.collect.Sets;
 import com.googlecode.concurrenttrees.radix.ConcurrentRadixTree;
 import com.googlecode.concurrenttrees.radix.RadixTree;
 import com.googlecode.concurrenttrees.radix.node.concrete.DefaultCharArrayNodeFactory;
-import java.io.IOException;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Queue;
 import java.util.Set;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.ExecutorService;
@@ -41,8 +42,6 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.locks.ReentrantLock;
-import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
@@ -76,13 +75,18 @@ public class CaffeineEntityCache extends BaseEntityCache {
           new ThreadPoolExecutor.CallerRunsPolicy());
 
   private static final Logger LOG = LoggerFactory.getLogger(CaffeineEntityCache.class.getName());
-  private final ReentrantLock opLock = new ReentrantLock();
 
-  /** Cache part */
-  private final Cache<EntityCacheKey, List<Entity>> cacheData;
+  /** Segmented locking for better concurrency */
+  private final SegmentedLock segmentedLock;
 
-  /** Index part */
-  private RadixTree<EntityCacheKey> cacheIndex;
+  /** Cache data structure. */
+  private final Cache<EntityCacheRelationKey, List<Entity>> cacheData;
+
+  /** Cache reverse index structure. */
+  private ReverseIndexCache reverseIndex;
+
+  /** Cache Index structure. */
+  private RadixTree<EntityCacheRelationKey> cacheIndex;
 
   private ScheduledExecutorService scheduler;
 
@@ -94,6 +98,11 @@ public class CaffeineEntityCache extends BaseEntityCache {
   public CaffeineEntityCache(Config cacheConfig) {
     super(cacheConfig);
     this.cacheIndex = new ConcurrentRadixTree<>(new DefaultCharArrayNodeFactory());
+    this.reverseIndex = new ReverseIndexCache();
+
+    // Initialize segmented lock
+    int lockSegments = cacheConfig.get(Configs.CACHE_LOCK_SEGMENTS);
+    this.segmentedLock = new SegmentedLock(lockSegments);
 
     Caffeine<EntityCacheKey, List<Entity>> cacheDataBuilder = newBaseBuilder(cacheConfig);
 
@@ -133,7 +142,7 @@ public class CaffeineEntityCache extends BaseEntityCache {
     checkArguments(nameIdentifier, identType, relType);
 
     List<Entity> entitiesFromCache =
-        cacheData.getIfPresent(EntityCacheKey.of(nameIdentifier, identType, relType));
+        cacheData.getIfPresent(EntityCacheRelationKey.of(nameIdentifier, identType, relType));
     return Optional.ofNullable(entitiesFromCache).map(BaseEntityCache::convertEntities);
   }
 
@@ -143,7 +152,7 @@ public class CaffeineEntityCache extends BaseEntityCache {
       NameIdentifier ident, Entity.EntityType type) {
     checkArguments(ident, type);
 
-    List<Entity> entitiesFromCache = cacheData.getIfPresent(EntityCacheKey.of(ident, type));
+    List<Entity> entitiesFromCache = cacheData.getIfPresent(EntityCacheRelationKey.of(ident, type));
 
     return Optional.ofNullable(entitiesFromCache)
         .filter(l -> !l.isEmpty())
@@ -156,15 +165,18 @@ public class CaffeineEntityCache extends BaseEntityCache {
       NameIdentifier ident, Entity.EntityType type, SupportsRelationOperations.Type relType) {
     checkArguments(ident, type, relType);
 
-    return withLock(() -> invalidateEntities(ident));
+    return segmentedLock.withLock(
+        EntityCacheRelationKey.of(ident, type, relType),
+        () -> invalidateEntities(ident, type, Optional.of(relType)));
   }
 
   /** {@inheritDoc} */
   @Override
   public boolean invalidate(NameIdentifier ident, Entity.EntityType type) {
     checkArguments(ident, type);
-
-    return withLock(() -> invalidateEntities(ident));
+    return segmentedLock.withLock(
+        EntityCacheRelationKey.of(ident, type),
+        () -> invalidateEntities(ident, type, Optional.empty()));
   }
 
   /** {@inheritDoc} */
@@ -172,14 +184,14 @@ public class CaffeineEntityCache extends BaseEntityCache {
   public boolean contains(
       NameIdentifier ident, Entity.EntityType type, SupportsRelationOperations.Type relType) {
     checkArguments(ident, type, relType);
-    return cacheData.getIfPresent(EntityCacheKey.of(ident, type, relType)) != null;
+    return cacheData.getIfPresent(EntityCacheRelationKey.of(ident, type, relType)) != null;
   }
 
   /** {@inheritDoc} */
   @Override
   public boolean contains(NameIdentifier ident, Entity.EntityType type) {
     checkArguments(ident, type);
-    return cacheData.getIfPresent(EntityCacheKey.of(ident, type)) != null;
+    return cacheData.getIfPresent(EntityCacheRelationKey.of(ident, type)) != null;
   }
 
   /** {@inheritDoc} */
@@ -191,10 +203,9 @@ public class CaffeineEntityCache extends BaseEntityCache {
   /** {@inheritDoc} */
   @Override
   public void clear() {
-    withLock(
+    segmentedLock.withGlobalLock(
         () -> {
           cacheData.invalidateAll();
-          cacheIndex = new ConcurrentRadixTree<>(new DefaultCharArrayNodeFactory());
         });
   }
 
@@ -207,15 +218,16 @@ public class CaffeineEntityCache extends BaseEntityCache {
       List<E> entities) {
     checkArguments(ident, type, relType);
     Preconditions.checkArgument(entities != null, "Entities cannot be null");
-    withLock(
+    EntityCacheRelationKey entityCacheKey = EntityCacheRelationKey.of(ident, type, relType);
+    segmentedLock.withLock(
+        entityCacheKey,
         () -> {
           if (entities.isEmpty()) {
             return;
           }
 
           syncEntitiesToCache(
-              EntityCacheKey.of(ident, type, relType),
-              entities.stream().map(e -> (Entity) e).collect(Collectors.toList()));
+              entityCacheKey, entities.stream().map(e -> (Entity) e).collect(Collectors.toList()));
         });
   }
 
@@ -224,12 +236,13 @@ public class CaffeineEntityCache extends BaseEntityCache {
   public <E extends Entity & HasIdentifier> void put(E entity) {
     Preconditions.checkArgument(entity != null, "Entity cannot be null");
 
-    withLock(
+    NameIdentifier identifier = getIdentFromEntity(entity);
+    EntityCacheRelationKey entityCacheKey = EntityCacheRelationKey.of(identifier, entity.type());
+
+    segmentedLock.withLock(
+        entityCacheKey,
         () -> {
           invalidateOnKeyChange(entity);
-          NameIdentifier identifier = getIdentFromEntity(entity);
-          EntityCacheKey entityCacheKey = EntityCacheKey.of(identifier, entity.type());
-
           syncEntitiesToCache(entityCacheKey, Lists.newArrayList(entity));
         });
   }
@@ -248,18 +261,22 @@ public class CaffeineEntityCache extends BaseEntityCache {
 
   /** {@inheritDoc} */
   @Override
-  public <E extends Exception> void withCacheLock(ThrowingRunnable<E> action) throws E {
+  public <E extends Exception> void withCacheLock(
+      EntityCacheKey key, EntityCache.ThrowingRunnable<E> action) throws E {
+    Preconditions.checkArgument(key != null, "Key cannot be null");
     Preconditions.checkArgument(action != null, "Action cannot be null");
 
-    withLockAndThrow(action);
+    segmentedLock.withLockAndThrow(key, action);
   }
 
   /** {@inheritDoc} */
   @Override
-  public <E, T extends Exception> E withCacheLock(ThrowingSupplier<E, T> action) throws T {
+  public <E, T extends Exception> E withCacheLock(
+      EntityCacheKey key, EntityCache.ThrowingSupplier<E, T> action) throws T {
+    Preconditions.checkArgument(key != null, "Key cannot be null");
     Preconditions.checkArgument(action != null, "Action cannot be null");
 
-    return withLockAndThrow(action);
+    return segmentedLock.withLockAndThrow(key, action);
   }
 
   /**
@@ -270,8 +287,10 @@ public class CaffeineEntityCache extends BaseEntityCache {
    */
   @Override
   protected void invalidateExpiredItem(EntityCacheKey key) {
-    withLock(
+    segmentedLock.withLock(
+        key,
         () -> {
+          reverseIndex.remove(key);
           cacheIndex.remove(key.toString());
         });
   }
@@ -283,7 +302,9 @@ public class CaffeineEntityCache extends BaseEntityCache {
    * @param key The key of the entities.
    * @param newEntities The new entities to sync to the cache.
    */
-  private void syncEntitiesToCache(EntityCacheKey key, List<Entity> newEntities) {
+  private void syncEntitiesToCache(EntityCacheRelationKey key, List<Entity> newEntities) {
+    if (key.relationType() != null) return;
+
     List<Entity> existingEntities = cacheData.getIfPresent(key);
 
     if (existingEntities != null && key.relationType() != null) {
@@ -293,6 +314,10 @@ public class CaffeineEntityCache extends BaseEntityCache {
     }
 
     cacheData.put(key, newEntities);
+
+    for (Entity entity : newEntities) {
+      reverseIndex.indexEntity(entity, key);
+    }
 
     if (cacheData.policy().getIfPresentQuietly(key) != null) {
       cacheIndex.put(key.toString(), key);
@@ -331,101 +356,62 @@ public class CaffeineEntityCache extends BaseEntityCache {
   }
 
   /**
-   * Invalidates the entities by the given cache key.
+   * Invalidate entities with iterative BFS algorithm.
    *
    * @param identifier The identifier of the entity to invalidate
    */
-  private boolean invalidateEntities(NameIdentifier identifier) {
-    List<EntityCacheKey> entityKeysToRemove =
-        Lists.newArrayList(cacheIndex.getValuesForKeysStartingWith(identifier.toString()));
+  private boolean invalidateEntities(
+      NameIdentifier identifier,
+      Entity.EntityType type,
+      Optional<SupportsRelationOperations.Type> relTypeOpt) {
+    Queue<EntityCacheKey> queue = new ArrayDeque<>();
 
-    cacheData.invalidateAll(entityKeysToRemove);
-    entityKeysToRemove.forEach(key -> cacheIndex.remove(key.toString()));
+    EntityCacheKey valueForExactKey =
+        cacheIndex.getValueForExactKey(
+            relTypeOpt.isEmpty()
+                ? EntityCacheKey.of(identifier, type).toString()
+                : EntityCacheRelationKey.of(identifier, type, relTypeOpt.get()).toString());
 
-    return !entityKeysToRemove.isEmpty();
-  }
-
-  /**
-   * Runs the given action with the lock.
-   *
-   * @param action The action to run with the lock
-   */
-  private void withLock(Runnable action) {
-    try {
-      opLock.lockInterruptibly();
-      try {
-        action.run();
-      } finally {
-        opLock.unlock();
-      }
-    } catch (InterruptedException e) {
-      Thread.currentThread().interrupt();
-      throw new IllegalStateException("Thread was interrupted while waiting for lock", e);
+    if (valueForExactKey == null) {
+      // No key to remove
+      return false;
     }
-  }
 
-  /**
-   * Runs the given action with the lock and returns the result.
-   *
-   * @param action The action to run with the lock
-   * @param <T> The type of the result
-   * @return The result of the action
-   */
-  private <T> T withLock(Supplier<T> action) {
-    try {
-      opLock.lockInterruptibly();
-      try {
-        return action.get();
-      } finally {
-        opLock.unlock();
-      }
-    } catch (InterruptedException e) {
-      Thread.currentThread().interrupt();
-      throw new IllegalStateException("Thread was interrupted while waiting for lock", e);
-    }
-  }
+    queue.offer(valueForExactKey);
 
-  /**
-   * Runs the given action with the lock and throws the exception if it occurs.
-   *
-   * @param action The action to run with the lock
-   * @param <T> The type of the result
-   * @return The result of the action
-   * @throws IOException If an exception occurs during the action
-   */
-  private <T, E extends Exception> T withLockAndThrow(ThrowingSupplier<T, E> action) throws E {
-    try {
-      opLock.lockInterruptibly();
-      try {
-        return action.get();
-      } finally {
-        opLock.unlock();
-      }
-    } catch (InterruptedException e) {
-      Thread.currentThread().interrupt();
-      throw new IllegalStateException("Thread was interrupted while waiting for lock", e);
-    }
-  }
+    while (!queue.isEmpty()) {
+      EntityCacheKey currentKeyToRemove = queue.poll();
 
-  /**
-   * Runs the given action with the lock and throws the exception if it occurs.
-   *
-   * @param action The action to run with the lock
-   * @param <E> The type of the exception
-   * @throws E If an exception occurs during the action
-   */
-  private <E extends Exception> void withLockAndThrow(ThrowingRunnable<E> action) throws E {
-    try {
-      opLock.lockInterruptibly();
-      try {
-        action.run();
-      } finally {
-        opLock.unlock();
-      }
-    } catch (InterruptedException e) {
-      Thread.currentThread().interrupt();
-      throw new IllegalStateException("Thread was interrupted while waiting for lock", e);
+      cacheData.invalidate(currentKeyToRemove);
+      cacheIndex.remove(currentKeyToRemove.toString());
+
+      // Remove related entity keys
+      List<EntityCacheKey> relatedEntityKeysToRemove =
+          Lists.newArrayList(
+              cacheIndex.getValuesForKeysStartingWith(currentKeyToRemove.identifier().toString()));
+      queue.addAll(relatedEntityKeysToRemove);
+
+      // Look up from reverse index to go to next depth
+      List<EntityCacheKey> reverseKeysToRemove =
+          Lists.newArrayList(
+              reverseIndex.getValuesForKeysStartingWith(
+                  currentKeyToRemove.identifier().toString()));
+      reverseKeysToRemove.forEach(
+          key -> {
+            // Remove from reverse index
+            // Convert EntityCacheRelationKey to EntityCacheKey
+            reverseIndex
+                .getKeysStartingWith(key.toString())
+                .forEach(
+                    reverseIndexKey -> {
+                      reverseIndex.remove(reverseIndexKey.toString());
+                    });
+          });
+
+      queue.addAll(reverseKeysToRemove);
     }
+
+    return true;
   }
 
   /** Starts the cache stats monitor. */

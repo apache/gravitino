@@ -28,9 +28,13 @@ import org.apache.gravitino.client.GravitinoClient;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.TagAlreadyExistsException;
 
+/** Command to create tags. */
 public class CreateTag extends Command {
+  /** The name of the metalake. */
   protected final String metalake;
+  /** The names of the tags. */
   protected final String[] tags;
+  /** The comment of the tag. */
   protected final String comment;
 
   /**

@@ -55,6 +55,14 @@ import org.apache.gravitino.trino.connector.GravitinoErrorCode;
 /** This class is used to transform datatype between Apache Gravitino and Trino */
 public class GeneralDataTypeTransformer {
 
+  // Trino supports time/timestamp precision from 0 to 12 (picoseconds precision).
+  // @see
+  // https://trino.io/docs/current/language/types.html#date-and-time
+  protected static final int TRINO_SECONDS_PRECISION = 0;
+  protected static final int TRINO_MILLIS_PRECISION = 3;
+  protected static final int TRINO_MICROS_PRECISION = 6;
+  protected static final int TRINO_PICOS_PRECISION = 12;
+
   /**
    * Transforms a Gravitino datatype to a Trino datatype.
    *
@@ -108,13 +116,38 @@ public class GeneralDataTypeTransformer {
       case DATE:
         return DATE;
       case TIME:
+        Types.TimeType timeType = (Types.TimeType) type;
+        if (timeType.hasPrecisionSet()) {
+          int precision = timeType.precision();
+          if (precision >= TRINO_SECONDS_PRECISION && precision <= TRINO_PICOS_PRECISION) {
+            return TimeType.createTimeType(precision);
+          } else {
+            throw new TrinoException(
+                GravitinoErrorCode.GRAVITINO_UNSUPPORTED_GRAVITINO_DATATYPE,
+                "Unsupported time precision for Trino: " + precision);
+          }
+        }
+        // default millis (precision 3) to match Trino default precision
         return TimeType.TIME_MILLIS;
       case TIMESTAMP:
-        if (((Types.TimestampType) type).hasTimeZone()) {
-          return TimestampWithTimeZoneType.TIMESTAMP_TZ_MILLIS;
-        } else {
-          return TimestampType.TIMESTAMP_MILLIS;
+        Types.TimestampType timestampType = (Types.TimestampType) type;
+        boolean hasTimeZone = timestampType.hasTimeZone();
+        if (timestampType.hasPrecisionSet()) {
+          int precision = timestampType.precision();
+          if (precision >= TRINO_SECONDS_PRECISION && precision <= TRINO_PICOS_PRECISION) {
+            return hasTimeZone
+                ? TimestampWithTimeZoneType.createTimestampWithTimeZoneType(precision)
+                : TimestampType.createTimestampType(precision);
+          } else {
+            throw new TrinoException(
+                GravitinoErrorCode.GRAVITINO_UNSUPPORTED_GRAVITINO_DATATYPE,
+                "Unsupported timestamp precision for Trino: " + precision);
+          }
         }
+        // default millis (precision 3) to match Trino default precision
+        return hasTimeZone
+            ? TimestampWithTimeZoneType.TIMESTAMP_TZ_MILLIS
+            : TimestampType.TIMESTAMP_MILLIS;
       case LIST:
         return new ArrayType(getTrinoType(((Types.ListType) type).elementType()));
       case MAP:
@@ -191,11 +224,11 @@ public class GeneralDataTypeTransformer {
     } else if (typeClass == io.trino.spi.type.DateType.class) {
       return Types.DateType.get();
     } else if (io.trino.spi.type.TimeType.class.isAssignableFrom(typeClass)) {
-      return Types.TimeType.get();
+      return Types.TimeType.of(((TimeType) type).getPrecision());
     } else if (io.trino.spi.type.TimestampType.class.isAssignableFrom(typeClass)) {
-      return Types.TimestampType.withoutTimeZone();
+      return Types.TimestampType.withoutTimeZone(((TimestampType) type).getPrecision());
     } else if (io.trino.spi.type.TimestampWithTimeZoneType.class.isAssignableFrom(typeClass)) {
-      return Types.TimestampType.withTimeZone();
+      return Types.TimestampType.withTimeZone(((TimestampWithTimeZoneType) type).getPrecision());
     } else if (typeClass == io.trino.spi.type.ArrayType.class) {
       // Ignore nullability for the type, we could only get nullability from column metadata
       return Types.ListType.of(

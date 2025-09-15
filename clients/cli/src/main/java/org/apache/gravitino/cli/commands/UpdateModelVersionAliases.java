@@ -32,11 +32,17 @@ import org.apache.gravitino.model.ModelVersionChange;
 
 /** Update the aliases of a model version. */
 public class UpdateModelVersionAliases extends Command {
+  /** The name of the metalake. */
   protected final String metalake;
+  /** The name of the catalog. */
   protected final String catalog;
+  /** The name of the schema. */
   protected final String schema;
+  /** The name of the model. */
   protected final String model;
+  /** The version of the model. */
   protected final Integer version;
+
   private final String alias;
   private final String[] aliasesToAdd;
   private final String[] aliasesToRemove;
@@ -114,7 +120,9 @@ public class UpdateModelVersionAliases extends Command {
     if (alias != null && version != null) {
       exitWithError("Cannot specify both alias and version");
     }
-
+    if (alias == null && version == null) {
+      exitWithError("Either alias or version must be specified");
+    }
     return this;
   }
 }

@@ -22,7 +22,6 @@ from typing import Final, List
 from gravitino.api.expressions.expression import Expression
 from gravitino.api.expressions.named_reference import NamedReference
 from gravitino.api.expressions.transforms.transform import Transform
-from gravitino.dto.rel.column_dto import ColumnDTO
 from gravitino.dto.rel.partition_utils import PartitionUtils
 from gravitino.exceptions.base import IllegalArgumentException
 from gravitino.utils.precondition import Precondition
@@ -76,7 +75,7 @@ class Partitioning(Transform):
         pass  # pragma: no cover
 
     @abstractmethod
-    def validate(self, columns: List[ColumnDTO]) -> None:
+    def validate(self, columns: List["ColumnDTO"]) -> None:
         """Validates the partitioning columns.
 
         Args:
@@ -128,7 +127,7 @@ class SingleFieldPartitioning(Partitioning):
         """
         return self._field_name
 
-    def validate(self, columns: List[ColumnDTO]) -> None:
+    def validate(self, columns: List["ColumnDTO"]) -> None:
         """Validates the partitioning columns.
 
         Args:

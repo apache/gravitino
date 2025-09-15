@@ -87,6 +87,8 @@ Gravitino currently supports the following catalogs:
 * [**OceanBase catalog**](./jdbc-oceanbase-catalog.md)
 * [**StarRocks catalog**](./jdbc-starrocks-catalog.md)
 
+If you want to operate table and partition statistics, you can refer to the [document](./manage-statistics-in-gravitino.md).
+
 **Fileset catalogs:**
 
 * [**Fileset catalog**](./fileset-catalog.md)
@@ -121,6 +123,7 @@ complete environment. To experience all the features, see
 Gravitino supports different catalogs to manage the metadata in different sources. Please see:
 
 * [Doris catalog](./jdbc-doris-catalog.md): a complete guide to using Gravitino to manage Doris data.
+* [StarRocks catalog](./jdbc-starrocks-catalog.md): a complete guide to using Gravitino to manage StarRocks data.
 * [Fileset catalog](./fileset-catalog.md): a complete guide to using Gravitino to manage fileset
   using Hadoop Compatible File System (HCFS).
 * [Hive catalog](./apache-hive-catalog.md): a complete guide to using Gravitino to manage Apache Hive data.
@@ -185,6 +188,12 @@ Gravitino provides security configurations for Gravitino, including HTTPS, authe
 * [Authentication](./security/how-to-authenticate.md): provides authentication configurations including simple, OAuth, Kerberos.
 * [Access Control](./security/access-control.md): provides access control configurations.
 * [CORS](./security/how-to-use-cors.md): provides CORS configurations.
+
+### Gravitino MCP server
+
+Gravitino MCP server provides the ability to manage Gravitino metadata for AI tools.
+
+* [Gravitino MCP server](./gravitino-mcp-server.md): a complete guide to using the Gravitino MCP server.
 
 ### Programming guides
 

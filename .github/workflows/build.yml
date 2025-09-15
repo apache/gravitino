@@ -63,7 +63,8 @@ jobs:
           cache: 'gradle'
 
       - name: Build with Gradle
-        run: ./gradlew build -x test -PjdkVersion=8
+        run: |
+          ./gradlew release -x test
 
   # To check the spark-connector is compatible with scala2.13
   spark-connector-build:
@@ -86,6 +87,7 @@ jobs:
 
       - name: Build with Scala2.13
         run: |
+          ./gradlew :spark-connector:spark-3.3:build -PscalaVersion=2.13 -PskipITs -PskipDockerTests=false
           ./gradlew :spark-connector:spark-3.4:build -PscalaVersion=2.13 -PskipITs -PskipDockerTests=false
           ./gradlew :spark-connector:spark-3.5:build -PscalaVersion=2.13 -PskipITs -PskipDockerTests=false
 
@@ -124,6 +126,11 @@ jobs:
       - name: Free up disk space
         run: |
           dev/ci/util_free_space.sh
+
+      - name: Install dependencies
+        run: |
+          wget https://nz2.archive.ubuntu.com/ubuntu/pool/main/o/openssl/libssl1.1_1.1.1f-1ubuntu2_amd64.deb
+          sudo dpkg -i libssl1.1_1.1.1f-1ubuntu2_amd64.deb  
 
       - name: Build with Gradle
         run: ./gradlew build -PskipITs -PjdkVersion=${{ matrix.java-version }} -PskipDockerTests=false -x :clients:client-python:build

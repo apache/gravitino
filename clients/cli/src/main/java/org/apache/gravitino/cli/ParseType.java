@@ -24,6 +24,10 @@ import java.util.regex.Pattern;
 import org.apache.gravitino.rel.types.Type;
 import org.apache.gravitino.rel.types.Types;
 
+/**
+ * Utility class for parsing and converting data type strings into Gravitino {@link
+ * org.apache.gravitino.rel.types.Type} objects.
+ */
 public class ParseType {
 
   /**
@@ -38,7 +42,7 @@ public class ParseType {
    * @throws IllegalArgumentException if the data type format is unsupported or malformed
    */
   public static ParsedType parseBasicType(String datatype) {
-    Pattern pattern = Pattern.compile("^(\\w+)\\((\\d+)(?:,(\\d+))?\\)$");
+    Pattern pattern = Pattern.compile("^(\\w+)\\(\\s*(\\d+)\\s*(?:,\\s*(\\d+)\\s*)?\\)$");
     Matcher matcher = pattern.matcher(datatype);
 
     if (matcher.matches()) {
@@ -76,7 +80,7 @@ public class ParseType {
     Pattern pattern = Pattern.compile("^list\\s*\\(\\s*(.+?)\\s*\\)$");
     Matcher matcher = pattern.matcher(datatype);
     if (matcher.matches()) {
-      Type elementType = toBasicType(matcher.group(1).trim());
+      Type elementType = toType(matcher.group(1).trim());
       return Types.ListType.of(elementType, false);
     }
     throw new IllegalArgumentException("Malformed list type: " + datatype);
@@ -86,13 +90,20 @@ public class ParseType {
     Pattern pattern = Pattern.compile("^map\\s*\\(\\s*(.+?)\\s*,\\s*(.+?)\\s*\\)$");
     Matcher matcher = pattern.matcher(datatype);
     if (matcher.matches()) {
-      Type keyType = toBasicType(matcher.group(1).trim());
-      Type valueType = toBasicType(matcher.group(2).trim());
+      Type keyType = toType(matcher.group(1).trim());
+      Type valueType = toType(matcher.group(2).trim());
       return Types.MapType.of(keyType, valueType, false);
     }
     throw new IllegalArgumentException("Malformed map type: " + datatype);
   }
 
+  /**
+   * Parses a data type string and returns a {@link org.apache.gravitino.rel.types.Type} object
+   * representing the parsed type.
+   *
+   * @param datatype The data type string to parse.
+   * @return a {@link org.apache.gravitino.rel.types.Type} object representing the parsed type.
+   */
   public static Type toType(String datatype) {
     if (datatype.startsWith("list")) {
       return toListType(datatype);

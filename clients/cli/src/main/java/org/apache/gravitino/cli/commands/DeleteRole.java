@@ -29,10 +29,15 @@ import org.apache.gravitino.client.GravitinoClient;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.NoSuchRoleException;
 
+/** Represents delete a role */
 public class DeleteRole extends Command {
+  /** The joiner for the comma separated roles. */
   public static final Joiner COMMA_JOINER = Joiner.on(", ").skipNulls();
+  /** The name of the metalake. */
   protected String metalake;
+  /** The array of the role. */
   protected String[] roles;
+  /** The flag to force the deletion. */
   protected boolean force;
 
   /**

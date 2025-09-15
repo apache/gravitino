@@ -36,7 +36,7 @@ import org.apache.gravitino.trino.connector.catalog.CatalogConnectorManager;
 import org.apache.gravitino.trino.connector.catalog.CatalogRegister;
 import org.apache.gravitino.trino.connector.catalog.DefaultCatalogConnectorFactory;
 import org.apache.gravitino.trino.connector.system.GravitinoSystemConnector;
-import org.apache.gravitino.trino.connector.system.storedprocdure.GravitinoStoredProcedureFactory;
+import org.apache.gravitino.trino.connector.system.storedprocedure.GravitinoStoredProcedureFactory;
 import org.apache.gravitino.trino.connector.system.table.GravitinoSystemTableFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

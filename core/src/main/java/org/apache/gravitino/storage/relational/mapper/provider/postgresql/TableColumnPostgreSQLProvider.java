@@ -28,8 +28,8 @@ public class TableColumnPostgreSQLProvider extends TableColumnBaseSQLProvider {
   public String softDeleteColumnsByTableId(@Param("tableId") Long tableId) {
     return "UPDATE "
         + TableColumnMapper.COLUMN_TABLE_NAME
-        + " SET deleted_at = floor(extract(epoch from((current_timestamp -"
-        + " timestamp '1970-01-01 00:00:00')*1000)))"
+        + " SET deleted_at = floor(extract(epoch from(current_timestamp -"
+        + " timestamp '1970-01-01 00:00:00'))*1000)"
         + " WHERE table_id = #{tableId} AND deleted_at = 0";
   }
 
@@ -37,8 +37,8 @@ public class TableColumnPostgreSQLProvider extends TableColumnBaseSQLProvider {
   public String softDeleteColumnsByMetalakeId(@Param("metalakeId") Long metalakeId) {
     return "UPDATE "
         + TableColumnMapper.COLUMN_TABLE_NAME
-        + " SET deleted_at = floor(extract(epoch from((current_timestamp -"
-        + " timestamp '1970-01-01 00:00:00')*1000)))"
+        + " SET deleted_at = floor(extract(epoch from(current_timestamp -"
+        + " timestamp '1970-01-01 00:00:00'))*1000)"
         + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0";
   }
 
@@ -46,8 +46,8 @@ public class TableColumnPostgreSQLProvider extends TableColumnBaseSQLProvider {
   public String softDeleteColumnsByCatalogId(@Param("catalogId") Long catalogId) {
     return "UPDATE "
         + TableColumnMapper.COLUMN_TABLE_NAME
-        + " SET deleted_at = floor(extract(epoch from((current_timestamp -"
-        + " timestamp '1970-01-01 00:00:00')*1000)))"
+        + " SET deleted_at = floor(extract(epoch from(current_timestamp -"
+        + " timestamp '1970-01-01 00:00:00'))*1000)"
         + " WHERE catalog_id = #{catalogId} AND deleted_at = 0";
   }
 
@@ -55,8 +55,8 @@ public class TableColumnPostgreSQLProvider extends TableColumnBaseSQLProvider {
   public String softDeleteColumnsBySchemaId(@Param("schemaId") Long schemaId) {
     return "UPDATE "
         + TableColumnMapper.COLUMN_TABLE_NAME
-        + " SET deleted_at = floor(extract(epoch from((current_timestamp -"
-        + " timestamp '1970-01-01 00:00:00')*1000)))"
+        + " SET deleted_at = floor(extract(epoch from(current_timestamp -"
+        + " timestamp '1970-01-01 00:00:00'))*1000)"
         + " WHERE schema_id = #{schemaId} AND deleted_at = 0";
   }
 

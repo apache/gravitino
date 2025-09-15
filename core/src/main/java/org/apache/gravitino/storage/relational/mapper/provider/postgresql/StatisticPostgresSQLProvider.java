@@ -27,8 +27,8 @@ import org.apache.gravitino.storage.relational.po.StatisticPO;
 public class StatisticPostgresSQLProvider extends StatisticBaseSQLProvider {
   @Override
   protected String softDeleteSQL() {
-    return " SET deleted_at = floor(extract(epoch from((current_timestamp -"
-        + " timestamp '1970-01-01 00:00:00')*1000))) ";
+    return " SET deleted_at = floor(extract(epoch from(current_timestamp -"
+        + " timestamp '1970-01-01 00:00:00'))*1000)";
   }
 
   @Override
@@ -56,7 +56,7 @@ public class StatisticPostgresSQLProvider extends StatisticBaseSQLProvider {
         + "  audit_info = EXCLUDED.audit_info,"
         + "  current_version = EXCLUDED.current_version,"
         + "  last_version = EXCLUDED.last_version,"
-        + "  deleted_at = EXCLUDE.deleted_at"
+        + "  deleted_at = EXCLUDED.deleted_at"
         + "</script>";
   }
 }

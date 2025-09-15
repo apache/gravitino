@@ -31,7 +31,9 @@ import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import java.io.IOException;
 import java.time.Instant;
+import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.core.Application;
 import javax.ws.rs.core.MediaType;
@@ -42,19 +44,28 @@ import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.catalog.TableDispatcher;
+import org.apache.gravitino.dto.requests.PartitionStatisticsDropRequest;
+import org.apache.gravitino.dto.requests.PartitionStatisticsUpdateRequest;
 import org.apache.gravitino.dto.requests.StatisticsDropRequest;
 import org.apache.gravitino.dto.requests.StatisticsUpdateRequest;
 import org.apache.gravitino.dto.responses.BaseResponse;
 import org.apache.gravitino.dto.responses.DropResponse;
 import org.apache.gravitino.dto.responses.ErrorConstants;
 import org.apache.gravitino.dto.responses.ErrorResponse;
+import org.apache.gravitino.dto.responses.PartitionStatisticsListResponse;
 import org.apache.gravitino.dto.responses.StatisticListResponse;
+import org.apache.gravitino.dto.stats.PartitionStatisticsDropDTO;
+import org.apache.gravitino.dto.stats.PartitionStatisticsUpdateDTO;
 import org.apache.gravitino.dto.stats.StatisticDTO;
 import org.apache.gravitino.dto.util.DTOConverters;
+import org.apache.gravitino.exceptions.IllegalStatisticNameException;
 import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
+import org.apache.gravitino.exceptions.UnmodifiableStatisticException;
 import org.apache.gravitino.lock.LockManager;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.rest.RESTUtils;
+import org.apache.gravitino.stats.PartitionRange;
+import org.apache.gravitino.stats.PartitionStatistics;
 import org.apache.gravitino.stats.Statistic;
 import org.apache.gravitino.stats.StatisticManager;
 import org.apache.gravitino.stats.StatisticValue;
@@ -321,13 +332,42 @@ public class TestStatisticOperations extends JerseyTest {
             .accept("application/vnd.gravitino.v1+json")
             .put(entity(req, MediaType.APPLICATION_JSON_TYPE));
 
-    Assertions.assertEquals(
-        Response.Status.INTERNAL_SERVER_ERROR.getStatusCode(), resp3.getStatus());
+    Assertions.assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), resp3.getStatus());
     Assertions.assertEquals(MediaType.APPLICATION_JSON_TYPE, resp3.getMediaType());
 
     ErrorResponse errorResp3 = resp3.readEntity(ErrorResponse.class);
-    Assertions.assertEquals(ErrorConstants.INTERNAL_ERROR_CODE, errorResp3.getCode());
-    Assertions.assertEquals(RuntimeException.class.getSimpleName(), errorResp3.getType());
+    Assertions.assertEquals(ErrorConstants.ILLEGAL_ARGUMENTS_CODE, errorResp3.getCode());
+    Assertions.assertEquals(
+        IllegalStatisticNameException.class.getSimpleName(), errorResp3.getType());
+
+    // Test throw UnmodifiableStatisticException
+    doThrow(new UnmodifiableStatisticException("mock error"))
+        .when(manager)
+        .updateStatistics(any(), any(), any());
+    statsMap.clear();
+    statsMap.put(Statistic.CUSTOM_PREFIX + "test1", StatisticValues.stringValue("test"));
+    req = new StatisticsUpdateRequest(statsMap);
+
+    Response resp4 =
+        target(
+                "/metalakes/"
+                    + metalake
+                    + "/objects/"
+                    + tableObject.type()
+                    + "/"
+                    + tableObject.fullName()
+                    + "/statistics")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .put(entity(req, MediaType.APPLICATION_JSON_TYPE));
+
+    Assertions.assertEquals(Response.Status.METHOD_NOT_ALLOWED.getStatusCode(), resp4.getStatus());
+    Assertions.assertEquals(MediaType.APPLICATION_JSON_TYPE, resp4.getMediaType());
+
+    ErrorResponse errorResp4 = resp4.readEntity(ErrorResponse.class);
+    Assertions.assertEquals(ErrorConstants.UNSUPPORTED_OPERATION_CODE, errorResp4.getCode());
+    Assertions.assertEquals(
+        UnmodifiableStatisticException.class.getSimpleName(), errorResp4.getType());
   }
 
   @Test
@@ -405,5 +445,406 @@ public class TestStatisticOperations extends JerseyTest {
     ErrorResponse errorResp2 = resp2.readEntity(ErrorResponse.class);
     Assertions.assertEquals(ErrorConstants.INTERNAL_ERROR_CODE, errorResp2.getCode());
     Assertions.assertEquals(RuntimeException.class.getSimpleName(), errorResp2.getType());
+
+    // Test throw UnmodifiableStatisticException
+    doThrow(new UnmodifiableStatisticException("mock error"))
+        .when(manager)
+        .dropStatistics(any(), any(), any());
+    Response resp3 =
+        target(
+                "/metalakes/"
+                    + metalake
+                    + "/objects/"
+                    + tableObject.type()
+                    + "/"
+                    + tableObject.fullName()
+                    + "/statistics")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .post(entity(req, MediaType.APPLICATION_JSON_TYPE));
+
+    Assertions.assertEquals(Response.Status.METHOD_NOT_ALLOWED.getStatusCode(), resp3.getStatus());
+    Assertions.assertEquals(MediaType.APPLICATION_JSON_TYPE, resp3.getMediaType());
+
+    ErrorResponse errorResp3 = resp3.readEntity(ErrorResponse.class);
+    Assertions.assertEquals(ErrorConstants.UNSUPPORTED_OPERATION_CODE, errorResp3.getCode());
+    Assertions.assertEquals(
+        UnmodifiableStatisticException.class.getSimpleName(), errorResp3.getType());
+  }
+
+  @Test
+  public void testListPartitionStatistics() {
+    AuditInfo auditInfo =
+        AuditInfo.builder()
+            .withCreateTime(Instant.now())
+            .withCreator("test")
+            .withLastModifiedTime(Instant.now())
+            .withLastModifier("test")
+            .build();
+
+    StatisticDTO stat1 =
+        StatisticDTO.builder()
+            .withName("test1")
+            .withValue(Optional.of(StatisticValues.stringValue("test")))
+            .withReserved(true)
+            .withModifiable(false)
+            .withAudit(DTOConverters.toDTO(auditInfo))
+            .build();
+    StatisticDTO stat2 =
+        StatisticDTO.builder()
+            .withName("test1")
+            .withValue(Optional.of(StatisticValues.longValue(1L)))
+            .withReserved(true)
+            .withModifiable(false)
+            .withAudit(DTOConverters.toDTO(auditInfo))
+            .build();
+    PartitionStatistics partitionStatistics =
+        new StatisticManager.CustomPartitionStatistic("partition1", new Statistic[] {stat1, stat2});
+    MetadataObject tableObject =
+        MetadataObjects.parse(
+            String.format("%s.%s.%s", catalog, schema, table), MetadataObject.Type.TABLE);
+
+    when(manager.listPartitionStatistics(any(), any(), any()))
+        .thenReturn(Lists.newArrayList(partitionStatistics));
+    when(tableDispatcher.tableExists(any())).thenReturn(true);
+
+    Response resp =
+        target(
+                "/metalakes/"
+                    + metalake
+                    + "/objects/"
+                    + tableObject.type()
+                    + "/"
+                    + tableObject.fullName()
+                    + "/statistics/partitions")
+            .queryParam("from", "p0")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .get();
+
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp.getStatus());
+    Assertions.assertEquals(MediaType.APPLICATION_JSON_TYPE, resp.getMediaType());
+
+    PartitionStatisticsListResponse listResp =
+        resp.readEntity(PartitionStatisticsListResponse.class);
+    Assertions.assertEquals(0, listResp.getCode());
+
+    Statistic[] statisticDTOS = listResp.getPartitionStatistics()[0].statistics();
+    Assertions.assertEquals(2, statisticDTOS.length);
+    Assertions.assertEquals(stat1.name(), statisticDTOS[0].name());
+    Assertions.assertEquals(stat1.value().get(), statisticDTOS[0].value().get());
+    Assertions.assertEquals(stat2.name(), statisticDTOS[1].name());
+    Assertions.assertEquals(stat2.value().get(), statisticDTOS[1].value().get());
+
+    // Test throw NoSuchMetadataObjectException
+    when(tableDispatcher.tableExists(any())).thenReturn(false);
+    Response resp1 =
+        target(
+                "/metalakes/"
+                    + metalake
+                    + "/objects/"
+                    + tableObject.type()
+                    + "/"
+                    + tableObject.fullName()
+                    + "/statistics/partitions")
+            .queryParam("from", "p0")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .get();
+
+    Assertions.assertEquals(Response.Status.NOT_FOUND.getStatusCode(), resp1.getStatus());
+    Assertions.assertEquals(MediaType.APPLICATION_JSON_TYPE, resp1.getMediaType());
+
+    ErrorResponse errorResp = resp1.readEntity(ErrorResponse.class);
+    Assertions.assertEquals(ErrorConstants.NOT_FOUND_CODE, errorResp.getCode());
+    Assertions.assertEquals(
+        NoSuchMetadataObjectException.class.getSimpleName(), errorResp.getType());
+
+    // Test throw RuntimeException
+    when(tableDispatcher.tableExists(any())).thenReturn(true);
+    doThrow(new RuntimeException("mock error"))
+        .when(manager)
+        .listPartitionStatistics(any(), any(), any());
+    Response resp2 =
+        target(
+                "/metalakes/"
+                    + metalake
+                    + "/objects/"
+                    + tableObject.type()
+                    + "/"
+                    + tableObject.fullName()
+                    + "/statistics/partitions")
+            .queryParam("from", "p0")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .get();
+
+    Assertions.assertEquals(
+        Response.Status.INTERNAL_SERVER_ERROR.getStatusCode(), resp2.getStatus());
+    Assertions.assertEquals(MediaType.APPLICATION_JSON_TYPE, resp2.getMediaType());
+
+    ErrorResponse errorResp2 = resp2.readEntity(ErrorResponse.class);
+    Assertions.assertEquals(ErrorConstants.INTERNAL_ERROR_CODE, errorResp2.getCode());
+    Assertions.assertEquals(RuntimeException.class.getSimpleName(), errorResp2.getType());
+  }
+
+  @Test
+  public void testUpdatePartitionStatistics() {
+    Map<String, StatisticValue<?>> statsMap = Maps.newHashMap();
+    statsMap.put(Statistic.CUSTOM_PREFIX + "test1", StatisticValues.stringValue("test"));
+    statsMap.put(Statistic.CUSTOM_PREFIX + "test2", StatisticValues.longValue(1L));
+    List<PartitionStatisticsUpdateDTO> partitionStatsList = Lists.newArrayList();
+    partitionStatsList.add(PartitionStatisticsUpdateDTO.of("partition1", statsMap));
+    MetadataObject tableObject =
+        MetadataObjects.parse(
+            String.format("%s.%s.%s", catalog, schema, table), MetadataObject.Type.TABLE);
+
+    PartitionStatisticsUpdateRequest req = new PartitionStatisticsUpdateRequest(partitionStatsList);
+
+    when(tableDispatcher.tableExists(any())).thenReturn(true);
+
+    Response resp =
+        target(
+                "/metalakes/"
+                    + metalake
+                    + "/objects/"
+                    + tableObject.type()
+                    + "/"
+                    + tableObject.fullName()
+                    + "/statistics/partitions")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .put(entity(req, MediaType.APPLICATION_JSON_TYPE));
+
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp.getStatus());
+    Assertions.assertEquals(MediaType.APPLICATION_JSON_TYPE, resp.getMediaType());
+
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp.getStatus());
+    Assertions.assertEquals(MediaType.APPLICATION_JSON_TYPE, resp.getMediaType());
+
+    BaseResponse updateResp = resp.readEntity(BaseResponse.class);
+    Assertions.assertEquals(0, updateResp.getCode());
+
+    // Test throw NoSuchMetadataObjectException
+    when(tableDispatcher.tableExists(any())).thenReturn(false);
+
+    Response resp1 =
+        target(
+                "/metalakes/"
+                    + metalake
+                    + "/objects/"
+                    + tableObject.type()
+                    + "/"
+                    + tableObject.fullName()
+                    + "/statistics/partitions")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .put(entity(req, MediaType.APPLICATION_JSON_TYPE));
+
+    Assertions.assertEquals(Response.Status.NOT_FOUND.getStatusCode(), resp1.getStatus());
+    Assertions.assertEquals(MediaType.APPLICATION_JSON_TYPE, resp1.getMediaType());
+
+    ErrorResponse errorResp = resp1.readEntity(ErrorResponse.class);
+    Assertions.assertEquals(ErrorConstants.NOT_FOUND_CODE, errorResp.getCode());
+    Assertions.assertEquals(
+        NoSuchMetadataObjectException.class.getSimpleName(), errorResp.getType());
+
+    when(tableDispatcher.tableExists(any())).thenReturn(true);
+
+    // Test throw RuntimeException
+    doThrow(new RuntimeException("mock error"))
+        .when(manager)
+        .updatePartitionStatistics(any(), any(), any());
+    Response resp2 =
+        target(
+                "/metalakes/"
+                    + metalake
+                    + "/objects/"
+                    + tableObject.type()
+                    + "/"
+                    + tableObject.fullName()
+                    + "/statistics/partitions")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .put(entity(req, MediaType.APPLICATION_JSON_TYPE));
+
+    Assertions.assertEquals(
+        Response.Status.INTERNAL_SERVER_ERROR.getStatusCode(), resp2.getStatus());
+    Assertions.assertEquals(MediaType.APPLICATION_JSON_TYPE, resp2.getMediaType());
+
+    ErrorResponse errorResp2 = resp2.readEntity(ErrorResponse.class);
+    Assertions.assertEquals(ErrorConstants.INTERNAL_ERROR_CODE, errorResp2.getCode());
+    Assertions.assertEquals(RuntimeException.class.getSimpleName(), errorResp2.getType());
+
+    // Test throw IllegalStatisticNameException
+    statsMap.put("test1", StatisticValues.longValue(1L));
+
+    req = new PartitionStatisticsUpdateRequest(partitionStatsList);
+    Response resp3 =
+        target(
+                "/metalakes/"
+                    + metalake
+                    + "/objects/"
+                    + tableObject.type()
+                    + "/"
+                    + tableObject.fullName()
+                    + "/statistics/partitions")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .put(entity(req, MediaType.APPLICATION_JSON_TYPE));
+
+    Assertions.assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), resp3.getStatus());
+    Assertions.assertEquals(MediaType.APPLICATION_JSON_TYPE, resp3.getMediaType());
+
+    ErrorResponse errorResp3 = resp3.readEntity(ErrorResponse.class);
+    Assertions.assertEquals(ErrorConstants.ILLEGAL_ARGUMENTS_CODE, errorResp3.getCode());
+    Assertions.assertEquals(
+        IllegalStatisticNameException.class.getSimpleName(), errorResp3.getType());
+
+    // Test throw UnmodifiableStatisticException
+    statsMap.clear();
+    statsMap.put(Statistic.CUSTOM_PREFIX + "test1", StatisticValues.longValue(1L));
+    doThrow(new UnmodifiableStatisticException("mock error"))
+        .when(manager)
+        .updatePartitionStatistics(any(), any(), any());
+
+    req = new PartitionStatisticsUpdateRequest(partitionStatsList);
+    Response resp4 =
+        target(
+                "/metalakes/"
+                    + metalake
+                    + "/objects/"
+                    + tableObject.type()
+                    + "/"
+                    + tableObject.fullName()
+                    + "/statistics/partitions")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .put(entity(req, MediaType.APPLICATION_JSON_TYPE));
+
+    Assertions.assertEquals(Response.Status.METHOD_NOT_ALLOWED.getStatusCode(), resp4.getStatus());
+    Assertions.assertEquals(MediaType.APPLICATION_JSON_TYPE, resp4.getMediaType());
+
+    ErrorResponse errorResp4 = resp4.readEntity(ErrorResponse.class);
+    Assertions.assertEquals(ErrorConstants.UNSUPPORTED_OPERATION_CODE, errorResp4.getCode());
+    Assertions.assertEquals(
+        UnmodifiableStatisticException.class.getSimpleName(), errorResp4.getType());
+  }
+
+  @Test
+  public void testDropPartitionStatistics() {
+    List<PartitionStatisticsDropDTO> partitionStatistics = Lists.newArrayList();
+    partitionStatistics.add(
+        PartitionStatisticsDropDTO.of("partition1", Lists.newArrayList("stat1", "stat2")));
+    PartitionStatisticsDropRequest req = new PartitionStatisticsDropRequest(partitionStatistics);
+    when(manager.dropPartitionStatistics(any(), any(), any())).thenReturn(true);
+    when(tableDispatcher.tableExists(any())).thenReturn(true);
+
+    MetadataObject tableObject =
+        MetadataObjects.parse(
+            String.format("%s.%s.%s", catalog, schema, table), MetadataObject.Type.TABLE);
+
+    Response resp =
+        target(
+                "/metalakes/"
+                    + metalake
+                    + "/objects/"
+                    + tableObject.type()
+                    + "/"
+                    + tableObject.fullName()
+                    + "/statistics/partitions")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .post(entity(req, MediaType.APPLICATION_JSON_TYPE));
+
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp.getStatus());
+    Assertions.assertEquals(MediaType.APPLICATION_JSON_TYPE, resp.getMediaType());
+
+    DropResponse dropResp = resp.readEntity(DropResponse.class);
+    Assertions.assertEquals(0, dropResp.getCode());
+    Assertions.assertTrue(dropResp.dropped());
+
+    // Test throw NoSuchMetadataObjectExcep
+    when(tableDispatcher.tableExists(any())).thenReturn(false);
+
+    Response resp1 =
+        target(
+                "/metalakes/"
+                    + metalake
+                    + "/objects/"
+                    + tableObject.type()
+                    + "/"
+                    + tableObject.fullName()
+                    + "/statistics/partitions")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .post(entity(req, MediaType.APPLICATION_JSON_TYPE));
+
+    Assertions.assertEquals(Response.Status.NOT_FOUND.getStatusCode(), resp1.getStatus());
+    Assertions.assertEquals(MediaType.APPLICATION_JSON_TYPE, resp1.getMediaType());
+
+    ErrorResponse errorResp = resp1.readEntity(ErrorResponse.class);
+    Assertions.assertEquals(ErrorConstants.NOT_FOUND_CODE, errorResp.getCode());
+    Assertions.assertEquals(
+        NoSuchMetadataObjectException.class.getSimpleName(), errorResp.getType());
+
+    // Test throw RuntimeException
+    when(tableDispatcher.tableExists(any())).thenReturn(true);
+    doThrow(new RuntimeException("mock error"))
+        .when(manager)
+        .dropPartitionStatistics(any(), any(), any());
+    Response resp2 =
+        target(
+                "/metalakes/"
+                    + metalake
+                    + "/objects/"
+                    + tableObject.type()
+                    + "/"
+                    + tableObject.fullName()
+                    + "/statistics/partitions")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .post(entity(req, MediaType.APPLICATION_JSON_TYPE));
+
+    Assertions.assertEquals(
+        Response.Status.INTERNAL_SERVER_ERROR.getStatusCode(), resp2.getStatus());
+    Assertions.assertEquals(MediaType.APPLICATION_JSON_TYPE, resp2.getMediaType());
+
+    ErrorResponse errorResp2 = resp2.readEntity(ErrorResponse.class);
+    Assertions.assertEquals(ErrorConstants.INTERNAL_ERROR_CODE, errorResp2.getCode());
+    Assertions.assertEquals(RuntimeException.class.getSimpleName(), errorResp2.getType());
+
+    // Test throw UnmodifiableStatisticException
+    doThrow(new UnmodifiableStatisticException("mock error"))
+        .when(manager)
+        .dropPartitionStatistics(any(), any(), any());
+    Response resp3 =
+        target(
+                "/metalakes/"
+                    + metalake
+                    + "/objects/"
+                    + tableObject.type()
+                    + "/"
+                    + tableObject.fullName()
+                    + "/statistics/partitions")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .post(entity(req, MediaType.APPLICATION_JSON_TYPE));
+
+    Assertions.assertEquals(Response.Status.METHOD_NOT_ALLOWED.getStatusCode(), resp3.getStatus());
+    Assertions.assertEquals(MediaType.APPLICATION_JSON_TYPE, resp3.getMediaType());
+
+    ErrorResponse errorResp3 = resp3.readEntity(ErrorResponse.class);
+    Assertions.assertEquals(ErrorConstants.UNSUPPORTED_OPERATION_CODE, errorResp3.getCode());
+    Assertions.assertEquals(
+        UnmodifiableStatisticException.class.getSimpleName(), errorResp3.getType());
+  }
+
+  @Test
+  public void testGetBoundType() {
+    Assertions.assertEquals(
+        PartitionRange.BoundType.CLOSED, StatisticOperations.getFromBoundType(true));
+    Assertions.assertEquals(
+        PartitionRange.BoundType.OPEN, StatisticOperations.getFromBoundType(false));
   }
 }

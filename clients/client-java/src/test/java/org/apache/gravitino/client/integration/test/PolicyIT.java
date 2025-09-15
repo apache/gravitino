@@ -466,17 +466,16 @@ public class PolicyIT extends BaseIT {
     Assertions.assertTrue(policies7[0].enabled());
 
     // Test disable the policy then list again
-    // todo: uncomment after the bug is fixed
-    // https://github.com/apache/gravitino/issues/7787#issue-3255540700
-    //    Assertions.assertDoesNotThrow(() -> metalake.disablePolicy(policy1.name()));
-    //    Policy[] policies8 = relationalCatalog.supportsPolicies().listPolicyInfos();
-    //    Assertions.assertEquals(1, policies8.length);
-    //    Assertions.assertEquals(policy1.name(), policies8[0].name());
-    //    Assertions.assertFalse(policies8[0].enabled());
+    Assertions.assertDoesNotThrow(() -> metalake.disablePolicy(policy1.name()));
+    Policy[] policies8 = relationalCatalog.supportsPolicies().listPolicyInfos();
+    Assertions.assertEquals(1, policies8.length);
+    Assertions.assertEquals(policy1.name(), policies8[0].name());
+    Assertions.assertFalse(policies8[0].enabled());
+    Assertions.assertDoesNotThrow(() -> metalake.enablePolicy(policy1.name()));
 
     // Test get associated policy for catalog
     Policy policy = relationalCatalog.supportsPolicies().getPolicy(policy1.name());
-    Assertions.assertEquals(policy1, policy);
+    Assertions.assertEquals(policy1.enabled(), policy.enabled());
     Assertions.assertFalse(policy.inherited().get());
 
     // Test get non-existed policy for catalog

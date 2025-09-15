@@ -26,7 +26,7 @@ public interface PartitionStatistics {
    *
    * @return the name of the partition
    */
-  String name();
+  String partitionName();
 
   /**
    * Returns the statistics for the partition.

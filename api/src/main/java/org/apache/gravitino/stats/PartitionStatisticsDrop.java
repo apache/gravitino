@@ -25,44 +25,19 @@ import java.util.List;
  * source. It is used to manage and track the statistics that are relevant when partitions are
  * dropped.
  */
-public class PartitionStatisticsDrop {
-
-  private final String partitionName;
-  private final List<String> statisticNames;
-
-  /**
-   * Creates a PartitionDropStatistics instance with the specified partition name and statistic
-   * names.
-   *
-   * @param partitionName the name of the partition.
-   * @param statisticNames a list of statistic names that are relevant to the partition being
-   *     dropped.
-   * @return a PartitionDropStatistics instance
-   */
-  public static PartitionStatisticsDrop of(String partitionName, List<String> statisticNames) {
-    return new PartitionStatisticsDrop(partitionName, statisticNames);
-  }
-
-  private PartitionStatisticsDrop(String partitionName, List<String> statisticNames) {
-    this.partitionName = partitionName;
-    this.statisticNames = statisticNames;
-  }
+public interface PartitionStatisticsDrop {
 
   /**
    * Returns the name of the partition for which these statistics are applicable.
    *
    * @return the name of the partition
    */
-  public String partitionName() {
-    return partitionName;
-  }
+  String partitionName();
 
   /**
    * Returns the names of the statistics that are relevant to the partition being dropped.
    *
    * @return a list of statistic names
    */
-  public List<String> statisticNames() {
-    return statisticNames;
-  }
+  List<String> statisticNames();
 }

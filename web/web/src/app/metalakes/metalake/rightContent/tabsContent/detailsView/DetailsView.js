@@ -184,6 +184,57 @@ const DetailsView = () => {
           </Grid>
         )}
 
+        {activatedItem?.uris && (
+          <Grid item xs={12} sx={{ mb: [0, 5] }}>
+            <Typography variant='body2' sx={{ mb: 2 }}>
+              URI(s)
+            </Typography>
+
+            <TableContainer>
+              <Table>
+                <TableHead
+                  sx={{
+                    backgroundColor: theme => theme.palette.action.hover
+                  }}
+                >
+                  <TableRow>
+                    <TableCell sx={{ py: 2 }}>Name</TableCell>
+                    <TableCell sx={{ py: 2 }}>URI</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody data-refer='details-uris-table'>
+                  {Object.keys(activatedItem?.uris).map((name, index) => {
+                    return (
+                      <TableRow key={index} data-refer={`details-uris-index-${index}`}>
+                        <TableCell
+                          className={'twc-py-[0.7rem] twc-truncate twc-max-w-[134px]'}
+                          data-refer={`uris-name-${name}`}
+                        >
+                          <Tooltip title={<span data-refer={`tip-uris-name-${name}`}>{name}</span>} placement='bottom'>
+                            {name}
+                          </Tooltip>
+                        </TableCell>
+                        <TableCell
+                          className={'twc-py-[0.7rem] twc-truncate twc-max-w-[134px]'}
+                          data-refer={`uris-location-${activatedItem?.uris[name]}`}
+                          data-prev-refer={`uris-name-${name}`}
+                        >
+                          <Tooltip
+                            title={<span data-prev-refer={`uris-name-${name}`}>{activatedItem?.uris[name]}</span>}
+                            placement='bottom'
+                          >
+                            {activatedItem?.uris[name]}
+                          </Tooltip>
+                        </TableCell>
+                      </TableRow>
+                    )
+                  })}
+                </TableBody>
+              </Table>
+            </TableContainer>
+          </Grid>
+        )}
+
         {activatedItem?.aliases && (
           <Grid item xs={12} md={6} sx={{ mb: [0, 5] }}>
             <Typography variant='body2' sx={{ mb: 2 }}>
