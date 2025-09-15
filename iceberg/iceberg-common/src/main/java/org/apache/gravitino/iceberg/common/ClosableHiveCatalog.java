@@ -23,11 +23,11 @@ import com.google.common.collect.Lists;
 import java.io.Closeable;
 import java.io.IOException;
 import java.util.List;
+import net.sf.cglib.proxy.Enhancer;
+import net.sf.cglib.proxy.MethodInterceptor;
 import org.apache.iceberg.Schema;
-import org.apache.iceberg.Transaction;
 import org.apache.iceberg.catalog.Catalog;
 import org.apache.iceberg.catalog.TableIdentifier;
-import org.apache.iceberg.exceptions.AlreadyExistsException;
 import org.apache.iceberg.hive.HiveCatalog;
 import org.apache.iceberg.view.BaseMetastoreViewCatalog;
 import org.slf4j.Logger;
@@ -88,48 +88,74 @@ public class ClosableHiveCatalog extends HiveCatalog implements Closeable {
   }
 
   public Catalog.TableBuilder buildTable(TableIdentifier identifier, Schema schema) {
-    return new ViewAwareTableBuilder(identifier, schema);
+    ViewAwareTableBuilder builder = new ViewAwareTableBuilder(identifier, schema);
+    ViewAwareTableBuilderProxy proxy =
+        new ViewAwareTableBuilderProxy(builder, this.proxy != null ? this.proxy : this);
+    ViewAwareTableBuilder r = proxy.getProxy(new Object[] {this, identifier, schema});
+    return r;
   }
 
-  private class ViewAwareTableBuilder
+  public static class ViewAwareTableBuilderProxy implements MethodInterceptor {
+    private final ViewAwareTableBuilder target;
+    private final ClosableHiveCatalog closableHiveCatalogProxy;
+
+    public ViewAwareTableBuilderProxy(
+        ViewAwareTableBuilder target, ClosableHiveCatalog closableHiveCatalogProxy) {
+      this.target = target;
+      this.closableHiveCatalogProxy = closableHiveCatalogProxy;
+    }
+
+    @Override
+    public Object intercept(
+        Object o,
+        java.lang.reflect.Method method,
+        Object[] objects,
+        net.sf.cglib.proxy.MethodProxy methodProxy)
+        throws Throwable {
+
+      // Methods from Object class are not proxied.
+      if (method.getDeclaringClass() == Object.class) {
+        return methodProxy.invoke(target, objects);
+      }
+
+      // Special handling for "with" methods to return the proxy itself for method chaining.
+      if (method.getReturnType().isAssignableFrom(o.getClass())
+          && method.getName().startsWith("with")) {
+        methodProxy.invoke(target, objects);
+        return o;
+      }
+
+      if (closableHiveCatalogProxy != null) {
+        return closableHiveCatalogProxy.execute(
+            () -> {
+              try {
+                return methodProxy.invoke(target, objects);
+              } catch (Throwable t) {
+                LOGGER.error(
+                    "Failed to invoke method: {} in ViewAwareTableBuilderProxy ", method, t);
+                throw new RuntimeException(t);
+              }
+            });
+      }
+      return methodProxy.invoke(target, objects);
+    }
+
+    public ViewAwareTableBuilder getProxy(Object[] args) {
+      Enhancer e = new Enhancer();
+      e.setClassLoader(target.getClass().getClassLoader());
+      e.setSuperclass(target.getClass());
+      e.setCallback(this);
+
+      Class<?>[] argClass =
+          new Class[] {ClosableHiveCatalog.class, TableIdentifier.class, Schema.class};
+      return (ViewAwareTableBuilder) e.create(argClass, args);
+    }
+  }
+
+  public class ViewAwareTableBuilder
       extends BaseMetastoreViewCatalog.BaseMetastoreViewCatalogTableBuilder {
-    private final TableIdentifier identifier;
-
-    private ViewAwareTableBuilder(TableIdentifier identifier, Schema schema) {
+    public ViewAwareTableBuilder(TableIdentifier identifier, Schema schema) {
       super(identifier, schema);
-      this.identifier = identifier;
-    }
-
-    public Transaction createOrReplaceTransaction() {
-      boolean viewExists =
-          proxy != null
-              ? proxy.viewExists(this.identifier)
-              : ClosableHiveCatalog.this.viewExists(this.identifier);
-      if (viewExists) {
-        throw new AlreadyExistsException("View with same name already exists: %s", this.identifier);
-      }
-
-      if (proxy != null) {
-        return proxy.execute(() -> super.createOrReplaceTransaction());
-      }
-
-      return super.createOrReplaceTransaction();
-    }
-
-    public org.apache.iceberg.Table create() {
-      boolean viewExists =
-          proxy != null
-              ? proxy.viewExists(this.identifier)
-              : ClosableHiveCatalog.this.viewExists(this.identifier);
-      if (viewExists) {
-        throw new AlreadyExistsException("View with same name already exists: %s", this.identifier);
-      }
-
-      if (proxy != null) {
-        return proxy.execute(() -> super.create());
-      }
-
-      return super.create();
     }
   }
 }
