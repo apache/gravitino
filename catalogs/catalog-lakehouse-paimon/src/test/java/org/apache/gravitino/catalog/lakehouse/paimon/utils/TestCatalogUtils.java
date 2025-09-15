@@ -74,6 +74,8 @@ public class TestCatalogUtils {
                             "paimon_catalog_warehouse"),
                         PaimonConfig.CATALOG_URI.getKey(),
                         generateUri(metastore),
+                        "cache-enabled",
+                        "false",
                         PaimonConfig.CATALOG_JDBC_USER.getKey(),
                         "user",
                         PaimonConfig.CATALOG_JDBC_PASSWORD.getKey(),
