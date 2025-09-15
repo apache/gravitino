@@ -57,6 +57,7 @@ import org.apache.gravitino.metrics.MetricNames;
 import org.apache.gravitino.server.authorization.MetadataFilterHelper;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationExpression;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationMetadata;
+import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants;
 import org.apache.gravitino.server.web.Utils;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
@@ -71,9 +72,6 @@ public class CatalogOperations {
   private static final Logger LOG = LoggerFactory.getLogger(CatalogOperations.class);
 
   private final CatalogDispatcher catalogDispatcher;
-
-  private static final String loadCatalogAuthorizationExpression =
-      "ANY_USE_CATALOG || ANY(OWNER, METALAKE, CATALOG)";
 
   @Context private HttpServletRequest httpRequest;
 
@@ -104,7 +102,7 @@ public class CatalogOperations {
               catalogs =
                   MetadataFilterHelper.filterByExpression(
                       metalake,
-                      loadCatalogAuthorizationExpression,
+                      AuthorizationExpressionConstants.loadCatalogAuthorizationExpression,
                       Entity.EntityType.CATALOG,
                       catalogs,
                       (catalogEntity) ->
@@ -117,7 +115,7 @@ public class CatalogOperations {
               idents =
                   MetadataFilterHelper.filterByExpression(
                       metalake,
-                      loadCatalogAuthorizationExpression,
+                      AuthorizationExpressionConstants.loadCatalogAuthorizationExpression,
                       Entity.EntityType.CATALOG,
                       idents);
               Response response = Utils.ok(new EntityListResponse(idents));
