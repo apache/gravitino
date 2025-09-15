@@ -9,7 +9,7 @@ The Apache Gravitino Spark connector offers the capability to read and write Ice
 
 ## Preparation
 
-1. `spark.sql.gravitino.enableIcebergSupport` to `true` in Spark configuration.
+1. Set `spark.sql.gravitino.enableIcebergSupport` to `true` in Spark configuration.
 2. Download Iceberg Spark runtime jar to Spark classpath.
 
 ## Capabilities
