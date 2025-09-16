@@ -21,7 +21,7 @@ replicas: 1
 
 image:
   repository: apache/gravitino-iceberg-rest
-  tag: 1.0.0-SNAPSHOT
+  tag: 1.1.0-SNAPSHOT
   pullPolicy: IfNotPresent
   ## Optionally specify an array of pullSecrets (secrets must be manually created in the namespace)
   ## ref: https://kubernetes.io/docs/tasks/configure-pod-container/pull-image-private-registry/
