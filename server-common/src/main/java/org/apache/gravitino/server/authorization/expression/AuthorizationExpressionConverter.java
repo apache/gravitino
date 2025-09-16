@@ -241,11 +241,11 @@ public class AuthorizationExpressionConverter {
     expression =
         expression.replaceAll(
             CAN_SET_OWNER,
-            "authorizer.hasSetOwnerPermission(p_metalake,p_metadataObjectType,p_fullName)");
+            "authorizer.hasSetOwnerPermission(p_metalake,p_metadataObjectType,p_fullName,authorizationContext)");
     expression =
         expression.replaceAll(
             CAN_OPERATE_METADATA_PRIVILEGE,
-            "authorizer.hasMetadataPrivilegePermission(p_metalake,p_type,p_fullName)");
+            "authorizer.hasMetadataPrivilegePermission(p_metalake,p_type,p_fullName,authorizationContext)");
     return expression;
   }
 }
