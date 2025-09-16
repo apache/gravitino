@@ -84,6 +84,10 @@ public class ClosableHiveCatalog extends HiveCatalog implements Closeable {
       return runnable.run();
     } catch (Exception e) {
       LOGGER.error("Failed to execute runnable: {}", runnable, e);
+      if (e instanceof RuntimeException) {
+        throw (RuntimeException) e;
+      }
+
       throw new RuntimeException(e);
     }
   }
@@ -137,6 +141,10 @@ public class ClosableHiveCatalog extends HiveCatalog implements Closeable {
               } catch (Throwable t) {
                 LOGGER.error(
                     "Failed to invoke method: {} in ViewAwareTableBuilderProxy ", method, t);
+                if (t instanceof RuntimeException) {
+                  throw (RuntimeException) t;
+                }
+
                 throw new RuntimeException(t);
               }
             });
