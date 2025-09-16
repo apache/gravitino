@@ -348,6 +348,7 @@ These variables override the corresponding entries in `gravitino.conf` at startu
 | `GRAVITINO_ENTITY_STORE_RELATIONAL_JDBC_PASSWORD`        | `gravitino.entity.store.relational.jdbcPassword`     | `gravitino`                                          | 1.0.0         |
 | `GRAVITINO_CATALOG_CACHE_EVICTION_INTERVAL_MS`           | `gravitino.catalog.cache.evictionIntervalMs`         | `3600000`                                            | 1.0.0         |
 | `GRAVITINO_AUTHORIZATION_ENABLE`                         | `gravitino.authorization.enable`                     | `false`                                              | 1.0.0         |
+| `GRAVITINO_AUTHORIZATION_THREAD_POOL_SIZE`               | `gravitino.authorization.threadPoolSize`             | `100`                                                | 1.0.0         |
 | `GRAVITINO_AUTHORIZATION_SERVICE_ADMINS`                 | `gravitino.authorization.serviceAdmins`              | `anonymous`                                          | 1.0.0         |
 | `GRAVITINO_AUX_SERVICE_NAMES`                            | `gravitino.auxService.names`                         | `iceberg-rest`                                       | 1.0.0         |
 | `GRAVITINO_ICEBERG_REST_CLASSPATH`                       | `gravitino.iceberg-rest.classpath`                   | `iceberg-rest-server/libs, iceberg-rest-server/conf` | 1.0.0         |
