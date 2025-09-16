@@ -28,52 +28,6 @@ updates:
     directory: "/clients/client-python"
     schedule:
       interval: "weekly"
-      
-  # DOCKER
-  - package-ecosystem: "docker"
-    directory: "/dev/docker/hive"
-    schedule:
-      interval: "weekly"  
-      
-  - package-ecosystem: "docker"
-    directory: "/dev/docker/kerberos-hive"
-    schedule:
-      interval: "weekly" 
-      
-  - package-ecosystem: "docker"
-    directory: "/dev/docker/trino"
-    schedule:
-      interval: "weekly"  
-      
-  - package-ecosystem: "docker"
-    directory: "/dev/docker/ranger"
-    schedule:
-      interval: "weekly"  
-      
-  - package-ecosystem: "docker"
-    directory: "/dev/docker/gravitino"
-    schedule:
-      interval: "weekly" 
-      
-  - package-ecosystem: "docker"
-    directory: "/dev/docker/mcp-server"
-    schedule:
-      interval: "weekly" 
-      
-  - package-ecosystem: "docker"
-    directory: "/dev/docker/iceberg-rest-server"
-    schedule:
-      interval: "weekly" 
-      
-  - package-ecosystem: "docker"
-    directory: "/dev/docker/doris"
-    schedule:
-      interval: "weekly"  
-      
-  - package-ecosystem: "docker"
-    directory: "/dev/docker/ranger"
-    schedule:
-      interval: "weekly"  
    
 
       
