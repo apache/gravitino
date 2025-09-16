@@ -98,7 +98,7 @@ dependencies {
   testImplementation(libs.slf4j.api)
   testImplementation(libs.testcontainers)
   testImplementation(libs.cglib) {
-    // Build in asm is 7.1, which is compatible with Java 17 well
+    // The version of build-in asm is 7.1, which is not compatible with Java 17 well
     exclude("org.ow2.asm")
   }
   testImplementation(libs.asm)

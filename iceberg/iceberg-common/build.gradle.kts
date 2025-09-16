@@ -40,7 +40,7 @@ dependencies {
   }
   implementation(libs.caffeine)
   implementation(libs.cglib) {
-    // Build in asm is 7.1, which is compatible with Java 17 well
+    // The version of build-in asm is 7.1, which is not compatible with Java 17 well
     exclude("org.ow2.asm")
   }
   implementation(libs.asm)
