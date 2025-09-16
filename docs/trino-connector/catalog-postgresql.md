@@ -53,6 +53,10 @@ Only `UPDATE` statements with constant assignments and predicates are supported.
 
 If the `WHERE` clause is specified, only the matching rows are deleted. Otherwise, all rows from the table are deleted. See also [DELETE limitation](https://trino.io/docs/current/connector/postgresql.html#delete-limitation).
 
+## Merge
+
+Not support.
+
 ## Table and Schema properties
 
 PostgreSQL's tables and schemas cannot support properties.
@@ -148,13 +152,13 @@ Insert data into the table `table_01` from select:
 INSERT INTO postgresql_test.database_01.table_01 (name, salary) SELECT * FROM postgresql_test.database_01.table_01;
 ```
 
-Update the table `table_01`:
+Update data into the table `table_01`:
 
 ```sql
 UPDATE postgresql_test.database_01.table_01 SET name = 'ice_update' WHERE salary = 12;
 ```
 
-Delete the table `table_01`:
+Delete data from the table `table_01`:
 
 ```sql
 DELETE FROM postgresql_test.database_01.table_01 WHERE salary = 12;

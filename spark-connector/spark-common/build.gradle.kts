@@ -36,6 +36,11 @@ val kyuubiVersion: String = libs.versions.kyuubi4spark.get()
 val scalaJava8CompatVersion: String = libs.versions.scala.java.compat.get()
 val scalaCollectionCompatVersion: String = libs.versions.scala.collection.compat.get()
 
+if (hasProperty("excludePackagesForSparkConnector")) {
+  val configureFunc = properties["excludePackagesForSparkConnector"] as? (Project) -> Unit
+  configureFunc?.invoke(project)
+}
+
 dependencies {
   implementation(project(":catalogs:catalog-common")) {
     exclude("org.apache.logging.log4j")
@@ -46,14 +51,15 @@ dependencies {
   compileOnly(project(":clients:client-java-runtime", configuration = "shadow"))
   compileOnly("org.apache.iceberg:iceberg-spark-runtime-${sparkMajorVersion}_$scalaVersion:$icebergVersion")
   compileOnly("org.apache.kyuubi:kyuubi-spark-connector-hive_$scalaVersion:$kyuubiVersion")
-  compileOnly("org.apache.paimon:paimon-spark-$sparkMajorVersion:$paimonVersion") {
-    exclude("org.apache.spark")
-  }
-
   compileOnly("org.apache.spark:spark-catalyst_$scalaVersion:$sparkVersion")
   compileOnly("org.apache.spark:spark-core_$scalaVersion:$sparkVersion")
   compileOnly("org.apache.spark:spark-sql_$scalaVersion:$sparkVersion")
   compileOnly("org.scala-lang.modules:scala-java8-compat_$scalaVersion:$scalaJava8CompatVersion")
+  if (scalaVersion == "2.12") {
+    compileOnly("org.apache.paimon:paimon-spark-$sparkMajorVersion:$paimonVersion") {
+      exclude("org.apache.spark")
+    }
+  }
 
   annotationProcessor(libs.lombok)
   compileOnly(libs.lombok)
@@ -121,8 +127,10 @@ dependencies {
   testImplementation("org.apache.iceberg:iceberg-core:$icebergVersion")
   testImplementation("org.apache.iceberg:iceberg-hive-metastore:$icebergVersion")
   testImplementation("org.apache.iceberg:iceberg-spark-runtime-${sparkMajorVersion}_$scalaVersion:$icebergVersion")
-  testImplementation("org.apache.paimon:paimon-spark-$sparkMajorVersion:$paimonVersion") {
-    exclude("org.apache.spark")
+  if (scalaVersion == "2.12") {
+    testImplementation("org.apache.paimon:paimon-spark-$sparkMajorVersion:$paimonVersion") {
+      exclude("org.apache.spark")
+    }
   }
   testImplementation("org.apache.kyuubi:kyuubi-spark-connector-hive_$scalaVersion:$kyuubiVersion")
   // include spark-sql,spark-catalyst,hive-common,hdfs-client
@@ -173,4 +181,8 @@ configurations {
 
 artifacts {
   add("testArtifacts", testJar)
+}
+
+tasks.named<Jar>("sourcesJar") {
+  duplicatesStrategy = DuplicatesStrategy.EXCLUDE
 }
