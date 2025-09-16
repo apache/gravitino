@@ -83,31 +83,24 @@ public class TestExtractMetricNameAndLabel {
     checkResult(
         MetricsSource.GRAVITINO_SERVER_METRIC_NAME
             + "."
-            + MetricNames.ENTITY_STORE_RELATION_DATASOURCE_ACTIVE_CONNECTIONS,
+            + MetricNames.DATASOURCE_ACTIVE_CONNECTIONS,
         Collector.sanitizeMetricName(MetricsSource.GRAVITINO_SERVER_METRIC_NAME)
             + "_"
-            + Collector.sanitizeMetricName(
-                MetricNames.ENTITY_STORE_RELATION_DATASOURCE_ACTIVE_CONNECTIONS),
+            + Collector.sanitizeMetricName(MetricNames.DATASOURCE_ACTIVE_CONNECTIONS),
         ImmutableMap.of());
 
     checkResult(
-        MetricsSource.GRAVITINO_SERVER_METRIC_NAME
-            + "."
-            + MetricNames.ENTITY_STORE_RELATION_DATASOURCE_IDLE_CONNECTIONS,
+        MetricsSource.GRAVITINO_SERVER_METRIC_NAME + "." + MetricNames.DATASOURCE_IDLE_CONNECTIONS,
         Collector.sanitizeMetricName(MetricsSource.GRAVITINO_SERVER_METRIC_NAME)
             + "_"
-            + Collector.sanitizeMetricName(
-                MetricNames.ENTITY_STORE_RELATION_DATASOURCE_IDLE_CONNECTIONS),
+            + Collector.sanitizeMetricName(MetricNames.DATASOURCE_IDLE_CONNECTIONS),
         ImmutableMap.of());
 
     checkResult(
-        MetricsSource.GRAVITINO_SERVER_METRIC_NAME
-            + "."
-            + MetricNames.ENTITY_STORE_RELATION_DATASOURCE_MAX_CONNECTIONS,
+        MetricsSource.GRAVITINO_SERVER_METRIC_NAME + "." + MetricNames.DATASOURCE_MAX_CONNECTIONS,
         Collector.sanitizeMetricName(MetricsSource.GRAVITINO_SERVER_METRIC_NAME)
             + "_"
-            + Collector.sanitizeMetricName(
-                MetricNames.ENTITY_STORE_RELATION_DATASOURCE_MAX_CONNECTIONS),
+            + Collector.sanitizeMetricName(MetricNames.DATASOURCE_MAX_CONNECTIONS),
         ImmutableMap.of());
   }
 }
