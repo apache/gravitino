@@ -45,7 +45,11 @@ dependencies {
   implementation(libs.bundles.iceberg)
 
   implementation(libs.bundles.log4j)
-  implementation(libs.cglib)
+  implementation(libs.cglib) {
+    // Build in asm is 7.1, which is compatible with Java 17 well
+    exclude("org.ow2.asm")
+  }
+  implementation(libs.asm)
   implementation(libs.commons.collections4)
   implementation(libs.commons.io)
   implementation(libs.commons.lang3)

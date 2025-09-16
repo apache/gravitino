@@ -97,6 +97,11 @@ dependencies {
   testImplementation(libs.sqlite.jdbc)
   testImplementation(libs.slf4j.api)
   testImplementation(libs.testcontainers)
+  testImplementation(libs.cglib) {
+    // Build in asm is 7.1, which is compatible with Java 17 well
+    exclude("org.ow2.asm")
+  }
+  testImplementation(libs.asm)
 
   testRuntimeOnly(libs.junit.jupiter.engine)
 }

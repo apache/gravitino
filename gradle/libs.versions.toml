@@ -91,7 +91,8 @@ servlet = "3.1.0"
 jodd = "3.5.2"
 flink = "1.18.0"
 flinkjdbc = "3.2.0-1.18"
-cglib = "2.2"
+cglib = "3.3.0"
+asm = "9.8"
 ranger = "2.4.0"
 javax-jaxb-api = "2.3.1"
 javax-ws-rs-api = "2.1.1"
@@ -269,6 +270,7 @@ kafka-clients = { group = "org.apache.kafka", name = "kafka-clients", version.re
 kafka = { group = "org.apache.kafka", name = "kafka_2.12", version.ref = "kafka" }
 curator-test = { group = "org.apache.curator", name = "curator-test", version.ref = "curator"}
 cglib = { group = "cglib", name = "cglib", version.ref = "cglib"}
+asm = { group = "org.ow2.asm", name = "asm", version.ref = "asm"}
 woodstox-core = { group = "com.fasterxml.woodstox", name = "woodstox-core", version.ref = "woodstox-core"}
 thrift = { group = "org.apache.thrift", name = "libthrift", version.ref = "thrift"}
 derby = { group = "org.apache.derby", name = "derby", version.ref = "derby"}

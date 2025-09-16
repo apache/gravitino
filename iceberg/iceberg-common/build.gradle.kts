@@ -39,7 +39,11 @@ dependencies {
     exclude("org.jline")
   }
   implementation(libs.caffeine)
-  implementation(libs.cglib)
+  implementation(libs.cglib) {
+    // Build in asm is 7.1, which is compatible with Java 17 well
+    exclude("org.ow2.asm")
+  }
+  implementation(libs.asm)
   implementation(libs.commons.lang3)
   implementation(libs.guava)
   implementation(libs.iceberg.aliyun)
