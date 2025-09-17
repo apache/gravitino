@@ -58,6 +58,7 @@ public class AuthorizationExpressionConstants {
       "ANY(OWNER, METALAKE, CATALOG, SCHEMA, TOPIC) || "
           + "ANY_CONSUME_TOPIC || "
           + "ANY_PRODUCE_TOPIC";
+
   public static final String filterFilesetAuthorizationExpression =
       "ANY(OWNER, METALAKE, CATALOG, SCHEMA, FILESET) || "
           + "ANY_READ_FILESET || "
