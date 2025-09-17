@@ -40,6 +40,7 @@ public abstract class MetricsSource {
   // metrics source name
   public static final String ICEBERG_REST_SERVER_METRIC_NAME = "iceberg-rest-server";
   public static final String GRAVITINO_SERVER_METRIC_NAME = "gravitino-server";
+  public static final String GRAVITINO_RELATIONAL_STORE_METRIC_NAME = "gravitino-relational-store";
   public static final String JVM_METRIC_NAME = "jvm";
   private final MetricRegistry metricRegistry;
   private final String metricsSourceName;
