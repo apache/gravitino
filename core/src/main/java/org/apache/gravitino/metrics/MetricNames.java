@@ -22,12 +22,9 @@ package org.apache.gravitino.metrics;
 public class MetricNames {
   public static final String HTTP_PROCESS_DURATION = "http-request-duration-seconds";
   public static final String SERVER_IDLE_THREAD_NUM = "http-server.idle-thread.num";
-  public static final String ENTITY_STORE_RELATION_DATASOURCE_ACTIVE_CONNECTIONS =
-      "entity-store.relation-datasource.active-connections";
-  public static final String ENTITY_STORE_RELATION_DATASOURCE_IDLE_CONNECTIONS =
-      "entity-store.relation-datasource.idle-connections";
-  public static final String ENTITY_STORE_RELATION_DATASOURCE_MAX_CONNECTIONS =
-      "entity-store.relation-datasource.max-connections";
+  public static final String DATASOURCE_ACTIVE_CONNECTIONS = "datasource.active-connections";
+  public static final String DATASOURCE_IDLE_CONNECTIONS = "datasource.idle-connections";
+  public static final String DATASOURCE_MAX_CONNECTIONS = "datasource.max-connections";
 
   private MetricNames() {}
 }
