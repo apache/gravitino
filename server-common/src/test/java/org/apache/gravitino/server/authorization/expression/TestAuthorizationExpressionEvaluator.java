@@ -26,6 +26,7 @@ import java.util.Map;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.UserPrincipal;
+import org.apache.gravitino.authorization.AuthorizationRequestContext;
 import org.apache.gravitino.server.authorization.GravitinoAuthorizerProvider;
 import org.apache.gravitino.server.authorization.MockGravitinoAuthorizer;
 import org.apache.gravitino.utils.NameIdentifierUtil;
@@ -63,11 +64,15 @@ public class TestAuthorizationExpressionEvaluator {
           Entity.EntityType.TABLE,
           NameIdentifierUtil.ofTable(
               "testMetalake", "testCatalog", "testSchema", "testTableHasNotPermission"));
-      Assertions.assertFalse(authorizationExpressionEvaluator.evaluate(metadataNames));
+      Assertions.assertFalse(
+          authorizationExpressionEvaluator.evaluate(
+              metadataNames, new AuthorizationRequestContext()));
       metadataNames.put(
           Entity.EntityType.TABLE,
           NameIdentifierUtil.ofTable("testMetalake", "testCatalog", "testSchema", "testTable"));
-      Assertions.assertTrue(authorizationExpressionEvaluator.evaluate(metadataNames));
+      Assertions.assertTrue(
+          authorizationExpressionEvaluator.evaluate(
+              metadataNames, new AuthorizationRequestContext()));
     }
   }
 
@@ -91,10 +96,14 @@ public class TestAuthorizationExpressionEvaluator {
       metadataNames.put(
           Entity.EntityType.CATALOG,
           NameIdentifierUtil.ofCatalog("metalakeWithOwner", "testCatalog"));
-      Assertions.assertFalse(authorizationExpressionEvaluator.evaluate(metadataNames));
+      Assertions.assertFalse(
+          authorizationExpressionEvaluator.evaluate(
+              metadataNames, new AuthorizationRequestContext()));
       metadataNames.put(
           Entity.EntityType.METALAKE, NameIdentifierUtil.ofMetalake("metalakeWithOwner"));
-      Assertions.assertTrue(authorizationExpressionEvaluator.evaluate(metadataNames));
+      Assertions.assertTrue(
+          authorizationExpressionEvaluator.evaluate(
+              metadataNames, new AuthorizationRequestContext()));
     }
   }
 }

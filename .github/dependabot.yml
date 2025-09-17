@@ -1,16 +1,33 @@
 version: 2
 updates:
+  # GitHub Actions
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
       interval: "weekly"
-
+      
+  # Java (Gradle) : Single root entry is enough because settings.gradle.kts includes all submodules
   - package-ecosystem: "gradle"
     directory: "/"
     schedule:
       interval: "weekly"
-
+          
+  # NPM 
   - package-ecosystem: "npm"
     directory: "/web/web"
     schedule:
       interval: "weekly"
+      
+  # PYTHON
+  - package-ecosystem: "pip"
+    directory: "/mcp-server"
+    schedule:
+      interval: "weekly"
+    
+  - package-ecosystem: "pip"
+    directory: "/clients/client-python"
+    schedule:
+      interval: "weekly"
+   
+
+      
