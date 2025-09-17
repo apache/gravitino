@@ -69,9 +69,6 @@ public abstract class ClientPoolImpl<C, E extends Exception>
             close(client);
             currentSize -= 1;
           }
-          synchronized (signal) {
-            signal.notifyAll();
-          }
 
           // if reconnection throws any exception, rethrow the original failure
           throw reconnectExc.cast(exc);
