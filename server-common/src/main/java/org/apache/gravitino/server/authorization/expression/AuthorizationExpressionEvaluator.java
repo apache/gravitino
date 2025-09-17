@@ -29,6 +29,7 @@ import ognl.OgnlException;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.authorization.AuthorizationRequestContext;
 import org.apache.gravitino.authorization.GravitinoAuthorizer;
 import org.apache.gravitino.server.authorization.GravitinoAuthorizerProvider;
 import org.apache.gravitino.utils.NameIdentifierUtil;
@@ -57,8 +58,10 @@ public class AuthorizationExpressionEvaluator {
    * @param metadataNames key-metadata type, value-metadata NameIdentifier
    * @return authorization result
    */
-  public boolean evaluate(Map<Entity.EntityType, NameIdentifier> metadataNames) {
-    return evaluate(metadataNames, new HashMap<>());
+  public boolean evaluate(
+      Map<Entity.EntityType, NameIdentifier> metadataNames,
+      AuthorizationRequestContext requestContext) {
+    return evaluate(metadataNames, new HashMap<>(), requestContext);
   }
 
   /**
@@ -70,13 +73,16 @@ public class AuthorizationExpressionEvaluator {
    * @return authorization result
    */
   public boolean evaluate(
-      Map<Entity.EntityType, NameIdentifier> metadataNames, Map<String, Object> pathParams) {
+      Map<Entity.EntityType, NameIdentifier> metadataNames,
+      Map<String, Object> pathParams,
+      AuthorizationRequestContext requestContext) {
     Principal currentPrincipal = PrincipalUtils.getCurrentPrincipal();
     GravitinoAuthorizer gravitinoAuthorizer =
         GravitinoAuthorizerProvider.getInstance().getGravitinoAuthorizer();
     OgnlContext ognlContext = Ognl.createDefaultContext(null);
     ognlContext.put("principal", currentPrincipal);
     ognlContext.put("authorizer", gravitinoAuthorizer);
+    ognlContext.put("authorizationContext", requestContext);
     ognlContext.putAll(pathParams);
     metadataNames.forEach(
         (type, entityNameIdent) -> {
@@ -91,10 +97,9 @@ public class AuthorizationExpressionEvaluator {
     ognlContext.put(
         "METALAKE_NAME", Optional.ofNullable(nameIdentifier).map(NameIdentifier::name).orElse(""));
     try {
-      Object value = Ognl.getValue(ognlAuthorizationExpression, ognlContext);
-      return (boolean) value;
+      return (boolean) Ognl.getValue(ognlAuthorizationExpression, ognlContext);
     } catch (OgnlException e) {
-      throw new RuntimeException("ognl evaluate error", e);
+      throw new RuntimeException(e);
     }
   }
 

@@ -42,19 +42,22 @@ public interface GravitinoAuthorizer extends Closeable {
    * @param metalake the metalake
    * @param metadataObject the metadataObject.
    * @param privilege for example, CREATE_CATALOG, CREATE_TABLE, etc.
+   * @param requestContext authorization request context
    * @return authorization result.
    */
   boolean authorize(
       Principal principal,
       String metalake,
       MetadataObject metadataObject,
-      Privilege.Name privilege);
+      Privilege.Name privilege,
+      AuthorizationRequestContext requestContext);
 
   boolean deny(
       Principal principal,
       String metalake,
       MetadataObject metadataObject,
-      Privilege.Name privilege);
+      Privilege.Name privilege,
+      AuthorizationRequestContext requestContext);
 
   /**
    * Determine whether the user is the Owner of a certain metadata object.
@@ -97,9 +100,11 @@ public interface GravitinoAuthorizer extends Closeable {
    * @param metalake metalake
    * @param type metadata type
    * @param fullName metadata full name
+   * @param requestContext authorization request context
    * @return authorization result
    */
-  boolean hasSetOwnerPermission(String metalake, String type, String fullName);
+  boolean hasSetOwnerPermission(
+      String metalake, String type, String fullName, AuthorizationRequestContext requestContext);
 
   /**
    * Determine whether the user can grant or revoke privilege for metadata
@@ -107,9 +112,11 @@ public interface GravitinoAuthorizer extends Closeable {
    * @param metalake metalake
    * @param type metadata type
    * @param fullName metadata full name
+   * @param requestContext authorization request context
    * @return authorization result
    */
-  boolean hasMetadataPrivilegePermission(String metalake, String type, String fullName);
+  boolean hasMetadataPrivilegePermission(
+      String metalake, String type, String fullName, AuthorizationRequestContext requestContext);
 
   /**
    * When the permissions of a role change, it is necessary to notify the GravitinoAuthorizer in
