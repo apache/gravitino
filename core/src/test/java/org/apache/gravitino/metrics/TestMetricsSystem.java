@@ -19,6 +19,7 @@
 
 package org.apache.gravitino.metrics;
 
+import org.apache.gravitino.metrics.source.MetricsSource;
 import org.apache.gravitino.metrics.source.TestMetricsSource;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -26,8 +27,30 @@ import org.junit.jupiter.api.Test;
 public class TestMetricsSystem {
   private MetricsSystem metricsSystem = new MetricsSystem();
 
+  private static class MockMetricsSource extends MetricsSource {
+    public MockMetricsSource(String metricsSourceName) {
+      super(metricsSourceName);
+    }
+  }
+
+  private static class Mock2MetricsSource extends MetricsSource {
+    public Mock2MetricsSource(String metricsSourceName) {
+      super(metricsSourceName);
+    }
+  }
+
   @Test
-  void testRegisterMetricsSource() {
+  void testRegisterMetricsWithSameMetricsSourceName() {
+    MockMetricsSource metricsSource = new MockMetricsSource("a");
+    Mock2MetricsSource metricsSource2 = new Mock2MetricsSource("a");
+    metricsSystem.register(metricsSource);
+    Assertions.assertThrowsExactly(
+        IllegalStateException.class, () -> metricsSystem.register(metricsSource2));
+    Assertions.assertDoesNotThrow(() -> metricsSystem.register(metricsSource));
+  }
+
+  @Test
+  void testRegisterMetricsSourceInRaceCondition() {
     TestMetricsSource metricsSource = new TestMetricsSource();
     metricsSystem.register(metricsSource);
     metricsSource.incCounter("a.b");
