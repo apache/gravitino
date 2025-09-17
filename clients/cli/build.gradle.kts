@@ -26,6 +26,7 @@ dependencies {
   implementation(libs.commons.cli.new)
   implementation(libs.commons.csv)
   implementation(libs.guava)
+  implementation(libs.picocli)
   implementation(libs.slf4j.api)
   implementation(libs.slf4j.simple)
   implementation(project(":api"))

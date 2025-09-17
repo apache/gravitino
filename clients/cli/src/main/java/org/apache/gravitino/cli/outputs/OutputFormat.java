@@ -25,6 +25,11 @@ import com.google.common.base.Joiner;
  * handle the conversion of entities to their string representation in specific output formats.
  */
 public interface OutputFormat<T> {
+  enum OutputType {
+    PLAIN,
+    TABLE;
+  }
+
   /** Joiner for creating comma-separated output strings, ignoring null values */
   Joiner COMMA_JOINER = Joiner.on(",").skipNulls();
   /** Joiner for creating line-separated output strings, ignoring null values */
