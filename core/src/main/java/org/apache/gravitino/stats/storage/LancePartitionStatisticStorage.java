@@ -124,6 +124,7 @@ public class LancePartitionStatisticStorage implements PartitionStatisticStorage
   private final int readBatchSize;
   private final long metadataFileCacheSize;
   private final long indexCacheSize;
+  private final ScheduledThreadPoolExecutor scheduler;
 
   private final EntityStore entityStore = GravitinoEnv.getInstance().entityStore();
 
@@ -178,16 +179,15 @@ public class LancePartitionStatisticStorage implements PartitionStatisticStorage
 
     this.properties = properties;
     if (datasetCacheSize != 0) {
+      this.scheduler =
+          new ScheduledThreadPoolExecutor(
+              1, newDaemonThreadFactory("lance-partition-statistic-storage-cache-cleaner"));
+
       this.datasetCache =
           Optional.of(
               Caffeine.newBuilder()
                   .maximumSize(datasetCacheSize)
-                  .scheduler(
-                      Scheduler.forScheduledExecutorService(
-                          new ScheduledThreadPoolExecutor(
-                              1,
-                              newDaemonThreadFactory(
-                                  "lance-partition-statistic-storage-cache-cleaner"))))
+                  .scheduler(Scheduler.forScheduledExecutorService(this.scheduler))
                   .evictionListener(
                       (RemovalListener<Long, Dataset>)
                           (key, value, cause) -> {
@@ -197,7 +197,8 @@ public class LancePartitionStatisticStorage implements PartitionStatisticStorage
                           })
                   .build());
     } else {
-      datasetCache = Optional.empty();
+      this.datasetCache = Optional.empty();
+      this.scheduler = null;
     }
   }
 
@@ -330,6 +331,10 @@ public class LancePartitionStatisticStorage implements PartitionStatisticStorage
     }
 
     datasetCache.ifPresent(Cache::invalidateAll);
+
+    if (scheduler != null) {
+      scheduler.shutdown();
+    }
   }
 
   @VisibleForTesting
