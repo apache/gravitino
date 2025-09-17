@@ -27,6 +27,7 @@ import ognl.OgnlException;
 import org.apache.gravitino.dto.requests.TopicCreateRequest;
 import org.apache.gravitino.dto.requests.TopicUpdatesRequest;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationExpression;
+import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants;
 import org.apache.gravitino.server.web.rest.TopicOperations;
 import org.junit.jupiter.api.Test;
 
@@ -75,7 +76,8 @@ public class TestTopicAuthorizationExpression {
   @Test
   public void testLoadTopics() throws OgnlException, NoSuchFieldException, IllegalAccessException {
     Field loadTopicsAuthorizationExpressionField =
-        TopicOperations.class.getDeclaredField("loadTopicsAuthorizationExpression");
+        AuthorizationExpressionConstants.class.getDeclaredField(
+            "loadTopicsAuthorizationExpression");
     loadTopicsAuthorizationExpressionField.setAccessible(true);
     String loadTopicsAuthorizationExpression =
         (String) loadTopicsAuthorizationExpressionField.get(null);

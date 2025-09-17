@@ -53,6 +53,7 @@ import org.apache.gravitino.metrics.MetricNames;
 import org.apache.gravitino.server.authorization.MetadataFilterHelper;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationExpression;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationMetadata;
+import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants;
 import org.apache.gravitino.server.web.Utils;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
@@ -65,10 +66,6 @@ import org.slf4j.LoggerFactory;
 public class SchemaOperations {
 
   private static final Logger LOG = LoggerFactory.getLogger(SchemaOperations.class);
-
-  private static final String loadSchemaAuthorizationExpression =
-      " ANY(OWNER, METALAKE, CATALOG) || "
-          + "ANY_USE_CATALOG && (SCHEMA::OWNER || ANY_USE_SCHEMA) ";
 
   private final SchemaDispatcher dispatcher;
 
@@ -83,8 +80,14 @@ public class SchemaOperations {
   @Produces("application/vnd.gravitino.v1+json")
   @Timed(name = "list-schema." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "list-schema", absolute = true)
+  @AuthorizationExpression(
+      expression = AuthorizationExpressionConstants.loadCatalogAuthorizationExpression,
+      accessMetadataType = MetadataObject.Type.CATALOG)
   public Response listSchemas(
-      @PathParam("metalake") String metalake, @PathParam("catalog") String catalog) {
+      @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
+          String metalake,
+      @PathParam("catalog") @AuthorizationMetadata(type = Entity.EntityType.CATALOG)
+          String catalog) {
     LOG.info("Received list schema request for catalog: {}.{}", metalake, catalog);
     try {
       return Utils.doAs(
@@ -94,7 +97,10 @@ public class SchemaOperations {
             NameIdentifier[] idents = dispatcher.listSchemas(schemaNS);
             idents =
                 MetadataFilterHelper.filterByExpression(
-                    metalake, loadSchemaAuthorizationExpression, Entity.EntityType.SCHEMA, idents);
+                    metalake,
+                    AuthorizationExpressionConstants.filterSchemaAuthorizationExpression,
+                    Entity.EntityType.SCHEMA,
+                    idents);
             Response response = Utils.ok(new EntityListResponse(idents));
             LOG.info("List {} schemas in catalog {}.{}", idents.length, metalake, catalog);
             return response;
@@ -143,7 +149,7 @@ public class SchemaOperations {
   @Timed(name = "load-schema." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "load-schema", absolute = true)
   @AuthorizationExpression(
-      expression = loadSchemaAuthorizationExpression,
+      expression = AuthorizationExpressionConstants.loadSchemaAuthorizationExpression,
       accessMetadataType = MetadataObject.Type.SCHEMA)
   public Response loadSchema(
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
