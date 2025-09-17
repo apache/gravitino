@@ -23,11 +23,11 @@ import com.google.common.collect.Lists;
 import java.io.Closeable;
 import java.io.IOException;
 import java.util.List;
+import lombok.Getter;
 import net.sf.cglib.proxy.Enhancer;
 import net.sf.cglib.proxy.MethodInterceptor;
 import org.apache.iceberg.Schema;
 import org.apache.iceberg.Transaction;
-import org.apache.iceberg.catalog.Catalog;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.exceptions.AlreadyExistsException;
 import org.apache.iceberg.hive.HiveCatalog;
@@ -42,8 +42,9 @@ public class ClosableHiveCatalog extends HiveCatalog implements Closeable {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(ClosableHiveCatalog.class);
 
-  private final List<Closeable> resources = Lists.newArrayList();
+  @Getter private final List<Closeable> resources = Lists.newArrayList();
 
+  @SuppressWarnings("unused")
   private ClosableHiveCatalog proxy;
 
   public void setProxy(ClosableHiveCatalog proxy) {
@@ -92,15 +93,15 @@ public class ClosableHiveCatalog extends HiveCatalog implements Closeable {
     }
   }
 
-  public Catalog.TableBuilder buildTable(TableIdentifier identifier, Schema schema) {
-    ExtendedViewAwareTableBuilderExtended builder =
-        new ExtendedViewAwareTableBuilderExtended(identifier, schema);
-    ViewAwareTableBuilderProxy proxy =
-        new ViewAwareTableBuilderProxy(builder, this.proxy != null ? this.proxy : this);
-    ExtendedViewAwareTableBuilderExtended r =
-        proxy.getProxy(new Object[] {this, identifier, schema});
-    return r;
-  }
+  //  public Catalog.TableBuilder buildTable(TableIdentifier identifier, Schema schema) {
+  //    ExtendedViewAwareTableBuilderExtended builder =
+  //        new ExtendedViewAwareTableBuilderExtended(identifier, schema);
+  //    ViewAwareTableBuilderProxy proxy =
+  //        new ViewAwareTableBuilderProxy(builder, this.proxy != null ? this.proxy : this);
+  //    ExtendedViewAwareTableBuilderExtended r =
+  //        proxy.getProxy(new Object[] {this, identifier, schema});
+  //    return r;
+  //  }
 
   public static class ViewAwareTableBuilderProxy implements MethodInterceptor {
     private final ExtendedViewAwareTableBuilderExtended target;

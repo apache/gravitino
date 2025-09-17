@@ -35,7 +35,6 @@ import org.apache.gravitino.exceptions.ConnectionFailedException;
 import org.apache.gravitino.iceberg.common.ClosableHiveCatalog;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
 import org.apache.gravitino.iceberg.common.authentication.AuthenticationConfig;
-import org.apache.gravitino.iceberg.common.authentication.kerberos.HiveBackendProxy;
 import org.apache.gravitino.iceberg.common.authentication.kerberos.KerberosClient;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdfs.HdfsConfiguration;
@@ -78,23 +77,24 @@ public class IcebergCatalogUtil {
       hiveCatalog.initialize(icebergCatalogName, properties);
       return hiveCatalog;
     } else if (authenticationConfig.isKerberosAuth()) {
+      @SuppressWarnings("ModifiedButNotUsed")
       Map<String, String> resultProperties = new HashMap<>(properties);
       resultProperties.put(CatalogProperties.CLIENT_POOL_CACHE_KEYS, "USER_NAME");
       hdfsConfiguration.set(HADOOP_SECURITY_AUTHORIZATION, "true");
       hdfsConfiguration.set(HADOOP_SECURITY_AUTHENTICATION, "kerberos");
       hiveCatalog.setConf(hdfsConfiguration);
-      hiveCatalog.initialize(icebergCatalogName, properties);
+      hiveCatalog.initialize(icebergCatalogName, resultProperties);
 
       KerberosClient kerberosClient = initKerberosAndReturnClient(properties, hdfsConfiguration);
       hiveCatalog.addResource(kerberosClient);
-      if (authenticationConfig.isImpersonationEnabled()) {
-        HiveBackendProxy proxyHiveCatalog =
-            new HiveBackendProxy(resultProperties, hiveCatalog, kerberosClient.getRealm());
-        ClosableHiveCatalog closableHiveCatalog = proxyHiveCatalog.getProxy();
-        hiveCatalog.setProxy(closableHiveCatalog);
-
-        return closableHiveCatalog;
-      }
+      //      if (authenticationConfig.isImpersonationEnabled()) {
+      //        HiveBackendProxy proxyHiveCatalog =
+      //            new HiveBackendProxy(resultProperties, hiveCatalog, kerberosClient.getRealm());
+      //        ClosableHiveCatalog closableHiveCatalog = proxyHiveCatalog.getProxy();
+      //        hiveCatalog.setProxy(closableHiveCatalog);
+      //
+      //        return closableHiveCatalog;
+      //      }
 
       return hiveCatalog;
     } else {

@@ -52,6 +52,7 @@ import org.apache.gravitino.exceptions.TableAlreadyExistsException;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
 import org.apache.gravitino.iceberg.common.ops.IcebergCatalogWrapper;
 import org.apache.gravitino.iceberg.common.ops.IcebergCatalogWrapper.IcebergTableChange;
+import org.apache.gravitino.iceberg.common.ops.IcebergCatalogWrapperProxy;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Table;
@@ -113,7 +114,8 @@ public class IcebergCatalogOperations implements CatalogOperations, SupportsSche
     resultConf.put("catalog_uuid", info.id().toString());
     IcebergConfig icebergConfig = new IcebergConfig(resultConf);
 
-    this.icebergCatalogWrapper = new IcebergCatalogWrapper(icebergConfig);
+    IcebergCatalogWrapper rawWrapper = new IcebergCatalogWrapper(icebergConfig);
+    this.icebergCatalogWrapper = new IcebergCatalogWrapperProxy(rawWrapper).getProxy(icebergConfig);
     this.icebergCatalogWrapperHelper =
         new IcebergCatalogWrapperHelper(icebergCatalogWrapper.getCatalog());
   }

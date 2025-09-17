@@ -68,10 +68,12 @@ public class IcebergCatalogWrapper implements AutoCloseable {
   @Getter protected Catalog catalog;
   private SupportsNamespaces asNamespaceCatalog;
   private final IcebergCatalogBackend catalogBackend;
+  @Getter private final IcebergConfig icebergConfig;
   private String catalogUri = null;
   private Map<String, String> catalogPropertiesMap;
 
   public IcebergCatalogWrapper(IcebergConfig icebergConfig) {
+    this.icebergConfig = icebergConfig;
     this.catalogBackend =
         IcebergCatalogBackend.valueOf(
             icebergConfig.get(IcebergConfig.CATALOG_BACKEND).toUpperCase(Locale.ROOT));
