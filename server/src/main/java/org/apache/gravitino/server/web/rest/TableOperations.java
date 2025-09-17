@@ -54,6 +54,7 @@ import org.apache.gravitino.rel.TableChange;
 import org.apache.gravitino.server.authorization.MetadataFilterHelper;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationExpression;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationMetadata;
+import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants;
 import org.apache.gravitino.server.web.Utils;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
@@ -64,11 +65,6 @@ import org.slf4j.LoggerFactory;
 public class TableOperations {
 
   private static final Logger LOG = LoggerFactory.getLogger(TableOperations.class);
-
-  private static final String loadTableAuthorizationExpression =
-      "ANY(OWNER, METALAKE, CATALOG) ||"
-          + "SCHEMA_OWNER_WITH_USE_CATALOG ||"
-          + "ANY_USE_CATALOG && ANY_USE_SCHEMA  && (TABLE::OWNER || ANY_SELECT_TABLE || ANY_MODIFY_TABLE)";
 
   private final TableDispatcher dispatcher;
 
@@ -83,10 +79,14 @@ public class TableOperations {
   @Produces("application/vnd.gravitino.v1+json")
   @Timed(name = "list-table." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "list-table", absolute = true)
+  @AuthorizationExpression(
+      expression = AuthorizationExpressionConstants.loadSchemaAuthorizationExpression,
+      accessMetadataType = MetadataObject.Type.SCHEMA)
   public Response listTables(
-      @PathParam("metalake") String metalake,
-      @PathParam("catalog") String catalog,
-      @PathParam("schema") String schema) {
+      @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
+          String metalake,
+      @PathParam("catalog") @AuthorizationMetadata(type = Entity.EntityType.CATALOG) String catalog,
+      @PathParam("schema") @AuthorizationMetadata(type = Entity.EntityType.SCHEMA) String schema) {
     LOG.info("Received list tables request for schema: {}.{}.{}", metalake, catalog, schema);
     try {
       return Utils.doAs(
@@ -96,7 +96,10 @@ public class TableOperations {
             NameIdentifier[] idents = dispatcher.listTables(tableNS);
             idents =
                 MetadataFilterHelper.filterByExpression(
-                    metalake, loadTableAuthorizationExpression, Entity.EntityType.TABLE, idents);
+                    metalake,
+                    AuthorizationExpressionConstants.filterTableAuthorizationExpression,
+                    Entity.EntityType.TABLE,
+                    idents);
             Response response = Utils.ok(new EntityListResponse(idents));
             LOG.info(
                 "List {} tables under schema: {}.{}.{}", idents.length, metalake, catalog, schema);

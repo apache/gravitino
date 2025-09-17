@@ -29,6 +29,7 @@ import org.apache.gravitino.dto.requests.ModelUpdatesRequest;
 import org.apache.gravitino.dto.requests.ModelVersionLinkRequest;
 import org.apache.gravitino.dto.requests.ModelVersionUpdatesRequest;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationExpression;
+import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants;
 import org.apache.gravitino.server.web.rest.ModelOperations;
 import org.junit.jupiter.api.Test;
 
@@ -83,7 +84,7 @@ public class TestModelAuthorizationExpression {
   @Test
   public void testLoadModel() throws OgnlException, NoSuchFieldException, IllegalAccessException {
     Field loadModelAuthorizationExpressionField =
-        ModelOperations.class.getDeclaredField("loadModelAuthorizationExpression");
+        AuthorizationExpressionConstants.class.getDeclaredField("loadModelAuthorizationExpression");
     loadModelAuthorizationExpressionField.setAccessible(true);
     String loadModelAuthExpression = (String) loadModelAuthorizationExpressionField.get(null);
     MockAuthorizationExpressionEvaluator mockEvaluator =
