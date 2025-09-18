@@ -53,7 +53,7 @@ Or start an HTTP MCP server by `uv run mcp_server --metalake test --gravitino-ur
 
 ### Docker instructions
 
-You could start Gravitino MCP server by Docker image, `docker run -p 8000:8000 --network=host apache/gravitino-mcp-server:latest --metalake test --transport http --mcp-url http://0.0.0.0:8000/mcp --gravitino-uri=http://127.0.0.1:8090`. Please note that the MCP server in Docker container doesn't support `stdio` transport mode.
+You could start Gravitino MCP server by Docker image, `docker run -p 8000:8000 --network=host apache/gravitino-mcp-server:latest --metalake test --transport http --mcp-url http://0.0.0.0:8000/mcp --gravitino-uri http://127.0.0.1:8090`. Please note that the MCP server in Docker container doesn't support `stdio` transport mode.
 
 ### Supported tools
 
