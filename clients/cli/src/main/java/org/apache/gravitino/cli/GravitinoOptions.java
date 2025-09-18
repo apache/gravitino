@@ -24,6 +24,7 @@ import org.apache.commons.cli.Options;
 
 /** Gravitino Command line options */
 public class GravitinoOptions {
+  /** Represents the long prefix for a option. */
   public static final String OPTION_LONG_PREFIX = "--";
   /** Represents the audit option. */
   public static final String AUDIT = "audit";

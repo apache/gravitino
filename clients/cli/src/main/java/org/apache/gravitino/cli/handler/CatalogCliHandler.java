@@ -31,6 +31,9 @@ import org.apache.gravitino.cli.CliFullName;
 import org.apache.gravitino.cli.CommandActions;
 import org.apache.gravitino.cli.CommandEntities;
 import org.apache.gravitino.cli.GravitinoOptions;
+import org.apache.gravitino.cli.options.CommonOptions;
+import org.apache.gravitino.cli.options.EnableDisableOptions;
+import org.apache.gravitino.cli.options.PropertyOptions;
 import picocli.CommandLine;
 
 /** Handler for the catalog command. */

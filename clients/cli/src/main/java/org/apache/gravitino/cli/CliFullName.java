@@ -35,6 +35,11 @@ public class CliFullName {
   private CommandLine.Model.CommandSpec spec;
   private String[] names;
 
+  /**
+   * Construct a new instance of the {@link CliFullName} class.
+   *
+   * @param spec The command line specification.
+   */
   public CliFullName(picocli.CommandLine.Model.CommandSpec spec) {
     this.spec = spec;
     this.fullName = getFullName();
@@ -93,6 +98,11 @@ public class CliFullName {
     return null;
   }
 
+  /**
+   * Retrieves the catalog name from the first part of the full name option.
+   *
+   * @return the catalog name, or null if not found.
+   */
   public String getCatalogName() {
     return getNamePart(0);
   }
@@ -151,6 +161,12 @@ public class CliFullName {
     return getNamePart(3);
   }
 
+  /**
+   * Retrieves the name part from the full name option.
+   *
+   * @param position The index of the name part to retrieve.
+   * @return The name part, or null if not found.
+   */
   public String getNamePart(int position) {
     if (fullName.isEmpty()) {
       showMissingNameInfo();

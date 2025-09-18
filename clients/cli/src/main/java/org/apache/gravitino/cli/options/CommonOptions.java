@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package org.apache.gravitino.cli.handler;
+package org.apache.gravitino.cli.options;
 
 import org.apache.gravitino.cli.GravitinoOptions;
 import org.apache.gravitino.cli.outputs.OutputFormat;
@@ -49,37 +49,37 @@ public class CommonOptions {
       description = "Whether command information should be suppressed.",
       negatable = true,
       defaultValue = "false")
-  boolean quiet;
+  public boolean quiet;
 
   /** name of the metalake, use --metalake/-m to specify the metalake */
   @CommandLine.Option(
       names = {"-m", GravitinoOptions.OPTION_LONG_PREFIX + GravitinoOptions.METALAKE},
       description = "name of the metalake")
-  String metalake;
+  public String metalake;
 
   /** output format, use --output to specify the output format */
   @CommandLine.Option(
       names = {GravitinoOptions.OPTION_LONG_PREFIX + GravitinoOptions.OUTPUT},
       description = "The format of output. Valid values: ${COMPLETION-CANDIDATES}",
       defaultValue = "PLAIN")
-  OutputFormat.OutputType outputFormat;
+  public OutputFormat.OutputType outputFormat;
 
   /** Gravitino URL, use --url/-u to specify the Gravitino URL */
   @CommandLine.Option(
       names = {"-u", GravitinoOptions.OPTION_LONG_PREFIX + GravitinoOptions.URL},
       description = "Gravitino URL (default: http://localhost:8090)",
       defaultValue = "http://localhost:8090")
-  String url;
+  public String url;
 
   /** Login for authentication, use --login to specify the login for authentication */
   @CommandLine.Option(
       names = {GravitinoOptions.OPTION_LONG_PREFIX + GravitinoOptions.LOGIN},
       description = "Login for authentication")
-  String login;
+  public String login;
 
   /** Whether to use simple authentication, use --simple to use simple authentication */
   @CommandLine.Option(
       names = {GravitinoOptions.OPTION_LONG_PREFIX + GravitinoOptions.SIMPLE},
       description = "simple authentication")
-  boolean simple;
+  public boolean simple;
 }

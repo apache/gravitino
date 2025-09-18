@@ -31,6 +31,8 @@ import org.apache.gravitino.cli.CliFullName;
 import org.apache.gravitino.cli.CommandActions;
 import org.apache.gravitino.cli.CommandEntities;
 import org.apache.gravitino.cli.GravitinoOptions;
+import org.apache.gravitino.cli.options.CommonOptions;
+import org.apache.gravitino.cli.options.PropertyOptions;
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
@@ -49,11 +51,14 @@ import picocli.CommandLine.Option;
       ModelUpdate.class
     })
 public class ModelCliHandler implements Runnable {
+  /** Validator for name options of model commands. except list command. */
   public static final NameValidator MODEL_NAME_VALIDATOR = new ModelNameValidator();
+  /** Validator for name options of model list command. */
   public static final NameValidator MODEL_LIST_VALIDATOR = new ModelListValidator();
+  /** Joiner for comma separated values. */
   public static final Joiner COMMA_JOINER = Joiner.on(", ").skipNulls();
 
-  /** display help message, use --help/-h to display help message */
+  /** display help message, use --help/-h to display a help message */
   @CommandLine.Option(
       names = {"-h", GravitinoOptions.OPTION_LONG_PREFIX + GravitinoOptions.HELP},
       usageHelp = true,

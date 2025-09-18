@@ -17,21 +17,24 @@
  * under the License.
  */
 
-package org.apache.gravitino.cli.handler;
+package org.apache.gravitino.cli.options;
 
 import org.apache.gravitino.cli.GravitinoOptions;
 import picocli.CommandLine;
 
+/** Defines the options for setting a property in key=value format. */
 public class PropertyOptions {
+  /** The property option, use --property to set the property name */
   @CommandLine.Option(
       names = {GravitinoOptions.OPTION_LONG_PREFIX + GravitinoOptions.PROPERTY},
       required = true,
       description = "The property to set in key=value format")
-  String property;
+  public String property;
 
+  /** The value option, use --value to set the property value */
   @CommandLine.Option(
       names = {GravitinoOptions.OPTION_LONG_PREFIX + GravitinoOptions.VALUE},
       required = true,
       description = "The value to set in key=value format")
-  String value;
+  public String value;
 }

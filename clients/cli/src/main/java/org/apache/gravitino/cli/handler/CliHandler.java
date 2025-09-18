@@ -27,8 +27,15 @@ import org.apache.gravitino.cli.ErrorMessages;
 import org.apache.gravitino.cli.MainCli;
 import picocli.CommandLine;
 
-/** Base class fro all cli handlers. */
+/** Base class fro all cli handlers. will be renamed as Command when */
 public abstract class CliHandler implements Callable<Integer> {
+
+  public static final String HEAD_HEADING_STYLE = "@|bold,underline Usage|@:%n%n";
+  public static final String SYNOPSIS_HEADING_STYLE = "%n";
+  public static final String DESCRIPTION_HEADING_STYLE = "%n@|bold,underline Description|@:%n%n";
+  public static final String PARAMETER_LIST_HEADING_STYLE = "%n@|bold,underline Options|@:%n%n";
+  public static final String OPTION_LIST_HEADING_STYLE = "%n@|bold,underline Options|@:%n";
+
   /** The joiner for comma-separated values. */
   public static final Joiner COMMA_JOINER = Joiner.on(", ").skipNulls();
   /** The full name of the entity, constructed from the metalake, schema, and entity name. */
@@ -41,6 +48,8 @@ public abstract class CliHandler implements Callable<Integer> {
   /**
    * Validate the options for the command, check whether the required options are present. or wheter
    * the options are conflict.
+   *
+   * @param validator The name validator for the command.
    */
   protected void validateOptions(NameValidator validator) {
     this.fullName = new CliFullName(spec);
@@ -73,6 +82,10 @@ public abstract class CliHandler implements Callable<Integer> {
    */
   protected abstract Integer doCall() throws Exception;
 
-  /** Initialize the name option validator for the command. */
+  /**
+   * Initialize the name option validator for the command.
+   *
+   * @return The name validator for the command.
+   */
   protected abstract NameValidator createValidator();
 }
