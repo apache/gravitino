@@ -127,8 +127,10 @@ jcasbin = "1.81.0"
 ognl = "3.4.7"
 concurrent-trees = "2.6.0"
 jakarta-validation = "2.0.2"
+aspectj = "1.9.24"
 
 [libraries]
+aspectj-aspectjrt = { group = "org.aspectj", name = "aspectjrt", version.ref = "aspectj" }
 aws-iam = { group = "software.amazon.awssdk", name = "iam", version.ref = "awssdk" }
 aws-policy = { group = "software.amazon.awssdk", name = "iam-policy-builder", version.ref = "awssdk" }
 aws-s3 = { group = "software.amazon.awssdk", name = "s3", version.ref = "awssdk" }
@@ -324,3 +326,4 @@ bom = {id = "org.cyclonedx.bom", version = "1.5.0"}
 errorprone = {id = "net.ltgt.errorprone", version.ref = "error-prone"}
 jcstress = { id = "io.github.reyerizo.gradle.jcstress", version.ref = "jcstress" }
 jmh = { id = "me.champeau.jmh", version.ref = "jmh-plugin" }
+aspectj-post-compile-weaving = { id = "io.freefair.aspectj.post-compile-weaving", version = "8.14.2" }

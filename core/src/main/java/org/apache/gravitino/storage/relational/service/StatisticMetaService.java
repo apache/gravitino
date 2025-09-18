@@ -18,12 +18,15 @@
  */
 package org.apache.gravitino.storage.relational.service;
 
+import static org.apache.gravitino.metrics.source.MetricsSource.GRAVITINO_RELATIONAL_STORE_METRIC_NAME;
+
 import java.util.List;
 import java.util.stream.Collectors;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.meta.StatisticEntity;
+import org.apache.gravitino.metrics.Monitored;
 import org.apache.gravitino.storage.relational.mapper.StatisticMetaMapper;
 import org.apache.gravitino.storage.relational.po.StatisticPO;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
@@ -43,6 +46,7 @@ public class StatisticMetaService {
 
   private StatisticMetaService() {}
 
+  @Monitored(prefix = GRAVITINO_RELATIONAL_STORE_METRIC_NAME + ".listStatisticsByEntity")
   public List<StatisticEntity> listStatisticsByEntity(
       NameIdentifier identifier, Entity.EntityType type) {
     long metalakeId =
@@ -58,6 +62,9 @@ public class StatisticMetaService {
     return statisticPOs.stream().map(StatisticPO::fromStatisticPO).collect(Collectors.toList());
   }
 
+  @Monitored(
+      prefix =
+          GRAVITINO_RELATIONAL_STORE_METRIC_NAME + ".batchInsertStatisticPOsOnDuplicateKeyUpdate")
   public void batchInsertStatisticPOsOnDuplicateKeyUpdate(
       List<StatisticEntity> statisticEntities, NameIdentifier entity, Entity.EntityType type) {
     if (statisticEntities == null || statisticEntities.isEmpty()) {
@@ -77,6 +84,7 @@ public class StatisticMetaService {
         mapper -> mapper.batchInsertStatisticPOsOnDuplicateKeyUpdate(pos));
   }
 
+  @Monitored(prefix = GRAVITINO_RELATIONAL_STORE_METRIC_NAME + ".batchDeleteStatisticPOs")
   public int batchDeleteStatisticPOs(
       NameIdentifier identifier, Entity.EntityType type, List<String> statisticNames) {
     if (statisticNames == null || statisticNames.isEmpty()) {
@@ -94,6 +102,7 @@ public class StatisticMetaService {
         mapper -> mapper.batchDeleteStatisticPOs(entityId, statisticNames));
   }
 
+  @Monitored(prefix = GRAVITINO_RELATIONAL_STORE_METRIC_NAME + ".deleteStatisticsByLegacyTimeline")
   public int deleteStatisticsByLegacyTimeline(long legacyTimeline, int limit) {
     return SessionUtils.doWithCommitAndFetchResult(
         StatisticMetaMapper.class,

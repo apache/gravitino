@@ -18,6 +18,8 @@
  */
 package org.apache.gravitino.storage.relational.service;
 
+import static org.apache.gravitino.metrics.source.MetricsSource.GRAVITINO_RELATIONAL_STORE_METRIC_NAME;
+
 import com.google.common.collect.Lists;
 import java.util.Collections;
 import java.util.List;
@@ -29,6 +31,7 @@ import org.apache.gravitino.Entity;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.meta.ColumnEntity;
 import org.apache.gravitino.meta.TableEntity;
+import org.apache.gravitino.metrics.Monitored;
 import org.apache.gravitino.storage.relational.mapper.TableColumnMapper;
 import org.apache.gravitino.storage.relational.po.ColumnPO;
 import org.apache.gravitino.storage.relational.po.TablePO;
@@ -45,6 +48,7 @@ public class TableColumnMetaService {
     return INSTANCE;
   }
 
+  @Monitored(prefix = GRAVITINO_RELATIONAL_STORE_METRIC_NAME + ".getColumnsByTableIdAndVersion")
   List<ColumnPO> getColumnsByTableIdAndVersion(Long tableId, Long version) {
     List<ColumnPO> columnPOs =
         SessionUtils.getWithoutCommit(
@@ -57,6 +61,7 @@ public class TableColumnMetaService {
         .collect(Collectors.toList());
   }
 
+  @Monitored(prefix = GRAVITINO_RELATIONAL_STORE_METRIC_NAME + ".getColumnIdByTableIdAndName")
   Long getColumnIdByTableIdAndName(Long tableId, String columnName) {
     Long columnId =
         SessionUtils.getWithoutCommit(
@@ -73,6 +78,7 @@ public class TableColumnMetaService {
     return columnId;
   }
 
+  @Monitored(prefix = GRAVITINO_RELATIONAL_STORE_METRIC_NAME + ".getColumnPOById")
   ColumnPO getColumnPOById(Long columnId) {
     ColumnPO columnPO =
         SessionUtils.getWithoutCommit(
@@ -88,6 +94,7 @@ public class TableColumnMetaService {
     return columnPO;
   }
 
+  @Monitored(prefix = GRAVITINO_RELATIONAL_STORE_METRIC_NAME + ".insertColumnPOs")
   void insertColumnPOs(TablePO tablePO, List<ColumnEntity> columnEntities) {
     List<ColumnPO> columnPOs =
         POConverters.initializeColumnPOs(tablePO, columnEntities, ColumnPO.ColumnOpType.CREATE);
@@ -97,6 +104,7 @@ public class TableColumnMetaService {
         TableColumnMapper.class, mapper -> mapper.insertColumnPOs(columnPOs));
   }
 
+  @Monitored(prefix = GRAVITINO_RELATIONAL_STORE_METRIC_NAME + ".deleteColumnsByTableId")
   boolean deleteColumnsByTableId(Long tableId) {
     // deleteColumns will be done in deleteTable transaction, so we don't do commit here.
     Integer result =
@@ -105,6 +113,7 @@ public class TableColumnMetaService {
     return result > 0;
   }
 
+  @Monitored(prefix = GRAVITINO_RELATIONAL_STORE_METRIC_NAME + ".deleteColumnsByLegacyTimeline")
   public int deleteColumnsByLegacyTimeline(Long legacyTimeline, int limit) {
     return SessionUtils.doWithCommitAndFetchResult(
         TableColumnMapper.class,
@@ -127,6 +136,7 @@ public class TableColumnMetaService {
     return oldColumns.size() != newColumns.size() || !oldColumns.equals(newColumns);
   }
 
+  @Monitored(prefix = GRAVITINO_RELATIONAL_STORE_METRIC_NAME + ".updateColumnPOsFromTableDiff")
   void updateColumnPOsFromTableDiff(
       TableEntity oldTable, TableEntity newTable, TablePO newTablePO) {
     Map<Long, ColumnEntity> oldColumns =

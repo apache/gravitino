@@ -18,6 +18,8 @@
  */
 package org.apache.gravitino.storage.relational.service;
 
+import static org.apache.gravitino.metrics.source.MetricsSource.GRAVITINO_RELATIONAL_STORE_METRIC_NAME;
+
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
@@ -37,6 +39,7 @@ import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.meta.RoleEntity;
 import org.apache.gravitino.meta.UserEntity;
+import org.apache.gravitino.metrics.Monitored;
 import org.apache.gravitino.storage.relational.mapper.OwnerMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.UserMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.UserRoleRelMapper;
@@ -73,6 +76,7 @@ public class UserMetaService {
     return userPO;
   }
 
+  @Monitored(prefix = GRAVITINO_RELATIONAL_STORE_METRIC_NAME + ".getUserIdByMetalakeIdAndName")
   public Long getUserIdByMetalakeIdAndName(Long metalakeId, String userName) {
     Long userId =
         SessionUtils.getWithoutCommit(
@@ -88,6 +92,7 @@ public class UserMetaService {
     return userId;
   }
 
+  @Monitored(prefix = GRAVITINO_RELATIONAL_STORE_METRIC_NAME + ".getUserByIdentifier")
   public UserEntity getUserByIdentifier(NameIdentifier identifier) {
     AuthorizationUtils.checkUser(identifier);
 
@@ -99,6 +104,7 @@ public class UserMetaService {
     return POConverters.fromUserPO(userPO, rolePOs, identifier.namespace());
   }
 
+  @Monitored(prefix = GRAVITINO_RELATIONAL_STORE_METRIC_NAME + ".listUsersByRoleIdent")
   public List<UserEntity> listUsersByRoleIdent(NameIdentifier roleIdent) {
     RoleEntity roleEntity = RoleMetaService.getInstance().getRoleByIdentifier(roleIdent);
     List<UserPO> userPOs =
@@ -114,6 +120,7 @@ public class UserMetaService {
         .collect(Collectors.toList());
   }
 
+  @Monitored(prefix = GRAVITINO_RELATIONAL_STORE_METRIC_NAME + ".insertUser")
   public void insertUser(UserEntity userEntity, boolean overwritten) throws IOException {
     try {
       AuthorizationUtils.checkUser(userEntity.nameIdentifier());
@@ -157,6 +164,7 @@ public class UserMetaService {
     }
   }
 
+  @Monitored(prefix = GRAVITINO_RELATIONAL_STORE_METRIC_NAME + ".deleteUser")
   public boolean deleteUser(NameIdentifier identifier) {
     AuthorizationUtils.checkUser(identifier);
 
@@ -180,6 +188,7 @@ public class UserMetaService {
     return true;
   }
 
+  @Monitored(prefix = GRAVITINO_RELATIONAL_STORE_METRIC_NAME + ".updateUser")
   public <E extends Entity & HasIdentifier> UserEntity updateUser(
       NameIdentifier identifier, Function<E, E> updater) throws IOException {
     AuthorizationUtils.checkUser(identifier);
@@ -248,6 +257,7 @@ public class UserMetaService {
     return newEntity;
   }
 
+  @Monitored(prefix = GRAVITINO_RELATIONAL_STORE_METRIC_NAME + ".listUsersByNamespace")
   public List<UserEntity> listUsersByNamespace(Namespace namespace, boolean allFields) {
     AuthorizationUtils.checkUserNamespace(namespace);
     String metalakeName = namespace.level(0);
@@ -278,6 +288,7 @@ public class UserMetaService {
     }
   }
 
+  @Monitored(prefix = GRAVITINO_RELATIONAL_STORE_METRIC_NAME + ".deleteUserMetasByLegacyTimeline")
   public int deleteUserMetasByLegacyTimeline(long legacyTimeline, int limit) {
     int[] userDeletedCount = new int[] {0};
     int[] userRoleRelDeletedCount = new int[] {0};

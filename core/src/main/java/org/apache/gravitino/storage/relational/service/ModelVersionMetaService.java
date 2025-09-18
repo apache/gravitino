@@ -18,6 +18,8 @@
  */
 package org.apache.gravitino.storage.relational.service;
 
+import static org.apache.gravitino.metrics.source.MetricsSource.GRAVITINO_RELATIONAL_STORE_METRIC_NAME;
+
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.ImmutableList;
@@ -40,6 +42,7 @@ import org.apache.gravitino.Namespace;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.meta.ModelEntity;
 import org.apache.gravitino.meta.ModelVersionEntity;
+import org.apache.gravitino.metrics.Monitored;
 import org.apache.gravitino.storage.relational.mapper.ModelMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.ModelVersionAliasRelMapper;
 import org.apache.gravitino.storage.relational.mapper.ModelVersionMetaMapper;
@@ -61,6 +64,7 @@ public class ModelVersionMetaService {
 
   private ModelVersionMetaService() {}
 
+  @Monitored(prefix = GRAVITINO_RELATIONAL_STORE_METRIC_NAME + ".listModelVersionsByNamespace")
   public List<ModelVersionEntity> listModelVersionsByNamespace(Namespace ns) {
     NamespaceUtil.checkModelVersion(ns);
 
@@ -102,6 +106,7 @@ public class ModelVersionMetaService {
             .values());
   }
 
+  @Monitored(prefix = GRAVITINO_RELATIONAL_STORE_METRIC_NAME + ".getModelVersionByIdentifier")
   public ModelVersionEntity getModelVersionByIdentifier(NameIdentifier ident) {
     NameIdentifierUtil.checkModelVersion(ident);
 
@@ -146,6 +151,7 @@ public class ModelVersionMetaService {
     return POConverters.fromModelVersionPO(modelIdent, modelVersionPOs, aliasRelPOs);
   }
 
+  @Monitored(prefix = GRAVITINO_RELATIONAL_STORE_METRIC_NAME + ".insertModelVersion")
   public void insertModelVersion(ModelVersionEntity modelVersionEntity) throws IOException {
     NameIdentifier modelIdent = modelVersionEntity.modelIdentifier();
     NameIdentifierUtil.checkModel(modelIdent);
@@ -186,6 +192,7 @@ public class ModelVersionMetaService {
     }
   }
 
+  @Monitored(prefix = GRAVITINO_RELATIONAL_STORE_METRIC_NAME + ".deleteModelVersion")
   public boolean deleteModelVersion(NameIdentifier ident) {
     NameIdentifierUtil.checkModelVersion(ident);
 
@@ -238,6 +245,8 @@ public class ModelVersionMetaService {
     return modelVersionDeletedCount.get() > 0;
   }
 
+  @Monitored(
+      prefix = GRAVITINO_RELATIONAL_STORE_METRIC_NAME + ".deleteModelVersionMetasByLegacyTimeline")
   public int deleteModelVersionMetasByLegacyTimeline(Long legacyTimeline, int limit) {
     int[] modelVersionDeletedCount = new int[] {0};
     int[] modelVersionAliasRelDeletedCount = new int[] {0};
@@ -268,6 +277,7 @@ public class ModelVersionMetaService {
    * @param <E> the type of the entity to update
    * @throws IOException if an error occurs while updating the entity
    */
+  @Monitored(prefix = GRAVITINO_RELATIONAL_STORE_METRIC_NAME + ".updateModelVersion")
   public <E extends Entity & HasIdentifier> ModelVersionEntity updateModelVersion(
       NameIdentifier ident, Function<E, E> updater) throws IOException {
     NameIdentifierUtil.checkModelVersion(ident);

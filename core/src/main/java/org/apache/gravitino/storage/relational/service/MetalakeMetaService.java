@@ -19,6 +19,8 @@
 
 package org.apache.gravitino.storage.relational.service;
 
+import static org.apache.gravitino.metrics.source.MetricsSource.GRAVITINO_RELATIONAL_STORE_METRIC_NAME;
+
 import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.util.List;
@@ -31,6 +33,7 @@ import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NonEmptyEntityException;
 import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.CatalogEntity;
+import org.apache.gravitino.metrics.Monitored;
 import org.apache.gravitino.storage.relational.mapper.CatalogMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.FilesetMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.FilesetVersionMapper;
@@ -75,6 +78,7 @@ public class MetalakeMetaService {
 
   private MetalakeMetaService() {}
 
+  @Monitored(prefix = GRAVITINO_RELATIONAL_STORE_METRIC_NAME + ".listMetalakes")
   public List<BaseMetalake> listMetalakes() {
     List<MetalakePO> metalakePOS =
         SessionUtils.getWithoutCommit(
@@ -82,6 +86,7 @@ public class MetalakeMetaService {
     return POConverters.fromMetalakePOs(metalakePOS);
   }
 
+  @Monitored(prefix = GRAVITINO_RELATIONAL_STORE_METRIC_NAME + ".getMetalakeIdByName")
   public Long getMetalakeIdByName(String metalakeName) {
     Long metalakeId =
         SessionUtils.getWithoutCommit(
@@ -95,6 +100,7 @@ public class MetalakeMetaService {
     return metalakeId;
   }
 
+  @Monitored(prefix = GRAVITINO_RELATIONAL_STORE_METRIC_NAME + ".getMetalakeByIdentifier")
   public BaseMetalake getMetalakeByIdentifier(NameIdentifier ident) {
     NameIdentifierUtil.checkMetalake(ident);
     MetalakePO metalakePO =
@@ -109,14 +115,7 @@ public class MetalakeMetaService {
     return POConverters.fromMetalakePO(metalakePO);
   }
 
-  // Metalake may be deleted, so the MetalakePO may be null.
-  public MetalakePO getMetalakePOById(Long id) {
-    MetalakePO metalakePO =
-        SessionUtils.getWithoutCommit(
-            MetalakeMetaMapper.class, mapper -> mapper.selectMetalakeMetaById(id));
-    return metalakePO;
-  }
-
+  @Monitored(prefix = GRAVITINO_RELATIONAL_STORE_METRIC_NAME + ".insertMetalake")
   public void insertMetalake(BaseMetalake baseMetalake, boolean overwrite) throws IOException {
     try {
       NameIdentifierUtil.checkMetalake(baseMetalake.nameIdentifier());
@@ -137,6 +136,7 @@ public class MetalakeMetaService {
     }
   }
 
+  @Monitored(prefix = GRAVITINO_RELATIONAL_STORE_METRIC_NAME + ".updateMetalake")
   public <E extends Entity & HasIdentifier> BaseMetalake updateMetalake(
       NameIdentifier ident, Function<E, E> updater) throws IOException {
     NameIdentifierUtil.checkMetalake(ident);
@@ -178,6 +178,7 @@ public class MetalakeMetaService {
     }
   }
 
+  @Monitored(prefix = GRAVITINO_RELATIONAL_STORE_METRIC_NAME + ".deleteMetalake")
   public boolean deleteMetalake(NameIdentifier ident, boolean cascade) {
     NameIdentifierUtil.checkMetalake(ident);
     Long metalakeId = getMetalakeIdByName(ident.name());
@@ -350,6 +351,8 @@ public class MetalakeMetaService {
     return true;
   }
 
+  @Monitored(
+      prefix = GRAVITINO_RELATIONAL_STORE_METRIC_NAME + ".deleteMetalakeMetasByLegacyTimeline")
   public int deleteMetalakeMetasByLegacyTimeline(Long legacyTimeline, int limit) {
     int[] metalakeDeleteCount = new int[] {0};
     int[] ownerRelDeleteCount = new int[] {0};

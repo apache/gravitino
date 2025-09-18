@@ -18,6 +18,8 @@
  */
 package org.apache.gravitino.storage.relational.service;
 
+import static org.apache.gravitino.metrics.source.MetricsSource.GRAVITINO_RELATIONAL_STORE_METRIC_NAME;
+
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
@@ -41,6 +43,7 @@ import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.meta.RoleEntity;
 import org.apache.gravitino.meta.UserEntity;
+import org.apache.gravitino.metrics.Monitored;
 import org.apache.gravitino.storage.relational.mapper.GroupRoleRelMapper;
 import org.apache.gravitino.storage.relational.mapper.OwnerMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.RoleMetaMapper;
@@ -66,6 +69,7 @@ public class RoleMetaService {
 
   private RoleMetaService() {}
 
+  @Monitored(prefix = GRAVITINO_RELATIONAL_STORE_METRIC_NAME + ".getRoleIdByMetalakeIdAndName")
   public Long getRoleIdByMetalakeIdAndName(Long metalakeId, String roleName) {
     Long roleId =
         SessionUtils.getWithoutCommit(
@@ -81,11 +85,13 @@ public class RoleMetaService {
     return roleId;
   }
 
+  @Monitored(prefix = GRAVITINO_RELATIONAL_STORE_METRIC_NAME + ".listRolesByUserId")
   public List<RolePO> listRolesByUserId(Long userId) {
     return SessionUtils.getWithoutCommit(
         RoleMetaMapper.class, mapper -> mapper.listRolesByUserId(userId));
   }
 
+  @Monitored(prefix = GRAVITINO_RELATIONAL_STORE_METRIC_NAME + ".listRolesByUserIdent")
   public List<RoleEntity> listRolesByUserIdent(NameIdentifier userIdent) {
     UserEntity user = UserMetaService.getInstance().getUserByIdentifier(userIdent);
     String metalake = NameIdentifierUtil.getMetalake(userIdent);
@@ -98,6 +104,7 @@ public class RoleMetaService {
         .collect(Collectors.toList());
   }
 
+  @Monitored(prefix = GRAVITINO_RELATIONAL_STORE_METRIC_NAME + ".listRolesByMetadataObject")
   public List<RoleEntity> listRolesByMetadataObject(
       NameIdentifier metadataObjectIdent, Entity.EntityType metadataObjectType, boolean allFields) {
     String metalake = NameIdentifierUtil.getMetalake(metadataObjectIdent);
@@ -127,11 +134,13 @@ public class RoleMetaService {
         .collect(Collectors.toList());
   }
 
+  @Monitored(prefix = GRAVITINO_RELATIONAL_STORE_METRIC_NAME + ".listRolesByGroupId")
   public List<RolePO> listRolesByGroupId(Long groupId) {
     return SessionUtils.getWithoutCommit(
         RoleMetaMapper.class, mapper -> mapper.listRolesByGroupId(groupId));
   }
 
+  @Monitored(prefix = GRAVITINO_RELATIONAL_STORE_METRIC_NAME + ".insertRole")
   public void insertRole(RoleEntity roleEntity, boolean overwritten) throws IOException {
     try {
       AuthorizationUtils.checkRole(roleEntity.nameIdentifier());
@@ -181,6 +190,7 @@ public class RoleMetaService {
     }
   }
 
+  @Monitored(prefix = GRAVITINO_RELATIONAL_STORE_METRIC_NAME + ".updateRole")
   public <E extends Entity & HasIdentifier> RoleEntity updateRole(
       NameIdentifier identifier, Function<E, E> updater) throws IOException {
     AuthorizationUtils.checkRole(identifier);
@@ -264,6 +274,7 @@ public class RoleMetaService {
     return securableObjectPOs;
   }
 
+  @Monitored(prefix = GRAVITINO_RELATIONAL_STORE_METRIC_NAME + ".getRoleByIdentifier")
   public RoleEntity getRoleByIdentifier(NameIdentifier identifier) {
     AuthorizationUtils.checkRole(identifier);
 
@@ -276,6 +287,7 @@ public class RoleMetaService {
     return POConverters.fromRolePO(rolePO, securableObjects, identifier.namespace());
   }
 
+  @Monitored(prefix = GRAVITINO_RELATIONAL_STORE_METRIC_NAME + ".deleteRole")
   public boolean deleteRole(NameIdentifier identifier) {
     AuthorizationUtils.checkRole(identifier);
 
@@ -306,11 +318,13 @@ public class RoleMetaService {
     return true;
   }
 
+  @Monitored(prefix = GRAVITINO_RELATIONAL_STORE_METRIC_NAME + ".listSecurableObjectsByRoleId")
   public static List<SecurableObjectPO> listSecurableObjectsByRoleId(Long roleId) {
     return SessionUtils.getWithoutCommit(
         SecurableObjectMapper.class, mapper -> mapper.listSecurableObjectsByRoleId(roleId));
   }
 
+  @Monitored(prefix = GRAVITINO_RELATIONAL_STORE_METRIC_NAME + ".listRolesByNamespace")
   public List<RoleEntity> listRolesByNamespace(Namespace namespace) {
     AuthorizationUtils.checkRoleNamespace(namespace);
     String metalakeName = namespace.level(0);
@@ -327,6 +341,7 @@ public class RoleMetaService {
         .collect(Collectors.toList());
   }
 
+  @Monitored(prefix = GRAVITINO_RELATIONAL_STORE_METRIC_NAME + ".deleteRoleMetasByLegacyTimeline")
   public int deleteRoleMetasByLegacyTimeline(long legacyTimeline, int limit) {
     int[] roleDeletedCount = new int[] {0};
     int[] userRoleRelDeletedCount = new int[] {0};
