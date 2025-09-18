@@ -19,12 +19,27 @@
 
 package org.apache.gravitino.cli.handler;
 
+import static org.apache.gravitino.cli.DescriptionMessages.SCHEMA_CREATE_DESCRIPTIONS;
+import static org.apache.gravitino.cli.DescriptionMessages.SCHEMA_DELETE_DESCRIPTIONS;
+import static org.apache.gravitino.cli.DescriptionMessages.SCHEMA_DETAILS_DESCRIPTIONS;
+import static org.apache.gravitino.cli.DescriptionMessages.SCHEMA_LIST_DESCRIPTIONS;
+import static org.apache.gravitino.cli.DescriptionMessages.SCHEMA_PROPERTIES_DESCRIPTIONS;
+import static org.apache.gravitino.cli.DescriptionMessages.SCHEMA_REMOVE_DESCRIPTIONS;
+import static org.apache.gravitino.cli.DescriptionMessages.SCHEMA_SET_DESCRIPTIONS;
+import static org.apache.gravitino.cli.handler.CliHandler.DESCRIPTION_HEADING_STYLE;
+import static org.apache.gravitino.cli.handler.CliHandler.HEAD_HEADING_STYLE;
+import static org.apache.gravitino.cli.handler.CliHandler.OPTION_LIST_HEADING_STYLE;
+import static org.apache.gravitino.cli.handler.CliHandler.PARAMETER_LIST_HEADING_STYLE;
+import static org.apache.gravitino.cli.handler.CliHandler.SYNOPSIS_HEADING_STYLE;
+
 import com.google.common.collect.Lists;
 import java.util.List;
 import org.apache.gravitino.cli.CliFullName;
 import org.apache.gravitino.cli.CommandActions;
 import org.apache.gravitino.cli.CommandEntities;
 import org.apache.gravitino.cli.GravitinoOptions;
+import org.apache.gravitino.cli.options.CommonOptions;
+import org.apache.gravitino.cli.options.PropertyOptions;
 import picocli.CommandLine;
 
 /** Handler for schema command. */
@@ -61,7 +76,14 @@ public class SchemaCliHandler implements Runnable {
 
 @CommandLine.Command(
     name = CommandActions.DETAILS,
-    description = "Get details of a schema or get audit information for a schema")
+    sortOptions = false,
+    headerHeading = HEAD_HEADING_STYLE,
+    synopsisHeading = SYNOPSIS_HEADING_STYLE,
+    descriptionHeading = DESCRIPTION_HEADING_STYLE,
+    parameterListHeading = PARAMETER_LIST_HEADING_STYLE,
+    optionListHeading = OPTION_LIST_HEADING_STYLE,
+    header = "Get details of a schema or get audit information for a schema",
+    description = SCHEMA_DETAILS_DESCRIPTIONS)
 class SchemaDetails extends CliHandler {
   @CommandLine.Mixin protected SchemaCommonOptions commonOptions;
 
@@ -89,7 +111,16 @@ class SchemaDetails extends CliHandler {
 }
 
 /** Handler for schema create command. */
-@CommandLine.Command(name = CommandActions.CREATE, description = "Create a new schema")
+@CommandLine.Command(
+    name = CommandActions.CREATE,
+    sortOptions = false,
+    headerHeading = HEAD_HEADING_STYLE,
+    synopsisHeading = SYNOPSIS_HEADING_STYLE,
+    descriptionHeading = DESCRIPTION_HEADING_STYLE,
+    parameterListHeading = PARAMETER_LIST_HEADING_STYLE,
+    optionListHeading = OPTION_LIST_HEADING_STYLE,
+    header = "Create a new schema",
+    description = SCHEMA_CREATE_DESCRIPTIONS)
 class SchemaCreate extends CliHandler {
   @CommandLine.Mixin protected SchemaCommonOptions commonOptions;
 
@@ -115,8 +146,18 @@ class SchemaCreate extends CliHandler {
 }
 
 /** Handler for schema delete command. */
-@CommandLine.Command(name = CommandActions.DELETE, description = "Delete a schema")
+@CommandLine.Command(
+    name = CommandActions.DELETE,
+    sortOptions = false,
+    headerHeading = HEAD_HEADING_STYLE,
+    synopsisHeading = SYNOPSIS_HEADING_STYLE,
+    descriptionHeading = DESCRIPTION_HEADING_STYLE,
+    parameterListHeading = PARAMETER_LIST_HEADING_STYLE,
+    optionListHeading = OPTION_LIST_HEADING_STYLE,
+    header = "Delete a schema",
+    description = SCHEMA_DELETE_DESCRIPTIONS)
 class SchemaDelete extends CliHandler {
+  /** Common options for schema commands. */
   @CommandLine.Mixin protected SchemaCommonOptions commonOptions;
 
   /**
@@ -129,12 +170,14 @@ class SchemaDelete extends CliHandler {
       defaultValue = "false")
   boolean force;
 
+  /** {inheritDoc} */
   @Override
   protected Integer doCall() throws Exception {
     // TODO: implement schema delete command
     return 0;
   }
 
+  /** {inheritDoc} */
   @Override
   protected NameValidator createValidator() {
     return SchemaCliHandler.SCHEMA_VALIDATOR;
@@ -142,11 +185,22 @@ class SchemaDelete extends CliHandler {
 }
 
 /** Handler for schema set command. */
-@CommandLine.Command(name = CommandActions.SET, description = "Set properties of a schema")
+@CommandLine.Command(
+    name = CommandActions.SET,
+    sortOptions = false,
+    headerHeading = HEAD_HEADING_STYLE,
+    synopsisHeading = SYNOPSIS_HEADING_STYLE,
+    descriptionHeading = DESCRIPTION_HEADING_STYLE,
+    parameterListHeading = PARAMETER_LIST_HEADING_STYLE,
+    optionListHeading = OPTION_LIST_HEADING_STYLE,
+    header = "Set properties of a schema",
+    description = SCHEMA_SET_DESCRIPTIONS)
 class SchemaSet extends CliHandler {
 
+  /** Common options for set commands. */
   @CommandLine.Mixin protected SchemaCommonOptions commonOptions;
 
+  /** The property related options */
   @CommandLine.ArgGroup(exclusive = false)
   PropertyOptions propertyOptions;
 
@@ -165,7 +219,16 @@ class SchemaSet extends CliHandler {
 }
 
 /** Handler for schema remove command. */
-@CommandLine.Command(name = CommandActions.REMOVE, description = "Remove a property from a schema")
+@CommandLine.Command(
+    name = CommandActions.REMOVE,
+    sortOptions = false,
+    headerHeading = HEAD_HEADING_STYLE,
+    synopsisHeading = SYNOPSIS_HEADING_STYLE,
+    descriptionHeading = DESCRIPTION_HEADING_STYLE,
+    parameterListHeading = PARAMETER_LIST_HEADING_STYLE,
+    optionListHeading = OPTION_LIST_HEADING_STYLE,
+    header = "Remove a property from a schema",
+    description = SCHEMA_REMOVE_DESCRIPTIONS)
 class SchemaRemove extends CliHandler {
   @CommandLine.Mixin protected SchemaCommonOptions commonOptions;
 
@@ -192,9 +255,17 @@ class SchemaRemove extends CliHandler {
 /** Handler for schema properties command. */
 @CommandLine.Command(
     name = CommandActions.PROPERTIES,
-    description = "List the properties of a schema")
+    sortOptions = false,
+    headerHeading = HEAD_HEADING_STYLE,
+    synopsisHeading = SYNOPSIS_HEADING_STYLE,
+    descriptionHeading = DESCRIPTION_HEADING_STYLE,
+    parameterListHeading = PARAMETER_LIST_HEADING_STYLE,
+    optionListHeading = OPTION_LIST_HEADING_STYLE,
+    header = "List the properties of a schema",
+    description = SCHEMA_PROPERTIES_DESCRIPTIONS)
 class SchemaProperties extends CliHandler {
 
+  /** Common options for schema commands. */
   @CommandLine.Mixin protected SchemaCommonOptions commonOptions;
   /** {inheritDoc} */
   @Override
@@ -211,7 +282,16 @@ class SchemaProperties extends CliHandler {
 }
 
 /** Handler for schema list command. */
-@CommandLine.Command(name = CommandActions.LIST, description = "List the schemas in a catalog")
+@CommandLine.Command(
+    name = CommandActions.LIST,
+    sortOptions = false,
+    headerHeading = HEAD_HEADING_STYLE,
+    synopsisHeading = SYNOPSIS_HEADING_STYLE,
+    descriptionHeading = DESCRIPTION_HEADING_STYLE,
+    parameterListHeading = PARAMETER_LIST_HEADING_STYLE,
+    optionListHeading = OPTION_LIST_HEADING_STYLE,
+    header = "List the schemas in a catalog",
+    description = SCHEMA_LIST_DESCRIPTIONS)
 class SchemaList extends CliHandler {
   @CommandLine.Mixin protected SchemaCommonOptions commonOptions;
 

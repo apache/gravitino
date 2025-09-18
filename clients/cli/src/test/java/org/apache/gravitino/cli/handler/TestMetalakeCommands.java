@@ -45,6 +45,11 @@ class TestMetalakeCommands {
     String[] createArgs = {CommandEntities.METALAKE, CommandActions.CREATE, "-h"};
     Assertions.assertDoesNotThrow(() -> MainCli.main(createArgs));
 
+    String[] createArgs2 = {
+      CommandEntities.METALAKE, CommandActions.CREATE, "--help", "--metalake", "ml1"
+    };
+    Assertions.assertDoesNotThrow(() -> MainCli.main(createArgs2));
+
     String[] deleteArgs = {CommandEntities.METALAKE, CommandActions.DELETE, "-h"};
     Assertions.assertDoesNotThrow(() -> MainCli.main(deleteArgs));
 

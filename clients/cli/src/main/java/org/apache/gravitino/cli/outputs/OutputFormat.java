@@ -25,8 +25,11 @@ import com.google.common.base.Joiner;
  * handle the conversion of entities to their string representation in specific output formats.
  */
 public interface OutputFormat<T> {
+  /** Defines the output type for the command-line interface */
   enum OutputType {
+    /** Output in plain text format */
     PLAIN,
+    /** Output in Tabular format */
     TABLE;
   }
 

@@ -17,19 +17,22 @@
  * under the License.
  */
 
-package org.apache.gravitino.cli.handler;
+package org.apache.gravitino.cli.options;
 
 import org.apache.gravitino.cli.GravitinoOptions;
 import picocli.CommandLine;
 
+/** Options for enable/disable commands. */
 public class EnableDisableOptions {
+  /** Enable a metalake or a catalog, use it with --enable */
   @CommandLine.Option(
       names = {GravitinoOptions.OPTION_LONG_PREFIX + GravitinoOptions.ENABLE},
-      description = "Enable " + "a metalake or a catalog")
-  boolean enable;
+      description = "Enable " + "a etalake or a catalog")
+  public boolean enable;
 
+  /** Disable a metalake or a catalog, use it with --disable */
   @CommandLine.Option(
       names = {GravitinoOptions.OPTION_LONG_PREFIX + GravitinoOptions.DISABLE},
       description = "Disable a metalake or a catalog")
-  boolean disable;
+  public boolean disable;
 }

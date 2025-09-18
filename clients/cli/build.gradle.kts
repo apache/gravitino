@@ -27,6 +27,7 @@ dependencies {
   implementation(libs.commons.csv)
   implementation(libs.guava)
   implementation(libs.picocli)
+  annotationProcessor(libs.picocli)
   implementation(libs.slf4j.api)
   implementation(libs.slf4j.simple)
   implementation(project(":api"))
@@ -83,4 +84,8 @@ tasks.test {
     dependsOn(tasks.jar)
     dependsOn(":catalogs:catalog-jdbc-postgresql:jar", ":catalogs:catalog-jdbc-postgresql:runtimeJars")
   }
+}
+
+tasks.compileJava {
+  options.compilerArgs.add("-Aproject=${project.group}/${project.name}")
 }

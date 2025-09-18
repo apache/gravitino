@@ -25,6 +25,9 @@ import java.util.ArrayList;
 import org.apache.gravitino.cli.CommandActions;
 import org.apache.gravitino.cli.CommandEntities;
 import org.apache.gravitino.cli.GravitinoOptions;
+import org.apache.gravitino.cli.options.CommonOptions;
+import org.apache.gravitino.cli.options.EnableDisableOptions;
+import org.apache.gravitino.cli.options.PropertyOptions;
 import picocli.CommandLine;
 
 /** Handler for the metalake command. */
@@ -42,6 +45,7 @@ import picocli.CommandLine;
       MetalakeList.class
     })
 public class MetalakeCliHandler implements Runnable {
+  /** Validator for name options, which does not validate */
   public static final NameValidator NO_OP_VALIDATOR = fullName -> new ArrayList<>();
 
   /** display help message, use --help/-h to display a help message */
