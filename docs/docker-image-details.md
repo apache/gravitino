@@ -429,7 +429,7 @@ Changelog
     - Use `docker exec -it <container_id> bash` to enter the docker container.
     - Add these context `export JAVA_OPTS=-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5001` into `/opt/ranger-admin/ews/webapp/WEB-INF/classes/conf/ranger-admin-env-debug.sh` in the docker container.
     - Execute `./opt/ranger-admin/stop-ranger-admin.sh` and `./opt/ranger-admin/start-ranger-admin.sh` to restart Ranger admin.
-    - Clone the `Apache Ranger` project from GiHub and checkout the `2.4.0` release.
+    - Clone the `Apache Ranger` project from GitHub and checkout the `2.4.0` release.
     - Create a remote debug configuration (`Use model classpath` = `EmbeddedServer`) in your IDE and connect to the Ranger admin container.
 
 - datastrato/gravitino-ci-ranger:0.1.0
