@@ -697,7 +697,7 @@ gravitino_client: GravitinoClient = GravitinoClient(uri="http://localhost:8090",
 catalog: Catalog = gravitino_client.load_catalog(name="catalog")
 changes = (
    FilesetChange.remove_property("fileset_properties_key1"),
-   FilesetChange.set_property("fileset_properties_key2", "fileset_propertie_new_value"),
+   FilesetChange.set_property("fileset_properties_key2", "fileset_properties_new_value"),
 )
 fileset_new = catalog.as_fileset_catalog().alter_fileset(NameIdentifier.of("schema", "fileset"), 
                                                          *changes)

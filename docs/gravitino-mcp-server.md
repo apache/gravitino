@@ -39,7 +39,7 @@ Gravitino MCP server provides the ability to manage Gravitino metadata for LLM.
 }
 ```
 
-Or start a HTTP MCP server by `uv run mcp_server --metalake test --uri http://127.0.0.1:8090 --transport http --mcp-url http://localhost:8000/mcp`, and use the configuration:
+Or start an HTTP MCP server by `uv run mcp_server --metalake test --uri http://127.0.0.1:8090 --transport http --mcp-url http://localhost:8000/mcp`, and use the configuration:
 
 ```json
 {
