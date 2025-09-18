@@ -105,8 +105,9 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
   /**
    * Get table credentials.
    *
-   * @param identifier
-   * @return
+   * @param identifier The table identifier for which to load credentials
+   * @return A {@link org.apache.iceberg.rest.responses.LoadCredentialsResponse} object containing
+   *     the credentials.
    */
   public LoadCredentialsResponse loadTableCredentials(TableIdentifier identifier) {
     try {
