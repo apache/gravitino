@@ -33,6 +33,9 @@ import org.apache.gravitino.listener.api.event.IcebergDropTablePreEvent;
 import org.apache.gravitino.listener.api.event.IcebergListTableEvent;
 import org.apache.gravitino.listener.api.event.IcebergListTableFailureEvent;
 import org.apache.gravitino.listener.api.event.IcebergListTablePreEvent;
+import org.apache.gravitino.listener.api.event.IcebergLoadTableCredentialEvent;
+import org.apache.gravitino.listener.api.event.IcebergLoadTableCredentialFailureEvent;
+import org.apache.gravitino.listener.api.event.IcebergLoadTableCredentialPreEvent;
 import org.apache.gravitino.listener.api.event.IcebergLoadTableEvent;
 import org.apache.gravitino.listener.api.event.IcebergLoadTableFailureEvent;
 import org.apache.gravitino.listener.api.event.IcebergLoadTablePreEvent;
@@ -246,18 +249,20 @@ public class IcebergTableEventDispatcher implements IcebergTableOperationDispatc
     NameIdentifier gravitinoNameIdentifier =
         IcebergRestUtils.getGravitinoNameIdentifier(
             metalakeName, context.catalogName(), tableIdentifier);
-    eventBus.dispatchEvent(new IcebergLoadTablePreEvent(context, gravitinoNameIdentifier));
+    eventBus.dispatchEvent(
+        new IcebergLoadTableCredentialPreEvent(context, gravitinoNameIdentifier));
     LoadCredentialsResponse loadCredentialsResponse;
     try {
       loadCredentialsResponse =
           icebergTableOperationDispatcher.getTableCredentials(context, tableIdentifier);
     } catch (Exception e) {
-      eventBus.dispatchEvent(new IcebergLoadTableFailureEvent(context, gravitinoNameIdentifier, e));
+      eventBus.dispatchEvent(
+          new IcebergLoadTableCredentialFailureEvent(context, gravitinoNameIdentifier, e));
       throw e;
     }
-    // Note: Currently there is no dedicated IcebergLoadCredentialsEvent event, reusing
-    // IcebergLoadTableEvent
-    eventBus.dispatchEvent(new IcebergLoadTableEvent(context, gravitinoNameIdentifier, null));
+    eventBus.dispatchEvent(
+        new IcebergLoadTableCredentialEvent(
+            context, gravitinoNameIdentifier, loadCredentialsResponse));
     return loadCredentialsResponse;
   }
 }
