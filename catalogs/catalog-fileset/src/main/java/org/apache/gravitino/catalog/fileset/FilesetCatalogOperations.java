@@ -26,7 +26,10 @@ import static org.apache.gravitino.file.Fileset.PROPERTY_FILESET_PLACEHOLDER;
 import static org.apache.gravitino.file.Fileset.PROPERTY_LOCATION_PLACEHOLDER_PREFIX;
 import static org.apache.gravitino.file.Fileset.PROPERTY_MULTIPLE_LOCATIONS_PREFIX;
 import static org.apache.gravitino.file.Fileset.PROPERTY_SCHEMA_PLACEHOLDER;
+import static org.apache.gravitino.metrics.MetricNames.FILESYSTEM_CACHE;
+import static org.apache.gravitino.metrics.source.MetricsSource.GRAVITINO_FILESET_CATALOG_METRIC_PREFIX;
 
+import com.codahale.metrics.caffeine.MetricsStatsCounter;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import com.github.benmanes.caffeine.cache.Scheduler;
@@ -89,6 +92,7 @@ import org.apache.gravitino.file.FilesetChange;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.FilesetEntity;
 import org.apache.gravitino.meta.SchemaEntity;
+import org.apache.gravitino.metrics.MetricsSystem;
 import org.apache.gravitino.utils.NamespaceUtil;
 import org.apache.gravitino.utils.PrincipalUtils;
 import org.apache.hadoop.conf.Configuration;
@@ -134,27 +138,6 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
 
   FilesetCatalogOperations(EntityStore store) {
     this.store = store;
-    scheduler =
-        new ScheduledThreadPoolExecutor(
-            1,
-            new ThreadFactoryBuilder()
-                .setDaemon(true)
-                .setNameFormat("file-system-cache-for-fileset" + "-%d")
-                .build());
-
-    this.fileSystemCache =
-        Caffeine.newBuilder()
-            .expireAfterAccess(1, TimeUnit.HOURS)
-            .removalListener(
-                (ignored, value, cause) -> {
-                  try {
-                    ((FileSystem) value).close();
-                  } catch (IOException e) {
-                    LOG.warn("Failed to close FileSystem instance in cache", e);
-                  }
-                })
-            .scheduler(Scheduler.forScheduledExecutorService(scheduler))
-            .build();
   }
 
   static class FileSystemCacheKey {
@@ -257,6 +240,44 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
       this.defaultFileSystemProvider =
           FileSystemUtils.getFileSystemProviderByName(
               fileSystemProvidersMap, defaultFileSystemProviderName);
+
+      scheduler =
+          new ScheduledThreadPoolExecutor(
+              1,
+              new ThreadFactoryBuilder()
+                  .setDaemon(true)
+                  .setNameFormat("file-system-cache-for-fileset" + "-%d")
+                  .build());
+
+      Caffeine<Object, Object> cacheBuilder =
+          Caffeine.newBuilder()
+              .expireAfterAccess(1, TimeUnit.HOURS)
+              .removalListener(
+                  (ignored, value, cause) -> {
+                    try {
+                      ((FileSystem) value).close();
+                    } catch (IOException e) {
+                      LOG.warn("Failed to close FileSystem instance in cache", e);
+                    }
+                  })
+              .scheduler(Scheduler.forScheduledExecutorService(scheduler));
+
+      MetricsSystem metricsSystem = GravitinoEnv.getInstance().metricsSystem();
+      // Metrics System could be null in UT.
+      if (metricsSystem != null) {
+        cacheBuilder.recordStats(
+            () -> {
+              String metricsPrefix =
+                  String.join(
+                      ".",
+                      GRAVITINO_FILESET_CATALOG_METRIC_PREFIX,
+                      catalogInfo.namespace().toString(),
+                      catalogInfo.name(),
+                      FILESYSTEM_CACHE);
+              return new MetricsStatsCounter(metricsSystem.getMetricRegistry(), metricsPrefix);
+            });
+      }
+      this.fileSystemCache = cacheBuilder.build();
     }
 
     this.catalogStorageLocations = getAndCheckCatalogStorageLocations(config);

@@ -1,0 +1,81 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *  http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+package org.apache.gravitino.metrics;
+
+import io.prometheus.client.Collector;
+import io.prometheus.client.dropwizard.samplebuilder.CustomMappingSampleBuilder;
+import io.prometheus.client.dropwizard.samplebuilder.MapperConfig;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+public class GravitinoSampleBuilder extends CustomMappingSampleBuilder {
+
+  public static final String GRAVITINO_CATALOG_METRIC_PREFIX = "gravitino-catalog";
+
+  // match pattern:
+  // gravitino-catalog.<provider>.<metalake>.<catalog>.<rest-of-the-metric-name>
+  private static final Pattern CATALOG_PATTERN =
+      Pattern.compile(
+          Pattern.quote(GRAVITINO_CATALOG_METRIC_PREFIX) + "\\.([^.]+)\\.([^.]+)\\.([^.]+)\\.(.+)");
+
+  public GravitinoSampleBuilder(List<MapperConfig> mapperConfigs) {
+    super(mapperConfigs);
+  }
+
+  @Override
+  public Collector.MetricFamilySamples.Sample createSample(
+      String dropwizardName,
+      String nameSuffix,
+      List<String> additionalLabelNames,
+      List<String> additionalLabelValues,
+      double value) {
+
+    Matcher matcher = CATALOG_PATTERN.matcher(dropwizardName);
+    if (matcher.matches()) {
+      String provider = matcher.group(1);
+      String metalake = matcher.group(2);
+      String catalog = matcher.group(3);
+      // Replace '.' with '_' in the remaining part to conform to Prometheus naming conventions
+      String metricNameRest = matcher.group(4).replace('.', '_');
+
+      String prometheusName = GRAVITINO_CATALOG_METRIC_PREFIX + "_" + metricNameRest;
+
+      List<String> labelNames = new ArrayList<>();
+      labelNames.add("provider");
+      labelNames.add("metalake");
+      labelNames.add("catalog");
+      labelNames.addAll(additionalLabelNames);
+
+      List<String> labelValues = new ArrayList<>();
+      labelValues.add(provider);
+      labelValues.add(metalake);
+      labelValues.add(catalog);
+      labelValues.addAll(additionalLabelValues);
+
+      return new Collector.MetricFamilySamples.Sample(
+          prometheusName, labelNames, labelValues, value);
+    }
+
+    // Fallback to the parent class's default behavior for mismatched metrics
+    return super.createSample(
+        dropwizardName, nameSuffix, additionalLabelNames, additionalLabelValues, value);
+  }
+}
