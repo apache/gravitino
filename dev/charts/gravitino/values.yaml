@@ -48,6 +48,7 @@ mysql:
   ## @param image.tag MySQL image tag
   ##
   image:
+    repository: bitnamilegacy/mysql
     tag: 8.0.36-debian-12-r12
   ## MySQL Authentication parameters
   ##
