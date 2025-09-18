@@ -482,7 +482,7 @@ The following are examples of how to use the pandas library to access the OSS fi
 import pandas as pd
 
 storage_options = {
-    "server_uri": "http://localhost:8090", 
+    "server_uri": "http://mini.io:9000", 
     "metalake_name": "test",
     "options": {
         "oss_access_key_id": "access_key",

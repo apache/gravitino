@@ -541,7 +541,7 @@ Spark:
 
 ```python
 spark = SparkSession.builder
-    .appName("adls_fielset_test")
+    .appName("adls_fileset_test")
     .config("spark.hadoop.fs.gravitino.enableCredentialVending", "true")
     .config("spark.hadoop.fs.AbstractFileSystem.gvfs.impl", "org.apache.gravitino.filesystem.hadoop.Gvfs")
     .config("spark.hadoop.fs.gvfs.impl", "org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystem")
