@@ -68,7 +68,7 @@ def _parse_args():
         "--gravitino-uri",
         type=str,
         default=DefaultSetting.default_gravitino_uri,
-        help=f"The url of Gravitino server. (default: {DefaultSetting.default_gravitino_uri})",
+        help=f"The uri of Gravitino server. (default: {DefaultSetting.default_gravitino_uri})",
     )
 
     parser.add_argument(
