@@ -31,7 +31,6 @@ import org.apache.gravitino.cli.CliFullName;
 import org.apache.gravitino.cli.CommandActions;
 import org.apache.gravitino.cli.CommandEntities;
 import org.apache.gravitino.cli.GravitinoOptions;
-import org.apache.gravitino.cli.options.CommonOptions;
 import org.apache.gravitino.cli.options.PropertyOptions;
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
@@ -89,7 +88,11 @@ public class ModelCliHandler implements Runnable {
 /** Handler for a model create command. */
 @Command(name = CommandActions.CREATE, description = "Create a new model")
 class ModelCreate extends CliHandler {
-  @CommandLine.Mixin protected ModelCommonOptions commonOptions;
+  @CommandLine.Option(
+      names = {"-n", GravitinoOptions.OPTION_LONG_PREFIX + GravitinoOptions.NAME},
+      required = true,
+      description = "name of the entity")
+  String name;
 
   @Option(
       names = {"-c", GravitinoOptions.OPTION_LONG_PREFIX + GravitinoOptions.COMMENT},
@@ -126,7 +129,11 @@ class ModelCreate extends CliHandler {
 /** Handler for model details command. */
 @Command(name = CommandActions.DETAILS, description = "Get details of a model")
 class ModelDetails extends CliHandler {
-  @CommandLine.Mixin protected ModelCommonOptions commonOptions;
+  @CommandLine.Option(
+      names = {"-n", GravitinoOptions.OPTION_LONG_PREFIX + GravitinoOptions.NAME},
+      required = true,
+      description = "name of the entity")
+  String name;
 
   @Option(
       names = GravitinoOptions.OPTION_LONG_PREFIX + GravitinoOptions.AUDIT,
@@ -152,7 +159,11 @@ class ModelDetails extends CliHandler {
     description = "List models in specified metalake.catalog.schema")
 class ModelList extends CliHandler {
 
-  @CommandLine.Mixin protected ModelCommonOptions common;
+  @CommandLine.Option(
+      names = {"-n", GravitinoOptions.OPTION_LONG_PREFIX + GravitinoOptions.NAME},
+      required = true,
+      description = "name of the entity")
+  String name;
 
   @Override
   protected Integer doCall() throws Exception {
@@ -171,7 +182,11 @@ class ModelList extends CliHandler {
     description = "Delete model in specified metalake.catalog.schema")
 class ModelDelete extends CliHandler {
 
-  @CommandLine.Mixin protected ModelCommonOptions common;
+  @CommandLine.Option(
+      names = {"-n", GravitinoOptions.OPTION_LONG_PREFIX + GravitinoOptions.NAME},
+      required = true,
+      description = "name of the entity")
+  String name;
 
   /** Whether to force delete the model, use -f or --force to force delete the model */
   @CommandLine.Option(
@@ -197,7 +212,12 @@ class ModelDelete extends CliHandler {
     usageHelpAutoWidth = true,
     description = "Set property of a model version by alias or version")
 class ModelSet extends CliHandler {
-  @CommandLine.Mixin protected ModelCommonOptions commonOptions;
+  @CommandLine.Option(
+      names = {"-n", GravitinoOptions.OPTION_LONG_PREFIX + GravitinoOptions.NAME},
+      required = true,
+      description = "name of the entity")
+  String name;
+
   @CommandLine.ArgGroup() VersionOrAlias versionOrAlias;
 
   @CommandLine.ArgGroup(exclusive = false)
@@ -220,7 +240,11 @@ class ModelSet extends CliHandler {
     usageHelpAutoWidth = true,
     description = "Remove property of a model version by alias or version")
 class ModelRemove extends CliHandler {
-  @CommandLine.Mixin ModelCommonOptions common;
+  @CommandLine.Option(
+      names = {"-n", GravitinoOptions.OPTION_LONG_PREFIX + GravitinoOptions.NAME},
+      required = true,
+      description = "name of the entity")
+  String name;
 
   @CommandLine.ArgGroup() VersionOrAlias versionOrAlias;
 
@@ -258,7 +282,11 @@ class ModelRemove extends CliHandler {
     usageHelpAutoWidth = true,
     description = "Update model or model version")
 class ModelUpdate extends CliHandler {
-  @CommandLine.Mixin ModelCommonOptions common;
+  @CommandLine.Option(
+      names = {"-n", GravitinoOptions.OPTION_LONG_PREFIX + GravitinoOptions.NAME},
+      required = true,
+      description = "name of the entity")
+  String name;
 
   @Option(
       names = GravitinoOptions.OPTION_LONG_PREFIX + GravitinoOptions.ALIAS,
@@ -369,13 +397,4 @@ class VersionOrAlias {
       required = true,
       description = "Version of the model version")
   int version;
-}
-
-class ModelCommonOptions extends CommonOptions {
-  /** name of the entity, use --name/-n to specify the name */
-  @CommandLine.Option(
-      names = {"-n", GravitinoOptions.OPTION_LONG_PREFIX + GravitinoOptions.NAME},
-      required = true,
-      description = "name of the entity")
-  String name;
 }

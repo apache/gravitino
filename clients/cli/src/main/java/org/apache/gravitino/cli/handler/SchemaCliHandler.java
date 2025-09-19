@@ -34,12 +34,17 @@ import static org.apache.gravitino.cli.handler.CliHandler.SYNOPSIS_HEADING_STYLE
 
 import com.google.common.collect.Lists;
 import java.util.List;
+import java.util.Map;
+import org.apache.gravitino.Audit;
+import org.apache.gravitino.Schema;
+import org.apache.gravitino.SchemaChange;
+import org.apache.gravitino.cli.AreYouSure;
 import org.apache.gravitino.cli.CliFullName;
 import org.apache.gravitino.cli.CommandActions;
 import org.apache.gravitino.cli.CommandEntities;
 import org.apache.gravitino.cli.GravitinoOptions;
-import org.apache.gravitino.cli.options.CommonOptions;
 import org.apache.gravitino.cli.options.PropertyOptions;
+import org.apache.gravitino.client.GravitinoClient;
 import picocli.CommandLine;
 
 /** Handler for schema command. */
@@ -62,18 +67,21 @@ public class SchemaCliHandler implements Runnable {
   /** Validator for schema list command name options. */
   public static final NameValidator SCHEMA_LIST_VALIDATOR = new SchemaListNameValidator();
 
+  /** Help option, use -h/--help */
   @CommandLine.Option(
       names = {"-h", GravitinoOptions.OPTION_LONG_PREFIX + GravitinoOptions.HELP},
       usageHelp = true,
       description = "display help message")
   boolean usageHelpRequested;
 
+  /** {@inheritDoc} */
   @Override
   public void run() {
     System.out.println("Schema command");
   }
 }
 
+/** Handler for details command. */
 @CommandLine.Command(
     name = CommandActions.DETAILS,
     sortOptions = false,
@@ -85,7 +93,12 @@ public class SchemaCliHandler implements Runnable {
     header = "Get details of a schema or get audit information for a schema",
     description = SCHEMA_DETAILS_DESCRIPTIONS)
 class SchemaDetails extends CliHandler {
-  @CommandLine.Mixin protected SchemaCommonOptions commonOptions;
+  /** The name options, use -n/--name */
+  @CommandLine.Option(
+      names = {"-n", GravitinoOptions.OPTION_LONG_PREFIX + GravitinoOptions.NAME},
+      required = true,
+      description = "name of the entity")
+  String name;
 
   /**
    * Weather to show audit information for the model, use --audit to enable or --no-audit to
@@ -98,12 +111,29 @@ class SchemaDetails extends CliHandler {
       defaultValue = "false")
   boolean audit;
 
+  /**
+   * {@inheritDoc}
+   *
+   * @return The return code.
+   * @throws Exception The Exception.
+   */
   @Override
   protected Integer doCall() throws Exception {
-    // TODO: implement schema details command
+    Schema result;
+    String catalog = getCatalog();
+    String schema = getSchema();
+    GravitinoClient client = buildClient();
+
+    result = execute(() -> client.loadCatalog(catalog).asSchemas().loadSchema(schema));
+
+    if (result != null) {
+      printResults(result);
+    }
+
     return 0;
   }
 
+  /** {@inheritDoc} */
   @Override
   protected NameValidator createValidator() {
     return SchemaCliHandler.SCHEMA_VALIDATOR;
@@ -122,7 +152,12 @@ class SchemaDetails extends CliHandler {
     header = "Create a new schema",
     description = SCHEMA_CREATE_DESCRIPTIONS)
 class SchemaCreate extends CliHandler {
-  @CommandLine.Mixin protected SchemaCommonOptions commonOptions;
+  /** The name options, use -n/--name */
+  @CommandLine.Option(
+      names = {"-n", GravitinoOptions.OPTION_LONG_PREFIX + GravitinoOptions.NAME},
+      required = true,
+      description = "name of the entity")
+  String name;
 
   /** Comment for the Schema, use -c/--comment */
   @CommandLine.Option(
@@ -134,7 +169,20 @@ class SchemaCreate extends CliHandler {
   /** {@inheritDoc} */
   @Override
   protected Integer doCall() throws Exception {
-    // TODO: implement schema create command
+    GravitinoClient client = buildClient();
+    String catalog = getCatalog();
+    String schema = getSchema();
+
+    String result =
+        execute(
+            () -> {
+              client.loadCatalog(catalog).asSchemas().createSchema(schema, comment, null);
+
+              return schema + " " + "created";
+            });
+
+    printInformation(result);
+
     return 0;
   }
 
@@ -157,8 +205,11 @@ class SchemaCreate extends CliHandler {
     header = "Delete a schema",
     description = SCHEMA_DELETE_DESCRIPTIONS)
 class SchemaDelete extends CliHandler {
-  /** Common options for schema commands. */
-  @CommandLine.Mixin protected SchemaCommonOptions commonOptions;
+  @CommandLine.Option(
+      names = {"-n", GravitinoOptions.OPTION_LONG_PREFIX + GravitinoOptions.NAME},
+      required = true,
+      description = "name of the entity")
+  String name;
 
   /**
    * Whether force to delete the catalog, use -f or --force to force delete the catalog, default is
@@ -173,7 +224,24 @@ class SchemaDelete extends CliHandler {
   /** {inheritDoc} */
   @Override
   protected Integer doCall() throws Exception {
-    // TODO: implement schema delete command
+    if (!AreYouSure.really(force)) {
+      return 0;
+    }
+
+    boolean deleted;
+    String catalog = getCatalog();
+    String schema = getSchema();
+
+    GravitinoClient client = buildClient();
+
+    deleted = execute(() -> client.loadCatalog(catalog).asSchemas().dropSchema(schema, false));
+
+    if (deleted) {
+      printInformation(schema + " deleted.");
+    } else {
+      printInformation(schema + " not deleted.");
+    }
+
     return 0;
   }
 
@@ -196,9 +264,11 @@ class SchemaDelete extends CliHandler {
     header = "Set properties of a schema",
     description = SCHEMA_SET_DESCRIPTIONS)
 class SchemaSet extends CliHandler {
-
-  /** Common options for set commands. */
-  @CommandLine.Mixin protected SchemaCommonOptions commonOptions;
+  @CommandLine.Option(
+      names = {"-n", GravitinoOptions.OPTION_LONG_PREFIX + GravitinoOptions.NAME},
+      required = true,
+      description = "name of the entity")
+  String name;
 
   /** The property related options */
   @CommandLine.ArgGroup(exclusive = false)
@@ -207,7 +277,21 @@ class SchemaSet extends CliHandler {
   /** {inheritDoc} */
   @Override
   protected Integer doCall() throws Exception {
-    // TODO implement command
+    GravitinoClient client = buildClient();
+    String catalog = getCatalog();
+    String schema = getSchema();
+
+    String result =
+        execute(
+            () -> {
+              SchemaChange change =
+                  SchemaChange.setProperty(propertyOptions.property, propertyOptions.value);
+              client.loadCatalog(catalog).asSchemas().alterSchema(schema, change);
+
+              return schema + " property set.";
+            });
+
+    printInformation(result);
     return 0;
   }
 
@@ -230,7 +314,11 @@ class SchemaSet extends CliHandler {
     header = "Remove a property from a schema",
     description = SCHEMA_REMOVE_DESCRIPTIONS)
 class SchemaRemove extends CliHandler {
-  @CommandLine.Mixin protected SchemaCommonOptions commonOptions;
+  @CommandLine.Option(
+      names = {"-n", GravitinoOptions.OPTION_LONG_PREFIX + GravitinoOptions.NAME},
+      required = true,
+      description = "name of the entity")
+  String name;
 
   @CommandLine.Option(
       names = {GravitinoOptions.OPTION_LONG_PREFIX + GravitinoOptions.PROPERTY},
@@ -241,7 +329,20 @@ class SchemaRemove extends CliHandler {
   /** {inheritDoc} */
   @Override
   protected Integer doCall() throws Exception {
-    // TODO implement command
+    GravitinoClient client = buildClient();
+    String catalog = getCatalog();
+    String schema = getSchema();
+
+    String result =
+        execute(
+            () -> {
+              SchemaChange change = SchemaChange.removeProperty(property);
+              client.loadCatalog(catalog).asSchemas().alterSchema(schema, change);
+
+              return property + " property removed.";
+            });
+
+    printInformation(result);
     return 0;
   }
 
@@ -265,12 +366,28 @@ class SchemaRemove extends CliHandler {
     description = SCHEMA_PROPERTIES_DESCRIPTIONS)
 class SchemaProperties extends CliHandler {
 
-  /** Common options for schema commands. */
-  @CommandLine.Mixin protected SchemaCommonOptions commonOptions;
+  @CommandLine.Option(
+      names = {"-n", GravitinoOptions.OPTION_LONG_PREFIX + GravitinoOptions.NAME},
+      required = true,
+      description = "name of the entity")
+  String name;
+
   /** {inheritDoc} */
   @Override
   protected Integer doCall() throws Exception {
-    // TODO implement command
+    GravitinoClient client = buildClient();
+    String catalog = getCatalog();
+    String schema = getSchema();
+
+    Map<String, String> result =
+        execute(
+            () -> {
+              Schema gSchema = client.loadCatalog(catalog).asSchemas().loadSchema(schema);
+              return gSchema.properties();
+            });
+
+    printResults(result);
+
     return 0;
   }
 
@@ -293,12 +410,49 @@ class SchemaProperties extends CliHandler {
     header = "List the schemas in a catalog",
     description = SCHEMA_LIST_DESCRIPTIONS)
 class SchemaList extends CliHandler {
-  @CommandLine.Mixin protected SchemaCommonOptions commonOptions;
+  @CommandLine.Option(
+      names = {"-n", GravitinoOptions.OPTION_LONG_PREFIX + GravitinoOptions.NAME},
+      required = true,
+      description = "name of the entity")
+  String name;
 
   /** {inheritDoc} */
   @Override
   protected Integer doCall() throws Exception {
-    // TODO implement command
+    GravitinoClient client = buildClient();
+    String catalog = getCatalog();
+
+    String[] schemas =
+        execute(
+            () -> {
+              return client.loadCatalog(catalog).asSchemas().listSchemas();
+            });
+
+    if (schemas.length == 0) {
+      printInformation("No schemas exist.");
+      return 0;
+    }
+
+    Schema[] schemaObjects = new Schema[schemas.length];
+    for (int i = 0; i < schemas.length; i++) {
+      String schemaName = schemas[i];
+      Schema gSchema =
+          new Schema() {
+            @Override
+            public String name() {
+              return schemaName;
+            }
+
+            @Override
+            public Audit auditInfo() {
+              return null;
+            }
+          };
+      schemaObjects[i] = gSchema;
+    }
+
+    printResults(schemaObjects);
+
     return 0;
   }
 
@@ -332,13 +486,4 @@ class SchemaListNameValidator implements NameValidator {
 
     return missingEntities;
   }
-}
-
-class SchemaCommonOptions extends CommonOptions {
-  /** name of the entity, use --name/-n to specify the name */
-  @CommandLine.Option(
-      names = {"-n", GravitinoOptions.OPTION_LONG_PREFIX + GravitinoOptions.NAME},
-      required = true,
-      description = "name of the entity")
-  String name;
 }
