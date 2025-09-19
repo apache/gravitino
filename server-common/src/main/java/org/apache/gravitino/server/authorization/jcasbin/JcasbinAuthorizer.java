@@ -231,8 +231,7 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
                   UserEntity.class)
           != null;
     } catch (Exception e) {
-      LOG.warn("Can not get user {} in metalake {}", currentUserName, metalake, e);
-      return false;
+      throw new RuntimeException(e);
     }
   }
 
@@ -260,8 +259,7 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
         return entities.stream().anyMatch(roleEntity -> Objects.equals(roleEntity.id(), roleId));
 
       } catch (Exception e) {
-        LOG.warn("can not get user id or role id.", e);
-        return false;
+        throw new RuntimeException(e);
       }
     }
     throw new UnsupportedOperationException("Unsupported Entity Type.");
@@ -409,8 +407,7 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
         userId = userEntity.id();
         metadataId = MetadataIdConverter.getID(metadataObject, metalake);
       } catch (Exception e) {
-        LOG.debug("Can not get entity id", e);
-        return false;
+        throw new RuntimeException(e);
       }
       loadRolePrivilege(metalake, username, userId, requestContext);
       return authorizeByJcasbin(userId, metadataObject, metadataId, privilege);
@@ -513,7 +510,7 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
         }
       }
     } catch (IOException e) {
-      LOG.warn("Can not load metadata owner", e);
+      throw new RuntimeException(e);
     }
   }
 
