@@ -31,7 +31,6 @@ import org.apache.gravitino.cli.CliFullName;
 import org.apache.gravitino.cli.CommandActions;
 import org.apache.gravitino.cli.CommandEntities;
 import org.apache.gravitino.cli.GravitinoOptions;
-import org.apache.gravitino.cli.options.CommonOptions;
 import org.apache.gravitino.cli.options.EnableDisableOptions;
 import org.apache.gravitino.cli.options.PropertyOptions;
 import picocli.CommandLine;
@@ -92,7 +91,11 @@ public class CatalogCliHandler implements Runnable {
     name = CommandActions.DETAILS,
     description = "Get details of a catalog or get audit information for a catalog")
 class CatalogDetails extends CliHandler {
-  @CommandLine.Mixin protected CatalogCommonOptions commonOptions;
+  @CommandLine.Option(
+      names = {"-n", GravitinoOptions.OPTION_LONG_PREFIX + GravitinoOptions.NAME},
+      required = true,
+      description = "name of the entity")
+  String name;
 
   /**
    * Wether to show audit information for the catalog, use --audit to enable or --no-audit to
@@ -121,7 +124,11 @@ class CatalogDetails extends CliHandler {
 @CommandLine.Command(name = CommandActions.CREATE, description = "Create a new catalog")
 class CatalogCreate extends CliHandler {
 
-  @CommandLine.Mixin protected CatalogCommonOptions commonOptions;
+  @CommandLine.Option(
+      names = {"-n", GravitinoOptions.OPTION_LONG_PREFIX + GravitinoOptions.NAME},
+      required = true,
+      description = "name of the entity")
+  String name;
 
   @CommandLine.Option(
       names = {GravitinoOptions.OPTION_LONG_PREFIX + GravitinoOptions.PROVIDER},
@@ -201,7 +208,11 @@ class CatalogCreate extends CliHandler {
 /** Handler for the catalog update command. */
 @CommandLine.Command(name = CommandActions.DELETE, description = "Delete a catalog")
 class CatalogDelete extends CliHandler {
-  @CommandLine.Mixin protected CatalogCommonOptions commonOptions;
+  @CommandLine.Option(
+      names = {"-n", GravitinoOptions.OPTION_LONG_PREFIX + GravitinoOptions.NAME},
+      required = true,
+      description = "name of the entity")
+  String name;
 
   /**
    * Whether force to delete the catalog, use -f or --force to force delete the catalog, default is
@@ -229,7 +240,11 @@ class CatalogDelete extends CliHandler {
 /** Handler for set command. */
 @CommandLine.Command(name = CommandActions.SET, description = "Set property of a catalog")
 class CatalogSet extends CliHandler {
-  @CommandLine.Mixin protected CatalogCommonOptions commonOptions;
+  @CommandLine.Option(
+      names = {"-n", GravitinoOptions.OPTION_LONG_PREFIX + GravitinoOptions.NAME},
+      required = true,
+      description = "name of the entity")
+  String name;
 
   @CommandLine.ArgGroup(exclusive = false)
   PropertyOptions propertyOptions;
@@ -248,7 +263,11 @@ class CatalogSet extends CliHandler {
 /** Handler for the catalog remove command. */
 @CommandLine.Command(name = CommandActions.REMOVE, description = "Remove a property from a catalog")
 class CatalogRemove extends CliHandler {
-  @CommandLine.Mixin protected CatalogCommonOptions commonOptions;
+  @CommandLine.Option(
+      names = {"-n", GravitinoOptions.OPTION_LONG_PREFIX + GravitinoOptions.NAME},
+      required = true,
+      description = "name of the entity")
+  String name;
 
   @CommandLine.Option(
       names = {GravitinoOptions.OPTION_LONG_PREFIX + GravitinoOptions.PROPERTY},
@@ -271,7 +290,11 @@ class CatalogRemove extends CliHandler {
 /** Handler for the catalog properties command. */
 @CommandLine.Command(name = CommandActions.PROPERTIES, description = "List properties of a catalog")
 class CatalogProperties extends CliHandler {
-  @CommandLine.Mixin protected CatalogCommonOptions commonOptions;
+  @CommandLine.Option(
+      names = {"-n", GravitinoOptions.OPTION_LONG_PREFIX + GravitinoOptions.NAME},
+      required = true,
+      description = "name of the entity")
+  String name;
 
   @Override
   protected Integer doCall() throws Exception {
@@ -287,8 +310,6 @@ class CatalogProperties extends CliHandler {
 /** Handler for the catalog list command. */
 @CommandLine.Command(name = CommandActions.LIST, description = "List all catalogs in the metalake")
 class CatalogList extends CliHandler {
-  @CommandLine.Mixin protected CommonOptions commonOptions;
-
   /** name of the entity, use --name/-n to specify the name */
   @CommandLine.Option(
       names = {"-n", GravitinoOptions.OPTION_LONG_PREFIX + GravitinoOptions.NAME},
@@ -309,7 +330,11 @@ class CatalogList extends CliHandler {
 /** Handler for the catalog update command. */
 @CommandLine.Command(name = CommandActions.UPDATE, description = "Update a catalog")
 class CatalogUpdate extends CliHandler {
-  @CommandLine.Mixin protected CatalogCommonOptions commonOptions;
+  @CommandLine.Option(
+      names = {"-n", GravitinoOptions.OPTION_LONG_PREFIX + GravitinoOptions.NAME},
+      required = true,
+      description = "name of the entity")
+  String name;
 
   @CommandLine.ArgGroup(multiplicity = "1")
   UpdateOptions updateOptions;
@@ -353,13 +378,4 @@ class CatalogNameValidator implements NameValidator {
 
     return missingEntities;
   }
-}
-
-class CatalogCommonOptions extends CommonOptions {
-  /** name of the entity, use --name/-n to specify the name */
-  @CommandLine.Option(
-      names = {"-n", GravitinoOptions.OPTION_LONG_PREFIX + GravitinoOptions.NAME},
-      required = true,
-      description = "name of the entity")
-  String name;
 }

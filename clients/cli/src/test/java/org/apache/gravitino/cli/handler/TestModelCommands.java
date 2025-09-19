@@ -88,7 +88,7 @@ class TestModelCommands {
     Assertions.assertEquals("v1", mockModelCreate.properties.get("k1"));
     Assertions.assertEquals("v2", mockModelCreate.properties.get("k2"));
     Assertions.assertEquals("ml1", mockModelCreate.commonOptions.metalake);
-    Assertions.assertEquals("catalog1.schema1.model1", mockModelCreate.commonOptions.name);
+    Assertions.assertEquals("catalog1.schema1.model1", mockModelCreate.name);
   }
 
   @Test
@@ -104,7 +104,7 @@ class TestModelCommands {
     int exitCode = cmd.execute(args);
     Assertions.assertEquals(0, exitCode);
     Assertions.assertEquals("ml1", mockModelCreate.commonOptions.metalake);
-    Assertions.assertEquals("catalog1.schema1.model1", mockModelCreate.commonOptions.name);
+    Assertions.assertEquals("catalog1.schema1.model1", mockModelCreate.name);
     Assertions.assertEquals("", mockModelCreate.comment);
     Assertions.assertEquals(new HashMap<>(), mockModelCreate.properties);
   }
@@ -138,7 +138,7 @@ class TestModelCommands {
     int exitCode = cmd.execute(args);
     Assertions.assertEquals(0, exitCode);
     Assertions.assertEquals("ml1", mockModelDetails.commonOptions.metalake);
-    Assertions.assertEquals("catalog1.schema1.model1", mockModelDetails.commonOptions.name);
+    Assertions.assertEquals("catalog1.schema1.model1", mockModelDetails.name);
     Assertions.assertEquals(
         OutputFormat.OutputType.TABLE, mockModelDetails.commonOptions.outputFormat);
     Assertions.assertFalse(mockModelDetails.audit);
@@ -166,7 +166,7 @@ class TestModelCommands {
     int exitCode = cmd.execute(args);
     Assertions.assertEquals(0, exitCode);
     Assertions.assertEquals("ml1", mockModelDetails.commonOptions.metalake);
-    Assertions.assertEquals("catalog1.schema1.model1", mockModelDetails.commonOptions.name);
+    Assertions.assertEquals("catalog1.schema1.model1", mockModelDetails.name);
     Assertions.assertEquals(
         OutputFormat.OutputType.TABLE, mockModelDetails.commonOptions.outputFormat);
     Assertions.assertTrue(mockModelDetails.audit);
@@ -194,7 +194,7 @@ class TestModelCommands {
     int exitCode = cmd.execute(args);
     Assertions.assertEquals(0, exitCode);
     Assertions.assertEquals("ml1", mockModelDetails.commonOptions.metalake);
-    Assertions.assertEquals("catalog1.schema1.model1", mockModelDetails.commonOptions.name);
+    Assertions.assertEquals("catalog1.schema1.model1", mockModelDetails.name);
     Assertions.assertEquals(
         OutputFormat.OutputType.TABLE, mockModelDetails.commonOptions.outputFormat);
     Assertions.assertFalse(mockModelDetails.audit);
@@ -237,9 +237,9 @@ class TestModelCommands {
 
     int exitCode1 = cmd.execute(args1);
     Assertions.assertEquals(0, exitCode1);
-    Assertions.assertEquals("ml1", mockModeList.common.metalake);
-    Assertions.assertEquals("catalog1.schema1", mockModeList.common.name);
-    Assertions.assertEquals(OutputFormat.OutputType.TABLE, mockModeList.common.outputFormat);
+    Assertions.assertEquals("ml1", mockModeList.commonOptions.metalake);
+    Assertions.assertEquals("catalog1.schema1", mockModeList.name);
+    Assertions.assertEquals(OutputFormat.OutputType.TABLE, mockModeList.commonOptions.outputFormat);
 
     String[] args2 = {
       "mock_list", "--metalake", "ml1", "--name", "catalog1.schema1", "--output", "PLAIN"
@@ -247,9 +247,9 @@ class TestModelCommands {
 
     int exitCode2 = cmd.execute(args2);
     Assertions.assertEquals(0, exitCode2);
-    Assertions.assertEquals("ml1", mockModeList.common.metalake);
-    Assertions.assertEquals("catalog1.schema1", mockModeList.common.name);
-    Assertions.assertEquals(OutputFormat.OutputType.PLAIN, mockModeList.common.outputFormat);
+    Assertions.assertEquals("ml1", mockModeList.commonOptions.metalake);
+    Assertions.assertEquals("catalog1.schema1", mockModeList.name);
+    Assertions.assertEquals(OutputFormat.OutputType.PLAIN, mockModeList.commonOptions.outputFormat);
   }
 
   @Test
@@ -279,8 +279,8 @@ class TestModelCommands {
 
     int exitCode1 = cmd.execute(args1);
     Assertions.assertEquals(0, exitCode1);
-    Assertions.assertEquals("ml1", mockModelDelete.common.metalake);
-    Assertions.assertEquals("catalog1.schema1.model1", mockModelDelete.common.name);
+    Assertions.assertEquals("ml1", mockModelDelete.commonOptions.metalake);
+    Assertions.assertEquals("catalog1.schema1.model1", mockModelDelete.name);
     Assertions.assertFalse(mockModelDelete.force);
 
     String[] args2 = {
@@ -288,8 +288,8 @@ class TestModelCommands {
     };
     int exitCode2 = cmd.execute(args2);
     Assertions.assertEquals(0, exitCode2);
-    Assertions.assertEquals("ml1", mockModelDelete.common.metalake);
-    Assertions.assertEquals("catalog1.schema1.model1", mockModelDelete.common.name);
+    Assertions.assertEquals("ml1", mockModelDelete.commonOptions.metalake);
+    Assertions.assertEquals("catalog1.schema1.model1", mockModelDelete.name);
     Assertions.assertTrue(mockModelDelete.force);
   }
 
@@ -331,7 +331,7 @@ class TestModelCommands {
     int exitCode1 = cmd.execute(args1);
     Assertions.assertEquals(0, exitCode1);
     Assertions.assertEquals("ml1", mockModelSet.commonOptions.metalake);
-    Assertions.assertEquals("catalog1.schema1.model1", mockModelSet.commonOptions.name);
+    Assertions.assertEquals("catalog1.schema1.model1", mockModelSet.name);
     Assertions.assertEquals("alias1", mockModelSet.versionOrAlias.alias);
     Assertions.assertEquals("k1", mockModelSet.propertyOptions.property);
     Assertions.assertEquals("v2", mockModelSet.propertyOptions.value);
@@ -361,7 +361,7 @@ class TestModelCommands {
     int exitCode1 = cmd.execute(args);
     Assertions.assertEquals(0, exitCode1);
     Assertions.assertEquals("ml1", mockModelSet.commonOptions.metalake);
-    Assertions.assertEquals("catalog1.schema1.model1", mockModelSet.commonOptions.name);
+    Assertions.assertEquals("catalog1.schema1.model1", mockModelSet.name);
     Assertions.assertEquals(2, mockModelSet.versionOrAlias.version);
     Assertions.assertEquals("k1", mockModelSet.propertyOptions.property);
     Assertions.assertEquals("v2", mockModelSet.propertyOptions.value);
@@ -414,7 +414,7 @@ class TestModelCommands {
     int exitCode1 = cmd.execute(args);
     Assertions.assertEquals(0, exitCode1);
     Assertions.assertEquals("ml1", mockModelSet.commonOptions.metalake);
-    Assertions.assertEquals("catalog1.schema1.model1", mockModelSet.commonOptions.name);
+    Assertions.assertEquals("catalog1.schema1.model1", mockModelSet.name);
     Assertions.assertNull(mockModelSet.versionOrAlias);
     Assertions.assertEquals("k1", mockModelSet.propertyOptions.property);
     Assertions.assertEquals("v2", mockModelSet.propertyOptions.value);
@@ -496,8 +496,8 @@ class TestModelCommands {
 
     int exitCode = cmd.execute(args);
     Assertions.assertEquals(0, exitCode);
-    Assertions.assertEquals("ml1", mockModelRemove.common.metalake);
-    Assertions.assertEquals("catalog1.schema1.model1", mockModelRemove.common.name);
+    Assertions.assertEquals("ml1", mockModelRemove.commonOptions.metalake);
+    Assertions.assertEquals("catalog1.schema1.model1", mockModelRemove.name);
     Assertions.assertEquals("alias1", mockModelRemove.versionOrAlias.alias);
     Assertions.assertEquals("k1", mockModelRemove.removeOptions.removedProperty);
   }
@@ -523,8 +523,8 @@ class TestModelCommands {
 
     int exitCode = cmd.execute(args);
     Assertions.assertEquals(0, exitCode);
-    Assertions.assertEquals("ml1", mockModelRemove.common.metalake);
-    Assertions.assertEquals("catalog1.schema1.model1", mockModelRemove.common.name);
+    Assertions.assertEquals("ml1", mockModelRemove.commonOptions.metalake);
+    Assertions.assertEquals("catalog1.schema1.model1", mockModelRemove.name);
     Assertions.assertEquals(2, mockModelRemove.versionOrAlias.version);
     Assertions.assertEquals("k1", mockModelRemove.removeOptions.removedProperty);
   }
@@ -550,8 +550,8 @@ class TestModelCommands {
 
     int exitCode = cmd.execute(args);
     Assertions.assertEquals(0, exitCode);
-    Assertions.assertEquals("ml1", mockModelRemove.common.metalake);
-    Assertions.assertEquals("catalog1.schema1.model1", mockModelRemove.common.name);
+    Assertions.assertEquals("ml1", mockModelRemove.commonOptions.metalake);
+    Assertions.assertEquals("catalog1.schema1.model1", mockModelRemove.name);
     Assertions.assertEquals("alias1", mockModelRemove.versionOrAlias.alias);
     Assertions.assertEquals("alias1", mockModelRemove.removeOptions.removedAlias);
   }
@@ -577,8 +577,8 @@ class TestModelCommands {
 
     int exitCode = cmd.execute(args);
     Assertions.assertEquals(0, exitCode);
-    Assertions.assertEquals("ml1", mockModelRemove.common.metalake);
-    Assertions.assertEquals("catalog1.schema1.model1", mockModelRemove.common.name);
+    Assertions.assertEquals("ml1", mockModelRemove.commonOptions.metalake);
+    Assertions.assertEquals("catalog1.schema1.model1", mockModelRemove.name);
     Assertions.assertEquals(2, mockModelRemove.versionOrAlias.version);
     Assertions.assertEquals("alias1", mockModelRemove.removeOptions.removedAlias);
   }
@@ -597,8 +597,8 @@ class TestModelCommands {
 
     int exitCode = cmd.execute(args);
     Assertions.assertEquals(0, exitCode);
-    Assertions.assertEquals("ml1", mockModelRemove.common.metalake);
-    Assertions.assertEquals("catalog1.schema1.model1", mockModelRemove.common.name);
+    Assertions.assertEquals("ml1", mockModelRemove.commonOptions.metalake);
+    Assertions.assertEquals("catalog1.schema1.model1", mockModelRemove.name);
     Assertions.assertEquals("k1", mockModelRemove.removeOptions.removedProperty);
     Assertions.assertNull(mockModelRemove.versionOrAlias);
   }
@@ -719,8 +719,8 @@ class TestModelCommands {
 
     int exitCode = cmd.execute(args);
     Assertions.assertEquals(0, exitCode);
-    Assertions.assertEquals("ml1", mockModelUpdate.common.metalake);
-    Assertions.assertEquals("catalog1.schema1.model1", mockModelUpdate.common.name);
+    Assertions.assertEquals("ml1", mockModelUpdate.commonOptions.metalake);
+    Assertions.assertEquals("catalog1.schema1.model1", mockModelUpdate.name);
     Assertions.assertEquals("new_comment", mockModelUpdate.comment);
   }
 
@@ -744,8 +744,8 @@ class TestModelCommands {
 
     int exitCode = cmd.execute(args);
     Assertions.assertEquals(0, exitCode);
-    Assertions.assertEquals("ml1", mockModelUpdate.common.metalake);
-    Assertions.assertEquals("catalog1.schema1.model1", mockModelUpdate.common.name);
+    Assertions.assertEquals("ml1", mockModelUpdate.commonOptions.metalake);
+    Assertions.assertEquals("catalog1.schema1.model1", mockModelUpdate.name);
     Assertions.assertEquals("new_name", mockModelUpdate.updateOptions.newName);
   }
 
@@ -771,8 +771,8 @@ class TestModelCommands {
 
     int exitCode = cmd.execute(args);
     Assertions.assertEquals(0, exitCode);
-    Assertions.assertEquals("ml1", mockModelUpdate.common.metalake);
-    Assertions.assertEquals("catalog1.schema1.model1", mockModelUpdate.common.name);
+    Assertions.assertEquals("ml1", mockModelUpdate.commonOptions.metalake);
+    Assertions.assertEquals("catalog1.schema1.model1", mockModelUpdate.name);
     Assertions.assertArrayEquals(new String[] {"alias1"}, mockModelUpdate.alias);
     Assertions.assertNotNull(mockModelUpdate.comment);
     Assertions.assertEquals("new_comment", mockModelUpdate.comment);
@@ -800,8 +800,8 @@ class TestModelCommands {
 
     int exitCode = cmd.execute(args);
     Assertions.assertEquals(0, exitCode);
-    Assertions.assertEquals("ml1", mockModelUpdate.common.metalake);
-    Assertions.assertEquals("catalog1.schema1.model1", mockModelUpdate.common.name);
+    Assertions.assertEquals("ml1", mockModelUpdate.commonOptions.metalake);
+    Assertions.assertEquals("catalog1.schema1.model1", mockModelUpdate.name);
     Assertions.assertEquals(2, mockModelUpdate.version);
     Assertions.assertNotNull(mockModelUpdate.comment);
     Assertions.assertEquals("new_comment", mockModelUpdate.comment);
@@ -829,8 +829,8 @@ class TestModelCommands {
 
     int exitCode = cmd.execute(args);
     Assertions.assertEquals(0, exitCode);
-    Assertions.assertEquals("ml1", mockModelUpdate.common.metalake);
-    Assertions.assertEquals("catalog1.schema1.model1", mockModelUpdate.common.name);
+    Assertions.assertEquals("ml1", mockModelUpdate.commonOptions.metalake);
+    Assertions.assertEquals("catalog1.schema1.model1", mockModelUpdate.name);
     Assertions.assertArrayEquals(new String[] {"alias1"}, mockModelUpdate.alias);
     Assertions.assertNotNull(mockModelUpdate.updateOptions);
     Assertions.assertEquals(1, mockModelUpdate.updateOptions.newAliases.size());
@@ -859,8 +859,8 @@ class TestModelCommands {
 
     int exitCode = cmd.execute(args);
     Assertions.assertEquals(0, exitCode);
-    Assertions.assertEquals("ml1", mockModelUpdate.common.metalake);
-    Assertions.assertEquals("catalog1.schema1.model1", mockModelUpdate.common.name);
+    Assertions.assertEquals("ml1", mockModelUpdate.commonOptions.metalake);
+    Assertions.assertEquals("catalog1.schema1.model1", mockModelUpdate.name);
     Assertions.assertEquals(2, mockModelUpdate.version);
     Assertions.assertNotNull(mockModelUpdate.updateOptions);
     Assertions.assertEquals(1, mockModelUpdate.updateOptions.newAliases.size());
@@ -889,8 +889,8 @@ class TestModelCommands {
 
     int exitCode = cmd.execute(args);
     Assertions.assertEquals(0, exitCode);
-    Assertions.assertEquals("ml1", mockModelUpdate.common.metalake);
-    Assertions.assertEquals("catalog1.schema1.model1", mockModelUpdate.common.name);
+    Assertions.assertEquals("ml1", mockModelUpdate.commonOptions.metalake);
+    Assertions.assertEquals("catalog1.schema1.model1", mockModelUpdate.name);
     Assertions.assertArrayEquals(new String[] {"alias1"}, mockModelUpdate.alias);
     Assertions.assertNotNull(mockModelUpdate.updateOptions);
     Assertions.assertNotNull(mockModelUpdate.updateOptions.newUri);
@@ -919,8 +919,8 @@ class TestModelCommands {
 
     int exitCode = cmd.execute(args);
     Assertions.assertEquals(0, exitCode);
-    Assertions.assertEquals("ml1", mockModelUpdate.common.metalake);
-    Assertions.assertEquals("catalog1.schema1.model1", mockModelUpdate.common.name);
+    Assertions.assertEquals("ml1", mockModelUpdate.commonOptions.metalake);
+    Assertions.assertEquals("catalog1.schema1.model1", mockModelUpdate.name);
     Assertions.assertEquals(2, mockModelUpdate.version);
     Assertions.assertNotNull(mockModelUpdate.updateOptions);
     Assertions.assertNotNull(mockModelUpdate.updateOptions.newUri);
@@ -951,8 +951,8 @@ class TestModelCommands {
 
     int exitCode = cmd.execute(args);
     Assertions.assertEquals(0, exitCode);
-    Assertions.assertEquals("ml1", mockModelUpdate.common.metalake);
-    Assertions.assertEquals("catalog1.schema1.model1", mockModelUpdate.common.name);
+    Assertions.assertEquals("ml1", mockModelUpdate.commonOptions.metalake);
+    Assertions.assertEquals("catalog1.schema1.model1", mockModelUpdate.name);
     Assertions.assertArrayEquals(new String[] {"aliasA", "aliasB"}, mockModelUpdate.alias);
     Assertions.assertEquals("u1", mockModelUpdate.updateOptions.uris.get("n1"));
     Assertions.assertEquals("u2", mockModelUpdate.updateOptions.uris.get("n2"));

@@ -106,7 +106,7 @@ class TestSchemaCommand {
     int exitCode = cmd.execute(args);
     Assertions.assertEquals(0, exitCode);
     Assertions.assertEquals("ml1", mockSchemaDetails.commonOptions.metalake);
-    Assertions.assertEquals("catalog1.schema1", mockSchemaDetails.commonOptions.name);
+    Assertions.assertEquals("catalog1.schema1", mockSchemaDetails.name);
     Assertions.assertFalse(mockSchemaDetails.audit);
   }
 
@@ -123,7 +123,7 @@ class TestSchemaCommand {
     int exitCode = cmd.execute(args);
     Assertions.assertEquals(0, exitCode);
     Assertions.assertEquals("ml1", mockSchemaDetails.commonOptions.metalake);
-    Assertions.assertEquals("catalog1.schema1", mockSchemaDetails.commonOptions.name);
+    Assertions.assertEquals("catalog1.schema1", mockSchemaDetails.name);
     Assertions.assertTrue(mockSchemaDetails.audit);
   }
 
@@ -140,7 +140,7 @@ class TestSchemaCommand {
     int exitCode = cmd.execute(args);
     Assertions.assertEquals(0, exitCode);
     Assertions.assertEquals("ml1", mockSchemaDetails.commonOptions.metalake);
-    Assertions.assertEquals("catalog1.schema1", mockSchemaDetails.commonOptions.name);
+    Assertions.assertEquals("catalog1.schema1", mockSchemaDetails.name);
     Assertions.assertFalse(mockSchemaDetails.audit);
   }
 
@@ -179,7 +179,7 @@ class TestSchemaCommand {
     int exitCode = cmd.execute(args);
     Assertions.assertEquals(0, exitCode);
     Assertions.assertEquals("ml1", mockSchemaCreate.commonOptions.metalake);
-    Assertions.assertEquals("catalog1.schema1", mockSchemaCreate.commonOptions.name);
+    Assertions.assertEquals("catalog1.schema1", mockSchemaCreate.name);
     Assertions.assertEquals("schema1 comment", mockSchemaCreate.comment);
   }
 
@@ -196,7 +196,7 @@ class TestSchemaCommand {
     int exitCode = cmd.execute(args);
     Assertions.assertEquals(0, exitCode);
     Assertions.assertEquals("ml1", mockSchemaCreate.commonOptions.metalake);
-    Assertions.assertEquals("catalog1.schema1", mockSchemaCreate.commonOptions.name);
+    Assertions.assertEquals("catalog1.schema1", mockSchemaCreate.name);
     Assertions.assertEquals("", mockSchemaCreate.comment);
   }
 
@@ -227,7 +227,7 @@ class TestSchemaCommand {
     int exitCode = cmd.execute(args);
     Assertions.assertEquals(0, exitCode);
     Assertions.assertEquals("ml1", mockSchemaDelete.commonOptions.metalake);
-    Assertions.assertEquals("catalog1.schema1", mockSchemaDelete.commonOptions.name);
+    Assertions.assertEquals("catalog1.schema1", mockSchemaDelete.name);
     Assertions.assertTrue(mockSchemaDelete.force);
   }
 
@@ -244,7 +244,7 @@ class TestSchemaCommand {
     int exitCode = cmd.execute(args);
     Assertions.assertEquals(0, exitCode);
     Assertions.assertEquals("ml1", mockSchemaDelete.commonOptions.metalake);
-    Assertions.assertEquals("catalog1.schema1", mockSchemaDelete.commonOptions.name);
+    Assertions.assertEquals("catalog1.schema1", mockSchemaDelete.name);
     Assertions.assertFalse(mockSchemaDelete.force);
   }
 
@@ -285,7 +285,7 @@ class TestSchemaCommand {
     int exitCode = cmd.execute(args);
     Assertions.assertEquals(0, exitCode);
     Assertions.assertEquals("ml1", mockSchemaSet.commonOptions.metalake);
-    Assertions.assertEquals("catalog1.schema1", mockSchemaSet.commonOptions.name);
+    Assertions.assertEquals("catalog1.schema1", mockSchemaSet.name);
     Assertions.assertEquals("key1", mockSchemaSet.propertyOptions.property);
     Assertions.assertEquals("value1", mockSchemaSet.propertyOptions.value);
   }
@@ -361,7 +361,7 @@ class TestSchemaCommand {
     int exitCode = cmd.execute(args);
     Assertions.assertEquals(0, exitCode);
     Assertions.assertEquals("ml1", mockSchemaRemove.commonOptions.metalake);
-    Assertions.assertEquals("catalog1.schema1", mockSchemaRemove.commonOptions.name);
+    Assertions.assertEquals("catalog1.schema1", mockSchemaRemove.name);
     Assertions.assertEquals("key1", mockSchemaRemove.property);
   }
 
@@ -410,7 +410,7 @@ class TestSchemaCommand {
     int exitCode = cmd.execute(args);
     Assertions.assertEquals(0, exitCode);
     Assertions.assertEquals("ml1", mockSchemaProperties.commonOptions.metalake);
-    Assertions.assertEquals("catalog1.schema1", mockSchemaProperties.commonOptions.name);
+    Assertions.assertEquals("catalog1.schema1", mockSchemaProperties.name);
     Assertions.assertEquals(
         OutputFormat.OutputType.TABLE, mockSchemaProperties.commonOptions.outputFormat);
   }
@@ -428,7 +428,7 @@ class TestSchemaCommand {
     int exitCode = cmd.execute(args);
     Assertions.assertEquals(0, exitCode);
     Assertions.assertEquals("ml1", mockSchemaProperties.commonOptions.metalake);
-    Assertions.assertEquals("catalog1.schema1", mockSchemaProperties.commonOptions.name);
+    Assertions.assertEquals("catalog1.schema1", mockSchemaProperties.name);
     Assertions.assertEquals(
         OutputFormat.OutputType.PLAIN, mockSchemaProperties.commonOptions.outputFormat);
   }
@@ -460,7 +460,7 @@ class TestSchemaCommand {
     int exitCode = cmd.execute(args);
     Assertions.assertEquals(0, exitCode);
     Assertions.assertEquals("ml1", mockSchemaList.commonOptions.metalake);
-    Assertions.assertEquals("catalog1", mockSchemaList.commonOptions.name);
+    Assertions.assertEquals("catalog1", mockSchemaList.name);
     Assertions.assertEquals(
         OutputFormat.OutputType.TABLE, mockSchemaList.commonOptions.outputFormat);
   }
@@ -478,7 +478,7 @@ class TestSchemaCommand {
     int exitCode = cmd.execute(args);
     Assertions.assertEquals(0, exitCode);
     Assertions.assertEquals("ml1", mockSchemaList.commonOptions.metalake);
-    Assertions.assertEquals("catalog1", mockSchemaList.commonOptions.name);
+    Assertions.assertEquals("catalog1", mockSchemaList.name);
     Assertions.assertEquals(
         OutputFormat.OutputType.PLAIN, mockSchemaList.commonOptions.outputFormat);
   }

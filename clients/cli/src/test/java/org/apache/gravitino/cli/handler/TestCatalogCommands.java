@@ -88,7 +88,7 @@ class TestCatalogCommand {
 
     int exitCode = cmd.execute(args);
     Assertions.assertEquals(0, exitCode);
-    Assertions.assertEquals("catalog1", mockCatalogCreate.commonOptions.name);
+    Assertions.assertEquals("catalog1", mockCatalogCreate.name);
     Assertions.assertEquals("ml1", mockCatalogCreate.commonOptions.metalake);
     Assertions.assertEquals(CatalogCreate.Provider.HIVE, mockCatalogCreate.provider);
     Assertions.assertEquals("hive catalog", mockCatalogCreate.comment);
@@ -110,7 +110,7 @@ class TestCatalogCommand {
 
     int exitCode = cmd.execute(args);
     Assertions.assertEquals(0, exitCode);
-    Assertions.assertEquals("catalog1", mockCatalogCreate.commonOptions.name);
+    Assertions.assertEquals("catalog1", mockCatalogCreate.name);
     Assertions.assertEquals("ml1", mockCatalogCreate.commonOptions.metalake);
     Assertions.assertEquals(CatalogCreate.Provider.HIVE, mockCatalogCreate.provider);
     Assertions.assertEquals("", mockCatalogCreate.comment);
@@ -173,7 +173,7 @@ class TestCatalogCommand {
 
     int exitCode = cmd.execute(args);
     Assertions.assertEquals(0, exitCode);
-    Assertions.assertEquals("catalog1", mockCatalogDetails.commonOptions.name);
+    Assertions.assertEquals("catalog1", mockCatalogDetails.name);
     Assertions.assertEquals("ml1", mockCatalogDetails.commonOptions.metalake);
     Assertions.assertFalse(mockCatalogDetails.audit);
   }
@@ -190,7 +190,7 @@ class TestCatalogCommand {
 
     int exitCode = cmd.execute(args);
     Assertions.assertEquals(0, exitCode);
-    Assertions.assertEquals("catalog1", mockCatalogDetails.commonOptions.name);
+    Assertions.assertEquals("catalog1", mockCatalogDetails.name);
     Assertions.assertEquals("ml1", mockCatalogDetails.commonOptions.metalake);
     Assertions.assertTrue(mockCatalogDetails.audit);
   }
@@ -238,7 +238,7 @@ class TestCatalogCommand {
 
     int exitCode = cmd.execute(args);
     Assertions.assertEquals(0, exitCode);
-    Assertions.assertEquals("catalog1", mockCatalogProperties.commonOptions.name);
+    Assertions.assertEquals("catalog1", mockCatalogProperties.name);
     Assertions.assertEquals("ml1", mockCatalogProperties.commonOptions.metalake);
     Assertions.assertEquals(
         OutputFormat.OutputType.PLAIN, mockCatalogProperties.commonOptions.outputFormat);
@@ -270,7 +270,7 @@ class TestCatalogCommand {
 
     int exitCode = cmd.execute(args);
     Assertions.assertEquals(0, exitCode);
-    Assertions.assertEquals("catalog1", mockCatalogDelete.commonOptions.name);
+    Assertions.assertEquals("catalog1", mockCatalogDelete.name);
     Assertions.assertEquals("ml1", mockCatalogDelete.commonOptions.metalake);
     Assertions.assertFalse(mockCatalogDelete.force);
   }
@@ -287,7 +287,7 @@ class TestCatalogCommand {
 
     int exitCode = cmd.execute(args);
     Assertions.assertEquals(0, exitCode);
-    Assertions.assertEquals("catalog1", mockCatalogDelete.commonOptions.name);
+    Assertions.assertEquals("catalog1", mockCatalogDelete.name);
     Assertions.assertEquals("ml1", mockCatalogDelete.commonOptions.metalake);
     Assertions.assertTrue(mockCatalogDelete.force);
   }
@@ -328,7 +328,7 @@ class TestCatalogCommand {
 
     int exitCode = cmd.execute(args);
     Assertions.assertEquals(0, exitCode);
-    Assertions.assertEquals("catalog1", mockCatalogSet.commonOptions.name);
+    Assertions.assertEquals("catalog1", mockCatalogSet.name);
     Assertions.assertEquals("ml1", mockCatalogSet.commonOptions.metalake);
     Assertions.assertEquals("key1", mockCatalogSet.propertyOptions.property);
     Assertions.assertEquals("value1", mockCatalogSet.propertyOptions.value);
@@ -390,7 +390,7 @@ class TestCatalogCommand {
 
     int exitCode = cmd.execute(args);
     Assertions.assertEquals(0, exitCode);
-    Assertions.assertEquals("catalog1", mockCatalogRemove.commonOptions.name);
+    Assertions.assertEquals("catalog1", mockCatalogRemove.name);
     Assertions.assertEquals("ml1", mockCatalogRemove.commonOptions.metalake);
     Assertions.assertEquals("key1", mockCatalogRemove.property);
   }
@@ -437,7 +437,7 @@ class TestCatalogCommand {
 
     int exitCode = cmd.execute(args);
     Assertions.assertEquals(0, exitCode);
-    Assertions.assertEquals("catalog1", mockCatalogUpdate.commonOptions.name);
+    Assertions.assertEquals("catalog1", mockCatalogUpdate.name);
     Assertions.assertEquals("ml1", mockCatalogUpdate.commonOptions.metalake);
     Assertions.assertEquals("new_name", mockCatalogUpdate.updateOptions.newName);
   }
@@ -456,7 +456,7 @@ class TestCatalogCommand {
 
     int exitCode = cmd.execute(args);
     Assertions.assertEquals(0, exitCode);
-    Assertions.assertEquals("catalog1", mockCatalogUpdate.commonOptions.name);
+    Assertions.assertEquals("catalog1", mockCatalogUpdate.name);
     Assertions.assertEquals("ml1", mockCatalogUpdate.commonOptions.metalake);
     Assertions.assertEquals("new_comment", mockCatalogUpdate.updateOptions.comment);
   }
@@ -473,7 +473,7 @@ class TestCatalogCommand {
 
     int exitCode = cmd.execute(args);
     Assertions.assertEquals(0, exitCode);
-    Assertions.assertEquals("catalog1", mockCatalogUpdate.commonOptions.name);
+    Assertions.assertEquals("catalog1", mockCatalogUpdate.name);
     Assertions.assertEquals("ml1", mockCatalogUpdate.commonOptions.metalake);
     Assertions.assertTrue(mockCatalogUpdate.updateOptions.enableDisableOptions.enable);
     Assertions.assertFalse(mockCatalogUpdate.updateOptions.enableDisableOptions.disable);
@@ -491,7 +491,7 @@ class TestCatalogCommand {
 
     int exitCode = cmd.execute(args);
     Assertions.assertEquals(0, exitCode);
-    Assertions.assertEquals("catalog1", mockCatalogUpdate.commonOptions.name);
+    Assertions.assertEquals("catalog1", mockCatalogUpdate.name);
     Assertions.assertEquals("ml1", mockCatalogUpdate.commonOptions.metalake);
     Assertions.assertFalse(mockCatalogUpdate.updateOptions.enableDisableOptions.enable);
     Assertions.assertTrue(mockCatalogUpdate.updateOptions.enableDisableOptions.disable);

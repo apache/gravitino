@@ -25,7 +25,6 @@ import java.util.ArrayList;
 import org.apache.gravitino.cli.CommandActions;
 import org.apache.gravitino.cli.CommandEntities;
 import org.apache.gravitino.cli.GravitinoOptions;
-import org.apache.gravitino.cli.options.CommonOptions;
 import org.apache.gravitino.cli.options.EnableDisableOptions;
 import org.apache.gravitino.cli.options.PropertyOptions;
 import picocli.CommandLine;
@@ -64,7 +63,6 @@ public class MetalakeCliHandler implements Runnable {
 /** Handler for the metalake details command. */
 @CommandLine.Command(name = CommandActions.DETAILS, description = "Show details of a metalake")
 class MetalakeDetails extends CliHandler {
-  @CommandLine.Mixin protected CommonOptions commonOptions;
 
   /**
    * Wether to show audit information for the catalog, use --audit to enable or --no-audit to
@@ -92,7 +90,6 @@ class MetalakeDetails extends CliHandler {
 /** Handler for the metalake create command. */
 @CommandLine.Command(name = CommandActions.CREATE, description = "Create a new metalake")
 class MetalakeCreate extends CliHandler {
-  @CommandLine.Mixin protected CommonOptions commonOptions;
 
   /** Comment for the Schema, use -c/--comment */
   @CommandLine.Option(
@@ -116,7 +113,6 @@ class MetalakeCreate extends CliHandler {
 /** Handler for the metalake delete command. */
 @CommandLine.Command(name = CommandActions.DELETE, description = "Delete a metalake")
 class MetalakeDelete extends CliHandler {
-  @CommandLine.Mixin protected CommonOptions commonOptions;
 
   /**
    * Whether force to delete the catalog, use -f or --force to force delete the catalog, default is
@@ -143,7 +139,6 @@ class MetalakeDelete extends CliHandler {
 /** Handler for the metalake set command. */
 @CommandLine.Command(name = CommandActions.SET, description = "Set a property of a metalake")
 class MetalakeSet extends CliHandler {
-  @CommandLine.Mixin protected CommonOptions commonOptions;
 
   @CommandLine.ArgGroup(exclusive = false, heading = "Property options%n")
   PropertyOptions propertyOptions;
@@ -165,7 +160,6 @@ class MetalakeSet extends CliHandler {
     name = CommandActions.REMOVE,
     description = "Remove a property from a metalake")
 class MetalakeRemove extends CliHandler {
-  @CommandLine.Mixin protected CommonOptions commonOptions;
 
   @CommandLine.Option(
       names = {GravitinoOptions.OPTION_LONG_PREFIX + GravitinoOptions.PROPERTY},
@@ -190,7 +184,6 @@ class MetalakeRemove extends CliHandler {
     name = CommandActions.PROPERTIES,
     description = "Show properties of a metalake")
 class MetalakeProperties extends CliHandler {
-  @CommandLine.Mixin protected CommonOptions commonOptions;
 
   @Override
   protected Integer doCall() throws Exception {
@@ -206,7 +199,6 @@ class MetalakeProperties extends CliHandler {
 /** Handler for the metalake update command. */
 @CommandLine.Command(name = CommandActions.UPDATE, description = "Update a metalake")
 class MetalakeUpdate extends CliHandler {
-  @CommandLine.Mixin protected CommonOptions commonOptions;
 
   @CommandLine.ArgGroup(multiplicity = "1", heading = "update options%n")
   CatalogUpdate.UpdateOptions updateOptions;
@@ -242,7 +234,6 @@ class MetalakeUpdate extends CliHandler {
 /** Handler for the metalake list command. */
 @CommandLine.Command(name = CommandActions.LIST, description = "List all metalakes")
 class MetalakeList extends CliHandler {
-  @CommandLine.Mixin protected CommonOptions commonOptions;
 
   @Override
   protected Integer doCall() throws Exception {

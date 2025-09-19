@@ -31,7 +31,7 @@ public class CommonOptions {
       names = {"-h", GravitinoOptions.OPTION_LONG_PREFIX + GravitinoOptions.HELP},
       usageHelp = true,
       description = "display help message")
-  boolean usageHelpRequested;
+  public boolean usageHelpRequested;
 
   /** whether versions should be ignored, use --ignore to ignore versions */
   @CommandLine.Option(
@@ -39,7 +39,7 @@ public class CommonOptions {
       description = "Whether versions should be ignored",
       negatable = true,
       defaultValue = "false")
-  boolean ignoreVersions;
+  public boolean ignoreVersions;
 
   /**
    * whether command information should be suppressed, use --quiet to suppress command information
