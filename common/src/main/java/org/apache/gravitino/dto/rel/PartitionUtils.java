@@ -39,7 +39,10 @@ public class PartitionUtils {
       throws IllegalArgumentException {
     Preconditions.checkArgument(ArrayUtils.isNotEmpty(columns), "columns cannot be null or empty");
     Preconditions.checkArgument(
-        ArrayUtils.isNotEmpty(fieldName), "fieldName cannot be null or empty");
+        ArrayUtils.isNotEmpty(fieldName) && StringUtils.isNotBlank(fieldName[0]),
+        "fieldName cannot be null or empty");
+
+    ArrayUtils.isNotEmpty((fieldName), "fieldName cannot be null or empty");
 
     // Check if nested fields are supported (currently not supported)
     Preconditions.checkArgument(
