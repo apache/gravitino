@@ -119,6 +119,10 @@ public class MetricsSystem implements Closeable {
     LOG.info("Unregistered {} from metrics system {}", metricsSource.getMetricsSourceName(), name);
   }
 
+  public MetricsSource getMetricsSource(String metricsSourceName) {
+    return this.metricSources.get(metricsSourceName);
+  }
+
   // We support JMX reporter for now, todo: support more reporters
   private void initAndStartMetricsReporter() {
     JmxReporter jmxReporter = JmxReporter.forRegistry(metricRegistry).build();

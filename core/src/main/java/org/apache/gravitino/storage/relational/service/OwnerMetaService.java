@@ -46,7 +46,7 @@ public class OwnerMetaService {
     return INSTANCE;
   }
 
-  @Monitored(prefix = GRAVITINO_RELATIONAL_STORE_METRIC_NAME + ".getOwner")
+  @Monitored(metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME, baseMetricName = "getOwner")
   public Optional<Entity> getOwner(NameIdentifier identifier, Entity.EntityType type) {
     long metalakeId =
         MetalakeMetaService.getInstance()
@@ -82,7 +82,7 @@ public class OwnerMetaService {
     return Optional.empty();
   }
 
-  @Monitored(prefix = GRAVITINO_RELATIONAL_STORE_METRIC_NAME + ".setOwner")
+  @Monitored(metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME, baseMetricName = "setOwner")
   public void setOwner(
       NameIdentifier entity,
       Entity.EntityType entityType,

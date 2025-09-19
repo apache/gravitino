@@ -69,7 +69,9 @@ public class SchemaMetaService {
 
   private SchemaMetaService() {}
 
-  @Monitored(prefix = GRAVITINO_RELATIONAL_STORE_METRIC_NAME + ".getSchemaPOByCatalogIdAndName")
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "getSchemaPOByCatalogIdAndName")
   public SchemaPO getSchemaPOByCatalogIdAndName(Long catalogId, String schemaName) {
     SchemaPO schemaPO =
         SessionUtils.getWithoutCommit(
@@ -86,9 +88,8 @@ public class SchemaMetaService {
   }
 
   @Monitored(
-      prefix =
-          GRAVITINO_RELATIONAL_STORE_METRIC_NAME
-              + ".getSchemaIdByMetalakeNameAndCatalogNameAndSchemaName")
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "getSchemaIdByMetalakeNameAndCatalogNameAndSchemaName")
   public SchemaIds getSchemaIdByMetalakeNameAndCatalogNameAndSchemaName(
       String metalakeName, String catalogName, String schemaName) {
     return SessionUtils.getWithoutCommit(
@@ -98,7 +99,9 @@ public class SchemaMetaService {
                 metalakeName, catalogName, schemaName));
   }
 
-  @Monitored(prefix = GRAVITINO_RELATIONAL_STORE_METRIC_NAME + ".getSchemaIdByCatalogIdAndName")
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "getSchemaIdByCatalogIdAndName")
   public Long getSchemaIdByCatalogIdAndName(Long catalogId, String schemaName) {
     Long schemaId =
         SessionUtils.getWithoutCommit(
@@ -114,7 +117,9 @@ public class SchemaMetaService {
     return schemaId;
   }
 
-  @Monitored(prefix = GRAVITINO_RELATIONAL_STORE_METRIC_NAME + ".getSchemaByIdentifier")
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "getSchemaByIdentifier")
   public SchemaEntity getSchemaByIdentifier(NameIdentifier identifier) {
     NameIdentifierUtil.checkSchema(identifier);
     String schemaName = identifier.name();
@@ -127,7 +132,9 @@ public class SchemaMetaService {
     return POConverters.fromSchemaPO(schemaPO, identifier.namespace());
   }
 
-  @Monitored(prefix = GRAVITINO_RELATIONAL_STORE_METRIC_NAME + ".listSchemasByNamespace")
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "listSchemasByNamespace")
   public List<SchemaEntity> listSchemasByNamespace(Namespace namespace) {
     NamespaceUtil.checkSchema(namespace);
 
@@ -139,7 +146,9 @@ public class SchemaMetaService {
     return POConverters.fromSchemaPOs(schemaPOs, namespace);
   }
 
-  @Monitored(prefix = GRAVITINO_RELATIONAL_STORE_METRIC_NAME + ".insertSchema")
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "insertSchema")
   public void insertSchema(SchemaEntity schemaEntity, boolean overwrite) throws IOException {
     try {
       NameIdentifierUtil.checkSchema(schemaEntity.nameIdentifier());
@@ -164,7 +173,9 @@ public class SchemaMetaService {
     }
   }
 
-  @Monitored(prefix = GRAVITINO_RELATIONAL_STORE_METRIC_NAME + ".updateSchema")
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "updateSchema")
   public <E extends Entity & HasIdentifier> SchemaEntity updateSchema(
       NameIdentifier identifier, Function<E, E> updater) throws IOException {
     NameIdentifierUtil.checkSchema(identifier);
@@ -204,7 +215,9 @@ public class SchemaMetaService {
     }
   }
 
-  @Monitored(prefix = GRAVITINO_RELATIONAL_STORE_METRIC_NAME + ".deleteSchema")
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "deleteSchema")
   public boolean deleteSchema(NameIdentifier identifier, boolean cascade) {
     NameIdentifierUtil.checkSchema(identifier);
 
@@ -344,7 +357,9 @@ public class SchemaMetaService {
     return true;
   }
 
-  @Monitored(prefix = GRAVITINO_RELATIONAL_STORE_METRIC_NAME + ".deleteSchemaMetasByLegacyTimeline")
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "deleteSchemaMetasByLegacyTimeline")
   public int deleteSchemaMetasByLegacyTimeline(Long legacyTimeline, int limit) {
     return SessionUtils.doWithCommitAndFetchResult(
         SchemaMetaMapper.class,

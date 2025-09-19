@@ -50,7 +50,9 @@ public class JobMetaService {
     return INSTANCE;
   }
 
-  @Monitored(prefix = GRAVITINO_RELATIONAL_STORE_METRIC_NAME + ".listJobsByNamespace")
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "listJobsByNamespace")
   public List<JobEntity> listJobsByNamespace(Namespace ns) {
     String metalakeName = ns.level(0);
     if (ns.length() == 3) {
@@ -78,7 +80,9 @@ public class JobMetaService {
     }
   }
 
-  @Monitored(prefix = GRAVITINO_RELATIONAL_STORE_METRIC_NAME + ".getJobByIdentifier")
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "getJobByIdentifier")
   public JobEntity getJobByIdentifier(NameIdentifier ident) {
     String metalakeName = ident.namespace().level(0);
     String jobRunId = ident.name();
@@ -102,7 +106,7 @@ public class JobMetaService {
     return JobPO.fromJobPO(jobPO, ident.namespace());
   }
 
-  @Monitored(prefix = GRAVITINO_RELATIONAL_STORE_METRIC_NAME + ".insertJob")
+  @Monitored(metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME, baseMetricName = "insertJob")
   public void insertJob(JobEntity jobEntity, boolean overwrite) throws IOException {
     String metalakeName = jobEntity.namespace().level(0);
 
@@ -126,7 +130,7 @@ public class JobMetaService {
     }
   }
 
-  @Monitored(prefix = GRAVITINO_RELATIONAL_STORE_METRIC_NAME + ".deleteJob")
+  @Monitored(metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME, baseMetricName = "deleteJob")
   public boolean deleteJob(NameIdentifier jobIdent) {
     String jobRunId = jobIdent.name();
     long jobRunIdLong;
@@ -141,7 +145,9 @@ public class JobMetaService {
     return result > 0;
   }
 
-  @Monitored(prefix = GRAVITINO_RELATIONAL_STORE_METRIC_NAME + ".deleteJobsByLegacyTimeline")
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "deleteJobsByLegacyTimeline")
   public int deleteJobsByLegacyTimeline(long legacyTimeline, int limit) {
     // Mark jobs as deleted for finished jobs, so that they can be cleaned up later
     SessionUtils.doWithCommit(

@@ -59,7 +59,9 @@ public class TableMetaService {
 
   private TableMetaService() {}
 
-  @Monitored(prefix = GRAVITINO_RELATIONAL_STORE_METRIC_NAME + ".getTableIdBySchemaIdAndName")
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "getTableIdBySchemaIdAndName")
   public Long getTableIdBySchemaIdAndName(Long schemaId, String tableName) {
     Long tableId =
         SessionUtils.getWithoutCommit(
@@ -75,7 +77,9 @@ public class TableMetaService {
     return tableId;
   }
 
-  @Monitored(prefix = GRAVITINO_RELATIONAL_STORE_METRIC_NAME + ".getTableByIdentifier")
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "getTableByIdentifier")
   public TableEntity getTableByIdentifier(NameIdentifier identifier) {
     NameIdentifierUtil.checkTable(identifier);
 
@@ -90,7 +94,9 @@ public class TableMetaService {
     return POConverters.fromTableAndColumnPOs(tablePO, columnPOs, identifier.namespace());
   }
 
-  @Monitored(prefix = GRAVITINO_RELATIONAL_STORE_METRIC_NAME + ".listTablesByNamespace")
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "listTablesByNamespace")
   public List<TableEntity> listTablesByNamespace(Namespace namespace) {
     NamespaceUtil.checkTable(namespace);
 
@@ -103,7 +109,7 @@ public class TableMetaService {
     return POConverters.fromTablePOs(tablePOs, namespace);
   }
 
-  @Monitored(prefix = GRAVITINO_RELATIONAL_STORE_METRIC_NAME + ".insertTable")
+  @Monitored(metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME, baseMetricName = "insertTable")
   public void insertTable(TableEntity tableEntity, boolean overwrite) throws IOException {
     try {
       NameIdentifierUtil.checkTable(tableEntity.nameIdentifier());
@@ -146,7 +152,7 @@ public class TableMetaService {
     }
   }
 
-  @Monitored(prefix = GRAVITINO_RELATIONAL_STORE_METRIC_NAME + ".updateTable")
+  @Monitored(metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME, baseMetricName = "updateTable")
   public <E extends Entity & HasIdentifier> TableEntity updateTable(
       NameIdentifier identifier, Function<E, E> updater) throws IOException {
     NameIdentifierUtil.checkTable(identifier);
@@ -203,7 +209,7 @@ public class TableMetaService {
     }
   }
 
-  @Monitored(prefix = GRAVITINO_RELATIONAL_STORE_METRIC_NAME + ".deleteTable")
+  @Monitored(metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME, baseMetricName = "deleteTable")
   public boolean deleteTable(NameIdentifier identifier) {
     NameIdentifierUtil.checkTable(identifier);
 
@@ -255,7 +261,9 @@ public class TableMetaService {
     return deleteResult.get() > 0;
   }
 
-  @Monitored(prefix = GRAVITINO_RELATIONAL_STORE_METRIC_NAME + ".deleteTableMetasByLegacyTimeline")
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "deleteTableMetasByLegacyTimeline")
   public int deleteTableMetasByLegacyTimeline(Long legacyTimeline, int limit) {
     return SessionUtils.doWithCommitAndFetchResult(
         TableMetaMapper.class,

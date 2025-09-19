@@ -48,7 +48,9 @@ public class TableColumnMetaService {
     return INSTANCE;
   }
 
-  @Monitored(prefix = GRAVITINO_RELATIONAL_STORE_METRIC_NAME + ".getColumnsByTableIdAndVersion")
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "getColumnsByTableIdAndVersion")
   List<ColumnPO> getColumnsByTableIdAndVersion(Long tableId, Long version) {
     List<ColumnPO> columnPOs =
         SessionUtils.getWithoutCommit(
@@ -61,7 +63,9 @@ public class TableColumnMetaService {
         .collect(Collectors.toList());
   }
 
-  @Monitored(prefix = GRAVITINO_RELATIONAL_STORE_METRIC_NAME + ".getColumnIdByTableIdAndName")
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "getColumnIdByTableIdAndName")
   Long getColumnIdByTableIdAndName(Long tableId, String columnName) {
     Long columnId =
         SessionUtils.getWithoutCommit(
@@ -78,7 +82,9 @@ public class TableColumnMetaService {
     return columnId;
   }
 
-  @Monitored(prefix = GRAVITINO_RELATIONAL_STORE_METRIC_NAME + ".getColumnPOById")
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "getColumnPOById")
   ColumnPO getColumnPOById(Long columnId) {
     ColumnPO columnPO =
         SessionUtils.getWithoutCommit(
@@ -94,7 +100,9 @@ public class TableColumnMetaService {
     return columnPO;
   }
 
-  @Monitored(prefix = GRAVITINO_RELATIONAL_STORE_METRIC_NAME + ".insertColumnPOs")
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "insertColumnPOs")
   void insertColumnPOs(TablePO tablePO, List<ColumnEntity> columnEntities) {
     List<ColumnPO> columnPOs =
         POConverters.initializeColumnPOs(tablePO, columnEntities, ColumnPO.ColumnOpType.CREATE);
@@ -104,7 +112,9 @@ public class TableColumnMetaService {
         TableColumnMapper.class, mapper -> mapper.insertColumnPOs(columnPOs));
   }
 
-  @Monitored(prefix = GRAVITINO_RELATIONAL_STORE_METRIC_NAME + ".deleteColumnsByTableId")
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "deleteColumnsByTableId")
   boolean deleteColumnsByTableId(Long tableId) {
     // deleteColumns will be done in deleteTable transaction, so we don't do commit here.
     Integer result =
@@ -113,7 +123,9 @@ public class TableColumnMetaService {
     return result > 0;
   }
 
-  @Monitored(prefix = GRAVITINO_RELATIONAL_STORE_METRIC_NAME + ".deleteColumnsByLegacyTimeline")
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "deleteColumnsByLegacyTimeline")
   public int deleteColumnsByLegacyTimeline(Long legacyTimeline, int limit) {
     return SessionUtils.doWithCommitAndFetchResult(
         TableColumnMapper.class,
@@ -136,7 +148,9 @@ public class TableColumnMetaService {
     return oldColumns.size() != newColumns.size() || !oldColumns.equals(newColumns);
   }
 
-  @Monitored(prefix = GRAVITINO_RELATIONAL_STORE_METRIC_NAME + ".updateColumnPOsFromTableDiff")
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "updateColumnPOsFromTableDiff")
   void updateColumnPOsFromTableDiff(
       TableEntity oldTable, TableEntity newTable, TablePO newTablePO) {
     Map<Long, ColumnEntity> oldColumns =

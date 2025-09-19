@@ -76,7 +76,9 @@ public class UserMetaService {
     return userPO;
   }
 
-  @Monitored(prefix = GRAVITINO_RELATIONAL_STORE_METRIC_NAME + ".getUserIdByMetalakeIdAndName")
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "getUserIdByMetalakeIdAndName")
   public Long getUserIdByMetalakeIdAndName(Long metalakeId, String userName) {
     Long userId =
         SessionUtils.getWithoutCommit(
@@ -92,7 +94,9 @@ public class UserMetaService {
     return userId;
   }
 
-  @Monitored(prefix = GRAVITINO_RELATIONAL_STORE_METRIC_NAME + ".getUserByIdentifier")
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "getUserByIdentifier")
   public UserEntity getUserByIdentifier(NameIdentifier identifier) {
     AuthorizationUtils.checkUser(identifier);
 
@@ -104,7 +108,9 @@ public class UserMetaService {
     return POConverters.fromUserPO(userPO, rolePOs, identifier.namespace());
   }
 
-  @Monitored(prefix = GRAVITINO_RELATIONAL_STORE_METRIC_NAME + ".listUsersByRoleIdent")
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "listUsersByRoleIdent")
   public List<UserEntity> listUsersByRoleIdent(NameIdentifier roleIdent) {
     RoleEntity roleEntity = RoleMetaService.getInstance().getRoleByIdentifier(roleIdent);
     List<UserPO> userPOs =
@@ -120,7 +126,7 @@ public class UserMetaService {
         .collect(Collectors.toList());
   }
 
-  @Monitored(prefix = GRAVITINO_RELATIONAL_STORE_METRIC_NAME + ".insertUser")
+  @Monitored(metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME, baseMetricName = "insertUser")
   public void insertUser(UserEntity userEntity, boolean overwritten) throws IOException {
     try {
       AuthorizationUtils.checkUser(userEntity.nameIdentifier());
@@ -164,7 +170,7 @@ public class UserMetaService {
     }
   }
 
-  @Monitored(prefix = GRAVITINO_RELATIONAL_STORE_METRIC_NAME + ".deleteUser")
+  @Monitored(metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME, baseMetricName = "deleteUser")
   public boolean deleteUser(NameIdentifier identifier) {
     AuthorizationUtils.checkUser(identifier);
 
@@ -188,7 +194,7 @@ public class UserMetaService {
     return true;
   }
 
-  @Monitored(prefix = GRAVITINO_RELATIONAL_STORE_METRIC_NAME + ".updateUser")
+  @Monitored(metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME, baseMetricName = "updateUser")
   public <E extends Entity & HasIdentifier> UserEntity updateUser(
       NameIdentifier identifier, Function<E, E> updater) throws IOException {
     AuthorizationUtils.checkUser(identifier);
@@ -257,7 +263,9 @@ public class UserMetaService {
     return newEntity;
   }
 
-  @Monitored(prefix = GRAVITINO_RELATIONAL_STORE_METRIC_NAME + ".listUsersByNamespace")
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "listUsersByNamespace")
   public List<UserEntity> listUsersByNamespace(Namespace namespace, boolean allFields) {
     AuthorizationUtils.checkUserNamespace(namespace);
     String metalakeName = namespace.level(0);
@@ -288,7 +296,9 @@ public class UserMetaService {
     }
   }
 
-  @Monitored(prefix = GRAVITINO_RELATIONAL_STORE_METRIC_NAME + ".deleteUserMetasByLegacyTimeline")
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "deleteUserMetasByLegacyTimeline")
   public int deleteUserMetasByLegacyTimeline(long legacyTimeline, int limit) {
     int[] userDeletedCount = new int[] {0};
     int[] userRoleRelDeletedCount = new int[] {0};

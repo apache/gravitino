@@ -21,8 +21,8 @@ package org.apache.gravitino.metrics;
 import com.codahale.metrics.Meter;
 import com.codahale.metrics.MetricRegistry;
 import com.codahale.metrics.Timer;
-import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.GravitinoEnv;
+import org.apache.gravitino.metrics.source.MetricsSource;
 import org.aspectj.lang.ProceedingJoinPoint;
 import org.aspectj.lang.annotation.Around;
 import org.aspectj.lang.annotation.Aspect;
@@ -34,13 +34,12 @@ import org.slf4j.LoggerFactory;
 public class MethodMonitorAspect {
 
   private static final Logger LOG = LoggerFactory.getLogger(MethodMonitorAspect.class);
-  private MetricRegistry metricRegistry;
+  private MetricsSystem metricsSystem;
 
   public MethodMonitorAspect() {
-    MetricsSystem metricsSystem = GravitinoEnv.getInstance().metricsSystem();
+    this.metricsSystem = GravitinoEnv.getInstance().metricsSystem();
     // Metrics System could be null in UT.
     if (metricsSystem != null) {
-      this.metricRegistry = metricsSystem.getMetricRegistry();
       LOG.info("MethodMonitorAspect initialized.");
     } else {
       LOG.warn("MetricsSystem is not initialized, MethodMonitorAspect is disabled.");
@@ -52,15 +51,23 @@ public class MethodMonitorAspect {
 
   @Around("monitoredMethods() && @annotation(monitored)")
   public Object monitorMethod(ProceedingJoinPoint pjp, Monitored monitored) throws Throwable {
-    if (metricRegistry == null) {
+    if (metricsSystem == null) {
       return pjp.proceed();
     }
 
-    String baseName = buildBaseName(pjp, monitored);
+    MetricsSource metricsSource = metricsSystem.getMetricsSource(monitored.metricsSource());
+    if (metricsSource == null) {
+      LOG.warn(
+          "MetricsSource {} is not registered in MetricsSystem, skip monitoring for method {}",
+          monitored.metricsSource(),
+          pjp.getSignature().toShortString());
+      return pjp.proceed();
+    }
 
-    Timer timer = metricRegistry.timer(MetricRegistry.name(baseName, "total"));
-    Meter successMeter = metricRegistry.meter(MetricRegistry.name(baseName, "success"));
-    Meter failureMeter = metricRegistry.meter(MetricRegistry.name(baseName, "failure"));
+    String baseMetricName = monitored.baseMetricName();
+    Timer timer = metricsSource.getTimer(MetricRegistry.name(baseMetricName, "total"));
+    Meter successMeter = metricsSource.getMeter(MetricRegistry.name(baseMetricName, "success"));
+    Meter failureMeter = metricsSource.getMeter(MetricRegistry.name(baseMetricName, "failure"));
 
     try (Timer.Context ignore = timer.time()) {
       Object result = pjp.proceed();
@@ -70,13 +77,5 @@ public class MethodMonitorAspect {
       failureMeter.mark();
       throw t;
     }
-  }
-
-  private String buildBaseName(ProceedingJoinPoint pjp, Monitored monitored) {
-    String prefix = monitored.prefix();
-    if (StringUtils.isNotBlank(prefix)) {
-      return prefix;
-    }
-    return MetricRegistry.name(pjp.getSignature().getDeclaringType(), pjp.getSignature().getName());
   }
 }

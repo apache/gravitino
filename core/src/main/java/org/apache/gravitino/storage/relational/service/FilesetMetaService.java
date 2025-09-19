@@ -65,7 +65,9 @@ public class FilesetMetaService {
 
   private FilesetMetaService() {}
 
-  @Monitored(prefix = GRAVITINO_RELATIONAL_STORE_METRIC_NAME + ".getFilesetPOBySchemaIdAndName")
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "getFilesetPOBySchemaIdAndName")
   public FilesetPO getFilesetPOBySchemaIdAndName(Long schemaId, String filesetName) {
     FilesetPO filesetPO =
         SessionUtils.getWithoutCommit(
@@ -81,7 +83,9 @@ public class FilesetMetaService {
     return filesetPO;
   }
 
-  @Monitored(prefix = GRAVITINO_RELATIONAL_STORE_METRIC_NAME + ".getFilesetIdBySchemaIdAndName")
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "getFilesetIdBySchemaIdAndName")
   public Long getFilesetIdBySchemaIdAndName(Long schemaId, String filesetName) {
     Long filesetId =
         SessionUtils.getWithoutCommit(
@@ -97,7 +101,9 @@ public class FilesetMetaService {
     return filesetId;
   }
 
-  @Monitored(prefix = GRAVITINO_RELATIONAL_STORE_METRIC_NAME + ".getFilesetByIdentifier")
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "getFilesetByIdentifier")
   public FilesetEntity getFilesetByIdentifier(NameIdentifier identifier) {
     NameIdentifierUtil.checkFileset(identifier);
 
@@ -111,7 +117,9 @@ public class FilesetMetaService {
     return POConverters.fromFilesetPO(filesetPO, identifier.namespace());
   }
 
-  @Monitored(prefix = GRAVITINO_RELATIONAL_STORE_METRIC_NAME + ".listFilesetsByNamespace")
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "listFilesetsByNamespace")
   public List<FilesetEntity> listFilesetsByNamespace(Namespace namespace) {
     NamespaceUtil.checkFileset(namespace);
 
@@ -124,7 +132,9 @@ public class FilesetMetaService {
     return POConverters.fromFilesetPOs(filesetPOs, namespace);
   }
 
-  @Monitored(prefix = GRAVITINO_RELATIONAL_STORE_METRIC_NAME + ".insertFileset")
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "insertFileset")
   public void insertFileset(FilesetEntity filesetEntity, boolean overwrite) throws IOException {
     try {
       NameIdentifierUtil.checkFileset(filesetEntity.nameIdentifier());
@@ -163,7 +173,9 @@ public class FilesetMetaService {
     }
   }
 
-  @Monitored(prefix = GRAVITINO_RELATIONAL_STORE_METRIC_NAME + ".updateFileset")
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "updateFileset")
   public <E extends Entity & HasIdentifier> FilesetEntity updateFileset(
       NameIdentifier identifier, Function<E, E> updater) throws IOException {
     NameIdentifierUtil.checkFileset(identifier);
@@ -226,7 +238,9 @@ public class FilesetMetaService {
     }
   }
 
-  @Monitored(prefix = GRAVITINO_RELATIONAL_STORE_METRIC_NAME + ".deleteFileset")
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "deleteFileset")
   public boolean deleteFileset(NameIdentifier identifier) {
     NameIdentifierUtil.checkFileset(identifier);
 
@@ -280,8 +294,8 @@ public class FilesetMetaService {
   }
 
   @Monitored(
-      prefix =
-          GRAVITINO_RELATIONAL_STORE_METRIC_NAME + ".deleteFilesetAndVersionMetasByLegacyTimeline")
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "deleteFilesetAndVersionMetasByLegacyTimeline")
   public int deleteFilesetAndVersionMetasByLegacyTimeline(Long legacyTimeline, int limit) {
     int filesetDeletedCount =
         SessionUtils.doWithCommitAndFetchResult(
@@ -299,7 +313,8 @@ public class FilesetMetaService {
   }
 
   @Monitored(
-      prefix = GRAVITINO_RELATIONAL_STORE_METRIC_NAME + ".deleteFilesetVersionsByRetentionCount")
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "deleteFilesetVersionsByRetentionCount")
   public int deleteFilesetVersionsByRetentionCount(Long versionRetentionCount, int limit) {
     // get the current version of all filesets.
     List<FilesetMaxVersionPO> filesetCurVersions =

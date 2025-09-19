@@ -39,7 +39,9 @@ public class CommonMetaService {
 
   private CommonMetaService() {}
 
-  @Monitored(prefix = GRAVITINO_RELATIONAL_STORE_METRIC_NAME + ".getParentEntityIdByNamespace")
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "getParentEntityIdByNamespace")
   public Long getParentEntityIdByNamespace(Namespace namespace) {
     Preconditions.checkArgument(
         !namespace.isEmpty() && namespace.levels().length <= 3,
@@ -92,7 +94,9 @@ public class CommonMetaService {
     }
   }
 
-  @Monitored(prefix = GRAVITINO_RELATIONAL_STORE_METRIC_NAME + ".getParentEntityIdsByNamespace")
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "getParentEntityIdsByNamespace")
   public Long[] getParentEntityIdsByNamespace(Namespace namespace) {
     Preconditions.checkArgument(
         !namespace.isEmpty() && namespace.levels().length <= 3,

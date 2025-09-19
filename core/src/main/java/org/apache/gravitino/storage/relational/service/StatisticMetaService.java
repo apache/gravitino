@@ -46,7 +46,9 @@ public class StatisticMetaService {
 
   private StatisticMetaService() {}
 
-  @Monitored(prefix = GRAVITINO_RELATIONAL_STORE_METRIC_NAME + ".listStatisticsByEntity")
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "listStatisticsByEntity")
   public List<StatisticEntity> listStatisticsByEntity(
       NameIdentifier identifier, Entity.EntityType type) {
     long metalakeId =
@@ -63,8 +65,8 @@ public class StatisticMetaService {
   }
 
   @Monitored(
-      prefix =
-          GRAVITINO_RELATIONAL_STORE_METRIC_NAME + ".batchInsertStatisticPOsOnDuplicateKeyUpdate")
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "batchInsertStatisticPOsOnDuplicateKeyUpdate")
   public void batchInsertStatisticPOsOnDuplicateKeyUpdate(
       List<StatisticEntity> statisticEntities, NameIdentifier entity, Entity.EntityType type) {
     if (statisticEntities == null || statisticEntities.isEmpty()) {
@@ -84,7 +86,9 @@ public class StatisticMetaService {
         mapper -> mapper.batchInsertStatisticPOsOnDuplicateKeyUpdate(pos));
   }
 
-  @Monitored(prefix = GRAVITINO_RELATIONAL_STORE_METRIC_NAME + ".batchDeleteStatisticPOs")
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "batchDeleteStatisticPOs")
   public int batchDeleteStatisticPOs(
       NameIdentifier identifier, Entity.EntityType type, List<String> statisticNames) {
     if (statisticNames == null || statisticNames.isEmpty()) {
@@ -102,7 +106,9 @@ public class StatisticMetaService {
         mapper -> mapper.batchDeleteStatisticPOs(entityId, statisticNames));
   }
 
-  @Monitored(prefix = GRAVITINO_RELATIONAL_STORE_METRIC_NAME + ".deleteStatisticsByLegacyTimeline")
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "deleteStatisticsByLegacyTimeline")
   public int deleteStatisticsByLegacyTimeline(long legacyTimeline, int limit) {
     return SessionUtils.doWithCommitAndFetchResult(
         StatisticMetaMapper.class,

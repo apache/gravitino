@@ -63,7 +63,9 @@ public class PolicyMetaService {
 
   private PolicyMetaService() {}
 
-  @Monitored(prefix = GRAVITINO_RELATIONAL_STORE_METRIC_NAME + ".listPoliciesByNamespace")
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "listPoliciesByNamespace")
   public List<PolicyEntity> listPoliciesByNamespace(Namespace namespace) {
     String metalakeName = namespace.level(0);
     List<PolicyPO> policyPOs =
@@ -74,14 +76,18 @@ public class PolicyMetaService {
         .collect(Collectors.toList());
   }
 
-  @Monitored(prefix = GRAVITINO_RELATIONAL_STORE_METRIC_NAME + ".getPolicyByIdentifier")
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "getPolicyByIdentifier")
   public PolicyEntity getPolicyByIdentifier(NameIdentifier ident) {
     String metalakeName = ident.namespace().level(0);
     PolicyPO policyPO = getPolicyPOByMetalakeAndName(metalakeName, ident.name());
     return POConverters.fromPolicyPO(policyPO, ident.namespace());
   }
 
-  @Monitored(prefix = GRAVITINO_RELATIONAL_STORE_METRIC_NAME + ".insertPolicy")
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "insertPolicy")
   public void insertPolicy(PolicyEntity policyEntity, boolean overwritten) throws IOException {
     Namespace ns = policyEntity.namespace();
     String metalakeName = ns.level(0);
@@ -120,7 +126,9 @@ public class PolicyMetaService {
     }
   }
 
-  @Monitored(prefix = GRAVITINO_RELATIONAL_STORE_METRIC_NAME + ".updatePolicy")
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "updatePolicy")
   public <E extends Entity & HasIdentifier> PolicyEntity updatePolicy(
       NameIdentifier ident, Function<E, E> updater) throws IOException {
     String metalakeName = ident.namespace().level(0);
@@ -173,7 +181,9 @@ public class PolicyMetaService {
     }
   }
 
-  @Monitored(prefix = GRAVITINO_RELATIONAL_STORE_METRIC_NAME + ".deletePolicy")
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "deletePolicy")
   public boolean deletePolicy(NameIdentifier ident) {
     String metalakeName = ident.namespace().level(0);
     int[] policyMetaDeletedCount = new int[] {0};
@@ -197,7 +207,9 @@ public class PolicyMetaService {
     return policyMetaDeletedCount[0] + policyVersionDeletedCount[0] > 0;
   }
 
-  @Monitored(prefix = GRAVITINO_RELATIONAL_STORE_METRIC_NAME + ".listPoliciesForMetadataObject")
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "listPoliciesForMetadataObject")
   public List<PolicyEntity> listPoliciesForMetadataObject(
       NameIdentifier objectIdent, Entity.EntityType objectType)
       throws NoSuchEntityException, IOException {
@@ -227,7 +239,9 @@ public class PolicyMetaService {
         .collect(Collectors.toList());
   }
 
-  @Monitored(prefix = GRAVITINO_RELATIONAL_STORE_METRIC_NAME + ".getPolicyForMetadataObject")
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "getPolicyForMetadataObject")
   public PolicyEntity getPolicyForMetadataObject(
       NameIdentifier objectIdent, Entity.EntityType objectType, NameIdentifier policyIdent)
       throws NoSuchEntityException, IOException {
@@ -262,7 +276,9 @@ public class PolicyMetaService {
     return POConverters.fromPolicyPO(policyPO, NamespaceUtil.ofPolicy(metalake));
   }
 
-  @Monitored(prefix = GRAVITINO_RELATIONAL_STORE_METRIC_NAME + ".listAssociatedEntitiesForPolicy")
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "listAssociatedEntitiesForPolicy")
   public List<GenericEntity> listAssociatedEntitiesForPolicy(NameIdentifier policyIdent)
       throws IOException {
     String metalakeName = policyIdent.namespace().level(0);
@@ -294,7 +310,8 @@ public class PolicyMetaService {
   }
 
   @Monitored(
-      prefix = GRAVITINO_RELATIONAL_STORE_METRIC_NAME + ".associatePoliciesWithMetadataObject")
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "associatePoliciesWithMetadataObject")
   public List<PolicyEntity> associatePoliciesWithMetadataObject(
       NameIdentifier objectIdent,
       Entity.EntityType objectType,
@@ -380,8 +397,8 @@ public class PolicyMetaService {
   }
 
   @Monitored(
-      prefix =
-          GRAVITINO_RELATIONAL_STORE_METRIC_NAME + ".deletePolicyAndVersionMetasByLegacyTimeline")
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "deletePolicyAndVersionMetasByLegacyTimeline")
   public int deletePolicyAndVersionMetasByLegacyTimeline(Long legacyTimeline, int limit) {
     int policyDeletedCount =
         SessionUtils.doWithCommitAndFetchResult(
@@ -397,7 +414,8 @@ public class PolicyMetaService {
   }
 
   @Monitored(
-      prefix = GRAVITINO_RELATIONAL_STORE_METRIC_NAME + ".deletePolicyVersionsByRetentionCount")
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "deletePolicyVersionsByRetentionCount")
   public int deletePolicyVersionsByRetentionCount(Long versionRetentionCount, int limit) {
     // get the current version of all policies.
     List<PolicyMaxVersionPO> policyMaxVersions =

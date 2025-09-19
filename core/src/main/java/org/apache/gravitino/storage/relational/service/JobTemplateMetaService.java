@@ -49,7 +49,9 @@ public class JobTemplateMetaService {
     return INSTANCE;
   }
 
-  @Monitored(prefix = GRAVITINO_RELATIONAL_STORE_METRIC_NAME + ".listJobTemplatesByNamespace")
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "listJobTemplatesByNamespace")
   public List<JobTemplateEntity> listJobTemplatesByNamespace(Namespace ns) {
     String metalakeName = ns.level(0);
     List<JobTemplatePO> jobTemplatePOs =
@@ -62,7 +64,9 @@ public class JobTemplateMetaService {
         .collect(Collectors.toList());
   }
 
-  @Monitored(prefix = GRAVITINO_RELATIONAL_STORE_METRIC_NAME + ".getJobTemplateByIdentifier")
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "getJobTemplateByIdentifier")
   public JobTemplateEntity getJobTemplateByIdentifier(NameIdentifier jobTemplateIdent) {
     String metalakeName = jobTemplateIdent.namespace().level(0);
     String jobTemplateName = jobTemplateIdent.name();
@@ -82,7 +86,9 @@ public class JobTemplateMetaService {
     return JobTemplatePO.fromJobTemplatePO(jobTemplatePO, jobTemplateIdent.namespace());
   }
 
-  @Monitored(prefix = GRAVITINO_RELATIONAL_STORE_METRIC_NAME + ".insertJobTemplate")
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "insertJobTemplate")
   public void insertJobTemplate(JobTemplateEntity jobTemplateEntity, boolean overwrite)
       throws IOException {
     String metalakeName = jobTemplateEntity.namespace().level(0);
@@ -110,7 +116,9 @@ public class JobTemplateMetaService {
     }
   }
 
-  @Monitored(prefix = GRAVITINO_RELATIONAL_STORE_METRIC_NAME + ".deleteJobTemplate")
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "deleteJobTemplate")
   public boolean deleteJobTemplate(NameIdentifier jobTemplateIdent) {
     String metalakeName = jobTemplateIdent.namespace().level(0);
     String jobTemplateName = jobTemplateIdent.name();
@@ -133,7 +141,8 @@ public class JobTemplateMetaService {
   }
 
   @Monitored(
-      prefix = GRAVITINO_RELATIONAL_STORE_METRIC_NAME + ".deleteJobTemplatesByLegacyTimeline")
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "deleteJobTemplatesByLegacyTimeline")
   public int deleteJobTemplatesByLegacyTimeline(long legacyTimeline, int limit) {
     return SessionUtils.doWithCommitAndFetchResult(
         JobTemplateMetaMapper.class,

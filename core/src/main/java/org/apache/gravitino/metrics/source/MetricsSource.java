@@ -22,6 +22,7 @@ package org.apache.gravitino.metrics.source;
 import com.codahale.metrics.Counter;
 import com.codahale.metrics.Gauge;
 import com.codahale.metrics.Histogram;
+import com.codahale.metrics.Meter;
 import com.codahale.metrics.MetricRegistry;
 import com.codahale.metrics.SlidingTimeWindowArrayReservoir;
 import com.codahale.metrics.Timer;
@@ -125,6 +126,16 @@ public abstract class MetricsSource {
             new Timer(
                 new SlidingTimeWindowArrayReservoir(
                     getTimeSlidingWindowSeconds(), TimeUnit.SECONDS)));
+  }
+
+  /**
+   * Get or create a Meter
+   *
+   * @param name The name for the meter, should be unique in metrics source.
+   * @return a new or pre-existing Meter
+   */
+  public Meter getMeter(String name) {
+    return this.metricRegistry.meter(name);
   }
 
   protected int getTimeSlidingWindowSeconds() {

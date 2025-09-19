@@ -22,21 +22,39 @@ import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
+import org.apache.gravitino.metrics.source.MetricsSource;
 
 /**
  * An annotation for monitoring method performance. It automatically tracks the execution time,
- * success count, and failure count. The metric names will be generated based on the provided prefix
- * and the method's outcome. - {prefix}.total: A timer for overall execution duration. -
- * {prefix}.success: A meter for successful executions. - {prefix}.failure: A meter for failed
- * executions. If no prefix is provided, it defaults to "ClassName.methodName".
+ * success count, and failure count.
+ *
+ * <p>The metric names will be generated based on the {@link #metricsSource()} and {@link
+ * #baseMetricName()} and the method's outcome. The final metric name will be in the format: {@code
+ * {metricsSource}.{baseMetricName}.{suffix}}.
+ *
+ * <p>The generated metrics like:
+ *
+ * <ul>
+ *   <li>{@code {metricsSource}.{baseMetricName}.total}: A timer for overall execution duration.
+ *   <li>{@code {metricsSource}.{baseMetricName}.success}: A meter for successful executions.
+ *   <li>{@code {metricsSource}.{baseMetricName}.failure}: A meter for failed executions.
+ * </ul>
  */
 @Target(ElementType.METHOD)
 @Retention(RetentionPolicy.RUNTIME)
 public @interface Monitored {
+
   /**
-   * The prefix for the metric names.
+   * The {@link MetricsSource} name of the metric belongs to.
    *
-   * @return The prefix of the metric name.
+   * @return the metrics source name
    */
-  String prefix() default "";
+  String metricsSource();
+
+  /**
+   * The base name for the metric.
+   *
+   * @return the base name for the metric
+   */
+  String baseMetricName();
 }

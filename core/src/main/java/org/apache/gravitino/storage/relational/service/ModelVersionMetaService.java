@@ -64,7 +64,9 @@ public class ModelVersionMetaService {
 
   private ModelVersionMetaService() {}
 
-  @Monitored(prefix = GRAVITINO_RELATIONAL_STORE_METRIC_NAME + ".listModelVersionsByNamespace")
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "listModelVersionsByNamespace")
   public List<ModelVersionEntity> listModelVersionsByNamespace(Namespace ns) {
     NamespaceUtil.checkModelVersion(ns);
 
@@ -106,7 +108,9 @@ public class ModelVersionMetaService {
             .values());
   }
 
-  @Monitored(prefix = GRAVITINO_RELATIONAL_STORE_METRIC_NAME + ".getModelVersionByIdentifier")
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "getModelVersionByIdentifier")
   public ModelVersionEntity getModelVersionByIdentifier(NameIdentifier ident) {
     NameIdentifierUtil.checkModelVersion(ident);
 
@@ -151,7 +155,9 @@ public class ModelVersionMetaService {
     return POConverters.fromModelVersionPO(modelIdent, modelVersionPOs, aliasRelPOs);
   }
 
-  @Monitored(prefix = GRAVITINO_RELATIONAL_STORE_METRIC_NAME + ".insertModelVersion")
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "insertModelVersion")
   public void insertModelVersion(ModelVersionEntity modelVersionEntity) throws IOException {
     NameIdentifier modelIdent = modelVersionEntity.modelIdentifier();
     NameIdentifierUtil.checkModel(modelIdent);
@@ -192,7 +198,9 @@ public class ModelVersionMetaService {
     }
   }
 
-  @Monitored(prefix = GRAVITINO_RELATIONAL_STORE_METRIC_NAME + ".deleteModelVersion")
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "deleteModelVersion")
   public boolean deleteModelVersion(NameIdentifier ident) {
     NameIdentifierUtil.checkModelVersion(ident);
 
@@ -246,7 +254,8 @@ public class ModelVersionMetaService {
   }
 
   @Monitored(
-      prefix = GRAVITINO_RELATIONAL_STORE_METRIC_NAME + ".deleteModelVersionMetasByLegacyTimeline")
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "deleteModelVersionMetasByLegacyTimeline")
   public int deleteModelVersionMetasByLegacyTimeline(Long legacyTimeline, int limit) {
     int[] modelVersionDeletedCount = new int[] {0};
     int[] modelVersionAliasRelDeletedCount = new int[] {0};
@@ -277,7 +286,9 @@ public class ModelVersionMetaService {
    * @param <E> the type of the entity to update
    * @throws IOException if an error occurs while updating the entity
    */
-  @Monitored(prefix = GRAVITINO_RELATIONAL_STORE_METRIC_NAME + ".updateModelVersion")
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "updateModelVersion")
   public <E extends Entity & HasIdentifier> ModelVersionEntity updateModelVersion(
       NameIdentifier ident, Function<E, E> updater) throws IOException {
     NameIdentifierUtil.checkModelVersion(ident);

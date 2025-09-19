@@ -70,7 +70,9 @@ public class CatalogMetaService {
 
   private CatalogMetaService() {}
 
-  @Monitored(prefix = GRAVITINO_RELATIONAL_STORE_METRIC_NAME + ".getCatalogPOByName")
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "getCatalogPOByName")
   public CatalogPO getCatalogPOByName(String metalakeName, String catalogName) {
     CatalogPO catalogPO =
         SessionUtils.getWithoutCommit(
@@ -87,14 +89,17 @@ public class CatalogMetaService {
   }
 
   @Monitored(
-      prefix = GRAVITINO_RELATIONAL_STORE_METRIC_NAME + ".getCatalogIdByMetalakeAndCatalogName")
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "getCatalogIdByMetalakeAndCatalogName")
   public CatalogIds getCatalogIdByMetalakeAndCatalogName(String metalakeName, String catalogName) {
     return SessionUtils.getWithoutCommit(
         CatalogMetaMapper.class,
         mapper -> mapper.selectCatalogIdByMetalakeNameAndCatalogName(metalakeName, catalogName));
   }
 
-  @Monitored(prefix = GRAVITINO_RELATIONAL_STORE_METRIC_NAME + ".getCatalogIdByMetalakeIdAndName")
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "getCatalogIdByMetalakeIdAndName")
   public Long getCatalogIdByMetalakeIdAndName(Long metalakeId, String catalogName) {
     Long catalogId =
         SessionUtils.getWithoutCommit(
@@ -110,7 +115,9 @@ public class CatalogMetaService {
     return catalogId;
   }
 
-  @Monitored(prefix = GRAVITINO_RELATIONAL_STORE_METRIC_NAME + ".getCatalogIdByName")
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "getCatalogIdByName")
   public Long getCatalogIdByName(String metalakeName, String catalogName) {
     Long catalogId =
         SessionUtils.doWithCommitAndFetchResult(
@@ -126,7 +133,9 @@ public class CatalogMetaService {
     return catalogId;
   }
 
-  @Monitored(prefix = GRAVITINO_RELATIONAL_STORE_METRIC_NAME + ".getCatalogByIdentifier")
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "getCatalogByIdentifier")
   public CatalogEntity getCatalogByIdentifier(NameIdentifier identifier) {
     NameIdentifierUtil.checkCatalog(identifier);
     String catalogName = identifier.name();
@@ -136,7 +145,9 @@ public class CatalogMetaService {
     return POConverters.fromCatalogPO(catalogPO, identifier.namespace());
   }
 
-  @Monitored(prefix = GRAVITINO_RELATIONAL_STORE_METRIC_NAME + ".listCatalogsByNamespace")
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "listCatalogsByNamespace")
   public List<CatalogEntity> listCatalogsByNamespace(Namespace namespace) {
     NamespaceUtil.checkCatalog(namespace);
     List<CatalogPO> catalogPOS =
@@ -147,7 +158,9 @@ public class CatalogMetaService {
     return POConverters.fromCatalogPOs(catalogPOS, namespace);
   }
 
-  @Monitored(prefix = GRAVITINO_RELATIONAL_STORE_METRIC_NAME + ".insertCatalog")
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "insertCatalog")
   public void insertCatalog(CatalogEntity catalogEntity, boolean overwrite) throws IOException {
     try {
       NameIdentifierUtil.checkCatalog(catalogEntity.nameIdentifier());
@@ -172,7 +185,9 @@ public class CatalogMetaService {
     }
   }
 
-  @Monitored(prefix = GRAVITINO_RELATIONAL_STORE_METRIC_NAME + ".updateCatalog")
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "updateCatalog")
   public <E extends Entity & HasIdentifier> CatalogEntity updateCatalog(
       NameIdentifier identifier, Function<E, E> updater) throws IOException {
     NameIdentifierUtil.checkCatalog(identifier);
@@ -213,7 +228,9 @@ public class CatalogMetaService {
     }
   }
 
-  @Monitored(prefix = GRAVITINO_RELATIONAL_STORE_METRIC_NAME + ".deleteCatalog")
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "deleteCatalog")
   public boolean deleteCatalog(NameIdentifier identifier, boolean cascade) {
     NameIdentifierUtil.checkCatalog(identifier);
 
@@ -330,7 +347,8 @@ public class CatalogMetaService {
   }
 
   @Monitored(
-      prefix = GRAVITINO_RELATIONAL_STORE_METRIC_NAME + ".deleteCatalogMetasByLegacyTimeline")
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "deleteCatalogMetasByLegacyTimeline")
   public int deleteCatalogMetasByLegacyTimeline(Long legacyTimeline, int limit) {
     return SessionUtils.doWithCommitAndFetchResult(
         CatalogMetaMapper.class,
