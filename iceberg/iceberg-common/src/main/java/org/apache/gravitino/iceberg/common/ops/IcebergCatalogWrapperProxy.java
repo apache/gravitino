@@ -54,11 +54,13 @@ public class IcebergCatalogWrapperProxy implements MethodInterceptor {
   @Override
   public Object intercept(Object o, Method method, Object[] objects, MethodProxy methodProxy)
       throws Throwable {
-    Map<String, String> properties = target.getIcebergConfig().getIcebergCatalogProperties();
-    AuthenticationConfig authenticationConfig = new AuthenticationConfig(properties);
-    if (!authenticationConfig.isImpersonationEnabled()) {
+    // This means no kerberos is configured, just invoke the method directly.
+    if (kerberosClient == null) {
       return methodProxy.invoke(target, objects);
     }
+
+    Map<String, String> properties = target.getIcebergConfig().getIcebergCatalogProperties();
+    AuthenticationConfig authenticationConfig = new AuthenticationConfig(properties);
 
     final String finalPrincipalName;
     String proxyKerberosPrincipalName = PrincipalUtils.getCurrentPrincipal().getName();
@@ -71,7 +73,10 @@ public class IcebergCatalogWrapperProxy implements MethodInterceptor {
     }
 
     UserGroupInformation realUser =
-        UserGroupInformation.createProxyUser(finalPrincipalName, kerberosClient.getLoginUser());
+        authenticationConfig.isImpersonationEnabled()
+            ? UserGroupInformation.createProxyUser(
+                finalPrincipalName, kerberosClient.getLoginUser())
+            : kerberosClient.getLoginUser();
 
     try {
       ClientPool<IMetaStoreClient, TException> newClientPool =
