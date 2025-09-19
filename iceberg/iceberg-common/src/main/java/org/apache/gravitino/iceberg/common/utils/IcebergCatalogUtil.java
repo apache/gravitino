@@ -81,7 +81,6 @@ public class IcebergCatalogUtil {
       hiveCatalog.initialize(icebergCatalogName, properties);
       return hiveCatalog;
     } else if (authenticationConfig.isKerberosAuth()) {
-      @SuppressWarnings("ModifiedButNotUsed")
       Map<String, String> resultProperties = new HashMap<>(properties);
       resultProperties.put(CatalogProperties.CLIENT_POOL_CACHE_KEYS, "USER_NAME");
       hdfsConfiguration.set(HADOOP_SECURITY_AUTHORIZATION, "true");
@@ -92,15 +91,6 @@ public class IcebergCatalogUtil {
 
       KerberosClient kerberosClient = initKerberosAndReturnClient(properties, hdfsConfiguration);
       hiveCatalog.setKerberosClient(kerberosClient);
-      //      if (authenticationConfig.isImpersonationEnabled()) {
-      //        HiveBackendProxy proxyHiveCatalog =
-      //            new HiveBackendProxy(resultProperties, hiveCatalog, kerberosClient.getRealm());
-      //        ClosableHiveCatalog closableHiveCatalog = proxyHiveCatalog.getProxy();
-      //        hiveCatalog.setProxy(closableHiveCatalog);
-      //
-      //        return closableHiveCatalog;
-      //      }
-
       return hiveCatalog;
     } else {
       throw new UnsupportedOperationException(
