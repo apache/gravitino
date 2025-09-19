@@ -90,7 +90,7 @@ class TestCatalogCommand {
     Assertions.assertEquals(0, exitCode);
     Assertions.assertEquals("catalog1", mockCatalogCreate.name);
     Assertions.assertEquals("ml1", mockCatalogCreate.commonOptions.metalake);
-    Assertions.assertEquals(CatalogCreate.Provider.HIVE, mockCatalogCreate.provider);
+    Assertions.assertEquals("hive", mockCatalogCreate.provider);
     Assertions.assertEquals("hive catalog", mockCatalogCreate.comment);
     Assertions.assertEquals("value1", mockCatalogCreate.properties.get("key1"));
     Assertions.assertEquals("value2", mockCatalogCreate.properties.get("key2"));
@@ -112,7 +112,7 @@ class TestCatalogCommand {
     Assertions.assertEquals(0, exitCode);
     Assertions.assertEquals("catalog1", mockCatalogCreate.name);
     Assertions.assertEquals("ml1", mockCatalogCreate.commonOptions.metalake);
-    Assertions.assertEquals(CatalogCreate.Provider.HIVE, mockCatalogCreate.provider);
+    Assertions.assertEquals("hive", mockCatalogCreate.provider);
     Assertions.assertEquals("", mockCatalogCreate.comment);
     Assertions.assertEquals(0, mockCatalogCreate.properties.size());
   }

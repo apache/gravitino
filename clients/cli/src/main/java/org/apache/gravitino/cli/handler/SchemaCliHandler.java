@@ -77,7 +77,7 @@ public class SchemaCliHandler implements Runnable {
   /** {@inheritDoc} */
   @Override
   public void run() {
-    System.out.println("Schema command");
+    CommandLine.usage(this, System.out);
   }
 }
 
@@ -126,7 +126,9 @@ class SchemaDetails extends CliHandler {
 
     result = execute(() -> client.loadCatalog(catalog).asSchemas().loadSchema(schema));
 
-    if (result != null) {
+    if (audit) {
+      printResults(result.auditInfo());
+    } else {
       printResults(result);
     }
 

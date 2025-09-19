@@ -64,24 +64,10 @@ public class ModelCliHandler implements Runnable {
       description = "display help message")
   boolean usageHelpRequested;
 
-  /** Valid actions for the model command. */
-  private static final String VALID_ACTIONS =
-      COMMA_JOINER.join(
-          new String[] {
-            CommandActions.CREATE,
-            CommandActions.DETAILS,
-            CommandActions.UPDATE,
-            CommandActions.LIST,
-            CommandActions.SET,
-            CommandActions.DELETE,
-            CommandActions.REMOVE
-          });
-
   /** Runs the command. */
   @Override
   public void run() {
-    System.out.println(CommandEntities.MODEL + " " + "[command] [options]");
-    System.out.println("Available model commands: " + VALID_ACTIONS);
+    CommandLine.usage(this, System.out);
   }
 }
 

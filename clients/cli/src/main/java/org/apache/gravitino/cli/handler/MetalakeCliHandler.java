@@ -56,7 +56,7 @@ public class MetalakeCliHandler implements Runnable {
 
   @Override
   public void run() {
-    System.out.println("No operation specified, use --help to see available options");
+    CommandLine.usage(this, System.out);
   }
 }
 

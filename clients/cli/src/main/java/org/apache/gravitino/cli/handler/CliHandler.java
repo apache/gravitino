@@ -41,6 +41,8 @@ import org.apache.gravitino.client.GravitinoAdminClient;
 import org.apache.gravitino.client.GravitinoClient;
 import org.apache.gravitino.client.GravitinoClientBase;
 import org.apache.gravitino.client.KerberosTokenProvider;
+import org.apache.gravitino.exceptions.CatalogInUseException;
+import org.apache.gravitino.exceptions.MetalakeInUseException;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchColumnException;
 import org.apache.gravitino.exceptions.NoSuchFilesetException;
@@ -174,6 +176,10 @@ public abstract class CliHandler implements Callable<Integer> {
       exitWithError(ErrorMessages.UNKNOWN_USER);
     } catch (NoSuchGroupException err) {
       exitWithError(ErrorMessages.UNKNOWN_GROUP);
+    } catch (MetalakeInUseException err) {
+      exitWithError("Metalake" + ErrorMessages.ENTITY_IN_USE);
+    } catch (CatalogInUseException catalogInUseException) {
+      exitWithError("Catalog" + ErrorMessages.ENTITY_IN_USE);
     } catch (Exception exp) {
       exitWithError(exp.getMessage());
     }
