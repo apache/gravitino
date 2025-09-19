@@ -157,11 +157,20 @@ public final class AuditInfo implements Audit, Entity {
       return this;
     }
 
-    this.creator = overwrite || this.creator == null ? other.creator : creator;
-    this.createTime = overwrite || this.createTime == null ? other.createTime : createTime;
-    this.lastModifier = overwrite || this.lastModifier == null ? other.lastModifier : lastModifier;
+    this.creator =
+        (overwrite && other.creator != null) || this.creator == null ? other.creator : creator;
+    this.createTime =
+        (overwrite && other.createTime != null) || this.createTime == null
+            ? other.createTime
+            : createTime;
+    this.lastModifier =
+        (overwrite && other.lastModifier != null) || this.lastModifier == null
+            ? other.lastModifier
+            : lastModifier;
     this.lastModifiedTime =
-        overwrite || this.lastModifiedTime == null ? other.lastModifiedTime : lastModifiedTime;
+        (overwrite && other.lastModifiedTime != null) || this.lastModifiedTime == null
+            ? other.lastModifiedTime
+            : lastModifiedTime;
 
     return this;
   }
