@@ -54,9 +54,9 @@ public class TestAuthorizationExpressionConverter {
             createTableAuthorizationExpression);
     Assertions.assertEquals(
         "authorizer.authorize(principal,METALAKE_NAME,CATALOG,"
-            + "@org.apache.gravitino.authorization.Privilege$Name@CREATE_TABLE) "
+            + "@org.apache.gravitino.authorization.Privilege$Name@CREATE_TABLE,authorizationContext) "
             + "|| authorizer.authorize(principal,METALAKE_NAME,SCHEMA,"
-            + "@org.apache.gravitino.authorization.Privilege$Name@CREATE_SCHEMA)",
+            + "@org.apache.gravitino.authorization.Privilege$Name@CREATE_SCHEMA,authorizationContext)",
         createTableOgnlExpression);
     String selectTableAuthorizationExpression =
         "CATALOG::USE_CATALOG && SCHEMA::USE_SCHEMA &&"
@@ -66,13 +66,13 @@ public class TestAuthorizationExpressionConverter {
             selectTableAuthorizationExpression);
     Assertions.assertEquals(
         "authorizer.authorize(principal,METALAKE_NAME,CATALOG,"
-            + "@org.apache.gravitino.authorization.Privilege$Name@USE_CATALOG) "
+            + "@org.apache.gravitino.authorization.Privilege$Name@USE_CATALOG,authorizationContext) "
             + "&& authorizer.authorize(principal,METALAKE_NAME,SCHEMA,"
-            + "@org.apache.gravitino.authorization.Privilege$Name@USE_SCHEMA) "
+            + "@org.apache.gravitino.authorization.Privilege$Name@USE_SCHEMA,authorizationContext) "
             + "&& (authorizer.authorize(principal,METALAKE_NAME,TABLE,"
-            + "@org.apache.gravitino.authorization.Privilege$Name@SELECT_TABLE) "
+            + "@org.apache.gravitino.authorization.Privilege$Name@SELECT_TABLE,authorizationContext) "
             + "|| authorizer.authorize(principal,METALAKE_NAME,TABLE,"
-            + "@org.apache.gravitino.authorization.Privilege$Name@MODIFY_TABLE))",
+            + "@org.apache.gravitino.authorization.Privilege$Name@MODIFY_TABLE,authorizationContext))",
         selectTableOgnlExpression);
   }
 
@@ -83,7 +83,7 @@ public class TestAuthorizationExpressionConverter {
         AuthorizationExpressionConverter.convertToOgnlExpression(expressionWithOwner);
     Assertions.assertEquals(
         "authorizer.authorize(principal,METALAKE_NAME,CATALOG,"
-            + "@org.apache.gravitino.authorization.Privilege$Name@CREATE_SCHEMA) "
+            + "@org.apache.gravitino.authorization.Privilege$Name@CREATE_SCHEMA,authorizationContext) "
             + "|| authorizer.isOwner(principal,METALAKE_NAME,SCHEMA)",
         createTableOgnlExpression);
 
@@ -94,7 +94,7 @@ public class TestAuthorizationExpressionConverter {
         "(authorizer.isOwner(principal,METALAKE_NAME,METALAKE) "
             + "|| authorizer.isOwner(principal,METALAKE_NAME,CATALOG))"
             + " && authorizer.authorize(principal,METALAKE_NAME,CATALOG"
-            + ",@org.apache.gravitino.authorization.Privilege$Name@USE_CATALOG))",
+            + ",@org.apache.gravitino.authorization.Privilege$Name@USE_CATALOG,authorizationContext))",
         useCatalogOgnExpression);
   }
 

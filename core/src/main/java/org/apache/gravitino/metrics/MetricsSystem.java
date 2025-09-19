@@ -24,6 +24,7 @@ import com.codahale.metrics.MetricRegistry;
 import com.codahale.metrics.Reporter;
 import com.codahale.metrics.jmx.JmxReporter;
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 import io.prometheus.client.CollectorRegistry;
 import io.prometheus.client.dropwizard.DropwizardExports;
@@ -77,7 +78,15 @@ public class MetricsSystem implements Closeable {
   public synchronized void register(MetricsSource metricsSource) {
     LOG.info("Register {} to metrics system {}", metricsSource.getMetricsSourceName(), name);
     if (metricSources.containsKey(metricsSource.getMetricsSourceName())) {
-      unregister(metricSources.get(metricsSource.getMetricsSourceName()));
+      MetricsSource originalMetricsSource = metricSources.get(metricsSource.getMetricsSourceName());
+      // In case different MetricsSource use the same name
+      Preconditions.checkState(
+          metricsSource.getClass().getName().equals(originalMetricsSource.getClass().getName()),
+          "Metrics source name %s is already registered, and it's class name is %s, but the new metrics source class name is %s",
+          metricsSource.getMetricsSourceName(),
+          originalMetricsSource.getClass().getName(),
+          metricsSource.getClass().getName());
+      unregister(originalMetricsSource);
     }
     this.metricSources.put(metricsSource.getMetricsSourceName(), metricsSource);
     metricRegistry.register(

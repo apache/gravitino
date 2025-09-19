@@ -49,6 +49,7 @@ import org.apache.gravitino.metrics.MetricNames;
 import org.apache.gravitino.server.authorization.MetadataFilterHelper;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationExpression;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationMetadata;
+import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants;
 import org.apache.gravitino.server.web.Utils;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
@@ -58,11 +59,6 @@ import org.slf4j.LoggerFactory;
 @Path("/metalakes/{metalake}/catalogs/{catalog}/schemas/{schema}/topics")
 public class TopicOperations {
   private static final Logger LOG = LoggerFactory.getLogger(TopicOperations.class);
-
-  private static final String loadTopicsAuthorizationExpression =
-      "ANY(OWNER, METALAKE, CATALOG) || "
-          + "SCHEMA_OWNER_WITH_USE_CATALOG || "
-          + "ANY_USE_CATALOG && ANY_USE_SCHEMA && (TOPIC::OWNER || ANY_CONSUME_TOPIC || ANY_PRODUCE_TOPIC)";
 
   private final TopicDispatcher dispatcher;
 
@@ -77,10 +73,14 @@ public class TopicOperations {
   @Produces("application/vnd.gravitino.v1+json")
   @Timed(name = "list-topic." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "list-topic", absolute = true)
+  @AuthorizationExpression(
+      expression = AuthorizationExpressionConstants.loadSchemaAuthorizationExpression,
+      accessMetadataType = MetadataObject.Type.SCHEMA)
   public Response listTopics(
-      @PathParam("metalake") String metalake,
-      @PathParam("catalog") String catalog,
-      @PathParam("schema") String schema) {
+      @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
+          String metalake,
+      @PathParam("catalog") @AuthorizationMetadata(type = Entity.EntityType.CATALOG) String catalog,
+      @PathParam("schema") @AuthorizationMetadata(type = Entity.EntityType.SCHEMA) String schema) {
     try {
       LOG.info("Received list topics request for schema: {}.{}.{}", metalake, catalog, schema);
       return Utils.doAs(
@@ -92,7 +92,10 @@ public class TopicOperations {
             topics = topics == null ? new NameIdentifier[0] : topics;
             topics =
                 MetadataFilterHelper.filterByExpression(
-                    metalake, loadTopicsAuthorizationExpression, Entity.EntityType.TOPIC, topics);
+                    metalake,
+                    AuthorizationExpressionConstants.filterTopicsAuthorizationExpression,
+                    Entity.EntityType.TOPIC,
+                    topics);
             Response response = Utils.ok(new EntityListResponse(topics));
             LOG.info(
                 "List {} topics under schema: {}.{}.{}", topics.length, metalake, catalog, schema);
@@ -156,7 +159,7 @@ public class TopicOperations {
   @Timed(name = "load-topic." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "load-topic", absolute = true)
   @AuthorizationExpression(
-      expression = loadTopicsAuthorizationExpression,
+      expression = AuthorizationExpressionConstants.loadTopicsAuthorizationExpression,
       accessMetadataType = MetadataObject.Type.TOPIC)
   public Response loadTopic(
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
