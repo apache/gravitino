@@ -99,11 +99,15 @@ public interface TableUpdateRequest extends RESTRequest {
   /** Represents a request to rename a table. */
   @EqualsAndHashCode
   @ToString
+  @Getter
   class RenameTableRequest implements TableUpdateRequest {
 
-    @Getter
     @JsonProperty("newName")
     private final String newName;
+
+    @JsonProperty("newSchemaName")
+    @Nullable
+    private final String newSchemaName;
 
     /**
      * Constructor for RenameTableRequest.
@@ -111,12 +115,23 @@ public interface TableUpdateRequest extends RESTRequest {
      * @param newName the new name of the table
      */
     public RenameTableRequest(String newName) {
-      this.newName = newName;
+      this(newName, null);
     }
 
     /** Default constructor for Jackson deserialization. */
     public RenameTableRequest() {
       this(null);
+    }
+
+    /**
+     * Constructor for RenameTableRequest.
+     *
+     * @param newName the new name of the table
+     * @param newSchemaName the new schema name of the table, null if not changing schema
+     */
+    public RenameTableRequest(String newName, @Nullable String newSchemaName) {
+      this.newName = newName;
+      this.newSchemaName = newSchemaName;
     }
 
     /**
@@ -137,7 +152,7 @@ public interface TableUpdateRequest extends RESTRequest {
      */
     @Override
     public TableChange tableChange() {
-      return TableChange.rename(newName);
+      return TableChange.rename(newName, newSchemaName);
     }
   }
 

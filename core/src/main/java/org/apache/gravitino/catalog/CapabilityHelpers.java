@@ -325,8 +325,13 @@ public class CapabilityHelpers {
       TableChange.RenameTable renameTable, Capability capabilities) {
     String newName =
         applyCaseSensitiveOnName(Capability.Scope.TABLE, renameTable.getNewName(), capabilities);
+    String newSchemaName =
+        renameTable
+            .getNewSchemaName()
+            .map(s -> applyCaseSensitiveOnName(Capability.Scope.SCHEMA, s, capabilities))
+            .orElse(null);
     applyNameSpecification(Capability.Scope.TABLE, newName, capabilities);
-    return TableChange.rename(newName);
+    return TableChange.rename(newName, newSchemaName);
   }
 
   private static TableChange applyCapabilities(

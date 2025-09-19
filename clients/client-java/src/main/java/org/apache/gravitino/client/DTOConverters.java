@@ -197,8 +197,9 @@ class DTOConverters {
 
   static TableUpdateRequest toTableUpdateRequest(TableChange change) {
     if (change instanceof TableChange.RenameTable) {
+      TableChange.RenameTable renameTable = (TableChange.RenameTable) change;
       return new TableUpdateRequest.RenameTableRequest(
-          ((TableChange.RenameTable) change).getNewName());
+          renameTable.getNewName(), renameTable.getNewSchemaName().orElse(null));
 
     } else if (change instanceof TableChange.UpdateComment) {
       return new TableUpdateRequest.UpdateTableCommentRequest(

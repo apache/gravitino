@@ -23,6 +23,7 @@ package org.apache.gravitino.rel;
 import com.google.common.base.Preconditions;
 import java.util.Arrays;
 import java.util.Objects;
+import java.util.Optional;
 import org.apache.gravitino.annotation.Evolving;
 import org.apache.gravitino.rel.expressions.Expression;
 import org.apache.gravitino.rel.indexes.Index.IndexType;
@@ -42,6 +43,17 @@ public interface TableChange {
    */
   static TableChange rename(String newName) {
     return new RenameTable(newName);
+  }
+
+  /**
+   * Create a TableChange for renaming a table, possibly moving it to a new schema.
+   *
+   * @param newName the new table name
+   * @param newSchemaName the new schema name, or null to leave the schema unchanged
+   * @return A TableChange for the rename.
+   */
+  static TableChange rename(String newName, String newSchemaName) {
+    return new RenameTable(newName, Optional.ofNullable(newSchemaName));
   }
 
   /**
@@ -467,9 +479,15 @@ public interface TableChange {
   /** A TableChange to rename a table. */
   final class RenameTable implements TableChange {
     private final String newName;
+    private final Optional<String> newSchemaName;
 
     private RenameTable(String newName) {
+      this(newName, Optional.empty());
+    }
+
+    private RenameTable(String newName, Optional<String> newSchemaName) {
       this.newName = newName;
+      this.newSchemaName = newSchemaName;
     }
 
     /**
@@ -479,6 +497,15 @@ public interface TableChange {
      */
     public String getNewName() {
       return newName;
+    }
+
+    /**
+     * Retrieves the new schema name for the table, if provided.
+     *
+     * @return An Optional containing the new schema of the table, or empty if not provided.
+     */
+    public Optional<String> getNewSchemaName() {
+      return newSchemaName;
     }
 
     /**
@@ -493,7 +520,7 @@ public interface TableChange {
       if (this == o) return true;
       if (o == null || getClass() != o.getClass()) return false;
       RenameTable that = (RenameTable) o;
-      return newName.equals(that.newName);
+      return newName.equals(that.newName) && newSchemaName.equals(that.newSchemaName);
     }
 
     /**
@@ -504,7 +531,7 @@ public interface TableChange {
      */
     @Override
     public int hashCode() {
-      return newName.hashCode();
+      return Objects.hash(newName, newSchemaName);
     }
 
     /**
@@ -515,7 +542,7 @@ public interface TableChange {
      */
     @Override
     public String toString() {
-      return "RENAMETABLE " + newName;
+      return "RENAMETABLE " + newSchemaName.map(s -> s + "." + newName).orElse(newName);
     }
   }
 
