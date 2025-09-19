@@ -28,6 +28,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+import lombok.Getter;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.security.UserGroupInformation;
@@ -40,6 +41,7 @@ public class KerberosClient implements Closeable {
   private final ScheduledThreadPoolExecutor checkTgtExecutor;
   private final Map<String, String> conf;
   private final Configuration hadoopConf;
+  @Getter private UserGroupInformation loginUser;
   private String realm;
 
   public KerberosClient(Map<String, String> conf, Configuration hadoopConf) {
@@ -72,15 +74,15 @@ public class KerberosClient implements Closeable {
 
     // Login
     UserGroupInformation.setConfiguration(hadoopConf);
-    UserGroupInformation.loginUserFromKeytab(catalogPrincipal, keytabFilePath);
-    UserGroupInformation kerberosLoginUgi = UserGroupInformation.getCurrentUser();
+    loginUser =
+        UserGroupInformation.loginUserFromKeytabAndReturnUGI(catalogPrincipal, keytabFilePath);
 
     // Refresh the cache if it's out of date.
     int checkInterval = kerberosConfig.getCheckIntervalSec();
     checkTgtExecutor.scheduleAtFixedRate(
         () -> {
           try {
-            kerberosLoginUgi.checkTGTAndReloginFromKeytab();
+            loginUser.checkTGTAndReloginFromKeytab();
           } catch (Exception e) {
             LOG.error("Fail to refresh ugi token: ", e);
           }
