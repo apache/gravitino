@@ -82,6 +82,7 @@ import org.apache.gravitino.dto.responses.JobListResponse;
 import org.apache.gravitino.dto.responses.JobResponse;
 import org.apache.gravitino.dto.responses.JobTemplateListResponse;
 import org.apache.gravitino.dto.responses.JobTemplateResponse;
+import org.apache.gravitino.dto.responses.MetadataObjectListResponse;
 import org.apache.gravitino.dto.responses.NameListResponse;
 import org.apache.gravitino.dto.responses.OwnerResponse;
 import org.apache.gravitino.dto.responses.PolicyListResponse;
@@ -575,6 +576,28 @@ public class GravitinoMetalake extends MetalakeDTO
             ErrorHandlers.tagErrorHandler());
     resp.validate();
     return resp.dropped();
+  }
+
+  /**
+   * List all metadata objects associated with the specified tags.
+   *
+   * @param tagNames Array of tag names to query for associated objects.
+   * @return Array of metadata objects associated with the specified tags.
+   * @throws NoSuchTagException If any of the specified tags do not exist.
+   */
+  @Override
+  public MetadataObject[] listMetadataObjectsForTags(String[] tagNames) throws NoSuchTagException {
+    String tagsParam = String.join(",", tagNames);
+    MetadataObjectListResponse resp =
+        restClient.get(
+            String.format("api/metalakes/%s", RESTUtils.encodeString(this.name()))
+                + "/objects?tags="
+                + RESTUtils.encodeString(tagsParam),
+            MetadataObjectListResponse.class,
+            Collections.emptyMap(),
+            ErrorHandlers.tagErrorHandler());
+    resp.validate();
+    return resp.getMetadataObjects();
   }
 
   /**
