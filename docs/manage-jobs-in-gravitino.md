@@ -99,9 +99,6 @@ Please note that:
 
 The `spark` job template is used to run Spark jobs, it is a Spark application JAR file for now.
 
-**Note** that the Spark job support is still under development, in 1.0.0, it only supports
-registering a Spark job template, running a Spark job is not supported yet.
-
 The template is defined as follows:
 
 ```json
@@ -548,6 +545,7 @@ The following are the default configurations for the local job executor:
 | `gravitino.jobExecutor.local.waitingQueueSize`      | The size of the waiting queue for queued jobs in the local job executor   | `100`                                  | No       | 1.0.0         |
 | `gravitino.jobExecutor.local.maxRunningJobs`        | The maximum number of running jobs in the local job executor              | `max(1, min(available cores / 2, 10))` | No       | 1.0.0         |
 | `gravitino.jobExecutor.local.jobStatusKeepTimeInMs` | The time in milliseconds to keep the job status in the local job executor | `3600000` (1 hour)                     | No       | 1.0.0         |
+| `gravitino.jobExecutor.local.sparkHome`             | The home directory of Spark, it is required for running Spark jobs        | `None`                                 | No       | 1.1.0         |
 
 ### Implement a custom job executor
 

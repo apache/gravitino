@@ -35,4 +35,6 @@ public class LocalJobExecutorConfigs {
 
   public static final String JOB_STATUS_KEEP_TIME_MS = "jobStatusKeepTimeInMs";
   public static final long DEFAULT_JOB_STATUS_KEEP_TIME_MS = 60 * 60 * 1000; // 1 hour
+
+  public static final String SPARK_HOME = "sparkHome";
 }

@@ -18,13 +18,11 @@
  */
 package org.apache.gravitino.job;
 
-import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import org.apache.commons.lang3.StringUtils;
 
 /**
  * Represents a job template for executing Spark applications. This class extends the JobTemplate
@@ -144,7 +142,9 @@ public class SparkJobTemplate extends JobTemplate {
   @Override
   public String toString() {
     StringBuilder sb = new StringBuilder("\nSparkJobTemplate{\n");
-    sb.append("  className='").append(className).append("',\n");
+    if (className != null) {
+      sb.append("  className='").append(className).append("',\n");
+    }
 
     if (!jars.isEmpty()) {
       sb.append("  jars=[\n");
@@ -279,9 +279,6 @@ public class SparkJobTemplate extends JobTemplate {
     @Override
     protected void validate() {
       super.validate();
-
-      Preconditions.checkArgument(
-          StringUtils.isNotBlank(className), "Class name must not be null or empty");
 
       this.jars = jars != null ? ImmutableList.copyOf(jars) : ImmutableList.of();
       this.files = files != null ? ImmutableList.copyOf(files) : ImmutableList.of();
