@@ -526,7 +526,7 @@ class TestTableChange(unittest.TestCase):
             )
             self.assertListEqual(update_column_auto_increment.field_name(), field_name)
             self.assertEqual(
-                update_column_auto_increment.get_auto_increment(), auto_increment
+                update_column_auto_increment.is_auto_increment(), auto_increment
             )
 
     def test_update_column_auto_increment_equal_and_hash(self):
@@ -559,5 +559,8 @@ class TestTableChange(unittest.TestCase):
         )
         self.assertFalse(
             another_update_column_auto_increment == update_column_auto_increments[0]
+        )
+        self.assertFalse(
+            update_column_auto_increments[0] == "invalid_update_column_auto_increment"
         )
         self.assertEqual(len(update_column_auto_increment_dict), 2)
