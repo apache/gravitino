@@ -996,8 +996,17 @@ class DeleteColumn(TableChange.ColumnChange):
         """
         return self._if_exists
 
+    def __eq__(self, value: object) -> bool:
+        if not isinstance(value, DeleteColumn):
+            return False
+        other = cast(DeleteColumn, value)
+        return (
+            self._field_name == other.get_field_name()
+            and self._if_exists == other.get_if_exists()
+        )
+
     def __hash__(self) -> int:
-        return hash((*sorted(self._field_name), self._if_exists))
+        return 31 * hash(self._if_exists) + hash(tuple(self._field_name))
 
 
 @final
