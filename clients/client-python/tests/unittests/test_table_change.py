@@ -385,6 +385,7 @@ class TestTableChange(unittest.TestCase):
         }
         self.assertFalse(update_column_positions[0] == another_update_column_position)
         self.assertFalse(another_update_column_position == update_column_positions[0])
+        self.assertFalse(update_column_positions[0] == "invalid_update_column_position")
         self.assertEqual(len(update_column_position_dict), 2)
 
     def test_delete_column(self):
