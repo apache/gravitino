@@ -730,10 +730,23 @@ class AddColumn(TableChange.ColumnChange):
     def field_name(self) -> list[str]:
         return self._field_name
 
+    def __eq__(self, value: object) -> bool:
+        if not isinstance(value, AddColumn):
+            return False
+        other = cast(AddColumn, value)
+        return (
+            self._nullable == other.is_nullable()
+            and self._auto_increment == other.is_auto_increment()
+            and self._field_name == other.get_field_name()
+            and self._comment == other.get_comment()
+            and self._data_type == other.get_data_type()
+            and self._position == other.get_position()
+            and self.get_default_value() == other.get_default_value()
+        )
+
     def __hash__(self) -> int:
-        return hash(
+        return 31 * hash(
             (
-                *sorted(self._field_name),
                 self._data_type,
                 self._comment,
                 self._position,
@@ -745,7 +758,7 @@ class AddColumn(TableChange.ColumnChange):
                     else self._default_value
                 ),
             )
-        )
+        ) + hash(tuple(self._field_name))
 
 
 @final
