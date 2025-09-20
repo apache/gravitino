@@ -23,6 +23,9 @@ import com.google.common.collect.Lists;
 import java.io.Closeable;
 import java.io.IOException;
 import java.util.List;
+import lombok.Getter;
+import org.apache.gravitino.iceberg.common.authentication.SupportsKerberos;
+import org.apache.gravitino.iceberg.common.authentication.kerberos.KerberosClient;
 import org.apache.iceberg.hive.HiveCatalog;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -31,11 +34,16 @@ import org.slf4j.LoggerFactory;
  * ClosableHiveCatalog is a wrapper class to wrap Iceberg HiveCatalog to do some clean-up work like
  * closing resources.
  */
-public class ClosableHiveCatalog extends HiveCatalog implements Closeable {
+public class ClosableHiveCatalog extends HiveCatalog implements Closeable, SupportsKerberos {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(ClosableHiveCatalog.class);
 
-  private final List<Closeable> resources = Lists.newArrayList();
+  @Getter private final List<Closeable> resources = Lists.newArrayList();
+
+  @SuppressWarnings("unused")
+  private ClosableHiveCatalog proxy;
+
+  private KerberosClient kerberosClient;
 
   public ClosableHiveCatalog() {
     super();
@@ -45,8 +53,25 @@ public class ClosableHiveCatalog extends HiveCatalog implements Closeable {
     resources.add(resource);
   }
 
+  public void setKerberosClient(KerberosClient kerberosClient) {
+    this.kerberosClient = kerberosClient;
+  }
+
+  @Override
+  public KerberosClient getKerberosClient() {
+    return kerberosClient;
+  }
+
   @Override
   public void close() throws IOException {
+    if (kerberosClient != null) {
+      try {
+        kerberosClient.close();
+      } catch (Exception e) {
+        LOGGER.warn("Failed to close KerberosClient", e);
+      }
+    }
+
     // Do clean up work here. We need a mechanism to close the HiveCatalog; however, HiveCatalog
     // doesn't implement the Closeable interface.
     resources.forEach(
