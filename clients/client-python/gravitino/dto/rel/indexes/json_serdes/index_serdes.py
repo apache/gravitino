@@ -18,7 +18,7 @@
 from typing import Any
 
 from gravitino.api.rel.indexes.index import Index
-from gravitino.api.types.json_serdes import JsonSerializable
+from gravitino.api.rel.types.json_serdes import JsonSerializable
 from gravitino.dto.rel.indexes.index_dto import IndexDTO
 from gravitino.utils.precondition import Precondition
 from gravitino.utils.serdes import SerdesUtilsBase

@@ -19,7 +19,7 @@ from typing import Any, Dict
 
 from gravitino.api.expressions.sorts.null_ordering import NullOrdering
 from gravitino.api.expressions.sorts.sort_direction import SortDirection
-from gravitino.api.types.json_serdes import JsonSerializable
+from gravitino.api.rel.types.json_serdes import JsonSerializable
 from gravitino.dto.rel.expressions.json_serdes._helper.serdes_utils import SerdesUtils
 from gravitino.dto.rel.sort_order_dto import SortOrderDTO
 from gravitino.utils.precondition import Precondition

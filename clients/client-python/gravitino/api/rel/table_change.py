@@ -24,7 +24,7 @@ from dataclasses_json import config
 from gravitino.api.expressions.expression import Expression
 from gravitino.api.rel.column import Column
 from gravitino.api.rel.indexes.index import Index
-from gravitino.api.types.type import Type
+from gravitino.api.rel.types.type import Type
 
 
 class TableChange(ABC):

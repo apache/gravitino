@@ -21,7 +21,7 @@ from dataclasses_json.core import Json
 
 from gravitino.api.expressions.expression import Expression
 from gravitino.api.rel.column import Column
-from gravitino.api.types.json_serdes.base import JsonSerializable
+from gravitino.api.rel.types.json_serdes.base import JsonSerializable
 from gravitino.dto.rel.expressions.json_serdes._helper.serdes_utils import SerdesUtils
 
 
