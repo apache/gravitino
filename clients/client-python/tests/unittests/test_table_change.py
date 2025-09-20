@@ -453,6 +453,7 @@ class TestTableChange(unittest.TestCase):
         add_index_dict = {add_indexes[i]: i for i in range(2)}
         self.assertTrue(add_indexes[0] == add_indexes[1])
         self.assertTrue(add_indexes[1] == add_indexes[0])
+        self.assertFalse(add_indexes[0] == "invalid_add_index")
         self.assertEqual(len(add_index_dict), 1)
 
         another_add_index = TableChange.add_index(
