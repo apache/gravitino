@@ -44,7 +44,6 @@ import org.apache.iceberg.TableProperties;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.exceptions.ServiceUnavailableException;
-import org.apache.iceberg.rest.credentials.ImmutableCredential;
 import org.apache.iceberg.rest.requests.CreateTableRequest;
 import org.apache.iceberg.rest.responses.ImmutableLoadCredentialsResponse;
 import org.apache.iceberg.rest.responses.LoadCredentialsResponse;
@@ -109,16 +108,25 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
    * @return A {@link org.apache.iceberg.rest.responses.LoadCredentialsResponse} object containing
    *     the credentials.
    */
-  public LoadCredentialsResponse loadTableCredentials(TableIdentifier identifier) {
+  public LoadCredentialsResponse getTableCredentials(TableIdentifier identifier) {
     try {
       LoadTableResponse loadTableResponse = super.loadTable(identifier);
       Credential credential = getCredential(loadTableResponse);
-      // Convert Gravitino credential to Iceberg credential.
-      ImmutableCredential icebergCredential =
-          ImmutableCredential.builder()
-              .prefix(credential.credentialType())
-              .config(CredentialPropertyUtils.toIcebergProperties(credential))
-              .build();
+      org.apache.iceberg.rest.credentials.Credential icebergCredential =
+          new org.apache.iceberg.rest.credentials.Credential() {
+            @Override
+            public String prefix() {
+              return "";
+            }
+
+            @Override
+            public Map<String, String> config() {
+              return CredentialPropertyUtils.toIcebergProperties(credential);
+            }
+
+            @Override
+            public void validate() {}
+          };
       return ImmutableLoadCredentialsResponse.builder().addCredentials(icebergCredential).build();
     } catch (ServiceUnavailableException e) {
       LOG.warn("Service unavailable when loading table credentials for table: {}", identifier, e);

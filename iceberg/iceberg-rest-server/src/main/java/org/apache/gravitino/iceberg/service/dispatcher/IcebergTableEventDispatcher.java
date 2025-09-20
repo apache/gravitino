@@ -260,9 +260,7 @@ public class IcebergTableEventDispatcher implements IcebergTableOperationDispatc
           new IcebergLoadTableCredentialFailureEvent(context, gravitinoNameIdentifier, e));
       throw e;
     }
-    eventBus.dispatchEvent(
-        new IcebergLoadTableCredentialEvent(
-            context, gravitinoNameIdentifier, loadCredentialsResponse));
+    eventBus.dispatchEvent(new IcebergLoadTableCredentialEvent(context, gravitinoNameIdentifier));
     return loadCredentialsResponse;
   }
 }

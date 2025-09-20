@@ -21,30 +21,17 @@ package org.apache.gravitino.listener.api.event;
 
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.annotation.DeveloperApi;
-import org.apache.gravitino.iceberg.service.IcebergRestUtils;
-import org.apache.iceberg.rest.responses.LoadCredentialsResponse;
 
 /** Represent an event after loading Iceberg table credential successfully. */
 @DeveloperApi
 public class IcebergLoadTableCredentialEvent extends IcebergTableEvent {
-  private final LoadCredentialsResponse loadCredentialsResponse;
-
   public IcebergLoadTableCredentialEvent(
-      IcebergRequestContext icebergRequestContext,
-      NameIdentifier resourceIdentifier,
-      LoadCredentialsResponse loadCredentialsResponse) {
+      IcebergRequestContext icebergRequestContext, NameIdentifier resourceIdentifier) {
     super(icebergRequestContext, resourceIdentifier);
-    this.loadCredentialsResponse =
-        IcebergRestUtils.cloneIcebergRESTObject(
-            loadCredentialsResponse, LoadCredentialsResponse.class);
   }
 
   @Override
   public OperationType operationType() {
     return OperationType.LOAD_TABLE_CREDENTIAL;
-  }
-
-  public LoadCredentialsResponse getLoadCredentialsResponse() {
-    return loadCredentialsResponse;
   }
 }

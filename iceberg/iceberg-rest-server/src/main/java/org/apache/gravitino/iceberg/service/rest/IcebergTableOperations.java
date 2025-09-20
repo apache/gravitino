@@ -358,10 +358,6 @@ public class IcebergTableOperations {
             // First check if the table exists
             IcebergRequestContext context =
                 new IcebergRequestContext(httpServletRequest(), catalogName);
-            boolean exists = tableOperationDispatcher.tableExists(context, tableIdentifier);
-            if (!exists) {
-              return IcebergRestUtils.notExists();
-            }
             // Get credentials using the table operation dispatcher
             LoadCredentialsResponse credentialsResponse =
                 tableOperationDispatcher.getTableCredentials(context, tableIdentifier);
