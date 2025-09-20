@@ -953,8 +953,17 @@ class UpdateColumnPosition(TableChange.ColumnChange):
         """
         return self._position
 
+    def __eq__(self, value: object) -> bool:
+        if not isinstance(value, UpdateColumnPosition):
+            return False
+        other = cast(UpdateColumnPosition, value)
+        return (
+            self._field_name == other.get_field_name()
+            and self._position == other.get_position()
+        )
+
     def __hash__(self) -> int:
-        return hash((*sorted(self._field_name), self._position))
+        return 31 * hash(self._position) + hash(tuple(self._field_name))
 
 
 @final
