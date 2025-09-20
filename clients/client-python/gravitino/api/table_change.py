@@ -355,6 +355,15 @@ class TableChange(ABC):
         def __str__(self):
             return f"UPDATECOMMENT {self._new_comment}"
 
+        def __eq__(self, value: object) -> bool:
+            if not isinstance(value, TableChange.UpdateComment):
+                return False
+            other = cast(TableChange.UpdateComment, value)
+            return self._new_comment == other.get_new_comment()
+
+        def __hash__(self) -> int:
+            return hash(self._new_comment)
+
     @final
     @dataclass(frozen=True)
     class SetProperty:
