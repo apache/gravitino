@@ -21,9 +21,9 @@ from typing import Optional, cast, final
 
 from dataclasses_json import config
 
-from gravitino.api.column import Column
 from gravitino.api.expressions.expression import Expression
 from gravitino.api.expressions.indexes.index import Index
+from gravitino.api.rel.column import Column
 from gravitino.api.types.type import Type
 
 
