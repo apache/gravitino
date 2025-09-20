@@ -871,8 +871,17 @@ class UpdateColumnType(TableChange.ColumnChange):
     def get_new_data_type(self) -> Type:
         return self._new_data_type
 
+    def __eq__(self, value: object) -> bool:
+        if not isinstance(value, UpdateColumnType):
+            return False
+        other = cast(UpdateColumnType, value)
+        return (
+            self._field_name == other.get_field_name()
+            and self._new_data_type == other.get_new_data_type()
+        )
+
     def __hash__(self) -> int:
-        return hash((*sorted(self._field_name), self._new_data_type))
+        return 31 * hash(self._new_data_type) + hash(tuple(self._field_name))
 
 
 @final
