@@ -109,14 +109,13 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
    * @return A {@link org.apache.iceberg.rest.responses.LoadCredentialsResponse} object containing
    *     the credentials.
    */
-  public LoadCredentialsResponse loadTableCredentials(TableIdentifier identifier) {
+  public LoadCredentialsResponse getTableCredentials(TableIdentifier identifier) {
     try {
       LoadTableResponse loadTableResponse = super.loadTable(identifier);
       Credential credential = getCredential(loadTableResponse);
       // Convert Gravitino credential to Iceberg credential.
       ImmutableCredential icebergCredential =
           ImmutableCredential.builder()
-              .prefix(credential.credentialType())
               .config(CredentialPropertyUtils.toIcebergProperties(credential))
               .build();
       return ImmutableLoadCredentialsResponse.builder().addCredentials(icebergCredential).build();

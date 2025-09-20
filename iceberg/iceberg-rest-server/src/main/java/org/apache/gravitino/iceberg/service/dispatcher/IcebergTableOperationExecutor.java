@@ -104,6 +104,6 @@ public class IcebergTableOperationExecutor implements IcebergTableOperationDispa
       IcebergRequestContext context, TableIdentifier tableIdentifier) {
     return icebergCatalogWrapperManager
         .getCatalogWrapper(context.catalogName())
-        .loadTableCredentials(tableIdentifier);
+        .getTableCredentials(tableIdentifier);
   }
 }
