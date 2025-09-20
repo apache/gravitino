@@ -29,11 +29,14 @@ class TestTableChange(unittest.TestCase):
         rename1, rename2 = (
             TableChange.rename(f"New table name {i + 1}") for i in range(2)
         )
+        rename3 = TableChange.rename("New table name 1")
         self.assertEqual(rename1.get_new_name(), "New table name 1")
         self.assertEqual(str(rename1), f"RENAMETABLE {rename1.get_new_name()}")
         self.assertFalse(rename1 == rename2)
         self.assertFalse(rename1 == "invalid_rename")
-        self.assertTrue(rename1 == TableChange.rename("New table name 1"))
+        self.assertTrue(rename1 == rename3)
+        self.assertTrue(hash(rename1) == hash(rename3))
+        self.assertFalse(hash(rename1) == hash(rename2))
 
     def test_table_change_update_comment(self):
         new_comment1, new_comment2 = (
