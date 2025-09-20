@@ -44,7 +44,10 @@ import org.apache.iceberg.TableProperties;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.exceptions.ServiceUnavailableException;
+import org.apache.iceberg.rest.credentials.ImmutableCredential;
 import org.apache.iceberg.rest.requests.CreateTableRequest;
+import org.apache.iceberg.rest.responses.ImmutableLoadCredentialsResponse;
+import org.apache.iceberg.rest.responses.LoadCredentialsResponse;
 import org.apache.iceberg.rest.responses.LoadTableResponse;
 
 /** Process Iceberg REST specific operations, like credential vending. */
@@ -100,6 +103,29 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
     return loadTableResponse;
   }
 
+  /**
+   * Get table credentials.
+   *
+   * @param identifier The table identifier for which to load credentials
+   * @return A {@link org.apache.iceberg.rest.responses.LoadCredentialsResponse} object containing
+   *     the credentials.
+   */
+  public LoadCredentialsResponse getTableCredentials(TableIdentifier identifier) {
+    try {
+      LoadTableResponse loadTableResponse = super.loadTable(identifier);
+      Credential credential = getCredential(loadTableResponse);
+      // Convert Gravitino credential to Iceberg credential.
+      ImmutableCredential icebergCredential =
+          ImmutableCredential.builder()
+              .config(CredentialPropertyUtils.toIcebergProperties(credential))
+              .build();
+      return ImmutableLoadCredentialsResponse.builder().addCredentials(icebergCredential).build();
+    } catch (ServiceUnavailableException e) {
+      LOG.warn("Service unavailable when loading table credentials for table: {}", identifier, e);
+      return ImmutableLoadCredentialsResponse.builder().build();
+    }
+  }
+
   @Override
   public void close() {
     if (catalogCredentialManager != null) {
@@ -113,6 +139,23 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
 
   private LoadTableResponse injectCredentialConfig(
       TableIdentifier tableIdentifier, LoadTableResponse loadTableResponse) {
+    final Credential credential = getCredential(loadTableResponse);
+
+    LOG.info(
+        "Generate credential: {} for Iceberg table: {}",
+        credential.credentialType(),
+        tableIdentifier);
+
+    Map<String, String> credentialConfig = CredentialPropertyUtils.toIcebergProperties(credential);
+    return LoadTableResponse.builder()
+        .withTableMetadata(loadTableResponse.tableMetadata())
+        .addAllConfig(loadTableResponse.config())
+        .addAllConfig(getCatalogConfigToClient())
+        .addAllConfig(credentialConfig)
+        .build();
+  }
+
+  private Credential getCredential(LoadTableResponse loadTableResponse) {
     TableMetadata tableMetadata = loadTableResponse.tableMetadata();
     String[] path =
         Stream.of(
@@ -129,19 +172,7 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
     if (credential == null) {
       throw new ServiceUnavailableException("Couldn't generate credential, %s", context);
     }
-
-    LOG.info(
-        "Generate credential: {} for Iceberg table: {}",
-        credential.credentialType(),
-        tableIdentifier);
-
-    Map<String, String> credentialConfig = CredentialPropertyUtils.toIcebergProperties(credential);
-    return LoadTableResponse.builder()
-        .withTableMetadata(loadTableResponse.tableMetadata())
-        .addAllConfig(loadTableResponse.config())
-        .addAllConfig(getCatalogConfigToClient())
-        .addAllConfig(credentialConfig)
-        .build();
+    return credential;
   }
 
   @VisibleForTesting

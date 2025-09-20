@@ -26,6 +26,7 @@ import org.apache.iceberg.rest.requests.CreateTableRequest;
 import org.apache.iceberg.rest.requests.RenameTableRequest;
 import org.apache.iceberg.rest.requests.UpdateTableRequest;
 import org.apache.iceberg.rest.responses.ListTablesResponse;
+import org.apache.iceberg.rest.responses.LoadCredentialsResponse;
 import org.apache.iceberg.rest.responses.LoadTableResponse;
 
 /**
@@ -102,4 +103,14 @@ public interface IcebergTableOperationDispatcher {
    * @param renameTableRequest Rename table request information.
    */
   void renameTable(IcebergRequestContext context, RenameTableRequest renameTableRequest);
+
+  /**
+   * Get credentials for an Iceberg table.
+   *
+   * @param context Iceberg REST request context information.
+   * @param tableIdentifier The Iceberg table identifier.
+   * @return A {@link LoadCredentialsResponse} object containing the credentials.
+   */
+  LoadCredentialsResponse getTableCredentials(
+      IcebergRequestContext context, TableIdentifier tableIdentifier);
 }

@@ -27,6 +27,7 @@ import org.apache.iceberg.rest.requests.CreateTableRequest;
 import org.apache.iceberg.rest.requests.RenameTableRequest;
 import org.apache.iceberg.rest.requests.UpdateTableRequest;
 import org.apache.iceberg.rest.responses.ListTablesResponse;
+import org.apache.iceberg.rest.responses.LoadCredentialsResponse;
 import org.apache.iceberg.rest.responses.LoadTableResponse;
 
 public class IcebergTableOperationExecutor implements IcebergTableOperationDispatcher {
@@ -96,5 +97,13 @@ public class IcebergTableOperationExecutor implements IcebergTableOperationDispa
     icebergCatalogWrapperManager
         .getCatalogWrapper(context.catalogName())
         .renameTable(renameTableRequest);
+  }
+
+  @Override
+  public LoadCredentialsResponse getTableCredentials(
+      IcebergRequestContext context, TableIdentifier tableIdentifier) {
+    return icebergCatalogWrapperManager
+        .getCatalogWrapper(context.catalogName())
+        .getTableCredentials(tableIdentifier);
   }
 }
