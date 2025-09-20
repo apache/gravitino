@@ -616,6 +616,15 @@ class After(TableChange.ColumnPosition):
     def __str__(self):
         return f"AFTER {self._column}"
 
+    def __eq__(self, value: object) -> bool:
+        if not isinstance(value, After):
+            return False
+        other = cast(After, value)
+        return self._column == other.get_column()
+
+    def __hash__(self) -> int:
+        return hash(self._column)
+
 
 @final
 @dataclass(frozen=True)
