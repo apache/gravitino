@@ -21,7 +21,7 @@ from gravitino.api.expressions.literals.literals import Literals
 from gravitino.api.rel.column import Column
 from gravitino.api.rel.indexes.index import Index
 from gravitino.api.rel.table_change import TableChange
-from gravitino.api.types.types import Types
+from gravitino.api.rel.types.types import Types
 
 
 class TestTableChange(unittest.TestCase):
