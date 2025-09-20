@@ -97,6 +97,22 @@ class TestTableChange(unittest.TestCase):
         self.assertEqual(str(after), "AFTER column")
         self.assertEqual(str(default_pos), "DEFAULT")
 
+    def test_column_position_equal_and_hash(self):
+        first = TableChange.ColumnPosition.first()
+        after = TableChange.ColumnPosition.after("column")
+        default_pos = TableChange.ColumnPosition.default_pos()
+
+        self.assertFalse(first == after)
+        self.assertTrue(first == TableChange.ColumnPosition.first())
+        self.assertFalse(after == default_pos)
+        self.assertTrue(after == TableChange.ColumnPosition.after("column"))
+        self.assertTrue(hash(after) == hash(TableChange.ColumnPosition.after("column")))
+        self.assertFalse(
+            hash(after) == hash(TableChange.ColumnPosition.after("aonther column"))
+        )
+        self.assertFalse(default_pos == first)
+        self.assertTrue(default_pos == TableChange.ColumnPosition.default_pos())
+
     def test_add_column(self):
         add_col_mandatory = TableChange.add_column(["col1"], Types.StringType.get())
         self.assertListEqual(add_col_mandatory.get_field_name(), ["col1"])
