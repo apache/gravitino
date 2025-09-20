@@ -40,6 +40,7 @@ dependencies {
   implementation(project(":core")) {
     exclude(group = "*")
   }
+  implementation(libs.awaitility)
   implementation(libs.caffeine)
   implementation(libs.commons.lang3)
   implementation(libs.commons.io)
@@ -61,7 +62,8 @@ dependencies {
     exclude("com.google.protobuf", "protobuf-java")
   }
   implementation(libs.slf4j.api)
-  implementation(libs.awaitility)
+  implementation(libs.metrics.caffeine)
+  implementation(libs.metrics.core)
 
   compileOnly(libs.guava)
 
