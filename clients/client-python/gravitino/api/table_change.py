@@ -906,8 +906,17 @@ class UpdateColumnComment(TableChange.ColumnChange):
     def get_new_comment(self) -> str:
         return self._new_comment
 
+    def __eq__(self, value: object) -> bool:
+        if not isinstance(value, UpdateColumnComment):
+            return False
+        other = cast(UpdateColumnComment, value)
+        return (
+            self._field_name == other.get_field_name()
+            and self._new_comment == other.get_new_comment()
+        )
+
     def __hash__(self) -> int:
-        return hash((*sorted(self._field_name), self._new_comment))
+        return 31 * hash(self._new_comment) + hash(tuple(self._field_name))
 
 
 @final
