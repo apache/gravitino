@@ -164,6 +164,7 @@ class TestTableChange(unittest.TestCase):
 
         self.assertTrue(add_columns[0] == add_columns[1])
         self.assertTrue(add_columns[1] == add_columns[0])
+        self.assertFalse(add_columns[0] == "invalid_add_column")
         self.assertEqual(len(add_column_dict), 1)
         self.assertEqual(add_column_dict[add_columns[0]], 1)
 
