@@ -1041,8 +1041,17 @@ class UpdateColumnNullability(TableChange.ColumnChange):
         """
         return self._nullable
 
+    def __eq__(self, value: object) -> bool:
+        if not isinstance(value, UpdateColumnNullability):
+            return False
+        other = cast(UpdateColumnNullability, value)
+        return (
+            self._field_name == other.get_field_name()
+            and self._nullable == other.get_nullable()
+        )
+
     def __hash__(self) -> int:
-        return hash((*sorted(self._field_name), self._nullable))
+        return 31 * hash(self._nullable) + hash(tuple(self._field_name))
 
 
 @final
