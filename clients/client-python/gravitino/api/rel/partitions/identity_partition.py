@@ -16,32 +16,39 @@
 # under the License.
 
 from abc import abstractmethod
-from typing import List, Any
+from typing import Any, List
 
 from gravitino.api.expressions.literals.literal import Literal
-from gravitino.api.expressions.partitions.partition import Partition
+from gravitino.api.rel.partitions.partition import Partition
 
 
-class ListPartition(Partition):
+class IdentityPartition(Partition):
     """
-    A list partition represents a result of list partitioning. For example, for list partition
+    An identity partition represents a result of identity partitioning. For example, for Hive
+    partition
 
     ```
-    PARTITION p202204_California VALUES IN (
-      ("2022-04-01", "Los Angeles"),
-      ("2022-04-01", "San Francisco")
-    )
+    PARTITION (dt='2008-08-08',country='us')
     ```
 
-    its name is "p202204_California" and lists are [["2022-04-01","Los Angeles"], ["2022-04-01", "San Francisco"]].
+    its partition name is "dt=2008-08-08/country=us", field names are [["dt"], ["country"]] and
+    values are ["2008-08-08", "us"].
 
     APIs that are still evolving towards becoming stable APIs, and can change from one feature release to another (0.5.0 to 0.6.0).
     """
 
     @abstractmethod
-    def lists(self) -> List[List[Literal[Any]]]:
+    def field_names(self) -> List[List[str]]:
         """
         Returns:
-            List[List[Literal[Any]]]: The values of the list partition.
+            List[List[str]]: A list of lists representing the field names of the identity partition.
+        """
+        pass
+
+    @abstractmethod
+    def values(self) -> List[Literal[Any]]:
+        """
+        Returns:
+            List[Literal[Any]]: The values of the identity partition.
         """
         pass

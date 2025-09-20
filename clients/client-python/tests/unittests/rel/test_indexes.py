@@ -17,8 +17,8 @@
 
 import unittest
 
-from gravitino.api.expressions.indexes.index import Index
-from gravitino.api.expressions.indexes.indexes import Indexes
+from gravitino.api.rel.indexes.index import Index
+from gravitino.api.rel.indexes.indexes import Indexes
 
 
 class TestIndexes(unittest.TestCase):

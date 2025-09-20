@@ -20,8 +20,8 @@ from typing import List
 
 from gravitino.api.expressions.expression import Expression
 from gravitino.api.expressions.named_reference import NamedReference
-from gravitino.api.expressions.partitions.partition import Partition
-from gravitino.api.expressions.partitions.partitions import Partitions
+from gravitino.api.rel.partitions.partition import Partition
+from gravitino.api.rel.partitions.partitions import Partitions
 
 
 class Transform(Expression, ABC):

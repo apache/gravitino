@@ -16,39 +16,37 @@
 # under the License.
 
 from abc import abstractmethod
-from typing import List, Any
+from typing import Any
 
-from .partition import Partition
-from ..literals.literal import Literal
+from gravitino.api.expressions.literals.literal import Literal
+from gravitino.api.rel.partitions.partition import Partition
 
 
-class IdentityPartition(Partition):
+class RangePartition(Partition):
     """
-    An identity partition represents a result of identity partitioning. For example, for Hive
-    partition
+    A range partition represents a result of range partitioning. For example, for range partition
 
     ```
-    PARTITION (dt='2008-08-08',country='us')
+    PARTITION p20200321 VALUES LESS THAN ("2020-03-22")
     ```
 
-    its partition name is "dt=2008-08-08/country=us", field names are [["dt"], ["country"]] and
-    values are ["2008-08-08", "us"].
+    its upper bound is "2020-03-22" and its lower bound is null.
 
     APIs that are still evolving towards becoming stable APIs, and can change from one feature release to another (0.5.0 to 0.6.0).
     """
 
     @abstractmethod
-    def field_names(self) -> List[List[str]]:
+    def upper(self) -> Literal[Any]:
         """
         Returns:
-            List[List[str]]: A list of lists representing the field names of the identity partition.
+            Literal[Any]: The upper bound of the partition.
         """
         pass
 
     @abstractmethod
-    def values(self) -> List[Literal[Any]]:
+    def lower(self) -> Literal[Any]:
         """
         Returns:
-            List[Literal[Any]]: The values of the identity partition.
+            Literal[Any]: The lower bound of the partition.
         """
         pass

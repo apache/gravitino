@@ -19,7 +19,7 @@ from __future__ import annotations
 
 from typing import List
 
-from .type import (
+from gravitino.api.rel.types.type import (
     ComplexType,
     DateTimeType,
     FractionType,

@@ -15,11 +15,11 @@
 # specific language governing permissions and limitations
 # under the License.
 import unittest
-from datetime import date, time, datetime
+from datetime import date, datetime, time
 from decimal import Decimal
 
 from gravitino.api.expressions.literals.literals import Literals
-from gravitino.api.types.types import Types
+from gravitino.api.rel.types.types import Types
 
 
 class TestLiterals(unittest.TestCase):

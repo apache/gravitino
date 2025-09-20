@@ -22,9 +22,9 @@ from dataclasses_json.core import Json
 
 from gravitino.api.expressions.distributions.distribution import Distribution
 from gravitino.api.expressions.expression import Expression
-from gravitino.api.expressions.indexes.index import Index
 from gravitino.api.expressions.sorts.sort_order import SortOrder
-from gravitino.api.types.types import Type
+from gravitino.api.rel.indexes.index import Index
+from gravitino.api.rel.types.types import Type
 from gravitino.dto.rel.partitioning.partitioning import Partitioning
 from gravitino.dto.rel.partitions.partition_dto import PartitionDTO
 

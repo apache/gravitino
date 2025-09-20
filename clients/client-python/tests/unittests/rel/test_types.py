@@ -17,7 +17,7 @@
 
 import unittest
 
-from gravitino.api.types.types import Types, Name
+from gravitino.api.rel.types.types import Name, Types
 
 
 class TestTypes(unittest.TestCase):

@@ -18,7 +18,7 @@
 
 from typing import ClassVar, List, Optional, final
 
-from gravitino.api.expressions.indexes.index import Index
+from gravitino.api.rel.indexes.index import Index
 
 
 class Indexes:

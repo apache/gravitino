@@ -18,9 +18,9 @@
 
 from dataclasses_json.core import Json
 
-from gravitino.api.types.json_serdes._helper.serdes_utils import SerdesUtils
-from gravitino.api.types.json_serdes.base import JsonSerializable
-from gravitino.api.types.type import Type
+from gravitino.api.rel.types.json_serdes._helper.serdes_utils import SerdesUtils
+from gravitino.api.rel.types.json_serdes.base import JsonSerializable
+from gravitino.api.rel.types.type import Type
 
 
 class TypeSerdes(JsonSerializable[Type]):

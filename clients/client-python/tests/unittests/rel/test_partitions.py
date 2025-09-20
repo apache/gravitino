@@ -18,7 +18,7 @@ import unittest
 from datetime import date
 
 from gravitino.api.expressions.literals.literals import Literals
-from gravitino.api.expressions.partitions.partitions import Partitions
+from gravitino.api.rel.partitions.partitions import Partitions
 
 
 class TestPartitions(unittest.TestCase):

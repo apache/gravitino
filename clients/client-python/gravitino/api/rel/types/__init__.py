@@ -14,8 +14,3 @@
 # KIND, either express or implied.  See the License for the
 # specific language governing permissions and limitations
 # under the License.
-
-from gravitino.api.types.json_serdes.base import JsonSerializable
-from gravitino.api.types.json_serdes.type_serdes import TypeSerdes
-
-__all__ = ["JsonSerializable", "TypeSerdes"]

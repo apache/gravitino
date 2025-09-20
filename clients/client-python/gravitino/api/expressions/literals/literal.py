@@ -16,10 +16,10 @@
 # under the License.
 
 from abc import abstractmethod
-from typing import List, TypeVar, Generic
+from typing import Generic, List, TypeVar
 
 from gravitino.api.expressions.expression import Expression
-from gravitino.api.types.type import Type
+from gravitino.api.rel.types.type import Type
 
 T = TypeVar("T")
 
