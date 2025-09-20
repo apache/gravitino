@@ -18,7 +18,7 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from itertools import chain
-from typing import Optional, final
+from typing import Optional, cast, final
 
 from dataclasses_json import config
 
@@ -327,6 +327,15 @@ class TableChange(ABC):
 
         def __str__(self):
             return f"RENAMETABLE {self._new_name}"
+
+        def __eq__(self, value: object) -> bool:
+            if not isinstance(value, TableChange.RenameTable):
+                return False
+            other = cast(TableChange.RenameTable, value)
+            return self._new_name == other.get_new_name()
+
+        def __hash__(self) -> int:
+            return hash(self._new_name)
 
     @final
     @dataclass(frozen=True)
