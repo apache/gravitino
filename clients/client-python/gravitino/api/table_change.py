@@ -1059,9 +1059,7 @@ class UpdateColumnNullability(TableChange.ColumnChange):
 class UpdateColumnAutoIncrement(TableChange.ColumnChange):
     """A TableChange to update the `autoIncrement` of a field.
 
-    The field names are used to find the field to update.
-
-    If the field does not exist, the change must result in an `IllegalArgumentException`.
+    True is to add autoIncrement, false is to delete autoIncrement.
     """
 
     _field_name: list[str] = field(metadata=config(field_name="field_name"))
@@ -1070,7 +1068,7 @@ class UpdateColumnAutoIncrement(TableChange.ColumnChange):
     def field_name(self) -> list[str]:
         return self._field_name
 
-    def get_auto_increment(self) -> bool:
+    def is_auto_increment(self) -> bool:
         """Checks if the column is `autoIncrement`.
 
         Returns:
@@ -1078,5 +1076,14 @@ class UpdateColumnAutoIncrement(TableChange.ColumnChange):
         """
         return self._auto_increment
 
+    def __eq__(self, value: object) -> bool:
+        if not isinstance(value, UpdateColumnAutoIncrement):
+            return False
+        other = cast(UpdateColumnAutoIncrement, value)
+        return (
+            self._field_name == other.field_name()
+            and self._auto_increment == other.is_auto_increment()
+        )
+
     def __hash__(self) -> int:
-        return hash((*sorted(self._field_name), self._auto_increment))
+        return 31 * hash(self._auto_increment) + hash(tuple(self._field_name))
