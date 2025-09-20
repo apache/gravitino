@@ -409,10 +409,11 @@ public class POConverters {
    * @param oldTablePO the old TablePO object
    * @param newTable the new TableEntity object
    * @param needUpdateVersion whether need to update the version
+   * @param newSchemaId the new schema id
    * @return TablePO object with updated version
    */
-  public static TablePO updateTablePOWithVersion(
-      TablePO oldTablePO, TableEntity newTable, boolean needUpdateVersion) {
+  public static TablePO updateTablePOWithVersionAndSchemaId(
+      TablePO oldTablePO, TableEntity newTable, boolean needUpdateVersion, Long newSchemaId) {
     Long lastVersion;
     Long currentVersion;
     if (needUpdateVersion) {
@@ -429,7 +430,7 @@ public class POConverters {
           .withTableName(newTable.name())
           .withMetalakeId(oldTablePO.getMetalakeId())
           .withCatalogId(oldTablePO.getCatalogId())
-          .withSchemaId(oldTablePO.getSchemaId())
+          .withSchemaId(newSchemaId)
           .withAuditInfo(JsonUtils.anyFieldMapper().writeValueAsString(newTable.auditInfo()))
           .withCurrentVersion(currentVersion)
           .withLastVersion(lastVersion)

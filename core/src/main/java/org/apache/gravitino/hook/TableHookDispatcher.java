@@ -110,6 +110,7 @@ public class TableHookDispatcher implements TableDispatcher {
     Table alteredTable = dispatcher.alterTable(ident, changes);
 
     if (lastRenameChange != null) {
+      // todo: support rename across different schemas
       AuthorizationUtils.authorizationPluginRenamePrivileges(
           ident, Entity.EntityType.TABLE, lastRenameChange.getNewName(), locations);
     }

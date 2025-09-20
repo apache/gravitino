@@ -176,10 +176,18 @@ public class TableMetaService {
         newTableEntity.id(),
         oldTableEntity.id());
 
+    boolean isSchemaChanged = !newTableEntity.namespace().equals(oldTableEntity.namespace());
+    Long newSchemaId =
+        isSchemaChanged
+            ? CommonMetaService.getInstance()
+                .getParentEntityIdByNamespace(newTableEntity.namespace())
+            : schemaId;
+
     boolean isColumnChanged =
         TableColumnMetaService.getInstance().isColumnUpdated(oldTableEntity, newTableEntity);
     TablePO newTablePO =
-        POConverters.updateTablePOWithVersion(oldTablePO, newTableEntity, isColumnChanged);
+        POConverters.updateTablePOWithVersionAndSchemaId(
+            oldTablePO, newTableEntity, isColumnChanged, newSchemaId);
 
     final AtomicInteger updateResult = new AtomicInteger(0);
     try {
@@ -188,9 +196,9 @@ public class TableMetaService {
               updateResult.set(
                   SessionUtils.getWithoutCommit(
                       TableMetaMapper.class,
-                      mapper -> mapper.updateTableMeta(newTablePO, oldTablePO))),
+                      mapper -> mapper.updateTableMeta(newTablePO, oldTablePO, newSchemaId))),
           () -> {
-            if (updateResult.get() > 0 && isColumnChanged) {
+            if (updateResult.get() > 0 && (isColumnChanged || isSchemaChanged)) {
               TableColumnMetaService.getInstance()
                   .updateColumnPOsFromTableDiff(oldTableEntity, newTableEntity, newTablePO);
             }

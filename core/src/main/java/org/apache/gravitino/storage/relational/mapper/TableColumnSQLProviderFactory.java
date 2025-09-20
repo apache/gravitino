@@ -61,6 +61,11 @@ public class TableColumnSQLProviderFactory {
     return getProvider().insertColumnPOs(columnPOs);
   }
 
+  public static String updateSchemaIdByTableId(
+      @Param("tableId") Long tableId, @Param("newSchemaId") Long newSchemaId) {
+    return getProvider().updateSchemaIdByTableId(tableId, newSchemaId);
+  }
+
   public static String softDeleteColumnsByTableId(@Param("tableId") Long tableId) {
     return getProvider().softDeleteColumnsByTableId(tableId);
   }

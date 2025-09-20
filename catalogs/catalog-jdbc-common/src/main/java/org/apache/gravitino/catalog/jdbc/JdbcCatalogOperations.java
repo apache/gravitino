@@ -505,6 +505,8 @@ public class JdbcCatalogOperations implements CatalogOperations, SupportsSchemas
    */
   private Table renameTable(NameIdentifier tableIdent, TableChange.RenameTable renameTable)
       throws NoSuchTableException, IllegalArgumentException {
+    Preconditions.checkArgument(
+        !renameTable.getNewSchemaName().isPresent(), "Does not support rename schema yet");
     String databaseName = NameIdentifier.of(tableIdent.namespace().levels()).name();
     tableOperation.rename(databaseName, tableIdent.name(), renameTable.getNewName());
     return loadTable(NameIdentifier.of(tableIdent.namespace(), renameTable.getNewName()));

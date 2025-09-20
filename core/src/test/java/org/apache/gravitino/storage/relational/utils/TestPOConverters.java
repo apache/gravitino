@@ -694,7 +694,8 @@ public class TestPOConverters {
     TablePO.Builder builder =
         TablePO.builder().withMetalakeId(1L).withCatalogId(1L).withSchemaId(1L);
     TablePO initPO = POConverters.initializeTablePOWithVersion(tableEntity, builder);
-    TablePO updatePO = POConverters.updateTablePOWithVersion(initPO, updatedTable, false);
+    TablePO updatePO =
+        POConverters.updateTablePOWithVersionAndSchemaId(initPO, updatedTable, false, 1L);
     assertEquals(1, initPO.getCurrentVersion());
     assertEquals(1, initPO.getLastVersion());
     assertEquals(0, initPO.getDeletedAt());
