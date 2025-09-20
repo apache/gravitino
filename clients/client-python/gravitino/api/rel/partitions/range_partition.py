@@ -19,7 +19,7 @@ from abc import abstractmethod
 from typing import Any
 
 from gravitino.api.expressions.literals.literal import Literal
-from gravitino.api.expressions.partitions.partition import Partition
+from gravitino.api.rel.partitions.partition import Partition
 
 
 class RangePartition(Partition):

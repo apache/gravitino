@@ -16,10 +16,10 @@
 # under the License.
 
 from abc import abstractmethod
-from typing import List, Any
+from typing import Any, List
 
-from .partition import Partition
-from ..literals.literal import Literal
+from gravitino.api.expressions.literals.literal import Literal
+from gravitino.api.rel.partitions.partition import Partition
 
 
 class IdentityPartition(Partition):
