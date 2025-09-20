@@ -17,7 +17,7 @@
 # under the License.
 #
 apiVersion: v2
-appVersion: 1.0.0-SNAPSHOT
+appVersion: 1.1.0-SNAPSHOT
 description: Apache Gravitino is a high-performance, geo-distributed, and federated metadata lake. It manages the metadata directly in different sources, types, and regions. It also provides users with unified metadata access for data and AI assets.
 home: https://gravitino.apache.org
 annotations:
@@ -32,7 +32,7 @@ dependencies:
     name: mysql
     repository: https://charts.bitnami.com/bitnami
     version: 10.2.1
-kubeVersion: '>=1.29.0-0'
+kubeVersion: '>=1.28.0-0'
 maintainers:
   - name: Gravitino
     email: dev@gravitino.apache.org
@@ -40,4 +40,4 @@ maintainers:
 name: gravitino
 sources:
   - https://github.com/apache/gravitino
-version: 1.0.3
+version: 1.1.0

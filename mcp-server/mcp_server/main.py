@@ -26,7 +26,7 @@ def do_main():
     args = _parse_args()
     setting = Setting(
         metalake=args.metalake,
-        uri=args.uri,
+        gravitino_uri=args.gravitino_uri,
         tags=args.include_tool_tags,
         transport=args.transport,
         mcp_url=args.mcp_url,
@@ -55,7 +55,7 @@ def _comma_separated_set(value) -> set:
 def _parse_args():
     parser = argparse.ArgumentParser(
         description="Gravitino Mcp server",
-        epilog="Example: uv run mcp_server --metalake test --uri http://127.0.0.1:8090",
+        epilog="Example: uv run mcp_server --metalake test --gravitino-uri http://127.0.0.1:8090",
     )
 
     parser.add_argument(
@@ -65,10 +65,10 @@ def _parse_args():
         help="Gravitino metalake name.",
     )
     parser.add_argument(
-        "--uri",
+        "--gravitino-uri",
         type=str,
-        default=DefaultSetting.default_uri,
-        help=f"The uri of Gravitino server. (default: {DefaultSetting.default_uri})",
+        default=DefaultSetting.default_gravitino_uri,
+        help=f"The uri of Gravitino server. (default: {DefaultSetting.default_gravitino_uri})",
     )
 
     parser.add_argument(

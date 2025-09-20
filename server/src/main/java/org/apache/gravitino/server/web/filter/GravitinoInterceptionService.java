@@ -37,6 +37,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.authorization.AuthorizationRequestContext;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationExpression;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationMetadata;
 import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionEvaluator;
@@ -128,7 +129,8 @@ public class GravitinoInterceptionService implements InterceptionService {
           AuthorizationExpressionEvaluator authorizationExpressionEvaluator =
               new AuthorizationExpressionEvaluator(expression);
           boolean authorizeResult =
-              authorizationExpressionEvaluator.evaluate(metadataContext, pathParams);
+              authorizationExpressionEvaluator.evaluate(
+                  metadataContext, pathParams, new AuthorizationRequestContext());
           if (!authorizeResult) {
             MetadataObject.Type type = expressionAnnotation.accessMetadataType();
             NameIdentifier accessMetadataName =

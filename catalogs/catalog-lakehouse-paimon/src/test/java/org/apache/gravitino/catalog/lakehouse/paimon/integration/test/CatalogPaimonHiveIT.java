@@ -77,7 +77,7 @@ public class CatalogPaimonHiveIT extends CatalogPaimonBaseIT {
     // load schema check.
     Schema schema = schemas.loadSchema(schemaIdent.name());
     Assertions.assertEquals(schema.properties().get("key"), "hive");
-    Map<String, String> loadedProps = paimonCatalog.loadDatabaseProperties(schemaIdent.name());
+    Map<String, String> loadedProps = paimonCatalog.getDatabase(schemaIdent.name()).options();
     Assertions.assertEquals(loadedProps.get("key"), "hive");
   }
 }
