@@ -794,8 +794,17 @@ class RenameColumn(TableChange.ColumnChange):
     def field_name(self) -> list[str]:
         return self._field_name
 
+    def __eq__(self, value: object) -> bool:
+        if not isinstance(value, RenameColumn):
+            return False
+        other = cast(RenameColumn, value)
+        return (
+            self._field_name == other.get_field_name()
+            and self._new_name == other.get_new_name()
+        )
+
     def __hash__(self) -> int:
-        return hash((*sorted(self._field_name), self._new_name))
+        return 31 * hash(self._new_name) + hash(tuple(self._field_name))
 
 
 @final
