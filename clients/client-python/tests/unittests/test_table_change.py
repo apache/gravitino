@@ -412,6 +412,7 @@ class TestTableChange(unittest.TestCase):
         delete_column_dict = {delete_columns[0]: 0, another_delete_column: 1}
         self.assertFalse(delete_columns[0] == another_delete_column)
         self.assertFalse(another_delete_column == delete_columns[0])
+        self.assertFalse(delete_columns[0] == "invalid_delete_column")
         self.assertEqual(len(delete_column_dict), 2)
 
     def test_update_column_nullability(self):
