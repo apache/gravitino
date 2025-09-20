@@ -818,7 +818,7 @@ class UpdateColumnDefaultValue(TableChange.ColumnChange):
     """
 
     _field_name: list[str] = field(metadata=config(field_name="field_name"))
-    _new_default_value: Expression = field(
+    _new_default_value: Optional[Expression] = field(
         metadata=config(field_name="new_default_value")
     )
 
@@ -826,19 +826,27 @@ class UpdateColumnDefaultValue(TableChange.ColumnChange):
         return self._field_name
 
     def get_new_default_value(self) -> Expression:
-        return self._new_default_value
+        return (
+            self._new_default_value
+            if self._new_default_value
+            else Column.DEFAULT_VALUE_NOT_SET
+        )
+
+    def __eq__(self, value: object) -> bool:
+        if not isinstance(value, UpdateColumnDefaultValue):
+            return False
+        other = cast(UpdateColumnDefaultValue, value)
+        return (
+            self._field_name == other.field_name()
+            and self.get_new_default_value() == other.get_new_default_value()
+        )
 
     def __hash__(self) -> int:
-        return hash(
-            (
-                *sorted(self._field_name),
-                (
-                    tuple(self._new_default_value)
-                    if self._new_default_value == Column.DEFAULT_VALUE_NOT_SET
-                    else self._new_default_value
-                ),
-            )
-        )
+        return 31 * hash(
+            tuple(self.get_new_default_value())
+            if self._new_default_value == Column.DEFAULT_VALUE_NOT_SET
+            else self._new_default_value
+        ) + hash(tuple(self._field_name))
 
 
 @final
