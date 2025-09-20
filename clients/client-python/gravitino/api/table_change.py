@@ -391,6 +391,18 @@ class TableChange(ABC):
         def __str__(self):
             return f"SETPROPERTY {self._property} {self._value}"
 
+        def __eq__(self, value: object) -> bool:
+            if not isinstance(value, TableChange.SetProperty):
+                return False
+            other = cast(TableChange.SetProperty, value)
+            return (
+                self._property == other.get_property()
+                and self._value == other.get_value()
+            )
+
+        def __hash__(self) -> int:
+            return hash((self._property, self._value))
+
     @final
     @dataclass(frozen=True)
     class RemoveProperty:
