@@ -510,6 +510,18 @@ class TableChange(ABC):
             """
             return self._if_exists
 
+        def __eq__(self, value: object) -> bool:
+            if not isinstance(value, TableChange.DeleteIndex):
+                return False
+            other = cast(TableChange.DeleteIndex, value)
+            return (
+                self._name == other.get_name()
+                and self._if_exists == other.is_if_exists()
+            )
+
+        def __hash__(self) -> int:
+            return hash((self._name, self._if_exists))
+
     class ColumnPosition(ABC):
         """The interface for all column positions.
 
