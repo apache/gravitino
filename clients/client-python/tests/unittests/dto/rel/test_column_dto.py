@@ -19,7 +19,7 @@ import json
 import unittest
 from itertools import product
 
-from gravitino.api.column import Column
+from gravitino.api.rel.column import Column
 from gravitino.api.types.json_serdes import TypeSerdes
 from gravitino.api.types.json_serdes._helper.serdes_utils import SerdesUtils
 from gravitino.api.types.types import Types

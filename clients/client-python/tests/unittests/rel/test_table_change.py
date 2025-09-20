@@ -17,10 +17,10 @@
 
 import unittest
 
-from gravitino.api.column import Column
 from gravitino.api.expressions.indexes.index import Index
 from gravitino.api.expressions.literals.literals import Literals
-from gravitino.api.table_change import TableChange
+from gravitino.api.rel.column import Column
+from gravitino.api.rel.table_change import TableChange
 from gravitino.api.types.types import Types
 
 

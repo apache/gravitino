@@ -18,7 +18,7 @@
 import unittest
 from unittest.mock import patch
 
-from gravitino.api.column import Column
+from gravitino.api.rel.column import Column
 from gravitino.api.types.types import Types
 from gravitino.dto.rel.expressions.field_reference_dto import FieldReferenceDTO
 from gravitino.dto.rel.expressions.func_expression_dto import FuncExpressionDTO
