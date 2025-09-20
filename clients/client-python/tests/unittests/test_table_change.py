@@ -253,6 +253,9 @@ class TestTableChange(unittest.TestCase):
         self.assertTrue(
             update_column_default_values[1] == update_column_default_values[0]
         )
+        self.assertFalse(
+            update_column_default_values[0] == "invalid_update_column_default_value"
+        )
         self.assertEqual(len(update_column_default_value_dict), 1)
         self.assertEqual(
             update_column_default_value_dict[update_column_default_values[0]], 1
