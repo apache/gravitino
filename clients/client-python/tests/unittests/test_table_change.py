@@ -457,6 +457,9 @@ class TestTableChange(unittest.TestCase):
         self.assertFalse(
             another_update_column_nullability == update_column_nullabilities[0]
         )
+        self.assertFalse(
+            update_column_nullabilities[0] == "invalid_update_column_nullability"
+        )
         self.assertEqual(len(update_column_nullability_dict), 2)
 
     def test_add_index(self):
