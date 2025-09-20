@@ -202,6 +202,7 @@ class TestTableChange(unittest.TestCase):
 
         self.assertTrue(rename_columns[0] == rename_columns[1])
         self.assertTrue(rename_columns[1] == rename_columns[0])
+        self.assertFalse(rename_columns[0] == "invalid_rename_column")
         self.assertEqual(len(rename_column_dict), 1)
         self.assertEqual(rename_column_dict[rename_columns[0]], 1)
 
