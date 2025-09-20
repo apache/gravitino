@@ -424,6 +424,15 @@ class TableChange(ABC):
         def __str__(self):
             return f"REMOVEPROPERTY {self._property}"
 
+        def __eq__(self, value: object) -> bool:
+            if not isinstance(value, TableChange.RemoveProperty):
+                return False
+            other = cast(TableChange.RemoveProperty, value)
+            return self._property == other.get_property()
+
+        def __hash__(self) -> int:
+            return hash(self._property)
+
     @final
     @dataclass(frozen=True)
     class AddIndex:
