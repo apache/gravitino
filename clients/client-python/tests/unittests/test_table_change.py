@@ -480,6 +480,7 @@ class TestTableChange(unittest.TestCase):
         delete_index_dict = {delete_indexes[i]: i for i in range(2)}
         self.assertTrue(delete_indexes[0] == delete_indexes[1])
         self.assertTrue(delete_indexes[1] == delete_indexes[0])
+        self.assertFalse(delete_indexes[0] == "invalid_delete_index")
         self.assertEqual(len(delete_index_dict), 1)
 
         another_delete_index = TableChange.delete_index("another_index_name", if_exists)
