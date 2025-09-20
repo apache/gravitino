@@ -465,6 +465,7 @@
    This product bundles various third-party components also under the
    Eclipse Public License 2.0
 
+   Eclipse AspectJ
    Eclipse Jetty
    Eclipse Jersey
    Eclipse GlassFish

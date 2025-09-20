@@ -18,6 +18,8 @@
  */
 package org.apache.gravitino.storage.relational.service;
 
+import static org.apache.gravitino.metrics.source.MetricsSource.GRAVITINO_RELATIONAL_STORE_METRIC_NAME;
+
 import com.google.common.base.Joiner;
 import com.google.common.base.Splitter;
 import com.google.common.collect.ImmutableMap;
@@ -31,6 +33,7 @@ import org.apache.gravitino.Entity;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.meta.GenericEntity;
+import org.apache.gravitino.metrics.Monitored;
 import org.apache.gravitino.storage.relational.mapper.CatalogMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.FilesetMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.MetalakeMetaMapper;
@@ -77,6 +80,9 @@ public class MetadataObjectService {
 
   private MetadataObjectService() {}
 
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "fromGenericEntities")
   public static List<MetadataObject> fromGenericEntities(List<GenericEntity> entities) {
     if (entities == null || entities.isEmpty()) {
       return Lists.newArrayList();
@@ -109,6 +115,9 @@ public class MetadataObjectService {
     return metadataObjects;
   }
 
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "getMetadataObjectId")
   public static long getMetadataObjectId(
       long metalakeId, String fullName, MetadataObject.Type type) {
     if (type == MetadataObject.Type.METALAKE) {
@@ -164,6 +173,9 @@ public class MetadataObjectService {
    *     if no Metalake objects are found for the given IDs. {@code @example} value of metalake full
    *     name: "metalake1.catalog1.schema1.table1"
    */
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "getMetalakeObjectsFullName")
   public static Map<Long, String> getMetalakeObjectsFullName(List<Long> metalakeIds) {
     List<MetalakePO> metalakePOs =
         SessionUtils.getWithoutCommit(
@@ -191,6 +203,9 @@ public class MetadataObjectService {
    *     if no Fileset objects are found for the given IDs. {@code @example} value of fileset full
    *     name: "catalog1.schema1.fileset1"
    */
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "getFilesetObjectsFullName")
   public static Map<Long, String> getFilesetObjectsFullName(List<Long> filesetIds) {
     List<FilesetPO> filesetPOs =
         SessionUtils.getWithoutCommit(
@@ -234,6 +249,9 @@ public class MetadataObjectService {
    *     no Model objects are found for the given IDs. {@code @example} value of model full name:
    *     "catalog1.schema1.model1"
    */
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "getModelObjectsFullName")
   public static Map<Long, String> getModelObjectsFullName(List<Long> modelIds) {
     List<ModelPO> modelPOs =
         SessionUtils.getWithoutCommit(
@@ -276,6 +294,9 @@ public class MetadataObjectService {
    *     no Table objects are found for the given IDs. {@code @example} value of table full name:
    *     "catalog1.schema1.table1"
    */
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "getTableObjectsFullName")
   public static Map<Long, String> getTableObjectsFullName(List<Long> tableIds) {
     List<TablePO> tablePOs =
         SessionUtils.getWithoutCommit(
@@ -319,6 +340,9 @@ public class MetadataObjectService {
    *     no column objects are found for the given IDs. {@code @example} value of table full name:
    *     "catalog1.schema1.table1.column1"
    */
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "getColumnObjectsFullName")
   public static Map<Long, String> getColumnObjectsFullName(List<Long> columnsIds) {
     List<ColumnPO> columnPOs =
         SessionUtils.getWithoutCommit(
@@ -364,6 +388,9 @@ public class MetadataObjectService {
    *     no Topic objects are found for the given IDs. {@code @example} value of topic full name:
    *     "catalog1.schema1.topic1"
    */
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "getTopicObjectsFullName")
   public static Map<Long, String> getTopicObjectsFullName(List<Long> topicIds) {
     List<TopicPO> topicPOs =
         SessionUtils.getWithoutCommit(
@@ -406,6 +433,9 @@ public class MetadataObjectService {
    *     if no Catalog objects are found for the given IDs. {@code @example} value of catalog full
    *     name: "catalog1"
    */
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "getCatalogObjectsFullName")
   public static Map<Long, String> getCatalogObjectsFullName(List<Long> catalogIds) {
     List<CatalogPO> catalogPOs =
         SessionUtils.getWithoutCommit(
@@ -432,6 +462,9 @@ public class MetadataObjectService {
    *     no Schema objects are found for the given IDs. {@code @example} value of schema full name:
    *     "catalog1.schema1"
    */
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "getSchemaObjectsFullName")
   public static Map<Long, String> getSchemaObjectsFullName(List<Long> schemaIds) {
     List<SchemaPO> schemaPOs =
         SessionUtils.getWithoutCommit(
