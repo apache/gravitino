@@ -42,13 +42,16 @@ class TestTableChange(unittest.TestCase):
         new_comment1, new_comment2 = (
             TableChange.update_comment(f"New comment {i + 1}") for i in range(2)
         )
+        new_comment3 = TableChange.update_comment("New comment 1")
         self.assertEqual(new_comment1.get_new_comment(), "New comment 1")
         self.assertEqual(
             str(new_comment1), f"UPDATECOMMENT {new_comment1.get_new_comment()}"
         )
         self.assertFalse(new_comment1 == new_comment2)
         self.assertFalse(new_comment1 == "invalid_update_comment")
-        self.assertTrue(new_comment1 == TableChange.update_comment("New comment 1"))
+        self.assertTrue(new_comment1 == new_comment3)
+        self.assertTrue(hash(new_comment1) == hash(new_comment3))
+        self.assertFalse(hash(new_comment1) == hash(new_comment2))
 
     def test_table_change_set_property(self):
         new_property1, new_property2 = (
