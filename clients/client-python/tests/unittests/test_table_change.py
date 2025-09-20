@@ -348,6 +348,7 @@ class TestTableChange(unittest.TestCase):
         }
         self.assertFalse(update_column_comments[0] == another_update_column_comment)
         self.assertFalse(another_update_column_comment == update_column_comments[0])
+        self.assertFalse(update_column_comments[0] == "invalid_update_column_comment")
         self.assertEqual(len(update_column_comment_dict), 2)
 
     def test_update_column_position(self):
