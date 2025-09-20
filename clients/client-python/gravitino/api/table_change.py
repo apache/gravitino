@@ -17,7 +17,6 @@
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from itertools import chain
 from typing import Optional, cast, final
 
 from dataclasses_json import config
@@ -469,13 +468,19 @@ class TableChange(ABC):
             """
             return self._field_names
 
+        def __eq__(self, value: object) -> bool:
+            if not isinstance(value, TableChange.AddIndex):
+                return False
+            other = cast(TableChange.AddIndex, value)
+            return (
+                self._type == other.get_type()
+                and self._name == other.get_name()
+                and self._field_names == other.get_field_names()
+            )
+
         def __hash__(self) -> int:
-            return hash(
-                (
-                    self._type,
-                    self._name,
-                    *sorted(chain.from_iterable(self._field_names)),
-                )
+            return 31 * hash((self._type, self._name)) + hash(
+                tuple(tuple(field_name) for field_name in self._field_names)
             )
 
     @final
