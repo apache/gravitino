@@ -253,6 +253,7 @@ metrics-core = { group = "io.dropwizard.metrics", name = "metrics-core", version
 metrics-jersey2 = { group = "io.dropwizard.metrics", name = "metrics-jersey2", version.ref = "metrics" }
 metrics-jvm = { group = "io.dropwizard.metrics", name = "metrics-jvm", version.ref = "metrics" }
 metrics-jmx = { group = "io.dropwizard.metrics", name = "metrics-jmx", version.ref = "metrics" }
+metrics-caffeine = { group = "io.dropwizard.metrics", name = "metrics-caffeine", version.ref = "metrics" }
 jline-terminal = { group = "org.jline", name = "jline-terminal", version.ref = "jline" }
 okhttp3-loginterceptor = { group = "com.squareup.okhttp3", name = "logging-interceptor", version.ref = "okhttp3" }
 opencsv = {group = "net.sf.opencsv", name = "opencsv", version.ref = "opencsv"}

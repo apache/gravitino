@@ -151,34 +151,50 @@ public class MetricsSystem implements Closeable {
         });
   }
 
-  /*
-   * Extract a metric name and labels from Dropwizard metrics for Prometheus.
+  /**
+   * Provides rules to extract a metric name and labels from Dropwizard metrics for Prometheus.
    *
-   * All extraction rules must be registered with the Prometheus registry before starting the Prometheus
-   * servlet. At times, certain MetricsSources, like HiveCatalogMetricsSource, may not register with
-   * MetricsSystem. Therefore, all rules are consolidated in MetricsSystem instead of being spread across
-   * separate MetricsSources.
+   * <p>All extraction rules must be registered with the Prometheus registry before starting the
+   * Prometheus servlet. At times, certain MetricsSources, like HiveCatalogMetricsSource, may not
+   * register with MetricsSystem. Therefore, all rules are consolidated in MetricsSystem instead of
+   * being spread across separate MetricsSources.
    *
-   * If a metric name doesn't match any rules, it will be converted to the Prometheus metrics
+   * <p>If a metric name doesn't match any rules, it will be converted to the Prometheus metrics
    * name format. For example, "ab.c-a.d" transforms into "ab_c_a_d".
    *
-   * The MapperConfig is utilized to extract Prometheus metricsName and labels with the following method:
-   * `MapperConfig(final String match, final String name, final Map<String, String> labels)`
-   * - `match` is a regex used to match the incoming metric name. It employs a simplified glob syntax where
-   *   only '*' is allowed.
-   * - `name` is the new metric name, which can contain placeholders to be replaced with
-   *   actual values from the incoming metric name. Placeholders are in the ${n} format, where n
-   *   is the zero-based index of the group to extract from the original metric name.
-   * - `labels` are the labels to be extracted, and they should also contain placeholders.
-   * E.g.:
+   * <p>The {@link MapperConfig} is utilized to extract Prometheus metric names and labels. The
+   * constructor is {@code MapperConfig(final String match, final String name, final Map<String,
+   * String> labels)}:
+   *
+   * <ul>
+   *   <li>{@code match}: A regex used to match the incoming metric name. It employs a simplified
+   *       glob syntax where only '*' is allowed.
+   *   <li>{@code name}: The new metric name, which can contain placeholders to be replaced with
+   *       actual values from the incoming metric name. Placeholders are in the {@code ${n}} format,
+   *       where n is the zero-based index of the group to extract from the original metric name.
+   *   <li>{@code labels}: The labels to be extracted, which can also contain placeholders.
+   * </ul>
+   *
+   * <p>Example:
+   *
+   * <pre>{@code
    * Match: gravitino.dispatcher.*.*
    * Name: dispatcher_events_total_${0}
-   * Labels: label1: ${1}_t
+   * Labels: {label1: "${1}_t"}
+   * }</pre>
+   *
    * A metric "gravitino.dispatcher.sp1.yay" will be converted to a new metric with name
-   * "dispatcher_events_total_sp1" with label {label1: yay_t}.
-   * Metric names MUST adhere to the regex [a-zA-Z_:]([a-zA-Z0-9_:])*.
-   * Label names MUST adhere to the regex [a-zA-Z_]([a-zA-Z0-9_])*.
-   * Label values MAY be any sequence of UTF-8 characters .
+   * "dispatcher_events_total_sp1" and label {@code {label1="yay_t"}}.
+   *
+   * <p>Constraints for Prometheus metrics:
+   *
+   * <ul>
+   *   <li>Metric names MUST adhere to the regex {@code [a-zA-Z_:][a-zA-Z0-9_:]*}.
+   *   <li>Label names MUST adhere to the regex {@code [a-zA-Z_][a-zA-Z0-9_]*}.
+   *   <li>Label values MAY be any sequence of UTF-8 characters.
+   * </ul>
+   *
+   * @return A list of {@link MapperConfig} rules.
    */
   @VisibleForTesting
   static List<MapperConfig> getMetricNameAndLabelRules() {
@@ -195,7 +211,7 @@ public class MetricsSystem implements Closeable {
 
   private void registerMetricsToPrometheusRegistry() {
     CustomMappingSampleBuilder sampleBuilder =
-        new CustomMappingSampleBuilder(getMetricNameAndLabelRules());
+        new GravitinoSampleBuilder(getMetricNameAndLabelRules());
     DropwizardExports dropwizardExports = new DropwizardExports(metricRegistry, sampleBuilder);
     dropwizardExports.register(prometheusRegistry);
   }

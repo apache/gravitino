@@ -17,15 +17,17 @@
  * under the License.
  */
 
-package org.apache.gravitino.metrics;
+package org.apache.gravitino.metrics.source;
 
-public class MetricNames {
-  public static final String HTTP_PROCESS_DURATION = "http-request-duration-seconds";
-  public static final String SERVER_IDLE_THREAD_NUM = "http-server.idle-thread.num";
-  public static final String DATASOURCE_ACTIVE_CONNECTIONS = "datasource.active-connections";
-  public static final String DATASOURCE_IDLE_CONNECTIONS = "datasource.idle-connections";
-  public static final String DATASOURCE_MAX_CONNECTIONS = "datasource.max-connections";
-  public static final String FILESYSTEM_CACHE = "filesystem-cache";
+public abstract class CatalogMetricsSource extends MetricsSource {
 
-  private MetricNames() {}
+  public CatalogMetricsSource(String provider, String metalakeName, String catalogName) {
+    super(
+        String.join(
+            ".",
+            MetricsSource.GRAVITINO_CATALOG_METRIC_PREFIX,
+            provider,
+            metalakeName,
+            catalogName));
+  }
 }
