@@ -15,13 +15,13 @@
 # specific language governing permissions and limitations
 # under the License.
 
-from typing import List, Dict, Any, Optional
+from typing import Any, Dict, List, Optional
 
 from gravitino.api.expressions.literals.literal import Literal
-from gravitino.api.expressions.partitions.identity_partition import IdentityPartition
-from gravitino.api.expressions.partitions.list_partition import ListPartition
-from gravitino.api.expressions.partitions.partition import Partition
-from gravitino.api.expressions.partitions.range_partition import RangePartition
+from gravitino.api.rel.partitions.identity_partition import IdentityPartition
+from gravitino.api.rel.partitions.list_partition import ListPartition
+from gravitino.api.rel.partitions.partition import Partition
+from gravitino.api.rel.partitions.range_partition import RangePartition
 
 
 class Partitions:

@@ -17,7 +17,7 @@
 
 import unittest
 
-from gravitino.api.expressions.indexes.index import Index
+from gravitino.api.rel.indexes.index import Index
 from gravitino.dto.rel.indexes.index_dto import IndexDTO
 from gravitino.exceptions.base import IllegalArgumentException
 

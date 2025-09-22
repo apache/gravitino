@@ -15,18 +15,7 @@
 # specific language governing permissions and limitations
 # under the License.
 
-from typing import Any, Dict
-
 from gravitino.api.rel.types.json_serdes.base import JsonSerializable
-from gravitino.dto.rel.partitions.json_serdes._helper.serdes_utils import SerdesUtils
-from gravitino.dto.rel.partitions.partition_dto import PartitionDTO
+from gravitino.api.rel.types.json_serdes.type_serdes import TypeSerdes
 
-
-class PartitionDTOSerdes(JsonSerializable[PartitionDTO]):
-    @classmethod
-    def serialize(cls, data_type: PartitionDTO) -> Dict[str, Any]:
-        return SerdesUtils.write_partition(data_type)
-
-    @classmethod
-    def deserialize(cls, data: Dict[str, Any]) -> PartitionDTO:
-        return SerdesUtils.read_partition(data)
+__all__ = ["JsonSerializable", "TypeSerdes"]
