@@ -28,7 +28,7 @@ public class DescriptionMessages {
           + "# Show details of a metalake%n"
           + "gcli metalake details -m demo_metalake%n"
           + "%n"
-          + "# Show metalake's audit information"
+          + "# Show metalake's audit information%n"
           + "gcli metalake details -m demo_metalake%n --audit%n";
 
   /** Description of create command */
@@ -86,6 +86,77 @@ public class DescriptionMessages {
       "List all Metalakes, %n the example as follows: %n"
           + "# List all Metalakes%n"
           + "gcli metalake list%n";
+
+  // -------------------------- Catalog Descriptions --------------------------
+  public static final String CATALOG_DETAILS_DESCRIPTIONS =
+      "Get details of a catalog or get audit information for a catalog, %n the example as follows: %n"
+          + "# Show a catalog audit information%n"
+          + "gcli catalog details -m demo_metalake --name catalog_postgres --audit%n"
+          + "%n"
+          + "# Show a catalog details%n"
+          + "gcli catalog details -m demo_metalake --name catalog_postgres%n";
+
+  public static final String CATALOG_CREATE_DESCRIPTIONS =
+      "Create a new catalog in a Metalake, %n the example as follows: %n"
+          + "The type of catalog to be created is specified by the `--provider` option. Different catalogs require different properties, for example, a Hive catalog requires a metastore-uri property. %n"
+          + "# Create a Hive catalog%n"
+          + "gcli catalog create -m demo_metalake --name hive --provider hive --properties metastore.uris=thrift://hive-host:9083%n"
+          + "%n"
+          + "# Create an Iceberg catalog%n"
+          + "gcli catalog create -m demo_metalake  --name iceberg --provider iceberg --properties "
+          + "uri=thrift://hive-host:9083,"
+          + "catalog-backend=hive,warehouse=hdfs://hdfs-host:9000/user/iceberg/warehouse%n"
+          + "%n"
+          + "# Create a MySQL catalog%n"
+          + "gcli catalog create -m demo_metalake  --name mysql --provider mysql --properties "
+          + "jdbc-url=jdbc:mysql://mysql-host:3306?useSSL=false,jdbc-user=user,jdbc-password=password,jdbc-driver=com.mysql.cj.jdbc.Driver"
+          + "%n"
+          + "# Create a Postgres catalog%n"
+          + "gcli catalog create -m demo_metalake  --name postgres --provider postgres --properties "
+          + "jdbc-url=jdbc:postgresql://postgresql-host/mydb,jdbc-user=user,jdbc-password=password,jdbc-database=db,jdbc-driver=org.postgresql.Driver%n "
+          + "%n"
+          + "# Create a Kafka catalog%n"
+          + "gcli catalog create -m demo_metalake --name kafka "
+          + "--provider kafka --properties bootstrap.servers=127.0.0.1:9092,127.0.0.2:9092%n";
+
+  public static final String CATALOG_DELETE_DESCRIPTIONS =
+      "Delete a catalog from a Metalake, %n the example as follows: %n"
+          + "# Delete a catalog from a Metalake%n"
+          + "gcli catalog delete -m demo_metalake --name catalog_postgres%n";
+
+  public static final String CATALOG_SET_DESCRIPTIONS =
+      "Set properties of a catalog in a Metalake, %n the example as follows: %n"
+          + "# Set properties of a catalog in a Metalake%n"
+          + "gcli catalog set --name catalog_mysql --property test --value value%n";
+
+  public static final String CATALOG_REMOVE_DESCRIPTIONS =
+      "Remove a property of a catalog in a Metalake, %n the example as follows: %n"
+          + "# Remove a property of a catalog in a Metalake%n"
+          + "gcli catalog remove -m demo_metalake --name catalog_mysql --property test%n";
+
+  public static final String CATALOG_PROPERTIES_DESCRIPTIONS =
+      "Display a catalog's properties, %n the example as follows: %n"
+          + "# Display a catalog's properties%n"
+          + "gcli catalog properties -m demo_metalake --name catalog_mysql";
+
+  public static final String CATALOG_LIST_DESCRIPTIONS =
+      "Show all catalogs in a metalake, %n the example as follows: %n"
+          + "# Show all catalogs in a Metalake%n"
+          + "gcli catalog list -m demo_metlake%n";
+
+  public static final String CATALOG_UPDATE_DESCRIPTIONS =
+      "Update a catalog in a Metalake, %n the example as follows: %n"
+          + "# Rename a catalog%n"
+          + "gcli catalog update -m demo_metalake --name catalog_mysql --rename mysql"
+          + "%n"
+          + "# Update a catalog's comment%n"
+          + "gcli catalog update -m demo_metalake --name catalog_mysql --comment 'new comment'%n"
+          + "%n"
+          + "# Enable a catalog%n"
+          + "gcli catalog update -m demo_metalake --name catalog_mysql --enable%n"
+          + "%n"
+          + "# Disable a catalog%n"
+          + "gcli catalog update -m demo_metalake --name catalog_mysql --disable%n";
 
   // -------------------------- Schema Descriptions --------------------------
   /** Description of details command */

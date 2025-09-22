@@ -19,8 +19,21 @@
 
 package org.apache.gravitino.cli.handler;
 
+import static org.apache.gravitino.cli.DescriptionMessages.CATALOG_CREATE_DESCRIPTIONS;
+import static org.apache.gravitino.cli.DescriptionMessages.CATALOG_DELETE_DESCRIPTIONS;
+import static org.apache.gravitino.cli.DescriptionMessages.CATALOG_DETAILS_DESCRIPTIONS;
+import static org.apache.gravitino.cli.DescriptionMessages.CATALOG_LIST_DESCRIPTIONS;
+import static org.apache.gravitino.cli.DescriptionMessages.CATALOG_PROPERTIES_DESCRIPTIONS;
+import static org.apache.gravitino.cli.DescriptionMessages.CATALOG_REMOVE_DESCRIPTIONS;
+import static org.apache.gravitino.cli.DescriptionMessages.CATALOG_SET_DESCRIPTIONS;
+import static org.apache.gravitino.cli.DescriptionMessages.CATALOG_UPDATE_DESCRIPTIONS;
 import static org.apache.gravitino.cli.handler.CatalogCliHandler.CATALOG_VALIDATOR;
 import static org.apache.gravitino.cli.handler.CatalogCliHandler.NO_OP_VALIDATOR;
+import static org.apache.gravitino.cli.handler.CliHandler.DESCRIPTION_HEADING_STYLE;
+import static org.apache.gravitino.cli.handler.CliHandler.HEAD_HEADING_STYLE;
+import static org.apache.gravitino.cli.handler.CliHandler.OPTION_LIST_HEADING_STYLE;
+import static org.apache.gravitino.cli.handler.CliHandler.PARAMETER_LIST_HEADING_STYLE;
+import static org.apache.gravitino.cli.handler.CliHandler.SYNOPSIS_HEADING_STYLE;
 
 import com.google.common.base.Joiner;
 import com.google.common.collect.Lists;
@@ -80,7 +93,14 @@ public class CatalogCliHandler implements Runnable {
 /** Handler for the catalog details command. */
 @CommandLine.Command(
     name = CommandActions.DETAILS,
-    description = "Get details of a catalog or get audit information for a catalog")
+    sortOptions = false,
+    headerHeading = HEAD_HEADING_STYLE,
+    synopsisHeading = SYNOPSIS_HEADING_STYLE,
+    descriptionHeading = DESCRIPTION_HEADING_STYLE,
+    parameterListHeading = PARAMETER_LIST_HEADING_STYLE,
+    optionListHeading = OPTION_LIST_HEADING_STYLE,
+    header = "Get details of a catalog or get audit information for a catalog",
+    description = CATALOG_DETAILS_DESCRIPTIONS)
 class CatalogDetails extends CliHandler {
   @CommandLine.Option(
       names = {"-n", GravitinoOptions.OPTION_LONG_PREFIX + GravitinoOptions.NAME},
@@ -124,7 +144,16 @@ class CatalogDetails extends CliHandler {
 }
 
 /** Handler for the catalog create command. */
-@CommandLine.Command(name = CommandActions.CREATE, description = "Create a new catalog")
+@CommandLine.Command(
+    name = CommandActions.CREATE,
+    sortOptions = false,
+    headerHeading = HEAD_HEADING_STYLE,
+    synopsisHeading = SYNOPSIS_HEADING_STYLE,
+    descriptionHeading = DESCRIPTION_HEADING_STYLE,
+    parameterListHeading = PARAMETER_LIST_HEADING_STYLE,
+    optionListHeading = OPTION_LIST_HEADING_STYLE,
+    header = "Create a new catalog",
+    description = CATALOG_CREATE_DESCRIPTIONS)
 class CatalogCreate extends CliHandler {
 
   @CommandLine.Option(
@@ -191,7 +220,16 @@ class CatalogCreate extends CliHandler {
 }
 
 /** Handler for the catalog update command. */
-@CommandLine.Command(name = CommandActions.DELETE, description = "Delete a catalog")
+@CommandLine.Command(
+    name = CommandActions.DELETE,
+    sortOptions = false,
+    headerHeading = HEAD_HEADING_STYLE,
+    synopsisHeading = SYNOPSIS_HEADING_STYLE,
+    descriptionHeading = DESCRIPTION_HEADING_STYLE,
+    parameterListHeading = PARAMETER_LIST_HEADING_STYLE,
+    optionListHeading = OPTION_LIST_HEADING_STYLE,
+    header = "Delete a catalog",
+    description = CATALOG_DELETE_DESCRIPTIONS)
 class CatalogDelete extends CliHandler {
   @CommandLine.Option(
       names = {"-n", GravitinoOptions.OPTION_LONG_PREFIX + GravitinoOptions.NAME},
@@ -238,7 +276,16 @@ class CatalogDelete extends CliHandler {
 }
 
 /** Handler for set command. */
-@CommandLine.Command(name = CommandActions.SET, description = "Set property of a catalog")
+@CommandLine.Command(
+    name = CommandActions.SET,
+    sortOptions = false,
+    headerHeading = HEAD_HEADING_STYLE,
+    synopsisHeading = SYNOPSIS_HEADING_STYLE,
+    descriptionHeading = DESCRIPTION_HEADING_STYLE,
+    parameterListHeading = PARAMETER_LIST_HEADING_STYLE,
+    optionListHeading = OPTION_LIST_HEADING_STYLE,
+    header = "Set a property of a catalog",
+    description = CATALOG_SET_DESCRIPTIONS)
 class CatalogSet extends CliHandler {
   @CommandLine.Option(
       names = {"-n", GravitinoOptions.OPTION_LONG_PREFIX + GravitinoOptions.NAME},
@@ -278,7 +325,16 @@ class CatalogSet extends CliHandler {
 }
 
 /** Handler for the catalog remove command. */
-@CommandLine.Command(name = CommandActions.REMOVE, description = "Remove a property from a catalog")
+@CommandLine.Command(
+    name = CommandActions.REMOVE,
+    sortOptions = false,
+    headerHeading = HEAD_HEADING_STYLE,
+    synopsisHeading = SYNOPSIS_HEADING_STYLE,
+    descriptionHeading = DESCRIPTION_HEADING_STYLE,
+    parameterListHeading = PARAMETER_LIST_HEADING_STYLE,
+    optionListHeading = OPTION_LIST_HEADING_STYLE,
+    header = "Remove a property from a catalog",
+    description = CATALOG_REMOVE_DESCRIPTIONS)
 class CatalogRemove extends CliHandler {
   @CommandLine.Option(
       names = {"-n", GravitinoOptions.OPTION_LONG_PREFIX + GravitinoOptions.NAME},
@@ -320,7 +376,16 @@ class CatalogRemove extends CliHandler {
 }
 
 /** Handler for the catalog properties command. */
-@CommandLine.Command(name = CommandActions.PROPERTIES, description = "List properties of a catalog")
+@CommandLine.Command(
+    name = CommandActions.PROPERTIES,
+    sortOptions = false,
+    headerHeading = HEAD_HEADING_STYLE,
+    synopsisHeading = SYNOPSIS_HEADING_STYLE,
+    descriptionHeading = DESCRIPTION_HEADING_STYLE,
+    parameterListHeading = PARAMETER_LIST_HEADING_STYLE,
+    optionListHeading = OPTION_LIST_HEADING_STYLE,
+    header = "Display a catalog's properties",
+    description = CATALOG_PROPERTIES_DESCRIPTIONS)
 class CatalogProperties extends CliHandler {
   @CommandLine.Option(
       names = {"-n", GravitinoOptions.OPTION_LONG_PREFIX + GravitinoOptions.NAME},
@@ -354,7 +419,16 @@ class CatalogProperties extends CliHandler {
 }
 
 /** Handler for the catalog list command. */
-@CommandLine.Command(name = CommandActions.LIST, description = "List all catalogs in the metalake")
+@CommandLine.Command(
+    name = CommandActions.LIST,
+    sortOptions = false,
+    headerHeading = HEAD_HEADING_STYLE,
+    synopsisHeading = SYNOPSIS_HEADING_STYLE,
+    descriptionHeading = DESCRIPTION_HEADING_STYLE,
+    parameterListHeading = PARAMETER_LIST_HEADING_STYLE,
+    optionListHeading = OPTION_LIST_HEADING_STYLE,
+    header = "Show all catalogs in a metalake",
+    description = CATALOG_LIST_DESCRIPTIONS)
 class CatalogList extends CliHandler {
 
   /** {@inheritDoc} */
@@ -378,7 +452,16 @@ class CatalogList extends CliHandler {
 }
 
 /** Handler for the catalog update command. */
-@CommandLine.Command(name = CommandActions.UPDATE, description = "Update a catalog")
+@CommandLine.Command(
+    name = CommandActions.UPDATE,
+    sortOptions = false,
+    headerHeading = HEAD_HEADING_STYLE,
+    synopsisHeading = SYNOPSIS_HEADING_STYLE,
+    descriptionHeading = DESCRIPTION_HEADING_STYLE,
+    parameterListHeading = PARAMETER_LIST_HEADING_STYLE,
+    optionListHeading = OPTION_LIST_HEADING_STYLE,
+    header = "Update a catalog",
+    description = CATALOG_UPDATE_DESCRIPTIONS)
 class CatalogUpdate extends CliHandler {
   @CommandLine.Option(
       names = {"-n", GravitinoOptions.OPTION_LONG_PREFIX + GravitinoOptions.NAME},
