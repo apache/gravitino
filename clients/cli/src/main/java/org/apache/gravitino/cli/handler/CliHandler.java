@@ -59,7 +59,6 @@ import picocli.CommandLine;
 
 /** Base class for all cli handlers. will be renamed as Command when */
 public abstract class CliHandler implements Callable<Integer> {
-
   /** The style of the head heading */
   public static final String HEAD_HEADING_STYLE = "@|bold,underline Usage|@:%n%n";
   /** The style of the synopsis heading */
@@ -277,9 +276,14 @@ public abstract class CliHandler implements Callable<Integer> {
    * @return A configured {@link GravitinoAdminClient} instance.
    */
   protected GravitinoAdminClient buildAdminClient() {
-    GravitinoClientBase.Builder<GravitinoAdminClient> client = GravitinoAdminClient.builder(url);
+    try {
+      GravitinoClientBase.Builder<GravitinoAdminClient> client = GravitinoAdminClient.builder(url);
 
-    return constructClient(client).build();
+      return constructClient(client).build();
+    } catch (Exception e) {
+      exitWithError(e.getMessage());
+    }
+    return null;
   }
 
   /**
