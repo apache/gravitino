@@ -19,15 +19,9 @@
 
 package org.apache.gravitino.metrics.source;
 
-public abstract class CatalogMetricsSource extends MetricsSource {
+public class FilesetCatalogMetricsSource extends CatalogMetricsSource {
 
-  public CatalogMetricsSource(String provider, String metalakeName, String catalogName) {
-    super(
-        String.join(
-            ".",
-            MetricsSource.GRAVITINO_CATALOG_METRIC_PREFIX,
-            provider,
-            metalakeName,
-            catalogName));
+  public FilesetCatalogMetricsSource(String metalakeName, String catalogName) {
+    super("fileset", metalakeName, catalogName);
   }
 }

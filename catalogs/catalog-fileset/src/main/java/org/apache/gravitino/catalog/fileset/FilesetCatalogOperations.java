@@ -92,7 +92,7 @@ import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.FilesetEntity;
 import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.metrics.MetricsSystem;
-import org.apache.gravitino.metrics.source.CatalogMetricsSource;
+import org.apache.gravitino.metrics.source.FilesetCatalogMetricsSource;
 import org.apache.gravitino.utils.NamespaceUtil;
 import org.apache.gravitino.utils.PrincipalUtils;
 import org.apache.hadoop.conf.Configuration;
@@ -133,7 +133,7 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
 
   private boolean disableFSOps;
 
-  private CatalogMetricsSource catalogMetricsSource;
+  private FilesetCatalogMetricsSource catalogMetricsSource;
 
   @VisibleForTesting ScheduledThreadPoolExecutor scheduler;
   @VisibleForTesting Cache<FileSystemCacheKey, FileSystem> fileSystemCache;
@@ -228,8 +228,7 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
     // Metrics System could be null in UT.
     if (metricsSystem != null) {
       this.catalogMetricsSource =
-          new CatalogMetricsSource(
-              catalogInfo.provider(), catalogInfo.namespace().toString(), catalogInfo.name());
+          new FilesetCatalogMetricsSource(catalogInfo.namespace().toString(), catalogInfo.name());
     }
 
     if (!disableFSOps) {
