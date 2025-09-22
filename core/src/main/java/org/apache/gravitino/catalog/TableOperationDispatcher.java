@@ -224,7 +224,7 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
 
     return TreeLockUtils.doWithTreeLock(
         nameIdentifierForLock,
-        LockType.WRITE,
+        nameIdentifierForLock.equals(ident) ? LockType.READ : LockType.WRITE,
         () -> {
           NameIdentifier catalogIdent = getCatalogIdentifier(ident);
           Table alteredTable =
@@ -267,28 +267,7 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
                           TableEntity.class,
                           TABLE,
                           tableEntity -> {
-                            Namespace newNamespace =
-                                Arrays.stream(changes)
-                                    .filter(
-                                        c ->
-                                            c instanceof TableChange.RenameTable
-                                                && ((TableChange.RenameTable) c)
-                                                    .getNewSchemaName()
-                                                    .isPresent()
-                                                && !((TableChange.RenameTable) c)
-                                                    .getNewSchemaName()
-                                                    .get()
-                                                    .equals(schemaName))
-                                    .map(
-                                        c ->
-                                            NamespaceUtil.ofTable(
-                                                ident.namespace().level(0),
-                                                ident.namespace().level(1),
-                                                ((TableChange.RenameTable) c)
-                                                    .getNewSchemaName()
-                                                    .get()))
-                                    .reduce((c1, c2) -> c2)
-                                    .orElse(ident.namespace());
+                            Namespace newNamespace = getNewNamespace(ident, changes);
 
                             // Update the columns
                             Pair<Boolean, List<ColumnEntity>> columnsUpdateResult =
@@ -421,6 +400,24 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
               ? droppedFromStore
               : droppedFromCatalog;
         });
+  }
+
+  private Namespace getNewNamespace(NameIdentifier tableIdent, TableChange... changes) {
+    String schemaName = tableIdent.namespace().level(2);
+    return Arrays.stream(changes)
+        .filter(
+            c ->
+                c instanceof TableChange.RenameTable
+                    && ((TableChange.RenameTable) c).getNewSchemaName().isPresent()
+                    && !((TableChange.RenameTable) c).getNewSchemaName().get().equals(schemaName))
+        .map(
+            c ->
+                NamespaceUtil.ofTable(
+                    tableIdent.namespace().level(0),
+                    tableIdent.namespace().level(1),
+                    ((TableChange.RenameTable) c).getNewSchemaName().get()))
+        .reduce((c1, c2) -> c2)
+        .orElse(tableIdent.namespace());
   }
 
   private EntityCombinedTable importTable(NameIdentifier identifier) {
