@@ -26,6 +26,36 @@ import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+/**
+ * GravitinoSampleBuilder is a custom SampleBuilder for Prometheus that transforms Dropwizard
+ * metrics into Prometheus samples. It is designed to handle Gravitino's metric naming conventions
+ * for catalog-level metrics.
+ *
+ * <p>The metric names are expected to follow a specific format to be processed correctly. The
+ * format is: {@code gravitino-catalog.<provider>.<metalake>.<catalog>.<rest-of-the-metric-name>}.
+ *
+ * <p>This builder extracts the following labels from the metric name:
+ *
+ * <ul>
+ *   <li>{@code provider}: The provider of the catalog (e.g., fileset, model, hive).
+ *   <li>{@code metalake}: The name of the metalake.
+ *   <li>{@code catalog}: The name of the catalog.
+ * </ul>
+ *
+ * <p>For example, a Dropwizard metric named {@code
+ * gravitino-catalog.fileset.metalake1.catalog1.some-metric} will be converted to a Prometheus
+ * sample with the metric name {@code gravitino_catalog_some_metric} and the labels {@code
+ * provider="fileset"}, {@code metalake="metalake1"}, and {@code catalog="catalog1"}.
+ *
+ * <p>We are not using the default {@link CustomMappingSampleBuilder} with {@code MapperConfig}
+ * directly because {@code MapperConfig} only supports exact matching of metric names. For metrics
+ * that contain multiple variable parts, it would require defining a separate complex rule for each
+ * possible combination, which is not practical. This class uses regular expressions to dynamically
+ * parse metric names, providing a more flexible and scalable solution.
+ *
+ * <p>Metrics that do not match this pattern will be processed by the default behavior of {@link
+ * CustomMappingSampleBuilder}.
+ */
 public class GravitinoSampleBuilder extends CustomMappingSampleBuilder {
 
   public static final String GRAVITINO_CATALOG_METRIC_PREFIX = "gravitino-catalog";

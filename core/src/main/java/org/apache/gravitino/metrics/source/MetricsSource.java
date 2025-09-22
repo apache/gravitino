@@ -19,8 +19,6 @@
 
 package org.apache.gravitino.metrics.source;
 
-import static org.apache.gravitino.metrics.GravitinoSampleBuilder.GRAVITINO_CATALOG_METRIC_PREFIX;
-
 import com.codahale.metrics.Counter;
 import com.codahale.metrics.Gauge;
 import com.codahale.metrics.Histogram;
@@ -43,8 +41,7 @@ public abstract class MetricsSource {
   public static final String ICEBERG_REST_SERVER_METRIC_NAME = "iceberg-rest-server";
   public static final String GRAVITINO_SERVER_METRIC_NAME = "gravitino-server";
   public static final String GRAVITINO_RELATIONAL_STORE_METRIC_NAME = "gravitino-relational-store";
-  public static final String GRAVITINO_FILESET_CATALOG_METRIC_PREFIX =
-      GRAVITINO_CATALOG_METRIC_PREFIX + ".fileset";
+  public static final String GRAVITINO_CATALOG_METRIC_PREFIX = "gravitino-catalog";
   public static final String JVM_METRIC_NAME = "jvm";
   private final MetricRegistry metricRegistry;
   private final String metricsSourceName;

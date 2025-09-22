@@ -27,7 +27,6 @@ import static org.apache.gravitino.file.Fileset.PROPERTY_LOCATION_PLACEHOLDER_PR
 import static org.apache.gravitino.file.Fileset.PROPERTY_MULTIPLE_LOCATIONS_PREFIX;
 import static org.apache.gravitino.file.Fileset.PROPERTY_SCHEMA_PLACEHOLDER;
 import static org.apache.gravitino.metrics.MetricNames.FILESYSTEM_CACHE;
-import static org.apache.gravitino.metrics.source.MetricsSource.GRAVITINO_FILESET_CATALOG_METRIC_PREFIX;
 
 import com.codahale.metrics.caffeine.MetricsStatsCounter;
 import com.github.benmanes.caffeine.cache.Cache;
@@ -93,6 +92,7 @@ import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.FilesetEntity;
 import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.metrics.MetricsSystem;
+import org.apache.gravitino.metrics.source.CatalogMetricsSource;
 import org.apache.gravitino.utils.NamespaceUtil;
 import org.apache.gravitino.utils.PrincipalUtils;
 import org.apache.hadoop.conf.Configuration;
@@ -132,6 +132,8 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
   private FileSystemProvider defaultFileSystemProvider;
 
   private boolean disableFSOps;
+
+  private CatalogMetricsSource catalogMetricsSource;
 
   @VisibleForTesting ScheduledThreadPoolExecutor scheduler;
   @VisibleForTesting Cache<FileSystemCacheKey, FileSystem> fileSystemCache;
@@ -265,17 +267,14 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
       MetricsSystem metricsSystem = GravitinoEnv.getInstance().metricsSystem();
       // Metrics System could be null in UT.
       if (metricsSystem != null) {
+        this.catalogMetricsSource =
+            new CatalogMetricsSource(
+                catalogInfo.provider(), catalogInfo.namespace().toString(), catalogInfo.name());
         cacheBuilder.recordStats(
-            () -> {
-              String metricsPrefix =
-                  String.join(
-                      ".",
-                      GRAVITINO_FILESET_CATALOG_METRIC_PREFIX,
-                      catalogInfo.namespace().toString(),
-                      catalogInfo.name(),
-                      FILESYSTEM_CACHE);
-              return new MetricsStatsCounter(metricsSystem.getMetricRegistry(), metricsPrefix);
-            });
+            () ->
+                new MetricsStatsCounter(
+                    catalogMetricsSource.getMetricRegistry(), FILESYSTEM_CACHE));
+        metricsSystem.register(catalogMetricsSource);
       }
       this.fileSystemCache = cacheBuilder.build();
     }
@@ -1002,6 +1001,12 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
                 }
               });
       fileSystemCache.cleanUp();
+    }
+
+    // Metrics System could be null in UT.
+    MetricsSystem metricsSystem = GravitinoEnv.getInstance().metricsSystem();
+    if (metricsSystem != null) {
+      metricsSystem.unregister(catalogMetricsSource);
     }
   }
 

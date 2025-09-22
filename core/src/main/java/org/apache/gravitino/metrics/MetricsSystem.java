@@ -202,11 +202,7 @@ public class MetricsSystem implements Closeable {
         new MapperConfig(
             MetricsSource.GRAVITINO_SERVER_METRIC_NAME + ".*.*",
             MetricsSource.GRAVITINO_SERVER_METRIC_NAME + "_${1}",
-            ImmutableMap.of("operation", "${0}")),
-        new MapperConfig(
-            MetricsSource.GRAVITINO_FILESET_CATALOG_METRIC_PREFIX + ".*.*.*",
-            MetricsSource.GRAVITINO_FILESET_CATALOG_METRIC_PREFIX + "_${2}",
-            ImmutableMap.of("metalake", "${0}", "catalog", "${1}")));
+            ImmutableMap.of("operation", "${0}")));
   }
 
   private void registerMetricsToPrometheusRegistry() {
