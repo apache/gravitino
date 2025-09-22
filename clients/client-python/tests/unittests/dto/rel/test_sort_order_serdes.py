@@ -23,8 +23,8 @@ from typing import cast
 
 from dataclasses_json import DataClassJsonMixin, config
 
-from gravitino.api.expressions.sorts.null_ordering import NullOrdering
-from gravitino.api.expressions.sorts.sort_direction import SortDirection
+from gravitino.api.rel.expressions.sorts.null_ordering import NullOrdering
+from gravitino.api.rel.expressions.sorts.sort_direction import SortDirection
 from gravitino.api.rel.types.types import Types
 from gravitino.dto.rel.expressions.field_reference_dto import FieldReferenceDTO
 from gravitino.dto.rel.expressions.func_expression_dto import FuncExpressionDTO

@@ -17,7 +17,7 @@
 import unittest
 from datetime import date
 
-from gravitino.api.expressions.literals.literals import Literals
+from gravitino.api.rel.expressions.literals.literals import Literals
 from gravitino.api.rel.partitions.partitions import Partitions
 
 
