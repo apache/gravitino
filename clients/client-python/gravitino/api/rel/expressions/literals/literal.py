@@ -18,7 +18,7 @@
 from abc import abstractmethod
 from typing import Generic, List, TypeVar
 
-from gravitino.api.expressions.expression import Expression
+from gravitino.api.rel.expressions.expression import Expression
 from gravitino.api.rel.types.type import Type
 
 T = TypeVar("T")
