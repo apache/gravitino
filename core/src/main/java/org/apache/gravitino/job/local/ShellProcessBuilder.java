@@ -19,6 +19,7 @@
 
 package org.apache.gravitino.job.local;
 
+import com.google.common.base.Joiner;
 import com.google.common.collect.Lists;
 import java.io.File;
 import java.util.List;
@@ -55,7 +56,7 @@ public class ShellProcessBuilder extends LocalProcessBuilder {
     builder.redirectOutput(outputFile);
     builder.redirectError(errorFile);
 
-    LOG.info("Starting local shell job with command: {}", String.join(" ", commandList));
+    LOG.info("Starting local shell job with command: {}", Joiner.on(" ").join(commandList));
 
     try {
       return builder.start();

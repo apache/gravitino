@@ -21,10 +21,12 @@ package org.apache.gravitino.job.local;
 
 import static org.apache.gravitino.job.local.LocalJobExecutorConfigs.SPARK_HOME;
 
+import com.google.common.base.Joiner;
 import com.google.common.collect.Lists;
 import java.io.File;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import org.apache.arrow.util.Preconditions;
 import org.apache.arrow.util.VisibleForTesting;
 import org.apache.commons.lang3.StringUtils;
@@ -36,21 +38,25 @@ import org.slf4j.LoggerFactory;
  * The SparkProcessBuilder class is responsible for constructing and starting a local Spark job
  * process using the spark-submit command. Using local job executor to run Spark job has some
  * limitations: 1. It uses the aliveness of the spark-submit process to determine if the job is
- * still running, which is not accurate for cluster deploy mode. 2. It cannot support user
+ * still running, which is not accurate for the cluster deploy mode. 2. It cannot support user
  * impersonation for now.
  */
 public class SparkProcessBuilder extends LocalProcessBuilder {
 
   private static final Logger LOG = LoggerFactory.getLogger(SparkProcessBuilder.class);
 
+  private static final String ENV_SPARK_HOME = "SPARK_HOME";
+
   private final String sparkSubmit;
 
   protected SparkProcessBuilder(SparkJobTemplate sparkJobTemplate, Map<String, String> configs) {
     super(sparkJobTemplate, configs);
-    String sparkHome = configs.get(SPARK_HOME);
+    String sparkHome =
+        Optional.ofNullable(configs.get(SPARK_HOME)).orElse(System.getenv(ENV_SPARK_HOME));
     Preconditions.checkArgument(
         StringUtils.isNotBlank(sparkHome),
-        "gravitino.jobExecutor.local.sparkHome must be set for Spark jobs");
+        "gravitino.jobExecutor.local.sparkHome or SPARK_HOME environment variable must"
+            + " be set for Spark jobs");
 
     this.sparkSubmit = sparkHome + "/bin/spark-submit";
     File sparkSubmitFile = new File(sparkSubmit);
@@ -118,7 +124,10 @@ public class SparkProcessBuilder extends LocalProcessBuilder {
     builder.redirectOutput(outputFile);
     builder.redirectError(errorFile);
 
-    LOG.info("Starting local Spark job with command: {}", String.join(" ", commandList));
+    LOG.info(
+        "Starting local Spark job with command: {}, environment variables: {}",
+        Joiner.on(" ").join(commandList),
+        Joiner.on(", ").withKeyValueSeparator(": ").join(sparkJobTemplate.environments()));
 
     try {
       return builder.start();
