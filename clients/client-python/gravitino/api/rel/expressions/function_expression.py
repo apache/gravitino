@@ -16,9 +16,10 @@
 # under the License.
 
 from __future__ import annotations
+
 from abc import abstractmethod
 
-from gravitino.api.expressions.expression import Expression
+from gravitino.api.rel.expressions.expression import Expression
 
 
 class FunctionExpression(Expression):
