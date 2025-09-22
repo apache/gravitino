@@ -223,6 +223,15 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
             propertiesMetadata
                 .catalogPropertiesMetadata()
                 .getOrDefault(config, FilesetCatalogPropertiesMetadata.DISABLE_FILESYSTEM_OPS);
+
+    MetricsSystem metricsSystem = GravitinoEnv.getInstance().metricsSystem();
+    // Metrics System could be null in UT.
+    if (metricsSystem != null) {
+      this.catalogMetricsSource =
+          new CatalogMetricsSource(
+              catalogInfo.provider(), catalogInfo.namespace().toString(), catalogInfo.name());
+    }
+
     if (!disableFSOps) {
       String fileSystemProviders =
           (String)
@@ -264,22 +273,22 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
                   })
               .scheduler(Scheduler.forScheduledExecutorService(scheduler));
 
-      MetricsSystem metricsSystem = GravitinoEnv.getInstance().metricsSystem();
       // Metrics System could be null in UT.
       if (metricsSystem != null) {
-        this.catalogMetricsSource =
-            new CatalogMetricsSource(
-                catalogInfo.provider(), catalogInfo.namespace().toString(), catalogInfo.name());
         cacheBuilder.recordStats(
             () ->
                 new MetricsStatsCounter(
                     catalogMetricsSource.getMetricRegistry(), FILESYSTEM_CACHE));
-        metricsSystem.register(catalogMetricsSource);
       }
       this.fileSystemCache = cacheBuilder.build();
     }
 
     this.catalogStorageLocations = getAndCheckCatalogStorageLocations(config);
+
+    // Metrics System could be null in UT.
+    if (metricsSystem != null) {
+      metricsSystem.register(catalogMetricsSource);
+    }
   }
 
   @Override
