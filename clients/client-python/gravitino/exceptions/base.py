@@ -191,3 +191,11 @@ class NoSuchJobException(NotFoundException):
 
 class ForbiddenException(GravitinoRuntimeException):
     """An exception thrown when a user is forbidden to perform an action."""
+
+
+class IllegalStatisticNameException(IllegalArgumentException):
+    """An exception thrown when statistic has an illegal name"""
+
+
+class UnmodifiableStatisticException(UnsupportedOperationException):
+    """An exception thrown when users modify an unmodifiable statistic"""
