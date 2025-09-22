@@ -18,6 +18,8 @@
  */
 package org.apache.gravitino.metrics;
 
+import static org.apache.gravitino.metrics.source.MetricsSource.GRAVITINO_CATALOG_METRIC_PREFIX;
+
 import io.prometheus.client.Collector;
 import io.prometheus.client.dropwizard.samplebuilder.CustomMappingSampleBuilder;
 import io.prometheus.client.dropwizard.samplebuilder.MapperConfig;
@@ -57,9 +59,6 @@ import java.util.regex.Pattern;
  * CustomMappingSampleBuilder}.
  */
 public class GravitinoSampleBuilder extends CustomMappingSampleBuilder {
-
-  public static final String GRAVITINO_CATALOG_METRIC_PREFIX = "gravitino-catalog";
-
   // match pattern:
   // gravitino-catalog.<provider>.<metalake>.<catalog>.<rest-of-the-metric-name>
   private static final Pattern CATALOG_PATTERN =
