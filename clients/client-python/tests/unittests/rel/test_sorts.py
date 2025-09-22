@@ -17,12 +17,12 @@
 import unittest
 from unittest.mock import MagicMock
 
-from gravitino.api.expressions.function_expression import FunctionExpression
-from gravitino.api.expressions.named_reference import NamedReference
-from gravitino.api.expressions.sorts.sort_direction import SortDirection
-from gravitino.api.expressions.sorts.null_ordering import NullOrdering
-from gravitino.api.expressions.sorts.sort_orders import SortImpl, SortOrders
-from gravitino.api.expressions.expression import Expression
+from gravitino.api.rel.expressions.expression import Expression
+from gravitino.api.rel.expressions.function_expression import FunctionExpression
+from gravitino.api.rel.expressions.named_reference import NamedReference
+from gravitino.api.rel.expressions.sorts.null_ordering import NullOrdering
+from gravitino.api.rel.expressions.sorts.sort_direction import SortDirection
+from gravitino.api.rel.expressions.sorts.sort_orders import SortImpl, SortOrders
 
 
 class TestSortOrder(unittest.TestCase):

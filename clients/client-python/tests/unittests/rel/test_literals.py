@@ -18,7 +18,7 @@ import unittest
 from datetime import date, datetime, time
 from decimal import Decimal
 
-from gravitino.api.expressions.literals.literals import Literals
+from gravitino.api.rel.expressions.literals.literals import Literals
 from gravitino.api.rel.types.types import Types
 
 
