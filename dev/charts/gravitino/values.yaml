@@ -383,6 +383,11 @@ additionalLog4j2Properties:
   appender.console.layout.pattern: "%d{yyyy-MM-dd HH:mm:ss} %-5p [%t] %c{1}:%L - %m%n"
   rootLogger.appenderRef.console.ref: consoleLogger
 
+initScript: |
+  cp /tmp/conf/* ${GRAVITINO_HOME}/conf
+  echo "Start the Gravitino Server"
+  /bin/bash ${GRAVITINO_HOME}/bin/gravitino.sh run
+
 ## Expose the gravitino service to be accessed from outside the cluster (LoadBalancer service).
 ## or access it from within the cluster (ClusterIP service). Set the service type and the port to serve it.
 ## ref: http://kubernetes.io/docs/user-guide/services/
