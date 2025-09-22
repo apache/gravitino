@@ -23,8 +23,8 @@ from typing import Optional
 
 from gravitino.api.expressions.expression import Expression
 from gravitino.api.expressions.function_expression import FunctionExpression
+from gravitino.api.rel.types.type import Type
 from gravitino.api.tag.supports_tags import SupportsTags
-from gravitino.api.types.type import Type
 from gravitino.exceptions.base import UnsupportedOperationException
 from gravitino.utils.precondition import Precondition
 

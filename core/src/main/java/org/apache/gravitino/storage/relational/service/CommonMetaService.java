@@ -19,10 +19,13 @@
 
 package org.apache.gravitino.storage.relational.service;
 
+import static org.apache.gravitino.metrics.source.MetricsSource.GRAVITINO_RELATIONAL_STORE_METRIC_NAME;
+
 import com.google.common.base.Preconditions;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
+import org.apache.gravitino.metrics.Monitored;
 import org.apache.gravitino.storage.relational.helper.CatalogIds;
 import org.apache.gravitino.storage.relational.helper.SchemaIds;
 
@@ -36,6 +39,9 @@ public class CommonMetaService {
 
   private CommonMetaService() {}
 
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "getParentEntityIdByNamespace")
   public Long getParentEntityIdByNamespace(Namespace namespace) {
     Preconditions.checkArgument(
         !namespace.isEmpty() && namespace.levels().length <= 3,
@@ -88,6 +94,9 @@ public class CommonMetaService {
     }
   }
 
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "getParentEntityIdsByNamespace")
   public Long[] getParentEntityIdsByNamespace(Namespace namespace) {
     Preconditions.checkArgument(
         !namespace.isEmpty() && namespace.levels().length <= 3,

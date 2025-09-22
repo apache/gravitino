@@ -18,12 +18,15 @@
  */
 package org.apache.gravitino.storage.relational.service;
 
+import static org.apache.gravitino.metrics.source.MetricsSource.GRAVITINO_RELATIONAL_STORE_METRIC_NAME;
+
 import java.util.Collections;
 import java.util.Optional;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.authorization.AuthorizationUtils;
+import org.apache.gravitino.metrics.Monitored;
 import org.apache.gravitino.storage.relational.mapper.OwnerMetaMapper;
 import org.apache.gravitino.storage.relational.po.GroupPO;
 import org.apache.gravitino.storage.relational.po.OwnerRelPO;
@@ -43,6 +46,7 @@ public class OwnerMetaService {
     return INSTANCE;
   }
 
+  @Monitored(metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME, baseMetricName = "getOwner")
   public Optional<Entity> getOwner(NameIdentifier identifier, Entity.EntityType type) {
     long metalakeId =
         MetalakeMetaService.getInstance()
@@ -78,6 +82,7 @@ public class OwnerMetaService {
     return Optional.empty();
   }
 
+  @Monitored(metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME, baseMetricName = "setOwner")
   public void setOwner(
       NameIdentifier entity,
       Entity.EntityType entityType,

@@ -19,7 +19,7 @@
 from abc import abstractmethod
 from enum import Enum, unique
 
-from gravitino.api.expressions.partitions.partition import Partition
+from gravitino.api.rel.partitions.partition import Partition
 
 
 class PartitionDTO(Partition):

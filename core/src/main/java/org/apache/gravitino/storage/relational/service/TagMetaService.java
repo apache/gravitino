@@ -18,6 +18,8 @@
  */
 package org.apache.gravitino.storage.relational.service;
 
+import static org.apache.gravitino.metrics.source.MetricsSource.GRAVITINO_RELATIONAL_STORE_METRIC_NAME;
+
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import java.io.IOException;
@@ -38,6 +40,7 @@ import org.apache.gravitino.Namespace;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchTagException;
 import org.apache.gravitino.meta.TagEntity;
+import org.apache.gravitino.metrics.Monitored;
 import org.apache.gravitino.storage.relational.mapper.TagMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.TagMetadataObjectRelMapper;
 import org.apache.gravitino.storage.relational.po.TagMetadataObjectRelPO;
@@ -58,6 +61,9 @@ public class TagMetaService {
 
   private TagMetaService() {}
 
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "listTagsByNamespace")
   public List<TagEntity> listTagsByNamespace(Namespace ns) {
     String metalakeName = ns.level(0);
     List<TagPO> tagPOs =
@@ -68,12 +74,16 @@ public class TagMetaService {
         .collect(Collectors.toList());
   }
 
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "getTagByIdentifier")
   public TagEntity getTagByIdentifier(NameIdentifier ident) {
     String metalakeName = ident.namespace().level(0);
     TagPO tagPO = getTagPOByMetalakeAndName(metalakeName, ident.name());
     return POConverters.fromTagPO(tagPO, ident.namespace());
   }
 
+  @Monitored(metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME, baseMetricName = "insertTag")
   public void insertTag(TagEntity tagEntity, boolean overwritten) throws IOException {
     Namespace ns = tagEntity.namespace();
     String metalakeName = ns.level(0);
@@ -99,13 +109,14 @@ public class TagMetaService {
     }
   }
 
+  @Monitored(metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME, baseMetricName = "updateTag")
   public <E extends Entity & HasIdentifier> TagEntity updateTag(
-      NameIdentifier ident, Function<E, E> updater) throws IOException {
-    String metalakeName = ident.namespace().level(0);
+      NameIdentifier identifier, Function<E, E> updater) throws IOException {
+    String metalakeName = identifier.namespace().level(0);
 
     try {
-      TagPO tagPO = getTagPOByMetalakeAndName(metalakeName, ident.name());
-      TagEntity oldTagEntity = POConverters.fromTagPO(tagPO, ident.namespace());
+      TagPO tagPO = getTagPOByMetalakeAndName(metalakeName, identifier.name());
+      TagEntity oldTagEntity = POConverters.fromTagPO(tagPO, identifier.namespace());
       TagEntity updatedTagEntity = (TagEntity) updater.apply((E) oldTagEntity);
       Preconditions.checkArgument(
           Objects.equals(oldTagEntity.id(), updatedTagEntity.id()),
@@ -121,19 +132,20 @@ public class TagMetaService {
                       POConverters.updateTagPOWithVersion(tagPO, updatedTagEntity), tagPO));
 
       if (result == null || result == 0) {
-        throw new IOException("Failed to update the entity: " + ident);
+        throw new IOException("Failed to update the entity: " + identifier);
       }
 
       return updatedTagEntity;
 
     } catch (RuntimeException e) {
-      ExceptionUtils.checkSQLException(e, Entity.EntityType.TAG, ident.toString());
+      ExceptionUtils.checkSQLException(e, Entity.EntityType.TAG, identifier.toString());
       throw e;
     }
   }
 
-  public boolean deleteTag(NameIdentifier ident) {
-    String metalakeName = ident.namespace().level(0);
+  @Monitored(metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME, baseMetricName = "deleteTag")
+  public boolean deleteTag(NameIdentifier identifier) {
+    String metalakeName = identifier.namespace().level(0);
     int[] tagDeletedCount = new int[] {0};
     int[] tagMetadataObjectRelDeletedCount = new int[] {0};
 
@@ -143,18 +155,22 @@ public class TagMetaService {
                 SessionUtils.getWithoutCommit(
                     TagMetaMapper.class,
                     mapper ->
-                        mapper.softDeleteTagMetaByMetalakeAndTagName(metalakeName, ident.name())),
+                        mapper.softDeleteTagMetaByMetalakeAndTagName(
+                            metalakeName, identifier.name())),
         () ->
             tagMetadataObjectRelDeletedCount[0] =
                 SessionUtils.getWithoutCommit(
                     TagMetadataObjectRelMapper.class,
                     mapper ->
                         mapper.softDeleteTagMetadataObjectRelsByMetalakeAndTagName(
-                            metalakeName, ident.name())));
+                            metalakeName, identifier.name())));
 
     return tagDeletedCount[0] + tagMetadataObjectRelDeletedCount[0] > 0;
   }
 
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "listTagsForMetadataObject")
   public List<TagEntity> listTagsForMetadataObject(
       NameIdentifier objectIdent, Entity.EntityType objectType)
       throws NoSuchTagException, IOException {
@@ -184,6 +200,9 @@ public class TagMetaService {
         .collect(Collectors.toList());
   }
 
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "getTagForMetadataObject")
   public TagEntity getTagForMetadataObject(
       NameIdentifier objectIdent, Entity.EntityType objectType, NameIdentifier tagIdent)
       throws NoSuchEntityException, IOException {
@@ -218,6 +237,9 @@ public class TagMetaService {
     return POConverters.fromTagPO(tagPO, NamespaceUtil.ofTag(metalake));
   }
 
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "listAssociatedMetadataObjectsForTag")
   public List<MetadataObject> listAssociatedMetadataObjectsForTag(NameIdentifier tagIdent)
       throws IOException {
     String metalakeName = tagIdent.namespace().level(0);
@@ -268,6 +290,9 @@ public class TagMetaService {
     }
   }
 
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "associateTagsWithMetadataObject")
   public List<TagEntity> associateTagsWithMetadataObject(
       NameIdentifier objectIdent,
       Entity.EntityType objectType,
@@ -352,6 +377,9 @@ public class TagMetaService {
     }
   }
 
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "deleteTagMetasByLegacyTimeline")
   public int deleteTagMetasByLegacyTimeline(long legacyTimeline, int limit) {
     int[] tagDeletedCount = new int[] {0};
     int[] tagMetadataObjectRelDeletedCount = new int[] {0};

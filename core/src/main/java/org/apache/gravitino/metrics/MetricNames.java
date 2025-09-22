@@ -25,6 +25,7 @@ public class MetricNames {
   public static final String DATASOURCE_ACTIVE_CONNECTIONS = "datasource.active-connections";
   public static final String DATASOURCE_IDLE_CONNECTIONS = "datasource.idle-connections";
   public static final String DATASOURCE_MAX_CONNECTIONS = "datasource.max-connections";
+  public static final String FILESYSTEM_CACHE = "filesystem-cache";
 
   private MetricNames() {}
 }

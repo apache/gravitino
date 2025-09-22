@@ -20,8 +20,8 @@ from typing import Any, Dict, Union, overload
 
 from dataclasses_json.core import Json
 
-from gravitino.api.types.type import Name, Type
-from gravitino.api.types.types import Types
+from gravitino.api.rel.types.type import Name, Type
+from gravitino.api.rel.types.types import Types
 from gravitino.utils.precondition import Precondition
 from gravitino.utils.serdes import SerdesUtilsBase
 

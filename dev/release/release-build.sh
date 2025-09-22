@@ -170,7 +170,7 @@ if [ -z "$GRAVITINO_VERSION" ]; then
   GRAVITINO_VERSION=$(cat gradle.properties | parse_version)
 fi
 
-if [ -z "$PYGRAVITINO_VERSION"]; then
+if [ -z "$PYGRAVITINO_VERSION" ]; then
   PYGRAVITINO_VERSION=$(cat clients/client-python/setup.py | grep "version=" | awk -F"\"" '{print $2}')
 fi
 
