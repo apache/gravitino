@@ -18,6 +18,8 @@
  */
 package org.apache.gravitino.metrics;
 
+import static org.apache.gravitino.metrics.source.MetricsSource.GRAVITINO_CATALOG_METRIC_PREFIX;
+
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import io.prometheus.client.Collector;
@@ -50,8 +52,7 @@ public class TestGravitinoSampleBuilder {
         sampleBuilder.createSample(
             dropwizardName, "", Collections.emptyList(), Collections.emptyList(), value);
 
-    Assertions.assertEquals(
-        GravitinoSampleBuilder.GRAVITINO_CATALOG_METRIC_PREFIX + "_some_metric_count", sample.name);
+    Assertions.assertEquals(GRAVITINO_CATALOG_METRIC_PREFIX + "_some_metric_count", sample.name);
     Assertions.assertEquals(ImmutableList.of("provider", "metalake", "catalog"), sample.labelNames);
     Assertions.assertEquals(ImmutableList.of("hive", "metalake1", "catalog1"), sample.labelValues);
     Assertions.assertEquals(value, sample.value);
@@ -68,8 +69,7 @@ public class TestGravitinoSampleBuilder {
         sampleBuilder.createSample(
             dropwizardName, "", additionalLabelNames, additionalLabelValues, value);
 
-    Assertions.assertEquals(
-        GravitinoSampleBuilder.GRAVITINO_CATALOG_METRIC_PREFIX + "_another_metric", sample.name);
+    Assertions.assertEquals(GRAVITINO_CATALOG_METRIC_PREFIX + "_another_metric", sample.name);
     Assertions.assertEquals(
         ImmutableList.of("provider", "metalake", "catalog", "type"), sample.labelNames);
     Assertions.assertEquals(
