@@ -503,7 +503,32 @@ public class JobManager implements JobOperationDispatcher {
 
       activeJobs.forEach(
           job -> {
-            JobHandle.Status newStatus = jobExecutor.getJobStatus(job.jobExecutionId());
+            JobHandle.Status newStatus = job.status();
+            try {
+              newStatus = jobExecutor.getJobStatus(job.jobExecutionId());
+            } catch (NoSuchJobException e) {
+              // If the job is not found in the external job executor, we assume the job is
+              // SUCCEEDED if it is not in CANCELLING status, otherwise we assume it is CANCELLED.
+              if (job.status() == JobHandle.Status.CANCELLING) {
+                newStatus = JobHandle.Status.CANCELLED;
+              } else {
+                newStatus = JobHandle.Status.SUCCEEDED;
+              }
+              LOG.warn(
+                  "Job with execution id {} for job {} under metalake {} is not found in the "
+                      + "external job executor, marking it as {}",
+                  job.jobExecutionId(),
+                  job.name(),
+                  metalake,
+                  newStatus);
+            } catch (Exception e) {
+              LOG.error(
+                  "Failed to get job status for job {} by execution id {}",
+                  job.name(),
+                  job.jobExecutionId(),
+                  e);
+            }
+
             if (newStatus != job.status()) {
               JobEntity newJobEntity =
                   JobEntity.builder()
@@ -522,6 +547,7 @@ public class JobManager implements JobOperationDispatcher {
                       .build();
 
               // Update the job entity with new status.
+              JobHandle.Status finalNewStatus = newStatus;
               TreeLockUtils.doWithTreeLock(
                   NameIdentifierUtil.ofJob(metalake, job.name()),
                   LockType.WRITE,
@@ -533,7 +559,7 @@ public class JobManager implements JobOperationDispatcher {
                       throw new RuntimeException(
                           String.format(
                               "Failed to update job entity %s to status %s",
-                              newJobEntity, newStatus),
+                              newJobEntity, finalNewStatus),
                           e);
                     }
                   });
