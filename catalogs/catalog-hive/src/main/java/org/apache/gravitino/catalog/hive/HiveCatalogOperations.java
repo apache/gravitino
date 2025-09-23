@@ -968,6 +968,8 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
 
   private void doRenameTable(
       org.apache.hadoop.hive.metastore.api.Table hiveTable, TableChange.RenameTable change) {
+    Preconditions.checkArgument(
+        !change.getNewSchemaName().isPresent(), "Does not support rename schema yet");
     hiveTable.setTableName(change.getNewName());
   }
 
