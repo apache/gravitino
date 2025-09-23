@@ -391,28 +391,12 @@ class TestMetalakeCommands {
 
     picocli.CommandLine cmd =
         new picocli.CommandLine(root).addSubcommand("mock_list", mockMetalakeList);
-    String[] args = {"mock_list", "--output", "TABLE", "--metalake", "ml1"};
+    String[] args = {"mock_list", "--output", "TABLE"};
 
     int exitCode = cmd.execute(args);
     Assertions.assertEquals(0, exitCode);
     Assertions.assertEquals(
         OutputFormat.OutputType.TABLE, mockMetalakeList.commonOptions.outputFormat);
-    Assertions.assertEquals("ml1", mockMetalakeList.commonOptions.metalake);
-  }
-
-  @Test
-  void testListMetalakeWithoutMetalake() {
-    MainCli.useExit = false;
-    MetalakeCliHandler root = new MetalakeCliHandler();
-    org.apache.gravitino.cli.handler.MockMetalakeList mockMetalakeList =
-        new org.apache.gravitino.cli.handler.MockMetalakeList();
-
-    picocli.CommandLine cmd =
-        new picocli.CommandLine(root).addSubcommand("mock_list", mockMetalakeList);
-    String[] args = {"mock_list"};
-
-    int exitCode = cmd.execute(args);
-    Assertions.assertEquals(1, exitCode);
   }
 
   @Test

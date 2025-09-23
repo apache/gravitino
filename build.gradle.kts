@@ -621,6 +621,7 @@ tasks.rat {
     "ROADMAP.md",
     "GETTING_STARTED.md",
     "clients/cli/src/main/resources/*.txt",
+    "clients/cli/src/main/resources/description/*.txt",
     "clients/client-python/venv/*",
     "clients/client-python/docs/build",
     "clients/client-python/docs/source/generated",

@@ -111,7 +111,9 @@ public abstract class CliHandler implements Callable<Integer> {
     this.userName = commonOptions.login;
     this.quiet = commonOptions.quiet;
 
-    if (metalake == null) {
+    if (metalake == null
+        && !("metalake".equals(spec.parent().name()) && "list".equals(spec.name()))) {
+      System.err.println(ErrorMessages.MISSING_METALAKE);
       MainCli.exit(-1);
     }
 

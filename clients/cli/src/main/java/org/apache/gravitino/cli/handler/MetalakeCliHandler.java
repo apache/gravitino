@@ -148,20 +148,17 @@ class MetalakeCreate extends CliHandler {
   /** {@inheritDoc} */
   @Override
   protected Integer doCall() throws Exception {
-    GravitinoAdminClient client = buildAdminClient();
     String metalake = getMetalake();
 
-    String result =
-        execute(
-            () -> {
-              client.createMetalake(metalake, comment, null);
+    try (GravitinoAdminClient client = buildAdminClient()) {
+      return execute(
+          () -> {
+            client.createMetalake(metalake, comment, null);
 
-              return metalake + " created";
-            });
-
-    printInformation(result);
-
-    return 0;
+            printInformation(metalake + " created");
+            return 0;
+          });
+    }
   }
 
   /** {@inheritDoc} */
@@ -200,18 +197,19 @@ class MetalakeDelete extends CliHandler {
       return 0;
     }
 
-    GravitinoAdminClient client = buildAdminClient();
     String metalake = getMetalake();
 
-    boolean deleted = execute(() -> client.dropMetalake(metalake));
+    try (GravitinoAdminClient client = buildAdminClient()) {
+      boolean deleted = execute(() -> client.dropMetalake(metalake));
 
-    if (deleted) {
-      printInformation(metalake + " deleted.");
-    } else {
-      printInformation(metalake + " not deleted.");
+      if (deleted) {
+        printInformation(metalake + " deleted.");
+      } else {
+        printInformation(metalake + " not deleted.");
+      }
+
+      return 0;
     }
-
-    return 0;
   }
 
   /** {@inheritDoc} */
@@ -239,21 +237,19 @@ class MetalakeSet extends CliHandler {
   /** {@inheritDoc} */
   @Override
   protected Integer doCall() throws Exception {
-    GravitinoAdminClient client = buildAdminClient();
     String metalake = getMetalake();
 
-    String result =
-        execute(
-            () -> {
-              MetalakeChange change =
-                  MetalakeChange.setProperty(propertyOptions.property, propertyOptions.value);
-              client.alterMetalake(metalake, change);
+    try (GravitinoAdminClient client = buildAdminClient()) {
+      return execute(
+          () -> {
+            MetalakeChange change =
+                MetalakeChange.setProperty(propertyOptions.property, propertyOptions.value);
+            client.alterMetalake(metalake, change);
 
-              return metalake + " property set.";
-            });
-    printInformation(result);
-
-    return 0;
+            printInformation(metalake + " property set.");
+            return 0;
+          });
+    }
   }
 
   /** {@inheritDoc} */
@@ -287,18 +283,14 @@ class MetalakeRemove extends CliHandler {
     GravitinoAdminClient client = buildAdminClient();
     String metalake = getMetalake();
 
-    String result =
-        execute(
-            () -> {
-              MetalakeChange change = MetalakeChange.removeProperty(property);
-              client.alterMetalake(metalake, change);
+    return execute(
+        () -> {
+          MetalakeChange change = MetalakeChange.removeProperty(property);
+          client.alterMetalake(metalake, change);
+          printInformation(property + " property removed.");
 
-              return property + " property removed.";
-            });
-
-    printInformation(result);
-
-    return 0;
+          return 0;
+        });
   }
 
   /** {@inheritDoc} */
@@ -323,13 +315,16 @@ class MetalakeProperties extends CliHandler {
   /** {@inheritDoc} */
   @Override
   protected Integer doCall() throws Exception {
-    GravitinoAdminClient client = buildAdminClient();
     String metalake = getMetalake();
 
-    Map<String, String> result = execute(() -> client.loadMetalake(metalake).properties());
-
-    printResults(result);
-    return 0;
+    try (GravitinoAdminClient client = buildAdminClient(); ) {
+      return execute(
+          () -> {
+            Map<String, String> properties = client.loadMetalake(metalake).properties();
+            printResults(properties);
+            return 0;
+          });
+    }
   }
 
   /** {@inheritDoc} */
@@ -383,46 +378,48 @@ class MetalakeUpdate extends CliHandler {
     GravitinoAdminClient adminClient = buildAdminClient();
     GravitinoClient client = buildClient();
 
-    String result =
-        execute(
-            () -> {
-              if (updateOptions.enableDisableOptions != null) {
-                boolean update = updateOptions.enableDisableOptions.enable;
-                if (all && update) {
-                  adminClient.enableMetalake(metalake);
-                  String[] catalogs = client.listCatalogs();
-                  Arrays.stream(catalogs).forEach(client::enableCatalog);
+    return execute(
+        () -> {
+          if (updateOptions.enableDisableOptions != null) {
+            boolean update = updateOptions.enableDisableOptions.enable;
+            if (all && update) {
+              adminClient.enableMetalake(metalake);
+              String[] catalogs = client.listCatalogs();
+              Arrays.stream(catalogs).forEach(client::enableCatalog);
 
-                  return metalake
-                      + " has been enabled, and all catalogs in this metalake have been enabled.";
-                }
+              printInformation(
+                  metalake
+                      + " has been enabled, and all catalogs in this metalake have been enabled.");
+              return 0;
+            }
 
-                if (update) {
-                  adminClient.enableMetalake(metalake);
+            if (update) {
+              adminClient.enableMetalake(metalake);
 
-                  return metalake + " has been enabled.";
-                } else {
-                  adminClient.disableMetalake(metalake);
+              printInformation(metalake + " has been enabled.");
+              return 0;
+            } else {
+              adminClient.disableMetalake(metalake);
 
-                  return metalake + " has been disabled.";
-                }
-              }
+              printInformation(metalake + " has been disabled.");
+              return 0;
+            }
+          }
 
-              if (updateOptions.comment != null) {
-                MetalakeChange change = MetalakeChange.updateComment(updateOptions.comment);
-                adminClient.alterMetalake(metalake, change);
+          if (updateOptions.comment != null) {
+            MetalakeChange change = MetalakeChange.updateComment(updateOptions.comment);
+            adminClient.alterMetalake(metalake, change);
 
-                return metalake + " comment changed.";
-              }
+            printInformation(metalake + " comment changed.");
+            return 0;
+          }
 
-              MetalakeChange change = MetalakeChange.rename(updateOptions.newName);
-              adminClient.alterMetalake(metalake, change);
+          MetalakeChange change = MetalakeChange.rename(updateOptions.newName);
+          adminClient.alterMetalake(metalake, change);
 
-              return metalake + " name changed.";
-            });
-
-    printInformation(result);
-    return 0;
+          printInformation(metalake + " name changed.");
+          return 0;
+        });
   }
 
   /** {@inheritDoc} */
@@ -447,16 +444,24 @@ class MetalakeList extends CliHandler {
   /** {@inheritDoc} */
   @Override
   protected Integer doCall() throws Exception {
-    GravitinoAdminClient adminClient = buildAdminClient();
-    GravitinoMetalake[] gMetalakes = execute(adminClient::listMetalakes);
+    int result;
 
-    if (gMetalakes.length == 0) {
-      printInformation("No metalakes exist.");
-      return 0;
+    try (GravitinoAdminClient adminClient = buildAdminClient()) {
+      result =
+          execute(
+              () -> {
+                GravitinoMetalake[] gMetalakes = execute(adminClient::listMetalakes);
+                if (gMetalakes.length == 0) {
+                  printInformation("No metalakes exist.");
+                  return 0;
+                }
+
+                printResults(gMetalakes);
+                return 0;
+              });
     }
 
-    printResults(gMetalakes);
-    return 0;
+    return result;
   }
 
   /** {@inheritDoc} */

@@ -61,6 +61,7 @@ public class CommonOptions {
   @CommandLine.Option(
       names = {GravitinoOptions.OPTION_LONG_PREFIX + GravitinoOptions.OUTPUT},
       description = "The format of output. Valid values: ${COMPLETION-CANDIDATES}",
+      converter = OutputFormat.CaseInsensitiveOutputFormatConverter.class,
       defaultValue = "PLAIN")
   public OutputFormat.OutputType outputFormat;
 
