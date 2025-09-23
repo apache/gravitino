@@ -187,7 +187,7 @@ Gravitino uses Maven profiles for Scala:
 * `-Pscala-2.12` for Scala 2.12
 * `-Pscala-2.13` for Scala 2.13 (default)
 
-Gravitino supports JDK 8, 11 and 17.
+Gravitino supports JDK 17.
 
 ## 🎨 Formatting Code with Spotless
 
