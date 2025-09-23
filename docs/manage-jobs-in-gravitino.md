@@ -166,8 +166,8 @@ Note that:
 3. Gravitino will copy the `executable`, `jars`, `files`, and `archives` files to the job working
    directory when running the job, so you can use the relative path in the `executable`, `jars`,
    `files`, and `archives` to refer to other files in the job working directory.
-4. The `className` is required for the Spark job template, it is the main class of the Spark 
-   application to be executed.
+4. The `className` is required for the Java and Scala Spark job template, it is the main class of
+   the Spark application to be executed. For PySpark job template, this field can be `null` instead.
 
 To register a job template, you can use REST API or the Java and Python SDKs. Here is the
 example to register a shell job template:
@@ -546,7 +546,7 @@ The following are the default configurations for the local job executor:
 | `gravitino.jobExecutor.local.waitingQueueSize`      | The size of the waiting queue for queued jobs in the local job executor                                                                           | `100`                                  | No       | 1.0.0         |
 | `gravitino.jobExecutor.local.maxRunningJobs`        | The maximum number of running jobs in the local job executor                                                                                      | `max(1, min(available cores / 2, 10))` | No       | 1.0.0         |
 | `gravitino.jobExecutor.local.jobStatusKeepTimeInMs` | The time in milliseconds to keep the job status in the local job executor                                                                         | `3600000` (1 hour)                     | No       | 1.0.0         |
-| `gravitino.jobExecutor.local.sparkHome`             | The home directory of Spark, Gravitino checks this configuration firstly and then `SPARK_HOME` env. Either of them should be set to run Spark job | `None`                                 | No       | 1.1.0         |
+| `gravitino.jobExecutor.local.sparkHome`             | The home directory of Spark, Gravitino checks this configuration firstly and then `SPARK_HOME` env. Either of them should be set to run Spark job | `None`                                 | No       | 1.0.1         |
 
 ### Implement a custom job executor
 
