@@ -10,7 +10,7 @@ There are several options for getting started with Apache Gravitino.
 Installing and configuring Hive and Trino can be a little complex.
 If you are unfamiliar with the technologies, using Docker might be a good choice.
 There are pre-packaged containers for Gravitino, Apache Hive, Apache Hadoop,
-Trino, MySQL, PostgresSQL, and others.
+Trino, MySQL, PostgreSQL, and others.
 Check [installing Gravitino playground](./playground.md) for more details.
 
 <!--Build from source-->
