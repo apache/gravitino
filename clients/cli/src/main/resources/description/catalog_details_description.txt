@@ -1,0 +1,9 @@
+Get details of a catalog or get audit information for a catalog.
+
+Example commands
+
+# Show a catalog audit information
+gcli catalog details -m demo_metalake --name catalog_postgres --audit
+
+# Show a catalog details
+gcli catalog details -m demo_metalake --name catalog_postgres;

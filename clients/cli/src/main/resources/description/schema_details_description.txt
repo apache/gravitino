@@ -1,0 +1,9 @@
+Get details of a schema or get audit information for a schema.
+
+Example commands
+
+# Get details of a schema
+gcli schema details -m demo_metalake -n catalog.schema
+
+# Get audit inforamtion of a schema
+gcli schema details -m demo_metalake -n catalog.schema --audit;

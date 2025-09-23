@@ -54,7 +54,10 @@ public class MainCli implements Runnable {
    * @param args command line arguments
    */
   public static void main(String[] args) {
-    int exitCode = new CommandLine(new MainCli()).execute(args);
+    CommandLine commandLine = new CommandLine(new MainCli());
+    commandLine.setHelpFactory(new FileBackedHelpFactory());
+
+    int exitCode = commandLine.execute(args);
     exit(exitCode);
   }
 

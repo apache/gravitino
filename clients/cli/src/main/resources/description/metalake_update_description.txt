@@ -1,0 +1,22 @@
+Update a Metalake, you can rename, comment, enable or disable a Metalake.
+
+Note:
+The Metalake for the CLI can be set using one of the following methods:
+1. Passed in on the command line via the --metalake parameter.
+2. Set via the GRAVITINO_METALAKE environment variable.
+3. Stored in the Gravitino CLI configuration file.
+4. This is a potentially dangerous command to run and may result in unpredictable behaviour.
+
+Example commands
+
+# Rename a metalake
+gcli metalake update --metalake demo_metalake  --rename demo
+          
+# Update a metalake's comment
+gcli metalake update --metalake demo_metalake  --comment 'new comment'
+          
+# Enable a metalake
+gcli metalake update --metalake demo_metalake  --enable
+          
+# Disable a metalke
+gcli metalake update --metalake demo_metalake  --disable;

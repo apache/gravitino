@@ -1,0 +1,9 @@
+List all schemas in a Metalake catalog, use --output specify the output format
+
+Example commands
+
+# List all schemas in a Metalake.catalog, use plain format
+gcli schema list -m demo_metalake --name catalog_postgres
+
+# List all schemas in a Metalake.catalog, use table format
+gcli schema list -m demo_metalake --name catalog_postgres --output table;

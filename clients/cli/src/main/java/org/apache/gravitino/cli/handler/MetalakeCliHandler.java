@@ -19,14 +19,6 @@
 
 package org.apache.gravitino.cli.handler;
 
-import static org.apache.gravitino.cli.DescriptionMessages.METALAKE_CREATE_DESCRIPTIONS;
-import static org.apache.gravitino.cli.DescriptionMessages.METALAKE_DELETE_DESCRIPTIONS;
-import static org.apache.gravitino.cli.DescriptionMessages.METALAKE_DETAILS_DESCRIPTIONS;
-import static org.apache.gravitino.cli.DescriptionMessages.METALAKE_LIST_DESCRIPTIONS;
-import static org.apache.gravitino.cli.DescriptionMessages.METALAKE_PROPERTIES_DESCRIPTIONS;
-import static org.apache.gravitino.cli.DescriptionMessages.METALAKE_REMOVE_DESCRIPTIONS;
-import static org.apache.gravitino.cli.DescriptionMessages.METALAKE_SET_DESCRIPTIONS;
-import static org.apache.gravitino.cli.DescriptionMessages.METALAKE_UPDATE_DESCRIPTIONS;
 import static org.apache.gravitino.cli.handler.CliHandler.DESCRIPTION_HEADING_STYLE;
 import static org.apache.gravitino.cli.handler.CliHandler.HEAD_HEADING_STYLE;
 import static org.apache.gravitino.cli.handler.CliHandler.OPTION_LIST_HEADING_STYLE;
@@ -52,6 +44,12 @@ import picocli.CommandLine;
 /** Handler for the metalake command. */
 @CommandLine.Command(
     name = CommandEntities.METALAKE,
+    sortOptions = false,
+    headerHeading = HEAD_HEADING_STYLE,
+    synopsisHeading = SYNOPSIS_HEADING_STYLE,
+    descriptionHeading = DESCRIPTION_HEADING_STYLE,
+    parameterListHeading = PARAMETER_LIST_HEADING_STYLE,
+    optionListHeading = OPTION_LIST_HEADING_STYLE,
     description = "Operations on metalake",
     subcommands = {
       MetalakeDetails.class,
@@ -90,8 +88,8 @@ public class MetalakeCliHandler implements Runnable {
     descriptionHeading = DESCRIPTION_HEADING_STYLE,
     parameterListHeading = PARAMETER_LIST_HEADING_STYLE,
     optionListHeading = OPTION_LIST_HEADING_STYLE,
-    header = "Show details of a metalake or get details of a catalog",
-    description = METALAKE_DETAILS_DESCRIPTIONS)
+    header =
+        "Show details of a metalake or get audit information of the metalake(use --audit option)")
 class MetalakeDetails extends CliHandler {
 
   /**
@@ -137,8 +135,7 @@ class MetalakeDetails extends CliHandler {
     descriptionHeading = DESCRIPTION_HEADING_STYLE,
     parameterListHeading = PARAMETER_LIST_HEADING_STYLE,
     optionListHeading = OPTION_LIST_HEADING_STYLE,
-    header = "Create a new metalake",
-    description = METALAKE_CREATE_DESCRIPTIONS)
+    header = "Create a new metalake")
 class MetalakeCreate extends CliHandler {
 
   /** Comment for the Schema, use -c/--comment */
@@ -183,8 +180,7 @@ class MetalakeCreate extends CliHandler {
     descriptionHeading = DESCRIPTION_HEADING_STYLE,
     parameterListHeading = PARAMETER_LIST_HEADING_STYLE,
     optionListHeading = OPTION_LIST_HEADING_STYLE,
-    header = "Delete a metalake",
-    description = METALAKE_DELETE_DESCRIPTIONS)
+    header = "Delete a metalake")
 class MetalakeDelete extends CliHandler {
 
   /**
@@ -234,8 +230,7 @@ class MetalakeDelete extends CliHandler {
     descriptionHeading = DESCRIPTION_HEADING_STYLE,
     parameterListHeading = PARAMETER_LIST_HEADING_STYLE,
     optionListHeading = OPTION_LIST_HEADING_STYLE,
-    header = "Set a property of a metalake",
-    description = METALAKE_SET_DESCRIPTIONS)
+    header = "Set a property of a metalake")
 class MetalakeSet extends CliHandler {
 
   @CommandLine.ArgGroup(exclusive = false, heading = "Property options%n")
@@ -277,8 +272,7 @@ class MetalakeSet extends CliHandler {
     descriptionHeading = DESCRIPTION_HEADING_STYLE,
     parameterListHeading = PARAMETER_LIST_HEADING_STYLE,
     optionListHeading = OPTION_LIST_HEADING_STYLE,
-    header = "Remove a property from a metalake",
-    description = METALAKE_REMOVE_DESCRIPTIONS)
+    header = "Remove a property from a metalake")
 class MetalakeRemove extends CliHandler {
 
   @CommandLine.Option(
@@ -323,8 +317,7 @@ class MetalakeRemove extends CliHandler {
     descriptionHeading = DESCRIPTION_HEADING_STYLE,
     parameterListHeading = PARAMETER_LIST_HEADING_STYLE,
     optionListHeading = OPTION_LIST_HEADING_STYLE,
-    header = "Display the properties of a metalake",
-    description = METALAKE_PROPERTIES_DESCRIPTIONS)
+    header = "Display the properties of a metalake")
 class MetalakeProperties extends CliHandler {
 
   /** {@inheritDoc} */
@@ -355,8 +348,7 @@ class MetalakeProperties extends CliHandler {
     descriptionHeading = DESCRIPTION_HEADING_STYLE,
     parameterListHeading = PARAMETER_LIST_HEADING_STYLE,
     optionListHeading = OPTION_LIST_HEADING_STYLE,
-    header = "Update a metalake",
-    description = METALAKE_UPDATE_DESCRIPTIONS)
+    header = "Update a metalake")
 class MetalakeUpdate extends CliHandler {
 
   @CommandLine.ArgGroup(multiplicity = "1", heading = "update options%n")
@@ -449,8 +441,7 @@ class MetalakeUpdate extends CliHandler {
     descriptionHeading = DESCRIPTION_HEADING_STYLE,
     parameterListHeading = PARAMETER_LIST_HEADING_STYLE,
     optionListHeading = OPTION_LIST_HEADING_STYLE,
-    header = "List all metalakes",
-    description = METALAKE_LIST_DESCRIPTIONS)
+    header = "List all metalakes")
 class MetalakeList extends CliHandler {
 
   /** {@inheritDoc} */

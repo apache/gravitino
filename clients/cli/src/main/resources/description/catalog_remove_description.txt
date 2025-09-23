@@ -1,0 +1,6 @@
+Remove a property of a catalog in a Metalake, use --property to specify the property to be removed.
+
+Example commands
+
+# Remove a property of a catalog in a Metalake
+gcli catalog remove -m demo_metalake --name catalog_mysql --property test

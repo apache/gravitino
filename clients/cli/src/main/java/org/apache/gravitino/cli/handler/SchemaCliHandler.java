@@ -19,13 +19,6 @@
 
 package org.apache.gravitino.cli.handler;
 
-import static org.apache.gravitino.cli.DescriptionMessages.SCHEMA_CREATE_DESCRIPTIONS;
-import static org.apache.gravitino.cli.DescriptionMessages.SCHEMA_DELETE_DESCRIPTIONS;
-import static org.apache.gravitino.cli.DescriptionMessages.SCHEMA_DETAILS_DESCRIPTIONS;
-import static org.apache.gravitino.cli.DescriptionMessages.SCHEMA_LIST_DESCRIPTIONS;
-import static org.apache.gravitino.cli.DescriptionMessages.SCHEMA_PROPERTIES_DESCRIPTIONS;
-import static org.apache.gravitino.cli.DescriptionMessages.SCHEMA_REMOVE_DESCRIPTIONS;
-import static org.apache.gravitino.cli.DescriptionMessages.SCHEMA_SET_DESCRIPTIONS;
 import static org.apache.gravitino.cli.handler.CliHandler.DESCRIPTION_HEADING_STYLE;
 import static org.apache.gravitino.cli.handler.CliHandler.HEAD_HEADING_STYLE;
 import static org.apache.gravitino.cli.handler.CliHandler.OPTION_LIST_HEADING_STYLE;
@@ -50,6 +43,11 @@ import picocli.CommandLine;
 /** Handler for schema command. */
 @CommandLine.Command(
     name = CommandEntities.SCHEMA,
+    headerHeading = HEAD_HEADING_STYLE,
+    synopsisHeading = SYNOPSIS_HEADING_STYLE,
+    descriptionHeading = DESCRIPTION_HEADING_STYLE,
+    parameterListHeading = PARAMETER_LIST_HEADING_STYLE,
+    optionListHeading = OPTION_LIST_HEADING_STYLE,
     description = "Operations on schemas",
     subcommands = {
       SchemaDetails.class,
@@ -90,8 +88,7 @@ public class SchemaCliHandler implements Runnable {
     descriptionHeading = DESCRIPTION_HEADING_STYLE,
     parameterListHeading = PARAMETER_LIST_HEADING_STYLE,
     optionListHeading = OPTION_LIST_HEADING_STYLE,
-    header = "Get details of a schema or get audit information for a schema",
-    description = SCHEMA_DETAILS_DESCRIPTIONS)
+    header = "Get details of a schema or get audit information for a schema")
 class SchemaDetails extends CliHandler {
   /** The name options, use -n/--name */
   @CommandLine.Option(
@@ -151,8 +148,7 @@ class SchemaDetails extends CliHandler {
     descriptionHeading = DESCRIPTION_HEADING_STYLE,
     parameterListHeading = PARAMETER_LIST_HEADING_STYLE,
     optionListHeading = OPTION_LIST_HEADING_STYLE,
-    header = "Create a new schema",
-    description = SCHEMA_CREATE_DESCRIPTIONS)
+    header = "Create a new schema")
 class SchemaCreate extends CliHandler {
   /** The name options, use -n/--name */
   @CommandLine.Option(
@@ -204,8 +200,7 @@ class SchemaCreate extends CliHandler {
     descriptionHeading = DESCRIPTION_HEADING_STYLE,
     parameterListHeading = PARAMETER_LIST_HEADING_STYLE,
     optionListHeading = OPTION_LIST_HEADING_STYLE,
-    header = "Delete a schema",
-    description = SCHEMA_DELETE_DESCRIPTIONS)
+    header = "Delete a schema")
 class SchemaDelete extends CliHandler {
   @CommandLine.Option(
       names = {"-n", GravitinoOptions.OPTION_LONG_PREFIX + GravitinoOptions.NAME},
@@ -263,8 +258,7 @@ class SchemaDelete extends CliHandler {
     descriptionHeading = DESCRIPTION_HEADING_STYLE,
     parameterListHeading = PARAMETER_LIST_HEADING_STYLE,
     optionListHeading = OPTION_LIST_HEADING_STYLE,
-    header = "Set properties of a schema",
-    description = SCHEMA_SET_DESCRIPTIONS)
+    header = "Set properties of a schema")
 class SchemaSet extends CliHandler {
   @CommandLine.Option(
       names = {"-n", GravitinoOptions.OPTION_LONG_PREFIX + GravitinoOptions.NAME},
@@ -313,8 +307,7 @@ class SchemaSet extends CliHandler {
     descriptionHeading = DESCRIPTION_HEADING_STYLE,
     parameterListHeading = PARAMETER_LIST_HEADING_STYLE,
     optionListHeading = OPTION_LIST_HEADING_STYLE,
-    header = "Remove a property from a schema",
-    description = SCHEMA_REMOVE_DESCRIPTIONS)
+    header = "Remove a property from a schema")
 class SchemaRemove extends CliHandler {
   @CommandLine.Option(
       names = {"-n", GravitinoOptions.OPTION_LONG_PREFIX + GravitinoOptions.NAME},
@@ -364,8 +357,7 @@ class SchemaRemove extends CliHandler {
     descriptionHeading = DESCRIPTION_HEADING_STYLE,
     parameterListHeading = PARAMETER_LIST_HEADING_STYLE,
     optionListHeading = OPTION_LIST_HEADING_STYLE,
-    header = "List the properties of a schema",
-    description = SCHEMA_PROPERTIES_DESCRIPTIONS)
+    header = "List the properties of a schema")
 class SchemaProperties extends CliHandler {
 
   @CommandLine.Option(
@@ -409,8 +401,7 @@ class SchemaProperties extends CliHandler {
     descriptionHeading = DESCRIPTION_HEADING_STYLE,
     parameterListHeading = PARAMETER_LIST_HEADING_STYLE,
     optionListHeading = OPTION_LIST_HEADING_STYLE,
-    header = "List the schemas in a catalog",
-    description = SCHEMA_LIST_DESCRIPTIONS)
+    header = "List the schemas in a catalog")
 class SchemaList extends CliHandler {
   @CommandLine.Option(
       names = {"-n", GravitinoOptions.OPTION_LONG_PREFIX + GravitinoOptions.NAME},

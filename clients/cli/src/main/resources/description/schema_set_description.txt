@@ -1,0 +1,6 @@
+Set properties of a schema in a Metalake catalog, use --property and --value to set the property and its value.
+
+Example commands
+
+# Set properties of a schema in a Metalake.catalog
+gcli schema set --metalake demo_metalake --name catalog_postgres.old_db --property key1 --value value1;

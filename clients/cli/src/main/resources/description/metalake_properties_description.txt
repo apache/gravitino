@@ -1,0 +1,13 @@
+Display the properties of a metalake, you can specify the output format as plain or table by using the --output parameter.
+
+Note:
+The Metalake for the CLI can be set using one of the following methods:
+1. Passed in on the command line via the --metalake parameter.
+2. Set via the GRAVITINO_METALAKE environment variable.
+3. Stored in the Gravitino CLI configuration file.
+
+# Display the properties of a metalake in plain format
+gcli metalake properties --metalake my_metalake
+
+# Display the properties of a metalake in Table format
+gcli metalake properties --metalake my_metalake --output TABLE

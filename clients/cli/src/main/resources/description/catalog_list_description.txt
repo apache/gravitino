@@ -1,0 +1,6 @@
+Show all catalogs in a metalake.
+
+Example commands
+
+# Show all catalogs in a Metalake
+gcli catalog list -m demo_metlake;

@@ -233,6 +233,15 @@ public abstract class CliHandler implements Callable<Integer> {
   }
 
   /**
+   * Get the name of the table for the command.
+   *
+   * @return The name of the Model for the command.
+   */
+  protected String getModel() {
+    return fullName.getModelName();
+  }
+
+  /**
    * Get the url
    *
    * @return The url

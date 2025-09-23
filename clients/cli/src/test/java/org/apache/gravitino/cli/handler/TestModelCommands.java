@@ -553,7 +553,8 @@ class TestModelCommands {
     Assertions.assertEquals("ml1", mockModelRemove.commonOptions.metalake);
     Assertions.assertEquals("catalog1.schema1.model1", mockModelRemove.name);
     Assertions.assertEquals("alias1", mockModelRemove.versionOrAlias.alias);
-    Assertions.assertEquals("alias1", mockModelRemove.removeOptions.removedAlias);
+    Assertions.assertArrayEquals(
+        new String[] {"alias1"}, mockModelRemove.removeOptions.removedAlias);
   }
 
   @Test
@@ -580,7 +581,8 @@ class TestModelCommands {
     Assertions.assertEquals("ml1", mockModelRemove.commonOptions.metalake);
     Assertions.assertEquals("catalog1.schema1.model1", mockModelRemove.name);
     Assertions.assertEquals(2, mockModelRemove.versionOrAlias.version);
-    Assertions.assertEquals("alias1", mockModelRemove.removeOptions.removedAlias);
+    Assertions.assertArrayEquals(
+        new String[] {"alias1"}, mockModelRemove.removeOptions.removedAlias);
   }
 
   @Test
@@ -773,7 +775,7 @@ class TestModelCommands {
     Assertions.assertEquals(0, exitCode);
     Assertions.assertEquals("ml1", mockModelUpdate.commonOptions.metalake);
     Assertions.assertEquals("catalog1.schema1.model1", mockModelUpdate.name);
-    Assertions.assertArrayEquals(new String[] {"alias1"}, mockModelUpdate.alias);
+    Assertions.assertArrayEquals(new String[] {"alias1"}, mockModelUpdate.aliases);
     Assertions.assertNotNull(mockModelUpdate.comment);
     Assertions.assertEquals("new_comment", mockModelUpdate.comment);
   }
@@ -831,10 +833,9 @@ class TestModelCommands {
     Assertions.assertEquals(0, exitCode);
     Assertions.assertEquals("ml1", mockModelUpdate.commonOptions.metalake);
     Assertions.assertEquals("catalog1.schema1.model1", mockModelUpdate.name);
-    Assertions.assertArrayEquals(new String[] {"alias1"}, mockModelUpdate.alias);
+    Assertions.assertArrayEquals(new String[] {"alias1"}, mockModelUpdate.aliases);
     Assertions.assertNotNull(mockModelUpdate.updateOptions);
-    Assertions.assertEquals(1, mockModelUpdate.updateOptions.newAliases.size());
-    Assertions.assertEquals("alias2", mockModelUpdate.updateOptions.newAliases.get(0));
+    Assertions.assertArrayEquals(new String[] {"alias2"}, mockModelUpdate.updateOptions.newAliases);
   }
 
   @Test
@@ -863,8 +864,7 @@ class TestModelCommands {
     Assertions.assertEquals("catalog1.schema1.model1", mockModelUpdate.name);
     Assertions.assertEquals(2, mockModelUpdate.version);
     Assertions.assertNotNull(mockModelUpdate.updateOptions);
-    Assertions.assertEquals(1, mockModelUpdate.updateOptions.newAliases.size());
-    Assertions.assertEquals("alias2", mockModelUpdate.updateOptions.newAliases.get(0));
+    Assertions.assertArrayEquals(new String[] {"alias2"}, mockModelUpdate.updateOptions.newAliases);
   }
 
   @Test
@@ -891,7 +891,7 @@ class TestModelCommands {
     Assertions.assertEquals(0, exitCode);
     Assertions.assertEquals("ml1", mockModelUpdate.commonOptions.metalake);
     Assertions.assertEquals("catalog1.schema1.model1", mockModelUpdate.name);
-    Assertions.assertArrayEquals(new String[] {"alias1"}, mockModelUpdate.alias);
+    Assertions.assertArrayEquals(new String[] {"alias1"}, mockModelUpdate.aliases);
     Assertions.assertNotNull(mockModelUpdate.updateOptions);
     Assertions.assertNotNull(mockModelUpdate.updateOptions.newUri);
     Assertions.assertEquals("s3://new_uri", mockModelUpdate.updateOptions.newUri);
@@ -953,7 +953,7 @@ class TestModelCommands {
     Assertions.assertEquals(0, exitCode);
     Assertions.assertEquals("ml1", mockModelUpdate.commonOptions.metalake);
     Assertions.assertEquals("catalog1.schema1.model1", mockModelUpdate.name);
-    Assertions.assertArrayEquals(new String[] {"aliasA", "aliasB"}, mockModelUpdate.alias);
+    Assertions.assertArrayEquals(new String[] {"aliasA", "aliasB"}, mockModelUpdate.aliases);
     Assertions.assertEquals("u1", mockModelUpdate.updateOptions.uris.get("n1"));
     Assertions.assertEquals("u2", mockModelUpdate.updateOptions.uris.get("n2"));
   }
