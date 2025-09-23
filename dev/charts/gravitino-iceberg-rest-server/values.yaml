@@ -274,6 +274,12 @@ service:
   portName: http
   nodePort: ""
 
+initScript: |
+  echo "Override config."
+  cp /tmp/conf/* ${GRAVITINO_HOME}/conf
+  echo "Start the Gravitino Iceberg Rest Catalog Server"
+  /bin/bash ${GRAVITINO_HOME}/bin/gravitino-iceberg-rest-server.sh run
+
 ## Readiness probe for the Gravitino deployment
 ##
 readinessProbe:
