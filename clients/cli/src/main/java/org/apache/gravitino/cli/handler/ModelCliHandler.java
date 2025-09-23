@@ -154,19 +154,21 @@ class ModelCreate extends CliHandler {
   /** {@inheritDoc} */
   @Override
   protected Integer doCall() throws Exception {
-    GravitinoClient client = buildClient();
     String catalog = getCatalog();
     String schema = getSchema();
     String model = getModel();
+    Model registeredModel;
 
     NameIdentifier name = NameIdentifier.of(schema, model);
 
-    Model registeredModel =
-        execute(
-            () -> {
-              ModelCatalog modelCatalog = client.loadCatalog(catalog).asModelCatalog();
-              return modelCatalog.registerModel(name, comment, properties);
-            });
+    try (GravitinoClient client = buildClient()) {
+      registeredModel =
+          execute(
+              () -> {
+                ModelCatalog modelCatalog = client.loadCatalog(catalog).asModelCatalog();
+                return modelCatalog.registerModel(name, comment, properties);
+              });
+    }
 
     if (registeredModel != null) {
       printInformation("Successful register " + registeredModel.name() + ".");
@@ -215,14 +217,16 @@ class ModelDetails extends CliHandler {
     String schema = getSchema();
     String model = getModel();
     NameIdentifier name = NameIdentifier.of(schema, model);
-    GravitinoClient client = buildClient();
+    Model gModel;
 
-    Model gModel =
-        execute(
-            () -> {
-              ModelCatalog modelCatalog = client.loadCatalog(catalog).asModelCatalog();
-              return modelCatalog.getModel(name);
-            });
+    try (GravitinoClient client = buildClient()) {
+      gModel =
+          execute(
+              () -> {
+                ModelCatalog modelCatalog = client.loadCatalog(catalog).asModelCatalog();
+                return modelCatalog.getModel(name);
+              });
+    }
 
     if (gModel == null) {
       return 1;

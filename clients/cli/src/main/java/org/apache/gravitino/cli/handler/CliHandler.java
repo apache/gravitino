@@ -185,7 +185,47 @@ public abstract class CliHandler implements Callable<Integer> {
       exitWithError(exp.getMessage());
     }
 
-    return null;
+    throw new IllegalStateException(
+        "Unreachable: exitWithError should have terminated the program");
+  }
+
+  protected void execute(Runnable function) {
+    try {
+      function.run();
+    } catch (NoSuchMetalakeException err) {
+      exitWithError(ErrorMessages.UNKNOWN_METALAKE);
+    } catch (NoSuchCatalogException err) {
+      exitWithError(ErrorMessages.UNKNOWN_CATALOG);
+    } catch (NoSuchSchemaException err) {
+      exitWithError(ErrorMessages.UNKNOWN_SCHEMA);
+    } catch (NoSuchTableException err) {
+      exitWithError(ErrorMessages.UNKNOWN_TABLE);
+    } catch (NoSuchFilesetException err) {
+      exitWithError(ErrorMessages.UNKNOWN_FILESET);
+    } catch (NoSuchTopicException err) {
+      exitWithError(ErrorMessages.UNKNOWN_TOPIC);
+    } catch (NoSuchColumnException err) {
+      exitWithError(ErrorMessages.UNKNOWN_COLUMN);
+    } catch (NoSuchModelException err) {
+      exitWithError(ErrorMessages.UNKNOWN_MODEL);
+    } catch (NoSuchModelVersionException err) {
+      exitWithError(ErrorMessages.UNKNOWN_MODEL_VERSION);
+    } catch (NoSuchRoleException err) {
+      exitWithError(ErrorMessages.UNKNOWN_ROLE);
+    } catch (NoSuchUserException err) {
+      exitWithError(ErrorMessages.UNKNOWN_USER);
+    } catch (NoSuchGroupException err) {
+      exitWithError(ErrorMessages.UNKNOWN_GROUP);
+    } catch (MetalakeInUseException err) {
+      exitWithError("Metalake" + ErrorMessages.ENTITY_IN_USE);
+    } catch (CatalogInUseException catalogInUseException) {
+      exitWithError("Catalog" + ErrorMessages.ENTITY_IN_USE);
+    } catch (Exception exp) {
+      exitWithError(exp.getMessage());
+    }
+
+    throw new IllegalStateException(
+        "Unreachable: exitWithError should have terminated the program");
   }
 
   /**

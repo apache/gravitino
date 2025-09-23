@@ -119,9 +119,9 @@ class SchemaDetails extends CliHandler {
     Schema result;
     String catalog = getCatalog();
     String schema = getSchema();
-    GravitinoClient client = buildClient();
-
-    result = execute(() -> client.loadCatalog(catalog).asSchemas().loadSchema(schema));
+    try (GravitinoClient client = buildClient()) {
+      result = execute(() -> client.loadCatalog(catalog).asSchemas().loadSchema(schema));
+    }
 
     if (audit) {
       printResults(result.auditInfo());
@@ -167,20 +167,17 @@ class SchemaCreate extends CliHandler {
   /** {@inheritDoc} */
   @Override
   protected Integer doCall() throws Exception {
-    GravitinoClient client = buildClient();
     String catalog = getCatalog();
     String schema = getSchema();
 
-    String result =
-        execute(
-            () -> {
-              client.loadCatalog(catalog).asSchemas().createSchema(schema, comment, null);
+    try (GravitinoClient client = buildClient()) {
+      execute(
+          () -> {
+            client.loadCatalog(catalog).asSchemas().createSchema(schema, comment, null);
+          });
+    }
 
-              return schema + " " + "created";
-            });
-
-    printInformation(result);
-
+    printInformation(schema + " " + "created");
     return 0;
   }
 
@@ -229,9 +226,9 @@ class SchemaDelete extends CliHandler {
     String catalog = getCatalog();
     String schema = getSchema();
 
-    GravitinoClient client = buildClient();
-
-    deleted = execute(() -> client.loadCatalog(catalog).asSchemas().dropSchema(schema, false));
+    try (GravitinoClient client = buildClient()) {
+      deleted = execute(() -> client.loadCatalog(catalog).asSchemas().dropSchema(schema, false));
+    }
 
     if (deleted) {
       printInformation(schema + " deleted.");
@@ -273,21 +270,20 @@ class SchemaSet extends CliHandler {
   /** {inheritDoc} */
   @Override
   protected Integer doCall() throws Exception {
-    GravitinoClient client = buildClient();
+
     String catalog = getCatalog();
     String schema = getSchema();
 
-    String result =
-        execute(
-            () -> {
-              SchemaChange change =
-                  SchemaChange.setProperty(propertyOptions.property, propertyOptions.value);
-              client.loadCatalog(catalog).asSchemas().alterSchema(schema, change);
+    try (GravitinoClient client = buildClient()) {
+      execute(
+          () -> {
+            SchemaChange change =
+                SchemaChange.setProperty(propertyOptions.property, propertyOptions.value);
+            client.loadCatalog(catalog).asSchemas().alterSchema(schema, change);
+          });
+    }
 
-              return schema + " property set.";
-            });
-
-    printInformation(result);
+    printInformation(schema + " property set.");
     return 0;
   }
 
@@ -324,20 +320,18 @@ class SchemaRemove extends CliHandler {
   /** {inheritDoc} */
   @Override
   protected Integer doCall() throws Exception {
-    GravitinoClient client = buildClient();
     String catalog = getCatalog();
     String schema = getSchema();
 
-    String result =
-        execute(
-            () -> {
-              SchemaChange change = SchemaChange.removeProperty(property);
-              client.loadCatalog(catalog).asSchemas().alterSchema(schema, change);
+    try (GravitinoClient client = buildClient()) {
+      execute(
+          () -> {
+            SchemaChange change = SchemaChange.removeProperty(property);
+            client.loadCatalog(catalog).asSchemas().alterSchema(schema, change);
+          });
+    }
 
-              return property + " property removed.";
-            });
-
-    printInformation(result);
+    printInformation(property + " property removed.");
     return 0;
   }
 
@@ -369,20 +363,20 @@ class SchemaProperties extends CliHandler {
   /** {inheritDoc} */
   @Override
   protected Integer doCall() throws Exception {
-    GravitinoClient client = buildClient();
     String catalog = getCatalog();
     String schema = getSchema();
 
-    Map<String, String> result =
-        execute(
-            () -> {
-              Schema gSchema = client.loadCatalog(catalog).asSchemas().loadSchema(schema);
-              return gSchema.properties();
-            });
+    try (GravitinoClient client = buildClient()) {
+      Map<String, String> result =
+          execute(
+              () -> {
+                Schema gSchema = client.loadCatalog(catalog).asSchemas().loadSchema(schema);
+                return gSchema.properties();
+              });
 
-    printResults(result);
-
-    return 0;
+      printResults(result);
+      return 0;
+    }
   }
 
   /** {inheritDoc} */
@@ -412,16 +406,14 @@ class SchemaList extends CliHandler {
   /** {inheritDoc} */
   @Override
   protected Integer doCall() throws Exception {
-    GravitinoClient client = buildClient();
+    String[] schemas;
     String catalog = getCatalog();
 
-    String[] schemas =
-        execute(
-            () -> {
-              return client.loadCatalog(catalog).asSchemas().listSchemas();
-            });
+    try (GravitinoClient client = buildClient()) {
+      schemas = execute(() -> client.loadCatalog(catalog).asSchemas().listSchemas());
+    }
 
-    if (schemas.length == 0) {
+    if (schemas == null || schemas.length == 0) {
       printInformation("No schemas exist.");
       return 0;
     }
@@ -456,6 +448,7 @@ class SchemaList extends CliHandler {
   }
 }
 
+/** Validator for schema command name options (excluding the list command). */
 class SchemaNameValidator extends SchemaListNameValidator {
   @Override
   public List<String> getMissingEntities(CliFullName fullName) {
@@ -468,6 +461,7 @@ class SchemaNameValidator extends SchemaListNameValidator {
   }
 }
 
+/** Validator for schema list command name options. */
 class SchemaListNameValidator implements NameValidator {
 
   @Override

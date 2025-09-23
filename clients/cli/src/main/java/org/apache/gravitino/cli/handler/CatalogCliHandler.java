@@ -119,14 +119,15 @@ class CatalogDetails extends CliHandler {
   @Override
   protected Integer doCall() throws Exception {
     String catalog = getCatalog();
-    GravitinoClient client = buildClient();
-
-    Catalog result = execute(() -> client.loadCatalog(catalog));
+    Catalog gCatalog;
+    try (GravitinoClient client = buildClient()) {
+      gCatalog = execute(() -> client.loadCatalog(catalog));
+    }
 
     if (audit) {
-      printResults(result.auditInfo());
+      printResults(gCatalog.auditInfo());
     } else {
-      printResults(result);
+      printResults(gCatalog);
     }
 
     return 0;
@@ -193,23 +194,22 @@ class CatalogCreate extends CliHandler {
   /** {@inheritDoc} */
   @Override
   protected Integer doCall() throws Exception {
-    GravitinoClient client = buildClient();
+
     String catalog = getCatalog();
 
-    String result =
-        execute(
-            () -> {
-              client.createCatalog(
-                  catalog,
-                  Providers.catalogType(provider),
-                  Providers.internal(provider),
-                  comment,
-                  properties);
+    try (GravitinoClient client = buildClient()) {
+      execute(
+          () -> {
+            client.createCatalog(
+                catalog,
+                Providers.catalogType(provider),
+                Providers.internal(provider),
+                comment,
+                properties);
+          });
+    }
 
-              return catalog + " catalog created";
-            });
-
-    printInformation(result);
+    printInformation(catalog + " catalog created");
     return 0;
   }
 }
@@ -253,11 +253,12 @@ class CatalogDelete extends CliHandler {
     if (!AreYouSure.really(force)) {
       return 0;
     }
-
     String catalog = getCatalog();
+    boolean deleted;
 
-    GravitinoClient client = buildClient();
-    boolean deleted = execute(() -> client.dropCatalog(catalog));
+    try (GravitinoClient client = buildClient()) {
+      deleted = execute(() -> client.dropCatalog(catalog));
+    }
 
     if (deleted) {
       printInformation(catalog + " deleted.");
@@ -298,21 +299,18 @@ class CatalogSet extends CliHandler {
   /** {inheritDoc} */
   @Override
   protected Integer doCall() throws Exception {
-    GravitinoClient client = buildClient();
     String catalog = getCatalog();
 
-    String result =
-        execute(
-            () -> {
-              CatalogChange change =
-                  CatalogChange.setProperty(propertyOptions.property, propertyOptions.value);
-              client.alterCatalog(catalog, change);
+    try (GravitinoClient client = buildClient()) {
+      execute(
+          () -> {
+            CatalogChange change =
+                CatalogChange.setProperty(propertyOptions.property, propertyOptions.value);
+            client.alterCatalog(catalog, change);
+          });
+    }
 
-              return catalog + " property set.";
-            });
-
-    printInformation(result);
-
+    printInformation(catalog + " property set.");
     return 0;
   }
 }
@@ -343,20 +341,17 @@ class CatalogRemove extends CliHandler {
   /** {@inheritDoc} */
   @Override
   protected Integer doCall() throws Exception {
-    GravitinoClient client = buildClient();
     String catalog = getCatalog();
 
-    String result =
-        execute(
-            () -> {
-              CatalogChange change = CatalogChange.removeProperty(property);
-              client.alterCatalog(catalog, change);
+    try (GravitinoClient client = buildClient()) {
+      execute(
+          () -> {
+            CatalogChange change = CatalogChange.removeProperty(property);
+            client.alterCatalog(catalog, change);
+          });
+    }
 
-              return property + " property removed.";
-            });
-
-    printInformation(result);
-
+    printInformation(property + " property removed.");
     return 0;
   }
 
@@ -387,18 +382,20 @@ class CatalogProperties extends CliHandler {
   /** {@inheritDoc} */
   @Override
   protected Integer doCall() throws Exception {
-    GravitinoClient client = buildClient();
     String catalog = getCatalog();
+    Map<String, String> gCatalogs;
 
-    Map<String, String> result =
-        execute(
-            () -> {
-              Catalog gCatalog = client.loadCatalog(catalog);
+    try (GravitinoClient client = buildClient()) {
+      gCatalogs =
+          execute(
+              () -> {
+                Catalog gCatalog = client.loadCatalog(catalog);
 
-              return gCatalog.properties();
-            });
+                return gCatalog.properties();
+              });
+    }
 
-    printResults(result);
+    printResults(gCatalogs);
     return 0;
   }
 
@@ -424,13 +421,14 @@ class CatalogList extends CliHandler {
   /** {@inheritDoc} */
   @Override
   protected Integer doCall() throws Exception {
-    GravitinoClient client = buildClient();
     String catalog = getCatalog();
+    Catalog gCatalog;
 
-    Catalog result = execute(() -> client.loadCatalog(catalog));
+    try (GravitinoClient client = buildClient()) {
+      gCatalog = execute(() -> client.loadCatalog(catalog));
+    }
 
-    printResults(result);
-
+    printResults(gCatalog);
     return 0;
   }
 
@@ -487,48 +485,56 @@ class CatalogUpdate extends CliHandler {
   /** {@inheritDoc} */
   @Override
   protected Integer doCall() throws Exception {
-    GravitinoAdminClient adminClient = buildAdminClient();
-    GravitinoClient client = buildClient();
+
     String metalake = getMetalake();
     String catalog = getCatalog();
 
-    String result =
+    try (GravitinoAdminClient adminClient = buildAdminClient();
+        GravitinoClient client = buildClient()) {
+      if (updateOptions.enableDisableOptions != null) {
+        boolean enable = updateOptions.enableDisableOptions.enable;
+
         execute(
             () -> {
-              if (updateOptions.enableDisableOptions != null) {
-                boolean enable = updateOptions.enableDisableOptions.enable;
-
-                if (all && enable) {
-                  adminClient.enableMetalake(metalake);
-                }
-
-                if (enable) {
-                  client.enableCatalog(catalog);
-
-                  return metalake + "." + catalog + " has been enabled.";
-                } else {
-                  client.disableCatalog(catalog);
-
-                  return metalake + "." + catalog + " has been disabled.";
-                }
+              if (all && enable) {
+                adminClient.enableMetalake(metalake);
               }
 
-              if (updateOptions.comment != null) {
-                CatalogChange change = CatalogChange.updateComment(updateOptions.comment);
-                client.alterCatalog(catalog, change);
+              if (enable) {
+                client.enableCatalog(catalog);
+                printInformation(metalake + "." + catalog + " has been enabled.");
 
-                return catalog + " comment changed.";
+              } else {
+                client.disableCatalog(catalog);
+                printInformation(metalake + "." + catalog + " has been disabled.");
               }
-
-              CatalogChange change = CatalogChange.rename(name);
-              client.alterCatalog(catalog, change);
-
-              return catalog + " name changed.";
             });
 
-    printInformation(result);
+        return 0;
+      }
 
-    return 0;
+      if (updateOptions.comment != null && !updateOptions.comment.isEmpty()) {
+        execute(
+            () -> {
+              CatalogChange change = CatalogChange.updateComment(updateOptions.comment);
+              client.alterCatalog(catalog, change);
+            });
+
+        printInformation(catalog + " comment changed.");
+
+        return 0;
+      }
+
+      execute(
+          () -> {
+            CatalogChange change = CatalogChange.rename(name);
+            client.alterCatalog(catalog, change);
+          });
+
+      printInformation(catalog + " name changed.");
+
+      return 0;
+    }
   }
 
   /** {@inheritDoc} */

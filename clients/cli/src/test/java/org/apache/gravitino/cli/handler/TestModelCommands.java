@@ -581,6 +581,7 @@ class TestModelCommands {
     Assertions.assertEquals("ml1", mockModelRemove.commonOptions.metalake);
     Assertions.assertEquals("catalog1.schema1.model1", mockModelRemove.name);
     Assertions.assertEquals(2, mockModelRemove.versionOrAlias.version);
+    Assertions.assertNull(mockModelRemove.versionOrAlias.alias);
     Assertions.assertArrayEquals(
         new String[] {"alias1"}, mockModelRemove.removeOptions.removedAlias);
   }

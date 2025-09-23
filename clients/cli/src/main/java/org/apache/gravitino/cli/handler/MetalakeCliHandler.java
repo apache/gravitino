@@ -106,14 +106,17 @@ class MetalakeDetails extends CliHandler {
   /** {@inheritDoc} */
   @Override
   protected Integer doCall() throws Exception {
-    GravitinoClient client = buildClient();
     String metalake = getMetalake();
+    GravitinoMetalake gMetalake;
 
-    GravitinoMetalake result = execute(() -> client.loadMetalake(metalake));
+    try (GravitinoClient client = buildClient()) {
+      gMetalake = execute(() -> client.loadMetalake(metalake));
+    }
+
     if (audit) {
-      printResults(result.auditInfo());
+      printResults(gMetalake.auditInfo());
     } else {
-      printResults(result);
+      printResults(gMetalake);
     }
 
     return 0;
@@ -151,14 +154,11 @@ class MetalakeCreate extends CliHandler {
     String metalake = getMetalake();
 
     try (GravitinoAdminClient client = buildAdminClient()) {
-      return execute(
-          () -> {
-            client.createMetalake(metalake, comment, null);
-
-            printInformation(metalake + " created");
-            return 0;
-          });
+      execute(() -> client.createMetalake(metalake, comment, null));
     }
+
+    printInformation(metalake + " created");
+    return 0;
   }
 
   /** {@inheritDoc} */
@@ -196,20 +196,21 @@ class MetalakeDelete extends CliHandler {
     if (!AreYouSure.really(force)) {
       return 0;
     }
+    boolean deleted;
 
     String metalake = getMetalake();
 
     try (GravitinoAdminClient client = buildAdminClient()) {
-      boolean deleted = execute(() -> client.dropMetalake(metalake));
-
-      if (deleted) {
-        printInformation(metalake + " deleted.");
-      } else {
-        printInformation(metalake + " not deleted.");
-      }
-
-      return 0;
+      deleted = execute(() -> client.dropMetalake(metalake));
     }
+
+    if (deleted) {
+      printInformation(metalake + " deleted.");
+    } else {
+      printInformation(metalake + " not deleted.");
+    }
+
+    return 0;
   }
 
   /** {@inheritDoc} */
@@ -240,16 +241,15 @@ class MetalakeSet extends CliHandler {
     String metalake = getMetalake();
 
     try (GravitinoAdminClient client = buildAdminClient()) {
-      return execute(
+      execute(
           () -> {
             MetalakeChange change =
                 MetalakeChange.setProperty(propertyOptions.property, propertyOptions.value);
             client.alterMetalake(metalake, change);
-
-            printInformation(metalake + " property set.");
-            return 0;
           });
     }
+    printInformation(metalake + " property set.");
+    return 0;
   }
 
   /** {@inheritDoc} */
@@ -280,17 +280,18 @@ class MetalakeRemove extends CliHandler {
   /** {@inheritDoc} */
   @Override
   protected Integer doCall() throws Exception {
-    GravitinoAdminClient client = buildAdminClient();
     String metalake = getMetalake();
 
-    return execute(
-        () -> {
-          MetalakeChange change = MetalakeChange.removeProperty(property);
-          client.alterMetalake(metalake, change);
-          printInformation(property + " property removed.");
+    try (GravitinoAdminClient client = buildAdminClient()) {
+      execute(
+          () -> {
+            MetalakeChange change = MetalakeChange.removeProperty(property);
+            client.alterMetalake(metalake, change);
+          });
+    }
 
-          return 0;
-        });
+    printInformation(property + " property removed.");
+    return 0;
   }
 
   /** {@inheritDoc} */
@@ -316,15 +317,14 @@ class MetalakeProperties extends CliHandler {
   @Override
   protected Integer doCall() throws Exception {
     String metalake = getMetalake();
+    Map<String, String> properties;
 
     try (GravitinoAdminClient client = buildAdminClient(); ) {
-      return execute(
-          () -> {
-            Map<String, String> properties = client.loadMetalake(metalake).properties();
-            printResults(properties);
-            return 0;
-          });
+      properties = execute(() -> client.loadMetalake(metalake).properties());
     }
+
+    printResults(properties);
+    return 0;
   }
 
   /** {@inheritDoc} */
@@ -375,51 +375,52 @@ class MetalakeUpdate extends CliHandler {
   @Override
   protected Integer doCall() throws Exception {
     String metalake = getMetalake();
-    GravitinoAdminClient adminClient = buildAdminClient();
-    GravitinoClient client = buildClient();
 
-    return execute(
-        () -> {
-          if (updateOptions.enableDisableOptions != null) {
-            boolean update = updateOptions.enableDisableOptions.enable;
-            if (all && update) {
-              adminClient.enableMetalake(metalake);
-              String[] catalogs = client.listCatalogs();
-              Arrays.stream(catalogs).forEach(client::enableCatalog);
+    try (GravitinoAdminClient adminClient = buildAdminClient();
+        GravitinoClient client = buildClient()) {
+      return execute(
+          () -> {
+            if (updateOptions.enableDisableOptions != null) {
+              boolean enabled = updateOptions.enableDisableOptions.enable;
+              if (all && enabled) {
+                adminClient.enableMetalake(metalake);
+                String[] catalogs = client.listCatalogs();
+                Arrays.stream(catalogs).forEach(client::enableCatalog);
 
-              printInformation(
-                  metalake
-                      + " has been enabled, and all catalogs in this metalake have been enabled.");
+                printInformation(
+                    metalake
+                        + " has been enabled, and all catalogs in this metalake have been enabled.");
+                return 0;
+              }
+
+              if (enabled) {
+                adminClient.enableMetalake(metalake);
+
+                printInformation(metalake + " has been enabled.");
+              } else {
+                adminClient.disableMetalake(metalake);
+
+                printInformation(metalake + " has been disabled.");
+              }
+
               return 0;
             }
 
-            if (update) {
-              adminClient.enableMetalake(metalake);
+            if (updateOptions.comment != null && !updateOptions.comment.isEmpty()) {
+              MetalakeChange change = MetalakeChange.updateComment(updateOptions.comment);
+              adminClient.alterMetalake(metalake, change);
 
-              printInformation(metalake + " has been enabled.");
-              return 0;
-            } else {
-              adminClient.disableMetalake(metalake);
-
-              printInformation(metalake + " has been disabled.");
+              printInformation(metalake + " comment changed.");
               return 0;
             }
-          }
 
-          if (updateOptions.comment != null) {
-            MetalakeChange change = MetalakeChange.updateComment(updateOptions.comment);
+            MetalakeChange change = MetalakeChange.rename(updateOptions.newName);
             adminClient.alterMetalake(metalake, change);
 
-            printInformation(metalake + " comment changed.");
+            printInformation(metalake + " name changed.");
             return 0;
-          }
-
-          MetalakeChange change = MetalakeChange.rename(updateOptions.newName);
-          adminClient.alterMetalake(metalake, change);
-
-          printInformation(metalake + " name changed.");
-          return 0;
-        });
+          });
+    }
   }
 
   /** {@inheritDoc} */
@@ -444,24 +445,18 @@ class MetalakeList extends CliHandler {
   /** {@inheritDoc} */
   @Override
   protected Integer doCall() throws Exception {
-    int result;
-
+    GravitinoMetalake[] gMetalakes;
     try (GravitinoAdminClient adminClient = buildAdminClient()) {
-      result =
-          execute(
-              () -> {
-                GravitinoMetalake[] gMetalakes = execute(adminClient::listMetalakes);
-                if (gMetalakes.length == 0) {
-                  printInformation("No metalakes exist.");
-                  return 0;
-                }
-
-                printResults(gMetalakes);
-                return 0;
-              });
+      gMetalakes = execute(() -> execute(adminClient::listMetalakes));
     }
 
-    return result;
+    if (gMetalakes.length == 0) {
+      printInformation("No metalakes exist.");
+      return 0;
+    }
+
+    printResults(gMetalakes);
+    return 0;
   }
 
   /** {@inheritDoc} */
