@@ -1,6 +1,6 @@
 ---
 title: "Getting started with Apache Gravitino"
-slug: /getting-started
+slug: /getting-started/index
 license: "This software is licensed under the Apache License version 2."
 ---
 

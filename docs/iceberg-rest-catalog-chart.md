@@ -1,11 +1,12 @@
 ---
-title: "Helm Chart"
-slug: /chart
-keyword: chart
+title: "Install Iceberg Rest catalog server on Kubernetes"
+slug: /iceberg-rest-catalog-chart
+keyword: 
+  - Iceberg REST Helm Chart
 license: "This software is licensed under the Apache License version 2."
 ---
 
-# Gravitino Iceberg Rest Catalog Server Helm Chart
+# Install Iceberg Rest catalog server on Kubernetes
 
 This Helm chart deploys Apache Gravitino Iceberg REST Catalog Server on Kubernetes with customizable configurations.
 
