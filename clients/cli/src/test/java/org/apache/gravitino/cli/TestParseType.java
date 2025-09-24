@@ -155,4 +155,22 @@ public class TestParseType {
     assertThat(type, instanceOf(Types.VarCharType.class));
     assertEquals(10, ((Types.VarCharType) type).length());
   }
+
+  /** Ensures that "decimal(10)" is parsed as DecimalType with precision=10 and scale=0. */
+  @Test
+  public void testParseTypeDecimalWithPrecisionOnly() {
+    Type type = ParseType.toType("decimal(10)");
+    assertThat(type, instanceOf(Types.DecimalType.class));
+    assertEquals(10, ((Types.DecimalType) type).precision());
+    assertEquals(0, ((Types.DecimalType) type).scale());
+  }
+
+  /** Accepts case-insensitive input and extra spaces for the single-arg form. */
+  @Test
+  public void testParseTypeDecimalWithPrecisionOnlySpacesAndCase() {
+    Type type = ParseType.toType("DECIMAL ( 10 ) ");
+    assertThat(type, instanceOf(Types.DecimalType.class));
+    assertEquals(10, ((Types.DecimalType) type).precision());
+    assertEquals(0, ((Types.DecimalType) type).scale());
+  }
 }
