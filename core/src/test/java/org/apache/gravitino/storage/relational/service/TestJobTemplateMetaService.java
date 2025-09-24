@@ -209,6 +209,75 @@ public class TestJobTemplateMetaService extends TestJDBCBackend {
     Assertions.assertEquals(0, jobs.size());
   }
 
+  @Test
+  public void testUpdateJobTemplate() throws IOException {
+    BaseMetalake metalake =
+        createBaseMakeLake(RandomIdGenerator.INSTANCE.nextId(), METALAKE_NAME, AUDIT_INFO);
+    backend.insert(metalake, false);
+
+    JobTemplateMetaService jobTemplateMetaService = JobTemplateMetaService.getInstance();
+
+    JobTemplateEntity jobTemplateEntity =
+        newShellJobTemplateEntity("updatable_template", "An updatable job template", METALAKE_NAME);
+    jobTemplateMetaService.insertJobTemplate(jobTemplateEntity, false);
+
+    // Update the job template's comment
+    JobTemplateEntity updatedJobTemplateEntity =
+        JobTemplateEntity.builder()
+            .withId(jobTemplateEntity.id())
+            .withName("updated_template")
+            .withNamespace(jobTemplateEntity.namespace())
+            .withTemplateContent(jobTemplateEntity.templateContent())
+            .withComment("Updated comment for the job template")
+            .withAuditInfo(jobTemplateEntity.auditInfo())
+            .build();
+
+    jobTemplateMetaService.updateJobTemplate(
+        jobTemplateEntity.nameIdentifier(), e -> updatedJobTemplateEntity);
+
+    // Verify the update
+    JobTemplateEntity fetchedJobTemplate =
+        jobTemplateMetaService.getJobTemplateByIdentifier(
+            NameIdentifierUtil.ofJobTemplate(METALAKE_NAME, "updated_template"));
+
+    Assertions.assertEquals(updatedJobTemplateEntity, fetchedJobTemplate);
+
+    // Verify that the old name no longer exists
+    Assertions.assertThrows(
+        NoSuchEntityException.class,
+        () ->
+            jobTemplateMetaService.getJobTemplateByIdentifier(
+                NameIdentifierUtil.ofJobTemplate(METALAKE_NAME, "updatable_template")));
+
+    // Test update an non-existent job template
+    Assertions.assertThrows(
+        NoSuchEntityException.class,
+        () ->
+            jobTemplateMetaService.updateJobTemplate(
+                NameIdentifierUtil.ofJobTemplate(METALAKE_NAME, "non_existent_template"),
+                e -> updatedJobTemplateEntity));
+
+    // Test update to a name that already exists
+    JobTemplateEntity anotherJobTemplateEntity =
+        newSparkJobTemplateEntity("existing_template", "An existing job template", METALAKE_NAME);
+    jobTemplateMetaService.insertJobTemplate(anotherJobTemplateEntity, false);
+    JobTemplateEntity duplicateNameJobTemplateEntity =
+        JobTemplateEntity.builder()
+            .withId(updatedJobTemplateEntity.id())
+            .withName("existing_template")
+            .withNamespace(updatedJobTemplateEntity.namespace())
+            .withTemplateContent(updatedJobTemplateEntity.templateContent())
+            .withComment("Trying to update to an existing name")
+            .withAuditInfo(updatedJobTemplateEntity.auditInfo())
+            .build();
+
+    Assertions.assertThrows(
+        EntityAlreadyExistsException.class,
+        () ->
+            jobTemplateMetaService.updateJobTemplate(
+                updatedJobTemplateEntity.nameIdentifier(), e -> duplicateNameJobTemplateEntity));
+  }
+
   static JobTemplateEntity newShellJobTemplateEntity(String name, String comment, String metalake) {
     ShellJobTemplate shellJobTemplate =
         ShellJobTemplate.builder()

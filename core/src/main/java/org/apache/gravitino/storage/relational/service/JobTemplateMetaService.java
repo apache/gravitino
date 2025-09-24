@@ -20,12 +20,16 @@ package org.apache.gravitino.storage.relational.service;
 
 import static org.apache.gravitino.metrics.source.MetricsSource.GRAVITINO_RELATIONAL_STORE_METRIC_NAME;
 
+import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.util.List;
 import java.util.Locale;
+import java.util.Objects;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.apache.gravitino.Entity;
+import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
@@ -147,5 +151,59 @@ public class JobTemplateMetaService {
     return SessionUtils.doWithCommitAndFetchResult(
         JobTemplateMetaMapper.class,
         mapper -> mapper.deleteJobTemplateMetasByLegacyTimeline(legacyTimeline, limit));
+  }
+
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "updateJobTemplate")
+  public <E extends Entity & HasIdentifier> JobTemplateEntity updateJobTemplate(
+      NameIdentifier jobTemplateIdent, Function<E, E> updater) throws IOException {
+    JobTemplateEntity oldJobTemplateEntity = getJobTemplateByIdentifier(jobTemplateIdent);
+    JobTemplateEntity newJobTemplateEntity =
+        (JobTemplateEntity) updater.apply((E) oldJobTemplateEntity);
+    Preconditions.checkArgument(
+        Objects.equals(oldJobTemplateEntity.id(), newJobTemplateEntity.id()),
+        "The updated job templated id: %s is not equal to the old one: %s, which is unexpected",
+        newJobTemplateEntity.id(),
+        oldJobTemplateEntity.id());
+
+    String metalakeName = jobTemplateIdent.namespace().level(0);
+    Long metalakeId = MetalakeMetaService.getInstance().getMetalakeIdByName(metalakeName);
+
+    JobTemplatePO.JobTemplatePOBuilder oldBuilder =
+        JobTemplatePO.builder().withMetalakeId(metalakeId);
+    JobTemplatePO oldJobTemplatePO =
+        JobTemplatePO.initializeJobTemplatePO(oldJobTemplateEntity, oldBuilder);
+
+    JobTemplatePO.JobTemplatePOBuilder newBuilder =
+        JobTemplatePO.builder().withMetalakeId(metalakeId);
+    JobTemplatePO newJobTemplatePO =
+        JobTemplatePO.initializeJobTemplatePO(newJobTemplateEntity, newBuilder);
+
+    Integer result;
+    try {
+      result =
+          SessionUtils.doWithCommitAndFetchResult(
+              JobTemplateMetaMapper.class,
+              mapper -> mapper.updateJobTemplateMeta(newJobTemplatePO, oldJobTemplatePO));
+    } catch (RuntimeException e) {
+      ExceptionUtils.checkSQLException(
+          e, Entity.EntityType.JOB_TEMPLATE, oldJobTemplateEntity.name());
+      throw e;
+    }
+
+    if (result == null || result == 0) {
+      throw new NoSuchEntityException(
+          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
+          Entity.EntityType.JOB_TEMPLATE.name().toLowerCase(Locale.ROOT),
+          oldJobTemplateEntity.name());
+    } else if (result > 1) {
+      throw new IOException(
+          String.format(
+              "Failed to update job template: %s, because more than one rows are updated: %d",
+              oldJobTemplateEntity.name(), result));
+    } else {
+      return newJobTemplateEntity;
+    }
   }
 }

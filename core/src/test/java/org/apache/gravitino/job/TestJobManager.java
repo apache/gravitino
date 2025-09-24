@@ -595,6 +595,221 @@ public class TestJobManager {
             });
   }
 
+  @Test
+  public void testUpdateShellJobTemplateEntity() {
+    String jobTemplateName = "old_shell_job";
+    String jobTemplateComment = "An old shell job template";
+    JobTemplateEntity oldJobTemplateEntity =
+        newShellJobTemplateEntity(jobTemplateName, jobTemplateComment);
+
+    // Update name and comment
+    String newJobTemplateName = "new_shell_job";
+    String newJobTemplateComment = "A new shell job template";
+    JobTemplateChange rename = JobTemplateChange.rename(newJobTemplateName);
+    JobTemplateChange updateComment = JobTemplateChange.updateComment(newJobTemplateComment);
+
+    JobTemplateEntity newJobTemplateEntity =
+        jobManager.updateJobTemplateEntity(
+            oldJobTemplateEntity.nameIdentifier(), oldJobTemplateEntity, rename, updateComment);
+
+    Assertions.assertEquals(oldJobTemplateEntity.id(), newJobTemplateEntity.id());
+    Assertions.assertEquals(newJobTemplateName, newJobTemplateEntity.name());
+    Assertions.assertEquals(oldJobTemplateEntity.namespace(), newJobTemplateEntity.namespace());
+    Assertions.assertEquals(newJobTemplateComment, newJobTemplateEntity.comment());
+    Assertions.assertEquals(
+        oldJobTemplateEntity.templateContent(), newJobTemplateEntity.templateContent());
+
+    // Update the executable of the shell job template
+    JobTemplateChange updateShellTemplate =
+        JobTemplateChange.updateTemplate(
+            JobTemplateChange.ShellTemplateUpdate.builder().withNewExecutable("/bin/ls").build());
+
+    newJobTemplateEntity =
+        jobManager.updateJobTemplateEntity(
+            oldJobTemplateEntity.nameIdentifier(), oldJobTemplateEntity, updateShellTemplate);
+    Assertions.assertEquals(oldJobTemplateEntity.id(), newJobTemplateEntity.id());
+    Assertions.assertEquals(oldJobTemplateEntity.name(), newJobTemplateEntity.name());
+    Assertions.assertEquals(oldJobTemplateEntity.namespace(), newJobTemplateEntity.namespace());
+    Assertions.assertEquals(oldJobTemplateEntity.comment(), newJobTemplateEntity.comment());
+    Assertions.assertNotEquals(
+        oldJobTemplateEntity.templateContent(), newJobTemplateEntity.templateContent());
+    JobTemplateEntity.TemplateContent oldContent = oldJobTemplateEntity.templateContent();
+    JobTemplateEntity.TemplateContent newContent = newJobTemplateEntity.templateContent();
+    Assertions.assertEquals(oldContent.jobType(), newContent.jobType());
+    Assertions.assertEquals("/bin/ls", newContent.executable());
+    Assertions.assertEquals(oldContent.arguments(), newContent.arguments());
+    Assertions.assertEquals(oldContent.environments(), newContent.environments());
+    Assertions.assertEquals(oldContent.customFields(), newContent.customFields());
+
+    // Update the arguments, environments, custom fields of the shell job template
+    JobTemplateChange updateShellTemplate2 =
+        JobTemplateChange.updateTemplate(
+            JobTemplateChange.ShellTemplateUpdate.builder()
+                .withNewArguments(ImmutableList.of("arg1", "arg2"))
+                .withNewEnvironments(Collections.singletonMap("env1", "value1"))
+                .withNewCustomFields(Collections.singletonMap("field1", "value1"))
+                .build());
+    newJobTemplateEntity =
+        jobManager.updateJobTemplateEntity(
+            oldJobTemplateEntity.nameIdentifier(), oldJobTemplateEntity, updateShellTemplate2);
+
+    JobTemplateEntity.TemplateContent newContent2 = newJobTemplateEntity.templateContent();
+    Assertions.assertEquals(oldContent.jobType(), newContent2.jobType());
+    Assertions.assertEquals(oldContent.executable(), newContent2.executable());
+    Assertions.assertEquals(ImmutableList.of("arg1", "arg2"), newContent2.arguments());
+    Assertions.assertEquals(Collections.singletonMap("env1", "value1"), newContent2.environments());
+    Assertions.assertEquals(
+        Collections.singletonMap("field1", "value1"), newContent2.customFields());
+    Assertions.assertEquals(oldContent.scripts(), newContent2.scripts());
+
+    // Update the scripts of the shell job template
+    JobTemplateChange updateShellTemplate3 =
+        JobTemplateChange.updateTemplate(
+            JobTemplateChange.ShellTemplateUpdate.builder()
+                .withNewScripts(ImmutableList.of("echo Hello", "echo World"))
+                .build());
+    newJobTemplateEntity =
+        jobManager.updateJobTemplateEntity(
+            oldJobTemplateEntity.nameIdentifier(), oldJobTemplateEntity, updateShellTemplate3);
+
+    JobTemplateEntity.TemplateContent newContent3 = newJobTemplateEntity.templateContent();
+    Assertions.assertEquals(oldContent.jobType(), newContent3.jobType());
+    Assertions.assertEquals(oldContent.executable(), newContent3.executable());
+    Assertions.assertEquals(oldContent.arguments(), newContent3.arguments());
+    Assertions.assertEquals(oldContent.environments(), newContent3.environments());
+    Assertions.assertEquals(oldContent.customFields(), newContent3.customFields());
+    Assertions.assertEquals(ImmutableList.of("echo Hello", "echo World"), newContent3.scripts());
+
+    // Update with no changes
+    JobTemplateChange noChange =
+        JobTemplateChange.updateTemplate(JobTemplateChange.ShellTemplateUpdate.builder().build());
+    newJobTemplateEntity =
+        jobManager.updateJobTemplateEntity(
+            oldJobTemplateEntity.nameIdentifier(), oldJobTemplateEntity, noChange);
+    Assertions.assertEquals(
+        oldJobTemplateEntity.templateContent(), newJobTemplateEntity.templateContent());
+
+    // Update job template with SparkJobTemplateChange should throw IllegalArgumentException
+    JobTemplateChange invalidChange =
+        JobTemplateChange.updateTemplate(JobTemplateChange.SparkTemplateUpdate.builder().build());
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            jobManager.updateJobTemplateEntity(
+                oldJobTemplateEntity.nameIdentifier(), oldJobTemplateEntity, invalidChange));
+  }
+
+  @Test
+  public void testUpdateSparkJobTemplateEntity() {
+    String jobTemplateName = "old_spark_job";
+    String jobTemplateComment = "An old spark job template";
+    JobTemplateEntity oldJobTemplateEntity =
+        newSparkJobTemplateEntity(jobTemplateName, jobTemplateComment);
+
+    // Update the executable and class name of the spark job template
+    JobTemplateChange updateSparkTemplate =
+        JobTemplateChange.updateTemplate(
+            JobTemplateChange.SparkTemplateUpdate.builder()
+                .withNewExecutable("file:/new/path/to/spark-examples.jar")
+                .withNewClassName("org.apache.spark.examples.SparkWordCount")
+                .build());
+    JobTemplateEntity newJobTemplateEntity =
+        jobManager.updateJobTemplateEntity(
+            oldJobTemplateEntity.nameIdentifier(), oldJobTemplateEntity, updateSparkTemplate);
+    Assertions.assertEquals(oldJobTemplateEntity.id(), newJobTemplateEntity.id());
+    Assertions.assertEquals(oldJobTemplateEntity.name(), newJobTemplateEntity.name());
+    Assertions.assertEquals(oldJobTemplateEntity.namespace(), newJobTemplateEntity.namespace());
+    Assertions.assertEquals(oldJobTemplateEntity.comment(), newJobTemplateEntity.comment());
+    Assertions.assertNotEquals(
+        oldJobTemplateEntity.templateContent(), newJobTemplateEntity.templateContent());
+    JobTemplateEntity.TemplateContent oldContent = oldJobTemplateEntity.templateContent();
+    JobTemplateEntity.TemplateContent newContent = newJobTemplateEntity.templateContent();
+    Assertions.assertEquals(oldContent.jobType(), newContent.jobType());
+    Assertions.assertEquals("file:/new/path/to/spark-examples.jar", newContent.executable());
+    Assertions.assertEquals("org.apache.spark.examples.SparkWordCount", newContent.className());
+    Assertions.assertEquals(oldContent.arguments(), newContent.arguments());
+    Assertions.assertEquals(oldContent.environments(), newContent.environments());
+    Assertions.assertEquals(oldContent.customFields(), newContent.customFields());
+    Assertions.assertEquals(oldContent.jars(), newContent.jars());
+    Assertions.assertEquals(oldContent.files(), newContent.files());
+    Assertions.assertEquals(oldContent.archives(), newContent.archives());
+    Assertions.assertEquals(oldContent.configs(), newContent.configs());
+
+    // Update the arguments, environments, custom fields of the spark job template
+    JobTemplateChange updateSparkTemplate2 =
+        JobTemplateChange.updateTemplate(
+            JobTemplateChange.SparkTemplateUpdate.builder()
+                .withNewArguments(ImmutableList.of("arg1", "arg2"))
+                .withNewEnvironments(Collections.singletonMap("env1", "value1"))
+                .withNewCustomFields(Collections.singletonMap("field1", "value1"))
+                .build());
+    newJobTemplateEntity =
+        jobManager.updateJobTemplateEntity(
+            oldJobTemplateEntity.nameIdentifier(), oldJobTemplateEntity, updateSparkTemplate2);
+    JobTemplateEntity.TemplateContent newContent2 = newJobTemplateEntity.templateContent();
+    Assertions.assertEquals(oldContent.jobType(), newContent2.jobType());
+    Assertions.assertEquals(oldContent.executable(), newContent2.executable());
+    Assertions.assertEquals(oldContent.className(), newContent2.className());
+    Assertions.assertEquals(ImmutableList.of("arg1", "arg2"), newContent2.arguments());
+    Assertions.assertEquals(Collections.singletonMap("env1", "value1"), newContent2.environments());
+    Assertions.assertEquals(
+        Collections.singletonMap("field1", "value1"), newContent2.customFields());
+    Assertions.assertEquals(oldContent.jars(), newContent2.jars());
+    Assertions.assertEquals(oldContent.files(), newContent2.files());
+    Assertions.assertEquals(oldContent.archives(), newContent2.archives());
+    Assertions.assertEquals(oldContent.configs(), newContent2.configs());
+
+    // Update the jars, files, archives, configs of the spark job template
+    JobTemplateChange updateSparkTemplate3 =
+        JobTemplateChange.updateTemplate(
+            JobTemplateChange.SparkTemplateUpdate.builder()
+                .withNewJars(ImmutableList.of("file:/new/path/to/jar1 ", "file:/new/path/to/jar2"))
+                .withNewFiles(
+                    ImmutableList.of("file:/new/path/to/file1", "file:/new/path/to/file2"))
+                .withNewArchives(
+                    ImmutableList.of("file:/new/path/to/archive1", "file:/new/path/to/archive2"))
+                .withNewConfigs(Collections.singletonMap("spark.executor.memory", "4g"))
+                .build());
+    newJobTemplateEntity =
+        jobManager.updateJobTemplateEntity(
+            oldJobTemplateEntity.nameIdentifier(), oldJobTemplateEntity, updateSparkTemplate3);
+    JobTemplateEntity.TemplateContent newContent3 = newJobTemplateEntity.templateContent();
+    Assertions.assertEquals(oldContent.jobType(), newContent3.jobType());
+    Assertions.assertEquals(oldContent.executable(), newContent3.executable());
+    Assertions.assertEquals(oldContent.className(), newContent3.className());
+    Assertions.assertEquals(oldContent.arguments(), newContent3.arguments());
+    Assertions.assertEquals(oldContent.environments(), newContent3.environments());
+    Assertions.assertEquals(oldContent.customFields(), newContent3.customFields());
+    Assertions.assertEquals(
+        ImmutableList.of("file:/new/path/to/jar1 ", "file:/new/path/to/jar2"), newContent3.jars());
+    Assertions.assertEquals(
+        ImmutableList.of("file:/new/path/to/file1", "file:/new/path/to/file2"),
+        newContent3.files());
+    Assertions.assertEquals(
+        ImmutableList.of("file:/new/path/to/archive1", "file:/new/path/to/archive2"),
+        newContent3.archives());
+    Assertions.assertEquals(
+        Collections.singletonMap("spark.executor.memory", "4g"), newContent3.configs());
+
+    // Update with no changes
+    JobTemplateChange noChange =
+        JobTemplateChange.updateTemplate(JobTemplateChange.SparkTemplateUpdate.builder().build());
+    newJobTemplateEntity =
+        jobManager.updateJobTemplateEntity(
+            oldJobTemplateEntity.nameIdentifier(), oldJobTemplateEntity, noChange);
+    Assertions.assertEquals(
+        oldJobTemplateEntity.templateContent(), newJobTemplateEntity.templateContent());
+
+    // Update job template with ShellJobTemplateChange should throw IllegalArgumentException
+    JobTemplateChange invalidChange =
+        JobTemplateChange.updateTemplate(JobTemplateChange.ShellTemplateUpdate.builder().build());
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            jobManager.updateJobTemplateEntity(
+                oldJobTemplateEntity.nameIdentifier(), oldJobTemplateEntity, invalidChange));
+  }
+
   private static JobTemplateEntity newShellJobTemplateEntity(String name, String comment) {
     ShellJobTemplate shellJobTemplate =
         ShellJobTemplate.builder()
