@@ -94,7 +94,7 @@ class SchemaDetails extends CliHandler {
   @CommandLine.Option(
       names = {"-n", GravitinoOptions.OPTION_LONG_PREFIX + GravitinoOptions.NAME},
       required = true,
-      description = "name of the entity")
+      description = "name of the schema")
   String name;
 
   /**
@@ -154,7 +154,7 @@ class SchemaCreate extends CliHandler {
   @CommandLine.Option(
       names = {"-n", GravitinoOptions.OPTION_LONG_PREFIX + GravitinoOptions.NAME},
       required = true,
-      description = "name of the entity")
+      description = "name of the schema")
   String name;
 
   /** Comment for the Schema, use -c/--comment */
@@ -199,10 +199,11 @@ class SchemaCreate extends CliHandler {
     optionListHeading = OPTION_LIST_HEADING_STYLE,
     header = "Delete a schema")
 class SchemaDelete extends CliHandler {
+  /** The name option, use -n/--name */
   @CommandLine.Option(
       names = {"-n", GravitinoOptions.OPTION_LONG_PREFIX + GravitinoOptions.NAME},
       required = true,
-      description = "name of the entity")
+      description = "name of the schema")
   String name;
 
   /**
@@ -257,10 +258,11 @@ class SchemaDelete extends CliHandler {
     optionListHeading = OPTION_LIST_HEADING_STYLE,
     header = "Set properties of a schema")
 class SchemaSet extends CliHandler {
+  /** The name options, use -n/--name */
   @CommandLine.Option(
       names = {"-n", GravitinoOptions.OPTION_LONG_PREFIX + GravitinoOptions.NAME},
       required = true,
-      description = "name of the entity")
+      description = "name of the schema")
   String name;
 
   /** The property related options */
@@ -305,14 +307,16 @@ class SchemaSet extends CliHandler {
     optionListHeading = OPTION_LIST_HEADING_STYLE,
     header = "Remove a property from a schema")
 class SchemaRemove extends CliHandler {
+  /** The name options, use -n/--name */
   @CommandLine.Option(
       names = {"-n", GravitinoOptions.OPTION_LONG_PREFIX + GravitinoOptions.NAME},
       required = true,
-      description = "name of the entity")
+      description = "name of the schema")
   String name;
 
+  /** The property remove options, use -P/--property */
   @CommandLine.Option(
-      names = {GravitinoOptions.OPTION_LONG_PREFIX + GravitinoOptions.PROPERTY},
+      names = {"-P", GravitinoOptions.OPTION_LONG_PREFIX + GravitinoOptions.PROPERTY},
       required = true,
       description = "The property to remove from the schema")
   String property;
@@ -354,10 +358,11 @@ class SchemaRemove extends CliHandler {
     header = "List the properties of a schema")
 class SchemaProperties extends CliHandler {
 
+  /** The name options, use -n/--name */
   @CommandLine.Option(
       names = {"-n", GravitinoOptions.OPTION_LONG_PREFIX + GravitinoOptions.NAME},
       required = true,
-      description = "name of the entity")
+      description = "name of the schema")
   String name;
 
   /** {inheritDoc} */
@@ -371,6 +376,7 @@ class SchemaProperties extends CliHandler {
           execute(
               () -> {
                 Schema gSchema = client.loadCatalog(catalog).asSchemas().loadSchema(schema);
+
                 return gSchema.properties();
               });
 
@@ -397,10 +403,11 @@ class SchemaProperties extends CliHandler {
     optionListHeading = OPTION_LIST_HEADING_STYLE,
     header = "List the schemas in a catalog")
 class SchemaList extends CliHandler {
+  /** The name options, use -n/--name */
   @CommandLine.Option(
       names = {"-n", GravitinoOptions.OPTION_LONG_PREFIX + GravitinoOptions.NAME},
       required = true,
-      description = "name of the entity")
+      description = "name of the schema")
   String name;
 
   /** {inheritDoc} */

@@ -26,7 +26,6 @@ import org.apache.gravitino.cli.MainCli;
 import org.apache.gravitino.cli.outputs.OutputFormat;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
-import picocli.CommandLine;
 
 class TestModelCommands {
   @Test
@@ -960,6 +959,41 @@ class TestModelCommands {
   }
 
   @Test
+  void testLinkModelWithProperties() {
+    ModelCliHandler root = new ModelCliHandler();
+    org.apache.gravitino.cli.handler.MockModelUpdate mockModelUpdate =
+        new org.apache.gravitino.cli.handler.MockModelUpdate();
+
+    picocli.CommandLine cmd =
+        new picocli.CommandLine(root).addSubcommand("mock_update", mockModelUpdate);
+    String[] args = {
+      "mock_update",
+      "--metalake",
+      "ml1",
+      "--name",
+      "catalog1.schema1.model1",
+      "--uris",
+      "n1=u1,n2=u2",
+      "--alias",
+      "aliasA",
+      "--alias",
+      "aliasB",
+      "--properties",
+      "key1=value1,key2=value2"
+    };
+
+    int exitCode = cmd.execute(args);
+    Assertions.assertEquals(0, exitCode);
+    Assertions.assertEquals("ml1", mockModelUpdate.commonOptions.metalake);
+    Assertions.assertEquals("catalog1.schema1.model1", mockModelUpdate.name);
+    Assertions.assertArrayEquals(new String[] {"aliasA", "aliasB"}, mockModelUpdate.aliases);
+    Assertions.assertEquals("u1", mockModelUpdate.updateOptions.uris.get("n1"));
+    Assertions.assertEquals("u2", mockModelUpdate.updateOptions.uris.get("n2"));
+    Assertions.assertEquals("value1", mockModelUpdate.properties.get("key1"));
+    Assertions.assertEquals("value2", mockModelUpdate.properties.get("key2"));
+  }
+
+  @Test
   void testUpdateModelWithMalformedEntity() {
     ModelCliHandler root = new ModelCliHandler();
     org.apache.gravitino.cli.handler.MockModelUpdate mockModelUpdate =
@@ -987,7 +1021,6 @@ class TestModelCommands {
 }
 
 /** Mock classes for testing Model create command. */
-@picocli.CommandLine.Command(name = "mock_create", description = "Create a new model")
 class MockModelCreate extends ModelCreate {
   @Override
   protected Integer doCall() throws Exception {
@@ -996,7 +1029,6 @@ class MockModelCreate extends ModelCreate {
 }
 
 /** Mock classes for testing Model details command. */
-@picocli.CommandLine.Command(name = "mock_details", description = "Create a new model")
 class MockModelDetails extends ModelDetails {
 
   @Override
@@ -1006,9 +1038,6 @@ class MockModelDetails extends ModelDetails {
 }
 
 /** Mock classes for testing Model list command. */
-@picocli.CommandLine.Command(
-    name = "mock_list",
-    description = "List models in specified metalake.catalog.schema")
 class MockModeList extends ModelList {
 
   @Override
@@ -1018,9 +1047,6 @@ class MockModeList extends ModelList {
 }
 
 /** Mock classes for testing Model delete command. */
-@picocli.CommandLine.Command(
-    name = "mock_delete",
-    description = "Delete model in specified metalake.catalog.schema")
 class MockModelDelete extends ModelDelete {
 
   @Override
@@ -1030,9 +1056,6 @@ class MockModelDelete extends ModelDelete {
 }
 
 /** Mock classes for testing Model set command. */
-@picocli.CommandLine.Command(
-    name = "mock_set",
-    description = "Set property of a model version by alias or version")
 class MockModelSet extends ModelSet {
   @Override
   protected Integer doCall() throws Exception {
@@ -1041,9 +1064,6 @@ class MockModelSet extends ModelSet {
 }
 
 /** Mock class for testing model remove command. */
-@picocli.CommandLine.Command(
-    name = CommandActions.REMOVE,
-    description = "Remove property of a model version by alias or version")
 class MockModelRemove extends ModelRemove {
   @Override
   protected Integer doCall() throws Exception {
@@ -1052,10 +1072,6 @@ class MockModelRemove extends ModelRemove {
 }
 
 /** Mock class for testing model update command. */
-@CommandLine.Command(
-    name = "mock_update",
-    usageHelpAutoWidth = true,
-    description = "Update property of model or model version, like name, comment, alias")
 class MockModelUpdate extends ModelUpdate {
   @Override
   protected Integer doCall() throws Exception {

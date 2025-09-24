@@ -24,16 +24,16 @@ import picocli.CommandLine;
 
 /** Defines the options for setting a property in key=value format. */
 public class PropertyOptions {
-  /** The property option, use --property to set the property name */
+  /** The property option, use -P/--property to set the property name */
   @CommandLine.Option(
-      names = {GravitinoOptions.OPTION_LONG_PREFIX + GravitinoOptions.PROPERTY},
+      names = {"-P", GravitinoOptions.OPTION_LONG_PREFIX + GravitinoOptions.PROPERTY},
       required = true,
       description = "The property to set in key=value format")
   public String property;
 
-  /** The value option, use --value to set the property value */
+  /** The value option, use -V/--value to set the property value */
   @CommandLine.Option(
-      names = {GravitinoOptions.OPTION_LONG_PREFIX + GravitinoOptions.VALUE},
+      names = {"-V", GravitinoOptions.OPTION_LONG_PREFIX + GravitinoOptions.VALUE},
       required = true,
       description = "The value to set in key=value format")
   public String value;

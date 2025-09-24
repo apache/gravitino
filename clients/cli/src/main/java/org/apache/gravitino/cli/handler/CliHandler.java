@@ -189,6 +189,11 @@ public abstract class CliHandler implements Callable<Integer> {
         "Unreachable: exitWithError should have terminated the program");
   }
 
+  /**
+   * Execute the command without returning any result.
+   *
+   * @param function The execute command
+   */
   protected void execute(Runnable function) {
     try {
       function.run();

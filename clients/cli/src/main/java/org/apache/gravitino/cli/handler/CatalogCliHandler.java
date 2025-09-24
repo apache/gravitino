@@ -98,10 +98,11 @@ public class CatalogCliHandler implements Runnable {
     optionListHeading = OPTION_LIST_HEADING_STYLE,
     header = "Get details of a catalog or get audit information for a catalog")
 class CatalogDetails extends CliHandler {
+  /** Name of the catalog, use -n/--name to specify */
   @CommandLine.Option(
       names = {"-n", GravitinoOptions.OPTION_LONG_PREFIX + GravitinoOptions.NAME},
       required = true,
-      description = "name of the entity")
+      description = "name of the catalog")
   String name;
 
   /**
@@ -152,24 +153,28 @@ class CatalogDetails extends CliHandler {
     header = "Create a new catalog")
 class CatalogCreate extends CliHandler {
 
+  /** Name of the catalog, use -n/--name to specify */
   @CommandLine.Option(
       names = {"-n", GravitinoOptions.OPTION_LONG_PREFIX + GravitinoOptions.NAME},
       required = true,
-      description = "name of the entity")
+      description = "name of the catalog")
   String name;
 
+  /** Provider for the catalog, use --provider to specify */
   @CommandLine.Option(
       names = {GravitinoOptions.OPTION_LONG_PREFIX + GravitinoOptions.PROVIDER},
       description = "Provider for the catalog",
       required = true)
   String provider;
 
+  /** Comment for the Catalog, use -c/--comment to specify */
   @CommandLine.Option(
       names = {"-c", GravitinoOptions.OPTION_LONG_PREFIX + GravitinoOptions.COMMENT},
       description = "Comment for the Catalog",
       defaultValue = "")
   String comment;
 
+  /** Properties for the catalog, use -p/--properties to specify */
   @CommandLine.Option(
       names = {"-p", "--properties"},
       description = "Properties in key=value format",
@@ -225,10 +230,11 @@ class CatalogCreate extends CliHandler {
     optionListHeading = OPTION_LIST_HEADING_STYLE,
     header = "Delete a catalog")
 class CatalogDelete extends CliHandler {
+  /** Name of the catalog, use -n/--name to specify */
   @CommandLine.Option(
       names = {"-n", GravitinoOptions.OPTION_LONG_PREFIX + GravitinoOptions.NAME},
       required = true,
-      description = "name of the entity")
+      description = "name of the catalog")
   String name;
 
   /**
@@ -281,10 +287,11 @@ class CatalogDelete extends CliHandler {
     optionListHeading = OPTION_LIST_HEADING_STYLE,
     header = "Set a property of a catalog")
 class CatalogSet extends CliHandler {
+  /** Name of the catalog, use -n/--name to specify */
   @CommandLine.Option(
       names = {"-n", GravitinoOptions.OPTION_LONG_PREFIX + GravitinoOptions.NAME},
       required = true,
-      description = "name of the entity")
+      description = "name of the catalog")
   String name;
 
   @CommandLine.ArgGroup(exclusive = false)
@@ -326,14 +333,16 @@ class CatalogSet extends CliHandler {
     optionListHeading = OPTION_LIST_HEADING_STYLE,
     header = "Remove a property from a catalog")
 class CatalogRemove extends CliHandler {
+  /** Name of the catalog, use -n/--name to specify */
   @CommandLine.Option(
       names = {"-n", GravitinoOptions.OPTION_LONG_PREFIX + GravitinoOptions.NAME},
       required = true,
-      description = "name of the entity")
+      description = "name of the catalog")
   String name;
 
+  /** The property to remove from the catalog, use --property to specify */
   @CommandLine.Option(
-      names = {GravitinoOptions.OPTION_LONG_PREFIX + GravitinoOptions.PROPERTY},
+      names = {"-P", GravitinoOptions.OPTION_LONG_PREFIX + GravitinoOptions.PROPERTY},
       required = true,
       description = "The property to remove from the catalog")
   String property;
@@ -373,10 +382,11 @@ class CatalogRemove extends CliHandler {
     optionListHeading = OPTION_LIST_HEADING_STYLE,
     header = "Display a catalog's properties")
 class CatalogProperties extends CliHandler {
+  /** Name of the catalog, use -n/--name to specify */
   @CommandLine.Option(
       names = {"-n", GravitinoOptions.OPTION_LONG_PREFIX + GravitinoOptions.NAME},
       required = true,
-      description = "name of the entity")
+      description = "name of the catalog")
   String name;
 
   /** {@inheritDoc} */
@@ -450,15 +460,17 @@ class CatalogList extends CliHandler {
     optionListHeading = OPTION_LIST_HEADING_STYLE,
     header = "Update a catalog")
 class CatalogUpdate extends CliHandler {
+  /** Name of the catalog, use -n/--name to specify */
   @CommandLine.Option(
       names = {"-n", GravitinoOptions.OPTION_LONG_PREFIX + GravitinoOptions.NAME},
       required = true,
-      description = "name of the entity")
+      description = "name of the catalog")
   String name;
 
+  /** All flg, use it when you want to enable the metalake in the same time */
   @CommandLine.Option(
       names = {GravitinoOptions.OPTION_LONG_PREFIX + GravitinoOptions.ALL},
-      description = "New comment for the catalog",
+      description = "All flg, use it when you want to enable the metalake in the same time",
       defaultValue = "")
   boolean all;
 
@@ -470,12 +482,14 @@ class CatalogUpdate extends CliHandler {
     @CommandLine.ArgGroup(multiplicity = "1")
     EnableDisableOptions enableDisableOptions;
 
+    /** New comment for the catalog, use -c/--comment to specify */
     @CommandLine.Option(
         names = {"-c", GravitinoOptions.OPTION_LONG_PREFIX + GravitinoOptions.COMMENT},
         description = "New comment for the catalog",
         defaultValue = "")
     String comment;
 
+    /** New name for the catalog, use --rename to specify */
     @CommandLine.Option(
         names = GravitinoOptions.OPTION_LONG_PREFIX + GravitinoOptions.RENAME,
         description = "New name for the catalog")

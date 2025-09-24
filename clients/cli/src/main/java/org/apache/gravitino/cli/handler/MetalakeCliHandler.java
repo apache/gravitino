@@ -248,6 +248,7 @@ class MetalakeSet extends CliHandler {
             client.alterMetalake(metalake, change);
           });
     }
+
     printInformation(metalake + " property set.");
     return 0;
   }
@@ -271,8 +272,11 @@ class MetalakeSet extends CliHandler {
     header = "Remove a property from a metalake")
 class MetalakeRemove extends CliHandler {
 
+  /**
+   * The property to remove from the metalake, use -P/--property to specify the property to remove
+   */
   @CommandLine.Option(
-      names = {GravitinoOptions.OPTION_LONG_PREFIX + GravitinoOptions.PROPERTY},
+      names = {"-P", GravitinoOptions.OPTION_LONG_PREFIX + GravitinoOptions.PROPERTY},
       required = true,
       description = "The property to remove from the metalake")
   String property;
@@ -359,12 +363,14 @@ class MetalakeUpdate extends CliHandler {
     @CommandLine.ArgGroup(multiplicity = "1")
     EnableDisableOptions enableDisableOptions;
 
+    /** Comment for the metalake, use -c/--comment */
     @CommandLine.Option(
         names = {"-c", GravitinoOptions.OPTION_LONG_PREFIX + GravitinoOptions.COMMENT},
         description = "New comment for the catalog",
         defaultValue = "")
     String comment;
 
+    /** New name for the metalake, use --rename to specify the new name */
     @CommandLine.Option(
         names = GravitinoOptions.OPTION_LONG_PREFIX + GravitinoOptions.RENAME,
         description = "New name for the catalog")

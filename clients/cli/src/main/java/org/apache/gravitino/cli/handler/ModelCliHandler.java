@@ -120,11 +120,11 @@ public class ModelCliHandler implements Runnable {
     optionListHeading = OPTION_LIST_HEADING_STYLE,
     header = "Create a model")
 class ModelCreate extends CliHandler {
-  /** Name of the entity, use -n/--name specify the value */
+  /** name of the model, use -n/--name specify the value */
   @CommandLine.Option(
       names = {"-n", GravitinoOptions.OPTION_LONG_PREFIX + GravitinoOptions.NAME},
       required = true,
-      description = "name of the entity")
+      description = "name of the model")
   String name;
 
   /** Comment of a model, use -c/--comment specify the value */
@@ -197,12 +197,14 @@ class ModelCreate extends CliHandler {
     optionListHeading = OPTION_LIST_HEADING_STYLE,
     header = "Get details of a model or get audit information for a model")
 class ModelDetails extends CliHandler {
+  /** name of the model, use -n/--name specify the value */
   @CommandLine.Option(
       names = {"-n", GravitinoOptions.OPTION_LONG_PREFIX + GravitinoOptions.NAME},
       required = true,
-      description = "name of the entity")
+      description = "name of the model")
   String name;
 
+  /** Whether to show audit information for the model, use -a/--audit to show audit information */
   @Option(
       names = GravitinoOptions.OPTION_LONG_PREFIX + GravitinoOptions.AUDIT,
       description = "Show audit information for the model",
@@ -260,10 +262,11 @@ class ModelDetails extends CliHandler {
     header = "List model in a catalog.schema")
 class ModelList extends CliHandler {
 
+  /** The name options, use -n/--name to specify the value */
   @CommandLine.Option(
       names = {"-n", GravitinoOptions.OPTION_LONG_PREFIX + GravitinoOptions.NAME},
       required = true,
-      description = "name of the entity")
+      description = "name of the model")
   String name;
 
   /** {@inheritDoc} */
@@ -326,10 +329,11 @@ class ModelList extends CliHandler {
     header = "Delete a model")
 class ModelDelete extends CliHandler {
 
+  /** name of the model, use -n/--name specify the value */
   @CommandLine.Option(
       names = {"-n", GravitinoOptions.OPTION_LONG_PREFIX + GravitinoOptions.NAME},
       required = true,
-      description = "name of the entity")
+      description = "name of the model")
   String name;
 
   /** Whether to force delete the model, use -f or --force to force delete the model */
@@ -379,7 +383,6 @@ class ModelDelete extends CliHandler {
 /** Handler for model set command. */
 @Command(
     name = CommandActions.SET,
-    usageHelpAutoWidth = true,
     sortOptions = false,
     headerHeading = HEAD_HEADING_STYLE,
     synopsisHeading = SYNOPSIS_HEADING_STYLE,
@@ -388,10 +391,11 @@ class ModelDelete extends CliHandler {
     optionListHeading = OPTION_LIST_HEADING_STYLE,
     header = "Set property of a model version by alias or version")
 class ModelSet extends CliHandler {
+  /** The name options, use -n/--name to specify the value */
   @CommandLine.Option(
       names = {"-n", GravitinoOptions.OPTION_LONG_PREFIX + GravitinoOptions.NAME},
       required = true,
-      description = "name of the entity")
+      description = "name of the model")
   String name;
 
   @CommandLine.ArgGroup() VersionOrAlias versionOrAlias;
@@ -463,7 +467,6 @@ class ModelSet extends CliHandler {
 /** Handler for model remove command. */
 @Command(
     name = CommandActions.REMOVE,
-    usageHelpAutoWidth = true,
     sortOptions = false,
     headerHeading = HEAD_HEADING_STYLE,
     synopsisHeading = SYNOPSIS_HEADING_STYLE,
@@ -473,10 +476,11 @@ class ModelSet extends CliHandler {
     header =
         "Remove property/alias of a model version by alias or version, or remove property of a model")
 class ModelRemove extends CliHandler {
+  /** The name options, use -n/--name to specify the value */
   @CommandLine.Option(
       names = {"-n", GravitinoOptions.OPTION_LONG_PREFIX + GravitinoOptions.NAME},
       required = true,
-      description = "name of the entity")
+      description = "name of the model")
   String name;
 
   @CommandLine.ArgGroup() VersionOrAlias versionOrAlias;
@@ -486,7 +490,7 @@ class ModelRemove extends CliHandler {
 
   static class RemoveOptions {
     @Option(
-        names = GravitinoOptions.OPTION_LONG_PREFIX + GravitinoOptions.PROPERTY,
+        names = {"-P", GravitinoOptions.OPTION_LONG_PREFIX + GravitinoOptions.PROPERTY},
         required = true,
         description = "Property name to remove")
     String removedProperty;
@@ -605,7 +609,6 @@ class ModelRemove extends CliHandler {
 /** Handler for model update command. */
 @Command(
     name = CommandActions.UPDATE,
-    usageHelpAutoWidth = true,
     sortOptions = false,
     headerHeading = HEAD_HEADING_STYLE,
     synopsisHeading = SYNOPSIS_HEADING_STYLE,
@@ -614,30 +617,34 @@ class ModelRemove extends CliHandler {
     optionListHeading = OPTION_LIST_HEADING_STYLE,
     header = "Update model or model version")
 class ModelUpdate extends CliHandler {
+  /** The name options, use -n/--name to specify the value */
   @CommandLine.Option(
       names = {"-n", GravitinoOptions.OPTION_LONG_PREFIX + GravitinoOptions.NAME},
       required = true,
-      description = "name of the entity")
+      description = "name of the model")
   String name;
 
+  /** The aliases options, use --alias to specify the value */
   @Option(
       names = GravitinoOptions.OPTION_LONG_PREFIX + GravitinoOptions.ALIAS,
       description = "Alias of the model " + "version")
   String[] aliases;
 
+  /** THe version options, use --version to specify the value */
   @Option(
       names = GravitinoOptions.OPTION_LONG_PREFIX + GravitinoOptions.VERSION,
       description = "Version of the model version")
   Integer version;
 
+  /** The Comment options, use -c/--comment to specify the value */
   @Option(
-      names = GravitinoOptions.OPTION_LONG_PREFIX + GravitinoOptions.COMMENT,
+      names = {"-c", GravitinoOptions.OPTION_LONG_PREFIX + GravitinoOptions.COMMENT},
       description = "Comment for the model or model version")
   String comment;
 
-  /** Property of a model, use -p/--property specify the value */
+  /** Property of a model, use --properties to specify the value */
   @Option(
-      names = {"-p", GravitinoOptions.OPTION_LONG_PREFIX + GravitinoOptions.PROPERTY},
+      names = {GravitinoOptions.OPTION_LONG_PREFIX + GravitinoOptions.PROPERTIES},
       description = "Properties in key=value format",
       split = ",")
   Map<String, String> properties;
@@ -646,22 +653,26 @@ class ModelUpdate extends CliHandler {
   UpdateOptions updateOptions;
 
   static class UpdateOptions {
+    /** The URI options, use --uris to specify the value */
     @Option(
         names = {GravitinoOptions.OPTION_LONG_PREFIX + GravitinoOptions.URIS},
         description = "URIs for link model",
         split = ",")
     Map<String, String> uris;
 
+    /** The new name options, use --rename to specify the value */
     @Option(
         names = GravitinoOptions.OPTION_LONG_PREFIX + GravitinoOptions.RENAME,
         description = "New name for the model")
     String newName;
 
+    /** The new URI options, use --newuri to specify the value */
     @Option(
         names = GravitinoOptions.OPTION_LONG_PREFIX + GravitinoOptions.NEW_URI,
         description = "New URI for the model " + "version")
     String newUri;
 
+    /** The new alias options, use --newalias to specify the value */
     @Option(
         names = GravitinoOptions.OPTION_LONG_PREFIX + GravitinoOptions.NEW_ALIAS,
         split = ",",
