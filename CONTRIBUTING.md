@@ -234,7 +234,7 @@ Before contributing:
 
 Contributions are under the [Apache License 2.0](http://www.apache.org/licenses/LICENSE-2.0).
 
-If contributing on behalf of an employer or regularly, you may need to submit an [ICLA](https://www.apache.org/licenses/icla.html). See [ASF Contributor FAQs](https://www.apache.org/dev/new-committers-guide.html#cla).
+If contributing on behalf of an employer or regularly, you may need to submit an [ICLA](https://www.apache.org/licenses/#contributor-license-agreements). See [ASF Contributor FAQs](https://www.apache.org/dev/new-committers-guide.html#cla).
 
 Official repo: [https://github.com/apache/gravitino](https://github.com/apache/gravitino)
 
