@@ -131,10 +131,11 @@ public abstract class ClientPoolImpl<C, E extends Exception>
   }
 
   private C get() throws InterruptedException {
-    Preconditions.checkState(!closed, "Cannot get a client from a closed pool");
     while (true) {
+      Preconditions.checkState(!closed, "Cannot get a client from a closed pool");
       if (!clients.isEmpty() || currentSize < poolSize) {
         synchronized (this) {
+          Preconditions.checkState(!closed, "Cannot get a client from a closed pool");
           if (!clients.isEmpty()) {
             return clients.removeFirst();
           } else if (currentSize < poolSize) {
