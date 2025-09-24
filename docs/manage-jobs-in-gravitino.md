@@ -99,9 +99,6 @@ Please note that:
 
 The `spark` job template is used to run Spark jobs, it is a Spark application JAR file for now.
 
-**Note** that the Spark job support is still under development, in 1.0.0, it only supports
-registering a Spark job template, running a Spark job is not supported yet.
-
 The template is defined as follows:
 
 ```json
@@ -144,7 +141,8 @@ Here is a brief description of the fields in the Spark job template:
 - `customFields`: Custom fields for the job template, which can be used to store additional information.
   It can use placeholders like `{{value1}}` and `{{value2}}` to be replaced with actual values
   when running the job.
-- `className`: The main class of the Spark application, it is required for Spark job template.
+- `className`: The main class of the Spark application. It is required for Java/Scala Spark 
+  application. For PySpark application, this field can be `null` instead.
 - `jars`: A list of JAR files to add to the Spark job classpath, which can be a local file path or a URL
   with a supported scheme.
 - `files`: A list of files to be copied to the working directory of the Spark job, which can be a local
@@ -168,8 +166,8 @@ Note that:
 3. Gravitino will copy the `executable`, `jars`, `files`, and `archives` files to the job working
    directory when running the job, so you can use the relative path in the `executable`, `jars`,
    `files`, and `archives` to refer to other files in the job working directory.
-4. The `className` is required for the Spark job template, it is the main class of the Spark 
-   application to be executed.
+4. The `className` is required for the Java and Scala Spark job template, it is the main class of
+   the Spark application to be executed. For PySpark job template, this field can be `null` instead.
 
 To register a job template, you can use REST API or the Java and Python SDKs. Here is the
 example to register a shell job template:
@@ -543,11 +541,12 @@ default configurations:
 The local job executor is used for testing and development purposes, it runs the job in the local process.
 The following are the default configurations for the local job executor:
 
-| Property name                                       | Description                                                               | Default value                          | Required | Since Version |
-|-----------------------------------------------------|---------------------------------------------------------------------------|----------------------------------------|----------|---------------|
-| `gravitino.jobExecutor.local.waitingQueueSize`      | The size of the waiting queue for queued jobs in the local job executor   | `100`                                  | No       | 1.0.0         |
-| `gravitino.jobExecutor.local.maxRunningJobs`        | The maximum number of running jobs in the local job executor              | `max(1, min(available cores / 2, 10))` | No       | 1.0.0         |
-| `gravitino.jobExecutor.local.jobStatusKeepTimeInMs` | The time in milliseconds to keep the job status in the local job executor | `3600000` (1 hour)                     | No       | 1.0.0         |
+| Property name                                       | Description                                                                                                                                       | Default value                          | Required | Since Version |
+|-----------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------|----------------------------------------|----------|---------------|
+| `gravitino.jobExecutor.local.waitingQueueSize`      | The size of the waiting queue for queued jobs in the local job executor                                                                           | `100`                                  | No       | 1.0.0         |
+| `gravitino.jobExecutor.local.maxRunningJobs`        | The maximum number of running jobs in the local job executor                                                                                      | `max(1, min(available cores / 2, 10))` | No       | 1.0.0         |
+| `gravitino.jobExecutor.local.jobStatusKeepTimeInMs` | The time in milliseconds to keep the job status in the local job executor                                                                         | `3600000` (1 hour)                     | No       | 1.0.0         |
+| `gravitino.jobExecutor.local.sparkHome`             | The home directory of Spark, Gravitino checks this configuration firstly and then `SPARK_HOME` env. Either of them should be set to run Spark job | `None`                                 | No       | 1.0.1         |
 
 ### Implement a custom job executor
 
