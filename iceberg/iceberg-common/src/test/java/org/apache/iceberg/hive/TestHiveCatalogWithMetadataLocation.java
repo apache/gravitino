@@ -17,22 +17,16 @@
  *  under the License.
  */
 
-package org.apache.gravitino.utils;
+package org.apache.iceberg.hive;
 
-public class ClassUtils {
-  public static <T> T loadClass(String className) {
-    try {
-      return (T) Class.forName(className).getDeclaredConstructor().newInstance();
-    } catch (Exception e) {
-      throw new RuntimeException(e);
-    }
-  }
+import java.util.Collections;
+import org.junit.jupiter.api.Test;
 
-  public static <T> T loadClass(String className, ClassLoader classLoader) {
-    try {
-      return (T) Class.forName(className, true, classLoader).getDeclaredConstructor().newInstance();
-    } catch (Exception e) {
-      throw new RuntimeException(e);
-    }
+public class TestHiveCatalogWithMetadataLocation {
+
+  @Test
+  void testLoadFields() {
+    HiveCatalogWithMetadataLocation catalog = new HiveCatalogWithMetadataLocation();
+    catalog.initialize("hive", Collections.emptyMap());
   }
 }
