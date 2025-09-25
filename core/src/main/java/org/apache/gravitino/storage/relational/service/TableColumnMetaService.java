@@ -184,6 +184,13 @@ public class TableColumnMetaService {
 
     // If there is no change, directly return
     if (columnPOsToInsert.isEmpty()) {
+      // If namespace is changed, just update the schema_id of the columns.
+      if (!newTable.namespace().equals(oldTable.namespace())) {
+        SessionUtils.doWithoutCommit(
+            TableColumnMapper.class,
+            mapper ->
+                mapper.updateSchemaIdByTableId(newTablePO.getTableId(), newTablePO.getSchemaId()));
+      }
       return;
     }
 

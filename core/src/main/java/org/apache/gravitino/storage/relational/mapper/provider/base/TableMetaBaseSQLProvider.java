@@ -134,13 +134,15 @@ public class TableMetaBaseSQLProvider {
   }
 
   public String updateTableMeta(
-      @Param("newTableMeta") TablePO newTablePO, @Param("oldTableMeta") TablePO oldTablePO) {
+      @Param("newTableMeta") TablePO newTablePO,
+      @Param("oldTableMeta") TablePO oldTablePO,
+      @Param("newSchemaId") Long newSchemaId) {
     return "UPDATE "
         + TABLE_NAME
         + " SET table_name = #{newTableMeta.tableName},"
         + " metalake_id = #{newTableMeta.metalakeId},"
         + " catalog_id = #{newTableMeta.catalogId},"
-        + " schema_id = #{newTableMeta.schemaId},"
+        + " schema_id = #{newSchemaId},"
         + " audit_info = #{newTableMeta.auditInfo},"
         + " current_version = #{newTableMeta.currentVersion},"
         + " last_version = #{newTableMeta.lastVersion},"
