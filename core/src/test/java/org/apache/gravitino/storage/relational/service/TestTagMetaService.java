@@ -592,6 +592,11 @@ public class TestTagMetaService extends TestJDBCBackend {
     Assertions.assertTrue(e.getMessage().contains("No such tag entity: tag4"));
   }
 
+  private boolean containsGenericEntity(
+      List<GenericEntity> genericEntities, String name, Entity.EntityType entityType) {
+    return genericEntities.stream().anyMatch(e -> e.name().equals(name) && e.type() == entityType);
+  }
+
   @Test
   public void testListAssociatedMetadataObjectsForTag() throws IOException {
     testAssociateAndDisassociateTagsWithMetadataObject();
@@ -605,25 +610,11 @@ public class TestTagMetaService extends TestJDBCBackend {
 
     Assertions.assertEquals(3, metadataObjects.size());
     Assertions.assertTrue(
-        metadataObjects.contains(
-            GenericEntity.builder()
-                .withName("catalog1")
-                .withEntityType(Entity.EntityType.CATALOG)
-                .build()));
-
+        containsGenericEntity(metadataObjects, "catalog1", Entity.EntityType.CATALOG));
     Assertions.assertTrue(
-        metadataObjects.contains(
-            GenericEntity.builder()
-                .withName("catalog1.schema1")
-                .withEntityType(Entity.EntityType.SCHEMA)
-                .build()));
-
+        containsGenericEntity(metadataObjects, "catalog1.schema1", Entity.EntityType.SCHEMA));
     Assertions.assertTrue(
-        metadataObjects.contains(
-            GenericEntity.builder()
-                .withName("catalog1.schema1.table1")
-                .withEntityType(Entity.EntityType.TABLE)
-                .build()));
+        containsGenericEntity(metadataObjects, "catalog1.schema1.table1", Entity.EntityType.TABLE));
 
     // Test list associated metadata objects for tag3
     List<GenericEntity> metadataObjects1 =
@@ -633,25 +624,12 @@ public class TestTagMetaService extends TestJDBCBackend {
     Assertions.assertEquals(3, metadataObjects1.size());
 
     Assertions.assertTrue(
-        metadataObjects1.contains(
-            GenericEntity.builder()
-                .withName("catalog1")
-                .withEntityType(Entity.EntityType.CATALOG)
-                .build()));
-
+        containsGenericEntity(metadataObjects1, "catalog1", Entity.EntityType.CATALOG));
     Assertions.assertTrue(
-        metadataObjects1.contains(
-            GenericEntity.builder()
-                .withName("catalog1.schema1")
-                .withEntityType(Entity.EntityType.SCHEMA)
-                .build()));
-
+        containsGenericEntity(metadataObjects1, "catalog1.schema1", Entity.EntityType.SCHEMA));
     Assertions.assertTrue(
-        metadataObjects1.contains(
-            GenericEntity.builder()
-                .withName("catalog1.schema1.table1")
-                .withEntityType(Entity.EntityType.TABLE)
-                .build()));
+        containsGenericEntity(
+            metadataObjects1, "catalog1.schema1.table1", Entity.EntityType.TABLE));
 
     // Test list associated metadata objects for non-existent tag
     List<GenericEntity> metadataObjects2 =
@@ -672,17 +650,9 @@ public class TestTagMetaService extends TestJDBCBackend {
     Assertions.assertEquals(2, metadataObjects3.size());
 
     Assertions.assertTrue(
-        metadataObjects3.contains(
-            GenericEntity.builder()
-                .withName("catalog1")
-                .withEntityType(Entity.EntityType.CATALOG)
-                .build()));
+        containsGenericEntity(metadataObjects3, "catalog1", Entity.EntityType.CATALOG));
     Assertions.assertTrue(
-        metadataObjects3.contains(
-            GenericEntity.builder()
-                .withName("catalog1.schema1")
-                .withEntityType(Entity.EntityType.SCHEMA)
-                .build()));
+        containsGenericEntity(metadataObjects3, "catalog1.schema1", Entity.EntityType.SCHEMA));
 
     backend.delete(
         NameIdentifier.of(metalakeName, "catalog1", "schema1"), Entity.EntityType.SCHEMA, false);
@@ -693,11 +663,7 @@ public class TestTagMetaService extends TestJDBCBackend {
 
     Assertions.assertEquals(1, metadataObjects4.size());
     Assertions.assertTrue(
-        metadataObjects4.contains(
-            GenericEntity.builder()
-                .withName("catalog1")
-                .withEntityType(Entity.EntityType.CATALOG)
-                .build()));
+        containsGenericEntity(metadataObjects4, "catalog1", Entity.EntityType.CATALOG));
 
     backend.delete(NameIdentifier.of(metalakeName, "catalog1"), Entity.EntityType.CATALOG, false);
 
