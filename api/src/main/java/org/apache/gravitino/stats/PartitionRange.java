@@ -64,6 +64,7 @@ public class PartitionRange {
     Preconditions.checkArgument(upperBoundType != null, "Upper bound type cannot be null");
     Preconditions.checkArgument(
         !upperPartitionName.isEmpty(), "Upper partition name cannot be empty");
+    Preconditions.checkArgument(comparator != null, "Comparator cannot be null");
     PartitionRange partitionRange = new PartitionRange();
     partitionRange.upperPartitionName = Optional.of(upperPartitionName);
     partitionRange.upperBoundType = Optional.of(upperBoundType);
