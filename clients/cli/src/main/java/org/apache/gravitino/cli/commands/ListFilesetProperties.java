@@ -25,6 +25,7 @@ import org.apache.gravitino.cli.CommandContext;
 import org.apache.gravitino.cli.ErrorMessages;
 import org.apache.gravitino.client.GravitinoClient;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
+import org.apache.gravitino.exceptions.NoSuchFilesetException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.file.Fileset;
@@ -32,9 +33,13 @@ import org.apache.gravitino.file.Fileset;
 /** List the properties of a fileset. */
 public class ListFilesetProperties extends ListProperties {
 
+  /** The name of the metalake. */
   protected final String metalake;
+  /** The name of the catalog. */
   protected final String catalog;
+  /** The name of the schema. */
   protected final String schema;
+  /** The name of the fileset. */
   protected final String fileset;
 
   /**
@@ -69,6 +74,8 @@ public class ListFilesetProperties extends ListProperties {
       exitWithError(ErrorMessages.UNKNOWN_CATALOG);
     } catch (NoSuchSchemaException err) {
       exitWithError(ErrorMessages.UNKNOWN_SCHEMA);
+    } catch (NoSuchFilesetException err) {
+      exitWithError(ErrorMessages.UNKNOWN_FILESET);
     } catch (Exception exp) {
       exitWithError(exp.getMessage());
     }

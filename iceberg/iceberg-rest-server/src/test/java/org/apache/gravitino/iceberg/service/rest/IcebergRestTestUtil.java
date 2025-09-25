@@ -122,6 +122,10 @@ public class IcebergRestTestUtil {
       catalogConf.put(
           String.format("%s.%s", catalogConfigPrefix, IcebergConstants.ICEBERG_OSS_ENDPOINT),
           "https://oss-endpoint.example.com");
+      catalogConf.put(
+          String.format(
+              "%s.%s", catalogConfigPrefix, IcebergConstants.ICEBERG_S3_PATH_STYLE_ACCESS),
+          "true");
       IcebergConfigProvider configProvider = IcebergConfigProviderFactory.create(catalogConf);
       configProvider.initialize(catalogConf);
       // used to override register table interface

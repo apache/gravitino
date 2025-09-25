@@ -208,11 +208,13 @@ public class PolicyOperations {
       PolicySetRequest request) {
     LOG.info("Received set policy request for policy: {} under metalake: {}", name, metalake);
 
+    OperationType op = request.isEnable() ? OperationType.ENABLE : OperationType.DISABLE;
+
     try {
       return Utils.doAs(
           httpRequest,
           () -> {
-            if (request.isEnable()) {
+            if (op == OperationType.ENABLE) {
               policyDispatcher.enablePolicy(metalake, name);
             } else {
               policyDispatcher.disablePolicy(metalake, name);
@@ -227,7 +229,7 @@ public class PolicyOperations {
             return response;
           });
     } catch (Exception e) {
-      return ExceptionHandlers.handlePolicyException(OperationType.ENABLE, name, metalake, e);
+      return ExceptionHandlers.handlePolicyException(op, name, metalake, e);
     }
   }
 
@@ -287,7 +289,7 @@ public class PolicyOperations {
           });
 
     } catch (Exception e) {
-      return ExceptionHandlers.handlePolicyException(OperationType.LIST, "", policyName, e);
+      return ExceptionHandlers.handlePolicyException(OperationType.LIST, "", metalake, e);
     }
   }
 

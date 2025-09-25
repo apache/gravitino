@@ -26,6 +26,7 @@ import org.apache.gravitino.cli.CommandContext;
 import org.apache.gravitino.cli.FullName;
 import org.apache.gravitino.client.GravitinoClient;
 
+/** Represents a command to display metadata about an entity. */
 public class MetadataCommand extends Command {
 
   /**

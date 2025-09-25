@@ -17,7 +17,7 @@
 
 import unittest
 
-from gravitino.api.types.types import Types
+from gravitino.api.rel.types.types import Types
 from gravitino.dto.rel.column_dto import ColumnDTO
 from gravitino.dto.rel.partition_utils import PartitionUtils
 from gravitino.exceptions.base import IllegalArgumentException

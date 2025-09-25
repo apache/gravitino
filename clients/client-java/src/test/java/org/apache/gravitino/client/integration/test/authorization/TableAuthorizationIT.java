@@ -131,6 +131,12 @@ public class TableAuthorizationIT extends BaseRestApiAuthorizationIT {
           tableCatalogNormalUser.createTable(
               NameIdentifier.of(SCHEMA, "table2"), createColumns(), "test2", new HashMap<>());
         });
+    assertThrows(
+        "Can not access metadata {" + CATALOG + "." + SCHEMA + "}.",
+        ForbiddenException.class,
+        () -> {
+          tableCatalogNormalUser.listTables(Namespace.of(SCHEMA));
+        });
     // grant privileges
     GravitinoMetalake gravitinoMetalake = client.loadMetalake(METALAKE);
     gravitinoMetalake.grantPrivilegesToRole(

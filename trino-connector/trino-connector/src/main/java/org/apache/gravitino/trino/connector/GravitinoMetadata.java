@@ -31,10 +31,13 @@ import io.trino.spi.connector.Assignment;
 import io.trino.spi.connector.ColumnHandle;
 import io.trino.spi.connector.ColumnMetadata;
 import io.trino.spi.connector.ConnectorInsertTableHandle;
+import io.trino.spi.connector.ConnectorMergeTableHandle;
 import io.trino.spi.connector.ConnectorMetadata;
 import io.trino.spi.connector.ConnectorOutputMetadata;
+import io.trino.spi.connector.ConnectorPartitioningHandle;
 import io.trino.spi.connector.ConnectorSession;
 import io.trino.spi.connector.ConnectorTableHandle;
+import io.trino.spi.connector.ConnectorTableLayout;
 import io.trino.spi.connector.ConnectorTableMetadata;
 import io.trino.spi.connector.ConnectorTableVersion;
 import io.trino.spi.connector.Constraint;
@@ -45,11 +48,13 @@ import io.trino.spi.connector.JoinType;
 import io.trino.spi.connector.LimitApplicationResult;
 import io.trino.spi.connector.ProjectionApplicationResult;
 import io.trino.spi.connector.RetryMode;
+import io.trino.spi.connector.RowChangeParadigm;
 import io.trino.spi.connector.SaveMode;
 import io.trino.spi.connector.SchemaTableName;
 import io.trino.spi.connector.SortItem;
 import io.trino.spi.connector.TopNApplicationResult;
 import io.trino.spi.expression.ConnectorExpression;
+import io.trino.spi.expression.Constant;
 import io.trino.spi.security.TrinoPrincipal;
 import io.trino.spi.statistics.ComputedStatistics;
 import io.trino.spi.statistics.TableStatistics;
@@ -58,6 +63,7 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.OptionalLong;
 import java.util.Set;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
@@ -73,6 +79,10 @@ import org.apache.gravitino.trino.connector.metadata.GravitinoTable;
  * Additionally, it wraps the internal connector metadata for accessing data.
  */
 public class GravitinoMetadata implements ConnectorMetadata {
+
+  // The column handle name that will generate row IDs for the merge operation.
+  public static final String MERGE_ROW_ID = "$row_id";
+
   // Handling metadata operations on gravitino server
   private final CatalogConnectorMetadata catalogConnectorMetadata;
 
@@ -433,7 +443,10 @@ public class GravitinoMetadata implements ConnectorMetadata {
   @Override
   public ColumnHandle getMergeRowIdColumnHandle(
       ConnectorSession session, ConnectorTableHandle tableHandle) {
-    return ConnectorMetadata.super.getMergeRowIdColumnHandle(session, tableHandle);
+    ColumnHandle mergeRowIdColumnHandle =
+        internalMetadata.getMergeRowIdColumnHandle(session, GravitinoHandle.unWrap(tableHandle));
+
+    return new GravitinoColumnHandle(MERGE_ROW_ID, mergeRowIdColumnHandle);
   }
 
   @Override
@@ -573,6 +586,100 @@ public class GravitinoMetadata implements ConnectorMetadata {
   public TableStatistics getTableStatistics(
       ConnectorSession session, ConnectorTableHandle tableHandle) {
     return internalMetadata.getTableStatistics(session, GravitinoHandle.unWrap(tableHandle));
+  }
+
+  @Override
+  public Optional<ConnectorPartitioningHandle> getUpdateLayout(
+      ConnectorSession session, ConnectorTableHandle tableHandle) {
+    Optional<ConnectorPartitioningHandle> updateLayout =
+        internalMetadata.getUpdateLayout(session, GravitinoHandle.unWrap(tableHandle));
+    return updateLayout.map(GravitinoPartitioningHandle::new);
+  }
+
+  @Override
+  public ConnectorMergeTableHandle beginMerge(
+      ConnectorSession session, ConnectorTableHandle tableHandle, RetryMode retryMode) {
+    ConnectorMergeTableHandle connectorMergeTableHandle =
+        internalMetadata.beginMerge(session, GravitinoHandle.unWrap(tableHandle), retryMode);
+    SchemaTableName tableName = getTableName(tableHandle);
+
+    return new GravitinoMergeTableHandle(
+        tableName.getSchemaName(), tableName.getTableName(), connectorMergeTableHandle);
+  }
+
+  @Override
+  public void finishMerge(
+      ConnectorSession session,
+      ConnectorMergeTableHandle mergeTableHandle,
+      Collection<Slice> fragments,
+      Collection<ComputedStatistics> computedStatistics) {
+    internalMetadata.finishMerge(
+        session, GravitinoHandle.unWrap(mergeTableHandle), fragments, computedStatistics);
+  }
+
+  @Override
+  public Optional<ConnectorTableHandle> applyUpdate(
+      ConnectorSession session,
+      ConnectorTableHandle tableHandle,
+      Map<ColumnHandle, Constant> assignments) {
+    return internalMetadata
+        .applyUpdate(
+            session,
+            GravitinoHandle.unWrap(tableHandle),
+            assignments.entrySet().stream()
+                .collect(
+                    Collectors.toMap(
+                        entry -> GravitinoHandle.unWrap(entry.getKey()), Map.Entry::getValue)))
+        .map(
+            result ->
+                new GravitinoTableHandle(
+                    getTableName(tableHandle).getSchemaName(),
+                    getTableName(tableHandle).getTableName(),
+                    result));
+  }
+
+  @Override
+  public RowChangeParadigm getRowChangeParadigm(
+      ConnectorSession session, ConnectorTableHandle tableHandle) {
+    return internalMetadata.getRowChangeParadigm(session, GravitinoHandle.unWrap(tableHandle));
+  }
+
+  @Override
+  public OptionalLong executeUpdate(ConnectorSession session, ConnectorTableHandle tableHandle) {
+    return internalMetadata.executeUpdate(session, GravitinoHandle.unWrap(tableHandle));
+  }
+
+  @Override
+  public Optional<ConnectorTableHandle> applyDelete(
+      ConnectorSession session, ConnectorTableHandle tableHandle) {
+    return internalMetadata
+        .applyDelete(session, GravitinoHandle.unWrap(tableHandle))
+        .map(
+            result ->
+                new GravitinoTableHandle(
+                    getTableName(tableHandle).getSchemaName(),
+                    getTableName(tableHandle).getTableName(),
+                    result));
+  }
+
+  @Override
+  public OptionalLong executeDelete(ConnectorSession session, ConnectorTableHandle tableHandle) {
+    return internalMetadata.executeDelete(session, GravitinoHandle.unWrap(tableHandle));
+  }
+
+  @Override
+  public Optional<ConnectorTableLayout> getInsertLayout(
+      ConnectorSession session, ConnectorTableHandle tableHandle) {
+    return internalMetadata
+        .getInsertLayout(session, GravitinoHandle.unWrap(tableHandle))
+        .map(
+            result ->
+                result.getPartitioning().isPresent()
+                    ? new ConnectorTableLayout(
+                        new GravitinoPartitioningHandle(result.getPartitioning().get()),
+                        result.getPartitionColumns(),
+                        result.supportsMultipleWritersPerPartition())
+                    : new ConnectorTableLayout(result.getPartitionColumns()));
   }
 
   private SchemaTableName getTableName(ConnectorTableHandle tableHandle) {

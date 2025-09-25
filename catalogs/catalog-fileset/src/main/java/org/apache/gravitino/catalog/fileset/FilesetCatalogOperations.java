@@ -26,7 +26,9 @@ import static org.apache.gravitino.file.Fileset.PROPERTY_FILESET_PLACEHOLDER;
 import static org.apache.gravitino.file.Fileset.PROPERTY_LOCATION_PLACEHOLDER_PREFIX;
 import static org.apache.gravitino.file.Fileset.PROPERTY_MULTIPLE_LOCATIONS_PREFIX;
 import static org.apache.gravitino.file.Fileset.PROPERTY_SCHEMA_PLACEHOLDER;
+import static org.apache.gravitino.metrics.MetricNames.FILESYSTEM_CACHE;
 
+import com.codahale.metrics.caffeine.MetricsStatsCounter;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import com.github.benmanes.caffeine.cache.Scheduler;
@@ -89,6 +91,8 @@ import org.apache.gravitino.file.FilesetChange;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.FilesetEntity;
 import org.apache.gravitino.meta.SchemaEntity;
+import org.apache.gravitino.metrics.MetricsSystem;
+import org.apache.gravitino.metrics.source.FilesetCatalogMetricsSource;
 import org.apache.gravitino.utils.NamespaceUtil;
 import org.apache.gravitino.utils.PrincipalUtils;
 import org.apache.hadoop.conf.Configuration;
@@ -129,32 +133,13 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
 
   private boolean disableFSOps;
 
+  private FilesetCatalogMetricsSource catalogMetricsSource;
+
   @VisibleForTesting ScheduledThreadPoolExecutor scheduler;
   @VisibleForTesting Cache<FileSystemCacheKey, FileSystem> fileSystemCache;
 
   FilesetCatalogOperations(EntityStore store) {
     this.store = store;
-    scheduler =
-        new ScheduledThreadPoolExecutor(
-            1,
-            new ThreadFactoryBuilder()
-                .setDaemon(true)
-                .setNameFormat("file-system-cache-for-fileset" + "-%d")
-                .build());
-
-    this.fileSystemCache =
-        Caffeine.newBuilder()
-            .expireAfterAccess(1, TimeUnit.HOURS)
-            .removalListener(
-                (ignored, value, cause) -> {
-                  try {
-                    ((FileSystem) value).close();
-                  } catch (IOException e) {
-                    LOG.warn("Failed to close FileSystem instance in cache", e);
-                  }
-                })
-            .scheduler(Scheduler.forScheduledExecutorService(scheduler))
-            .build();
   }
 
   static class FileSystemCacheKey {
@@ -238,6 +223,14 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
             propertiesMetadata
                 .catalogPropertiesMetadata()
                 .getOrDefault(config, FilesetCatalogPropertiesMetadata.DISABLE_FILESYSTEM_OPS);
+
+    MetricsSystem metricsSystem = GravitinoEnv.getInstance().metricsSystem();
+    // Metrics System could be null in UT.
+    if (metricsSystem != null) {
+      this.catalogMetricsSource =
+          new FilesetCatalogMetricsSource(catalogInfo.namespace().toString(), catalogInfo.name());
+    }
+
     if (!disableFSOps) {
       String fileSystemProviders =
           (String)
@@ -257,9 +250,44 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
       this.defaultFileSystemProvider =
           FileSystemUtils.getFileSystemProviderByName(
               fileSystemProvidersMap, defaultFileSystemProviderName);
+
+      scheduler =
+          new ScheduledThreadPoolExecutor(
+              1,
+              new ThreadFactoryBuilder()
+                  .setDaemon(true)
+                  .setNameFormat("file-system-cache-for-fileset" + "-%d")
+                  .build());
+
+      Caffeine<Object, Object> cacheBuilder =
+          Caffeine.newBuilder()
+              .expireAfterAccess(1, TimeUnit.HOURS)
+              .removalListener(
+                  (ignored, value, cause) -> {
+                    try {
+                      ((FileSystem) value).close();
+                    } catch (IOException e) {
+                      LOG.warn("Failed to close FileSystem instance in cache", e);
+                    }
+                  })
+              .scheduler(Scheduler.forScheduledExecutorService(scheduler));
+
+      // Metrics System could be null in UT.
+      if (metricsSystem != null) {
+        cacheBuilder.recordStats(
+            () ->
+                new MetricsStatsCounter(
+                    catalogMetricsSource.getMetricRegistry(), FILESYSTEM_CACHE));
+      }
+      this.fileSystemCache = cacheBuilder.build();
     }
 
     this.catalogStorageLocations = getAndCheckCatalogStorageLocations(config);
+
+    // Metrics System could be null in UT.
+    if (metricsSystem != null) {
+      metricsSystem.register(catalogMetricsSource);
+    }
   }
 
   @Override
@@ -981,6 +1009,12 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
                 }
               });
       fileSystemCache.cleanUp();
+    }
+
+    // Metrics System could be null in UT.
+    MetricsSystem metricsSystem = GravitinoEnv.getInstance().metricsSystem();
+    if (metricsSystem != null) {
+      metricsSystem.unregister(catalogMetricsSource);
     }
   }
 

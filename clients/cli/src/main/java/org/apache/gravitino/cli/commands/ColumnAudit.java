@@ -28,12 +28,18 @@ import org.apache.gravitino.exceptions.NoSuchColumnException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.NoSuchTableException;
 
+/** Represents audit information of a column. */
 public class ColumnAudit extends AuditCommand {
 
+  /** The name of the metalake. */
   protected final String metalake;
+  /** The name of the catalog. */
   protected final String catalog;
+  /** The name of the schema. */
   protected final String schema;
+  /** The name of the table. */
   protected final String table;
+  /** The name of the column. */
   protected final String column;
 
   /**

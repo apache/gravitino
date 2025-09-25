@@ -21,7 +21,7 @@ from enum import Enum
 from typing import cast
 from unittest.mock import patch
 
-from gravitino.api.types.types import Types
+from gravitino.api.rel.types.types import Types
 from gravitino.dto.rel.expressions.json_serdes._helper.serdes_utils import (
     SerdesUtils as ExpressionSerdesUtils,
 )

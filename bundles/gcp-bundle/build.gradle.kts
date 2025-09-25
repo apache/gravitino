@@ -25,7 +25,10 @@ plugins {
 }
 
 dependencies {
-  implementation(project(":bundles:gcp"))
+  implementation(project(":bundles:gcp")) {
+    // There is already a dependency on commons-logging v1.2 in hadoop-gcs, so exclude the one.
+    exclude(group = "commons-logging", module = "commons-logging")
+  }
   implementation(libs.hadoop3.client.api)
   implementation(libs.hadoop3.client.runtime)
   implementation(libs.hadoop3.gcs)
@@ -47,7 +50,6 @@ tasks.withType(ShadowJar::class.java) {
   relocate("com.google.errorprone", "org.apache.gravitino.gcp.shaded.com.google.errorprone")
   relocate("com.google.gson", "org.apache.gravitino.gcp.shaded.com.google.gson")
   relocate("com.google.j2objc", "org.apache.gravitino.gcp.shaded.com.google.j2objc")
-  relocate("com.google.longrunning", "org.apache.gravitino.gcp.shaded.com.google.longrunning")
   relocate("com.google.protobuf", "org.apache.gravitino.gcp.shaded.com.google.protobuf")
   relocate("com.google.thirdparty", "org.apache.gravitino.gcp.shaded.com.google.thirdparty")
   relocate("io.grpc", "org.apache.gravitino.gcp.shaded.io.grpc")

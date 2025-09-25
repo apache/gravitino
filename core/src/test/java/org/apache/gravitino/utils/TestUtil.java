@@ -28,8 +28,10 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import org.apache.gravitino.Catalog;
+import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.authorization.Privileges;
 import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.file.Fileset;
@@ -78,7 +80,7 @@ public class TestUtil {
    * @return The test {@link BaseMetalake} entity.
    */
   public static BaseMetalake getTestMetalake() {
-    return getTestMetalake(generator.nextId(), "test_metalake", "metalake entity test");
+    return getTestMetalake(generator.nextId(), "m1", "metalake entity test");
   }
 
   /**
@@ -107,7 +109,7 @@ public class TestUtil {
    */
   public static CatalogEntity getTestCatalogEntity() {
     return getTestCatalogEntity(
-        generator.nextId(), "test_catalog", Namespace.of("m1"), "hive", "catalog entity test");
+        generator.nextId(), "c2", Namespace.of("m1"), "hive", "catalog entity test");
   }
 
   /**
@@ -389,6 +391,7 @@ public class TestUtil {
   public static UserEntity getTestUserEntity(
       long id, String name, String metalake, List<Long> roles) {
     return UserEntity.builder()
+        .withNamespace(AuthorizationUtils.ofUserNamespace(metalake))
         .withId(id)
         .withName(name)
         .withNamespace(NamespaceUtil.ofUser(metalake))
@@ -421,7 +424,7 @@ public class TestUtil {
     return GroupEntity.builder()
         .withId(id)
         .withName(name)
-        .withNamespace(NamespaceUtil.ofGroup(metalake))
+        .withNamespace(AuthorizationUtils.ofGroupNamespace(metalake))
         .withAuditInfo(getTestAuditInfo())
         .withRoleNames(roles)
         .build();
@@ -449,7 +452,7 @@ public class TestUtil {
     return RoleEntity.builder()
         .withId(id)
         .withName(name)
-        .withNamespace(NamespaceUtil.ofRole(metalake))
+        .withNamespace(AuthorizationUtils.ofRoleNamespace(metalake))
         .withAuditInfo(getTestAuditInfo())
         .withSecurableObjects(ImmutableList.of(getMockSecurableObject()))
         .build();
@@ -462,6 +465,8 @@ public class TestUtil {
    */
   public static SecurableObject getMockSecurableObject() {
     SecurableObject mockObject = mock(SecurableObject.class);
+    when(mockObject.type()).thenReturn(MetadataObject.Type.CATALOG);
+    when(mockObject.name()).thenReturn("c1");
     when(mockObject.privileges())
         .thenReturn(
             ImmutableList.of(Privileges.CreateSchema.allow(), Privileges.CreateTable.allow()));

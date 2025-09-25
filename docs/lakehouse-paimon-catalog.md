@@ -15,7 +15,7 @@ Apache Gravitino provides the ability to manage Apache Paimon metadata.
 ### Requirements
 
 :::info
-Builds with Apache Paimon `0.8.0`.
+Builds with Apache Paimon `1.2`.
 :::
 
 ## Catalog
@@ -43,7 +43,7 @@ Builds with Apache Paimon `0.8.0`.
 | `authentication.kerberos.keytab-fetch-timeout-sec` | The fetch timeout of retrieving Kerberos keytab from `authentication.kerberos.keytab-uri`.                                                                                                                  | 60                                                                             | No                                                                                                                                                                   | 0.6.0-incubating |
 | `oss-endpoint`                                     | The endpoint of the Aliyun OSS.                                                                                                                                                                             | (none)                                                                         | required if the value of `warehouse` is a OSS path                                                                                                                   | 0.7.0-incubating |
 | `oss-access-key-id`                                | The access key of the Aliyun OSS.                                                                                                                                                                           | (none)                                                                         | required if the value of `warehouse` is a OSS path                                                                                                                   | 0.7.0-incubating |
-| `oss-access-key-secret`                           | The secret key the Aliyun OSS.                                                                                                                                                                              | (none)                                                                         | required if the value of `warehouse` is a OSS path                                                                                                                   | 0.7.0-incubating |
+| `oss-access-key-secret`                            | The secret key the Aliyun OSS.                                                                                                                                                                              | (none)                                                                         | required if the value of `warehouse` is a OSS path                                                                                                                   | 0.7.0-incubating |
 | `s3-endpoint`                                      | The endpoint of the AWS S3.                                                                                                                                                                                 | (none)                                                                         | required if the value of `warehouse` is a S3 path                                                                                                                    | 0.7.0-incubating |
 | `s3-access-key-id`                                 | The access key of the AWS S3.                                                                                                                                                                               | (none)                                                                         | required if the value of `warehouse` is a S3 path                                                                                                                    | 0.7.0-incubating |
 | `s3-secret-access-key`                             | The secret key of the AWS S3.                                                                                                                                                                               | (none)                                                                         | required if the value of `warehouse` is a S3 path                                                                                                                    | 0.7.0-incubating |
@@ -192,16 +192,16 @@ You can pass [Paimon table properties](https://paimon.apache.org/docs/0.8/mainte
 **Immutable**: Fields that cannot be modified once set.
 :::
 
-| Configuration item                 | Description                                                  | Default Value | Required  | Reserved | Immutable | Since version     |
-|------------------------------------|--------------------------------------------------------------|---------------|-----------|----------|-----------|-------------------|
-| `merge-engine`                     | The table merge-engine.                                      | (none)        | No        | No       | Yes       | 0.6.0-incubating  |
-| `sequence.field`                   | The table sequence.field.                                    | (none)        | No        | No       | Yes       | 0.6.0-incubating  |
-| `rowkind.field`                    | The table rowkind.field.                                     | (none)        | No        | No       | Yes       | 0.6.0-incubating  |
-| `comment`                          | The table comment.                                           | (none)        | No        | Yes      | No        | 0.6.0-incubating  |
-| `owner`                            | The table owner.                                             | (none)        | No        | Yes      | No        | 0.6.0-incubating  |
-| `bucket-key`                       | The table bucket-key.                                        | (none)        | No        | Yes      | No        | 0.6.0-incubating  |
-| `primary-key`                      | The table primary-key.                                       | (none)        | No        | Yes      | No        | 0.6.0-incubating  |
-| `partition`                        | The table partition.                                         | (none)        | No        | Yes      | No        | 0.6.0-incubating  |
+| Configuration item | Description               | Default Value | Required  | Reserved | Immutable | Since version     |
+|--------------------|---------------------------|---------------|-----------|----------|-----------|-------------------|
+| `merge-engine`     | The table merge-engine.   | (none)        | No        | No       | Yes       | 0.6.0-incubating  |
+| `sequence.field`   | The table sequence.field. | (none)        | No        | No       | Yes       | 0.6.0-incubating  |
+| `rowkind.field`    | The table rowkind.field.  | (none)        | No        | No       | Yes       | 0.6.0-incubating  |
+| `comment`          | The table comment.        | (none)        | No        | Yes      | No        | 0.6.0-incubating  |
+| `owner`            | The table owner.          | (none)        | No        | Yes      | No        | 0.6.0-incubating  |
+| `bucket-key`       | The table bucket-key.     | (none)        | No        | Yes      | No        | 0.6.0-incubating  |
+| `primary-key`      | The table primary-key.    | (none)        | No        | Yes      | No        | 0.6.0-incubating  |
+| `partition`        | The table partition.      | (none)        | No        | Yes      | No        | 0.6.0-incubating  |
 
 ### Table operations
 

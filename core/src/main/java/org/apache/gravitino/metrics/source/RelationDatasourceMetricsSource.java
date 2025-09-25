@@ -26,15 +26,10 @@ import org.apache.gravitino.metrics.MetricNames;
 public class RelationDatasourceMetricsSource extends MetricsSource {
 
   public RelationDatasourceMetricsSource(BasicDataSource dataSource) {
-    super(MetricsSource.GRAVITINO_SERVER_METRIC_NAME);
+    super(MetricsSource.GRAVITINO_RELATIONAL_STORE_METRIC_NAME);
     registerGauge(
-        MetricNames.ENTITY_STORE_RELATION_DATASOURCE_ACTIVE_CONNECTIONS,
-        (Gauge<Integer>) dataSource::getNumActive);
-    registerGauge(
-        MetricNames.ENTITY_STORE_RELATION_DATASOURCE_IDLE_CONNECTIONS,
-        (Gauge<Integer>) dataSource::getNumIdle);
-    registerGauge(
-        MetricNames.ENTITY_STORE_RELATION_DATASOURCE_MAX_CONNECTIONS,
-        (Gauge<Integer>) dataSource::getMaxTotal);
+        MetricNames.DATASOURCE_ACTIVE_CONNECTIONS, (Gauge<Integer>) dataSource::getNumActive);
+    registerGauge(MetricNames.DATASOURCE_IDLE_CONNECTIONS, (Gauge<Integer>) dataSource::getNumIdle);
+    registerGauge(MetricNames.DATASOURCE_MAX_CONNECTIONS, (Gauge<Integer>) dataSource::getMaxTotal);
   }
 }

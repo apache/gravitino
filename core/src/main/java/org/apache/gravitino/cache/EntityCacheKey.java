@@ -23,26 +23,11 @@ import com.google.common.base.Preconditions;
 import java.util.Objects;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.NameIdentifier;
-import org.apache.gravitino.SupportsRelationOperations;
 
 /** Key for Entity cache. */
 public class EntityCacheKey {
   private final NameIdentifier identifier;
   private final Entity.EntityType type;
-  private final SupportsRelationOperations.Type relationType;
-
-  /**
-   * Creates a new instance of {@link EntityCacheKey} with the given arguments.
-   *
-   * @param ident The identifier of the entity.
-   * @param type The type of the entity.
-   * @param relationType The type of the relation, it can be null.
-   * @return A new instance of {@link EntityCacheKey}.
-   */
-  public static EntityCacheKey of(
-      NameIdentifier ident, Entity.EntityType type, SupportsRelationOperations.Type relationType) {
-    return new EntityCacheKey(ident, type, relationType);
-  }
 
   /**
    * Creates a new instance of {@link EntityCacheKey} with the given arguments.
@@ -52,7 +37,7 @@ public class EntityCacheKey {
    * @return A new instance of {@link EntityCacheKey}.
    */
   public static EntityCacheKey of(NameIdentifier ident, Entity.EntityType type) {
-    return new EntityCacheKey(ident, type, null);
+    return new EntityCacheKey(ident, type);
   }
 
   /**
@@ -60,18 +45,13 @@ public class EntityCacheKey {
    *
    * @param identifier The identifier of the entity.
    * @param type The type of the entity.
-   * @param relationType The type of the relation.
    */
-  private EntityCacheKey(
-      NameIdentifier identifier,
-      Entity.EntityType type,
-      SupportsRelationOperations.Type relationType) {
+  EntityCacheKey(NameIdentifier identifier, Entity.EntityType type) {
     Preconditions.checkArgument(identifier != null, "identifier cannot be null");
     Preconditions.checkArgument(type != null, "type cannot be null");
 
     this.identifier = identifier;
     this.type = type;
-    this.relationType = relationType;
   }
 
   /**
@@ -93,15 +73,6 @@ public class EntityCacheKey {
   }
 
   /**
-   * Returns the type of the relation.
-   *
-   * @return The type of the relation.
-   */
-  public SupportsRelationOperations.Type relationType() {
-    return relationType;
-  }
-
-  /**
    * Compares two instances of {@link EntityCacheKey} for equality. The comparison is done by
    * comparing the identifier, type, and relationType of the instances.
    *
@@ -114,9 +85,7 @@ public class EntityCacheKey {
     if (!(obj instanceof EntityCacheKey)) return false;
     EntityCacheKey other = (EntityCacheKey) obj;
 
-    return Objects.equals(identifier, other.identifier)
-        && Objects.equals(type, other.type)
-        && Objects.equals(relationType, other.relationType);
+    return Objects.equals(identifier, other.identifier) && Objects.equals(type, other.type);
   }
 
   /**
@@ -127,7 +96,7 @@ public class EntityCacheKey {
    */
   @Override
   public int hashCode() {
-    return Objects.hash(identifier, type, relationType);
+    return Objects.hash(identifier, type);
   }
 
   /**
@@ -139,9 +108,6 @@ public class EntityCacheKey {
   @Override
   public String toString() {
     String stringExpr = identifier.toString() + ":" + type.toString();
-    if (relationType != null) {
-      stringExpr += ":" + relationType.name();
-    }
 
     return stringExpr;
   }

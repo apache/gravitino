@@ -379,6 +379,11 @@
    npgall concurrent-trees
    reyerizo jcstress-gradle-plugin
    melix jmh-gradle-plugin
+   Lance
+   JCasbin
+   OGNL
+   Google FlatBuffers
+   IPAddress
 
    This product bundles various third-party components also under the
    Apache Software Foundation License 1.1
@@ -460,6 +465,7 @@
    This product bundles various third-party components also under the
    Eclipse Public License 2.0
 
+   Eclipse AspectJ
    Eclipse Jetty
    Eclipse Jersey
    Eclipse GlassFish
@@ -486,3 +492,5 @@
 
    AOP Alliance
    XZ For Java
+   HdrHistogram
+   LatencyUtils

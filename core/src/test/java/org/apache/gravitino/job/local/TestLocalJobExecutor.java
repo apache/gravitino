@@ -35,6 +35,7 @@ import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.JobTemplateEntity;
 import org.apache.gravitino.utils.NamespaceUtil;
 import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
@@ -96,7 +97,7 @@ public class TestLocalJobExecutor {
     workingDir = Files.createTempDirectory("gravitino-test-local-job-executor").toFile();
   }
 
-  @BeforeEach
+  @AfterEach
   public void tearDown() throws IOException {
     if (workingDir != null && workingDir.exists()) {
       FileUtils.deleteDirectory(workingDir);

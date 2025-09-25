@@ -130,10 +130,10 @@ public class ConfigBuilder {
         new ConfigEntry<>(key, version, doc, alternatives, isPublic, isDeprecated);
     Function<String, Integer> func =
         s -> {
-          if (s == null || s.isEmpty()) {
+          if (s == null || s.trim().isEmpty()) {
             return null;
           } else {
-            return Integer.parseInt(s);
+            return Integer.parseInt(s.trim());
           }
         };
     conf.setValueConverter(func);
@@ -155,10 +155,10 @@ public class ConfigBuilder {
         new ConfigEntry<>(key, version, doc, alternatives, isPublic, isDeprecated);
     Function<String, Long> func =
         s -> {
-          if (s == null || s.isEmpty()) {
+          if (s == null || s.trim().isEmpty()) {
             return null;
           } else {
-            return Long.parseLong(s);
+            return Long.parseLong(s.trim());
           }
         };
     conf.setValueConverter(func);
@@ -180,10 +180,10 @@ public class ConfigBuilder {
         new ConfigEntry<>(key, version, doc, alternatives, isPublic, isDeprecated);
     Function<String, Double> func =
         s -> {
-          if (s == null || s.isEmpty()) {
+          if (s == null || s.trim().isEmpty()) {
             return null;
           } else {
-            return Double.parseDouble(s);
+            return Double.parseDouble(s.trim());
           }
         };
     conf.setValueConverter(func);
@@ -205,10 +205,10 @@ public class ConfigBuilder {
         new ConfigEntry<>(key, version, doc, alternatives, isPublic, isDeprecated);
     Function<String, Boolean> func =
         s -> {
-          if (s == null || s.isEmpty()) {
+          if (s == null || s.trim().isEmpty()) {
             return null;
           } else {
-            return Boolean.parseBoolean(s);
+            return Boolean.parseBoolean(s.trim());
           }
         };
     conf.setValueConverter(func);

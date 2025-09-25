@@ -176,7 +176,7 @@ public class GravitinoMetalake extends MetalakeDTO
 
     EntityListResponse resp =
         restClient.get(
-            String.format("api/metalakes/%s/catalogs", this.name()),
+            String.format("api/metalakes/%s/catalogs", RESTUtils.encodeString(this.name())),
             EntityListResponse.class,
             Collections.emptyMap(),
             ErrorHandlers.catalogErrorHandler());
@@ -198,7 +198,7 @@ public class GravitinoMetalake extends MetalakeDTO
     params.put("details", "true");
     CatalogListResponse resp =
         restClient.get(
-            String.format("api/metalakes/%s/catalogs", this.name()),
+            String.format("api/metalakes/%s/catalogs", RESTUtils.encodeString(this.name())),
             params,
             CatalogListResponse.class,
             Collections.emptyMap(),
@@ -221,7 +221,10 @@ public class GravitinoMetalake extends MetalakeDTO
 
     CatalogResponse resp =
         restClient.get(
-            String.format(API_METALAKES_CATALOGS_PATH, this.name(), catalogName),
+            String.format(
+                API_METALAKES_CATALOGS_PATH,
+                RESTUtils.encodeString(this.name()),
+                RESTUtils.encodeString(catalogName)),
             CatalogResponse.class,
             Collections.emptyMap(),
             ErrorHandlers.catalogErrorHandler());
@@ -256,7 +259,7 @@ public class GravitinoMetalake extends MetalakeDTO
 
     CatalogResponse resp =
         restClient.post(
-            String.format("api/metalakes/%s/catalogs", this.name()),
+            String.format("api/metalakes/%s/catalogs", RESTUtils.encodeString(this.name())),
             req,
             CatalogResponse.class,
             Collections.emptyMap(),
@@ -1496,7 +1499,7 @@ public class GravitinoMetalake extends MetalakeDTO
     JobListResponse resp =
         restClient.get(
             String.format(API_METALAKES_JOB_PATH, RESTUtils.encodeString(this.name())),
-            ImmutableMap.of("jobTemplateName", RESTUtils.encodeString(jobTemplateName)),
+            ImmutableMap.of("jobTemplateName", jobTemplateName),
             JobListResponse.class,
             Collections.emptyMap(),
             ErrorHandlers.jobErrorHandler());

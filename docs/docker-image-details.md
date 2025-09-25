@@ -20,6 +20,9 @@ docker run --rm -d -p 8090:8090 -p 9001:9001 apache/gravitino:0.7.0-incubating
 Changelog
 
 
+- apache/gravitino:1.0.0
+  - Based on Gravitino 1.0.0, you can know more information from 1.0.0 [release notes](https://github.com/apache/gravitino/releases/tag/v1.0.0).
+
 - apache/gravitino:0.9.1
   - Based on Gravitino 0.9.1, you can know more information from 0.9.1 [release notes](https://github.com/apache/gravitino/releases/tag/v0.9.1).
 
@@ -69,6 +72,10 @@ docker run --rm -d -p 9001:9001 apache/gravitino-iceberg-rest:0.7.0-incubating
 ```
 
 Changelog
+- apache/gravitino-iceberg-rest:1.0.0
+  - Upgrade Iceberg version to 1.9
+  - Supports to specify the catalog name using warehouse parameter
+
 - apache/gravitino-iceberg-rest:0.9.1
   - Fix the issue that Iceberg REST server fail to start when enabling OAuth.
   - Add the documents for the StarRocks and Apache Doris using IRC
@@ -139,6 +146,9 @@ Changelog
 
 Changelog
 
+
+- apache/gravitino-playground:trino-435-gravitino-1.0.0
+  - Use Gravitino release 1.0.0 Dockerfile to build the image.
 
 - apache/gravitino-playground:trino-435-gravitino-0.9.1
   - Use Gravitino release 0.9.1 Dockerfile to build the image.
@@ -419,7 +429,7 @@ Changelog
     - Use `docker exec -it <container_id> bash` to enter the docker container.
     - Add these context `export JAVA_OPTS=-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5001` into `/opt/ranger-admin/ews/webapp/WEB-INF/classes/conf/ranger-admin-env-debug.sh` in the docker container.
     - Execute `./opt/ranger-admin/stop-ranger-admin.sh` and `./opt/ranger-admin/start-ranger-admin.sh` to restart Ranger admin.
-    - Clone the `Apache Ranger` project from GiHub and checkout the `2.4.0` release.
+    - Clone the `Apache Ranger` project from GitHub and checkout the `2.4.0` release.
     - Create a remote debug configuration (`Use model classpath` = `EmbeddedServer`) in your IDE and connect to the Ranger admin container.
 
 - datastrato/gravitino-ci-ranger:0.1.0

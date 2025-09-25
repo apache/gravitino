@@ -18,6 +18,8 @@
  */
 package org.apache.gravitino.storage.relational.service;
 
+import static org.apache.gravitino.metrics.source.MetricsSource.GRAVITINO_RELATIONAL_STORE_METRIC_NAME;
+
 import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.util.List;
@@ -30,6 +32,7 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.meta.TopicEntity;
+import org.apache.gravitino.metrics.Monitored;
 import org.apache.gravitino.storage.relational.mapper.OwnerMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.PolicyMetadataObjectRelMapper;
 import org.apache.gravitino.storage.relational.mapper.SecurableObjectMapper;
@@ -56,6 +59,7 @@ public class TopicMetaService {
 
   private TopicMetaService() {}
 
+  @Monitored(metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME, baseMetricName = "insertTopic")
   public void insertTopic(TopicEntity topicEntity, boolean overwrite) throws IOException {
     try {
       NameIdentifierUtil.checkTopic(topicEntity.nameIdentifier());
@@ -81,6 +85,9 @@ public class TopicMetaService {
     }
   }
 
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "listTopicsByNamespace")
   public List<TopicEntity> listTopicsByNamespace(Namespace namespace) {
     NamespaceUtil.checkTopic(namespace);
 
@@ -93,6 +100,7 @@ public class TopicMetaService {
     return POConverters.fromTopicPOs(topicPOs, namespace);
   }
 
+  @Monitored(metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME, baseMetricName = "updateTopic")
   public <E extends Entity & HasIdentifier> TopicEntity updateTopic(
       NameIdentifier ident, Function<E, E> updater) throws IOException {
     NameIdentifierUtil.checkTopic(ident);
@@ -146,14 +154,6 @@ public class TopicMetaService {
     return topicPO;
   }
 
-  // Topic may be deleted, so the TopicPO may be null.
-  public TopicPO getTopicPOById(Long topicId) {
-    TopicPO topicPO =
-        SessionUtils.getWithoutCommit(
-            TopicMetaMapper.class, mapper -> mapper.selectTopicMetaById(topicId));
-    return topicPO;
-  }
-
   private void fillTopicPOBuilderParentEntityId(TopicPO.Builder builder, Namespace namespace) {
     NamespaceUtil.checkTopic(namespace);
     Long[] parentEntityIds =
@@ -163,6 +163,9 @@ public class TopicMetaService {
     builder.withSchemaId(parentEntityIds[2]);
   }
 
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "getTopicByIdentifier")
   public TopicEntity getTopicByIdentifier(NameIdentifier identifier) {
     NameIdentifierUtil.checkTopic(identifier);
 
@@ -174,6 +177,7 @@ public class TopicMetaService {
     return POConverters.fromTopicPO(topicPO, identifier.namespace());
   }
 
+  @Monitored(metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME, baseMetricName = "deleteTopic")
   public boolean deleteTopic(NameIdentifier identifier) {
     NameIdentifierUtil.checkTopic(identifier);
 
@@ -220,6 +224,9 @@ public class TopicMetaService {
     return true;
   }
 
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "deleteTopicMetasByLegacyTimeline")
   public int deleteTopicMetasByLegacyTimeline(Long legacyTimeline, int limit) {
     return SessionUtils.doWithCommitAndFetchResult(
         TopicMetaMapper.class,
@@ -228,6 +235,9 @@ public class TopicMetaService {
         });
   }
 
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "getTopicIdBySchemaIdAndName")
   public Long getTopicIdBySchemaIdAndName(Long schemaId, String topicName) {
     Long topicId =
         SessionUtils.getWithoutCommit(

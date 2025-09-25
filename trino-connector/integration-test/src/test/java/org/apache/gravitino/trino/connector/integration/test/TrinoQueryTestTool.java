@@ -85,6 +85,13 @@ public class TrinoQueryTestTool {
           "Additional parameters that can replace the value of ${key} in the testers contents, "
               + "example: --params=key1,v1;key2,v2");
 
+      options.addOption(
+          "trino_worker_num",
+          true,
+          "Specify the number of Trino independent worker, the default value is 0."
+              + "Use a distributed cluster for integration testing when necessary (value > 0), "
+              + "otherwise fall back to a single-node setup with combined coordinator-worker roles.");
+
       options.addOption("help", false, "Print this help message");
 
       CommandLineParser parser = new PosixParser();
@@ -97,6 +104,8 @@ public class TrinoQueryTestTool {
             "Examples:\n"
                 + "Run all the testers in the 'testsets' directory:\n"
                 + "TrinoTestTool --auto=all\n\n"
+                + "Run all the testers in the 'testsets' directory with a distributed cluster:\n"
+                + "TrinoTestTool --auto=all --trino_worker_num=3\n\n"
                 + "Run all the tpch testset's testers in the 'testsets/tpch' directory:\n"
                 + "TrinoTestTool --testset=tpch --auto=all\n\n"
                 + "Run the tester 'testsets/tpch/00005.sql' in the tpch testset under hive catalog :\n"
@@ -210,6 +219,23 @@ public class TrinoQueryTestTool {
             System.exit(1);
           }
         }
+      }
+
+      String trinoWorkerNumConfig = commandLine.getOptionValue("trino_worker_num", "0");
+      try {
+        int trinoWorkerNum = Integer.parseInt(trinoWorkerNumConfig);
+        if (trinoWorkerNum < 0) {
+          System.out.println(
+              "The value of trino_worker_num must be greater than zero, current value is: "
+                  + trinoWorkerNumConfig);
+          System.exit(1);
+        }
+        TrinoQueryIT.trinoWorkerNum = trinoWorkerNum;
+      } catch (Exception e) {
+        System.out.println(
+            "The value of trino_worker_num must be an integer value, current value is: "
+                + trinoWorkerNumConfig);
+        System.exit(1);
       }
 
       checkEnv();
