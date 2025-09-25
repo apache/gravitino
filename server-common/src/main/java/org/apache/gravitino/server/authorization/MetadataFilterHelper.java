@@ -19,20 +19,29 @@ package org.apache.gravitino.server.authorization;
 
 import java.lang.reflect.Array;
 import java.security.Principal;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executor;
+import java.util.concurrent.Executors;
 import java.util.function.Function;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.authorization.AuthorizationRequestContext;
 import org.apache.gravitino.authorization.GravitinoAuthorizer;
 import org.apache.gravitino.authorization.Privilege;
 import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionEvaluator;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.PrincipalUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * MetadataFilterHelper performs permission checks on the list data returned by the REST API based
@@ -40,6 +49,9 @@ import org.apache.gravitino.utils.PrincipalUtils;
  * returning only the metadata that the user has permission to access.
  */
 public class MetadataFilterHelper {
+
+  private static final Logger LOG = LoggerFactory.getLogger(MetadataFilterHelper.class);
+  private static volatile Executor executor = null;
 
   private MetadataFilterHelper() {}
 
@@ -59,9 +71,11 @@ public class MetadataFilterHelper {
     if (!enableAuthorization()) {
       return metadataList;
     }
+    checkExecutor();
     GravitinoAuthorizer gravitinoAuthorizer =
         GravitinoAuthorizerProvider.getInstance().getGravitinoAuthorizer();
     Principal currentPrincipal = PrincipalUtils.getCurrentPrincipal();
+    AuthorizationRequestContext authorizationRequestContext = new AuthorizationRequestContext();
     return Arrays.stream(metadataList)
         .filter(
             metaDataName ->
@@ -69,7 +83,8 @@ public class MetadataFilterHelper {
                     currentPrincipal,
                     metalake,
                     NameIdentifierUtil.toMetadataObject(metaDataName, entityType),
-                    Privilege.Name.valueOf(privilege)))
+                    Privilege.Name.valueOf(privilege),
+                    authorizationRequestContext))
         .toArray(NameIdentifier[]::new);
   }
 
@@ -87,18 +102,40 @@ public class MetadataFilterHelper {
       String expression,
       Entity.EntityType entityType,
       NameIdentifier[] nameIdentifiers) {
-    AuthorizationExpressionEvaluator authorizationExpressionEvaluator =
-        new AuthorizationExpressionEvaluator(expression);
     if (!enableAuthorization()) {
       return nameIdentifiers;
     }
-    return Arrays.stream(nameIdentifiers)
-        .filter(
-            metaDataName -> {
-              Map<Entity.EntityType, NameIdentifier> nameIdentifierMap =
-                  spiltMetadataNames(metalake, entityType, metaDataName);
-              return authorizationExpressionEvaluator.evaluate(nameIdentifierMap);
-            })
+    checkExecutor();
+    AuthorizationRequestContext authorizationRequestContext = new AuthorizationRequestContext();
+    List<CompletableFuture<NameIdentifier>> futures = new ArrayList<>();
+    for (NameIdentifier nameIdentifier : nameIdentifiers) {
+      Principal currentPrincipal = PrincipalUtils.getCurrentPrincipal();
+      futures.add(
+          CompletableFuture.supplyAsync(
+              () -> {
+                try {
+                  return PrincipalUtils.doAs(
+                      currentPrincipal,
+                      () -> {
+                        Map<Entity.EntityType, NameIdentifier> nameIdentifierMap =
+                            spiltMetadataNames(metalake, entityType, nameIdentifier);
+                        AuthorizationExpressionEvaluator authorizationExpressionEvaluator =
+                            new AuthorizationExpressionEvaluator(expression);
+                        return authorizationExpressionEvaluator.evaluate(
+                                nameIdentifierMap, authorizationRequestContext)
+                            ? nameIdentifier
+                            : null;
+                      });
+                } catch (Exception e) {
+                  LOG.error("GravitinoAuthorize error:{}", e.getMessage(), e);
+                  return null;
+                }
+              },
+              executor));
+    }
+    return futures.stream()
+        .map(CompletableFuture::join)
+        .filter(Objects::nonNull)
         .toArray(NameIdentifier[]::new);
   }
 
@@ -122,16 +159,38 @@ public class MetadataFilterHelper {
     if (!enableAuthorization()) {
       return entities;
     }
-    AuthorizationExpressionEvaluator authorizationExpressionEvaluator =
-        new AuthorizationExpressionEvaluator(expression);
-    return Arrays.stream(entities)
-        .filter(
-            entity -> {
-              NameIdentifier nameIdentifier = toNameIdentifier.apply(entity);
-              Map<Entity.EntityType, NameIdentifier> nameIdentifierMap =
-                  spiltMetadataNames(metalake, entityType, nameIdentifier);
-              return authorizationExpressionEvaluator.evaluate(nameIdentifierMap);
-            })
+    checkExecutor();
+    AuthorizationRequestContext authorizationRequestContext = new AuthorizationRequestContext();
+    List<CompletableFuture<E>> futures = new ArrayList<>();
+    for (E entity : entities) {
+      Principal currentPrincipal = PrincipalUtils.getCurrentPrincipal();
+      futures.add(
+          CompletableFuture.supplyAsync(
+              () -> {
+                try {
+                  return PrincipalUtils.doAs(
+                      currentPrincipal,
+                      () -> {
+                        AuthorizationExpressionEvaluator authorizationExpressionEvaluator =
+                            new AuthorizationExpressionEvaluator(expression);
+                        NameIdentifier nameIdentifier = toNameIdentifier.apply(entity);
+                        Map<Entity.EntityType, NameIdentifier> nameIdentifierMap =
+                            spiltMetadataNames(metalake, entityType, nameIdentifier);
+                        return authorizationExpressionEvaluator.evaluate(
+                                nameIdentifierMap, authorizationRequestContext)
+                            ? entity
+                            : null;
+                      });
+                } catch (Exception e) {
+                  LOG.error("GravitinoAuthorize error:{}", e.getMessage(), e);
+                  return null;
+                }
+              },
+              executor));
+    }
+    return futures.stream()
+        .map(CompletableFuture::join)
+        .filter(Objects::nonNull)
         .toArray(size -> (E[]) Array.newInstance(entities.getClass().getComponentType(), size));
   }
 
@@ -213,5 +272,25 @@ public class MetadataFilterHelper {
   private static boolean enableAuthorization() {
     Config config = GravitinoEnv.getInstance().config();
     return config != null && config.get(Configs.ENABLE_AUTHORIZATION);
+  }
+
+  private static void checkExecutor() {
+    if (executor == null) {
+      synchronized (MetadataFilterHelper.class) {
+        if (executor == null) {
+          executor =
+              Executors.newFixedThreadPool(
+                  GravitinoEnv.getInstance()
+                      .config()
+                      .get(Configs.GRAVITINO_AUTHORIZATION_THREAD_POOL_SIZE),
+                  runnable -> {
+                    Thread thread = new Thread(runnable);
+                    thread.setDaemon(true);
+                    thread.setName("MetadataFilterHelper-ThreadPool-" + thread.getId());
+                    return thread;
+                  });
+        }
+      }
+    }
   }
 }

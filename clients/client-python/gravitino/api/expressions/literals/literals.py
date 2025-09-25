@@ -15,12 +15,12 @@
 # specific language governing permissions and limitations
 # under the License.
 import decimal
+from datetime import date, datetime, time
 from typing import TypeVar
-from datetime import date, time, datetime
 
 from gravitino.api.expressions.literals.literal import Literal
-from gravitino.api.types.type import Type
-from gravitino.api.types.types import Types
+from gravitino.api.rel.types.type import Type
+from gravitino.api.rel.types.types import Types
 
 T = TypeVar("T")
 

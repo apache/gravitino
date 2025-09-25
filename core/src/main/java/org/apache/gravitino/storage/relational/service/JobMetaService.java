@@ -18,6 +18,8 @@
  */
 package org.apache.gravitino.storage.relational.service;
 
+import static org.apache.gravitino.metrics.source.MetricsSource.GRAVITINO_RELATIONAL_STORE_METRIC_NAME;
+
 import java.io.IOException;
 import java.util.List;
 import java.util.Locale;
@@ -29,6 +31,7 @@ import org.apache.gravitino.exceptions.IllegalNamespaceException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.job.JobHandle;
 import org.apache.gravitino.meta.JobEntity;
+import org.apache.gravitino.metrics.Monitored;
 import org.apache.gravitino.storage.relational.mapper.JobMetaMapper;
 import org.apache.gravitino.storage.relational.po.JobPO;
 import org.apache.gravitino.storage.relational.utils.ExceptionUtils;
@@ -47,6 +50,9 @@ public class JobMetaService {
     return INSTANCE;
   }
 
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "listJobsByNamespace")
   public List<JobEntity> listJobsByNamespace(Namespace ns) {
     String metalakeName = ns.level(0);
     if (ns.length() == 3) {
@@ -74,6 +80,9 @@ public class JobMetaService {
     }
   }
 
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "getJobByIdentifier")
   public JobEntity getJobByIdentifier(NameIdentifier ident) {
     String metalakeName = ident.namespace().level(0);
     String jobRunId = ident.name();
@@ -97,6 +106,7 @@ public class JobMetaService {
     return JobPO.fromJobPO(jobPO, ident.namespace());
   }
 
+  @Monitored(metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME, baseMetricName = "insertJob")
   public void insertJob(JobEntity jobEntity, boolean overwrite) throws IOException {
     String metalakeName = jobEntity.namespace().level(0);
 
@@ -120,6 +130,7 @@ public class JobMetaService {
     }
   }
 
+  @Monitored(metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME, baseMetricName = "deleteJob")
   public boolean deleteJob(NameIdentifier jobIdent) {
     String jobRunId = jobIdent.name();
     long jobRunIdLong;
@@ -134,6 +145,9 @@ public class JobMetaService {
     return result > 0;
   }
 
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "deleteJobsByLegacyTimeline")
   public int deleteJobsByLegacyTimeline(long legacyTimeline, int limit) {
     // Mark jobs as deleted for finished jobs, so that they can be cleaned up later
     SessionUtils.doWithCommit(

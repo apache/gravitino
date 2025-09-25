@@ -19,6 +19,8 @@
 package org.apache.gravitino.trino.connector;
 
 import io.trino.spi.connector.ConnectorInsertTableHandle;
+import io.trino.spi.connector.ConnectorMergeSink;
+import io.trino.spi.connector.ConnectorMergeTableHandle;
 import io.trino.spi.connector.ConnectorOutputTableHandle;
 import io.trino.spi.connector.ConnectorPageSink;
 import io.trino.spi.connector.ConnectorPageSinkId;
@@ -60,6 +62,19 @@ public class GravitinoPageSinkProvider implements ConnectorPageSinkProvider {
         GravitinoHandle.unWrap(transactionHandle),
         session,
         GravitinoHandle.unWrap(insertTableHandle),
+        pageSinkId);
+  }
+
+  @Override
+  public ConnectorMergeSink createMergeSink(
+      ConnectorTransactionHandle transactionHandle,
+      ConnectorSession session,
+      ConnectorMergeTableHandle mergeHandle,
+      ConnectorPageSinkId pageSinkId) {
+    return pageSinkProvider.createMergeSink(
+        GravitinoHandle.unWrap(transactionHandle),
+        session,
+        GravitinoHandle.unWrap(mergeHandle),
         pageSinkId);
   }
 }

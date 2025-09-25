@@ -55,6 +55,7 @@ public abstract class ClientPoolImpl<C, E extends Exception>
   @Override
   public <R> R run(Action<R, C, E> action, boolean retry) throws E, InterruptedException {
     C client = get();
+    boolean shouldRelease = true;
     try {
       return action.run(client);
 
@@ -62,7 +63,13 @@ public abstract class ClientPoolImpl<C, E extends Exception>
       if (retry && isConnectionException(exc)) {
         try {
           client = reconnect(client);
-        } catch (Exception ignored) {
+        } catch (Exception reconnectException) {
+          shouldRelease = false;
+          synchronized (this) {
+            close(client);
+            currentSize -= 1;
+          }
+
           // if reconnection throws any exception, rethrow the original failure
           throw reconnectExc.cast(exc);
         }
@@ -73,7 +80,9 @@ public abstract class ClientPoolImpl<C, E extends Exception>
       throw exc;
 
     } finally {
-      release(client);
+      if (shouldRelease) {
+        release(client);
+      }
     }
   }
 

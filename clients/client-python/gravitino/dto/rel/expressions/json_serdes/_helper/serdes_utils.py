@@ -17,7 +17,7 @@
 
 from typing import Any, Dict, cast
 
-from gravitino.api.types.json_serdes._helper.serdes_utils import (
+from gravitino.api.rel.types.json_serdes._helper.serdes_utils import (
     SerdesUtils as TypesSerdesUtils,
 )
 from gravitino.dto.rel.expressions.field_reference_dto import FieldReferenceDTO

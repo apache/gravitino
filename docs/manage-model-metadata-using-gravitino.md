@@ -403,7 +403,7 @@ The following operations are supported for altering a model:
 
 
 | Operation           | JSON Example                                               | Java Method                                | Python Method                               |
- |---------------------|------------------------------------------------------------|--------------------------------------------|---------------------------------------------|
+|---------------------|------------------------------------------------------------|--------------------------------------------|---------------------------------------------|
 | **Rename model**    | `{"@type":"rename","newName":"new_name"}`                  | `ModelChange.rename("new_name")`           | `ModelChange.rename("new_name")`            |
 | **Update comment**  | `{"@type":"updateComment","newComment":"new comment"}`     | `ModelChange.updateComment("new comment")` | `ModelChange.update_comment("new comment")` |
 | **Set property**    | `{"@type":"setProperty","property":"key","value":"value"}` | `ModelChange.setProperty("key", "value")`  | `ModelChange.set_property("key", "value")`  |

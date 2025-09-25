@@ -144,12 +144,12 @@ metalake = gravitino_admin_client.alter_metalake("metalake", *changes)
 
 The following table outlines the supported modifications that you can make to a metalake:
 
-| Supported modification | JSON                                                         | Java                                            | Python                                                                                    |
-|------------------------|--------------------------------------------------------------|-------------------------------------------------|-------------------------------------------------------------------------------------------|
-| Rename metalake        | `{"@type":"rename","newName":"metalake_renamed"}`            | `MetalakeChange.rename("metalake_renamed")`     | `MetalakeChange.rename("metalake_renamed")`                                               |
-| Update comment         | `{"@type":"updateComment","newComment":"new_comment"}`       | `MetalakeChange.updateComment("new_comment")`   | `MetalakeChange.update_comment("new_comment")`                                    |
-| Set property           | `{"@type":"setProperty","property":"key1","value":"value1"}` | `MetalakeChange.setProperty("key1", "value1")`  | `MetalakeChange.set_property("key1", "value1")` |
-| Remove property        | `{"@type":"removeProperty","property":"key1"}`               | `MetalakeChange.removeProperty("key1")`         | `MetalakeChange.remove_property("key1")`                               |
+| Supported modification | JSON                                                         | Java                                           | Python                                          |
+|------------------------|--------------------------------------------------------------|------------------------------------------------|-------------------------------------------------|
+| Rename metalake        | `{"@type":"rename","newName":"metalake_renamed"}`            | `MetalakeChange.rename("metalake_renamed")`    | `MetalakeChange.rename("metalake_renamed")`     |
+| Update comment         | `{"@type":"updateComment","newComment":"new_comment"}`       | `MetalakeChange.updateComment("new_comment")`  | `MetalakeChange.update_comment("new_comment")`  |
+| Set property           | `{"@type":"setProperty","property":"key1","value":"value1"}` | `MetalakeChange.setProperty("key1", "value1")` | `MetalakeChange.set_property("key1", "value1")` |
+| Remove property        | `{"@type":"removeProperty","property":"key1"}`               | `MetalakeChange.removeProperty("key1")`        | `MetalakeChange.remove_property("key1")`        |
 
 ## Enable a metalake
 

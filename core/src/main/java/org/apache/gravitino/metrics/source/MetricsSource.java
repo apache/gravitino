@@ -22,6 +22,7 @@ package org.apache.gravitino.metrics.source;
 import com.codahale.metrics.Counter;
 import com.codahale.metrics.Gauge;
 import com.codahale.metrics.Histogram;
+import com.codahale.metrics.Meter;
 import com.codahale.metrics.MetricRegistry;
 import com.codahale.metrics.SlidingTimeWindowArrayReservoir;
 import com.codahale.metrics.Timer;
@@ -40,6 +41,8 @@ public abstract class MetricsSource {
   // metrics source name
   public static final String ICEBERG_REST_SERVER_METRIC_NAME = "iceberg-rest-server";
   public static final String GRAVITINO_SERVER_METRIC_NAME = "gravitino-server";
+  public static final String GRAVITINO_RELATIONAL_STORE_METRIC_NAME = "gravitino-relational-store";
+  public static final String GRAVITINO_CATALOG_METRIC_PREFIX = "gravitino-catalog";
   public static final String JVM_METRIC_NAME = "jvm";
   private final MetricRegistry metricRegistry;
   private final String metricsSourceName;
@@ -124,6 +127,16 @@ public abstract class MetricsSource {
             new Timer(
                 new SlidingTimeWindowArrayReservoir(
                     getTimeSlidingWindowSeconds(), TimeUnit.SECONDS)));
+  }
+
+  /**
+   * Get or create a Meter
+   *
+   * @param name The name for the meter, should be unique in metrics source.
+   * @return a new or pre-existing Meter
+   */
+  public Meter getMeter(String name) {
+    return this.metricRegistry.meter(name);
   }
 
   protected int getTimeSlidingWindowSeconds() {

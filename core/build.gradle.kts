@@ -24,12 +24,14 @@ plugins {
   id("idea")
   alias(libs.plugins.jcstress)
   alias(libs.plugins.jmh)
+  alias(libs.plugins.aspectj.post.compile.weaving)
 }
 
 dependencies {
   implementation(project(":api"))
   implementation(project(":common"))
   implementation(project(":catalogs:catalog-common"))
+  implementation(libs.aspectj.aspectjrt)
   implementation(libs.bundles.log4j)
   implementation(libs.bundles.metrics)
   implementation(libs.bundles.prometheus)
@@ -71,6 +73,7 @@ dependencies {
   testRuntimeOnly(libs.junit.jupiter.engine)
 
   jcstressImplementation(libs.mockito.core)
+  jcstressImplementation(libs.aspectj.aspectjrt)
 }
 
 tasks.test {

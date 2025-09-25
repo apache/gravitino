@@ -31,6 +31,7 @@ The connector provides read access and write access to data and metadata stored 
 - [INSERT INTO SELECT](https://trino.io/docs/current/sql/insert.html)
 - [UPDATE](https://trino.io/docs/current/sql/update.html)
 - [DELETE](https://trino.io/docs/current/sql/delete.html)
+- [MERGE](https://trino.io/docs/current/sql/merge.html)
 
 ### Schema and table management
 
