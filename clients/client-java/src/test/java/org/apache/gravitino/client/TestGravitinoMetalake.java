@@ -852,20 +852,6 @@ public class TestGravitinoMetalake extends TestBase {
     // Test throw NoSuchMetalakeException
     ErrorResponse errorResponse =
         ErrorResponse.notFound(NoSuchMetalakeException.class.getSimpleName(), "mock error");
-    buildMockResource(Method.GET, path, queryParams, null, errorResponse, HttpStatus.SC_NOT_FOUND);
-    Throwable ex =
-        Assertions.assertThrows(
-            NoSuchMetalakeException.class,
-            () -> gravitinoClient.listMetadataObjectsForTags(tagNames));
-    Assertions.assertTrue(ex.getMessage().contains("mock error"));
-
-    // Test throw NoSuchTagException
-    ErrorResponse errorResponse1 =
-        ErrorResponse.notFound(NoSuchTagException.class.getSimpleName(), "mock error");
-    buildMockResource(Method.GET, path, queryParams, null, errorResponse1, HttpStatus.SC_NOT_FOUND);
-    Throwable ex1 =
-        Assertions.assertThrows(
-            NoSuchTagException.class, () -> gravitinoClient.listMetadataObjectsForTags(tagNames));
     buildMockResource(Method.GET, path, params, null, errorResponse, HttpStatus.SC_NOT_FOUND);
     Throwable ex =
         Assertions.assertThrows(NoSuchMetalakeException.class, gravitinoClient::listPolicyInfos);
@@ -927,12 +913,6 @@ public class TestGravitinoMetalake extends TestBase {
 
     // Test throw internal error
     ErrorResponse errorResp = ErrorResponse.internalError("mock error");
-    buildMockResource(
-        Method.GET, path, queryParams, null, errorResp, HttpStatus.SC_INTERNAL_SERVER_ERROR);
-    Throwable ex2 =
-        Assertions.assertThrows(
-            RuntimeException.class, () -> gravitinoClient.listMetadataObjectsForTags(tagNames));
-    Assertions.assertTrue(ex2.getMessage().contains("mock error"));
     buildMockResource(Method.GET, path, null, errorResp, HttpStatus.SC_INTERNAL_SERVER_ERROR);
     Throwable ex2 =
         Assertions.assertThrows(
