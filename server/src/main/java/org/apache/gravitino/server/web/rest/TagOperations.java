@@ -50,6 +50,7 @@ import org.apache.gravitino.dto.tag.MetadataObjectDTO;
 import org.apache.gravitino.dto.tag.TagDTO;
 import org.apache.gravitino.dto.util.DTOConverters;
 import org.apache.gravitino.metrics.MetricNames;
+import org.apache.gravitino.rest.RESTUtils;
 import org.apache.gravitino.server.web.Utils;
 import org.apache.gravitino.tag.Tag;
 import org.apache.gravitino.tag.TagChange;
@@ -252,7 +253,15 @@ public class TagOperations {
     }
 
     return Arrays.stream(tagsParam.split(","))
-        .map(String::trim)
+        .map(
+            tag -> {
+              try {
+                return RESTUtils.decodeString(tag.trim());
+              } catch (Exception e) {
+                // Fallback to the original tag if decoding fails
+                return tag.trim();
+              }
+            })
         .filter(tag -> !tag.isEmpty())
         .toArray(String[]::new);
   }

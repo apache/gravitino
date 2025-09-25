@@ -584,12 +584,13 @@ public class GravitinoMetalake extends MetalakeDTO
    */
   @Override
   public MetadataObject[] listMetadataObjectsForTags(String[] tagNames) throws NoSuchTagException {
-    String tagsParam = String.join(",", tagNames);
+    String tagsParam =
+        Arrays.stream(tagNames).map(RESTUtils::encodeString).collect(Collectors.joining(","));
+    Map<String, String> queryParams = ImmutableMap.of("tags", tagsParam);
     MetadataObjectListResponse resp =
         restClient.get(
-            String.format("api/metalakes/%s", RESTUtils.encodeString(this.name()))
-                + "/objects?tags="
-                + RESTUtils.encodeString(tagsParam),
+            String.format("api/metalakes/%s/objects", RESTUtils.encodeString(this.name())),
+            queryParams,
             MetadataObjectListResponse.class,
             Collections.emptyMap(),
             ErrorHandlers.tagErrorHandler());

@@ -74,6 +74,7 @@ import org.apache.gravitino.exceptions.TagAlreadyExistsException;
 import org.apache.gravitino.policy.Policy;
 import org.apache.gravitino.policy.PolicyChange;
 import org.apache.gravitino.policy.PolicyContents;
+import org.apache.gravitino.rest.RESTUtils;
 import org.apache.gravitino.tag.Tag;
 import org.apache.gravitino.tag.TagChange;
 import org.apache.hc.core5.http.HttpStatus;
@@ -726,8 +727,10 @@ public class TestGravitinoMetalake extends TestBase {
   @Test
   public void testListMetadataObjectsForTags() throws JsonProcessingException {
     String[] tagNames = {"tag1", "tag2"};
+    String encodedTags =
+        Arrays.stream(tagNames).map(RESTUtils::encodeString).collect(Collectors.joining(","));
     String path = "/api/metalakes/" + metalakeName + "/objects";
-    Map<String, String> queryParams = Collections.singletonMap("tags", "tag1,tag2");
+    Map<String, String> queryParams = ImmutableMap.of("tags", encodedTags);
 
     MetadataObjectDTO[] mockObjects = {
       MetadataObjectDTO.builder()
@@ -752,7 +755,8 @@ public class TestGravitinoMetalake extends TestBase {
 
     // Test with single tag
     String[] singleTag = {"tag1"};
-    Map<String, String> singleQueryParams = Collections.singletonMap("tags", "tag1");
+    String singleEncodedTag = RESTUtils.encodeString(singleTag[0]);
+    Map<String, String> singleQueryParams = ImmutableMap.of("tags", singleEncodedTag);
     buildMockResource(Method.GET, path, singleQueryParams, null, resp, HttpStatus.SC_OK);
 
     MetadataObject[] singleResult = gravitinoClient.listMetadataObjectsForTags(singleTag);
@@ -764,6 +768,48 @@ public class TestGravitinoMetalake extends TestBase {
 
     MetadataObject[] emptyResult = gravitinoClient.listMetadataObjectsForTags(tagNames);
     Assertions.assertEquals(0, emptyResult.length);
+  }
+
+  @Test
+  public void testListMetadataObjectsForTagsWithCommas() throws JsonProcessingException {
+    String[] tagNames = {"complex,tag1", "tag2"};
+
+    String expectedEncodedTags =
+        Arrays.stream(tagNames).map(RESTUtils::encodeString).collect(Collectors.joining(","));
+
+    String path = "/api/metalakes/" + metalakeName + "/objects";
+    Map<String, String> queryParams = ImmutableMap.of("tags", expectedEncodedTags);
+
+    MetadataObjectDTO[] mockObjects = {
+      MetadataObjectDTO.builder()
+          .withName("catalog1")
+          .withType(MetadataObject.Type.CATALOG)
+          .build(),
+      MetadataObjectDTO.builder()
+          .withName("catalog1.schema1")
+          .withType(MetadataObject.Type.SCHEMA)
+          .build(),
+    };
+
+    MetadataObjectListResponse resp = new MetadataObjectListResponse(mockObjects);
+    buildMockResource(Method.GET, path, queryParams, null, resp, HttpStatus.SC_OK);
+
+    MetadataObject[] result = gravitinoClient.listMetadataObjectsForTags(tagNames);
+    Assertions.assertEquals(2, result.length);
+    Assertions.assertEquals("catalog1", result[0].fullName());
+    Assertions.assertEquals(MetadataObject.Type.CATALOG, result[0].type());
+    Assertions.assertEquals("catalog1.schema1", result[1].fullName());
+    Assertions.assertEquals(MetadataObject.Type.SCHEMA, result[1].type());
+
+    // Test with single tag containing comma
+    String[] singleTagWithComma = {"complex,tag1"};
+    String singleEncodedTag = RESTUtils.encodeString(singleTagWithComma[0]);
+    Map<String, String> singleQueryParams = ImmutableMap.of("tags", singleEncodedTag);
+
+    buildMockResource(Method.GET, path, singleQueryParams, null, resp, HttpStatus.SC_OK);
+
+    MetadataObject[] singleResult = gravitinoClient.listMetadataObjectsForTags(singleTagWithComma);
+    Assertions.assertEquals(2, singleResult.length);
   }
 
   @Test
