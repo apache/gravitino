@@ -508,17 +508,19 @@ public class JobManager implements JobOperationDispatcher {
               newStatus = jobExecutor.getJobStatus(job.jobExecutionId());
             } catch (NoSuchJobException e) {
               // If the job is not found in the external job executor, we assume the job is
-              // SUCCEEDED if it is not in CANCELLING status, otherwise we assume it is CANCELLED.
+              // FAILED if it is not in CANCELLING status, otherwise we assume it is CANCELLED.
               if (job.status() == JobHandle.Status.CANCELLING) {
                 newStatus = JobHandle.Status.CANCELLED;
               } else {
-                newStatus = JobHandle.Status.SUCCEEDED;
+                newStatus = JobHandle.Status.FAILED;
               }
               LOG.warn(
-                  "Job with execution id {} for job {} under metalake {} is not found in the "
-                      + "external job executor, marking it as {}",
-                  job.jobExecutionId(),
+                  "Job {} with execution id {} under metalake {} is not found in the "
+                      + "external job executor, marking it as {}. This could be due to the job "
+                      + "being deleted by the external job executor. Please check the external job "
+                      + "executor to know more details.",
                   job.name(),
+                  job.jobExecutionId(),
                   metalake,
                   newStatus);
             } catch (Exception e) {
