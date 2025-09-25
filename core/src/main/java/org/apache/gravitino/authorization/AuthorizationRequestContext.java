@@ -23,6 +23,9 @@ import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Function;
+import java.util.concurrent.FutureTask;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.atomic.AtomicReference;
 import org.apache.gravitino.MetadataObject;
 
 public class AuthorizationRequestContext {
@@ -35,6 +38,9 @@ public class AuthorizationRequestContext {
 
   /** Used to determine whether the role has already been loaded. */
   private final AtomicBoolean hasLoadRole = new AtomicBoolean();
+
+  /** serialize role-loading initialization so the initializer runs exactly once */
+  private final AtomicReference<FutureTask<Void>> loadRoleTask = new AtomicReference<>();
 
   /**
    * check allow
@@ -80,8 +86,23 @@ public class AuthorizationRequestContext {
     if (hasLoadRole.get()) {
       return;
     }
-    runnable.run();
-    hasLoadRole.set(true);
+    FutureTask<Void> task = new FutureTask<>(() -> {
+      runnable.run();
+      return null;
+    });
+    if (loadRoleTask.compareAndSet(null, task)) {
+      task.run();
+      hasLoadRole.set(true);
+    } else {
+      try {
+        loadRoleTask.get().get();
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+        throw new RuntimeException("Interrupted while waiting for role to load", e);
+      } catch (ExecutionException e) {
+        throw new RuntimeException("Exception during role loading", e.getCause());
+      }
+    }
   }
 
   public static class AuthorizationKey {
