@@ -514,7 +514,7 @@ public class TestPolicyOperations extends JerseyTest {
     Assertions.assertEquals(0, baseResponse1.getCode());
   }
 
-  //Test to check exception on failure in set policy is dynamic based on enable/disable
+  // Test to check exception on failure in set policy is dynamic based on enable/disable
   @Test
   public void testSetPolicyDisableFailure() {
     PolicySetRequest req = new PolicySetRequest(false);
