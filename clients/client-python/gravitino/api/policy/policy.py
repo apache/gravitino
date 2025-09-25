@@ -17,6 +17,7 @@
 
 from abc import ABC, abstractmethod
 from enum import Enum
+from typing import Optional
 
 from gravitino.api.auditable import Auditable
 from gravitino.api.metadata_object import MetadataObject
@@ -80,7 +81,7 @@ class Policy(Auditable):
         """
 
     @abstractmethod
-    def inherited(self) -> bool:
+    def inherited(self) -> Optional[bool]:
         """Check if the policy is inherited from a parent object or not.
 
         **NOTE**: The return value is optional, Only when the policy is associated with a metadata
@@ -88,7 +89,7 @@ class Policy(Auditable):
         will be empty.
 
         Returns:
-            bool:
+            Optional[bool]:
                 `True` if the policy is inherited, false if it is owned by the object itself.
                 the policy is not associated with any object.
         """
