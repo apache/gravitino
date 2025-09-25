@@ -20,11 +20,11 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, ClassVar
 
 from gravitino.api.expressions.literals.literal import Literal
-from gravitino.api.types.types import Types
+from gravitino.api.rel.types.types import Types
 from gravitino.dto.rel.expressions.function_arg import FunctionArg
 
 if TYPE_CHECKING:
-    from gravitino.api.types.type import Type
+    from gravitino.api.rel.types.type import Type
 
 
 class LiteralDTO(Literal[str], FunctionArg):

@@ -25,6 +25,8 @@ services:
     container_name: trino-ci-hive
     environment:
       - HADOOP_USER_NAME=anonymous
+      - HIVE_RUNTIME_VERSION=${HIVE_RUNTIME_VERSION:-hive2}
+      - TRINO_CONNECTOR_TEST=${TRINO_CONNECTOR_TEST:-false}
     entrypoint:  /bin/bash /tmp/hive/init.sh
     volumes:
       - ./init/hive:/tmp/hive
@@ -87,6 +89,8 @@ services:
       - GRAVITINO_HOST_PORT=${GRAVITINO_SERVER_PORT:-8090}
       - GRAVITINO_METALAKE_NAME=test
       - HIVE_HOST_IP=hive
+      - TRINO_WORKER_NUM=${TRINO_WORKER_NUM:-0}
+      - TRINO_ROLE=coordinator
     entrypoint:  /bin/bash /tmp/trino/init.sh
     volumes:
       - ./init/trino:/tmp/trino
@@ -105,7 +109,35 @@ services:
         condition: service_healthy
       mysql:
         condition: service_healthy
+      trino-worker:
+        condition: service_healthy
 
+  trino-worker:
+    image: trinodb/trino:435
+    networks:
+      - trino-net
+    deploy:
+      replicas: ${TRINO_WORKER_NUM:-0}
+    environment:
+      - HADOOP_USER_NAME=anonymous
+      - GRAVITINO_HOST_IP=host.docker.internal
+      - GRAVITINO_HOST_PORT=${GRAVITINO_SERVER_PORT:-8090}
+      - GRAVITINO_METALAKE_NAME=test
+      - HIVE_HOST_IP=hive
+      - TRINO_ROLE=worker
+    entrypoint:  /bin/bash /tmp/trino/init.sh
+    volumes:
+      - ./init/trino:/tmp/trino
+      - ../../trino-connector/trino-connector/build/libs:/usr/lib/trino/plugin/gravitino
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      hive:
+        condition: service_healthy
+      postgresql:
+        condition: service_healthy
+      mysql:
+        condition: service_healthy
 
 networks:
   trino-net:

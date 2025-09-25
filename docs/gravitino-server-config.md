@@ -85,6 +85,9 @@ gravitino.cache.enabled=true
 
 # Specify the cache implementation (no need to use the fully qualified class name)
 gravitino.cache.implementation=caffeine
+
+# Number of lock segments for cache concurrency optimization
+gravitino.cache.lockSegments=16
 ```
 
 | Configuration Key                | Description                                | Default Value          | Required | Since Version |
@@ -95,6 +98,7 @@ gravitino.cache.implementation=caffeine
 | `gravitino.cache.expireTimeInMs` | Cache expiration time (in milliseconds)    | `3600000` (about 1 hr) | No       | 1.0.0         |
 | `gravitino.cache.enableStats`    | Whether to enable cache statistics logging | `false`                | No       | 1.0.0         |
 | `gravitino.cache.enableWeigher`  | Whether to enable weight-based eviction    | `true`                 | No       | 1.0.0         |
+| `gravitino.cache.lockSegments`   | Number of lock segments.                   | `16`                   | No       | 1.0.0         |
 
 - `gravitino.cache.enableWeigher`: When enabled, eviction is based on weight and `maxEntries` will be ignored.
 - `gravitino.cache.expireTimeInMs`: Controls the cache TTL in milliseconds.
@@ -344,6 +348,7 @@ These variables override the corresponding entries in `gravitino.conf` at startu
 | `GRAVITINO_ENTITY_STORE_RELATIONAL_JDBC_PASSWORD`        | `gravitino.entity.store.relational.jdbcPassword`     | `gravitino`                                          | 1.0.0         |
 | `GRAVITINO_CATALOG_CACHE_EVICTION_INTERVAL_MS`           | `gravitino.catalog.cache.evictionIntervalMs`         | `3600000`                                            | 1.0.0         |
 | `GRAVITINO_AUTHORIZATION_ENABLE`                         | `gravitino.authorization.enable`                     | `false`                                              | 1.0.0         |
+| `GRAVITINO_AUTHORIZATION_THREAD_POOL_SIZE`               | `gravitino.authorization.threadPoolSize`             | `100`                                                | 1.0.0         |
 | `GRAVITINO_AUTHORIZATION_SERVICE_ADMINS`                 | `gravitino.authorization.serviceAdmins`              | `anonymous`                                          | 1.0.0         |
 | `GRAVITINO_AUX_SERVICE_NAMES`                            | `gravitino.auxService.names`                         | `iceberg-rest`                                       | 1.0.0         |
 | `GRAVITINO_ICEBERG_REST_CLASSPATH`                       | `gravitino.iceberg-rest.classpath`                   | `iceberg-rest-server/libs, iceberg-rest-server/conf` | 1.0.0         |

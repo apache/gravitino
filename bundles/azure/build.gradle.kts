@@ -29,10 +29,8 @@ dependencies {
   compileOnly(libs.hadoop3.abs)
   compileOnly(libs.hadoop3.client.api)
   compileOnly(libs.hadoop3.client.runtime)
+  compileOnly(project(":common"))
 
-  implementation(project(":common")) {
-    exclude("*")
-  }
   implementation(project(":catalogs:catalog-common")) {
     exclude("*")
   }
@@ -50,6 +48,7 @@ dependencies {
 
   testImplementation(project(":api"))
   testImplementation(project(":core"))
+  testImplementation(project(":common"))
   testImplementation(libs.junit.jupiter.api)
   testImplementation(libs.junit.jupiter.params)
   testRuntimeOnly(libs.junit.jupiter.engine)
@@ -72,15 +71,12 @@ tasks.withType(ShadowJar::class.java) {
   relocate("com.microsoft.aad", "org.apache.gravitino.azure.shaded.com.microsoft.aad")
   relocate("com.nimbusds", "org.apache.gravitino.azure.shaded.com.nimbusds")
   relocate("com.sun.jna", "org.apache.gravitino.azure.shaded.com.sun.jna")
-  relocate("com.sun.xml", "org.apache.gravitino.azure.shaded.com.sun.xml")
   relocate("io.netty", "org.apache.gravitino.azure.shaded.io.netty")
   relocate("net.minidev", "org.apache.gravitino.azure.shaded.net.minidev")
   relocate("net.jcip.annotations", "org.apache.gravitino.azure.shaded.net.jcip.annotations")
   relocate("org.apache.commons", "org.apache.gravitino.azure.shaded.org.apache.commons")
-  relocate("org.apache.httpcomponents", "org.apache.gravitino.azure.shaded.org.apache.httpcomponents")
   relocate("org.checkerframework", "org.apache.gravitino.azure.shaded.org.checkerframework")
   relocate("org.codehaus.stax2", "org.apache.gravitino.azure.shaded.org.codehaus.stax2")
-  relocate("org.eclipse.jetty", "org.apache.gravitino.azure.shaded.org.eclipse.jetty")
   relocate("org.objectweb.asm", "org.apache.gravitino.azure.shaded.org.objectweb.asm")
   relocate("org.reactivestreams", "org.apache.gravitino.azure.shaded.org.reactivestreams")
   relocate("reactor", "org.apache.gravitino.azure.shaded.reactor")

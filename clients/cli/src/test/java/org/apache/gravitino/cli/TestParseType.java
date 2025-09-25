@@ -140,4 +140,19 @@ public class TestParseType {
     Type elementType = ((Types.ListType) valueType).elementType();
     assertThat(elementType, instanceOf(Types.IntegerType.class));
   }
+
+  @Test
+  public void testParseTypeDecimalWithSpaces() {
+    Type type = ParseType.toType("decimal(10, 5)");
+    assertThat(type, instanceOf(Types.DecimalType.class));
+    assertEquals(10, ((Types.DecimalType) type).precision());
+    assertEquals(5, ((Types.DecimalType) type).scale());
+  }
+
+  @Test
+  public void testParseTypeVarcharWithSpaces() {
+    Type type = ParseType.toType("varchar( 10 )");
+    assertThat(type, instanceOf(Types.VarCharType.class));
+    assertEquals(10, ((Types.VarCharType) type).length());
+  }
 }

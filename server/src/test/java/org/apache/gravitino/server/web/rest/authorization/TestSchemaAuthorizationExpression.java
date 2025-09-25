@@ -26,6 +26,7 @@ import ognl.OgnlException;
 import org.apache.gravitino.dto.requests.SchemaCreateRequest;
 import org.apache.gravitino.dto.requests.SchemaUpdatesRequest;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationExpression;
+import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants;
 import org.apache.gravitino.server.web.rest.SchemaOperations;
 import org.junit.jupiter.api.Test;
 
@@ -93,7 +94,8 @@ public class TestSchemaAuthorizationExpression {
   @Test
   public void testListSchema() throws NoSuchFieldException, IllegalAccessException, OgnlException {
     Field loadTableAuthorizationExpressionField =
-        SchemaOperations.class.getDeclaredField("loadSchemaAuthorizationExpression");
+        AuthorizationExpressionConstants.class.getDeclaredField(
+            "loadSchemaAuthorizationExpression");
     loadTableAuthorizationExpressionField.setAccessible(true);
     String loadTableAuthExpression = (String) loadTableAuthorizationExpressionField.get(null);
     MockAuthorizationExpressionEvaluator mockEvaluator =

@@ -471,4 +471,29 @@ public class TestIcebergTableOperations extends IcebergNamespaceTestBase {
     Response response = doCreateTable(ns, name);
     Assertions.assertEquals(status, response.getStatus());
   }
+
+  @ParameterizedTest
+  @MethodSource("org.apache.gravitino.iceberg.service.rest.IcebergRestTestUtil#testNamespaces")
+  public void testGetTableCredentials(Namespace ns) {
+    String tableName = "test_table_credentials";
+
+    // First create the namespace
+    verifyCreateNamespaceSucc(ns);
+
+    // Then create a table
+    verifyCreateTableSucc(ns, tableName);
+
+    // Then test getting credentials
+    Response response = doGetTableCredentials(ns, tableName);
+    Assertions.assertEquals(Status.OK.getStatusCode(), response.getStatus());
+
+    // Verify the response contains credentials (even if empty)
+    String responseBody = response.readEntity(String.class);
+    Assertions.assertNotNull(responseBody);
+    Assertions.assertTrue(responseBody.contains("credentials"));
+  }
+
+  private Response doGetTableCredentials(Namespace ns, String tableName) {
+    return getTableClientBuilder(ns, Optional.of(tableName + "/credentials")).get();
+  }
 }

@@ -26,9 +26,12 @@ import org.apache.gravitino.client.GravitinoClient;
 import org.apache.gravitino.exceptions.NoSuchGroupException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 
+/** Represents the audit command for groups. */
 public class GroupAudit extends AuditCommand {
 
+  /** The name of the metalake. */
   protected final String metalake;
+  /** The name of the group. */
   protected final String group;
 
   /**

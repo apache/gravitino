@@ -1,0 +1,23 @@
+INSERT: 2 rows
+
+"1","bob","12"
+"2","tom","13"
+
+CREATE SCHEMA
+
+CREATE TABLE
+
+INSERT: 3 rows
+
+"bob","14"
+"nancy","17"
+"tom","12"
+
+MERGE: 3 rows
+
+"3","nancy","17"
+"2","tom","25"
+
+DROP TABLE
+
+DROP SCHEMA

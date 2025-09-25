@@ -53,7 +53,9 @@ public class TestGCSTokenProvider {
             "/a/b/", "a/b/",
             "/a/b", "a/b/",
             "a/b", "a/b/",
-            "a/b/", "a/b/");
+            "a/b/", "a/b/",
+            "/", "",
+            "", "");
 
     checkResults.forEach(
         (k, v) -> {

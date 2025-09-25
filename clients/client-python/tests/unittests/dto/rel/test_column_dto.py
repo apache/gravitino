@@ -19,10 +19,10 @@ import json
 import unittest
 from itertools import product
 
-from gravitino.api.column import Column
-from gravitino.api.types.json_serdes import TypeSerdes
-from gravitino.api.types.json_serdes._helper.serdes_utils import SerdesUtils
-from gravitino.api.types.types import Types
+from gravitino.api.rel.column import Column
+from gravitino.api.rel.types.json_serdes import TypeSerdes
+from gravitino.api.rel.types.json_serdes._helper.serdes_utils import SerdesUtils
+from gravitino.api.rel.types.types import Types
 from gravitino.dto.rel.column_dto import ColumnDTO
 from gravitino.dto.rel.expressions.field_reference_dto import FieldReferenceDTO
 from gravitino.dto.rel.expressions.func_expression_dto import FuncExpressionDTO

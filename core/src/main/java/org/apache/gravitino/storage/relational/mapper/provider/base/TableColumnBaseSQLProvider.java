@@ -66,6 +66,14 @@ public class TableColumnBaseSQLProvider {
         + "</script>";
   }
 
+  public String updateSchemaIdByTableId(
+      @Param("tableId") Long tableId, @Param("newSchemaId") Long newSchemaId) {
+    return "UPDATE "
+        + TableColumnMapper.COLUMN_TABLE_NAME
+        + " SET schema_id = #{newSchemaId}"
+        + " WHERE table_id = #{tableId} AND deleted_at = 0";
+  }
+
   public String softDeleteColumnsByTableId(@Param("tableId") Long tableId) {
     return "UPDATE "
         + TableColumnMapper.COLUMN_TABLE_NAME

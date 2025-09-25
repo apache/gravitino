@@ -18,6 +18,8 @@
  */
 package org.apache.gravitino.storage.relational.service;
 
+import static org.apache.gravitino.metrics.source.MetricsSource.GRAVITINO_RELATIONAL_STORE_METRIC_NAME;
+
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
@@ -37,6 +39,7 @@ import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.meta.GroupEntity;
 import org.apache.gravitino.meta.RoleEntity;
+import org.apache.gravitino.metrics.Monitored;
 import org.apache.gravitino.storage.relational.mapper.GroupMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.GroupRoleRelMapper;
 import org.apache.gravitino.storage.relational.mapper.OwnerMetaMapper;
@@ -73,6 +76,9 @@ public class GroupMetaService {
     return GroupPO;
   }
 
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "getGroupIdByMetalakeIdAndName")
   public Long getGroupIdByMetalakeIdAndName(Long metalakeId, String groupName) {
     Long groupId =
         SessionUtils.getWithoutCommit(
@@ -88,6 +94,9 @@ public class GroupMetaService {
     return groupId;
   }
 
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "getGroupByIdentifier")
   public GroupEntity getGroupByIdentifier(NameIdentifier identifier) {
     AuthorizationUtils.checkGroup(identifier);
 
@@ -99,6 +108,9 @@ public class GroupMetaService {
     return POConverters.fromGroupPO(groupPO, rolePOs, identifier.namespace());
   }
 
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "listGroupsByRoleIdent")
   public List<GroupEntity> listGroupsByRoleIdent(NameIdentifier roleIdent) {
     RoleEntity roleEntity = RoleMetaService.getInstance().getRoleByIdentifier(roleIdent);
     List<GroupPO> groupPOs =
@@ -114,6 +126,7 @@ public class GroupMetaService {
         .collect(Collectors.toList());
   }
 
+  @Monitored(metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME, baseMetricName = "insertGroup")
   public void insertGroup(GroupEntity groupEntity, boolean overwritten) throws IOException {
     try {
       AuthorizationUtils.checkGroup(groupEntity.nameIdentifier());
@@ -157,6 +170,7 @@ public class GroupMetaService {
     }
   }
 
+  @Monitored(metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME, baseMetricName = "deleteGroup")
   public boolean deleteGroup(NameIdentifier identifier) {
     AuthorizationUtils.checkGroup(identifier);
 
@@ -181,6 +195,7 @@ public class GroupMetaService {
     return true;
   }
 
+  @Monitored(metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME, baseMetricName = "updateGroup")
   public <E extends Entity & HasIdentifier> GroupEntity updateGroup(
       NameIdentifier identifier, Function<E, E> updater) throws IOException {
     AuthorizationUtils.checkGroup(identifier);
@@ -251,6 +266,9 @@ public class GroupMetaService {
     return newEntity;
   }
 
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "listGroupsByNamespace")
   public List<GroupEntity> listGroupsByNamespace(Namespace namespace, boolean allFields) {
     AuthorizationUtils.checkGroupNamespace(namespace);
     String metalakeName = namespace.level(0);
@@ -281,6 +299,9 @@ public class GroupMetaService {
     }
   }
 
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "deleteGroupMetasByLegacyTimeline")
   public int deleteGroupMetasByLegacyTimeline(long legacyTimeline, int limit) {
     int[] groupDeletedCount = new int[] {0};
     int[] groupRoleRelDeletedCount = new int[] {0};

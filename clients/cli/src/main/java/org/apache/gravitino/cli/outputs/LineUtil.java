@@ -28,15 +28,20 @@ import org.apache.gravitino.rel.expressions.literals.Literal;
 import org.apache.gravitino.rel.types.Type;
 import org.apache.gravitino.tag.Tag;
 
+/** Utility class for handling line-based output. */
 public class LineUtil {
+  /** Represents an empty string. */
+  public static final String EMPTY_DEFAULT_VALUE = "";
+  /** Represents a null value. */
+  public static final String NULL_DEFAULT_VALUE = "N/A";
+  /** Represents an empty string for string type columns. */
+  public static final String EMPTY_STRING_TYPE_DEFAULT_VALUE = "''";
+
   // This expression is primarily used to match characters that have a display width of
   // 2, such as characters from Korean, Chinese
   private static final Pattern FULL_WIDTH_PATTERN =
       Pattern.compile(
           "[\u1100-\u115F\u2E80-\uA4CF\uAC00-\uD7A3\uF900-\uFAFF\uFE10-\uFE19\uFE30-\uFE6F\uFF00-\uFF60\uFFE0-\uFFE6]");
-  public static final String EMPTY_DEFAULT_VALUE = "";
-  public static final String NULL_DEFAULT_VALUE = "N/A";
-  public static final String EMPTY_STRING_TYPE_DEFAULT_VALUE = "''";
 
   /**
    * Get the display width of a string.

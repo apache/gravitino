@@ -93,6 +93,8 @@ public class Configs {
 
   public static final int DEFAULT_RELATIONAL_JDBC_BACKEND_MAX_CONNECTIONS = 100;
 
+  public static final int DEFAULT_GRAVITINO_AUTHORIZATION_THREAD_POOL_SIZE = 100;
+
   public static final long DEFAULT_RELATIONAL_JDBC_BACKEND_MAX_WAIT_MILLISECONDS = 1000L;
 
   public static final int GARBAGE_COLLECTOR_SINGLE_DELETION_LIMIT = 100;
@@ -293,6 +295,13 @@ public class Configs {
           .stringConf()
           .createWithDefault("org.apache.gravitino.server.authorization.jcasbin.JcasbinAuthorizer");
 
+  public static final ConfigEntry<Integer> GRAVITINO_AUTHORIZATION_THREAD_POOL_SIZE =
+      new ConfigBuilder("gravitino.authorization.threadPoolSize")
+          .doc("The thread pool size of metadata authorization requests")
+          .version(ConfigConstants.VERSION_1_0_0)
+          .intConf()
+          .createWithDefault(DEFAULT_GRAVITINO_AUTHORIZATION_THREAD_POOL_SIZE);
+
   public static final ConfigEntry<List<String>> SERVICE_ADMINS =
       new ConfigBuilder("gravitino.authorization.serviceAdmins")
           .doc("The admins of Gravitino service")
@@ -407,6 +416,23 @@ public class Configs {
           .stringConf()
           .checkValue(StringUtils::isNotBlank, ConfigConstants.NOT_BLANK_ERROR_MSG)
           .createWithDefault("caffeine");
+
+  // Number of lock segments for cache concurrency optimization
+  public static final ConfigEntry<Integer> CACHE_LOCK_SEGMENTS =
+      new ConfigBuilder("gravitino.cache.lockSegments")
+          .doc(
+              "Number of lock segments for cache concurrency optimization. "
+                  + "This configuration controls the granularity of locking in the cache system. "
+                  + "Instead of using a single global lock, Gravitino uses Guava's Striped<Lock> "
+                  + "to divide locks into segments, allowing concurrent access to different cache "
+                  + "entries while maintaining thread safety. Higher values reduce lock contention "
+                  + "but increase memory overhead. The actual number of segments will be rounded "
+                  + "up to the nearest power of 2 for optimal performance. "
+                  + "See: https://github.com/google/guava/wiki/StripedExplained")
+          .version(ConfigConstants.VERSION_1_0_0)
+          .intConf()
+          .checkValue(value -> value > 0, "Lock segments must be positive.")
+          .createWithDefault(16);
 
   public static final ConfigEntry<String> JOB_STAGING_DIR =
       new ConfigBuilder("gravitino.job.stagingDir")

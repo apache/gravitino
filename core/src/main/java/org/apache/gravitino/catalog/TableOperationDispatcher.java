@@ -23,6 +23,7 @@ import static org.apache.gravitino.catalog.CapabilityHelpers.applyCapabilities;
 import static org.apache.gravitino.catalog.PropertiesMetadataHelpers.validatePropertyForCreate;
 import static org.apache.gravitino.rel.expressions.transforms.Transforms.EMPTY_TRANSFORM;
 import static org.apache.gravitino.utils.NameIdentifierUtil.getCatalogIdentifier;
+import static org.apache.gravitino.utils.NameIdentifierUtil.getSchemaIdentifier;
 
 import com.google.common.base.Objects;
 import com.google.common.collect.Lists;
@@ -62,7 +63,7 @@ import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.indexes.Index;
 import org.apache.gravitino.rel.indexes.Indexes;
 import org.apache.gravitino.storage.IdGenerator;
-import org.apache.gravitino.utils.NameIdentifierUtil;
+import org.apache.gravitino.utils.NamespaceUtil;
 import org.apache.gravitino.utils.PrincipalUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -199,16 +200,31 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
       throws NoSuchTableException, IllegalArgumentException {
     validateAlterProperties(ident, HasPropertyMetadata::tablePropertiesMetadata, changes);
 
-    // Check if there exist TableChange.RenameTable in the changes, if so, we need to TreeLock of
-    // write on the new table name, or use the read lock on the table instead.
-    boolean containsRenameTable =
-        Arrays.stream(changes).anyMatch(c -> c instanceof TableChange.RenameTable);
-    NameIdentifier nameIdentifierForLock =
-        containsRenameTable ? NameIdentifier.of(ident.namespace().levels()) : ident;
+    // use the read lock on the table if there does not exist TableChange.RenameTable in the
+    // changes, or:
+    // 1. if the TableChange.RenameTable change the schema name, we need to acquire write lock on
+    // the catalog,
+    //    because the treeLock tool currently does not support acquiring write locks on two tables
+    // at the same time.
+    // 2. if the TableChange.RenameTable only change the table name, we need to acquire write lock
+    // to on the schema.
+    NameIdentifier nameIdentifierForLock = ident;
+    String schemaName = ident.namespace().level(2);
+    for (TableChange change : changes) {
+      if (change instanceof TableChange.RenameTable) {
+        TableChange.RenameTable rename = (TableChange.RenameTable) change;
+        if (rename.getNewSchemaName().isPresent()
+            && !rename.getNewSchemaName().get().equals(schemaName)) {
+          nameIdentifierForLock = getCatalogIdentifier(ident);
+          break;
+        }
+        nameIdentifierForLock = getSchemaIdentifier(ident);
+      }
+    }
 
     return TreeLockUtils.doWithTreeLock(
         nameIdentifierForLock,
-        LockType.WRITE,
+        nameIdentifierForLock.equals(ident) ? LockType.READ : LockType.WRITE,
         () -> {
           NameIdentifier catalogIdent = getCatalogIdentifier(ident);
           Table alteredTable =
@@ -251,20 +267,16 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
                           TableEntity.class,
                           TABLE,
                           tableEntity -> {
-                            String newName =
-                                Arrays.stream(changes)
-                                    .filter(c -> c instanceof TableChange.RenameTable)
-                                    .map(c -> ((TableChange.RenameTable) c).getNewName())
-                                    .reduce((c1, c2) -> c2)
-                                    .orElse(tableEntity.name());
+                            Namespace newNamespace = getNewNamespace(ident, changes);
+
                             // Update the columns
                             Pair<Boolean, List<ColumnEntity>> columnsUpdateResult =
                                 updateColumnsIfNecessary(alteredTable, tableEntity);
 
                             return TableEntity.builder()
                                 .withId(tableEntity.id())
-                                .withName(newName)
-                                .withNamespace(ident.namespace())
+                                .withName(alteredTable.name())
+                                .withNamespace(newNamespace)
                                 .withColumns(columnsUpdateResult.getRight())
                                 .withAuditInfo(
                                     AuditInfo.builder()
@@ -298,7 +310,7 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
    */
   @Override
   public boolean dropTable(NameIdentifier ident) {
-    NameIdentifier schemaIdentifier = NameIdentifierUtil.getSchemaIdentifier(ident);
+    NameIdentifier schemaIdentifier = getSchemaIdentifier(ident);
     return TreeLockUtils.doWithTreeLock(
         schemaIdentifier,
         LockType.WRITE,
@@ -351,7 +363,7 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
    */
   @Override
   public boolean purgeTable(NameIdentifier ident) throws UnsupportedOperationException {
-    NameIdentifier schemaIdentifier = NameIdentifierUtil.getSchemaIdentifier(ident);
+    NameIdentifier schemaIdentifier = getSchemaIdentifier(ident);
     NameIdentifier catalogIdent = getCatalogIdentifier(ident);
     return TreeLockUtils.doWithTreeLock(
         schemaIdentifier,
@@ -388,6 +400,24 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
               ? droppedFromStore
               : droppedFromCatalog;
         });
+  }
+
+  private Namespace getNewNamespace(NameIdentifier tableIdent, TableChange... changes) {
+    String schemaName = tableIdent.namespace().level(2);
+    return Arrays.stream(changes)
+        .filter(
+            c ->
+                c instanceof TableChange.RenameTable
+                    && ((TableChange.RenameTable) c).getNewSchemaName().isPresent()
+                    && !((TableChange.RenameTable) c).getNewSchemaName().get().equals(schemaName))
+        .map(
+            c ->
+                NamespaceUtil.ofTable(
+                    tableIdent.namespace().level(0),
+                    tableIdent.namespace().level(1),
+                    ((TableChange.RenameTable) c).getNewSchemaName().get()))
+        .reduce((c1, c2) -> c2)
+        .orElse(tableIdent.namespace());
   }
 
   private EntityCombinedTable importTable(NameIdentifier identifier) {

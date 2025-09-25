@@ -36,6 +36,8 @@ import io.trino.spi.block.Block;
 import io.trino.spi.block.BlockEncodingSerde;
 import io.trino.spi.connector.ColumnHandle;
 import io.trino.spi.connector.ConnectorInsertTableHandle;
+import io.trino.spi.connector.ConnectorMergeTableHandle;
+import io.trino.spi.connector.ConnectorPartitioningHandle;
 import io.trino.spi.connector.ConnectorSplit;
 import io.trino.spi.connector.ConnectorTableHandle;
 import io.trino.spi.connector.ConnectorTransactionHandle;
@@ -52,8 +54,8 @@ import org.apache.gravitino.trino.connector.GravitinoConnectorPluginManager;
  * Provides functionality for handling various Trino-specific types and plugin classes.
  */
 public class JsonCodec {
-  private static ObjectMapper mapper;
-  private static Type jsonType;
+  private static volatile ObjectMapper mapper;
+  private static volatile Type jsonType;
 
   private static ObjectMapper buildMapper(ClassLoader classLoader) {
     try {
@@ -161,6 +163,14 @@ public class JsonCodec {
     objectMapper.registerModule(
         new AbstractTypedJacksonModule<>(
             ConnectorInsertTableHandle.class, nameResolver, classResolver) {});
+
+    objectMapper.registerModule(
+        new AbstractTypedJacksonModule<>(
+            ConnectorMergeTableHandle.class, nameResolver, classResolver) {});
+
+    objectMapper.registerModule(
+        new AbstractTypedJacksonModule<>(
+            ConnectorPartitioningHandle.class, nameResolver, classResolver) {});
   }
 
   @SuppressWarnings("deprecation")

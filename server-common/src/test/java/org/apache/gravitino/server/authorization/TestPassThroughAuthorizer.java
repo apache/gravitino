@@ -18,6 +18,7 @@
 package org.apache.gravitino.server.authorization;
 
 import java.io.IOException;
+import org.apache.gravitino.authorization.AuthorizationRequestContext;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -27,7 +28,9 @@ public class TestPassThroughAuthorizer {
   @Test
   public void testAuthorize() throws IOException {
     try (PassThroughAuthorizer passThroughAuthorizer = new PassThroughAuthorizer()) {
-      boolean result = passThroughAuthorizer.authorize(null, null, null, null);
+      boolean result =
+          passThroughAuthorizer.authorize(
+              null, null, null, null, new AuthorizationRequestContext());
       Assertions.assertTrue(result, "Logic error in PassThroughAuthorizer");
     }
   }

@@ -25,10 +25,12 @@ import org.apache.gravitino.Namespace;
 import org.apache.gravitino.cli.CommandContext;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Table;
+import org.apache.gravitino.rel.TableCatalog;
 
 /** List the names of all tables in a schema. */
 public class ListTables extends TableCommand {
 
+  /** The name of the schema. */
   protected final String schema;
 
   /**
@@ -50,13 +52,20 @@ public class ListTables extends TableCommand {
     NameIdentifier[] tables = null;
     Namespace name = Namespace.of(schema);
 
+    TableCatalog catalog = tableCatalog();
+    if (catalog == null) {
+      // The error message is already printed in the tableCatalog() method.
+      // We just need to exit here.
+      return;
+    }
+
     try {
-      tables = tableCatalog().listTables(name);
+      tables = catalog.listTables(name);
     } catch (Exception exp) {
       exitWithError(exp.getMessage());
     }
 
-    if (tables.length == 0) {
+    if (tables == null || tables.length == 0) {
       printInformation("No tables exist.");
       return;
     }

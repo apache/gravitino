@@ -189,9 +189,15 @@ public class ScriptRunner {
       e.fillInStackTrace();
       printlnError("Error executing: " + command);
       printlnError(e);
+      if (!autoCommit) {
+        try {
+          conn.rollback();
+        } catch (SQLException rollbackException) {
+          printlnError("Error during rollback " + rollbackException);
+        }
+      }
       throw e;
     } finally {
-      conn.rollback();
       flush();
     }
   }

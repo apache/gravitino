@@ -22,7 +22,7 @@ info:
   license:
     name: Apache 2.0
     url: https://www.apache.org/licenses/LICENSE-2.0.html
-  version: 1.0.0-SNAPSHOT
+  version: 1.1.0-SNAPSHOT
   description: |
     Defines the specification for the first version of the Gravitino REST API.
 
@@ -64,6 +64,12 @@ paths:
 
   /metalakes/{metalake}/objects/{metadataObjectType}/{metadataObjectFullName}/tags:
     $ref: "./tags.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1objects~1%7BmetadataObjectType%7D~1%7BmetadataObjectFullName%7D~1tags"
+
+  /metalakes/{metalake}/objects/{metadataObjectType}/{metadataObjectFullName}/statistics:
+    $ref: "./statistics.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1objects~1%7BmetadataObjectType%7D~1%7BmetadataObjectFullName%7D~1statistics"
+
+  /metalakes/{metalake}/objects/{metadataObjectType}/{metadataObjectFullName}/statistics/partitions:
+    $ref: "./statistics.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1objects~1%7BmetadataObjectType%7D~1%7BmetadataObjectFullName%7D~1statistics~1partitions"
 
   /metalakes/{metalake}/policies:
     $ref: "./policies.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1policies"
@@ -145,6 +151,12 @@ paths:
 
   /metalakes/{metalake}/catalogs/{catalog}/schemas/{schema}/models/{model}/aliases/{alias}:
     $ref: "./models.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1catalogs~1%7Bcatalog%7D~1schemas~1%7Bschema%7D~1models~1%7Bmodel%7D~1aliases~1%7Balias%7D"
+
+  /metalakes/{metalake}/catalogs/{catalog}/schemas/{schema}/models/{model}/versions/{version}/uri:
+    $ref: "./models.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1catalogs~1%7Bcatalog%7D~1schemas~1%7Bschema%7D~1models~1%7Bmodel%7D~1versions~1%7Bversion%7D~1uri"
+
+  /metalakes/{metalake}/catalogs/{catalog}/schemas/{schema}/models/{model}/aliases/{alias}/uri:
+    $ref: "./models.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1catalogs~1%7Bcatalog%7D~1schemas~1%7Bschema%7D~1models~1%7Bmodel%7D~1aliases~1%7Balias%7D~1uri"
 
   /metalakes/{metalake}/users:
     $ref: "./users.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1users"

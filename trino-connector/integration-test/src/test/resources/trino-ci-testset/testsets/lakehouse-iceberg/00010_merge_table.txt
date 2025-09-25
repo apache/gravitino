@@ -1,0 +1,35 @@
+CREATE SCHEMA
+
+CREATE TABLE
+
+INSERT: 2 rows
+
+"bob","14"
+"tom","12"
+
+CREATE TABLE
+
+INSERT: 3 rows
+
+"bob","15"
+"nancy","17"
+"tom","16"
+
+MERGE: 3 rows
+
+"nancy","17"
+"tom","28"
+
+CREATE TABLE
+
+INSERT: 2 rows
+
+<QUERY_FAILED> Iceberg table updates require at least format version 2
+
+DROP TABLE
+
+DROP TABLE
+
+DROP TABLE
+
+DROP SCHEMA

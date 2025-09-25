@@ -27,11 +27,17 @@ import org.apache.gravitino.client.GravitinoClient;
 import org.apache.gravitino.exceptions.CatalogAlreadyExistsException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 
+/** Represents create a new catalog. */
 public class CreateCatalog extends Command {
+  /** The name of the metalake. */
   protected final String metalake;
+  /** The name of the catalog. */
   protected final String catalog;
+  /** The provider/type of catalog. */
   protected final String provider;
+  /** The catalog's comment. */
   protected final String comment;
+  /** The catalog's properties. */
   protected final Map<String, String> properties;
 
   /**
@@ -71,7 +77,7 @@ public class CreateCatalog extends Command {
           comment,
           properties);
     } catch (NoSuchMetalakeException err) {
-      exitWithError(ErrorMessages.METALAKE_EXISTS);
+      exitWithError(ErrorMessages.UNKNOWN_METALAKE);
     } catch (CatalogAlreadyExistsException err) {
       exitWithError(ErrorMessages.CATALOG_EXISTS);
     } catch (Exception exp) {

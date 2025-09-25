@@ -62,61 +62,68 @@ public class SqlSessionFactoryHelper {
    */
   @SuppressWarnings("deprecation")
   public void init(Config config) {
-    // Initialize the data source
-    BasicDataSource dataSource = new BasicDataSource();
-    String jdbcUrl = config.get(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_URL);
-    String driverClass = config.get(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_DRIVER);
-    JdbcUrlUtils.validateJdbcConfig(driverClass, jdbcUrl, config.getAllConfig());
-
-    JDBCBackendType jdbcType = JDBCBackendType.fromURI(jdbcUrl);
-    dataSource.setUrl(jdbcUrl);
-    dataSource.setDriverClassName(driverClass);
-    dataSource.setUsername(config.get(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_USER));
-    dataSource.setPassword(config.get(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_PASSWORD));
-    // Close the auto commit, so that we can control the transaction manual commit
-    dataSource.setDefaultAutoCommit(false);
-    dataSource.setMaxWaitMillis(
-        config.get(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_WAIT_MILLISECONDS));
-    dataSource.setMaxTotal(config.get(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_MAX_CONNECTIONS));
-    dataSource.setMaxIdle(5);
-    dataSource.setMinIdle(0);
-    dataSource.setLogAbandoned(true);
-    dataSource.setRemoveAbandonedOnBorrow(true);
-    dataSource.setRemoveAbandonedTimeout(60);
-    dataSource.setTimeBetweenEvictionRunsMillis(Duration.ofMillis(10 * 60 * 1000L).toMillis());
-    dataSource.setTestOnBorrow(true);
-    dataSource.setTestWhileIdle(true);
-    dataSource.setMinEvictableIdleTimeMillis(1000);
-    dataSource.setNumTestsPerEvictionRun(BaseObjectPoolConfig.DEFAULT_NUM_TESTS_PER_EVICTION_RUN);
-    dataSource.setTestOnReturn(BaseObjectPoolConfig.DEFAULT_TEST_ON_RETURN);
-    dataSource.setSoftMinEvictableIdleTimeMillis(
-        BaseObjectPoolConfig.DEFAULT_SOFT_MIN_EVICTABLE_IDLE_TIME.toMillis());
-    dataSource.setLifo(BaseObjectPoolConfig.DEFAULT_LIFO);
-    MetricsSystem metricsSystem = GravitinoEnv.getInstance().metricsSystem();
-    // Add null check to avoid NPE when metrics system is not initialized in test environments
-    if (metricsSystem != null) {
-      // Register connection pool metrics when metrics system is available
-      metricsSystem.register(new RelationDatasourceMetricsSource(dataSource));
-    }
-    // Create the transaction factory and env
-    TransactionFactory transactionFactory = new JdbcTransactionFactory();
-    Environment environment = new Environment("development", transactionFactory, dataSource);
-
-    // Initialize the configuration
-    Configuration configuration = new Configuration(environment);
-    configuration.setDatabaseId(jdbcType.name().toLowerCase());
-    ServiceLoader<MapperPackageProvider> loader = ServiceLoader.load(MapperPackageProvider.class);
-    for (MapperPackageProvider provider : loader) {
-      provider.getMapperClasses().forEach(configuration::addMapper);
-    }
-
     // Create the SqlSessionFactory object, it is a singleton object
-    if (sqlSessionFactory == null) {
-      synchronized (SqlSessionFactoryHelper.class) {
-        if (sqlSessionFactory == null) {
-          sqlSessionFactory = new SqlSessionFactoryBuilder().build(configuration);
-        }
+    if (sqlSessionFactory != null) {
+      return;
+    }
+
+    synchronized (SqlSessionFactoryHelper.class) {
+      if (sqlSessionFactory != null) {
+        return;
       }
+
+      // Initialize the data source
+      BasicDataSource dataSource = new BasicDataSource();
+      String jdbcUrl = config.get(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_URL);
+      String driverClass = config.get(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_DRIVER);
+      JdbcUrlUtils.validateJdbcConfig(driverClass, jdbcUrl, config.getAllConfig());
+
+      JDBCBackendType jdbcType = JDBCBackendType.fromURI(jdbcUrl);
+      dataSource.setUrl(jdbcUrl);
+      dataSource.setDriverClassName(driverClass);
+      dataSource.setUsername(config.get(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_USER));
+      dataSource.setPassword(config.get(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_PASSWORD));
+      // Close the auto commit, so that we can control the transaction manual commit
+      dataSource.setDefaultAutoCommit(false);
+      dataSource.setMaxWaitMillis(
+          config.get(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_WAIT_MILLISECONDS));
+      dataSource.setMaxTotal(config.get(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_MAX_CONNECTIONS));
+      dataSource.setMaxIdle(5);
+      dataSource.setMinIdle(0);
+      dataSource.setLogAbandoned(true);
+      dataSource.setRemoveAbandonedOnBorrow(true);
+      dataSource.setRemoveAbandonedTimeout(60);
+      dataSource.setTimeBetweenEvictionRunsMillis(Duration.ofMillis(10 * 60 * 1000L).toMillis());
+      dataSource.setTestOnBorrow(true);
+      dataSource.setTestWhileIdle(true);
+      dataSource.setMinEvictableIdleTimeMillis(1000);
+      dataSource.setNumTestsPerEvictionRun(BaseObjectPoolConfig.DEFAULT_NUM_TESTS_PER_EVICTION_RUN);
+      dataSource.setTestOnReturn(BaseObjectPoolConfig.DEFAULT_TEST_ON_RETURN);
+      dataSource.setSoftMinEvictableIdleTimeMillis(
+          BaseObjectPoolConfig.DEFAULT_SOFT_MIN_EVICTABLE_IDLE_TIME.toMillis());
+      dataSource.setLifo(BaseObjectPoolConfig.DEFAULT_LIFO);
+
+      // Create the transaction factory and env
+      TransactionFactory transactionFactory = new JdbcTransactionFactory();
+      Environment environment = new Environment("development", transactionFactory, dataSource);
+
+      // Initialize the configuration
+      Configuration configuration = new Configuration(environment);
+      configuration.setDatabaseId(jdbcType.name().toLowerCase());
+      ServiceLoader<MapperPackageProvider> loader = ServiceLoader.load(MapperPackageProvider.class);
+      for (MapperPackageProvider provider : loader) {
+        provider.getMapperClasses().forEach(configuration::addMapper);
+      }
+
+      MetricsSystem metricsSystem = GravitinoEnv.getInstance().metricsSystem();
+      // Add null check to avoid NPE when metrics system is not initialized in test environments
+      if (metricsSystem != null) {
+        // Register connection pool metrics when metrics system is available
+        metricsSystem.register(new RelationDatasourceMetricsSource(dataSource));
+      }
+
+      // Create the SqlSessionFactory object, it is a singleton object
+      sqlSessionFactory = new SqlSessionFactoryBuilder().build(configuration);
     }
   }
 

@@ -33,6 +33,9 @@ import org.apache.gravitino.listener.api.event.IcebergDropTablePreEvent;
 import org.apache.gravitino.listener.api.event.IcebergListTableEvent;
 import org.apache.gravitino.listener.api.event.IcebergListTableFailureEvent;
 import org.apache.gravitino.listener.api.event.IcebergListTablePreEvent;
+import org.apache.gravitino.listener.api.event.IcebergLoadTableCredentialEvent;
+import org.apache.gravitino.listener.api.event.IcebergLoadTableCredentialFailureEvent;
+import org.apache.gravitino.listener.api.event.IcebergLoadTableCredentialPreEvent;
 import org.apache.gravitino.listener.api.event.IcebergLoadTableEvent;
 import org.apache.gravitino.listener.api.event.IcebergLoadTableFailureEvent;
 import org.apache.gravitino.listener.api.event.IcebergLoadTablePreEvent;
@@ -52,6 +55,7 @@ import org.apache.iceberg.rest.requests.CreateTableRequest;
 import org.apache.iceberg.rest.requests.RenameTableRequest;
 import org.apache.iceberg.rest.requests.UpdateTableRequest;
 import org.apache.iceberg.rest.responses.ListTablesResponse;
+import org.apache.iceberg.rest.responses.LoadCredentialsResponse;
 import org.apache.iceberg.rest.responses.LoadTableResponse;
 
 /**
@@ -229,5 +233,34 @@ public class IcebergTableEventDispatcher implements IcebergTableOperationDispatc
     }
     eventBus.dispatchEvent(
         new IcebergRenameTableEvent(context, gravitinoNameIdentifier, renameTableRequest));
+  }
+
+  /**
+   * Get credentials for an Iceberg table.
+   *
+   * @param context Iceberg REST request context information.
+   * @param tableIdentifier The Iceberg table identifier.
+   * @return A {@link org.apache.iceberg.rest.responses.LoadCredentialsResponse} object containing
+   *     the credentials.
+   */
+  @Override
+  public LoadCredentialsResponse getTableCredentials(
+      IcebergRequestContext context, TableIdentifier tableIdentifier) {
+    NameIdentifier gravitinoNameIdentifier =
+        IcebergRestUtils.getGravitinoNameIdentifier(
+            metalakeName, context.catalogName(), tableIdentifier);
+    eventBus.dispatchEvent(
+        new IcebergLoadTableCredentialPreEvent(context, gravitinoNameIdentifier));
+    LoadCredentialsResponse loadCredentialsResponse;
+    try {
+      loadCredentialsResponse =
+          icebergTableOperationDispatcher.getTableCredentials(context, tableIdentifier);
+    } catch (Exception e) {
+      eventBus.dispatchEvent(
+          new IcebergLoadTableCredentialFailureEvent(context, gravitinoNameIdentifier, e));
+      throw e;
+    }
+    eventBus.dispatchEvent(new IcebergLoadTableCredentialEvent(context, gravitinoNameIdentifier));
+    return loadCredentialsResponse;
   }
 }

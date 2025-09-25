@@ -31,7 +31,9 @@ import org.apache.gravitino.tag.Tag;
 /** List the properties of a tag. */
 public class ListTagProperties extends ListProperties {
 
+  /** The name of the metalake. */
   protected final String metalake;
+  /** The name of the tag. */
   protected final String tag;
 
   /**

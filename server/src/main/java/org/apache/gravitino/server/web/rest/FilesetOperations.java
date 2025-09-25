@@ -23,9 +23,6 @@ import static org.apache.gravitino.file.Fileset.LOCATION_NAME_UNKNOWN;
 import com.codahale.metrics.annotation.ResponseMetered;
 import com.codahale.metrics.annotation.Timed;
 import com.google.common.collect.ImmutableMap;
-import java.io.UnsupportedEncodingException;
-import java.net.URLDecoder;
-import java.nio.charset.StandardCharsets;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
@@ -44,7 +41,6 @@ import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.Response;
-import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
@@ -68,6 +64,7 @@ import org.apache.gravitino.rest.RESTUtils;
 import org.apache.gravitino.server.authorization.MetadataFilterHelper;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationExpression;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationMetadata;
+import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants;
 import org.apache.gravitino.server.web.Utils;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
@@ -81,11 +78,6 @@ public class FilesetOperations {
 
   private final FilesetDispatcher dispatcher;
 
-  private static final String loadFilesetAuthorizationExpression =
-      "ANY(OWNER, METALAKE, CATALOG) || "
-          + "SCHEMA_OWNER_WITH_USE_CATALOG || "
-          + "ANY_USE_CATALOG && ANY_USE_SCHEMA && (FILESET::OWNER || ANY_READ_FILESET || ANY_WRITE_FILESET)";
-
   @Context private HttpServletRequest httpRequest;
 
   @Inject
@@ -97,6 +89,9 @@ public class FilesetOperations {
   @Produces("application/vnd.gravitino.v1+json")
   @Timed(name = "list-fileset." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "list-fileset", absolute = true)
+  @AuthorizationExpression(
+      expression = AuthorizationExpressionConstants.loadSchemaAuthorizationExpression,
+      accessMetadataType = MetadataObject.Type.SCHEMA)
   public Response listFilesets(
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
           String metalake,
@@ -113,7 +108,7 @@ public class FilesetOperations {
             idents =
                 MetadataFilterHelper.filterByExpression(
                     metalake,
-                    loadFilesetAuthorizationExpression,
+                    AuthorizationExpressionConstants.filterFilesetAuthorizationExpression,
                     Entity.EntityType.FILESET,
                     idents);
             Response response = Utils.ok(new EntityListResponse(idents));
@@ -194,7 +189,7 @@ public class FilesetOperations {
   @Timed(name = "load-fileset." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "load-fileset", absolute = true)
   @AuthorizationExpression(
-      expression = loadFilesetAuthorizationExpression,
+      expression = AuthorizationExpressionConstants.loadFilesetAuthorizationExpression,
       accessMetadataType = MetadataObject.Type.FILESET)
   public Response loadFileset(
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
@@ -225,7 +220,7 @@ public class FilesetOperations {
   @Timed(name = "list-fileset-files." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "list-fileset-files", absolute = true)
   @AuthorizationExpression(
-      expression = loadFilesetAuthorizationExpression,
+      expression = AuthorizationExpressionConstants.loadFilesetAuthorizationExpression,
       accessMetadataType = MetadataObject.Type.FILESET)
   public Response listFiles(
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
@@ -234,8 +229,7 @@ public class FilesetOperations {
       @PathParam("schema") @AuthorizationMetadata(type = Entity.EntityType.SCHEMA) String schema,
       @PathParam("fileset") @AuthorizationMetadata(type = Entity.EntityType.FILESET) String fileset,
       @QueryParam("sub_path") @DefaultValue("/") String subPath,
-      @QueryParam("location_name") String locationName)
-      throws UnsupportedEncodingException {
+      @QueryParam("location_name") String locationName) {
     LOG.info(
         "Received list files request: {}.{}.{}.{}, subPath: {}, locationName:{}",
         metalake,
@@ -245,15 +239,14 @@ public class FilesetOperations {
         subPath,
         locationName);
 
-    final String decodedSubPath =
-        StringUtils.isNotBlank(subPath)
-            ? URLDecoder.decode(subPath, StandardCharsets.UTF_8.name())
-            : subPath;
-
     try {
       return Utils.doAs(
           httpRequest,
           () -> {
+            int[] clientVersion = Utils.getClientVersion(httpRequest);
+            boolean isV1PlusClient = clientVersion == null || clientVersion[0] >= 1;
+            String decodedSubPath = isV1PlusClient ? subPath : RESTUtils.decodeString(subPath);
+
             NameIdentifier filesetIdent =
                 NameIdentifierUtil.ofFileset(metalake, catalog, schema, fileset);
             FileInfo[] files = dispatcher.listFiles(filesetIdent, locationName, decodedSubPath);
@@ -264,7 +257,7 @@ public class FilesetOperations {
                 catalog,
                 schema,
                 fileset,
-                subPath,
+                decodedSubPath,
                 locationName);
             return response;
           });
@@ -358,7 +351,7 @@ public class FilesetOperations {
   @Timed(name = "get-file-location." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "get-file-location", absolute = true)
   @AuthorizationExpression(
-      expression = loadFilesetAuthorizationExpression,
+      expression = AuthorizationExpressionConstants.loadFilesetAuthorizationExpression,
       accessMetadataType = MetadataObject.Type.FILESET)
   public Response getFileLocation(
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
@@ -374,12 +367,20 @@ public class FilesetOperations {
         catalog,
         schema,
         fileset,
-        RESTUtils.decodeString(subPath),
-        Optional.ofNullable(locationName).map(RESTUtils::decodeString).orElse(null));
+        subPath,
+        locationName);
     try {
       return Utils.doAs(
           httpRequest,
           () -> {
+            int[] clientVersion = Utils.getClientVersion(httpRequest);
+            boolean isV1PlusClient = clientVersion == null || clientVersion[0] >= 1;
+            String decodedSubPath = isV1PlusClient ? subPath : RESTUtils.decodeString(subPath);
+            String decodedLocationName =
+                isV1PlusClient
+                    ? locationName
+                    : Optional.ofNullable(locationName).map(RESTUtils::decodeString).orElse(null);
+
             NameIdentifier ident = NameIdentifierUtil.ofFileset(metalake, catalog, schema, fileset);
             Map<String, String> filteredAuditHeaders = Utils.filterFilesetAuditHeaders(httpRequest);
             // set the audit info into the thread local context
@@ -389,10 +390,7 @@ public class FilesetOperations {
               CallerContext.CallerContextHolder.set(context);
             }
             String actualFileLocation =
-                dispatcher.getFileLocation(
-                    ident,
-                    RESTUtils.decodeString(subPath),
-                    Optional.ofNullable(locationName).map(RESTUtils::decodeString).orElse(null));
+                dispatcher.getFileLocation(ident, decodedSubPath, decodedLocationName);
             return Utils.ok(new FileLocationResponse(actualFileLocation));
           });
     } catch (Exception e) {

@@ -78,13 +78,13 @@ public class TestCacheIndexCoherence {
           + "atomicity or thread-safety guarantees.")
   @State
   public static class InsertSameKeyCoherenceTest {
-    private final RadixTree<EntityCacheKey> indexTree =
+    private final RadixTree<EntityCacheRelationKey> indexTree =
         new ConcurrentRadixTree<>(new DefaultCharArrayNodeFactory());
 
     private final NameIdentifier ident = NameIdentifier.of("metalake1", "catalog1", "schema1");
     private final Entity entity =
         getTestSchemaEntity(123L, "schema1", Namespace.of("metalake1", "catalog1"), "ident1");
-    private final EntityCacheKey key = EntityCacheKey.of(ident, entity.type());
+    private final EntityCacheRelationKey key = EntityCacheRelationKey.of(ident, entity.type());
     private final String keyStr = key.toString();
 
     @Actor
@@ -99,7 +99,7 @@ public class TestCacheIndexCoherence {
 
     @Arbiter
     public void arbiter(I_Result r) {
-      EntityCacheKey valueForExactKey = indexTree.getValueForExactKey(keyStr);
+      EntityCacheRelationKey valueForExactKey = indexTree.getValueForExactKey(keyStr);
       r.r1 =
           (valueForExactKey != null
                   && Objects.equals(valueForExactKey, key)
@@ -121,12 +121,12 @@ public class TestCacheIndexCoherence {
           + "forbidden result indicates incorrect key handling or data loss under concurrency.")
   @State
   public static class InsertSameKeyWithRelationTypeCoherenceTest {
-    private final RadixTree<EntityCacheKey> indexTree =
+    private final RadixTree<EntityCacheRelationKey> indexTree =
         new ConcurrentRadixTree<>(new DefaultCharArrayNodeFactory());
 
     private final NameIdentifier ident = NameIdentifierUtil.ofRole("metalake", "role");
-    private final EntityCacheKey key =
-        EntityCacheKey.of(
+    private final EntityCacheRelationKey key =
+        EntityCacheRelationKey.of(
             ident, Entity.EntityType.ROLE, SupportsRelationOperations.Type.ROLE_USER_REL);
     private final String keyStr = key.toString();
 
@@ -142,7 +142,7 @@ public class TestCacheIndexCoherence {
 
     @Arbiter
     public void arbiter(I_Result r) {
-      EntityCacheKey valueForExactKey = indexTree.getValueForExactKey(keyStr);
+      EntityCacheRelationKey valueForExactKey = indexTree.getValueForExactKey(keyStr);
       r.r1 =
           (valueForExactKey != null
                   && Objects.equals(valueForExactKey, key)
@@ -164,7 +164,7 @@ public class TestCacheIndexCoherence {
           + "indicates data loss or broken concurrency guarantees.")
   @State
   public static class InsertMultipleKeyCoherenceTest {
-    private final RadixTree<EntityCacheKey> indexTree =
+    private final RadixTree<EntityCacheRelationKey> indexTree =
         new ConcurrentRadixTree<>(new DefaultCharArrayNodeFactory());
 
     private final NameIdentifier ident1 = NameIdentifier.of("metalake1", "catalog1", "schema1");
@@ -173,8 +173,8 @@ public class TestCacheIndexCoherence {
     private final NameIdentifier ident2 = NameIdentifier.of("metalake1", "catalog1", "schema2");
     private final Entity entity2 =
         getTestSchemaEntity(456L, "schema2", Namespace.of("metalake1", "catalog1"), "ident2");
-    private final EntityCacheKey key1 = EntityCacheKey.of(ident1, entity1.type());
-    private final EntityCacheKey key2 = EntityCacheKey.of(ident2, entity2.type());
+    private final EntityCacheRelationKey key1 = EntityCacheRelationKey.of(ident1, entity1.type());
+    private final EntityCacheRelationKey key2 = EntityCacheRelationKey.of(ident2, entity2.type());
     private final String key1Str = key1.toString();
     private final String key2Str = key2.toString();
 
@@ -190,8 +190,8 @@ public class TestCacheIndexCoherence {
 
     @Arbiter
     public void arbiter(I_Result r) {
-      EntityCacheKey valueForExactKey1 = indexTree.getValueForExactKey(key1Str);
-      EntityCacheKey valueForExactKey2 = indexTree.getValueForExactKey(key2Str);
+      EntityCacheRelationKey valueForExactKey1 = indexTree.getValueForExactKey(key1Str);
+      EntityCacheRelationKey valueForExactKey2 = indexTree.getValueForExactKey(key2Str);
       r.r1 =
           (valueForExactKey1 != null
                   && valueForExactKey2 != null
@@ -215,17 +215,17 @@ public class TestCacheIndexCoherence {
           + "both entries. A forbidden result indicates relation type is not correctly distinguished.")
   @State
   public static class InsertMultipleKeyWithRelationTypeCoherenceTest {
-    private final RadixTree<EntityCacheKey> indexTree =
+    private final RadixTree<EntityCacheRelationKey> indexTree =
         new ConcurrentRadixTree<>(new DefaultCharArrayNodeFactory());
 
     private final NameIdentifier ident1 = NameIdentifierUtil.ofRole("metalake", "role1");
     private final NameIdentifier ident2 = NameIdentifierUtil.ofRole("metalake", "role1");
 
-    private final EntityCacheKey key1 =
-        EntityCacheKey.of(
+    private final EntityCacheRelationKey key1 =
+        EntityCacheRelationKey.of(
             ident1, Entity.EntityType.ROLE, SupportsRelationOperations.Type.ROLE_USER_REL);
-    private final EntityCacheKey key2 =
-        EntityCacheKey.of(
+    private final EntityCacheRelationKey key2 =
+        EntityCacheRelationKey.of(
             ident2, Entity.EntityType.ROLE, SupportsRelationOperations.Type.ROLE_GROUP_REL);
     private final String key1Str = key1.toString();
     private final String key2Str = key2.toString();
@@ -242,8 +242,8 @@ public class TestCacheIndexCoherence {
 
     @Arbiter
     public void arbiter(I_Result r) {
-      EntityCacheKey valueForExactKey1 = indexTree.getValueForExactKey(key1Str);
-      EntityCacheKey valueForExactKey2 = indexTree.getValueForExactKey(key2Str);
+      EntityCacheRelationKey valueForExactKey1 = indexTree.getValueForExactKey(key1Str);
+      EntityCacheRelationKey valueForExactKey2 = indexTree.getValueForExactKey(key2Str);
       r.r1 =
           (valueForExactKey1 != null
                   && valueForExactKey2 != null
@@ -309,12 +309,12 @@ public class TestCacheIndexCoherence {
   @State
   public static class PutRemoveSameKeyWithRelationTypeCoherenceTest {
 
-    private final RadixTree<EntityCacheKey> indexTree =
+    private final RadixTree<EntityCacheRelationKey> indexTree =
         new ConcurrentRadixTree<>(new DefaultCharArrayNodeFactory());
 
     private final NameIdentifier ident = NameIdentifierUtil.ofRole("metalake", "role");
-    private final EntityCacheKey key =
-        EntityCacheKey.of(
+    private final EntityCacheRelationKey key =
+        EntityCacheRelationKey.of(
             ident, Entity.EntityType.ROLE, SupportsRelationOperations.Type.ROLE_USER_REL);
     private final String keyStr = key.toString();
 
@@ -330,7 +330,7 @@ public class TestCacheIndexCoherence {
 
     @Arbiter
     public void arbiter(I_Result r) {
-      EntityCacheKey value = indexTree.getValueForExactKey(keyStr);
+      EntityCacheRelationKey value = indexTree.getValueForExactKey(keyStr);
       r.r1 = (value == null) ? 1 : 0;
     }
   }
@@ -416,17 +416,17 @@ public class TestCacheIndexCoherence {
   @State
   public static class PutAndPrefixScanWithRelationTypeCoherenceTest {
 
-    private final RadixTree<EntityCacheKey> indexTree =
+    private final RadixTree<EntityCacheRelationKey> indexTree =
         new ConcurrentRadixTree<>(new DefaultCharArrayNodeFactory());
 
     private final NameIdentifier ident1 = NameIdentifierUtil.ofRole("metalake", "role1");
     private final NameIdentifier ident2 = NameIdentifierUtil.ofRole("metalake", "role2");
 
-    private final EntityCacheKey key1 =
-        EntityCacheKey.of(
+    private final EntityCacheRelationKey key1 =
+        EntityCacheRelationKey.of(
             ident1, Entity.EntityType.ROLE, SupportsRelationOperations.Type.ROLE_USER_REL);
-    private final EntityCacheKey key2 =
-        EntityCacheKey.of(
+    private final EntityCacheRelationKey key2 =
+        EntityCacheRelationKey.of(
             ident2, Entity.EntityType.ROLE, SupportsRelationOperations.Type.ROLE_GROUP_REL);
     private final String key1Str = key1.toString();
     private final String key2Str = key2.toString();
@@ -443,7 +443,7 @@ public class TestCacheIndexCoherence {
 
     @Arbiter
     public void arbiter(II_Result r) {
-      ImmutableList<EntityCacheKey> values =
+      ImmutableList<EntityCacheRelationKey> values =
           ImmutableList.copyOf(indexTree.getValuesForKeysStartingWith("metalake"));
       r.r1 = values.contains(key1) ? 1 : 0;
       r.r2 = values.contains(key2) ? 1 : 0;
@@ -495,11 +495,11 @@ public class TestCacheIndexCoherence {
           + "Missing value is interesting but not forbidden, depending on execution timing.")
   @State
   public static class PutAndGetWithRelationTypeCoherenceTest {
-    private final RadixTree<EntityCacheKey> indexTree =
+    private final RadixTree<EntityCacheRelationKey> indexTree =
         new ConcurrentRadixTree<>(new DefaultCharArrayNodeFactory());
     private final NameIdentifier ident = NameIdentifierUtil.ofRole("metalake", "role");
-    private final EntityCacheKey key =
-        EntityCacheKey.of(
+    private final EntityCacheRelationKey key =
+        EntityCacheRelationKey.of(
             ident, Entity.EntityType.ROLE, SupportsRelationOperations.Type.ROLE_USER_REL);
     private final String keyStr = key.toString();
 

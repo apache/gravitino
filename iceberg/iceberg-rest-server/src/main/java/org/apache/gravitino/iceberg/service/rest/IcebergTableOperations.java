@@ -56,6 +56,7 @@ import org.apache.iceberg.rest.requests.CreateTableRequest;
 import org.apache.iceberg.rest.requests.ReportMetricsRequest;
 import org.apache.iceberg.rest.requests.UpdateTableRequest;
 import org.apache.iceberg.rest.responses.ListTablesResponse;
+import org.apache.iceberg.rest.responses.LoadCredentialsResponse;
 import org.apache.iceberg.rest.responses.LoadTableResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -329,6 +330,41 @@ public class IcebergTableOperations {
     } catch (JsonProcessingException e) {
       LOG.warn("Serialize update table request failed", e);
       return updateTableRequest.toString();
+    }
+  }
+
+  @GET
+  @Path("{table}/credentials")
+  @Produces(MediaType.APPLICATION_JSON)
+  @Timed(name = "get-table-credentials." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
+  @ResponseMetered(name = "get-table-credentials", absolute = true)
+  public Response getTableCredentials(
+      @PathParam("prefix") String prefix,
+      @Encoded() @PathParam("namespace") String namespace,
+      @PathParam("table") String table) {
+    String catalogName = IcebergRestUtils.getCatalogName(prefix);
+    Namespace icebergNS = RESTUtil.decodeNamespace(namespace);
+    LOG.info(
+        "Get Iceberg table credentials, catalog: {}, namespace: {}, table: {}",
+        catalogName,
+        icebergNS,
+        table);
+    try {
+      return Utils.doAs(
+          httpRequest,
+          () -> {
+            // Convert Iceberg table identifier to Gravitino NameIdentifier
+            TableIdentifier tableIdentifier = TableIdentifier.of(icebergNS, table);
+            // First check if the table exists
+            IcebergRequestContext context =
+                new IcebergRequestContext(httpServletRequest(), catalogName);
+            // Get credentials using the table operation dispatcher
+            LoadCredentialsResponse credentialsResponse =
+                tableOperationDispatcher.getTableCredentials(context, tableIdentifier);
+            return IcebergRestUtils.ok(credentialsResponse);
+          });
+    } catch (Exception e) {
+      return IcebergExceptionMapper.toRESTResponse(e);
     }
   }
 

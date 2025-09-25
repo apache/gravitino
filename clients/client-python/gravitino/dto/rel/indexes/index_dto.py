@@ -18,7 +18,7 @@
 from functools import reduce
 from typing import ClassVar, List, Optional
 
-from gravitino.api.expressions.indexes.index import Index
+from gravitino.api.rel.indexes.index import Index
 from gravitino.utils.precondition import Precondition
 
 
@@ -61,7 +61,7 @@ class IndexDTO(Index):
             return False
         return (
             self._index_type is other.type()
-            and self._name is other.name()
+            and self._name == other.name()
             and self._field_names == other.field_names()
         )
 
