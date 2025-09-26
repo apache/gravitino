@@ -93,7 +93,7 @@ public class SetFilesetProperty extends Command {
       exitWithError(exp.getMessage());
     }
 
-    printInformation(schema + " property set.");
+    printInformation(fileset + " property set.");
   }
 
   @Override
