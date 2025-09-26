@@ -36,7 +36,6 @@ import org.apache.gravitino.Configs;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.HasIdentifier;
-import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.SupportsRelationOperations;
@@ -456,37 +455,6 @@ public class JDBCBackend implements RelationalBackend {
   }
 
   @Override
-  public List<MetadataObject> listAssociatedMetadataObjectsForTag(NameIdentifier tagIdent)
-      throws IOException {
-    return TagMetaService.getInstance().listAssociatedMetadataObjectsForTag(tagIdent);
-  }
-
-  @Override
-  public List<TagEntity> listAssociatedTagsForMetadataObject(
-      NameIdentifier objectIdent, Entity.EntityType objectType)
-      throws NoSuchEntityException, IOException {
-    return TagMetaService.getInstance().listTagsForMetadataObject(objectIdent, objectType);
-  }
-
-  @Override
-  public TagEntity getTagForMetadataObject(
-      NameIdentifier objectIdent, Entity.EntityType objectType, NameIdentifier tagIdent)
-      throws NoSuchEntityException, IOException {
-    return TagMetaService.getInstance().getTagForMetadataObject(objectIdent, objectType, tagIdent);
-  }
-
-  @Override
-  public List<TagEntity> associateTagsWithMetadataObject(
-      NameIdentifier objectIdent,
-      Entity.EntityType objectType,
-      NameIdentifier[] tagsToAdd,
-      NameIdentifier[] tagsToRemove)
-      throws NoSuchEntityException, EntityAlreadyExistsException, IOException {
-    return TagMetaService.getInstance()
-        .associateTagsWithMetadataObject(objectIdent, objectType, tagsToAdd, tagsToRemove);
-  }
-
-  @Override
   public int batchDelete(
       List<Pair<NameIdentifier, Entity.EntityType>> entitiesToDelete, boolean cascade)
       throws IOException {
@@ -597,6 +565,15 @@ public class JDBCBackend implements RelationalBackend {
               PolicyMetaService.getInstance()
                   .listPoliciesForMetadataObject(nameIdentifier, identType);
         }
+
+      case TAG_METADATA_OBJECT_REL:
+        if (identType == Entity.EntityType.TAG) {
+          return (List<E>)
+              TagMetaService.getInstance().listAssociatedMetadataObjectsForTag(nameIdentifier);
+        } else {
+          return (List<E>)
+              TagMetaService.getInstance().listTagsForMetadataObject(nameIdentifier, identType);
+        }
       default:
         throw new IllegalArgumentException(
             String.format("Doesn't support the relation type %s", relType));
@@ -635,6 +612,11 @@ public class JDBCBackend implements RelationalBackend {
             PolicyMetaService.getInstance()
                 .associatePoliciesWithMetadataObject(
                     srcEntityIdent, srcEntityType, destEntitiesToAdd, destEntitiesToRemove);
+      case TAG_METADATA_OBJECT_REL:
+        return (List<E>)
+            TagMetaService.getInstance()
+                .associateTagsWithMetadataObject(
+                    srcEntityIdent, srcEntityType, destEntitiesToAdd, destEntitiesToRemove);
       default:
         throw new IllegalArgumentException(
             String.format("Doesn't support the relation type %s", relType));
@@ -653,6 +635,10 @@ public class JDBCBackend implements RelationalBackend {
         return (E)
             PolicyMetaService.getInstance()
                 .getPolicyForMetadataObject(srcIdentifier, srcType, destEntityIdent);
+      case TAG_METADATA_OBJECT_REL:
+        return (E)
+            TagMetaService.getInstance()
+                .getTagForMetadataObject(srcIdentifier, srcType, destEntityIdent);
       default:
         throw new IllegalArgumentException(
             String.format("Doesn't support the relation type %s", relType));
