@@ -29,7 +29,7 @@ CREATE TABLE IF NOT EXISTS `metalake_meta` (
     `deleted_at` BIGINT NOT NULL DEFAULT 0 COMMENT 'metalake deleted at',
     PRIMARY KEY (metalake_id),
     CONSTRAINT uk_mn_del UNIQUE (metalake_name, deleted_at)
-) ENGINE = InnoDB;
+);
 
 
 CREATE TABLE IF NOT EXISTS `catalog_meta` (
