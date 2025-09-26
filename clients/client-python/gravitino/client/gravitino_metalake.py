@@ -22,6 +22,7 @@ from gravitino.api.catalog import Catalog
 from gravitino.api.catalog_change import CatalogChange
 from gravitino.api.job.job_handle import JobHandle
 from gravitino.api.job.job_template import JobTemplate
+from gravitino.api.job.job_template_change import JobTemplateChange
 from gravitino.api.job.supports_jobs import SupportsJobs
 from gravitino.client.dto_converters import DTOConverters
 from gravitino.client.generic_job_handle import GenericJobHandle
@@ -32,6 +33,9 @@ from gravitino.dto.requests.catalog_updates_request import CatalogUpdatesRequest
 from gravitino.dto.requests.job_run_request import JobRunRequest
 from gravitino.dto.requests.job_template_register_request import (
     JobTemplateRegisterRequest,
+)
+from gravitino.dto.requests.job_template_updates_request import (
+    JobTemplateUpdatesRequest,
 )
 from gravitino.dto.responses.catalog_list_response import CatalogListResponse
 from gravitino.dto.responses.catalog_response import CatalogResponse
@@ -364,6 +368,42 @@ class GravitinoMetalake(MetalakeDTO, SupportsJobs):
         drop_response.validate()
 
         return drop_response.dropped()
+
+    def alter_job_template(
+        self, job_template_name: str, *changes: JobTemplateChange
+    ) -> JobTemplate:
+        """Alter the job template with specified name by applying the changes.
+
+        Args:
+            job_template_name: the name of the job template.
+            changes: the changes to apply to the job template.
+
+        Raises:
+            NoSuchJobTemplateException if the job template with specified name does not exist.
+            IllegalArgumentException if the changes are invalid.
+
+        Returns:
+            the altered JobTemplate.
+        """
+
+        reqs = [
+            DTOConverters.to_job_template_update_request(change) for change in changes
+        ]
+        updates_request = JobTemplateUpdatesRequest(reqs)
+
+        url = (
+            f"{self.API_METALAKES_JOB_TEMPLATES_PATH.format(encode_string(self.name()))}/"
+            f"{encode_string(job_template_name)}"
+        )
+        response = self.rest_client.put(
+            url, json=updates_request, error_handler=JOB_ERROR_HANDLER
+        )
+        job_template_response = JobTemplateResponse.from_json(
+            response.body, infer_missing=True
+        )
+        job_template_response.validate()
+
+        return DTOConverters.from_job_template_dto(job_template_response.job_template())
 
     def list_jobs(self, job_template_name: str = None) -> List[JobHandle]:
         """List all the jobs under this metalake.
