@@ -51,7 +51,7 @@ public class IsolatedClassLoader implements Closeable {
 
   private final List<String> barrierClasses;
 
-  private URLClassLoader classLoader;
+  protected URLClassLoader classLoader;
 
   private final ClassLoader baseClassLoader;
 
