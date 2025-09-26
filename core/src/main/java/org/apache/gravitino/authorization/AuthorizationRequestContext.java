@@ -21,11 +21,11 @@ import java.security.Principal;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.function.Function;
-import java.util.concurrent.FutureTask;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.FutureTask;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Function;
 import org.apache.gravitino.MetadataObject;
 
 public class AuthorizationRequestContext {
@@ -86,10 +86,12 @@ public class AuthorizationRequestContext {
     if (hasLoadRole.get()) {
       return;
     }
-    FutureTask<Void> task = new FutureTask<>(() -> {
-      runnable.run();
-      return null;
-    });
+    FutureTask<Void> task =
+        new FutureTask<>(
+            () -> {
+              runnable.run();
+              return null;
+            });
     if (loadRoleTask.compareAndSet(null, task)) {
       task.run();
       hasLoadRole.set(true);
