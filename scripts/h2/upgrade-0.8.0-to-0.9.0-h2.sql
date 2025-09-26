@@ -18,8 +18,8 @@
 --
 
 -- using default 'unknown' to fill in the new column for compatibility
-ALTER TABLE `fileset_version_info` ADD COLUMN `storage_location_name` VARCHAR(256) NOT NULL DEFAULT 'unknown' COMMENT 'fileset storage location name';
-ALTER TABLE `fileset_version_info` DROP INDEX `uk_fid_ver_del`;
-ALTER TABLE `fileset_version_info` ADD CONSTRAINT `uk_fid_ver_sto_del` UNIQUE (`fileset_id`, `version`, `storage_location_name`, `deleted_at`);
+ALTER TABLE fileset_version_info ADD COLUMN storage_location_name VARCHAR(256) NOT NULL DEFAULT 'unknown' COMMENT 'fileset storage location name';
+ALTER TABLE fileset_version_info DROP INDEX uk_fid_ver_del;
+ALTER TABLE fileset_version_info ADD CONSTRAINT uk_fid_ver_sto_del UNIQUE (fileset_id, version, storage_location_name, deleted_at);
 -- remove the default value for storage_location_name
-ALTER TABLE `fileset_version_info` ALTER COLUMN `storage_location_name` DROP DEFAULT;
+ALTER TABLE fileset_version_info ALTER COLUMN storage_location_name DROP DEFAULT;

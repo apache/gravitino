@@ -17,100 +17,167 @@
 -- under the License.
 --
 
-CREATE TABLE IF NOT EXISTS `policy_meta` (
-    `policy_id` BIGINT NOT NULL COMMENT 'policy id',
-    `policy_name` VARCHAR(128) NOT NULL COMMENT 'policy name',
-    `policy_type` VARCHAR(64) NOT NULL COMMENT 'policy type',
-    `metalake_id` BIGINT NOT NULL COMMENT 'metalake id',
-    `audit_info` CLOB NOT NULL COMMENT 'policy audit info',
-    `current_version` INT NOT NULL DEFAULT 1 COMMENT 'policy current version',
-    `last_version` INT NOT NULL DEFAULT 1 COMMENT 'policy last version',
-    `deleted_at` BIGINT NOT NULL DEFAULT 0 COMMENT 'policy deleted at',
-    PRIMARY KEY (`policy_id`),
-    UNIQUE KEY `uk_mi_pn_del` (`metalake_id`, `policy_name`, `deleted_at`)
+CREATE TABLE IF NOT EXISTS policy_meta (
+    policy_id BIGINT NOT NULL,
+    policy_name VARCHAR(128) NOT NULL,
+    policy_type VARCHAR(64) NOT NULL,
+    metalake_id BIGINT NOT NULL,
+    audit_info CLOB NOT NULL,
+    current_version INT NOT NULL DEFAULT 1,
+    last_version INT NOT NULL DEFAULT 1,
+    deleted_at BIGINT NOT NULL DEFAULT 0,
+    PRIMARY KEY (policy_id),
+    UNIQUE KEY uk_mi_pn_del (metalake_id, policy_name, deleted_at)
 );
 
-CREATE TABLE IF NOT EXISTS `policy_version_info` (
-    `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT 'auto increment id',
-    `metalake_id` BIGINT NOT NULL COMMENT 'metalake id',
-    `policy_id` BIGINT NOT NULL COMMENT 'policy id',
-    `version` INT NOT NULL COMMENT 'policy info version',
-    `policy_comment` CLOB DEFAULT NULL COMMENT 'policy info comment',
-    `enabled` SMALLINT DEFAULT 1 COMMENT 'whether the policy is enabled, 0 is disabled, 1 is enabled',
-    `content` CLOB DEFAULT NULL COMMENT 'policy content',
-    `deleted_at` BIGINT NOT NULL DEFAULT 0 COMMENT 'policy deleted at',
-    PRIMARY KEY (`id`),
-    UNIQUE KEY `uk_pod_ver_del` (`policy_id`, `version`, `deleted_at`),
-    KEY `idx_mid` (`metalake_id`)
+COMMENT ON TABLE policy_meta IS 'policy meta';
+COMMENT ON COLUMN policy_meta.policy_id IS 'policy id';
+COMMENT ON COLUMN policy_meta.policy_name IS 'policy name';
+COMMENT ON COLUMN policy_meta.policy_type IS 'policy type';
+COMMENT ON COLUMN policy_meta.metalake_id IS 'metalake id';
+COMMENT ON COLUMN policy_meta.audit_info IS 'policy audit info';
+COMMENT ON COLUMN policy_meta.current_version IS 'policy current version';
+COMMENT ON COLUMN policy_meta.last_version IS 'policy last version';
+COMMENT ON COLUMN policy_meta.deleted_at IS 'policy deleted at';
+
+CREATE TABLE IF NOT EXISTS policy_version_info (
+    id BIGINT NOT NULL AUTO_INCREMENT,
+    metalake_id BIGINT NOT NULL,
+    policy_id BIGINT NOT NULL,
+    version INT NOT NULL,
+    policy_comment CLOB DEFAULT NULL,
+    enabled TINYINT DEFAULT 1,
+    content CLOB DEFAULT NULL,
+    deleted_at BIGINT NOT NULL DEFAULT 0,
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_pod_ver_del (policy_id, version, deleted_at)
 );
 
-CREATE TABLE IF NOT EXISTS `policy_relation_meta` (
-    `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT 'auto increment id',
-    `policy_id` BIGINT NOT NULL COMMENT 'policy id',
-    `metadata_object_id` BIGINT NOT NULL COMMENT 'metadata object id',
-    `metadata_object_type` VARCHAR(64) NOT NULL COMMENT 'metadata object type',
-    `audit_info` CLOB NOT NULL COMMENT 'policy relation audit info',
-    `current_version` INT NOT NULL DEFAULT 1 COMMENT 'policy relation current version',
-    `last_version` INT NOT NULL DEFAULT 1 COMMENT 'policy relation last version',
-    `deleted_at` BIGINT NOT NULL DEFAULT 0 COMMENT 'policy relation deleted at',
-    PRIMARY KEY (`id`),
-    UNIQUE KEY `uk_pi_mi_mo_del` (`policy_id`, `metadata_object_id`, `metadata_object_type`, `deleted_at`),
-    KEY `idx_pid` (`policy_id`),
-    KEY `idx_mid` (`metadata_object_id`)
+CREATE INDEX IF NOT EXISTS idx_pmid ON policy_version_info (metalake_id);
+COMMENT ON TABLE policy_version_info IS 'policy_version_info';
+COMMENT ON COLUMN policy_version_info.id IS 'auto increment id';
+COMMENT ON COLUMN policy_version_info.metalake_id IS 'metalake id';
+COMMENT ON COLUMN policy_version_info.policy_id IS 'policy id';
+COMMENT ON COLUMN policy_version_info.version IS 'policy info version';
+COMMENT ON COLUMN policy_version_info.policy_comment IS 'policy info comment';
+COMMENT ON COLUMN policy_version_info.enabled IS 'whether the policy is enabled, 0 is disabled, 1 is enabled';
+COMMENT ON COLUMN policy_version_info.content IS 'policy content';
+COMMENT ON COLUMN policy_version_info.deleted_at IS 'policy deleted at';
+
+CREATE TABLE IF NOT EXISTS policy_relation_meta (
+    id BIGINT NOT NULL AUTO_INCREMENT,
+    policy_id BIGINT NOT NULL,
+    metadata_object_id BIGINT NOT NULL,
+    metadata_object_type VARCHAR(64) NOT NULL,
+    audit_info CLOB NOT NULL,
+    current_version INT NOT NULL DEFAULT 1,
+    last_version INT NOT NULL DEFAULT 1,
+    deleted_at BIGINT NOT NULL DEFAULT 0,
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_pi_mi_mo_del (policy_id, metadata_object_id, metadata_object_type, deleted_at)
 );
+
+CREATE INDEX IF NOT EXISTS idx_pid ON policy_relation_meta (policy_id);
+CREATE INDEX IF NOT EXISTS idx_prmid ON policy_relation_meta (metadata_object_id);
+COMMENT ON TABLE policy_relation_meta IS 'policy_relation_meta';
+COMMENT ON COLUMN policy_relation_meta.id IS 'auto increment id';
+COMMENT ON COLUMN policy_relation_meta.policy_id IS 'policy id';
+COMMENT ON COLUMN policy_relation_meta.metadata_object_id IS 'metadata object id';
+COMMENT ON COLUMN policy_relation_meta.metadata_object_type IS 'metadata object type';
+COMMENT ON COLUMN policy_relation_meta.audit_info IS 'policy relation audit info';
+COMMENT ON COLUMN policy_relation_meta.current_version IS 'policy relation current version';
+COMMENT ON COLUMN policy_relation_meta.last_version IS 'policy relation last version';
+COMMENT ON COLUMN policy_relation_meta.deleted_at IS 'policy relation deleted at';
+
 
 -- using default 'unknown' to fill in the new column for compatibility
-ALTER TABLE `model_version_info` ADD COLUMN `model_version_uri_name` VARCHAR(256) NOT NULL DEFAULT 'unknown' COMMENT 'model version uri name';
-ALTER TABLE `model_version_info` DROP INDEX `uk_mid_ver_del`;
-ALTER TABLE `model_version_info` ADD CONSTRAINT `uk_mid_ver_uri_del` UNIQUE (`model_id`, `version`, `model_version_uri_name`, `deleted_at`);
+ALTER TABLE model_version_info ADD COLUMN model_version_uri_name VARCHAR(256) NOT NULL DEFAULT 'unknown' COMMENT 'model version uri name';
+ALTER TABLE model_version_info DROP INDEX uk_mid_ver_del;
+ALTER TABLE model_version_info ADD CONSTRAINT uk_mid_ver_uri_del UNIQUE (model_id, version, model_version_uri_name, deleted_at);
 -- remove the default value for model_version_uri_name
-ALTER TABLE `model_version_info` ALTER COLUMN `model_version_uri_name` DROP DEFAULT;
+ALTER TABLE model_version_info ALTER COLUMN model_version_uri_name DROP DEFAULT;
 
-CREATE TABLE IF NOT EXISTS `statistic_meta` (
-    `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT 'auto increment id',
-    `statistic_id` BIGINT NOT NULL COMMENT 'statistic id',
-    `statistic_name` VARCHAR(128) NOT NULL COMMENT 'statistic name',
-    `metalake_id` BIGINT NOT NULL COMMENT 'metalake id',
-    `statistic_value` CLOB NOT NULL COMMENT 'statistic value',
-    `metadata_object_id` BIGINT NOT NULL COMMENT 'metadata object id',
-    `metadata_object_type` VARCHAR(64) NOT NULL COMMENT 'metadata object type',
-    `audit_info` CLOB NOT NULL COMMENT 'statistic audit info',
-    `current_version` INT NOT NULL DEFAULT 1 COMMENT 'statistic current version',
-    `last_version` INT NOT NULL DEFAULT 1 COMMENT 'statistic last version',
-    `deleted_at` BIGINT NOT NULL DEFAULT 0 COMMENT 'statistic deleted at',
-    PRIMARY KEY (`id`),
-    UNIQUE KEY `uk_si_mi_mo_del` (`statistic_name`, `metadata_object_id`, `deleted_at`),
-    KEY `idx_stid` (`statistic_id`),
-    KEY `idx_moid` (`metadata_object_id`)
+CREATE TABLE IF NOT EXISTS statistic_meta (
+    id BIGINT NOT NULL AUTO_INCREMENT,
+    statistic_id BIGINT NOT NULL,
+    statistic_name VARCHAR(128) NOT NULL,
+    metalake_id BIGINT NOT NULL,
+    statistic_value CLOB NOT NULL,
+    metadata_object_id BIGINT NOT NULL,
+    metadata_object_type VARCHAR(64) NOT NULL,
+    audit_info CLOB NOT NULL,
+    current_version INT NOT NULL DEFAULT 1,
+    last_version INT NOT NULL DEFAULT 1,
+    deleted_at BIGINT NOT NULL DEFAULT 0,
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_si_mi_mo_del (statistic_name, metadata_object_id, deleted_at),
 );
 
-CREATE TABLE IF NOT EXISTS `job_template_meta` (
-    `job_template_id` BIGINT NOT NULL COMMENT 'job template id',
-    `job_template_name` VARCHAR(128) NOT NULL COMMENT 'job template name',
-    `metalake_id` BIGINT NOT NULL COMMENT 'metalake id',
-    `job_template_comment` CLOB DEFAULT NULL COMMENT 'job template comment',
-    `job_template_content` CLOB NOT NULL COMMENT 'job template content',
-    `audit_info` CLOB NOT NULL COMMENT 'job template audit info',
-    `current_version` INT NOT NULL DEFAULT 1 COMMENT 'job template current version',
-    `last_version` INT NOT NULL DEFAULT 1 COMMENT 'job template last version',
-    `deleted_at` BIGINT NOT NULL DEFAULT 0 COMMENT 'job template deleted at',
-    PRIMARY KEY (`job_template_id`),
-    UNIQUE KEY `uk_mid_jtn_del` (`metalake_id`, `job_template_name`, `deleted_at`)
+CREATE INDEX IF NOT EXISTS idx_stid ON statistic_meta (statistic_id);
+CREATE INDEX IF NOT EXISTS idx_mpid ON statistic_meta (metadata_object_id);
+COMMENT ON TABLE statistic_meta IS 'statistic_meta';
+COMMENT ON COLUMN statistic_meta.id IS 'auto increment id';
+COMMENT ON COLUMN statistic_meta.statistic_id IS 'statistic id';
+COMMENT ON COLUMN statistic_meta.statistic_name IS 'statistic name';
+COMMENT ON COLUMN statistic_meta.metalake_id IS 'metalake id';
+COMMENT ON COLUMN statistic_meta.statistic_value IS 'statistic value';
+COMMENT ON COLUMN statistic_meta.metadata_object_id IS 'metadata object id';
+COMMENT ON COLUMN statistic_meta.metadata_object_type IS 'metadata object type';
+COMMENT ON COLUMN statistic_meta.audit_info IS 'statistic audit info';
+COMMENT ON COLUMN statistic_meta.current_version IS 'statistic current version';
+COMMENT ON COLUMN statistic_meta.last_version IS 'statistic last version';
+COMMENT ON COLUMN statistic_meta.deleted_at IS 'statistic deleted at';
+
+CREATE TABLE IF NOT EXISTS job_template_meta (
+    job_template_id BIGINT NOT NULL,
+    job_template_name VARCHAR(128) NOT NULL,
+    metalake_id BIGINT NOT NULL,
+    job_template_comment CLOB DEFAULT NULL,
+    job_template_content CLOB NOT NULL,
+    audit_info CLOB NOT NULL,
+    current_version INT NOT NULL DEFAULT 1,
+    last_version INT NOT NULL DEFAULT 1,
+    deleted_at BIGINT NOT NULL DEFAULT 0,
+    PRIMARY KEY (job_template_id),
+    UNIQUE KEY uk_mid_jtn_del (metalake_id, job_template_name, deleted_at)
 );
 
-CREATE TABLE IF NOT EXISTS `job_run_meta` (
-    `job_run_id` BIGINT NOT NULL COMMENT 'job run id',
-    `job_template_id` BIGINT NOT NULL COMMENT 'job template id',
-    `metalake_id` BIGINT NOT NULL COMMENT 'metalake id',
-    `job_execution_id` varchar(256) NOT NULL COMMENT 'job execution id',
-    `job_run_status` varchar(64) NOT NULL COMMENT 'job run status',
-    `job_finished_at` BIGINT NOT NULL DEFAULT 0 COMMENT 'job finished at',
-    `audit_info` CLOB NOT NULL COMMENT 'job run audit info',
-    `current_version` INT NOT NULL DEFAULT 1 COMMENT 'job run current version',
-    `last_version` INT NOT NULL DEFAULT 1 COMMENT 'job run last version',
-    `deleted_at` BIGINT NOT NULL DEFAULT 0 COMMENT 'job run deleted at',
-    PRIMARY KEY (`job_run_id`),
-    UNIQUE KEY `uk_mid_jei_del` (`metalake_id`, `job_execution_id`, `deleted_at`),
-    KEY `idx_job_template_id` (`job_template_id`),
-    KEY `idx_job_execution_id` (`job_execution_id`)
+COMMENT ON TABLE job_template_meta IS 'job_template_meta';
+COMMENT ON COLUMN job_template_meta.job_template_id IS 'job template id';
+COMMENT ON COLUMN job_template_meta.job_template_name IS 'job template name';
+COMMENT ON COLUMN job_template_meta.metalake_id IS 'metalake id';
+COMMENT ON COLUMN job_template_meta.job_template_comment IS 'job template comment';
+COMMENT ON COLUMN job_template_meta.job_template_content IS 'job template content';
+COMMENT ON COLUMN job_template_meta.audit_info IS 'job template audit info';
+COMMENT ON COLUMN job_template_meta.current_version IS 'job template current version';
+COMMENT ON COLUMN job_template_meta.last_version IS 'job template last version';
+COMMENT ON COLUMN job_template_meta.deleted_at IS 'job template deleted at';
+
+CREATE TABLE IF NOT EXISTS job_run_meta (
+    job_run_id BIGINT NOT NULL,
+    job_template_id BIGINT NOT NULL,
+    metalake_id BIGINT NOT NULL,
+    job_execution_id VARCHAR(256) NOT NULL,
+    job_run_status VARCHAR(64) NOT NULL,
+    job_finished_at BIGINT NOT NULL DEFAULT 0,
+    audit_info CLOB NOT NULL,
+    current_version INT NOT NULL DEFAULT 1,
+    last_version INT NOT NULL DEFAULT 1,
+    deleted_at BIGINT NOT NULL DEFAULT 0,
+    PRIMARY KEY (job_run_id),
+    UNIQUE KEY uk_mid_jei_del (metalake_id, job_execution_id, deleted_at)
 );
+
+CREATE INDEX IF NOT EXISTS idx_job_execution_id ON job_run_meta (job_template_id);
+CREATE INDEX IF NOT EXISTS idx_job_template_id ON job_run_meta (job_execution_id);
+COMMENT ON TABLE job_run_meta IS 'job_run_meta';
+COMMENT ON COLUMN job_run_meta.job_run_id IS 'job run id';
+COMMENT ON COLUMN job_run_meta.job_template_id IS 'job template id';
+COMMENT ON COLUMN job_run_meta.metalake_id IS 'metalake id';
+COMMENT ON COLUMN job_run_meta.job_execution_id IS 'job execution id';
+COMMENT ON COLUMN job_run_meta.job_run_status IS 'job run status';
+COMMENT ON COLUMN job_run_meta.job_finished_at IS 'job finished at';
+COMMENT ON COLUMN job_run_meta.audit_info IS 'job run audit info';
+COMMENT ON COLUMN job_run_meta.current_version IS 'job run current version';
+COMMENT ON COLUMN job_run_meta.last_version IS 'job run last version';
+COMMENT ON COLUMN job_run_meta.deleted_at IS 'job run deleted at';

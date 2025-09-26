@@ -16,27 +16,47 @@
 -- specific language governing permissions and limitations
 -- under the License.
 --
-CREATE TABLE IF NOT EXISTS `table_column_version_info` (
-    `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT 'auto increment id',
-    `metalake_id` BIGINT NOT NULL COMMENT 'metalake id',
-    `catalog_id` BIGINT NOT NULL COMMENT 'catalog id',
-    `schema_id` BIGINT NOT NULL COMMENT 'schema id',
-    `table_id` BIGINT NOT NULL COMMENT 'table id',
-    `table_version` INT NOT NULL COMMENT 'table version',
-    `column_id` BIGINT NOT NULL COMMENT 'column id',
-    `column_name` VARCHAR(128) NOT NULL COMMENT 'column name',
-    `column_position` INT NOT NULL COMMENT 'column position, starting from 0',
-    `column_type` CLOB NOT NULL COMMENT 'column type',
-    `column_comment` VARCHAR(256) DEFAULT '' COMMENT 'column comment',
-    `column_nullable` SMALLINT NOT NULL DEFAULT 1 COMMENT 'column nullable, 0 is not nullable, 1 is nullable',
-    `column_auto_increment` SMALLINT NOT NULL DEFAULT 0 COMMENT 'column auto increment, 0 is not auto increment, 1 is auto increment',
-    `column_default_value` CLOB DEFAULT NULL COMMENT 'column default value',
-    `column_op_type` SMALLINT NOT NULL COMMENT 'column operation type, 1 is create, 2 is update, 3 is delete',
-    `deleted_at` BIGINT NOT NULL DEFAULT 0 COMMENT 'column deleted at',
-    `audit_info` CLOB NOT NULL COMMENT 'column audit info',
-    PRIMARY KEY (`id`),
-    UNIQUE KEY `uk_tid_ver_cid_del` (`table_id`, `table_version`, `column_id`, `deleted_at`),
-    KEY `idx_tcmid` (`metalake_id`),
-    KEY `idx_tccid` (`catalog_id`),
-    KEY `idx_tcsid` (`schema_id`)
+CREATE TABLE IF NOT EXISTS table_column_version_info (
+    id BIGINT NOT NULL AUTO_INCREMENT,
+    metalake_id BIGINT NOT NULL,
+    catalog_id BIGINT NOT NULL,
+    schema_id BIGINT NOT NULL,
+    table_id BIGINT NOT NULL,
+    table_version INT NOT NULL,
+    column_id BIGINT NOT NULL,
+    column_name VARCHAR(128) NOT NULL,
+    column_position INT NOT NULL,
+    column_type CLOB NOT NULL,
+    column_comment VARCHAR(256) DEFAULT '',
+    column_nullable TINYINT NOT NULL DEFAULT 1,
+    column_auto_increment TINYINT NOT NULL DEFAULT 0,
+    column_default_value CLOB DEFAULT NULL,
+    column_op_type TINYINT NOT NULL,
+    deleted_at BIGINT NOT NULL DEFAULT 0,
+    audit_info CLOB NOT NULL,
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_tid_ver_cid_del (table_id, table_version, column_id, deleted_at)
 );
+
+
+CREATE INDEX IF NOT EXISTS idx_tcmid ON table_column_version_info (metalake_id);
+CREATE INDEX IF NOT EXISTS idx_tccid ON table_column_version_info (catalog_id);
+CREATE INDEX IF NOT EXISTS idx_tcsid ON table_column_version_info (schema_id);
+COMMENT ON TABLE table_column_version_info IS 'table column version info';
+COMMENT ON COLUMN table_column_version_info.id IS 'auto increment id';
+COMMENT ON COLUMN table_column_version_info.metalake_id IS 'metalake id';
+COMMENT ON COLUMN table_column_version_info.catalog_id IS 'catalog id';
+COMMENT ON COLUMN table_column_version_info.schema_id IS 'schema id';
+COMMENT ON COLUMN table_column_version_info.table_id IS 'table id';
+COMMENT ON COLUMN table_column_version_info.table_version IS 'table version';
+COMMENT ON COLUMN table_column_version_info.column_id IS 'column id';
+COMMENT ON COLUMN table_column_version_info.column_name IS 'column name';
+COMMENT ON COLUMN table_column_version_info.column_position IS 'column position, starting from 0';
+COMMENT ON COLUMN table_column_version_info.column_type IS 'column type';
+COMMENT ON COLUMN table_column_version_info.column_comment IS 'column comment';
+COMMENT ON COLUMN table_column_version_info.column_nullable IS 'column nullable, 0 is not nullable, 1 is nullable';
+COMMENT ON COLUMN table_column_version_info.column_auto_increment IS 'column auto increment, 0 is not auto increment, 1 is auto increment';
+COMMENT ON COLUMN table_column_version_info.column_default_value IS 'column default value';
+COMMENT ON COLUMN table_column_version_info.column_op_type IS 'column operation type, 1 is create, 2 is update, 3 is delete';
+COMMENT ON COLUMN table_column_version_info.deleted_at IS 'column deleted at';
+COMMENT ON COLUMN table_column_version_info.audit_info IS 'column audit info';
