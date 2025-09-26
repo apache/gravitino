@@ -29,10 +29,14 @@ import lombok.Setter;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergCatalogBackend;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
+import org.apache.gravitino.iceberg.common.cache.MemoryMetadataCache;
+import org.apache.gravitino.iceberg.common.cache.MetadataCache;
+import org.apache.gravitino.iceberg.common.cache.SupportsMetadataLocation;
 import org.apache.gravitino.iceberg.common.utils.IcebergCatalogUtil;
 import org.apache.gravitino.utils.IsolatedClassLoader;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.iceberg.TableMetadata;
 import org.apache.iceberg.Transaction;
 import org.apache.iceberg.catalog.Catalog;
 import org.apache.iceberg.catalog.Namespace;
@@ -70,6 +74,7 @@ public class IcebergCatalogWrapper implements AutoCloseable {
   private final IcebergCatalogBackend catalogBackend;
   private String catalogUri = null;
   private Map<String, String> catalogPropertiesMap;
+  private MetadataCache metadataCache = new MemoryMetadataCache();
 
   public IcebergCatalogWrapper(IcebergConfig icebergConfig) {
     this.catalogBackend =
@@ -88,6 +93,10 @@ public class IcebergCatalogWrapper implements AutoCloseable {
     this.catalog = IcebergCatalogUtil.loadCatalogBackend(catalogBackend, icebergConfig);
     if (catalog instanceof SupportsNamespaces) {
       this.asNamespaceCatalog = (SupportsNamespaces) catalog;
+    }
+
+    if (catalog instanceof SupportsMetadataLocation) {
+      metadataCache.initialize((SupportsMetadataLocation) catalog);
     }
 
     this.catalogPropertiesMap = icebergConfig.getIcebergCatalogProperties();
@@ -163,19 +172,34 @@ public class IcebergCatalogWrapper implements AutoCloseable {
     if (request.stageCreate()) {
       return CatalogHandlers.stageTableCreate(catalog, namespace, request);
     }
-    return CatalogHandlers.createTable(catalog, namespace, request);
+    LoadTableResponse loadTableResponse = CatalogHandlers.createTable(catalog, namespace, request);
+    if (loadTableResponse != null) {
+      TableIdentifier tableIdentifier = TableIdentifier.of(namespace, request.name());
+      metadataCache.updateTableMetadata(tableIdentifier, loadTableResponse.tableMetadata());
+    }
+    return loadTableResponse;
   }
 
   public void dropTable(TableIdentifier tableIdentifier) {
+    metadataCache.invalidate(tableIdentifier);
     CatalogHandlers.dropTable(catalog, tableIdentifier);
   }
 
   public void purgeTable(TableIdentifier tableIdentifier) {
+    metadataCache.invalidate(tableIdentifier);
     CatalogHandlers.purgeTable(catalog, tableIdentifier);
   }
 
   public LoadTableResponse loadTable(TableIdentifier tableIdentifier) {
-    return CatalogHandlers.loadTable(catalog, tableIdentifier);
+    TableMetadata tableMetadata = metadataCache.getTableMetadata(tableIdentifier);
+    if (tableMetadata != null) {
+      return LoadTableResponse.builder().withTableMetadata(tableMetadata).build();
+    }
+    LoadTableResponse loadTableResponse = CatalogHandlers.loadTable(catalog, tableIdentifier);
+    if (loadTableResponse != null) {
+      metadataCache.updateTableMetadata(tableIdentifier, loadTableResponse.tableMetadata());
+    }
+    return loadTableResponse;
   }
 
   public boolean tableExists(TableIdentifier tableIdentifier) {
@@ -187,12 +211,19 @@ public class IcebergCatalogWrapper implements AutoCloseable {
   }
 
   public void renameTable(RenameTableRequest renameTableRequest) {
+    metadataCache.invalidate(renameTableRequest.source());
     CatalogHandlers.renameTable(catalog, renameTableRequest);
   }
 
   public LoadTableResponse updateTable(
       TableIdentifier tableIdentifier, UpdateTableRequest updateTableRequest) {
-    return CatalogHandlers.updateTable(catalog, tableIdentifier, updateTableRequest);
+    metadataCache.invalidate(tableIdentifier);
+    LoadTableResponse loadTableResponse =
+        CatalogHandlers.updateTable(catalog, tableIdentifier, updateTableRequest);
+    if (loadTableResponse != null) {
+      metadataCache.updateTableMetadata(tableIdentifier, loadTableResponse.tableMetadata());
+    }
+    return loadTableResponse;
   }
 
   public LoadTableResponse updateTable(IcebergTableChange icebergTableChange) {
