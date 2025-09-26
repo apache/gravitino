@@ -514,6 +514,29 @@ public class TestPolicyOperations extends JerseyTest {
     Assertions.assertEquals(0, baseResponse1.getCode());
   }
 
+  // Test to check exception on failure in set policy is dynamic based on enable/disable
+  @Test
+  public void testSetPolicyDisableFailure() {
+    PolicySetRequest req = new PolicySetRequest(false);
+    doThrow(new RuntimeException("mock disable exception"))
+        .when(policyManager)
+        .disablePolicy(any(), any());
+    Response resp =
+        target(policyPath(metalake))
+            .path("policy1")
+            .property(HttpUrlConnectorProvider.SET_METHOD_WORKAROUND, true)
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .method("PATCH", Entity.entity(req, MediaType.APPLICATION_JSON_TYPE));
+
+    Assertions.assertEquals(
+        Response.Status.INTERNAL_SERVER_ERROR.getStatusCode(), resp.getStatus());
+
+    ErrorResponse errorResp = resp.readEntity(ErrorResponse.class);
+    Assertions.assertEquals(ErrorConstants.INTERNAL_ERROR_CODE, errorResp.getCode());
+    Assertions.assertEquals(RuntimeException.class.getSimpleName(), errorResp.getType());
+  }
+
   @Test
   public void testDeletePolicy() {
     when(policyManager.deletePolicy(metalake, "policy1")).thenReturn(true);
