@@ -39,7 +39,9 @@ public interface SupportsRelationOperations {
     /** Role and group relationship */
     ROLE_GROUP_REL,
     /** Policy and metadata object relationship */
-    POLICY_METADATA_OBJECT_REL
+    POLICY_METADATA_OBJECT_REL,
+    /** Metadata object to tag relationship */
+    TAG_METADATA_OBJECT_REL,
   }
 
   /**
@@ -48,7 +50,7 @@ public interface SupportsRelationOperations {
    * @param <E> The type of entities returned.
    * @param relType The type of relation.
    * @param nameIdentifier The given entity identifier.
-   * @param identType The given entity type.
+   * @param identType The entity type of parameter nameIdentifier represents.
    * @return The list of entities
    * @throws IOException When occurs storage issues, it will throw IOException.
    */
@@ -63,13 +65,28 @@ public interface SupportsRelationOperations {
    * @param <E> the type of entities returned.
    * @param relType The type of relation.
    * @param nameIdentifier The given entity identifier
-   * @param identType The given entity type.
+   * @param identType The entity type of parameter nameIdentifier represents.
    * @param allFields Some fields may have a relatively high acquisition cost, EntityStore provide
    *     an optional setting to avoid fetching these high-cost fields to improve the performance. If
    *     true, the method will fetch all the fields, Otherwise, the method will fetch all the fields
    *     except for high-cost fields.
    * @return The list of entities
    * @throws IOException When occurs storage issues, it will throw IOException.
+   *     <pre>
+   *  Let's see an example to illustrate how this method works.
+   *  If we want to list all the users who have a specific role, we can use this method as follows:
+   *
+   *    listEntitiesByRelation(ROLE_USER_REL, name_identifier_of_role, EntityType.ROLE);
+   *
+   *  This will return a list of User entities that are associated with the specified role.
+   *  Similarly, if we want to list all roles a user has, we can call:
+   *
+   *  listEntitiesByRelation(ROLE_USER_REL, name_identifier_of_user, EntityType.USER);
+   *
+   *  That is to say, this method is versatile and can be used to navigate relationships in both
+   *  directions, the start entity is determined by the identType and nameIdentifier parameters.
+   *  The end entity type is determined by the relType parameter and start entity.
+   * </pre>
    */
   <E extends Entity & HasIdentifier> List<E> listEntitiesByRelation(
       Type relType, NameIdentifier nameIdentifier, Entity.EntityType identType, boolean allFields)
