@@ -217,7 +217,7 @@ public class OceanBaseTableOperations extends JdbcTableOperations {
         String sql = generateAlterTableSql(databaseName, tableName, change);
         if (StringUtils.isEmpty(sql)) {
           LOG.info("No changes to alter table {} from database {}", tableName, databaseName);
-          return;
+          continue;
         }
         JdbcConnectorUtils.executeUpdate(connection, sql);
       }
