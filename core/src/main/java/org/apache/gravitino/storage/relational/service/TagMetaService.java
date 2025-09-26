@@ -218,9 +218,6 @@ public class TagMetaService {
     return POConverters.fromTagPO(tagPO, NamespaceUtil.ofTag(metalake));
   }
 
-  @Monitored(
-      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
-      baseMetricName = "listAssociatedMetadataObjectsForTag")
   public List<GenericEntity> listAssociatedMetadataObjectsForTag(NameIdentifier tagIdent)
       throws IOException {
     String metalakeName = tagIdent.namespace().level(0);
