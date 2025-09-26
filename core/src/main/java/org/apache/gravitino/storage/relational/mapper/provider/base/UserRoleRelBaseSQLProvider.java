@@ -16,7 +16,6 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-
 package org.apache.gravitino.storage.relational.mapper.provider.base;
 
 import static org.apache.gravitino.storage.relational.mapper.UserRoleRelMapper.USER_ROLE_RELATION_TABLE_NAME;
@@ -28,8 +27,7 @@ import org.apache.ibatis.annotations.Param;
 
 public class UserRoleRelBaseSQLProvider {
 
-  public String batchInsertUserRoleRel(
-      @Param("userRoleRelList") List<UserRoleRelPO> userRoleRelList) {
+  public String batchInsertUserRoleRel(@Param("userRoleRels") List<UserRoleRelPO> userRoleRelList) {
     return "<script> INSERT INTO "
         + USER_ROLE_RELATION_TABLE_NAME
         + "(user_id, role_id,"
