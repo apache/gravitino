@@ -26,8 +26,6 @@ import java.util.List;
 import java.util.Map;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
-import org.apache.gravitino.MetadataObject;
-import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
@@ -36,6 +34,7 @@ import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.CatalogEntity;
 import org.apache.gravitino.meta.ColumnEntity;
 import org.apache.gravitino.meta.FilesetEntity;
+import org.apache.gravitino.meta.GenericEntity;
 import org.apache.gravitino.meta.ModelEntity;
 import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.meta.TableEntity;
@@ -593,6 +592,11 @@ public class TestTagMetaService extends TestJDBCBackend {
     Assertions.assertTrue(e.getMessage().contains("No such tag entity: tag4"));
   }
 
+  private boolean containsGenericEntity(
+      List<GenericEntity> genericEntities, String name, Entity.EntityType entityType) {
+    return genericEntities.stream().anyMatch(e -> e.name().equals(name) && e.type() == entityType);
+  }
+
   @Test
   public void testListAssociatedMetadataObjectsForTag() throws IOException {
     testAssociateAndDisassociateTagsWithMetadataObject();
@@ -600,37 +604,35 @@ public class TestTagMetaService extends TestJDBCBackend {
     TagMetaService tagMetaService = TagMetaService.getInstance();
 
     // Test list associated metadata objects for tag2
-    List<MetadataObject> metadataObjects =
+    List<GenericEntity> metadataObjects =
         tagMetaService.listAssociatedMetadataObjectsForTag(
             NameIdentifierUtil.ofTag(metalakeName, "tag2"));
 
     Assertions.assertEquals(3, metadataObjects.size());
     Assertions.assertTrue(
-        metadataObjects.contains(MetadataObjects.parse("catalog1", MetadataObject.Type.CATALOG)));
+        containsGenericEntity(metadataObjects, "catalog1", Entity.EntityType.CATALOG));
     Assertions.assertTrue(
-        metadataObjects.contains(
-            MetadataObjects.parse("catalog1.schema1", MetadataObject.Type.SCHEMA)));
+        containsGenericEntity(metadataObjects, "catalog1.schema1", Entity.EntityType.SCHEMA));
     Assertions.assertTrue(
-        metadataObjects.contains(
-            MetadataObjects.parse("catalog1.schema1.table1", MetadataObject.Type.TABLE)));
+        containsGenericEntity(metadataObjects, "catalog1.schema1.table1", Entity.EntityType.TABLE));
 
     // Test list associated metadata objects for tag3
-    List<MetadataObject> metadataObjects1 =
+    List<GenericEntity> metadataObjects1 =
         tagMetaService.listAssociatedMetadataObjectsForTag(
             NameIdentifierUtil.ofTag(metalakeName, "tag3"));
 
     Assertions.assertEquals(3, metadataObjects1.size());
+
     Assertions.assertTrue(
-        metadataObjects1.contains(MetadataObjects.parse("catalog1", MetadataObject.Type.CATALOG)));
+        containsGenericEntity(metadataObjects1, "catalog1", Entity.EntityType.CATALOG));
     Assertions.assertTrue(
-        metadataObjects1.contains(
-            MetadataObjects.parse("catalog1.schema1", MetadataObject.Type.SCHEMA)));
+        containsGenericEntity(metadataObjects1, "catalog1.schema1", Entity.EntityType.SCHEMA));
     Assertions.assertTrue(
-        metadataObjects1.contains(
-            MetadataObjects.parse("catalog1.schema1.table1", MetadataObject.Type.TABLE)));
+        containsGenericEntity(
+            metadataObjects1, "catalog1.schema1.table1", Entity.EntityType.TABLE));
 
     // Test list associated metadata objects for non-existent tag
-    List<MetadataObject> metadataObjects2 =
+    List<GenericEntity> metadataObjects2 =
         tagMetaService.listAssociatedMetadataObjectsForTag(
             NameIdentifierUtil.ofTag(metalakeName, "tag4"));
     Assertions.assertEquals(0, metadataObjects2.size());
@@ -641,31 +643,31 @@ public class TestTagMetaService extends TestJDBCBackend {
         Entity.EntityType.TABLE,
         false);
 
-    List<MetadataObject> metadataObjects3 =
+    List<GenericEntity> metadataObjects3 =
         tagMetaService.listAssociatedMetadataObjectsForTag(
             NameIdentifierUtil.ofTag(metalakeName, "tag2"));
 
     Assertions.assertEquals(2, metadataObjects3.size());
+
     Assertions.assertTrue(
-        metadataObjects3.contains(MetadataObjects.parse("catalog1", MetadataObject.Type.CATALOG)));
+        containsGenericEntity(metadataObjects3, "catalog1", Entity.EntityType.CATALOG));
     Assertions.assertTrue(
-        metadataObjects3.contains(
-            MetadataObjects.parse("catalog1.schema1", MetadataObject.Type.SCHEMA)));
+        containsGenericEntity(metadataObjects3, "catalog1.schema1", Entity.EntityType.SCHEMA));
 
     backend.delete(
         NameIdentifier.of(metalakeName, "catalog1", "schema1"), Entity.EntityType.SCHEMA, false);
 
-    List<MetadataObject> metadataObjects4 =
+    List<GenericEntity> metadataObjects4 =
         tagMetaService.listAssociatedMetadataObjectsForTag(
             NameIdentifierUtil.ofTag(metalakeName, "tag2"));
 
     Assertions.assertEquals(1, metadataObjects4.size());
     Assertions.assertTrue(
-        metadataObjects4.contains(MetadataObjects.parse("catalog1", MetadataObject.Type.CATALOG)));
+        containsGenericEntity(metadataObjects4, "catalog1", Entity.EntityType.CATALOG));
 
     backend.delete(NameIdentifier.of(metalakeName, "catalog1"), Entity.EntityType.CATALOG, false);
 
-    List<MetadataObject> metadataObjects5 =
+    List<GenericEntity> metadataObjects5 =
         tagMetaService.listAssociatedMetadataObjectsForTag(
             NameIdentifierUtil.ofTag(metalakeName, "tag2"));
 
