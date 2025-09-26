@@ -73,6 +73,21 @@ public interface SupportsJobs {
   boolean deleteJobTemplate(String jobTemplateName) throws InUseException;
 
   /**
+   * Alters a job template by applying the specified changes. This allows for modifying the
+   * properties of an existing job template, such as its name, description, or parameters.
+   *
+   * @param jobTemplateName the name of the job template to alter
+   * @param changes the changes to apply to the job template
+   * @return the updated job template after applying the changes
+   * @throws NoSuchJobTemplateException if no job template with the specified name exists
+   * @throws IllegalArgumentException if any of the changes cannot be applied to the job template
+   */
+  default JobTemplate alterJobTemplate(String jobTemplateName, JobTemplateChange... changes)
+      throws NoSuchJobTemplateException, IllegalArgumentException {
+    throw new UnsupportedOperationException("Not implemented");
+  }
+
+  /**
    * Lists all the jobs by the specified job template name. This will return a list of job handles
    * associated with the specified job template. Each job handle represents a specific job.
    *
