@@ -228,6 +228,12 @@ public interface EntityStore extends Closeable {
   <R, E extends Exception> R executeInTransaction(Executable<R, E> executable)
       throws E, IOException;
 
+  /**
+   * Get the extra relation operations that are supported by the entity store.
+   *
+   * @return the relation operations that are supported by the entity store
+   * @throws UnsupportedOperationException if the extra operations are not supported
+   */
   default SupportsRelationOperations relationOperations() {
     throw new UnsupportedOperationException("relation operations are not supported");
   }
