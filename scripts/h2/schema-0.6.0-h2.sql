@@ -118,7 +118,6 @@ COMMENT ON TABLE table_meta IS 'table meta';
 COMMENT ON COLUMN table_meta.table_id IS 'table id';
 COMMENT ON COLUMN table_meta.table_name IS 'table name';
 COMMENT ON COLUMN table_meta.metalake_id IS 'metalake id';
-COMMENT ON COLUMN table_meta.catalog_id IS 'catalog id';
 COMMENT ON COLUMN table_meta.schema_id IS 'schema id';
 COMMENT ON COLUMN table_meta.audit_info IS 'table audit info';
 COMMENT ON COLUMN table_meta.current_version IS 'table current version';
@@ -201,7 +200,7 @@ CREATE TABLE IF NOT EXISTS topic_meta (
 
 CREATE INDEX IF NOT EXISTS idx_tvmid ON topic_meta (metalake_id);
 CREATE INDEX IF NOT EXISTS idx_tvcid ON topic_meta (catalog_id);
-COMMENT ON TABLE topic_meta IS 'topic meta';
+COMMENT ON TABLE topic_meta IS 'topic_meta';
 COMMENT ON COLUMN topic_meta.topic_id IS 'topic id';
 COMMENT ON COLUMN topic_meta.topic_name IS 'topic name';
 COMMENT ON COLUMN topic_meta.metalake_id IS 'metalake id';
@@ -383,8 +382,8 @@ CREATE TABLE IF NOT EXISTS tag_relation_meta (
     current_version INT NOT NULL DEFAULT 1,
     last_version INT NOT NULL DEFAULT 1,
     deleted_at BIGINT NOT NULL DEFAULT 0,
-    PRIMARY KEY (id),
-    UNIQUE KEY uk_ti_mi_del (tag_id, metadata_object_id, deleted_at)
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_ti_mi_del` (`tag_id`, `metadata_object_id`, `deleted_at`)
     );
 
 CREATE INDEX IF NOT EXISTS idx_tid ON tag_relation_meta (tag_id);
