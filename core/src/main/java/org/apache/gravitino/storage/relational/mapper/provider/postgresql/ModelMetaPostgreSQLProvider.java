@@ -29,7 +29,7 @@ public class ModelMetaPostgreSQLProvider extends ModelMetaBaseSQLProvider {
   public String insertModelMetaOnDuplicateKeyUpdate(@Param("modelMeta") ModelPO modelPO) {
     return "INSERT INTO "
         + ModelMetaMapper.TABLE_NAME
-        + "(model_id, model_name, metalake_id, catalog_id, schema_id,"
+        + " (model_id, model_name, metalake_id, catalog_id, schema_id,"
         + " model_comment, model_properties, model_latest_version, audit_info, deleted_at)"
         + " VALUES (#{modelMeta.modelId}, #{modelMeta.modelName}, #{modelMeta.metalakeId},"
         + " #{modelMeta.catalogId}, #{modelMeta.schemaId}, #{modelMeta.modelComment},"
