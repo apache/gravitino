@@ -17,11 +17,11 @@
 
 from typing import ClassVar, List, Optional, Union, overload
 
-from gravitino.api.expressions.expression import Expression
-from gravitino.api.expressions.literals.literal import Literal
-from gravitino.api.expressions.literals.literals import Literals
-from gravitino.api.expressions.named_reference import NamedReference
-from gravitino.api.expressions.transforms.transform import (
+from gravitino.api.rel.expressions.expression import Expression
+from gravitino.api.rel.expressions.literals.literal import Literal
+from gravitino.api.rel.expressions.literals.literals import Literals
+from gravitino.api.rel.expressions.named_reference import NamedReference
+from gravitino.api.rel.expressions.transforms.transform import (
     SingleFieldTransform,
     Transform,
 )

@@ -15,38 +15,45 @@
 # specific language governing permissions and limitations
 # under the License.
 
-from abc import abstractmethod
-from typing import Any
 
-from gravitino.api.rel.expressions.literals.literal import Literal
-from gravitino.api.rel.partitions.partition import Partition
+from abc import ABC, abstractmethod
+from collections.abc import Mapping
+from typing import Generic, TypeVar, Union
+
+from gravitino.api.rel.types.type import Type
+
+AtomicStatisticValue = Union[bool, int, float, str]
 
 
-class RangePartition(Partition):
-    """
-    A range partition represents a result of range partitioning. For example, for range partition
+_StatisticValueT = TypeVar(
+    "_StatisticValueT",
+    bound=Union[
+        AtomicStatisticValue,
+        list["StatisticValue"],
+        Mapping[str, "StatisticValue"],
+    ],
+)
 
-    ```
-    PARTITION p20200321 VALUES LESS THAN ("2020-03-22")
-    ```
 
-    its upper bound is "2020-03-22" and its lower bound is null.
+class StatisticValue(Generic[_StatisticValueT], ABC):
+    """An interface representing a statistic value.
 
-    APIs that are still evolving towards becoming stable APIs, and can change from one feature release to another (0.5.0 to 0.6.0).
+    Type Parameters:
+        _StatisticValueT: The type of the statistic value.
     """
 
     @abstractmethod
-    def upper(self) -> Literal[Any]:
-        """
+    def value(self) -> _StatisticValueT:
+        """Returns the value of the statistic.
+
         Returns:
-            Literal[Any]: The upper bound of the partition.
+            _StatisticValueT: the value of the statistic
         """
-        pass
 
     @abstractmethod
-    def lower(self) -> Literal[Any]:
-        """
+    def data_type(self) -> Type:
+        """Returns the data type of the statistic value.
+
         Returns:
-            Literal[Any]: The lower bound of the partition.
+            Type: the data type of the statistic value
         """
-        pass

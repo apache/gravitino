@@ -16,11 +16,12 @@
 # under the License.
 
 import unittest
-from gravitino.api.expressions.function_expression import (
-    FunctionExpression,
+
+from gravitino.api.rel.expressions.expression import Expression
+from gravitino.api.rel.expressions.function_expression import (
     FuncExpressionImpl,
+    FunctionExpression,
 )
-from gravitino.api.expressions.expression import Expression
 
 
 class MockExpression(Expression):

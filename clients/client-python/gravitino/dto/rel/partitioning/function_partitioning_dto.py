@@ -17,7 +17,7 @@
 
 from typing import List
 
-from gravitino.api.expressions.expression import Expression
+from gravitino.api.rel.expressions.expression import Expression
 from gravitino.dto.rel.column_dto import ColumnDTO
 from gravitino.dto.rel.expressions.function_arg import FunctionArg
 from gravitino.dto.rel.partition_utils import PartitionUtils

@@ -18,12 +18,12 @@
 import unittest
 from typing import List
 
-from gravitino.api.expressions.distributions.distributions import (
+from gravitino.api.rel.expressions.distributions.distributions import (
     DistributionImpl,
     Distributions,
 )
-from gravitino.api.expressions.distributions.strategy import Strategy
-from gravitino.api.expressions.expression import Expression
+from gravitino.api.rel.expressions.distributions.strategy import Strategy
+from gravitino.api.rel.expressions.expression import Expression
 
 
 class MockExpression(Expression):

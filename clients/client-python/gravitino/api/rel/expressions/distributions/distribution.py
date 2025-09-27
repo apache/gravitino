@@ -17,8 +17,8 @@
 from abc import abstractmethod
 from typing import List
 
-from gravitino.api.expressions.distributions.strategy import Strategy
-from gravitino.api.expressions.expression import Expression
+from gravitino.api.rel.expressions.distributions.strategy import Strategy
+from gravitino.api.rel.expressions.expression import Expression
 
 
 class Distribution(Expression):
