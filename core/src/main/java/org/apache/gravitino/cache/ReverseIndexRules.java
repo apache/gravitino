@@ -18,11 +18,16 @@
  */
 package org.apache.gravitino.cache;
 
+import org.apache.commons.lang3.ArrayUtils;
 import org.apache.gravitino.Entity;
+import org.apache.gravitino.Entity.EntityType;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.meta.GenericEntity;
 import org.apache.gravitino.meta.GroupEntity;
+import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.meta.RoleEntity;
+import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.meta.UserEntity;
 import org.apache.gravitino.utils.NamespaceUtil;
 
@@ -141,5 +146,43 @@ public class ReverseIndexRules {
                     reverseIndexCache.put(securableObjectIdent, entityType, key);
                   });
         }
+      };
+
+  // Keep policy -> object reverse index for metadata objects, so the key is a object and the value
+  // is a policy.
+  public static final ReverseIndexCache.ReverseIndexRule GENERIC_METADATA_OBJECT_REVERSE_RULE =
+      (entity, key, reverseIndexCache) -> {
+        GenericEntity genericEntity = (GenericEntity) entity;
+        EntityType type = entity.type();
+        if (genericEntity.name() != null) {
+          // We may support a securable object to tag mapping in the future, so we need to add name
+          // `policy` to differentiate it.
+          String[] levels = genericEntity.name().split(",");
+          NameIdentifier policyNameIdentifier = NameIdentifier.of(ArrayUtils.add(levels, "policy"));
+          reverseIndexCache.put(policyNameIdentifier, type, key);
+
+          NameIdentifier tagNameIdentifier = NameIdentifier.of(ArrayUtils.add(levels, "tag"));
+          reverseIndexCache.put(tagNameIdentifier, type, key);
+        }
+      };
+
+  // Keep object -> policy reverse index for policy objects, so the key is a policy and the value is
+  // an object.
+  public static final ReverseIndexCache.ReverseIndexRule POLICY_REVERSE_RULE =
+      (entity, key, reverseIndexCache) -> {
+        PolicyEntity policyEntity = (PolicyEntity) entity;
+        NameIdentifier nameIdentifier =
+            NameIdentifier.of(policyEntity.namespace(), policyEntity.name());
+        reverseIndexCache.put(nameIdentifier, Entity.EntityType.POLICY, key);
+      };
+
+  // Keep object -> tag reverse index for tag objects, so the key is a tag and the value is an
+  // object.
+  public static final ReverseIndexCache.ReverseIndexRule TAG_REVERSE_RULE =
+      (entity, key, reverseIndexCache) -> {
+        TagEntity policyEntity = (TagEntity) entity;
+        NameIdentifier nameIdentifier =
+            NameIdentifier.of(policyEntity.namespace(), policyEntity.name());
+        reverseIndexCache.put(nameIdentifier, Entity.EntityType.TAG, key);
       };
 }
