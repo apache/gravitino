@@ -63,6 +63,9 @@ paths:
           application/json:
             schema:
               $ref: "#/components/schemas/StatisticsDropRequest"
+            examples:
+              StatisticsDropRequest:
+                $ref: "#/components/examples/StatisticsDropRequest"
 
       responses:
         "200":
@@ -107,6 +110,9 @@ paths:
           application/json:
             schema:
               $ref: "#/components/schemas/StatisticsUpdateRequest"
+            examples:
+              StatisticsUpdateRequest:
+                $ref: "#/components/examples/StatisticsUpdateRequest"
 
       responses:
         "200":
@@ -191,6 +197,9 @@ paths:
           application/json:
             schema:
               $ref: "#/components/schemas/PartitionStatisticsDropRequest"
+            examples:
+              PartitionStatisticsDropRequest:
+                $ref: "#/components/examples/PartitionStatisticsDropRequest"
 
       responses:
         "200":
@@ -235,6 +244,9 @@ paths:
           application/json:
             schema:
               $ref: "#/components/schemas/PartitionStatisticsUpdateRequest"
+            examples:
+              PartitionStatisticUpdateRequest:
+                $ref: "#/components/examples/PartitionStatisticUpdateRequest"
 
       responses:
         "200":
@@ -269,7 +281,6 @@ paths:
         "5xx":
           $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
 
-
 components:
   parameters:
     from:
@@ -302,7 +313,7 @@ components:
       description: Whether the upper partition name is inclusive
       required: false
       schema:
-        type: string
+        type: boolean
 
 
   schemas:
@@ -379,6 +390,75 @@ components:
               additionalProperties: {}
               description: The statistics to update for the partition
 
+    PartitionRange:
+        type: object
+        properties:
+            lowerPartitionName:
+              type: string
+              description: The lower partition name
+            upperPartitionName:
+              type: string
+              description: The upper partition name
+            lowerBoundType:
+              type: string
+              description: lower bound type
+              enum:
+                - "CLOSED"
+                - "OPEN"
+            upperBoundType:
+              type: string
+              description: upper bound type
+              enum:
+                - "CLOSED"
+                - "OPEN"
+
+
+    PartitionStatistics:
+        type: object
+        required:
+            - partitionName
+            - statistics
+        properties:
+            partitionName:
+              type: string
+              description: The name of the partition
+            statistics:
+              type: array
+              items:
+                $ref: "#/components/schemas/Statistic"
+
+    Statistic:
+        type: object
+        required:
+            - name
+            - reserved
+            - modifiable
+            - audit
+        properties:
+            name:
+              type: string
+              description: The name of the statistic
+            value:
+              oneOf:
+                - type: string
+                - type: number
+                - type: integer
+                - type: boolean
+                - type: array
+                  items: { }
+                - type: object
+                  additionalProperties: { }
+                - type: "null"
+              description: The value of the statistic
+            reserved:
+              type: boolean
+              description: Whether the statistic is reserved
+            modifiable:
+              type: boolean
+              description: Whether the statistic is modifiable
+            audit:
+              $ref: "./openapi.yaml#/components/schemas/Audit"
+
 
   responses:
     StatisticListResponse:
@@ -391,9 +471,9 @@ components:
               enum:
                 - 0
             statistics:
-              type: object
-              additionalProperties: {}
-              description: A map of statistic names to their values for the metadata object
+              type: array
+              items:
+                $ref: "#/components/schemas/Statistic"
 
 
     PartitionStatisticsListResponse:
@@ -406,23 +486,22 @@ components:
               enum:
                 - 0
             partitionStatistics:
-              type: object
-              additionalProperties:
-                type: object
-                additionalProperties: {}
-              description: A map of partition names to their statistics (which is a map of statistic names to their values)
+              type: array
+              items:
+                  $ref: "#/components/schemas/PartitionStatistics"
+              description: The list of partition statistics results
 
   examples:
     StatisticsDropRequest:
       value: {
-        "names": [ "row_count", "file_size" ]
+        "names": [ "custom-row_count", "custom-file_size" ]
       }
 
     StatisticsUpdateRequest:
       value: {
-        "stats": {
-          "row_count": "1000",
-          "file_size": "500MB"
+        "updates": {
+          "custom-row_count": "1000",
+          "custom-file_size": "500MB"
         }
       }
 
@@ -431,7 +510,7 @@ components:
         "drops": [
           {
             "partitionName": "2023-10-01",
-            "statisticNames": [ "row_count", "file_size" ]
+            "statisticNames": [ "custom-row_count", "custom-file_size" ]
           }
         ]
       }
@@ -441,9 +520,9 @@ components:
         "updates": [
           {
             "partitionName": "2023-10-01",
-            "stats": {
-              "row_count": "500",
-              "file_size": "250MB"
+            "statistics": {
+              "custom-row_count": "500",
+              "custom-file_size": "250MB"
             }
           }
         ]
@@ -452,27 +531,136 @@ components:
     StatisticListResponse:
         value: {
             "code": 0,
-            "statistics": {
-                "row_count": "1000",
-                "file_size": "500MB"
-            }
+            "statistics": [
+                {
+                    "name": "row_count",
+                    "value": "1000",
+                    "reserved": true,
+                    "modifiable": false,
+                    "audit": {
+                      "creator": "user1",
+                      "createTime": "2023-10-01T12:00:00Z",
+                      "lastModifier": "user2",
+                      "lastModifiedTime": "2023-10-02T12:00:00Z"
+                    }
+                },
+                {
+                    "name": "file_size",
+                    "value": "500MB",
+                    "reserved": true,
+                    "modifiable": false,
+                    "audit": {
+                      "creator": "user1",
+                      "createTime": "2023-10-01T12:00:00Z",
+                      "lastModifier": "user2",
+                      "lastModifiedTime": "2023-10-02T12:00:00Z"
+                    }
+                },
+                {
+                    "name": "custom-k1",
+                    "value": "v1",
+                    "reserved": false,
+                    "modifiable": true,
+                    "audit": {
+                      "creator": "user1",
+                      "createTime": "2023-10-01T12:00:00Z",
+                      "lastModifier": "user2",
+                      "lastModifiedTime": "2023-10-02T12:00:00Z"
+                    }
+                }]
         }
 
 
     PartitionStatisticListResponse:
         value: {
             "code": 0,
-            "partitionStatistics": {
-                "2023-10-01": {
-                    "row_count": "500",
-                    "file_size": "250MB"
+            "partitionStatistics": [
+                {
+                    "partitionName": "p0",
+                    "statistics": [
+                        {
+                            "name": "row_count",
+                            "value": "1000",
+                            "reserved": true,
+                            "modifiable": false,
+                            "audit": {
+                              "creator": "user1",
+                              "createTime": "2023-10-01T12:00:00Z",
+                              "lastModifier": "user2",
+                              "lastModifiedTime": "2023-10-02T12:00:00Z"
+                            }
+                        },
+                        {
+                            "name": "file_size",
+                            "value": "500MB",
+                            "reserved": true,
+                            "modifiable": false,
+                            "audit": {
+                              "creator": "user1",
+                              "createTime": "2023-10-01T12:00:00Z",
+                              "lastModifier": "user2",
+                              "lastModifiedTime": "2023-10-02T12:00:00Z"
+                            }
+                        },
+                        {
+                            "name": "custom-k1",
+                            "value": "v1",
+                            "reserved": false,
+                            "modifiable": true,
+                            "audit": {
+                              "creator": "user1",
+                              "createTime": "2023-10-01T12:00:00Z",
+                              "lastModifier": "user2",
+                              "lastModifiedTime": "2023-10-02T12:00:00Z"
+                            }
+                        }
+                    ]
                 },
-                "2023-10-02": {
-                    "row_count": "600",
-                    "file_size": "300MB"
+                {
+                    "partitionName": "p1",
+                    "statistics": [
+                        {
+                            "name": "row_count",
+                            "value": "2000",
+                            "reserved": true,
+                            "modifiable": false,
+                            "audit": {
+                              "creator": "user1",
+                              "createTime": "2023-10-01T12:00:00Z",
+                              "lastModifier": "user2",
+                              "lastModifiedTime": "2023-10-02T12:00:00Z"
+                            }
+                        },
+                        {
+                            "name": "file_size",
+                            "value": "1GB",
+                            "reserved": true,
+                            "modifiable": false,
+                            "audit": {
+                              "creator": "user1",
+                              "createTime": "2023-10-01T12:00:00Z",
+                              "lastModifier": "user2",
+                              "lastModifiedTime": "2023-10-02T12:00:00Z"
+                            }
+                        },
+                        {
+                            "name": "custom-k1",
+                            "value": "v2",
+                            "reserved": false,
+                            "modifiable": true,
+                            "audit": {
+                              "creator": "user1",
+                              "createTime": "2023-10-01T12:00:00Z",
+                              "lastModifier": "user2",
+                              "lastModifiedTime": "2023-10-02T12:00:00Z"
+                            }
+                        }
+                    ]
                 }
-            }
+            ]
         }
+
+
 
     NoSuchMetadataObjectException:
       value: {
