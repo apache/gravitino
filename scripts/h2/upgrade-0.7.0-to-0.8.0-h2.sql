@@ -20,48 +20,48 @@ ALTER TABLE `role_meta_securable_object` ALTER COLUMN `privilege_names` CLOB(819
 ALTER TABLE `role_meta_securable_object` ALTER COLUMN `privilege_conditions` CLOB(81920);
 
 CREATE TABLE IF NOT EXISTS `model_meta` (
-    `model_id` BIGINT NOT NULL COMMENT 'model id',
+    `model_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'model id',
     `model_name` VARCHAR(128) NOT NULL COMMENT 'model name',
-    `metalake_id` BIGINT NOT NULL COMMENT 'metalake id',
-    `catalog_id` BIGINT NOT NULL COMMENT 'catalog id',
-    `schema_id` BIGINT NOT NULL COMMENT 'schema id',
+    `metalake_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'metalake id',
+    `catalog_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'catalog id',
+    `schema_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'schema id',
     `model_comment` CLOB DEFAULT NULL COMMENT 'model comment',
     `model_properties` CLOB DEFAULT NULL COMMENT 'model properties',
-    `model_latest_version` INT DEFAULT 0 COMMENT 'model latest version',
+    `model_latest_version` INT UNSIGNED DEFAULT 0 COMMENT 'model latest version',
     `audit_info` CLOB NOT NULL COMMENT 'model audit info',
-    `deleted_at` BIGINT NOT NULL DEFAULT 0 COMMENT 'model deleted at',
+    `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'model deleted at',
     PRIMARY KEY (`model_id`),
     UNIQUE KEY `uk_sid_mn_del` (`schema_id`, `model_name`, `deleted_at`),
     KEY `idx_mmid` (`metalake_id`),
     KEY `idx_mcid` (`catalog_id`)
-);
+) ENGINE=InnoDB;
 
 CREATE TABLE IF NOT EXISTS `model_version_info` (
-    `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT 'auto increment id',
-    `metalake_id` BIGINT NOT NULL COMMENT 'metalake id',
-    `catalog_id` BIGINT NOT NULL COMMENT 'catalog id',
-    `schema_id` BIGINT NOT NULL COMMENT 'schema id',
-    `model_id` BIGINT NOT NULL COMMENT 'model id',
-    `version` INT NOT NULL COMMENT 'model version',
+    `id` BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT COMMENT 'auto increment id',
+    `metalake_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'metalake id',
+    `catalog_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'catalog id',
+    `schema_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'schema id',
+    `model_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'model id',
+    `version` INT UNSIGNED NOT NULL COMMENT 'model version',
     `model_version_comment` CLOB DEFAULT NULL COMMENT 'model version comment',
     `model_version_properties` CLOB DEFAULT NULL COMMENT 'model version properties',
     `model_version_uri` CLOB NOT NULL COMMENT 'model storage uri',
     `audit_info` CLOB NOT NULL COMMENT 'model version audit info',
-    `deleted_at` BIGINT NOT NULL DEFAULT 0 COMMENT 'model version deleted at',
+    `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'model version deleted at',
     PRIMARY KEY (`id`),
     UNIQUE KEY `uk_mid_ver_del` (`model_id`, `version`, `deleted_at`),
     KEY `idx_vmid` (`metalake_id`),
     KEY `idx_vcid` (`catalog_id`),
     KEY `idx_vsid` (`schema_id`)
-);
+) ENGINE=InnoDB;
 
 CREATE TABLE IF NOT EXISTS `model_version_alias_rel` (
-    `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT 'auto increment id',
-    `model_id` BIGINT NOT NULL COMMENT 'model id',
-    `model_version` INT NOT NULL COMMENT 'model version',
+    `id` BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT COMMENT 'auto increment id',
+    `model_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'model id',
+    `model_version` INT UNSIGNED NOT NULL COMMENT 'model version',
     `model_version_alias` VARCHAR(128) NOT NULL COMMENT 'model version alias',
-    `deleted_at` BIGINT NOT NULL DEFAULT 0 COMMENT 'model version alias deleted at',
+    `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'model version alias deleted at',
     PRIMARY KEY (`id`),
     UNIQUE KEY `uk_mi_mva_del` (`model_id`, `model_version_alias`, `deleted_at`),
     KEY `idx_mva` (`model_version_alias`)
-);
+) ENGINE=InnoDB;
