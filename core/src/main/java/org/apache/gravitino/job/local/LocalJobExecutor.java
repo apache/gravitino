@@ -316,7 +316,7 @@ public class LocalJobExecutor implements JobExecutor {
         jobExecutorService.submit(() -> runJob(jobPair));
 
       } catch (InterruptedException e) {
-        LOG.warn("Polling job interrupted", e);
+        LOG.warn("Polling job interrupted");
         finished = true;
       }
     }
