@@ -143,7 +143,7 @@ class DTOConverters:
         )
 
     @staticmethod
-    def _to_shell_job_template(template: JobTemplate) -> ShellJobTemplate:
+    def to_shell_job_template(template: JobTemplate) -> ShellJobTemplate:
         if isinstance(template, ShellJobTemplate):
             return template
 
@@ -152,7 +152,7 @@ class DTOConverters:
         )
 
     @staticmethod
-    def _to_spark_job_template(template: JobTemplate) -> SparkJobTemplate:
+    def to_spark_job_template(template: JobTemplate) -> SparkJobTemplate:
         if isinstance(template, SparkJobTemplate):
             return template
 
@@ -199,7 +199,7 @@ class DTOConverters:
     @staticmethod
     def to_job_template_dto(template: JobTemplate) -> JobTemplateDTO:
         if isinstance(template, ShellJobTemplate):
-            shell_template = DTOConverters._to_shell_job_template(template)
+            shell_template = DTOConverters.to_shell_job_template(template)
             return ShellJobTemplateDTO(
                 _job_type=shell_template.job_type(),
                 _name=shell_template.name,
@@ -212,7 +212,7 @@ class DTOConverters:
             )
 
         if isinstance(template, SparkJobTemplate):
-            spark_template = DTOConverters._to_spark_job_template(template)
+            spark_template = DTOConverters.to_spark_job_template(template)
             return SparkJobTemplateDTO(
                 _job_type=spark_template.job_type(),
                 _name=spark_template.name,
