@@ -117,7 +117,7 @@ public class TestCacheConfig {
                   NameIdentifier.of("metalake1.catalog" + i), Entity.EntityType.CATALOG)));
     }
 
-    Assertions.assertTrue(cache.asMap().size() == 10 + 3 + 500 / 10);
+    Assertions.assertEquals(10 + 3 + 500 / 10, cache.asMap().size());
   }
 
   @Test

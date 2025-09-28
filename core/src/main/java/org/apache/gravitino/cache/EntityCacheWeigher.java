@@ -36,10 +36,12 @@ import org.slf4j.LoggerFactory;
  * weight is calculated as follows:
  *
  * <ul>
- *   <li>Metalake: 100
- *   <li>Catalog: 75
- *   <li>Schema: 50
- *   <li>Other: 15
+ *   <li>Metalake: 0, which means that it will never be evicted from the cache unless timeout occurs
+ *       or manually cleared.
+ *   <li>Catalog: 0, which means that it will never be evicted from the cache unless timeout occurs
+ *       or manually cleared.
+ *   <li>Schema: 10
+ *   <li>Other: 100
  * </ul>
  */
 public class EntityCacheWeigher implements Weigher<EntityCacheKey, List<Entity>> {
