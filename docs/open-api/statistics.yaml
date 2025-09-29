@@ -412,7 +412,6 @@ components:
                 - "CLOSED"
                 - "OPEN"
 
-
     PartitionStatistics:
         type: object
         required:
@@ -488,7 +487,7 @@ components:
             partitionStatistics:
               type: array
               items:
-                  $ref: "#/components/schemas/PartitionStatistics"
+                $ref: "#/components/schemas/PartitionStatistics"
               description: The list of partition statistics results
 
   examples:
@@ -533,131 +532,131 @@ components:
             "code": 0,
             "statistics": [
                 {
-                    "name": "row_count",
-                    "value": "1000",
-                    "reserved": true,
-                    "modifiable": false,
-                    "audit": {
-                      "creator": "user1",
-                      "createTime": "2023-10-01T12:00:00Z",
-                      "lastModifier": "user2",
-                      "lastModifiedTime": "2023-10-02T12:00:00Z"
-                    }
+                  "name": "row_count",
+                  "value": "1000",
+                  "reserved": true,
+                  "modifiable": false,
+                  "audit": {
+                    "creator": "user1",
+                    "createTime": "2023-10-01T12:00:00Z",
+                    "lastModifier": "user2",
+                    "lastModifiedTime": "2023-10-02T12:00:00Z"
+                  }
                 },
                 {
-                    "name": "file_size",
-                    "value": "500MB",
-                    "reserved": true,
-                    "modifiable": false,
-                    "audit": {
-                      "creator": "user1",
-                      "createTime": "2023-10-01T12:00:00Z",
-                      "lastModifier": "user2",
-                      "lastModifiedTime": "2023-10-02T12:00:00Z"
-                    }
+                  "name": "file_size",
+                  "value": "500MB",
+                  "reserved": true,
+                  "modifiable": false,
+                  "audit": {
+                    "creator": "user1",
+                    "createTime": "2023-10-01T12:00:00Z",
+                    "lastModifier": "user2",
+                    "lastModifiedTime": "2023-10-02T12:00:00Z"
+                  }
                 },
                 {
-                    "name": "custom-k1",
-                    "value": "v1",
-                    "reserved": false,
-                    "modifiable": true,
-                    "audit": {
-                      "creator": "user1",
-                      "createTime": "2023-10-01T12:00:00Z",
-                      "lastModifier": "user2",
-                      "lastModifiedTime": "2023-10-02T12:00:00Z"
-                    }
+                  "name": "custom-k1",
+                  "value": "v1",
+                  "reserved": false,
+                  "modifiable": true,
+                  "audit": {
+                    "creator": "user1",
+                    "createTime": "2023-10-01T12:00:00Z",
+                    "lastModifier": "user2",
+                    "lastModifiedTime": "2023-10-02T12:00:00Z"
+                  }
                 }]
         }
 
 
     PartitionStatisticListResponse:
         value: {
-            "code": 0,
-            "partitionStatistics": [
+          "code": 0,
+          "partitionStatistics": [
+            {
+              "partitionName": "p0",
+              "statistics": [
                 {
-                    "partitionName": "p0",
-                    "statistics": [
-                        {
-                            "name": "row_count",
-                            "value": "1000",
-                            "reserved": true,
-                            "modifiable": false,
-                            "audit": {
-                              "creator": "user1",
-                              "createTime": "2023-10-01T12:00:00Z",
-                              "lastModifier": "user2",
-                              "lastModifiedTime": "2023-10-02T12:00:00Z"
-                            }
-                        },
-                        {
-                            "name": "file_size",
-                            "value": "500MB",
-                            "reserved": true,
-                            "modifiable": false,
-                            "audit": {
-                              "creator": "user1",
-                              "createTime": "2023-10-01T12:00:00Z",
-                              "lastModifier": "user2",
-                              "lastModifiedTime": "2023-10-02T12:00:00Z"
-                            }
-                        },
-                        {
-                            "name": "custom-k1",
-                            "value": "v1",
-                            "reserved": false,
-                            "modifiable": true,
-                            "audit": {
-                              "creator": "user1",
-                              "createTime": "2023-10-01T12:00:00Z",
-                              "lastModifier": "user2",
-                              "lastModifiedTime": "2023-10-02T12:00:00Z"
-                            }
-                        }
-                    ]
+                  "name": "row_count",
+                  "value": "1000",
+                  "reserved": true,
+                  "modifiable": false,
+                  "audit": {
+                    "creator": "user1",
+                    "createTime": "2023-10-01T12:00:00Z",
+                    "lastModifier": "user2",
+                    "lastModifiedTime": "2023-10-02T12:00:00Z"
+                  }
                 },
                 {
-                    "partitionName": "p1",
-                    "statistics": [
-                        {
-                            "name": "row_count",
-                            "value": "2000",
-                            "reserved": true,
-                            "modifiable": false,
-                            "audit": {
-                              "creator": "user1",
-                              "createTime": "2023-10-01T12:00:00Z",
-                              "lastModifier": "user2",
-                              "lastModifiedTime": "2023-10-02T12:00:00Z"
-                            }
-                        },
-                        {
-                            "name": "file_size",
-                            "value": "1GB",
-                            "reserved": true,
-                            "modifiable": false,
-                            "audit": {
-                              "creator": "user1",
-                              "createTime": "2023-10-01T12:00:00Z",
-                              "lastModifier": "user2",
-                              "lastModifiedTime": "2023-10-02T12:00:00Z"
-                            }
-                        },
-                        {
-                            "name": "custom-k1",
-                            "value": "v2",
-                            "reserved": false,
-                            "modifiable": true,
-                            "audit": {
-                              "creator": "user1",
-                              "createTime": "2023-10-01T12:00:00Z",
-                              "lastModifier": "user2",
-                              "lastModifiedTime": "2023-10-02T12:00:00Z"
-                            }
-                        }
-                    ]
+                  "name": "file_size",
+                  "value": "500MB",
+                  "reserved": true,
+                  "modifiable": false,
+                  "audit": {
+                    "creator": "user1",
+                    "createTime": "2023-10-01T12:00:00Z",
+                    "lastModifier": "user2",
+                    "lastModifiedTime": "2023-10-02T12:00:00Z"
+                  }
+                },
+                {
+                  "name": "custom-k1",
+                  "value": "v1",
+                  "reserved": false,
+                  "modifiable": true,
+                  "audit": {
+                    "creator": "user1",
+                    "createTime": "2023-10-01T12:00:00Z",
+                    "lastModifier": "user2",
+                    "lastModifiedTime": "2023-10-02T12:00:00Z"
+                  }
                 }
-            ]
+              ]
+            },
+            {
+              "partitionName": "p1",
+              "statistics": [
+               {
+                 "name": "row_count",
+                 "value": "2000",
+                 "reserved": true,
+                 "modifiable": false,
+                 "audit": {
+                   "creator": "user1",
+                   "createTime": "2023-10-01T12:00:00Z",
+                   "lastModifier": "user2",
+                   "lastModifiedTime": "2023-10-02T12:00:00Z"
+                 }
+               },
+               {
+                 "name": "file_size",
+                 "value": "1GB",
+                 "reserved": true,
+                 "modifiable": false,
+                 "audit": {
+                   "creator": "user1",
+                   "createTime": "2023-10-01T12:00:00Z",
+                   "lastModifier": "user2",
+                   "lastModifiedTime": "2023-10-02T12:00:00Z"
+                 }
+               },
+               {
+                 "name": "custom-k1",
+                 "value": "v2",
+                 "reserved": false,
+                 "modifiable": true,
+                 "audit": {
+                   "creator": "user1",
+                   "createTime": "2023-10-01T12:00:00Z",
+                   "lastModifier": "user2",
+                   "lastModifiedTime": "2023-10-02T12:00:00Z"
+                 }
+               }
+              ]
+            }
+          ]
         }
 
 
