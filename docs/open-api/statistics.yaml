@@ -63,6 +63,9 @@ paths:
           application/json:
             schema:
               $ref: "#/components/schemas/StatisticsDropRequest"
+            examples:
+              StatisticsDropRequest:
+                $ref: "#/components/examples/StatisticsDropRequest"
 
       responses:
         "200":
@@ -107,6 +110,9 @@ paths:
           application/json:
             schema:
               $ref: "#/components/schemas/StatisticsUpdateRequest"
+            examples:
+              StatisticsUpdateRequest:
+                $ref: "#/components/examples/StatisticsUpdateRequest"
 
       responses:
         "200":
@@ -159,14 +165,14 @@ paths:
         - $ref: "#/components/parameters/toInclusive"
       responses:
         "200":
-            description: Returns the partition statistics for the specified metadata object
-            content:
-              application/vnd.gravitino.v1+json:
-                schema:
-                  $ref: "#/components/responses/PartitionStatisticsListResponse"
-                examples:
-                  PartitionStatisticsListResponse:
-                    $ref: "#/components/examples/PartitionStatisticListResponse"
+          description: Returns the partition statistics for the specified metadata object
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "#/components/responses/PartitionStatisticsListResponse"
+              examples:
+                PartitionStatisticsListResponse:
+                  $ref: "#/components/examples/PartitionStatisticListResponse"
         "400":
           $ref: "./openapi.yaml#/components/responses/BadRequestErrorResponse"
         "404":
@@ -191,6 +197,9 @@ paths:
           application/json:
             schema:
               $ref: "#/components/schemas/PartitionStatisticsDropRequest"
+            examples:
+              PartitionStatisticsDropRequest:
+                $ref: "#/components/examples/PartitionStatisticsDropRequest"
 
       responses:
         "200":
@@ -235,6 +244,9 @@ paths:
           application/json:
             schema:
               $ref: "#/components/schemas/PartitionStatisticsUpdateRequest"
+            examples:
+              PartitionStatisticUpdateRequest:
+                $ref: "#/components/examples/PartitionStatisticUpdateRequest"
 
       responses:
         "200":
@@ -269,7 +281,6 @@ paths:
         "5xx":
           $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
 
-
 components:
   parameters:
     from:
@@ -302,8 +313,7 @@ components:
       description: Whether the upper partition name is inclusive
       required: false
       schema:
-        type: string
-
+        type: boolean
 
   schemas:
     StatisticsDropRequest:
@@ -322,37 +332,36 @@ components:
       required:
         - updates
       properties:
-          updates:
-            type: object
-            additionalProperties: {}
-            description: The statistics to update for each partition
+        updates:
+          type: object
+          additionalProperties: {}
+          description: The statistics to update for each partition
 
     PartitionStatisticsDropRequest:
-        type: object
-        required:
-            - drops
-        properties:
-            drops:
-              type: array
-              items:
-                $ref: "#/components/schemas/PartitionStatisticsDrop"
-              description: The list of partition statistics to drop
+      type: object
+      required:
+        - drops
+      properties:
+        drops:
+          type: array
+          items:
+            $ref: "#/components/schemas/PartitionStatisticsDrop"
+          description: The list of partition statistics to drop
 
     PartitionStatisticsDrop:
-        type: object
-        required:
-            - partitionName
-            - statisticNames
-        properties:
-            partitionName:
-              type: string
-              description: The name of the partition
-            statisticNames:
-              type: array
-              items:
-                type: string
-              description: The names of the statistics to drop for the partition
-
+      type: object
+      required:
+        - partitionName
+        - statisticNames
+      properties:
+        partitionName:
+          type: string
+          description: The name of the partition
+        statisticNames:
+          type: array
+          items:
+            type: string
+          description: The names of the statistics to drop for the partition
 
     PartitionStatisticsUpdateRequest:
       type: object
@@ -366,63 +375,128 @@ components:
           description: The list of partition statistics to update
 
     PartitionStatisticsUpdate:
-        type: object
-        required:
-            - partitionName
-            - statistics
-        properties:
-            partitionName:
-              type: string
-              description: The name of the partition
-            statistics:
-              type: object
-              additionalProperties: {}
-              description: The statistics to update for the partition
+      type: object
+      required:
+        - partitionName
+        - statistics
+      properties:
+        partitionName:
+          type: string
+          description: The name of the partition
+        statistics:
+          type: object
+          additionalProperties: {}
+          description: The statistics to update for the partition
 
+    PartitionRange:
+      type: object
+      properties:
+        lowerPartitionName:
+          type: string
+          description: The lower partition name
+        upperPartitionName:
+          type: string
+          description: The upper partition name
+        lowerBoundType:
+          type: string
+          description: lower bound type
+          enum:
+            - "CLOSED"
+            - "OPEN"
+        upperBoundType:
+          type: string
+          description: upper bound type
+          enum:
+            - "CLOSED"
+            - "OPEN"
+
+    PartitionStatistics:
+      type: object
+      required:
+        - partitionName
+        - statistics
+      properties:
+        partitionName:
+          type: string
+          description: The name of the partition
+        statistics:
+          type: array
+          items:
+            $ref: "#/components/schemas/Statistic"
+
+    Statistic:
+      type: object
+      required:
+        - name
+        - reserved
+        - modifiable
+        - audit
+      properties:
+        name:
+          type: string
+          description: The name of the statistic
+        value:
+          oneOf:
+            - type: string
+            - type: number
+            - type: integer
+            - type: boolean
+            - type: array
+              items: { }
+            - type: object
+              additionalProperties: { }
+            - type: "null"
+          description: The value of the statistic
+        reserved:
+          type: boolean
+          description: Whether the statistic is reserved
+        modifiable:
+          type: boolean
+          description: Whether the statistic is modifiable
+        audit:
+          $ref: "./openapi.yaml#/components/schemas/Audit"
 
   responses:
     StatisticListResponse:
-        type: object
-        properties:
-            code:
-              type: integer
-              format: int32
-              description: Status code of the response
-              enum:
-                - 0
-            statistics:
-              type: object
-              additionalProperties: {}
-              description: A map of statistic names to their values for the metadata object
-
+      type: object
+      properties:
+        code:
+          type: integer
+          format: int32
+          description: Status code of the response
+          enum:
+            - 0
+        statistics:
+          type: array
+          items:
+            $ref: "#/components/schemas/Statistic"
 
     PartitionStatisticsListResponse:
-        type: object
-        properties:
-            code:
-              type: integer
-              format: int32
-              description: Status code of the response
-              enum:
-                - 0
-            partitionStatistics:
-              type: object
-              additionalProperties:
-                type: object
-                additionalProperties: {}
-              description: A map of partition names to their statistics (which is a map of statistic names to their values)
+      type: object
+      properties:
+        code:
+          type: integer
+          format: int32
+          description: Status code of the response
+          enum:
+            - 0
+        partitionStatistics:
+          type: array
+          items:
+            $ref: "#/components/schemas/PartitionStatistics"
+          description: The list of partition statistics results
 
   examples:
     StatisticsDropRequest:
       value: {
-        "names": [ "row_count", "file_size" ]
+        "names": [ "custom-row_count", "custom-file_size" ]
       }
 
     StatisticsUpdateRequest:
       value: {
-        "stats": {
-          "row_count": "1000",
-          "file_size": "500MB"
+        "updates": {
+          "custom-row_count": "1000",
+          "custom-file_size": "500MB"
         }
       }
 
@@ -431,7 +505,7 @@ components:
         "drops": [
           {
             "partitionName": "2023-10-01",
-            "statisticNames": [ "row_count", "file_size" ]
+            "statisticNames": [ "custom-row_count", "custom-file_size" ]
           }
         ]
       }
@@ -441,38 +515,144 @@ components:
         "updates": [
           {
             "partitionName": "2023-10-01",
-            "stats": {
-              "row_count": "500",
-              "file_size": "250MB"
+            "statistics": {
+              "custom-row_count": "500",
+              "custom-file_size": "250MB"
             }
           }
         ]
       }
 
     StatisticListResponse:
-        value: {
-            "code": 0,
-            "statistics": {
-                "row_count": "1000",
-                "file_size": "500MB"
-            }
-        }
-
+      value: {
+          "code": 0,
+          "statistics": [
+              {
+                "name": "row_count",
+                "value": "1000",
+                "reserved": true,
+                "modifiable": false,
+                "audit": {
+                  "creator": "user1",
+                  "createTime": "2023-10-01T12:00:00Z",
+                  "lastModifier": "user2",
+                  "lastModifiedTime": "2023-10-02T12:00:00Z"
+                }
+              },
+              {
+                "name": "file_size",
+                "value": "500MB",
+                "reserved": true,
+                "modifiable": false,
+                "audit": {
+                  "creator": "user1",
+                  "createTime": "2023-10-01T12:00:00Z",
+                  "lastModifier": "user2",
+                  "lastModifiedTime": "2023-10-02T12:00:00Z"
+                }
+              },
+              {
+                "name": "custom-k1",
+                "value": "v1",
+                "reserved": false,
+                "modifiable": true,
+                "audit": {
+                  "creator": "user1",
+                  "createTime": "2023-10-01T12:00:00Z",
+                  "lastModifier": "user2",
+                  "lastModifiedTime": "2023-10-02T12:00:00Z"
+                }
+              }]
+      }
 
     PartitionStatisticListResponse:
-        value: {
-            "code": 0,
-            "partitionStatistics": {
-                "2023-10-01": {
-                    "row_count": "500",
-                    "file_size": "250MB"
-                },
-                "2023-10-02": {
-                    "row_count": "600",
-                    "file_size": "300MB"
+      value: {
+        "code": 0,
+        "partitionStatistics": [
+          {
+            "partitionName": "p0",
+            "statistics": [
+              {
+                "name": "row_count",
+                "value": "1000",
+                "reserved": true,
+                "modifiable": false,
+                "audit": {
+                  "creator": "user1",
+                  "createTime": "2023-10-01T12:00:00Z",
+                  "lastModifier": "user2",
+                  "lastModifiedTime": "2023-10-02T12:00:00Z"
                 }
-            }
-        }
+              },
+              {
+                "name": "file_size",
+                "value": "500MB",
+                "reserved": true,
+                "modifiable": false,
+                "audit": {
+                  "creator": "user1",
+                  "createTime": "2023-10-01T12:00:00Z",
+                  "lastModifier": "user2",
+                  "lastModifiedTime": "2023-10-02T12:00:00Z"
+                }
+              },
+              {
+                "name": "custom-k1",
+                "value": "v1",
+                "reserved": false,
+                "modifiable": true,
+                "audit": {
+                  "creator": "user1",
+                  "createTime": "2023-10-01T12:00:00Z",
+                  "lastModifier": "user2",
+                  "lastModifiedTime": "2023-10-02T12:00:00Z"
+                }
+              }
+            ]
+          },
+          {
+            "partitionName": "p1",
+            "statistics": [
+             {
+               "name": "row_count",
+               "value": "2000",
+               "reserved": true,
+               "modifiable": false,
+               "audit": {
+                 "creator": "user1",
+                 "createTime": "2023-10-01T12:00:00Z",
+                 "lastModifier": "user2",
+                 "lastModifiedTime": "2023-10-02T12:00:00Z"
+               }
+             },
+             {
+               "name": "file_size",
+               "value": "1GB",
+               "reserved": true,
+               "modifiable": false,
+               "audit": {
+                 "creator": "user1",
+                 "createTime": "2023-10-01T12:00:00Z",
+                 "lastModifier": "user2",
+                 "lastModifiedTime": "2023-10-02T12:00:00Z"
+               }
+             },
+             {
+               "name": "custom-k1",
+               "value": "v2",
+               "reserved": false,
+               "modifiable": true,
+               "audit": {
+                 "creator": "user1",
+                 "createTime": "2023-10-01T12:00:00Z",
+                 "lastModifier": "user2",
+                 "lastModifiedTime": "2023-10-02T12:00:00Z"
+               }
+             }
+            ]
+          }
+        ]
+      }
 
     NoSuchMetadataObjectException:
       value: {
