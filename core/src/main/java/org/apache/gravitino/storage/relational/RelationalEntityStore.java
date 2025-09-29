@@ -196,8 +196,37 @@ public class RelationalEntityStore implements EntityStore, SupportsRelationOpera
       Entity.EntityType srcType,
       NameIdentifier destEntityIdent)
       throws IOException, NoSuchEntityException {
-    // todo: support cache
-    return backend.getEntityByRelation(relType, srcIdentifier, srcType, destEntityIdent);
+    return cache.withCacheLock(
+        EntityCacheRelationKey.of(srcIdentifier, srcType, relType),
+        () -> {
+          Optional<List<E>> entities = cache.getIfPresent(relType, srcIdentifier, srcType);
+          if (entities.isPresent()) {
+            return entities.get().stream()
+                .filter(e -> e.nameIdentifier().equals(destEntityIdent))
+                .findFirst()
+                .orElseThrow(
+                    () ->
+                        new NoSuchEntityException(
+                            "No such entity with ident: %s", destEntityIdent));
+          }
+
+          // Use allFields=true to cache complete entities
+          List<E> backendEntities =
+              backend.listEntitiesByRelation(relType, srcIdentifier, srcType, true);
+
+          E r =
+              backendEntities.stream()
+                  .filter(e -> e.nameIdentifier().equals(destEntityIdent))
+                  .findFirst()
+                  .orElseThrow(
+                      () ->
+                          new NoSuchEntityException(
+                              "No such entity with ident: %s", destEntityIdent));
+
+          cache.put(srcIdentifier, srcType, relType, backendEntities);
+
+          return r;
+        });
   }
 
   @Override
