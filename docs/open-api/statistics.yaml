@@ -315,7 +315,6 @@ components:
       schema:
         type: boolean
 
-
   schemas:
     StatisticsDropRequest:
       type: object
@@ -363,7 +362,6 @@ components:
           items:
             type: string
           description: The names of the statistics to drop for the partition
-
 
     PartitionStatisticsUpdateRequest:
       type: object
@@ -458,7 +456,6 @@ components:
         audit:
           $ref: "./openapi.yaml#/components/schemas/Audit"
 
-
   responses:
     StatisticListResponse:
       type: object
@@ -473,7 +470,6 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/Statistic"
-
 
     PartitionStatisticsListResponse:
       type: object
@@ -569,7 +565,6 @@ components:
               }]
       }
 
-
     PartitionStatisticListResponse:
       value: {
         "code": 0,
@@ -658,8 +653,6 @@ components:
           }
         ]
       }
-
-
 
     NoSuchMetadataObjectException:
       value: {
