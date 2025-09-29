@@ -21,6 +21,7 @@ package org.apache.gravitino.cache;
 
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
+import java.time.Duration;
 import java.util.List;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.Config;
@@ -33,6 +34,7 @@ import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.CatalogEntity;
 import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.meta.SchemaVersion;
+import org.awaitility.Awaitility;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -120,7 +122,10 @@ public class TestCacheConfig {
     }
 
     // Only some of the 100 schemas are still in the cache, to be exact, 500 / 10 = 50 schemas.
-    Assertions.assertEquals(10 + 3 + 500 / 10, cache.asMap().size());
+    Awaitility.await()
+        .atMost(Duration.ofSeconds(5))
+        .pollInterval(Duration.ofMillis(10))
+        .until(() -> cache.asMap().size() == 10 + 3 + 500 / 10);
   }
 
   @Test
