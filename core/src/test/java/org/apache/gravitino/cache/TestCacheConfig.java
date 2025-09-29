@@ -103,13 +103,15 @@ public class TestCacheConfig {
           List.of(schemaEntity));
     }
 
-    Thread.sleep(100);
+    // Three 3 metalakes still in cache.
+    for (int i = 0; i < 3; i++) {
+      Assertions.assertNotNull(
+          cache.getIfPresent(
+              EntityCacheRelationKey.of(
+                  NameIdentifier.of("metalake" + 1), Entity.EntityType.METALAKE)));
+    }
 
-    // be evicted
-    Assertions.assertNotNull(
-        cache.getIfPresent(
-            EntityCacheRelationKey.of(NameIdentifier.of("metalake1"), Entity.EntityType.METALAKE)));
-
+    // 10 catalogs still in cache.
     for (int i = 0; i < 10; i++) {
       Assertions.assertNotNull(
           cache.getIfPresent(
@@ -117,6 +119,7 @@ public class TestCacheConfig {
                   NameIdentifier.of("metalake1.catalog" + i), Entity.EntityType.CATALOG)));
     }
 
+    // Only some of the 100 schemas are still in the cache, to be exact, 500 / 10 = 50 schemas.
     Assertions.assertEquals(10 + 3 + 500 / 10, cache.asMap().size());
   }
 
