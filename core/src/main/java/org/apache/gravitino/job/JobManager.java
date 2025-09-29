@@ -311,7 +311,7 @@ public class JobManager implements JobOperationDispatcher {
         Arrays.stream(changes)
             .filter(c -> c instanceof JobTemplateChange.RenameJobTemplate)
             .map(c -> ((JobTemplateChange.RenameJobTemplate) c).getNewName())
-            .findFirst();
+            .reduce((first, second) -> second);
 
     NameIdentifier jobTemplateIdent = NameIdentifierUtil.ofJobTemplate(metalake, jobTemplateName);
     return TreeLockUtils.doWithTreeLock(
