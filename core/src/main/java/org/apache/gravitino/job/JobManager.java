@@ -29,6 +29,7 @@ import java.io.IOException;
 import java.net.URI;
 import java.nio.file.Files;
 import java.time.Instant;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -306,6 +307,12 @@ public class JobManager implements JobOperationDispatcher {
       throws NoSuchJobTemplateException, IllegalArgumentException {
     checkMetalake(NameIdentifierUtil.ofMetalake(metalake), entityStore);
 
+    Optional<String> newName =
+        Arrays.stream(changes)
+            .filter(c -> c instanceof JobTemplateChange.RenameJobTemplate)
+            .map(c -> ((JobTemplateChange.RenameJobTemplate) c).getNewName())
+            .findFirst();
+
     NameIdentifier jobTemplateIdent = NameIdentifierUtil.ofJobTemplate(metalake, jobTemplateName);
     return TreeLockUtils.doWithTreeLock(
         jobTemplateIdent,
@@ -325,10 +332,13 @@ public class JobManager implements JobOperationDispatcher {
           } catch (IOException ioe) {
             throw new RuntimeException(ioe);
           } catch (EntityAlreadyExistsException e) {
+            // If the EntityAlreadyExistsException is thrown, it means the new name already exists.
+            // So there should be a rename change, and the new name should be present.
             throw new RuntimeException(
-                "Job template with the same name "
-                    + jobTemplateName
-                    + " already exists, this is unexpected because job template doesn't support rename",
+                String.format(
+                    "Failed to rename job template from %s to %s under metalake %s, the new name "
+                        + "already exists",
+                    jobTemplateName, newName, metalake),
                 e);
           }
         });
