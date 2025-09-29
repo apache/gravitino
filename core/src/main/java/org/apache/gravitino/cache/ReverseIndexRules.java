@@ -148,16 +148,17 @@ public class ReverseIndexRules {
         }
       };
 
-  // Keep policy -> object reverse index for metadata objects, so the key is a object and the value
-  // is a policy.
+  // Keep policies/tags to objects reverse index for metadata objects, so the key are objects and
+  // the values are policies/tags.
   public static final ReverseIndexCache.ReverseIndexRule GENERIC_METADATA_OBJECT_REVERSE_RULE =
       (entity, key, reverseIndexCache) -> {
         GenericEntity genericEntity = (GenericEntity) entity;
         EntityType type = entity.type();
         if (genericEntity.name() != null) {
-          // We may support a securable object to tag mapping in the future, so we need to add name
-          // `policy` to differentiate it.
+          // Since it's likely that both policies and tags will be associated with metadata objects,
+          // so we create two reverse index entries here.
           String[] levels = genericEntity.name().split(",");
+          // 'policy' marks it's a policy reverse index entry.
           NameIdentifier policyNameIdentifier = NameIdentifier.of(ArrayUtils.add(levels, "policy"));
           reverseIndexCache.put(policyNameIdentifier, type, key);
 
@@ -166,8 +167,8 @@ public class ReverseIndexRules {
         }
       };
 
-  // Keep object -> policy reverse index for policy objects, so the key is a policy and the value is
-  // an object.
+  // Keep objects to policies reverse index for policy objects, so the key are policies and the
+  // values are objects.
   public static final ReverseIndexCache.ReverseIndexRule POLICY_REVERSE_RULE =
       (entity, key, reverseIndexCache) -> {
         PolicyEntity policyEntity = (PolicyEntity) entity;
@@ -176,8 +177,8 @@ public class ReverseIndexRules {
         reverseIndexCache.put(nameIdentifier, Entity.EntityType.POLICY, key);
       };
 
-  // Keep object -> tag reverse index for tag objects, so the key is a tag and the value is an
-  // object.
+  // Keep objects to policies reverse index for tag objects, so the key are tags and the
+  // values are objects.
   public static final ReverseIndexCache.ReverseIndexRule TAG_REVERSE_RULE =
       (entity, key, reverseIndexCache) -> {
         TagEntity policyEntity = (TagEntity) entity;
