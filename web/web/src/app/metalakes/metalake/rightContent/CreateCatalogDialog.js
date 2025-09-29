@@ -278,7 +278,7 @@ const CreateCatalogDialog = props => {
           ...others
         } = prevProperties
 
-        properties = {...others}
+        properties = { ...others }
         catalogBackend && (properties['catalog-backend'] = catalogBackend)
         uri && (properties['uri'] = uri)
         warehouse && (properties['warehouse'] = warehouse)
