@@ -259,6 +259,9 @@ public class KafkaCatalogOperations implements CatalogOperations, SupportsSchema
     try {
       CreateTopicsResult createTopicsResult =
           adminClient.createTopics(Collections.singleton(buildNewTopic(ident, properties)));
+      // Wait for topic creation to complete
+      createTopicsResult.all().get();
+
       Uuid topicId = createTopicsResult.topicId(ident.name()).get();
       Integer numPartitions = createTopicsResult.numPartitions(ident.name()).get();
       Integer replicationFactor = createTopicsResult.replicationFactor(ident.name()).get();
