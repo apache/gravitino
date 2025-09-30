@@ -71,6 +71,11 @@ curl -L -s -o bundles/sqlite-jdbc-3.42.0.0.jar https://repo1.maven.org/maven2/or
 
 cp bundles/*jar ${iceberg_rest_server_dir}/packages/gravitino-iceberg-rest-server/libs/
 
+# Temporary rm log4j from Gravition to prevent class conflict with Iceberg AWS bundle jar
+rm -f ${iceberg_rest_server_dir}/packages/gravitino-iceberg-rest-server/libs/log4j-slf4j2-impl-*.jar
+rm -f ${iceberg_rest_server_dir}/packages/gravitino-iceberg-rest-server/libs/log4j-api-*.jar
+rm -f ${iceberg_rest_server_dir}/packages/gravitino-iceberg-rest-server/libs/log4j-core-*.jar
+
 cp start-iceberg-rest-server.sh ${iceberg_rest_server_dir}/packages/gravitino-iceberg-rest-server/bin/
 cp rewrite_config.py ${iceberg_rest_server_dir}/packages/gravitino-iceberg-rest-server/bin/
 
