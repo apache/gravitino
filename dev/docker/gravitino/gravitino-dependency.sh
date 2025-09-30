@@ -49,7 +49,7 @@ download_gcs_connector() {
 }
 
 # Build the Gravitino project
-${gravitino_home}/gradlew clean build -x test
+${gravitino_home}/gradlew clean build -x test -x rat
 
 rm -rf ${gravitino_home}/distribution
 # Prepare compile Gravitino packages
