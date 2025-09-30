@@ -405,7 +405,7 @@ public class ModelVersionMetaService {
 
     } catch (RuntimeException re) {
       ExceptionUtils.checkSQLException(
-          re, Entity.EntityType.CATALOG, newModelVersionEntity.nameIdentifier().toString());
+          re, Entity.EntityType.MODEL_VERSION, newModelVersionEntity.nameIdentifier().toString());
       throw re;
     }
 
