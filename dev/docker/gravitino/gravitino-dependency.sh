@@ -49,7 +49,7 @@ download_gcs_connector() {
 }
 
 # Build the Gravitino project
-${gravitino_home}/gradlew clean build -x test -x rat
+${gravitino_home}/gradlew clean build -x test
 
 rm -rf ${gravitino_home}/distribution
 # Prepare compile Gravitino packages
@@ -115,7 +115,6 @@ find ${gravitino_home}/bundles/aliyun-bundle/build/libs/ -name 'gravitino-aliyun
 download_gcs_connector
 
 # Temporary rm log4j from Gravition to prevent class conflict with Iceberg AWS bundle jar
-rm -f ${gravitino_iceberg_rest_dir}/log4j-slf4j2-impl-*.jar
 rm -f ${gravitino_iceberg_rest_dir}/log4j-api-*.jar
 rm -f ${gravitino_iceberg_rest_dir}/log4j-core-*.jar
 
