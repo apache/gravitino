@@ -22,6 +22,7 @@ import static org.apache.gravitino.rel.Column.DEFAULT_VALUE_NOT_SET;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.google.common.collect.ImmutableList;
+import java.util.Arrays;
 import java.util.List;
 import org.apache.gravitino.dto.rel.expressions.LiteralDTO;
 import org.apache.gravitino.json.JsonUtils;
@@ -308,5 +309,187 @@ public class TestTableUpdatesRequest {
     expected = "{\"@type\":\"deleteTableIndex\",\"name\":\"uk_2\",\"ifExists\":true}";
     Assertions.assertEquals(
         JsonUtils.objectMapper().readTree(expected), JsonUtils.objectMapper().readTree(jsonString));
+  }
+
+  @Test
+  public void testValidateValidTableUpdateRequests() {
+    // Test valid requests
+    List<TableUpdateRequest> validRequests =
+        Arrays.asList(
+            new TableUpdateRequest.RenameTableRequest("newTable"),
+            new TableUpdateRequest.UpdateTableCommentRequest("comment"),
+            new TableUpdateRequest.SetTablePropertyRequest("property", "value"),
+            new TableUpdateRequest.RemoveTablePropertyRequest("property"),
+            new TableUpdateRequest.AddTableColumnRequest(
+                new String[] {"column"}, Types.StringType.get(), "comment"),
+            new TableUpdateRequest.RenameTableColumnRequest(
+                new String[] {"oldColumn"}, "newColumn"),
+            new TableUpdateRequest.UpdateTableColumnDefaultValueRequest(
+                new String[] {"column"},
+                LiteralDTO.builder()
+                    .withDataType(Types.StringType.get())
+                    .withValue("default")
+                    .build()),
+            new TableUpdateRequest.UpdateTableColumnTypeRequest(
+                new String[] {"column"}, Types.StringType.get()),
+            new TableUpdateRequest.UpdateTableColumnCommentRequest(
+                new String[] {"column"}, "new comment"),
+            new TableUpdateRequest.UpdateTableColumnPositionRequest(
+                new String[] {"column"}, TableChange.ColumnPosition.first()),
+            new TableUpdateRequest.UpdateTableColumnNullabilityRequest(
+                new String[] {"column"}, false),
+            new TableUpdateRequest.DeleteTableColumnRequest(new String[] {"column"}, false),
+            new TableUpdateRequest.AddTableIndexRequest(
+                Index.IndexType.PRIMARY_KEY, "index_name", new String[][] {{"column1"}}),
+            new TableUpdateRequest.DeleteTableIndexRequest("index_name", true),
+            new TableUpdateRequest.UpdateColumnAutoIncrementRequest(new String[] {"column"}, true));
+
+    for (TableUpdateRequest request : validRequests) {
+      Assertions.assertDoesNotThrow(request::validate);
+    }
+  }
+
+  @Test
+  public void testValidateInvalidTableUpdateRequests() {
+    // Test invalid requests
+
+    // RenameTableRequest - null newName
+    IllegalArgumentException exception1 =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> new TableUpdateRequest.RenameTableRequest(null).validate());
+    Assertions.assertTrue(exception1.getMessage().contains("newName"));
+
+    // SetTablePropertyRequest - null property
+    IllegalArgumentException exception2 =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> new TableUpdateRequest.SetTablePropertyRequest(null, "value").validate());
+    Assertions.assertTrue(exception2.getMessage().contains("property"));
+
+    // SetTablePropertyRequest - null value
+    IllegalArgumentException exception3 =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> new TableUpdateRequest.SetTablePropertyRequest("property", null).validate());
+    Assertions.assertTrue(exception3.getMessage().contains("value"));
+
+    // RemoveTablePropertyRequest - null property
+    IllegalArgumentException exception4 =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> new TableUpdateRequest.RemoveTablePropertyRequest(null).validate());
+    Assertions.assertTrue(exception4.getMessage().contains("property"));
+
+    // AddTableColumnRequest - null fieldName
+    IllegalArgumentException exception5 =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                new TableUpdateRequest.AddTableColumnRequest(
+                        null, Types.StringType.get(), "comment")
+                    .validate());
+    Assertions.assertTrue(exception5.getMessage().contains("fieldName"));
+
+    // AddTableColumnRequest - null dataType
+    IllegalArgumentException exception6 =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                new TableUpdateRequest.AddTableColumnRequest(
+                        new String[] {"column"}, null, "comment")
+                    .validate());
+    Assertions.assertTrue(exception6.getMessage().contains("type"));
+
+    // RenameTableColumnRequest - null oldFieldName
+    IllegalArgumentException exception7 =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> new TableUpdateRequest.RenameTableColumnRequest(null, "newColumn").validate());
+    Assertions.assertTrue(exception7.getMessage().contains("oldFieldName"));
+
+    // RenameTableColumnRequest - null newFieldName
+    IllegalArgumentException exception8 =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                new TableUpdateRequest.RenameTableColumnRequest(new String[] {"oldColumn"}, null)
+                    .validate());
+    Assertions.assertTrue(exception8.getMessage().contains("newFieldName"));
+
+    // UpdateTableColumnDefaultValueRequest - null newDefaultVa
+    IllegalArgumentException exception9 =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                new TableUpdateRequest.UpdateTableColumnDefaultValueRequest(
+                        new String[] {"column"}, null)
+                    .validate());
+    Assertions.assertTrue(exception9.getMessage().contains("newDefaultValue"));
+
+    // UpdateTableColumnTypeRequest - null newType
+    IllegalArgumentException exception10 =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                new TableUpdateRequest.UpdateTableColumnTypeRequest(new String[] {"column"}, null)
+                    .validate());
+    Assertions.assertTrue(exception10.getMessage().contains("newType"));
+
+    // UpdateTableColumnCommentRequest - null newComment
+    IllegalArgumentException exception11 =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                new TableUpdateRequest.UpdateTableColumnCommentRequest(
+                        new String[] {"column"}, null)
+                    .validate());
+    Assertions.assertTrue(exception11.getMessage().contains("newComment"));
+
+    // UpdateTableColumnPositionRequest - null newPosition
+    IllegalArgumentException exception12 =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                new TableUpdateRequest.UpdateTableColumnPositionRequest(
+                        new String[] {"column"}, null)
+                    .validate());
+    Assertions.assertTrue(exception12.getMessage().contains("newPosition"));
+
+    // DeleteTableIndexRequest - null name
+    IllegalArgumentException exception13 =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> new TableUpdateRequest.DeleteTableIndexRequest(null, true).validate());
+    Assertions.assertTrue(exception13.getMessage().contains("Index name cannot be null"));
+
+    // AddTableIndexRequest - null index (using default constructor)
+    IllegalArgumentException exception14 =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> new TableUpdateRequest.AddTableIndexRequest().validate());
+    Assertions.assertTrue(exception14.getMessage().contains("Index cannot be null"));
+
+    // UpdateTableColumnNullabilityRequest - null fieldName
+    IllegalArgumentException exception15 =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                new TableUpdateRequest.UpdateTableColumnNullabilityRequest(null, false).validate());
+    Assertions.assertTrue(exception15.getMessage().contains("fieldName"));
+
+    // DeleteTableColumnRequest - null fieldName
+    IllegalArgumentException exception16 =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> new TableUpdateRequest.DeleteTableColumnRequest(null, false).validate());
+    Assertions.assertTrue(exception16.getMessage().contains("fieldName"));
+
+    // UpdateColumnAutoIncrementRequest - null fieldName
+    IllegalArgumentException exception17 =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> new TableUpdateRequest.UpdateColumnAutoIncrementRequest(null, true).validate());
+    Assertions.assertTrue(exception17.getMessage().contains("fieldName"));
   }
 }
