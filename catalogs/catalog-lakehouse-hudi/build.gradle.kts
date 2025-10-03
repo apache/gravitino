@@ -46,8 +46,11 @@ dependencies {
   implementation(libs.commons.io)
   implementation(libs.htrace.core4)
   implementation(libs.guava)
-  implementation(libs.hadoop2.auth) {
-    exclude("*")
+  implementation(libs.hadoop3.client.api) {
+    exclude("com.github.spotbugs")
+  }
+  implementation(libs.hadoop3.client.runtime) {
+    exclude("com.github.spotbugs")
   }
   implementation(libs.woodstox.core)
   implementation(libs.hive2.metastore) {
@@ -76,12 +79,6 @@ dependencies {
     exclude("org.openjdk.jol")
     exclude("org.slf4j")
   }
-  implementation(libs.hadoop2.common) {
-    exclude("*")
-  }
-  implementation(libs.hadoop2.mapreduce.client.core) {
-    exclude("*")
-  }
   implementation(libs.slf4j.api)
 
   compileOnly(libs.lombok)
@@ -109,12 +106,11 @@ dependencies {
   testImplementation(libs.datanucleus.rdbms)
   testImplementation(libs.datanucleus.jdo)
   testImplementation(libs.derby)
-  testImplementation(libs.hadoop2.auth) {
-    exclude("*")
+  testImplementation(libs.hadoop3.client.api) {
+    exclude("com.github.spotbugs")
   }
-  testImplementation(libs.hadoop2.hdfs)
-  testImplementation(libs.hadoop2.mapreduce.client.core) {
-    exclude("*")
+  testImplementation(libs.hadoop3.client.runtime) {
+    exclude("com.github.spotbugs")
   }
   testImplementation(libs.htrace.core4)
   testImplementation(libs.junit.jupiter.api)
