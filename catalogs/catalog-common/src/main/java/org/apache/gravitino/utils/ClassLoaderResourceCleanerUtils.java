@@ -221,6 +221,19 @@ public class ClassLoaderResourceCleanerUtils {
    */
   private static void releaseLogFactoryInCommonLogging(ClassLoader currentClassLoader)
       throws Exception {
+
+    // If we use fileset with the local file system, HTrace will be used, so we need to
+    // release the HTrace LogFactory as well.
+    try {
+      Class<?> htraceLogFactoryClass =
+          Class.forName(
+              "org.apache.htrace.shaded.commons.logging.LogFactory", true, currentClassLoader);
+      MethodUtils.invokeStaticMethod(htraceLogFactoryClass, "release", currentClassLoader);
+    } catch (Exception e) {
+      // Ignore if htrace is not used
+      LOG.debug("HTrace is not used, skipping release of HTrace LogFactory...");
+    }
+
     // Release the LogFactory for the FilesetCatalogOperations class loader
     Class<?> logFactoryClass =
         Class.forName("org.apache.commons.logging.LogFactory", true, currentClassLoader);
