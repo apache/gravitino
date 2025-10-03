@@ -431,9 +431,14 @@ components:
         newName:
           type: string
           description: The new name of the table
+        newSchemaName:
+          type: string
+          description: The new schema name of the table, if not provided, the schema will not be changed
+          nullable: true
       example: {
         "@type": "rename",
-        "newName": "my_hive_table_new"
+        "newName": "my_hive_table_new",
+        "newSchemaName": "my_hive_schema_new"
       }
 
     UpdateTableCommentRequest:

@@ -15,7 +15,7 @@
 # specific language governing permissions and limitations
 # under the License.
 
-from gravitino.api.types.json_serdes.base import JsonSerializable
-from gravitino.api.types.json_serdes.type_serdes import TypeSerdes
+from gravitino.api.rel.types.json_serdes.base import JsonSerializable
+from gravitino.api.rel.types.json_serdes.type_serdes import TypeSerdes
 
 __all__ = ["JsonSerializable", "TypeSerdes"]

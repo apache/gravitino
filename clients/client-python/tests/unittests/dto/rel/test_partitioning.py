@@ -18,7 +18,7 @@
 import unittest
 
 from gravitino.api.expressions.named_reference import NamedReference
-from gravitino.api.types.types import Types
+from gravitino.api.rel.types.types import Types
 from gravitino.dto.rel.column_dto import ColumnDTO
 from gravitino.dto.rel.partitioning.partitioning import (
     Partitioning,

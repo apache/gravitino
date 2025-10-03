@@ -36,17 +36,19 @@ import org.slf4j.LoggerFactory;
  * weight is calculated as follows:
  *
  * <ul>
- *   <li>Metalake: 100
- *   <li>Catalog: 75
- *   <li>Schema: 50
- *   <li>Other: 15
+ *   <li>Metalake: 0, which means that it will never be evicted from the cache unless timeout occurs
+ *       or manually cleared.
+ *   <li>Catalog: 0, which means that it will never be evicted from the cache unless timeout occurs
+ *       or manually cleared.
+ *   <li>Schema: 10
+ *   <li>Other: 100
  * </ul>
  */
 public class EntityCacheWeigher implements Weigher<EntityCacheKey, List<Entity>> {
-  public static final int METALAKE_WEIGHT = 100;
-  public static final int CATALOG_WEIGHT = 75;
-  public static final int SCHEMA_WEIGHT = 50;
-  public static final int OTHER_WEIGHT = 15;
+  public static final int METALAKE_WEIGHT = 0;
+  public static final int CATALOG_WEIGHT = 0;
+  public static final int SCHEMA_WEIGHT = 10;
+  public static final int OTHER_WEIGHT = 100;
   private static final Logger LOG = LoggerFactory.getLogger(EntityCacheWeigher.class.getName());
   private static final EntityCacheWeigher INSTANCE = new EntityCacheWeigher();
   private static final Map<Entity.EntityType, Integer> ENTITY_WEIGHTS =
@@ -54,7 +56,7 @@ public class EntityCacheWeigher implements Weigher<EntityCacheKey, List<Entity>>
           Entity.EntityType.METALAKE, METALAKE_WEIGHT,
           Entity.EntityType.CATALOG, CATALOG_WEIGHT,
           Entity.EntityType.SCHEMA, SCHEMA_WEIGHT);
-  private static long MAX_WEIGHT =
+  private static final long MAX_WEIGHT =
       2 * (METALAKE_WEIGHT * 10 + CATALOG_WEIGHT * (10 * 200) + SCHEMA_WEIGHT * (10 * 200 * 1000));
 
   @VisibleForTesting

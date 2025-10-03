@@ -18,7 +18,7 @@
 from functools import reduce
 from typing import ClassVar, List, Optional
 
-from gravitino.api.expressions.indexes.index import Index
+from gravitino.api.rel.indexes.index import Index
 from gravitino.utils.precondition import Precondition
 
 

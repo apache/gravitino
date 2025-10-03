@@ -69,7 +69,9 @@ public interface TableMetaMapper {
 
   @UpdateProvider(type = TableMetaSQLProviderFactory.class, method = "updateTableMeta")
   Integer updateTableMeta(
-      @Param("newTableMeta") TablePO newTablePO, @Param("oldTableMeta") TablePO oldTablePO);
+      @Param("newTableMeta") TablePO newTablePO,
+      @Param("oldTableMeta") TablePO oldTablePO,
+      @Param("newSchemaId") Long newSchemaId);
 
   @UpdateProvider(
       type = TableMetaSQLProviderFactory.class,

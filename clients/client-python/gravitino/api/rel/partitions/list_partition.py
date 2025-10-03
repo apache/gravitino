@@ -16,37 +16,32 @@
 # under the License.
 
 from abc import abstractmethod
-from typing import Any
+from typing import Any, List
 
 from gravitino.api.expressions.literals.literal import Literal
-from gravitino.api.expressions.partitions.partition import Partition
+from gravitino.api.rel.partitions.partition import Partition
 
 
-class RangePartition(Partition):
+class ListPartition(Partition):
     """
-    A range partition represents a result of range partitioning. For example, for range partition
+    A list partition represents a result of list partitioning. For example, for list partition
 
     ```
-    PARTITION p20200321 VALUES LESS THAN ("2020-03-22")
+    PARTITION p202204_California VALUES IN (
+      ("2022-04-01", "Los Angeles"),
+      ("2022-04-01", "San Francisco")
+    )
     ```
 
-    its upper bound is "2020-03-22" and its lower bound is null.
+    its name is "p202204_California" and lists are [["2022-04-01","Los Angeles"], ["2022-04-01", "San Francisco"]].
 
     APIs that are still evolving towards becoming stable APIs, and can change from one feature release to another (0.5.0 to 0.6.0).
     """
 
     @abstractmethod
-    def upper(self) -> Literal[Any]:
+    def lists(self) -> List[List[Literal[Any]]]:
         """
         Returns:
-            Literal[Any]: The upper bound of the partition.
-        """
-        pass
-
-    @abstractmethod
-    def lower(self) -> Literal[Any]:
-        """
-        Returns:
-            Literal[Any]: The lower bound of the partition.
+            List[List[Literal[Any]]]: The values of the list partition.
         """
         pass

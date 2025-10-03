@@ -18,10 +18,10 @@
 import unittest
 from unittest.mock import Mock
 
-from gravitino.api.column import Column, ColumnImpl
 from gravitino.api.expressions.expression import Expression
 from gravitino.api.expressions.function_expression import FunctionExpression
-from gravitino.api.types.type import Type
+from gravitino.api.rel.column import Column, ColumnImpl
+from gravitino.api.rel.types.type import Type
 from gravitino.exceptions.base import (
     IllegalArgumentException,
     UnsupportedOperationException,
