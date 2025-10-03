@@ -16,7 +16,6 @@
 # under the License.
 from abc import ABC
 from typing import List, Dict, Optional, Any
-from copy import deepcopy
 
 
 class JobTemplateChange:
@@ -184,7 +183,7 @@ class TemplateUpdate(ABC):
 
     def __init__(
         self,
-        new_executable: str,
+        new_executable: Optional[str] = None,
         new_arguments: Optional[List[str]] = None,
         new_environments: Optional[Dict[str, str]] = None,
         new_custom_fields: Optional[Dict[str, str]] = None,
@@ -198,20 +197,12 @@ class TemplateUpdate(ABC):
             new_environments: The new environments of the job template.
             new_custom_fields: The new custom fields of the job template.
         """
-        if not new_executable or not new_executable.strip():
-            raise ValueError("Executable cannot be null or blank")
         self._new_executable = new_executable
-        self._new_arguments = (
-            deepcopy(new_arguments) if new_arguments is not None else []
-        )
-        self._new_environments = (
-            deepcopy(new_environments) if new_environments is not None else {}
-        )
-        self._new_custom_fields = (
-            deepcopy(new_custom_fields) if new_custom_fields is not None else {}
-        )
+        self._new_arguments = new_arguments
+        self._new_environments = new_environments
+        self._new_custom_fields = new_custom_fields
 
-    def get_new_executable(self) -> str:
+    def get_new_executable(self) -> Optional[str]:
         """
         Get the new executable of the job template.
 
@@ -220,7 +211,7 @@ class TemplateUpdate(ABC):
         """
         return self._new_executable
 
-    def get_new_arguments(self) -> List[str]:
+    def get_new_arguments(self) -> Optional[List[str]]:
         """
         Get the new arguments of the job template.
 
@@ -229,7 +220,7 @@ class TemplateUpdate(ABC):
         """
         return self._new_arguments
 
-    def get_new_environments(self) -> Dict[str, str]:
+    def get_new_environments(self) -> Optional[Dict[str, str]]:
         """
         Get the new environments of the job template.
 
@@ -238,7 +229,7 @@ class TemplateUpdate(ABC):
         """
         return self._new_environments
 
-    def get_new_custom_fields(self) -> Dict[str, str]:
+    def get_new_custom_fields(self) -> Optional[Dict[str, str]]:
         """
         Get the new custom fields of the job template.
 
@@ -275,7 +266,7 @@ class ShellTemplateUpdate(TemplateUpdate):
 
     def __init__(
         self,
-        new_executable: str,
+        new_executable: Optional[str] = None,
         new_arguments: Optional[List[str]] = None,
         new_environments: Optional[Dict[str, str]] = None,
         new_custom_fields: Optional[Dict[str, str]] = None,
@@ -294,9 +285,9 @@ class ShellTemplateUpdate(TemplateUpdate):
         super().__init__(
             new_executable, new_arguments, new_environments, new_custom_fields
         )
-        self._new_scripts = deepcopy(new_scripts) if new_scripts is not None else []
+        self._new_scripts = new_scripts
 
-    def get_new_scripts(self) -> List[str]:
+    def get_new_scripts(self) -> Optional[List[str]]:
         """
         Get the new scripts of the shell job template.
 
@@ -323,7 +314,7 @@ class SparkTemplateUpdate(TemplateUpdate):
 
     def __init__(
         self,
-        new_executable: str,
+        new_executable: Optional[str] = None,
         new_arguments: Optional[List[str]] = None,
         new_environments: Optional[Dict[str, str]] = None,
         new_custom_fields: Optional[Dict[str, str]] = None,
@@ -351,10 +342,10 @@ class SparkTemplateUpdate(TemplateUpdate):
             new_executable, new_arguments, new_environments, new_custom_fields
         )
         self._new_class_name = new_class_name
-        self._new_jars = deepcopy(new_jars) if new_jars is not None else []
-        self._new_files = deepcopy(new_files) if new_files is not None else []
-        self._new_archives = deepcopy(new_archives) if new_archives is not None else []
-        self._new_configs = deepcopy(new_configs) if new_configs is not None else {}
+        self._new_jars = new_jars
+        self._new_files = new_files
+        self._new_archives = new_archives
+        self._new_configs = new_configs
 
     def get_new_class_name(self) -> Optional[str]:
         """
@@ -365,7 +356,7 @@ class SparkTemplateUpdate(TemplateUpdate):
         """
         return self._new_class_name
 
-    def get_new_jars(self) -> List[str]:
+    def get_new_jars(self) -> Optional[List[str]]:
         """
         Get the new jars of the spark job template.
 
@@ -374,7 +365,7 @@ class SparkTemplateUpdate(TemplateUpdate):
         """
         return self._new_jars
 
-    def get_new_files(self) -> List[str]:
+    def get_new_files(self) -> Optional[List[str]]:
         """
         Get the new files of the spark job template.
 
@@ -383,7 +374,7 @@ class SparkTemplateUpdate(TemplateUpdate):
         """
         return self._new_files
 
-    def get_new_archives(self) -> List[str]:
+    def get_new_archives(self) -> Optional[List[str]]:
         """
         Get the new archives of the spark job template.
 
@@ -392,7 +383,7 @@ class SparkTemplateUpdate(TemplateUpdate):
         """
         return self._new_archives
 
-    def get_new_configs(self) -> Dict[str, str]:
+    def get_new_configs(self) -> Optional[Dict[str, str]]:
         """
         Get the new configs of the spark job template.
 

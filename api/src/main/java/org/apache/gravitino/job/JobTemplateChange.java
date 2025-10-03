@@ -18,14 +18,9 @@
  */
 package org.apache.gravitino.job;
 
-import com.google.common.base.Preconditions;
-import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableMap;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import org.apache.commons.lang3.StringUtils;
 
 /**
  * The interface for job template changes. A job template change is an operation that modifies a job
@@ -378,18 +373,6 @@ public interface JobTemplateChange {
         this.newCustomFields = newCustomFields;
         return self();
       }
-
-      /** Validates the builder fields before building the TemplateUpdate instance. */
-      protected void validate() {
-        Preconditions.checkArgument(
-            StringUtils.isNoneBlank(newExecutable), "Executable cannot be null or blank");
-        this.newArguments =
-            newArguments == null ? Collections.emptyList() : ImmutableList.copyOf(newArguments);
-        this.newEnvironments =
-            newEnvironments == null ? Collections.emptyMap() : ImmutableMap.copyOf(newEnvironments);
-        this.newCustomFields =
-            newCustomFields == null ? Collections.emptyMap() : ImmutableMap.copyOf(newCustomFields);
-      }
     }
   }
 
@@ -470,7 +453,6 @@ public interface JobTemplateChange {
        */
       @Override
       public ShellTemplateUpdate build() {
-        validate();
         return new ShellTemplateUpdate(this);
       }
 
@@ -482,14 +464,6 @@ public interface JobTemplateChange {
       @Override
       protected Builder self() {
         return this;
-      }
-
-      /** Validates the builder fields before building the ShellTemplateUpdate instance. */
-      @Override
-      protected void validate() {
-        super.validate();
-        this.newScripts =
-            newScripts == null ? Collections.emptyList() : ImmutableList.copyOf(newScripts);
       }
     }
   }
@@ -671,7 +645,6 @@ public interface JobTemplateChange {
        */
       @Override
       public SparkTemplateUpdate build() {
-        validate();
         return new SparkTemplateUpdate(this);
       }
 
@@ -683,18 +656,6 @@ public interface JobTemplateChange {
       @Override
       protected Builder self() {
         return this;
-      }
-
-      /** Validates the builder fields before building the SparkTemplateUpdate instance. */
-      @Override
-      protected void validate() {
-        super.validate();
-        this.newJars = newJars == null ? Collections.emptyList() : ImmutableList.copyOf(newJars);
-        this.newFiles = newFiles == null ? Collections.emptyList() : ImmutableList.copyOf(newFiles);
-        this.newArchives =
-            newArchives == null ? Collections.emptyList() : ImmutableList.copyOf(newArchives);
-        this.newConfigs =
-            newConfigs == null ? Collections.emptyMap() : ImmutableMap.copyOf(newConfigs);
       }
     }
   }

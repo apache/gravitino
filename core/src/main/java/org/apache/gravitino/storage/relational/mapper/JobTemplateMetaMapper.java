@@ -65,4 +65,9 @@ public interface JobTemplateMetaMapper {
       method = "deleteJobTemplateMetasByLegacyTimeline")
   Integer deleteJobTemplateMetasByLegacyTimeline(
       @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit);
+
+  @UpdateProvider(type = JobTemplateMetaSQLProviderFactory.class, method = "updateJobTemplateMeta")
+  Integer updateJobTemplateMeta(
+      @Param("newJobTemplateMeta") JobTemplatePO newJobTemplatePO,
+      @Param("oldJobTemplateMeta") JobTemplatePO oldJobTemplatePO);
 }
