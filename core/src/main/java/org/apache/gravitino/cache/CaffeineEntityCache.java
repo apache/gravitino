@@ -24,6 +24,7 @@ import com.github.benmanes.caffeine.cache.Caffeine;
 import com.github.benmanes.caffeine.cache.RemovalCause;
 import com.github.benmanes.caffeine.cache.stats.CacheStats;
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
 import com.googlecode.concurrenttrees.radix.ConcurrentRadixTree;
@@ -89,6 +90,12 @@ public class CaffeineEntityCache extends BaseEntityCache {
   private RadixTree<EntityCacheRelationKey> cacheIndex;
 
   private ScheduledExecutorService scheduler;
+
+  Set<SupportsRelationOperations.Type> relationTypes =
+      ImmutableSet.of(
+          SupportsRelationOperations.Type.METADATA_OBJECT_ROLE_REL,
+          SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL,
+          SupportsRelationOperations.Type.POLICY_METADATA_OBJECT_REL);
 
   /**
    * Constructs a new {@link CaffeineEntityCache}.
@@ -167,7 +174,12 @@ public class CaffeineEntityCache extends BaseEntityCache {
 
     return segmentedLock.withLock(
         EntityCacheRelationKey.of(ident, type, relType),
-        () -> invalidateEntities(ident, type, Optional.of(relType)));
+        () -> {
+          // Invalidate the specific relation type and the entity itself
+          invalidate(ident, type);
+          invalidateEntities(ident, type, Optional.of(relType));
+          return true;
+        });
   }
 
   /** {@inheritDoc} */
@@ -176,7 +188,15 @@ public class CaffeineEntityCache extends BaseEntityCache {
     checkArguments(ident, type);
     return segmentedLock.withLock(
         EntityCacheRelationKey.of(ident, type),
-        () -> invalidateEntities(ident, type, Optional.empty()));
+        () -> {
+          // Invalid all relation types and the entity itself
+          invalidateEntities(ident, type, Optional.empty());
+          relationTypes.forEach(
+              relType -> {
+                invalidateEntities(ident, type, Optional.of(relType));
+              });
+          return true;
+        });
   }
 
   /** {@inheritDoc} */
@@ -303,8 +323,6 @@ public class CaffeineEntityCache extends BaseEntityCache {
    * @param newEntities The new entities to sync to the cache.
    */
   private void syncEntitiesToCache(EntityCacheRelationKey key, List<Entity> newEntities) {
-    if (key.relationType() != null) return;
-
     List<Entity> existingEntities = cacheData.getIfPresent(key);
 
     if (existingEntities != null && key.relationType() != null) {
