@@ -1,0 +1,15 @@
+Update a catalog in a Metalake; you can update the name, comment, enable/disable the catalog, and rename the catalog.
+
+Example commands
+
+# Rename a catalog
+gcli catalog update -m demo_metalake --name catalog_mysql --rename 'mysql'
+
+# Update a catalog's comment
+gcli catalog update -m demo_metalake --name catalog_mysql --comment 'new comment'
+
+# Enable a catalog
+gcli catalog update -m demo_metalake --name catalog_mysql --enable
+
+# Disable a catalog
+gcli catalog update -m demo_metalake --name catalog_mysql --disable;

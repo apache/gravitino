@@ -1,0 +1,6 @@
+Set properties of a catalog in a Metalake, use --property and --value to set the property and its value respectively.
+
+Example commands
+
+# Set properties of a catalog in a Metalake
+gcli catalog set --name catalog_mysql --property test --value value;
