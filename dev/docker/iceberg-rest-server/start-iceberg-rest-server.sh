@@ -26,4 +26,4 @@ cd ${iceberg_rest_server_dir}
 
 python bin/rewrite_config.py
 
-./bin/gravitino-iceberg-rest-server.sh start
+exec ./bin/gravitino-iceberg-rest-server.sh run
