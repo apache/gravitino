@@ -16,11 +16,12 @@
 # under the License.
 
 from __future__ import annotations
+
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, List
 
 if TYPE_CHECKING:
-    from gravitino.api.expressions.named_reference import NamedReference
+    from gravitino.api.rel.expressions.named_reference import NamedReference
 
 
 class Expression(ABC):

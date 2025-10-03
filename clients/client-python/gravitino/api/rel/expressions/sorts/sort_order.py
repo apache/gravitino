@@ -17,9 +17,9 @@
 from abc import ABC, abstractmethod
 from typing import List
 
-from gravitino.api.expressions.expression import Expression
-from gravitino.api.expressions.sorts.null_ordering import NullOrdering
-from gravitino.api.expressions.sorts.sort_direction import SortDirection
+from gravitino.api.rel.expressions.expression import Expression
+from gravitino.api.rel.expressions.sorts.null_ordering import NullOrdering
+from gravitino.api.rel.expressions.sorts.sort_direction import SortDirection
 
 
 class SortOrder(Expression, ABC):

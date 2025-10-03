@@ -17,7 +17,7 @@
 
 import unittest
 
-from gravitino.api.expressions.distributions.strategy import Strategy
+from gravitino.api.rel.expressions.distributions.strategy import Strategy
 from gravitino.api.rel.types.types import Types
 from gravitino.dto.rel.column_dto import ColumnDTO
 from gravitino.dto.rel.distribution_dto import DistributionDTO

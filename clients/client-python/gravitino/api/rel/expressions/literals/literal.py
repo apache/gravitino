@@ -15,21 +15,29 @@
 # specific language governing permissions and limitations
 # under the License.
 
-import unittest
+from abc import abstractmethod
+from typing import Generic, List, TypeVar
 
-from gravitino.api.rel.expressions.unparsed_expression import UnparsedExpressionImpl
+from gravitino.api.rel.expressions.expression import Expression
+from gravitino.api.rel.types.type import Type
+
+T = TypeVar("T")
 
 
-class TestUnparsedExpression(unittest.TestCase):
-    def test_unparsed_expression_creation(self):
-        expr = UnparsedExpressionImpl("some_expression")
-        self.assertEqual(expr.unparsed_expression(), "some_expression")
-        self.assertEqual(
-            str(expr), "UnparsedExpressionImpl{unparsedExpression='some_expression'}"
-        )
+class Literal(Generic[T], Expression):
+    """
+    Represents a constant literal value in the public expression API.
+    """
 
-    def test_unparsed_expression_equality(self):
-        expr1 = UnparsedExpressionImpl("some_expression")
-        expr2 = UnparsedExpressionImpl("some_expression")
-        self.assertEqual(expr1, expr2)
-        self.assertEqual(hash(expr1), hash(expr2))
+    @abstractmethod
+    def value(self) -> T:
+        """The literal value."""
+        raise NotImplementedError("Subclasses must implement the `value` method.")
+
+    @abstractmethod
+    def data_type(self) -> Type:
+        """The data type of the literal."""
+        raise NotImplementedError("Subclasses must implement the `data_type` method.")
+
+    def children(self) -> List[Expression]:
+        return Expression.EMPTY_EXPRESSION

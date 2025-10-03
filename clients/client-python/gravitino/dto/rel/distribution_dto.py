@@ -17,8 +17,8 @@
 
 from typing import List
 
-from gravitino.api.expressions.distributions.distribution import Distribution
-from gravitino.api.expressions.distributions.strategy import Strategy
+from gravitino.api.rel.expressions.distributions.distribution import Distribution
+from gravitino.api.rel.expressions.distributions.strategy import Strategy
 from gravitino.dto.rel.column_dto import ColumnDTO
 from gravitino.dto.rel.expressions.function_arg import FunctionArg
 from gravitino.utils.precondition import Precondition

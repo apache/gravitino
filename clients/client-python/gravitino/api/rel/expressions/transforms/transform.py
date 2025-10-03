@@ -18,8 +18,8 @@
 from abc import ABC, abstractmethod
 from typing import List
 
-from gravitino.api.expressions.expression import Expression
-from gravitino.api.expressions.named_reference import NamedReference
+from gravitino.api.rel.expressions.expression import Expression
+from gravitino.api.rel.expressions.named_reference import NamedReference
 from gravitino.api.rel.partitions.partition import Partition
 from gravitino.api.rel.partitions.partitions import Partitions
 

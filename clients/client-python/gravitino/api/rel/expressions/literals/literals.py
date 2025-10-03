@@ -18,7 +18,7 @@ import decimal
 from datetime import date, datetime, time
 from typing import TypeVar
 
-from gravitino.api.expressions.literals.literal import Literal
+from gravitino.api.rel.expressions.literals.literal import Literal
 from gravitino.api.rel.types.type import Type
 from gravitino.api.rel.types.types import Types
 

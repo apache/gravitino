@@ -15,7 +15,8 @@
 # specific language governing permissions and limitations
 # under the License.
 from enum import Enum
-from gravitino.api.expressions.sorts.null_ordering import NullOrdering
+
+from gravitino.api.rel.expressions.sorts.null_ordering import NullOrdering
 
 
 class SortDirection(Enum):
