@@ -82,10 +82,10 @@ public class GravitinoSampleBuilder extends CustomMappingSampleBuilder {
       String provider = matcher.group(1);
       String metalake = matcher.group(2);
       String catalog = matcher.group(3);
-      // Replace '.' with '_' in the remaining part to conform to Prometheus naming conventions
-      String metricNameRest = matcher.group(4).replace('.', '_');
-
-      String prometheusName = GRAVITINO_CATALOG_METRIC_PREFIX + "_" + metricNameRest;
+      // Use Prometheus client's sanitization to conform to naming conventions
+      String metricNameRest = Collector.sanitizeMetricName(matcher.group(4));
+      String sanitizedPrefix = Collector.sanitizeMetricName(GRAVITINO_CATALOG_METRIC_PREFIX);
+      String prometheusName = sanitizedPrefix + "_" + metricNameRest;
 
       List<String> labelNames = new ArrayList<>();
       labelNames.add("provider");
