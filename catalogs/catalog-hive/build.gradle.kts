@@ -46,8 +46,11 @@ dependencies {
   implementation(libs.htrace.core4)
   implementation(libs.commons.io)
   implementation(libs.guava)
-  implementation(libs.hadoop2.auth) {
-    exclude("*")
+  implementation(libs.hadoop3.client.api) {
+    exclude("com.github.spotbugs")
+  }
+  implementation(libs.hadoop3.client.runtime) {
+    exclude("com.github.spotbugs")
   }
   implementation(libs.woodstox.core)
   implementation(libs.hive2.metastore) {
@@ -75,13 +78,6 @@ dependencies {
     exclude("org.openjdk.jol")
     exclude("org.slf4j")
   }
-
-  implementation(libs.hadoop2.common) {
-    exclude("*")
-  }
-  implementation(libs.hadoop2.mapreduce.client.core) {
-    exclude("*")
-  }
   implementation(libs.slf4j.api)
 
   compileOnly(libs.immutables.value)
@@ -103,9 +99,11 @@ dependencies {
   testImplementation(libs.bundles.jetty)
   testImplementation(libs.bundles.jersey)
   testImplementation(libs.bundles.log4j)
-  testImplementation(libs.hadoop2.hdfs)
-  testImplementation(libs.hadoop2.mapreduce.client.core) {
-    exclude("*")
+  testImplementation(libs.hadoop3.client.api) {
+    exclude("com.github.spotbugs")
+  }
+  testImplementation(libs.hadoop3.client.runtime) {
+    exclude("com.github.spotbugs")
   }
   testImplementation(libs.hive2.common) {
     exclude("org.eclipse.jetty.aggregate", "jetty-all")
