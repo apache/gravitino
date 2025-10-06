@@ -19,7 +19,6 @@ from dataclasses import dataclass, field
 from typing import Optional
 
 from dataclasses_json import DataClassJsonMixin, config
-from marshmallow.fields import Field
 
 from gravitino.api.rel.expressions.distributions.distribution import Distribution
 from gravitino.api.rel.expressions.transforms.transform import Transform
@@ -29,41 +28,77 @@ from gravitino.dto.audit_dto import AuditDTO
 from gravitino.dto.rel.column_dto import ColumnDTO
 from gravitino.dto.rel.distribution_dto import DistributionDTO
 from gravitino.dto.rel.indexes.index_dto import IndexDTO
+from gravitino.dto.rel.indexes.json_serdes.index_serdes import IndexSerdes
+from gravitino.dto.rel.json_serdes.distribution_serdes import DistributionSerDes
+from gravitino.dto.rel.json_serdes.sort_order_serdes import SortOrderSerdes
+from gravitino.dto.rel.partitioning.json_serdes.partitioning_serdes import (
+    PartitioningSerdes,
+)
 from gravitino.dto.rel.partitioning.partitioning import Partitioning
 from gravitino.dto.rel.sort_order_dto import SortOrderDTO
 from gravitino.utils.precondition import Precondition
 
 
 @dataclass
-class TableDTO(Table, DataClassJsonMixin):
+class TableDTO(Table, DataClassJsonMixin):  # pylint: disable=R0902
     """Represents a Table DTO (Data Transfer Object)."""
 
-    _name: str = field(metadata=config(field_name="name"))
-    _columns: list[ColumnDTO] = field(metadata=config(field_name="columns"))
-    _audit: AuditDTO = field(metadata=config(field_name="audit"))
+    _name: Optional[str] = field(default=None, metadata=config(field_name="name"))
+    _columns: Optional[list[ColumnDTO]] = field(
+        default=None, metadata=config(field_name="columns")
+    )
+    _audit: Optional[AuditDTO] = field(
+        default=None, metadata=config(field_name="audit")
+    )
     _comment: Optional[str] = field(
         default=None,
-        metadata=config(field_name="comment", mm_field=Field(dump_default=None)),
+        metadata=config(field_name="comment", exclude=lambda value: value is None),
     )
     _distribution: Optional[DistributionDTO] = field(
         default=None,
-        metadata=config(field_name="distribution", mm_field=Field(dump_default=None)),
+        metadata=config(
+            field_name="distribution",
+            encoder=DistributionSerDes.serialize,
+            decoder=DistributionSerDes.deserialize,
+            exclude=lambda value: value is None,
+        ),
     )
     _sort_orders: Optional[list[SortOrderDTO]] = field(
         default=None,
-        metadata=config(field_name="sortOrder", mm_field=Field(dump_default=None)),
+        metadata=config(
+            field_name="sortOrders",
+            encoder=lambda items: [SortOrderSerdes.serialize(item) for item in items],
+            decoder=lambda values: [
+                SortOrderSerdes.deserialize(value) for value in values
+            ],
+            exclude=lambda value: value is None,
+        ),
     )
     _partitioning: Optional[list[Partitioning]] = field(
         default=None,
-        metadata=config(field_name="partitioning", mm_field=Field(dump_default=None)),
+        metadata=config(
+            field_name="partitioning",
+            encoder=lambda items: [
+                PartitioningSerdes.serialize(item) for item in items
+            ],
+            decoder=lambda values: [
+                PartitioningSerdes.deserialize(value) for value in values
+            ],
+            exclude=lambda value: value is None,
+        ),
     )
     _indexes: Optional[list[IndexDTO]] = field(
         default=None,
-        metadata=config(field_name="indexes", mm_field=Field(dump_default=None)),
+        metadata=config(
+            field_name="indexes",
+            encoder=lambda items: [IndexSerdes.serialize(item) for item in items],
+            decoder=lambda values: [IndexSerdes.deserialize(value) for value in values],
+            exclude=lambda value: value is None,
+        ),
     )
     _properties: Optional[dict[str, str]] = field(
         default=None,
-        metadata=config(field_name="properties", mm_field=Field(dump_default=None)),
+        metadata=config(field_name="properties", exclude=lambda value: value is None),
     )
 
     def __post_init__(self):
