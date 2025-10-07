@@ -25,10 +25,12 @@ import com.google.common.annotations.VisibleForTesting;
 import java.io.File;
 import java.io.IOException;
 import java.sql.SQLException;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
+import java.util.stream.Collectors;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergCatalogBackend;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import org.apache.gravitino.exceptions.ConnectionFailedException;
@@ -191,8 +193,10 @@ public class IcebergCatalogUtil {
       default:
         throw new RuntimeException(
             catalogBackend
-                + " catalog is not supported yet, supported catalogs: [memory]"
-                + catalogBackend);
+                + " catalog is not supported yet, supported catalogs: "
+                + Arrays.stream(IcebergCatalogBackend.values())
+                    .map(backend -> backend.name().toLowerCase(Locale.ROOT))
+                    .collect(Collectors.joining(", ", "[", "]")));
     }
   }
 
