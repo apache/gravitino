@@ -26,7 +26,7 @@ cd ${iceberg_rest_server_dir}
 
 python bin/rewrite_config.py
 
-JAVA_OPTS+="-XX:-UseContainerSupport"
+JAVA_OPTS+=" -XX:-UseContainerSupport"
 export JAVA_OPTS
 
 exec ./bin/gravitino-iceberg-rest-server.sh run
