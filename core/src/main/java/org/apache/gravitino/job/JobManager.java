@@ -329,7 +329,9 @@ public class JobManager implements JobOperationDispatcher {
                     updateJobTemplateEntity(jobTemplateIdent, jobTemplateEntity, changes));
           } catch (NoSuchEntityException e) {
             throw new NoSuchJobTemplateException(
-                "Job template with name %s under metalake %s does not exist",
+                "Job template with name %s under metalake %s does not exist, this could be due to"
+                    + " the job template not existing or updated concurrently. For the latter case"
+                    + " please retry the operation.",
                 jobTemplateName, metalake);
           } catch (IOException ioe) {
             throw new RuntimeException(ioe);
