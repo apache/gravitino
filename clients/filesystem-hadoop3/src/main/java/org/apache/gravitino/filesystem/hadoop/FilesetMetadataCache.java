@@ -28,7 +28,9 @@ import java.io.Closeable;
 import java.io.IOException;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.ThreadFactory;
+import org.apache.gravitino.Catalog;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.Schema;
 import org.apache.gravitino.client.GravitinoClient;
 import org.apache.gravitino.file.Fileset;
 import org.apache.gravitino.file.FilesetCatalog;
@@ -39,6 +41,7 @@ public class FilesetMetadataCache implements Closeable {
   private final GravitinoClient client;
   private final Cache<NameIdentifier, FilesetCatalog> catalogCache;
   private final Cache<NameIdentifier, Fileset> filesetCache;
+  private final Cache<NameIdentifier, Schema> schemaCache;
 
   /**
    * Creates a new instance of {@link FilesetMetadataCache}.
@@ -49,6 +52,7 @@ public class FilesetMetadataCache implements Closeable {
     this.client = client;
     this.catalogCache = newCatalogCache();
     this.filesetCache = newFilesetCache();
+    this.schemaCache = newSchemaCache();
   }
 
   /**
@@ -84,6 +88,17 @@ public class FilesetMetadataCache implements Closeable {
                 NameIdentifier.of(filesetIdent.namespace().level(2), filesetIdent.name())));
   }
 
+  public Schema getSchema(NameIdentifier schemaIdent) {
+    NameIdentifier catalogIdent =
+        NameIdentifier.of(schemaIdent.namespace().level(0), schemaIdent.namespace().level(1));
+    return schemaCache.get(
+        schemaIdent,
+        ident -> {
+          Catalog c = client.loadCatalog(catalogIdent.name());
+          return c.asSchemas().loadSchema(schemaIdent.name());
+        });
+  }
+
   private Cache<NameIdentifier, FilesetCatalog> newCatalogCache() {
     // In most scenarios, it will not read so many catalog filesets at the same time, so we can just
     // set a default value for this cache.
@@ -107,6 +122,18 @@ public class FilesetMetadataCache implements Closeable {
             Scheduler.forScheduledExecutorService(
                 new ScheduledThreadPoolExecutor(
                     1, newDaemonThreadFactory("gvfs-fileset-cache-cleaner"))))
+        .build();
+  }
+
+  private Cache<NameIdentifier, Schema> newSchemaCache() {
+    return Caffeine.newBuilder()
+        .maximumSize(10000)
+        // Since Caffeine does not ensure that removalListener will be involved after expiration
+        // We use a scheduler with one thread to clean up expired filesets.
+        .scheduler(
+            Scheduler.forScheduledExecutorService(
+                new ScheduledThreadPoolExecutor(
+                    1, newDaemonThreadFactory("gvfs-schema-cache-cleaner"))))
         .build();
   }
 

@@ -1145,7 +1145,7 @@ public class TestFilesetCatalogOperations {
   }
 
   @Test
-  public void testFormalizePath() throws IOException, IllegalAccessException {
+  public void testFormalizePath() throws IOException, IllegalAccessException, InterruptedException {
 
     String[] paths =
         new String[] {"tmp/catalog", "/tmp/catalog", "file:/tmp/catalog", "file:///tmp/catalog"};
