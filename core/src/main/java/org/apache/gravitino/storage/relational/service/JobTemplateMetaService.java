@@ -18,8 +18,6 @@
  */
 package org.apache.gravitino.storage.relational.service;
 
-import static org.apache.gravitino.metrics.source.MetricsSource.GRAVITINO_RELATIONAL_STORE_METRIC_NAME;
-
 import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.util.List;
@@ -123,9 +121,6 @@ public class JobTemplateMetaService {
         mapper -> mapper.deleteJobTemplateMetasByLegacyTimeline(legacyTimeline, limit));
   }
 
-  @Monitored(
-      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
-      baseMetricName = "updateJobTemplate")
   public <E extends Entity & HasIdentifier> JobTemplateEntity updateJobTemplate(
       NameIdentifier jobTemplateIdent, Function<E, E> updater) throws IOException {
     JobTemplatePO oldJobTemplatePO = getJobTemplatePO(jobTemplateIdent);
