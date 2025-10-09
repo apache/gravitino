@@ -28,4 +28,5 @@ dependencies {
   implementation(libs.hadoop3.client.api)
   implementation(libs.hadoop3.client.runtime)
   implementation(libs.guava)
+  implementation(libs.slf4j.api)
 }

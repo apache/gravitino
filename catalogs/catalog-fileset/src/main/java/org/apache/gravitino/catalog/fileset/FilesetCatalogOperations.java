@@ -467,13 +467,16 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
       try {
         // formalize the path to avoid path without scheme, uri, authority, etc.
         for (Map.Entry<String, Path> entry : filesetPaths.entrySet()) {
-
-          FileSystem tmpFs = getFileSystemWithCache(entry.getValue(), conf);
+          // catalog properties + schema properties + fileset properties
+          Map<String, String> fsConf = new HashMap<>(conf);
+          fsConf.putAll(schemaEntity.properties());
+          fsConf.putAll(properties);
+          FileSystem tmpFs = getFileSystemWithCache(entry.getValue(), fsConf);
           Path formalizePath =
               entry.getValue().makeQualified(tmpFs.getUri(), tmpFs.getWorkingDirectory());
 
           filesetPathsBuilder.put(entry.getKey(), formalizePath);
-          FileSystem fs = getFileSystemWithCache(formalizePath, conf);
+          FileSystem fs = getFileSystemWithCache(formalizePath, fsConf);
 
           if (fs.exists(formalizePath) && fs.getFileStatus(formalizePath).isFile()) {
             throw new IllegalArgumentException(

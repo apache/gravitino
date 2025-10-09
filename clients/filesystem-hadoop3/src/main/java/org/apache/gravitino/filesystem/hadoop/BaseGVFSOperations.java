@@ -57,6 +57,7 @@ import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.Schema;
 import org.apache.gravitino.audit.CallerContext;
 import org.apache.gravitino.audit.FilesetAuditConstants;
 import org.apache.gravitino.audit.FilesetDataOperation;
@@ -572,6 +573,19 @@ public abstract class BaseGVFSOperations implements Closeable {
                         NameIdentifier.of(filesetIdent.namespace().level(2), filesetIdent.name())));
   }
 
+  protected Schema getSchema(NameIdentifier schemaIdent) {
+    return filesetMetadataCache
+        .map(cache -> cache.getSchema(schemaIdent))
+        .orElseGet(
+            () -> {
+              NameIdentifier catalogIdent =
+                  NameIdentifier.of(
+                      schemaIdent.namespace().level(0), schemaIdent.namespace().level(1));
+              Catalog c = gravitinoClient.loadCatalog(catalogIdent.name());
+              return c.asSchemas().loadSchema(schemaIdent.name());
+            });
+  }
+
   @VisibleForTesting
   Cache<Pair<NameIdentifier, String>, FileSystem> internalFileSystemCache() {
     return internalFileSystemCache;
@@ -619,6 +633,11 @@ public abstract class BaseGVFSOperations implements Closeable {
               Map<String, String> allProperties =
                   getAllProperties(
                       cacheKey.getLeft(), targetLocation.toUri().getScheme(), targetLocationName);
+
+              Schema schema = getSchema(NameIdentifier.parse(filesetIdent.namespace().toString()));
+              allProperties.putAll(schema.properties());
+
+              allProperties.putAll(fileset.properties());
 
               FileSystem actualFileSystem =
                   getActualFileSystemByPath(targetLocation, allProperties);
