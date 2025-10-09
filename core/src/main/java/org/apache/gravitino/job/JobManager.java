@@ -316,7 +316,9 @@ public class JobManager implements JobOperationDispatcher {
     NameIdentifier jobTemplateIdent = NameIdentifierUtil.ofJobTemplate(metalake, jobTemplateName);
     return TreeLockUtils.doWithTreeLock(
         jobTemplateIdent,
-        LockType.WRITE,
+        LockType.READ, // Use READ lock because the update method in JobTemplateMetaService will
+        // handle the update transactionally and update with a new version number. So we don't
+        // have to use a WRITE lock here.
         () -> {
           try {
             return entityStore.update(
