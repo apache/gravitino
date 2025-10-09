@@ -120,4 +120,25 @@ public class JobTemplateMetaBaseSQLProvider {
         + JobTemplateMetaMapper.TABLE_NAME
         + " WHERE deleted_at < #{legacyTimeline} AND deleted_at > 0 LIMIT #{limit}";
   }
+
+  public String updateJobTemplateMeta(
+      @Param("newJobTemplateMeta") JobTemplatePO newJobTemplatePO,
+      @Param("oldJobTemplateMeta") JobTemplatePO oldJobTemplatePO) {
+    return "UPDATE "
+        + JobTemplateMetaMapper.TABLE_NAME
+        + " SET job_template_name = #{newJobTemplateMeta.jobTemplateName},"
+        + " metalake_id = #{newJobTemplateMeta.metalakeId},"
+        + " job_template_comment = #{newJobTemplateMeta.jobTemplateComment},"
+        + " job_template_content = #{newJobTemplateMeta.jobTemplateContent},"
+        + " audit_info = #{newJobTemplateMeta.auditInfo},"
+        + " current_version = #{newJobTemplateMeta.currentVersion},"
+        + " last_version = #{newJobTemplateMeta.lastVersion},"
+        + " deleted_at = #{newJobTemplateMeta.deletedAt}"
+        + " WHERE job_template_id = #{oldJobTemplateMeta.jobTemplateId}"
+        + " AND job_template_name = #{oldJobTemplateMeta.jobTemplateName}"
+        + " AND metalake_id = #{oldJobTemplateMeta.metalakeId}"
+        + " AND current_version = #{oldJobTemplateMeta.currentVersion}"
+        + " AND last_version = #{oldJobTemplateMeta.lastVersion}"
+        + " AND deleted_at = 0";
+  }
 }
