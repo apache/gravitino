@@ -73,10 +73,3 @@ cp bundles/*jar ${iceberg_rest_server_dir}/packages/gravitino-iceberg-rest-serve
 
 cp start-iceberg-rest-server.sh ${iceberg_rest_server_dir}/packages/gravitino-iceberg-rest-server/bin/
 cp rewrite_config.py ${iceberg_rest_server_dir}/packages/gravitino-iceberg-rest-server/bin/
-
-# Keeping the container running at all times
-cat <<EOF >> "${iceberg_rest_server_dir}/packages/gravitino-iceberg-rest-server/bin/gravitino-iceberg-rest-server.sh"
-
-# Keeping a process running in the background
-tail -f /dev/null
-EOF
