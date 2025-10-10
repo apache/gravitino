@@ -74,6 +74,20 @@ public interface JobOperationDispatcher extends Closeable {
   boolean deleteJobTemplate(String metalake, String jobTemplateName) throws InUseException;
 
   /**
+   * Alters a job template by applying the specified changes in the specified metalake.
+   *
+   * @param metalake the name of the metalake
+   * @param jobTemplateName the name of the job template to alter
+   * @param changes the changes to apply to the job template
+   * @return the updated job template entity after applying the changes
+   * @throws NoSuchJobTemplateException if no job template with the specified name exists
+   * @throws IllegalArgumentException if any of the changes cannot be applied to the job template.
+   */
+  JobTemplateEntity alterJobTemplate(
+      String metalake, String jobTemplateName, JobTemplateChange... changes)
+      throws NoSuchJobTemplateException, IllegalArgumentException;
+
+  /**
    * List all the jobs. If the jobTemplateName is provided, it will list the jobs associated with
    * that job template, if not, it will list all the jobs in the specified metalake.
    *
