@@ -17,33 +17,35 @@
  * under the License.
  */
 
-package org.apache.gravitino.listener.api.event;
+package org.apache.gravitino.listener.api.event.job;
 
-import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.annotation.DeveloperApi;
+import org.apache.gravitino.listener.api.event.OperationType;
+import org.apache.gravitino.listener.api.event.PreEvent;
+import org.apache.gravitino.utils.NameIdentifierUtil;
 
-/** Represents an event triggered after successfully listing users from a specific metalake. */
+/** Represents an event triggered before deleting a job template. */
 @DeveloperApi
-public class ListUsersEvent extends UserEvent {
+public class DeleteJobTemplatePreEvent extends PreEvent {
 
   /**
-   * Constructs a new {@link ListUsersEvent} instance with the specified initiator and metalake
-   * name.
+   * Constructs a new {@code DeleteJobTemplatePreEvent} instance.
    *
-   * @param initiator the user who initiated the request to list users.
-   * @param metalake the name of the metalake from which the users are listed.
+   * @param user The user who initiated the job template deletion operation.
+   * @param metalake The metalake name where the job template resides.
+   * @param jobTemplateName The name of the job template to delete.
    */
-  public ListUsersEvent(String initiator, String metalake) {
-    super(initiator, NameIdentifier.of(metalake));
+  public DeleteJobTemplatePreEvent(String user, String metalake, String jobTemplateName) {
+    super(user, NameIdentifierUtil.ofJobTemplate(metalake, jobTemplateName));
   }
 
   /**
-   * Returns the operation type for this event.
+   * Returns the type of operation.
    *
-   * @return the operation type for this event.
+   * @return the operation type.
    */
   @Override
   public OperationType operationType() {
-    return OperationType.LIST_USERS;
+    return OperationType.DELETE_JOB_TEMPLATE;
   }
 }
