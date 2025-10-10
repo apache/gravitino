@@ -126,13 +126,13 @@ public class ClassLoaderResourceCleanerUtils {
       clearThreadLocalMap(thread, classLoader);
       // Close all threads that are using the FilesetCatalogOperations class loader
       if (runningWithClassLoader(thread, classLoader)) {
-        LOG.info("Interrupting thread: {}", thread.getName());
+        LOG.debug("Interrupting thread: {}", thread.getName());
         thread.setContextClassLoader(null);
         thread.interrupt();
         try {
           thread.join(500);
         } catch (InterruptedException e) {
-          LOG.warn("Failed to join thread: {}", thread.getName(), e);
+          LOG.debug("Failed to join thread: {}", thread.getName(), e);
         }
       }
     }
@@ -178,7 +178,7 @@ public class ClassLoaderResourceCleanerUtils {
             if (value != null
                 && value.getClass().getClassLoader() != null
                 && value.getClass().getClassLoader() == targetClassLoader) {
-              LOG.info(
+              LOG.debug(
                   "Cleaning up thread local {} for thread {} with custom class loader",
                   value,
                   thread.getName());
@@ -188,7 +188,7 @@ public class ClassLoaderResourceCleanerUtils {
         }
       }
     } catch (Exception e) {
-      LOG.warn("Failed to clean up thread locals for thread {}", thread.getName(), e);
+      LOG.debug("Failed to clean up thread locals for thread {}", thread.getName(), e);
     }
   }
 
@@ -310,7 +310,7 @@ public class ClassLoaderResourceCleanerUtils {
     try {
       consumer.accept(value);
     } catch (Exception e) {
-      LOG.warn("Failed to execute consumer: ", e);
+      LOG.debug("Failed to execute consumer: ", e);
     }
   }
 }
