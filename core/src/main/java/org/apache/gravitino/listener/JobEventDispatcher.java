@@ -31,18 +31,31 @@ import org.apache.gravitino.job.JobTemplateChange;
 import org.apache.gravitino.listener.api.event.job.AlterJobTemplateEvent;
 import org.apache.gravitino.listener.api.event.job.AlterJobTemplateFailureEvent;
 import org.apache.gravitino.listener.api.event.job.AlterJobTemplatePreEvent;
+import org.apache.gravitino.listener.api.event.job.CancelJobEvent;
+import org.apache.gravitino.listener.api.event.job.CancelJobFailureEvent;
+import org.apache.gravitino.listener.api.event.job.CancelJobPreEvent;
 import org.apache.gravitino.listener.api.event.job.DeleteJobTemplateEvent;
 import org.apache.gravitino.listener.api.event.job.DeleteJobTemplateFailureEvent;
 import org.apache.gravitino.listener.api.event.job.DeleteJobTemplatePreEvent;
+import org.apache.gravitino.listener.api.event.job.GetJobEvent;
+import org.apache.gravitino.listener.api.event.job.GetJobFailureEvent;
+import org.apache.gravitino.listener.api.event.job.GetJobPreEvent;
 import org.apache.gravitino.listener.api.event.job.GetJobTemplateEvent;
 import org.apache.gravitino.listener.api.event.job.GetJobTemplateFailureEvent;
 import org.apache.gravitino.listener.api.event.job.GetJobTemplatePreEvent;
 import org.apache.gravitino.listener.api.event.job.ListJobTemplatesEvent;
 import org.apache.gravitino.listener.api.event.job.ListJobTemplatesFailureEvent;
 import org.apache.gravitino.listener.api.event.job.ListJobTemplatesPreEvent;
+import org.apache.gravitino.listener.api.event.job.ListJobsEvent;
+import org.apache.gravitino.listener.api.event.job.ListJobsFailureEvent;
+import org.apache.gravitino.listener.api.event.job.ListJobsPreEvent;
 import org.apache.gravitino.listener.api.event.job.RegisterJobTemplateEvent;
 import org.apache.gravitino.listener.api.event.job.RegisterJobTemplateFailureEvent;
 import org.apache.gravitino.listener.api.event.job.RegisterJobTemplatePreEvent;
+import org.apache.gravitino.listener.api.event.job.RunJobEvent;
+import org.apache.gravitino.listener.api.event.job.RunJobFailureEvent;
+import org.apache.gravitino.listener.api.event.job.RunJobPreEvent;
+import org.apache.gravitino.listener.api.info.JobInfo;
 import org.apache.gravitino.meta.JobEntity;
 import org.apache.gravitino.meta.JobTemplateEntity;
 import org.apache.gravitino.utils.PrincipalUtils;
@@ -164,23 +177,81 @@ public class JobEventDispatcher implements JobOperationDispatcher {
   @Override
   public List<JobEntity> listJobs(String metalake, java.util.Optional<String> jobTemplateName)
       throws NoSuchJobTemplateException {
-    return jobOperationDispatcher.listJobs(metalake, jobTemplateName);
+    eventBus.dispatchEvent(
+        new ListJobsPreEvent(PrincipalUtils.getCurrentUserName(), metalake, jobTemplateName));
+
+    try {
+      List<JobEntity> jobs = jobOperationDispatcher.listJobs(metalake, jobTemplateName);
+      eventBus.dispatchEvent(
+          new ListJobsEvent(PrincipalUtils.getCurrentUserName(), metalake, jobTemplateName));
+      return jobs;
+    } catch (Exception e) {
+      eventBus.dispatchEvent(
+          new ListJobsFailureEvent(
+              PrincipalUtils.getCurrentUserName(), metalake, jobTemplateName, e));
+      throw e;
+    }
   }
 
   @Override
   public JobEntity getJob(String metalake, String jobId) throws NoSuchJobException {
-    return jobOperationDispatcher.getJob(metalake, jobId);
+    eventBus.dispatchEvent(
+        new GetJobPreEvent(PrincipalUtils.getCurrentUserName(), metalake, jobId));
+
+    try {
+      JobEntity job = jobOperationDispatcher.getJob(metalake, jobId);
+      eventBus.dispatchEvent(
+          new GetJobEvent(
+              PrincipalUtils.getCurrentUserName(), metalake, JobInfo.fromJobEntity(job)));
+      return job;
+    } catch (Exception e) {
+      eventBus.dispatchEvent(
+          new GetJobFailureEvent(PrincipalUtils.getCurrentUserName(), metalake, jobId, e));
+      throw e;
+    }
   }
 
   @Override
   public JobEntity runJob(String metalake, String jobTemplateName, Map<String, String> jobConf)
       throws NoSuchJobTemplateException {
-    return jobOperationDispatcher.runJob(metalake, jobTemplateName, jobConf);
+    eventBus.dispatchEvent(
+        new RunJobPreEvent(
+            PrincipalUtils.getCurrentUserName(), metalake, jobTemplateName, jobConf));
+
+    try {
+      JobEntity job = jobOperationDispatcher.runJob(metalake, jobTemplateName, jobConf);
+      eventBus.dispatchEvent(
+          new RunJobEvent(
+              PrincipalUtils.getCurrentUserName(),
+              metalake,
+              jobTemplateName,
+              jobConf,
+              JobInfo.fromJobEntity(job)));
+      return job;
+    } catch (Exception e) {
+      eventBus.dispatchEvent(
+          new RunJobFailureEvent(
+              PrincipalUtils.getCurrentUserName(), metalake, jobTemplateName, jobConf, e));
+      throw e;
+    }
   }
 
   @Override
   public JobEntity cancelJob(String metalake, String jobId) throws NoSuchJobException {
-    return jobOperationDispatcher.cancelJob(metalake, jobId);
+    eventBus.dispatchEvent(
+        new CancelJobPreEvent(PrincipalUtils.getCurrentUserName(), metalake, jobId));
+
+    try {
+      JobEntity job = jobOperationDispatcher.getJob(metalake, jobId);
+      eventBus.dispatchEvent(
+          new CancelJobEvent(
+              PrincipalUtils.getCurrentUserName(), metalake, JobInfo.fromJobEntity(job)));
+      return job;
+    } catch (Exception e) {
+      eventBus.dispatchEvent(
+          new CancelJobFailureEvent(PrincipalUtils.getCurrentUserName(), metalake, jobId, e));
+      throw e;
+    }
   }
 
   @Override
