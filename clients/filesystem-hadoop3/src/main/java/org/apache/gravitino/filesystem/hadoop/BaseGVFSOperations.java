@@ -573,6 +573,12 @@ public abstract class BaseGVFSOperations implements Closeable {
                         NameIdentifier.of(filesetIdent.namespace().level(2), filesetIdent.name())));
   }
 
+  /**
+   * Get the schema by the schema identifier from the cache or load it from the server if the cache
+   *
+   * @param schemaIdent
+   * @return the schema.
+   */
   protected Schema getSchema(NameIdentifier schemaIdent) {
     return filesetMetadataCache
         .map(cache -> cache.getSchema(schemaIdent))

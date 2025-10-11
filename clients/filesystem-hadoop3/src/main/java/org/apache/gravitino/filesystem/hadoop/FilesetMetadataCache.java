@@ -88,6 +88,12 @@ public class FilesetMetadataCache implements Closeable {
                 NameIdentifier.of(filesetIdent.namespace().level(2), filesetIdent.name())));
   }
 
+  /**
+   * Gets the schema by the given schema identifier.
+   *
+   * @param schemaIdent the schema identifier.
+   * @return the schema.
+   */
   public Schema getSchema(NameIdentifier schemaIdent) {
     NameIdentifier catalogIdent =
         NameIdentifier.of(schemaIdent.namespace().level(0), schemaIdent.namespace().level(1));
