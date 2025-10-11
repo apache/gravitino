@@ -103,7 +103,7 @@ class TableDTO(Table, DataClassJsonMixin):  # pylint: disable=R0902
 
     def __post_init__(self):
         Precondition.check_argument(
-            self._name is not None and self._name.strip() != "",
+            self._name is not None and self._name != "",
             "name cannot be null or empty",
         )
         Precondition.check_argument(self._audit is not None, "audit cannot be null")
