@@ -300,6 +300,10 @@ For other Iceberg s3 properties not managed by Gravitino like `s3.sse.type`, you
 
 Please refer to [S3 credentials](./security/credential-vending.md#s3-credentials) for credential related configurations.
 
+:::caution
+To resolve Log4j class conflict issues that may arise when using Iceberg AWS 1.9 bundle jars alongside the Gravitino Iceberg REST server, it is recommended to remove the Log4j JAR files (specifically log4j-core and log4j-api) from the `iceberg-rest-server/libs` directory.
+:::
+
 :::info
 To configure the JDBC catalog backend, set the `gravitino.iceberg-rest.warehouse` parameter to `s3://{bucket_name}/${prefix_name}`. For the Hive catalog backend, set `gravitino.iceberg-rest.warehouse` to `s3a://{bucket_name}/${prefix_name}`. Additionally, download the [Iceberg AWS bundle](https://mvnrepository.com/artifact/org.apache.iceberg/iceberg-aws-bundle) and place it in the classpath of Iceberg REST server.
 :::
