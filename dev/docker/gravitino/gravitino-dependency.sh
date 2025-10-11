@@ -48,6 +48,21 @@ download_gcs_connector() {
   rm "${temp_file}"
 }
 
+download_aliyun_jars() {
+  local aliyun_sdk_version="3.10.2"
+  local aliyun_sdk="aliyun_java_sdk_${aliyun_sdk_version}.zip"
+  local bundle_dir="${1}"
+  local target_dir="${2}"
+  if [ ! -f "${bundle_dir}/${aliyun_sdk}" ]; then
+    curl -L -s -o "${bundle_dir}/${aliyun_sdk}" https://gosspublic.alicdn.com/sdks/java/${aliyun_sdk}
+  fi
+  rm -rf "${bundle_dir}/aliyun"
+  unzip -q "${bundle_dir}/${aliyun_sdk}" -d "${bundle_dir}/aliyun"
+  cp "${bundle_dir}/aliyun/aliyun_java_sdk_${aliyun_sdk_version}/aliyun-sdk-oss-3.10.2.jar" ${target_dir}
+  cp "${bundle_dir}/aliyun/aliyun_java_sdk_${aliyun_sdk_version}/lib/hamcrest-core-1.1.jar" ${target_dir}
+  cp "${bundle_dir}/aliyun/aliyun_java_sdk_${aliyun_sdk_version}/lib/jdom2-2.0.6.jar" ${target_dir}
+}
+
 # Build the Gravitino project
 ${gravitino_home}/gradlew clean build -x test
 
@@ -93,6 +108,8 @@ iceberg_azure_bundle="iceberg-azure-bundle-${iceberg_version}.jar"
 wget "https://repo1.maven.org/maven2/org/apache/iceberg/iceberg-azure-bundle/${iceberg_version}/${iceberg_azure_bundle}" -O "${gravitino_staging_dir}/${iceberg_azure_bundle}"
 cp "${gravitino_staging_dir}/${iceberg_azure_bundle}" "${gravitino_iceberg_rest_dir}"
 
+download_aliyun_jars "${gravitino_staging_dir}" "${gravitino_iceberg_rest_dir}"
+
 echo "Finish downloading"
 
 mkdir -p "${gravitino_dir}/packages/gravitino/bin"
@@ -110,9 +127,13 @@ find ${gravitino_home}/bundles/azure-bundle/build/libs/ -name 'gravitino-azure-*
 find ${gravitino_home}/bundles/gcp/build/libs/ -name 'gravitino-gcp-*.jar' ! -name '*-empty.jar' -exec cp -v {} "${gravitino_iceberg_rest_dir}" \;
 find ${gravitino_home}/bundles/aws/build/libs/ -name 'gravitino-aws-*.jar' ! -name '*-empty.jar' -exec cp -v {} "${gravitino_iceberg_rest_dir}" \;
 find ${gravitino_home}/bundles/azure/build/libs/ -name 'gravitino-azure-*.jar' ! -name '*-empty.jar' -exec cp -v {} "${gravitino_iceberg_rest_dir}" \;
-find ${gravitino_home}/bundles/aliyun-bundle/build/libs/ -name 'gravitino-aliyun-bundle-*.jar' ! -name '*-empty.jar' -exec cp -v {} "${gravitino_iceberg_rest_dir}" \;
+find ${gravitino_home}/bundles/aliyun/build/libs/ -name 'gravitino-aliyun-*.jar' ! -name '*-empty.jar' -exec cp -v {} "${gravitino_iceberg_rest_dir}" \;
 
 download_gcs_connector
+
+# Temporary rm log4j from Gravition to prevent class conflict with Iceberg AWS bundle jar
+rm -f ${gravitino_iceberg_rest_dir}/log4j-api-*.jar
+rm -f ${gravitino_iceberg_rest_dir}/log4j-core-*.jar
 
 # Keeping the container running at all times
 cat <<EOF >> "${gravitino_dir}/packages/gravitino/bin/gravitino.sh"
