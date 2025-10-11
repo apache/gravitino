@@ -71,7 +71,8 @@ public class FutureGrantManager {
       Map<UserEntity, Set<RoleEntity>> userGrantRoles = Maps.newHashMap();
       Map<GroupEntity, Set<RoleEntity>> groupGrantRoles = Maps.newHashMap();
       List<RoleEntity> roles =
-          entityStore.relationOperations()
+          entityStore
+              .relationOperations()
               .listEntitiesByRelation(
                   SupportsRelationOperations.Type.METADATA_OBJECT_ROLE_REL,
                   NameIdentifier.of(metalake),
@@ -95,7 +96,8 @@ public class FutureGrantManager {
         }
 
         List<UserEntity> users =
-            entityStore.relationOperations()
+            entityStore
+                .relationOperations()
                 .listEntitiesByRelation(
                     SupportsRelationOperations.Type.ROLE_USER_REL,
                     role.nameIdentifier(),
@@ -110,7 +112,8 @@ public class FutureGrantManager {
         }
 
         List<GroupEntity> groups =
-            entityStore.relationOperations()
+            entityStore
+                .relationOperations()
                 .listEntitiesByRelation(
                     SupportsRelationOperations.Type.ROLE_GROUP_REL,
                     role.nameIdentifier(),

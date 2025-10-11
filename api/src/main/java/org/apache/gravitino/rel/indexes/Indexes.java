@@ -92,25 +92,33 @@ public class Indexes {
       this.fieldNames = fieldNames;
     }
 
-    /** @return The type of the index */
+    /**
+     * @return The type of the index
+     */
     @Override
     public IndexType type() {
       return indexType;
     }
 
-    /** @return The name of the index */
+    /**
+     * @return The name of the index
+     */
     @Override
     public String name() {
       return name;
     }
 
-    /** @return The field names under the table contained in the index */
+    /**
+     * @return The field names under the table contained in the index
+     */
     @Override
     public String[][] fieldNames() {
       return fieldNames;
     }
 
-    /** @return the builder for creating a new instance of IndexImpl. */
+    /**
+     * @return the builder for creating a new instance of IndexImpl.
+     */
     public static Builder builder() {
       return new Builder();
     }

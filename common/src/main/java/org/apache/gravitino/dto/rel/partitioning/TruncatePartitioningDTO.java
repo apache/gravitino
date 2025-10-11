@@ -48,29 +48,39 @@ public final class TruncatePartitioningDTO implements Partitioning {
     this.fieldName = fieldName;
   }
 
-  /** @return The width of the partitioning. */
+  /**
+   * @return The width of the partitioning.
+   */
   public int width() {
     return width;
   }
 
-  /** @return The name of the field to partition. */
+  /**
+   * @return The name of the field to partition.
+   */
   public String[] fieldName() {
     return fieldName;
   }
 
-  /** @return The name of the partitioning strategy. */
+  /**
+   * @return The name of the partitioning strategy.
+   */
   @Override
   public String name() {
     return strategy().name().toLowerCase();
   }
 
-  /** @return The arguments of the partitioning. */
+  /**
+   * @return The arguments of the partitioning.
+   */
   @Override
   public Expression[] arguments() {
     return truncate(width, fieldName).arguments();
   }
 
-  /** @return The strategy of the partitioning. */
+  /**
+   * @return The strategy of the partitioning.
+   */
   @Override
   public Strategy strategy() {
     return Strategy.TRUNCATE;

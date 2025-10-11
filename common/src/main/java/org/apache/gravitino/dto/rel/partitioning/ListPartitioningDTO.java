@@ -59,7 +59,9 @@ public final class ListPartitioningDTO implements Partitioning {
     this.assignments = assignments;
   }
 
-  /** @return The names of the fields to partition. */
+  /**
+   * @return The names of the fields to partition.
+   */
   public String[][] fieldNames() {
     return fieldNames;
   }
@@ -69,7 +71,9 @@ public final class ListPartitioningDTO implements Partitioning {
     return assignments;
   }
 
-  /** @return The strategy of the partitioning. */
+  /**
+   * @return The strategy of the partitioning.
+   */
   @Override
   public Strategy strategy() {
     return Strategy.LIST;
@@ -87,13 +91,17 @@ public final class ListPartitioningDTO implements Partitioning {
         .forEach(fieldName -> PartitionUtils.validateFieldExistence(columns, fieldName));
   }
 
-  /** @return The name of the partitioning strategy. */
+  /**
+   * @return The name of the partitioning strategy.
+   */
   @Override
   public String name() {
     return strategy().name().toLowerCase();
   }
 
-  /** @return The arguments of the partitioning strategy. */
+  /**
+   * @return The arguments of the partitioning strategy.
+   */
   @Override
   public Expression[] arguments() {
     return Arrays.stream(fieldNames).map(NamedReference::field).toArray(Expression[]::new);

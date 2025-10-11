@@ -38,6 +38,8 @@ public interface ProxyPlugin {
       Principal principal, Executable<Object, Exception> action, Map<String, String> properties)
       throws Throwable;
 
-  /** @param ops The catalog operation is bind to plugin. */
+  /**
+   * @param ops The catalog operation is bind to plugin.
+   */
   void bindCatalogOperation(CatalogOperations ops);
 }

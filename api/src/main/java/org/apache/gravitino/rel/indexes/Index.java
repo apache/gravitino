@@ -28,10 +28,14 @@ import org.apache.gravitino.annotation.Evolving;
 @Evolving
 public interface Index {
 
-  /** @return The type of the index. eg: PRIMARY_KEY and UNIQUE_KEY. */
+  /**
+   * @return The type of the index. eg: PRIMARY_KEY and UNIQUE_KEY.
+   */
   IndexType type();
 
-  /** @return The name of the index. */
+  /**
+   * @return The name of the index.
+   */
   String name();
 
   /**

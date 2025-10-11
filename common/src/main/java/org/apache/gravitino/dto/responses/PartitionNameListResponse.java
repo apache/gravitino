@@ -46,7 +46,9 @@ public class PartitionNameListResponse extends BaseResponse {
     this.partitionNames = null;
   }
 
-  /** @return The array of partition names. */
+  /**
+   * @return The array of partition names.
+   */
   public String[] partitionNames() {
     return partitionNames;
   }

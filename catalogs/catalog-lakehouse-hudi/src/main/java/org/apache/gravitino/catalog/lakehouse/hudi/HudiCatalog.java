@@ -35,7 +35,9 @@ public class HudiCatalog extends BaseCatalog<HudiCatalog> {
   static final HudiTablePropertiesMetadata TABLE_PROPERTIES_METADATA =
       new HudiTablePropertiesMetadata();
 
-  /** @return The short name of the catalog. */
+  /**
+   * @return The short name of the catalog.
+   */
   @Override
   public String shortName() {
     return "lakehouse-hudi";

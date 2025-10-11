@@ -37,16 +37,22 @@ import org.apache.gravitino.tag.SupportsTags;
 @Evolving
 public interface Schema extends Auditable {
 
-  /** @return The name of the Schema. */
+  /**
+   * @return The name of the Schema.
+   */
   String name();
 
-  /** @return The comment of the Schema. Null is returned if the comment is not set. */
+  /**
+   * @return The comment of the Schema. Null is returned if the comment is not set.
+   */
   @Nullable
   default String comment() {
     return null;
   }
 
-  /** @return The properties of the Schema. An empty map is returned if no properties are set. */
+  /**
+   * @return The properties of the Schema. An empty map is returned if no properties are set.
+   */
   default Map<String, String> properties() {
     return Collections.emptyMap();
   }

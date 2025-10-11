@@ -33,7 +33,9 @@ import org.apache.gravitino.rel.expressions.literals.Literal;
 @Evolving
 public interface IdentityPartition extends Partition {
 
-  /** @return The field names of the identity partition. */
+  /**
+   * @return The field names of the identity partition.
+   */
   String[][] fieldNames();
 
   /**

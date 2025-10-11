@@ -105,7 +105,9 @@ public interface Partitioning extends Transform {
   abstract class SingleFieldPartitioning implements Partitioning {
     String[] fieldName;
 
-    /** @return The field name of the partitioning. */
+    /**
+     * @return The field name of the partitioning.
+     */
     public String[] fieldName() {
       return fieldName;
     }
@@ -121,13 +123,17 @@ public interface Partitioning extends Transform {
       PartitionUtils.validateFieldExistence(columns, fieldName);
     }
 
-    /** @return The name of the partitioning strategy. */
+    /**
+     * @return The name of the partitioning strategy.
+     */
     @Override
     public String name() {
       return strategy().name().toLowerCase();
     }
 
-    /** @return The arguments of the partitioning strategy. */
+    /**
+     * @return The arguments of the partitioning strategy.
+     */
     @Override
     public Expression[] arguments() {
       return new Expression[] {field(fieldName)};

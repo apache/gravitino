@@ -100,7 +100,8 @@ public abstract class FlinkEnvIT extends BaseIT {
     LOG.info("Stop Flink env successfully.");
   }
 
-  protected void initCatalogEnv() throws Exception {};
+  protected void initCatalogEnv() throws Exception {}
+  ;
 
   protected void stopCatalogEnv() throws Exception {}
 
