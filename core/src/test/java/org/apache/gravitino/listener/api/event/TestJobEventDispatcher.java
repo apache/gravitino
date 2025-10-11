@@ -142,7 +142,7 @@ public class TestJobEventDispatcher {
     Assertions.assertEquals(OperationType.GET_JOB_TEMPLATE, postEvent.operationType());
     Assertions.assertEquals(OperationStatus.SUCCESS, postEvent.operationStatus());
 
-    JobTemplate retrievedJobTemplate = ((GetJobTemplateEvent) postEvent).retrievedJobTemplate();
+    JobTemplate retrievedJobTemplate = ((GetJobTemplateEvent) postEvent).loadedJobTemplate();
     checkJobTemplate(retrievedJobTemplate, jobTemplateEntity);
   }
 

@@ -22,12 +22,11 @@ package org.apache.gravitino.listener.api.event.job;
 import org.apache.gravitino.annotation.DeveloperApi;
 import org.apache.gravitino.job.JobTemplate;
 import org.apache.gravitino.listener.api.event.OperationType;
-import org.apache.gravitino.listener.api.event.PreEvent;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 
 /** Represents an event triggered before the registration of a job template. */
 @DeveloperApi
-public class RegisterJobTemplatePreEvent extends PreEvent {
+public class RegisterJobTemplatePreEvent extends JobTemplatePreEvent {
 
   private final JobTemplate jobTemplate;
 

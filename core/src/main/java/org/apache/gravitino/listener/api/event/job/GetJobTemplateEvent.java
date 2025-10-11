@@ -43,11 +43,11 @@ public class GetJobTemplateEvent extends JobTemplateEvent {
   }
 
   /**
-   * Returns the job template that has been retrieved.
+   * Returns the job template that has been loaded.
    *
    * @return the retrieved job template
    */
-  public JobTemplate retrievedJobTemplate() {
+  public JobTemplate loadedJobTemplate() {
     return jobTemplate;
   }
 

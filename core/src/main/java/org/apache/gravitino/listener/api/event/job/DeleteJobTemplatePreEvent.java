@@ -21,12 +21,11 @@ package org.apache.gravitino.listener.api.event.job;
 
 import org.apache.gravitino.annotation.DeveloperApi;
 import org.apache.gravitino.listener.api.event.OperationType;
-import org.apache.gravitino.listener.api.event.PreEvent;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 
 /** Represents an event triggered before deleting a job template. */
 @DeveloperApi
-public class DeleteJobTemplatePreEvent extends PreEvent {
+public class DeleteJobTemplatePreEvent extends JobTemplatePreEvent {
 
   /**
    * Constructs a new {@code DeleteJobTemplatePreEvent} instance.
