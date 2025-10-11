@@ -576,7 +576,7 @@ public abstract class BaseGVFSOperations implements Closeable {
   /**
    * Get the schema by the schema identifier from the cache or load it from the server if the cache
    *
-   * @param schemaIdent
+   * @param schemaIdent the schema identifier.
    * @return the schema.
    */
   protected Schema getSchema(NameIdentifier schemaIdent) {
