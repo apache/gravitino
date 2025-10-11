@@ -30,7 +30,7 @@ var paimonVersion: String = libs.versions.paimon.get()
 val flinkVersion: String = libs.versions.flink.get()
 val flinkMajorVersion: String = flinkVersion.substringBeforeLast(".")
 
-val icebergVersion: String = libs.versions.iceberg4connector.get()
+val icebergVersion: String = libs.versions.iceberg4flink.get()
 
 // The Flink only support scala 2.12, and all scala api will be removed in a future version.
 // You can find more detail at the following issues:
