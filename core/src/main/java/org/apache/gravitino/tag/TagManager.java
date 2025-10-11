@@ -220,6 +220,41 @@ public class TagManager implements TagDispatcher {
         });
   }
 
+  public MetadataObject[] listMetadataObjectsForTags(String metalake, String[] names)
+      throws NoSuchTagException {
+    if (names == null || names.length == 0) {
+      return new MetadataObject[0];
+    }
+    NameIdentifier[] tagIds =
+        Arrays.stream(names)
+            .map(name -> NameIdentifierUtil.ofTag(metalake, name))
+            .toArray(NameIdentifier[]::new);
+    return TreeLockUtils.doWithTreeLock(
+        NameIdentifier.of(metalake),
+        LockType.READ,
+        () -> {
+          checkMetalake(NameIdentifier.of(metalake), entityStore);
+
+          try {
+            Set<MetadataObject> allObjects = Sets.newHashSet();
+            for (NameIdentifier tagId : tagIds) {
+              if (!entityStore.exists(tagId, Entity.EntityType.TAG)) {
+                throw new NoSuchTagException(
+                    "Tag with name %s under metalake %s does not exist", tagId.name(), metalake);
+              }
+              List<MetadataObject> objects =
+                  supportsTagOperations.listAssociatedMetadataObjectsForTag(tagId);
+              allObjects.addAll(objects);
+            }
+
+            return allObjects.toArray(new MetadataObject[0]);
+          } catch (IOException e) {
+            LOG.error("Failed to list metadata objects for tags {}", Arrays.toString(names), e);
+            throw new RuntimeException(e);
+          }
+        });
+  }
+
   public String[] listTagsForMetadataObject(String metalake, MetadataObject metadataObject)
       throws NotFoundException {
     return Arrays.stream(listTagsInfoForMetadataObject(metalake, metadataObject))

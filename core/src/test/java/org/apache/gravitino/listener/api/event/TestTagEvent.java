@@ -207,6 +207,38 @@ public class TestTagEvent {
   }
 
   @Test
+  void testListMetadataObjectsForTags() {
+    MetadataObject catalog =
+        NameIdentifierUtil.toMetadataObject(
+            NameIdentifierUtil.ofCatalog("metalake", "catalog_for_test"),
+            Entity.EntityType.CATALOG);
+    MetadataObject[] objects = new MetadataObject[] {catalog};
+    String[] tagNames = new String[] {"tag1", "tag2"};
+
+    when(mockTagDispatcher().listMetadataObjectsForTags("metalake", tagNames)).thenReturn(objects);
+
+    dispatcher.listMetadataObjectsForTags("metalake", tagNames);
+    PreEvent preEvent = dummyEventListener.popPreEvent();
+    NameIdentifier identifier = NameIdentifierUtil.ofTag("metalake", tagNames[0]);
+
+    Assertions.assertEquals(identifier.toString(), preEvent.identifier().toString());
+    Assertions.assertEquals(ListMetadataObjectsForTagsPreEvent.class, preEvent.getClass());
+    Assertions.assertEquals(OperationType.LIST_METADATA_OBJECTS_FOR_TAGS, preEvent.operationType());
+    Assertions.assertEquals(OperationStatus.UNPROCESSED, preEvent.operationStatus());
+    Assertions.assertArrayEquals(
+        tagNames, ((ListMetadataObjectsForTagsPreEvent) preEvent).tagNames());
+
+    Event postevent = dummyEventListener.popPostEvent();
+    Assertions.assertEquals(identifier.toString(), postevent.identifier().toString());
+    Assertions.assertEquals(ListMetadataObjectsForTagsEvent.class, postevent.getClass());
+    Assertions.assertEquals(
+        OperationType.LIST_METADATA_OBJECTS_FOR_TAGS, postevent.operationType());
+    Assertions.assertEquals(OperationStatus.SUCCESS, postevent.operationStatus());
+    Assertions.assertArrayEquals(
+        tagNames, ((ListMetadataObjectsForTagsEvent) postevent).tagNames());
+  }
+
+  @Test
   void testListTagsForMetadataObject() {
     MetadataObject metadataObject =
         NameIdentifierUtil.toMetadataObject(
@@ -514,6 +546,23 @@ public class TestTagEvent {
     Assertions.assertEquals(OperationStatus.FAILURE, event.operationStatus());
   }
 
+  @Test
+  void testListMetadataObjectsForTagsFailureEvent() {
+    String[] tagNames = new String[] {"tag1", "tag2"};
+    Assertions.assertThrowsExactly(
+        GravitinoRuntimeException.class,
+        () -> failureDispatcher.listMetadataObjectsForTags("metalake", tagNames));
+    Event event = dummyEventListener.popPostEvent();
+    Assertions.assertEquals(ListMetadataObjectsForTagsFailureEvent.class, event.getClass());
+    Assertions.assertEquals(
+        GravitinoRuntimeException.class,
+        ((ListMetadataObjectsForTagsFailureEvent) event).exception().getClass());
+    Assertions.assertArrayEquals(
+        tagNames, ((ListMetadataObjectsForTagsFailureEvent) event).tagNames());
+    Assertions.assertEquals(OperationType.LIST_METADATA_OBJECTS_FOR_TAGS, event.operationType());
+    Assertions.assertEquals(OperationStatus.FAILURE, event.operationStatus());
+  }
+
   private Tag mockTag() {
     Tag tag = mock(Tag.class);
     when(tag.name()).thenReturn("tag");
@@ -561,6 +610,9 @@ public class TestTagEvent {
     MetadataObject[] objects = new MetadataObject[] {catalog};
 
     when(dispatcher.listMetadataObjectsForTag(any(String.class), any(String.class)))
+        .thenReturn(objects);
+
+    when(dispatcher.listMetadataObjectsForTags(any(String.class), any(String[].class)))
         .thenReturn(objects);
 
     when(dispatcher.associateTagsForMetadataObject(

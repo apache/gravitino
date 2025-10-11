@@ -22,11 +22,12 @@ Note that current tag system is a basic implementation, some advanced features w
 the future versions.
 
 :::info
+
 1. Metadata objects are objects that are managed in Gravitino, such as `CATALOG`, `SCHEMA`, `TABLE`,
    `COLUMN`, `FILESET`, `TOPIC`, `COLUMN`, `MODEL`, etc. A metadata object is combined by a `type` and a
    dot-separated `name`. For example, a `CATALOG` object has a name "catalog1" with type
    "CATALOG", a `SCHEMA` object has a name "catalog1.schema1" with type "SCHEMA", a `TABLE`
-   object has a name "catalog1.schema1.table1" with type "TABLE", a `COLUMN` object has a name 
+   object has a name "catalog1.schema1.table1" with type "TABLE", a `COLUMN` object has a name
    "catalog1.schema1.table1.column1" with type "COLUMN".
 2. Currently, `CATALOG`, `SCHEMA`, `TABLE`, `FILESET`, `TOPIC`, `MODEL`, and `COLUMN` objects can be tagged.
 3. Tags in Gravitino is inheritable, so listing tags of a metadata object will also list the
@@ -173,7 +174,7 @@ Tag tag = client.alterTag(
 Currently, Gravitino support the following tag changes:
 
 | Supported modification | JSON                                                         | Java                                      |
-|------------------------|--------------------------------------------------------------|-------------------------------------------|
+| ---------------------- | ------------------------------------------------------------ | ----------------------------------------- |
 | Rename a tag           | `{"@type":"rename","newName":"tag_renamed"}`                 | `TagChange.rename("tag_renamed")`         |
 | Update a comment       | `{"@type":"updateComment","newComment":"new_comment"}`       | `TagChange.updateComment("new_comment")`  |
 | Set a tag property     | `{"@type":"setProperty","property":"key1","value":"value1"}` | `TagChange.setProperty("key1", "value1")` |
@@ -322,6 +323,8 @@ Tag tag = schema1.supportsTags().getTag("tag1");
 
 You can list all the metadata objects associated with a tag.
 
+The request path for REST API is `/api/metalakes/{metalake}/tags/{tag}/objects`.
+
 <Tabs groupId='language' queryString>
 <TabItem value="shell" label="Shell">
 
@@ -337,6 +340,32 @@ http://localhost:8090/api/metalakes/test/tags/tag1/objects
 Tag tag = ...
 MetadataObject[] objects = tag.associatedObjects().objects();
 int count = tag.associatedObjects().count();
+```
+
+</TabItem>
+</Tabs>
+
+### List metadata objects associated with a list of tags
+
+You can list all the metadata objects associated with a list of tags.
+
+The request path for REST API is `/api/metalakes/{metalake}/objects?tags=tag1,tag2,...`.
+
+<Tabs groupId='language' queryString>
+<TabItem value="shell" label="Shell">
+
+```shell
+curl -X GET -H "Accept: application/vnd.gravitino.v1+json" \
+http://localhost:8090/api/metalakes/test/objects?tags=tag1,tag2,tag3
+```
+
+</TabItem>
+<TabItem value="java" label="Java">
+
+```java
+GravitinoClient client = ...
+String[] tagNames = {"tag1", "tag2", "tag3"}
+MetadataObject[] objects = client.listMetadataObjectsForTags(tagNames)
 ```
 
 </TabItem>

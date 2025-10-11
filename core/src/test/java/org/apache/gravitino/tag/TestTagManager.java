@@ -565,6 +565,56 @@ public class TestTagManager {
   }
 
   @Test
+  public void testListMetadataObjectsForTags() {
+    Tag tag1 = tagManager.createTag(METALAKE, "tag1", null, null);
+    Tag tag2 = tagManager.createTag(METALAKE, "tag2", null, null);
+
+    MetadataObject catalogObject =
+        NameIdentifierUtil.toMetadataObject(
+            NameIdentifierUtil.ofCatalog(METALAKE, CATALOG), Entity.EntityType.CATALOG);
+    MetadataObject schemaObject =
+        NameIdentifierUtil.toMetadataObject(
+            NameIdentifierUtil.ofSchema(METALAKE, CATALOG, SCHEMA), Entity.EntityType.SCHEMA);
+    MetadataObject tableObject =
+        NameIdentifierUtil.toMetadataObject(
+            NameIdentifierUtil.ofTable(METALAKE, CATALOG, SCHEMA, TABLE), Entity.EntityType.TABLE);
+
+    tagManager.associateTagsForMetadataObject(
+        METALAKE, catalogObject, new String[] {tag1.name(), tag2.name()}, null);
+    tagManager.associateTagsForMetadataObject(
+        METALAKE, schemaObject, new String[] {tag1.name()}, null);
+    tagManager.associateTagsForMetadataObject(
+        METALAKE, tableObject, new String[] {tag2.name()}, null);
+
+    // Test both tags
+    MetadataObject[] objects =
+        tagManager.listMetadataObjectsForTags(METALAKE, new String[] {tag1.name(), tag2.name()});
+    Assertions.assertEquals(3, objects.length);
+    Assertions.assertTrue(
+        Arrays.asList(objects)
+            .containsAll(Arrays.asList(catalogObject, schemaObject, tableObject)));
+
+    // Test only tag1
+    MetadataObject[] objectsTag1 =
+        tagManager.listMetadataObjectsForTags(METALAKE, new String[] {tag1.name()});
+    Assertions.assertEquals(2, objectsTag1.length);
+    Assertions.assertTrue(
+        Arrays.asList(objectsTag1).containsAll(Arrays.asList(catalogObject, schemaObject)));
+
+    // Test only tag2
+    MetadataObject[] objectsTag2 =
+        tagManager.listMetadataObjectsForTags(METALAKE, new String[] {tag2.name()});
+    Assertions.assertEquals(2, objectsTag2.length);
+    Assertions.assertTrue(
+        Arrays.asList(objectsTag2).containsAll(Arrays.asList(catalogObject, tableObject)));
+
+    // Test non-existent tag
+    Assertions.assertThrows(
+        NoSuchTagException.class,
+        () -> tagManager.listMetadataObjectsForTags(METALAKE, new String[] {"non_existent_tag"}));
+  }
+
+  @Test
   public void testListTagsForMetadataObject() {
     Tag tag1 = tagManager.createTag(METALAKE, "tag1", null, null);
     Tag tag2 = tagManager.createTag(METALAKE, "tag2", null, null);

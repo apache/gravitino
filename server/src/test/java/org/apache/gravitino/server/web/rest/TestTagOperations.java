@@ -1094,6 +1094,120 @@ public class TestTagOperations extends JerseyTest {
     Assertions.assertEquals(RuntimeException.class.getSimpleName(), errorResponse1.getType());
   }
 
+  @Test
+  public void testListMetadataObjectsForTags() {
+    MetadataObject[] objects =
+        new MetadataObject[] {
+          MetadataObjects.parse("object1", MetadataObject.Type.CATALOG),
+          MetadataObjects.parse("object1.object2", MetadataObject.Type.SCHEMA),
+          MetadataObjects.parse("object1.object2.object3", MetadataObject.Type.TABLE),
+          MetadataObjects.parse("object1.object2.object3.object4", MetadataObject.Type.COLUMN)
+        };
+
+    String[] tagNames = new String[] {"tag1", "tag2"};
+    when(tagManager.listMetadataObjectsForTags(metalake, tagNames)).thenReturn(objects);
+
+    Response response =
+        target(tagPath(metalake))
+            .path("objects")
+            .queryParam("tags", "tag1,tag2")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .get();
+
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), response.getStatus());
+    Assertions.assertEquals(MediaType.APPLICATION_JSON_TYPE, response.getMediaType());
+
+    MetadataObjectListResponse objectListResponse =
+        response.readEntity(MetadataObjectListResponse.class);
+    Assertions.assertEquals(0, objectListResponse.getCode());
+
+    MetadataObject[] respObjects = objectListResponse.getMetadataObjects();
+    Assertions.assertEquals(objects.length, respObjects.length);
+
+    for (int i = 0; i < objects.length; i++) {
+      Assertions.assertEquals(objects[i].type(), respObjects[i].type());
+      Assertions.assertEquals(objects[i].fullName(), respObjects[i].fullName());
+    }
+
+    // Test with single tag
+    when(tagManager.listMetadataObjectsForTags(metalake, new String[] {"tag1"}))
+        .thenReturn(objects);
+
+    Response response1 =
+        target(tagPath(metalake))
+            .path("objects")
+            .queryParam("tags", "tag1")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .get();
+
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), response1.getStatus());
+
+    // Test with empty tags parameter
+    Response response2 =
+        target(tagPath(metalake))
+            .path("objects")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .get();
+
+    Assertions.assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), response2.getStatus());
+
+    ErrorResponse errorResponse = response2.readEntity(ErrorResponse.class);
+    Assertions.assertEquals(ErrorConstants.ILLEGAL_ARGUMENTS_CODE, errorResponse.getCode());
+
+    // Test with whitespace-only tags parameter
+    Response response3 =
+        target(tagPath(metalake))
+            .path("objects")
+            .queryParam("tags", "   ")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .get();
+
+    Assertions.assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), response3.getStatus());
+
+    // Test throw NoSuchTagException
+    doThrow(new NoSuchTagException("mock error"))
+        .when(tagManager)
+        .listMetadataObjectsForTags(metalake, tagNames);
+
+    Response response4 =
+        target(tagPath(metalake))
+            .path("objects")
+            .queryParam("tags", "tag1,tag2")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .get();
+
+    Assertions.assertEquals(Response.Status.NOT_FOUND.getStatusCode(), response4.getStatus());
+
+    ErrorResponse errorResponse1 = response4.readEntity(ErrorResponse.class);
+    Assertions.assertEquals(ErrorConstants.NOT_FOUND_CODE, errorResponse1.getCode());
+    Assertions.assertEquals(NoSuchTagException.class.getSimpleName(), errorResponse1.getType());
+
+    // Test throw RuntimeException
+    doThrow(new RuntimeException("mock error"))
+        .when(tagManager)
+        .listMetadataObjectsForTags(any(), any());
+
+    Response response5 =
+        target(tagPath(metalake))
+            .path("objects")
+            .queryParam("tags", "tag1,tag2")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .get();
+
+    Assertions.assertEquals(
+        Response.Status.INTERNAL_SERVER_ERROR.getStatusCode(), response5.getStatus());
+
+    ErrorResponse errorResponse2 = response5.readEntity(ErrorResponse.class);
+    Assertions.assertEquals(ErrorConstants.INTERNAL_ERROR_CODE, errorResponse2.getCode());
+    Assertions.assertEquals(RuntimeException.class.getSimpleName(), errorResponse2.getType());
+  }
+
   private String tagPath(String metalake) {
     return "/metalakes/" + metalake + "/tags";
   }
