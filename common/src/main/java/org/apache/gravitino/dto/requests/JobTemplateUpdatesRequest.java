@@ -44,7 +44,7 @@ public class JobTemplateUpdatesRequest implements RESTRequest {
   }
 
   /** This is the constructor that is used by Jackson deserializer */
-  public JobTemplateUpdatesRequest() {
+  private JobTemplateUpdatesRequest() {
     this(null);
   }
 

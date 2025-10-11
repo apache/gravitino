@@ -76,7 +76,7 @@ public interface JobTemplateUpdateRequest extends RESTRequest {
     }
 
     /** Default constructor for Jackson. */
-    public RenameJobTemplateRequest() {
+    private RenameJobTemplateRequest() {
       this(null);
     }
 
@@ -111,7 +111,7 @@ public interface JobTemplateUpdateRequest extends RESTRequest {
     }
 
     /** Default constructor for Jackson. */
-    public UpdateJobTemplateCommentRequest() {
+    private UpdateJobTemplateCommentRequest() {
       this(null);
     }
 
@@ -145,7 +145,7 @@ public interface JobTemplateUpdateRequest extends RESTRequest {
     }
 
     /** Default constructor for Jackson. */
-    public UpdateJobTemplateContentRequest() {
+    private UpdateJobTemplateContentRequest() {
       this(null);
     }
 
