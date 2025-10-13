@@ -36,7 +36,7 @@ public class AddUserEvent extends UserEvent {
    * @param metalake the name of the metalake where the user was added.
    * @param addedUserInfo the user information of the newly added user.
    */
-  protected AddUserEvent(String initiator, String metalake, UserInfo addedUserInfo) {
+  public AddUserEvent(String initiator, String metalake, UserInfo addedUserInfo) {
     super(initiator, NameIdentifierUtil.ofUser(metalake, addedUserInfo.name()));
 
     this.addedUserInfo = addedUserInfo;

@@ -49,7 +49,8 @@ public final class DorisUtils {
 
   private static final Pattern DISTRIBUTION_INFO_PATTERN =
       Pattern.compile(
-          "DISTRIBUTED BY\\s+(HASH|RANDOM)\\s*(\\(([^)]+)\\))?\\s*(BUCKETS\\s+(\\d+|AUTO))?");
+          "DISTRIBUTED BY\\s+(HASH|RANDOM)\\s*(\\(([^)]+)\\))?(?:\\s*BUCKETS\\s+(\\d+|AUTO))?",
+          Pattern.CASE_INSENSITIVE);
 
   private static final String LIST_PARTITION = "LIST";
   private static final String RANGE_PARTITION = "RANGE";
@@ -221,8 +222,8 @@ public final class DorisUtils {
 
   private static int extractBucketNum(Matcher matcher) {
     int bucketNum = 1;
-    if (matcher.group(5) != null) {
-      String bucketValue = matcher.group(5);
+    if (matcher.group(4) != null) {
+      String bucketValue = matcher.group(4);
       // Use -1 to indicate auto bucket.
       bucketNum =
           bucketValue.trim().toUpperCase().equals("AUTO")

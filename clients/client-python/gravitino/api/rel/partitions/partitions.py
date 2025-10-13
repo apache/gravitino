@@ -17,7 +17,7 @@
 
 from typing import Any, Dict, List, Optional
 
-from gravitino.api.expressions.literals.literal import Literal
+from gravitino.api.rel.expressions.literals.literal import Literal
 from gravitino.api.rel.partitions.identity_partition import IdentityPartition
 from gravitino.api.rel.partitions.list_partition import ListPartition
 from gravitino.api.rel.partitions.partition import Partition

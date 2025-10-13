@@ -16,7 +16,8 @@
 # under the License.
 
 import unittest
-from gravitino.api.expressions.unparsed_expression import UnparsedExpressionImpl
+
+from gravitino.api.rel.expressions.unparsed_expression import UnparsedExpressionImpl
 
 
 class TestUnparsedExpression(unittest.TestCase):

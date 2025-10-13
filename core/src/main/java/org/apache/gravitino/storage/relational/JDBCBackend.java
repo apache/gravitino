@@ -238,6 +238,8 @@ public class JDBCBackend implements RelationalBackend {
         return (E) ModelVersionMetaService.getInstance().updateModelVersion(ident, updater);
       case POLICY:
         return (E) PolicyMetaService.getInstance().updatePolicy(ident, updater);
+      case JOB_TEMPLATE:
+        return (E) JobTemplateMetaService.getInstance().updateJobTemplate(ident, updater);
       default:
         throw new UnsupportedEntityTypeException(
             "Unsupported entity type: %s for update operation", entityType);

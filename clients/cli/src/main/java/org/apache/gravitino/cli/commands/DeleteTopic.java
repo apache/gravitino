@@ -24,6 +24,7 @@ import org.apache.gravitino.cli.AreYouSure;
 import org.apache.gravitino.cli.CommandContext;
 import org.apache.gravitino.cli.ErrorMessages;
 import org.apache.gravitino.client.GravitinoClient;
+import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchTopicException;
@@ -76,6 +77,8 @@ public class DeleteTopic extends Command {
       deleted = client.loadCatalog(catalog).asTopicCatalog().dropTopic(name);
     } catch (NoSuchMetalakeException err) {
       exitWithError(ErrorMessages.UNKNOWN_METALAKE);
+    } catch (NoSuchCatalogException err) {
+      exitWithError(ErrorMessages.UNKNOWN_CATALOG);
     } catch (NoSuchSchemaException err) {
       exitWithError(ErrorMessages.UNKNOWN_SCHEMA);
     } catch (NoSuchTopicException err) {

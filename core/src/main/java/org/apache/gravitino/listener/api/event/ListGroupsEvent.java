@@ -32,7 +32,7 @@ public class ListGroupsEvent extends GroupEvent {
    * @param initiator the user who initiated the list-groups request.
    * @param metalake the name of the metalake from which the groups were listed.
    */
-  protected ListGroupsEvent(String initiator, String metalake) {
+  public ListGroupsEvent(String initiator, String metalake) {
     super(initiator, NameIdentifierUtil.ofMetalake(metalake));
   }
 
