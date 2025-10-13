@@ -16,10 +16,10 @@
 # under the License.
 from typing import List
 
-from gravitino.api.expressions.distributions.strategy import Strategy
-from gravitino.api.expressions.distributions.distribution import Distribution
-from gravitino.api.expressions.expression import Expression
-from gravitino.api.expressions.named_reference import NamedReference
+from gravitino.api.rel.expressions.distributions.distribution import Distribution
+from gravitino.api.rel.expressions.distributions.strategy import Strategy
+from gravitino.api.rel.expressions.expression import Expression
+from gravitino.api.rel.expressions.named_reference import NamedReference
 
 
 class DistributionImpl(Distribution):

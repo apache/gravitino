@@ -19,9 +19,9 @@ import unittest
 from datetime import date, time
 from itertools import combinations
 
-from gravitino.api.expressions.literals.literals import Literals
-from gravitino.api.expressions.named_reference import NamedReference
-from gravitino.api.expressions.transforms.transforms import Transforms
+from gravitino.api.rel.expressions.literals.literals import Literals
+from gravitino.api.rel.expressions.named_reference import NamedReference
+from gravitino.api.rel.expressions.transforms.transforms import Transforms
 from gravitino.api.rel.partitions.partitions import Partitions
 
 

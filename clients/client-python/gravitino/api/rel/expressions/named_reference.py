@@ -17,7 +17,7 @@
 
 from __future__ import annotations
 
-from gravitino.api.expressions.expression import Expression
+from gravitino.api.rel.expressions.expression import Expression
 
 
 class NamedReference(Expression):

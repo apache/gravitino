@@ -19,8 +19,8 @@ from __future__ import annotations
 
 from typing import List
 
-from gravitino.api.expressions.expression import Expression
-from gravitino.api.expressions.function_expression import FunctionExpression
+from gravitino.api.rel.expressions.expression import Expression
+from gravitino.api.rel.expressions.function_expression import FunctionExpression
 from gravitino.dto.rel.expressions.function_arg import FunctionArg
 
 
