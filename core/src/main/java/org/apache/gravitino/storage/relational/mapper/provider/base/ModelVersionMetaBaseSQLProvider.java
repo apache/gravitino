@@ -32,7 +32,7 @@ public class ModelVersionMetaBaseSQLProvider {
     return "<script>"
         + "INSERT INTO "
         + ModelVersionMetaMapper.TABLE_NAME
-        + "(metalake_id, catalog_id, schema_id, model_id, version, model_version_comment,"
+        + " (metalake_id, catalog_id, schema_id, model_id, version, model_version_comment,"
         + " model_version_properties, model_version_uri_name, model_version_uri, audit_info, deleted_at)"
         + " SELECT m.metalake_id, m.catalog_id, m.schema_id, m.model_id, m.model_latest_version, v.model_version_comment,"
         + " v.model_version_properties, v.model_version_uri_name, v.model_version_uri, v.audit_info, v.deleted_at"
@@ -59,7 +59,7 @@ public class ModelVersionMetaBaseSQLProvider {
     return "<script>"
         + "INSERT INTO "
         + ModelVersionMetaMapper.TABLE_NAME
-        + "(metalake_id, catalog_id, schema_id, model_id, version, model_version_comment,"
+        + " (metalake_id, catalog_id, schema_id, model_id, version, model_version_comment,"
         + " model_version_properties, model_version_uri_name, model_version_uri, audit_info, deleted_at)"
         + " SELECT m.metalake_id, m.catalog_id, m.schema_id, m.model_id, v.model_version_number, v.model_version_comment,"
         + " v.model_version_properties, v.model_version_uri_name, v.model_version_uri, v.audit_info, v.deleted_at"
