@@ -93,7 +93,7 @@ public class ModelVersionMetaBaseSQLProvider {
 
   public String selectModelVersionMeta(
       @Param("modelId") Long modelId, @Param("modelVersion") Integer modelVersion) {
-    return "SELECT metalake_id AS metalakeId, catalog_id AS catalogId, schema_id AS schemaId, "
+    return "SELECT metalake_id AS metalakeId, catalog_id AS catalogId, schema_id AS schemaId,"
         + " model_id AS modelId, version AS modelVersion, model_version_comment AS modelVersionComment,"
         + " model_version_properties AS modelVersionProperties, model_version_uri_name AS modelVersionUriName,"
         + " model_version_uri AS modelVersionUri, audit_info AS auditInfo, deleted_at AS deletedAt"
@@ -191,24 +191,24 @@ public class ModelVersionMetaBaseSQLProvider {
 
     return "UPDATE "
         + ModelVersionMetaMapper.TABLE_NAME
-        + " SET "
-        + "metalake_id = #{newModelVersionMeta.metalakeId}, "
-        + "catalog_id = #{newModelVersionMeta.catalogId}, "
-        + "schema_id = #{newModelVersionMeta.schemaId}, "
-        + "model_id = #{newModelVersionMeta.modelId}, "
-        + "version = #{newModelVersionMeta.modelVersion}, "
-        + "model_version_comment = #{newModelVersionMeta.modelVersionComment}, "
-        + "model_version_properties = #{newModelVersionMeta.modelVersionProperties}, "
-        + "audit_info = #{newModelVersionMeta.auditInfo}, "
-        + "deleted_at = #{newModelVersionMeta.deletedAt} "
-        + "WHERE model_id = #{oldModelVersionMeta.modelId} "
-        + "AND metalake_id = #{oldModelVersionMeta.metalakeId} "
-        + "AND catalog_id = #{oldModelVersionMeta.catalogId} "
-        + "AND schema_id = #{oldModelVersionMeta.schemaId} "
-        + "AND version = #{oldModelVersionMeta.modelVersion} "
-        + "AND model_version_comment = #{oldModelVersionMeta.modelVersionComment} "
-        + "AND model_version_properties = #{oldModelVersionMeta.modelVersionProperties} "
-        + "AND audit_info = #{oldModelVersionMeta.auditInfo} "
-        + "AND deleted_at = 0";
+        + " SET"
+        + " metalake_id = #{newModelVersionMeta.metalakeId},"
+        + " catalog_id = #{newModelVersionMeta.catalogId},"
+        + " schema_id = #{newModelVersionMeta.schemaId},"
+        + " model_id = #{newModelVersionMeta.modelId},"
+        + " version = #{newModelVersionMeta.modelVersion},"
+        + " model_version_comment = #{newModelVersionMeta.modelVersionComment},"
+        + " model_version_properties = #{newModelVersionMeta.modelVersionProperties},"
+        + " audit_info = #{newModelVersionMeta.auditInfo},"
+        + " deleted_at = #{newModelVersionMeta.deletedAt}"
+        + " WHERE model_id = #{oldModelVersionMeta.modelId}"
+        + " AND metalake_id = #{oldModelVersionMeta.metalakeId}"
+        + " AND catalog_id = #{oldModelVersionMeta.catalogId}"
+        + " AND schema_id = #{oldModelVersionMeta.schemaId}"
+        + " AND version = #{oldModelVersionMeta.modelVersion}"
+        + " AND model_version_comment = #{oldModelVersionMeta.modelVersionComment}"
+        + " AND model_version_properties = #{oldModelVersionMeta.modelVersionProperties}"
+        + " AND audit_info = #{oldModelVersionMeta.auditInfo}"
+        + " AND deleted_at = 0";
   }
 }
