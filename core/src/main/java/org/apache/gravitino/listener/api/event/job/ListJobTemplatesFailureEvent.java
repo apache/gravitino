@@ -17,33 +17,37 @@
  * under the License.
  */
 
-package org.apache.gravitino.listener.api.event;
+package org.apache.gravitino.listener.api.event.job;
 
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.annotation.DeveloperApi;
+import org.apache.gravitino.listener.api.event.OperationType;
 
-/** Represents an event triggered after successfully listing users from a specific metalake. */
+/**
+ * Represents an event triggered when an attempt to list job templates fails due to an exception.
+ */
 @DeveloperApi
-public class ListUsersEvent extends UserEvent {
+public class ListJobTemplatesFailureEvent extends JobTemplateFailureEvent {
 
   /**
-   * Constructs a new {@link ListUsersEvent} instance with the specified initiator and metalake
-   * name.
+   * Constructs a new {@code ListJobTemplatesFailureEvent} instance.
    *
-   * @param initiator the user who initiated the request to list users.
-   * @param metalake the name of the metalake from which the users are listed.
+   * @param user The user who initiated the job template listing operation.
+   * @param metalake The metalake name where the job templates are being listed.
+   * @param exception The exception encountered during the job template listing operation, providing
+   *     insights into the reasons behind the failure.
    */
-  public ListUsersEvent(String initiator, String metalake) {
-    super(initiator, NameIdentifier.of(metalake));
+  public ListJobTemplatesFailureEvent(String user, String metalake, Exception exception) {
+    super(user, NameIdentifier.of(metalake), exception);
   }
 
   /**
-   * Returns the operation type for this event.
+   * Returns the type of operation.
    *
-   * @return the operation type for this event.
+   * @return the operation type.
    */
   @Override
   public OperationType operationType() {
-    return OperationType.LIST_USERS;
+    return OperationType.LIST_JOB_TEMPLATES;
   }
 }
