@@ -24,7 +24,7 @@ import org.apache.gravitino.listener.api.event.OperationType;
 import org.apache.gravitino.listener.api.info.JobInfo;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 
-/** Represents an event triggered when a job has been successfully retrieved. */
+/** Represents an event triggered when a job has been successfully loaded. */
 @DeveloperApi
 public class GetJobEvent extends JobEvent {
 
@@ -35,7 +35,7 @@ public class GetJobEvent extends JobEvent {
    *
    * @param user The user who initiated the job retrieval operation.
    * @param metalake The metalake name where the job resides.
-   * @param jobInfo The information of the job that has been retrieved.
+   * @param jobInfo The information of the job that has been loaded.
    */
   public GetJobEvent(String user, String metalake, JobInfo jobInfo) {
     super(user, NameIdentifierUtil.ofJob(metalake, jobInfo.jobId()));
@@ -43,11 +43,11 @@ public class GetJobEvent extends JobEvent {
   }
 
   /**
-   * Returns the information of the job that has been retrieved.
+   * Returns the information of the job that has been loaded.
    *
    * @return the job information.
    */
-  public JobInfo retrievedJobInfo() {
+  public JobInfo loadedJobInfo() {
     return jobInfo;
   }
 

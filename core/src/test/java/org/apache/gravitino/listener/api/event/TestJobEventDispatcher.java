@@ -342,8 +342,8 @@ public class TestJobEventDispatcher {
     Assertions.assertEquals(OperationType.GET_JOB, postEvent.operationType());
     Assertions.assertEquals(OperationStatus.SUCCESS, postEvent.operationStatus());
 
-    JobInfo retrievedJobInfo = ((GetJobEvent) postEvent).retrievedJobInfo();
-    checkJobInfo(retrievedJobInfo, jobInfo);
+    JobInfo loadedJobInfo = ((GetJobEvent) postEvent).loadedJobInfo();
+    checkJobInfo(loadedJobInfo, jobInfo);
   }
 
   @Test
