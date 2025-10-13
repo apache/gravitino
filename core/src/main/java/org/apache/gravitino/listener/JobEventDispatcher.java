@@ -242,7 +242,7 @@ public class JobEventDispatcher implements JobOperationDispatcher {
         new CancelJobPreEvent(PrincipalUtils.getCurrentUserName(), metalake, jobId));
 
     try {
-      JobEntity job = jobOperationDispatcher.getJob(metalake, jobId);
+      JobEntity job = jobOperationDispatcher.cancelJob(metalake, jobId);
       eventBus.dispatchEvent(
           new CancelJobEvent(
               PrincipalUtils.getCurrentUserName(), metalake, JobInfo.fromJobEntity(job)));
