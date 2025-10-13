@@ -544,18 +544,18 @@ public class OceanBaseTableOperations extends JdbcTableOperations {
     String col = updateColumnPosition.fieldName()[0];
     JdbcColumn column = getJdbcColumnFromTable(jdbcTable, col);
     StringBuilder columnDefinition = new StringBuilder();
-    columnDefinition.append(MODIFY_COLUMN).append(col);
+    columnDefinition.append(MODIFY_COLUMN).append(BACK_QUOTE).append(col).append(BACK_QUOTE);
     appendColumnDefinition(column, columnDefinition);
     if (updateColumnPosition.getPosition() instanceof TableChange.First) {
       columnDefinition.append("FIRST");
     } else if (updateColumnPosition.getPosition() instanceof TableChange.After) {
       TableChange.After afterPosition = (TableChange.After) updateColumnPosition.getPosition();
-      columnDefinition.append(AFTER).append(afterPosition.getColumn());
+      columnDefinition.append(AFTER).append(BACK_QUOTE).append(afterPosition.getColumn()).append(BACK_QUOTE);
     } else {
       Arrays.stream(jdbcTable.columns())
           .reduce((column1, column2) -> column2)
           .map(Column::name)
-          .ifPresent(s -> columnDefinition.append(AFTER).append(s));
+          .ifPresent(s -> columnDefinition.append(AFTER).append(BACK_QUOTE).append(s).append(BACK_QUOTE));
     }
     return columnDefinition.toString();
   }
@@ -589,7 +589,7 @@ public class OceanBaseTableOperations extends JdbcTableOperations {
     }
     String col = updateColumnDefaultValue.fieldName()[0];
     JdbcColumn column = getJdbcColumnFromTable(jdbcTable, col);
-    StringBuilder sqlBuilder = new StringBuilder(MODIFY_COLUMN + col);
+    StringBuilder sqlBuilder = new StringBuilder(MODIFY_COLUMN + BACK_QUOTE + col + BACK_QUOTE);
     JdbcColumn newColumn =
         JdbcColumn.builder()
             .withName(col)
@@ -608,7 +608,7 @@ public class OceanBaseTableOperations extends JdbcTableOperations {
     }
     String col = updateColumnType.fieldName()[0];
     JdbcColumn column = getJdbcColumnFromTable(jdbcTable, col);
-    StringBuilder sqlBuilder = new StringBuilder(MODIFY_COLUMN + col);
+    StringBuilder sqlBuilder = new StringBuilder(MODIFY_COLUMN + BACK_QUOTE + col + BACK_QUOTE);
     JdbcColumn newColumn =
         JdbcColumn.builder()
             .withName(col)
