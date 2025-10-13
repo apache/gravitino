@@ -17,50 +17,39 @@
  * under the License.
  */
 
-package org.apache.gravitino.listener.api.event;
+package org.apache.gravitino.listener.api.event.job;
 
 import org.apache.gravitino.annotation.DeveloperApi;
+import org.apache.gravitino.listener.api.event.OperationType;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 
 /**
- * Represents an event triggered when an attempt to delete a role from a metalake fails due to an
- * exception.
+ * Represents an event triggered when an attempt to delete a job template in the database fails due
+ * to an exception.
  */
 @DeveloperApi
-public class DeleteRoleFailureEvent extends RoleFailureEvent {
-  private final String roleName;
-
+public class DeleteJobTemplateFailureEvent extends JobTemplateFailureEvent {
   /**
-   * Constructs a new {@code DeleteRoleFailureEvent} instance.
+   * Constructs a new {@code DeleteJobTemplateFailureEvent} instance.
    *
-   * @param user the user who initiated the deletion attempt
-   * @param metalake the target metalake from which the role is to be deleted
-   * @param exception the exception that caused the failure
-   * @param roleName the name of the role intended for deletion
+   * @param user The user who initiated the job template deletion operation.
+   * @param metalake The metalake name where the job template resides.
+   * @param jobTemplateName The name of the job template to delete.
+   * @param exception The exception encountered during the job template deletion operation,
+   *     providing insights into the reasons behind the operation's failure.
    */
-  public DeleteRoleFailureEvent(
-      String user, String metalake, Exception exception, String roleName) {
-    super(user, NameIdentifierUtil.ofRole(metalake, roleName), exception);
-
-    this.roleName = roleName;
+  public DeleteJobTemplateFailureEvent(
+      String user, String metalake, String jobTemplateName, Exception exception) {
+    super(user, NameIdentifierUtil.ofJobTemplate(metalake, jobTemplateName), exception);
   }
 
   /**
-   * Returns the name of the role that was intended for deletion.
-   *
-   * @return the name of the role
-   */
-  public String roleName() {
-    return roleName;
-  }
-
-  /**
-   * Returns the operation type of this event.
+   * Returns the type of operation.
    *
    * @return the operation type.
    */
   @Override
   public OperationType operationType() {
-    return OperationType.DELETE_ROLE;
+    return OperationType.DELETE_JOB_TEMPLATE;
   }
 }

@@ -17,50 +17,47 @@
  * under the License.
  */
 
-package org.apache.gravitino.listener.api.event;
+package org.apache.gravitino.listener.api.event.job;
 
 import org.apache.gravitino.annotation.DeveloperApi;
+import org.apache.gravitino.job.JobTemplate;
+import org.apache.gravitino.listener.api.event.OperationType;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 
-/**
- * Represents an event triggered when an attempt to delete a role from a metalake fails due to an
- * exception.
- */
+/** Represents an event triggered when a job template has been successfully retrieved. */
 @DeveloperApi
-public class DeleteRoleFailureEvent extends RoleFailureEvent {
-  private final String roleName;
+public class GetJobTemplateEvent extends JobTemplateEvent {
+
+  private final JobTemplate jobTemplate;
 
   /**
-   * Constructs a new {@code DeleteRoleFailureEvent} instance.
+   * Constructs a new {@code GetJobTemplateEvent} instance.
    *
-   * @param user the user who initiated the deletion attempt
-   * @param metalake the target metalake from which the role is to be deleted
-   * @param exception the exception that caused the failure
-   * @param roleName the name of the role intended for deletion
+   * @param user The user who initiated the job template retrieval operation.
+   * @param metalake The metalake name where the job template resides.
+   * @param jobTemplate The job template that has been retrieved.
    */
-  public DeleteRoleFailureEvent(
-      String user, String metalake, Exception exception, String roleName) {
-    super(user, NameIdentifierUtil.ofRole(metalake, roleName), exception);
-
-    this.roleName = roleName;
+  public GetJobTemplateEvent(String user, String metalake, JobTemplate jobTemplate) {
+    super(user, NameIdentifierUtil.ofJobTemplate(metalake, jobTemplate.name()));
+    this.jobTemplate = jobTemplate;
   }
 
   /**
-   * Returns the name of the role that was intended for deletion.
+   * Returns the job template that has been loaded.
    *
-   * @return the name of the role
+   * @return the retrieved job template
    */
-  public String roleName() {
-    return roleName;
+  public JobTemplate loadedJobTemplate() {
+    return jobTemplate;
   }
 
   /**
-   * Returns the operation type of this event.
+   * Returns the type of operation.
    *
    * @return the operation type.
    */
   @Override
   public OperationType operationType() {
-    return OperationType.DELETE_ROLE;
+    return OperationType.GET_JOB_TEMPLATE;
   }
 }

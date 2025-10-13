@@ -17,33 +17,33 @@
  * under the License.
  */
 
-package org.apache.gravitino.listener.api.event;
+package org.apache.gravitino.listener.api.event.job;
 
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.annotation.DeveloperApi;
+import org.apache.gravitino.listener.api.event.Event;
+import org.apache.gravitino.listener.api.event.OperationStatus;
 
-/** Represents an event triggered after successfully listing users from a specific metalake. */
+/**
+ * Represents an abstract base class for events related to job template operations. This class
+ * extends {@link Event} to provide a more specific context involving operations on job templates,
+ * such as register, alter, or delete.
+ */
 @DeveloperApi
-public class ListUsersEvent extends UserEvent {
+public abstract class JobTemplateEvent extends Event {
 
   /**
-   * Constructs a new {@link ListUsersEvent} instance with the specified initiator and metalake
-   * name.
+   * Constructs a new {@code JobTemplateEvent} with the specified user and job template identifier.
    *
-   * @param initiator the user who initiated the request to list users.
-   * @param metalake the name of the metalake from which the users are listed.
+   * @param user The user responsible for triggering the job template operation.
+   * @param identifier The identifier of the job template involved in the operation.
    */
-  public ListUsersEvent(String initiator, String metalake) {
-    super(initiator, NameIdentifier.of(metalake));
+  protected JobTemplateEvent(String user, NameIdentifier identifier) {
+    super(user, identifier);
   }
 
-  /**
-   * Returns the operation type for this event.
-   *
-   * @return the operation type for this event.
-   */
   @Override
-  public OperationType operationType() {
-    return OperationType.LIST_USERS;
+  public OperationStatus operationStatus() {
+    return OperationStatus.SUCCESS;
   }
 }

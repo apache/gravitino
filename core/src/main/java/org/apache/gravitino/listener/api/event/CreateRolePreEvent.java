@@ -45,7 +45,7 @@ public class CreateRolePreEvent extends RolePreEvent {
    * @param properties The properties of the role being created.
    * @param securableObjects The list of securable objects belonging to the role.
    */
-  protected CreateRolePreEvent(
+  public CreateRolePreEvent(
       String initiator,
       String metalake,
       String roleName,
