@@ -36,7 +36,7 @@ public class AddGroupEvent extends GroupEvent {
    * @param metalake the name of the metalake where the group was added.
    * @param addedGroupInfo the information about the group that was added.
    */
-  protected AddGroupEvent(String initiator, String metalake, GroupInfo addedGroupInfo) {
+  public AddGroupEvent(String initiator, String metalake, GroupInfo addedGroupInfo) {
     super(initiator, NameIdentifierUtil.ofGroup(metalake, addedGroupInfo.name()));
 
     this.addedGroupInfo = addedGroupInfo;

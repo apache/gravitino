@@ -146,5 +146,18 @@ public enum OperationType {
   GET_OWNER,
   SET_OWNER,
 
+  // Job template operations
+  LIST_JOB_TEMPLATES,
+  REGISTER_JOB_TEMPLATE,
+  GET_JOB_TEMPLATE,
+  ALTER_JOB_TEMPLATE,
+  DELETE_JOB_TEMPLATE,
+
+  // Job operations
+  LIST_JOBS,
+  RUN_JOB,
+  GET_JOB,
+  CANCEL_JOB,
+
   UNKNOWN,
 }
