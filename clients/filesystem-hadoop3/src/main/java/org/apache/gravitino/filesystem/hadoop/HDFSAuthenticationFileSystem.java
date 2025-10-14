@@ -1,4 +1,4 @@
-package org.apache.gravitino.catalog.hadoop.fs;
+package org.apache.gravitino.filesystem.hadoop;
 /*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -41,9 +41,9 @@ import org.slf4j.LoggerFactory;
  * A FileSystem wrapper that runs all operations under a specific UGI (UserGroupInformation).
  * Supports both simple and Kerberos authentication, with automatic ticket renewal.
  */
-public class AuthenticationFileSystem extends FileSystem {
+public class HDFSAuthenticationFileSystem extends FileSystem {
 
-  private static final Logger LOG = LoggerFactory.getLogger(AuthenticationFileSystem.class);
+  private static final Logger LOG = LoggerFactory.getLogger(HDFSAuthenticationFileSystem.class);
 
   private static final long DEFAULT_RENEW_INTERVAL_MS = 10 * 60 * 1000L;
   private static final String FS_DISABLE_CACHE = "fs.hdfs.impl.disable.cache";
@@ -61,7 +61,7 @@ public class AuthenticationFileSystem extends FileSystem {
   private final FileSystem fs;
   private Timer kerberosRenewTimer;
 
-  public AuthenticationFileSystem(Path path, Configuration conf) {
+  public HDFSAuthenticationFileSystem(Path path, Configuration conf) {
     try {
       conf.setBoolean(FS_DISABLE_CACHE, true);
       conf.setBoolean(IPC_FALLBACK_TO_SIMPLE_AUTH_ALLOWED, true);
