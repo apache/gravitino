@@ -23,11 +23,18 @@ from time import sleep
 
 from gravitino import GravitinoAdminClient, GravitinoMetalake
 from gravitino.api.job.job_handle import JobHandle
+from gravitino.api.job.job_template_change import (
+    JobTemplateChange,
+    ShellTemplateUpdate,
+    SparkTemplateUpdate,
+)
 from gravitino.api.job.shell_job_template import ShellJobTemplate
+from gravitino.client.dto_converters import DTOConverters
 from gravitino.exceptions.base import (
     JobTemplateAlreadyExistsException,
     NoSuchJobTemplateException,
     NoSuchJobException,
+    IllegalArgumentException,
 )
 from tests.integration.integration_test_env import IntegrationTestEnv
 
@@ -159,6 +166,109 @@ class TestSupportsJobs(IntegrationTestEnv):
         # Verify the list of job templates is empty after deleting both
         registered_templates = self._metalake.list_job_templates()
         self.assertTrue(len(registered_templates) == 0)
+
+    def test_register_and_alter_job_template(self):
+        template = self.builder.with_name("test_alter").build()
+        self._metalake.register_job_template(template)
+
+        # Rename the job template
+        updated_template = self._metalake.alter_job_template(
+            template.name, JobTemplateChange.rename("test_alter_renamed")
+        )
+        self.assertEqual("test_alter_renamed", updated_template.name)
+        self.assertEqual(template.executable, updated_template.executable)
+        self.assertEqual(template.arguments, updated_template.arguments)
+        self.assertEqual(template.environments, updated_template.environments)
+        self.assertEqual(template.custom_fields, updated_template.custom_fields)
+        self.assertEqual(
+            template.scripts,
+            DTOConverters.to_shell_job_template(updated_template).scripts,
+        )
+
+        fetched_template = self._metalake.get_job_template("test_alter_renamed")
+        self.assertEqual(updated_template, fetched_template)
+
+        # Update the comment of the job template
+        updated_template = self._metalake.alter_job_template(
+            "test_alter_renamed", JobTemplateChange.update_comment("Updated comment")
+        )
+        self.assertEqual("Updated comment", updated_template.comment)
+        self.assertEqual("test_alter_renamed", updated_template.name)
+        self.assertEqual(template.executable, updated_template.executable)
+        self.assertEqual(template.arguments, updated_template.arguments)
+        self.assertEqual(template.environments, updated_template.environments)
+        self.assertEqual(template.custom_fields, updated_template.custom_fields)
+        self.assertEqual(
+            template.scripts,
+            DTOConverters.to_shell_job_template(updated_template).scripts,
+        )
+
+        fetched_template = self._metalake.get_job_template("test_alter_renamed")
+        self.assertEqual(updated_template, fetched_template)
+
+        # Update the content of the job template
+        updated_template_content = ShellTemplateUpdate(
+            new_executable="/bin/echo",
+            new_arguments=["Hello", "World"],
+            new_environments={"NEW_ENV": "new_value"},
+        )
+        updated_template = self._metalake.alter_job_template(
+            "test_alter_renamed",
+            JobTemplateChange.update_template(updated_template_content),
+        )
+
+        self.assertEqual("/bin/echo", updated_template.executable)
+        self.assertEqual(["Hello", "World"], updated_template.arguments)
+        self.assertEqual({"NEW_ENV": "new_value"}, updated_template.environments)
+        self.assertEqual("Updated comment", updated_template.comment)
+        self.assertEqual("test_alter_renamed", updated_template.name)
+        self.assertEqual(template.custom_fields, updated_template.custom_fields)
+        self.assertEqual(
+            template.scripts,
+            DTOConverters.to_shell_job_template(updated_template).scripts,
+        )
+
+        fetched_template = self._metalake.get_job_template("test_alter_renamed")
+        self.assertEqual(updated_template, fetched_template)
+
+        # Update the custom fields and scripts of the job template
+        updated_template_content = ShellTemplateUpdate(
+            new_custom_fields={"key1": "value1", "key2": "value2"},
+            new_scripts=["/bin/script1.sh", "/bin/script2.sh"],
+        )
+        updated_template = self._metalake.alter_job_template(
+            "test_alter_renamed",
+            JobTemplateChange.update_template(updated_template_content),
+        )
+
+        self.assertEqual("/bin/echo", updated_template.executable)
+        self.assertEqual(["Hello", "World"], updated_template.arguments)
+        self.assertEqual({"NEW_ENV": "new_value"}, updated_template.environments)
+        self.assertEqual("Updated comment", updated_template.comment)
+        self.assertEqual("test_alter_renamed", updated_template.name)
+        self.assertEqual(
+            {"key1": "value1", "key2": "value2"}, updated_template.custom_fields
+        )
+        self.assertEqual(
+            ["/bin/script1.sh", "/bin/script2.sh"],
+            DTOConverters.to_shell_job_template(updated_template).scripts,
+        )
+
+        fetched_template = self._metalake.get_job_template("test_alter_renamed")
+        self.assertEqual(updated_template, fetched_template)
+
+        # Test altering a non-existent job template
+        with self.assertRaises(NoSuchJobTemplateException):
+            self._metalake.alter_job_template(
+                "non_existent", JobTemplateChange.rename("should_fail")
+            )
+
+        # Test altering with the wrong type of change
+        with self.assertRaises(IllegalArgumentException):
+            wrong_update = SparkTemplateUpdate(new_executable="/bin/echo")
+            self._metalake.alter_job_template(
+                "test_alter_renamed", JobTemplateChange.update_template(wrong_update)
+            )
 
     def test_run_and_list_jobs(self):
         template = self.builder.with_name("test_run").build()

@@ -21,8 +21,8 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from typing import Optional
 
-from gravitino.api.expressions.expression import Expression
-from gravitino.api.expressions.function_expression import FunctionExpression
+from gravitino.api.rel.expressions.expression import Expression
+from gravitino.api.rel.expressions.function_expression import FunctionExpression
 from gravitino.api.rel.types.type import Type
 from gravitino.api.tag.supports_tags import SupportsTags
 from gravitino.exceptions.base import UnsupportedOperationException

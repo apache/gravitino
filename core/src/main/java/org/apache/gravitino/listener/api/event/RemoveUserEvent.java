@@ -38,7 +38,7 @@ public class RemoveUserEvent extends UserEvent {
    * @param isExists {@code true} if the user was successfully removed, {@code false} if no such
    *     user exists in the metalake.
    */
-  protected RemoveUserEvent(
+  public RemoveUserEvent(
       String initiator, String metalake, String removedUserName, boolean isExists) {
     super(initiator, NameIdentifierUtil.ofUser(metalake, removedUserName));
 
