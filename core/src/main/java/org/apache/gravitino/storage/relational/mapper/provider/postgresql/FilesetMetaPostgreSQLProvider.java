@@ -30,7 +30,7 @@ public class FilesetMetaPostgreSQLProvider extends FilesetMetaBaseSQLProvider {
     return "UPDATE "
         + META_TABLE_NAME
         + " SET deleted_at = floor(extract(epoch from(current_timestamp -"
-        + " timestamp '1970-01-01 00:00:00'))*1000)"
+        + " timestamp '1970-01-01 00:00:00')) * 1000)"
         + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0";
   }
 
@@ -39,7 +39,7 @@ public class FilesetMetaPostgreSQLProvider extends FilesetMetaBaseSQLProvider {
     return "UPDATE "
         + META_TABLE_NAME
         + " SET deleted_at = floor(extract(epoch from(current_timestamp -"
-        + " timestamp '1970-01-01 00:00:00'))*1000)"
+        + " timestamp '1970-01-01 00:00:00')) * 1000)"
         + " WHERE catalog_id = #{catalogId} AND deleted_at = 0";
   }
 
@@ -48,7 +48,7 @@ public class FilesetMetaPostgreSQLProvider extends FilesetMetaBaseSQLProvider {
     return "UPDATE "
         + META_TABLE_NAME
         + " SET deleted_at = floor(extract(epoch from(current_timestamp -"
-        + " timestamp '1970-01-01 00:00:00'))*1000)"
+        + " timestamp '1970-01-01 00:00:00')) * 1000)"
         + " WHERE schema_id = #{schemaId} AND deleted_at = 0";
   }
 
@@ -57,7 +57,7 @@ public class FilesetMetaPostgreSQLProvider extends FilesetMetaBaseSQLProvider {
     return "UPDATE "
         + META_TABLE_NAME
         + " SET deleted_at = floor(extract(epoch from(current_timestamp -"
-        + " timestamp '1970-01-01 00:00:00'))*1000)"
+        + " timestamp '1970-01-01 00:00:00')) * 1000)"
         + " WHERE fileset_id = #{filesetId} AND deleted_at = 0";
   }
 
@@ -75,10 +75,10 @@ public class FilesetMetaPostgreSQLProvider extends FilesetMetaBaseSQLProvider {
   public String insertFilesetMetaOnDuplicateKeyUpdate(FilesetPO filesetPO) {
     return "INSERT INTO "
         + META_TABLE_NAME
-        + "(fileset_id, fileset_name, metalake_id,"
+        + " (fileset_id, fileset_name, metalake_id,"
         + " catalog_id, schema_id, type, audit_info,"
         + " current_version, last_version, deleted_at)"
-        + " VALUES("
+        + " VALUES ("
         + " #{filesetMeta.filesetId},"
         + " #{filesetMeta.filesetName},"
         + " #{filesetMeta.metalakeId},"

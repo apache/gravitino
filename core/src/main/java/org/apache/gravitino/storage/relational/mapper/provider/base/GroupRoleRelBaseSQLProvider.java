@@ -31,7 +31,7 @@ public class GroupRoleRelBaseSQLProvider {
     return "<script>"
         + "INSERT INTO "
         + GROUP_ROLE_RELATION_TABLE_NAME
-        + "(group_id, role_id,"
+        + " (group_id, role_id,"
         + " audit_info,"
         + " current_version, last_version, deleted_at)"
         + " VALUES "
@@ -51,7 +51,7 @@ public class GroupRoleRelBaseSQLProvider {
     return "<script>"
         + "INSERT INTO "
         + GROUP_ROLE_RELATION_TABLE_NAME
-        + "(group_id, role_id,"
+        + " (group_id, role_id,"
         + " audit_info,"
         + " current_version, last_version, deleted_at)"
         + " VALUES "

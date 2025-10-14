@@ -105,7 +105,7 @@ public class TagMetaBaseSQLProvider {
         + " (tag_id, tag_name,"
         + " metalake_id, tag_comment, properties, audit_info,"
         + " current_version, last_version, deleted_at)"
-        + " VALUES("
+        + " VALUES ("
         + " #{tagMeta.tagId},"
         + " #{tagMeta.tagName},"
         + " #{tagMeta.metalakeId},"
@@ -121,10 +121,10 @@ public class TagMetaBaseSQLProvider {
   public String insertTagMetaOnDuplicateKeyUpdate(@Param("tagMeta") TagPO tagPO) {
     return "INSERT INTO "
         + TAG_TABLE_NAME
-        + "(tag_id, tag_name,"
+        + " (tag_id, tag_name,"
         + " metalake_id, tag_comment, properties, audit_info,"
         + " current_version, last_version, deleted_at)"
-        + " VALUES("
+        + " VALUES ("
         + " #{tagMeta.tagId},"
         + " #{tagMeta.tagName},"
         + " #{tagMeta.metalakeId},"

@@ -29,10 +29,10 @@ public class SchemaMetaPostgreSQLProvider extends SchemaMetaBaseSQLProvider {
   public String insertSchemaMetaOnDuplicateKeyUpdate(SchemaPO schemaPO) {
     return "INSERT INTO "
         + TABLE_NAME
-        + "(schema_id, schema_name, metalake_id,"
+        + " (schema_id, schema_name, metalake_id,"
         + " catalog_id, schema_comment, properties, audit_info,"
         + " current_version, last_version, deleted_at)"
-        + " VALUES("
+        + " VALUES ("
         + " #{schemaMeta.schemaId},"
         + " #{schemaMeta.schemaName},"
         + " #{schemaMeta.metalakeId},"
@@ -44,7 +44,7 @@ public class SchemaMetaPostgreSQLProvider extends SchemaMetaBaseSQLProvider {
         + " #{schemaMeta.lastVersion},"
         + " #{schemaMeta.deletedAt}"
         + " )"
-        + " ON CONFLICT(schema_id) DO UPDATE SET "
+        + " ON CONFLICT(schema_id) DO UPDATE SET"
         + " schema_name = #{schemaMeta.schemaName},"
         + " metalake_id = #{schemaMeta.metalakeId},"
         + " catalog_id = #{schemaMeta.catalogId},"
@@ -61,7 +61,7 @@ public class SchemaMetaPostgreSQLProvider extends SchemaMetaBaseSQLProvider {
     return "UPDATE "
         + TABLE_NAME
         + " SET deleted_at = floor(extract(epoch from(current_timestamp -"
-        + " timestamp '1970-01-01 00:00:00'))*1000)"
+        + " timestamp '1970-01-01 00:00:00')) * 1000)"
         + " WHERE schema_id = #{schemaId} AND deleted_at = 0";
   }
 
@@ -70,7 +70,7 @@ public class SchemaMetaPostgreSQLProvider extends SchemaMetaBaseSQLProvider {
     return "UPDATE "
         + TABLE_NAME
         + " SET deleted_at = floor(extract(epoch from(current_timestamp -"
-        + " timestamp '1970-01-01 00:00:00'))*1000)"
+        + " timestamp '1970-01-01 00:00:00')) * 1000)"
         + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0";
   }
 
@@ -79,7 +79,7 @@ public class SchemaMetaPostgreSQLProvider extends SchemaMetaBaseSQLProvider {
     return "UPDATE "
         + TABLE_NAME
         + " SET deleted_at = floor(extract(epoch from(current_timestamp -"
-        + " timestamp '1970-01-01 00:00:00'))*1000)"
+        + " timestamp '1970-01-01 00:00:00')) * 1000)"
         + " WHERE catalog_id = #{catalogId} AND deleted_at = 0";
   }
 
