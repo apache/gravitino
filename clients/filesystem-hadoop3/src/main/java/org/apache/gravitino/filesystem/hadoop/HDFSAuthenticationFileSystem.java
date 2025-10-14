@@ -232,6 +232,15 @@ public class HDFSAuthenticationFileSystem extends FileSystem {
   }
 
   @Override
+  public short getDefaultReplication(Path path) {
+    try {
+      return doAsIO(() -> fs.getDefaultReplication(path));
+    } catch (IOException e) {
+      throw new RuntimeException(e);
+    }
+  }
+
+  @Override
   public void close() throws IOException {
     try {
       if (kerberosRenewTimer != null) {
