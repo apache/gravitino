@@ -33,7 +33,7 @@ public class ListUsersEvent extends UserEvent {
    * @param initiator the user who initiated the request to list users.
    * @param metalake the name of the metalake from which the users are listed.
    */
-  protected ListUsersEvent(String initiator, String metalake) {
+  public ListUsersEvent(String initiator, String metalake) {
     super(initiator, NameIdentifier.of(metalake));
   }
 

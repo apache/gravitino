@@ -41,6 +41,9 @@ public class FilesetUpdatesRequest implements RESTRequest {
 
   @Override
   public void validate() throws IllegalArgumentException {
+    if (updates == null) {
+      throw new IllegalArgumentException("Updates list cannot be null");
+    }
     updates.forEach(RESTMessage::validate);
   }
 }

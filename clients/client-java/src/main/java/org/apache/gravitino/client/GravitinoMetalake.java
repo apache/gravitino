@@ -56,6 +56,8 @@ import org.apache.gravitino.dto.requests.CatalogUpdatesRequest;
 import org.apache.gravitino.dto.requests.GroupAddRequest;
 import org.apache.gravitino.dto.requests.JobRunRequest;
 import org.apache.gravitino.dto.requests.JobTemplateRegisterRequest;
+import org.apache.gravitino.dto.requests.JobTemplateUpdateRequest;
+import org.apache.gravitino.dto.requests.JobTemplateUpdatesRequest;
 import org.apache.gravitino.dto.requests.OwnerSetRequest;
 import org.apache.gravitino.dto.requests.PolicyCreateRequest;
 import org.apache.gravitino.dto.requests.PolicySetRequest;
@@ -119,6 +121,7 @@ import org.apache.gravitino.exceptions.TagAlreadyExistsException;
 import org.apache.gravitino.exceptions.UserAlreadyExistsException;
 import org.apache.gravitino.job.JobHandle;
 import org.apache.gravitino.job.JobTemplate;
+import org.apache.gravitino.job.JobTemplateChange;
 import org.apache.gravitino.job.SupportsJobs;
 import org.apache.gravitino.policy.Policy;
 import org.apache.gravitino.policy.PolicyChange;
@@ -1465,6 +1468,32 @@ public class GravitinoMetalake extends MetalakeDTO
     resp.validate();
 
     return resp.dropped();
+  }
+
+  @Override
+  public JobTemplate alterJobTemplate(String jobTemplateName, JobTemplateChange... changes)
+      throws NoSuchJobTemplateException, IllegalArgumentException {
+    Preconditions.checkArgument(
+        StringUtils.isNotBlank(jobTemplateName), "job template name must not be null or empty");
+
+    List<JobTemplateUpdateRequest> updates =
+        Arrays.stream(changes)
+            .map(DTOConverters::toJobTemplateUpdateRequest)
+            .collect(Collectors.toList());
+    JobTemplateUpdatesRequest req = new JobTemplateUpdatesRequest(updates);
+
+    JobTemplateResponse resp =
+        restClient.put(
+            String.format(API_METALAKES_JOB_TEMPLATES_PATH, RESTUtils.encodeString(this.name()))
+                + "/"
+                + RESTUtils.encodeString(jobTemplateName),
+            req,
+            JobTemplateResponse.class,
+            Collections.emptyMap(),
+            ErrorHandlers.jobErrorHandler());
+    resp.validate();
+
+    return org.apache.gravitino.dto.util.DTOConverters.fromDTO(resp.getJobTemplate());
   }
 
   @Override

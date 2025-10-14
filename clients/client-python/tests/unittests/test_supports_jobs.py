@@ -21,6 +21,7 @@ from unittest.mock import Mock, patch
 from gravitino import GravitinoClient
 from gravitino.api.job.job_handle import JobHandle
 from gravitino.api.job.job_template import JobType
+from gravitino.api.job.job_template_change import JobTemplateChange, ShellTemplateUpdate
 from gravitino.api.job.shell_job_template import ShellJobTemplate
 from gravitino.api.job.spark_job_template import SparkJobTemplate
 from gravitino.dto.audit_dto import AuditDTO
@@ -132,6 +133,31 @@ class TestSupportsJobs(unittest.TestCase):
         ):
             result = gravitino_client.delete_job_template(shell_template.name)
             self.assertFalse(result)
+
+    def test_alter_job_template(self, *mock_methods):
+        gravitino_client = GravitinoClient(
+            uri="http://localhost:8090",
+            metalake_name=self._metalake_name,
+        )
+
+        shell_template = self._new_shell_job_template()
+        shell_template_dto = self._new_shell_job_template_dto(shell_template)
+        resp = JobTemplateResponse(_job_template=shell_template_dto, _code=0)
+        mock_resp = self._mock_http_response(resp.to_json())
+
+        with patch(
+            "gravitino.utils.http_client.HTTPClient.put", return_value=mock_resp
+        ):
+            result_template = gravitino_client.alter_job_template(
+                shell_template.name,
+                JobTemplateChange.rename(shell_template.name),
+                JobTemplateChange.update_comment(shell_template.comment),
+                JobTemplateChange.update_template(
+                    ShellTemplateUpdate(new_executable="test")
+                ),
+            )
+
+            self.assertEqual(shell_template, result_template)
 
     def test_list_jobs(self, *mock_methods):
         gravitino_client = GravitinoClient(
