@@ -61,6 +61,13 @@ public class HDFSAuthenticationFileSystem extends FileSystem {
   private final FileSystem fs;
   private Timer kerberosRenewTimer;
 
+  /**
+   * Create a HDFSAuthenticationFileSystem with the given path and configuration. Supports both
+   * simple and Kerberos authentication, with automatic ticket renewal for Kerberos.
+   *
+   * @param path the HDFS path
+   * @param conf the Hadoop configuration
+   */
   public HDFSAuthenticationFileSystem(Path path, Configuration conf) {
     try {
       conf.setBoolean(FS_DISABLE_CACHE, true);
@@ -237,9 +244,5 @@ public class HDFSAuthenticationFileSystem extends FileSystem {
             return null;
           });
     }
-  }
-
-  public FileSystem fileSystem() {
-    return fs;
   }
 }
