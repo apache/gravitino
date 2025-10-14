@@ -55,6 +55,7 @@ jobs:
     strategy:
       matrix:
         architecture: [linux/amd64]
+        java-version: [ 17 ]
     env:
       PLATFORM: ${{ matrix.architecture }}
     steps:
