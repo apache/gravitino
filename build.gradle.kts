@@ -115,9 +115,7 @@ allprojects {
   plugins.withType<com.diffplug.gradle.spotless.SpotlessPlugin>().configureEach {
     configure<com.diffplug.gradle.spotless.SpotlessExtension> {
       java {
-        // Fix the Google Java Format version to 1.7. Since JDK8 only support Google Java Format
-        // 1.7, which is not compatible with JDK17. We will use a newer version when we upgrade to
-        // JDK17.
+        // 1.15.0 supports both JDK8 and JDK17.
         googleJavaFormat("1.15.0")
         removeUnusedImports()
         trimTrailingWhitespace()

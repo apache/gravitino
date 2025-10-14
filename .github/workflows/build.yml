@@ -135,6 +135,9 @@ jobs:
       - name: Build with Gradle
         run: ./gradlew build -PskipITs -PjdkVersion=${{ matrix.java-version }} -PskipDockerTests=false -x :clients:client-python:build
 
+      - name: Release with Gradle
+        run: ./gradlew release -x test -PjdkVersion=${{ matrix.java-version }}
+
       - name: Upload unit tests report
         uses: actions/upload-artifact@v4
         if: failure()
