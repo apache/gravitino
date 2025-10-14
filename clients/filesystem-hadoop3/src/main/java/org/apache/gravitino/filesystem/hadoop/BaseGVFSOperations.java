@@ -701,7 +701,13 @@ public abstract class BaseGVFSOperations implements Closeable {
     // https://github.com/apache/gravitino/issues/5609
     resetFileSystemServiceLoader(scheme);
 
-    return provider.getFileSystem(actualFilePath, allProperties);
+    FileSystem fs;
+    if (scheme.equals("hdfs")) {
+      fs = new HDFSAuthenticationFileSystem(actualFilePath, conf);
+    } else {
+      fs = provider.getFileSystem(actualFilePath, allProperties);
+    }
+    return fs;
   }
 
   private void resetFileSystemServiceLoader(String fsScheme) {
