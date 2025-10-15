@@ -154,14 +154,8 @@ public class TestCacheConfig {
 
     Thread.sleep(1000);
 
-    // There should no tag entities in the cache, because the weight of each tag entity is 200 that
-    // is higher than the maximum weight of the fileset entity which is 100.
-    //    for (int i = 0; i < 4; i++) {
-    //      NameIdentifier tagNameIdent = NameIdentifierUtil.ofTag("metalake", "tag" + i);
-    //      Assertions.assertNull(
-    //          cache.getIfPresent(EntityCacheRelationKey.of(tagNameIdent, Entity.EntityType.TAG)));
-    //    }
-
+    // There should no tag entities in the cache, because the weight of each tag entity is 100 that
+    // is higher than the maximum weight of the fileset entity which is 200.
     Awaitility.await()
         .atMost(Duration.ofSeconds(5))
         .pollInterval(Duration.ofMillis(10))
