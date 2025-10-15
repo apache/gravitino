@@ -575,6 +575,26 @@ INSERT INTO t values(1);
 SELECT * FROM t;
 ```
 
+### Exploring Apache Iceberg with PyIceberg
+
+```python
+from pyiceberg.catalog import load_catalog
+
+catalog = load_catalog(
+    "my_rest_catalog", 
+    **{
+        "type": "rest",
+        "uri": "http://localhost:9001/iceberg",
+        "header.X-Iceberg-Access-Delegation":"vended-credentials",
+        "auth": {"type": "noop"},
+    }
+)
+
+table_identifier = "db.table"
+table = catalog.load_table(table_identifier)
+print(table.scan().to_arrow())
+```
+
 ## Docker instructions
 
 You could run Gravitino Iceberg REST server though docker container:
