@@ -20,6 +20,7 @@ package org.apache.gravitino.storage.relational;
 
 import static org.apache.gravitino.Configs.ENTITY_RELATIONAL_STORE;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
 import java.util.List;
@@ -57,6 +58,11 @@ public class RelationalEntityStore implements EntityStore, SupportsRelationOpera
   private RelationalBackend backend;
   private RelationalGarbageCollector garbageCollector;
   private EntityCache cache;
+
+  @VisibleForTesting
+  public EntityCache getCache() {
+    return cache;
+  }
 
   @Override
   public void initialize(Config config) throws RuntimeException {

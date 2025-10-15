@@ -23,6 +23,7 @@ import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import com.github.benmanes.caffeine.cache.RemovalCause;
 import com.github.benmanes.caffeine.cache.stats.CacheStats;
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
@@ -131,6 +132,11 @@ public class CaffeineEntityCache extends BaseEntityCache {
       this.scheduler = Executors.newSingleThreadScheduledExecutor();
       startCacheStatsMonitor();
     }
+  }
+
+  @VisibleForTesting
+  public Cache<EntityCacheRelationKey, List<Entity>> getCacheData() {
+    return this.cacheData;
   }
 
   /** {@inheritDoc} */
