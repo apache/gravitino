@@ -299,6 +299,10 @@ For other Iceberg s3 properties not managed by Gravitino like `s3.sse.type`, you
 
 Please refer to [S3 credentials](./security/credential-vending.md#s3-credentials) for credential related configurations.
 
+:::caution
+To resolve Log4j class conflict issues that may arise when using Iceberg AWS 1.9 bundle jars alongside the Gravitino Iceberg REST server, it is recommended to remove the Log4j JAR files (specifically log4j-core and log4j-api) from the `iceberg-rest-server/libs` directory.
+:::
+
 :::info
 To configure the JDBC catalog backend, set the `gravitino.iceberg-rest.warehouse` parameter to `s3://{bucket_name}/${prefix_name}`. For the Hive catalog backend, set `gravitino.iceberg-rest.warehouse` to `s3a://{bucket_name}/${prefix_name}`. Additionally, download the [Iceberg AWS bundle](https://mvnrepository.com/artifact/org.apache.iceberg/iceberg-aws-bundle) and place it in the classpath of Iceberg REST server.
 :::
@@ -571,6 +575,26 @@ INSERT INTO t values(1);
 SELECT * FROM t;
 ```
 
+### Exploring Apache Iceberg with PyIceberg
+
+```python
+from pyiceberg.catalog import load_catalog
+
+catalog = load_catalog(
+    "my_rest_catalog", 
+    **{
+        "type": "rest",
+        "uri": "http://localhost:9001/iceberg",
+        "header.X-Iceberg-Access-Delegation":"vended-credentials",
+        "auth": {"type": "noop"},
+    }
+)
+
+table_identifier = "db.table"
+table = catalog.load_table(table_identifier)
+print(table.scan().to_arrow())
+```
+
 ## Docker instructions
 
 You could run Gravitino Iceberg REST server though docker container:
@@ -611,6 +635,7 @@ Gravitino Iceberg REST server in docker image could access local storage by defa
 | `GRAVITINO_OSS_REGION`                 | `gravitino.iceberg-rest.oss-region`                 | 0.8.0-incubating |
 | `GRAVITINO_OSS_ROLE_ARN`               | `gravitino.iceberg-rest.oss-role-arn`               | 0.8.0-incubating |
 | `GRAVITINO_OSS_EXTERNAL_ID`            | `gravitino.iceberg-rest.oss-external-id`            | 0.8.0-incubating |
+| `GRAVITINO_ICEBERG_REST_HTTP_PORT`     | `gravitino.iceberg-rest.httpPort`                   | 1.1.0            |
 
 The below environment is deprecated, please use the corresponding configuration items instead.
 

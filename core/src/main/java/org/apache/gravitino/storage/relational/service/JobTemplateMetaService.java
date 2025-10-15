@@ -20,12 +20,16 @@ package org.apache.gravitino.storage.relational.service;
 
 import static org.apache.gravitino.metrics.source.MetricsSource.GRAVITINO_RELATIONAL_STORE_METRIC_NAME;
 
+import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.util.List;
 import java.util.Locale;
+import java.util.Objects;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.apache.gravitino.Entity;
+import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
@@ -68,21 +72,7 @@ public class JobTemplateMetaService {
       metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
       baseMetricName = "getJobTemplateByIdentifier")
   public JobTemplateEntity getJobTemplateByIdentifier(NameIdentifier jobTemplateIdent) {
-    String metalakeName = jobTemplateIdent.namespace().level(0);
-    String jobTemplateName = jobTemplateIdent.name();
-
-    JobTemplatePO jobTemplatePO =
-        SessionUtils.getWithoutCommit(
-            JobTemplateMetaMapper.class,
-            mapper -> mapper.selectJobTemplatePOByMetalakeAndName(metalakeName, jobTemplateName));
-
-    if (jobTemplatePO == null) {
-      throw new NoSuchEntityException(
-          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
-          Entity.EntityType.JOB_TEMPLATE.name().toLowerCase(Locale.ROOT),
-          jobTemplateName);
-    }
-
+    JobTemplatePO jobTemplatePO = getJobTemplatePO(jobTemplateIdent);
     return JobTemplatePO.fromJobTemplatePO(jobTemplatePO, jobTemplateIdent.namespace());
   }
 
@@ -147,5 +137,71 @@ public class JobTemplateMetaService {
     return SessionUtils.doWithCommitAndFetchResult(
         JobTemplateMetaMapper.class,
         mapper -> mapper.deleteJobTemplateMetasByLegacyTimeline(legacyTimeline, limit));
+  }
+
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "updateJobTemplate")
+  public <E extends Entity & HasIdentifier> JobTemplateEntity updateJobTemplate(
+      NameIdentifier jobTemplateIdent, Function<E, E> updater) throws IOException {
+    JobTemplatePO oldJobTemplatePO = getJobTemplatePO(jobTemplateIdent);
+    JobTemplateEntity oldJobTemplateEntity =
+        JobTemplatePO.fromJobTemplatePO(oldJobTemplatePO, jobTemplateIdent.namespace());
+    JobTemplateEntity newJobTemplateEntity =
+        (JobTemplateEntity) updater.apply((E) oldJobTemplateEntity);
+    Preconditions.checkArgument(
+        Objects.equals(oldJobTemplateEntity.id(), newJobTemplateEntity.id()),
+        "The updated job templated id: %s is not equal to the old one: %s, which is unexpected",
+        newJobTemplateEntity.id(),
+        oldJobTemplateEntity.id());
+
+    JobTemplatePO.JobTemplatePOBuilder newBuilder =
+        JobTemplatePO.builder().withMetalakeId(oldJobTemplatePO.metalakeId());
+    JobTemplatePO newJobTemplatePO =
+        JobTemplatePO.updateJobTemplatePO(oldJobTemplatePO, newJobTemplateEntity, newBuilder);
+
+    Integer result;
+    try {
+      result =
+          SessionUtils.doWithCommitAndFetchResult(
+              JobTemplateMetaMapper.class,
+              mapper -> mapper.updateJobTemplateMeta(newJobTemplatePO, oldJobTemplatePO));
+    } catch (RuntimeException e) {
+      ExceptionUtils.checkSQLException(
+          e, Entity.EntityType.JOB_TEMPLATE, oldJobTemplateEntity.name());
+      throw e;
+    }
+
+    if (result == null || result == 0) {
+      throw new NoSuchEntityException(
+          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
+          Entity.EntityType.JOB_TEMPLATE.name().toLowerCase(Locale.ROOT),
+          oldJobTemplateEntity.name());
+    } else if (result > 1) {
+      throw new IOException(
+          String.format(
+              "Failed to update job template: %s, because more than one rows are updated: %d",
+              oldJobTemplateEntity.name(), result));
+    } else {
+      return newJobTemplateEntity;
+    }
+  }
+
+  private JobTemplatePO getJobTemplatePO(NameIdentifier jobTemplateIdent) {
+    String metalakeName = jobTemplateIdent.namespace().level(0);
+    String jobTemplateName = jobTemplateIdent.name();
+
+    JobTemplatePO jobTemplatePO =
+        SessionUtils.getWithoutCommit(
+            JobTemplateMetaMapper.class,
+            mapper -> mapper.selectJobTemplatePOByMetalakeAndName(metalakeName, jobTemplateName));
+
+    if (jobTemplatePO == null) {
+      throw new NoSuchEntityException(
+          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
+          Entity.EntityType.JOB_TEMPLATE.name().toLowerCase(Locale.ROOT),
+          jobTemplateName);
+    }
+    return jobTemplatePO;
   }
 }

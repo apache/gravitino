@@ -32,7 +32,7 @@ public class ListUsersPreEvent extends UserPreEvent {
    * @param initiator the user who initiated the list-user request.
    * @param metalake the metalake name to list users from.
    */
-  protected ListUsersPreEvent(String initiator, String metalake) {
+  public ListUsersPreEvent(String initiator, String metalake) {
     super(initiator, NameIdentifier.of(metalake));
   }
 

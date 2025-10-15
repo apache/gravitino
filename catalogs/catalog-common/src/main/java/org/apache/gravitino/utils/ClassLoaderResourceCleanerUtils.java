@@ -126,13 +126,13 @@ public class ClassLoaderResourceCleanerUtils {
       clearThreadLocalMap(thread, classLoader);
       // Close all threads that are using the FilesetCatalogOperations class loader
       if (runningWithClassLoader(thread, classLoader)) {
-        LOG.info("Interrupting thread: {}", thread.getName());
+        LOG.debug("Interrupting thread: {}", thread.getName());
         thread.setContextClassLoader(null);
         thread.interrupt();
         try {
           thread.join(500);
         } catch (InterruptedException e) {
-          LOG.warn("Failed to join thread: {}", thread.getName(), e);
+          LOG.debug("Failed to join thread: {}", thread.getName(), e);
         }
       }
     }
@@ -178,7 +178,7 @@ public class ClassLoaderResourceCleanerUtils {
             if (value != null
                 && value.getClass().getClassLoader() != null
                 && value.getClass().getClassLoader() == targetClassLoader) {
-              LOG.info(
+              LOG.debug(
                   "Cleaning up thread local {} for thread {} with custom class loader",
                   value,
                   thread.getName());
@@ -188,7 +188,7 @@ public class ClassLoaderResourceCleanerUtils {
         }
       }
     } catch (Exception e) {
-      LOG.warn("Failed to clean up thread locals for thread {}", thread.getName(), e);
+      LOG.debug("Failed to clean up thread locals for thread {}", thread.getName(), e);
     }
   }
 
@@ -221,6 +221,19 @@ public class ClassLoaderResourceCleanerUtils {
    */
   private static void releaseLogFactoryInCommonLogging(ClassLoader currentClassLoader)
       throws Exception {
+
+    // If we use fileset with the local file system, HTrace will be used, so we need to
+    // release the HTrace LogFactory as well.
+    try {
+      Class<?> htraceLogFactoryClass =
+          Class.forName(
+              "org.apache.htrace.shaded.commons.logging.LogFactory", true, currentClassLoader);
+      MethodUtils.invokeStaticMethod(htraceLogFactoryClass, "release", currentClassLoader);
+    } catch (Exception e) {
+      // Ignore if htrace is not used
+      LOG.debug("HTrace is not used, skipping release of HTrace LogFactory...");
+    }
+
     // Release the LogFactory for the FilesetCatalogOperations class loader
     Class<?> logFactoryClass =
         Class.forName("org.apache.commons.logging.LogFactory", true, currentClassLoader);
@@ -297,7 +310,7 @@ public class ClassLoaderResourceCleanerUtils {
     try {
       consumer.accept(value);
     } catch (Exception e) {
-      LOG.warn("Failed to execute consumer: ", e);
+      LOG.debug("Failed to execute consumer: ", e);
     }
   }
 }

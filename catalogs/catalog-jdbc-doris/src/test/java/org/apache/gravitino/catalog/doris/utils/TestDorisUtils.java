@@ -191,4 +191,18 @@ public class TestDorisUtils {
         DorisUtils.extractDistributionInfoFromSql(createTableSqlWithRandomAuto);
     assertEquals(distribution3.number(), -1);
   }
+
+  @Test
+  public void testExtractBucketNumFromSql() {
+    String createTableSql =
+        "CREATE TABLE `testTable` (\n`col1` int NOT NULL\n) ENGINE=OLAP\n DISTRIBUTED BY HASH(`col1`) BUCKETS 8";
+    Distribution distribution = DorisUtils.extractDistributionInfoFromSql(createTableSql);
+    assertEquals(8, distribution.number());
+
+    String createTableSqlWithoutBucket =
+        "CREATE TABLE `testTable` (\n`col1` int NOT NULL\n) ENGINE=OLAP\n DISTRIBUTED BY HASH(`col1`)";
+    Distribution distributionDefault =
+        DorisUtils.extractDistributionInfoFromSql(createTableSqlWithoutBucket);
+    assertEquals(1, distributionDefault.number());
+  }
 }

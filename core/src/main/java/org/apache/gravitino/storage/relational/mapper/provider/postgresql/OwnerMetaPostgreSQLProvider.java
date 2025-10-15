@@ -35,8 +35,8 @@ public class OwnerMetaPostgreSQLProvider extends OwnerMetaBaseSQLProvider {
       Long metadataObjectId, String metadataObjectType) {
     return "UPDATE "
         + OWNER_TABLE_NAME
-        + " SET deleted_at = floor(extract(epoch from(current_timestamp - "
-        + " timestamp '1970-01-01 00:00:00')) *1000 )"
+        + " SET deleted_at = floor(extract(epoch from(current_timestamp -"
+        + " timestamp '1970-01-01 00:00:00')) * 1000)"
         + " WHERE metadata_object_id = #{metadataObjectId} AND metadata_object_type = #{metadataObjectType} AND deleted_at = 0";
   }
 
@@ -44,52 +44,52 @@ public class OwnerMetaPostgreSQLProvider extends OwnerMetaBaseSQLProvider {
   public String softDeleteOwnerRelByOwnerIdAndType(Long ownerId, String ownerType) {
     return "UPDATE "
         + OWNER_TABLE_NAME
-        + " SET deleted_at = floor(extract(epoch from(current_timestamp - "
-        + " timestamp '1970-01-01 00:00:00')) *1000 )"
+        + " SET deleted_at = floor(extract(epoch from(current_timestamp -"
+        + " timestamp '1970-01-01 00:00:00')) * 1000)"
         + " WHERE owner_id = #{ownerId} AND owner_type = #{ownerType} AND deleted_at = 0";
   }
 
   @Override
   public String softDeleteOwnerRelByMetalakeId(Long metalakeId) {
-    return "UPDATE  "
+    return "UPDATE "
         + OWNER_TABLE_NAME
-        + " SET deleted_at = floor(extract(epoch from(current_timestamp - "
-        + " timestamp '1970-01-01 00:00:00')) *1000 )"
-        + " WHERE metalake_id = #{metalakeId} AND deleted_at =0";
+        + " SET deleted_at = floor(extract(epoch from(current_timestamp -"
+        + " timestamp '1970-01-01 00:00:00')) * 1000)"
+        + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0";
   }
 
   @Override
   public String softDeleteOwnerRelByCatalogId(Long catalogId) {
-    return "UPDATE  "
+    return "UPDATE "
         + OWNER_TABLE_NAME
-        + " ot SET deleted_at = floor(extract(epoch from(current_timestamp - "
-        + " timestamp '1970-01-01 00:00:00')) *1000 )"
+        + " ot SET deleted_at = floor(extract(epoch from(current_timestamp -"
+        + " timestamp '1970-01-01 00:00:00')) * 1000)"
         + " WHERE ot.deleted_at = 0 AND EXISTS ("
         + " SELECT ct.catalog_id FROM "
         + CatalogMetaMapper.TABLE_NAME
-        + " ct WHERE ct.catalog_id = #{catalogId} AND "
-        + "ct.catalog_id = ot.metadata_object_id AND ot.metadata_object_type = 'CATALOG'"
-        + " UNION "
+        + " ct WHERE ct.catalog_id = #{catalogId} AND"
+        + " ct.catalog_id = ot.metadata_object_id AND ot.metadata_object_type = 'CATALOG'"
+        + " UNION"
         + " SELECT st.catalog_id FROM "
         + SchemaMetaMapper.TABLE_NAME
-        + " st WHERE st.catalog_id = #{catalogId} AND "
-        + "st.schema_id = ot.metadata_object_id AND ot.metadata_object_type = 'SCHEMA'"
-        + " UNION "
+        + " st WHERE st.catalog_id = #{catalogId} AND"
+        + " st.schema_id = ot.metadata_object_id AND ot.metadata_object_type = 'SCHEMA'"
+        + " UNION"
         + " SELECT tt.catalog_id FROM "
         + TopicMetaMapper.TABLE_NAME
-        + " tt WHERE tt.catalog_id = #{catalogId} AND "
-        + "tt.topic_id = ot.metadata_object_id AND ot.metadata_object_type = 'TOPIC'"
-        + " UNION "
+        + " tt WHERE tt.catalog_id = #{catalogId} AND"
+        + " tt.topic_id = ot.metadata_object_id AND ot.metadata_object_type = 'TOPIC'"
+        + " UNION"
         + " SELECT tat.catalog_id FROM "
         + TableMetaMapper.TABLE_NAME
-        + " tat WHERE tat.catalog_id = #{catalogId} AND "
-        + "tat.table_id = ot.metadata_object_id AND ot.metadata_object_type = 'TABLE'"
-        + " UNION "
+        + " tat WHERE tat.catalog_id = #{catalogId} AND"
+        + " tat.table_id = ot.metadata_object_id AND ot.metadata_object_type = 'TABLE'"
+        + " UNION"
         + " SELECT ft.catalog_id FROM "
         + FilesetMetaMapper.META_TABLE_NAME
         + " ft WHERE ft.catalog_id = #{catalogId} AND"
         + " ft.fileset_id = ot.metadata_object_id AND ot.metadata_object_type = 'FILESET'"
-        + " UNION "
+        + " UNION"
         + " SELECT mt.catalog_id FROM "
         + ModelMetaMapper.TABLE_NAME
         + " mt WHERE mt.catalog_id = #{catalogId} AND"
@@ -99,34 +99,34 @@ public class OwnerMetaPostgreSQLProvider extends OwnerMetaBaseSQLProvider {
 
   @Override
   public String softDeleteOwnerRelBySchemaId(Long schemaId) {
-    return "UPDATE  "
+    return "UPDATE "
         + OWNER_TABLE_NAME
-        + " ot SET deleted_at = floor(extract(epoch from(current_timestamp - timestamp '1970-01-01 00:00:00')) * 1000) "
+        + " ot SET deleted_at = floor(extract(epoch from(current_timestamp - timestamp '1970-01-01 00:00:00')) * 1000)"
         + " WHERE ot.deleted_at = 0 AND EXISTS ("
         + " SELECT st.schema_id FROM "
         + SchemaMetaMapper.TABLE_NAME
-        + " st WHERE st.schema_id = #{schemaId} "
+        + " st WHERE st.schema_id = #{schemaId}"
         + " AND st.schema_id = ot.metadata_object_id AND ot.metadata_object_type = 'SCHEMA'"
-        + " UNION "
+        + " UNION"
         + " SELECT tt.schema_id FROM "
         + TopicMetaMapper.TABLE_NAME
-        + " tt WHERE tt.schema_id = #{schemaId} AND "
-        + "tt.topic_id = ot.metadata_object_id AND ot.metadata_object_type = 'TOPIC'"
-        + " UNION "
+        + " tt WHERE tt.schema_id = #{schemaId} AND"
+        + " tt.topic_id = ot.metadata_object_id AND ot.metadata_object_type = 'TOPIC'"
+        + " UNION"
         + " SELECT tat.schema_id FROM "
         + TableMetaMapper.TABLE_NAME
-        + " tat WHERE tat.schema_id = #{schemaId} AND "
-        + "tat.table_id = ot.metadata_object_id AND ot.metadata_object_type = 'TABLE'"
-        + " UNION "
+        + " tat WHERE tat.schema_id = #{schemaId} AND"
+        + " tat.table_id = ot.metadata_object_id AND ot.metadata_object_type = 'TABLE'"
+        + " UNION"
         + " SELECT ft.schema_id FROM "
         + FilesetMetaMapper.META_TABLE_NAME
-        + " ft WHERE ft.schema_id = #{schemaId} AND "
-        + "ft.fileset_id = ot.metadata_object_id AND ot.metadata_object_type = 'FILESET'"
-        + " UNION "
+        + " ft WHERE ft.schema_id = #{schemaId} AND"
+        + " ft.fileset_id = ot.metadata_object_id AND ot.metadata_object_type = 'FILESET'"
+        + " UNION"
         + " SELECT mt.schema_id FROM "
         + ModelMetaMapper.TABLE_NAME
-        + " mt WHERE mt.schema_id = #{schemaId} AND "
-        + "mt.model_id = ot.metadata_object_id AND ot.metadata_object_type = 'MODEL'"
+        + " mt WHERE mt.schema_id = #{schemaId} AND"
+        + " mt.model_id = ot.metadata_object_id AND ot.metadata_object_type = 'MODEL'"
         + ")";
   }
 

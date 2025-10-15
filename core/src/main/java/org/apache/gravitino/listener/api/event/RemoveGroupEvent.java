@@ -38,7 +38,7 @@ public class RemoveGroupEvent extends GroupEvent {
    * @param isExists {@code true} if the group was successfully removed, {@code false} if there was
    *     no such group in the metalake.
    */
-  protected RemoveGroupEvent(
+  public RemoveGroupEvent(
       String initiator, String metalake, String removedGroupName, boolean isExists) {
     super(initiator, NameIdentifierUtil.ofGroup(metalake, removedGroupName));
 
