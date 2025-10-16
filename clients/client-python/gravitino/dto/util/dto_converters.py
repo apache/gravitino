@@ -25,6 +25,8 @@ from gravitino.api.rel.expressions.function_expression import FunctionExpression
 from gravitino.api.rel.expressions.literals.literals import Literals
 from gravitino.api.rel.expressions.named_reference import NamedReference
 from gravitino.api.rel.expressions.unparsed_expression import UnparsedExpression
+from gravitino.api.rel.indexes.index import Index
+from gravitino.api.rel.indexes.indexes import Indexes
 from gravitino.api.rel.types.types import Types
 from gravitino.dto.rel.distribution_dto import DistributionDTO
 from gravitino.dto.rel.expressions.field_reference_dto import FieldReferenceDTO
@@ -32,6 +34,7 @@ from gravitino.dto.rel.expressions.func_expression_dto import FuncExpressionDTO
 from gravitino.dto.rel.expressions.function_arg import FunctionArg
 from gravitino.dto.rel.expressions.literal_dto import LiteralDTO
 from gravitino.dto.rel.expressions.unparsed_expression_dto import UnparsedExpressionDTO
+from gravitino.dto.rel.indexes.index_dto import IndexDTO
 from gravitino.exceptions.base import IllegalArgumentException
 
 
@@ -105,3 +108,16 @@ class DTOConverters:
             dto.number(),
             *DTOConverters.from_function_args(dto.args()),
         )
+
+    @from_dto.register
+    @staticmethod
+    def _(dto: IndexDTO) -> Index:
+        """Converts an IndexDTO to an Index.
+
+        Args:
+            dto (IndexDTO): The Index DTO to be converted.
+
+        Returns:
+            Index: The index.
+        """
+        return Indexes.of(dto.type(), dto.name(), dto.field_names())
