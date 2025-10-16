@@ -21,12 +21,15 @@ from random import randint, random
 from typing import cast
 from unittest.mock import MagicMock, patch
 
+from gravitino.api.rel.expressions.distributions.distributions import Distributions
+from gravitino.api.rel.expressions.distributions.strategy import Strategy
 from gravitino.api.rel.expressions.expression import Expression
 from gravitino.api.rel.expressions.function_expression import FunctionExpression
 from gravitino.api.rel.expressions.literals.literals import Literals
 from gravitino.api.rel.expressions.named_reference import FieldReference
 from gravitino.api.rel.expressions.unparsed_expression import UnparsedExpression
 from gravitino.api.rel.types.types import Types
+from gravitino.dto.rel.distribution_dto import DistributionDTO
 from gravitino.dto.rel.expressions.field_reference_dto import FieldReferenceDTO
 from gravitino.dto.rel.expressions.func_expression_dto import FuncExpressionDTO
 from gravitino.dto.rel.expressions.function_arg import FunctionArg
@@ -145,4 +148,22 @@ class TestDTOConverters(unittest.TestCase):
         self.assertListEqual(converted, expected)
         self.assertListEqual(
             DTOConverters.from_function_args([]), Expression.EMPTY_EXPRESSION
+        )
+
+    def test_from_dto_distribution(self):
+        field_names = [f"field_{i}" for i in range(2)]
+        field_ref_dtos = [
+            FieldReferenceDTO.builder().with_field_name(field_name=[field_name]).build()
+            for field_name in field_names
+        ]
+        distribution_dto = DistributionDTO(
+            strategy=Strategy.HASH, number=4, args=field_ref_dtos
+        )
+        expected = Distributions.of(
+            Strategy.HASH, 4, *DTOConverters.from_function_args(field_ref_dtos)
+        )
+        converted = DTOConverters.from_dto(distribution_dto)
+        self.assertTrue(converted == expected)
+        self.assertTrue(
+            DTOConverters.from_dto(DistributionDTO.NONE) == Distributions.NONE
         )
