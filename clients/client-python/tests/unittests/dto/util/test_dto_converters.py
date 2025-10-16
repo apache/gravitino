@@ -28,6 +28,8 @@ from gravitino.api.rel.expressions.function_expression import FunctionExpression
 from gravitino.api.rel.expressions.literals.literals import Literals
 from gravitino.api.rel.expressions.named_reference import FieldReference
 from gravitino.api.rel.expressions.unparsed_expression import UnparsedExpression
+from gravitino.api.rel.indexes.index import Index
+from gravitino.api.rel.indexes.indexes import Indexes
 from gravitino.api.rel.types.types import Types
 from gravitino.dto.rel.distribution_dto import DistributionDTO
 from gravitino.dto.rel.expressions.field_reference_dto import FieldReferenceDTO
@@ -35,6 +37,7 @@ from gravitino.dto.rel.expressions.func_expression_dto import FuncExpressionDTO
 from gravitino.dto.rel.expressions.function_arg import FunctionArg
 from gravitino.dto.rel.expressions.literal_dto import LiteralDTO
 from gravitino.dto.rel.expressions.unparsed_expression_dto import UnparsedExpressionDTO
+from gravitino.dto.rel.indexes.index_dto import IndexDTO
 from gravitino.dto.util.dto_converters import DTOConverters
 from gravitino.exceptions.base import IllegalArgumentException
 
@@ -167,3 +170,23 @@ class TestDTOConverters(unittest.TestCase):
         self.assertTrue(
             DTOConverters.from_dto(DistributionDTO.NONE) == Distributions.NONE
         )
+
+    def test_from_dto_index(self):
+        field_names = [[f"field_{i}"] for i in range(2)]
+
+        index_dto = IndexDTO(
+            index_type=Index.IndexType.PRIMARY_KEY,
+            name="PRIMARY",
+            field_names=field_names,
+        )
+        converted = DTOConverters.from_dto(index_dto)
+        expected = Indexes.of(Index.IndexType.PRIMARY_KEY, "PRIMARY", field_names)
+        self.assertTrue(converted.type() == expected.type())
+        self.assertTrue(converted.name() == expected.name())
+        self.assertListEqual(converted.field_names(), expected.field_names())
+
+    def test_from_dto_raises_exception(self):
+        with self.assertRaisesRegex(
+            IllegalArgumentException, "Unsupported expression type"
+        ):
+            DTOConverters.from_dto("")
