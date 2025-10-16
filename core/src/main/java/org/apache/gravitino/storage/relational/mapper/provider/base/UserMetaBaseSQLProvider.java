@@ -53,10 +53,10 @@ public class UserMetaBaseSQLProvider {
   public String insertUserMeta(@Param("userMeta") UserPO userPO) {
     return "INSERT INTO "
         + USER_TABLE_NAME
-        + "(user_id, user_name,"
+        + " (user_id, user_name,"
         + " metalake_id, audit_info,"
         + " current_version, last_version, deleted_at)"
-        + " VALUES("
+        + " VALUES ("
         + " #{userMeta.userId},"
         + " #{userMeta.userName},"
         + " #{userMeta.metalakeId},"
@@ -70,10 +70,10 @@ public class UserMetaBaseSQLProvider {
   public String insertUserMetaOnDuplicateKeyUpdate(@Param("userMeta") UserPO userPO) {
     return "INSERT INTO "
         + USER_TABLE_NAME
-        + "(user_id, user_name,"
-        + "metalake_id, audit_info,"
+        + " (user_id, user_name,"
+        + " metalake_id, audit_info,"
         + " current_version, last_version, deleted_at)"
-        + " VALUES("
+        + " VALUES ("
         + " #{userMeta.userId},"
         + " #{userMeta.userName},"
         + " #{userMeta.metalakeId},"

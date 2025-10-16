@@ -39,13 +39,19 @@ public interface Tag extends Auditable {
    */
   String PROPERTY_COLOR = "color";
 
-  /** @return The name of the tag. */
+  /**
+   * @return The name of the tag.
+   */
   String name();
 
-  /** @return The comment of the tag. */
+  /**
+   * @return The comment of the tag.
+   */
   String comment();
 
-  /** @return The properties of the tag. */
+  /**
+   * @return The properties of the tag.
+   */
   Map<String, String> properties();
 
   /**
@@ -60,7 +66,9 @@ public interface Tag extends Auditable {
    */
   Optional<Boolean> inherited();
 
-  /** @return The associated objects of the tag. */
+  /**
+   * @return The associated objects of the tag.
+   */
   default AssociatedObjects associatedObjects() {
     throw new UnsupportedOperationException("The associatedObjects method is not supported.");
   }
@@ -68,13 +76,17 @@ public interface Tag extends Auditable {
   /** The interface of the associated objects of the tag. */
   interface AssociatedObjects {
 
-    /** @return The number of objects that are associated with this Tag */
+    /**
+     * @return The number of objects that are associated with this Tag
+     */
     default int count() {
       MetadataObject[] objects = objects();
       return objects == null ? 0 : objects.length;
     }
 
-    /** @return The list of objects that are associated with this tag. */
+    /**
+     * @return The list of objects that are associated with this tag.
+     */
     MetadataObject[] objects();
   }
 }

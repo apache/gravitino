@@ -110,7 +110,9 @@ public interface NamedReference extends Expression {
       return Arrays.hashCode(fieldName);
     }
 
-    /** @return The string representation of the field reference. */
+    /**
+     * @return The string representation of the field reference.
+     */
     @Override
     public String toString() {
       return String.join(".", fieldName);

@@ -71,12 +71,12 @@ jobs:
       - name: Python Client Integration Test
         id: integrationTest
         run: |
-          ./gradlew compileDistribution -x test -PjdkVersion=${{ matrix.java-version }}
+          ./gradlew compileDistribution -x test 
 
           for pythonVersion in "3.9" "3.10" "3.11" "3.12"
           do
             echo "Use Python version ${pythonVersion} to test the Python client."
-            ./gradlew -PjdkVersion=${{ matrix.java-version }} -PpythonVersion=${pythonVersion} -PskipDockerTests=false :clients:client-python:test
+            ./gradlew -PpythonVersion=${pythonVersion} -PskipDockerTests=false :clients:client-python:test
             # Clean Gravitino database to clean test data
             rm -rf ./distribution/package/data
           done

@@ -59,7 +59,7 @@ public class GroupMetaH2Provider extends GroupMetaBaseSQLProvider {
         + ROLE_TABLE_NAME
         + " WHERE deleted_at = 0)"
         + " AS rot ON rot.role_id = rt.role_id"
-        + " WHERE "
+        + " WHERE"
         + " gt.deleted_at = 0 AND"
         + " gt.metalake_id = #{metalakeId}"
         + " GROUP BY gt.group_id";

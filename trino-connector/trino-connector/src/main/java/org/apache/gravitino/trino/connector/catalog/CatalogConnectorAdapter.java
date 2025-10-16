@@ -30,7 +30,9 @@ import org.apache.gravitino.trino.connector.metadata.GravitinoCatalog;
  */
 public interface CatalogConnectorAdapter {
 
-  /** @return TableProperties list that used to validate table properties. */
+  /**
+   * @return TableProperties list that used to validate table properties.
+   */
   default List<PropertyMetadata<?>> getTableProperties() {
     return emptyList();
   }
@@ -44,18 +46,26 @@ public interface CatalogConnectorAdapter {
    */
   Map<String, String> buildInternalConnectorConfig(GravitinoCatalog catalog) throws Exception;
 
-  /** @return Return internal connector name with Trino. */
+  /**
+   * @return Return internal connector name with Trino.
+   */
   String internalConnectorName();
 
-  /** @return SchemaProperties list that used to validate schema properties. */
+  /**
+   * @return SchemaProperties list that used to validate schema properties.
+   */
   default List<PropertyMetadata<?>> getSchemaProperties() {
     return emptyList();
   }
 
-  /** @return Return MetadataAdapter for special catalog connector. */
+  /**
+   * @return Return MetadataAdapter for special catalog connector.
+   */
   CatalogConnectorMetadataAdapter getMetadataAdapter();
 
-  /** @return ColumnProperties list that used to validate column properties. */
+  /**
+   * @return ColumnProperties list that used to validate column properties.
+   */
   default List<PropertyMetadata<?>> getColumnProperties() {
     return emptyList();
   }

@@ -66,7 +66,7 @@ public class CatalogMetaBaseSQLProvider {
         + "<foreach collection='catalogIds' item='catalogId' separator=','>"
         + "#{catalogId}"
         + "</foreach>"
-        + ") "
+        + " )"
         + " AND deleted_at = 0"
         + "</script>";
   }
@@ -122,7 +122,7 @@ public class CatalogMetaBaseSQLProvider {
     return "SELECT me.metalake_id as metalakeId, ca.catalog_id as catalogId FROM "
         + TABLE_NAME
         + " ca INNER JOIN metalake_meta me ON ca.metalake_id = me.metalake_id"
-        + " WHERE me.metalake_name = #{metalakeName} AND ca.catalog_name = #{catalogName} "
+        + " WHERE me.metalake_name = #{metalakeName} AND ca.catalog_name = #{catalogName}"
         + " AND ca.deleted_at = 0 AND me.deleted_at = 0";
   }
 
@@ -140,10 +140,10 @@ public class CatalogMetaBaseSQLProvider {
   public String insertCatalogMeta(@Param("catalogMeta") CatalogPO catalogPO) {
     return "INSERT INTO "
         + TABLE_NAME
-        + "(catalog_id, catalog_name, metalake_id,"
+        + " (catalog_id, catalog_name, metalake_id,"
         + " type, provider, catalog_comment, properties, audit_info,"
         + " current_version, last_version, deleted_at)"
-        + " VALUES("
+        + " VALUES ("
         + " #{catalogMeta.catalogId},"
         + " #{catalogMeta.catalogName},"
         + " #{catalogMeta.metalakeId},"
@@ -161,10 +161,10 @@ public class CatalogMetaBaseSQLProvider {
   public String insertCatalogMetaOnDuplicateKeyUpdate(@Param("catalogMeta") CatalogPO catalogPO) {
     return "INSERT INTO "
         + TABLE_NAME
-        + "(catalog_id, catalog_name, metalake_id,"
+        + " (catalog_id, catalog_name, metalake_id,"
         + " type, provider, catalog_comment, properties, audit_info,"
         + " current_version, last_version, deleted_at)"
-        + " VALUES("
+        + " VALUES ("
         + " #{catalogMeta.catalogId},"
         + " #{catalogMeta.catalogName},"
         + " #{catalogMeta.metalakeId},"

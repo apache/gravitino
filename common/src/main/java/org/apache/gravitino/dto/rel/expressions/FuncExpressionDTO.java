@@ -33,24 +33,32 @@ public class FuncExpressionDTO implements FunctionExpression, FunctionArg {
     this.functionArgs = functionArgs;
   }
 
-  /** @return The function arguments. */
+  /**
+   * @return The function arguments.
+   */
   public FunctionArg[] args() {
     return functionArgs;
   }
 
-  /** @return The function name. */
+  /**
+   * @return The function name.
+   */
   @Override
   public String functionName() {
     return functionName;
   }
 
-  /** @return The function arguments. */
+  /**
+   * @return The function arguments.
+   */
   @Override
   public Expression[] arguments() {
     return functionArgs;
   }
 
-  /** @return The type of the function argument. */
+  /**
+   * @return The type of the function argument.
+   */
   @Override
   public ArgType argType() {
     return ArgType.FUNCTION;
@@ -96,7 +104,9 @@ public class FuncExpressionDTO implements FunctionExpression, FunctionArg {
     }
   }
 
-  /** @return the builder for creating a new instance of FuncExpressionDTO. */
+  /**
+   * @return the builder for creating a new instance of FuncExpressionDTO.
+   */
   public static Builder builder() {
     return new Builder();
   }

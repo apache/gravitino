@@ -31,9 +31,13 @@ import org.apache.gravitino.rel.expressions.literals.Literal;
 @Evolving
 public interface RangePartition extends Partition {
 
-  /** @return The upper bound of the partition. */
+  /**
+   * @return The upper bound of the partition.
+   */
   Literal<?> upper();
 
-  /** @return The lower bound of the partition. */
+  /**
+   * @return The lower bound of the partition.
+   */
   Literal<?> lower();
 }

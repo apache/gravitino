@@ -39,16 +39,22 @@ import org.apache.gravitino.tag.SupportsTags;
 @Evolving
 public interface Topic extends Auditable {
 
-  /** @return Name of the topic */
+  /**
+   * @return Name of the topic
+   */
   String name();
 
-  /** @return The comment of the topic object. Null is returned if no comment is set. */
+  /**
+   * @return The comment of the topic object. Null is returned if no comment is set.
+   */
   @Nullable
   default String comment() {
     return null;
   }
 
-  /** @return The properties of the topic object. Empty map is returned if no properties are set. */
+  /**
+   * @return The properties of the topic object. Empty map is returned if no properties are set.
+   */
   default Map<String, String> properties() {
     return Collections.emptyMap();
   }

@@ -77,7 +77,7 @@ public class OwnerMetaBaseSQLProvider {
   public String insertOwnerRel(@Param("ownerRelPO") OwnerRelPO ownerRelPO) {
     return "INSERT INTO "
         + OWNER_TABLE_NAME
-        + "(metalake_id, metadata_object_id, metadata_object_type, owner_id, owner_type,"
+        + " (metalake_id, metadata_object_id, metadata_object_type, owner_id, owner_type,"
         + " audit_info, current_version, last_version, deleted_at)"
         + " VALUES ("
         + " #{ownerRelPO.metalakeId},"
@@ -112,44 +112,44 @@ public class OwnerMetaBaseSQLProvider {
   }
 
   public String softDeleteOwnerRelByMetalakeId(@Param("metalakeId") Long metalakeId) {
-    return "UPDATE  "
+    return "UPDATE "
         + OWNER_TABLE_NAME
         + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
         + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
-        + " WHERE metalake_id = #{metalakeId} AND deleted_at =0";
+        + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0";
   }
 
   public String softDeleteOwnerRelByCatalogId(@Param("catalogId") Long catalogId) {
-    return "UPDATE  "
+    return "UPDATE "
         + OWNER_TABLE_NAME
         + " ot SET ot.deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
         + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
         + " WHERE ot.deleted_at = 0 AND EXISTS ("
         + " SELECT ct.catalog_id FROM "
         + CatalogMetaMapper.TABLE_NAME
-        + " ct WHERE ct.catalog_id = #{catalogId} AND "
+        + " ct WHERE ct.catalog_id = #{catalogId} AND"
         + " ct.catalog_id = ot.metadata_object_id AND ot.metadata_object_type = 'CATALOG'"
-        + " UNION "
+        + " UNION"
         + " SELECT st.catalog_id FROM "
         + SchemaMetaMapper.TABLE_NAME
-        + " st WHERE st.catalog_id = #{catalogId} AND "
+        + " st WHERE st.catalog_id = #{catalogId} AND"
         + " st.schema_id = ot.metadata_object_id AND ot.metadata_object_type = 'SCHEMA'"
-        + " UNION "
+        + " UNION"
         + " SELECT tt.catalog_id FROM "
         + TopicMetaMapper.TABLE_NAME
-        + " tt WHERE tt.catalog_id = #{catalogId} AND "
+        + " tt WHERE tt.catalog_id = #{catalogId} AND"
         + " tt.topic_id = ot.metadata_object_id AND ot.metadata_object_type = 'TOPIC'"
-        + " UNION "
+        + " UNION"
         + " SELECT tat.catalog_id FROM "
         + TableMetaMapper.TABLE_NAME
-        + " tat WHERE tat.catalog_id = #{catalogId} AND "
+        + " tat WHERE tat.catalog_id = #{catalogId} AND"
         + " tat.table_id = ot.metadata_object_id AND ot.metadata_object_type = 'TABLE'"
-        + " UNION "
+        + " UNION"
         + " SELECT ft.catalog_id FROM "
         + FilesetMetaMapper.META_TABLE_NAME
         + " ft WHERE ft.catalog_id = #{catalogId} AND"
         + " ft.fileset_id = ot.metadata_object_id AND ot.metadata_object_type = 'FILESET'"
-        + " UNION "
+        + " UNION"
         + " SELECT mt.catalog_id FROM "
         + ModelMetaMapper.TABLE_NAME
         + " mt WHERE mt.catalog_id = #{catalogId} AND"
@@ -158,7 +158,7 @@ public class OwnerMetaBaseSQLProvider {
   }
 
   public String softDeleteOwnerRelBySchemaId(@Param("schemaId") Long schemaId) {
-    return "UPDATE  "
+    return "UPDATE "
         + OWNER_TABLE_NAME
         + " ot SET ot.deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
         + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
@@ -167,25 +167,25 @@ public class OwnerMetaBaseSQLProvider {
         + SchemaMetaMapper.TABLE_NAME
         + " st WHERE st.schema_id = #{schemaId} AND"
         + " st.schema_id = ot.metadata_object_id AND ot.metadata_object_type = 'SCHEMA'"
-        + " UNION "
+        + " UNION"
         + " SELECT tt.schema_id FROM "
         + TopicMetaMapper.TABLE_NAME
-        + " tt WHERE tt.schema_id = #{schemaId} AND "
+        + " tt WHERE tt.schema_id = #{schemaId} AND"
         + " tt.topic_id = ot.metadata_object_id AND ot.metadata_object_type = 'TOPIC'"
-        + " UNION "
+        + " UNION"
         + " SELECT tat.schema_id FROM "
         + TableMetaMapper.TABLE_NAME
-        + " tat WHERE tat.schema_id = #{schemaId} AND "
+        + " tat WHERE tat.schema_id = #{schemaId} AND"
         + " tat.table_id = ot.metadata_object_id AND ot.metadata_object_type = 'TABLE'"
-        + " UNION "
+        + " UNION"
         + " SELECT ft.schema_id FROM "
         + FilesetMetaMapper.META_TABLE_NAME
-        + " ft WHERE ft.schema_id = #{schemaId} AND "
+        + " ft WHERE ft.schema_id = #{schemaId} AND"
         + " ft.fileset_id = ot.metadata_object_id AND ot.metadata_object_type = 'FILESET'"
-        + " UNION "
+        + " UNION"
         + " SELECT mt.schema_id FROM "
         + ModelMetaMapper.TABLE_NAME
-        + " mt WHERE mt.schema_id = #{schemaId} AND "
+        + " mt WHERE mt.schema_id = #{schemaId} AND"
         + " mt.model_id = ot.metadata_object_id AND ot.metadata_object_type = 'MODEL'"
         + ")";
   }

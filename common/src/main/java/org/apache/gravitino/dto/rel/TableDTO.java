@@ -97,55 +97,73 @@ public class TableDTO implements Table {
     this.indexes = indexes;
   }
 
-  /** @return The name of the table. */
+  /**
+   * @return The name of the table.
+   */
   @Override
   public String name() {
     return name;
   }
 
-  /** @return The columns of the table. */
+  /**
+   * @return The columns of the table.
+   */
   @Override
   public Column[] columns() {
     return columns;
   }
 
-  /** @return The comment associated with the table. */
+  /**
+   * @return The comment associated with the table.
+   */
   @Override
   public String comment() {
     return comment;
   }
 
-  /** @return The properties associated with the table. */
+  /**
+   * @return The properties associated with the table.
+   */
   @Override
   public Map<String, String> properties() {
     return properties;
   }
 
-  /** @return The audit information for the table. */
+  /**
+   * @return The audit information for the table.
+   */
   @Override
   public AuditDTO auditInfo() {
     return audit;
   }
 
-  /** @return The partitioning of the table. */
+  /**
+   * @return The partitioning of the table.
+   */
   @Override
   public Transform[] partitioning() {
     return partitioning;
   }
 
-  /** @return The sort orders of the table. */
+  /**
+   * @return The sort orders of the table.
+   */
   @Override
   public SortOrder[] sortOrder() {
     return sortOrders;
   }
 
-  /** @return The distribution of the table. */
+  /**
+   * @return The distribution of the table.
+   */
   @Override
   public Distribution distribution() {
     return distribution;
   }
 
-  /** @return The indexes of the table. */
+  /**
+   * @return The indexes of the table.
+   */
   @Override
   public Index[] index() {
     return indexes;

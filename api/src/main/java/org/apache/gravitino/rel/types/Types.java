@@ -30,7 +30,9 @@ public class Types {
   public static class NullType implements Type {
     private static final NullType INSTANCE = new NullType();
 
-    /** @return The singleton instance of {@link NullType}. */
+    /**
+     * @return The singleton instance of {@link NullType}.
+     */
     public static NullType get() {
       return INSTANCE;
     }
@@ -52,7 +54,9 @@ public class Types {
   public static class BooleanType extends Type.PrimitiveType {
     private static final BooleanType INSTANCE = new BooleanType();
 
-    /** @return The singleton instance of {@link BooleanType}. */
+    /**
+     * @return The singleton instance of {@link BooleanType}.
+     */
     public static BooleanType get() {
       return INSTANCE;
     }
@@ -75,12 +79,16 @@ public class Types {
     private static final ByteType INSTANCE = new ByteType(true);
     private static final ByteType UNSIGNED_INSTANCE = new ByteType(false);
 
-    /** @return The singleton instance of unsigned byte type */
+    /**
+     * @return The singleton instance of unsigned byte type
+     */
     public static ByteType unsigned() {
       return UNSIGNED_INSTANCE;
     }
 
-    /** @return The singleton instance of {@link ByteType}. */
+    /**
+     * @return The singleton instance of {@link ByteType}.
+     */
     public static ByteType get() {
       return INSTANCE;
     }
@@ -105,12 +113,16 @@ public class Types {
     private static final ShortType INSTANCE = new ShortType(true);
     private static final ShortType UNSIGNED_INSTANCE = new ShortType(false);
 
-    /** @return The singleton instance of unsigned short type */
+    /**
+     * @return The singleton instance of unsigned short type
+     */
     public static ShortType unsigned() {
       return UNSIGNED_INSTANCE;
     }
 
-    /** @return The singleton instance of {@link ShortType}. */
+    /**
+     * @return The singleton instance of {@link ShortType}.
+     */
     public static ShortType get() {
       return INSTANCE;
     }
@@ -135,12 +147,16 @@ public class Types {
     private static final IntegerType INSTANCE = new IntegerType(true);
     private static final IntegerType UNSIGNED_INSTANCE = new IntegerType(false);
 
-    /** @return The singleton instance of unsigned integer type */
+    /**
+     * @return The singleton instance of unsigned integer type
+     */
     public static IntegerType unsigned() {
       return UNSIGNED_INSTANCE;
     }
 
-    /** @return The singleton instance of {@link IntegerType}. */
+    /**
+     * @return The singleton instance of {@link IntegerType}.
+     */
     public static IntegerType get() {
       return INSTANCE;
     }
@@ -165,12 +181,16 @@ public class Types {
     private static final LongType INSTANCE = new LongType(true);
     private static final LongType UNSIGNED_INSTANCE = new LongType(false);
 
-    /** @return The singleton instance of unsigned long type */
+    /**
+     * @return The singleton instance of unsigned long type
+     */
     public static LongType unsigned() {
       return UNSIGNED_INSTANCE;
     }
 
-    /** @return The singleton instance of {@link LongType}. */
+    /**
+     * @return The singleton instance of {@link LongType}.
+     */
     public static LongType get() {
       return INSTANCE;
     }
@@ -194,7 +214,9 @@ public class Types {
   public static class FloatType extends Type.FractionType {
     private static final FloatType INSTANCE = new FloatType();
 
-    /** @return The singleton instance of {@link FloatType}. */
+    /**
+     * @return The singleton instance of {@link FloatType}.
+     */
     public static FloatType get() {
       return INSTANCE;
     }
@@ -216,7 +238,9 @@ public class Types {
   public static class DoubleType extends Type.FractionType {
     private static final DoubleType INSTANCE = new DoubleType();
 
-    /** @return The singleton instance of {@link DoubleType}. */
+    /**
+     * @return The singleton instance of {@link DoubleType}.
+     */
     public static DoubleType get() {
       return INSTANCE;
     }
@@ -266,18 +290,24 @@ public class Types {
           scale);
     }
 
-    /** @return The name of the decimal type. */
+    /**
+     * @return The name of the decimal type.
+     */
     @Override
     public Name name() {
       return Name.DECIMAL;
     }
 
-    /** @return The precision of the decimal type. */
+    /**
+     * @return The precision of the decimal type.
+     */
     public int precision() {
       return precision;
     }
 
-    /** @return The scale of the decimal type. */
+    /**
+     * @return The scale of the decimal type.
+     */
     public int scale() {
       return scale;
     }
@@ -309,14 +339,18 @@ public class Types {
   public static class DateType extends Type.DateTimeType {
     private static final DateType INSTANCE = new DateType();
 
-    /** @return The singleton instance of {@link DateType}. */
+    /**
+     * @return The singleton instance of {@link DateType}.
+     */
     public static DateType get() {
       return INSTANCE;
     }
 
     private DateType() {}
 
-    /** @return The name of the date type. */
+    /**
+     * @return The name of the date type.
+     */
     @Override
     public Name name() {
       return Name.DATE;
@@ -332,7 +366,9 @@ public class Types {
   public static class TimeType extends Type.DateTimeType {
     private static final TimeType INSTANCE = new TimeType();
 
-    /** @return The singleton instance of {@link TimeType}. */
+    /**
+     * @return The singleton instance of {@link TimeType}.
+     */
     public static TimeType get() {
       return INSTANCE;
     }
@@ -361,12 +397,16 @@ public class Types {
       this.precision = precision;
     }
 
-    /** @return The precision of the time type. */
+    /**
+     * @return The precision of the time type.
+     */
     public int precision() {
       return precision;
     }
 
-    /** @return True if the time type has precision set, false otherwise. */
+    /**
+     * @return True if the time type has precision set, false otherwise.
+     */
     public boolean hasPrecisionSet() {
       return precision != DATE_TIME_PRECISION_NOT_SET;
     }
@@ -405,12 +445,16 @@ public class Types {
     private static final TimestampType INSTANCE_WITHOUT_TIME_ZONE = new TimestampType(false);
     private static final TimestampType INSTANCE_WITH_TIME_ZONE = new TimestampType(true);
 
-    /** @return A {@link TimestampType} without time zone. */
+    /**
+     * @return A {@link TimestampType} without time zone.
+     */
     public static TimestampType withoutTimeZone() {
       return INSTANCE_WITHOUT_TIME_ZONE;
     }
 
-    /** @return A {@link TimestampType} with time zone. */
+    /**
+     * @return A {@link TimestampType} with time zone.
+     */
     public static TimestampType withTimeZone() {
       return INSTANCE_WITH_TIME_ZONE;
     }
@@ -455,17 +499,23 @@ public class Types {
       this.precision = precision;
     }
 
-    /** @return True if the timestamp type has time zone, false otherwise. */
+    /**
+     * @return True if the timestamp type has time zone, false otherwise.
+     */
     public boolean hasTimeZone() {
       return withTimeZone;
     }
 
-    /** @return The precision of the timestamp type. */
+    /**
+     * @return The precision of the timestamp type.
+     */
     public int precision() {
       return precision;
     }
 
-    /** @return True if the timestamp type has precision set, false otherwise. */
+    /**
+     * @return True if the timestamp type has precision set, false otherwise.
+     */
     public boolean hasPrecisionSet() {
       return precision != DATE_TIME_PRECISION_NOT_SET;
     }
@@ -475,7 +525,9 @@ public class Types {
       return Name.TIMESTAMP;
     }
 
-    /** @return The simple string representation of the timestamp type. */
+    /**
+     * @return The simple string representation of the timestamp type.
+     */
     @Override
     public String simpleString() {
       return hasPrecisionSet()
@@ -508,7 +560,9 @@ public class Types {
   public static class IntervalYearType extends Type.IntervalType {
     private static final IntervalYearType INSTANCE = new IntervalYearType();
 
-    /** @return The singleton instance of {@link IntervalYearType}. */
+    /**
+     * @return The singleton instance of {@link IntervalYearType}.
+     */
     public static IntervalYearType get() {
       return INSTANCE;
     }
@@ -530,7 +584,9 @@ public class Types {
   public static class IntervalDayType extends Type.IntervalType {
     private static final IntervalDayType INSTANCE = new IntervalDayType();
 
-    /** @return The singleton instance of {@link IntervalDayType}. */
+    /**
+     * @return The singleton instance of {@link IntervalDayType}.
+     */
     public static IntervalDayType get() {
       return INSTANCE;
     }
@@ -555,7 +611,9 @@ public class Types {
   public static class StringType extends Type.PrimitiveType {
     private static final StringType INSTANCE = new StringType();
 
-    /** @return The singleton instance of {@link StringType}. */
+    /**
+     * @return The singleton instance of {@link StringType}.
+     */
     public static StringType get() {
       return INSTANCE;
     }
@@ -577,7 +635,9 @@ public class Types {
   public static class UUIDType extends Type.PrimitiveType {
     private static final UUIDType INSTANCE = new UUIDType();
 
-    /** @return The singleton instance of {@link UUIDType}. */
+    /**
+     * @return The singleton instance of {@link UUIDType}.
+     */
     public static UUIDType get() {
       return INSTANCE;
     }
@@ -620,7 +680,9 @@ public class Types {
       return Name.FIXED;
     }
 
-    /** @return The length of the fixed type. */
+    /**
+     * @return The length of the fixed type.
+     */
     public int length() {
       return length;
     }
@@ -670,7 +732,9 @@ public class Types {
       return Name.VARCHAR;
     }
 
-    /** @return The length of the var char type. */
+    /**
+     * @return The length of the var char type.
+     */
     public int length() {
       return length;
     }
@@ -720,7 +784,9 @@ public class Types {
       return Name.FIXEDCHAR;
     }
 
-    /** @return The length of the fixed char type. */
+    /**
+     * @return The length of the fixed char type.
+     */
     public int length() {
       return length;
     }
@@ -752,7 +818,9 @@ public class Types {
   public static class BinaryType extends Type.PrimitiveType {
     private static final BinaryType INSTANCE = new BinaryType();
 
-    /** @return The singleton instance of {@link BinaryType}. */
+    /**
+     * @return The singleton instance of {@link BinaryType}.
+     */
     public static BinaryType get() {
       return INSTANCE;
     }
@@ -789,7 +857,9 @@ public class Types {
       this.fields = fields;
     }
 
-    /** @return The fields of the struct type. */
+    /**
+     * @return The fields of the struct type.
+     */
     public Field[] fields() {
       return fields;
     }
@@ -889,22 +959,30 @@ public class Types {
         this.comment = comment;
       }
 
-      /** @return The name of the field. */
+      /**
+       * @return The name of the field.
+       */
       public String name() {
         return name;
       }
 
-      /** @return The type of the field. */
+      /**
+       * @return The type of the field.
+       */
       public Type type() {
         return type;
       }
 
-      /** @return Whether the field is nullable. */
+      /**
+       * @return Whether the field is nullable.
+       */
       public boolean nullable() {
         return nullable;
       }
 
-      /** @return The comment of the field. May be null if not set. */
+      /**
+       * @return The comment of the field. May be null if not set.
+       */
       public String comment() {
         return comment;
       }
@@ -928,7 +1006,9 @@ public class Types {
         return Objects.hash(name, type, nullable);
       }
 
-      /** @return The simple string representation of the field. */
+      /**
+       * @return The simple string representation of the field.
+       */
       public String simpleString() {
         return String.format(
             "%s: %s %s COMMENT %s",
@@ -984,12 +1064,16 @@ public class Types {
       this.elementNullable = elementNullable;
     }
 
-    /** @return The element type of the list. */
+    /**
+     * @return The element type of the list.
+     */
     public Type elementType() {
       return elementType;
     }
 
-    /** @return Whether the element of the list is nullable. */
+    /**
+     * @return Whether the element of the list is nullable.
+     */
     public boolean elementNullable() {
       return elementNullable;
     }
@@ -1079,17 +1163,23 @@ public class Types {
       return Name.MAP;
     }
 
-    /** @return The key type of the map. */
+    /**
+     * @return The key type of the map.
+     */
     public Type keyType() {
       return keyType;
     }
 
-    /** @return The value type of the map. */
+    /**
+     * @return The value type of the map.
+     */
     public Type valueType() {
       return valueType;
     }
 
-    /** @return Whether the value of the map is nullable. */
+    /**
+     * @return Whether the value of the map is nullable.
+     */
     public boolean valueNullable() {
       return valueNullable;
     }
@@ -1140,7 +1230,9 @@ public class Types {
       this.types = types;
     }
 
-    /** @return The types of the union. */
+    /**
+     * @return The types of the union.
+     */
     public Type[] types() {
       return types;
     }
@@ -1197,7 +1289,9 @@ public class Types {
       this.unparsedType = unparsedType;
     }
 
-    /** @return The unparsed type as a string. */
+    /**
+     * @return The unparsed type as a string.
+     */
     public String unparsedType() {
       return unparsedType;
     }
@@ -1253,7 +1347,9 @@ public class Types {
       this.catalogString = catalogString;
     }
 
-    /** @return The string representation of this type in external catalog. */
+    /**
+     * @return The string representation of this type in external catalog.
+     */
     public String catalogString() {
       return catalogString;
     }
