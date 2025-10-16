@@ -20,6 +20,7 @@
 package org.apache.iceberg.hive;
 
 import java.util.Collections;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 public class TestHiveCatalogWithMetadataLocation {
@@ -27,6 +28,6 @@ public class TestHiveCatalogWithMetadataLocation {
   @Test
   void testLoadFields() {
     HiveCatalogWithMetadataLocation catalog = new HiveCatalogWithMetadataLocation();
-    catalog.initialize("hive", Collections.emptyMap());
+    Assertions.assertDoesNotThrow(() -> catalog.initialize("hive", Collections.emptyMap()));
   }
 }

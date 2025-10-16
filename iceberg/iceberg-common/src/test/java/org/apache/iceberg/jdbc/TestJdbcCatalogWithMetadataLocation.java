@@ -21,6 +21,7 @@ package org.apache.iceberg.jdbc;
 
 import com.google.common.collect.ImmutableMap;
 import org.apache.iceberg.CatalogProperties;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 public class TestJdbcCatalogWithMetadataLocation {
@@ -28,12 +29,14 @@ public class TestJdbcCatalogWithMetadataLocation {
   @Test
   void testLoadFields() {
     JdbcCatalogWithMetadataLocation catalog = new JdbcCatalogWithMetadataLocation(false);
-    catalog.initialize(
-        "jdbc",
-        ImmutableMap.of(
-            CatalogProperties.URI,
-            "jdbc:h2:mem:test",
-            CatalogProperties.WAREHOUSE_LOCATION,
-            "warehouse"));
+    Assertions.assertDoesNotThrow(
+        () ->
+            catalog.initialize(
+                "jdbc",
+                ImmutableMap.of(
+                    CatalogProperties.URI,
+                    "jdbc:h2:mem:test",
+                    CatalogProperties.WAREHOUSE_LOCATION,
+                    "warehouse")));
   }
 }

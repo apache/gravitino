@@ -28,13 +28,11 @@ import org.apache.hadoop.hive.metastore.api.Table;
 import org.apache.iceberg.BaseMetastoreTableOperations;
 import org.apache.iceberg.ClientPool;
 import org.apache.iceberg.catalog.TableIdentifier;
-import org.apache.iceberg.exceptions.NoSuchIcebergTableException;
 import org.apache.thrift.TException;
 
 public class HiveCatalogWithMetadataLocation extends ClosableHiveCatalog
     implements SupportsMetadataLocation {
   private ClientPool<IMetaStoreClient, TException> metaClients;
-  private String catalogName;
 
   @Override
   public void initialize(String name, Map<String, String> properties) {
@@ -46,17 +44,14 @@ public class HiveCatalogWithMetadataLocation extends ClosableHiveCatalog
   public String metadataLocation(TableIdentifier tableIdentifier) {
     String dbName = tableIdentifier.namespace().level(0);
     String tableName = tableIdentifier.name();
-    String fullName = catalogName + "." + dbName + "." + tableName;
 
     try {
       Table table = metaClients.run(client -> client.getTable(dbName, tableName));
       String tableType = table.getParameters().get(BaseMetastoreTableOperations.TABLE_TYPE_PROP);
-      NoSuchIcebergTableException.check(
-          tableType != null
-              && tableType.equalsIgnoreCase(BaseMetastoreTableOperations.ICEBERG_TABLE_TYPE_VALUE),
-          "Not an iceberg table: %s (type=%s)",
-          fullName,
-          tableType);
+      if (tableType == null
+          || !tableType.equalsIgnoreCase(BaseMetastoreTableOperations.ICEBERG_TABLE_TYPE_VALUE)) {
+        return null;
+      }
       return table.getParameters().get(METADATA_LOCATION_PROP);
     } catch (Exception e) {
       return null;
@@ -65,7 +60,6 @@ public class HiveCatalogWithMetadataLocation extends ClosableHiveCatalog
 
   private void loadFields() {
     try {
-      this.catalogName = (String) FieldUtils.readField(this, "name", true);
       this.metaClients =
           (ClientPool<IMetaStoreClient, TException>) FieldUtils.readField(this, "clients", true);
     } catch (IllegalAccessException e) {
