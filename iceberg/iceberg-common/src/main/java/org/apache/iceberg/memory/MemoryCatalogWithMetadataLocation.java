@@ -19,9 +19,9 @@
 
 package org.apache.iceberg.memory;
 
-import java.lang.reflect.Field;
 import java.util.Map;
 import java.util.concurrent.ConcurrentMap;
+import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.iceberg.common.cache.SupportsMetadataLocation;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.inmemory.InMemoryCatalog;
@@ -45,10 +45,9 @@ public class MemoryCatalogWithMetadataLocation extends InMemoryCatalog
   private void loadFields() {
     try {
       Class<?> baseClass = getClass().getSuperclass();
-      Field tablesField = baseClass.getDeclaredField("tables");
-      tablesField.setAccessible(true);
-      tables = (ConcurrentMap<TableIdentifier, String>) tablesField.get(this);
-    } catch (NoSuchFieldException | IllegalAccessException e) {
+      tables =
+          (ConcurrentMap<TableIdentifier, String>) FieldUtils.readField(baseClass, "tables", true);
+    } catch (IllegalAccessException e) {
       throw new RuntimeException(e);
     }
   }

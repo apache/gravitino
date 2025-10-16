@@ -24,6 +24,7 @@ import com.github.benmanes.caffeine.cache.Caffeine;
 import com.google.common.annotations.VisibleForTesting;
 import java.io.IOException;
 import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 import org.apache.iceberg.TableMetadata;
 import org.apache.iceberg.catalog.TableIdentifier;
@@ -67,7 +68,7 @@ public class LocalMetadataCache extends BaseMetadataCache {
 
   @Override
   public void close() throws IOException {
-    LOG.info("Close table cache");
+    LOG.info("Close Iceberg table metadata cache");
     if (tableMetadataCache != null) {
       tableMetadataCache.invalidateAll();
       tableMetadataCache.cleanUp();
@@ -75,8 +76,8 @@ public class LocalMetadataCache extends BaseMetadataCache {
   }
 
   @Override
-  protected TableMetadata doGetTableMetadata(TableIdentifier tableIdentifier) {
-    return tableMetadataCache.getIfPresent(tableIdentifier);
+  protected Optional<TableMetadata> doGetTableMetadata(TableIdentifier tableIdentifier) {
+    return Optional.ofNullable(tableMetadataCache.getIfPresent(tableIdentifier));
   }
 
   @VisibleForTesting

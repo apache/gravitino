@@ -19,8 +19,8 @@
 
 package org.apache.iceberg.jdbc;
 
-import java.lang.reflect.Field;
 import java.util.Map;
+import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.iceberg.common.cache.SupportsMetadataLocation;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.jdbc.JdbcUtil.SchemaVersion;
@@ -58,18 +58,11 @@ public class JdbcCatalogWithMetadataLocation extends JdbcCatalog
   private void loadFields() {
     try {
       Class<?> baseClass = JdbcCatalog.class;
-      Field catalogNameField = baseClass.getDeclaredField("catalogName");
-      catalogNameField.setAccessible(true);
-      this.catalogName = (String) catalogNameField.get(this);
-
-      Field connectionsField = baseClass.getDeclaredField("connections");
-      connectionsField.setAccessible(true);
-      this.connections = (JdbcClientPool) connectionsField.get(this);
-
-      Field schemaVersionField = baseClass.getDeclaredField("schemaVersion");
-      schemaVersionField.setAccessible(true);
-      this.schemaVersion = (JdbcUtil.SchemaVersion) schemaVersionField.get(this);
-    } catch (NoSuchFieldException | IllegalAccessException e) {
+      this.catalogName = (String) FieldUtils.readField(baseClass, "catalogName", true);
+      this.connections = (JdbcClientPool) FieldUtils.readField(baseClass, "connections", true);
+      this.schemaVersion =
+          (JdbcUtil.SchemaVersion) FieldUtils.readField(baseClass, "schemaVersion", true);
+    } catch (IllegalAccessException e) {
       throw new RuntimeException(e);
     }
   }

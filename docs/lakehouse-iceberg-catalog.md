@@ -174,7 +174,7 @@ Gravitino features a pluggable cache system for updating or retrieving table met
 | `table-metadata-cache-capacity`       | The capacity of table metadata cache.       | 200           | No       | 1.1.0         |
 | `table-metadata-cache-expire-minutes` | The expire minutes of table metadata cache. | 60            | No       | 1.1.0         |
 
-Gravitino provides build-in `org.apache.gravitino.iceberg.common.cache.LocalMetadataCache` to store the cache data in local memory. And you could implement your custom cache by implementing `org.apache.gravitino.iceberg.common.cache.MetadataCache` interface.
+Gravitino provides the build-in `org.apache.gravitino.iceberg.common.cache.LocalMetadataCache` to store the cached data in the memory. You could also implement your custom table metadata cache by implementing the `org.apache.gravitino.iceberg.common.cache.MetadataCache` interface.
 
 ### Catalog operations
 

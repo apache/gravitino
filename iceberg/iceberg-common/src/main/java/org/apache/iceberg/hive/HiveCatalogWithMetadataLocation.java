@@ -19,8 +19,8 @@
 
 package org.apache.iceberg.hive;
 
-import java.lang.reflect.Field;
 import java.util.Map;
+import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.iceberg.common.ClosableHiveCatalog;
 import org.apache.gravitino.iceberg.common.cache.SupportsMetadataLocation;
 import org.apache.hadoop.hive.metastore.IMetaStoreClient;
@@ -66,14 +66,11 @@ public class HiveCatalogWithMetadataLocation extends ClosableHiveCatalog
   private void loadFields() {
     try {
       Class<?> baseClass = HiveCatalog.class;
-      Field catalogNameField = baseClass.getDeclaredField("name");
-      catalogNameField.setAccessible(true);
-      this.catalogName = (String) catalogNameField.get(this);
-
-      Field clientsField = baseClass.getDeclaredField("clients");
-      clientsField.setAccessible(true);
-      this.metaClients = (ClientPool<IMetaStoreClient, TException>) clientsField.get(this);
-    } catch (NoSuchFieldException | IllegalAccessException e) {
+      this.catalogName = (String) FieldUtils.readField(baseClass, "name", true);
+      this.metaClients =
+          (ClientPool<IMetaStoreClient, TException>)
+              FieldUtils.readField(baseClass, "clients", true);
+    } catch (IllegalAccessException e) {
       throw new RuntimeException(e);
     }
   }

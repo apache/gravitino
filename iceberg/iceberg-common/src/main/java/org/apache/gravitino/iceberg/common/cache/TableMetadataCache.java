@@ -21,6 +21,7 @@ package org.apache.gravitino.iceberg.common.cache;
 
 import java.io.Closeable;
 import java.util.Map;
+import java.util.Optional;
 import org.apache.iceberg.TableMetadata;
 import org.apache.iceberg.catalog.TableIdentifier;
 
@@ -28,13 +29,13 @@ import org.apache.iceberg.catalog.TableIdentifier;
  * A cache interface for managing {@link TableMetadata} objects, providing methods for
  * initialization, retrieval, update, invalidation, and resource cleanup.
  */
-public interface MetadataCache extends Closeable {
+public interface TableMetadataCache extends Closeable {
   /**
-   * A no-op (dummy) implementation of {@link MetadataCache} that performs no actual caching. Useful
-   * for scenarios where caching functionality is not required.
+   * A no-op (dummy) implementation of {@link TableMetadataCache} that performs no actual caching.
+   * Useful for scenarios where caching functionality is not required.
    */
-  MetadataCache DUMMY =
-      new MetadataCache() {
+  TableMetadataCache DUMMY =
+      new TableMetadataCache() {
         @Override
         public void initialize(
             int capacity,
@@ -46,8 +47,8 @@ public interface MetadataCache extends Closeable {
         public void invalidate(TableIdentifier tableIdentifier) {}
 
         @Override
-        public TableMetadata getTableMetadata(TableIdentifier tableIdentifier) {
-          return null;
+        public Optional<TableMetadata> getTableMetadata(TableIdentifier tableIdentifier) {
+          return Optional.empty();
         }
 
         @Override
@@ -83,10 +84,10 @@ public interface MetadataCache extends Closeable {
    * Retrieves the latest {@link TableMetadata} for the specified table.
    *
    * @param tableIdentifier Identifier of the table to retrieve metadata for
-   * @return Cached {@link TableMetadata}, or {@code null} if no valid entry exists in the cache or
-   *     the cache is not latest.
+   * @return Cached {@link TableMetadata} wrapped in an {@link Optional}, or an empty {@link
+   *     Optional} if no valid entry exists in the cache or the cache is not latest.
    */
-  TableMetadata getTableMetadata(TableIdentifier tableIdentifier);
+  Optional<TableMetadata> getTableMetadata(TableIdentifier tableIdentifier);
 
   /**
    * Updates the cache with new {@link TableMetadata} for the specified table.

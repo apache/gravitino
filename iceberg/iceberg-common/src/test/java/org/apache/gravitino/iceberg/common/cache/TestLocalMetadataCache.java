@@ -57,24 +57,24 @@ class TestLocalMetadataCache {
 
   @Test
   void testUpdateAndGetTableMetadata() {
-    Assertions.assertNull(cache.getTableMetadata(testIdentifier));
+    Assertions.assertNull(cache.getTableMetadata(testIdentifier).orElse(null));
     cache.updateTableMetadata(testIdentifier, testMetadata);
-    Assertions.assertEquals(testMetadata, cache.getTableMetadata(testIdentifier));
+    Assertions.assertEquals(testMetadata, cache.getTableMetadata(testIdentifier).orElse(null));
 
     TableMetadata oldMetadata = mock(TableMetadata.class);
     cache.updateTableMetadata(testIdentifier, oldMetadata);
-    Assertions.assertEquals(oldMetadata, cache.doGetTableMetadata(testIdentifier));
-    Assertions.assertNull(cache.getTableMetadata(testIdentifier));
+    Assertions.assertEquals(oldMetadata, cache.doGetTableMetadata(testIdentifier).orElse(null));
+    Assertions.assertNull(cache.getTableMetadata(testIdentifier).orElse(null));
   }
 
   @Test
   void testInvalidate() {
     cache.updateTableMetadata(testIdentifier, testMetadata);
-    Assertions.assertEquals(testMetadata, cache.getTableMetadata(testIdentifier));
+    Assertions.assertEquals(testMetadata, cache.getTableMetadata(testIdentifier).orElse(null));
 
     cache.invalidate(testIdentifier);
-    Assertions.assertNull(cache.doGetTableMetadata(testIdentifier));
-    Assertions.assertNull(cache.getTableMetadata(testIdentifier));
+    Assertions.assertNull(cache.doGetTableMetadata(testIdentifier).orElse(null));
+    Assertions.assertNull(cache.getTableMetadata(testIdentifier).orElse(null));
   }
 
   @Test

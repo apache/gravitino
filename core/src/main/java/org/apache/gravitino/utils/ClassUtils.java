@@ -20,7 +20,7 @@
 package org.apache.gravitino.utils;
 
 public class ClassUtils {
-  public static <T> T loadClass(String className) {
+  public static <T> T loadAndGetInstance(String className) {
     try {
       return (T) Class.forName(className).getDeclaredConstructor().newInstance();
     } catch (Exception e) {
@@ -28,7 +28,7 @@ public class ClassUtils {
     }
   }
 
-  public static <T> T loadClass(String className, ClassLoader classLoader) {
+  public static <T> T loadAndGetInstance(String className, ClassLoader classLoader) {
     try {
       return (T) Class.forName(className, true, classLoader).getDeclaredConstructor().newInstance();
     } catch (Exception e) {

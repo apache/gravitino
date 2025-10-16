@@ -19,16 +19,17 @@
 
 package org.apache.gravitino.iceberg.common.cache;
 
+import java.util.Optional;
 import org.apache.iceberg.TableMetadata;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Abstract base class implementing {@link MetadataCache} that provides core metadata caching
+ * Abstract base class implementing {@link TableMetadataCache} that provides core metadata caching
  * functionality with validation of metadata location against the latest version.
  */
-public abstract class BaseMetadataCache implements MetadataCache {
+public abstract class BaseMetadataCache implements TableMetadataCache {
 
   public static final Logger LOG = LoggerFactory.getLogger(BaseMetadataCache.class);
   /** Component to retrieve the latest metadata location for a table, used for validation. */
@@ -39,9 +40,10 @@ public abstract class BaseMetadataCache implements MetadataCache {
    * this to provide actual cache retrieval logic.
    *
    * @param tableIdentifier Identifier of the table to retrieve cached metadata for
-   * @return Cached {@link TableMetadata}, or {@code null} if not found in cache
+   * @return Cached {@link TableMetadata} wrapped in an {@link Optional}, or an empty {@link
+   *     Optional} if not found in cache
    */
-  protected abstract TableMetadata doGetTableMetadata(TableIdentifier tableIdentifier);
+  protected abstract Optional<TableMetadata> doGetTableMetadata(TableIdentifier tableIdentifier);
 
   protected void initialize(SupportsMetadataLocation supportsMetadataLocation) {
     this.supportsMetadataLocation = supportsMetadataLocation;
@@ -56,25 +58,27 @@ public abstract class BaseMetadataCache implements MetadataCache {
    *     cache miss, location is invalid, or locations mismatch (after invalidation)
    */
   @Override
-  public TableMetadata getTableMetadata(TableIdentifier tableIdentifier) {
-    TableMetadata tableMetadata = doGetTableMetadata(tableIdentifier);
-    if (tableMetadata == null) {
-      return null;
+  public Optional<TableMetadata> getTableMetadata(TableIdentifier tableIdentifier) {
+    Optional<TableMetadata> tableMetadataOptional = doGetTableMetadata(tableIdentifier);
+    if (!tableMetadataOptional.isPresent()) {
+      return Optional.empty();
     }
+    TableMetadata tableMetadata = tableMetadataOptional.get();
     String latestLocation = supportsMetadataLocation.metadataLocation(tableIdentifier);
     if (latestLocation == null) {
-      return null;
+      return Optional.empty();
     }
     if (latestLocation.equals(tableMetadata.metadataFileLocation())) {
-      return tableMetadata;
+      return Optional.of(tableMetadata);
     }
 
     LOG.debug(
-        "The cached table metadata is not latest, table identifier: {}, table metadata location in cache: {}, latest metadata location: {}",
+        "The cached table metadata is not latest, table identifier: {}, "
+            + "table metadata location in cache: {}, latest metadata location: {}",
         tableIdentifier,
         tableMetadata.metadataFileLocation(),
         latestLocation);
     invalidate(tableIdentifier);
-    return null;
+    return Optional.empty();
   }
 }
