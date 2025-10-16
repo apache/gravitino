@@ -15,14 +15,18 @@
 # specific language governing permissions and limitations
 # under the License.
 
+from functools import singledispatchmethod
 from typing import cast
 
+from gravitino.api.rel.expressions.distributions.distribution import Distribution
+from gravitino.api.rel.expressions.distributions.distributions import Distributions
 from gravitino.api.rel.expressions.expression import Expression
 from gravitino.api.rel.expressions.function_expression import FunctionExpression
 from gravitino.api.rel.expressions.literals.literals import Literals
 from gravitino.api.rel.expressions.named_reference import NamedReference
 from gravitino.api.rel.expressions.unparsed_expression import UnparsedExpression
 from gravitino.api.rel.types.types import Types
+from gravitino.dto.rel.distribution_dto import DistributionDTO
 from gravitino.dto.rel.expressions.field_reference_dto import FieldReferenceDTO
 from gravitino.dto.rel.expressions.func_expression_dto import FuncExpressionDTO
 from gravitino.dto.rel.expressions.function_arg import FunctionArg
@@ -76,3 +80,28 @@ class DTOConverters:
         if not args:
             return Expression.EMPTY_EXPRESSION
         return [DTOConverters.from_function_arg(arg) for arg in args]
+
+    @singledispatchmethod
+    @staticmethod
+    def from_dto(dto) -> object:
+        raise IllegalArgumentException(f"Unsupported expression type: {dto}")
+
+    @from_dto.register
+    @staticmethod
+    def _(dto: DistributionDTO) -> Distribution:
+        """Converts a DistributionDTO to a Distribution.
+
+        Args:
+            dto (DistributionDTO): The distribution DTO.
+
+        Returns:
+            Distribution: The distribution.
+        """
+        if dto is None or DistributionDTO.NONE.equals(dto):
+            return Distributions.NONE
+
+        return Distributions.of(
+            dto.strategy(),
+            dto.number(),
+            *DTOConverters.from_function_args(dto.args()),
+        )
