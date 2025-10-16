@@ -83,7 +83,9 @@ public class PolicyDTO implements Policy {
     return Objects.hash(name, comment, policyType, enabled, content, audit);
   }
 
-  /** @return a new builder for constructing a PolicyDTO. */
+  /**
+   * @return a new builder for constructing a PolicyDTO.
+   */
   public static Builder builder() {
     return new Builder();
   }
@@ -208,7 +210,9 @@ public class PolicyDTO implements Policy {
       return this;
     }
 
-    /** @return The constructed Policy DTO. */
+    /**
+     * @return The constructed Policy DTO.
+     */
     public PolicyDTO build() {
       Preconditions.checkArgument(
           StringUtils.isNotBlank(policyDTO.name), "policy name cannot be empty");

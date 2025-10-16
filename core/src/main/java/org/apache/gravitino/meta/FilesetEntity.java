@@ -158,12 +158,16 @@ public class FilesetEntity implements Entity, Auditable, HasIdentifier {
     return type;
   }
 
-  /** @return The unnamed storage location of the fileset entity. */
+  /**
+   * @return The unnamed storage location of the fileset entity.
+   */
   public String storageLocation() {
     return storageLocations.get(LOCATION_NAME_UNKNOWN);
   }
 
-  /** @return The storage locations of this fileset entity. */
+  /**
+   * @return The storage locations of this fileset entity.
+   */
   public Map<String, String> storageLocations() {
     return storageLocations;
   }

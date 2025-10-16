@@ -38,33 +38,43 @@ public abstract class BaseModel implements Model {
 
   protected AuditInfo auditInfo;
 
-  /** @return The name of the model. */
+  /**
+   * @return The name of the model.
+   */
   @Override
   public String name() {
     return name;
   }
 
-  /** @return The comment of the model. */
+  /**
+   * @return The comment of the model.
+   */
   @Nullable
   @Override
   public String comment() {
     return comment;
   }
 
-  /** @return The properties of the model. */
+  /**
+   * @return The properties of the model.
+   */
   @Nullable
   @Override
   public Map<String, String> properties() {
     return properties;
   }
 
-  /** @return The latest version of the model. */
+  /**
+   * @return The latest version of the model.
+   */
   @Override
   public int latestVersion() {
     return latestVersion;
   }
 
-  /** @return The audit information of the model. */
+  /**
+   * @return The audit information of the model.
+   */
   @Override
   public AuditInfo auditInfo() {
     return auditInfo;

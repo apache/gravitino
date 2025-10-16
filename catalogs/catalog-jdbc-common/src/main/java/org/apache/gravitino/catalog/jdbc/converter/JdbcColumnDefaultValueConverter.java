@@ -63,7 +63,9 @@ public class JdbcColumnDefaultValueConverter {
       } else if (type instanceof Type.NumericType) {
         return literal.value().toString();
       } else if (type instanceof Types.TimestampType) {
-        /** @see LocalDateTime#toString() would return like 'yyyy-MM-ddTHH:mm:ss' */
+        /**
+         * @see LocalDateTime#toString() would return like 'yyyy-MM-ddTHH:mm:ss'
+         */
         if (literal.value() instanceof String || literal.value() instanceof LocalDateTime) {
           return String.format("'%s'", literal.value().toString().replace("T", " "));
         }

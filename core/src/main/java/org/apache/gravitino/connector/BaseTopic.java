@@ -37,26 +37,34 @@ public abstract class BaseTopic implements Topic {
 
   protected Audit auditInfo;
 
-  /** @return The name of the topic. */
+  /**
+   * @return The name of the topic.
+   */
   @Override
   public String name() {
     return name;
   }
 
-  /** @return The comment or description for the topic. */
+  /**
+   * @return The comment or description for the topic.
+   */
   @Nullable
   @Override
   public String comment() {
     return comment;
   }
 
-  /** @return The associated properties of the topic. */
+  /**
+   * @return The associated properties of the topic.
+   */
   @Override
   public Map<String, String> properties() {
     return properties;
   }
 
-  /** @return The audit information for the topic. */
+  /**
+   * @return The audit information for the topic.
+   */
   @Override
   public Audit auditInfo() {
     return auditInfo;

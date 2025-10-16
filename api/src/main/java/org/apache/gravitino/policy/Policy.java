@@ -148,7 +148,9 @@ public interface Policy extends Auditable {
    */
   Optional<Boolean> inherited();
 
-  /** @return The associated objects of the policy. */
+  /**
+   * @return The associated objects of the policy.
+   */
   default AssociatedObjects associatedObjects() {
     throw new UnsupportedOperationException("The associatedObjects method is not supported.");
   }
@@ -156,13 +158,17 @@ public interface Policy extends Auditable {
   /** The interface of the associated objects of the policy. */
   interface AssociatedObjects {
 
-    /** @return The number of objects that are associated with this policy */
+    /**
+     * @return The number of objects that are associated with this policy
+     */
     default int count() {
       MetadataObject[] objects = objects();
       return objects == null ? 0 : objects.length;
     }
 
-    /** @return The list of objects that are associated with this policy. */
+    /**
+     * @return The list of objects that are associated with this policy.
+     */
     MetadataObject[] objects();
   }
 }
