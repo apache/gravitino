@@ -57,11 +57,10 @@ public class JdbcCatalogWithMetadataLocation extends JdbcCatalog
 
   private void loadFields() {
     try {
-      Class<?> baseClass = JdbcCatalog.class;
-      this.catalogName = (String) FieldUtils.readField(baseClass, "catalogName", true);
-      this.connections = (JdbcClientPool) FieldUtils.readField(baseClass, "connections", true);
+      this.catalogName = (String) FieldUtils.readField(this, "catalogName", true);
+      this.connections = (JdbcClientPool) FieldUtils.readField(this, "connections", true);
       this.schemaVersion =
-          (JdbcUtil.SchemaVersion) FieldUtils.readField(baseClass, "schemaVersion", true);
+          (JdbcUtil.SchemaVersion) FieldUtils.readField(this, "schemaVersion", true);
     } catch (IllegalAccessException e) {
       throw new RuntimeException(e);
     }

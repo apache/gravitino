@@ -44,9 +44,7 @@ public class MemoryCatalogWithMetadataLocation extends InMemoryCatalog
 
   private void loadFields() {
     try {
-      Class<?> baseClass = getClass().getSuperclass();
-      tables =
-          (ConcurrentMap<TableIdentifier, String>) FieldUtils.readField(baseClass, "tables", true);
+      tables = (ConcurrentMap<TableIdentifier, String>) FieldUtils.readField(this, "tables", true);
     } catch (IllegalAccessException e) {
       throw new RuntimeException(e);
     }
