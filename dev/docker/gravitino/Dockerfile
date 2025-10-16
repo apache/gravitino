@@ -19,6 +19,9 @@
 FROM eclipse-temurin:17.0.16_8-jdk-jammy
 LABEL maintainer="dev@gravitino.apache.org"
 
+RUN apt-get update && apt-get install -y \
+    python-is-python3
+
 WORKDIR /root/gravitino
 
 COPY packages/gravitino /root/gravitino

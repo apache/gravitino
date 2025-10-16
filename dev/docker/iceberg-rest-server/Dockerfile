@@ -20,6 +20,9 @@ FROM openjdk:17-jdk-buster
 
 LABEL maintainer="dev@gravitino.apache.org"
 
+RUN apt-get update && apt-get install -y \
+    python-is-python3
+
 WORKDIR /root/gravitino-iceberg-rest-server
 
 COPY packages/gravitino-iceberg-rest-server /root/gravitino-iceberg-rest-server
