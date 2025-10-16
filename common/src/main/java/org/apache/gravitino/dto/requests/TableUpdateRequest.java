@@ -820,6 +820,8 @@ public interface TableUpdateRequest extends RESTRequest {
       Preconditions.checkArgument(
           index.fieldNames() != null && index.fieldNames().length > 0,
           "The index must be set with corresponding column names");
+      Preconditions.checkArgument(
+          StringUtils.isNotBlank(index.name()), "Index name cannot be null or empty");
     }
 
     /** @return An instance of TableChange. */
@@ -861,7 +863,8 @@ public interface TableUpdateRequest extends RESTRequest {
      */
     @Override
     public void validate() throws IllegalArgumentException {
-      Preconditions.checkArgument(name != null, "Index name cannot be null");
+      Preconditions.checkArgument(
+          StringUtils.isNotBlank(name), "Index name cannot be null or empty");
     }
 
     /** @return An instance of TableChange. */
