@@ -29,9 +29,9 @@ import org.apache.iceberg.jdbc.JdbcUtil.SchemaVersion;
 // Use Iceberg package to reuse JdbcUtil related classes.
 public class JdbcCatalogWithMetadataLocation extends JdbcCatalog
     implements SupportsMetadataLocation {
-  private String catalogName;
-  private JdbcClientPool connections;
-  private SchemaVersion schemaVersion;
+  private String jdbcCatalogName;
+  private JdbcClientPool jdbcConnections;
+  private SchemaVersion jdbcSchemaVersion;
 
   public JdbcCatalogWithMetadataLocation(boolean initializeCatalogTables) {
     super(null, null, initializeCatalogTables);
@@ -48,7 +48,8 @@ public class JdbcCatalogWithMetadataLocation extends JdbcCatalog
     Map<String, String> table;
 
     try {
-      table = JdbcUtil.loadTable(schemaVersion, connections, catalogName, tableIdentifier);
+      table =
+          JdbcUtil.loadTable(jdbcSchemaVersion, jdbcConnections, jdbcCatalogName, tableIdentifier);
     } catch (Exception e) {
       return null;
     }
@@ -58,16 +59,16 @@ public class JdbcCatalogWithMetadataLocation extends JdbcCatalog
 
   private void loadFields() {
     try {
-      this.catalogName = (String) FieldUtils.readField(this, "catalogName", true);
+      this.jdbcCatalogName = (String) FieldUtils.readField(this, "catalogName", true);
       Preconditions.checkState(
-          catalogName != null, "Failed to get catalogName field from JDBC catalog");
-      this.connections = (JdbcClientPool) FieldUtils.readField(this, "connections", true);
+          jdbcCatalogName != null, "Failed to get catalogName field from JDBC catalog");
+      this.jdbcConnections = (JdbcClientPool) FieldUtils.readField(this, "connections", true);
       Preconditions.checkState(
-          connections != null, "Failed to get connections field from JDBC catalog");
-      this.schemaVersion =
+          jdbcConnections != null, "Failed to get connections field from JDBC catalog");
+      this.jdbcSchemaVersion =
           (JdbcUtil.SchemaVersion) FieldUtils.readField(this, "schemaVersion", true);
       Preconditions.checkState(
-          schemaVersion != null, "Failed to get schemaVersion field from JDBC catalog");
+          jdbcSchemaVersion != null, "Failed to get schemaVersion field from JDBC catalog");
     } catch (IllegalAccessException e) {
       throw new RuntimeException(e);
     }
