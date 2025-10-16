@@ -19,6 +19,7 @@
 
 package org.apache.iceberg.hive;
 
+import com.google.common.base.Preconditions;
 import java.util.Map;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.iceberg.common.ClosableHiveCatalog;
@@ -62,6 +63,8 @@ public class HiveCatalogWithMetadataLocation extends ClosableHiveCatalog
     try {
       this.metaClients =
           (ClientPool<IMetaStoreClient, TException>) FieldUtils.readField(this, "clients", true);
+      Preconditions.checkState(
+          metaClients != null, "Failed to get clients field from hive catalog");
     } catch (IllegalAccessException e) {
       throw new RuntimeException(e);
     }

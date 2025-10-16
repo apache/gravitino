@@ -19,6 +19,7 @@
 
 package org.apache.iceberg.memory;
 
+import com.google.common.base.Preconditions;
 import java.util.Map;
 import java.util.concurrent.ConcurrentMap;
 import org.apache.commons.lang3.reflect.FieldUtils;
@@ -29,7 +30,7 @@ import org.apache.iceberg.inmemory.InMemoryCatalog;
 public class MemoryCatalogWithMetadataLocation extends InMemoryCatalog
     implements SupportsMetadataLocation {
 
-  private ConcurrentMap<TableIdentifier, String> tables;
+  private ConcurrentMap<TableIdentifier, String> tableStore;
 
   @Override
   public void initialize(String name, Map<String, String> properties) {
@@ -39,12 +40,15 @@ public class MemoryCatalogWithMetadataLocation extends InMemoryCatalog
 
   @Override
   public String metadataLocation(TableIdentifier tableIdentifier) {
-    return tables.get(tableIdentifier);
+    return tableStore.get(tableIdentifier);
   }
 
   private void loadFields() {
     try {
-      tables = (ConcurrentMap<TableIdentifier, String>) FieldUtils.readField(this, "tables", true);
+      this.tableStore =
+          (ConcurrentMap<TableIdentifier, String>) FieldUtils.readField(this, "tables", true);
+      Preconditions.checkArgument(
+          tableStore != null, "Failed to get tables field from memory catalog");
     } catch (IllegalAccessException e) {
       throw new RuntimeException(e);
     }

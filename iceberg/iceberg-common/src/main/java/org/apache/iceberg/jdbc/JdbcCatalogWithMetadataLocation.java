@@ -19,6 +19,7 @@
 
 package org.apache.iceberg.jdbc;
 
+import com.google.common.base.Preconditions;
 import java.util.Map;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.iceberg.common.cache.SupportsMetadataLocation;
@@ -58,9 +59,15 @@ public class JdbcCatalogWithMetadataLocation extends JdbcCatalog
   private void loadFields() {
     try {
       this.catalogName = (String) FieldUtils.readField(this, "catalogName", true);
+      Preconditions.checkState(
+          catalogName != null, "Failed to get catalogName field from JDBC catalog");
       this.connections = (JdbcClientPool) FieldUtils.readField(this, "connections", true);
+      Preconditions.checkState(
+          connections != null, "Failed to get connections field from JDBC catalog");
       this.schemaVersion =
           (JdbcUtil.SchemaVersion) FieldUtils.readField(this, "schemaVersion", true);
+      Preconditions.checkState(
+          schemaVersion != null, "Failed to get schemaVersion field from JDBC catalog");
     } catch (IllegalAccessException e) {
       throw new RuntimeException(e);
     }
