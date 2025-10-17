@@ -27,6 +27,9 @@ from gravitino.api.rel.expressions.expression import Expression
 from gravitino.api.rel.expressions.function_expression import FunctionExpression
 from gravitino.api.rel.expressions.literals.literals import Literals
 from gravitino.api.rel.expressions.named_reference import FieldReference
+from gravitino.api.rel.expressions.sorts.null_ordering import NullOrdering
+from gravitino.api.rel.expressions.sorts.sort_direction import SortDirection
+from gravitino.api.rel.expressions.sorts.sort_orders import SortOrders
 from gravitino.api.rel.expressions.unparsed_expression import UnparsedExpression
 from gravitino.api.rel.indexes.index import Index
 from gravitino.api.rel.indexes.indexes import Indexes
@@ -38,6 +41,7 @@ from gravitino.dto.rel.expressions.function_arg import FunctionArg
 from gravitino.dto.rel.expressions.literal_dto import LiteralDTO
 from gravitino.dto.rel.expressions.unparsed_expression_dto import UnparsedExpressionDTO
 from gravitino.dto.rel.indexes.index_dto import IndexDTO
+from gravitino.dto.rel.sort_order_dto import SortOrderDTO
 from gravitino.dto.util.dto_converters import DTOConverters
 from gravitino.exceptions.base import IllegalArgumentException
 
@@ -190,3 +194,21 @@ class TestDTOConverters(unittest.TestCase):
             IllegalArgumentException, "Unsupported expression type"
         ):
             DTOConverters.from_dto("")
+
+    def test_from_dto_sort_order(self):
+        direction, null_ordering = SortDirection.ASCENDING, NullOrdering.NULLS_LAST
+        field_ref_dto = (
+            FieldReferenceDTO.builder().with_field_name(field_name=["score"]).build()
+        )
+        sort_order_dto = SortOrderDTO(
+            sort_term=field_ref_dto,
+            direction=direction,
+            null_ordering=null_ordering,
+        )
+        expected = SortOrders.of(
+            expression=DTOConverters.from_function_arg(field_ref_dto),
+            direction=direction,
+            null_ordering=null_ordering,
+        )
+        converted = DTOConverters.from_dto(sort_order_dto)
+        self.assertTrue(converted == expected)
