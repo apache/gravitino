@@ -18,6 +18,7 @@
 from functools import singledispatchmethod
 from typing import cast
 
+from gravitino.api.rel.column import Column
 from gravitino.api.rel.expressions.distributions.distribution import Distribution
 from gravitino.api.rel.expressions.distributions.distributions import Distributions
 from gravitino.api.rel.expressions.expression import Expression
@@ -30,6 +31,7 @@ from gravitino.api.rel.expressions.unparsed_expression import UnparsedExpression
 from gravitino.api.rel.indexes.index import Index
 from gravitino.api.rel.indexes.indexes import Indexes
 from gravitino.api.rel.types.types import Types
+from gravitino.dto.rel.column_dto import ColumnDTO
 from gravitino.dto.rel.distribution_dto import DistributionDTO
 from gravitino.dto.rel.expressions.field_reference_dto import FieldReferenceDTO
 from gravitino.dto.rel.expressions.func_expression_dto import FuncExpressionDTO
@@ -140,4 +142,29 @@ class DTOConverters:
             DTOConverters.from_function_arg(dto.sort_term()),
             dto.direction(),
             dto.null_ordering(),
+        )
+
+    @from_dto.register
+    @staticmethod
+    def _(dto: ColumnDTO) -> Column:
+        """Converts a ColumnDTO to a Column.
+
+        Args:
+            dto (ColumnDTO): The column DTO to be converted.
+
+        Returns:
+            Column: The column.
+        """
+        dto_default_value = dto.default_value()
+        return Column.of(
+            dto.name(),
+            dto.data_type(),
+            dto.comment(),
+            dto.nullable(),
+            dto.auto_increment(),
+            (
+                None
+                if dto_default_value == Column.DEFAULT_VALUE_NOT_SET
+                else DTOConverters.from_function_arg(dto.default_value())
+            ),
         )
