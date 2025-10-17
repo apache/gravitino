@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.filesystem.hadoop;
 
+import static org.apache.gravitino.catalog.hadoop.fs.FileSystemProvider.GRAVITINO_BYPASS;
 import static org.apache.gravitino.file.Fileset.PROPERTY_DEFAULT_LOCATION_NAME;
 import static org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_CURRENT_LOCATION_NAME;
 import static org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_FILESET_METADATA_CACHE_ENABLE;
@@ -56,11 +57,13 @@ import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.Schema;
 import org.apache.gravitino.audit.CallerContext;
 import org.apache.gravitino.audit.FilesetAuditConstants;
 import org.apache.gravitino.audit.FilesetDataOperation;
 import org.apache.gravitino.audit.InternalClientType;
 import org.apache.gravitino.catalog.hadoop.fs.FileSystemProvider;
+import org.apache.gravitino.catalog.hadoop.fs.FileSystemUtils;
 import org.apache.gravitino.catalog.hadoop.fs.GravitinoFileSystemCredentialsProvider;
 import org.apache.gravitino.catalog.hadoop.fs.SupportsCredentialVending;
 import org.apache.gravitino.client.GravitinoClient;
@@ -560,6 +563,25 @@ public abstract class BaseGVFSOperations implements Closeable {
                         NameIdentifier.of(filesetIdent.namespace().level(2), filesetIdent.name())));
   }
 
+  /**
+   * Get the schema by the schema identifier from the cache or load it from the server if the cache
+   *
+   * @param schemaIdent the schema identifier.
+   * @return the schema.
+   */
+  protected Schema getSchema(NameIdentifier schemaIdent) {
+    return filesetMetadataCache
+        .map(cache -> cache.getSchema(schemaIdent))
+        .orElseGet(
+            () -> {
+              NameIdentifier catalogIdent =
+                  NameIdentifier.of(
+                      schemaIdent.namespace().level(0), schemaIdent.namespace().level(1));
+              Catalog c = gravitinoClient.loadCatalog(catalogIdent.name());
+              return c.asSchemas().loadSchema(schemaIdent.name());
+            });
+  }
+
   @VisibleForTesting
   Cache<Pair<NameIdentifier, String>, FileSystem> internalFileSystemCache() {
     return internalFileSystemCache;
@@ -607,6 +629,11 @@ public abstract class BaseGVFSOperations implements Closeable {
               Map<String, String> allProperties =
                   getAllProperties(
                       cacheKey.getLeft(), targetLocation.toUri().getScheme(), targetLocationName);
+
+              Schema schema = getSchema(NameIdentifier.parse(filesetIdent.namespace().toString()));
+              allProperties.putAll(schema.properties());
+
+              allProperties.putAll(fileset.properties());
 
               FileSystem actualFileSystem =
                   getActualFileSystemByPath(targetLocation, allProperties);
@@ -664,7 +691,14 @@ public abstract class BaseGVFSOperations implements Closeable {
     // https://github.com/apache/gravitino/issues/5609
     resetFileSystemServiceLoader(scheme);
 
-    return provider.getFileSystem(actualFilePath, allProperties);
+    FileSystem fs;
+    if (scheme.equals("hdfs")) {
+      Configuration fsConfig = FileSystemUtils.createConfiguration(GRAVITINO_BYPASS, allProperties);
+      fs = new HDFSAuthenticationFileSystem(actualFilePath, fsConfig);
+    } else {
+      fs = provider.getFileSystem(actualFilePath, allProperties);
+    }
+    return fs;
   }
 
   private void resetFileSystemServiceLoader(String fsScheme) {

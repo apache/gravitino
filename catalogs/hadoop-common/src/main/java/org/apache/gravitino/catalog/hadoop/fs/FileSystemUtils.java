@@ -37,6 +37,7 @@ import javax.xml.stream.XMLOutputFactory;
 import javax.xml.stream.XMLStreamWriter;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.Path;
 
 public class FileSystemUtils {
 
@@ -44,6 +45,7 @@ public class FileSystemUtils {
   private static final String PROPERTY_TAG = "property";
   private static final String NAME_TAG = "name";
   private static final String VALUE_TAG = "value";
+  private static final String HDFS_CONFIG_RESOURCES = "hdfs.config.resources";
 
   private FileSystemUtils() {}
 
@@ -215,6 +217,18 @@ public class FileSystemUtils {
    */
   public static Configuration createConfiguration(String bypass, Map<String, String> config) {
     try (ByteArrayOutputStream out = new ByteArrayOutputStream()) {
+      Configuration configuration = new Configuration();
+
+      String hdfsConfigResources = config.get(HDFS_CONFIG_RESOURCES);
+      if (StringUtils.isNotBlank(hdfsConfigResources)) {
+        for (String resource : hdfsConfigResources.split(",")) {
+          resource = resource.trim();
+          if (StringUtils.isNotBlank(resource)) {
+            configuration.addResource(new Path(resource));
+          }
+        }
+      }
+
       XMLStreamWriter writer = XMLOutputFactory.newInstance().createXMLStreamWriter(out);
       writer.writeStartDocument();
       writer.writeStartElement(CONFIG_ROOT);
@@ -225,12 +239,8 @@ public class FileSystemUtils {
       writer.writeEndElement();
       writer.writeEndDocument();
       writer.close();
-
-      return new Configuration() {
-        {
-          addResource(new ByteArrayInputStream(out.toByteArray()));
-        }
-      };
+      configuration.addResource(new ByteArrayInputStream(out.toByteArray()));
+      return configuration;
     } catch (Exception e) {
       throw new RuntimeException("Failed to create configuration", e);
     }
