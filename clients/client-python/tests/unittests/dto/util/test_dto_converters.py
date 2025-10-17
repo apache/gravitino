@@ -21,6 +21,7 @@ from random import randint, random
 from typing import cast
 from unittest.mock import MagicMock, patch
 
+from gravitino.api.rel.column import Column
 from gravitino.api.rel.expressions.distributions.distributions import Distributions
 from gravitino.api.rel.expressions.distributions.strategy import Strategy
 from gravitino.api.rel.expressions.expression import Expression
@@ -34,6 +35,7 @@ from gravitino.api.rel.expressions.unparsed_expression import UnparsedExpression
 from gravitino.api.rel.indexes.index import Index
 from gravitino.api.rel.indexes.indexes import Indexes
 from gravitino.api.rel.types.types import Types
+from gravitino.dto.rel.column_dto import ColumnDTO
 from gravitino.dto.rel.distribution_dto import DistributionDTO
 from gravitino.dto.rel.expressions.field_reference_dto import FieldReferenceDTO
 from gravitino.dto.rel.expressions.func_expression_dto import FuncExpressionDTO
@@ -211,4 +213,46 @@ class TestDTOConverters(unittest.TestCase):
             null_ordering=null_ordering,
         )
         converted = DTOConverters.from_dto(sort_order_dto)
+        self.assertTrue(converted == expected)
+
+    def test_from_dto_column(self):
+        column_name = "test_column"
+        column_data_type = Types.IntegerType.get()
+
+        # Test for default value not set
+        column_dto = (
+            ColumnDTO.builder()
+            .with_name(column_name)
+            .with_data_type(column_data_type)
+            .build()
+        )
+        expected = Column.of(
+            name=column_name,
+            data_type=column_data_type,
+        )
+        converted = DTOConverters.from_dto(column_dto)
+        self.assertTrue(converted.default_value() == Column.DEFAULT_VALUE_NOT_SET)
+        self.assertTrue(expected.default_value() == Column.DEFAULT_VALUE_NOT_SET)
+        self.assertTrue(converted == expected)
+
+        column_dto = (
+            ColumnDTO.builder()
+            .with_name(column_name)
+            .with_data_type(column_data_type)
+            .with_default_value(
+                LiteralDTO.builder()
+                .with_data_type(column_data_type)
+                .with_value("1")
+                .build()
+            )
+            .build()
+        )
+        expected = Column.of(
+            name=column_name,
+            data_type=column_data_type,
+            default_value=Literals.of(value="1", data_type=column_data_type),
+        )
+        converted = DTOConverters.from_dto(column_dto)
+        self.assertTrue(converted.default_value() != Column.DEFAULT_VALUE_NOT_SET)
+        self.assertTrue(expected.default_value() != Column.DEFAULT_VALUE_NOT_SET)
         self.assertTrue(converted == expected)
