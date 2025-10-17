@@ -152,18 +152,15 @@ public class ReverseIndexRules {
   // the values are policies/tags.
   public static final ReverseIndexCache.ReverseIndexRule GENERIC_METADATA_OBJECT_REVERSE_RULE =
       (entity, key, reverseIndexCache) -> {
+        // Name in GenericEntity contains no metalake.
         GenericEntity genericEntity = (GenericEntity) entity;
         EntityType type = entity.type();
         if (genericEntity.name() != null) {
-          // Since it's likely that both policies and tags will be associated with metadata objects,
-          // so we create two reverse index entries here.
-          String[] levels = genericEntity.name().split(",");
-          // 'policy' marks it's a policy reverse index entry.
-          NameIdentifier policyNameIdentifier = NameIdentifier.of(ArrayUtils.add(levels, "policy"));
-          reverseIndexCache.put(policyNameIdentifier, type, key);
-
-          NameIdentifier tagNameIdentifier = NameIdentifier.of(ArrayUtils.add(levels, "tag"));
-          reverseIndexCache.put(tagNameIdentifier, type, key);
+          String[] levels = genericEntity.name().split("\\.");
+          String metadataName = key.identifier().namespace().levels()[0];
+          NameIdentifier objectsNameIdentifier =
+              NameIdentifier.of(ArrayUtils.addFirst(levels, metadataName));
+          reverseIndexCache.put(objectsNameIdentifier, type, key);
         }
       };
 

@@ -19,10 +19,12 @@
 package org.apache.gravitino.cache;
 
 import com.google.common.base.Preconditions;
+import com.google.common.collect.Lists;
 import com.googlecode.concurrenttrees.radix.ConcurrentRadixTree;
 import com.googlecode.concurrenttrees.radix.RadixTree;
 import com.googlecode.concurrenttrees.radix.node.concrete.DefaultCharArrayNodeFactory;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.HasIdentifier;
@@ -39,12 +41,15 @@ import org.apache.gravitino.meta.UserEntity;
  * efficiently store and retrieve relationships between entities based on their keys.
  */
 public class ReverseIndexCache {
-  private RadixTree<EntityCacheKey> reverseIndex;
+  private RadixTree<List<EntityCacheKey>> reverseIndex;
   /** Registers a reverse index processor for a specific entity class. */
   private final Map<Class<? extends Entity>, ReverseIndexRule> reverseIndexRules = new HashMap<>();
 
-  public ReverseIndexCache() {
+  private final CaffeineEntityCache caffeineEntityCache;
+
+  public ReverseIndexCache(CaffeineEntityCache caffeineEntityCache) {
     this.reverseIndex = new ConcurrentRadixTree<>(new DefaultCharArrayNodeFactory());
+    this.caffeineEntityCache = caffeineEntityCache;
 
     registerReverseRule(UserEntity.class, ReverseIndexRules.USER_REVERSE_RULE);
     registerReverseRule(GroupEntity.class, ReverseIndexRules.GROUP_REVERSE_RULE);
@@ -55,11 +60,15 @@ public class ReverseIndexCache {
         GenericEntity.class, ReverseIndexRules.GENERIC_METADATA_OBJECT_REVERSE_RULE);
   }
 
+  public CaffeineEntityCache getCaffeineEntityCache() {
+    return caffeineEntityCache;
+  }
+
   public boolean remove(EntityCacheKey key) {
     return reverseIndex.remove(key.toString());
   }
 
-  public Iterable<EntityCacheKey> getValuesForKeysStartingWith(String keyPrefix) {
+  public Iterable<List<EntityCacheKey>> getValuesForKeysStartingWith(String keyPrefix) {
     return reverseIndex.getValuesForKeysStartingWith(keyPrefix);
   }
 
@@ -78,7 +87,24 @@ public class ReverseIndexCache {
   public void put(
       NameIdentifier nameIdentifier, Entity.EntityType type, EntityCacheRelationKey key) {
     EntityCacheKey entityCacheKey = EntityCacheKey.of(nameIdentifier, type);
-    reverseIndex.put(entityCacheKey.toString(), key);
+
+    List<EntityCacheKey> existingKeys = reverseIndex.getValueForExactKey(entityCacheKey.toString());
+    if (existingKeys == null) {
+      reverseIndex.put(entityCacheKey.toString(), List.of(key));
+    } else {
+      if (existingKeys.contains(key)) {
+        return;
+      }
+
+      List<EntityCacheKey> newValues = Lists.newArrayList(existingKeys);
+      newValues.add(key);
+      reverseIndex.put(entityCacheKey.toString(), newValues);
+    }
+  }
+
+  public List<EntityCacheKey> get(NameIdentifier nameIdentifier, Entity.EntityType type) {
+    EntityCacheKey entityCacheKey = EntityCacheKey.of(nameIdentifier, type);
+    return reverseIndex.getValueForExactKey(entityCacheKey.toString());
   }
 
   public void put(Entity entity, EntityCacheRelationKey key) {
@@ -106,5 +132,17 @@ public class ReverseIndexCache {
   @FunctionalInterface
   interface ReverseIndexRule {
     void indexEntity(Entity entity, EntityCacheRelationKey key, ReverseIndexCache cache);
+  }
+
+  @Override
+  public String toString() {
+    Iterable<CharSequence> keys = reverseIndex.getKeysStartingWith("");
+    StringBuilder sb = new StringBuilder();
+    for (CharSequence key : keys) {
+      sb.append(key).append(" -> ").append(reverseIndex.getValueForExactKey(key.toString()));
+      sb.append("\n");
+    }
+
+    return sb.toString();
   }
 }
