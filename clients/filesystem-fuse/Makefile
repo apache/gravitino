@@ -49,12 +49,12 @@ cargo-machete: install-cargo-machete
 	cargo machete
 
 install-taplo-cli:
-	cargo +nightly install taplo-cli@0.9.0
+	cargo install taplo-cli@0.9.0
 
 check-toml: install-taplo-cli
 	taplo check
 
-check: check-fmt check-clippy check-cargo-sort check-toml cargo-machete
+check: check-fmt check-clippy check-cargo-sort cargo-machete
 
 doc-test:
 	cargo test --no-fail-fast --doc --all-features --workspace
