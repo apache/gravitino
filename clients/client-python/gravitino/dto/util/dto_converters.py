@@ -24,6 +24,8 @@ from gravitino.api.rel.expressions.expression import Expression
 from gravitino.api.rel.expressions.function_expression import FunctionExpression
 from gravitino.api.rel.expressions.literals.literals import Literals
 from gravitino.api.rel.expressions.named_reference import NamedReference
+from gravitino.api.rel.expressions.sorts.sort_order import SortOrder
+from gravitino.api.rel.expressions.sorts.sort_orders import SortOrders
 from gravitino.api.rel.expressions.unparsed_expression import UnparsedExpression
 from gravitino.api.rel.indexes.index import Index
 from gravitino.api.rel.indexes.indexes import Indexes
@@ -35,6 +37,7 @@ from gravitino.dto.rel.expressions.function_arg import FunctionArg
 from gravitino.dto.rel.expressions.literal_dto import LiteralDTO
 from gravitino.dto.rel.expressions.unparsed_expression_dto import UnparsedExpressionDTO
 from gravitino.dto.rel.indexes.index_dto import IndexDTO
+from gravitino.dto.rel.sort_order_dto import SortOrderDTO
 from gravitino.exceptions.base import IllegalArgumentException
 
 
@@ -121,3 +124,20 @@ class DTOConverters:
             Index: The index.
         """
         return Indexes.of(dto.type(), dto.name(), dto.field_names())
+
+    @from_dto.register
+    @staticmethod
+    def _(dto: SortOrderDTO) -> SortOrder:
+        """Converts a SortOrderDTO to a SortOrder.
+
+        Args:
+            dto (SortOrderDTO): The sort order DTO to be converted.
+
+        Returns:
+            SortOrder: The sort order.
+        """
+        return SortOrders.of(
+            DTOConverters.from_function_arg(dto.sort_term()),
+            dto.direction(),
+            dto.null_ordering(),
+        )
