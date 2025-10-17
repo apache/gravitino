@@ -59,6 +59,8 @@ github:
     - tengqm
     - hdygxsj
     - bharos
+    - danhuawang
+    - tsungchih
 
 notifications:
   commits: commits@gravitino.apache.org
