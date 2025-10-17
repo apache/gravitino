@@ -40,24 +40,36 @@ import org.slf4j.LoggerFactory;
  *       or manually cleared.
  *   <li>Catalog: 0, which means that it will never be evicted from the cache unless timeout occurs
  *       or manually cleared.
- *   <li>Schema: 10
- *   <li>Other: 100
+ *   <li>Schema: 500
+ *   <li>Tag: 100
+ *   <li>Policy: 100
+ *   <li>Other: 200
  * </ul>
  */
 public class EntityCacheWeigher implements Weigher<EntityCacheKey, List<Entity>> {
-  public static final int METALAKE_WEIGHT = 0;
+  public static final int METALAKE_WEIGHT = 0; // 0 means never evict
   public static final int CATALOG_WEIGHT = 0;
-  public static final int SCHEMA_WEIGHT = 10;
-  public static final int OTHER_WEIGHT = 100;
+  public static final int SCHEMA_WEIGHT = 500; // higher weight means it will less likely be evicted
+  public static final int OTHER_WEIGHT = 200;
+  public static final int TAG_WEIGHT = 100;
+  public static final int POLICY_WEIGHT = 100;
   private static final Logger LOG = LoggerFactory.getLogger(EntityCacheWeigher.class.getName());
   private static final EntityCacheWeigher INSTANCE = new EntityCacheWeigher();
   private static final Map<Entity.EntityType, Integer> ENTITY_WEIGHTS =
       ImmutableMap.of(
           Entity.EntityType.METALAKE, METALAKE_WEIGHT,
           Entity.EntityType.CATALOG, CATALOG_WEIGHT,
-          Entity.EntityType.SCHEMA, SCHEMA_WEIGHT);
+          Entity.EntityType.SCHEMA, SCHEMA_WEIGHT,
+          Entity.EntityType.TAG, TAG_WEIGHT,
+          Entity.EntityType.POLICY, POLICY_WEIGHT);
   private static final long MAX_WEIGHT =
-      2 * (METALAKE_WEIGHT * 10 + CATALOG_WEIGHT * (10 * 200) + SCHEMA_WEIGHT * (10 * 200 * 1000));
+      2
+          * (METALAKE_WEIGHT * 10
+              + CATALOG_WEIGHT * 100
+              + SCHEMA_WEIGHT * 1000
+              + OTHER_WEIGHT * 10000
+              + TAG_WEIGHT * 10000
+              + POLICY_WEIGHT * 10000);
 
   @VisibleForTesting
   protected EntityCacheWeigher() {}
