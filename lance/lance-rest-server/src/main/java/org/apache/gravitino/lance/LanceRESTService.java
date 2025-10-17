@@ -23,8 +23,7 @@ import javax.servlet.Servlet;
 import org.apache.gravitino.auxiliary.GravitinoAuxiliaryService;
 import org.apache.gravitino.lance.common.config.LanceConfig;
 import org.apache.gravitino.lance.common.ops.LanceCatalogService;
-import org.apache.gravitino.lance.service.rest.LanceCatalogOperations;
-import org.apache.gravitino.lance.service.rest.LanceMetadataOperations;
+import org.apache.gravitino.lance.service.rest.LanceNamespaceOperations;
 import org.apache.gravitino.server.web.JettyServer;
 import org.apache.gravitino.server.web.JettyServerConfig;
 import org.glassfish.jersey.jackson.JacksonFeature;
@@ -61,8 +60,7 @@ public class LanceRESTService implements GravitinoAuxiliaryService {
 
     ResourceConfig resourceConfig = new ResourceConfig();
     resourceConfig.register(JacksonFeature.class);
-    resourceConfig.register(new LanceMetadataOperations(catalogService));
-    resourceConfig.register(new LanceCatalogOperations(catalogService));
+    resourceConfig.register(new LanceNamespaceOperations(catalogService));
 
     Servlet container = new ServletContainer(resourceConfig);
     server.addServlet(container, LANCE_SPEC);
