@@ -49,7 +49,7 @@ cargo-machete: install-cargo-machete
 	cargo machete
 
 install-taplo-cli:
-	cargo +nightly install taplo-cli@0.9.0
+	cargo install taplo-cli@0.10.0
 
 check-toml: install-taplo-cli
 	taplo check
