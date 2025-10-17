@@ -72,6 +72,11 @@ jobs:
         run: |
           dev/ci/check_commands.sh
 
+      - name: Start tmate session
+        uses: mxschmitt/action-tmate@v3
+        with:
+          limit-access-to-actor: true 
+
       - name: Build Gvfs-fuse
         run: |
            ./gradlew :clients:filesystem-fuse:build -PenableFuse=true
