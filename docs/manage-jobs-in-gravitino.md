@@ -84,9 +84,9 @@ Here is a brief description of the fields in the job template:
 Please note that:
 
 1. The `executable` and `scripts` must be accessible by the Gravitino server. Currently,
-   Gravitino supports accessing files from the local file system, HTTP(S) URLs, and FTP(S) URLs
-   (more distributed file system support will be added in the future). So the `executable` and
-   `scripts` can be a local file path, or a URL like `http://example.com/my_script.sh`.
+   Gravitino supports accessing files from the local file system, HTTP(S) URLs, FTP(S) URLs and
+   Hadoop Compatible FileSystems URLs (like `hdfs://`, `s3a://`, `gs://`, etc.). So the
+   `executable` and `scripts` can be a local file path, or a URL like `http://example.com/my_script.sh`.
 2. The `arguments`, `environments`, and `customFields` can use placeholders like `{{arg1}}` and
    `{{value1}}` to be replaced with actual values when running the job. The placeholders will be
    replaced with the actual values when running the job, so you can use them to pass dynamic values
@@ -155,9 +155,9 @@ Here is a brief description of the fields in the Spark job template:
 Note that:
 
 1. The `executable`, `jars`, `files`, and `archives` must be accessible by the Gravitino server.
-   Currently, Gravitino support accessing files from the local file system, HTTP(S) URLs, and
-   FTP(S) URLs (more distributed file system supports will be added in the future). So the
-   `executable`, `jars`, `files`, and `archives` can be a local file path, or a URL like
+   Currently, Gravitino support accessing files from the local file system, HTTP(S) URLs,
+   FTP(S) URLs and Hadoop Compatible FileSystems URLs (like `hdfs://`, `s3a://`, `gs://`, etc.).
+   So the `executable`, `jars`, `files`, and `archives` can be a local file path, or a URL like
    `http://example.com/my_spark_app.jar`.
 2. The `arguments`, `environments`, `customFields`, and `configs` can use placeholders like
    `{{arg1}}` and `{{value1}}` to be replaced with actual values when running the job. The placeholders
@@ -168,6 +168,19 @@ Note that:
    `files`, and `archives` to refer to other files in the job working directory.
 4. The `className` is required for the Java and Scala Spark job template, it is the main class of
    the Spark application to be executed. For PySpark job template, this field can be `null` instead.
+
+:::info
+If you want to use the job artifacts on the Hadoop Compatible FileSystems (like `hdfs://`,
+`s3a://`, `gs://`, etc.), You need to make sure that:
+
+1. The Gravitino server has the corresponding Hadoop client libraries in its classpath
+   `{GRAVITINO_HOME}/libs` directory. For example, if you want to use `s3a://` scheme, you need to
+   put the `hadoop-aws` and its dependencies in the `{GRAVITINO_HOME}/libs` directory. By
+   default, the HDFS client libraries are already included in the Gravitino server package.
+2. The Gravitino server has the corresponding Hadoop configurations in its classpath
+   `{GRAVITINO_HOME}/conf` directory. For example, if you want to use `s3a://` scheme, you need to
+   put the `core-site.xml` and `hdfs-site.xml` in the `{GRAVITINO_HOME}/conf` directory.
+:::
 
 To register a job template, you can use REST API or the Java and Python SDKs. Here is the
 example to register a shell job template:

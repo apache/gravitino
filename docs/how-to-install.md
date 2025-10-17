@@ -81,7 +81,7 @@ Gravitino takes the catalog configurations in the following order:
 1. Catalog `properties` specified in catalog creation API or REST API.
 2. Catalog configurations specified in the catalog configuration file.
 
-The catalog `properties` can override the catalog configurations specified in the configurationfile.
+The catalog `properties` can override the catalog configurations specified in the configuration file.
 :::
 
 Gravitino supports passing in catalog-specific configurations if you add `gravitino.bypass.`. For example, if you want to pass in the HMS-specific configuration `hive.metastore.client.capability.check` to the underlying Hive client in the Hive catalog, add the `gravitino.bypass.` prefix.

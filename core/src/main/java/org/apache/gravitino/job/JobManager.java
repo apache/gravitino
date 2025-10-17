@@ -65,6 +65,9 @@ import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
 import org.apache.gravitino.utils.PrincipalUtils;
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.Path;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -786,7 +789,12 @@ public class JobManager implements JobOperationDispatcher {
           break;
 
         default:
-          throw new IllegalArgumentException("Unsupported scheme: " + scheme);
+          Configuration hadoopConf = new Configuration();
+          // Initialize and close the FileSystem each time to avoid potential UGI issue and other
+          // resource leak issue.
+          try (FileSystem fs = FileSystem.newInstance(hadoopConf)) {
+            fs.copyToLocalFile(new Path(fileUri), new Path(destFile.toURI()));
+          }
       }
 
       return destFile.getAbsolutePath();
