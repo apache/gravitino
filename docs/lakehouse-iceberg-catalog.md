@@ -82,6 +82,10 @@ Supports using static access-key-id and secret-access-key to access S3 data.
 
 For other Iceberg s3 properties not managed by Gravitino like `s3.sse.type`, you could config it directly by `gravitino.bypass.s3.sse.type`.
 
+:::caution
+To resolve Log4j class conflict issues that may arise when using Iceberg AWS 1.9 bundle jars alongside the Gravitino server, it is recommended to remove the Log4j JAR files (specifically log4j-core and log4j-api) from the `catalogs/lakehouse-iceberg/libs` directory.
+:::
+
 :::info
 To configure the JDBC catalog backend, set the `warehouse` parameter to `s3://{bucket_name}/${prefix_name}`. For the Hive catalog backend, set `warehouse` to `s3a://{bucket_name}/${prefix_name}`. Additionally, download the [Iceberg AWS bundle](https://mvnrepository.com/artifact/org.apache.iceberg/iceberg-aws-bundle) and place it in the `catalogs/lakehouse-iceberg/libs/` directory.
 :::

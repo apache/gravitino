@@ -19,7 +19,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, ClassVar
 
-from gravitino.api.expressions.literals.literal import Literal
+from gravitino.api.rel.expressions.literals.literal import Literal
 from gravitino.api.rel.types.types import Types
 from gravitino.dto.rel.expressions.function_arg import FunctionArg
 

@@ -32,7 +32,7 @@ public class ModelVersionMetaPostgreSQLProvider extends ModelVersionMetaBaseSQLP
     return "UPDATE "
         + ModelVersionMetaMapper.TABLE_NAME
         + " mvi SET deleted_at = floor(extract(epoch from(current_timestamp -"
-        + " timestamp '1970-01-01 00:00:00'))*1000)"
+        + " timestamp '1970-01-01 00:00:00')) * 1000)"
         + " WHERE mvi.schema_id = #{schemaId} AND mvi.model_id = ("
         + " SELECT mm.model_id FROM "
         + ModelMetaMapper.TABLE_NAME
@@ -46,7 +46,7 @@ public class ModelVersionMetaPostgreSQLProvider extends ModelVersionMetaBaseSQLP
     return "UPDATE "
         + ModelVersionMetaMapper.TABLE_NAME
         + " SET deleted_at = floor(extract(epoch from(current_timestamp -"
-        + " timestamp '1970-01-01 00:00:00'))*1000)"
+        + " timestamp '1970-01-01 00:00:00')) * 1000)"
         + " WHERE model_id = #{modelId} AND version = #{modelVersion} AND deleted_at = 0";
   }
 
@@ -56,7 +56,7 @@ public class ModelVersionMetaPostgreSQLProvider extends ModelVersionMetaBaseSQLP
     return "UPDATE "
         + ModelVersionMetaMapper.TABLE_NAME
         + " SET deleted_at = floor(extract(epoch from(current_timestamp -"
-        + " timestamp '1970-01-01 00:00:00'))*1000)"
+        + " timestamp '1970-01-01 00:00:00')) * 1000)"
         + " WHERE model_id = #{modelId} AND version = ("
         + " SELECT model_version FROM "
         + ModelVersionAliasRelMapper.TABLE_NAME
@@ -69,7 +69,7 @@ public class ModelVersionMetaPostgreSQLProvider extends ModelVersionMetaBaseSQLP
     return "UPDATE "
         + ModelVersionMetaMapper.TABLE_NAME
         + " SET deleted_at = floor(extract(epoch from(current_timestamp -"
-        + " timestamp '1970-01-01 00:00:00'))*1000)"
+        + " timestamp '1970-01-01 00:00:00')) * 1000)"
         + " WHERE schema_id = #{schemaId} AND deleted_at = 0";
   }
 
@@ -78,7 +78,7 @@ public class ModelVersionMetaPostgreSQLProvider extends ModelVersionMetaBaseSQLP
     return "UPDATE "
         + ModelVersionMetaMapper.TABLE_NAME
         + " SET deleted_at = floor(extract(epoch from(current_timestamp -"
-        + " timestamp '1970-01-01 00:00:00'))*1000)"
+        + " timestamp '1970-01-01 00:00:00')) * 1000)"
         + " WHERE catalog_id = #{catalogId} AND deleted_at = 0";
   }
 
@@ -87,7 +87,7 @@ public class ModelVersionMetaPostgreSQLProvider extends ModelVersionMetaBaseSQLP
     return "UPDATE "
         + ModelVersionMetaMapper.TABLE_NAME
         + " SET deleted_at = floor(extract(epoch from(current_timestamp -"
-        + " timestamp '1970-01-01 00:00:00'))*1000)"
+        + " timestamp '1970-01-01 00:00:00')) * 1000)"
         + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0";
   }
 

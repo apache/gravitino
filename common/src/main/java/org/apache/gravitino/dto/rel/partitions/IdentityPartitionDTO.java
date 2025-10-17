@@ -32,7 +32,9 @@ public class IdentityPartitionDTO implements PartitionDTO, IdentityPartition {
   private final LiteralDTO[] values;
   private final Map<String, String> properties;
 
-  /** @return A builder instance for {@link IdentityPartitionDTO}. */
+  /**
+   * @return A builder instance for {@link IdentityPartitionDTO}.
+   */
   public static Builder builder() {
     return new Builder();
   }
@@ -49,31 +51,41 @@ public class IdentityPartitionDTO implements PartitionDTO, IdentityPartition {
     this.properties = properties;
   }
 
-  /** @return The name of the partition. */
+  /**
+   * @return The name of the partition.
+   */
   @Override
   public String name() {
     return name;
   }
 
-  /** @return The field names. */
+  /**
+   * @return The field names.
+   */
   @Override
   public String[][] fieldNames() {
     return fieldNames;
   }
 
-  /** @return The values. */
+  /**
+   * @return The values.
+   */
   @Override
   public LiteralDTO[] values() {
     return values;
   }
 
-  /** @return The properties. */
+  /**
+   * @return The properties.
+   */
   @Override
   public Map<String, String> properties() {
     return properties;
   }
 
-  /** @return The type of the partition. */
+  /**
+   * @return The type of the partition.
+   */
   @Override
   public Type type() {
     return Type.IDENTITY;

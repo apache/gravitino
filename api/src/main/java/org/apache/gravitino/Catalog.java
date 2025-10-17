@@ -150,13 +150,19 @@ public interface Catalog extends Auditable {
    */
   String AUTHORIZATION_PROVIDER = "authorization-provider";
 
-  /** @return The name of the catalog. */
+  /**
+   * @return The name of the catalog.
+   */
   String name();
 
-  /** @return The type of the catalog. */
+  /**
+   * @return The type of the catalog.
+   */
   Type type();
 
-  /** @return The provider of the catalog. */
+  /**
+   * @return The provider of the catalog.
+   */
   String provider();
 
   /**

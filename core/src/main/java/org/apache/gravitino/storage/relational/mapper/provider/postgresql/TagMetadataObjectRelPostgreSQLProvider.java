@@ -41,7 +41,7 @@ public class TagMetadataObjectRelPostgreSQLProvider extends TagMetadataObjectRel
     return "UPDATE "
         + TAG_METADATA_OBJECT_RELATION_TABLE_NAME
         + " te SET deleted_at = floor(extract(epoch from(current_timestamp -"
-        + " timestamp '1970-01-01 00:00:00'))*1000)"
+        + " timestamp '1970-01-01 00:00:00')) * 1000)"
         + " WHERE te.tag_id IN (SELECT tm.tag_id FROM "
         + TagMetaMapper.TAG_TABLE_NAME
         + " tm WHERE tm.metalake_id IN (SELECT mm.metalake_id FROM "
@@ -55,7 +55,7 @@ public class TagMetadataObjectRelPostgreSQLProvider extends TagMetadataObjectRel
     return "UPDATE "
         + TAG_METADATA_OBJECT_RELATION_TABLE_NAME
         + " te SET deleted_at = floor(extract(epoch from(current_timestamp -"
-        + " timestamp '1970-01-01 00:00:00'))*1000)"
+        + " timestamp '1970-01-01 00:00:00')) * 1000)"
         + " WHERE EXISTS (SELECT * FROM "
         + TagMetaMapper.TAG_TABLE_NAME
         + " tm WHERE tm.metalake_id = #{metalakeId} AND tm.tag_id = te.tag_id"
@@ -69,7 +69,7 @@ public class TagMetadataObjectRelPostgreSQLProvider extends TagMetadataObjectRel
     return " UPDATE "
         + TAG_METADATA_OBJECT_RELATION_TABLE_NAME
         + " SET deleted_at = floor(extract(epoch from(current_timestamp -"
-        + " timestamp '1970-01-01 00:00:00'))*1000)"
+        + " timestamp '1970-01-01 00:00:00')) * 1000)"
         + " WHERE metadata_object_id = #{metadataObjectId} AND deleted_at = 0"
         + " AND metadata_object_type = #{metadataObjectType}";
   }
@@ -79,38 +79,38 @@ public class TagMetadataObjectRelPostgreSQLProvider extends TagMetadataObjectRel
     return " UPDATE "
         + TagMetadataObjectRelMapper.TAG_METADATA_OBJECT_RELATION_TABLE_NAME
         + " tmt SET deleted_at = floor(extract(epoch from(current_timestamp -"
-        + " timestamp '1970-01-01 00:00:00'))*1000)"
+        + " timestamp '1970-01-01 00:00:00')) * 1000)"
         + " WHERE tmt.deleted_at = 0 AND EXISTS ("
         + " SELECT ct.catalog_id FROM "
         + CatalogMetaMapper.TABLE_NAME
-        + " ct WHERE ct.catalog_id = #{catalogId}  AND "
-        + "ct.catalog_id = tmt.metadata_object_id AND tmt.metadata_object_type = 'CATALOG'"
-        + " UNION "
+        + " ct WHERE ct.catalog_id = #{catalogId} AND"
+        + " ct.catalog_id = tmt.metadata_object_id AND tmt.metadata_object_type = 'CATALOG'"
+        + " UNION"
         + " SELECT st.catalog_id FROM "
         + SchemaMetaMapper.TABLE_NAME
-        + " st WHERE st.catalog_id = #{catalogId} AND "
-        + "st.schema_id = tmt.metadata_object_id AND tmt.metadata_object_type = 'SCHEMA'"
-        + " UNION "
+        + " st WHERE st.catalog_id = #{catalogId} AND"
+        + " st.schema_id = tmt.metadata_object_id AND tmt.metadata_object_type = 'SCHEMA'"
+        + " UNION"
         + " SELECT tt.catalog_id FROM "
         + TopicMetaMapper.TABLE_NAME
-        + " tt WHERE tt.catalog_id = #{catalogId} AND "
-        + "tt.topic_id = tmt.metadata_object_id AND tmt.metadata_object_type = 'TOPIC'"
-        + " UNION "
+        + " tt WHERE tt.catalog_id = #{catalogId} AND"
+        + " tt.topic_id = tmt.metadata_object_id AND tmt.metadata_object_type = 'TOPIC'"
+        + " UNION"
         + " SELECT tat.catalog_id FROM "
         + TableMetaMapper.TABLE_NAME
-        + " tat WHERE tat.catalog_id = #{catalogId} AND "
-        + "tat.table_id = tmt.metadata_object_id AND tmt.metadata_object_type = 'TABLE'"
-        + " UNION "
+        + " tat WHERE tat.catalog_id = #{catalogId} AND"
+        + " tat.table_id = tmt.metadata_object_id AND tmt.metadata_object_type = 'TABLE'"
+        + " UNION"
         + " SELECT ft.catalog_id FROM "
         + FilesetMetaMapper.META_TABLE_NAME
-        + " ft WHERE ft.catalog_id = #{catalogId}  AND"
+        + " ft WHERE ft.catalog_id = #{catalogId} AND"
         + " ft.fileset_id = tmt.metadata_object_id AND tmt.metadata_object_type = 'FILESET'"
-        + " UNION "
+        + " UNION"
         + " SELECT cot.catalog_id FROM "
         + TableColumnMapper.COLUMN_TABLE_NAME
         + " cot WHERE cot.catalog_id = #{catalogId} AND"
         + " cot.column_id = tmt.metadata_object_id AND tmt.metadata_object_type = 'COLUMN'"
-        + " UNION "
+        + " UNION"
         + " SELECT mt.catalog_id FROM "
         + ModelMetaMapper.TABLE_NAME
         + " mt WHERE mt.catalog_id = #{catalogId} AND"
@@ -123,36 +123,36 @@ public class TagMetadataObjectRelPostgreSQLProvider extends TagMetadataObjectRel
     return " UPDATE "
         + TagMetadataObjectRelMapper.TAG_METADATA_OBJECT_RELATION_TABLE_NAME
         + " tmt SET deleted_at = floor(extract(epoch from(current_timestamp -"
-        + " timestamp '1970-01-01 00:00:00'))*1000)"
+        + " timestamp '1970-01-01 00:00:00')) * 1000)"
         + " WHERE tmt.deleted_at = 0 AND EXISTS ("
         + " SELECT st.schema_id FROM "
         + SchemaMetaMapper.TABLE_NAME
-        + " st WHERE st.schema_id = #{schemaId} AND "
-        + "st.schema_id = tmt.metadata_object_id AND tmt.metadata_object_type = 'SCHEMA'"
-        + " UNION "
+        + " st WHERE st.schema_id = #{schemaId} AND"
+        + " st.schema_id = tmt.metadata_object_id AND tmt.metadata_object_type = 'SCHEMA'"
+        + " UNION"
         + " SELECT tt.schema_id FROM "
         + TopicMetaMapper.TABLE_NAME
-        + " tt WHERE tt.schema_id = #{schemaId} AND "
-        + "tt.topic_id = tmt.metadata_object_id AND tmt.metadata_object_type = 'TOPIC'"
-        + " UNION "
+        + " tt WHERE tt.schema_id = #{schemaId} AND"
+        + " tt.topic_id = tmt.metadata_object_id AND tmt.metadata_object_type = 'TOPIC'"
+        + " UNION"
         + " SELECT tat.schema_id FROM "
         + TableMetaMapper.TABLE_NAME
         + " tat WHERE tat.schema_id = #{schemaId} AND"
         + " tat.table_id = tmt.metadata_object_id AND tmt.metadata_object_type = 'TABLE'"
-        + " UNION "
+        + " UNION"
         + " SELECT ft.schema_id FROM "
         + FilesetMetaMapper.META_TABLE_NAME
         + " ft WHERE ft.schema_id = #{schemaId} AND"
         + " ft.fileset_id = tmt.metadata_object_id AND tmt.metadata_object_type = 'FILESET'"
-        + " UNION "
+        + " UNION"
         + " SELECT cot.schema_id FROM "
         + TableColumnMapper.COLUMN_TABLE_NAME
         + " cot WHERE cot.schema_id = #{schemaId} AND"
         + " cot.column_id = tmt.metadata_object_id AND tmt.metadata_object_type = 'COLUMN'"
-        + " UNION "
+        + " UNION"
         + " SELECT mt.schema_id FROM "
         + ModelMetaMapper.TABLE_NAME
-        + " mt WHERE mt.schema_id = #{schemaId} AND "
+        + " mt WHERE mt.schema_id = #{schemaId} AND"
         + " mt.model_id = tmt.metadata_object_id AND tmt.metadata_object_type = 'MODEL'"
         + ")";
   }
@@ -162,16 +162,16 @@ public class TagMetadataObjectRelPostgreSQLProvider extends TagMetadataObjectRel
     return " UPDATE "
         + TagMetadataObjectRelMapper.TAG_METADATA_OBJECT_RELATION_TABLE_NAME
         + " tmt SET deleted_at = floor(extract(epoch from(current_timestamp -"
-        + " timestamp '1970-01-01 00:00:00'))*1000)"
+        + " timestamp '1970-01-01 00:00:00')) * 1000)"
         + " WHERE tmt.deleted_at = 0 AND EXISTS ("
         + " SELECT tat.table_id FROM "
         + TableMetaMapper.TABLE_NAME
-        + " tat WHERE tat.table_id = #{tableId} AND "
+        + " tat WHERE tat.table_id = #{tableId} AND"
         + " tat.table_id = tmt.metadata_object_id AND tmt.metadata_object_type = 'TABLE'"
-        + " UNION "
+        + " UNION"
         + " SELECT cot.table_id FROM "
         + TableColumnMapper.COLUMN_TABLE_NAME
-        + " cot WHERE cot.table_id = #{tableId} AND "
+        + " cot WHERE cot.table_id = #{tableId} AND"
         + " cot.column_id = tmt.metadata_object_id AND tmt.metadata_object_type = 'COLUMN'"
         + ")";
   }
@@ -183,12 +183,12 @@ public class TagMetadataObjectRelPostgreSQLProvider extends TagMetadataObjectRel
         + "UPDATE "
         + TAG_METADATA_OBJECT_RELATION_TABLE_NAME
         + " SET deleted_at = floor(extract(epoch from(current_timestamp -"
-        + " timestamp '1970-01-01 00:00:00'))*1000)"
+        + " timestamp '1970-01-01 00:00:00')) * 1000)"
         + " WHERE tag_id IN "
         + "<foreach item='tagId' collection='tagIds' open='(' separator=',' close=')'>"
         + "#{tagId}"
         + "</foreach>"
-        + " And metadata_object_id = #{metadataObjectId}"
+        + " AND metadata_object_id = #{metadataObjectId}"
         + " AND metadata_object_type = #{metadataObjectType} AND deleted_at = 0"
         + "</script>";
   }

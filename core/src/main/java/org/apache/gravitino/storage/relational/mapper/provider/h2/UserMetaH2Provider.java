@@ -48,7 +48,7 @@ public class UserMetaH2Provider extends UserMetaBaseSQLProvider {
         + " WHERE deleted_at = 0)"
         + " AS rot ON rot.role_id = rt.role_id"
         + " WHERE "
-        + " ut.deleted_at = 0 AND "
+        + " ut.deleted_at = 0 AND"
         + " ut.metalake_id = #{metalakeId}"
         + " GROUP BY ut.user_id";
   }

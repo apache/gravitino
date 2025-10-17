@@ -55,7 +55,9 @@ public class UserDTO implements User {
     this.roles = roles;
   }
 
-  /** @return The name of the User DTO. */
+  /**
+   * @return The name of the User DTO.
+   */
   @Override
   public String name() {
     return name;
@@ -71,7 +73,9 @@ public class UserDTO implements User {
     return roles;
   }
 
-  /** @return The audit information of the User DTO. */
+  /**
+   * @return The audit information of the User DTO.
+   */
   @Override
   public Audit auditInfo() {
     return audit;

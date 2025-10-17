@@ -60,10 +60,12 @@ import org.apache.gravitino.hook.TableHookDispatcher;
 import org.apache.gravitino.hook.TopicHookDispatcher;
 import org.apache.gravitino.job.JobManager;
 import org.apache.gravitino.job.JobOperationDispatcher;
+import org.apache.gravitino.listener.AccessControlEventDispatcher;
 import org.apache.gravitino.listener.CatalogEventDispatcher;
 import org.apache.gravitino.listener.EventBus;
 import org.apache.gravitino.listener.EventListenerManager;
 import org.apache.gravitino.listener.FilesetEventDispatcher;
+import org.apache.gravitino.listener.JobEventDispatcher;
 import org.apache.gravitino.listener.MetalakeEventDispatcher;
 import org.apache.gravitino.listener.ModelEventDispatcher;
 import org.apache.gravitino.listener.PartitionEventDispatcher;
@@ -71,7 +73,6 @@ import org.apache.gravitino.listener.SchemaEventDispatcher;
 import org.apache.gravitino.listener.TableEventDispatcher;
 import org.apache.gravitino.listener.TagEventDispatcher;
 import org.apache.gravitino.listener.TopicEventDispatcher;
-import org.apache.gravitino.listener.api.event.AccessControlEventDispatcher;
 import org.apache.gravitino.lock.LockManager;
 import org.apache.gravitino.metalake.MetalakeDispatcher;
 import org.apache.gravitino.metalake.MetalakeManager;
@@ -599,7 +600,7 @@ public class GravitinoEnv {
     // todo: support policy event dispatcher
     this.policyDispatcher = new PolicyManager(idGenerator, entityStore);
 
-    // TODO: Support event for job operation dispatcher
-    this.jobOperationDispatcher = new JobManager(config, entityStore, idGenerator);
+    this.jobOperationDispatcher =
+        new JobEventDispatcher(eventBus, new JobManager(config, entityStore, idGenerator));
   }
 }

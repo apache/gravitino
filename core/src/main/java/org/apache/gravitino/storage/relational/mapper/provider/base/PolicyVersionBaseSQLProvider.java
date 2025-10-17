@@ -31,26 +31,26 @@ public class PolicyVersionBaseSQLProvider {
       @Param("policyVersion") PolicyVersionPO policyVersion) {
     return "INSERT INTO "
         + POLICY_VERSION_TABLE_NAME
-        + " (metalake_id, policy_id, version, policy_comment, enabled, content, deleted_at) "
-        + "VALUES (#{policyVersion.metalakeId}, #{policyVersion.policyId}, #{policyVersion.version}, #{policyVersion.policyComment}, "
-        + "#{policyVersion.enabled}, #{policyVersion.content}, #{policyVersion.deletedAt}) "
-        + "ON DUPLICATE KEY UPDATE "
-        + "metalake_id = #{policyVersion.metalakeId}, "
-        + "policy_id = #{policyVersion.policyId}, "
-        + "version = #{policyVersion.version}, "
-        + "policy_comment = #{policyVersion.policyComment}, "
-        + "enabled = #{policyVersion.enabled}, "
-        + "content = #{policyVersion.content}, "
-        + "deleted_at = #{policyVersion.deletedAt}";
+        + " (metalake_id, policy_id, version, policy_comment, enabled, content, deleted_at)"
+        + " VALUES (#{policyVersion.metalakeId}, #{policyVersion.policyId}, #{policyVersion.version}, #{policyVersion.policyComment},"
+        + " #{policyVersion.enabled}, #{policyVersion.content}, #{policyVersion.deletedAt})"
+        + " ON DUPLICATE KEY UPDATE"
+        + " metalake_id = #{policyVersion.metalakeId},"
+        + " policy_id = #{policyVersion.policyId},"
+        + " version = #{policyVersion.version},"
+        + " policy_comment = #{policyVersion.policyComment},"
+        + " enabled = #{policyVersion.enabled},"
+        + " content = #{policyVersion.content},"
+        + " deleted_at = #{policyVersion.deletedAt}";
   }
 
   public String insertPolicyVersion(@Param("policyVersion") PolicyVersionPO policyVersion) {
     return "INSERT INTO "
         + POLICY_VERSION_TABLE_NAME
-        + " (metalake_id, policy_id, version, policy_comment, enabled, content, deleted_at) "
-        + "VALUES (#{policyVersion.metalakeId}, #{policyVersion.policyId}, #{policyVersion.version}, "
-        + "#{policyVersion.policyComment}, #{policyVersion.enabled}, #{policyVersion.content}, "
-        + "#{policyVersion.deletedAt})";
+        + " (metalake_id, policy_id, version, policy_comment, enabled, content, deleted_at)"
+        + " VALUES (#{policyVersion.metalakeId}, #{policyVersion.policyId}, #{policyVersion.version},"
+        + " #{policyVersion.policyComment}, #{policyVersion.enabled}, #{policyVersion.content},"
+        + " #{policyVersion.deletedAt})";
   }
 
   public String softDeletePolicyVersionByMetalakeAndPolicyName(
@@ -83,12 +83,12 @@ public class PolicyVersionBaseSQLProvider {
 
   public String selectPolicyVersionsByRetentionCount(
       @Param("versionRetentionCount") Long versionRetentionCount) {
-    return "SELECT policy_id as policyId, "
-        + "Max(version) as version "
-        + "FROM "
+    return "SELECT policy_id as policyId,"
+        + " MAX(version) as version"
+        + " FROM "
         + POLICY_VERSION_TABLE_NAME
-        + " WHERE version > #{versionRetentionCount} AND deleted_at = 0 "
-        + "GROUP BY policy_id";
+        + " WHERE version > #{versionRetentionCount} AND deleted_at = 0"
+        + " GROUP BY policy_id";
   }
 
   public String softDeletePolicyVersionsByRetentionLine(

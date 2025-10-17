@@ -38,7 +38,7 @@ public class GetGroupEvent extends GroupEvent {
    * @param metalake the name of the metalake from which the group is retrieved.
    * @param loadedGroupInfo the information of the group that was retrieved.
    */
-  protected GetGroupEvent(String initiator, String metalake, GroupInfo loadedGroupInfo) {
+  public GetGroupEvent(String initiator, String metalake, GroupInfo loadedGroupInfo) {
     super(initiator, NameIdentifierUtil.ofGroup(metalake, loadedGroupInfo.name()));
 
     this.loadedGroupInfo = loadedGroupInfo;

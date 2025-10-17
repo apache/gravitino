@@ -343,6 +343,95 @@ curl -X DELETE -H "Accept: application/vnd.gravitino.v1+json" \
 </TabItem>
 </Tabs>
 
+### Alter a registered job template
+
+You can alter a registered job template by its name using the REST API or the Java and Python
+SDKs. Gravitino supports altering the `name`, `comment` and `template` fields of the job template.
+
+<Tabs groupId='language' queryString>
+<TabItem value="shell" label="Shell">
+
+```shell
+curl -X PUT -H "Accept: application/vnd.gravitino.v1+json" \
+    -H "Content-Type: application/json" \
+    -d '{
+        "updates": [
+            {
+                "@type": "rename",
+                "newName": "altered_shell_job_template"
+            },
+            {
+                "@type": "comment",
+                "newComment": "An altered shell job template"
+            },
+            {
+                "@type": "updateTemplate",
+                "newTemplate": {
+                    "@type": "shell",
+                    "newExecutable": "/new/path/to/my_script.sh",
+                    "newArguments": ["{{new_arg1}}", "{{new_arg2}}"],
+                    "newEnvironments": {
+                        "NEW_ENV_VAR1": "{{new_value1}}",
+                        "NEW_ENV_VAR2": "{{new_value2}}"
+                    },
+                    "newCustomFields": {
+                        "new_field1": "{{new_value1}}",
+                        "new_field2": "{{new_value2}}"
+                    },
+                    "newScripts": ["/new/path/to/script1.sh", "/new/path/to/script2.sh"]
+                }
+            }
+        ]
+
+    }' http://localhost:8090/api/metalakes/test/jobs/templates/my_shell_job_template
+```
+
+</TabItem>
+<TabItem value="java" label="Java">
+
+```java
+    ShellTemplateUpdate newTemplate = ShellTemplateUpdate.builder()
+        .withNewExecutable("/new/path/to/my_script.sh")
+        .withNewArguments(ImmutableList.of("{{new_arg1}}", "{{new_arg2}}"))
+        .withNewEnvironments(ImmutableMap.of("NEW_ENV_VAR1", "{{new_value1}}", "NEW_ENV_VAR2", "{{new_value2}}"))
+        .withNewCustomFields(ImmutableMap.of("new_field1", "{{new_value1}}", "new_field2", "{{new_value2}}"))
+        .withNewScripts(List.of("/new/path/to/script1.sh", "/new/path/to/script2.sh"))
+        .build();
+
+    List<JobTemplateChange> changes = List.of(
+        JobTemplateChange.rename("altered_shell_job_template"),
+        JobTemplateChange.updateComment("An altered shell job template"),
+        JobTemplateChange.updateTemplateUpdateJobTemplate(newTemplate));
+
+    GravitinoClient client = ...;
+    client.alterJobTemplate("my_shell_job_template", changes);
+```
+
+</TabItem>
+<TabItem value="python" label="Python">
+
+```python
+    new_template = ShellTemplateUpdate(
+        new_executable="/new/path/to/my_script.sh",
+        new_arguments=["{{new_arg1}}", "{{new_arg2}}"],
+        new_environments={"NEW_ENV_VAR1": "{{new_value1}}", "NEW_ENV_VAR2": "{{new_value2}}"},
+        new_custom_fields={"new_field1": "{{new_value1}}", "new_field2": "{{new_value2}}"},
+        new_scripts=["/new/path/to/script1.sh", "/new/path/to/script2.sh"]
+    )
+
+    changes = [
+        JobTemplateChange.rename("altered_shell_job_template"),
+        JobTemplateChange.update_comment("An altered shell job template"),
+        JobTemplateChange.update_template(new_template)
+    ]
+
+    client = GravitinoClient(...)
+    client.alter_job_template("my_shell_job_template", changes)
+```
+
+</TabItem>
+</Tabs>
+
 ### Run a job based on a job template
 
 To run a job based on the registered job template, you can use the REST API or the Java and Python SDKs.

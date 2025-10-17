@@ -35,7 +35,7 @@ public class AddGroupPreEvent extends GroupPreEvent {
    * @param metalake the name of the metalake where the group is to be added.
    * @param groupName the name of the group that is requested to be added to the metalake.
    */
-  protected AddGroupPreEvent(String initiator, String metalake, String groupName) {
+  public AddGroupPreEvent(String initiator, String metalake, String groupName) {
     super(initiator, NameIdentifierUtil.ofGroup(metalake, groupName));
 
     this.groupName = groupName;

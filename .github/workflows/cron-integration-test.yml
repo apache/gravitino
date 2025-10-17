@@ -75,7 +75,7 @@ jobs:
 
       - name: Package Gravitino
         run: |
-          ./gradlew compileDistribution -x test -PjdkVersion=${{ matrix.java-version }}
+          ./gradlew compileDistribution -x test 
 
       - name: Free up disk space
         run: |
@@ -84,7 +84,7 @@ jobs:
       - name: Integration Test
         id: integrationTest
         run: |
-          ./gradlew test -PskipTests -PtestMode=${{ matrix.test-mode }} -PjdkVersion=${{ matrix.java-version }} -PskipDockerTests=false
+          ./gradlew test -PskipTests -PtestMode=${{ matrix.test-mode }} -PskipDockerTests=false
 
       - name: Upload integrate tests reports
         uses: actions/upload-artifact@v4

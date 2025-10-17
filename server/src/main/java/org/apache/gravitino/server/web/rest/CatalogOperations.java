@@ -168,6 +168,9 @@ public class CatalogOperations {
   @Path("testConnection")
   @Produces("application/vnd.gravitino.v1+json")
   @Timed(name = "test-connection." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
+  @AuthorizationExpression(
+      expression = "METALAKE::CREATE_CATALOG || METALAKE::OWNER",
+      accessMetadataType = MetadataObject.Type.METALAKE)
   @ResponseMetered(name = "test-connection", absolute = true)
   public Response testConnection(
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)

@@ -26,4 +26,7 @@ cd ${gravitino_dir}
 
 python bin/rewrite_gravitino_server_config.py
 
+JAVA_OPTS+=" -XX:-UseContainerSupport"
+export JAVA_OPTS
+
 ./bin/gravitino.sh start 

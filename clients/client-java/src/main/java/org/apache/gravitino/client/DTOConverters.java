@@ -38,9 +38,13 @@ import org.apache.gravitino.dto.authorization.PrivilegeDTO;
 import org.apache.gravitino.dto.authorization.SecurableObjectDTO;
 import org.apache.gravitino.dto.job.JobTemplateDTO;
 import org.apache.gravitino.dto.job.ShellJobTemplateDTO;
+import org.apache.gravitino.dto.job.ShellTemplateUpdateDTO;
 import org.apache.gravitino.dto.job.SparkJobTemplateDTO;
+import org.apache.gravitino.dto.job.SparkTemplateUpdateDTO;
+import org.apache.gravitino.dto.job.TemplateUpdateDTO;
 import org.apache.gravitino.dto.requests.CatalogUpdateRequest;
 import org.apache.gravitino.dto.requests.FilesetUpdateRequest;
+import org.apache.gravitino.dto.requests.JobTemplateUpdateRequest;
 import org.apache.gravitino.dto.requests.MetalakeUpdateRequest;
 import org.apache.gravitino.dto.requests.ModelUpdateRequest;
 import org.apache.gravitino.dto.requests.ModelVersionUpdateRequest;
@@ -51,6 +55,7 @@ import org.apache.gravitino.dto.requests.TagUpdateRequest;
 import org.apache.gravitino.dto.requests.TopicUpdateRequest;
 import org.apache.gravitino.file.FilesetChange;
 import org.apache.gravitino.job.JobTemplate;
+import org.apache.gravitino.job.JobTemplateChange;
 import org.apache.gravitino.job.ShellJobTemplate;
 import org.apache.gravitino.job.SparkJobTemplate;
 import org.apache.gravitino.messaging.TopicChange;
@@ -493,6 +498,58 @@ class DTOConverters {
 
       default:
         throw new IllegalArgumentException("Unsupported job type: " + jobTemplate.jobType());
+    }
+  }
+
+  static JobTemplateUpdateRequest toJobTemplateUpdateRequest(JobTemplateChange change) {
+    if (change instanceof JobTemplateChange.RenameJobTemplate) {
+      return new JobTemplateUpdateRequest.RenameJobTemplateRequest(
+          ((JobTemplateChange.RenameJobTemplate) change).getNewName());
+
+    } else if (change instanceof JobTemplateChange.UpdateJobTemplateComment) {
+      return new JobTemplateUpdateRequest.UpdateJobTemplateCommentRequest(
+          ((JobTemplateChange.UpdateJobTemplateComment) change).getNewComment());
+
+    } else if (change instanceof JobTemplateChange.UpdateJobTemplate) {
+      return new JobTemplateUpdateRequest.UpdateJobTemplateContentRequest(
+          toTemplateUpdateDTO(((JobTemplateChange.UpdateJobTemplate) change).getTemplateUpdate()));
+
+    } else {
+      throw new IllegalArgumentException(
+          "Unknown change type: " + change.getClass().getSimpleName());
+    }
+  }
+
+  static TemplateUpdateDTO toTemplateUpdateDTO(JobTemplateChange.TemplateUpdate change) {
+    if (change instanceof JobTemplateChange.ShellTemplateUpdate) {
+      JobTemplateChange.ShellTemplateUpdate shellUpdate =
+          (JobTemplateChange.ShellTemplateUpdate) change;
+      return ShellTemplateUpdateDTO.builder()
+          .withNewExecutable(shellUpdate.getNewExecutable())
+          .withNewArguments(shellUpdate.getNewArguments())
+          .withNewEnvironments(shellUpdate.getNewEnvironments())
+          .withNewCustomFields(shellUpdate.getNewCustomFields())
+          .withNewScripts(shellUpdate.getNewScripts())
+          .build();
+
+    } else if (change instanceof JobTemplateChange.SparkTemplateUpdate) {
+      JobTemplateChange.SparkTemplateUpdate sparkUpdate =
+          (JobTemplateChange.SparkTemplateUpdate) change;
+      return SparkTemplateUpdateDTO.builder()
+          .withNewExecutable(sparkUpdate.getNewExecutable())
+          .withNewArguments(sparkUpdate.getNewArguments())
+          .withNewEnvironments(sparkUpdate.getNewEnvironments())
+          .withNewCustomFields(sparkUpdate.getNewCustomFields())
+          .withNewClassName(sparkUpdate.getNewClassName())
+          .withNewJars(sparkUpdate.getNewJars())
+          .withNewFiles(sparkUpdate.getNewFiles())
+          .withNewArchives(sparkUpdate.getNewArchives())
+          .withNewConfigs(sparkUpdate.getNewConfigs())
+          .build();
+
+    } else {
+      throw new IllegalArgumentException(
+          "Unknown template update type: " + change.getClass().getSimpleName());
     }
   }
 }

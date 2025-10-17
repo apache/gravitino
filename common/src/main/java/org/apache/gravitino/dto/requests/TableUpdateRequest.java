@@ -280,7 +280,9 @@ public interface TableUpdateRequest extends RESTRequest {
           StringUtils.isNotBlank(property), "\"property\" field is required and cannot be empty");
     }
 
-    /** @return An instance of TableChange. */
+    /**
+     * @return An instance of TableChange.
+     */
     @Override
     public TableChange tableChange() {
       return TableChange.removeProperty(property);
@@ -402,7 +404,9 @@ public interface TableUpdateRequest extends RESTRequest {
           dataType != null, "\"type\" field is required and cannot be empty");
     }
 
-    /** @return An instance of TableChange. */
+    /**
+     * @return An instance of TableChange.
+     */
     @Override
     public TableChange tableChange() {
       return TableChange.addColumn(
@@ -456,7 +460,9 @@ public interface TableUpdateRequest extends RESTRequest {
           "\"newFieldName\" field is required and cannot be empty");
     }
 
-    /** @return An instance of TableChange. */
+    /**
+     * @return An instance of TableChange.
+     */
     @Override
     public TableChange tableChange() {
       return TableChange.renameColumn(oldFieldName, newFieldName);
@@ -511,7 +517,9 @@ public interface TableUpdateRequest extends RESTRequest {
           "\"newDefaultValue\" field is required and cannot be empty");
     }
 
-    /** @return An instance of TableChange. */
+    /**
+     * @return An instance of TableChange.
+     */
     @Override
     public TableChange tableChange() {
       return TableChange.updateColumnDefaultValue(fieldName, newDefaultValue);
@@ -565,7 +573,9 @@ public interface TableUpdateRequest extends RESTRequest {
           newType != null, "\"newType\" field is required and cannot be empty");
     }
 
-    /** @return An instance of TableChange. */
+    /**
+     * @return An instance of TableChange.
+     */
     @Override
     public TableChange tableChange() {
       return TableChange.updateColumnType(fieldName, newType);
@@ -618,7 +628,9 @@ public interface TableUpdateRequest extends RESTRequest {
           "\"newComment\" field is required and cannot be empty");
     }
 
-    /** @return An instance of TableChange. */
+    /**
+     * @return An instance of TableChange.
+     */
     @Override
     public TableChange tableChange() {
       return TableChange.updateColumnComment(fieldName, newComment);
@@ -673,7 +685,9 @@ public interface TableUpdateRequest extends RESTRequest {
           newPosition != null, "\"newPosition\" field is required and cannot be empty");
     }
 
-    /** @return An instance of TableChange. */
+    /**
+     * @return An instance of TableChange.
+     */
     @Override
     public TableChange tableChange() {
       return TableChange.updateColumnPosition(fieldName, newPosition);
@@ -777,7 +791,9 @@ public interface TableUpdateRequest extends RESTRequest {
           "\"fieldName\" field is required and cannot be empty");
     }
 
-    /** @return An instance of TableChange. */
+    /**
+     * @return An instance of TableChange.
+     */
     @Override
     public TableChange tableChange() {
       return TableChange.deleteColumn(fieldName, ifExists);
@@ -822,7 +838,9 @@ public interface TableUpdateRequest extends RESTRequest {
           "The index must be set with corresponding column names");
     }
 
-    /** @return An instance of TableChange. */
+    /**
+     * @return An instance of TableChange.
+     */
     @Override
     public TableChange tableChange() {
       return TableChange.addIndex(index.type(), index.name(), index.fieldNames());
@@ -864,7 +882,9 @@ public interface TableUpdateRequest extends RESTRequest {
       Preconditions.checkNotNull(name, "Index name cannot be null");
     }
 
-    /** @return An instance of TableChange. */
+    /**
+     * @return An instance of TableChange.
+     */
     @Override
     public TableChange tableChange() {
       return TableChange.deleteIndex(name, ifExists);
@@ -914,7 +934,9 @@ public interface TableUpdateRequest extends RESTRequest {
           "\"fieldName\" field is required and cannot be empty");
     }
 
-    /** @return An instance of TableChange. */
+    /**
+     * @return An instance of TableChange.
+     */
     @Override
     public TableChange tableChange() {
       return TableChange.updateColumnAutoIncrement(fieldName, autoIncrement);

@@ -222,10 +222,10 @@ public class CaffeineEntityCache extends BaseEntityCache {
     segmentedLock.withLock(
         entityCacheKey,
         () -> {
-          if (entities.isEmpty()) {
-            return;
-          }
-
+          // We still need to cache the entities even if the list is empty, to avoid cache
+          // misses. Consider the scenario where a user queries for an entity's relations and the
+          // result is empty. If we don't cache this empty result, the next query will still hit the
+          // backend, this is not desired.
           syncEntitiesToCache(
               entityCacheKey, entities.stream().map(e -> (Entity) e).collect(Collectors.toList()));
         });

@@ -18,6 +18,15 @@
 from gravitino.api.catalog import Catalog
 from gravitino.api.catalog_change import CatalogChange
 from gravitino.api.job.job_template import JobTemplate, JobType
+from gravitino.api.job.job_template_change import (
+    TemplateUpdate,
+    ShellTemplateUpdate,
+    SparkTemplateUpdate,
+    JobTemplateChange,
+    RenameJobTemplate,
+    UpdateJobTemplateComment,
+    UpdateJobTemplate,
+)
 from gravitino.api.job.shell_job_template import ShellJobTemplate
 from gravitino.api.job.spark_job_template import SparkJobTemplate
 from gravitino.client.fileset_catalog import FilesetCatalog
@@ -25,8 +34,17 @@ from gravitino.client.generic_model_catalog import GenericModelCatalog
 from gravitino.dto.catalog_dto import CatalogDTO
 from gravitino.dto.job.job_template_dto import JobTemplateDTO
 from gravitino.dto.job.shell_job_template_dto import ShellJobTemplateDTO
+from gravitino.dto.job.shell_template_update_dto import ShellTemplateUpdateDTO
 from gravitino.dto.job.spark_job_template_dto import SparkJobTemplateDTO
+from gravitino.dto.job.spark_template_update_dto import SparkTemplateUpdateDTO
+from gravitino.dto.job.template_update_dto import TemplateUpdateDTO
 from gravitino.dto.requests.catalog_update_request import CatalogUpdateRequest
+from gravitino.dto.requests.job_template_update_request import (
+    JobTemplateUpdateRequest,
+    RenameJobTemplateRequest,
+    UpdateJobTemplateCommentRequest,
+    UpdateJobTemplateContentRequest,
+)
 from gravitino.dto.requests.metalake_update_request import MetalakeUpdateRequest
 from gravitino.api.metalake_change import MetalakeChange
 from gravitino.utils import HTTPClient
@@ -125,7 +143,7 @@ class DTOConverters:
         )
 
     @staticmethod
-    def _to_shell_job_template(template: JobTemplate) -> ShellJobTemplate:
+    def to_shell_job_template(template: JobTemplate) -> ShellJobTemplate:
         if isinstance(template, ShellJobTemplate):
             return template
 
@@ -134,7 +152,7 @@ class DTOConverters:
         )
 
     @staticmethod
-    def _to_spark_job_template(template: JobTemplate) -> SparkJobTemplate:
+    def to_spark_job_template(template: JobTemplate) -> SparkJobTemplate:
         if isinstance(template, SparkJobTemplate):
             return template
 
@@ -181,7 +199,7 @@ class DTOConverters:
     @staticmethod
     def to_job_template_dto(template: JobTemplate) -> JobTemplateDTO:
         if isinstance(template, ShellJobTemplate):
-            shell_template = DTOConverters._to_shell_job_template(template)
+            shell_template = DTOConverters.to_shell_job_template(template)
             return ShellJobTemplateDTO(
                 _job_type=shell_template.job_type(),
                 _name=shell_template.name,
@@ -194,7 +212,7 @@ class DTOConverters:
             )
 
         if isinstance(template, SparkJobTemplate):
-            spark_template = DTOConverters._to_spark_job_template(template)
+            spark_template = DTOConverters.to_spark_job_template(template)
             return SparkJobTemplateDTO(
                 _job_type=spark_template.job_type(),
                 _name=spark_template.name,
@@ -211,3 +229,47 @@ class DTOConverters:
             )
 
         raise ValueError(f"Unsupported job type: {type(template)}")
+
+    @staticmethod
+    def to_template_update_dto(template_update: TemplateUpdate) -> TemplateUpdateDTO:
+        if isinstance(template_update, ShellTemplateUpdate):
+            return ShellTemplateUpdateDTO(
+                new_executable=template_update.get_new_executable(),
+                new_arguments=template_update.get_new_arguments(),
+                new_environments=template_update.get_new_environments(),
+                new_custom_fields=template_update.get_new_custom_fields(),
+                new_scripts=template_update.get_new_scripts(),
+            )
+
+        if isinstance(template_update, SparkTemplateUpdate):
+            return SparkTemplateUpdateDTO(
+                new_executable=template_update.get_new_executable(),
+                new_arguments=template_update.get_new_arguments(),
+                new_environments=template_update.get_new_environments(),
+                new_custom_fields=template_update.get_new_custom_fields(),
+                new_class_name=template_update.get_new_class_name(),
+                new_jars=template_update.get_new_jars(),
+                new_files=template_update.get_new_files(),
+                new_archives=template_update.get_new_archives(),
+                new_configs=template_update.get_new_configs(),
+            )
+
+        raise ValueError(f"Unsupported template update type: {type(template_update)}")
+
+    @staticmethod
+    def to_job_template_update_request(
+        change: JobTemplateChange,
+    ) -> JobTemplateUpdateRequest:
+        if isinstance(change, RenameJobTemplate):
+            return RenameJobTemplateRequest(change.get_new_name())
+
+        if isinstance(change, UpdateJobTemplateComment):
+            return UpdateJobTemplateCommentRequest(change.get_new_comment())
+
+        if isinstance(change, UpdateJobTemplate):
+            template_update_dto = DTOConverters.to_template_update_dto(
+                change.get_template_update()
+            )
+            return UpdateJobTemplateContentRequest(template_update_dto)
+
+        raise ValueError(f"Unknown change type: {type(change).__name__}")

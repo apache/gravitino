@@ -39,8 +39,11 @@ import javax.ws.rs.core.Response;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.dto.job.JobTemplateDTO;
+import org.apache.gravitino.dto.job.ShellTemplateUpdateDTO;
 import org.apache.gravitino.dto.requests.JobRunRequest;
 import org.apache.gravitino.dto.requests.JobTemplateRegisterRequest;
+import org.apache.gravitino.dto.requests.JobTemplateUpdateRequest;
+import org.apache.gravitino.dto.requests.JobTemplateUpdatesRequest;
 import org.apache.gravitino.dto.responses.BaseResponse;
 import org.apache.gravitino.dto.responses.DropResponse;
 import org.apache.gravitino.dto.responses.ErrorConstants;
@@ -58,6 +61,7 @@ import org.apache.gravitino.exceptions.NoSuchJobTemplateException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.job.JobHandle;
 import org.apache.gravitino.job.JobOperationDispatcher;
+import org.apache.gravitino.job.JobTemplateChange;
 import org.apache.gravitino.job.ShellJobTemplate;
 import org.apache.gravitino.job.SparkJobTemplate;
 import org.apache.gravitino.meta.AuditInfo;
@@ -496,6 +500,131 @@ public class TestJobOperations extends JerseyTest {
     ErrorResponse errorResp4 = resp5.readEntity(ErrorResponse.class);
     Assertions.assertEquals(ErrorConstants.IN_USE_CODE, errorResp4.getCode());
     Assertions.assertEquals(InUseException.class.getSimpleName(), errorResp4.getType());
+  }
+
+  @Test
+  public void testAlterJobTemplate() {
+    String templateName = "shell_template_1";
+    JobTemplateEntity template = newShellJobTemplateEntity(templateName, "Updated comment");
+    JobTemplateUpdateRequest renameReq =
+        new JobTemplateUpdateRequest.RenameJobTemplateRequest(templateName);
+    JobTemplateUpdateRequest updateCommentReq =
+        new JobTemplateUpdateRequest.UpdateJobTemplateCommentRequest("Updated comment");
+    JobTemplateUpdateRequest updateContentReq =
+        new JobTemplateUpdateRequest.UpdateJobTemplateContentRequest(
+            ShellTemplateUpdateDTO.builder().build());
+    JobTemplateUpdatesRequest req =
+        new JobTemplateUpdatesRequest(
+            Lists.newArrayList(renameReq, updateCommentReq, updateContentReq));
+    JobTemplateChange[] changes =
+        req.getUpdates().stream()
+            .map(JobTemplateUpdateRequest::jobTemplateChange)
+            .toArray(JobTemplateChange[]::new);
+
+    when(jobOperationDispatcher.alterJobTemplate(metalake, templateName, changes))
+        .thenReturn(template);
+
+    Response resp =
+        target(jobTemplatePath())
+            .path(templateName)
+            .request(APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .put(Entity.entity(req, APPLICATION_JSON_TYPE));
+
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp.getStatus());
+    Assertions.assertEquals(APPLICATION_JSON_TYPE, resp.getMediaType());
+
+    JobTemplateResponse jobTemplateResp = resp.readEntity(JobTemplateResponse.class);
+    Assertions.assertEquals(0, jobTemplateResp.getCode());
+    Assertions.assertEquals(JobOperations.toDTO(template), jobTemplateResp.getJobTemplate());
+
+    // Test throw NoSuchMetalakeException
+    doThrow(new NoSuchMetalakeException("mock error"))
+        .when(jobOperationDispatcher)
+        .alterJobTemplate(any(), any(), any());
+
+    Response resp2 =
+        target(jobTemplatePath())
+            .path(templateName)
+            .request(APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .put(Entity.entity(req, APPLICATION_JSON_TYPE));
+
+    Assertions.assertEquals(Response.Status.NOT_FOUND.getStatusCode(), resp2.getStatus());
+
+    ErrorResponse errorResp = resp2.readEntity(ErrorResponse.class);
+    Assertions.assertEquals(ErrorConstants.NOT_FOUND_CODE, errorResp.getCode());
+    Assertions.assertEquals(NoSuchMetalakeException.class.getSimpleName(), errorResp.getType());
+
+    // Test throw MetalakeNotInUseException
+    doThrow(new MetalakeNotInUseException("mock error"))
+        .when(jobOperationDispatcher)
+        .alterJobTemplate(any(), any(), any());
+
+    Response resp3 =
+        target(jobTemplatePath())
+            .path(templateName)
+            .request(APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .put(Entity.entity(req, APPLICATION_JSON_TYPE));
+
+    Assertions.assertEquals(Response.Status.CONFLICT.getStatusCode(), resp3.getStatus());
+
+    ErrorResponse errorResp2 = resp3.readEntity(ErrorResponse.class);
+    Assertions.assertEquals(ErrorConstants.NOT_IN_USE_CODE, errorResp2.getCode());
+    Assertions.assertEquals(MetalakeNotInUseException.class.getSimpleName(), errorResp2.getType());
+
+    // Test throw IllegalArgumentException
+    doThrow(new IllegalArgumentException("mock error"))
+        .when(jobOperationDispatcher)
+        .alterJobTemplate(any(), any(), any());
+
+    Response resp4 =
+        target(jobTemplatePath())
+            .path(templateName)
+            .request(APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .put(Entity.entity(req, APPLICATION_JSON_TYPE));
+
+    Assertions.assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), resp4.getStatus());
+    ErrorResponse errorResp3 = resp4.readEntity(ErrorResponse.class);
+    Assertions.assertEquals(ErrorConstants.ILLEGAL_ARGUMENTS_CODE, errorResp3.getCode());
+    Assertions.assertEquals(IllegalArgumentException.class.getSimpleName(), errorResp3.getType());
+
+    // Test throw NoSuchJobTemplateException
+    doThrow(new NoSuchJobTemplateException("mock error"))
+        .when(jobOperationDispatcher)
+        .alterJobTemplate(any(), any(), any());
+
+    Response resp5 =
+        target(jobTemplatePath())
+            .path(templateName)
+            .request(APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .put(Entity.entity(req, APPLICATION_JSON_TYPE));
+
+    Assertions.assertEquals(Response.Status.NOT_FOUND.getStatusCode(), resp5.getStatus());
+    ErrorResponse errorResp4 = resp5.readEntity(ErrorResponse.class);
+    Assertions.assertEquals(ErrorConstants.NOT_FOUND_CODE, errorResp4.getCode());
+    Assertions.assertEquals(NoSuchJobTemplateException.class.getSimpleName(), errorResp4.getType());
+
+    // Test throw RuntimeException
+    doThrow(new RuntimeException("mock error"))
+        .when(jobOperationDispatcher)
+        .alterJobTemplate(any(), any(), any());
+
+    Response resp6 =
+        target(jobTemplatePath())
+            .path(templateName)
+            .request(APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .put(Entity.entity(req, APPLICATION_JSON_TYPE));
+
+    Assertions.assertEquals(
+        Response.Status.INTERNAL_SERVER_ERROR.getStatusCode(), resp6.getStatus());
+    ErrorResponse errorResp5 = resp6.readEntity(ErrorResponse.class);
+    Assertions.assertEquals(ErrorConstants.INTERNAL_ERROR_CODE, errorResp5.getCode());
+    Assertions.assertEquals(RuntimeException.class.getSimpleName(), errorResp5.getType());
   }
 
   @Test

@@ -35,10 +35,14 @@ import org.apache.gravitino.rel.partitions.Partitions;
  */
 @Evolving
 public interface Transform extends Expression {
-  /** @return The transform function name. */
+  /**
+   * @return The transform function name.
+   */
   String name();
 
-  /** @return The arguments passed to the transform function. */
+  /**
+   * @return The arguments passed to the transform function.
+   */
   Expression[] arguments();
 
   /**
@@ -59,7 +63,9 @@ public interface Transform extends Expression {
   abstract class SingleFieldTransform implements Transform {
     NamedReference ref;
 
-    /** @return the referenced field name as an array of String parts. */
+    /**
+     * @return the referenced field name as an array of String parts.
+     */
     public String[] fieldName() {
       return ref.fieldName();
     }

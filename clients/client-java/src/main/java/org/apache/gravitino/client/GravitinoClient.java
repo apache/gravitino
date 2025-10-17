@@ -61,6 +61,7 @@ import org.apache.gravitino.exceptions.TagAlreadyExistsException;
 import org.apache.gravitino.exceptions.UserAlreadyExistsException;
 import org.apache.gravitino.job.JobHandle;
 import org.apache.gravitino.job.JobTemplate;
+import org.apache.gravitino.job.JobTemplateChange;
 import org.apache.gravitino.job.SupportsJobs;
 import org.apache.gravitino.policy.Policy;
 import org.apache.gravitino.policy.PolicyChange;
@@ -592,6 +593,12 @@ public class GravitinoClient extends GravitinoClientBase
   @Override
   public boolean deleteJobTemplate(String jobTemplateName) throws InUseException {
     return getMetalake().deleteJobTemplate(jobTemplateName);
+  }
+
+  @Override
+  public JobTemplate alterJobTemplate(String jobTemplateName, JobTemplateChange... changes)
+      throws NoSuchJobTemplateException, IllegalArgumentException {
+    return getMetalake().alterJobTemplate(jobTemplateName, changes);
   }
 
   @Override

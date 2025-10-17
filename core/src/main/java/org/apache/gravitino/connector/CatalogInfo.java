@@ -70,48 +70,64 @@ public final class CatalogInfo implements Catalog {
     this.namespace = namespace;
   }
 
-  /** @return The unique id of the catalog. */
+  /**
+   * @return The unique id of the catalog.
+   */
   public Long id() {
     return id;
   }
 
-  /** @return The name of the catalog. */
+  /**
+   * @return The name of the catalog.
+   */
   @Override
   public String name() {
     return name;
   }
 
-  /** @return The type of the catalog. */
+  /**
+   * @return The type of the catalog.
+   */
   @Override
   public Catalog.Type type() {
     return type;
   }
 
-  /** @return The provider of the catalog. */
+  /**
+   * @return The provider of the catalog.
+   */
   @Override
   public String provider() {
     return provider;
   }
 
-  /** @return The comment or description for the catalog. */
+  /**
+   * @return The comment or description for the catalog.
+   */
   @Override
   public String comment() {
     return comment;
   }
 
-  /** @return The associated properties of the catalog. */
+  /**
+   * @return The associated properties of the catalog.
+   */
   @Override
   public Map<String, String> properties() {
     return properties;
   }
 
-  /** @return The audit details of the catalog. */
+  /**
+   * @return The audit details of the catalog.
+   */
   @Override
   public Audit auditInfo() {
     return auditInfo;
   }
 
-  /** @return The namespace of the catalog. */
+  /**
+   * @return The namespace of the catalog.
+   */
   public Namespace namespace() {
     return namespace;
   }

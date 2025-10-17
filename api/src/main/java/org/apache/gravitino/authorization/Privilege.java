@@ -28,10 +28,14 @@ import org.apache.gravitino.annotation.Unstable;
 @Unstable
 public interface Privilege {
 
-  /** @return The generic name of the privilege. */
+  /**
+   * @return The generic name of the privilege.
+   */
   Name name();
 
-  /** @return A readable string representation for the privilege. */
+  /**
+   * @return A readable string representation for the privilege.
+   */
   String simpleString();
 
   /**

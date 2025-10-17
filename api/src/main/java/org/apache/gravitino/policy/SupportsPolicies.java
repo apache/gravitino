@@ -28,10 +28,14 @@ import org.apache.gravitino.exceptions.PolicyAlreadyAssociatedException;
  */
 @Evolving
 public interface SupportsPolicies {
-  /** @return List all the policy names for the specific object. */
+  /**
+   * @return List all the policy names for the specific object.
+   */
   String[] listPolicies();
 
-  /** @return List all the policies with details for the specific object. */
+  /**
+   * @return List all the policies with details for the specific object.
+   */
   Policy[] listPolicyInfos();
 
   /**

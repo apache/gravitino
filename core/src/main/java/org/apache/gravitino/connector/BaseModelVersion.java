@@ -40,37 +40,49 @@ public abstract class BaseModelVersion implements ModelVersion {
 
   protected AuditInfo auditInfo;
 
-  /** @return the version of the model object. */
+  /**
+   * @return the version of the model object.
+   */
   @Override
   public int version() {
     return version;
   }
 
-  /** @return the aliases of the model version. */
+  /**
+   * @return the aliases of the model version.
+   */
   @Override
   public String[] aliases() {
     return aliases;
   }
 
-  /** @return the comment of the model version. */
+  /**
+   * @return the comment of the model version.
+   */
   @Override
   public String comment() {
     return comment;
   }
 
-  /** @return the URIs of the model artifact. */
+  /**
+   * @return the URIs of the model artifact.
+   */
   @Override
   public Map<String, String> uris() {
     return uris;
   }
 
-  /** @return the properties of the model version. */
+  /**
+   * @return the properties of the model version.
+   */
   @Override
   public Map<String, String> properties() {
     return properties;
   }
 
-  /** @return the audit details of the model version. */
+  /**
+   * @return the audit details of the model version.
+   */
   @Override
   public AuditInfo auditInfo() {
     return auditInfo;

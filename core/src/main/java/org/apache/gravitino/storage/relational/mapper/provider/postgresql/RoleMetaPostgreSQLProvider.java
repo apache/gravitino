@@ -30,7 +30,7 @@ public class RoleMetaPostgreSQLProvider extends RoleMetaBaseSQLProvider {
     return "UPDATE "
         + ROLE_TABLE_NAME
         + " SET deleted_at = floor(extract(epoch from(current_timestamp -"
-        + " timestamp '1970-01-01 00:00:00'))*1000)"
+        + " timestamp '1970-01-01 00:00:00')) * 1000)"
         + " WHERE role_id = #{roleId} AND deleted_at = 0";
   }
 
@@ -39,7 +39,7 @@ public class RoleMetaPostgreSQLProvider extends RoleMetaBaseSQLProvider {
     return "UPDATE "
         + ROLE_TABLE_NAME
         + " SET deleted_at = floor(extract(epoch from(current_timestamp -"
-        + " timestamp '1970-01-01 00:00:00'))*1000)"
+        + " timestamp '1970-01-01 00:00:00')) * 1000)"
         + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0";
   }
 
@@ -47,10 +47,10 @@ public class RoleMetaPostgreSQLProvider extends RoleMetaBaseSQLProvider {
   public String insertRoleMetaOnDuplicateKeyUpdate(RolePO rolePO) {
     return "INSERT INTO "
         + ROLE_TABLE_NAME
-        + "(role_id, role_name,"
+        + " (role_id, role_name,"
         + " metalake_id, properties,"
         + " audit_info, current_version, last_version, deleted_at)"
-        + " VALUES("
+        + " VALUES ("
         + " #{roleMeta.roleId},"
         + " #{roleMeta.roleName},"
         + " #{roleMeta.metalakeId},"
