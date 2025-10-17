@@ -23,6 +23,8 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.NoSuchElementException;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
@@ -72,6 +74,23 @@ public class LanceCatalogService implements AutoCloseable {
     return namespaces.keySet().stream()
         .sorted(Comparator.naturalOrder())
         .collect(Collectors.toUnmodifiableList());
+  }
+
+  public NamespaceListingResult listChildNamespaces(
+      String parentId, String delimiter, String pageToken, Integer limit) {
+    String normalizedParent = StringUtils.trimToEmpty(parentId);
+    String effectiveDelimiter = StringUtils.isBlank(delimiter) ? "." : delimiter;
+
+    List<String> sortedNamespaces = listNamespaceNames();
+    List<String> filtered = filterChildren(sortedNamespaces, normalizedParent, effectiveDelimiter);
+
+    int startingOffset = parsePageToken(pageToken, filtered.size());
+    int pageLimit = limit == null ? filtered.size() : validatePositiveLimit(limit, filtered.size());
+    int endIndex = Math.min(filtered.size(), startingOffset + pageLimit);
+
+    List<String> page = filtered.subList(startingOffset, endIndex);
+    String nextToken = endIndex < filtered.size() ? String.valueOf(endIndex) : null;
+    return new NamespaceListingResult(normalizedParent, effectiveDelimiter, page, nextToken);
   }
 
   public boolean createNamespace(String namespace) {
@@ -125,6 +144,36 @@ public class LanceCatalogService implements AutoCloseable {
     return Optional.of(tableEntry.describe());
   }
 
+  public TableListingResult listTables(
+      String namespaceId, String delimiter, String pageToken, Integer limit) {
+    String normalizedNamespace = StringUtils.trimToEmpty(namespaceId);
+    if (StringUtils.isBlank(normalizedNamespace)) {
+      throw new IllegalArgumentException("Namespace id must be provided");
+    }
+
+    String effectiveDelimiter = StringUtils.isBlank(delimiter) ? "." : delimiter;
+
+    NamespaceState state = namespaces.get(normalizedNamespace);
+    if (state == null) {
+      throw new NoSuchElementException("Unknown namespace: " + normalizedNamespace);
+    }
+
+    List<String> sortedTables =
+        state.tables.keySet().stream()
+            .sorted(Comparator.naturalOrder())
+            .collect(Collectors.toList());
+
+    int startingOffset = parsePageToken(pageToken, sortedTables.size());
+    int pageLimit =
+        limit == null ? sortedTables.size() : validatePositiveLimit(limit, sortedTables.size());
+    int endIndex = Math.min(sortedTables.size(), startingOffset + pageLimit);
+
+    List<String> page = sortedTables.subList(startingOffset, endIndex);
+    String nextToken = endIndex < sortedTables.size() ? String.valueOf(endIndex) : null;
+
+    return new TableListingResult(normalizedNamespace, effectiveDelimiter, page, nextToken);
+  }
+
   @Override
   public void close() {
     namespaces.clear();
@@ -170,6 +219,134 @@ public class LanceCatalogService implements AutoCloseable {
       result.put("name", name);
       result.put("namespace", namespace);
       return Collections.unmodifiableMap(result);
+    }
+  }
+
+  private List<String> filterChildren(List<String> namespaces, String parentId, String delimiter) {
+    boolean rootRequest = StringUtils.isBlank(parentId) || "root".equalsIgnoreCase(parentId);
+    if (rootRequest) {
+      return namespaces;
+    }
+
+    String parentPrefix = parentId + delimiter;
+    return namespaces.stream()
+        .filter(ns -> ns.startsWith(parentPrefix))
+        .map(
+            ns -> {
+              String remainder = ns.substring(parentPrefix.length());
+              int nextDelimiter = remainder.indexOf(delimiter);
+              if (nextDelimiter >= 0) {
+                return remainder.substring(0, nextDelimiter);
+              }
+              return remainder;
+            })
+        .filter(child -> !child.isEmpty())
+        .distinct()
+        .sorted(Comparator.naturalOrder())
+        .collect(Collectors.toUnmodifiableList());
+  }
+
+  private int parsePageToken(String pageToken, int size) {
+    if (StringUtils.isBlank(pageToken)) {
+      return 0;
+    }
+    try {
+      int parsed = Integer.parseInt(pageToken);
+      if (parsed < 0 || parsed > size) {
+        throw new IllegalArgumentException("Invalid page_token value");
+      }
+      return parsed;
+    } catch (NumberFormatException nfe) {
+      throw new IllegalArgumentException("Invalid page_token value", nfe);
+    }
+  }
+
+  private int validatePositiveLimit(int limit, int size) {
+    if (limit <= 0) {
+      throw new IllegalArgumentException("limit must be greater than 0");
+    }
+    return Math.min(limit, Math.max(size, 0));
+  }
+
+  public static final class NamespaceListingResult {
+    private final String parentId;
+    private final String delimiter;
+    private final List<String> namespaces;
+    private final String nextPageToken;
+
+    NamespaceListingResult(
+        String parentId, String delimiter, List<String> namespaces, String nextPageToken) {
+      this.parentId = parentId;
+      this.delimiter = delimiter;
+      this.namespaces = List.copyOf(namespaces);
+      this.nextPageToken = nextPageToken;
+    }
+
+    public String getParentId() {
+      return parentId;
+    }
+
+    public String getDelimiter() {
+      return delimiter;
+    }
+
+    public List<String> getNamespaces() {
+      return namespaces;
+    }
+
+    public Optional<String> getNextPageToken() {
+      return Optional.ofNullable(nextPageToken);
+    }
+
+    @Override
+    public boolean equals(Object o) {
+      if (this == o) {
+        return true;
+      }
+      if (!(o instanceof NamespaceListingResult)) {
+        return false;
+      }
+      NamespaceListingResult that = (NamespaceListingResult) o;
+      return Objects.equals(parentId, that.parentId)
+          && Objects.equals(delimiter, that.delimiter)
+          && Objects.equals(namespaces, that.namespaces)
+          && Objects.equals(nextPageToken, that.nextPageToken);
+    }
+
+    @Override
+    public int hashCode() {
+      return Objects.hash(parentId, delimiter, namespaces, nextPageToken);
+    }
+  }
+
+  public static final class TableListingResult {
+    private final String namespaceId;
+    private final String delimiter;
+    private final List<String> tables;
+    private final String nextPageToken;
+
+    TableListingResult(
+        String namespaceId, String delimiter, List<String> tables, String nextPageToken) {
+      this.namespaceId = namespaceId;
+      this.delimiter = delimiter;
+      this.tables = List.copyOf(tables);
+      this.nextPageToken = nextPageToken;
+    }
+
+    public String getNamespaceId() {
+      return namespaceId;
+    }
+
+    public String getDelimiter() {
+      return delimiter;
+    }
+
+    public List<String> getTables() {
+      return tables;
+    }
+
+    public Optional<String> getNextPageToken() {
+      return Optional.ofNullable(nextPageToken);
     }
   }
 }
