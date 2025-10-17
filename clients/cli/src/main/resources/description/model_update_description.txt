@@ -1,0 +1,36 @@
+Supports updating a model or model version, including update comment, linking a new version,
+renaming the model, updating the URI of a model version, and modifying the alias of a model version.
+
+Example commands
+
+# Update the comment of a model
+gcli model update -m my_metalake --name catalog.schema.model --comment "New model comment"
+
+# Update the name of a model
+gcli model update -m my_metalake --name catalog.schema.model --rename 'new_name'
+
+# Update the comment of a model version by alias
+gcli model update -m my_metalake --name catalog.schema.model --comment "New model comment" --alias
+alias1
+
+# Update the comment of a model version by version
+gcli model update -m my_metalake --name catalog.schema.model --comment "New model comment" --version
+ 1
+
+# Link a new version to a model
+gcli model update -m my_metalake --name catalog.schema.model --uris 'n1=u1,n2=u2' --alias alias1 --alias alias2
+
+# Update the alias of a model version by alias
+gcli model update -m my_metalake --name catalog.schema.model --alias alias1 --newalias new_alias
+
+# Update the alias of a model version by version
+gcli model update -m my_metalake --name catalog.schema.model --version 1 --newalias new_alias
+
+# Update the URI of a model version by alias
+gcli model update -m my_metalake --name catalog.schema.model --alias alias1 --newuri 's3://new_uri'
+
+# Update the URI of a model version by version
+gcli model update -m my_metalake --name catalog.schema.model --version 1 --newuri 's3://new_uri'
+
+
+

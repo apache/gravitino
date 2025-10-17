@@ -1,0 +1,9 @@
+Delete a catalog from a Metalake; you can specify the --force option to bypass the confirmation prompt
+
+Example commands
+
+# Delete a catalog from a Metalake
+gcli catalog delete -m demo_metalake --name catalog_postgres;
+
+# Delete a catalog from a Metalake without confirmation prompt
+gcli catalog delete -m demo_metalake --name catalog_postgres --force;
