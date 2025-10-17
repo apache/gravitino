@@ -47,7 +47,7 @@ dependencies {
   implementation(libs.iceberg.azure)
   implementation(libs.iceberg.hive.metastore)
   implementation(libs.iceberg.gcp)
-  implementation(libs.hadoop2.common) {
+  implementation(libs.hadoop3.common) {
     exclude("com.github.spotbugs")
     exclude("com.sun.jersey")
     exclude("javax.servlet")
@@ -56,17 +56,15 @@ dependencies {
     exclude("org.mortbay.jetty")
   }
   // use hdfs-default.xml
-  implementation(libs.hadoop2.hdfs) {
+  implementation(libs.hadoop3.hdfs) {
     exclude("*")
   }
-  implementation(libs.hadoop2.hdfs.client) {
+  implementation(libs.hadoop3.client.api)
+  implementation(libs.hadoop3.client.runtime) {
     exclude("com.sun.jersey")
     exclude("javax.servlet")
     exclude("org.fusesource.leveldbjni")
     exclude("org.mortbay.jetty")
-  }
-  implementation(libs.hadoop2.mapreduce.client.core) {
-    exclude("*")
   }
   implementation(libs.hive2.metastore) {
     exclude("co.cask.tephra")

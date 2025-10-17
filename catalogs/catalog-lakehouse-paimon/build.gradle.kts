@@ -104,25 +104,11 @@ dependencies {
   implementation(libs.bundles.log4j)
   implementation(libs.commons.lang3)
   implementation(libs.guava)
-  implementation(libs.hadoop2.common) {
+  implementation(libs.hadoop3.client.api) {
     exclude("com.github.spotbugs")
-    exclude("com.sun.jersey")
-    exclude("javax.servlet")
-    exclude("org.apache.curator")
-    exclude("org.apache.zookeeper")
-    exclude("org.mortbay.jetty")
   }
-  implementation(libs.hadoop2.hdfs) {
-    exclude("*")
-  }
-  implementation(libs.hadoop2.hdfs.client) {
-    exclude("com.sun.jersey")
-    exclude("javax.servlet")
-    exclude("org.fusesource.leveldbjni")
-    exclude("org.mortbay.jetty")
-  }
-  implementation(libs.hadoop2.mapreduce.client.core) {
-    exclude("*")
+  implementation(libs.hadoop3.client.runtime) {
+    exclude("com.github.spotbugs")
   }
   annotationProcessor(libs.lombok)
   compileOnly(libs.lombok)
