@@ -143,7 +143,9 @@ class RelationalTable
     return table.name();
   }
 
-  /** @return the columns of the table. */
+  /**
+   * @return the columns of the table.
+   */
   @Override
   public Column[] columns() {
     return Arrays.stream(table.columns())
@@ -159,50 +161,66 @@ class RelationalTable
         .toArray(Column[]::new);
   }
 
-  /** @return the partitioning of the table. */
+  /**
+   * @return the partitioning of the table.
+   */
   @Override
   public Transform[] partitioning() {
     return table.partitioning();
   }
 
-  /** @return the sort order of the table. */
+  /**
+   * @return the sort order of the table.
+   */
   @Override
   public SortOrder[] sortOrder() {
     return table.sortOrder();
   }
 
-  /** @return the distribution of the table. */
+  /**
+   * @return the distribution of the table.
+   */
   @Override
   public Distribution distribution() {
     return table.distribution();
   }
 
-  /** @return the comment of the table. */
+  /**
+   * @return the comment of the table.
+   */
   @Nullable
   @Override
   public String comment() {
     return table.comment();
   }
 
-  /** @return the properties of the table. */
+  /**
+   * @return the properties of the table.
+   */
   @Override
   public Map<String, String> properties() {
     return table.properties();
   }
 
-  /** @return the audit information of the table. */
+  /**
+   * @return the audit information of the table.
+   */
   @Override
   public Audit auditInfo() {
     return table.auditInfo();
   }
 
-  /** @return the indexes of the table. */
+  /**
+   * @return the indexes of the table.
+   */
   @Override
   public Index[] index() {
     return table.index();
   }
 
-  /** @return The partition names of the table. */
+  /**
+   * @return The partition names of the table.
+   */
   @Override
   public String[] listPartitionNames() {
     PartitionNameListResponse resp =
@@ -214,7 +232,9 @@ class RelationalTable
     return resp.partitionNames();
   }
 
-  /** @return The partition request path. */
+  /**
+   * @return The partition request path.
+   */
   @VisibleForTesting
   String getPartitionRequestPath() {
     return "api/metalakes/"
@@ -228,7 +248,9 @@ class RelationalTable
         + "/partitions";
   }
 
-  /** @return The partitions of the table. */
+  /**
+   * @return The partitions of the table.
+   */
   @Override
   public Partition[] listPartitions() {
     Map<String, String> params = new HashMap<>();

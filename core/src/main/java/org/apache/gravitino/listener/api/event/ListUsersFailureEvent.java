@@ -35,7 +35,7 @@ public class ListUsersFailureEvent extends UserFailureEvent {
    * @param metalake the name of the metalake where the operation was attempted
    * @param exception the exception encountered during the operation
    */
-  protected ListUsersFailureEvent(String user, String metalake, Exception exception) {
+  public ListUsersFailureEvent(String user, String metalake, Exception exception) {
     super(user, NameIdentifierUtil.ofMetalake(metalake), exception);
   }
 

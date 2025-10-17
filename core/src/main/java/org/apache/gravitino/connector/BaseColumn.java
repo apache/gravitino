@@ -82,7 +82,9 @@ public abstract class BaseColumn implements Column {
     return nullable;
   }
 
-  /** @return True if this column is an auto-increment column. Default is false. */
+  /**
+   * @return True if this column is an auto-increment column. Default is false.
+   */
   @Override
   public boolean autoIncrement() {
     return autoIncrement;

@@ -29,10 +29,10 @@ public class TableMetaPostgreSQLProvider extends TableMetaBaseSQLProvider {
   public String insertTableMetaOnDuplicateKeyUpdate(TablePO tablePO) {
     return "INSERT INTO "
         + TABLE_NAME
-        + "(table_id, table_name, metalake_id,"
+        + " (table_id, table_name, metalake_id,"
         + " catalog_id, schema_id, audit_info,"
         + " current_version, last_version, deleted_at)"
-        + " VALUES("
+        + " VALUES ("
         + " #{tableMeta.tableId},"
         + " #{tableMeta.tableName},"
         + " #{tableMeta.metalakeId},"
@@ -43,7 +43,7 @@ public class TableMetaPostgreSQLProvider extends TableMetaBaseSQLProvider {
         + " #{tableMeta.lastVersion},"
         + " #{tableMeta.deletedAt}"
         + " )"
-        + " ON CONFLICT (table_id) DO UPDATE SET "
+        + " ON CONFLICT (table_id) DO UPDATE SET"
         + " table_name = #{tableMeta.tableName},"
         + " metalake_id = #{tableMeta.metalakeId},"
         + " catalog_id = #{tableMeta.catalogId},"
@@ -59,7 +59,7 @@ public class TableMetaPostgreSQLProvider extends TableMetaBaseSQLProvider {
     return "UPDATE "
         + TABLE_NAME
         + " SET deleted_at = floor(extract(epoch from(current_timestamp -"
-        + " timestamp '1970-01-01 00:00:00'))*1000)"
+        + " timestamp '1970-01-01 00:00:00')) * 1000)"
         + " WHERE table_id = #{tableId} AND deleted_at = 0";
   }
 
@@ -68,7 +68,7 @@ public class TableMetaPostgreSQLProvider extends TableMetaBaseSQLProvider {
     return "UPDATE "
         + TABLE_NAME
         + " SET deleted_at = floor(extract(epoch from(current_timestamp -"
-        + " timestamp '1970-01-01 00:00:00'))*1000)"
+        + " timestamp '1970-01-01 00:00:00')) * 1000)"
         + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0";
   }
 
@@ -77,7 +77,7 @@ public class TableMetaPostgreSQLProvider extends TableMetaBaseSQLProvider {
     return "UPDATE "
         + TABLE_NAME
         + " SET deleted_at = floor(extract(epoch from(current_timestamp -"
-        + " timestamp '1970-01-01 00:00:00'))*1000)"
+        + " timestamp '1970-01-01 00:00:00')) * 1000)"
         + " WHERE catalog_id = #{catalogId} AND deleted_at = 0";
   }
 
@@ -86,7 +86,7 @@ public class TableMetaPostgreSQLProvider extends TableMetaBaseSQLProvider {
     return "UPDATE "
         + TABLE_NAME
         + " SET deleted_at = floor(extract(epoch from(current_timestamp -"
-        + " timestamp '1970-01-01 00:00:00'))*1000)"
+        + " timestamp '1970-01-01 00:00:00')) * 1000)"
         + " WHERE schema_id = #{schemaId} AND deleted_at = 0";
   }
 

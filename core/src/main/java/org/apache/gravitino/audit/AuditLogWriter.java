@@ -29,7 +29,9 @@ import org.apache.gravitino.listener.api.event.Event;
  */
 public interface AuditLogWriter extends Closeable {
 
-  /** @return formatter. */
+  /**
+   * @return formatter.
+   */
   Formatter getFormatter();
 
   /**

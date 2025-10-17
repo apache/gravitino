@@ -31,7 +31,7 @@ public class ModelVersionAliasRelPostgreSQLProvider extends ModelVersionAliasRel
     return "UPDATE "
         + ModelVersionAliasRelMapper.TABLE_NAME
         + " mvar SET deleted_at = floor(extract(epoch from(current_timestamp -"
-        + " timestamp '1970-01-01 00:00:00'))*1000)"
+        + " timestamp '1970-01-01 00:00:00')) * 1000)"
         + " WHERE mvar.model_id = ("
         + " SELECT mm.model_id FROM "
         + ModelMetaMapper.TABLE_NAME
@@ -45,7 +45,7 @@ public class ModelVersionAliasRelPostgreSQLProvider extends ModelVersionAliasRel
     return "UPDATE "
         + ModelVersionAliasRelMapper.TABLE_NAME
         + " SET deleted_at = floor(extract(epoch from(current_timestamp -"
-        + " timestamp '1970-01-01 00:00:00'))*1000)"
+        + " timestamp '1970-01-01 00:00:00')) * 1000)"
         + " WHERE model_id = #{modelId} AND model_version = #{modelVersion} AND deleted_at = 0";
   }
 
@@ -55,7 +55,7 @@ public class ModelVersionAliasRelPostgreSQLProvider extends ModelVersionAliasRel
     return "UPDATE "
         + ModelVersionAliasRelMapper.TABLE_NAME
         + " SET deleted_at = floor(extract(epoch from(current_timestamp -"
-        + " timestamp '1970-01-01 00:00:00'))*1000)"
+        + " timestamp '1970-01-01 00:00:00')) * 1000)"
         + " WHERE model_id = #{modelId} AND model_version = ("
         + " SELECT model_version FROM "
         + ModelVersionAliasRelMapper.TABLE_NAME
@@ -68,7 +68,7 @@ public class ModelVersionAliasRelPostgreSQLProvider extends ModelVersionAliasRel
     return "UPDATE "
         + ModelVersionAliasRelMapper.TABLE_NAME
         + " SET deleted_at = floor(extract(epoch from(current_timestamp -"
-        + " timestamp '1970-01-01 00:00:00'))*1000)"
+        + " timestamp '1970-01-01 00:00:00')) * 1000)"
         + " WHERE model_id IN ("
         + " SELECT model_id FROM "
         + ModelMetaMapper.TABLE_NAME
@@ -80,7 +80,7 @@ public class ModelVersionAliasRelPostgreSQLProvider extends ModelVersionAliasRel
     return "UPDATE "
         + ModelVersionAliasRelMapper.TABLE_NAME
         + " SET deleted_at = floor(extract(epoch from(current_timestamp -"
-        + " timestamp '1970-01-01 00:00:00'))*1000)"
+        + " timestamp '1970-01-01 00:00:00')) * 1000)"
         + " WHERE model_id IN ("
         + " SELECT model_id FROM "
         + ModelMetaMapper.TABLE_NAME
@@ -92,7 +92,7 @@ public class ModelVersionAliasRelPostgreSQLProvider extends ModelVersionAliasRel
     return "UPDATE "
         + ModelVersionAliasRelMapper.TABLE_NAME
         + " SET deleted_at = floor(extract(epoch from(current_timestamp -"
-        + " timestamp '1970-01-01 00:00:00'))*1000)"
+        + " timestamp '1970-01-01 00:00:00')) * 1000)"
         + " WHERE model_id IN ("
         + " SELECT model_id FROM "
         + ModelMetaMapper.TABLE_NAME

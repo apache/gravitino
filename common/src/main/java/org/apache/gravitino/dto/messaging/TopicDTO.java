@@ -29,7 +29,9 @@ import org.apache.gravitino.messaging.Topic;
 /** Represents a topic DTO (Data Transfer Object). */
 public class TopicDTO implements Topic {
 
-  /** @return a new builder for constructing a Topic DTO. */
+  /**
+   * @return a new builder for constructing a Topic DTO.
+   */
   public static Builder builder() {
     return new Builder();
   }
@@ -173,7 +175,9 @@ public class TopicDTO implements Topic {
       return this;
     }
 
-    /** @return The constructed Topic DTO. */
+    /**
+     * @return The constructed Topic DTO.
+     */
     public TopicDTO build() {
       return new TopicDTO(name, comment, properties, audit);
     }

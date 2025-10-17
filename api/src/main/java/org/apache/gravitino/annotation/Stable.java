@@ -39,6 +39,8 @@ import java.lang.annotation.Target;
 })
 public @interface Stable {
 
-  /** @return The version when the API was first marked stable. */
+  /**
+   * @return The version when the API was first marked stable.
+   */
   String since();
 }

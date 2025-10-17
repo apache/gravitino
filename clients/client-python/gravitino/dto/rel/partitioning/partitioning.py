@@ -19,9 +19,9 @@ from abc import abstractmethod
 from enum import Enum, unique
 from typing import Final, List
 
-from gravitino.api.expressions.expression import Expression
-from gravitino.api.expressions.named_reference import NamedReference
-from gravitino.api.expressions.transforms.transform import Transform
+from gravitino.api.rel.expressions.expression import Expression
+from gravitino.api.rel.expressions.named_reference import NamedReference
+from gravitino.api.rel.expressions.transforms.transform import Transform
 from gravitino.dto.rel.partition_utils import PartitionUtils
 from gravitino.exceptions.base import IllegalArgumentException
 from gravitino.utils.precondition import Precondition

@@ -21,6 +21,7 @@ from gravitino.api.catalog import Catalog
 from gravitino.api.catalog_change import CatalogChange
 from gravitino.api.job.job_handle import JobHandle
 from gravitino.api.job.job_template import JobTemplate
+from gravitino.api.job.job_template_change import JobTemplateChange
 from gravitino.api.job.supports_jobs import SupportsJobs
 from gravitino.auth.auth_data_provider import AuthDataProvider
 from gravitino.client.gravitino_client_base import GravitinoClientBase
@@ -162,6 +163,24 @@ class GravitinoClient(GravitinoClientBase, SupportsJobs):
             InUseException: If there are still queued or started jobs associated with this job template.
         """
         return self.get_metalake().delete_job_template(job_template_name)
+
+    def alter_job_template(
+        self, job_template_name: str, *changes: JobTemplateChange
+    ) -> JobTemplate:
+        """Alters a job template with the specified changes.
+
+        Args:
+            job_template_name: The name of the job template to alter.
+            changes: The changes to apply to the job template.
+
+        Returns:
+            The altered JobTemplate object.
+
+        Raises:
+            NoSuchJobTemplateException: If no job template with the specified name exists.
+            IllegalArgumentException: If any of the changes cannot be applied.
+        """
+        return self.get_metalake().alter_job_template(job_template_name, *changes)
 
     def list_jobs(self, job_template_name: str = None) -> List[JobHandle]:
         """Lists all the jobs in the current metalake.

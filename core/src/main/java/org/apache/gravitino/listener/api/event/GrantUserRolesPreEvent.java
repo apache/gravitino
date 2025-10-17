@@ -38,7 +38,7 @@ public class GrantUserRolesPreEvent extends UserPreEvent {
    * @param userName the username of the user to whom the roles will be granted.
    * @param roles the list of roles that will be granted to the user.
    */
-  protected GrantUserRolesPreEvent(
+  public GrantUserRolesPreEvent(
       String initiator, String metalake, String userName, List<String> roles) {
     super(initiator, NameIdentifierUtil.ofUser(metalake, userName));
 

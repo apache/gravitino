@@ -282,12 +282,16 @@ public class Privileges {
       super(condition, name);
     }
 
-    /** @return The instance with allow condition of the privilege. */
+    /**
+     * @return The instance with allow condition of the privilege.
+     */
     public static CreateCatalog allow() {
       return ALLOW_INSTANCE;
     }
 
-    /** @return The instance with deny condition of the privilege. */
+    /**
+     * @return The instance with deny condition of the privilege.
+     */
     public static CreateCatalog deny() {
       return DENY_INSTANCE;
     }
@@ -309,12 +313,16 @@ public class Privileges {
       super(condition, name);
     }
 
-    /** @return The instance with allow condition of the privilege. */
+    /**
+     * @return The instance with allow condition of the privilege.
+     */
     public static UseCatalog allow() {
       return ALLOW_INSTANCE;
     }
 
-    /** @return The instance with deny condition of the privilege. */
+    /**
+     * @return The instance with deny condition of the privilege.
+     */
     public static UseCatalog deny() {
       return DENY_INSTANCE;
     }
@@ -334,12 +342,16 @@ public class Privileges {
       super(condition, name);
     }
 
-    /** @return The instance with allow condition of the privilege. */
+    /**
+     * @return The instance with allow condition of the privilege.
+     */
     public static UseSchema allow() {
       return ALLOW_INSTANCE;
     }
 
-    /** @return The instance with deny condition of the privilege. */
+    /**
+     * @return The instance with deny condition of the privilege.
+     */
     public static UseSchema deny() {
       return DENY_INSTANCE;
     }
@@ -361,12 +373,16 @@ public class Privileges {
       super(condition, name);
     }
 
-    /** @return The instance with allow condition of the privilege. */
+    /**
+     * @return The instance with allow condition of the privilege.
+     */
     public static CreateSchema allow() {
       return ALLOW_INSTANCE;
     }
 
-    /** @return The instance with deny condition of the privilege. */
+    /**
+     * @return The instance with deny condition of the privilege.
+     */
     public static CreateSchema deny() {
       return DENY_INSTANCE;
     }
@@ -388,12 +404,16 @@ public class Privileges {
       super(condition, name);
     }
 
-    /** @return The instance with allow condition of the privilege. */
+    /**
+     * @return The instance with allow condition of the privilege.
+     */
     public static CreateTable allow() {
       return ALLOW_INSTANCE;
     }
 
-    /** @return The instance with deny condition of the privilege. */
+    /**
+     * @return The instance with deny condition of the privilege.
+     */
     public static CreateTable deny() {
       return DENY_INSTANCE;
     }
@@ -415,12 +435,16 @@ public class Privileges {
       super(condition, name);
     }
 
-    /** @return The instance with allow condition of the privilege. */
+    /**
+     * @return The instance with allow condition of the privilege.
+     */
     public static SelectTable allow() {
       return ALLOW_INSTANCE;
     }
 
-    /** @return The instance with deny condition of the privilege. */
+    /**
+     * @return The instance with deny condition of the privilege.
+     */
     public static SelectTable deny() {
       return DENY_INSTANCE;
     }
@@ -442,12 +466,16 @@ public class Privileges {
       super(condition, name);
     }
 
-    /** @return The instance with allow condition of the privilege. */
+    /**
+     * @return The instance with allow condition of the privilege.
+     */
     public static ModifyTable allow() {
       return ALLOW_INSTANCE;
     }
 
-    /** @return The instance with deny condition of the privilege. */
+    /**
+     * @return The instance with deny condition of the privilege.
+     */
     public static ModifyTable deny() {
       return DENY_INSTANCE;
     }
@@ -469,12 +497,16 @@ public class Privileges {
       super(condition, name);
     }
 
-    /** @return The instance with allow condition of the privilege. */
+    /**
+     * @return The instance with allow condition of the privilege.
+     */
     public static CreateFileset allow() {
       return ALLOW_INSTANCE;
     }
 
-    /** @return The instance with deny condition of the privilege. */
+    /**
+     * @return The instance with deny condition of the privilege.
+     */
     public static CreateFileset deny() {
       return DENY_INSTANCE;
     }
@@ -496,12 +528,16 @@ public class Privileges {
       super(condition, name);
     }
 
-    /** @return The instance with allow condition of the privilege. */
+    /**
+     * @return The instance with allow condition of the privilege.
+     */
     public static ReadFileset allow() {
       return ALLOW_INSTANCE;
     }
 
-    /** @return The instance with deny condition of the privilege. */
+    /**
+     * @return The instance with deny condition of the privilege.
+     */
     public static ReadFileset deny() {
       return DENY_INSTANCE;
     }
@@ -523,12 +559,16 @@ public class Privileges {
       super(condition, name);
     }
 
-    /** @return The instance with allow condition of the privilege. */
+    /**
+     * @return The instance with allow condition of the privilege.
+     */
     public static WriteFileset allow() {
       return ALLOW_INSTANCE;
     }
 
-    /** @return The instance with deny condition of the privilege. */
+    /**
+     * @return The instance with deny condition of the privilege.
+     */
     public static WriteFileset deny() {
       return DENY_INSTANCE;
     }
@@ -550,12 +590,16 @@ public class Privileges {
       super(condition, name);
     }
 
-    /** @return The instance with allow condition of the privilege. */
+    /**
+     * @return The instance with allow condition of the privilege.
+     */
     public static CreateTopic allow() {
       return ALLOW_INSTANCE;
     }
 
-    /** @return The instance with deny condition of the privilege. */
+    /**
+     * @return The instance with deny condition of the privilege.
+     */
     public static CreateTopic deny() {
       return DENY_INSTANCE;
     }
@@ -577,12 +621,16 @@ public class Privileges {
       super(condition, name);
     }
 
-    /** @return The instance with allow condition of the privilege. */
+    /**
+     * @return The instance with allow condition of the privilege.
+     */
     public static ConsumeTopic allow() {
       return ALLOW_INSTANCE;
     }
 
-    /** @return The instance with deny condition of the privilege. */
+    /**
+     * @return The instance with deny condition of the privilege.
+     */
     public static ConsumeTopic deny() {
       return DENY_INSTANCE;
     }
@@ -604,12 +652,16 @@ public class Privileges {
       super(condition, name);
     }
 
-    /** @return The instance with allow condition of the privilege. */
+    /**
+     * @return The instance with allow condition of the privilege.
+     */
     public static ProduceTopic allow() {
       return ALLOW_INSTANCE;
     }
 
-    /** @return The instance with deny condition of the privilege. */
+    /**
+     * @return The instance with deny condition of the privilege.
+     */
     public static ProduceTopic deny() {
       return DENY_INSTANCE;
     }
@@ -631,12 +683,16 @@ public class Privileges {
       super(condition, name);
     }
 
-    /** @return The instance with allow condition of the privilege. */
+    /**
+     * @return The instance with allow condition of the privilege.
+     */
     public static ManageUsers allow() {
       return ALLOW_INSTANCE;
     }
 
-    /** @return The instance with deny condition of the privilege. */
+    /**
+     * @return The instance with deny condition of the privilege.
+     */
     public static ManageUsers deny() {
       return DENY_INSTANCE;
     }
@@ -658,12 +714,16 @@ public class Privileges {
       super(condition, name);
     }
 
-    /** @return The instance with allow condition of the privilege. */
+    /**
+     * @return The instance with allow condition of the privilege.
+     */
     public static ManageGroups allow() {
       return ALLOW_INSTANCE;
     }
 
-    /** @return The instance with deny condition of the privilege. */
+    /**
+     * @return The instance with deny condition of the privilege.
+     */
     public static ManageGroups deny() {
       return DENY_INSTANCE;
     }
@@ -685,12 +745,16 @@ public class Privileges {
       super(condition, name);
     }
 
-    /** @return The instance with allow condition of the privilege. */
+    /**
+     * @return The instance with allow condition of the privilege.
+     */
     public static CreateRole allow() {
       return ALLOW_INSTANCE;
     }
 
-    /** @return The instance with deny condition of the privilege. */
+    /**
+     * @return The instance with deny condition of the privilege.
+     */
     public static CreateRole deny() {
       return DENY_INSTANCE;
     }
@@ -712,12 +776,16 @@ public class Privileges {
       super(condition, name);
     }
 
-    /** @return The instance with allow condition of the privilege. */
+    /**
+     * @return The instance with allow condition of the privilege.
+     */
     public static ManageGrants allow() {
       return ALLOW_INSTANCE;
     }
 
-    /** @return The instance with deny condition of the privilege. */
+    /**
+     * @return The instance with deny condition of the privilege.
+     */
     public static ManageGrants deny() {
       return DENY_INSTANCE;
     }
@@ -739,12 +807,16 @@ public class Privileges {
       super(condition, name);
     }
 
-    /** @return The instance with allow condition of the privilege. */
+    /**
+     * @return The instance with allow condition of the privilege.
+     */
     public static CreateModel allow() {
       return ALLOW_INSTANCE;
     }
 
-    /** @return The instance with deny condition of the privilege. */
+    /**
+     * @return The instance with deny condition of the privilege.
+     */
     public static CreateModel deny() {
       return DENY_INSTANCE;
     }
@@ -764,12 +836,16 @@ public class Privileges {
       super(condition, name);
     }
 
-    /** @return The instance with allow condition of the privilege. */
+    /**
+     * @return The instance with allow condition of the privilege.
+     */
     public static UseModel allow() {
       return ALLOW_INSTANCE;
     }
 
-    /** @return The instance with deny condition of the privilege. */
+    /**
+     * @return The instance with deny condition of the privilege.
+     */
     public static UseModel deny() {
       return DENY_INSTANCE;
     }
@@ -791,12 +867,16 @@ public class Privileges {
       super(condition, name);
     }
 
-    /** @return The instance with allow condition of the privilege. */
+    /**
+     * @return The instance with allow condition of the privilege.
+     */
     public static CreateModelVersion allow() {
       return ALLOW_INSTANCE;
     }
 
-    /** @return The instance with deny condition of the privilege. */
+    /**
+     * @return The instance with deny condition of the privilege.
+     */
     public static CreateModelVersion deny() {
       return DENY_INSTANCE;
     }

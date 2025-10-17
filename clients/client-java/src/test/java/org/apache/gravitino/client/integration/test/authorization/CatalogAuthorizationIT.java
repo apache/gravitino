@@ -59,9 +59,17 @@ public class CatalogAuthorizationIT extends BaseRestApiAuthorizationIT {
 
   @Test
   @Order(1)
-  public void testCreateCatalog() {
+  public void testCreateCatalog() throws Exception {
     Map<String, String> properties = Maps.newHashMap();
     properties.put("metastore.uris", hmsUri);
+    assertThrows(
+        "Can not access metadata {" + catalog1 + "}.",
+        ForbiddenException.class,
+        () -> {
+          normalUserClient
+              .loadMetalake(METALAKE)
+              .testConnection(catalog1, Catalog.Type.RELATIONAL, "hive", "comment", properties);
+        });
     assertThrows(
         "Can not access metadata {" + catalog1 + "}.",
         ForbiddenException.class,
@@ -72,7 +80,13 @@ public class CatalogAuthorizationIT extends BaseRestApiAuthorizationIT {
         });
     client
         .loadMetalake(METALAKE)
+        .testConnection(catalog1, Catalog.Type.RELATIONAL, "hive", "comment", properties);
+    client
+        .loadMetalake(METALAKE)
         .createCatalog(catalog1, Catalog.Type.RELATIONAL, "hive", "comment", properties);
+    client
+        .loadMetalake(METALAKE)
+        .testConnection(catalog2, Catalog.Type.RELATIONAL, "hive", "comment", properties);
     client
         .loadMetalake(METALAKE)
         .createCatalog(catalog2, Catalog.Type.RELATIONAL, "hive", "comment", properties);

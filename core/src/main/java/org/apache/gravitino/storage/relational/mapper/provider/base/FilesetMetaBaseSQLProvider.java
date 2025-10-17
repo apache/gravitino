@@ -64,7 +64,7 @@ public class FilesetMetaBaseSQLProvider {
         + " fm INNER JOIN "
         + VERSION_TABLE_NAME
         + " vi ON fm.fileset_id = vi.fileset_id AND fm.current_version = vi.version"
-        + " WHERE fm.fileset_id in ("
+        + " WHERE fm.fileset_id IN ("
         + "<foreach collection='filesetIds' item='filesetId' separator=','>"
         + "#{filesetId}"
         + "</foreach>"
@@ -109,10 +109,10 @@ public class FilesetMetaBaseSQLProvider {
   public String insertFilesetMeta(@Param("filesetMeta") FilesetPO filesetPO) {
     return "INSERT INTO "
         + META_TABLE_NAME
-        + "(fileset_id, fileset_name, metalake_id,"
+        + " (fileset_id, fileset_name, metalake_id,"
         + " catalog_id, schema_id, type, audit_info,"
         + " current_version, last_version, deleted_at)"
-        + " VALUES("
+        + " VALUES ("
         + " #{filesetMeta.filesetId},"
         + " #{filesetMeta.filesetName},"
         + " #{filesetMeta.metalakeId},"
@@ -129,10 +129,10 @@ public class FilesetMetaBaseSQLProvider {
   public String insertFilesetMetaOnDuplicateKeyUpdate(@Param("filesetMeta") FilesetPO filesetPO) {
     return "INSERT INTO "
         + META_TABLE_NAME
-        + "(fileset_id, fileset_name, metalake_id,"
+        + " (fileset_id, fileset_name, metalake_id,"
         + " catalog_id, schema_id, type, audit_info,"
         + " current_version, last_version, deleted_at)"
-        + " VALUES("
+        + " VALUES ("
         + " #{filesetMeta.filesetId},"
         + " #{filesetMeta.filesetName},"
         + " #{filesetMeta.metalakeId},"

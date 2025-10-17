@@ -19,12 +19,10 @@
 package org.apache.gravitino.cache;
 
 import com.google.common.base.Preconditions;
-import com.google.common.collect.Lists;
 import com.googlecode.concurrenttrees.radix.ConcurrentRadixTree;
 import com.googlecode.concurrenttrees.radix.RadixTree;
 import com.googlecode.concurrenttrees.radix.node.concrete.DefaultCharArrayNodeFactory;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.HasIdentifier;
@@ -73,12 +71,7 @@ public class ReverseIndexCache {
   public void put(
       NameIdentifier nameIdentifier, Entity.EntityType type, EntityCacheRelationKey key) {
     EntityCacheKey entityCacheKey = EntityCacheKey.of(nameIdentifier, type);
-    String strEntityCacheKey = entityCacheKey.toString();
-    List<EntityCacheKey> entityKeys =
-        Lists.newArrayList(reverseIndex.getValuesForKeysStartingWith(strEntityCacheKey));
-    String strEntityCacheKeySerialNumber =
-        String.format("%s-%d", strEntityCacheKey, entityKeys.size());
-    reverseIndex.put(strEntityCacheKeySerialNumber, key);
+    reverseIndex.put(entityCacheKey.toString(), key);
   }
 
   public void put(Entity entity, EntityCacheRelationKey key) {

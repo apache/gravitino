@@ -121,7 +121,7 @@ jobs:
           cache: 'gradle'
 
       - name: Test publish to local
-        run: ./gradlew publishToMavenLocal -x test -PjdkVersion=${{ matrix.java-version }}
+        run: ./gradlew publishToMavenLocal -x test
 
       - name: Free up disk space
         run: |
@@ -133,7 +133,10 @@ jobs:
           sudo dpkg -i libssl1.1_1.1.1f-1ubuntu2_amd64.deb  
 
       - name: Build with Gradle
-        run: ./gradlew build -PskipITs -PjdkVersion=${{ matrix.java-version }} -PskipDockerTests=false -x :clients:client-python:build
+        run: ./gradlew build -PskipITs -PskipDockerTests=false -x :clients:client-python:build
+
+      - name: Release with Gradle
+        run: ./gradlew clean && ./gradlew release -x test --rerun-tasks
 
       - name: Upload unit tests report
         uses: actions/upload-artifact@v4

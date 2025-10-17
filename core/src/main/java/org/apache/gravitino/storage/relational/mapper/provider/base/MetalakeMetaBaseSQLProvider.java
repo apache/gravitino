@@ -45,7 +45,7 @@ public class MetalakeMetaBaseSQLProvider {
         + " deleted_at as deletedAt"
         + " FROM "
         + TABLE_NAME
-        + " WHERE metalake_name = #{metalakeName} and deleted_at = 0";
+        + " WHERE metalake_name = #{metalakeName} AND deleted_at = 0";
   }
 
   public String selectMetalakeMetaById(@Param("metalakeId") Long metalakeId) {
@@ -56,14 +56,14 @@ public class MetalakeMetaBaseSQLProvider {
         + " deleted_at as deletedAt"
         + " FROM "
         + TABLE_NAME
-        + " WHERE metalake_id = #{metalakeId} and deleted_at = 0";
+        + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0";
   }
 
   public String selectMetalakeIdMetaByName(@Param("metalakeName") String metalakeName) {
     return "SELECT metalake_id as metalakeId"
         + " FROM "
         + TABLE_NAME
-        + " WHERE metalake_name = #{metalakeName} and deleted_at = 0";
+        + " WHERE metalake_name = #{metalakeName} AND deleted_at = 0";
   }
 
   public String listMetalakePOsByMetalakeIds(@Param("metalakeIds") List<Long> metalakeIds) {
@@ -76,7 +76,7 @@ public class MetalakeMetaBaseSQLProvider {
         + " FROM "
         + TABLE_NAME
         + " WHERE deleted_at = 0"
-        + " AND metalake_id in ("
+        + " AND metalake_id IN ("
         + "<foreach collection='metalakeIds' item='metalakeId' separator=','>"
         + "#{metalakeId}"
         + "</foreach>"
@@ -87,9 +87,9 @@ public class MetalakeMetaBaseSQLProvider {
   public String insertMetalakeMeta(@Param("metalakeMeta") MetalakePO metalakePO) {
     return "INSERT INTO "
         + TABLE_NAME
-        + "(metalake_id, metalake_name, metalake_comment, properties, audit_info,"
+        + " (metalake_id, metalake_name, metalake_comment, properties, audit_info,"
         + " schema_version, current_version, last_version, deleted_at)"
-        + " VALUES("
+        + " VALUES ("
         + " #{metalakeMeta.metalakeId},"
         + " #{metalakeMeta.metalakeName},"
         + " #{metalakeMeta.metalakeComment},"
@@ -106,9 +106,9 @@ public class MetalakeMetaBaseSQLProvider {
       @Param("metalakeMeta") MetalakePO metalakePO) {
     return "INSERT INTO "
         + TABLE_NAME
-        + "(metalake_id, metalake_name, metalake_comment, properties, audit_info,"
+        + " (metalake_id, metalake_name, metalake_comment, properties, audit_info,"
         + " schema_version, current_version, last_version, deleted_at)"
-        + " VALUES("
+        + " VALUES ("
         + " #{metalakeMeta.metalakeId},"
         + " #{metalakeMeta.metalakeName},"
         + " #{metalakeMeta.metalakeComment},"
