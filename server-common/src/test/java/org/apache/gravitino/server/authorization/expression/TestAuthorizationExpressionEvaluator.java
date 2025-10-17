@@ -42,8 +42,6 @@ public class TestAuthorizationExpressionEvaluator {
   public void testEvaluator() {
     String expression =
         "CATALOG::USE_CATALOG && SCHEMA::USE_SCHEMA && (TABLE::SELECT_TABLE || TABLE::MODIFY_TABLE)";
-    AuthorizationExpressionEvaluator authorizationExpressionEvaluator =
-        new AuthorizationExpressionEvaluator(expression);
     try (MockedStatic<PrincipalUtils> principalUtilsMocked = mockStatic(PrincipalUtils.class);
         MockedStatic<GravitinoAuthorizerProvider> mockStatic =
             mockStatic(GravitinoAuthorizerProvider.class)) {
@@ -53,6 +51,9 @@ public class TestAuthorizationExpressionEvaluator {
       GravitinoAuthorizerProvider mockedProvider = mock(GravitinoAuthorizerProvider.class);
       mockStatic.when(GravitinoAuthorizerProvider::getInstance).thenReturn(mockedProvider);
       when(mockedProvider.getGravitinoAuthorizer()).thenReturn(new MockGravitinoAuthorizer());
+      AuthorizationExpressionEvaluator authorizationExpressionEvaluator =
+          new AuthorizationExpressionEvaluator(expression);
+
       Map<Entity.EntityType, NameIdentifier> metadataNames = new HashMap<>();
       metadataNames.put(Entity.EntityType.METALAKE, NameIdentifierUtil.ofMetalake("testMetalake"));
       metadataNames.put(
@@ -79,17 +80,19 @@ public class TestAuthorizationExpressionEvaluator {
   @Test
   public void testEvaluatorWithOwner() {
     String expression = "METALAKE::OWNER || CATALOG::CREATE_CATALOG";
-    AuthorizationExpressionEvaluator authorizationExpressionEvaluator =
-        new AuthorizationExpressionEvaluator(expression);
     try (MockedStatic<PrincipalUtils> principalUtilsMocked = mockStatic(PrincipalUtils.class);
         MockedStatic<GravitinoAuthorizerProvider> mockStatic =
             mockStatic(GravitinoAuthorizerProvider.class)) {
-      principalUtilsMocked
-          .when(PrincipalUtils::getCurrentPrincipal)
-          .thenReturn(new UserPrincipal("tester"));
       GravitinoAuthorizerProvider mockedProvider = mock(GravitinoAuthorizerProvider.class);
       mockStatic.when(GravitinoAuthorizerProvider::getInstance).thenReturn(mockedProvider);
       when(mockedProvider.getGravitinoAuthorizer()).thenReturn(new MockGravitinoAuthorizer());
+
+      AuthorizationExpressionEvaluator authorizationExpressionEvaluator =
+          new AuthorizationExpressionEvaluator(expression);
+      principalUtilsMocked
+          .when(PrincipalUtils::getCurrentPrincipal)
+          .thenReturn(new UserPrincipal("tester"));
+
       Map<Entity.EntityType, NameIdentifier> metadataNames = new HashMap<>();
       metadataNames.put(
           Entity.EntityType.METALAKE, NameIdentifierUtil.ofMetalake("metalakeWithOutOwner"));

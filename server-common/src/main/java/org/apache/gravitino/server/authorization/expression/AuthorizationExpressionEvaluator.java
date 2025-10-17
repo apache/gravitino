@@ -39,6 +39,7 @@ import org.apache.gravitino.utils.PrincipalUtils;
 public class AuthorizationExpressionEvaluator {
 
   private final String ognlAuthorizationExpression;
+  private final GravitinoAuthorizer authorizer;
 
   /**
    * Use {@link AuthorizationExpressionConverter} to convert the authorization expression into an
@@ -47,8 +48,19 @@ public class AuthorizationExpressionEvaluator {
    * @param expression authorization expression
    */
   public AuthorizationExpressionEvaluator(String expression) {
+    this(expression, GravitinoAuthorizerProvider.getInstance().getGravitinoAuthorizer());
+  }
+
+  /**
+   * Constructor of AuthorizationExpressionEvaluator
+   *
+   * @param expression authorization expression
+   * @param authorizer GravitinoAuthorizer instance
+   */
+  public AuthorizationExpressionEvaluator(String expression, GravitinoAuthorizer authorizer) {
     this.ognlAuthorizationExpression =
         AuthorizationExpressionConverter.convertToOgnlExpression(expression);
+    this.authorizer = authorizer;
   }
 
   /**
@@ -61,7 +73,24 @@ public class AuthorizationExpressionEvaluator {
   public boolean evaluate(
       Map<Entity.EntityType, NameIdentifier> metadataNames,
       AuthorizationRequestContext requestContext) {
-    return evaluate(metadataNames, new HashMap<>(), requestContext);
+    Principal currentPrincipal = PrincipalUtils.getCurrentPrincipal();
+    return evaluate(metadataNames, new HashMap<>(), requestContext, currentPrincipal);
+  }
+
+  /**
+   * Use OGNL expressions to invoke GravitinoAuthorizer for authorizing multiple types of metadata
+   * IDs.
+   *
+   * @param metadataNames key-metadata type, value-metadata NameIdentifier
+   * @param requestContext authorization request context
+   * @param principal current principal
+   * @return authorization result
+   */
+  public boolean evaluate(
+      Map<Entity.EntityType, NameIdentifier> metadataNames,
+      AuthorizationRequestContext requestContext,
+      Principal principal) {
+    return evaluate(metadataNames, new HashMap<>(), requestContext, principal);
   }
 
   /**
@@ -77,11 +106,27 @@ public class AuthorizationExpressionEvaluator {
       Map<String, Object> pathParams,
       AuthorizationRequestContext requestContext) {
     Principal currentPrincipal = PrincipalUtils.getCurrentPrincipal();
-    GravitinoAuthorizer gravitinoAuthorizer =
-        GravitinoAuthorizerProvider.getInstance().getGravitinoAuthorizer();
+    return evaluate(metadataNames, pathParams, requestContext, currentPrincipal);
+  }
+
+  /**
+   * Use OGNL expressions to invoke GravitinoAuthorizer for authorizing multiple types of metadata
+   * IDs.
+   *
+   * @param metadataNames key-metadata type, value-metadata NameIdentifier
+   * @param pathParams params from request path
+   * @param requestContext authorization request context
+   * @param currentPrincipal current principal
+   * @return authorization result
+   */
+  private boolean evaluate(
+      Map<Entity.EntityType, NameIdentifier> metadataNames,
+      Map<String, Object> pathParams,
+      AuthorizationRequestContext requestContext,
+      Principal currentPrincipal) {
     OgnlContext ognlContext = Ognl.createDefaultContext(null);
     ognlContext.put("principal", currentPrincipal);
-    ognlContext.put("authorizer", gravitinoAuthorizer);
+    ognlContext.put("authorizer", authorizer);
     ognlContext.put("authorizationContext", requestContext);
     ognlContext.putAll(pathParams);
     metadataNames.forEach(
