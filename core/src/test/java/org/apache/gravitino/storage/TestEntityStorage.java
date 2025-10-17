@@ -35,6 +35,7 @@ import static org.apache.gravitino.Configs.VERSION_RETENTION_COUNT;
 import static org.apache.gravitino.file.Fileset.LOCATION_NAME_UNKNOWN;
 import static org.apache.gravitino.storage.relational.TestJDBCBackend.createRoleEntity;
 
+import com.github.benmanes.caffeine.cache.Cache;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
@@ -64,11 +65,14 @@ import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.EntityStoreFactory;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.SupportsRelationOperations;
 import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.authorization.Privileges;
 import org.apache.gravitino.authorization.Role;
 import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.authorization.SecurableObjects;
+import org.apache.gravitino.cache.CaffeineEntityCache;
+import org.apache.gravitino.cache.EntityCacheRelationKey;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NonEmptyEntityException;
 import org.apache.gravitino.file.Fileset;
@@ -86,6 +90,7 @@ import org.apache.gravitino.meta.RoleEntity;
 import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.meta.SchemaVersion;
 import org.apache.gravitino.meta.TableEntity;
+import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.meta.TopicEntity;
 import org.apache.gravitino.meta.UserEntity;
 import org.apache.gravitino.model.ModelVersion;
@@ -100,6 +105,7 @@ import org.apache.gravitino.storage.relational.converters.MySQLExceptionConverte
 import org.apache.gravitino.storage.relational.converters.PostgreSQLExceptionConverter;
 import org.apache.gravitino.storage.relational.converters.SQLExceptionConverterFactory;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
+import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
 import org.apache.ibatis.session.SqlSession;
 import org.junit.jupiter.api.AfterEach;
@@ -2640,6 +2646,129 @@ public class TestEntityStorage {
       Assertions.assertEquals(1, securableObjects.size());
       Assertions.assertEquals("newCatalogName", securableObjects.get(0).name());
       destroy(type);
+    }
+  }
+
+  @ParameterizedTest
+  @MethodSource("storageProvider")
+  void testTagRelationCache(String type) throws Exception {
+    Config config = Mockito.mock(Config.class);
+    init(type, config);
+
+    AuditInfo auditInfo =
+        AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
+
+    try (EntityStore store = EntityStoreFactory.createEntityStore(config)) {
+      store.initialize(config);
+
+      BaseMetalake metalake =
+          createBaseMakeLake(RandomIdGenerator.INSTANCE.nextId(), "metalake", auditInfo);
+      store.put(metalake, false);
+
+      Namespace namespace = NameIdentifierUtil.ofTag("metalake", "tag1").namespace();
+      TagEntity tag1 =
+          TagEntity.builder()
+              .withId(RandomIdGenerator.INSTANCE.nextId())
+              .withNamespace(namespace)
+              .withName("tag1")
+              .withAuditInfo(auditInfo)
+              .withProperties(Collections.emptyMap())
+              .build();
+      CatalogEntity catalog =
+          createCatalog(
+              RandomIdGenerator.INSTANCE.nextId(),
+              NamespaceUtil.ofCatalog("metalake"),
+              "catalog",
+              auditInfo);
+
+      store.put(catalog, false);
+      store.put(tag1, false);
+
+      SupportsRelationOperations relationOperations = (SupportsRelationOperations) store;
+
+      relationOperations.updateEntityRelations(
+          SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL,
+          catalog.nameIdentifier(),
+          EntityType.CATALOG,
+          new NameIdentifier[] {tag1.nameIdentifier()},
+          new NameIdentifier[] {});
+
+      // Now try to load the relation
+      List<TagEntity> tags =
+          relationOperations.listEntitiesByRelation(
+              SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL,
+              catalog.nameIdentifier(),
+              EntityType.CATALOG,
+              true);
+      Assertions.assertEquals(1, tags.size());
+      Assertions.assertEquals(tag1, tags.get(0));
+
+      // Check whether tags exists in entity store cache
+      RelationalEntityStore relationalEntityStore = (RelationalEntityStore) store;
+      CaffeineEntityCache caffeineEntityCache =
+          (CaffeineEntityCache) relationalEntityStore.getCache();
+      Cache<EntityCacheRelationKey, List<Entity>> cache = caffeineEntityCache.getCacheData();
+
+      List<Entity> cachedTags =
+          cache.get(
+              EntityCacheRelationKey.of(
+                  catalog.nameIdentifier(),
+                  EntityType.CATALOG,
+                  SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL),
+              k -> null);
+
+      // Check cached tags is correct
+      Assertions.assertNotNull(cachedTags);
+      Assertions.assertEquals(1, cachedTags.size());
+      Assertions.assertEquals(tag1, cachedTags.get(0));
+
+      // Now we are going to alter the catalog
+      CatalogEntity updatedCatalog =
+          CatalogEntity.builder()
+              .withId(catalog.id())
+              .withNamespace(catalog.namespace())
+              .withName("newCatalogName")
+              .withAuditInfo(auditInfo)
+              .withComment(catalog.getComment())
+              .withProperties(catalog.getProperties())
+              .withType(catalog.getType())
+              .withProvider(catalog.getProvider())
+              .build();
+      store.update(
+          catalog.nameIdentifier(),
+          CatalogEntity.class,
+          Entity.EntityType.CATALOG,
+          e -> updatedCatalog);
+      // Now try to load the relation again from cache, it should be empty.
+      List<Entity> cachedTagsAfterCatalogUpdate =
+          cache.get(
+              EntityCacheRelationKey.of(
+                  catalog.nameIdentifier(),
+                  EntityType.CATALOG,
+                  SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL),
+              k -> null);
+      Assertions.assertNull(cachedTagsAfterCatalogUpdate);
+
+      // Load tags again, it should repopulate the cache
+      List<TagEntity> tagsAfterCatalogUpdate =
+          relationOperations.listEntitiesByRelation(
+              SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL,
+              updatedCatalog.nameIdentifier(),
+              EntityType.CATALOG,
+              true);
+      Assertions.assertEquals(1, tagsAfterCatalogUpdate.size());
+      Assertions.assertEquals(tag1, tagsAfterCatalogUpdate.get(0));
+
+      List<Entity> cachedTagsAfterReload =
+          cache.get(
+              EntityCacheRelationKey.of(
+                  updatedCatalog.nameIdentifier(),
+                  EntityType.CATALOG,
+                  SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL),
+              k -> null);
+      Assertions.assertNotNull(cachedTagsAfterReload);
+      Assertions.assertEquals(1, cachedTagsAfterReload.size());
+      Assertions.assertEquals(tag1, cachedTagsAfterReload.get(0));
     }
   }
 }

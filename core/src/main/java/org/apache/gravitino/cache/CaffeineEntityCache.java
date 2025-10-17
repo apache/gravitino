@@ -23,6 +23,7 @@ import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import com.github.benmanes.caffeine.cache.RemovalCause;
 import com.github.benmanes.caffeine.cache.stats.CacheStats;
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
@@ -133,6 +134,11 @@ public class CaffeineEntityCache extends BaseEntityCache {
     }
   }
 
+  @VisibleForTesting
+  public Cache<EntityCacheRelationKey, List<Entity>> getCacheData() {
+    return this.cacheData;
+  }
+
   /** {@inheritDoc} */
   @Override
   public <E extends Entity & HasIdentifier> Optional<List<E>> getIfPresent(
@@ -167,7 +173,10 @@ public class CaffeineEntityCache extends BaseEntityCache {
 
     return segmentedLock.withLock(
         EntityCacheRelationKey.of(ident, type, relType),
-        () -> invalidateEntities(ident, type, Optional.of(relType)));
+        () -> {
+          invalidateEntities(ident, type, Optional.of(relType));
+          return true;
+        });
   }
 
   /** {@inheritDoc} */
@@ -176,7 +185,11 @@ public class CaffeineEntityCache extends BaseEntityCache {
     checkArguments(ident, type);
     return segmentedLock.withLock(
         EntityCacheRelationKey.of(ident, type),
-        () -> invalidateEntities(ident, type, Optional.empty()));
+        () -> {
+          // Invalid all relation types and the entity itself
+          invalidateEntities(ident, type, Optional.empty());
+          return true;
+        });
   }
 
   /** {@inheritDoc} */
@@ -303,8 +316,6 @@ public class CaffeineEntityCache extends BaseEntityCache {
    * @param newEntities The new entities to sync to the cache.
    */
   private void syncEntitiesToCache(EntityCacheRelationKey key, List<Entity> newEntities) {
-    if (key.relationType() != null) return;
-
     List<Entity> existingEntities = cacheData.getIfPresent(key);
 
     if (existingEntities != null && key.relationType() != null) {
