@@ -51,6 +51,7 @@ include(
   "clients:client-python",
   "clients:cli"
 )
+include("catalogs:catalog-generic-lakehouse")
 if (gradle.startParameter.projectProperties["enableFuse"]?.toBoolean() == true) {
   include("clients:filesystem-fuse")
 } else {
