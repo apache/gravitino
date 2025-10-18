@@ -17,6 +17,7 @@
 
 import unittest
 from datetime import datetime
+from itertools import product
 from random import randint, random
 from typing import cast
 from unittest.mock import MagicMock, patch
@@ -353,3 +354,36 @@ class TestDTOConverters(unittest.TestCase):
             self.assertListEqual(converted.field_names(), expected.field_names())
 
         self.assertEqual(DTOConverters.from_dtos([]), [])
+
+    def test_from_dtos_sort_order(self):
+        directions = {SortDirection.ASCENDING, SortDirection.DESCENDING}
+        null_orderings = {NullOrdering.NULLS_LAST, NullOrdering.NULLS_FIRST}
+        field_names = [
+            [f"score_{i}"] for i in range(len(directions) * len(null_orderings))
+        ]
+        sort_order_dtos = []
+        expected = []
+        for field_name, (direction, null_ordering) in zip(
+            field_names, product(directions, null_orderings)
+        ):
+            field_ref_dto = (
+                FieldReferenceDTO.builder()
+                .with_field_name(field_name=field_name)
+                .build()
+            )
+            sort_order_dtos.append(
+                SortOrderDTO(
+                    sort_term=field_ref_dto,
+                    direction=direction,
+                    null_ordering=null_ordering,
+                )
+            )
+            expected.append(
+                SortOrders.of(
+                    expression=DTOConverters.from_function_arg(field_ref_dto),
+                    direction=direction,
+                    null_ordering=null_ordering,
+                )
+            )
+        converted = DTOConverters.from_dtos(sort_order_dtos)
+        self.assertListEqual(converted, expected)
