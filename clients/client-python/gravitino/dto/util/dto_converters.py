@@ -16,8 +16,9 @@
 # under the License.
 
 from functools import singledispatchmethod
-from typing import Union, cast
+from typing import Optional, Union, cast
 
+from gravitino.api.audit import Audit
 from gravitino.api.rel.column import Column
 from gravitino.api.rel.expressions.distributions.distribution import Distribution
 from gravitino.api.rel.expressions.distributions.distributions import Distributions
@@ -32,6 +33,7 @@ from gravitino.api.rel.expressions.transforms.transforms import Transforms
 from gravitino.api.rel.expressions.unparsed_expression import UnparsedExpression
 from gravitino.api.rel.indexes.index import Index
 from gravitino.api.rel.indexes.indexes import Indexes
+from gravitino.api.rel.table import Table
 from gravitino.api.rel.types.types import Types
 from gravitino.dto.rel.column_dto import ColumnDTO
 from gravitino.dto.rel.distribution_dto import DistributionDTO
@@ -43,6 +45,7 @@ from gravitino.dto.rel.expressions.unparsed_expression_dto import UnparsedExpres
 from gravitino.dto.rel.indexes.index_dto import IndexDTO
 from gravitino.dto.rel.partitioning.partitioning import Partitioning
 from gravitino.dto.rel.sort_order_dto import SortOrderDTO
+from gravitino.dto.rel.table_dto import TableDTO
 from gravitino.exceptions.base import IllegalArgumentException
 
 
@@ -213,6 +216,82 @@ class DTOConverters:
                 dto.function_name(), DTOConverters.from_function_args(dto.args())
             )
         raise IllegalArgumentException(f"Unsupported partitioning: {strategy}")
+
+    @from_dto.register
+    @staticmethod
+    def _(dto: TableDTO) -> Table:
+        """Converts a TableDTO to a Table.
+
+        Args:
+            dto (TableDTO): The table DTO to be converted.
+
+        Returns:
+            Table: The table.
+        """
+
+        class TableImpl(Table):  # pylint: disable=too-many-instance-attributes
+            """A table implementation."""
+
+            def __init__(
+                self,
+                name: str,
+                columns: list[Column],
+                partitioning: list[Transform],
+                sort_order: list[SortOrder],
+                distribution: Distribution,
+                index: list[Index],
+                comment: Optional[str],
+                properties: dict[str, str],
+                audit_info: Audit,
+            ):
+                self._name = name
+                self._columns = columns
+                self._partitioning = partitioning
+                self._sort_order = sort_order
+                self._distribution = distribution
+                self._index = index
+                self._comment = comment
+                self._properties = properties
+                self._audit_info = audit_info
+
+            def name(self) -> str:
+                return self._name
+
+            def columns(self) -> list[Column]:
+                return self._columns
+
+            def partitioning(self) -> list[Transform]:
+                return self._partitioning
+
+            def sort_order(self) -> list[SortOrder]:
+                return self._sort_order
+
+            def distribution(self) -> Distribution:
+                return self._distribution
+
+            def index(self) -> list[Index]:
+                return self._index
+
+            def comment(self) -> Optional[str]:
+                return self._comment
+
+            def properties(self) -> dict[str, str]:
+                return self._properties
+
+            def audit_info(self) -> Audit:
+                return self._audit_info
+
+        return TableImpl(
+            name=dto.name(),
+            columns=DTOConverters.from_dtos(dto.columns()),
+            partitioning=DTOConverters.from_dtos(dto.partitioning()),
+            sort_order=DTOConverters.from_dtos(dto.sort_order()),
+            distribution=DTOConverters.from_dto(dto.distribution()),
+            index=DTOConverters.from_dtos(dto.index()),
+            comment=dto.comment(),
+            properties=dto.properties(),
+            audit_info=dto.audit_info(),
+        )
 
     @staticmethod
     def from_dtos(
