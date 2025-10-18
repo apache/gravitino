@@ -31,6 +31,7 @@ from gravitino.api.rel.expressions.named_reference import FieldReference
 from gravitino.api.rel.expressions.sorts.null_ordering import NullOrdering
 from gravitino.api.rel.expressions.sorts.sort_direction import SortDirection
 from gravitino.api.rel.expressions.sorts.sort_orders import SortOrders
+from gravitino.api.rel.expressions.transforms.transforms import Transforms
 from gravitino.api.rel.expressions.unparsed_expression import UnparsedExpression
 from gravitino.api.rel.indexes.index import Index
 from gravitino.api.rel.indexes.indexes import Indexes
@@ -43,6 +44,23 @@ from gravitino.dto.rel.expressions.function_arg import FunctionArg
 from gravitino.dto.rel.expressions.literal_dto import LiteralDTO
 from gravitino.dto.rel.expressions.unparsed_expression_dto import UnparsedExpressionDTO
 from gravitino.dto.rel.indexes.index_dto import IndexDTO
+from gravitino.dto.rel.partitioning.bucket_partitioning_dto import BucketPartitioningDTO
+from gravitino.dto.rel.partitioning.day_partitioning_dto import DayPartitioningDTO
+from gravitino.dto.rel.partitioning.function_partitioning_dto import (
+    FunctionPartitioningDTO,
+)
+from gravitino.dto.rel.partitioning.hour_partitioning_dto import HourPartitioningDTO
+from gravitino.dto.rel.partitioning.identity_partitioning_dto import (
+    IdentityPartitioningDTO,
+)
+from gravitino.dto.rel.partitioning.list_partitioning_dto import ListPartitioningDTO
+from gravitino.dto.rel.partitioning.month_partitioning_dto import MonthPartitioningDTO
+from gravitino.dto.rel.partitioning.partitioning import Partitioning
+from gravitino.dto.rel.partitioning.range_partitioning_dto import RangePartitioningDTO
+from gravitino.dto.rel.partitioning.truncate_partitioning_dto import (
+    TruncatePartitioningDTO,
+)
+from gravitino.dto.rel.partitioning.year_partitioning_dto import YearPartitioningDTO
 from gravitino.dto.rel.sort_order_dto import SortOrderDTO
 from gravitino.dto.util.dto_converters import DTOConverters
 from gravitino.exceptions.base import IllegalArgumentException
@@ -256,3 +274,60 @@ class TestDTOConverters(unittest.TestCase):
         self.assertTrue(converted.default_value() != Column.DEFAULT_VALUE_NOT_SET)
         self.assertTrue(expected.default_value() != Column.DEFAULT_VALUE_NOT_SET)
         self.assertTrue(converted == expected)
+
+    def test_from_dto_partitioning(self):
+        field_name = ["score"]
+        field_names = [field_name]
+        partitioning = {
+            Partitioning.Strategy.IDENTITY: IdentityPartitioningDTO(*field_name),
+            Partitioning.Strategy.YEAR: YearPartitioningDTO(*field_name),
+            Partitioning.Strategy.MONTH: MonthPartitioningDTO(*field_name),
+            Partitioning.Strategy.DAY: DayPartitioningDTO(*field_name),
+            Partitioning.Strategy.HOUR: HourPartitioningDTO(*field_name),
+            Partitioning.Strategy.BUCKET: BucketPartitioningDTO(10, *field_names),
+            Partitioning.Strategy.TRUNCATE: TruncatePartitioningDTO(10, field_name),
+            Partitioning.Strategy.LIST: ListPartitioningDTO([["createTime"], ["city"]]),
+            Partitioning.Strategy.RANGE: RangePartitioningDTO(field_name),
+            Partitioning.Strategy.FUNCTION: FunctionPartitioningDTO(
+                "test_function",
+                LiteralDTO.builder()
+                .with_data_type(Types.IntegerType.get())
+                .with_value("-1")
+                .build(),
+                LiteralDTO.builder()
+                .with_data_type(Types.BooleanType.get())
+                .with_value("True")
+                .build(),
+            ),
+        }
+        transform = {
+            Partitioning.Strategy.IDENTITY: Transforms.identity(field_name),
+            Partitioning.Strategy.YEAR: Transforms.year(field_name),
+            Partitioning.Strategy.MONTH: Transforms.month(field_name),
+            Partitioning.Strategy.DAY: Transforms.day(field_name),
+            Partitioning.Strategy.HOUR: Transforms.hour(field_name),
+            Partitioning.Strategy.BUCKET: Transforms.bucket(10, *field_names),
+            Partitioning.Strategy.TRUNCATE: Transforms.truncate(10, field_name),
+            Partitioning.Strategy.LIST: Transforms.list(["createTime"], ["city"]),
+            Partitioning.Strategy.RANGE: Transforms.range(field_name),
+            Partitioning.Strategy.FUNCTION: Transforms.apply(
+                "test_function",
+                [
+                    Literals.of(value="-1", data_type=Types.IntegerType.get()),
+                    Literals.of(value="True", data_type=Types.BooleanType.get()),
+                ],
+            ),
+        }
+
+        for strategy, dto in partitioning.items():
+            expected = transform[strategy]
+            self.assertTrue(DTOConverters.from_dto(dto) == expected)
+
+        with (
+            patch.object(IdentityPartitioningDTO, "strategy") as mock_strategy,
+            self.assertRaisesRegex(
+                IllegalArgumentException, "Unsupported partitioning"
+            ),
+        ):
+            mock_strategy.return_value = "invalid_strategy"
+            DTOConverters.from_dto(IdentityPartitioningDTO(*field_name))
