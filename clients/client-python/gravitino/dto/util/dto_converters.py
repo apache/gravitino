@@ -27,6 +27,8 @@ from gravitino.api.rel.expressions.literals.literals import Literals
 from gravitino.api.rel.expressions.named_reference import NamedReference
 from gravitino.api.rel.expressions.sorts.sort_order import SortOrder
 from gravitino.api.rel.expressions.sorts.sort_orders import SortOrders
+from gravitino.api.rel.expressions.transforms.transform import Transform
+from gravitino.api.rel.expressions.transforms.transforms import Transforms
 from gravitino.api.rel.expressions.unparsed_expression import UnparsedExpression
 from gravitino.api.rel.indexes.index import Index
 from gravitino.api.rel.indexes.indexes import Indexes
@@ -39,6 +41,7 @@ from gravitino.dto.rel.expressions.function_arg import FunctionArg
 from gravitino.dto.rel.expressions.literal_dto import LiteralDTO
 from gravitino.dto.rel.expressions.unparsed_expression_dto import UnparsedExpressionDTO
 from gravitino.dto.rel.indexes.index_dto import IndexDTO
+from gravitino.dto.rel.partitioning.partitioning import Partitioning
 from gravitino.dto.rel.sort_order_dto import SortOrderDTO
 from gravitino.exceptions.base import IllegalArgumentException
 
@@ -168,3 +171,45 @@ class DTOConverters:
                 else DTOConverters.from_function_arg(dto.default_value())
             ),
         )
+
+    @from_dto.register
+    @staticmethod
+    def _(dto: Partitioning) -> Transform:  # pylint: disable=too-many-return-statements
+        """Converts a partitioning DTO to a Transform.
+
+        Args:
+            dto (Partitioning): The partitioning DTO to be converted.
+
+        Returns:
+            Transform: The transform.
+        """
+        strategy = dto.strategy()
+        if strategy is Partitioning.Strategy.IDENTITY:
+            return Transforms.identity(dto.field_name())
+        if strategy is Partitioning.Strategy.YEAR:
+            return Transforms.year(dto.field_name())
+        if strategy is Partitioning.Strategy.MONTH:
+            return Transforms.month(dto.field_name())
+        if strategy is Partitioning.Strategy.DAY:
+            return Transforms.day(dto.field_name())
+        if strategy is Partitioning.Strategy.HOUR:
+            return Transforms.hour(dto.field_name())
+        if strategy is Partitioning.Strategy.BUCKET:
+            return Transforms.bucket(dto.num_buckets(), *dto.field_names())
+        if strategy is Partitioning.Strategy.TRUNCATE:
+            return Transforms.truncate(dto.width(), dto.field_name())
+        if strategy is Partitioning.Strategy.LIST:
+            return Transforms.list(
+                field_names=dto.field_names(),
+                assignments=[DTOConverters.from_dto(p) for p in dto.assignments()],
+            )
+        if strategy is Partitioning.Strategy.RANGE:
+            return Transforms.range(
+                dto.field_name(),
+                [DTOConverters.from_dto(p) for p in dto.assignments()],
+            )
+        if strategy is Partitioning.Strategy.FUNCTION:
+            return Transforms.apply(
+                dto.function_name(), DTOConverters.from_function_args(dto.args())
+            )
+        raise IllegalArgumentException(f"Unsupported partitioning: {strategy}")
