@@ -949,7 +949,8 @@ tasks {
       ":catalogs:catalog-lakehouse-hudi:copyLibAndConfig",
       ":catalogs:catalog-lakehouse-iceberg:copyLibAndConfig",
       ":catalogs:catalog-lakehouse-paimon:copyLibAndConfig",
-      ":catalogs:catalog-model:copyLibAndConfig"
+      ":catalogs:catalog-model:copyLibAndConfig",
+      ":catalogs:catalog-generic-lakehouse:copyLibAndConfig"
     )
   }
 
