@@ -210,9 +210,7 @@ class TestDTOConverters(unittest.TestCase):
         self.assertListEqual(converted.field_names(), expected.field_names())
 
     def test_from_dto_raises_exception(self):
-        with self.assertRaisesRegex(
-            IllegalArgumentException, "Unsupported expression type"
-        ):
+        with self.assertRaisesRegex(IllegalArgumentException, "Unsupported DTO type"):
             DTOConverters.from_dto("")
 
     def test_from_dto_sort_order(self):
@@ -331,3 +329,27 @@ class TestDTOConverters(unittest.TestCase):
         ):
             mock_strategy.return_value = "invalid_strategy"
             DTOConverters.from_dto(IdentityPartitioningDTO(*field_name))
+
+    def test_from_dtos_index_dto(self):
+        field_names = [[f"field_{i}"] for i in range(2)]
+
+        dtos = [
+            IndexDTO(
+                index_type=index_type,
+                name=index_type.value,
+                field_names=field_names,
+            )
+            for index_type in Index.IndexType
+        ]
+        converted_dtos = DTOConverters.from_dtos(dtos)
+        expected_items = [
+            Indexes.of(index_type, index_type.value, field_names)
+            for index_type in Index.IndexType
+        ]
+        self.assertEqual(len(converted_dtos), len(expected_items))
+        for converted, expected in zip(converted_dtos, expected_items):
+            self.assertTrue(converted.type() == expected.type())
+            self.assertTrue(converted.name() == expected.name())
+            self.assertListEqual(converted.field_names(), expected.field_names())
+
+        self.assertEqual(DTOConverters.from_dtos([]), [])
