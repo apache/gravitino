@@ -36,6 +36,7 @@ from gravitino.api.rel.expressions.transforms.transforms import Transforms
 from gravitino.api.rel.expressions.unparsed_expression import UnparsedExpression
 from gravitino.api.rel.indexes.index import Index
 from gravitino.api.rel.indexes.indexes import Indexes
+from gravitino.api.rel.table import Table
 from gravitino.api.rel.types.types import Types
 from gravitino.dto.rel.column_dto import ColumnDTO
 from gravitino.dto.rel.distribution_dto import DistributionDTO
@@ -63,6 +64,7 @@ from gravitino.dto.rel.partitioning.truncate_partitioning_dto import (
 )
 from gravitino.dto.rel.partitioning.year_partitioning_dto import YearPartitioningDTO
 from gravitino.dto.rel.sort_order_dto import SortOrderDTO
+from gravitino.dto.rel.table_dto import TableDTO
 from gravitino.dto.util.dto_converters import DTOConverters
 from gravitino.exceptions.base import IllegalArgumentException
 
@@ -91,6 +93,133 @@ class TestDTOConverters(unittest.TestCase):
             Types.VarCharType.of(10): "test",
             Types.FixedCharType.of(10): "test",
         }
+        cls.table_dto_json = """
+        {
+            "name": "example_table",
+            "comment": "This is an example table",
+            "audit": {
+                "creator": "Apache Gravitino",
+                "createTime":"2025-10-10T00:00:00"
+            },
+            "columns": [
+                {
+                    "name": "id",
+                    "type": "integer",
+                    "comment": "id column comment",
+                    "nullable": false,
+                    "autoIncrement": true,
+                    "defaultValue": {
+                        "type": "literal",
+                        "dataType": "integer",
+                        "value": "-1"
+                    }
+                },
+                {
+                    "name": "name",
+                    "type": "varchar(500)",
+                    "comment": "name column comment",
+                    "nullable": true,
+                    "autoIncrement": false,
+                    "defaultValue": {
+                        "type": "literal",
+                        "dataType": "null",
+                        "value": "null"
+                    }
+                },
+                {
+                    "name": "StartingDate",
+                    "type": "timestamp",
+                    "comment": "StartingDate column comment",
+                    "nullable": false,
+                    "autoIncrement": false,
+                    "defaultValue": {
+                        "type": "function",
+                        "funcName": "current_timestamp",
+                        "funcArgs": []
+                    }
+                },
+                {
+                    "name": "info",
+                    "type": {
+                        "type": "struct",
+                        "fields": [
+                            {
+                                "name": "position",
+                                "type": "string",
+                                "nullable": true,
+                                "comment": "position field comment"
+                            },
+                            {
+                                "name": "contact",
+                                "type": {
+                                "type": "list",
+                                "elementType": "integer",
+                                "containsNull": false
+                                },
+                                "nullable": true,
+                                "comment": "contact field comment"
+                            },
+                            {
+                                "name": "rating",
+                                "type": {
+                                "type": "map",
+                                "keyType": "string",
+                                "valueType": "integer",
+                                "valueContainsNull": false
+                                },
+                                "nullable": true,
+                                "comment": "rating field comment"
+                            }
+                        ]
+                    },
+                    "comment": "info column comment",
+                    "nullable": true
+                },
+                {
+                    "name": "dt",
+                    "type": "date",
+                    "comment": "dt column comment",
+                    "nullable": true
+                }
+            ],
+            "partitioning": [
+                {
+                    "strategy": "identity",
+                    "fieldName": [ "dt" ]
+                }
+            ],
+            "distribution": {
+                "strategy": "hash",
+                "number": 32,
+                "funcArgs": [
+                    {
+                        "type": "field",
+                        "fieldName": [ "id" ]
+                    }
+                ]
+            },
+            "sortOrders": [
+                {
+                    "sortTerm": {
+                        "type": "field",
+                        "fieldName": [ "age" ]
+                    },
+                    "direction": "asc",
+                    "nullOrdering": "nulls_first"
+                }
+            ],
+            "indexes": [
+                {
+                    "indexType": "primary_key",
+                    "name": "PRIMARY",
+                    "fieldNames": [["id"]]
+                }
+            ],
+            "properties": {
+                "format": "ORC"
+            }
+        }
+        """
 
     def test_from_function_arg_literal_dto(self):
         for data_type, value in TestDTOConverters.literals.items():
@@ -421,3 +550,29 @@ class TestDTOConverters(unittest.TestCase):
             for column_name, column_data_type in zip(column_names, column_data_types)
         ]
         self.assertListEqual(DTOConverters.from_dtos(column_dtos), expected)
+
+    def test_from_dto_table_dto(self):
+        dto = TableDTO.from_json(self.table_dto_json)
+        converted = DTOConverters.from_dto(dto)
+        table = cast(Table, converted)
+        self.assertIsInstance(converted, Table)
+        self.assertEqual(table.name(), dto.name())
+        self.assertEqual(table.comment(), dto.comment())
+        self.assertListEqual(table.columns(), DTOConverters.from_dtos(dto.columns()))
+        self.assertListEqual(
+            table.partitioning(), DTOConverters.from_dtos(dto.partitioning())
+        )
+        self.assertListEqual(
+            table.sort_order(), DTOConverters.from_dtos(dto.sort_order())
+        )
+        for table_index, dto_index in zip(
+            table.index(), DTOConverters.from_dtos(dto.index())
+        ):
+            self.assertEqual(table_index.name(), dto_index.name())
+            self.assertEqual(table_index.type(), dto_index.type())
+            self.assertListEqual(table_index.field_names(), dto_index.field_names())
+        self.assertEqual(
+            table.distribution(), DTOConverters.from_dto(dto.distribution())
+        )
+        self.assertEqual(table.audit_info(), dto.audit_info())
+        self.assertEqual(table.properties(), dto.properties())
