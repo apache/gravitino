@@ -387,3 +387,17 @@ class TestDTOConverters(unittest.TestCase):
             )
         converted = DTOConverters.from_dtos(sort_order_dtos)
         self.assertListEqual(converted, expected)
+
+    def test_from_dtos_partitioning(self):
+        field_name = ["score"]
+        field_names = [field_name]
+        partitioning = [
+            IdentityPartitioningDTO(*field_name),
+            BucketPartitioningDTO(10, *field_names),
+        ]
+        transform = [
+            Transforms.identity(field_name),
+            Transforms.bucket(10, *field_names),
+        ]
+        converted = DTOConverters.from_dtos(partitioning)
+        self.assertListEqual(converted, transform)
