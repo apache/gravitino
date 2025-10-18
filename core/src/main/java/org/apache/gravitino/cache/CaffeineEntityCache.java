@@ -448,10 +448,15 @@ public class CaffeineEntityCache extends BaseEntityCache {
       return false;
     }
 
+    Set<EntityCacheKey> visited = Sets.newHashSet();
     queue.offer(valueForExactKey);
 
     while (!queue.isEmpty()) {
       EntityCacheKey currentKeyToRemove = queue.poll();
+      if (visited.contains(currentKeyToRemove)) {
+        continue;
+      }
+      visited.add(currentKeyToRemove);
 
       cacheData.invalidate(currentKeyToRemove);
       cacheIndex.remove(currentKeyToRemove.toString());
