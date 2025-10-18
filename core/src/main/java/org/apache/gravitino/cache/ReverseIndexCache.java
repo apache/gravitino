@@ -45,11 +45,8 @@ public class ReverseIndexCache {
   /** Registers a reverse index processor for a specific entity class. */
   private final Map<Class<? extends Entity>, ReverseIndexRule> reverseIndexRules = new HashMap<>();
 
-  private final CaffeineEntityCache caffeineEntityCache;
-
-  public ReverseIndexCache(CaffeineEntityCache caffeineEntityCache) {
+  public ReverseIndexCache() {
     this.reverseIndex = new ConcurrentRadixTree<>(new DefaultCharArrayNodeFactory());
-    this.caffeineEntityCache = caffeineEntityCache;
 
     registerReverseRule(UserEntity.class, ReverseIndexRules.USER_REVERSE_RULE);
     registerReverseRule(GroupEntity.class, ReverseIndexRules.GROUP_REVERSE_RULE);
@@ -58,10 +55,6 @@ public class ReverseIndexCache {
     registerReverseRule(TagEntity.class, ReverseIndexRules.TAG_REVERSE_RULE);
     registerReverseRule(
         GenericEntity.class, ReverseIndexRules.GENERIC_METADATA_OBJECT_REVERSE_RULE);
-  }
-
-  public CaffeineEntityCache getCaffeineEntityCache() {
-    return caffeineEntityCache;
   }
 
   public boolean remove(EntityCacheKey key) {

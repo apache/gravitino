@@ -110,7 +110,7 @@ public class CaffeineEntityCache extends BaseEntityCache {
   public CaffeineEntityCache(Config cacheConfig) {
     super(cacheConfig);
     this.cacheIndex = new ConcurrentRadixTree<>(new DefaultCharArrayNodeFactory());
-    this.reverseIndex = new ReverseIndexCache(this);
+    this.reverseIndex = new ReverseIndexCache();
 
     // Initialize segmented lock
     int lockSegments = cacheConfig.get(Configs.CACHE_LOCK_SEGMENTS);
@@ -197,16 +197,6 @@ public class CaffeineEntityCache extends BaseEntityCache {
     return segmentedLock.withLock(
         EntityCacheRelationKey.of(ident, type),
         () -> {
-          //          List<EntityCacheKey> cacheRelationKey = reverseIndex.get(ident, type);
-          //          if (CollectionUtils.isNotEmpty(cacheRelationKey)) {
-          //            cacheRelationKey.stream()
-          //                .forEach(
-          //                    key -> {
-          //                      cacheData.invalidate(key);
-          //                      cacheIndex.remove(key.toString());
-          //                    });
-          //          }
-
           // Clear possible relation first, then clear the main entity cache.
           // For example, if a tag has been updated, apart from invalidating the the relation:
           // metadata_object_to_tag_rel, we also need to invalidate the tag_to_metadata_object_rel.
@@ -293,8 +283,7 @@ public class CaffeineEntityCache extends BaseEntityCache {
         entityCacheKey,
         () -> {
           // Return directly if entities are empty. No need to put an empty list to cache, we will
-          // use
-          // another PR to resolve the performance problem.
+          // use another PR to resolve the performance problem.
           if (entities.isEmpty()) {
             return;
           }
@@ -489,9 +478,6 @@ public class CaffeineEntityCache extends BaseEntityCache {
       Set<EntityCacheKey> toAdd =
           Sets.newHashSet(
               reverseKeysToRemove.stream().flatMap(List::stream).collect(Collectors.toList()));
-      toAdd.remove(currentKeyToRemove);
-      toAdd.removeAll(queue);
-
       queue.addAll(toAdd);
     }
 
