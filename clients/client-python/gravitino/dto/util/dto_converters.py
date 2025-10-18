@@ -16,7 +16,7 @@
 # under the License.
 
 from functools import singledispatchmethod
-from typing import cast
+from typing import Union, cast
 
 from gravitino.api.rel.column import Column
 from gravitino.api.rel.expressions.distributions.distribution import Distribution
@@ -95,7 +95,7 @@ class DTOConverters:
     @singledispatchmethod
     @staticmethod
     def from_dto(dto) -> object:
-        raise IllegalArgumentException(f"Unsupported expression type: {dto}")
+        raise IllegalArgumentException(f"Unsupported DTO type: {type(dto)}")
 
     @from_dto.register
     @staticmethod
@@ -213,3 +213,21 @@ class DTOConverters:
                 dto.function_name(), DTOConverters.from_function_args(dto.args())
             )
         raise IllegalArgumentException(f"Unsupported partitioning: {strategy}")
+
+    @staticmethod
+    def from_dtos(
+        dtos: list[Union[ColumnDTO, IndexDTO, SortOrderDTO, Partitioning]],
+    ) -> list[Union[Column, Index, SortOrder, Transform]]:
+        """Converts list of `ColumnDTO`, `IndexDTO`, `SortOrderDTO`, or `Partitioning`
+        to the corresponding list of `Column`s, `Index`es, `SortOrder`s, or `Transform`s.
+
+        Args:
+            dtos (list[Union[ColumnDTO, IndexDTO, SortOrderDTO, Partitioning]]):
+                The DTOs to be converted.
+
+        Returns:
+            list[Union[Column, Index, SortOrder, Transform]]: The list of Indexes.
+        """
+        if not dtos:
+            return []
+        return [DTOConverters.from_dto(dto) for dto in dtos]
