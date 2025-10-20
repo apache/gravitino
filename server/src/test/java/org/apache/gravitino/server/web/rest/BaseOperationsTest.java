@@ -31,12 +31,12 @@ import org.mockito.MockedStatic;
 
 public abstract class BaseOperationsTest extends JerseyTest {
 
-  private static final MockedStatic<MetadataIdConverter> metadataIdConverterMockedStatic =
-      mockStatic(MetadataIdConverter.class);
+  private static MockedStatic<MetadataIdConverter> metadataIdConverterMockedStatic;
 
   @BeforeAll
   public static void start() {
     GravitinoAuthorizerProvider.getInstance().initialize(new ServerConfig());
+    metadataIdConverterMockedStatic = mockStatic(MetadataIdConverter.class);
     metadataIdConverterMockedStatic
         .when(() -> MetadataIdConverter.getID(any(), any()))
         .then(request -> request.getArguments()[0]);
