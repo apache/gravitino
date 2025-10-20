@@ -20,7 +20,7 @@
 requests==2.32.3
 dataclasses-json==0.6.7
 readerwriterlock==1.0.9
-fsspec==2024.3.1
+fsspec==2025.9.0
 pyarrow==15.0.2
 cachetools==5.5.2
 gcsfs==2024.3.1
