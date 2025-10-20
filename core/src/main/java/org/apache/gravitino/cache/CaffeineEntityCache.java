@@ -44,12 +44,15 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
+import org.apache.commons.lang3.ArrayUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.SupportsRelationOperations;
+import org.apache.gravitino.meta.GenericEntity;
 import org.apache.gravitino.meta.ModelVersionEntity;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -90,6 +93,14 @@ public class CaffeineEntityCache extends BaseEntityCache {
   private RadixTree<EntityCacheRelationKey> cacheIndex;
 
   private ScheduledExecutorService scheduler;
+
+  private static final Set<SupportsRelationOperations.Type> RELATION_TYPES =
+      Sets.newHashSet(
+          SupportsRelationOperations.Type.METADATA_OBJECT_ROLE_REL,
+          SupportsRelationOperations.Type.ROLE_USER_REL,
+          SupportsRelationOperations.Type.ROLE_GROUP_REL,
+          SupportsRelationOperations.Type.POLICY_METADATA_OBJECT_REL,
+          SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL);
 
   /**
    * Constructs a new {@link CaffeineEntityCache}.
@@ -186,7 +197,43 @@ public class CaffeineEntityCache extends BaseEntityCache {
     return segmentedLock.withLock(
         EntityCacheRelationKey.of(ident, type),
         () -> {
-          // Invalid all relation types and the entity itself
+          // Clear possible relation first, then clear the main entity cache.
+          // For example, if a tag has been updated, apart from invalidating the the relation:
+          // metadata_object_to_tag_rel, we also need to invalidate the tag_to_metadata_object_rel.
+          // Assuming a tag "tag1" is related to a metadata object "catalog", when "catalog" is
+          // renamed to `catalog_new`, we need to invalidate both relations to avoid stale data.
+          // that is: before: tag1:TAG_METADATA_OBJECT_REL -> catalog,
+          // catalog:TAG_METADATA_OBJECT_REL -> tag1, after: tag1:TAG_METADATA_OBJECT_REL -> null,
+          // catalog:TAG_METADATA_OBJECT_REL -> null.
+          RELATION_TYPES.forEach(
+              relType -> {
+                List<Entity> relatedEntities =
+                    cacheData.getIfPresent(EntityCacheRelationKey.of(ident, type, relType));
+                if (relatedEntities != null) {
+                  relatedEntities.stream()
+                      .filter(e -> StringUtils.isNotBlank(((HasIdentifier) e).name()))
+                      .forEach(
+                          entity -> {
+                            NameIdentifier identifier = ((HasIdentifier) entity).nameIdentifier();
+                            if (entity instanceof GenericEntity) {
+                              String metalakeName = ident.namespace().level(0);
+                              String[] names =
+                                  ArrayUtils.addFirst(
+                                      identifier.namespace().levels(), metalakeName);
+                              names = ArrayUtils.add(names, identifier.name());
+                              identifier = NameIdentifier.of(names);
+                            }
+
+                            invalidateEntities(identifier, entity.type(), Optional.of(relType));
+                          });
+                }
+              });
+
+          RELATION_TYPES.forEach(
+              relType -> {
+                invalidateEntities(ident, type, Optional.of(relType));
+              });
+
           invalidateEntities(ident, type, Optional.empty());
           return true;
         });
@@ -235,10 +282,12 @@ public class CaffeineEntityCache extends BaseEntityCache {
     segmentedLock.withLock(
         entityCacheKey,
         () -> {
-          // We still need to cache the entities even if the list is empty, to avoid cache
-          // misses. Consider the scenario where a user queries for an entity's relations and the
-          // result is empty. If we don't cache this empty result, the next query will still hit the
-          // backend, this is not desired.
+          // Return directly if entities are empty. No need to put an empty list to cache, we will
+          // use another PR to resolve the performance problem.
+          if (entities.isEmpty()) {
+            return;
+          }
+
           syncEntitiesToCache(
               entityCacheKey, entities.stream().map(e -> (Entity) e).collect(Collectors.toList()));
         });
@@ -388,10 +437,15 @@ public class CaffeineEntityCache extends BaseEntityCache {
       return false;
     }
 
+    Set<EntityCacheKey> visited = Sets.newHashSet();
     queue.offer(valueForExactKey);
 
     while (!queue.isEmpty()) {
       EntityCacheKey currentKeyToRemove = queue.poll();
+      if (visited.contains(currentKeyToRemove)) {
+        continue;
+      }
+      visited.add(currentKeyToRemove);
 
       cacheData.invalidate(currentKeyToRemove);
       cacheIndex.remove(currentKeyToRemove.toString());
@@ -403,23 +457,28 @@ public class CaffeineEntityCache extends BaseEntityCache {
       queue.addAll(relatedEntityKeysToRemove);
 
       // Look up from reverse index to go to next depth
-      List<EntityCacheKey> reverseKeysToRemove =
+      List<List<EntityCacheKey>> reverseKeysToRemove =
           Lists.newArrayList(
               reverseIndex.getValuesForKeysStartingWith(
                   currentKeyToRemove.identifier().toString()));
+
       reverseKeysToRemove.forEach(
           key -> {
             // Remove from reverse index
             // Convert EntityCacheRelationKey to EntityCacheKey
-            reverseIndex
-                .getKeysStartingWith(key.toString())
+            key.stream()
                 .forEach(
-                    reverseIndexKey -> {
-                      reverseIndex.remove(reverseIndexKey.toString());
-                    });
+                    k ->
+                        reverseIndex
+                            .getValuesForKeysStartingWith(k.toString())
+                            .forEach(rsk -> reverseIndex.remove(rsk.toString())));
           });
 
-      queue.addAll(reverseKeysToRemove);
+      // Remove duplicates
+      Set<EntityCacheKey> toAdd =
+          Sets.newHashSet(
+              reverseKeysToRemove.stream().flatMap(List::stream).collect(Collectors.toList()));
+      queue.addAll(toAdd);
     }
 
     return true;

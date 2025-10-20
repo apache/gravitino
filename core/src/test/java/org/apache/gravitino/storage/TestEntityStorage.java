@@ -83,6 +83,7 @@ import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.CatalogEntity;
 import org.apache.gravitino.meta.ColumnEntity;
 import org.apache.gravitino.meta.FilesetEntity;
+import org.apache.gravitino.meta.GenericEntity;
 import org.apache.gravitino.meta.GroupEntity;
 import org.apache.gravitino.meta.ModelEntity;
 import org.apache.gravitino.meta.ModelVersionEntity;
@@ -2722,6 +2723,16 @@ public class TestEntityStorage {
       Assertions.assertEquals(1, cachedTags.size());
       Assertions.assertEquals(tag1, cachedTags.get(0));
 
+      List<GenericEntity> genericEntities =
+          relationOperations.listEntitiesByRelation(
+              SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL,
+              tag1.nameIdentifier(),
+              EntityType.TAG,
+              true);
+      Assertions.assertEquals(1, genericEntities.size());
+      Assertions.assertEquals(catalog.id(), genericEntities.get(0).id());
+      Assertions.assertEquals(catalog.name(), genericEntities.get(0).name());
+
       // Now we are going to alter the catalog
       CatalogEntity updatedCatalog =
           CatalogEntity.builder()
@@ -2749,6 +2760,15 @@ public class TestEntityStorage {
               k -> null);
       Assertions.assertNull(cachedTagsAfterCatalogUpdate);
 
+      List<Entity> cachedTagsByTagAfterCatalogUpdate =
+          cache.get(
+              EntityCacheRelationKey.of(
+                  tag1.nameIdentifier(),
+                  EntityType.TAG,
+                  SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL),
+              k -> null);
+      Assertions.assertNull(cachedTagsByTagAfterCatalogUpdate);
+
       // Load tags again, it should repopulate the cache
       List<TagEntity> tagsAfterCatalogUpdate =
           relationOperations.listEntitiesByRelation(
@@ -2769,6 +2789,104 @@ public class TestEntityStorage {
       Assertions.assertNotNull(cachedTagsAfterReload);
       Assertions.assertEquals(1, cachedTagsAfterReload.size());
       Assertions.assertEquals(tag1, cachedTagsAfterReload.get(0));
+
+      List<GenericEntity> genericEntitiesAfterCatalogUpdate =
+          relationOperations.listEntitiesByRelation(
+              SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL,
+              tag1.nameIdentifier(),
+              EntityType.TAG,
+              true);
+      Assertions.assertEquals(1, genericEntitiesAfterCatalogUpdate.size());
+      Assertions.assertEquals(catalog.id(), genericEntitiesAfterCatalogUpdate.get(0).id());
+      Assertions.assertEquals(
+          updatedCatalog.name(), genericEntitiesAfterCatalogUpdate.get(0).name());
+
+      List<Entity> cachedTagsByTagAfterReload =
+          cache.get(
+              EntityCacheRelationKey.of(
+                  tag1.nameIdentifier(),
+                  EntityType.TAG,
+                  SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL),
+              k -> null);
+      Assertions.assertNotNull(cachedTagsByTagAfterReload);
+      Assertions.assertEquals(1, cachedTagsByTagAfterReload.size());
+      Assertions.assertEquals(
+          updatedCatalog.id(), ((GenericEntity) cachedTagsByTagAfterReload.get(0)).id());
+      Assertions.assertEquals(
+          updatedCatalog.name(), ((GenericEntity) cachedTagsByTagAfterReload.get(0)).name());
+
+      // Now try to alter the tag: rename tag1 -> tagChanged.
+      TagEntity updatedTag1 =
+          TagEntity.builder()
+              .withId(tag1.id())
+              .withNamespace(tag1.namespace())
+              .withName("tagChanged")
+              .withAuditInfo(auditInfo)
+              .withProperties(tag1.properties())
+              .build();
+      store.update(tag1.nameIdentifier(), TagEntity.class, Entity.EntityType.TAG, e -> updatedTag1);
+
+      // Now try to load the relation again from cache, it should be empty.
+      List<Entity> cachedTagsAfterTagUpdate =
+          cache.get(
+              EntityCacheRelationKey.of(
+                  updatedCatalog.nameIdentifier(),
+                  EntityType.CATALOG,
+                  SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL),
+              k -> null);
+      Assertions.assertNull(cachedTagsAfterTagUpdate);
+
+      List<Entity> cachedEntitiesAfterTagUpdate =
+          cache.get(
+              EntityCacheRelationKey.of(
+                  tag1.nameIdentifier(),
+                  EntityType.TAG,
+                  SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL),
+              k -> null);
+      Assertions.assertNull(cachedEntitiesAfterTagUpdate);
+
+      List<TagEntity> tagsAfterTagUpdate =
+          relationOperations.listEntitiesByRelation(
+              SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL,
+              updatedCatalog.nameIdentifier(),
+              EntityType.CATALOG,
+              true);
+      Assertions.assertEquals(1, tagsAfterTagUpdate.size());
+      Assertions.assertEquals(updatedTag1, tagsAfterTagUpdate.get(0));
+
+      List<Entity> cachedTagsAfterTagReload =
+          cache.get(
+              EntityCacheRelationKey.of(
+                  updatedCatalog.nameIdentifier(),
+                  EntityType.CATALOG,
+                  SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL),
+              k -> null);
+      Assertions.assertNotNull(cachedTagsAfterTagReload);
+      Assertions.assertEquals(1, cachedTagsAfterTagReload.size());
+      Assertions.assertEquals(updatedTag1, cachedTagsAfterTagReload.get(0));
+
+      List<GenericEntity> genericEntitiesAfterTagUpdate =
+          relationOperations.listEntitiesByRelation(
+              SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL,
+              updatedTag1.nameIdentifier(),
+              EntityType.TAG,
+              true);
+      Assertions.assertEquals(1, genericEntitiesAfterTagUpdate.size());
+      Assertions.assertEquals(catalog.id(), genericEntitiesAfterTagUpdate.get(0).id());
+      Assertions.assertEquals(updatedCatalog.name(), genericEntitiesAfterTagUpdate.get(0).name());
+      List<Entity> cachedTagsByTagAfterTagReload =
+          cache.get(
+              EntityCacheRelationKey.of(
+                  updatedTag1.nameIdentifier(),
+                  EntityType.TAG,
+                  SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL),
+              k -> null);
+      Assertions.assertNotNull(cachedTagsByTagAfterTagReload);
+      Assertions.assertEquals(1, cachedTagsByTagAfterTagReload.size());
+      Assertions.assertEquals(
+          updatedCatalog.id(), ((GenericEntity) cachedTagsByTagAfterTagReload.get(0)).id());
+      Assertions.assertEquals(
+          updatedCatalog.name(), ((GenericEntity) cachedTagsByTagAfterTagReload.get(0)).name());
     }
   }
 }
