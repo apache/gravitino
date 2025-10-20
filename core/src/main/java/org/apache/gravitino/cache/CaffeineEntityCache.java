@@ -437,6 +437,8 @@ public class CaffeineEntityCache extends BaseEntityCache {
       return false;
     }
 
+    // The visited set to avoid processing the same key multiple times and thus causing infinite
+    // loop.
     Set<EntityCacheKey> visited = Sets.newHashSet();
     queue.offer(valueForExactKey);
 
@@ -474,7 +476,6 @@ public class CaffeineEntityCache extends BaseEntityCache {
                             .forEach(rsk -> reverseIndex.remove(rsk.toString())));
           });
 
-      // Remove duplicates
       Set<EntityCacheKey> toAdd =
           Sets.newHashSet(
               reverseKeysToRemove.stream().flatMap(List::stream).collect(Collectors.toList()));
