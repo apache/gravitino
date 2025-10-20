@@ -768,25 +768,29 @@ COMMENT ON COLUMN job_run_meta.current_version IS 'job run current version';
 COMMENT ON COLUMN job_run_meta.last_version IS 'job run last version';
 COMMENT ON COLUMN job_run_meta.deleted_at IS 'job run deleted at';
 
-CREATE TABLE IF NOT EXISTS table_details (
+CREATE TABLE IF NOT EXISTS table_version_info (
     table_id        BIGINT PRIMARY KEY,
     format          VARCHAR(64) NOT NULL,
     location        VARCHAR(512) NOT NULL,
     "external"      BOOLEAN NOT NULL DEFAULT FALSE,
     properties      TEXT,
     partition_info  TEXT,
+    distribution_info TEXT,
+    sort_order_info TEXT,
     index_info      TEXT,
     current_version BIGINT,
     last_version    BIGINT,
     deleted_at      BIGINT DEFAULT 0
     );
-COMMENT ON COLUMN table_details.table_id        IS 'table id';
-COMMENT ON COLUMN table_details.format          IS 'table format, such as Lance, Iceberg and so on';
-COMMENT ON COLUMN table_details.location        IS 'table storage location';
-COMMENT ON COLUMN table_details."external"      IS 'whether the table is external table';
-COMMENT ON COLUMN table_details.properties      IS 'table properties';
-COMMENT ON COLUMN table_details.partition_info  IS 'table partition info';
-COMMENT ON COLUMN table_details.index_info      IS 'table index info';
-COMMENT ON COLUMN table_details.current_version IS 'table current version';
-COMMENT ON COLUMN table_details.last_version    IS 'table last version';
-COMMENT ON COLUMN table_details.deleted_at      IS 'table deletion timestamp, 0 means not deleted';
+COMMENT ON COLUMN table_version_info.table_id        IS 'table id';
+COMMENT ON COLUMN table_version_info.format          IS 'table format, such as Lance, Iceberg and so on';
+COMMENT ON COLUMN table_version_info.location        IS 'table storage location';
+COMMENT ON COLUMN table_version_info."external"      IS 'whether the table is external table';
+COMMENT ON COLUMN table_version_info.properties      IS 'table properties';
+COMMENT ON COLUMN table_version_info.partition_info  IS 'table partition info';
+COMMENT on COLUMN table_version_info.distribution_info IS 'table distribution info';
+COMMENT ON COLUMN table_version_info.sort_order_info IS 'table sort order info';
+COMMENT ON COLUMN table_version_info.index_info      IS 'table index info';
+COMMENT ON COLUMN table_version_info.current_version IS 'table current version';
+COMMENT ON COLUMN table_version_info.last_version    IS 'table last version';
+COMMENT ON COLUMN table_version_info.deleted_at      IS 'table deletion timestamp, 0 means not deleted';

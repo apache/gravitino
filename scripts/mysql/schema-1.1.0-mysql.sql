@@ -440,13 +440,15 @@ CREATE TABLE IF NOT EXISTS `job_run_meta` (
     KEY `idx_job_execution_id` (`job_execution_id`)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'job run metadata';
 
-CREATE TABLE IF NOT EXISTS `table_details` (
+CREATE TABLE IF NOT EXISTS `table_version_info` (
     `table_id`        BIGINT(20) UNSIGNED NOT NULL COMMENT 'table id',
     `format`          VARCHAR(64) NOT NULL COMMENT 'table format, such as Lance, Iceberg and so on',
     `location`        VARCHAR(512) NOT NULL COMMENT 'table storage location',
     `external`        BOOLEAN NOT NULL DEFAULT FALSE COMMENT 'whether the table is external table',
     `properties`      MEDIUMTEXT DEFAULT NULL COMMENT 'table properties',
     `partition_info`  MEDIUMTEXT DEFAULT NULL COMMENT 'table partition info',
+    `distribution_info` MEDIUMTEXT DEFAULT NULL COMMENT 'table distribution info',
+    `sort_order_info` MEDIUMTEXT DEFAULT NULL COMMENT 'table sort order info',
     `index_info`      MEDIUMTEXT DEFAULT NULL COMMENT 'table index info',
     `current_version` BIGINT(20) UNSIGNED COMMENT 'table current version',
     `last_version`    BIGINT(20) UNSIGNED COMMENT 'table last version',
