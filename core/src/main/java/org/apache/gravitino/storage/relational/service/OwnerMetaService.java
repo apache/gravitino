@@ -124,7 +124,7 @@ public class OwnerMetaService {
       default:
         MetadataObject metadataObject = NameIdentifierUtil.toMetadataObject(identifier, type);
         String metalake = NameIdentifierUtil.getMetalake(identifier);
-        return MetadataIdConverter.getID(metadataObject,metalake);
+        return MetadataIdConverter.getID(metadataObject, metalake);
     }
   }
 }
