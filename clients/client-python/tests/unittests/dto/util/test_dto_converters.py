@@ -372,14 +372,9 @@ class TestDTOConverters(unittest.TestCase):
             .with_data_type(column_data_type)
             .build()
         )
-        expected = Column.of(
-            name=column_name,
-            data_type=column_data_type,
-        )
         converted = DTOConverters.from_dto(column_dto)
         self.assertTrue(converted.default_value() == Column.DEFAULT_VALUE_NOT_SET)
-        self.assertTrue(expected.default_value() == Column.DEFAULT_VALUE_NOT_SET)
-        self.assertTrue(converted == expected)
+        self.assertTrue(converted == column_dto)
 
         column_dto = (
             ColumnDTO.builder()
@@ -534,7 +529,6 @@ class TestDTOConverters(unittest.TestCase):
     def test_from_dtos_column_dto(self):
         column_names = {f"column_{i}" for i in range(2)}
         column_data_types = {Types.IntegerType.get(), Types.BooleanType.get()}
-
         column_dtos: list[ColumnDTO] = [
             ColumnDTO.builder()
             .with_name(column_name)
@@ -542,14 +536,34 @@ class TestDTOConverters(unittest.TestCase):
             .build()
             for column_name, column_data_type in zip(column_names, column_data_types)
         ]
-        expected = [
-            Column.of(
-                name=column_name,
-                data_type=column_data_type,
+        self.assertListEqual(DTOConverters.from_dtos(column_dtos), column_dtos)
+
+    def test_from_dtos_column_dto_with_default_value(self):
+        column_names = {f"column_{i}" for i in range(2)}
+        column_data_types = {Types.IntegerType.get(), Types.BooleanType.get()}
+        column_dto_default_values = {
+            LiteralDTO.builder()
+            .with_data_type(Types.IntegerType.get())
+            .with_value("1")
+            .build(),
+            LiteralDTO.builder()
+            .with_data_type(Types.BooleanType.get())
+            .with_value("True")
+            .build(),
+        }
+        column_dtos: list[ColumnDTO] = [
+            ColumnDTO.builder()
+            .with_name(column_name)
+            .with_data_type(column_data_type)
+            .with_default_value(default_value)
+            .build()
+            for column_name, column_data_type, default_value in zip(
+                column_names, column_data_types, column_dto_default_values
             )
-            for column_name, column_data_type in zip(column_names, column_data_types)
         ]
-        self.assertListEqual(DTOConverters.from_dtos(column_dtos), expected)
+        expected = [DTOConverters.from_dto(dto) for dto in column_dtos]
+        converted = DTOConverters.from_dtos(column_dtos)
+        self.assertListEqual(converted, expected)
 
     def test_from_dto_table_dto(self):
         dto = TableDTO.from_json(self.table_dto_json)
