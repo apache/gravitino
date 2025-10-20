@@ -782,6 +782,7 @@ CREATE TABLE IF NOT EXISTS table_version_info (
     last_version    BIGINT,
     deleted_at      BIGINT DEFAULT 0
     );
+COMMENT ON TABLE table_version_info IS 'table detail information including format, location, properties, partition, distribution, sort order, index and so on';
 COMMENT ON COLUMN table_version_info.table_id        IS 'table id';
 COMMENT ON COLUMN table_version_info.format          IS 'table format, such as Lance, Iceberg and so on';
 COMMENT ON COLUMN table_version_info.location        IS 'table storage location';

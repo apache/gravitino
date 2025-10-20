@@ -31,4 +31,4 @@ CREATE TABLE IF NOT EXISTS `table_version_info` (
     `last_version`    BIGINT(20) UNSIGNED COMMENT 'table last version',
     `deleted_at`      BIGINT(20) UNSIGNED DEFAULT 0 COMMENT 'table deletion timestamp, 0 means not deleted',
     PRIMARY KEY (table_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'table detail information including format, location, properties, partition, distribution, sort order, index and so on';
