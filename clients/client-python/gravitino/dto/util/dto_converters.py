@@ -33,6 +33,8 @@ from gravitino.api.rel.expressions.transforms.transforms import Transforms
 from gravitino.api.rel.expressions.unparsed_expression import UnparsedExpression
 from gravitino.api.rel.indexes.index import Index
 from gravitino.api.rel.indexes.indexes import Indexes
+from gravitino.api.rel.partitions.list_partition import ListPartition
+from gravitino.api.rel.partitions.range_partition import RangePartition
 from gravitino.api.rel.table import Table
 from gravitino.api.rel.types.types import Types
 from gravitino.dto.rel.column_dto import ColumnDTO
@@ -43,7 +45,19 @@ from gravitino.dto.rel.expressions.function_arg import FunctionArg
 from gravitino.dto.rel.expressions.literal_dto import LiteralDTO
 from gravitino.dto.rel.expressions.unparsed_expression_dto import UnparsedExpressionDTO
 from gravitino.dto.rel.indexes.index_dto import IndexDTO
-from gravitino.dto.rel.partitioning.partitioning import Partitioning
+from gravitino.dto.rel.partitioning.bucket_partitioning_dto import BucketPartitioningDTO
+from gravitino.dto.rel.partitioning.function_partitioning_dto import (
+    FunctionPartitioningDTO,
+)
+from gravitino.dto.rel.partitioning.list_partitioning_dto import ListPartitioningDTO
+from gravitino.dto.rel.partitioning.partitioning import (
+    Partitioning,
+    SingleFieldPartitioning,
+)
+from gravitino.dto.rel.partitioning.range_partitioning_dto import RangePartitioningDTO
+from gravitino.dto.rel.partitioning.truncate_partitioning_dto import (
+    TruncatePartitioningDTO,
+)
 from gravitino.dto.rel.sort_order_dto import SortOrderDTO
 from gravitino.dto.rel.table_dto import TableDTO
 from gravitino.exceptions.base import IllegalArgumentException
@@ -185,32 +199,50 @@ class DTOConverters:
         """
         strategy = dto.strategy()
         if strategy is Partitioning.Strategy.IDENTITY:
-            return Transforms.identity(dto.field_name())
+            return Transforms.identity(cast(SingleFieldPartitioning, dto).field_name())
         if strategy is Partitioning.Strategy.YEAR:
-            return Transforms.year(dto.field_name())
+            return Transforms.year(cast(SingleFieldPartitioning, dto).field_name())
         if strategy is Partitioning.Strategy.MONTH:
-            return Transforms.month(dto.field_name())
+            return Transforms.month(cast(SingleFieldPartitioning, dto).field_name())
         if strategy is Partitioning.Strategy.DAY:
-            return Transforms.day(dto.field_name())
+            return Transforms.day(cast(SingleFieldPartitioning, dto).field_name())
         if strategy is Partitioning.Strategy.HOUR:
-            return Transforms.hour(dto.field_name())
+            return Transforms.hour(cast(SingleFieldPartitioning, dto).field_name())
         if strategy is Partitioning.Strategy.BUCKET:
-            return Transforms.bucket(dto.num_buckets(), *dto.field_names())
+            bucket_partitioning_dto = cast(BucketPartitioningDTO, dto)
+            return Transforms.bucket(
+                bucket_partitioning_dto.num_buckets(),
+                *bucket_partitioning_dto.field_names(),
+            )
         if strategy is Partitioning.Strategy.TRUNCATE:
-            return Transforms.truncate(dto.width(), dto.field_name())
+            truncate_partitioning_dto = cast(TruncatePartitioningDTO, dto)
+            return Transforms.truncate(
+                truncate_partitioning_dto.width(),
+                truncate_partitioning_dto.field_name(),
+            )
         if strategy is Partitioning.Strategy.LIST:
+            list_partitioning_dto = cast(ListPartitioningDTO, dto)
             return Transforms.list(
-                field_names=dto.field_names(),
-                assignments=[DTOConverters.from_dto(p) for p in dto.assignments()],
+                field_names=list_partitioning_dto.field_names(),
+                assignments=[
+                    cast(ListPartition, DTOConverters.from_dto(p))
+                    for p in list_partitioning_dto.assignments()
+                ],
             )
         if strategy is Partitioning.Strategy.RANGE:
+            range_partitioning_dto = cast(RangePartitioningDTO, dto)
             return Transforms.range(
-                dto.field_name(),
-                [DTOConverters.from_dto(p) for p in dto.assignments()],
+                range_partitioning_dto.field_name(),
+                [
+                    cast(RangePartition, DTOConverters.from_dto(p))
+                    for p in range_partitioning_dto.assignments()
+                ],
             )
         if strategy is Partitioning.Strategy.FUNCTION:
+            function_partitioning_dto = cast(FunctionPartitioningDTO, dto)
             return Transforms.apply(
-                dto.function_name(), DTOConverters.from_function_args(dto.args())
+                function_partitioning_dto.function_name(),
+                DTOConverters.from_function_args(function_partitioning_dto.args()),
             )
         raise IllegalArgumentException(f"Unsupported partitioning: {strategy}")
 
