@@ -21,6 +21,7 @@ package org.apache.gravitino.filesystem.hadoop;
 import static org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystemUtils.getConfigMap;
 
 import com.google.common.annotations.VisibleForTesting;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
 import java.net.URI;
@@ -135,7 +136,7 @@ public class GravitinoVirtualFileSystem extends FileSystem {
             return null;
           },
           FilesetDataOperation.SET_WORKING_DIR);
-    } catch (FilesetPathNotFoundException e) {
+    } catch (FileNotFoundException e) {
       throw new RuntimeException(e);
     }
     this.workingDirectory = newPath;
@@ -176,8 +177,7 @@ public class GravitinoVirtualFileSystem extends FileSystem {
     } catch (NoSuchCatalogException
         | CatalogNotInUseException
         | NoSuchFilesetException
-        | NoSuchLocationNameException
-        | FilesetPathNotFoundException e) {
+        | NoSuchLocationNameException e) {
       String message =
           "Fileset is not found for path: "
               + path
@@ -218,7 +218,7 @@ public class GravitinoVirtualFileSystem extends FileSystem {
           recursive,
           runWithExceptionTranslation(
               () -> operations.delete(newPath, recursive), FilesetDataOperation.DELETE));
-    } catch (FilesetPathNotFoundException e) {
+    } catch (FileNotFoundException e) {
       return false;
     }
   }
@@ -247,8 +247,7 @@ public class GravitinoVirtualFileSystem extends FileSystem {
     } catch (NoSuchCatalogException
         | CatalogNotInUseException
         | NoSuchFilesetException
-        | NoSuchLocationNameException
-        | FilesetPathNotFoundException e) {
+        | NoSuchLocationNameException e) {
       String message =
           "Fileset is not found for path: "
               + newPath
@@ -310,24 +309,23 @@ public class GravitinoVirtualFileSystem extends FileSystem {
   }
 
   private <R, E extends IOException> R runWithExceptionTranslation(
-      Executable<R, E> executable, FilesetDataOperation operation)
-      throws FilesetPathNotFoundException, E {
+      Executable<R, E> executable, FilesetDataOperation operation) throws FileNotFoundException, E {
     try {
       return executable.execute();
     } catch (NoSuchCatalogException | CatalogNotInUseException e) {
       String message = String.format("Cannot get fileset catalog during %s", operation);
       LOG.warn(message, e);
-      throw new FilesetPathNotFoundException(message, e);
+      throw (FileNotFoundException) new FileNotFoundException(message).initCause(e);
 
     } catch (NoSuchFilesetException e) {
       String message = String.format("Cannot get fileset during %s", operation);
       LOG.warn(message, e);
-      throw new FilesetPathNotFoundException(message, e);
+      throw (FileNotFoundException) new FileNotFoundException(message).initCause(e);
 
     } catch (NoSuchLocationNameException e) {
       String message = String.format("Cannot find location name during %s", operation);
       LOG.warn(message, e);
-      throw new FilesetPathNotFoundException(message, e);
+      throw (FileNotFoundException) new FileNotFoundException(message).initCause(e);
 
     } catch (IOException e) {
       throw e;

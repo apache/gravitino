@@ -22,6 +22,7 @@ import static org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystemU
 import static org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystemUtils.getSubPathFromGvfsPath;
 
 import com.google.common.base.Preconditions;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.Arrays;
 import org.apache.gravitino.NameIdentifier;
@@ -67,7 +68,7 @@ public class DefaultGVFSOperations extends BaseGVFSOperations {
   }
 
   @Override
-  public synchronized void setWorkingDirectory(Path gvfsDir) throws FilesetPathNotFoundException {
+  public synchronized void setWorkingDirectory(Path gvfsDir) throws FileNotFoundException {
     FileSystem actualFs = getActualFileSystem(gvfsDir, currentLocationName());
     Path actualFilePath =
         getActualFilePath(gvfsDir, currentLocationName(), FilesetDataOperation.SET_WORKING_DIR);
@@ -90,7 +91,7 @@ public class DefaultGVFSOperations extends BaseGVFSOperations {
           getActualFilePath(gvfsPath, currentLocationName(), FilesetDataOperation.CREATE);
       return actualFs.create(
           actualFilePath, permission, overwrite, bufferSize, replication, blockSize, progress);
-    } catch (FilesetPathNotFoundException e) {
+    } catch (FileNotFoundException e) {
       String message =
           "Fileset is not found for path: "
               + gvfsPath
@@ -138,7 +139,7 @@ public class DefaultGVFSOperations extends BaseGVFSOperations {
       Path actualFilePath =
           getActualFilePath(gvfsPath, currentLocationName(), FilesetDataOperation.DELETE);
       return actualFs.delete(actualFilePath, recursive);
-    } catch (FilesetPathNotFoundException e) {
+    } catch (FileNotFoundException e) {
       return false;
     }
   }
@@ -190,7 +191,7 @@ public class DefaultGVFSOperations extends BaseGVFSOperations {
       Path actualFilePath =
           getActualFilePath(gvfsPath, currentLocationName(), FilesetDataOperation.MKDIRS);
       return actualFs.mkdirs(actualFilePath, permission);
-    } catch (FilesetPathNotFoundException e) {
+    } catch (FileNotFoundException e) {
       String message =
           "Fileset is not found for path: "
               + gvfsPath
@@ -209,7 +210,7 @@ public class DefaultGVFSOperations extends BaseGVFSOperations {
           getActualFilePath(
               gvfsPath, currentLocationName(), FilesetDataOperation.GET_DEFAULT_REPLICATION);
       return actualFs.getDefaultReplication(actualFilePath);
-    } catch (FilesetPathNotFoundException e) {
+    } catch (FileNotFoundException e) {
       return 1;
     }
   }
@@ -222,7 +223,7 @@ public class DefaultGVFSOperations extends BaseGVFSOperations {
           getActualFilePath(
               gvfsPath, currentLocationName(), FilesetDataOperation.GET_DEFAULT_BLOCK_SIZE);
       return actualFs.getDefaultBlockSize(actualFilePath);
-    } catch (FilesetPathNotFoundException e) {
+    } catch (FileNotFoundException e) {
       return defaultBlockSize();
     }
   }
