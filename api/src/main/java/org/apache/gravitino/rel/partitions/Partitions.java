@@ -99,13 +99,17 @@ public class Partitions {
       this.lower = lower;
     }
 
-    /** @return The upper bound of the partition. */
+    /**
+     * @return The upper bound of the partition.
+     */
     @Override
     public Literal<?> upper() {
       return upper;
     }
 
-    /** @return The lower bound of the partition. */
+    /**
+     * @return The lower bound of the partition.
+     */
     @Override
     public Literal<?> lower() {
       return lower;
@@ -155,7 +159,9 @@ public class Partitions {
       this.lists = lists;
     }
 
-    /** @return The values of the list partition. */
+    /**
+     * @return The values of the list partition.
+     */
     @Override
     public Literal<?>[][] lists() {
       return lists;
@@ -208,13 +214,17 @@ public class Partitions {
       this.properties = properties;
     }
 
-    /** @return The field names of the identity partition. */
+    /**
+     * @return The field names of the identity partition.
+     */
     @Override
     public String[][] fieldNames() {
       return fieldNames;
     }
 
-    /** @return The values of the identity partition. */
+    /**
+     * @return The values of the identity partition.
+     */
     @Override
     public Literal<?>[] values() {
       return values;

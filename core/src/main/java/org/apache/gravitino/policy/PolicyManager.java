@@ -266,7 +266,8 @@ public class PolicyManager implements PolicyDispatcher {
         LockType.READ,
         () -> {
           try {
-            return entityStore.relationOperations()
+            return entityStore
+                .relationOperations()
                 .listEntitiesByRelation(
                     SupportsRelationOperations.Type.POLICY_METADATA_OBJECT_REL,
                     entityIdent,

@@ -30,9 +30,13 @@ import org.apache.gravitino.rel.Table;
 @Evolving
 public interface Partition {
 
-  /** @return The name of the partition. */
+  /**
+   * @return The name of the partition.
+   */
   String name();
 
-  /** @return The properties of the partition, such as statistics, location, etc. */
+  /**
+   * @return The properties of the partition, such as statistics, location, etc.
+   */
   Map<String, String> properties();
 }

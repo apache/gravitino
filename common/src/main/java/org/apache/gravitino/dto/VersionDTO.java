@@ -56,17 +56,23 @@ public class VersionDTO {
     this.gitCommit = gitCommit;
   }
 
-  /** @return The version of the software. */
+  /**
+   * @return The version of the software.
+   */
   public String version() {
     return version;
   }
 
-  /** @return The date the software was compiled. */
+  /**
+   * @return The date the software was compiled.
+   */
   public String compileDate() {
     return compileDate;
   }
 
-  /** @return The git commit of the software. */
+  /**
+   * @return The git commit of the software.
+   */
   public String gitCommit() {
     return gitCommit;
   }

@@ -72,12 +72,16 @@ public abstract class JdbcCatalog extends BaseCatalog<JdbcCatalog> {
     return new JdbcCatalogCapability();
   }
 
-  /** @return The {@link JdbcExceptionConverter} to be used by the catalog. */
+  /**
+   * @return The {@link JdbcExceptionConverter} to be used by the catalog.
+   */
   protected JdbcExceptionConverter createExceptionConverter() {
     return new JdbcExceptionConverter() {};
   }
 
-  /** @return The {@link JdbcTypeConverter} to be used by the catalog. */
+  /**
+   * @return The {@link JdbcTypeConverter} to be used by the catalog.
+   */
   protected abstract JdbcTypeConverter createJdbcTypeConverter();
 
   /**
@@ -85,10 +89,14 @@ public abstract class JdbcCatalog extends BaseCatalog<JdbcCatalog> {
    */
   protected abstract JdbcDatabaseOperations createJdbcDatabaseOperations();
 
-  /** @return The {@link JdbcTableOperations} to be used by the catalog to manage tables in the */
+  /**
+   * @return The {@link JdbcTableOperations} to be used by the catalog to manage tables in the
+   */
   protected abstract JdbcTableOperations createJdbcTableOperations();
 
-  /** @return The {@link JdbcColumnDefaultValueConverter} to be used by the catalog */
+  /**
+   * @return The {@link JdbcColumnDefaultValueConverter} to be used by the catalog
+   */
   protected abstract JdbcColumnDefaultValueConverter createJdbcColumnDefaultValueConverter();
 
   @Override

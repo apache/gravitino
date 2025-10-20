@@ -46,7 +46,9 @@ import org.apache.gravitino.rest.RESTRequest;
 })
 public interface TopicUpdateRequest extends RESTRequest {
 
-  /** @return The topic change. */
+  /**
+   * @return The topic change.
+   */
   TopicChange topicChange();
 
   /** Represents a request to update the comment of a topic. */
@@ -172,7 +174,9 @@ public interface TopicUpdateRequest extends RESTRequest {
           StringUtils.isNotBlank(property), "\"property\" field is required and cannot be empty");
     }
 
-    /** @return An instance of TopicChange. */
+    /**
+     * @return An instance of TopicChange.
+     */
     @Override
     public TopicChange topicChange() {
       return TopicChange.removeProperty(property);
