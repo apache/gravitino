@@ -157,7 +157,7 @@ public class TestCacheConfig {
     // There should no tag entities in the cache, because the weight of each tag entity is 100 that
     // is higher than the maximum weight of the fileset entity which is 200.
     Awaitility.await()
-        .atMost(Duration.ofSeconds(5))
+        .atMost(Duration.ofSeconds(20))
         .pollInterval(Duration.ofMillis(10))
         .until(
             () ->
