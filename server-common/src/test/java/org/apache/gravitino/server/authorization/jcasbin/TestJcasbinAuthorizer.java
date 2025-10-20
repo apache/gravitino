@@ -55,7 +55,7 @@ import org.apache.gravitino.meta.RoleEntity;
 import org.apache.gravitino.meta.SchemaVersion;
 import org.apache.gravitino.meta.UserEntity;
 import org.apache.gravitino.server.ServerConfig;
-import org.apache.gravitino.server.authorization.MetadataIdConverter;
+import org.apache.gravitino.MetadataIdConverter;
 import org.apache.gravitino.storage.relational.po.SecurableObjectPO;
 import org.apache.gravitino.storage.relational.service.OwnerMetaService;
 import org.apache.gravitino.storage.relational.utils.POConverters;

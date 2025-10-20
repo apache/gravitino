@@ -6,9 +6,7 @@
  * to you under the Apache License, Version 2.0 (the
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
- *
  *  http://www.apache.org/licenses/LICENSE-2.0
- *
  * Unless required by applicable law or agreed to in writing,
  * software distributed under the License is distributed on an
  * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
@@ -17,19 +15,14 @@
  * under the License.
  */
 
-package org.apache.gravitino.server.authorization;
+package org.apache.gravitino;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
 import java.util.Map;
-import org.apache.gravitino.Entity;
-import org.apache.gravitino.EntityStore;
-import org.apache.gravitino.GravitinoEnv;
-import org.apache.gravitino.HasIdentifier;
-import org.apache.gravitino.MetadataObject;
-import org.apache.gravitino.NameIdentifier;
+
 import org.apache.gravitino.catalog.CapabilityHelpers;
 import org.apache.gravitino.catalog.CatalogManager;
 import org.apache.gravitino.connector.capability.Capability;

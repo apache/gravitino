@@ -6,9 +6,7 @@
  * to you under the Apache License, Version 2.0 (the
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
- *
  *  http://www.apache.org/licenses/LICENSE-2.0
- *
  * Unless required by applicable law or agreed to in writing,
  * software distributed under the License is distributed on an
  * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
@@ -17,7 +15,7 @@
  * under the License.
  */
 
-package org.apache.gravitino.server.authorization;
+package org.apache.gravitino;
 
 import static org.mockito.Answers.CALLS_REAL_METHODS;
 import static org.mockito.ArgumentMatchers.eq;
@@ -30,14 +28,6 @@ import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
 import java.time.Instant;
 import org.apache.commons.lang3.reflect.FieldUtils;
-import org.apache.gravitino.Catalog;
-import org.apache.gravitino.Entity;
-import org.apache.gravitino.EntityStore;
-import org.apache.gravitino.GravitinoEnv;
-import org.apache.gravitino.MetadataObject;
-import org.apache.gravitino.MetadataObjects;
-import org.apache.gravitino.NameIdentifier;
-import org.apache.gravitino.Namespace;
 import org.apache.gravitino.catalog.CatalogManager;
 import org.apache.gravitino.connector.capability.Capability;
 import org.apache.gravitino.file.Fileset;

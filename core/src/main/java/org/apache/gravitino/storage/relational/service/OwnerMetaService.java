@@ -23,6 +23,7 @@ import static org.apache.gravitino.metrics.source.MetricsSource.GRAVITINO_RELATI
 import java.util.Collections;
 import java.util.Optional;
 import org.apache.gravitino.Entity;
+import org.apache.gravitino.MetadataIdConverter;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.authorization.AuthorizationUtils;
@@ -121,9 +122,9 @@ public class OwnerMetaService {
         return GroupMetaService.getInstance()
             .getGroupIdByMetalakeIdAndName(metalakeId, identifier.name());
       default:
-        MetadataObject object = NameIdentifierUtil.toMetadataObject(identifier, type);
-        return MetadataObjectService.getMetadataObjectId(
-            metalakeId, object.fullName(), object.type());
+        MetadataObject metadataObject = NameIdentifierUtil.toMetadataObject(identifier, type);
+        String metalake = NameIdentifierUtil.getMetalake(identifier);
+        return MetadataIdConverter.getID(metadataObject,metalake);
     }
   }
 }
