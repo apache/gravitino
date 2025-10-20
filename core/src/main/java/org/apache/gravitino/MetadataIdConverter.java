@@ -116,7 +116,7 @@ public class MetadataIdConverter {
   }
 
   @VisibleForTesting
-  static NameIdentifier normalizeCaseSensitive(
+  public static NameIdentifier normalizeCaseSensitive(
       NameIdentifier ident, Capability.Scope scope, CatalogManager catalogManager) {
     if (scope == null) {
       return ident;

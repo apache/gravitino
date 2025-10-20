@@ -17,22 +17,34 @@
 
 package org.apache.gravitino.server.web.rest;
 
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mockStatic;
+
 import java.io.IOException;
+import org.apache.gravitino.MetadataIdConverter;
 import org.apache.gravitino.server.ServerConfig;
 import org.apache.gravitino.server.authorization.GravitinoAuthorizerProvider;
 import org.glassfish.jersey.test.JerseyTest;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
+import org.mockito.MockedStatic;
 
 public abstract class BaseOperationsTest extends JerseyTest {
+
+  private static final MockedStatic<MetadataIdConverter> metadataIdConverterMockedStatic =
+      mockStatic(MetadataIdConverter.class);
 
   @BeforeAll
   public static void start() {
     GravitinoAuthorizerProvider.getInstance().initialize(new ServerConfig());
+    metadataIdConverterMockedStatic
+        .when(() -> MetadataIdConverter.getID(any(), any()))
+        .then(request -> request.getArguments()[0]);
   }
 
   @AfterAll
   public static void stop() throws IOException {
     GravitinoAuthorizerProvider.getInstance().close();
+    metadataIdConverterMockedStatic.close();
   }
 }
