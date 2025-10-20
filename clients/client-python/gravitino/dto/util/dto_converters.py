@@ -161,18 +161,15 @@ class DTOConverters:
         Returns:
             Column: The column.
         """
-        dto_default_value = dto.default_value()
+        if dto.default_value() == Column.DEFAULT_VALUE_NOT_SET:
+            return dto
         return Column.of(
             dto.name(),
             dto.data_type(),
             dto.comment(),
             dto.nullable(),
             dto.auto_increment(),
-            (
-                None
-                if dto_default_value == Column.DEFAULT_VALUE_NOT_SET
-                else DTOConverters.from_function_arg(dto.default_value())
-            ),
+            DTOConverters.from_function_arg(dto.default_value()),
         )
 
     @from_dto.register
