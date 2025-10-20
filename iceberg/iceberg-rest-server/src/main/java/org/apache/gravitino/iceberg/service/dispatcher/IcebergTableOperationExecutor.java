@@ -19,6 +19,10 @@
 
 package org.apache.gravitino.iceberg.service.dispatcher;
 
+import java.util.HashMap;
+import java.util.Map;
+import org.apache.commons.lang3.StringUtils;
+import org.apache.gravitino.auth.AuthConstants;
 import org.apache.gravitino.iceberg.service.IcebergCatalogWrapperManager;
 import org.apache.gravitino.listener.api.event.IcebergRequestContext;
 import org.apache.iceberg.catalog.Namespace;
@@ -29,8 +33,13 @@ import org.apache.iceberg.rest.requests.UpdateTableRequest;
 import org.apache.iceberg.rest.responses.ListTablesResponse;
 import org.apache.iceberg.rest.responses.LoadCredentialsResponse;
 import org.apache.iceberg.rest.responses.LoadTableResponse;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class IcebergTableOperationExecutor implements IcebergTableOperationDispatcher {
+
+  private static final Logger LOG = LoggerFactory.getLogger(IcebergTableOperationExecutor.class);
+  private static final String OWNER_PROPERTY = "owner";
 
   private IcebergCatalogWrapperManager icebergCatalogWrapperManager;
 
@@ -41,6 +50,34 @@ public class IcebergTableOperationExecutor implements IcebergTableOperationDispa
   @Override
   public LoadTableResponse createTable(
       IcebergRequestContext context, Namespace namespace, CreateTableRequest createTableRequest) {
+    String authenticatedUser = context.userName();
+    if (StringUtils.isNotBlank(authenticatedUser)
+        && !AuthConstants.ANONYMOUS_USER.equals(authenticatedUser)) {
+      String existingOwner = createTableRequest.properties().get(OWNER_PROPERTY);
+
+      // Updated the owner as the authenticated user, if owner missing or different from
+      // authenticated user
+      if (existingOwner == null || !existingOwner.equals(authenticatedUser)) {
+        Map<String, String> properties = new HashMap<>(createTableRequest.properties());
+        properties.put(OWNER_PROPERTY, authenticatedUser);
+        LOG.debug(
+            "Overriding table owner from '{}' to authenticated user: '{}'",
+            existingOwner,
+            authenticatedUser);
+
+        // CreateTableRequest is immutable, so we need to rebuild it with modified properties
+        createTableRequest =
+            CreateTableRequest.builder()
+                .withName(createTableRequest.name())
+                .withSchema(createTableRequest.schema())
+                .withPartitionSpec(createTableRequest.spec())
+                .withWriteOrder(createTableRequest.writeOrder())
+                .withLocation(createTableRequest.location())
+                .setProperties(properties)
+                .build();
+      }
+    }
+
     return icebergCatalogWrapperManager
         .getCatalogWrapper(context.catalogName())
         .createTable(namespace, createTableRequest, context.requestCredentialVending());
