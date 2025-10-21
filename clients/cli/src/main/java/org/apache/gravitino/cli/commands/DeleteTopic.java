@@ -75,6 +75,8 @@ public class DeleteTopic extends Command {
     try {
       GravitinoClient client = buildClient(metalake);
       deleted = client.loadCatalog(catalog).asTopicCatalog().dropTopic(name);
+    } catch (NoSuchCatalogException exception) {
+      exitWithError(ErrorMessages.UNKNOWN_CATALOG);
     } catch (NoSuchMetalakeException err) {
       exitWithError(ErrorMessages.UNKNOWN_METALAKE);
     } catch (NoSuchCatalogException err) {
