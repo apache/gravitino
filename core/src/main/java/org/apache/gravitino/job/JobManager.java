@@ -671,7 +671,9 @@ public class JobManager implements JobOperationDispatcher {
     String comment = jobTemplateEntity.comment();
 
     JobTemplateEntity.TemplateContent content = jobTemplateEntity.templateContent();
-    String executable = fetchFileFromUri(content.executable(), stagingDir, TIMEOUT_IN_MS);
+    String executable =
+        fetchFileFromUri(
+            replacePlaceholder(content.executable(), jobConf), stagingDir, TIMEOUT_IN_MS);
 
     List<String> args =
         content.arguments().stream()
@@ -692,7 +694,11 @@ public class JobManager implements JobOperationDispatcher {
 
     // For shell job template
     if (content.jobType() == JobTemplate.JobType.SHELL) {
-      List<String> scripts = fetchFilesFromUri(content.scripts(), stagingDir, TIMEOUT_IN_MS);
+      List<String> scripts =
+          content.scripts().stream()
+              .map(script -> replacePlaceholder(script, jobConf))
+              .map(script -> fetchFileFromUri(script, stagingDir, TIMEOUT_IN_MS))
+              .collect(Collectors.toList());
 
       return ShellJobTemplate.builder()
           .withName(name)
@@ -707,10 +713,25 @@ public class JobManager implements JobOperationDispatcher {
 
     // For Spark job template
     if (content.jobType() == JobTemplate.JobType.SPARK) {
-      String className = content.className();
-      List<String> jars = fetchFilesFromUri(content.jars(), stagingDir, TIMEOUT_IN_MS);
-      List<String> files = fetchFilesFromUri(content.files(), stagingDir, TIMEOUT_IN_MS);
-      List<String> archives = fetchFilesFromUri(content.archives(), stagingDir, TIMEOUT_IN_MS);
+      String className = replacePlaceholder(content.className(), jobConf);
+      List<String> jars =
+          content.jars().stream()
+              .map(jar -> replacePlaceholder(jar, jobConf))
+              .map(jar -> fetchFileFromUri(jar, stagingDir, TIMEOUT_IN_MS))
+              .collect(Collectors.toList());
+
+      List<String> files =
+          content.files().stream()
+              .map(file -> replacePlaceholder(file, jobConf))
+              .map(file -> fetchFileFromUri(file, stagingDir, TIMEOUT_IN_MS))
+              .collect(Collectors.toList());
+
+      List<String> archives =
+          content.archives().stream()
+              .map(archive -> replacePlaceholder(archive, jobConf))
+              .map(archive -> fetchFileFromUri(archive, stagingDir, TIMEOUT_IN_MS))
+              .collect(Collectors.toList());
+
       Map<String, String> configs =
           content.configs().entrySet().stream()
               .collect(

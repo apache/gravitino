@@ -223,6 +223,61 @@ public class TestJobTemplate {
   }
 
   @Test
+  public void testCreateShellRuntimeJobTemplateWithReplacementsInScripts() throws IOException {
+    File testScript1 = Files.createTempFile(tempDir.toPath(), "testScript1", ".sh").toFile();
+    File testScript2 = Files.createTempFile(tempDir.toPath(), "testScript2", ".sh").toFile();
+
+    ShellJobTemplate shellJobTemplate =
+        ShellJobTemplate.builder()
+            .withName("testShellJob1")
+            .withComment("This is a test shell job template")
+            .withExecutable("/bin/echo")
+            .withArguments(Lists.newArrayList("arg1", "arg2", "{{arg3}}, {{arg4}}"))
+            .withEnvironments(ImmutableMap.of("ENV_VAR1", "{{val1}}", "ENV_VAR2", "{{val2}}"))
+            .withCustomFields(ImmutableMap.of("customField1", "{{customVal1}}"))
+            .withScripts(
+                Lists.newArrayList(
+                    testScript1.toURI().toString().replace("testScript1", "{{scriptName1}}"),
+                    testScript2.toURI().toString().replace("testScript2", "{{scriptName2}}")))
+            .build();
+
+    JobTemplateEntity entity =
+        JobTemplateEntity.builder()
+            .withId(1L)
+            .withName(shellJobTemplate.name())
+            .withComment(shellJobTemplate.comment())
+            .withNamespace(NamespaceUtil.ofJobTemplate("test"))
+            .withTemplateContent(
+                JobTemplateEntity.TemplateContent.fromJobTemplate(shellJobTemplate))
+            .withAuditInfo(
+                AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build())
+            .build();
+
+    JobTemplate result =
+        JobManager.createRuntimeJobTemplate(
+            entity,
+            ImmutableMap.of(
+                "arg3", "value3",
+                "arg4", "value4",
+                "val1", "value1",
+                "val2", "value2",
+                "customVal1", "customValue1",
+                "scriptName1", "testScript1",
+                "scriptName2", "testScript2"),
+            tempStagingDir);
+
+    Assertions.assertEquals("echo", new File(result.executable).getName());
+    Assertions.assertEquals(2, ((ShellJobTemplate) result).scripts().size());
+    List<String> scriptNames =
+        ((ShellJobTemplate) result)
+            .scripts().stream()
+                .map(script -> new File(script).getName())
+                .collect(Collectors.toList());
+    Assertions.assertTrue(scriptNames.contains(testScript1.getName()));
+    Assertions.assertTrue(scriptNames.contains(testScript2.getName()));
+  }
+
+  @Test
   public void testCreateSparkRuntimeJobTemplate() throws IOException {
     File executable = Files.createTempFile(tempDir.toPath(), "testSparkJob", ".jar").toFile();
     File jar1 = Files.createTempFile(tempDir.toPath(), "testJar1", ".jar").toFile();
@@ -310,5 +365,97 @@ public class TestJobTemplate {
     Assertions.assertEquals(
         ImmutableMap.of("spark.executor.memory", "4g", "spark.driver.cores", "2"),
         ((SparkJobTemplate) result).configs());
+  }
+
+  @Test
+  public void testCreateSparkRuntimeJobTemplateWithReplacements() throws IOException {
+    File executable = Files.createTempFile(tempDir.toPath(), "testSparkJob", ".jar").toFile();
+    File jar1 = Files.createTempFile(tempDir.toPath(), "testJar1", ".jar").toFile();
+    File jar2 = Files.createTempFile(tempDir.toPath(), "testJar2", ".jar").toFile();
+
+    File file1 = Files.createTempFile(tempDir.toPath(), "testFile1", ".txt").toFile();
+    File file2 = Files.createTempFile(tempDir.toPath(), "testFile2", ".txt").toFile();
+
+    File archive1 = Files.createTempFile(tempDir.toPath(), "testArchive1", ".zip").toFile();
+
+    SparkJobTemplate sparkJobTemplate =
+        SparkJobTemplate.builder()
+            .withName("testSparkJob")
+            .withComment("This is a test Spark job template")
+            .withExecutable(executable.toURI().toString().replace("test", "{{env}}"))
+            .withClassName("org.apache.gravitino.TestSparkJob")
+            .withArguments(Lists.newArrayList("arg1", "arg2", "{{arg3}}"))
+            .withEnvironments(ImmutableMap.of("ENV_VAR1", "{{val1}}", "ENV_VAR2", "{{val2}}"))
+            .withCustomFields(ImmutableMap.of("customField1", "{{customVal1}}"))
+            .withJars(
+                Lists.newArrayList(
+                    jar1.toURI().toString().replace("test", "{{env}}"),
+                    jar2.toURI().toString().replace("test", "{{env}}")))
+            .withFiles(
+                Lists.newArrayList(
+                    file1.toURI().toString().replace("test", "{{env}}"),
+                    file2.toURI().toString().replace("test", "{{env}}")))
+            .withArchives(
+                Lists.newArrayList(archive1.toURI().toString().replace("test", "{{env}}")))
+            .withConfigs(
+                ImmutableMap.of(
+                    "spark.executor.memory",
+                    "{{executor-mem}}",
+                    "spark.driver.cores",
+                    "{{driver-cores}}"))
+            .build();
+
+    JobTemplateEntity entity =
+        JobTemplateEntity.builder()
+            .withId(1L)
+            .withName(sparkJobTemplate.name())
+            .withComment(sparkJobTemplate.comment())
+            .withNamespace(NamespaceUtil.ofJobTemplate("test"))
+            .withTemplateContent(
+                JobTemplateEntity.TemplateContent.fromJobTemplate(sparkJobTemplate))
+            .withAuditInfo(
+                AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build())
+            .build();
+
+    JobTemplate result =
+        JobManager.createRuntimeJobTemplate(
+            entity,
+            ImmutableMap.of(
+                "arg3", "value3",
+                "val1", "value1",
+                "val2", "value2",
+                "customVal1", "customValue1",
+                "executor-mem", "4g",
+                "driver-cores", "2",
+                "env", "test"),
+            tempStagingDir);
+
+    Assertions.assertEquals(executable.getName(), new File(result.executable).getName());
+    Assertions.assertEquals(Lists.newArrayList("arg1", "arg2", "value3"), result.arguments());
+    Assertions.assertEquals(
+        ImmutableMap.of("ENV_VAR1", "value1", "ENV_VAR2", "value2"), result.environments());
+    Assertions.assertEquals(ImmutableMap.of("customField1", "customValue1"), result.customFields());
+
+    Assertions.assertEquals(2, ((SparkJobTemplate) result).jars().size());
+    List<String> jarNames =
+        ((SparkJobTemplate) result)
+            .jars().stream().map(jar -> new File(jar).getName()).collect(Collectors.toList());
+    Assertions.assertTrue(jarNames.contains(jar1.getName()));
+    Assertions.assertTrue(jarNames.contains(jar2.getName()));
+
+    Assertions.assertEquals(2, ((SparkJobTemplate) result).files().size());
+    List<String> fileNames =
+        ((SparkJobTemplate) result)
+            .files().stream().map(file -> new File(file).getName()).collect(Collectors.toList());
+    Assertions.assertTrue(fileNames.contains(file1.getName()));
+    Assertions.assertTrue(fileNames.contains(file2.getName()));
+
+    Assertions.assertEquals(1, ((SparkJobTemplate) result).archives().size());
+    List<String> archiveNames =
+        ((SparkJobTemplate) result)
+            .archives().stream()
+                .map(archive -> new File(archive).getName())
+                .collect(Collectors.toList());
+    Assertions.assertTrue(archiveNames.contains(archive1.getName()));
   }
 }
