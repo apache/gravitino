@@ -40,7 +40,7 @@ public abstract class SparkIcebergCatalogHiveBackendIT extends SparkIcebergCatal
         IcebergPropertiesConstants.GRAVITINO_ICEBERG_CATALOG_URI, hiveMetastoreUri);
     catalogProperties.put(
         IcebergConstants.TABLE_METADATA_CACHE_IMPL,
-        "org.apache.gravitino.iceberg.common.cache.LocalMetadataCache");
+        "org.apache.gravitino.iceberg.common.cache.LocalTableMetadataCache");
 
     return catalogProperties;
   }
