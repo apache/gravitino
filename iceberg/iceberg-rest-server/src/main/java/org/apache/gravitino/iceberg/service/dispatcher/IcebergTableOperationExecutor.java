@@ -23,6 +23,7 @@ import java.util.HashMap;
 import java.util.Map;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.auth.AuthConstants;
+import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import org.apache.gravitino.iceberg.service.IcebergCatalogWrapperManager;
 import org.apache.gravitino.listener.api.event.IcebergRequestContext;
 import org.apache.iceberg.catalog.Namespace;
@@ -39,7 +40,6 @@ import org.slf4j.LoggerFactory;
 public class IcebergTableOperationExecutor implements IcebergTableOperationDispatcher {
 
   private static final Logger LOG = LoggerFactory.getLogger(IcebergTableOperationExecutor.class);
-  private static final String OWNER_PROPERTY = "owner";
 
   private IcebergCatalogWrapperManager icebergCatalogWrapperManager;
 
@@ -53,13 +53,12 @@ public class IcebergTableOperationExecutor implements IcebergTableOperationDispa
     String authenticatedUser = context.userName();
     if (StringUtils.isNotBlank(authenticatedUser)
         && !AuthConstants.ANONYMOUS_USER.equals(authenticatedUser)) {
-      String existingOwner = createTableRequest.properties().get(OWNER_PROPERTY);
+      String existingOwner = createTableRequest.properties().get(IcebergConstants.OWNER);
 
-      // Updated the owner as the authenticated user, if owner missing or different from
-      // authenticated user
-      if (existingOwner == null || !existingOwner.equals(authenticatedUser)) {
+      // Override the owner as the authenticated user if different from authenticated user
+      if (!authenticatedUser.equals(existingOwner)) {
         Map<String, String> properties = new HashMap<>(createTableRequest.properties());
-        properties.put(OWNER_PROPERTY, authenticatedUser);
+        properties.put(IcebergConstants.OWNER, authenticatedUser);
         LOG.debug(
             "Overriding table owner from '{}' to authenticated user: '{}'",
             existingOwner,

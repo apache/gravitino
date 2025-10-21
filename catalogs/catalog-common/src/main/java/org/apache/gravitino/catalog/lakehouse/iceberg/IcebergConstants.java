@@ -57,6 +57,7 @@ public class IcebergConstants {
 
   public static final String COMMENT = "comment";
   public static final String CREATOR = "creator";
+  public static final String OWNER = "owner";
   public static final String LOCATION = "location";
   public static final String CURRENT_SNAPSHOT_ID = "current-snapshot-id";
   public static final String CHERRY_PICK_SNAPSHOT_ID = "cherry-pick-snapshot-id";
