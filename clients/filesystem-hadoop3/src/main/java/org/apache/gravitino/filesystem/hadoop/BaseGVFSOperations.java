@@ -19,6 +19,7 @@
 package org.apache.gravitino.filesystem.hadoop;
 
 import static org.apache.gravitino.catalog.hadoop.fs.FileSystemProvider.GRAVITINO_BYPASS;
+import static org.apache.gravitino.catalog.hadoop.fs.HDFSFileSystemProvider.SCHEME_HDFS;
 import static org.apache.gravitino.file.Fileset.PROPERTY_DEFAULT_LOCATION_NAME;
 import static org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_CURRENT_LOCATION_NAME;
 import static org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_FILESET_METADATA_CACHE_ENABLE;
@@ -704,7 +705,7 @@ public abstract class BaseGVFSOperations implements Closeable {
     resetFileSystemServiceLoader(scheme);
 
     FileSystem fs;
-    if (scheme.equals("hdfs")) {
+    if (scheme.equals(SCHEME_HDFS)) {
       Configuration fsConfig = FileSystemUtils.createConfiguration(GRAVITINO_BYPASS, allProperties);
       fs = new HDFSAuthenticationFileSystem(actualFilePath, fsConfig);
     } else {

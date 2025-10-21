@@ -26,6 +26,7 @@ import org.apache.gravitino.config.ConfigBuilder;
 import org.apache.gravitino.config.ConfigConstants;
 import org.apache.gravitino.config.ConfigEntry;
 import org.apache.gravitino.connector.PropertyEntry;
+import org.apache.hadoop.conf.Configuration;
 
 public class AuthenticationConfig extends Config {
 
@@ -45,9 +46,15 @@ public class AuthenticationConfig extends Config {
 
   public static final boolean KERBEROS_DEFAULT_IMPERSONATION_ENABLE = false;
 
-  public AuthenticationConfig(Map<String, String> properties) {
+  public AuthenticationConfig(Map<String, String> properties, Configuration configuration) {
     super(false);
+    loadFromConfiguration(configuration);
     loadFromMap(properties, k -> true);
+  }
+
+  private void loadFromConfiguration(Configuration configuration) {
+    String authType = configuration.get("hadoop.security.authentication", "simple");
+    configMap.put(AUTH_TYPE_KEY, authType);
   }
 
   public static final ConfigEntry<String> AUTH_TYPE_ENTRY =

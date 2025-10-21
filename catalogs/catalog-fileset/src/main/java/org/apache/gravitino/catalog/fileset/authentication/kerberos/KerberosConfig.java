@@ -27,6 +27,7 @@ import org.apache.gravitino.config.ConfigBuilder;
 import org.apache.gravitino.config.ConfigConstants;
 import org.apache.gravitino.config.ConfigEntry;
 import org.apache.gravitino.connector.PropertyEntry;
+import org.apache.hadoop.conf.Configuration;
 
 public class KerberosConfig extends AuthenticationConfig {
   public static final String KEY_TAB_URI_KEY = "authentication.kerberos.keytab-uri";
@@ -70,9 +71,17 @@ public class KerberosConfig extends AuthenticationConfig {
           .checkValue(value -> value > 0, ConfigConstants.POSITIVE_NUMBER_ERROR_MSG)
           .createWithDefault(2);
 
-  public KerberosConfig(Map<String, String> properties) {
-    super(properties);
+  public KerberosConfig(Map<String, String> properties, Configuration configuration) {
+    super(properties, configuration);
+    loadFromConfiguration(configuration);
     loadFromMap(properties, k -> true);
+  }
+
+  private void loadFromConfiguration(Configuration configuration) {
+    String keyTab = configuration.get("hadoop.security.authentication.kerberos.keytab", "");
+    configMap.put(KEY_TAB_URI_KEY, keyTab);
+    String principal = configuration.get("hadoop.security.authentication.kerberos.principal", "");
+    configMap.put(PRINCIPAL_KEY, principal);
   }
 
   public String getPrincipalName() {
