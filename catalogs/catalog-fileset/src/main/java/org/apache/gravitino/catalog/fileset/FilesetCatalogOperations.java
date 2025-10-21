@@ -18,7 +18,6 @@
  */
 package org.apache.gravitino.catalog.fileset;
 
-import static org.apache.gravitino.connector.BaseCatalog.CATALOG_BYPASS_PREFIX;
 import static org.apache.gravitino.file.Fileset.LOCATION_NAME_UNKNOWN;
 import static org.apache.gravitino.file.Fileset.PROPERTY_CATALOG_PLACEHOLDER;
 import static org.apache.gravitino.file.Fileset.PROPERTY_DEFAULT_LOCATION_NAME;
@@ -198,12 +197,6 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
 
   public CatalogInfo getCatalogInfo() {
     return catalogInfo;
-  }
-
-  public Configuration getHadoopConf() {
-    Configuration configuration = new Configuration();
-    conf.forEach((k, v) -> configuration.set(k.replace(CATALOG_BYPASS_PREFIX, ""), v));
-    return configuration;
   }
 
   public Map<String, String> getConf() {

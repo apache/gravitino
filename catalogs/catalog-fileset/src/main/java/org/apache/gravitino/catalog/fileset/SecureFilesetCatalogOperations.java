@@ -24,10 +24,9 @@ import static org.apache.gravitino.file.Fileset.PROPERTY_DEFAULT_LOCATION_NAME;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.io.IOException;
-import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 import javax.security.auth.Subject;
@@ -103,11 +102,7 @@ public class SecureFilesetCatalogOperations
       throws RuntimeException {
     filesetCatalogOperations.initialize(config, info, propertiesMetadata);
     this.catalogUserContext =
-        UserContext.getUserContext(
-            NameIdentifier.of(info.namespace(), info.name()),
-            config,
-            filesetCatalogOperations.getHadoopConf(),
-            info);
+        UserContext.getUserContext(NameIdentifier.of(info.namespace(), info.name()), config, info);
     this.catalogProperties = info.properties();
   }
 
@@ -126,15 +121,21 @@ public class SecureFilesetCatalogOperations
       throws NoSuchSchemaException, FilesetAlreadyExistsException {
     String apiUser = PrincipalUtils.getCurrentUserName();
 
+    Map<String, String> filesetProperties = new HashMap<>(filesetCatalogOperations.getConf());
+    Schema schema =
+        filesetCatalogOperations.loadSchema(NameIdentifier.parse(ident.namespace().toString()));
+    filesetProperties.putAll(schema.properties());
+    filesetProperties.putAll(properties);
+
     UserContext userContext =
         UserContext.getUserContext(
-            ident, properties, null, filesetCatalogOperations.getCatalogInfo());
+            ident, filesetProperties, filesetCatalogOperations.getCatalogInfo());
     return userContext.doAs(
         () -> {
           try {
             setUser(apiUser);
             return filesetCatalogOperations.createMultipleLocationFileset(
-                ident, comment, type, storageLocations, properties);
+                ident, comment, type, storageLocations, filesetProperties);
           } finally {
             unsetUser(apiUser);
           }
@@ -157,9 +158,15 @@ public class SecureFilesetCatalogOperations
       throw new RuntimeException("Failed to delete fileset " + ident, ioe);
     }
 
+    Map<String, String> filesetProperties = new HashMap<>(filesetCatalogOperations.getConf());
+    Schema schema =
+        filesetCatalogOperations.loadSchema(NameIdentifier.parse(ident.namespace().toString()));
+    filesetProperties.putAll(schema.properties());
+    filesetProperties.putAll(filesetEntity.properties());
+
     UserContext userContext =
         UserContext.getUserContext(
-            ident, filesetEntity.properties(), null, filesetCatalogOperations.getCatalogInfo());
+            ident, filesetProperties, filesetCatalogOperations.getCatalogInfo());
     boolean r = userContext.doAs(() -> filesetCatalogOperations.dropFileset(ident), ident);
     UserContext.clearUserContext(ident);
     return r;
@@ -168,15 +175,17 @@ public class SecureFilesetCatalogOperations
   @Override
   public Schema createSchema(NameIdentifier ident, String comment, Map<String, String> properties)
       throws NoSuchCatalogException, SchemaAlreadyExistsException {
+    Map<String, String> schemaProperties = new HashMap<>(filesetCatalogOperations.getConf());
+    schemaProperties.putAll(properties);
     String apiUser = PrincipalUtils.getCurrentUserName();
     UserContext userContext =
         UserContext.getUserContext(
-            ident, properties, null, filesetCatalogOperations.getCatalogInfo());
+            ident, schemaProperties, filesetCatalogOperations.getCatalogInfo());
     return userContext.doAs(
         () -> {
           try {
             setUser(apiUser);
-            return filesetCatalogOperations.createSchema(ident, comment, properties);
+            return filesetCatalogOperations.createSchema(ident, comment, schemaProperties);
           } finally {
             unsetUser(apiUser);
           }
@@ -189,12 +198,12 @@ public class SecureFilesetCatalogOperations
     try {
       SchemaEntity schemaEntity =
           filesetCatalogOperations.store().get(ident, Entity.EntityType.SCHEMA, SchemaEntity.class);
-      Map<String, String> properties =
-          Optional.ofNullable(schemaEntity.properties()).orElse(Collections.emptyMap());
 
+      Map<String, String> schemaProperties = new HashMap<>(filesetCatalogOperations.getConf());
+      schemaProperties.putAll(schemaEntity.properties());
       UserContext userContext =
           UserContext.getUserContext(
-              ident, properties, null, filesetCatalogOperations.getCatalogInfo());
+              ident, schemaProperties, filesetCatalogOperations.getCatalogInfo());
       boolean r =
           userContext.doAs(() -> filesetCatalogOperations.dropSchema(ident, cascade), ident);
       UserContext.clearUserContext(ident);

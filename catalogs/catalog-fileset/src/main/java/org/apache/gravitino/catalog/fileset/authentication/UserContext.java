@@ -20,9 +20,9 @@
 package org.apache.gravitino.catalog.fileset.authentication;
 
 import static org.apache.gravitino.catalog.fileset.SecureFilesetCatalogOperations.GRAVITINO_KEYTAB_FORMAT;
-import static org.apache.gravitino.catalog.fileset.authentication.AuthenticationConfig.AUTH_TYPE_ENTRY;
 import static org.apache.gravitino.catalog.fileset.authentication.AuthenticationConfig.ENABLE_IMPERSONATION_ENTRY;
 import static org.apache.gravitino.catalog.fileset.authentication.AuthenticationConfig.IMPERSONATION_ENABLE_KEY;
+import static org.apache.gravitino.catalog.hadoop.fs.FileSystemProvider.GRAVITINO_BYPASS;
 
 import com.google.common.collect.Maps;
 import java.io.Closeable;
@@ -34,6 +34,7 @@ import java.security.PrivilegedExceptionAction;
 import java.util.Map;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.catalog.fileset.authentication.AuthenticationConfig.AuthenticationType;
+import org.apache.gravitino.catalog.hadoop.fs.FileSystemUtils;
 import org.apache.gravitino.connector.CatalogInfo;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.security.UserGroupInformation;
@@ -63,50 +64,24 @@ public abstract class UserContext implements Closeable {
   }
 
   public static UserContext getUserContext(
-      NameIdentifier nameIdentifier,
-      Map<String, String> properties,
-      Configuration configuration,
-      CatalogInfo catalogInfo) {
-    // Try to get the parent user context.
-    NameIdentifier currentNameIdentifier = NameIdentifier.of(nameIdentifier.namespace().levels());
-    UserContext parentContext = null;
-    while (!currentNameIdentifier.namespace().isEmpty()) {
-      if (userContextMap.containsKey(currentNameIdentifier)) {
-        parentContext = userContextMap.get(currentNameIdentifier);
-        break;
-      }
-      currentNameIdentifier = NameIdentifier.of(currentNameIdentifier.namespace().levels());
+      NameIdentifier nameIdentifier, Map<String, String> properties, CatalogInfo catalogInfo) {
+    if (userContextMap.containsKey(nameIdentifier)) {
+      return userContextMap.get(nameIdentifier);
     }
 
-    if (configuration == null) {
-      configuration = new Configuration();
-    }
-    AuthenticationConfig authenticationConfig = new AuthenticationConfig(properties);
+    Configuration configuration = FileSystemUtils.createConfiguration(GRAVITINO_BYPASS, properties);
+    AuthenticationConfig authenticationConfig = new AuthenticationConfig(properties, configuration);
 
     // If we do not set the impersonation, we will use the parent context;
     boolean enableUserImpersonation = ENABLE_IMPERSONATION_ENTRY.getDefaultValue();
     if (properties.containsKey(IMPERSONATION_ENABLE_KEY)) {
       enableUserImpersonation = authenticationConfig.isImpersonationEnabled();
-    } else if (parentContext != null) {
-      enableUserImpersonation = parentContext.enableUserImpersonation();
     }
 
     AuthenticationType authenticationType =
-        AuthenticationType.fromString(AUTH_TYPE_ENTRY.getDefaultValue());
-    // If we do not set the authentication type explicitly, we will use the parent context. If the
-    // parent is null, then we will use the default value.
-    if (properties.containsKey(AuthenticationConfig.AUTH_TYPE_KEY)) {
-      authenticationType =
-          authenticationConfig.isSimpleAuth()
-              ? AuthenticationType.SIMPLE
-              : AuthenticationType.KERBEROS;
-
-    } else if (parentContext != null) {
-      authenticationType =
-          parentContext instanceof SimpleUserContext
-              ? AuthenticationType.SIMPLE
-              : AuthenticationType.KERBEROS;
-    }
+        authenticationConfig.isSimpleAuth()
+            ? AuthenticationType.SIMPLE
+            : AuthenticationType.KERBEROS;
 
     UserGroupInformation currentUser;
     try {
@@ -116,29 +91,18 @@ public abstract class UserContext implements Closeable {
     }
 
     if (authenticationType == AuthenticationType.SIMPLE) {
-      UserGroupInformation userGroupInformation =
-          parentContext != null ? parentContext.getUser() : currentUser;
       SimpleUserContext simpleUserContext =
-          new SimpleUserContext(userGroupInformation, enableUserImpersonation);
+          new SimpleUserContext(currentUser, enableUserImpersonation);
       addUserContext(nameIdentifier, simpleUserContext);
       return simpleUserContext;
     } else if (authenticationType == AuthenticationType.KERBEROS) {
-      // if the kerberos authentication is inherited from the parent context, we will use the
-      // parent context's kerberos configuration.
-      if (parentContext != null && authenticationConfig.isSimpleAuth()) {
-        KerberosUserContext kerberosUserContext = ((KerberosUserContext) parentContext).deepCopy();
-        kerberosUserContext.setEnableUserImpersonation(enableUserImpersonation);
-        addUserContext(nameIdentifier, kerberosUserContext);
-        return kerberosUserContext;
-      }
-
       String keytabPath =
           String.format(
               GRAVITINO_KEYTAB_FORMAT,
               catalogInfo.id() + "-" + nameIdentifier.toString().replace(".", "-"));
       KerberosUserContext kerberosUserContext =
           new KerberosUserContext(enableUserImpersonation, keytabPath);
-      kerberosUserContext.initKerberos(properties, configuration, parentContext == null);
+      kerberosUserContext.initKerberos(properties, configuration, true);
       addUserContext(nameIdentifier, kerberosUserContext);
       return kerberosUserContext;
     } else {

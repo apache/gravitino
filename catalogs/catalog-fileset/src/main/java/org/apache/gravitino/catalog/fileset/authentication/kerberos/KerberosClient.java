@@ -52,7 +52,7 @@ public class KerberosClient implements Closeable {
   }
 
   public String login(String keytabFilePath) throws IOException {
-    KerberosConfig kerberosConfig = new KerberosConfig(conf);
+    KerberosConfig kerberosConfig = new KerberosConfig(conf, hadoopConf);
 
     // Check the principal and keytab file
     String catalogPrincipal = kerberosConfig.getPrincipalName();
@@ -89,7 +89,7 @@ public class KerberosClient implements Closeable {
   }
 
   public File saveKeyTabFileFromUri(String keytabPath) throws IOException {
-    KerberosConfig kerberosConfig = new KerberosConfig(conf);
+    KerberosConfig kerberosConfig = new KerberosConfig(conf, hadoopConf);
 
     String keyTabUri = kerberosConfig.getKeytab();
     Preconditions.checkArgument(StringUtils.isNotBlank(keyTabUri), "Keytab uri can't be blank");

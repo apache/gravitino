@@ -18,6 +18,8 @@ package org.apache.gravitino.filesystem.hadoop;
  * under the License.
  */
 
+import static org.apache.gravitino.catalog.hadoop.fs.HDFSFileSystemProvider.IPC_FALLBACK_TO_SIMPLE_AUTH_ALLOWED;
+
 import java.io.IOException;
 import java.net.URI;
 import java.security.PrivilegedExceptionAction;
@@ -47,8 +49,6 @@ public class HDFSAuthenticationFileSystem extends FileSystem {
 
   private static final long DEFAULT_RENEW_INTERVAL_MS = 10 * 60 * 1000L;
   private static final String FS_DISABLE_CACHE = "fs.hdfs.impl.disable.cache";
-  private static final String IPC_FALLBACK_TO_SIMPLE_AUTH_ALLOWED =
-      "ipc.client.fallback-to-simple-auth-allowed";
   private static final String HADOOP_SECURITY_AUTHENTICATION = "hadoop.security.authentication";
   private static final String HADOOP_SECURITY_PRINCIPAL =
       "hadoop.security.authentication.kerberos.principal";
