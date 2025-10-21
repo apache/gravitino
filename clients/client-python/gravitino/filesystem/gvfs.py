@@ -75,6 +75,7 @@ class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
         self._operations = self._get_gvfs_operations_class(
             server_uri, metalake_name, options
         )
+        self._hook.set_operations_context(self._operations)
 
         super().__init__(**kwargs)
 
