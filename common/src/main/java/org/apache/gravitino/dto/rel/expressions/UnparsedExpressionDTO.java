@@ -31,13 +31,17 @@ public class UnparsedExpressionDTO implements UnparsedExpression, FunctionArg {
     this.unparsedExpression = unparsedExpression;
   }
 
-  /** @return The value of the unparsed expression. */
+  /**
+   * @return The value of the unparsed expression.
+   */
   @Override
   public String unparsedExpression() {
     return unparsedExpression;
   }
 
-  /** @return The type of the function argument. */
+  /**
+   * @return The type of the function argument.
+   */
   @Override
   public ArgType argType() {
     return ArgType.UNPARSED;
@@ -48,7 +52,9 @@ public class UnparsedExpressionDTO implements UnparsedExpression, FunctionArg {
     return "UnparsedExpressionDTO{" + "unparsedExpression='" + unparsedExpression + '\'' + '}';
   }
 
-  /** @return A builder instance for {@link UnparsedExpressionDTO}. */
+  /**
+   * @return A builder instance for {@link UnparsedExpressionDTO}.
+   */
   public static Builder builder() {
     return new Builder();
   }

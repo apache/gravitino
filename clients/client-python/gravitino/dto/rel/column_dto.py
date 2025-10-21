@@ -22,8 +22,8 @@ from typing import List, Optional, Union, cast
 
 from dataclasses_json import DataClassJsonMixin, config
 
-from gravitino.api.expressions.expression import Expression
 from gravitino.api.rel.column import Column
+from gravitino.api.rel.expressions.expression import Expression
 from gravitino.api.rel.types.json_serdes.type_serdes import TypeSerdes
 from gravitino.api.rel.types.type import Type
 from gravitino.api.rel.types.types import Types

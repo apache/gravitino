@@ -44,13 +44,19 @@ import org.apache.gravitino.tag.SupportsTags;
 @Evolving
 public interface Table extends Auditable {
 
-  /** @return Name of the table. */
+  /**
+   * @return Name of the table.
+   */
   String name();
 
-  /** @return The columns of the table. */
+  /**
+   * @return The columns of the table.
+   */
   Column[] columns();
 
-  /** @return The physical partitioning of the table. */
+  /**
+   * @return The physical partitioning of the table.
+   */
   default Transform[] partitioning() {
     return Transforms.EMPTY_TRANSFORM;
   }
@@ -78,13 +84,17 @@ public interface Table extends Auditable {
     return Indexes.EMPTY_INDEXES;
   }
 
-  /** @return The comment of the table. Null is returned if no comment is set. */
+  /**
+   * @return The comment of the table. Null is returned if no comment is set.
+   */
   @Nullable
   default String comment() {
     return null;
   }
 
-  /** @return The properties of the table. Empty map is returned if no properties are set. */
+  /**
+   * @return The properties of the table. Empty map is returned if no properties are set.
+   */
   default Map<String, String> properties() {
     return Collections.emptyMap();
   }

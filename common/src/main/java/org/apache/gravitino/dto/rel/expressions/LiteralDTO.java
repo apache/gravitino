@@ -38,19 +38,25 @@ public class LiteralDTO implements Literal<String>, FunctionArg {
     this.dataType = dataType;
   }
 
-  /** @return The value of the literal. */
+  /**
+   * @return The value of the literal.
+   */
   @Override
   public String value() {
     return value;
   }
 
-  /** @return The data type of the literal. */
+  /**
+   * @return The data type of the literal.
+   */
   @Override
   public Type dataType() {
     return dataType;
   }
 
-  /** @return The type of the argument. */
+  /**
+   * @return The type of the argument.
+   */
   @Override
   public ArgType argType() {
     return ArgType.LITERAL;
@@ -101,7 +107,9 @@ public class LiteralDTO implements Literal<String>, FunctionArg {
     }
   }
 
-  /** @return the builder for creating a new instance of LiteralDTO. */
+  /**
+   * @return the builder for creating a new instance of LiteralDTO.
+   */
   public static Builder builder() {
     return new Builder();
   }

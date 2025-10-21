@@ -56,7 +56,9 @@ public interface DatabaseOperation {
    */
   boolean delete(String databaseName, boolean cascade);
 
-  /** @return The list name of databases. */
+  /**
+   * @return The list name of databases.
+   */
   List<String> listDatabases();
 
   /**

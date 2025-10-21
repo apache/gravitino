@@ -65,7 +65,9 @@ class MessagingCatalog extends BaseSchemaCatalog implements TopicCatalog {
     super(namespace, name, type, provider, comment, properties, auditDTO, restClient);
   }
 
-  /** @return A new builder for {@link MessagingCatalog}. */
+  /**
+   * @return A new builder for {@link MessagingCatalog}.
+   */
   public static Builder builder() {
     return new Builder();
   }

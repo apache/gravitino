@@ -78,7 +78,7 @@ jobs:
 
       - name: Package Gravitino
         run: |
-          ./gradlew compileDistribution -x test -PjdkVersion=${{ matrix.java-version }}
+          ./gradlew compileDistribution -x test 
 
       - name: Free up disk space
         run: |
@@ -87,9 +87,9 @@ jobs:
       - name: Authorization Integration Test (JDK${{ matrix.java-version }})
         id: integrationTest
         run: |
-          ./gradlew -PtestMode=embedded -PjdbcBackend=h2 -PjdkVersion=${{ matrix.java-version }} -PskipDockerTests=false :authorizations:test
-          ./gradlew -PtestMode=deploy -PjdbcBackend=mysql -PjdkVersion=${{ matrix.java-version }} -PskipDockerTests=false :authorizations:test
-          ./gradlew -PtestMode=deploy -PjdbcBackend=postgresql -PjdkVersion=${{ matrix.java-version }} -PskipDockerTests=false :authorizations:test
+          ./gradlew -PtestMode=embedded -PjdbcBackend=h2 -PskipDockerTests=false :authorizations:test
+          ./gradlew -PtestMode=deploy -PjdbcBackend=mysql -PskipDockerTests=false :authorizations:test
+          ./gradlew -PtestMode=deploy -PjdbcBackend=postgresql -PskipDockerTests=false :authorizations:test
 
       - name: Upload integrate tests reports
         uses: actions/upload-artifact@v4

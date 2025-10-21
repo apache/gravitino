@@ -47,11 +47,11 @@ public class TableMetaBaseSQLProvider {
         + " FROM "
         + TABLE_NAME
         + " WHERE deleted_at = 0"
-        + " AND table_id in ("
+        + " AND table_id IN ("
         + "<foreach collection='tableIds' item='tableId' separator=','>"
         + "#{tableId}"
         + "</foreach>"
-        + ") "
+        + ")"
         + "</script>";
   }
 
@@ -89,10 +89,10 @@ public class TableMetaBaseSQLProvider {
   public String insertTableMeta(@Param("tableMeta") TablePO tablePO) {
     return "INSERT INTO "
         + TABLE_NAME
-        + "(table_id, table_name, metalake_id,"
+        + " (table_id, table_name, metalake_id,"
         + " catalog_id, schema_id, audit_info,"
         + " current_version, last_version, deleted_at)"
-        + " VALUES("
+        + " VALUES ("
         + " #{tableMeta.tableId},"
         + " #{tableMeta.tableName},"
         + " #{tableMeta.metalakeId},"
@@ -108,10 +108,10 @@ public class TableMetaBaseSQLProvider {
   public String insertTableMetaOnDuplicateKeyUpdate(@Param("tableMeta") TablePO tablePO) {
     return "INSERT INTO "
         + TABLE_NAME
-        + "(table_id, table_name, metalake_id,"
+        + " (table_id, table_name, metalake_id,"
         + " catalog_id, schema_id, audit_info,"
         + " current_version, last_version, deleted_at)"
-        + " VALUES("
+        + " VALUES ("
         + " #{tableMeta.tableId},"
         + " #{tableMeta.tableName},"
         + " #{tableMeta.metalakeId},"

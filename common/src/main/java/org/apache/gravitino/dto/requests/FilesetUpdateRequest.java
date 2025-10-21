@@ -103,7 +103,9 @@ public interface FilesetUpdateRequest extends RESTRequest {
     @JsonProperty("newComment")
     private final String newComment;
 
-    /** @return The fileset change. */
+    /**
+     * @return The fileset change.
+     */
     @Override
     public FilesetChange filesetChange() {
       return FilesetChange.updateComment(newComment);
@@ -129,7 +131,9 @@ public interface FilesetUpdateRequest extends RESTRequest {
     @JsonProperty("value")
     private final String value;
 
-    /** @return The fileset change. */
+    /**
+     * @return The fileset change.
+     */
     @Override
     public FilesetChange filesetChange() {
       return FilesetChange.setProperty(property, value);
@@ -159,7 +163,9 @@ public interface FilesetUpdateRequest extends RESTRequest {
     @JsonProperty("property")
     private final String property;
 
-    /** @return The fileset change. */
+    /**
+     * @return The fileset change.
+     */
     @Override
     public FilesetChange filesetChange() {
       return FilesetChange.removeProperty(property);
@@ -183,7 +189,9 @@ public interface FilesetUpdateRequest extends RESTRequest {
   @ToString
   class RemoveFilesetCommentRequest implements FilesetUpdateRequest {
 
-    /** @return The fileset change. */
+    /**
+     * @return The fileset change.
+     */
     @Override
     public FilesetChange filesetChange() {
       return FilesetChange.updateComment(null);

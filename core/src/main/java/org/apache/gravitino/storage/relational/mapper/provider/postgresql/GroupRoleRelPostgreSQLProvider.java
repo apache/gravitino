@@ -31,7 +31,7 @@ public class GroupRoleRelPostgreSQLProvider extends GroupRoleRelBaseSQLProvider 
     return "UPDATE "
         + GROUP_ROLE_RELATION_TABLE_NAME
         + " SET deleted_at = floor(extract(epoch from(current_timestamp -"
-        + " timestamp '1970-01-01 00:00:00'))*1000)"
+        + " timestamp '1970-01-01 00:00:00')) * 1000)"
         + " WHERE group_id = #{groupId} AND deleted_at = 0";
   }
 
@@ -41,8 +41,8 @@ public class GroupRoleRelPostgreSQLProvider extends GroupRoleRelBaseSQLProvider 
         + "UPDATE "
         + GROUP_ROLE_RELATION_TABLE_NAME
         + " SET deleted_at = floor(extract(epoch from(current_timestamp -"
-        + " timestamp '1970-01-01 00:00:00'))*1000)"
-        + " WHERE group_id = #{groupId} AND role_id in ("
+        + " timestamp '1970-01-01 00:00:00')) * 1000)"
+        + " WHERE group_id = #{groupId} AND role_id IN ("
         + "<foreach collection='roleIds' item='roleId' separator=','>"
         + "#{roleId}"
         + "</foreach>"
@@ -56,7 +56,7 @@ public class GroupRoleRelPostgreSQLProvider extends GroupRoleRelBaseSQLProvider 
     return "UPDATE "
         + GROUP_ROLE_RELATION_TABLE_NAME
         + " SET deleted_at = floor(extract(epoch from(current_timestamp -"
-        + " timestamp '1970-01-01 00:00:00'))*1000)"
+        + " timestamp '1970-01-01 00:00:00')) * 1000)"
         + " WHERE group_id IN (SELECT group_id FROM "
         + GROUP_TABLE_NAME
         + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0)"
@@ -68,7 +68,7 @@ public class GroupRoleRelPostgreSQLProvider extends GroupRoleRelBaseSQLProvider 
     return "UPDATE "
         + GROUP_ROLE_RELATION_TABLE_NAME
         + " SET deleted_at = floor(extract(epoch from(current_timestamp -"
-        + " timestamp '1970-01-01 00:00:00'))*1000)"
+        + " timestamp '1970-01-01 00:00:00')) * 1000)"
         + " WHERE role_id = #{roleId} AND deleted_at = 0";
   }
 

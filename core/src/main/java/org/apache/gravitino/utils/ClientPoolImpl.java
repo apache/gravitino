@@ -18,7 +18,6 @@
  */
 package org.apache.gravitino.utils;
 
-import com.google.common.base.Preconditions;
 import java.io.Closeable;
 import java.util.ArrayDeque;
 import java.util.Deque;
@@ -131,8 +130,10 @@ public abstract class ClientPoolImpl<C, E extends Exception>
   }
 
   private C get() throws InterruptedException {
-    Preconditions.checkState(!closed, "Cannot get a client from a closed pool");
     while (true) {
+      if (closed) {
+        throw new IllegalArgumentException("Cannot get a client from a closed pool");
+      }
       if (!clients.isEmpty() || currentSize < poolSize) {
         synchronized (this) {
           if (!clients.isEmpty()) {

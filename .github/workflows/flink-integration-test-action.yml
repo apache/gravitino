@@ -38,7 +38,7 @@ jobs:
 
       - name: Package Gravitino
         run: |
-          ./gradlew compileDistribution -x test -PjdkVersion=${{ inputs.java-version }}
+          ./gradlew compileDistribution -x test 
 
       - name: Free up disk space
         run: |
@@ -48,8 +48,8 @@ jobs:
         id: integrationTest
         # run embedded mode and deploy mode integration tests
         run: |
-          ./gradlew -PskipTests -PtestMode=embedded -PjdkVersion=${{ inputs.java-version }} -PskipDockerTests=false :flink-connector:flink:test --tests "org.apache.gravitino.flink.connector.integration.test.**"
-          ./gradlew -PskipTests -PtestMode=deploy -PjdkVersion=${{ inputs.java-version }} -PskipDockerTests=false :flink-connector:flink:test --tests "org.apache.gravitino.flink.connector.integration.test.**"
+          ./gradlew -PskipTests -PtestMode=embedded -PskipDockerTests=false :flink-connector:flink:test --tests "org.apache.gravitino.flink.connector.integration.test.**"
+          ./gradlew -PskipTests -PtestMode=deploy -PskipDockerTests=false :flink-connector:flink:test --tests "org.apache.gravitino.flink.connector.integration.test.**"
 
       - name: Upload integrate tests reports
         uses: actions/upload-artifact@v4
