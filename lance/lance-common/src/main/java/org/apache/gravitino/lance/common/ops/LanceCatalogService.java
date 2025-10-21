@@ -79,7 +79,7 @@ public class LanceCatalogService implements AutoCloseable {
   public NamespaceListingResult listChildNamespaces(
       String parentId, String delimiter, String pageToken, Integer limit) {
     String normalizedParent = StringUtils.trimToEmpty(parentId);
-    String effectiveDelimiter = StringUtils.isBlank(delimiter) ? "." : delimiter;
+    String effectiveDelimiter = StringUtils.isBlank(delimiter) ? "$" : delimiter;
 
     List<String> sortedNamespaces = listNamespaceNames();
     List<String> filtered = filterChildren(sortedNamespaces, normalizedParent, effectiveDelimiter);
@@ -151,7 +151,7 @@ public class LanceCatalogService implements AutoCloseable {
       throw new IllegalArgumentException("Namespace id must be provided");
     }
 
-    String effectiveDelimiter = StringUtils.isBlank(delimiter) ? "." : delimiter;
+    String effectiveDelimiter = StringUtils.isBlank(delimiter) ? "$" : delimiter;
 
     NamespaceState state = namespaces.get(normalizedNamespace);
     if (state == null) {

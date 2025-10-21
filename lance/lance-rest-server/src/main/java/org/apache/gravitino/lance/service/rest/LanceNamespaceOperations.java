@@ -46,7 +46,7 @@ public class LanceNamespaceOperations {
   @Path("/{id}/list")
   public Response listNamespaces(
       @Encoded @PathParam("id") String namespaceId,
-      @DefaultValue(".") @QueryParam("delimiter") String delimiter,
+      @DefaultValue("$") @QueryParam("delimiter") String delimiter,
       @QueryParam("page_token") String pageToken,
       @QueryParam("limit") Integer limit) {
     try {
@@ -70,7 +70,7 @@ public class LanceNamespaceOperations {
   @Path("/{id}/table/list")
   public Response listTables(
       @Encoded @PathParam("id") String namespaceId,
-      @DefaultValue(".") @QueryParam("delimiter") String delimiter,
+      @DefaultValue("$") @QueryParam("delimiter") String delimiter,
       @QueryParam("page_token") String pageToken,
       @QueryParam("limit") Integer limit) {
     try {
