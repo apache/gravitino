@@ -94,7 +94,8 @@ public class StatisticManager implements Closeable {
           identifier,
           LockType.READ,
           () ->
-              store.list(Namespace.fromString(identifier.toString()), StatisticEntity.class, type)
+              store
+                  .list(Namespace.fromString(identifier.toString()), StatisticEntity.class, type)
                   .stream()
                   .map(
                       entity -> {

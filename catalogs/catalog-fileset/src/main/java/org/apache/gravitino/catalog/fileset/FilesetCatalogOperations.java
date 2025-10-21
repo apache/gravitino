@@ -878,8 +878,7 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
       // may mis-delete the storage location of the external fileset if it happens to be under
       // the schema path.
       ClassLoader cl = Thread.currentThread().getContextClassLoader();
-      filesets
-          .parallelStream()
+      filesets.parallelStream()
           .filter(f -> f.filesetType() == Fileset.Type.MANAGED)
           .forEach(
               f -> {

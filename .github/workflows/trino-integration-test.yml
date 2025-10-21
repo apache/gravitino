@@ -76,7 +76,7 @@ jobs:
 
       - name: Package Gravitino
         run: |
-          ./gradlew compileDistribution compileTrinoConnector -x test -PjdkVersion=${{ matrix.java-version }}
+          ./gradlew compileDistribution compileTrinoConnector -x test
 
       - name: Free up disk space
         run: |
@@ -85,8 +85,8 @@ jobs:
       - name: Trino Integration Test
         id: integrationTest
         run: |
-          ./gradlew -PskipTests -PtestMode=embedded -PjdkVersion=${{ matrix.java-version }} -PskipDockerTests=false :trino-connector:integration-test:test
-          ./gradlew -PskipTests -PtestMode=deploy -PjdkVersion=${{ matrix.java-version }} -PskipDockerTests=false :trino-connector:integration-test:test
+          ./gradlew -PskipTests -PtestMode=embedded -PskipDockerTests=false :trino-connector:integration-test:test
+          ./gradlew -PskipTests -PtestMode=deploy -PskipDockerTests=false :trino-connector:integration-test:test
           # Disable the Trino cascading query integration test, because the connector jars are private now.
           #trino-connector/integration-test/trino-test-tools/run_test.sh
 

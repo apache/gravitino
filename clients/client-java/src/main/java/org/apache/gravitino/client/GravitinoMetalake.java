@@ -1618,7 +1618,9 @@ public class GravitinoMetalake extends MetalakeDTO
     return super.equals(that);
   }
 
-  /** @return the builder for creating a new instance of GravitinoMetaLake. */
+  /**
+   * @return the builder for creating a new instance of GravitinoMetaLake.
+   */
   public static Builder builder() {
     return new Builder();
   }

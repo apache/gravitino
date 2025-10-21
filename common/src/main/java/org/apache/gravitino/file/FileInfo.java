@@ -27,18 +27,28 @@ package org.apache.gravitino.file;
  */
 public interface FileInfo {
 
-  /** @return The filename or directory name of file object. */
+  /**
+   * @return The filename or directory name of file object.
+   */
   String name();
 
-  /** @return Whether this is a directory (true). */
+  /**
+   * @return Whether this is a directory (true).
+   */
   boolean isDir();
 
-  /** @return The file size in bytes (0 if directory). */
+  /**
+   * @return The file size in bytes (0 if directory).
+   */
   long size();
 
-  /** @return The last modification time as an Instant. */
+  /**
+   * @return The last modification time as an Instant.
+   */
   long lastModified();
 
-  /** @return The full path of the file or directory within the fileset. */
+  /**
+   * @return The full path of the file or directory within the fileset.
+   */
   String path();
 }

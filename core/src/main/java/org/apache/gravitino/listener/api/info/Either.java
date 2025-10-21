@@ -108,12 +108,16 @@ public final class Either<L, R> {
     return new Either<>(Optional.empty(), Optional.of(value));
   }
 
-  /** @return the left value */
+  /**
+   * @return the left value
+   */
   public Optional<L> left() {
     return left;
   }
 
-  /** @return the right value */
+  /**
+   * @return the right value
+   */
   public Optional<R> right() {
     return right;
   }

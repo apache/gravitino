@@ -77,7 +77,9 @@ public class CredentialDTO implements Credential {
     throw new UnsupportedOperationException("CredentialDTO doesn't support initWithCredentialInfo");
   }
 
-  /** @return a new builder for constructing a Credential DTO. */
+  /**
+   * @return a new builder for constructing a Credential DTO.
+   */
   public static Builder builder() {
     return new Builder();
   }
@@ -123,7 +125,9 @@ public class CredentialDTO implements Credential {
       return this;
     }
 
-    /** @return The constructed credential DTO. */
+    /**
+     * @return The constructed credential DTO.
+     */
     public CredentialDTO build() {
       return credentialDTO;
     }

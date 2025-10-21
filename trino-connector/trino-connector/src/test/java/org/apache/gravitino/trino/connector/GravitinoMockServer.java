@@ -148,7 +148,8 @@ public class GravitinoMockServer implements AutoCloseable {
               @Override
               public String[] answer(InvocationOnMock invocation) throws Throwable {
                 return metalakes.get(metalakeName).catalogs.keySet().toArray(String[]::new);
-              };
+              }
+              ;
             });
 
     when(metaLake.createCatalog(
