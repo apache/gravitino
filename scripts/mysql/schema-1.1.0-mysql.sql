@@ -450,8 +450,8 @@ CREATE TABLE IF NOT EXISTS `table_version_info` (
     `distribution_info` MEDIUMTEXT DEFAULT NULL COMMENT 'table distribution info',
     `sort_order_info` MEDIUMTEXT DEFAULT NULL COMMENT 'table sort order info',
     `index_info`      MEDIUMTEXT DEFAULT NULL COMMENT 'table index info',
+    `table_comment`   MEDIUMTEXT DEFAULT NULL COMMENT 'table comment',
     `current_version` BIGINT(20) UNSIGNED COMMENT 'table current version',
-    `last_version`    BIGINT(20) UNSIGNED COMMENT 'table last version',
     `deleted_at`      BIGINT(20) UNSIGNED DEFAULT 0 COMMENT 'table deletion timestamp, 0 means not deleted',
      PRIMARY KEY (table_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'table detail information including format, location, properties, partition, distribution, sort order, index and so on';

@@ -28,8 +28,8 @@ CREATE TABLE IF NOT EXISTS table_version_info (
     distribution_info TEXT,
     sort_order_info TEXT,
     index_info      TEXT,
+    table_comment   TEXT,
     current_version BIGINT,
-    last_version    BIGINT,
     deleted_at      BIGINT DEFAULT 0
     );
 COMMENT ON TABLE table_version_info IS 'table detail information including format, location, properties, partition, distribution, sort order, index and so on';
@@ -42,6 +42,6 @@ COMMENT ON COLUMN table_version_info.partition_info  IS 'table partition info';
 COMMENT on COLUMN table_version_info.distribution_info IS 'table distribution info';
 COMMENT ON COLUMN table_version_info.sort_order_info IS 'table sort order info';
 COMMENT ON COLUMN table_version_info.index_info      IS 'table index info';
+COMMENT ON COLUMN table_version_info.table_comment   IS 'table comment';
 COMMENT ON COLUMN table_version_info.current_version IS 'table current version';
-COMMENT ON COLUMN table_version_info.last_version    IS 'table last version';
 COMMENT ON COLUMN table_version_info.deleted_at      IS 'table deletion timestamp, 0 means not deleted';
