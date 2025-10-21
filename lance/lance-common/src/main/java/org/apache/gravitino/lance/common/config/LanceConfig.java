@@ -1,0 +1,65 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *  http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+package org.apache.gravitino.lance.common.config;
+
+import com.google.common.collect.ImmutableMap;
+import java.util.Map;
+import org.apache.gravitino.Config;
+import org.apache.gravitino.OverwriteDefaultConfig;
+import org.apache.gravitino.config.ConfigBuilder;
+import org.apache.gravitino.config.ConfigConstants;
+import org.apache.gravitino.config.ConfigEntry;
+
+/** Base Lance REST configuration. */
+public class LanceConfig extends Config implements OverwriteDefaultConfig {
+
+  public static final String LANCE_CONFIG_PREFIX = "gravitino.lance-rest.";
+
+  public static final int DEFAULT_LANCE_REST_SERVICE_HTTP_PORT = 9101;
+  public static final int DEFAULT_LANCE_REST_SERVICE_HTTPS_PORT = 9533;
+
+  public static final ConfigEntry<String> CATALOG_NAME =
+      new ConfigBuilder(LANCE_CONFIG_PREFIX + "catalog-name")
+          .doc("Logical Lance catalog served by the REST endpoint")
+          .version(ConfigConstants.VERSION_0_1_0)
+          .stringConf()
+          .createWithDefault("default");
+
+  public LanceConfig(Map<String, String> properties) {
+    super(false);
+    loadFromMap(properties, key -> true);
+  }
+
+  public LanceConfig() {
+    super(false);
+  }
+
+  public String getCatalogName() {
+    return get(CATALOG_NAME);
+  }
+
+  @Override
+  public Map<String, String> getOverwriteDefaultConfig() {
+    return ImmutableMap.of(
+        ConfigConstants.WEBSERVER_HTTP_PORT,
+        String.valueOf(DEFAULT_LANCE_REST_SERVICE_HTTP_PORT),
+        ConfigConstants.WEBSERVER_HTTPS_PORT,
+        String.valueOf(DEFAULT_LANCE_REST_SERVICE_HTTPS_PORT));
+  }
+}
