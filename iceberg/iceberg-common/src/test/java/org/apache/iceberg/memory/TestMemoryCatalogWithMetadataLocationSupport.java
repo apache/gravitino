@@ -28,13 +28,14 @@ import org.apache.iceberg.types.Types;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
-public class TestMemoryCatalogWithMetadataLocation {
+public class TestMemoryCatalogWithMetadataLocationSupport {
   private static final Schema SCHEMA =
       new Schema(Types.NestedField.required(1, "id", Types.IntegerType.get()));
 
   @Test
   void testMetadataLocation() {
-    MemoryCatalogWithMetadataLocation catalog = new MemoryCatalogWithMetadataLocation();
+    MemoryCatalogWithMetadataLocationSupport catalog =
+        new MemoryCatalogWithMetadataLocationSupport();
     catalog.initialize("memory", Collections.emptyMap());
     catalog.createNamespace(Namespace.of("ns"));
     TableIdentifier tableIdentifier = TableIdentifier.of("ns", "t");

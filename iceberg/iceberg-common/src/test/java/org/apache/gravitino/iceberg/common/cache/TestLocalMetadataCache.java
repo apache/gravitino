@@ -32,14 +32,14 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 class TestLocalMetadataCache {
-  private LocalMetadataCache cache;
+  private LocalTableMetadataCache cache;
   private TableIdentifier testIdentifier;
   private TableMetadata testMetadata;
   private SupportsMetadataLocation supportsMetadataLocation;
 
   @BeforeEach
   void setUp() {
-    cache = new LocalMetadataCache();
+    cache = new LocalTableMetadataCache();
     testIdentifier = TableIdentifier.of("test", "table");
     testMetadata = mock(TableMetadata.class);
     when(testMetadata.metadataFileLocation()).thenReturn("test_location_" + testIdentifier.name());
@@ -96,7 +96,7 @@ class TestLocalMetadataCache {
 
   @Test
   void testCloseWithNullCache() throws IOException {
-    LocalMetadataCache emptyCache = new LocalMetadataCache();
+    LocalTableMetadataCache emptyCache = new LocalTableMetadataCache();
     emptyCache.close(); // Should not throw exception
   }
 }

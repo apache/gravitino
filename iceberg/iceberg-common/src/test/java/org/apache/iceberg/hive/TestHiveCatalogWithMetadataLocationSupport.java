@@ -17,26 +17,17 @@
  *  under the License.
  */
 
-package org.apache.iceberg.jdbc;
+package org.apache.iceberg.hive;
 
-import com.google.common.collect.ImmutableMap;
-import org.apache.iceberg.CatalogProperties;
+import java.util.Collections;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
-public class TestJdbcCatalogWithMetadataLocation {
+public class TestHiveCatalogWithMetadataLocationSupport {
 
   @Test
   void testLoadFields() {
-    JdbcCatalogWithMetadataLocation catalog = new JdbcCatalogWithMetadataLocation(false);
-    Assertions.assertDoesNotThrow(
-        () ->
-            catalog.initialize(
-                "jdbc",
-                ImmutableMap.of(
-                    CatalogProperties.URI,
-                    "jdbc:h2:mem:test",
-                    CatalogProperties.WAREHOUSE_LOCATION,
-                    "warehouse")));
+    HiveCatalogWithMetadataLocationSupport catalog = new HiveCatalogWithMetadataLocationSupport();
+    Assertions.assertDoesNotThrow(() -> catalog.initialize("hive", Collections.emptyMap()));
   }
 }

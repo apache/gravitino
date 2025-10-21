@@ -170,7 +170,7 @@ Users can use the following properties to configure the security of the catalog 
 
 #### Table metadata cache
 
-Gravitino features a pluggable cache system for updating or retrieving table metadata caches. It validates the location of table metadata against the catalog backend to ensure the correctness of cached data.
+Gravitino features a pluggable cache system for updating or retrieving table metadata in the cache. It validates the location of table metadata against the catalog backend to ensure the correctness of cached data.
 
 | Configuration item                    | Description                                 | Default value | Required | Since Version |
 |---------------------------------------|---------------------------------------------|---------------|----------|---------------|
@@ -178,7 +178,7 @@ Gravitino features a pluggable cache system for updating or retrieving table met
 | `table-metadata-cache-capacity`       | The capacity of table metadata cache.       | 200           | No       | 1.1.0         |
 | `table-metadata-cache-expire-minutes` | The expire minutes of table metadata cache. | 60            | No       | 1.1.0         |
 
-Gravitino provides the build-in `org.apache.gravitino.iceberg.common.cache.LocalMetadataCache` to store the cached data in the memory. You could also implement your custom table metadata cache by implementing the `org.apache.gravitino.iceberg.common.cache.MetadataCache` interface.
+Gravitino provides the build-in `org.apache.gravitino.iceberg.common.cache.LocalTableMetadataCache` to store the cached data in the memory. You could also implement your custom table metadata cache by implementing the `org.apache.gravitino.iceberg.common.cache.TableMetadataCache` interface.
 
 ### Catalog operations
 

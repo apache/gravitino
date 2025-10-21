@@ -31,7 +31,7 @@ import org.apache.iceberg.ClientPool;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.thrift.TException;
 
-public class HiveCatalogWithMetadataLocation extends ClosableHiveCatalog
+public class HiveCatalogWithMetadataLocationSupport extends ClosableHiveCatalog
     implements SupportsMetadataLocation {
   private ClientPool<IMetaStoreClient, TException> metaClients;
 

@@ -29,9 +29,9 @@ import org.slf4j.LoggerFactory;
  * Abstract base class implementing {@link TableMetadataCache} that provides core metadata caching
  * functionality with validation of metadata location against the latest version.
  */
-public abstract class BaseMetadataCache implements TableMetadataCache {
+public abstract class BaseTableMetadataCache implements TableMetadataCache {
 
-  public static final Logger LOG = LoggerFactory.getLogger(BaseMetadataCache.class);
+  public static final Logger LOG = LoggerFactory.getLogger(BaseTableMetadataCache.class);
   /** Component to retrieve the latest metadata location for a table, used for validation. */
   private SupportsMetadataLocation supportsMetadataLocation;
 

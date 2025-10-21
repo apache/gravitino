@@ -345,7 +345,8 @@ public class IcebergCatalogWrapper implements AutoCloseable {
 
     Preconditions.checkArgument(
         catalog instanceof SupportsMetadataLocation,
-        "You shouldn't enable Iceberg metadata cache for the catalog %s, because the catalog impl does not support get metadata location.",
+        "You shouldn't enable Iceberg metadata cache for the catalog %s,"
+            + " because the catalog impl does not support get metadata location.",
         catalog.name());
 
     TableMetadataCache cache =

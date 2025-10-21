@@ -17,25 +17,20 @@
  *  under the License.
  */
 
-package org.apache.iceberg.jdbc;
+package org.apache.iceberg.memory;
 
 import com.google.common.base.Preconditions;
 import java.util.Map;
+import java.util.concurrent.ConcurrentMap;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.iceberg.common.cache.SupportsMetadataLocation;
 import org.apache.iceberg.catalog.TableIdentifier;
-import org.apache.iceberg.jdbc.JdbcUtil.SchemaVersion;
+import org.apache.iceberg.inmemory.InMemoryCatalog;
 
-// Use Iceberg package to reuse JdbcUtil related classes.
-public class JdbcCatalogWithMetadataLocation extends JdbcCatalog
+public class MemoryCatalogWithMetadataLocationSupport extends InMemoryCatalog
     implements SupportsMetadataLocation {
-  private String jdbcCatalogName;
-  private JdbcClientPool jdbcConnections;
-  private SchemaVersion jdbcSchemaVersion;
 
-  public JdbcCatalogWithMetadataLocation(boolean initializeCatalogTables) {
-    super(null, null, initializeCatalogTables);
-  }
+  private ConcurrentMap<TableIdentifier, String> tableStore;
 
   @Override
   public void initialize(String name, Map<String, String> properties) {
@@ -45,30 +40,15 @@ public class JdbcCatalogWithMetadataLocation extends JdbcCatalog
 
   @Override
   public String metadataLocation(TableIdentifier tableIdentifier) {
-    Map<String, String> table;
-
-    try {
-      table =
-          JdbcUtil.loadTable(jdbcSchemaVersion, jdbcConnections, jdbcCatalogName, tableIdentifier);
-    } catch (Exception e) {
-      return null;
-    }
-
-    return table.get(METADATA_LOCATION_PROP);
+    return tableStore.get(tableIdentifier);
   }
 
   private void loadFields() {
     try {
-      this.jdbcCatalogName = (String) FieldUtils.readField(this, "catalogName", true);
-      Preconditions.checkState(
-          jdbcCatalogName != null, "Failed to get catalogName field from JDBC catalog");
-      this.jdbcConnections = (JdbcClientPool) FieldUtils.readField(this, "connections", true);
-      Preconditions.checkState(
-          jdbcConnections != null, "Failed to get connections field from JDBC catalog");
-      this.jdbcSchemaVersion =
-          (JdbcUtil.SchemaVersion) FieldUtils.readField(this, "schemaVersion", true);
-      Preconditions.checkState(
-          jdbcSchemaVersion != null, "Failed to get schemaVersion field from JDBC catalog");
+      this.tableStore =
+          (ConcurrentMap<TableIdentifier, String>) FieldUtils.readField(this, "tables", true);
+      Preconditions.checkArgument(
+          tableStore != null, "Failed to get tables field from memory catalog");
     } catch (IllegalAccessException e) {
       throw new RuntimeException(e);
     }

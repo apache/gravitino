@@ -31,8 +31,8 @@ import org.apache.iceberg.catalog.TableIdentifier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class LocalMetadataCache extends BaseMetadataCache {
-  public static final Logger LOG = LoggerFactory.getLogger(LocalMetadataCache.class);
+public class LocalTableMetadataCache extends BaseTableMetadataCache {
+  public static final Logger LOG = LoggerFactory.getLogger(LocalTableMetadataCache.class);
   private Cache<TableIdentifier, TableMetadata> tableMetadataCache;
 
   @Override
@@ -46,6 +46,8 @@ public class LocalMetadataCache extends BaseMetadataCache {
         Caffeine.newBuilder()
             .maximumSize(capacity)
             .expireAfterAccess(expireMinutes, TimeUnit.MINUTES)
+            // control the cache size not exceed the cache capacity
+            .executor(Runnable::run)
             .build();
   }
 
@@ -62,8 +64,6 @@ public class LocalMetadataCache extends BaseMetadataCache {
         tableIdentifier,
         tableMetadata.metadataFileLocation());
     tableMetadataCache.put(tableIdentifier, tableMetadata);
-    // Clean up expired entries
-    tableMetadataCache.cleanUp();
   }
 
   @Override
