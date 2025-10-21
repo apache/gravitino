@@ -152,26 +152,22 @@ public class TestCacheConfig {
           List.of(fileset));
     }
 
-    // Force cache cleanup to trigger eviction synchronously
-    cache.cleanUp();
+    Thread.sleep(1000);
 
-    // There should be no tag entities in the cache, because the weight of each tag entity is 100,
-    // which means they are more likely to be evicted than filesets (weight 200) when the cache
-    // reaches its weight limit of 2000.
+    // There should no tag entities in the cache, because the weight of each tag entity is 100 that
+    // is higher than the maximum weight of the fileset entity which is 200.
     Awaitility.await()
         .atMost(Duration.ofSeconds(5))
         .pollInterval(Duration.ofMillis(10))
         .until(
-            () -> {
-              cache.cleanUp(); // Ensure eviction happens during polling
-              return IntStream.of(0, 1, 2, 3)
-                  .mapToObj(i -> NameIdentifierUtil.ofTag("metalake", "tag" + i))
-                  .allMatch(
-                      tagNameIdent ->
-                          cache.getIfPresent(
-                                  EntityCacheRelationKey.of(tagNameIdent, Entity.EntityType.TAG))
-                              == null);
-            });
+            () ->
+                IntStream.of(0, 1, 2, 3)
+                    .mapToObj(i -> NameIdentifierUtil.ofTag("metalake", "tag" + i))
+                    .allMatch(
+                        tagNameIdent ->
+                            cache.getIfPresent(
+                                    EntityCacheRelationKey.of(tagNameIdent, Entity.EntityType.TAG))
+                                == null));
   }
 
   @Test
@@ -244,18 +240,11 @@ public class TestCacheConfig {
                   NameIdentifier.of("metalake1.catalog" + i), Entity.EntityType.CATALOG)));
     }
 
-    // Force cache cleanup to trigger eviction
-    cache.cleanUp();
-
     // Only some of the 100 schemas are still in the cache, to be exact, 5000 / 500 = 10 schemas.
     Awaitility.await()
         .atMost(Duration.ofSeconds(5))
         .pollInterval(Duration.ofMillis(10))
-        .until(
-            () -> {
-              cache.cleanUp(); // Ensure eviction happens during polling
-              return cache.asMap().size() == 10 + 3 + 5000 / 500;
-            });
+        .until(() -> cache.asMap().size() == 10 + 3 + 5000 / 500);
   }
 
   @Test
