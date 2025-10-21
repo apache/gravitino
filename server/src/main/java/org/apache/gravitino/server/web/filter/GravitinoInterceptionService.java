@@ -26,6 +26,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import javax.ws.rs.PathParam;
@@ -36,10 +37,14 @@ import org.aopalliance.intercept.MethodInvocation;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.MetadataObject;
+import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.authorization.AuthorizationRequestContext;
+import org.apache.gravitino.server.authorization.MetadataFilterHelper;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationExpression;
+import org.apache.gravitino.server.authorization.annotations.AuthorizationFullName;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationMetadata;
+import org.apache.gravitino.server.authorization.annotations.AuthorizationObjectType;
 import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionEvaluator;
 import org.apache.gravitino.server.web.Utils;
 import org.apache.gravitino.server.web.rest.CatalogOperations;
@@ -51,9 +56,11 @@ import org.apache.gravitino.server.web.rest.OwnerOperations;
 import org.apache.gravitino.server.web.rest.PermissionOperations;
 import org.apache.gravitino.server.web.rest.RoleOperations;
 import org.apache.gravitino.server.web.rest.SchemaOperations;
+import org.apache.gravitino.server.web.rest.StatisticOperations;
 import org.apache.gravitino.server.web.rest.TableOperations;
 import org.apache.gravitino.server.web.rest.TopicOperations;
 import org.apache.gravitino.server.web.rest.UserOperations;
+import org.apache.gravitino.utils.MetadataObjectUtil;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.PrincipalUtils;
 import org.glassfish.hk2.api.Descriptor;
@@ -84,7 +91,8 @@ public class GravitinoInterceptionService implements InterceptionService {
             GroupOperations.class.getName(),
             PermissionOperations.class.getName(),
             RoleOperations.class.getName(),
-            OwnerOperations.class.getName()));
+            OwnerOperations.class.getName(),
+            StatisticOperations.class.getName()));
   }
 
   @Override
@@ -192,6 +200,7 @@ public class GravitinoInterceptionService implements InterceptionService {
         Parameter[] parameters, Object[] args) {
       Map<Entity.EntityType, String> entities = new HashMap<>();
       Map<Entity.EntityType, NameIdentifier> nameIdentifierMap = new HashMap<>();
+      // Extract AuthorizationMetadata
       for (int i = 0; i < parameters.length; i++) {
         Parameter parameter = parameters[i];
         AuthorizationMetadata authorizeResource =
@@ -202,12 +211,31 @@ public class GravitinoInterceptionService implements InterceptionService {
         Entity.EntityType type = authorizeResource.type();
         entities.put(type, String.valueOf(args[i]));
       }
+
       String metalake = entities.get(Entity.EntityType.METALAKE);
       String catalog = entities.get(Entity.EntityType.CATALOG);
       String schema = entities.get(Entity.EntityType.SCHEMA);
       String table = entities.get(Entity.EntityType.TABLE);
       String topic = entities.get(Entity.EntityType.TOPIC);
       String fileset = entities.get(Entity.EntityType.FILESET);
+
+      // Extract full name and types
+      String fullName = null;
+      String metadataObjectType = null;
+      for (int i = 0; i < parameters.length; i++) {
+        Parameter parameter = parameters[i];
+        AuthorizationFullName authorizeFullName =
+            parameter.getAnnotation(AuthorizationFullName.class);
+        if (authorizeFullName != null) {
+          fullName = String.valueOf(args[i]);
+        }
+
+        AuthorizationObjectType objectType = parameter.getAnnotation(AuthorizationObjectType.class);
+        if (objectType != null) {
+          metadataObjectType = String.valueOf(args[i]);
+        }
+      }
+
       entities.forEach(
           (type, metadata) -> {
             switch (type) {
@@ -264,6 +292,18 @@ public class GravitinoInterceptionService implements InterceptionService {
                 break;
             }
           });
+
+      // Extract fullName and metadataObjectType
+      if (fullName != null && metadataObjectType != null && metalake != null) {
+        MetadataObject.Type type =
+            MetadataObject.Type.valueOf(metadataObjectType.toUpperCase(Locale.ROOT));
+        NameIdentifier nameIdentifier =
+            MetadataObjectUtil.toEntityIdent(metalake, MetadataObjects.parse(fullName, type));
+        nameIdentifierMap.putAll(
+            MetadataFilterHelper.spiltMetadataNames(
+                metalake, MetadataObjectUtil.toEntityType(type), nameIdentifier));
+      }
+
       return nameIdentifierMap;
     }
 
