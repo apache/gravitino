@@ -52,6 +52,7 @@ import java.lang.reflect.Field;
 import java.net.SocketTimeoutException;
 import java.net.URISyntaxException;
 import java.nio.charset.StandardCharsets;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
@@ -64,8 +65,10 @@ import org.apache.commons.lang3.tuple.Pair;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Version;
 import org.apache.gravitino.dto.AuditDTO;
+import org.apache.gravitino.dto.CatalogDTO;
 import org.apache.gravitino.dto.credential.CredentialDTO;
 import org.apache.gravitino.dto.file.FilesetDTO;
+import org.apache.gravitino.dto.responses.CatalogResponse;
 import org.apache.gravitino.dto.responses.CredentialResponse;
 import org.apache.gravitino.dto.responses.ErrorResponse;
 import org.apache.gravitino.dto.responses.FileLocationResponse;
@@ -1037,6 +1040,127 @@ public class TestGvfsBase extends GravitinoMockServerBase {
             });
     Assertions.assertInstanceOf(SocketTimeoutException.class, throwable.getCause());
     Assertions.assertEquals("Read timed out", throwable.getCause().getMessage());
+  }
+
+  @Test
+  public void testAutoCreateLocation() throws IOException, JsonProcessingException {
+    Assumptions.assumeTrue(getClass() == TestGvfsBase.class);
+    String catalogNameWithFsOpsDisabled = "catalog_fs_ops_disabled";
+    String schemaNameLocal = "schema_auto_create";
+    String filesetName = "fileset_auto_create";
+
+    // Mock a catalog with disable-filesystem-ops=true
+    CatalogDTO catalogWithFsOpsDisabled =
+        CatalogDTO.builder()
+            .withName(catalogNameWithFsOpsDisabled)
+            .withType(CatalogDTO.Type.FILESET)
+            .withProvider(provider)
+            .withComment("test catalog")
+            .withProperties(ImmutableMap.of("disable-filesystem-ops", "true"))
+            .withAudit(
+                AuditDTO.builder().withCreator("creator").withCreateTime(Instant.now()).build())
+            .build();
+    CatalogResponse catalogResponse = new CatalogResponse(catalogWithFsOpsDisabled);
+    buildMockResource(
+        Method.GET,
+        "/api/metalakes/" + metalakeName + "/catalogs/" + catalogNameWithFsOpsDisabled,
+        null,
+        catalogResponse,
+        SC_OK);
+
+    Path managedFilesetPath =
+        FileSystemTestUtils.createFilesetPath(
+            catalogNameWithFsOpsDisabled, schemaNameLocal, filesetName, true);
+    Path localPath =
+        FileSystemTestUtils.createLocalDirPrefix(
+            catalogNameWithFsOpsDisabled, schemaNameLocal, filesetName);
+    String locationPath =
+        String.format(
+            "/api/metalakes/%s/catalogs/%s/schemas/%s/filesets/%s/location",
+            metalakeName, catalogNameWithFsOpsDisabled, schemaNameLocal, filesetName);
+
+    // Mock the fileset
+    mockFilesetDTO(
+        metalakeName,
+        catalogNameWithFsOpsDisabled,
+        schemaNameLocal,
+        filesetName,
+        Fileset.Type.MANAGED,
+        ImmutableMap.of("location1", localPath.toString()),
+        ImmutableMap.of(PROPERTY_DEFAULT_LOCATION_NAME, "location1"));
+
+    // Test with autoCreateLocation = false
+    Configuration configWithoutAutoCreate = new Configuration(conf);
+    configWithoutAutoCreate.setBoolean(
+        GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_AUTO_CREATE_LOCATION, false);
+
+    try (FileSystem gravitinoFileSystem =
+            managedFilesetPath.getFileSystem(configWithoutAutoCreate);
+        FileSystem localFileSystem = localPath.getFileSystem(conf)) {
+
+      // Setup mock responses
+      FileLocationResponse fileLocationResponse = new FileLocationResponse(localPath.toString());
+      Map<String, String> queryParams = new HashMap<>();
+      queryParams.put("sub_path", "");
+      buildMockResource(Method.GET, locationPath, queryParams, null, fileLocationResponse, SC_OK);
+      buildMockResourceForCredential(filesetName, localPath.toString());
+
+      // Delete local path if it exists
+      if (localFileSystem.exists(localPath)) {
+        localFileSystem.delete(localPath, true);
+      }
+
+      // Verify location does not exist
+      assertFalse(localFileSystem.exists(localPath));
+
+      // Try to list the fileset - this triggers the auto-creation check
+      // When autoCreateLocation=false and directory doesn't exist, it should throw
+      // FileNotFoundException
+      assertThrows(
+          FileNotFoundException.class,
+          () -> gravitinoFileSystem.listStatus(managedFilesetPath),
+          "Should throw FileNotFoundException when location doesn't exist and autoCreateLocation=false");
+
+      // Verify location was NOT auto-created when autoCreateLocation=false
+      assertFalse(
+          localFileSystem.exists(localPath),
+          "Location should NOT be auto-created when autoCreateLocation=false");
+    }
+
+    // Test with autoCreateLocation = true (default)
+    Configuration configWithAutoCreate = new Configuration(conf);
+    // Don't set the config, use default which is true
+
+    try (FileSystem gravitinoFileSystem = managedFilesetPath.getFileSystem(configWithAutoCreate);
+        FileSystem localFileSystem = localPath.getFileSystem(conf)) {
+
+      // Setup mock responses (need to rebuild since we created a new filesystem)
+      FileLocationResponse fileLocationResponse = new FileLocationResponse(localPath.toString());
+      Map<String, String> queryParams = new HashMap<>();
+      queryParams.put("sub_path", "");
+      buildMockResource(Method.GET, locationPath, queryParams, null, fileLocationResponse, SC_OK);
+      buildMockResourceForCredential(filesetName, localPath.toString());
+
+      // Delete local path if it exists
+      if (localFileSystem.exists(localPath)) {
+        localFileSystem.delete(localPath, true);
+      }
+
+      // Verify location does not exist initially
+      assertFalse(localFileSystem.exists(localPath));
+
+      // Try to list the fileset - with autoCreateLocation=true (default), it should create the
+      // location
+      gravitinoFileSystem.listStatus(managedFilesetPath);
+
+      // Verify location WAS auto-created when autoCreateLocation=true (default)
+      assertTrue(
+          localFileSystem.exists(localPath),
+          "Location SHOULD be auto-created when autoCreateLocation=true");
+
+      // Clean up
+      localFileSystem.delete(localPath, true);
+    }
   }
 
   @Test

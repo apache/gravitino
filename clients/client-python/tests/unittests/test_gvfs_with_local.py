@@ -1386,3 +1386,46 @@ class TestLocalFilesystem(unittest.TestCase):
                     self.assertEqual(status["name"], file_virtual_path)
                 else:
                     raise GravitinoRuntimeException("Unexpected file found")
+
+    def test_auto_create_location_config(self, *mock_methods):
+        """Test that auto_create_location configuration is correctly set"""
+        # Test with auto_create_location = False
+        options_disabled = {
+            GVFSConfig.GVFS_FILESYSTEM_AUTO_CREATE_LOCATION: False,
+        }
+        fs_disabled = gvfs.GravitinoVirtualFileSystem(
+            server_uri=self._server_uri,
+            metalake_name=self._metalake_name,
+            options=options_disabled,
+            skip_instance_cache=True,
+        )
+        self.assertFalse(
+            fs_disabled._operations._auto_create_location,
+            "auto_create_location should be False when explicitly disabled",
+        )
+
+        # Test with auto_create_location = True
+        options_enabled = {
+            GVFSConfig.GVFS_FILESYSTEM_AUTO_CREATE_LOCATION: True,
+        }
+        fs_enabled = gvfs.GravitinoVirtualFileSystem(
+            server_uri=self._server_uri,
+            metalake_name=self._metalake_name,
+            options=options_enabled,
+            skip_instance_cache=True,
+        )
+        self.assertTrue(
+            fs_enabled._operations._auto_create_location,
+            "auto_create_location should be True when explicitly enabled",
+        )
+
+        # Test default behavior (should be True)
+        fs_default = gvfs.GravitinoVirtualFileSystem(
+            server_uri=self._server_uri,
+            metalake_name=self._metalake_name,
+            skip_instance_cache=True,
+        )
+        self.assertTrue(
+            fs_default._operations._auto_create_location,
+            "auto_create_location should default to True",
+        )
