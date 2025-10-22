@@ -29,7 +29,7 @@ public class TableVersionBaseSQLProvider {
   public String insertTableVersion(@Param("tablePO") TablePO tablePO) {
     return "INSERT INTO "
         + TABLE_NAME
-        + " (table_id, format, properties, partitions"
+        + " (table_id, format, properties, partitioning"
         + " distribution, sort_orders, indexes, comment,"
         + " version, last_version, deleted_at)"
         + " VALUES ("
@@ -50,7 +50,7 @@ public class TableVersionBaseSQLProvider {
   public String insertTableVersionOnDuplicateKeyUpdate(@Param("tablePO") TablePO tablePO) {
     return "INSERT INTO "
         + TABLE_NAME
-        + " (table_id, format, properties, partitions,"
+        + " (table_id, format, properties, partitioning,"
         + " distribution, sort_orders, indexes, comment,"
         + " version, deleted_at)"
         + " VALUES ("
@@ -68,7 +68,7 @@ public class TableVersionBaseSQLProvider {
         + " ON DUPLICATE KEY UPDATE"
         + " format = #{tablePO.format},"
         + " properties = #{tablePO.properties},"
-        + " partitions = #{tablePO.partitions},"
+        + " partitioning = #{tablePO.partitions},"
         + " distribution = #{tablePO.distribution},"
         + " sort_orders = #{tablePO.sortOrders},"
         + " indexes = #{tablePO.indexes},"

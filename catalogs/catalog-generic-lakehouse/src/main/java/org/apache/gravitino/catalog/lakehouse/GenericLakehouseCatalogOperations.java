@@ -18,12 +18,17 @@
  */
 package org.apache.gravitino.catalog.lakehouse;
 
+import static org.apache.gravitino.Entity.EntityType.TABLE;
+
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.Maps;
+import java.io.IOException;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Catalog;
+import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
@@ -37,11 +42,14 @@ import org.apache.gravitino.connector.CatalogOperations;
 import org.apache.gravitino.connector.HasPropertyMetadata;
 import org.apache.gravitino.connector.SupportsSchemas;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
+import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.exceptions.NonEmptySchemaException;
 import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
 import org.apache.gravitino.exceptions.TableAlreadyExistsException;
+import org.apache.gravitino.meta.GenericTableEntity;
+import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.TableCatalog;
@@ -148,7 +156,25 @@ public class GenericLakehouseCatalogOperations
 
   @Override
   public NameIdentifier[] listTables(Namespace namespace) throws NoSuchSchemaException {
-    throw new UnsupportedOperationException("Not implemented yet.");
+    EntityStore store = GravitinoEnv.getInstance().entityStore();
+    NameIdentifier identifier = NameIdentifier.of(namespace.levels());
+    try {
+      store.get(identifier, Entity.EntityType.SCHEMA, SchemaEntity.class);
+    } catch (NoSuchTableException e) {
+      throw new NoSuchEntityException(e, "Schema %s does not exist", namespace);
+    } catch (IOException ioe) {
+      throw new RuntimeException("Failed to get schema " + identifier);
+    }
+
+    try {
+      List<GenericTableEntity> tableEntityList =
+          store.list(namespace, GenericTableEntity.class, TABLE);
+      return tableEntityList.stream()
+          .map(e -> NameIdentifier.of(namespace, e.name()))
+          .toArray(NameIdentifier[]::new);
+    } catch (IOException e) {
+      throw new RuntimeException("Failed to list tables under schema " + namespace, e);
+    }
   }
 
   @Override
