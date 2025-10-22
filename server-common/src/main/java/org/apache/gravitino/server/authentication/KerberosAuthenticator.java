@@ -19,6 +19,8 @@ import java.security.PrivilegedActionException;
 import java.security.PrivilegedExceptionAction;
 import java.util.Base64;
 import java.util.List;
+import java.net.InetAddress;
+import java.net.UnknownHostException;
 import javax.security.auth.Subject;
 import javax.security.auth.kerberos.KerberosPrincipal;
 import javax.security.auth.kerberos.KeyTab;
@@ -54,7 +56,7 @@ public class KerberosAuthenticator implements Authenticator {
   @Override
   public void initialize(Config config) throws RuntimeException {
     try {
-      String principal = config.get(KerberosConfig.PRINCIPAL);
+      String principal = replaceHostPlaceholder(config.get(KerberosConfig.PRINCIPAL));
       if (!principal.startsWith("HTTP/")) {
         throw new IllegalArgumentException("Principal must starts with `HTTP/`");
       }
@@ -131,6 +133,21 @@ public class KerberosAuthenticator implements Authenticator {
       LOG.warn("Fail to validate the token, exception: ", e);
       throw new UnauthorizedException("Fail to validate the token", AuthConstants.NEGOTIATE);
     }
+  }
+
+  private String replaceHostPlaceholder(String principal) {
+    if (principal.contains("_HOST")) {
+      try {
+        String hostname = InetAddress.getLocalHost().getCanonicalHostName();
+        String resolvedPrincipal = principal.replace("_HOST", hostname);
+        LOG.info("Replaced _HOST with {} in principal", hostname);
+        return resolvedPrincipal;
+      } catch (UnknownHostException  e) {
+        LOG.error("Failed to resolve hostname for _HOST replacement", e);
+        return principal;
+      }
+    }
+    return principal;
   }
 
   @Override
