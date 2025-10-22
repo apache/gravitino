@@ -352,10 +352,19 @@ class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
         """
         try:
             new_path = self._hook.pre_mkdir(path, create_parents, **kwargs)
-            decorated_mkdir = self._with_exception_translation(
-                FilesetDataOperation.MKDIRS
-            )(self._operations.mkdir)
-            decorated_mkdir(new_path, create_parents, **kwargs)
+            try:
+                self._operations.mkdir(new_path, create_parents, **kwargs)
+            except (
+                NoSuchCatalogException,
+                CatalogNotInUseException,
+                NoSuchFilesetException,
+                NoSuchLocationNameException,
+            ) as e:
+                raise OSError(
+                    f"Fileset is not found for path: {new_path} for operation MKDIRS. This "
+                    f"may be caused by fileset related metadata not found or not in use "
+                    f"in Gravitino,"
+                ) from e
             self._hook.post_mkdir(new_path, create_parents, **kwargs)
         except Exception as e:  # pylint: disable=broad-exception-caught
             self._hook.on_mkdir_failure(path, create_parents, e, **kwargs)
@@ -367,10 +376,19 @@ class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
         """
         try:
             new_path = self._hook.pre_makedirs(path, exist_ok)
-            decorated_makedirs = self._with_exception_translation(
-                FilesetDataOperation.MKDIRS
-            )(self._operations.makedirs)
-            decorated_makedirs(new_path, exist_ok)
+            try:
+                self._operations.makedirs(new_path, exist_ok)
+            except (
+                NoSuchCatalogException,
+                CatalogNotInUseException,
+                NoSuchFilesetException,
+                NoSuchLocationNameException,
+            ) as e:
+                raise OSError(
+                    f"Fileset is not found for path: {new_path} for operation MKDIRS. This "
+                    f"may be caused by fileset related metadata not found or not in use "
+                    f"in Gravitino,"
+                ) from e
             self._hook.post_makedirs(new_path, exist_ok)
         except Exception as e:  # pylint: disable=broad-exception-caught
             self._hook.on_makedirs_failure(path, exist_ok, e)
