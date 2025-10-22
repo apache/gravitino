@@ -772,7 +772,7 @@ CREATE TABLE IF NOT EXISTS table_version_info (
     table_id        BIGINT PRIMARY KEY,
     format          VARCHAR(64) NOT NULL,
     properties      TEXT,
-    partitions  TEXT,
+    partitioning  TEXT,
     distribution TEXT,
     sort_orders TEXT,
     indexes      TEXT,
@@ -785,7 +785,7 @@ COMMENT ON TABLE table_version_info                  IS 'table detail informatio
 COMMENT ON COLUMN table_version_info.table_id        IS 'table id';
 COMMENT ON COLUMN table_version_info.format          IS 'table format, such as Lance, Iceberg and so on';
 COMMENT ON COLUMN table_version_info.properties      IS 'table properties';
-COMMENT ON COLUMN table_version_info.partitions      IS 'table partition info';
+COMMENT ON COLUMN table_version_info.partitioning      IS 'table partition info';
 COMMENT on COLUMN table_version_info.distribution    IS 'table distribution info';
 COMMENT ON COLUMN table_version_info.sort_orders     IS 'table sort order info';
 COMMENT ON COLUMN table_version_info.indexes         IS 'table index info';
