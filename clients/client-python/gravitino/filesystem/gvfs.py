@@ -355,14 +355,7 @@ class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
             decorated_mkdir = self._with_exception_translation(
                 FilesetDataOperation.MKDIRS
             )(self._operations.mkdir)
-            try:
-                decorated_mkdir(new_path, create_parents, **kwargs)
-            except FileNotFoundError as e:
-                raise OSError(
-                    f"Fileset is not found for path: {new_path} for operation MKDIRS. This "
-                    f"may be caused by fileset related metadata not found or not in use "
-                    f"in Gravitino,"
-                ) from e
+            decorated_mkdir(new_path, create_parents, **kwargs)
             self._hook.post_mkdir(new_path, create_parents, **kwargs)
         except Exception as e:  # pylint: disable=broad-exception-caught
             self._hook.on_mkdir_failure(path, create_parents, e, **kwargs)
@@ -377,14 +370,7 @@ class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
             decorated_makedirs = self._with_exception_translation(
                 FilesetDataOperation.MKDIRS
             )(self._operations.makedirs)
-            try:
-                decorated_makedirs(new_path, exist_ok)
-            except FileNotFoundError as e:
-                raise OSError(
-                    f"Fileset is not found for path: {new_path} for operation MKDIRS. This "
-                    f"may be caused by fileset related metadata not found or not in use "
-                    f"in Gravitino,"
-                ) from e
+            decorated_makedirs(new_path, exist_ok)
             self._hook.post_makedirs(new_path, exist_ok)
         except Exception as e:  # pylint: disable=broad-exception-caught
             self._hook.on_makedirs_failure(path, exist_ok, e)
