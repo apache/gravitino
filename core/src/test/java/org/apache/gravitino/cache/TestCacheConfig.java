@@ -163,7 +163,24 @@ public class TestCacheConfig {
 
     cache.cleanUp(); // Force synchronous eviction
 
-    // Count how many tags are still in cache - expect some to be evicted
+    // Count how many filesets are still in cache
+    // Note: We cannot keep all 10 filesets because base entities (800) + 10 filesets (2000)
+    // = 2800 exceeds max weight (2000). However, filesets should be prioritized over tags
+    // due to higher access frequency.
+    long remainingFilesets =
+        IntStream.range(5, 15)
+            .mapToObj(i -> "fileset" + i)
+            .filter(
+                filesetName ->
+                    cache.getIfPresent(
+                            EntityCacheRelationKey.of(
+                                NameIdentifier.of(
+                                    new String[] {"metalake1", "catalog1", "schema1", filesetName}),
+                                Entity.EntityType.FILESET))
+                        != null)
+            .count();
+
+    // Count how many tags are still in cache
     long remainingTags =
         IntStream.range(0, 10)
             .mapToObj(i -> NameIdentifierUtil.ofTag("metalake", "tag" + i))
@@ -174,9 +191,18 @@ public class TestCacheConfig {
                         != null)
             .count();
 
+    // Verify the weigher-based eviction behavior:
+    // 1. Some entities were evicted (can't fit everything in 2000 weight limit)
+    // 2. Filesets (freq=2) are strongly prioritized over tags (freq=1)
     Assertions.assertTrue(
-        remainingTags < 10,
-        "Expected some tags to be evicted, but found " + remainingTags + " tags still in cache");
+        remainingFilesets + remainingTags < 20,
+        "Expected some entities to be evicted due to weight limit");
+
+    Assertions.assertTrue(
+        remainingFilesets > remainingTags,
+        String.format(
+            "Expected filesets (freq=2) to be prioritized over tags (freq=1). Found filesets=%d, tags=%d",
+            remainingFilesets, remainingTags));
   }
 
   @Test
