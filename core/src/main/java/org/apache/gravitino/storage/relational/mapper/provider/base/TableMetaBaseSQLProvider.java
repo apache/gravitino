@@ -21,6 +21,7 @@ package org.apache.gravitino.storage.relational.mapper.provider.base;
 import static org.apache.gravitino.storage.relational.mapper.TableMetaMapper.TABLE_NAME;
 
 import java.util.List;
+import org.apache.gravitino.storage.relational.mapper.TableVersionMapper;
 import org.apache.gravitino.storage.relational.po.TablePO;
 import org.apache.ibatis.annotations.Param;
 
@@ -65,14 +66,22 @@ public class TableMetaBaseSQLProvider {
 
   public String selectTableMetaBySchemaIdAndName(
       @Param("schemaId") Long schemaId, @Param("tableName") String name) {
-    return "SELECT table_id as tableId, table_name as tableName,"
-        + " metalake_id as metalakeId, catalog_id as catalogId,"
-        + " schema_id as schemaId, audit_info as auditInfo,"
-        + " current_version as currentVersion, last_version as lastVersion,"
-        + " deleted_at as deletedAt"
+    return "SELECT tm.table_id as tableId, tm.table_name as tableName,"
+        + " tm.metalake_id as metalakeId, tm.catalog_id as catalogId,"
+        + " tm.schema_id as schemaId, tm.audit_info as auditInfo,"
+        + " tm.current_version as currentVersion, tm.last_version as lastVersion,"
+        + " tm.deleted_at as deletedAt,"
+        + " tv.format as format, "
+        + " tv.properties as properties,"
+        + " tv.partitions as partitions, tv.sort_orders as sortOrders,"
+        + " tv.distribution as distribution, tv.indexes as indexes,"
+        + " tv.comment as comment"
         + " FROM "
         + TABLE_NAME
-        + " WHERE schema_id = #{schemaId} AND table_name = #{tableName} AND deleted_at = 0";
+        + " tm LEFT JOIN "
+        + TableVersionMapper.TABLE_NAME
+        + " tv ON tm.table_id = tv.table_id AND tm.current_version = tv.version AND tv.deleted_at = 0"
+        + " WHERE tm.schema_id = #{schemaId} AND tm.table_name = #{tableName} AND tm.deleted_at = 0";
   }
 
   public String selectTableMetaById(@Param("tableId") Long tableId) {

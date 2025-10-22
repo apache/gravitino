@@ -19,6 +19,7 @@
 package org.apache.gravitino.catalog.lakehouse;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.collect.Maps;
 import java.util.Map;
 import java.util.Optional;
 import org.apache.commons.lang3.StringUtils;
@@ -30,6 +31,7 @@ import org.apache.gravitino.Namespace;
 import org.apache.gravitino.Schema;
 import org.apache.gravitino.SchemaChange;
 import org.apache.gravitino.catalog.ManagedSchemaOperations;
+import org.apache.gravitino.catalog.lakehouse.lance.LanceCatalogOperations;
 import org.apache.gravitino.connector.CatalogInfo;
 import org.apache.gravitino.connector.CatalogOperations;
 import org.apache.gravitino.connector.HasPropertyMetadata;
@@ -61,6 +63,11 @@ public class GenericLakehouseCatalogOperations
   @SuppressWarnings("unused") // todo: remove this after implementing table operations
   private Optional<Path> catalogLakehouseDir;
 
+  private static final Map<String, LakehouseCatalogOperations> SUPPORTED_FORMATS =
+      Maps.newHashMap();
+
+  private CatalogInfo catalogInfo;
+  private HasPropertyMetadata propertiesMetadata;
   /**
    * Initializes the generic lakehouse catalog operations with the provided configuration.
    *
@@ -160,7 +167,18 @@ public class GenericLakehouseCatalogOperations
       SortOrder[] sortOrders,
       Index[] indexes)
       throws NoSuchSchemaException, TableAlreadyExistsException {
-    throw new UnsupportedOperationException("Not implemented yet.");
+    String format = properties.getOrDefault("format", "lance");
+    LakehouseCatalogOperations lakehouseCatalogOperations =
+        SUPPORTED_FORMATS.compute(
+            format,
+            (k, v) ->
+                v == null
+                    ? createLakehouseCatalogOperations(
+                        format, properties, catalogInfo, propertiesMetadata)
+                    : v);
+
+    return lakehouseCatalogOperations.createTable(
+        ident, columns, comment, properties, partitions, distribution, sortOrders, indexes);
   }
 
   @Override
@@ -176,5 +194,23 @@ public class GenericLakehouseCatalogOperations
 
   private String ensureTrailingSlash(String path) {
     return path.endsWith(SLASH) ? path : path + SLASH;
+  }
+
+  private LakehouseCatalogOperations createLakehouseCatalogOperations(
+      String format,
+      Map<String, String> properties,
+      CatalogInfo catalogInfo,
+      HasPropertyMetadata propertiesMetadata) {
+    LakehouseCatalogOperations operations;
+    switch (format.toLowerCase()) {
+      case "lance":
+        operations = new LanceCatalogOperations();
+        break;
+      default:
+        throw new UnsupportedOperationException("Unsupported lakehouse format: " + format);
+    }
+
+    operations.initialize(properties, catalogInfo, propertiesMetadata);
+    return operations;
   }
 }
