@@ -56,10 +56,6 @@ PROTOCOL_NAME = "gvfs"
 TIME_WITHOUT_EXPIRATION = sys.maxsize
 
 
-class FilesetPathNotFoundError(FileNotFoundError):
-    """Exception raised when the catalog, schema or fileset is not found in the GVFS path."""
-
-
 class BaseGVFSOperations(ABC):
     """
     Abstract base class for Gravitino Virtual File System operations.
