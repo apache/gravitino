@@ -32,6 +32,7 @@ import static org.apache.hc.core5.http.HttpStatus.SC_OK;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -1036,6 +1037,50 @@ public class TestGvfsBase extends GravitinoMockServerBase {
             });
     Assertions.assertInstanceOf(SocketTimeoutException.class, throwable.getCause());
     Assertions.assertEquals("Read timed out", throwable.getCause().getMessage());
+  }
+
+  @Test
+  public void testHookSetOperationsContext() throws IOException {
+    String filesetName = "testHookSetOperationsContext";
+    Path managedFilesetPath =
+        FileSystemTestUtils.createFilesetPath(catalogName, schemaName, filesetName, true);
+    Path localPath = FileSystemTestUtils.createLocalDirPrefix(catalogName, schemaName, filesetName);
+    String locationPath =
+        String.format(
+            "/api/metalakes/%s/catalogs/%s/schemas/%s/filesets/%s/location",
+            metalakeName, catalogName, schemaName, filesetName);
+
+    try (GravitinoVirtualFileSystem fs =
+        (GravitinoVirtualFileSystem) managedFilesetPath.getFileSystem(conf)) {
+
+      // Verify that setOperationsContext was called during GVFS initialization
+      MockGVFSHook hook = getHook(fs);
+      assertTrue(
+          hook.setOperationsContextCalled,
+          "setOperationsContext should be called during initialization");
+      assertNotNull(hook.operations, "Operations context should not be null");
+      assertEquals(
+          fs.getOperations(),
+          hook.operations,
+          "Hook should have reference to the same operations instance");
+
+      // Verify the hook can access operations methods
+      FileLocationResponse fileLocationResponse = new FileLocationResponse(localPath.toString());
+      Map<String, String> queryParams = new HashMap<>();
+      queryParams.put("sub_path", "");
+      buildMockResource(Method.GET, locationPath, queryParams, null, fileLocationResponse, SC_OK);
+      buildMockResourceForCredential(filesetName, localPath.toString());
+
+      try (FileSystem localFileSystem = localPath.getFileSystem(conf)) {
+        FileSystemTestUtils.mkdirs(localPath, localFileSystem);
+        FileSystemTestUtils.mkdirs(managedFilesetPath, fs);
+
+        // Verify hook's operations context is still valid after operations are performed
+        assertNotNull(hook.operations, "Operations context should remain available");
+        assertTrue(hook.preMkdirsCalled, "Hook should be invoked for operations");
+        assertTrue(hook.postMkdirsCalled, "Hook should be invoked for operations");
+      }
+    }
   }
 
   private void buildMockResourceForCredential(String filesetName, String filesetLocation)

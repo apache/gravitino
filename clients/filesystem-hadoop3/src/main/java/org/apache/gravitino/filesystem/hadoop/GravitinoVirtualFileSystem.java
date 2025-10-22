@@ -99,6 +99,8 @@ public class GravitinoVirtualFileSystem extends FileSystem {
           e, "Cannot create operations instance: %s", operationsClassName);
     }
 
+    hook.setOperationsContext(operations);
+
     this.workingDirectory = new Path(name);
     this.uri = URI.create(name.getScheme() + "://" + name.getAuthority());
 

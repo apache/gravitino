@@ -29,6 +29,8 @@ import org.apache.hadoop.fs.permission.FsPermission;
 
 public class MockGVFSHook implements GravitinoVirtualFileSystemHook {
 
+  boolean setOperationsContextCalled = false;
+  BaseGVFSOperations operations = null;
   boolean preSetWorkingDirectoryCalled = false;
   boolean preOpenCalled = false;
   boolean preCreateCalled = false;
@@ -51,6 +53,12 @@ public class MockGVFSHook implements GravitinoVirtualFileSystemHook {
   boolean postMkdirsCalled = false;
   boolean postGetDefaultReplicationCalled = false;
   boolean postGetDefaultBlockSizeCalled = false;
+
+  @Override
+  public void setOperationsContext(BaseGVFSOperations operations) {
+    this.setOperationsContextCalled = true;
+    this.operations = operations;
+  }
 
   @Override
   public void initialize(Map<String, String> config) {}

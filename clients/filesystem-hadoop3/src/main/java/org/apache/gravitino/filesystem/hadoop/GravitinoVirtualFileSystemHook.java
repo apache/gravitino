@@ -38,6 +38,16 @@ import org.apache.hadoop.fs.permission.FsPermission;
 public interface GravitinoVirtualFileSystemHook extends Closeable {
 
   /**
+   * Set the operations context for this hook. This method will be called during GVFS initialization
+   * to provide the hook with access to the BaseGVFSOperations instance.
+   *
+   * @param operations the BaseGVFSOperations instance
+   */
+  default void setOperationsContext(BaseGVFSOperations operations) {
+    // Default implementation does nothing - hooks can override if they need operations access
+  }
+
+  /**
    * Initialize the hook with the configuration. This method will be called in the GVFS initialize
    * method, and the configuration will be passed from the GVFS configuration. The implementor can
    * initialize the hook with the configuration. The exception will be thrown to the caller and fail
