@@ -118,34 +118,6 @@ public class TestIcebergTableOperationExecutor {
   }
 
   @Test
-  public void testCreateTablePreservesOwnerWhenUnauthenticated() {
-    String clientProvidedOwner = "spark";
-
-    Map<String, String> properties = new HashMap<>();
-    properties.put(IcebergConstants.OWNER, clientProvidedOwner);
-
-    CreateTableRequest originalRequest =
-        CreateTableRequest.builder()
-            .withName("test_table")
-            .withSchema(TABLE_SCHEMA)
-            .setProperties(properties)
-            .build();
-
-    when(mockContext.userName()).thenReturn(null);
-    LoadTableResponse mockResponse = mock(LoadTableResponse.class);
-    when(mockCatalogWrapper.createTable(any(), any(), anyBoolean())).thenReturn(mockResponse);
-
-    executor.createTable(mockContext, Namespace.of("test_namespace"), originalRequest);
-
-    ArgumentCaptor<CreateTableRequest> requestCaptor =
-        ArgumentCaptor.forClass(CreateTableRequest.class);
-    verify(mockCatalogWrapper).createTable(any(), requestCaptor.capture(), anyBoolean());
-
-    String actualOwner = requestCaptor.getValue().properties().get(IcebergConstants.OWNER);
-    Assertions.assertEquals(clientProvidedOwner, actualOwner);
-  }
-
-  @Test
   public void testCreateTablePreservesOwnerForAnonymousUser() {
     String clientProvidedOwner = "spark";
 

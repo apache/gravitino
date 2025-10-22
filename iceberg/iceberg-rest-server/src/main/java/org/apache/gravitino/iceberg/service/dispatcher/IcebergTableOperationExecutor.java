@@ -21,7 +21,6 @@ package org.apache.gravitino.iceberg.service.dispatcher;
 
 import java.util.HashMap;
 import java.util.Map;
-import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.auth.AuthConstants;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import org.apache.gravitino.iceberg.service.IcebergCatalogWrapperManager;
@@ -51,8 +50,7 @@ public class IcebergTableOperationExecutor implements IcebergTableOperationDispa
   public LoadTableResponse createTable(
       IcebergRequestContext context, Namespace namespace, CreateTableRequest createTableRequest) {
     String authenticatedUser = context.userName();
-    if (StringUtils.isNotBlank(authenticatedUser)
-        && !AuthConstants.ANONYMOUS_USER.equals(authenticatedUser)) {
+    if (!AuthConstants.ANONYMOUS_USER.equals(authenticatedUser)) {
       String existingOwner = createTableRequest.properties().get(IcebergConstants.OWNER);
 
       // Override the owner as the authenticated user if different from authenticated user
