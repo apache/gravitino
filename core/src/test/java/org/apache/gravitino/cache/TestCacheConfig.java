@@ -53,14 +53,14 @@ public class TestCacheConfig {
     Assertions.assertTrue(config.get(Configs.CACHE_WEIGHER_ENABLED));
     Assertions.assertEquals(10_000, config.get(Configs.CACHE_MAX_ENTRIES));
     Assertions.assertEquals(3_600_000L, config.get(Configs.CACHE_EXPIRATION_TIME));
-    Assertions.assertEquals(9_000_000L, EntityCacheWeigher.getMaxWeight());
+    Assertions.assertEquals(24_200_000L, EntityCacheWeigher.getMaxWeight());
     Assertions.assertEquals("caffeine", config.get(Configs.CACHE_IMPLEMENTATION));
   }
 
   @Test
   void testPolicyAndTagCacheWeigher() throws InterruptedException {
     Caffeine<Object, Object> builder = Caffeine.newBuilder();
-    builder.maximumWeight(2000);
+    builder.maximumWeight(4500);
     builder.weigher(EntityCacheWeigher.getInstance());
     Cache<EntityCacheRelationKey, List<Entity>> cache = builder.build();
 
@@ -152,7 +152,7 @@ public class TestCacheConfig {
           List.of(fileset));
     }
 
-    // Access all filesets to make them more likely to be retained
+    // Access filesets 5-14 once to increase their frequency to 2 (insert + get)
     for (int i = 5; i < 15; i++) {
       String filesetName = "fileset" + i;
       cache.getIfPresent(
@@ -164,9 +164,9 @@ public class TestCacheConfig {
     cache.cleanUp(); // Force synchronous eviction
 
     // Count how many filesets are still in cache
-    // Note: We cannot keep all 10 filesets because base entities (800) + 10 filesets (2000)
-    // = 2800 exceeds max weight (2000). However, filesets should be prioritized over tags
-    // due to higher access frequency.
+    // Weight calculation: base(100) + filesets(15×200=3000) + tags(10×500=5000) = 8100 > 4500 limit
+    // Filesets 5-14 have freq=2, tags have freq=1. With frequency advantage + lighter weight,
+    // filesets should be strongly prioritized by Caffeine's W-TinyLFU
     long remainingFilesets =
         IntStream.range(5, 15)
             .mapToObj(i -> "fileset" + i)
@@ -191,17 +191,18 @@ public class TestCacheConfig {
                         != null)
             .count();
 
-    // Verify the weigher-based eviction behavior:
-    // 1. Some entities were evicted (can't fit everything in 2000 weight limit)
-    // 2. Filesets (freq=2) are strongly prioritized over tags (freq=1)
+    // Verify weight-based eviction: filesets (weight=200, freq=2) should be strongly
+    // prioritized over tags (weight=500, freq=1) due to both higher frequency and lighter weight
     Assertions.assertTrue(
         remainingFilesets + remainingTags < 20,
-        "Expected some entities to be evicted due to weight limit");
+        String.format(
+            "Expected significant eviction due to weight limit (max=5000). Found filesets=%d, tags=%d (total=%d/20)",
+            remainingFilesets, remainingTags, remainingFilesets + remainingTags));
 
     Assertions.assertTrue(
         remainingFilesets > remainingTags,
         String.format(
-            "Expected filesets (freq=2) to be prioritized over tags (freq=1). Found filesets=%d, tags=%d",
+            "Expected filesets (weight=200, freq=2) to be prioritized over tags (weight=500, freq=1). Found filesets=%d, tags=%d",
             remainingFilesets, remainingTags));
   }
 
@@ -275,11 +276,12 @@ public class TestCacheConfig {
                   NameIdentifier.of("metalake1.catalog" + i), Entity.EntityType.CATALOG)));
     }
 
-    // Only some of the 100 schemas are still in the cache, to be exact, 5000 / 500 = 10 schemas.
+    // Only some of the 100 schemas are still in the cache.
+    // With new weights: schema=100, so approximately 5000 / 100 = 50 schemas fit.
     Awaitility.await()
         .atMost(Duration.ofSeconds(5))
         .pollInterval(Duration.ofMillis(10))
-        .until(() -> cache.asMap().size() == 10 + 3 + 5000 / 500);
+        .until(() -> cache.asMap().size() == 10 + 3 + 5000 / 100);
   }
 
   @Test
