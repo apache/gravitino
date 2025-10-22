@@ -456,7 +456,7 @@ CREATE TABLE IF NOT EXISTS `table_version_info` (
     `partitions`  CLOB DEFAULT NULL COMMENT 'table partition info',
     `distribution` CLOB DEFAULT NULL COMMENT 'table distribution info',
     `sort_orders` CLOB DEFAULT NULL COMMENT 'table sort order info',
-    `indexes_info`      CLOB DEFAULT NULL COMMENT 'table index info',
+    `indexes`      CLOB DEFAULT NULL COMMENT 'table index info',
     `comment`   CLOB DEFAULT NULL COMMENT 'table comment',
     `version` BIGINT(20) UNSIGNED COMMENT 'table current version',
     `deleted_at`      BIGINT(20) UNSIGNED DEFAULT 0 COMMENT 'table deletion timestamp, 0 means not deleted',

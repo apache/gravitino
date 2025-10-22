@@ -447,7 +447,7 @@ CREATE TABLE IF NOT EXISTS `table_version_info` (
     `partitions`  MEDIUMTEXT DEFAULT NULL COMMENT 'table partition info',
     `distribution` MEDIUMTEXT DEFAULT NULL COMMENT 'table distribution info',
     `sort_orders` MEDIUMTEXT DEFAULT NULL COMMENT 'table sort order info',
-    `indexes_info`      MEDIUMTEXT DEFAULT NULL COMMENT 'table index info',
+    `indexes`      MEDIUMTEXT DEFAULT NULL COMMENT 'table index info',
     `comment`   MEDIUMTEXT DEFAULT NULL COMMENT 'table comment',
     `version` BIGINT(20) UNSIGNED COMMENT 'table current version',
     `deleted_at`      BIGINT(20) UNSIGNED DEFAULT 0 COMMENT 'table deletion timestamp, 0 means not deleted',
