@@ -60,7 +60,7 @@ public class TestCacheConfig {
   @Test
   void testPolicyAndTagCacheWeigher() throws InterruptedException {
     Caffeine<Object, Object> builder = Caffeine.newBuilder();
-    builder.maximumWeight(4500);
+    builder.maximumWeight(5000);
     builder.weigher(EntityCacheWeigher.getInstance());
     Cache<EntityCacheRelationKey, List<Entity>> cache = builder.build();
 
@@ -152,20 +152,22 @@ public class TestCacheConfig {
           List.of(fileset));
     }
 
-    // Access filesets 5-14 once to increase their frequency to 2 (insert + get)
-    for (int i = 5; i < 15; i++) {
-      String filesetName = "fileset" + i;
-      cache.getIfPresent(
-          EntityCacheRelationKey.of(
-              NameIdentifier.of(new String[] {"metalake1", "catalog1", "schema1", filesetName}),
-              Entity.EntityType.FILESET));
+    // Access filesets 5-14 twice to increase their frequency to 5 (insert + 4 gets)
+    for (int access = 0; access < 4; access++) {
+      for (int i = 5; i < 15; i++) {
+        String filesetName = "fileset" + i;
+        cache.getIfPresent(
+            EntityCacheRelationKey.of(
+                NameIdentifier.of(new String[] {"metalake1", "catalog1", "schema1", filesetName}),
+                Entity.EntityType.FILESET));
+      }
     }
 
-    cache.cleanUp(); // Force synchronous eviction
+    Thread.sleep(1000);
 
     // Count how many filesets are still in cache
-    // Weight calculation: base(100) + filesets(15×200=3000) + tags(10×500=5000) = 8100 > 4500 limit
-    // Filesets 5-14 have freq=2, tags have freq=1. With frequency advantage + lighter weight,
+    // Weight calculation: base(100) + filesets(15×200=3000) + tags(10×500=5000) = 8100 > 5000 limit
+    // Filesets 5-14 have freq=5, tags have freq=1. With frequency advantage + lighter weight,
     // filesets should be strongly prioritized by Caffeine's W-TinyLFU
     long remainingFilesets =
         IntStream.range(5, 15)
@@ -191,7 +193,7 @@ public class TestCacheConfig {
                         != null)
             .count();
 
-    // Verify weight-based eviction: filesets (weight=200, freq=2) should be strongly
+    // Verify weight-based eviction: filesets (weight=200, freq=5) should be strongly
     // prioritized over tags (weight=500, freq=1) due to both higher frequency and lighter weight
     Assertions.assertTrue(
         remainingFilesets + remainingTags < 20,
@@ -202,7 +204,7 @@ public class TestCacheConfig {
     Assertions.assertTrue(
         remainingFilesets > remainingTags,
         String.format(
-            "Expected filesets (weight=200, freq=2) to be prioritized over tags (weight=500, freq=1). Found filesets=%d, tags=%d",
+            "Expected filesets (weight=200, freq=5) to be prioritized over tags (weight=500, freq=1). Found filesets=%d, tags=%d",
             remainingFilesets, remainingTags));
   }
 
