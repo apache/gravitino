@@ -771,28 +771,24 @@ COMMENT ON COLUMN job_run_meta.deleted_at IS 'job run deleted at';
 CREATE TABLE IF NOT EXISTS table_version_info (
     table_id        BIGINT PRIMARY KEY,
     format          VARCHAR(64) NOT NULL,
-    location        VARCHAR(512) NOT NULL,
-    "external"      BOOLEAN NOT NULL DEFAULT FALSE,
     properties      TEXT,
     partitions  TEXT,
     distribution TEXT,
     sort_orders TEXT,
     indexes      TEXT,
     "comment"   TEXT,
-    current_version BIGINT,
+    version BIGINT,
     deleted_at      BIGINT DEFAULT 0,
     UNIQUE (table_id, deleted_at)
 );
 COMMENT ON TABLE table_version_info                  IS 'table detail information including format, location, properties, partition, distribution, sort order, index and so on';
 COMMENT ON COLUMN table_version_info.table_id        IS 'table id';
 COMMENT ON COLUMN table_version_info.format          IS 'table format, such as Lance, Iceberg and so on';
-COMMENT ON COLUMN table_version_info.location        IS 'table storage location';
-COMMENT ON COLUMN table_version_info."external"      IS 'whether the table is external table';
 COMMENT ON COLUMN table_version_info.properties      IS 'table properties';
 COMMENT ON COLUMN table_version_info.partitions      IS 'table partition info';
 COMMENT on COLUMN table_version_info.distribution    IS 'table distribution info';
 COMMENT ON COLUMN table_version_info.sort_orders     IS 'table sort order info';
 COMMENT ON COLUMN table_version_info.indexes         IS 'table index info';
 COMMENT ON COLUMN table_version_info."comment"       IS 'table comment';
-COMMENT ON COLUMN table_version_info.current_version IS 'table current version';
+COMMENT ON COLUMN table_version_info.version IS 'table current version';
 COMMENT ON COLUMN table_version_info.deleted_at      IS 'table deletion timestamp, 0 means not deleted';

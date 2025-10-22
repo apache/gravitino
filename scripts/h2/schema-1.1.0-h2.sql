@@ -452,15 +452,13 @@ CREATE TABLE IF NOT EXISTS `job_run_meta` (
 CREATE TABLE IF NOT EXISTS `table_version_info` (
     `table_id`        BIGINT(20) UNSIGNED NOT NULL COMMENT 'table id',
     `format`          VARCHAR(64) NOT NULL COMMENT 'table format, such as Lance, Iceberg and so on',
-    `location`        VARCHAR(512) NOT NULL COMMENT 'table storage location',
-    `external`        BOOLEAN NOT NULL DEFAULT FALSE COMMENT 'whether the table is external table',
     `properties`      CLOB DEFAULT NULL COMMENT 'table properties',
     `partitions`  CLOB DEFAULT NULL COMMENT 'table partition info',
     `distribution` CLOB DEFAULT NULL COMMENT 'table distribution info',
     `sort_orders` CLOB DEFAULT NULL COMMENT 'table sort order info',
     `indexes_info`      CLOB DEFAULT NULL COMMENT 'table index info',
     `comment`   CLOB DEFAULT NULL COMMENT 'table comment',
-    `current_version` BIGINT(20) UNSIGNED COMMENT 'table current version',
+    `version` BIGINT(20) UNSIGNED COMMENT 'table current version',
     `deleted_at`      BIGINT(20) UNSIGNED DEFAULT 0 COMMENT 'table deletion timestamp, 0 means not deleted',
     PRIMARY KEY (table_id),
     UNIQUE KEY `uk_table_id_version_deleted_at` (`table_id`, `deleted_at`)
