@@ -22,6 +22,7 @@ import java.util.List;
 import javax.security.auth.Subject;
 import javax.security.auth.kerberos.KerberosPrincipal;
 import javax.security.auth.kerberos.KeyTab;
+import javax.servlet.http.HttpServletRequest;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.UserPrincipal;
@@ -95,7 +96,7 @@ public class KerberosAuthenticator implements Authenticator {
   }
 
   @Override
-  public Principal authenticateToken(byte[] tokenData) {
+  public Principal authenticateToken(byte[] tokenData, HttpServletRequest request) {
     if (tokenData == null) {
       throw new UnauthorizedException("Empty token authorization header", AuthConstants.NEGOTIATE);
     }
@@ -124,7 +125,7 @@ public class KerberosAuthenticator implements Authenticator {
           new PrivilegedExceptionAction<Principal>() {
             @Override
             public Principal run() throws Exception {
-              return retrievePrincipalFromToken(serverPrincipal, clientToken);
+              return retrievePrincipalFromToken(serverPrincipal, clientToken, request);
             }
           });
     } catch (Exception e) {
@@ -140,7 +141,18 @@ public class KerberosAuthenticator implements Authenticator {
             .startsWith(AuthConstants.AUTHORIZATION_NEGOTIATE_HEADER);
   }
 
-  private Principal retrievePrincipalFromToken(String serverPrincipal, byte[] clientToken)
+  private String getDoAsUserFromRequest(HttpServletRequest request) {
+    try {
+      if (request != null) {
+        return request.getParameter("doAs");
+      }
+    } catch (Exception e) {
+      LOG.warn("Failed to retrieve doAs user from request", e);
+    }
+    return null;
+  }
+
+  private Principal retrievePrincipalFromToken(String serverPrincipal, byte[] clientToken, HttpServletRequest request)
       throws GSSException {
     GSSContext gssContext = null;
     GSSCredential gssCreds = null;
@@ -169,15 +181,22 @@ public class KerberosAuthenticator implements Authenticator {
         String challenge = AuthConstants.AUTHORIZATION_NEGOTIATE_HEADER + authenticateToken;
         throw new UnauthorizedException("GssContext isn't established", challenge);
       }
-
-      // Usually principal names are in the form 'user/instance@REALM' or 'user@REALM'.
-      List<String> principalComponents =
-          Splitter.on('@').splitToList(gssContext.getSrcName().toString());
-      if (principalComponents.size() != 2) {
-        throw new UnauthorizedException("Principal has wrong format", AuthConstants.NEGOTIATE);
+      String doAsUser = getDoAsUserFromRequest(request);
+      // If the doAs parameter exists, use that user; otherwise, use the user in the Kerberos token.
+      String user;
+      if (StringUtils.isNotBlank(doAsUser)) {
+        LOG.info("Using doAs user: {}", doAsUser);
+        user = doAsUser;
+      } else {
+        // Usually principal names are in the form 'user/instance@REALM' or 'user@REALM'.
+        List<String> principalComponents =
+                Splitter.on('@').splitToList(gssContext.getSrcName().toString());
+        if (principalComponents.size() != 2) {
+          throw new UnauthorizedException("Principal has wrong format", AuthConstants.NEGOTIATE);
+        }
+        user = principalComponents.get(0);
       }
 
-      String user = principalComponents.get(0);
       // TODO: We will have KerberosUserPrincipal in the future.
       //  We can put more information of Kerberos to the KerberosUserPrincipal
       // For example, we can put the token into the KerberosUserPrincipal,

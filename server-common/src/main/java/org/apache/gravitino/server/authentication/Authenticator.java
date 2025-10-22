@@ -46,6 +46,18 @@ public interface Authenticator {
   }
 
   /**
+   * Use the token data and HTTP request to authenticate (overload for request-aware authentication).
+   *
+   * @param tokenData The data is used for authentication
+   * @param request The HTTP request context
+   * @return The identifier of user
+   */
+  default Principal authenticateToken(byte[] tokenData, HttpServletRequest request) {
+    throw new UnsupportedOperationException(
+            "Authenticator doesn't support to authenticate the data from the token");
+  }
+
+  /**
    * Initialize the authenticator
    *
    * <p>Note. This method will be called after the Authenticator object is created, and before any *
