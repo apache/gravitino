@@ -18,9 +18,18 @@
  */
 package org.apache.gravitino.catalog.lakehouse;
 
+import com.google.common.annotations.VisibleForTesting;
 import java.util.Map;
+import java.util.Optional;
+import org.apache.commons.lang3.StringUtils;
+import org.apache.gravitino.Catalog;
+import org.apache.gravitino.EntityStore;
+import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.Schema;
+import org.apache.gravitino.SchemaChange;
+import org.apache.gravitino.catalog.ManagedSchemaOperations;
 import org.apache.gravitino.connector.CatalogInfo;
 import org.apache.gravitino.connector.CatalogOperations;
 import org.apache.gravitino.connector.HasPropertyMetadata;
@@ -39,10 +48,18 @@ import org.apache.gravitino.rel.expressions.distributions.Distribution;
 import org.apache.gravitino.rel.expressions.sorts.SortOrder;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.indexes.Index;
+import org.apache.hadoop.fs.Path;
 
 /** Operations for interacting with a generic lakehouse catalog in Apache Gravitino. */
 public class GenericLakehouseCatalogOperations
     implements CatalogOperations, SupportsSchemas, TableCatalog {
+
+  private static final String SLASH = "/";
+
+  private final ManagedSchemaOperations managedSchemaOps;
+
+  @SuppressWarnings("unused") // todo: remove this after implementing table operations
+  private Optional<Path> catalogLakehouseDir;
 
   /**
    * Initializes the generic lakehouse catalog operations with the provided configuration.
@@ -56,7 +73,30 @@ public class GenericLakehouseCatalogOperations
   public void initialize(
       Map<String, String> conf, CatalogInfo info, HasPropertyMetadata propertiesMetadata)
       throws RuntimeException {
-    // TODO: Implement initialization logic
+    String catalogDir =
+        (String)
+            propertiesMetadata
+                .catalogPropertiesMetadata()
+                .getOrDefault(conf, GenericLakehouseCatalogPropertiesMetadata.LAKEHOUSE_DIR);
+    this.catalogLakehouseDir =
+        StringUtils.isNotBlank(catalogDir)
+            ? Optional.of(catalogDir).map(this::ensureTrailingSlash).map(Path::new)
+            : Optional.empty();
+  }
+
+  public GenericLakehouseCatalogOperations() {
+    this(GravitinoEnv.getInstance().entityStore());
+  }
+
+  @VisibleForTesting
+  GenericLakehouseCatalogOperations(EntityStore store) {
+    this.managedSchemaOps =
+        new ManagedSchemaOperations() {
+          @Override
+          protected EntityStore store() {
+            return store;
+          }
+        };
   }
 
   @Override
@@ -65,44 +105,38 @@ public class GenericLakehouseCatalogOperations
   @Override
   public void testConnection(
       NameIdentifier catalogIdent,
-      org.apache.gravitino.Catalog.Type type,
+      Catalog.Type type,
       String provider,
       String comment,
-      Map<String, String> properties)
-      throws Exception {
-    throw new UnsupportedOperationException("Not implemented yet.");
+      Map<String, String> properties) {
+    // No-op for generic lakehouse catalog.
   }
 
   @Override
-  public org.apache.gravitino.NameIdentifier[] listSchemas(org.apache.gravitino.Namespace namespace)
-      throws NoSuchCatalogException {
-    throw new UnsupportedOperationException("Not implemented yet.");
+  public NameIdentifier[] listSchemas(Namespace namespace) throws NoSuchCatalogException {
+    return managedSchemaOps.listSchemas(namespace);
   }
 
   @Override
-  public org.apache.gravitino.Schema createSchema(
-      org.apache.gravitino.NameIdentifier ident, String comment, Map<String, String> properties)
+  public Schema createSchema(NameIdentifier ident, String comment, Map<String, String> properties)
       throws NoSuchCatalogException, SchemaAlreadyExistsException {
-    throw new UnsupportedOperationException("Not implemented yet.");
+    return managedSchemaOps.createSchema(ident, comment, properties);
   }
 
   @Override
-  public org.apache.gravitino.Schema loadSchema(org.apache.gravitino.NameIdentifier ident)
+  public Schema loadSchema(NameIdentifier ident) throws NoSuchSchemaException {
+    return managedSchemaOps.loadSchema(ident);
+  }
+
+  @Override
+  public Schema alterSchema(NameIdentifier ident, SchemaChange... changes)
       throws NoSuchSchemaException {
-    throw new UnsupportedOperationException("Not implemented yet.");
+    return managedSchemaOps.alterSchema(ident, changes);
   }
 
   @Override
-  public org.apache.gravitino.Schema alterSchema(
-      org.apache.gravitino.NameIdentifier ident, org.apache.gravitino.SchemaChange... changes)
-      throws NoSuchSchemaException {
-    throw new UnsupportedOperationException("Not implemented yet.");
-  }
-
-  @Override
-  public boolean dropSchema(org.apache.gravitino.NameIdentifier ident, boolean cascade)
-      throws NonEmptySchemaException {
-    throw new UnsupportedOperationException("Not implemented yet.");
+  public boolean dropSchema(NameIdentifier ident, boolean cascade) throws NonEmptySchemaException {
+    return managedSchemaOps.dropSchema(ident, cascade);
   }
 
   @Override
@@ -138,5 +172,9 @@ public class GenericLakehouseCatalogOperations
   @Override
   public boolean dropTable(NameIdentifier ident) {
     throw new UnsupportedOperationException("Not implemented yet.");
+  }
+
+  private String ensureTrailingSlash(String path) {
+    return path.endsWith(SLASH) ? path : path + SLASH;
   }
 }
