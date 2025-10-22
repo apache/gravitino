@@ -34,6 +34,8 @@ class MockGVFSHook(GravitinoVirtualFileSystemHook):
     # pylint: disable=too-many-instance-attributes
 
     def __init__(self):
+        self.set_operations_context_called = False
+        self.operations = None
         self.ls_called = False
         self.info_called = False
         self.exists_called = False
@@ -64,6 +66,10 @@ class MockGVFSHook(GravitinoVirtualFileSystemHook):
         self.post_get_file_called = False
         self.post_created_called = False
         self.post_modified_called = False
+
+    def set_operations_context(self, operations):
+        self.set_operations_context_called = True
+        self.operations = operations
 
     def initialize(self, config: Optional[Dict[str, str]]):
         pass
@@ -259,6 +265,11 @@ class TestGVFSHook(unittest.TestCase):
                     GVFSConfig.GVFS_FILESYSTEM_HOOK: "tests.unittests.test_gvfs_with_hook.MockGVFSHook"
                 },
             )
+
+            # Test that set_operations_context was called during initialization
+            self.assertTrue(fs.hook.set_operations_context_called)
+            self.assertIsNotNone(fs.hook.operations)
+            self.assertEqual(fs.operations, fs.hook.operations)
 
             # Test pre_exists and post_exists hook
             fs.exists(fileset_virtual_path)

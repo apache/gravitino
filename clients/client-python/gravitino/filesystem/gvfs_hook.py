@@ -30,6 +30,17 @@ class GravitinoVirtualFileSystemHook(ABC):
     idempotent issues if required.
     """
 
+    def set_operations_context(self, operations):
+        """
+        Set the operations context for this hook. This method will be called during GVFS initialization
+        to provide the hook with access to the BaseGVFSOperations instance.
+
+        Args:
+            operations: The BaseGVFSOperations instance.
+        """
+        # Default implementation does nothing - hooks can override if they need operations access
+        pass
+
     @abstractmethod
     def initialize(self, config: Optional[Dict[str, str]]):
         """
