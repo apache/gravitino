@@ -56,7 +56,7 @@ public class KerberosAuthenticator implements Authenticator {
   @Override
   public void initialize(Config config) throws RuntimeException {
     try {
-      String principal = replaceHostPlaceholder(config.get(KerberosConfig.PRINCIPAL));
+      String principal = KerberosServerUtils.replaceHostPlaceholder(config.get(KerberosConfig.PRINCIPAL));
       if (!principal.startsWith("HTTP/")) {
         throw new IllegalArgumentException("Principal must starts with `HTTP/`");
       }
@@ -88,6 +88,8 @@ public class KerberosAuthenticator implements Authenticator {
               });
     } catch (PrivilegedActionException ex) {
       throw new RuntimeException(ex);
+    } catch (UnknownHostException e) {
+      throw new RuntimeException(e);
     }
   }
 
