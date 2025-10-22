@@ -38,6 +38,7 @@ import com.google.common.collect.Sets;
 import com.google.common.collect.Streams;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.io.Closeable;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.net.URI;
 import java.util.Arrays;
@@ -213,9 +214,9 @@ public abstract class BaseGVFSOperations implements Closeable {
    * Set the working directory. Same as {@link FileSystem#setWorkingDirectory(Path)}.
    *
    * @param gvfsDir the new working directory.
-   * @throws FilesetPathNotFoundException if the fileset path is not found.
+   * @throws FileNotFoundException if the fileset path is not found.
    */
-  public abstract void setWorkingDirectory(Path gvfsDir) throws FilesetPathNotFoundException;
+  public abstract void setWorkingDirectory(Path gvfsDir) throws FileNotFoundException;
 
   /**
    * Create a file. Same as {@link FileSystem#create(Path, FsPermission, boolean, int, short, long,
@@ -394,11 +395,11 @@ public abstract class BaseGVFSOperations implements Closeable {
    * @param locationName the location name.
    * @param operation the fileset data operation.
    * @return the actual file path.
-   * @throws FilesetPathNotFoundException if the fileset path is not found.
+   * @throws FileNotFoundException if the fileset path is not found.
    */
   protected Path getActualFilePath(
       Path gvfsPath, String locationName, FilesetDataOperation operation)
-      throws FilesetPathNotFoundException {
+      throws FileNotFoundException {
     NameIdentifier filesetIdent = extractIdentifier(metalakeName, gvfsPath.toString());
     String subPath = getSubPathFromGvfsPath(filesetIdent, gvfsPath.toString());
     NameIdentifier catalogIdent =
@@ -415,14 +416,14 @@ public abstract class BaseGVFSOperations implements Closeable {
     } catch (NoSuchCatalogException | CatalogNotInUseException e) {
       String message = String.format("Cannot get fileset catalog by identifier: %s", catalogIdent);
       LOG.warn(message, e);
-      throw new FilesetPathNotFoundException(message, e);
+      throw (FileNotFoundException) new FileNotFoundException(message).initCause(e);
 
     } catch (NoSuchFilesetException e) {
       String message =
           String.format(
               "Cannot get fileset by fileset identifier: %s, sub_path %s", filesetIdent, subPath);
       LOG.warn(message, e);
-      throw new FilesetPathNotFoundException(message, e);
+      throw (FileNotFoundException) new FileNotFoundException(message).initCause(e);
 
     } catch (NoSuchLocationNameException e) {
       String message =
@@ -430,7 +431,7 @@ public abstract class BaseGVFSOperations implements Closeable {
               "Location name not found by fileset identifier: %s, sub_path %s, location_name %s",
               filesetIdent, subPath, locationName);
       LOG.warn(message, e);
-      throw new FilesetPathNotFoundException(message, e);
+      throw (FileNotFoundException) new FileNotFoundException(message).initCause(e);
     }
 
     Path actualFilePath = new Path(fileLocation);
@@ -520,10 +521,10 @@ public abstract class BaseGVFSOperations implements Closeable {
    * @param filesetPath the virtual path.
    * @param locationName the location name. null means the default location.
    * @return the actual file system.
-   * @throws FilesetPathNotFoundException if the fileset path is not found.
+   * @throws FileNotFoundException if the fileset path is not found.
    */
   protected FileSystem getActualFileSystem(Path filesetPath, String locationName)
-      throws FilesetPathNotFoundException {
+      throws FileNotFoundException {
     NameIdentifier filesetIdent = extractIdentifier(metalakeName, filesetPath.toString());
     return getActualFileSystemByLocationName(filesetIdent, locationName);
   }
@@ -583,7 +584,7 @@ public abstract class BaseGVFSOperations implements Closeable {
   }
 
   private FileSystem getActualFileSystemByLocationName(
-      NameIdentifier filesetIdent, String locationName) throws FilesetPathNotFoundException {
+      NameIdentifier filesetIdent, String locationName) throws FileNotFoundException {
     NameIdentifier catalogIdent =
         NameIdentifier.of(filesetIdent.namespace().level(0), filesetIdent.namespace().level(1));
     try {
@@ -627,14 +628,14 @@ public abstract class BaseGVFSOperations implements Closeable {
         String message =
             String.format("Cannot get fileset catalog by identifier: %s", catalogIdent);
         LOG.warn(message, e);
-        throw new FilesetPathNotFoundException(message, e);
+        throw (FileNotFoundException) new FileNotFoundException(message).initCause(e);
       }
 
       if (cause instanceof NoSuchFilesetException) {
         String message =
             String.format("Cannot get fileset by fileset identifier: %s", filesetIdent);
         LOG.warn(message, e);
-        throw new FilesetPathNotFoundException(message, e);
+        throw (FileNotFoundException) new FileNotFoundException(message).initCause(e);
       }
 
       if (cause instanceof NoSuchLocationNameException) {
@@ -643,7 +644,7 @@ public abstract class BaseGVFSOperations implements Closeable {
                 "Location name not found by fileset identifier: %s, location_name %s",
                 filesetIdent, locationName);
         LOG.warn(message, e);
-        throw new FilesetPathNotFoundException(message, e);
+        throw (FileNotFoundException) new FileNotFoundException(message).initCause(e);
       }
 
       throw e;

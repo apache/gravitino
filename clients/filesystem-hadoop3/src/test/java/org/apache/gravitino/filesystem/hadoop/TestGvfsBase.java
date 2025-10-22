@@ -45,6 +45,7 @@ import static org.mockserver.model.HttpResponse.response;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.google.common.collect.ImmutableMap;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.lang.reflect.Field;
 import java.net.SocketTimeoutException;
@@ -167,8 +168,7 @@ public class TestGvfsBase extends GravitinoMockServerBase {
       Mockito.doThrow(new NoSuchFilesetException("fileset not found"))
           .when(mockOps)
           .open(any(), anyInt());
-      assertThrows(
-          FilesetPathNotFoundException.class, () -> fs.open(new Path("gvfs://fileset/"), 1024));
+      assertThrows(FileNotFoundException.class, () -> fs.open(new Path("gvfs://fileset/"), 1024));
 
       // test create
       Mockito.doThrow(new NoSuchCatalogException("fileset catalog not found"))
@@ -184,15 +184,14 @@ public class TestGvfsBase extends GravitinoMockServerBase {
       Mockito.doThrow(new NoSuchLocationNameException("location name not found"))
           .when(mockOps)
           .append(any(), anyInt(), any());
-      assertThrows(
-          FilesetPathNotFoundException.class, () -> fs.append(new Path("gvfs://fileset/"), 1024));
+      assertThrows(FileNotFoundException.class, () -> fs.append(new Path("gvfs://fileset/"), 1024));
 
       // test rename
       Mockito.doThrow(new NoSuchFilesetException("fileset not found"))
           .when(mockOps)
           .rename(any(), any());
       assertThrows(
-          FilesetPathNotFoundException.class,
+          FileNotFoundException.class,
           () -> fs.rename(new Path("gvfs://fileset/"), new Path("gvfs://fileset/new")));
 
       // test delete
@@ -206,21 +205,19 @@ public class TestGvfsBase extends GravitinoMockServerBase {
           .when(mockOps)
           .getFileStatus(any());
       assertThrows(
-          FilesetPathNotFoundException.class, () -> fs.getFileStatus(new Path("gvfs://fileset/")));
+          FileNotFoundException.class, () -> fs.getFileStatus(new Path("gvfs://fileset/")));
 
       // test listStatus
       Mockito.doThrow(new NoSuchFilesetException("fileset not found"))
           .when(mockOps)
           .listStatus(any());
-      assertThrows(
-          FilesetPathNotFoundException.class, () -> fs.listStatus(new Path("gvfs://fileset/")));
+      assertThrows(FileNotFoundException.class, () -> fs.listStatus(new Path("gvfs://fileset/")));
 
       // test listStatus
       Mockito.doThrow(new NoSuchFilesetException("fileset not found"))
           .when(mockOps)
           .listStatus(any());
-      assertThrows(
-          FilesetPathNotFoundException.class, () -> fs.listStatus(new Path("gvfs://fileset/")));
+      assertThrows(FileNotFoundException.class, () -> fs.listStatus(new Path("gvfs://fileset/")));
 
       // test mkdirs
       Mockito.doThrow(new NoSuchFilesetException("fileset not found"))
@@ -973,17 +970,17 @@ public class TestGvfsBase extends GravitinoMockServerBase {
 
       Path testPath = new Path(managedFilesetPath + "/test.txt");
       assertThrows(RuntimeException.class, () -> fs.setWorkingDirectory(testPath));
-      assertThrows(FilesetPathNotFoundException.class, () -> fs.open(testPath));
+      assertThrows(FileNotFoundException.class, () -> fs.open(testPath));
       assertThrows(IOException.class, () -> fs.create(testPath));
-      assertThrows(FilesetPathNotFoundException.class, () -> fs.append(testPath));
+      assertThrows(FileNotFoundException.class, () -> fs.append(testPath));
 
       Path testPath1 = new Path(managedFilesetPath + "/test1.txt");
-      assertThrows(FilesetPathNotFoundException.class, () -> fs.rename(testPath, testPath1));
+      assertThrows(FileNotFoundException.class, () -> fs.rename(testPath, testPath1));
 
       assertFalse(fs.delete(testPath, true));
 
-      assertThrows(FilesetPathNotFoundException.class, () -> fs.getFileStatus(testPath));
-      assertThrows(FilesetPathNotFoundException.class, () -> fs.listStatus(testPath));
+      assertThrows(FileNotFoundException.class, () -> fs.getFileStatus(testPath));
+      assertThrows(FileNotFoundException.class, () -> fs.listStatus(testPath));
 
       assertThrows(IOException.class, () -> fs.mkdirs(testPath));
 
