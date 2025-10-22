@@ -32,6 +32,7 @@ import static org.apache.hc.core5.http.HttpStatus.SC_OK;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -45,6 +46,7 @@ import static org.mockserver.model.HttpResponse.response;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.google.common.collect.ImmutableMap;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.lang.reflect.Field;
 import java.net.SocketTimeoutException;
@@ -167,8 +169,7 @@ public class TestGvfsBase extends GravitinoMockServerBase {
       Mockito.doThrow(new NoSuchFilesetException("fileset not found"))
           .when(mockOps)
           .open(any(), anyInt());
-      assertThrows(
-          FilesetPathNotFoundException.class, () -> fs.open(new Path("gvfs://fileset/"), 1024));
+      assertThrows(FileNotFoundException.class, () -> fs.open(new Path("gvfs://fileset/"), 1024));
 
       // test create
       Mockito.doThrow(new NoSuchCatalogException("fileset catalog not found"))
@@ -184,15 +185,14 @@ public class TestGvfsBase extends GravitinoMockServerBase {
       Mockito.doThrow(new NoSuchLocationNameException("location name not found"))
           .when(mockOps)
           .append(any(), anyInt(), any());
-      assertThrows(
-          FilesetPathNotFoundException.class, () -> fs.append(new Path("gvfs://fileset/"), 1024));
+      assertThrows(FileNotFoundException.class, () -> fs.append(new Path("gvfs://fileset/"), 1024));
 
       // test rename
       Mockito.doThrow(new NoSuchFilesetException("fileset not found"))
           .when(mockOps)
           .rename(any(), any());
       assertThrows(
-          FilesetPathNotFoundException.class,
+          FileNotFoundException.class,
           () -> fs.rename(new Path("gvfs://fileset/"), new Path("gvfs://fileset/new")));
 
       // test delete
@@ -206,21 +206,19 @@ public class TestGvfsBase extends GravitinoMockServerBase {
           .when(mockOps)
           .getFileStatus(any());
       assertThrows(
-          FilesetPathNotFoundException.class, () -> fs.getFileStatus(new Path("gvfs://fileset/")));
+          FileNotFoundException.class, () -> fs.getFileStatus(new Path("gvfs://fileset/")));
 
       // test listStatus
       Mockito.doThrow(new NoSuchFilesetException("fileset not found"))
           .when(mockOps)
           .listStatus(any());
-      assertThrows(
-          FilesetPathNotFoundException.class, () -> fs.listStatus(new Path("gvfs://fileset/")));
+      assertThrows(FileNotFoundException.class, () -> fs.listStatus(new Path("gvfs://fileset/")));
 
       // test listStatus
       Mockito.doThrow(new NoSuchFilesetException("fileset not found"))
           .when(mockOps)
           .listStatus(any());
-      assertThrows(
-          FilesetPathNotFoundException.class, () -> fs.listStatus(new Path("gvfs://fileset/")));
+      assertThrows(FileNotFoundException.class, () -> fs.listStatus(new Path("gvfs://fileset/")));
 
       // test mkdirs
       Mockito.doThrow(new NoSuchFilesetException("fileset not found"))
@@ -973,17 +971,17 @@ public class TestGvfsBase extends GravitinoMockServerBase {
 
       Path testPath = new Path(managedFilesetPath + "/test.txt");
       assertThrows(RuntimeException.class, () -> fs.setWorkingDirectory(testPath));
-      assertThrows(FilesetPathNotFoundException.class, () -> fs.open(testPath));
+      assertThrows(FileNotFoundException.class, () -> fs.open(testPath));
       assertThrows(IOException.class, () -> fs.create(testPath));
-      assertThrows(FilesetPathNotFoundException.class, () -> fs.append(testPath));
+      assertThrows(FileNotFoundException.class, () -> fs.append(testPath));
 
       Path testPath1 = new Path(managedFilesetPath + "/test1.txt");
-      assertThrows(FilesetPathNotFoundException.class, () -> fs.rename(testPath, testPath1));
+      assertThrows(FileNotFoundException.class, () -> fs.rename(testPath, testPath1));
 
       assertFalse(fs.delete(testPath, true));
 
-      assertThrows(FilesetPathNotFoundException.class, () -> fs.getFileStatus(testPath));
-      assertThrows(FilesetPathNotFoundException.class, () -> fs.listStatus(testPath));
+      assertThrows(FileNotFoundException.class, () -> fs.getFileStatus(testPath));
+      assertThrows(FileNotFoundException.class, () -> fs.listStatus(testPath));
 
       assertThrows(IOException.class, () -> fs.mkdirs(testPath));
 
@@ -1039,6 +1037,50 @@ public class TestGvfsBase extends GravitinoMockServerBase {
             });
     Assertions.assertInstanceOf(SocketTimeoutException.class, throwable.getCause());
     Assertions.assertEquals("Read timed out", throwable.getCause().getMessage());
+  }
+
+  @Test
+  public void testHookSetOperationsContext() throws IOException {
+    String filesetName = "testHookSetOperationsContext";
+    Path managedFilesetPath =
+        FileSystemTestUtils.createFilesetPath(catalogName, schemaName, filesetName, true);
+    Path localPath = FileSystemTestUtils.createLocalDirPrefix(catalogName, schemaName, filesetName);
+    String locationPath =
+        String.format(
+            "/api/metalakes/%s/catalogs/%s/schemas/%s/filesets/%s/location",
+            metalakeName, catalogName, schemaName, filesetName);
+
+    try (GravitinoVirtualFileSystem fs =
+        (GravitinoVirtualFileSystem) managedFilesetPath.getFileSystem(conf)) {
+
+      // Verify that setOperationsContext was called during GVFS initialization
+      MockGVFSHook hook = getHook(fs);
+      assertTrue(
+          hook.setOperationsContextCalled,
+          "setOperationsContext should be called during initialization");
+      assertNotNull(hook.operations, "Operations context should not be null");
+      assertEquals(
+          fs.getOperations(),
+          hook.operations,
+          "Hook should have reference to the same operations instance");
+
+      // Verify the hook can access operations methods
+      FileLocationResponse fileLocationResponse = new FileLocationResponse(localPath.toString());
+      Map<String, String> queryParams = new HashMap<>();
+      queryParams.put("sub_path", "");
+      buildMockResource(Method.GET, locationPath, queryParams, null, fileLocationResponse, SC_OK);
+      buildMockResourceForCredential(filesetName, localPath.toString());
+
+      try (FileSystem localFileSystem = localPath.getFileSystem(conf)) {
+        FileSystemTestUtils.mkdirs(localPath, localFileSystem);
+        FileSystemTestUtils.mkdirs(managedFilesetPath, fs);
+
+        // Verify hook's operations context is still valid after operations are performed
+        assertNotNull(hook.operations, "Operations context should remain available");
+        assertTrue(hook.preMkdirsCalled, "Hook should be invoked for operations");
+        assertTrue(hook.postMkdirsCalled, "Hook should be invoked for operations");
+      }
+    }
   }
 
   private void buildMockResourceForCredential(String filesetName, String filesetLocation)

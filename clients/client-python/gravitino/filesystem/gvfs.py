@@ -32,7 +32,6 @@ from gravitino.exceptions.base import (
 )
 from gravitino.filesystem.gvfs_base_operations import (
     BaseGVFSOperations,
-    FilesetPathNotFoundError,
 )
 from gravitino.filesystem.gvfs_config import GVFSConfig
 from gravitino.filesystem.gvfs_default_operations import DefaultGVFSOperations
@@ -76,6 +75,7 @@ class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
         self._operations = self._get_gvfs_operations_class(
             server_uri, metalake_name, options
         )
+        self._hook.set_operations_context(self._operations)
 
         super().__init__(**kwargs)
 
@@ -94,7 +94,7 @@ class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
     @staticmethod
     def _with_exception_translation(operation: FilesetDataOperation):
         """
-        Decorator to translate fileset metadata not found exceptions into FilesetPathNotFoundError.
+        Decorator to translate fileset metadata not found exceptions into FileNotFoundError.
         :param operation: The operation being performed.
         """
 
@@ -106,15 +106,15 @@ class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
                 except (NoSuchCatalogException, CatalogNotInUseException) as e:
                     message = f"Cannot get fileset catalog during {operation}"
                     logger.warning("%s, %s", message, str(e))
-                    raise FilesetPathNotFoundError(message) from e
+                    raise FileNotFoundError(message) from e
                 except NoSuchFilesetException as e:
                     message = f"Cannot get fileset during {operation}"
                     logger.warning("%s, %s", message, str(e))
-                    raise FilesetPathNotFoundError(message) from e
+                    raise FileNotFoundError(message) from e
                 except NoSuchLocationNameException as e:
                     message = f"Cannot find location name during {operation}"
                     logger.warning("%s, %s", message, str(e))
-                    raise FilesetPathNotFoundError(message) from e
+                    raise FileNotFoundError(message) from e
 
             return wrapper
 
@@ -168,7 +168,7 @@ class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
         )(self._operations.exists)
         try:
             result = decorated_exists(new_path, **kwargs)
-        except FilesetPathNotFoundError:
+        except FileNotFoundError:
             return False
 
         return self._hook.post_exists(
@@ -292,7 +292,7 @@ class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
                 compression,
                 **kwargs,
             )
-        except FilesetPathNotFoundError as e:
+        except FileNotFoundError as e:
             if mode in ("w", "wb", "x", "xb", "a", "ab"):
                 raise OSError(
                     f"Fileset is not found for path: {new_path} for operation OPEN. This "
@@ -319,12 +319,14 @@ class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
         :param kwargs: Extra args
         """
         new_path = self._hook.pre_mkdir(path, create_parents, **kwargs)
-        decorated_mkdir = self._with_exception_translation(FilesetDataOperation.MKDIRS)(
-            self._operations.mkdir
-        )
         try:
-            decorated_mkdir(new_path, create_parents, **kwargs)
-        except FilesetPathNotFoundError as e:
+            self._operations.mkdir(new_path, create_parents, **kwargs)
+        except (
+            NoSuchCatalogException,
+            CatalogNotInUseException,
+            NoSuchFilesetException,
+            NoSuchLocationNameException,
+        ) as e:
             raise OSError(
                 f"Fileset is not found for path: {new_path} for operation MKDIRS. This "
                 f"may be caused by fileset related metadata not found or not in use "
@@ -338,12 +340,14 @@ class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
         :param exist_ok: Continue if a directory already exists
         """
         new_path = self._hook.pre_makedirs(path, exist_ok)
-        decorated_makedirs = self._with_exception_translation(
-            FilesetDataOperation.MKDIRS
-        )(self._operations.makedirs)
         try:
-            decorated_makedirs(new_path, exist_ok)
-        except FilesetPathNotFoundError as e:
+            self._operations.makedirs(new_path, exist_ok)
+        except (
+            NoSuchCatalogException,
+            CatalogNotInUseException,
+            NoSuchFilesetException,
+            NoSuchLocationNameException,
+        ) as e:
             raise OSError(
                 f"Fileset is not found for path: {new_path} for operation MKDIRS. This "
                 f"may be caused by fileset related metadata not found or not in use "
