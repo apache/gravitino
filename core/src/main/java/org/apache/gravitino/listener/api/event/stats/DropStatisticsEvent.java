@@ -23,7 +23,7 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.annotation.DeveloperApi;
 import org.apache.gravitino.listener.api.event.OperationType;
 
-/** Event fired after dropping statistics on a table. */
+/** Event fired after dropping statistics on a metadata object. */
 @DeveloperApi
 public class DropStatisticsEvent extends StatisticsEvent {
 
