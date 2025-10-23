@@ -36,6 +36,7 @@ dependencies {
   implementation(project(":server-common")) {
     exclude("*")
   }
+
   implementation(project(":lance:lance-common"))
 
   implementation(libs.bundles.jetty)
@@ -43,6 +44,7 @@ dependencies {
   implementation(libs.bundles.log4j)
   implementation(libs.bundles.metrics)
   implementation(libs.bundles.prometheus)
+  implementation(libs.lance.namespace.core)
   implementation(libs.metrics.jersey2)
   implementation(libs.guava)
   implementation(libs.jackson.annotations)
