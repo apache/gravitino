@@ -632,6 +632,7 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
               .withPartitions(table.partitioning())
               .withSortOrder(table.sortOrder())
               .withProperties(genericTable.properties())
+              .withComment(genericTable.comment())
               .build();
     } else {
       tableEntity =

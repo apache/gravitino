@@ -194,6 +194,10 @@ public class GenericLakehouseCatalogOperations
       Index[] indexes)
       throws NoSuchSchemaException, TableAlreadyExistsException {
     String format = properties.getOrDefault("format", "lance");
+    String tableLocation = calculateTableLocation(ident, properties);
+    Map<String, String> newProperties = Maps.newHashMap(properties);
+    newProperties.put("location", tableLocation);
+
     LakehouseCatalogOperations lakehouseCatalogOperations =
         SUPPORTED_FORMATS.compute(
             format,
@@ -204,7 +208,51 @@ public class GenericLakehouseCatalogOperations
                     : v);
 
     return lakehouseCatalogOperations.createTable(
-        ident, columns, comment, properties, partitions, distribution, sortOrders, indexes);
+        ident, columns, comment, newProperties, partitions, distribution, sortOrders, indexes);
+  }
+
+  private String calculateTableLocation(
+      NameIdentifier tableIdent, Map<String, String> tableProperties) {
+    String tableLocation = tableProperties.get("location");
+    if (StringUtils.isNotBlank(tableLocation)) {
+      return ensureTrailingSlash(tableLocation);
+    }
+
+    String schemaLocation;
+    try {
+      Schema schema = loadSchema(NameIdentifier.of(tableIdent.namespace().levels()));
+      schemaLocation = schema.properties().get("location");
+    } catch (NoSuchSchemaException e) {
+      throw new RuntimeException(
+          String.format(
+              "Failed to load schema for table %s to determine default location.", tableIdent),
+          e);
+    }
+
+    // If we do not set location in table properties, and schema location is set, use schema
+    // location
+    // as the base path.
+    if (StringUtils.isNotBlank(schemaLocation)) {
+      return ensureTrailingSlash(schemaLocation) + tableIdent.name() + SLASH;
+    }
+
+    // If the schema location is not set, use catalog lakehouse dir as the base path. Or else, throw
+    // an exception.
+    if (catalogLakehouseDir.isEmpty()) {
+      throw new RuntimeException(
+          String.format(
+              "No location specified for table %s, you need to set location either in catalog, schema, or table properties",
+              tableIdent));
+    }
+
+    String catalogLakehousePath = catalogLakehouseDir.get().toString();
+    String[] nsLevels = tableIdent.namespace().levels();
+    String schemaName = nsLevels[nsLevels.length - 1];
+    return ensureTrailingSlash(catalogLakehousePath)
+        + schemaName
+        + SLASH
+        + tableIdent.name()
+        + SLASH;
   }
 
   @Override
