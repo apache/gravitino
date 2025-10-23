@@ -25,7 +25,7 @@ import org.apache.gravitino.stats.PartitionRange;
 
 /** Event fired before listing partition statistics. */
 @DeveloperApi
-public class ListPartitionStatisticsPreEvent extends StatsiticsPreEvent {
+public class ListPartitionStatisticsPreEvent extends StatisticsPreEvent {
   private final PartitionRange partitionRange;
 
   /**

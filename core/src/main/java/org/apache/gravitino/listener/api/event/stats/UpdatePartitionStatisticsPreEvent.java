@@ -26,7 +26,7 @@ import org.apache.gravitino.stats.PartitionStatisticsUpdate;
 
 /** Event fired before updating partition statistics. */
 @DeveloperApi
-public class UpdatePartitionStatisticsPreEvent extends StatsiticsPreEvent {
+public class UpdatePartitionStatisticsPreEvent extends StatisticsPreEvent {
   private final List<PartitionStatisticsUpdate> partitionStatisticsUpdates;
 
   /**

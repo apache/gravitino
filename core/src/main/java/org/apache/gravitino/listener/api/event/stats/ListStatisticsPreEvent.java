@@ -23,7 +23,7 @@ import org.apache.gravitino.listener.api.event.OperationType;
 
 /** Event fired before listing statistics. */
 @DeveloperApi
-public class ListStatisticsPreEvent extends StatsiticsPreEvent {
+public class ListStatisticsPreEvent extends StatisticsPreEvent {
 
   /**
    * Constructor for creating a list statistics pre-event.

@@ -25,7 +25,7 @@ import org.apache.gravitino.listener.api.event.OperationType;
 
 /** Event fired before dropping statistics of a metadata object. */
 @DeveloperApi
-public class DropStatisticsPreEvent extends StatsiticsPreEvent {
+public class DropStatisticsPreEvent extends StatisticsPreEvent {
   private final List<String> statisticNames;
 
   /**

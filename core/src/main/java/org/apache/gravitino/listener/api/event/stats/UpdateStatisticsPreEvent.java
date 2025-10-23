@@ -26,7 +26,7 @@ import org.apache.gravitino.stats.StatisticValue;
 
 /** Event fired before updating statistics. */
 @DeveloperApi
-public class UpdateStatisticsPreEvent extends StatsiticsPreEvent {
+public class UpdateStatisticsPreEvent extends StatisticsPreEvent {
   private Map<String, StatisticValue<?>> statistics;
 
   /**

@@ -26,7 +26,7 @@ import org.apache.gravitino.stats.PartitionStatisticsDrop;
 
 /** Event fired before dropping partition statistics. */
 @DeveloperApi
-public class DropPartitionStatisticsPreEvent extends StatsiticsPreEvent {
+public class DropPartitionStatisticsPreEvent extends StatisticsPreEvent {
   private final List<PartitionStatisticsDrop> partitionStatisticsDrops;
 
   /**
