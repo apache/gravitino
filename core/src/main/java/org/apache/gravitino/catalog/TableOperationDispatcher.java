@@ -648,6 +648,12 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
     try {
       store.put(tableEntity, true /* overwrite */);
     } catch (Exception e) {
+      if (isGenericLakehouseCatalog(catalogIdent)) {
+        // Drop table
+        doWithCatalog(
+            catalogIdent, c -> c.doWithTableOps(t -> t.dropTable(ident)), RuntimeException.class);
+      }
+
       LOG.error(FormattedErrorMessages.STORE_OP_FAILURE, "put", ident, e);
       return EntityCombinedTable.of(table)
           .withHiddenProperties(

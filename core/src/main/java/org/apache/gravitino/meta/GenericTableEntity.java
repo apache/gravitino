@@ -72,7 +72,7 @@ public class GenericTableEntity extends TableEntity {
   }
 
   private String format;
-  private Map<String, String> properties;
+  @Getter private Map<String, String> properties;
   private Transform[] partitions;
   private SortOrder[] sortOrder;
   private Distribution distribution;

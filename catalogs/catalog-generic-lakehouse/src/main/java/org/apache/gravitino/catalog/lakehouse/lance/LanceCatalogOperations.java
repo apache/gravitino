@@ -19,6 +19,7 @@
 
 package org.apache.gravitino.catalog.lakehouse.lance;
 
+import com.google.common.collect.ImmutableMap;
 import com.lancedb.lance.Dataset;
 import com.lancedb.lance.WriteParams;
 import java.io.IOException;
@@ -48,13 +49,20 @@ import org.apache.gravitino.rel.expressions.sorts.SortOrder;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.indexes.Index;
 import org.apache.gravitino.utils.PrincipalUtils;
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.Path;
 
 public class LanceCatalogOperations implements LakehouseCatalogOperations {
+
+  private Map<String, String> lancePropertiesMap;
 
   @Override
   public void initialize(
       Map<String, String> config, CatalogInfo info, HasPropertyMetadata propertiesMetadata)
-      throws RuntimeException {}
+      throws RuntimeException {
+    lancePropertiesMap = ImmutableMap.copyOf(config);
+  }
 
   @Override
   public void testConnection(
@@ -153,7 +161,13 @@ public class LanceCatalogOperations implements LakehouseCatalogOperations {
 
   @Override
   public boolean dropTable(NameIdentifier ident) {
-    // TODO, drop directly?
-    return false;
+    try {
+      String location = lancePropertiesMap.get("location");
+      // Remove the directory on storage
+      FileSystem fs = FileSystem.get(new Configuration());
+      return fs.delete(new Path(location), true);
+    } catch (IOException e) {
+      throw new RuntimeException("Failed to drop Lance table: " + ident.name(), e);
+    }
   }
 }

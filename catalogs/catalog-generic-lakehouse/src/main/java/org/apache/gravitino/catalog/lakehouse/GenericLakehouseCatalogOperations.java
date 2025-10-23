@@ -263,7 +263,25 @@ public class GenericLakehouseCatalogOperations
 
   @Override
   public boolean dropTable(NameIdentifier ident) {
-    throw new UnsupportedOperationException("Not implemented yet.");
+    EntityStore store = GravitinoEnv.getInstance().entityStore();
+    Namespace namespace = ident.namespace();
+    try {
+      GenericTableEntity tableEntity =
+          store.get(ident, Entity.EntityType.TABLE, GenericTableEntity.class);
+      Map<String, String> tableProperties = tableEntity.getProperties();
+      String format = tableProperties.getOrDefault("format", "lance");
+      LakehouseCatalogOperations lakehouseCatalogOperations =
+          SUPPORTED_FORMATS.compute(
+              format,
+              (k, v) ->
+                  v == null
+                      ? createLakehouseCatalogOperations(
+                          format, tableProperties, catalogInfo, propertiesMetadata)
+                      : v);
+      return lakehouseCatalogOperations.dropTable(ident);
+    } catch (IOException e) {
+      throw new RuntimeException("Failed to list tables under schema " + namespace, e);
+    }
   }
 
   private String ensureTrailingSlash(String path) {
