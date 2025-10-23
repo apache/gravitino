@@ -18,9 +18,13 @@
  */
 package org.apache.gravitino.storage.relational.service;
 
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mockStatic;
+
 import java.io.IOException;
 import java.time.Instant;
 import org.apache.gravitino.Entity;
+import org.apache.gravitino.MetadataIdConverter;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.meta.AuditInfo;
@@ -36,8 +40,11 @@ import org.apache.gravitino.meta.TopicEntity;
 import org.apache.gravitino.meta.UserEntity;
 import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.storage.relational.TestJDBCBackend;
+import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.mockito.MockedStatic;
 
 class TestOwnerMetaService extends TestJDBCBackend {
 
@@ -45,6 +52,21 @@ class TestOwnerMetaService extends TestJDBCBackend {
 
   private final AuditInfo auditInfo =
       AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
+
+  private static MockedStatic<MetadataIdConverter> metadataIdConverterMockedStatic;
+
+  @BeforeAll
+  public static void start() {
+    metadataIdConverterMockedStatic = mockStatic(MetadataIdConverter.class);
+    metadataIdConverterMockedStatic
+        .when(() -> MetadataIdConverter.getID(any(), any()))
+        .then(request -> request.getArguments()[0]);
+  }
+
+  @AfterAll
+  public static void stop() {
+    metadataIdConverterMockedStatic.close();
+  }
 
   @Test
   void testDifferentOwners() throws IOException {
