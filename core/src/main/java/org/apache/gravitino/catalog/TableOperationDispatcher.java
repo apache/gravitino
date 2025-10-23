@@ -262,6 +262,57 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
             tableId = te.id();
           }
 
+          if (isGenericLakehouseCatalog(catalogIdent)) {
+            // For generic lakehouse catalog, we only update the table entity with basic info.
+            GenericTableEntity genericTableEntity =
+                operateOnEntity(
+                    ident, id -> store.get(id, TABLE, GenericTableEntity.class), "GET", tableId);
+            if (genericTableEntity == null) {
+              throw new NoSuchTableException("No such table: %s", ident);
+            }
+
+            GenericTable genericTable = (GenericTable) alteredTable;
+            GenericTableEntity updatedGenericTableEntity =
+                operateOnEntity(
+                    ident,
+                    id ->
+                        store.update(
+                            id,
+                            GenericTableEntity.class,
+                            TABLE,
+                            tableEntity ->
+                                GenericTableEntity.getBuilder()
+                                    .withId(tableEntity.id())
+                                    .withName(alteredTable.name())
+                                    .withNamespace(getNewNamespace(ident, changes))
+                                    .withFormat(genericTable.format())
+                                    .withAuditInfo(
+                                        AuditInfo.builder()
+                                            .withCreator(tableEntity.auditInfo().creator())
+                                            .withCreateTime(tableEntity.auditInfo().createTime())
+                                            .withLastModifier(
+                                                PrincipalUtils.getCurrentPrincipal().getName())
+                                            .withLastModifiedTime(Instant.now())
+                                            .build())
+                                    .withColumns(tableEntity.columns())
+                                    .withIndexes(genericTable.index())
+                                    .withDistribution(genericTable.distribution())
+                                    .withPartitions(genericTable.partitioning())
+                                    .withSortOrder(genericTable.sortOrder())
+                                    .withProperties(genericTable.properties())
+                                    .withComment(genericTable.comment())
+                                    .build()),
+                    "UPDATE",
+                    tableId);
+
+            return EntityCombinedTable.of(alteredTable, updatedGenericTableEntity)
+                .withHiddenProperties(
+                    getHiddenPropertyNames(
+                        getCatalogIdentifier(ident),
+                        HasPropertyMetadata::tablePropertiesMetadata,
+                        alteredTable.properties()));
+          }
+
           TableEntity updatedTableEntity =
               operateOnEntity(
                   ident,
