@@ -108,14 +108,23 @@ public class IcebergMetricsManager {
                 TimeUnit.HOURS));
   }
 
-  public void recordMetric(MetricsReport metricsReport) {
+  /**
+   * Records a metrics report by adding it to the processing queue.
+   *
+   * @param metricsReport the metrics report to record
+   * @return true if the metric was successfully queued, false if it was rejected (manager closed or
+   *     queue full)
+   */
+  public boolean recordMetric(MetricsReport metricsReport) {
     if (isClosed) {
       logMetrics("Drop Iceberg metrics because Iceberg Metrics Manager is closed.", metricsReport);
-      return;
+      return false;
     }
     if (!queue.offer(metricsReport)) {
       logMetrics("Drop Iceberg metrics because metrics queue is full.", metricsReport);
+      return false;
     }
+    return true;
   }
 
   public void close() {
