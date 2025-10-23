@@ -19,6 +19,9 @@
 
 package org.apache.gravitino.catalog.fileset.authentication.kerberos;
 
+import static org.apache.gravitino.catalog.hadoop.fs.Constants.HADOOP_KRB5_CONF;
+import static org.apache.gravitino.catalog.hadoop.fs.Constants.SECURITY_KRB5_ENV;
+
 import com.google.common.base.Preconditions;
 import com.google.common.base.Splitter;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
@@ -63,9 +66,9 @@ public class KerberosClient implements Closeable {
     Preconditions.checkArgument(
         principalComponents.size() == 2, "The principal has the wrong format");
 
-    String krb5Config = hadoopConf.get("hadoop.security.authentication.kerberos.krb5.conf");
+    String krb5Config = hadoopConf.get(HADOOP_KRB5_CONF);
     if (krb5Config != null) {
-      System.setProperty("java.security.krb5.conf", krb5Config);
+      System.setProperty(SECURITY_KRB5_ENV, krb5Config);
     }
 
     // Login

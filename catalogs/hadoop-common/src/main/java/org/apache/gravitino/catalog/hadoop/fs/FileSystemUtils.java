@@ -20,6 +20,7 @@ package org.apache.gravitino.catalog.hadoop.fs;
 
 import static org.apache.gravitino.catalog.hadoop.fs.Constants.BUILTIN_HDFS_FS_PROVIDER;
 import static org.apache.gravitino.catalog.hadoop.fs.Constants.BUILTIN_LOCAL_FS_PROVIDER;
+import static org.apache.gravitino.catalog.hadoop.fs.Constants.HDFS_CONFIG_RESOURCES;
 import static org.apache.gravitino.catalog.hadoop.fs.FileSystemProvider.GRAVITINO_BYPASS;
 
 import com.google.common.collect.Maps;
@@ -45,7 +46,6 @@ public class FileSystemUtils {
   private static final String PROPERTY_TAG = "property";
   private static final String NAME_TAG = "name";
   private static final String VALUE_TAG = "value";
-  private static final String HDFS_CONFIG_RESOURCES = "hdfs.config.resources";
 
   private FileSystemUtils() {}
 
