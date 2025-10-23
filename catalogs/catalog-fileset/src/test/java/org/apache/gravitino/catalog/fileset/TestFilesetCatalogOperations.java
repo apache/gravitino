@@ -1726,21 +1726,6 @@ public class TestFilesetCatalogOperations {
                   createMultiLocationSchema("s1", "comment", ImmutableMap.of(), illegalLocations));
       Assertions.assertEquals("Location name must not be blank", exception.getMessage());
 
-      // empty location name in storage location
-      exception =
-          Assertions.assertThrows(
-              IllegalArgumentException.class,
-              () ->
-                  createMultiLocationFileset(
-                      "fileset_test",
-                      "s1",
-                      null,
-                      Fileset.Type.MANAGED,
-                      ImmutableMap.of(),
-                      ImmutableMap.of("", TEST_ROOT_PATH + "/fileset31"),
-                      null));
-      Assertions.assertEquals("Location name must not be blank", exception.getMessage());
-
       // empty location in catalog location
       Map<String, String> illegalLocations2 =
           new HashMap<String, String>() {
@@ -1769,23 +1754,6 @@ public class TestFilesetCatalogOperations {
       Assertions.assertEquals(
           "The value of the schema property location must not be blank", exception.getMessage());
 
-      // empty fileset storage location
-      exception =
-          Assertions.assertThrows(
-              IllegalArgumentException.class,
-              () ->
-                  createMultiLocationFileset(
-                      "fileset_test",
-                      "s1",
-                      null,
-                      Fileset.Type.MANAGED,
-                      ImmutableMap.of(),
-                      ImmutableMap.of("location1", ""),
-                      null));
-      Assertions.assertEquals(
-          "Storage location must not be blank for location name: location1",
-          exception.getMessage());
-
       // storage location is parent of schema location
       Schema multipLocationSchema =
           createMultiLocationSchema(
@@ -1812,6 +1780,38 @@ public class TestFilesetCatalogOperations {
               .contains(
                   "The fileset property default-location-name must be set and must be one of the fileset locations"),
           "Exception message: " + exception.getMessage());
+
+      // empty location name in storage location
+      exception =
+          Assertions.assertThrows(
+              IllegalArgumentException.class,
+              () ->
+                  createMultiLocationFileset(
+                      "fileset_test",
+                      "s1",
+                      null,
+                      Fileset.Type.MANAGED,
+                      ImmutableMap.of(),
+                      ImmutableMap.of("", TEST_ROOT_PATH + "/fileset31"),
+                      null));
+      Assertions.assertEquals("Location name must not be blank", exception.getMessage());
+
+      // empty fileset storage location
+      exception =
+          Assertions.assertThrows(
+              IllegalArgumentException.class,
+              () ->
+                  createMultiLocationFileset(
+                      "fileset_test",
+                      "s1",
+                      null,
+                      Fileset.Type.MANAGED,
+                      ImmutableMap.of(),
+                      ImmutableMap.of("location1", ""),
+                      null));
+      Assertions.assertEquals(
+          "Storage location must not be blank for location name: location1",
+          exception.getMessage());
     }
   }
 
