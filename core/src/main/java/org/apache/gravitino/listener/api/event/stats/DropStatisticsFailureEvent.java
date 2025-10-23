@@ -31,9 +31,10 @@ public class DropStatisticsFailureEvent extends StatisticsFailureEvent {
   /**
    * Constructor for DropStatisticsFailureEvent.
    *
-   * @param user
-   * @param identifier
-   * @param exception
+   * @param user the name of the user who initiated the drop statistics operation
+   * @param identifier the identifier of the metadata object whose statistics were to be dropped
+   * @param exception the exception that was thrown during the drop statistics operation
+   * @param statisticNames the list of statistic names that were attempted to be dropped
    */
   public DropStatisticsFailureEvent(
       String user, NameIdentifier identifier, Exception exception, List<String> statisticNames) {
