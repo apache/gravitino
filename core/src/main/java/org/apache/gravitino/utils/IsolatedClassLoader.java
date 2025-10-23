@@ -230,6 +230,7 @@ public class IsolatedClassLoader implements Closeable {
         || name.startsWith("org.apache.logging.log4j")
         || name.startsWith("java.")
         || !isCatalogClass(name)
+        || !name.startsWith("org.apache.hadoop")
         || sharedClasses.stream().anyMatch(name::startsWith);
   }
 
@@ -261,7 +262,8 @@ public class IsolatedClassLoader implements Closeable {
    */
   private boolean isBarrierClass(String name) {
     // We need to add more later on when we have more catalog implementations.
-    return barrierClasses.stream().anyMatch(name::startsWith);
+    return barrierClasses.stream().anyMatch(name::startsWith)
+        || name.startsWith("org.apache.hadoop");
   }
 
   private ClassLoader getRootClassLoader() throws Exception {
