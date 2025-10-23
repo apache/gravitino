@@ -250,17 +250,14 @@ public class StatisticOperations {
                   "Listing partition statistics is only supported for tables now.");
             }
 
-            if (fromPartitionName == null && toPartitionName == null) {
-              throw new IllegalArgumentException(
-                  "Both 'from' and 'to' parameters cannot be null at the same time.");
-            }
-
             MetadataObjectUtil.checkMetadataObject(metalake, object);
 
             PartitionRange range;
             PartitionRange.BoundType fromBoundType = getFromBoundType(fromInclusive);
             PartitionRange.BoundType toBoundType = getFromBoundType(toInclusive);
-            if (fromPartitionName != null && toPartitionName != null) {
+            if (fromPartitionName == null && toPartitionName == null) {
+              range = PartitionRange.ALL_PARTITIONS;
+            } else if (fromPartitionName != null && toPartitionName != null) {
               range =
                   PartitionRange.between(
                       fromPartitionName, fromBoundType, toPartitionName, toBoundType);

@@ -167,12 +167,27 @@ public class StatisticIT extends BaseIT {
     statisticsToUpdate.add(PartitionStatisticsModification.update("p1", stats));
     table.supportsPartitionStatistics().updatePartitionStatistics(statisticsToUpdate);
 
+    // Test range partitions
     List<PartitionStatistics> listedStats =
         table.supportsPartitionStatistics().listPartitionStatistics(range);
     Assertions.assertEquals(1, listedStats.size());
     PartitionStatistics partitionStatistics = listedStats.get(0);
     Assertions.assertEquals("p1", partitionStatistics.partitionName());
     Statistic[] statistics = partitionStatistics.statistics();
+    Assertions.assertEquals(2, statistics.length);
+    Arrays.sort(statistics, Comparator.comparing(Statistic::name));
+    Assertions.assertEquals(statistics[0].name(), "custom-k1");
+    Assertions.assertEquals(statistics[0].value().get(), StatisticValues.stringValue("v1"));
+    Assertions.assertEquals(statistics[1].name(), "custom-k2");
+    Assertions.assertEquals(statistics[1].value().get(), StatisticValues.stringValue("v2"));
+
+    // Test list all partitions
+    listedStats =
+        table.supportsPartitionStatistics().listPartitionStatistics(PartitionRange.ALL_PARTITIONS);
+    Assertions.assertEquals(1, listedStats.size());
+    partitionStatistics = listedStats.get(0);
+    Assertions.assertEquals("p1", partitionStatistics.partitionName());
+    statistics = partitionStatistics.statistics();
     Assertions.assertEquals(2, statistics.length);
     Arrays.sort(statistics, Comparator.comparing(Statistic::name));
     Assertions.assertEquals(statistics[0].name(), "custom-k1");
