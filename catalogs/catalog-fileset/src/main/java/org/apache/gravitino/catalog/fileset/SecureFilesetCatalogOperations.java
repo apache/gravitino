@@ -135,7 +135,7 @@ public class SecureFilesetCatalogOperations
           try {
             setUser(apiUser);
             return filesetCatalogOperations.createMultipleLocationFileset(
-                ident, comment, type, storageLocations, filesetProperties);
+                ident, comment, type, storageLocations, properties);
           } finally {
             unsetUser(apiUser);
           }
@@ -185,7 +185,7 @@ public class SecureFilesetCatalogOperations
         () -> {
           try {
             setUser(apiUser);
-            return filesetCatalogOperations.createSchema(ident, comment, schemaProperties);
+            return filesetCatalogOperations.createSchema(ident, comment, properties);
           } finally {
             unsetUser(apiUser);
           }
