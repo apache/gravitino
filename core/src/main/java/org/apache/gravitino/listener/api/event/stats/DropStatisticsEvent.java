@@ -32,7 +32,7 @@ public class DropStatisticsEvent extends StatisticsEvent {
    * Constructor for DropStatisticsEvent.
    *
    * @param user the user performing the operation
-   * @param identifier the identifier of the table
+   * @param identifier the identifier of the metadata object
    * @param statisticNames the names of the statistics that were dropped
    */
   public DropStatisticsEvent(String user, NameIdentifier identifier, List<String> statisticNames) {

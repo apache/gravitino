@@ -32,8 +32,9 @@ public class UpdateStatisticsFailureEvent extends StatisticsFailureEvent {
    * Constructor for UpdateStatisticsFailureEvent.
    *
    * @param user the user performing the operation
-   * @param identifier the identifier of the table
+   * @param identifier the identifier of the metadata object
    * @param cause the exception that occurred
+   * @param statistics the statistics that were being updated
    */
   public UpdateStatisticsFailureEvent(
       String user,

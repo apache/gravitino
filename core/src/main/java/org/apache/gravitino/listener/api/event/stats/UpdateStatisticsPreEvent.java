@@ -33,7 +33,7 @@ public class UpdateStatisticsPreEvent extends StatisticsPreEvent {
    * Constructor for UpdateStatisticsPreEvent.
    *
    * @param user the user performing the operation
-   * @param identifier the identifier of the table
+   * @param identifier the identifier of the metadata object
    * @param statistics the statistics to be updated
    */
   public UpdateStatisticsPreEvent(
