@@ -258,7 +258,7 @@ public class IcebergTableOperations {
   @Path("{table}")
   @Produces(MediaType.APPLICATION_JSON)
   @Timed(name = "table-exists." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
-  @ResponseMetered(name = "table-exits", absolute = true)
+  @ResponseMetered(name = "table-exists", absolute = true)
   public Response tableExists(
       @PathParam("prefix") String prefix,
       @Encoded() @PathParam("namespace") String namespace,
