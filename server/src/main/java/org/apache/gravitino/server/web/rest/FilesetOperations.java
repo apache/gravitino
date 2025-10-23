@@ -132,9 +132,11 @@ public class FilesetOperations {
   @ResponseMetered(name = "create-fileset", absolute = true)
   @AuthorizationExpression(
       expression =
-          "ANY(OWNER, METALAKE, CATALOG) || "
-              + "SCHEMA_OWNER_WITH_USE_CATALOG || "
-              + "ANY_USE_CATALOG && ANY_USE_SCHEMA && ANY_CREATE_FILESET",
+          """
+                      ANY(OWNER, METALAKE, CATALOG) ||
+                      SCHEMA_OWNER_WITH_USE_CATALOG ||
+                      ANY_USE_CATALOG && ANY_USE_SCHEMA && ANY_CREATE_FILESET
+                      """,
       accessMetadataType = MetadataObject.Type.SCHEMA)
   public Response createFileset(
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
@@ -273,9 +275,11 @@ public class FilesetOperations {
   @ResponseMetered(name = "alter-fileset", absolute = true)
   @AuthorizationExpression(
       expression =
-          "ANY(OWNER, METALAKE, CATALOG) || "
-              + "SCHEMA_OWNER_WITH_USE_CATALOG || "
-              + "ANY_USE_CATALOG && ANY_USE_SCHEMA && (FILESET::OWNER || ANY_WRITE_FILESET)",
+          """
+                      ANY(OWNER, METALAKE, CATALOG) ||
+                      SCHEMA_OWNER_WITH_USE_CATALOG ||
+                      ANY_USE_CATALOG && ANY_USE_SCHEMA && (FILESET::OWNER || ANY_WRITE_FILESET)
+                      """,
       accessMetadataType = MetadataObject.Type.FILESET)
   public Response alterFileset(
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
@@ -313,9 +317,11 @@ public class FilesetOperations {
   @ResponseMetered(name = "drop-fileset", absolute = true)
   @AuthorizationExpression(
       expression =
-          "ANY(OWNER, METALAKE, CATALOG) || "
-              + "SCHEMA_OWNER_WITH_USE_CATALOG || "
-              + "ANY_USE_CATALOG && ANY_USE_SCHEMA && FILESET::OWNER",
+          """
+                      ANY(OWNER, METALAKE, CATALOG) ||
+                      SCHEMA_OWNER_WITH_USE_CATALOG ||
+                      ANY_USE_CATALOG && ANY_USE_SCHEMA && FILESET::OWNER
+                      """,
       accessMetadataType = MetadataObject.Type.FILESET)
   public Response dropFileset(
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
