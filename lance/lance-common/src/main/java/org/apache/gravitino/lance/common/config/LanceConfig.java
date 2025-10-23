@@ -72,7 +72,7 @@ public class LanceConfig extends Config implements OverwriteDefaultConfig {
       new ConfigBuilder(LANCE_CONFIG_PREFIX + "gravitino-uri")
           .doc(
               "The URI of the Gravitino server for Lance REST to access metadata. "
-                  + "Only required in standalone mode. In auxiliary mode, direct memory access is used.")
+                  + "Only required in standalone mode. In auxiliary mode, direct memory access can be used.")
           .version(ConfigConstants.VERSION_0_1_0)
           .stringConf()
           .createWithDefault("http://localhost:8090");
