@@ -42,6 +42,7 @@ dependencies {
   implementation(libs.lance.namespace.core)
   implementation(libs.slf4j.api)
 
+  testImplementation(project(":server-common"))
   testImplementation(libs.junit.jupiter.api)
   testRuntimeOnly(libs.junit.jupiter.engine)
 }
