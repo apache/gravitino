@@ -189,9 +189,10 @@ public class GvfsMultipleClusterIT extends BaseIT {
     return new Path(String.format("gvfs://fileset/%s/%s/%s", catalogName, schemaName, fileset));
   }
 
-  private String baseHdfsPath(String ip) {
+  private String baseHdfsPath(String ip, String filesetName) {
     return String.format(
-        "hdfs://%s:%d/tmp/%s/%s", ip, HiveContainer.HDFS_DEFAULTFS_PORT, catalogName, schemaName);
+        "hdfs://%s:%d/tmp/%s/%s/%s",
+        ip, HiveContainer.HDFS_DEFAULTFS_PORT, catalogName, schemaName, filesetName);
   }
 
   @Test
@@ -200,7 +201,7 @@ public class GvfsMultipleClusterIT extends BaseIT {
     String normalFilesetName = GravitinoITUtils.genRandomName("fileset_normal");
     NameIdentifier normalFilesetIdent = NameIdentifier.of(schemaName, normalFilesetName);
     Catalog catalog = metalake.loadCatalog(catalogName);
-    String location = baseHdfsPath(hiveContainer.getContainerIpAddress());
+    String location = baseHdfsPath(hiveContainer.getContainerIpAddress(), normalFilesetName);
     catalog
         .asFilesetCatalog()
         .createMultipleLocationFileset(
@@ -214,7 +215,7 @@ public class GvfsMultipleClusterIT extends BaseIT {
     // create a fileset with kerberos cluster
     String kerberosFilesetName = GravitinoITUtils.genRandomName("fileset_kerberos");
     NameIdentifier kerberosFilesetIdent = NameIdentifier.of(schemaName, kerberosFilesetName);
-    location = baseHdfsPath(kerberosHiveContainer.getContainerIpAddress());
+    location = baseHdfsPath(kerberosHiveContainer.getContainerIpAddress(), kerberosFilesetName);
     String configResources =
         configResourcesPath + "/core-site.xml," + configResourcesPath + "/hdfs-site.xml";
     catalog
@@ -247,7 +248,7 @@ public class GvfsMultipleClusterIT extends BaseIT {
       gvfs.create(new Path(kerberosGvfsPath + "/file2.txt")).close();
     }
 
-    catalog.asFilesetCatalog().dropFileset(normalFilesetIdent);
-    catalog.asFilesetCatalog().dropFileset(kerberosFilesetIdent);
+    // catalog.asFilesetCatalog().dropFileset(normalFilesetIdent);
+    // catalog.asFilesetCatalog().dropFileset(kerberosFilesetIdent);
   }
 }

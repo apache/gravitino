@@ -39,8 +39,8 @@ public class TestFileset {
     conf.set("fs.gravitino.client.metalake", "test");
     // set the location name if you want to access a specific location
     // conf.set("fs.gravitino.current.location.name","test_location_name");
-    Path filesetPath1 = new Path("gvfs://fileset/fileset_catalog/test_schema/fs6");
-    Path filesetPath2 = new Path("gvfs://fileset/fileset_catalog/test_schema/fs7");
+    Path filesetPath1 = new Path("gvfs://fileset/fileset_catalog/test_schema/fs1");
+    Path filesetPath2 = new Path("gvfs://fileset/fileset_catalog/test_schema/fs2");
     FileSystem fs = filesetPath1.getFileSystem(conf);
     fs.create(new Path(filesetPath1 + "/file1.txt")).close();
     fs.create(new Path(filesetPath2 + "/file1.txt")).close();

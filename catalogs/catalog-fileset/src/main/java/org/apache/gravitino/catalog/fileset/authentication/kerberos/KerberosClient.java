@@ -63,6 +63,11 @@ public class KerberosClient implements Closeable {
     Preconditions.checkArgument(
         principalComponents.size() == 2, "The principal has the wrong format");
 
+    String krb5Config = hadoopConf.get("hadoop.security.authentication.kerberos.krb5.conf");
+    if (krb5Config != null) {
+      System.setProperty("java.security.krb5.conf", krb5Config);
+    }
+
     // Login
     UserGroupInformation.setConfiguration(hadoopConf);
     UserGroupInformation.loginUserFromKeytab(catalogPrincipal, keytabFilePath);
