@@ -43,6 +43,7 @@ public abstract class Config {
 
   private static final String CONFIG_PREPEND = "gravitino.";
 
+  /** The concurrent map to hold configuration key-value pairs. */
   protected final ConcurrentMap<String, String> configMap;
 
   private final Map<String, DeprecatedConfig> deprecatedConfigMap;

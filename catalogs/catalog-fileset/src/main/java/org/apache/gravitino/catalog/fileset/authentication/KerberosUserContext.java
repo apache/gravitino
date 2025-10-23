@@ -58,7 +58,6 @@ public class KerberosUserContext extends UserContext {
         HADOOP_SECURITY_AUTHENTICATION,
         AuthenticationMethod.KERBEROS.name().toLowerCase(Locale.ROOT));
     try {
-      UserGroupInformation.setConfiguration(configuration);
       KerberosClient client = new KerberosClient(properties, configuration, refreshCredentials);
       // Add the kerberos client to the closable to close resources.
       this.kerberosClient = client;
