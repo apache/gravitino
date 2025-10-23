@@ -24,14 +24,14 @@ import org.apache.gravitino.listener.api.event.PreEvent;
 
 /** Base class for all statistics-related pre-events. */
 @DeveloperApi
-public abstract class StatsiticsPreEvent extends PreEvent {
+public abstract class StatisticsPreEvent extends PreEvent {
   /**
    * Constructor for creating a statistics pre-event.
    *
    * @param user the user initiating the event
    * @param identifier the name identifier associated with the event.
    */
-  protected StatsiticsPreEvent(String user, NameIdentifier identifier) {
+  protected StatisticsPreEvent(String user, NameIdentifier identifier) {
     super(user, identifier);
   }
 }
