@@ -18,6 +18,14 @@ package org.apache.gravitino.filesystem.hadoop;
  * under the License.
  */
 
+import static org.apache.gravitino.catalog.hadoop.fs.Constants.AUTH_KERBEROS;
+import static org.apache.gravitino.catalog.hadoop.fs.Constants.AUTH_SIMPlE;
+import static org.apache.gravitino.catalog.hadoop.fs.Constants.FS_DISABLE_CACHE;
+import static org.apache.gravitino.catalog.hadoop.fs.Constants.HADOOP_KRB5_CONF;
+import static org.apache.gravitino.catalog.hadoop.fs.Constants.HADOOP_SECURITY_AUTHENTICATION;
+import static org.apache.gravitino.catalog.hadoop.fs.Constants.HADOOP_SECURITY_KEYTAB;
+import static org.apache.gravitino.catalog.hadoop.fs.Constants.HADOOP_SECURITY_PRINCIPAL;
+import static org.apache.gravitino.catalog.hadoop.fs.Constants.SECURITY_KRB5_ENV;
 import static org.apache.gravitino.catalog.hadoop.fs.HDFSFileSystemProvider.IPC_FALLBACK_TO_SIMPLE_AUTH_ALLOWED;
 
 import java.io.IOException;
@@ -48,14 +56,6 @@ public class HDFSAuthenticationFileSystem extends FileSystem {
   private static final Logger LOG = LoggerFactory.getLogger(HDFSAuthenticationFileSystem.class);
 
   private static final long DEFAULT_RENEW_INTERVAL_MS = 10 * 60 * 1000L;
-  private static final String FS_DISABLE_CACHE = "fs.hdfs.impl.disable.cache";
-  private static final String HADOOP_SECURITY_AUTHENTICATION = "hadoop.security.authentication";
-  private static final String HADOOP_SECURITY_PRINCIPAL =
-      "hadoop.security.authentication.kerberos.principal";
-  private static final String HADOOP_SECURITY_KEYTAB =
-      "hadoop.security.authentication.kerberos.keytab";
-  private static final String AUTH_KERBEROS = "kerberos";
-  private static final String AUTH_SIMPlE = "simple";
 
   private final UserGroupInformation ugi;
   private final FileSystem fs;
@@ -76,10 +76,10 @@ public class HDFSAuthenticationFileSystem extends FileSystem {
       String authType = conf.get(HADOOP_SECURITY_AUTHENTICATION, AUTH_SIMPlE);
 
       if (AUTH_KERBEROS.equalsIgnoreCase(authType)) {
-        String krb5Config = conf.get("hadoop.security.authentication.kerberos.krb5.conf");
+        String krb5Config = conf.get(HADOOP_KRB5_CONF);
 
         if (krb5Config != null) {
-          System.setProperty("java.security.krb5.conf", krb5Config);
+          System.setProperty(SECURITY_KRB5_ENV, krb5Config);
         }
         UserGroupInformation.setConfiguration(conf);
         String principal = conf.get(HADOOP_SECURITY_PRINCIPAL, null);
