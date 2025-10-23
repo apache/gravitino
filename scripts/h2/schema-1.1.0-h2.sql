@@ -15,7 +15,7 @@
 -- KIND, either express or implied.  See the License for the
 -- specific language governing permissions and limitations
 -- under the License.
--
+--
 
 CREATE TABLE IF NOT EXISTS `metalake_meta` (
     `metalake_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'metalake id',
