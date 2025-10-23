@@ -21,6 +21,7 @@ package org.apache.gravitino.server.authentication;
 
 import java.security.Principal;
 import org.apache.gravitino.Config;
+import javax.servlet.http.HttpServletRequest;
 
 /** The interface provides authentication mechanism. */
 public interface Authenticator {
