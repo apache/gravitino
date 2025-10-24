@@ -18,31 +18,27 @@
  */
 package org.apache.gravitino.lance.service.rest;
 
-import com.codahale.metrics.annotation.ResponseMetered;
-import com.codahale.metrics.annotation.Timed;
-import java.util.NoSuchElementException;
+import static org.apache.gravitino.lance.common.ops.NamespaceWrapper.NAMESPACE_DELIMITER_DEFAULT;
+
+import com.lancedb.lance.namespace.model.ListNamespacesResponse;
 import javax.inject.Inject;
-import javax.ws.rs.BadRequestException;
 import javax.ws.rs.Consumes;
 import javax.ws.rs.DefaultValue;
 import javax.ws.rs.Encoded;
 import javax.ws.rs.GET;
-import javax.ws.rs.NotFoundException;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
-import org.apache.gravitino.lance.common.ops.LanceCatalogService;
-import org.apache.gravitino.metrics.MetricNames;
+import org.apache.gravitino.lance.common.ops.NamespaceWrapper;
+import org.apache.gravitino.lance.service.LanceExceptionMapper;
 
 @Path("/v1/namespace")
 @Consumes(MediaType.APPLICATION_JSON)
 @Produces(MediaType.APPLICATION_JSON)
 public class LanceNamespaceOperations {
-
-  private static final String NAMESPACE_DELIMITER_DEFAULT = "$";
 
   private final NamespaceWrapper lanceNamespace;
 
@@ -53,8 +49,6 @@ public class LanceNamespaceOperations {
 
   @GET
   @Path("/{id}/list")
-  @Timed(name = "list-namespaces." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
-  @ResponseMetered(name = "list-namespaces", absolute = true)
   public Response listNamespaces(
       @Encoded @PathParam("id") String namespaceId,
       @DefaultValue(NAMESPACE_DELIMITER_DEFAULT) @QueryParam("delimiter") String delimiter,
