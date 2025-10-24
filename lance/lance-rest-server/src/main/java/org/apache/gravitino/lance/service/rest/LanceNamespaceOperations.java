@@ -79,6 +79,8 @@ public class LanceNamespaceOperations {
 
   @POST
   @Path("/{id}/describe")
+  @Timed(name = "describe-namespaces." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
+  @ResponseMetered(name = "describe-namespaces", absolute = true)
   public Response describeNamespace(
       @Encoded @PathParam("id") String namespaceId,
       @DefaultValue(NAMESPACE_DELIMITER_DEFAULT) @QueryParam("delimiter") String delimiter) {
@@ -93,6 +95,8 @@ public class LanceNamespaceOperations {
 
   @POST
   @Path("/{id}/create")
+  @Timed(name = "create-namespaces." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
+  @ResponseMetered(name = "create-namespaces", absolute = true)
   public Response createNamespace(
       @Encoded @PathParam("id") String namespaceId,
       @DefaultValue(NAMESPACE_DELIMITER_DEFAULT) @QueryParam("delimiter") String delimiter,
@@ -116,6 +120,8 @@ public class LanceNamespaceOperations {
 
   @POST
   @Path("/{id}/drop")
+  @Timed(name = "drop-namespaces." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
+  @ResponseMetered(name = "drop-namespaces", absolute = true)
   public Response dropNamespace(
       @Encoded @PathParam("id") String namespaceId,
       @DefaultValue(NAMESPACE_DELIMITER_DEFAULT) @QueryParam("delimiter") String delimiter,
@@ -141,6 +147,8 @@ public class LanceNamespaceOperations {
 
   @POST
   @Path("/{id}/exists")
+  @Timed(name = "namespace-exists." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
+  @ResponseMetered(name = "namespace-exists", absolute = true)
   public Response namespaceExists(
       @Encoded @PathParam("id") String namespaceId,
       @DefaultValue(NAMESPACE_DELIMITER_DEFAULT) @QueryParam("delimiter") String delimiter) {
