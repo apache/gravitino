@@ -280,7 +280,7 @@ public class TagManager implements TagDispatcher {
                     entityType,
                     tagIdent);
           } catch (NoSuchEntityException e) {
-            if (e.getMessage().contains("No such tag entity")) {
+            if (e.getMessage().contains("No such entity")) {
               throw new NoSuchTagException(
                   e, "Tag %s does not exist for metadata object %s", name, metadataObject);
             } else {
