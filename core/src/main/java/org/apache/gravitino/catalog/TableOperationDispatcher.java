@@ -27,6 +27,7 @@ import static org.apache.gravitino.utils.NameIdentifierUtil.getSchemaIdentifier;
 
 import com.google.common.base.Objects;
 import com.google.common.collect.Lists;
+import java.io.IOException;
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.Collections;
@@ -36,6 +37,7 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.gravitino.Catalog;
 import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.GravitinoEnv;
@@ -52,8 +54,10 @@ import org.apache.gravitino.lock.LockType;
 import org.apache.gravitino.lock.TreeLockUtils;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.ColumnEntity;
+import org.apache.gravitino.meta.GenericTableEntity;
 import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.rel.Column;
+import org.apache.gravitino.rel.GenericTable;
 import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.TableChange;
 import org.apache.gravitino.rel.expressions.distributions.Distribution;
@@ -256,6 +260,57 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
             tableId = stringId.id();
           } else {
             tableId = te.id();
+          }
+
+          if (isGenericLakehouseCatalog(catalogIdent)) {
+            // For generic lakehouse catalog, we only update the table entity with basic info.
+            GenericTableEntity genericTableEntity =
+                operateOnEntity(
+                    ident, id -> store.get(id, TABLE, GenericTableEntity.class), "GET", tableId);
+            if (genericTableEntity == null) {
+              throw new NoSuchTableException("No such table: %s", ident);
+            }
+
+            GenericTable genericTable = (GenericTable) alteredTable;
+            GenericTableEntity updatedGenericTableEntity =
+                operateOnEntity(
+                    ident,
+                    id ->
+                        store.update(
+                            id,
+                            GenericTableEntity.class,
+                            TABLE,
+                            tableEntity ->
+                                GenericTableEntity.getBuilder()
+                                    .withId(tableEntity.id())
+                                    .withName(alteredTable.name())
+                                    .withNamespace(getNewNamespace(ident, changes))
+                                    .withFormat(genericTable.format())
+                                    .withAuditInfo(
+                                        AuditInfo.builder()
+                                            .withCreator(tableEntity.auditInfo().creator())
+                                            .withCreateTime(tableEntity.auditInfo().createTime())
+                                            .withLastModifier(
+                                                PrincipalUtils.getCurrentPrincipal().getName())
+                                            .withLastModifiedTime(Instant.now())
+                                            .build())
+                                    .withColumns(tableEntity.columns())
+                                    .withIndexes(genericTable.index())
+                                    .withDistribution(genericTable.distribution())
+                                    .withPartitions(genericTable.partitioning())
+                                    .withSortOrder(genericTable.sortOrder())
+                                    .withProperties(genericTable.properties())
+                                    .withComment(genericTable.comment())
+                                    .build()),
+                    "UPDATE",
+                    tableId);
+
+            return EntityCombinedTable.of(alteredTable, updatedGenericTableEntity)
+                .withHiddenProperties(
+                    getHiddenPropertyNames(
+                        getCatalogIdentifier(ident),
+                        HasPropertyMetadata::tablePropertiesMetadata,
+                        alteredTable.properties()));
           }
 
           TableEntity updatedTableEntity =
@@ -487,6 +542,19 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
   }
 
   private EntityCombinedTable internalLoadTable(NameIdentifier ident) {
+    NameIdentifier catalogIdent = getCatalogIdentifier(ident);
+    if (isGenericLakehouseCatalog(catalogIdent)) {
+      try {
+        GenericTableEntity tableEntity = store.get(ident, TABLE, GenericTableEntity.class);
+        if (tableEntity != null) {
+          GenericTable genericTable = tableEntity.toGenericTable();
+          return EntityCombinedTable.of(genericTable).withImported(true);
+        }
+      } catch (IOException ioe) {
+        throw new RuntimeException("Failed to load table entity " + ident, ioe);
+      }
+    }
+
     NameIdentifier catalogIdentifier = getCatalogIdentifier(ident);
     Table table =
         doWithCatalog(
@@ -597,18 +665,46 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
             .mapToObj(i -> ColumnEntity.toColumnEntity(columns[i], i, idGenerator.nextId(), audit))
             .collect(Collectors.toList());
 
-    TableEntity tableEntity =
-        TableEntity.builder()
-            .withId(uid)
-            .withName(ident.name())
-            .withNamespace(ident.namespace())
-            .withColumns(columnEntityList)
-            .withAuditInfo(audit)
-            .build();
+    TableEntity tableEntity;
+    if (isGenericLakehouseCatalog(catalogIdent)) {
+      // For generic lakehouse catalog, we only create the table entity with basic info.
+      GenericTable genericTable = (GenericTable) table;
+      tableEntity =
+          GenericTableEntity.getBuilder()
+              .withId(uid)
+              .withName(ident.name())
+              .withNamespace(ident.namespace())
+              .withFormat(genericTable.format())
+              .withAuditInfo(audit)
+              .withColumns(columnEntityList)
+              .withIndexes(table.index())
+              .withDistribution(table.distribution())
+              .withFormat(genericTable.format())
+              .withPartitions(table.partitioning())
+              .withSortOrder(table.sortOrder())
+              .withProperties(genericTable.properties())
+              .withComment(genericTable.comment())
+              .build();
+    } else {
+      tableEntity =
+          TableEntity.builder()
+              .withId(uid)
+              .withName(ident.name())
+              .withNamespace(ident.namespace())
+              .withColumns(columnEntityList)
+              .withAuditInfo(audit)
+              .build();
+    }
 
     try {
       store.put(tableEntity, true /* overwrite */);
     } catch (Exception e) {
+      if (isGenericLakehouseCatalog(catalogIdent)) {
+        // Drop table
+        doWithCatalog(
+            catalogIdent, c -> c.doWithTableOps(t -> t.dropTable(ident)), RuntimeException.class);
+      }
+
       LOG.error(FormattedErrorMessages.STORE_OP_FAILURE, "put", ident, e);
       return EntityCombinedTable.of(table)
           .withHiddenProperties(
@@ -616,6 +712,7 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
                   catalogIdent, HasPropertyMetadata::tablePropertiesMetadata, table.properties()));
     }
 
+    // For managed table, we can use table entity to indicate the table is created successfully.
     return EntityCombinedTable.of(table, tableEntity)
         .withHiddenProperties(
             getHiddenPropertyNames(
@@ -628,6 +725,18 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
         : IntStream.range(0, columns.length)
             .mapToObj(i -> ColumnEntity.toColumnEntity(columns[i], i, idGenerator.nextId(), audit))
             .collect(Collectors.toList());
+  }
+
+  private boolean isGenericLakehouseCatalog(NameIdentifier catalogIdent) {
+    CatalogManager catalogManager = GravitinoEnv.getInstance().catalogManager();
+    try {
+      Catalog catalog = catalogManager.loadCatalog(catalogIdent);
+      return catalog.type() == Catalog.Type.RELATIONAL
+          && catalog.provider().equals("generic-lakehouse");
+    } catch (NoSuchEntityException e) {
+      LOG.warn("Catalog not found: {}", catalogIdent, e);
+      return false;
+    }
   }
 
   private boolean isSameColumn(Column left, int columnPosition, ColumnEntity right) {

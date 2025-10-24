@@ -67,5 +67,50 @@ public interface Index {
      * UNIQUE KEY helps in avoiding redundancy and ensuring data accuracy in the database.
      */
     UNIQUE_KEY,
+
+    // The following index types are specific to Lance, for more, please see: IndexType in LanceDB
+    /**
+     * SCALAR index is used to optimize searches on scalar data types such as integers, floats,
+     * strings, etc. Currently, this type is only applicable to Lance.
+     */
+    SCALAR,
+    /**
+     * BTREE index is a balanced tree data structure that maintains sorted data and allows for
+     * logarithmic time complexity for search, insert, and delete operations. Currently, this type
+     * is only applicable to Lance.
+     */
+    BTREE,
+    /**
+     * Bitmap index is a type of database index that uses bit arrays (bitmaps) to represent the
+     * presence or absence of values in a column, enabling efficient querying and data retrieval.
+     * Currently, this type is only applicable to Lance.
+     */
+    BITMAP,
+    /**
+     * LABEL_LIST index is used to optimize searches on columns containing lists of labels or tags.
+     * Currently, this type is only applicable to Lance.
+     */
+    LABEL_LIST,
+    /**
+     * INVERTED index is a data structure used to optimize full-text searches by mapping terms to
+     * their locations within a dataset, allowing for quick retrieval of documents containing
+     * specific words or phrases. Currently, this type is only applicable to Lance.
+     */
+    INVERTED,
+    /**
+     * VECTOR index is used to optimize similarity searches in high-dimensional vector spaces.
+     * Currently, this type is only applicable to Lance.
+     */
+    VECTOR,
+    /** IVF_FLAT (Inverted File with Flat quantization) is an indexing method used for efficient */
+    IVF_FLAT,
+    /** IVF_SQ (Inverted File with Scalar Quantization) is an indexing method used for efficient */
+    IVF_SQ,
+    /** IVF_PQ (Inverted File with Product Quantization) is an indexing method used for efficient */
+    IVF_PQ,
+    /** IVF_HNSW_FLAT */
+    IVF_HNSW_SQ,
+    /** IVF_HNSW_PQ */
+    IVF_HNSW_PQ;
   }
 }
