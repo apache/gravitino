@@ -42,15 +42,15 @@ public class TableEntity implements Entity, Auditable, HasIdentifier {
   public static final Field COLUMNS =
       Field.optional("columns", List.class, "The columns of the table");
 
-  private Long id;
+  protected Long id;
 
-  private String name;
+  protected String name;
 
-  private AuditInfo auditInfo;
+  protected AuditInfo auditInfo;
 
-  private Namespace namespace;
+  protected Namespace namespace;
 
-  private List<ColumnEntity> columns;
+  protected List<ColumnEntity> columns;
 
   /**
    * Returns a map of the fields and their corresponding values for this table.

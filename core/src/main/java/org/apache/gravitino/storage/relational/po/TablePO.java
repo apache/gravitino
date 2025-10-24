@@ -20,7 +20,9 @@ package org.apache.gravitino.storage.relational.po;
 
 import com.google.common.base.Objects;
 import com.google.common.base.Preconditions;
+import lombok.Getter;
 
+@Getter
 public class TablePO {
   private Long tableId;
   private String tableName;
@@ -31,6 +33,15 @@ public class TablePO {
   private Long currentVersion;
   private Long lastVersion;
   private Long deletedAt;
+
+  private String format;
+
+  private String properties;
+  private String partitions;
+  private String sortOrders;
+  private String distribution;
+  private String indexes;
+  private String comment;
 
   public Long getTableId() {
     return tableId;
@@ -151,6 +162,41 @@ public class TablePO {
 
     public Builder withDeletedAt(Long deletedAt) {
       tablePO.deletedAt = deletedAt;
+      return this;
+    }
+
+    public Builder withFormat(String format) {
+      tablePO.format = format;
+      return this;
+    }
+
+    public Builder withProperties(String properties) {
+      tablePO.properties = properties;
+      return this;
+    }
+
+    public Builder withPartitions(String partitions) {
+      tablePO.partitions = partitions;
+      return this;
+    }
+
+    public Builder withSortOrders(String sortOrders) {
+      tablePO.sortOrders = sortOrders;
+      return this;
+    }
+
+    public Builder withDistribution(String distribution) {
+      tablePO.distribution = distribution;
+      return this;
+    }
+
+    public Builder withIndexes(String indexes) {
+      tablePO.indexes = indexes;
+      return this;
+    }
+
+    public Builder withComment(String comment) {
+      tablePO.comment = comment;
       return this;
     }
 
