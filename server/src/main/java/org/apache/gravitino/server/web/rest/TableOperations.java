@@ -199,9 +199,11 @@ public class TableOperations {
   @ResponseMetered(name = "alter-table", absolute = true)
   @AuthorizationExpression(
       expression =
-          "ANY(OWNER, METALAKE, CATALOG) || "
-              + "SCHEMA_OWNER_WITH_USE_CATALOG || "
-              + "ANY_USE_CATALOG && ANY_USE_SCHEMA  && (TABLE::OWNER || ANY_MODIFY_TABLE)",
+          """
+                      ANY(OWNER, METALAKE, CATALOG) ||
+                       SCHEMA_OWNER_WITH_USE_CATALOG ||
+                       ANY_USE_CATALOG && ANY_USE_SCHEMA  && (TABLE::OWNER || ANY_MODIFY_TABLE)
+                      """,
       accessMetadataType = MetadataObject.Type.TABLE)
   public Response alterTable(
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
@@ -239,9 +241,11 @@ public class TableOperations {
   @ResponseMetered(name = "drop-table", absolute = true)
   @AuthorizationExpression(
       expression =
-          "ANY(OWNER, METALAKE, CATALOG) || "
-              + "SCHEMA_OWNER_WITH_USE_CATALOG || "
-              + "ANY_USE_CATALOG && ANY_USE_SCHEMA  && TABLE::OWNER ",
+          """
+              ANY(OWNER, METALAKE, CATALOG) ||
+              SCHEMA_OWNER_WITH_USE_CATALOG ||
+              ANY_USE_CATALOG && ANY_USE_SCHEMA  && TABLE::OWNER
+              """,
       accessMetadataType = MetadataObject.Type.TABLE)
   public Response dropTable(
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
