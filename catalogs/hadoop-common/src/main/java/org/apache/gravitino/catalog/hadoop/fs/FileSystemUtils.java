@@ -20,6 +20,7 @@ package org.apache.gravitino.catalog.hadoop.fs;
 
 import static org.apache.gravitino.catalog.hadoop.fs.Constants.BUILTIN_HDFS_FS_PROVIDER;
 import static org.apache.gravitino.catalog.hadoop.fs.Constants.BUILTIN_LOCAL_FS_PROVIDER;
+import static org.apache.gravitino.catalog.hadoop.fs.Constants.HDFS_CONFIG_RESOURCES;
 import static org.apache.gravitino.catalog.hadoop.fs.FileSystemProvider.GRAVITINO_BYPASS;
 
 import com.google.common.collect.Maps;
@@ -37,6 +38,7 @@ import javax.xml.stream.XMLOutputFactory;
 import javax.xml.stream.XMLStreamWriter;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.Path;
 
 public class FileSystemUtils {
 
@@ -215,6 +217,18 @@ public class FileSystemUtils {
    */
   public static Configuration createConfiguration(String bypass, Map<String, String> config) {
     try (ByteArrayOutputStream out = new ByteArrayOutputStream()) {
+      Configuration configuration = new Configuration();
+
+      String hdfsConfigResources = config.get(HDFS_CONFIG_RESOURCES);
+      if (StringUtils.isNotBlank(hdfsConfigResources)) {
+        for (String resource : hdfsConfigResources.split(",")) {
+          resource = resource.trim();
+          if (StringUtils.isNotBlank(resource)) {
+            configuration.addResource(new Path(resource));
+          }
+        }
+      }
+
       XMLStreamWriter writer = XMLOutputFactory.newInstance().createXMLStreamWriter(out);
       writer.writeStartDocument();
       writer.writeStartElement(CONFIG_ROOT);
@@ -225,12 +239,8 @@ public class FileSystemUtils {
       writer.writeEndElement();
       writer.writeEndDocument();
       writer.close();
-
-      return new Configuration() {
-        {
-          addResource(new ByteArrayInputStream(out.toByteArray()));
-        }
-      };
+      configuration.addResource(new ByteArrayInputStream(out.toByteArray()));
+      return configuration;
     } catch (Exception e) {
       throw new RuntimeException("Failed to create configuration", e);
     }

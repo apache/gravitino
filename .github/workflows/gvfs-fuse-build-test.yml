@@ -2,10 +2,10 @@ name: Build gvfs-fuse and testing
 
 # Controls when the workflow will run
 on:
-  push:
-    branches: [ "main", "branch-*" ]
-  pull_request:
-    branches: [ "main", "branch-*" ]
+  # push:
+  #   branches: [ "main", "branch-*" ]
+  # pull_request:
+  #   branches: [ "main", "branch-*" ]
   workflow_dispatch:
 
 concurrency:
