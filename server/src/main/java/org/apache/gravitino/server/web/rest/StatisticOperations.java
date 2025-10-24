@@ -63,7 +63,7 @@ import org.apache.gravitino.stats.PartitionRange;
 import org.apache.gravitino.stats.PartitionStatistics;
 import org.apache.gravitino.stats.PartitionStatisticsModification;
 import org.apache.gravitino.stats.Statistic;
-import org.apache.gravitino.stats.StatisticManager;
+import org.apache.gravitino.stats.StatisticDispatcher;
 import org.apache.gravitino.stats.StatisticValue;
 import org.apache.gravitino.utils.MetadataObjectUtil;
 import org.slf4j.Logger;
@@ -78,11 +78,11 @@ public class StatisticOperations {
 
   @Context private HttpServletRequest httpRequest;
 
-  private final StatisticManager statisticManager;
+  private final StatisticDispatcher statisticDispatcher;
 
   @Inject
-  public StatisticOperations(StatisticManager statisticManager) {
-    this.statisticManager = statisticManager;
+  public StatisticOperations(StatisticDispatcher statisticDispatcher) {
+    this.statisticDispatcher = statisticDispatcher;
   }
 
   @GET
@@ -113,7 +113,7 @@ public class StatisticOperations {
 
             MetadataObjectUtil.checkMetadataObject(metalake, object);
 
-            List<Statistic> statistics = statisticManager.listStatistics(metalake, object);
+            List<Statistic> statistics = statisticDispatcher.listStatistics(metalake, object);
             return Utils.ok(
                 new StatisticListResponse(
                     DTOConverters.toDTOs(statistics.toArray(new Statistic[0]))));
@@ -164,7 +164,7 @@ public class StatisticOperations {
 
             MetadataObjectUtil.checkMetadataObject(metalake, object);
 
-            statisticManager.updateStatistics(metalake, object, statisticMaps);
+            statisticDispatcher.updateStatistics(metalake, object, statisticMaps);
             return Utils.ok(new BaseResponse(0));
           });
     } catch (Exception e) {
@@ -204,7 +204,7 @@ public class StatisticOperations {
             MetadataObjectUtil.checkMetadataObject(metalake, object);
 
             boolean dropped =
-                statisticManager.dropStatistics(
+                statisticDispatcher.dropStatistics(
                     metalake, object, Lists.newArrayList(request.getNames()));
             return Utils.ok(new DropResponse(dropped));
           });
@@ -271,7 +271,7 @@ public class StatisticOperations {
             }
 
             List<PartitionStatistics> statistics =
-                statisticManager.listPartitionStatistics(metalake, object, range);
+                statisticDispatcher.listPartitionStatistics(metalake, object, range);
 
             PartitionStatisticsDTO[] partitionStatistics =
                 statistics.stream()
@@ -343,7 +343,7 @@ public class StatisticOperations {
 
             MetadataObjectUtil.checkMetadataObject(metalake, object);
 
-            statisticManager.updatePartitionStatistics(
+            statisticDispatcher.updatePartitionStatistics(
                 metalake,
                 object,
                 updates.stream()
@@ -400,7 +400,7 @@ public class StatisticOperations {
 
             return Utils.ok(
                 new DropResponse(
-                    statisticManager.dropPartitionStatistics(
+                    statisticDispatcher.dropPartitionStatistics(
                         metalake,
                         object,
                         request.getDrops().stream()
