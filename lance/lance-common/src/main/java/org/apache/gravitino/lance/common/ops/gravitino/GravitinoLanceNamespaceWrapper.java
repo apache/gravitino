@@ -38,6 +38,7 @@ import com.lancedb.lance.namespace.util.CommonUtil;
 import com.lancedb.lance.namespace.util.PageUtil;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.function.BiFunction;
@@ -113,7 +114,7 @@ public class GravitinoLanceNamespaceWrapper extends NamespaceWrapper
     Preconditions.checkArgument(
         nsId.levels() <= 2, "Expected at most 2-level namespace but got: %s", namespaceId);
 
-    java.util.List<String> namespaces;
+    List<String> namespaces;
     switch (nsId.levels()) {
       case 0:
         namespaces =
