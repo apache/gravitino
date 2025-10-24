@@ -90,7 +90,7 @@ public class LanceRESTService implements GravitinoAuxiliaryService {
     server.addCustomFilters(LANCE_SPEC);
     server.addSystemFilters(LANCE_SPEC);
 
-    LOG.info("Initialized Lance REST service for catalog {}", lanceConfig.getCatalogName());
+    LOG.info("Initialized Lance REST service for backend {}", lanceConfig.getNamespaceBackend());
   }
 
   @Override

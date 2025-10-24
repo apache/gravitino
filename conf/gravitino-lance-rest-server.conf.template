@@ -40,6 +40,9 @@ gravitino.lance-rest.requestHeaderSize = 131072
 # The response header size of the built-in web server
 gravitino.lance-rest.responseHeaderSize = 131072
 
-# THE CONFIGURATION FOR Lance CATALOG
-# The logical Lance catalog served by this REST endpoint
-gravitino.lance-rest.catalog-name = default
+# THE CONFIGURATION FOR Lance namespace backend
+# The backend Lance namespace for Lance REST service, it's recommended to use Gravitino
+gravitino.lance-rest.namespace-backend = gravitino
+gravitino.lance-rest.uri = http://localhost:8090
+# replace metalake with your metalake name in Gravitino
+# gravitino.lance-rest.metalake-name = metalake

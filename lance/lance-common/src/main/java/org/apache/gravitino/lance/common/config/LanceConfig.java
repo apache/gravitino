@@ -39,29 +39,22 @@ public class LanceConfig extends Config implements OverwriteDefaultConfig {
   public static final String DEFAULT_NAMESPACE_BACKEND = "gravitino";
   public static final String DEFAULT_URI = "http://localhost:8090";
 
-  public static final ConfigEntry<String> CATALOG_NAME =
-      new ConfigBuilder(LANCE_CONFIG_PREFIX + "catalog-name")
-          .doc("Logical Lance catalog served by the REST endpoint")
-          .version(ConfigConstants.VERSION_0_1_0)
-          .stringConf()
-          .createWithDefault("default");
-
   public static final ConfigEntry<String> NAMESPACE_BACKEND =
-      new ConfigBuilder(LANCE_CONFIG_PREFIX + CONFIG_NAMESPACE_BACKEND)
+      new ConfigBuilder(CONFIG_NAMESPACE_BACKEND)
           .doc("The backend implementation for namespace operations")
           .version(ConfigConstants.VERSION_0_1_0)
           .stringConf()
           .createWithDefault(DEFAULT_NAMESPACE_BACKEND);
 
   public static final ConfigEntry<String> METALAKE_NAME =
-      new ConfigBuilder(LANCE_CONFIG_PREFIX + CONFIG_METALAKE)
+      new ConfigBuilder(CONFIG_METALAKE)
           .doc("The Metalake name for Gravitino namespace backend")
           .version(ConfigConstants.VERSION_0_1_0)
           .stringConf()
           .create();
 
   public static final ConfigEntry<String> NAMESPACE_URI =
-      new ConfigBuilder(LANCE_CONFIG_PREFIX + CONFIG_URI)
+      new ConfigBuilder(CONFIG_URI)
           .doc("The URI for the namespace backend, e.g., Gravitino server URI")
           .version(ConfigConstants.VERSION_0_1_0)
           .stringConf()
@@ -76,8 +69,8 @@ public class LanceConfig extends Config implements OverwriteDefaultConfig {
     super(false);
   }
 
-  public String getCatalogName() {
-    return get(CATALOG_NAME);
+  public String getNamespaceBackend() {
+    return get(NAMESPACE_BACKEND);
   }
 
   public String getNamespaceUri() {
