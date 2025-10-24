@@ -43,9 +43,12 @@ import org.apache.iceberg.CatalogProperties;
 import org.apache.iceberg.CatalogUtil;
 import org.apache.iceberg.catalog.Catalog;
 import org.apache.iceberg.hive.HiveCatalog;
+import org.apache.iceberg.hive.HiveCatalogWithMetadataLocationSupport;
 import org.apache.iceberg.inmemory.InMemoryCatalog;
 import org.apache.iceberg.jdbc.JdbcCatalog;
+import org.apache.iceberg.jdbc.JdbcCatalogWithMetadataLocationSupport;
 import org.apache.iceberg.jdbc.UncheckedSQLException;
+import org.apache.iceberg.memory.MemoryCatalogWithMetadataLocationSupport;
 import org.apache.iceberg.rest.RESTCatalog;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -56,7 +59,7 @@ public class IcebergCatalogUtil {
 
   private static InMemoryCatalog loadMemoryCatalog(IcebergConfig icebergConfig) {
     String icebergCatalogName = icebergConfig.getCatalogBackendName();
-    InMemoryCatalog memoryCatalog = new InMemoryCatalog();
+    InMemoryCatalog memoryCatalog = new MemoryCatalogWithMetadataLocationSupport();
     Map<String, String> resultProperties = icebergConfig.getIcebergCatalogProperties();
     if (!resultProperties.containsKey(IcebergConstants.WAREHOUSE)) {
       resultProperties.put(IcebergConstants.WAREHOUSE, "/tmp");
@@ -66,7 +69,7 @@ public class IcebergCatalogUtil {
   }
 
   private static HiveCatalog loadHiveCatalog(IcebergConfig icebergConfig) {
-    ClosableHiveCatalog hiveCatalog = new ClosableHiveCatalog();
+    ClosableHiveCatalog hiveCatalog = new HiveCatalogWithMetadataLocationSupport();
     HdfsConfiguration hdfsConfiguration = new HdfsConfiguration();
     String icebergCatalogName = icebergConfig.getCatalogBackendName();
 
@@ -129,7 +132,8 @@ public class IcebergCatalogUtil {
       throw new IllegalArgumentException("Couldn't load jdbc driver " + driverClassName);
     }
     JdbcCatalog jdbcCatalog =
-        new JdbcCatalog(null, null, icebergConfig.get(IcebergConfig.JDBC_INIT_TABLES));
+        new JdbcCatalogWithMetadataLocationSupport(
+            icebergConfig.get(IcebergConfig.JDBC_INIT_TABLES));
 
     HdfsConfiguration hdfsConfiguration = new HdfsConfiguration();
     properties.forEach(hdfsConfiguration::set);

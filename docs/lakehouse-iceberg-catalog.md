@@ -30,6 +30,7 @@ Builds with Apache Iceberg `1.9.2`. The Apache Iceberg table format version is `
 - Doesn't support snapshot or table management operations.
 - Supports multi storage, including S3, GCS, ADLS, OSS and HDFS.
 - Supports Kerberos or simple authentication for Iceberg catalog with Hive backend.
+- Supports table metadata cache.
 
 ### Catalog properties
 
@@ -166,6 +167,18 @@ Users can use the following properties to configure the security of the catalog 
 | `authentication.kerberos.keytab-uri`               | The URI of The keytab for the Kerberos authentication.                                                                                                                                                                                           | (none)        | required if the value of `authentication.type` is Kerberos.                                                                                                          | 0.6.0-incubating |
 | `authentication.kerberos.check-interval-sec`       | The check interval of Kerberos credential for Iceberg catalog.                                                                                                                                                                                   | 60            | No                                                                                                                                                                   | 0.6.0-incubating |
 | `authentication.kerberos.keytab-fetch-timeout-sec` | The fetch timeout of retrieving Kerberos keytab from `authentication.kerberos.keytab-uri`.                                                                                                                                                       | 60            | No                                                                                                                                                                   | 0.6.0-incubating |
+
+#### Table metadata cache
+
+Gravitino features a pluggable cache system for updating or retrieving table metadata in the cache. It validates the location of table metadata against the catalog backend to ensure the correctness of cached data.
+
+| Configuration item                    | Description                                 | Default value | Required | Since Version |
+|---------------------------------------|---------------------------------------------|---------------|----------|---------------|
+| `table-metadata-cache-impl`           | The implement of the cache.                 | (none)        | No       | 1.1.0         |
+| `table-metadata-cache-capacity`       | The capacity of table metadata cache.       | 200           | No       | 1.1.0         |
+| `table-metadata-cache-expire-minutes` | The expire minutes of table metadata cache. | 60            | No       | 1.1.0         |
+
+Gravitino provides the build-in `org.apache.gravitino.iceberg.common.cache.LocalTableMetadataCache` to store the cached data in the memory. You could also implement your custom table metadata cache by implementing the `org.apache.gravitino.iceberg.common.cache.TableMetadataCache` interface.
 
 ### Catalog operations
 

@@ -17,22 +17,27 @@
  *  under the License.
  */
 
-package org.apache.gravitino.utils;
+package org.apache.iceberg.jdbc;
 
-public class ClassUtils {
-  public static <T> T loadAndGetInstance(String className) {
-    try {
-      return (T) Class.forName(className).getDeclaredConstructor().newInstance();
-    } catch (Exception e) {
-      throw new RuntimeException(e);
-    }
-  }
+import com.google.common.collect.ImmutableMap;
+import org.apache.iceberg.CatalogProperties;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
 
-  public static <T> T loadAndGetInstance(String className, ClassLoader classLoader) {
-    try {
-      return (T) Class.forName(className, true, classLoader).getDeclaredConstructor().newInstance();
-    } catch (Exception e) {
-      throw new RuntimeException(e);
-    }
+public class TestJdbcCatalogWithMetadataLocationSupport {
+
+  @Test
+  void testLoadFields() {
+    JdbcCatalogWithMetadataLocationSupport catalog =
+        new JdbcCatalogWithMetadataLocationSupport(false);
+    Assertions.assertDoesNotThrow(
+        () ->
+            catalog.initialize(
+                "jdbc",
+                ImmutableMap.of(
+                    CatalogProperties.URI,
+                    "jdbc:h2:mem:test",
+                    CatalogProperties.WAREHOUSE_LOCATION,
+                    "warehouse")));
   }
 }

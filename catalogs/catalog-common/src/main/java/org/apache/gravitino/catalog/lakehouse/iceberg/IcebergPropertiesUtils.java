@@ -67,6 +67,15 @@ public class IcebergPropertiesUtils {
     map.put(
         AzureProperties.GRAVITINO_AZURE_STORAGE_ACCOUNT_KEY,
         IcebergConstants.ICEBERG_ADLS_STORAGE_ACCOUNT_KEY);
+    // Table metadata cache
+    map.put(IcebergConstants.TABLE_METADATA_CACHE_IMPL, IcebergConstants.TABLE_METADATA_CACHE_IMPL);
+    map.put(
+        IcebergConstants.TABLE_METADATA_CACHE_CAPACITY,
+        IcebergConstants.TABLE_METADATA_CACHE_CAPACITY);
+    map.put(
+        IcebergConstants.TABLE_METADATA_CACHE_EXPIRE_MINUTES,
+        IcebergConstants.TABLE_METADATA_CACHE_EXPIRE_MINUTES);
+
     GRAVITINO_CONFIG_TO_ICEBERG = Collections.unmodifiableMap(map);
 
     Map<String, String> icebergCatalogConfigToGravitino = new HashMap<>();

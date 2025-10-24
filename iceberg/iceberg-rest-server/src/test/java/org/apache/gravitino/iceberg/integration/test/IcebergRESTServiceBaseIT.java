@@ -33,6 +33,7 @@ import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergCatalogBackend;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
+import org.apache.gravitino.iceberg.common.cache.LocalTableMetadataCache;
 import org.apache.gravitino.iceberg.integration.test.util.IcebergRESTServerManager;
 import org.apache.gravitino.integration.test.util.ITUtils;
 import org.apache.gravitino.server.web.JettyServerConfig;
@@ -117,6 +118,9 @@ public abstract class IcebergRESTServiceBaseIT {
 
   private void registerIcebergCatalogConfig() {
     Map<String, String> icebergConfigs = getCatalogConfig();
+    icebergConfigs.put(
+        IcebergConfig.ICEBERG_CONFIG_PREFIX + IcebergConfig.TABLE_METADATA_CACHE_IMPL.getKey(),
+        LocalTableMetadataCache.class.getName());
     icebergRESTServerManager.registerCustomConfigs(icebergConfigs);
     LOG.info("Iceberg REST service config registered, {}", StringUtils.join(icebergConfigs));
   }
