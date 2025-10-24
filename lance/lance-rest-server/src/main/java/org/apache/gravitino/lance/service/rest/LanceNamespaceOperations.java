@@ -22,12 +22,19 @@ import static org.apache.gravitino.lance.common.ops.NamespaceWrapper.NAMESPACE_D
 
 import com.codahale.metrics.annotation.ResponseMetered;
 import com.codahale.metrics.annotation.Timed;
+import com.lancedb.lance.namespace.model.CreateNamespaceRequest;
+import com.lancedb.lance.namespace.model.CreateNamespaceResponse;
+import com.lancedb.lance.namespace.model.DescribeNamespaceResponse;
+import com.lancedb.lance.namespace.model.DropNamespaceRequest;
+import com.lancedb.lance.namespace.model.DropNamespaceResponse;
 import com.lancedb.lance.namespace.model.ListNamespacesResponse;
+import java.util.regex.Pattern;
 import javax.inject.Inject;
 import javax.ws.rs.Consumes;
 import javax.ws.rs.DefaultValue;
 import javax.ws.rs.Encoded;
 import javax.ws.rs.GET;
+import javax.ws.rs.POST;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
@@ -61,8 +68,93 @@ public class LanceNamespaceOperations {
       @QueryParam("limit") Integer limit) {
     try {
       ListNamespacesResponse response =
-          lanceNamespace.asNamespaceOps().listNamespaces(namespaceId, delimiter, pageToken, limit);
+          lanceNamespace
+              .asNamespaceOps()
+              .listNamespaces(namespaceId, Pattern.quote(delimiter), pageToken, limit);
       return Response.ok(response).build();
+    } catch (Exception e) {
+      return LanceExceptionMapper.toRESTResponse(namespaceId, e);
+    }
+  }
+
+  @POST
+  @Path("/{id}/describe")
+  @Timed(name = "describe-namespaces." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
+  @ResponseMetered(name = "describe-namespaces", absolute = true)
+  public Response describeNamespace(
+      @Encoded @PathParam("id") String namespaceId,
+      @DefaultValue(NAMESPACE_DELIMITER_DEFAULT) @QueryParam("delimiter") String delimiter) {
+    try {
+      DescribeNamespaceResponse response =
+          lanceNamespace.asNamespaceOps().describeNamespace(namespaceId, Pattern.quote(delimiter));
+      return Response.ok(response).build();
+    } catch (Exception e) {
+      return LanceExceptionMapper.toRESTResponse(namespaceId, e);
+    }
+  }
+
+  @POST
+  @Path("/{id}/create")
+  @Timed(name = "create-namespaces." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
+  @ResponseMetered(name = "create-namespaces", absolute = true)
+  public Response createNamespace(
+      @Encoded @PathParam("id") String namespaceId,
+      @DefaultValue(NAMESPACE_DELIMITER_DEFAULT) @QueryParam("delimiter") String delimiter,
+      CreateNamespaceRequest request) {
+    try {
+      CreateNamespaceResponse response =
+          lanceNamespace
+              .asNamespaceOps()
+              .createNamespace(
+                  namespaceId,
+                  Pattern.quote(delimiter),
+                  request.getMode() == null
+                      ? CreateNamespaceRequest.ModeEnum.CREATE
+                      : request.getMode(),
+                  request.getProperties());
+      return Response.ok(response).build();
+    } catch (Exception e) {
+      return LanceExceptionMapper.toRESTResponse(namespaceId, e);
+    }
+  }
+
+  @POST
+  @Path("/{id}/drop")
+  @Timed(name = "drop-namespaces." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
+  @ResponseMetered(name = "drop-namespaces", absolute = true)
+  public Response dropNamespace(
+      @Encoded @PathParam("id") String namespaceId,
+      @DefaultValue(NAMESPACE_DELIMITER_DEFAULT) @QueryParam("delimiter") String delimiter,
+      DropNamespaceRequest request) {
+    try {
+      DropNamespaceResponse response =
+          lanceNamespace
+              .asNamespaceOps()
+              .dropNamespace(
+                  namespaceId,
+                  Pattern.quote(delimiter),
+                  request.getMode() == null
+                      ? DropNamespaceRequest.ModeEnum.FAIL
+                      : request.getMode(),
+                  request.getBehavior() == null
+                      ? DropNamespaceRequest.BehaviorEnum.RESTRICT
+                      : request.getBehavior());
+      return Response.ok(response).build();
+    } catch (Exception e) {
+      return LanceExceptionMapper.toRESTResponse(namespaceId, e);
+    }
+  }
+
+  @POST
+  @Path("/{id}/exists")
+  @Timed(name = "namespace-exists." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
+  @ResponseMetered(name = "namespace-exists", absolute = true)
+  public Response namespaceExists(
+      @Encoded @PathParam("id") String namespaceId,
+      @DefaultValue(NAMESPACE_DELIMITER_DEFAULT) @QueryParam("delimiter") String delimiter) {
+    try {
+      lanceNamespace.asNamespaceOps().namespaceExists(namespaceId, Pattern.quote(delimiter));
+      return Response.ok().build();
     } catch (Exception e) {
       return LanceExceptionMapper.toRESTResponse(namespaceId, e);
     }

@@ -32,19 +32,19 @@ public interface LanceNamespaceOperations {
   ListNamespacesResponse listNamespaces(
       String namespaceId, String delimiter, String pageToken, Integer limit);
 
-  DescribeNamespaceResponse describeNamespace(String id, String delimiter);
+  DescribeNamespaceResponse describeNamespace(String namespaceId, String delimiter);
 
   CreateNamespaceResponse createNamespace(
-      String id,
+      String namespaceId,
       String delimiter,
       CreateNamespaceRequest.ModeEnum mode,
       Map<String, String> properties);
 
   DropNamespaceResponse dropNamespace(
-      String id,
+      String namespaceId,
       String delimiter,
       DropNamespaceRequest.ModeEnum mode,
       DropNamespaceRequest.BehaviorEnum behavior);
 
-  void namespaceExists(String id, String delimiter) throws LanceNamespaceException;
+  void namespaceExists(String namespaceId, String delimiter) throws LanceNamespaceException;
 }
