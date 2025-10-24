@@ -21,7 +21,9 @@ package org.apache.gravitino.lance.service.rest;
 import com.codahale.metrics.annotation.ResponseMetered;
 import com.codahale.metrics.annotation.Timed;
 import java.util.NoSuchElementException;
+import javax.inject.Inject;
 import javax.ws.rs.BadRequestException;
+import javax.ws.rs.Consumes;
 import javax.ws.rs.DefaultValue;
 import javax.ws.rs.Encoded;
 import javax.ws.rs.GET;
@@ -36,13 +38,17 @@ import org.apache.gravitino.lance.common.ops.LanceCatalogService;
 import org.apache.gravitino.metrics.MetricNames;
 
 @Path("/v1/namespace")
+@Consumes(MediaType.APPLICATION_JSON)
 @Produces(MediaType.APPLICATION_JSON)
 public class LanceNamespaceOperations {
 
-  private final LanceCatalogService catalogService;
+  private static final String NAMESPACE_DELIMITER_DEFAULT = "$";
 
-  public LanceNamespaceOperations(LanceCatalogService catalogService) {
-    this.catalogService = catalogService;
+  private final NamespaceWrapper lanceNamespace;
+
+  @Inject
+  public LanceNamespaceOperations(NamespaceWrapper lanceNamespace) {
+    this.lanceNamespace = lanceNamespace;
   }
 
   @GET
@@ -51,49 +57,15 @@ public class LanceNamespaceOperations {
   @ResponseMetered(name = "list-namespaces", absolute = true)
   public Response listNamespaces(
       @Encoded @PathParam("id") String namespaceId,
-      @DefaultValue("$") @QueryParam("delimiter") String delimiter,
+      @DefaultValue(NAMESPACE_DELIMITER_DEFAULT) @QueryParam("delimiter") String delimiter,
       @QueryParam("page_token") String pageToken,
       @QueryParam("limit") Integer limit) {
     try {
-      LanceCatalogService.NamespaceListingResult result =
-          catalogService.listChildNamespaces(namespaceId, delimiter, pageToken, limit);
-      LanceListNamespacesResponse payload =
-          new LanceListNamespacesResponse(
-              result.getParentId(),
-              result.getDelimiter(),
-              result.getNamespaces(),
-              result.getNextPageToken().orElse(null));
-      return Response.ok(payload).build();
-    } catch (NoSuchElementException nse) {
-      throw new NotFoundException(nse.getMessage(), nse);
-    } catch (IllegalArgumentException iae) {
-      throw new BadRequestException(iae.getMessage(), iae);
-    }
-  }
-
-  @GET
-  @Path("/{id}/table/list")
-  @Timed(name = "list-tables." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
-  @ResponseMetered(name = "list-tables", absolute = true)
-  public Response listTables(
-      @Encoded @PathParam("id") String namespaceId,
-      @DefaultValue("$") @QueryParam("delimiter") String delimiter,
-      @QueryParam("page_token") String pageToken,
-      @QueryParam("limit") Integer limit) {
-    try {
-      LanceCatalogService.TableListingResult result =
-          catalogService.listTables(namespaceId, delimiter, pageToken, limit);
-      LanceListTablesResponse payload =
-          new LanceListTablesResponse(
-              result.getNamespaceId(),
-              result.getDelimiter(),
-              result.getTables(),
-              result.getNextPageToken().orElse(null));
-      return Response.ok(payload).build();
-    } catch (NoSuchElementException nse) {
-      throw new NotFoundException(nse.getMessage(), nse);
-    } catch (IllegalArgumentException iae) {
-      throw new BadRequestException(iae.getMessage(), iae);
+      ListNamespacesResponse response =
+          lanceNamespace.asNamespaceOps().listNamespaces(namespaceId, delimiter, pageToken, limit);
+      return Response.ok(response).build();
+    } catch (Exception e) {
+      return LanceExceptionMapper.toRESTResponse(namespaceId, e);
     }
   }
 }
