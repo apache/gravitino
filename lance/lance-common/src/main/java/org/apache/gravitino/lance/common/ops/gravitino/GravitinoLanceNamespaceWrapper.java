@@ -123,10 +123,16 @@ public class GravitinoLanceNamespaceWrapper extends NamespaceWrapper
                 .map(Catalog::name)
                 .collect(Collectors.toList());
         break;
+
       case 1:
         Catalog catalog = loadAndValidateLakehouseCatalog(nsId.levelAtListPos(0));
         namespaces = Lists.newArrayList(catalog.asSchemas().listSchemas());
         break;
+
+      case 2:
+        namespaces = Lists.newArrayList();
+        break;
+
       default:
         throw new IllegalArgumentException(
             "Expected at most 2-level namespace but got: " + namespaceId);
@@ -145,23 +151,25 @@ public class GravitinoLanceNamespaceWrapper extends NamespaceWrapper
   public DescribeNamespaceResponse describeNamespace(String namespaceId, String delimiter) {
     ObjectIdentifier nsId = ObjectIdentifier.of(namespaceId, delimiter);
     Preconditions.checkArgument(
-        nsId.levels() <= 2, "Expected at most 2-level namespace but got: %s", namespaceId);
+        nsId.levels() <= 2 && nsId.levels() > 0,
+        "Expected at most 2-level and at least 1-level namespace but got: %s",
+        namespaceId);
 
     Catalog catalog = loadAndValidateLakehouseCatalog(nsId.levelAtListPos(0));
     Map<String, String> properties = Maps.newHashMap();
 
     switch (nsId.levels()) {
-      case 0:
+      case 1:
         Optional.ofNullable(catalog.properties()).ifPresent(properties::putAll);
         break;
-      case 1:
+      case 2:
         String schemaName = nsId.levelAtListPos(1);
         Schema schema = catalog.asSchemas().loadSchema(schemaName);
         Optional.ofNullable(schema.properties()).ifPresent(properties::putAll);
         break;
       default:
         throw new IllegalArgumentException(
-            "Expected at most 2-level namespace but got: " + namespaceId);
+            "Expected at most 2-level and at least 1-level namespace but got: " + namespaceId);
     }
 
     DescribeNamespaceResponse response = new DescribeNamespaceResponse();
@@ -177,17 +185,19 @@ public class GravitinoLanceNamespaceWrapper extends NamespaceWrapper
       Map<String, String> properties) {
     ObjectIdentifier nsId = ObjectIdentifier.of(namespaceId, delimiter);
     Preconditions.checkArgument(
-        nsId.levels() <= 2, "Expected at most 2-level namespace but got: %s", namespaceId);
+        nsId.levels() <= 2 && nsId.levels() > 0,
+        "Expected at most 2-level and at least 1-level namespace but got: %s",
+        namespaceId);
 
     switch (nsId.levels()) {
-      case 0:
-        return createOrUpdateCatalog(nsId.levelAtListPos(0), mode, properties);
       case 1:
+        return createOrUpdateCatalog(nsId.levelAtListPos(0), mode, properties);
+      case 2:
         return createOrUpdateSchema(
             nsId.levelAtListPos(0), nsId.levelAtListPos(1), mode, properties);
       default:
         throw new IllegalArgumentException(
-            "Expected at most 2-level namespace but got: " + namespaceId);
+            "Expected at most 2-level and at least 1-level namespace but got: " + namespaceId);
     }
   }
 
@@ -199,27 +209,31 @@ public class GravitinoLanceNamespaceWrapper extends NamespaceWrapper
       DropNamespaceRequest.BehaviorEnum behavior) {
     ObjectIdentifier nsId = ObjectIdentifier.of(namespaceId, delimiter);
     Preconditions.checkArgument(
-        nsId.levels() <= 2, "Expected at most 2-level namespace but got: %s", namespaceId);
+        nsId.levels() <= 2 && nsId.levels() > 0,
+        "Expected at most 2-level and at least 1-level namespace but got: %s",
+        namespaceId);
 
     switch (nsId.levels()) {
-      case 0:
-        return dropCatalog(nsId.levelAtListPos(0), mode, behavior);
       case 1:
+        return dropCatalog(nsId.levelAtListPos(0), mode, behavior);
+      case 2:
         return dropSchema(nsId.levelAtListPos(0), nsId.levelAtListPos(1), mode, behavior);
       default:
         throw new IllegalArgumentException(
-            "Expected at most 2-level namespace but got: " + namespaceId);
+            "Expected at most 2-level and at least 1-level namespace but got: " + namespaceId);
     }
   }
 
   @Override
-  public void namespaceExists(String id, String delimiter) throws LanceNamespaceException {
-    ObjectIdentifier nsId = ObjectIdentifier.of(id, delimiter);
+  public void namespaceExists(String namespaceId, String delimiter) throws LanceNamespaceException {
+    ObjectIdentifier nsId = ObjectIdentifier.of(namespaceId, delimiter);
     Preconditions.checkArgument(
-        nsId.levels() <= 2, "Expected at most 2-level namespace but got: %s", id);
+        nsId.levels() <= 2 && nsId.levels() > 0,
+        "Expected at most 2-level and at least 1-level namespace but got: %s",
+        namespaceId);
 
     Catalog catalog = loadAndValidateLakehouseCatalog(nsId.levelAtListPos(0));
-    if (nsId.levels() == 1) {
+    if (nsId.levels() == 2) {
       String schemaName = nsId.levelAtListPos(1);
       if (!catalog.asSchemas().schemaExists(schemaName)) {
         throw LanceNamespaceException.notFound(
@@ -266,41 +280,48 @@ public class GravitinoLanceNamespaceWrapper extends NamespaceWrapper
   private CreateNamespaceResponse createOrUpdateCatalog(
       String catalogName, CreateNamespaceRequest.ModeEnum mode, Map<String, String> properties) {
     CreateNamespaceResponse response = new CreateNamespaceResponse();
+
+    Catalog catalog;
     try {
-      Catalog catalog = client.loadCatalog(catalogName);
-      // Catalog exists, handle based on mode
-      switch (mode) {
-        case EXIST_OK:
-          response.setProperties(Maps.newHashMap());
-          return response;
-        case CREATE:
-          throw LanceNamespaceException.conflict(
-              "Catalog already exists: " + catalogName,
-              CatalogAlreadyExistsException.class.getSimpleName(),
-              catalogName,
-              CommonUtil.formatCurrentStackTrace());
-        case OVERWRITE:
-          CatalogChange[] changes =
-              buildChanges(
-                  properties,
-                  catalog.properties(),
-                  CatalogChange::setProperty,
-                  CatalogChange::removeProperty,
-                  CatalogChange[]::new);
-          Catalog alteredCatalog = client.alterCatalog(catalogName, changes);
-          Optional.ofNullable(alteredCatalog.properties()).ifPresent(response::setProperties);
-          return response;
-        default:
-          throw new IllegalArgumentException("Unknown mode: " + mode);
-      }
+      catalog = client.loadCatalog(catalogName);
     } catch (NoSuchCatalogException e) {
       // Catalog does not exist, create it
       Catalog createdCatalog =
           client.createCatalog(
-              catalogName, Catalog.Type.RELATIONAL, "generic-lakehouse", properties);
+              catalogName,
+              Catalog.Type.RELATIONAL,
+              "generic-lakehouse",
+              "created by Lance REST server",
+              properties);
       response.setProperties(
           createdCatalog.properties() == null ? Maps.newHashMap() : createdCatalog.properties());
       return response;
+    }
+
+    // Catalog exists, handle based on mode
+    switch (mode) {
+      case EXIST_OK:
+        response.setProperties(Maps.newHashMap());
+        return response;
+      case CREATE:
+        throw LanceNamespaceException.conflict(
+            "Catalog already exists: " + catalogName,
+            CatalogAlreadyExistsException.class.getSimpleName(),
+            catalogName,
+            CommonUtil.formatCurrentStackTrace());
+      case OVERWRITE:
+        CatalogChange[] changes =
+            buildChanges(
+                properties,
+                catalog.properties(),
+                CatalogChange::setProperty,
+                CatalogChange::removeProperty,
+                CatalogChange[]::new);
+        Catalog alteredCatalog = client.alterCatalog(catalogName, changes);
+        Optional.ofNullable(alteredCatalog.properties()).ifPresent(response::setProperties);
+        return response;
+      default:
+        throw new IllegalArgumentException("Unknown mode: " + mode);
     }
   }
 

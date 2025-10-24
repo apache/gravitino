@@ -28,6 +28,7 @@ import com.lancedb.lance.namespace.model.DescribeNamespaceResponse;
 import com.lancedb.lance.namespace.model.DropNamespaceRequest;
 import com.lancedb.lance.namespace.model.DropNamespaceResponse;
 import com.lancedb.lance.namespace.model.ListNamespacesResponse;
+import java.util.regex.Pattern;
 import javax.inject.Inject;
 import javax.ws.rs.Consumes;
 import javax.ws.rs.DefaultValue;
@@ -67,7 +68,9 @@ public class LanceNamespaceOperations {
       @QueryParam("limit") Integer limit) {
     try {
       ListNamespacesResponse response =
-          lanceNamespace.asNamespaceOps().listNamespaces(namespaceId, delimiter, pageToken, limit);
+          lanceNamespace
+              .asNamespaceOps()
+              .listNamespaces(namespaceId, Pattern.quote(delimiter), pageToken, limit);
       return Response.ok(response).build();
     } catch (Exception e) {
       return LanceExceptionMapper.toRESTResponse(namespaceId, e);
@@ -81,7 +84,7 @@ public class LanceNamespaceOperations {
       @DefaultValue(NAMESPACE_DELIMITER_DEFAULT) @QueryParam("delimiter") String delimiter) {
     try {
       DescribeNamespaceResponse response =
-          lanceNamespace.asNamespaceOps().describeNamespace(namespaceId, delimiter);
+          lanceNamespace.asNamespaceOps().describeNamespace(namespaceId, Pattern.quote(delimiter));
       return Response.ok(response).build();
     } catch (Exception e) {
       return LanceExceptionMapper.toRESTResponse(namespaceId, e);
@@ -100,7 +103,7 @@ public class LanceNamespaceOperations {
               .asNamespaceOps()
               .createNamespace(
                   namespaceId,
-                  delimiter,
+                  Pattern.quote(delimiter),
                   request.getMode() == null
                       ? CreateNamespaceRequest.ModeEnum.CREATE
                       : request.getMode(),
@@ -123,7 +126,7 @@ public class LanceNamespaceOperations {
               .asNamespaceOps()
               .dropNamespace(
                   namespaceId,
-                  delimiter,
+                  Pattern.quote(delimiter),
                   request.getMode() == null
                       ? DropNamespaceRequest.ModeEnum.FAIL
                       : request.getMode(),
@@ -142,7 +145,7 @@ public class LanceNamespaceOperations {
       @Encoded @PathParam("id") String namespaceId,
       @DefaultValue(NAMESPACE_DELIMITER_DEFAULT) @QueryParam("delimiter") String delimiter) {
     try {
-      lanceNamespace.asNamespaceOps().namespaceExists(namespaceId, delimiter);
+      lanceNamespace.asNamespaceOps().namespaceExists(namespaceId, Pattern.quote(delimiter));
       return Response.ok().build();
     } catch (Exception e) {
       return LanceExceptionMapper.toRESTResponse(namespaceId, e);

@@ -33,10 +33,10 @@ public class TestLanceConfig {
 
     LanceConfig lanceConfig = new LanceConfig();
     lanceConfig.loadFromMap(properties, k -> k.startsWith("gravitino.lance-rest."));
-    Assertions.assertEquals("test_catalog", lanceConfig.getCatalogName());
+    Assertions.assertEquals("test_catalog", lanceConfig.getNamespaceBackend());
 
     LanceConfig lanceConfig2 = new LanceConfig(properties);
-    Assertions.assertEquals("test_catalog", lanceConfig2.getCatalogName());
+    Assertions.assertEquals("test_catalog", lanceConfig2.getNamespaceBackend());
   }
 
   @Test
@@ -44,7 +44,7 @@ public class TestLanceConfig {
     // Test default catalog name when not specified
     Map<String, String> properties = ImmutableMap.of();
     LanceConfig lanceConfig = new LanceConfig(properties);
-    Assertions.assertEquals("default", lanceConfig.getCatalogName());
+    Assertions.assertEquals("default", lanceConfig.getNamespaceBackend());
   }
 
   @Test
@@ -104,7 +104,7 @@ public class TestLanceConfig {
     LanceConfig lanceConfig = new LanceConfig(properties);
 
     // Verify all config values
-    Assertions.assertEquals("lance_catalog", lanceConfig.getCatalogName());
+    Assertions.assertEquals("lance_catalog", lanceConfig.getNamespaceBackend());
     Assertions.assertEquals("http://gravitino-prod:8090", lanceConfig.getNamespaceUri());
     Assertions.assertEquals("production", lanceConfig.getGravitinoMetalake());
 
