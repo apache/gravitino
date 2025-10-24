@@ -54,6 +54,8 @@ install-taplo-cli:
 check-toml: install-taplo-cli
 	taplo check
 
+#  todo: Disable some checks due to build failures caused by Rust dependency library upgrades.
+#  check: check-fmt check-clippy check-cargo-sort check-toml cargo-machete
 check: check-fmt check-clippy check-cargo-sort
 
 doc-test:
