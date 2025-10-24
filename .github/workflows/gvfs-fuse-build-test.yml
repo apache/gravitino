@@ -2,7 +2,7 @@ name: Build gvfs-fuse and testing
 
 # Controls when the workflow will run
 on:
-  # Temporarily disable on event
+  # Temporarily disable
   # push:
   #  branches: [ "main", "branch-*" ]
   # pull_request:
