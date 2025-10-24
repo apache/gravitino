@@ -29,22 +29,22 @@ public class TestLanceConfig {
   @Test
   public void testLoadLanceConfig() {
     Map<String, String> properties =
-        ImmutableMap.of("gravitino.lance-rest.catalog-name", "test_catalog");
+        ImmutableMap.of("gravitino.lance-rest.namespace-backend", "test_catalog");
 
     LanceConfig lanceConfig = new LanceConfig();
     lanceConfig.loadFromMap(properties, k -> k.startsWith("gravitino.lance-rest."));
-    Assertions.assertEquals("test_catalog", lanceConfig.getNamespaceBackend());
+    Assertions.assertEquals("gravitino", lanceConfig.getNamespaceBackend());
 
     LanceConfig lanceConfig2 = new LanceConfig(properties);
-    Assertions.assertEquals("test_catalog", lanceConfig2.getNamespaceBackend());
+    Assertions.assertEquals("gravitino", lanceConfig2.getNamespaceBackend());
   }
 
   @Test
   public void testDefaultCatalogName() {
-    // Test default catalog name when not specified
+    // Test default namespace backend name when not specified
     Map<String, String> properties = ImmutableMap.of();
     LanceConfig lanceConfig = new LanceConfig(properties);
-    Assertions.assertEquals("default", lanceConfig.getNamespaceBackend());
+    Assertions.assertEquals("gravitino", lanceConfig.getNamespaceBackend());
   }
 
   @Test
@@ -94,7 +94,6 @@ public class TestLanceConfig {
     // Test all configurations together for auxiliary mode
     Map<String, String> properties =
         ImmutableMap.<String, String>builder()
-            .put(LanceConfig.CATALOG_NAME.getKey(), "lance_catalog")
             .put(LanceConfig.NAMESPACE_URI.getKey(), "http://gravitino-prod:8090")
             .put(LanceConfig.METALAKE_NAME.getKey(), "production")
             .put(LanceConfig.NAMESPACE_BACKEND.getKey(), "gravitino")
@@ -104,7 +103,7 @@ public class TestLanceConfig {
     LanceConfig lanceConfig = new LanceConfig(properties);
 
     // Verify all config values
-    Assertions.assertEquals("lance_catalog", lanceConfig.getNamespaceBackend());
+    Assertions.assertEquals("gravitino", lanceConfig.getNamespaceBackend());
     Assertions.assertEquals("http://gravitino-prod:8090", lanceConfig.getNamespaceUri());
     Assertions.assertEquals("production", lanceConfig.getGravitinoMetalake());
 
