@@ -38,6 +38,9 @@ public class PartitionRange {
 
   private PartitionRange() {}
 
+  /** A PartitionRange that includes all partitions. */
+  public static final PartitionRange ALL_PARTITIONS = new PartitionRange();
+
   /**
    * Creates a PartitionRange which only has upper bound partition name.
    *
