@@ -204,6 +204,10 @@ public class MetricsSystem implements Closeable {
             MetricsSource.ICEBERG_REST_SERVER_METRIC_NAME + "_${1}",
             ImmutableMap.of("operation", "${0}")),
         new MapperConfig(
+            MetricsSource.LANCE_REST_SERVER_METRIC_NAME + ".*.*",
+            MetricsSource.LANCE_REST_SERVER_METRIC_NAME + "_${1}",
+            ImmutableMap.of("operation", "${0}")),
+        new MapperConfig(
             MetricsSource.GRAVITINO_SERVER_METRIC_NAME + ".*.*",
             MetricsSource.GRAVITINO_SERVER_METRIC_NAME + "_${1}",
             ImmutableMap.of("operation", "${0}")));
