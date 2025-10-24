@@ -46,7 +46,6 @@ public class LanceConfig extends Config implements OverwriteDefaultConfig {
           .stringConf()
           .createWithDefault("default");
 
-<<<<<<< HEAD
   public static final ConfigEntry<String> NAMESPACE_BACKEND =
       new ConfigBuilder(LANCE_CONFIG_PREFIX + CONFIG_NAMESPACE_BACKEND)
           .doc("The backend implementation for namespace operations")
@@ -67,23 +66,6 @@ public class LanceConfig extends Config implements OverwriteDefaultConfig {
           .version(ConfigConstants.VERSION_0_1_0)
           .stringConf()
           .createWithDefault(DEFAULT_URI);
-=======
-  public static final ConfigEntry<String> GRAVITINO_URI =
-      new ConfigBuilder(LANCE_CONFIG_PREFIX + "gravitino-uri")
-          .doc(
-              "The URI of the Gravitino server for Lance REST to access metadata. "
-                  + "Only required in standalone mode. In auxiliary mode, direct memory access can be used.")
-          .version(ConfigConstants.VERSION_0_1_0)
-          .stringConf()
-          .createWithDefault("http://localhost:8090");
-
-  public static final ConfigEntry<String> GRAVITINO_METALAKE =
-      new ConfigBuilder(LANCE_CONFIG_PREFIX + "gravitino-metalake")
-          .doc("The Gravitino metalake to use for Lance catalog metadata")
-          .version(ConfigConstants.VERSION_0_1_0)
-          .stringConf()
-          .createWithDefault("metalake");
->>>>>>> 16e9f1889 (update-for-standalone-mode-and-auxiliary-mode)
 
   public LanceConfig(Map<String, String> properties) {
     super(false);
