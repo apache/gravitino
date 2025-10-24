@@ -18,9 +18,10 @@
  */
 package org.apache.gravitino.lance.common.ops.gravitino;
 
-import static org.apache.gravitino.lance.common.config.LanceConfig.METALAKE_NAME;
 import static org.apache.gravitino.lance.common.config.LanceConfig.NAMESPACE_URI;
+import static org.apache.gravitino.rel.Column.DEFAULT_VALUE_NOT_SET;
 
+import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
@@ -29,25 +30,48 @@ import com.lancedb.lance.namespace.LanceNamespaceException;
 import com.lancedb.lance.namespace.ObjectIdentifier;
 import com.lancedb.lance.namespace.model.CreateNamespaceRequest;
 import com.lancedb.lance.namespace.model.CreateNamespaceResponse;
+import com.lancedb.lance.namespace.model.CreateTableResponse;
 import com.lancedb.lance.namespace.model.DescribeNamespaceResponse;
+import com.lancedb.lance.namespace.model.DescribeTableResponse;
 import com.lancedb.lance.namespace.model.DropNamespaceRequest;
 import com.lancedb.lance.namespace.model.DropNamespaceResponse;
+import com.lancedb.lance.namespace.model.JsonArrowDataType;
+import com.lancedb.lance.namespace.model.JsonArrowField;
+import com.lancedb.lance.namespace.model.JsonArrowSchema;
 import com.lancedb.lance.namespace.model.ListNamespacesResponse;
 import com.lancedb.lance.namespace.model.ListTablesResponse;
 import com.lancedb.lance.namespace.util.CommonUtil;
 import com.lancedb.lance.namespace.util.PageUtil;
+import java.io.ByteArrayInputStream;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.function.BiFunction;
 import java.util.function.Function;
 import java.util.function.IntFunction;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
-import org.apache.commons.lang3.StringUtils;
+import org.apache.arrow.memory.BufferAllocator;
+import org.apache.arrow.memory.RootAllocator;
+import org.apache.arrow.vector.VectorSchemaRoot;
+import org.apache.arrow.vector.ipc.ArrowStreamReader;
+import org.apache.arrow.vector.types.DateUnit;
+import org.apache.arrow.vector.types.FloatingPointPrecision;
+import org.apache.arrow.vector.types.TimeUnit;
+import org.apache.arrow.vector.types.pojo.ArrowType;
+import org.apache.arrow.vector.types.pojo.ArrowType.Bool;
+import org.apache.arrow.vector.types.pojo.ArrowType.FloatingPoint;
+import org.apache.arrow.vector.types.pojo.ArrowType.Int;
+import org.apache.arrow.vector.types.pojo.Field;
+import org.apache.arrow.vector.types.pojo.FieldType;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.CatalogChange;
+import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.Namespace;
 import org.apache.gravitino.Schema;
 import org.apache.gravitino.SchemaChange;
 import org.apache.gravitino.client.GravitinoClient;
@@ -57,10 +81,18 @@ import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NonEmptyCatalogException;
 import org.apache.gravitino.exceptions.NonEmptySchemaException;
 import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
+import org.apache.gravitino.json.JsonUtils;
 import org.apache.gravitino.lance.common.config.LanceConfig;
 import org.apache.gravitino.lance.common.ops.LanceNamespaceOperations;
 import org.apache.gravitino.lance.common.ops.LanceTableOperations;
 import org.apache.gravitino.lance.common.ops.NamespaceWrapper;
+import org.apache.gravitino.lance.common.ops.arrow.ArrowRecordBatchList;
+import org.apache.gravitino.rel.Column;
+import org.apache.gravitino.rel.Table;
+import org.apache.gravitino.rel.types.Type;
+import org.apache.gravitino.rel.types.Types;
+import org.apache.gravitino.rel.types.Types.FixedType;
+import org.apache.gravitino.rel.types.Types.UnparsedType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -77,12 +109,7 @@ public class GravitinoLanceNamespaceWrapper extends NamespaceWrapper
   @Override
   protected void initialize() {
     String uri = config().get(NAMESPACE_URI);
-    String metalakeName = config().get(METALAKE_NAME);
-    Preconditions.checkArgument(
-        StringUtils.isNotBlank(metalakeName),
-        "Metalake name must be provided for Gravitino namespace backend");
-
-    this.client = GravitinoClient.builder(uri).withMetalake(metalakeName).build();
+    this.client = GravitinoClient.builder(uri).withMetalake("test").build();
   }
 
   @Override
@@ -109,7 +136,7 @@ public class GravitinoLanceNamespaceWrapper extends NamespaceWrapper
   @Override
   public ListNamespacesResponse listNamespaces(
       String namespaceId, String delimiter, String pageToken, Integer limit) {
-    ObjectIdentifier nsId = ObjectIdentifier.of(namespaceId, delimiter);
+    ObjectIdentifier nsId = ObjectIdentifier.of(namespaceId, Pattern.quote(delimiter));
     Preconditions.checkArgument(
         nsId.levels() <= 2, "Expected at most 2-level namespace but got: %s", namespaceId);
 
@@ -142,7 +169,7 @@ public class GravitinoLanceNamespaceWrapper extends NamespaceWrapper
 
   @Override
   public DescribeNamespaceResponse describeNamespace(String namespaceId, String delimiter) {
-    ObjectIdentifier nsId = ObjectIdentifier.of(namespaceId, delimiter);
+    ObjectIdentifier nsId = ObjectIdentifier.of(namespaceId, Pattern.quote(delimiter));
     Preconditions.checkArgument(
         nsId.levels() <= 2, "Expected at most 2-level namespace but got: %s", namespaceId);
 
@@ -174,7 +201,7 @@ public class GravitinoLanceNamespaceWrapper extends NamespaceWrapper
       String delimiter,
       CreateNamespaceRequest.ModeEnum mode,
       Map<String, String> properties) {
-    ObjectIdentifier nsId = ObjectIdentifier.of(namespaceId, delimiter);
+    ObjectIdentifier nsId = ObjectIdentifier.of(namespaceId, Pattern.quote(delimiter));
     Preconditions.checkArgument(
         nsId.levels() <= 2, "Expected at most 2-level namespace but got: %s", namespaceId);
 
@@ -196,7 +223,7 @@ public class GravitinoLanceNamespaceWrapper extends NamespaceWrapper
       String delimiter,
       DropNamespaceRequest.ModeEnum mode,
       DropNamespaceRequest.BehaviorEnum behavior) {
-    ObjectIdentifier nsId = ObjectIdentifier.of(namespaceId, delimiter);
+    ObjectIdentifier nsId = ObjectIdentifier.of(namespaceId, Pattern.quote(delimiter));
     Preconditions.checkArgument(
         nsId.levels() <= 2, "Expected at most 2-level namespace but got: %s", namespaceId);
 
@@ -213,7 +240,7 @@ public class GravitinoLanceNamespaceWrapper extends NamespaceWrapper
 
   @Override
   public void namespaceExists(String id, String delimiter) throws LanceNamespaceException {
-    ObjectIdentifier nsId = ObjectIdentifier.of(id, delimiter);
+    ObjectIdentifier nsId = ObjectIdentifier.of(id, Pattern.quote(delimiter));
     Preconditions.checkArgument(
         nsId.levels() <= 2, "Expected at most 2-level namespace but got: %s", id);
 
@@ -233,7 +260,273 @@ public class GravitinoLanceNamespaceWrapper extends NamespaceWrapper
   @Override
   public ListTablesResponse listTables(
       String id, String delimiter, String pageToken, Integer limit) {
-    throw new UnsupportedOperationException("Not implemented yet");
+    ObjectIdentifier nsId = ObjectIdentifier.of(id, Pattern.quote(delimiter));
+    Preconditions.checkArgument(
+        nsId.levels() <= 2, "Expected at most 2-level namespace but got: %s", nsId.levels());
+    String catalogName = nsId.levelAtListPos(0);
+    Catalog catalog = loadAndValidateLakehouseCatalog(catalogName);
+    String schemaName = nsId.levelAtListPos(1);
+    List<String> tables =
+        Arrays.stream(catalog.asTableCatalog().listTables(Namespace.of(schemaName)))
+            .map(ident -> Joiner.on(delimiter).join(catalogName, schemaName, ident.name()))
+            .collect(Collectors.toList());
+
+    Collections.sort(tables);
+    PageUtil.Page page = PageUtil.splitPage(tables, pageToken, PageUtil.normalizePageSize(limit));
+    ListNamespacesResponse response = new ListNamespacesResponse();
+    response.setNamespaces(Sets.newHashSet(page.items()));
+    response.setPageToken(page.nextPageToken());
+
+    return new ListTablesResponse()
+        .tables(response.getNamespaces())
+        .pageToken(response.getPageToken());
+  }
+
+  @Override
+  public DescribeTableResponse describeTable(String tableId, String delimiter) {
+    ObjectIdentifier nsId = ObjectIdentifier.of(tableId, Pattern.quote(delimiter));
+    Preconditions.checkArgument(
+        nsId.levels() <= 3, "Expected at most 3-level namespace but got: %s", nsId.levels());
+
+    String catalogName = nsId.levelAtListPos(0);
+    Catalog catalog = loadAndValidateLakehouseCatalog(catalogName);
+    NameIdentifier tableIdentifier =
+        NameIdentifier.of(nsId.levelAtListPos(1), nsId.levelAtListPos(2));
+
+    Table table = catalog.asTableCatalog().loadTable(tableIdentifier);
+    DescribeTableResponse response = new DescribeTableResponse();
+    response.setProperties(table.properties());
+    response.setLocation(table.properties().get("location"));
+    response.setSchema(toJsonArrowSchema(table.columns()));
+    return response;
+  }
+
+  private JsonArrowSchema toJsonArrowSchema(Column[] columns) {
+    List<JsonArrowField> fields = new ArrayList<>();
+    for (Column column : columns) {
+      ArrowType arrowType = fromGravitinoType(column.dataType());
+      FieldType fieldType = new FieldType(column.nullable(), arrowType, null, null);
+      Field field = new Field(column.name(), fieldType, null);
+
+      JsonArrowDataType jsonArrowDataType = new JsonArrowDataType();
+      // other filed needs to be set accordingly such as list, map, struct
+      jsonArrowDataType.setType(arrowType.toString());
+
+      JsonArrowField arrowField = new JsonArrowField();
+      arrowField.setName(field.getName());
+      arrowField.setType(jsonArrowDataType);
+
+      fields.add(arrowField);
+    }
+
+    JsonArrowSchema jsonArrowSchema = new JsonArrowSchema();
+    jsonArrowSchema.setFields(fields);
+    return jsonArrowSchema;
+  }
+
+  @Override
+  public CreateTableResponse createTable(
+      String tableId,
+      String mode,
+      String delimiter,
+      String tableLocation,
+      Map<String, String> tableProperties,
+      String rootCatalog,
+      byte[] arrowStreamBody) {
+    ObjectIdentifier nsId = ObjectIdentifier.of(tableId, Pattern.quote(delimiter));
+    Preconditions.checkArgument(
+        nsId.levels() <= 3, "Expected at most 3-level namespace but got: %s", nsId.levels());
+    if (rootCatalog != null) {
+      List<String> levels = nsId.listStyleId();
+      List<String> newLevels = Lists.newArrayList(rootCatalog);
+      newLevels.addAll(levels);
+      nsId = ObjectIdentifier.of(newLevels);
+    }
+
+    // Parser column information.
+    List<Column> columns = Lists.newArrayList();
+    if (arrowStreamBody != null) {
+      ArrowRecordBatchList recordBatchList = parseArrowIpcStream(arrowStreamBody);
+      columns = extractColumns(recordBatchList);
+    }
+
+    String catalogName = nsId.levelAtListPos(0);
+    Catalog catalog = loadAndValidateLakehouseCatalog(catalogName);
+
+    NameIdentifier tableIdentifier =
+        NameIdentifier.of(nsId.levelAtListPos(1), nsId.levelAtListPos(2));
+
+    Map<String, String> createTableProperties = Maps.newHashMap(tableProperties);
+    createTableProperties.put("location", tableLocation);
+    createTableProperties.put("mode", mode);
+    Table t =
+        catalog
+            .asTableCatalog()
+            .createTable(
+                tableIdentifier,
+                columns.toArray(new Column[0]),
+                tableLocation,
+                createTableProperties);
+
+    CreateTableResponse response = new CreateTableResponse();
+    response.setProperties(t.properties());
+    response.setLocation(tableLocation);
+    response.setVersion(0L);
+    return response;
+  }
+
+  private ArrowRecordBatchList parseArrowIpcStream(byte[] stream) {
+    try (BufferAllocator allocator = new RootAllocator();
+        ByteArrayInputStream bais = new ByteArrayInputStream(stream);
+        ArrowStreamReader reader = new ArrowStreamReader(bais, allocator)) {
+
+      org.apache.arrow.vector.types.pojo.Schema schema = reader.getVectorSchemaRoot().getSchema();
+      List<VectorSchemaRoot> batches = new ArrayList<>();
+
+      while (reader.loadNextBatch()) {
+        VectorSchemaRoot root = reader.getVectorSchemaRoot();
+        if (root.getRowCount() > 0) {
+          batches.add(root);
+        }
+      }
+      return new ArrowRecordBatchList(schema, batches);
+    } catch (Exception e) {
+      throw new RuntimeException("Failed to parse Arrow IPC stream", e);
+    }
+  }
+
+  private List<Column> extractColumns(ArrowRecordBatchList recordBatchList) {
+    List<Column> columns = new ArrayList<>();
+    org.apache.arrow.vector.types.pojo.Schema arrowSchema = recordBatchList.getSchema();
+
+    for (org.apache.arrow.vector.types.pojo.Field field : arrowSchema.getFields()) {
+      columns.add(toGravitinoColumn(field));
+    }
+    return columns;
+  }
+
+  private Column toGravitinoColumn(Field field) {
+    return Column.of(
+        field.getName(),
+        toGravitinoType(field),
+        field.getMetadata().get("comment"),
+        field.isNullable(),
+        false,
+        DEFAULT_VALUE_NOT_SET);
+  }
+
+  private ArrowType fromGravitinoType(Type type) {
+    switch (type.name()) {
+      case BOOLEAN:
+        return Bool.INSTANCE;
+      case BYTE:
+        return new Int(8, true);
+      case SHORT:
+        return new Int(16, true);
+      case INTEGER:
+        return new Int(32, true);
+      case LONG:
+        return new Int(64, true);
+      case FLOAT:
+        return new FloatingPoint(FloatingPointPrecision.SINGLE);
+      case DOUBLE:
+        return new FloatingPoint(FloatingPointPrecision.DOUBLE);
+      case DECIMAL:
+        // Lance uses FIXED_SIZE_BINARY for decimal types
+        return new ArrowType.FixedSizeBinary(16); // assuming 16 bytes for decimal
+      case DATE:
+        return new ArrowType.Date(DateUnit.DAY);
+      case TIME:
+        return new ArrowType.Time(TimeUnit.MILLISECOND, 32);
+      case TIMESTAMP:
+        return new ArrowType.Timestamp(TimeUnit.MILLISECOND, null);
+      case VARCHAR:
+      case STRING:
+        return new ArrowType.Utf8();
+      case FIXED:
+        FixedType fixedType = (FixedType) type;
+        return new ArrowType.FixedSizeBinary(fixedType.length());
+      case BINARY:
+        return new ArrowType.Binary();
+      case UNPARSED:
+        String typeStr = ((UnparsedType) type).unparsedType().toString();
+        try {
+          Type t = JsonUtils.anyFieldMapper().readValue(typeStr, Type.class);
+          if (t instanceof Types.ListType) {
+            return ArrowType.List.INSTANCE;
+          } else if (t instanceof Types.MapType) {
+            return new ArrowType.Map(false);
+          } else if (t instanceof Types.StructType) {
+            return ArrowType.Struct.INSTANCE;
+          } else {
+            throw new UnsupportedOperationException(
+                "Unsupported UnparsedType conversion: " + t.simpleString());
+          }
+        } catch (Exception e) {
+          // FixedSizeListArray(integer, 3)
+          if (typeStr.startsWith("FixedSizeListArray")) {
+            int size =
+                Integer.parseInt(
+                    typeStr.substring(typeStr.indexOf(',') + 1, typeStr.indexOf(')')).trim());
+            return new ArrowType.FixedSizeList(size);
+          }
+          throw new UnsupportedOperationException("Failed to parse UnparsedType: " + typeStr, e);
+        }
+      default:
+        throw new UnsupportedOperationException("Unsupported Gravitino type: " + type.name());
+    }
+  }
+
+  private Type toGravitinoType(Field field) {
+    FieldType parentType = field.getFieldType();
+    ArrowType arrowType = parentType.getType();
+    if (arrowType instanceof Bool) {
+      return Types.BooleanType.get();
+    } else if (arrowType instanceof Int) {
+      Int intType = (Int) arrowType;
+      switch (intType.getBitWidth()) {
+        case 8 -> {
+          return Types.ByteType.get();
+        }
+        case 16 -> {
+          return Types.ShortType.get();
+        }
+        case 32 -> {
+          return Types.IntegerType.get();
+        }
+        case 64 -> {
+          return Types.LongType.get();
+        }
+        default -> throw new UnsupportedOperationException(
+            "Unsupported Int bit width: " + intType.getBitWidth());
+      }
+    } else if (arrowType instanceof FloatingPoint) {
+      FloatingPoint floatingPoint = (FloatingPoint) arrowType;
+      switch (floatingPoint.getPrecision()) {
+        case SINGLE:
+          return Types.FloatType.get();
+        case DOUBLE:
+          return Types.DoubleType.get();
+        default:
+          throw new UnsupportedOperationException(
+              "Unsupported FloatingPoint precision: " + floatingPoint.getPrecision());
+      }
+    } else if (arrowType instanceof ArrowType.FixedSizeBinary) {
+      ArrowType.FixedSizeBinary fixedSizeBinary = (ArrowType.FixedSizeBinary) arrowType;
+      return Types.FixedType.of(fixedSizeBinary.getByteWidth());
+    } else if (arrowType instanceof ArrowType.Date) {
+      return Types.DateType.get();
+    } else if (arrowType instanceof ArrowType.Time) {
+      return Types.TimeType.get();
+    } else if (arrowType instanceof ArrowType.Timestamp) {
+      return Types.TimestampType.withoutTimeZone();
+    } else if (arrowType instanceof ArrowType.Utf8) {
+      return Types.StringType.get();
+    } else if (arrowType instanceof ArrowType.Binary) {
+      return Types.BinaryType.get();
+    } else {
+      return Types.UnparsedType.of(arrowType.toString());
+    }
   }
 
   private boolean isLakehouseCatalog(Catalog catalog) {

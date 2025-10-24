@@ -25,6 +25,7 @@ import com.lancedb.lance.namespace.model.DescribeNamespaceResponse;
 import com.lancedb.lance.namespace.model.DropNamespaceRequest;
 import com.lancedb.lance.namespace.model.DropNamespaceResponse;
 import com.lancedb.lance.namespace.model.ListNamespacesResponse;
+import com.lancedb.lance.namespace.model.ListTablesResponse;
 import java.util.Map;
 
 public interface LanceNamespaceOperations {
@@ -47,4 +48,6 @@ public interface LanceNamespaceOperations {
       DropNamespaceRequest.BehaviorEnum behavior);
 
   void namespaceExists(String id, String delimiter) throws LanceNamespaceException;
+
+  ListTablesResponse listTables(String id, String delimiter, String pageToken, Integer limit);
 }

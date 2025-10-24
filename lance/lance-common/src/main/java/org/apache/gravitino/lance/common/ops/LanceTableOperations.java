@@ -18,11 +18,20 @@
  */
 package org.apache.gravitino.lance.common.ops;
 
-import com.lancedb.lance.namespace.model.ListTablesResponse;
+import com.lancedb.lance.namespace.model.CreateTableResponse;
+import com.lancedb.lance.namespace.model.DescribeTableResponse;
+import java.util.Map;
 
 public interface LanceTableOperations {
 
-  ListTablesResponse listTables(String id, String delimiter, String pageToken, Integer limit);
+  DescribeTableResponse describeTable(String tableId, String delimiter);
 
-  // todo: add more table operation methods
+  CreateTableResponse createTable(
+      String tableId,
+      String mode,
+      String delimiter,
+      String tableLocation,
+      Map<String, String> tableProperties,
+      String rootCatalog,
+      byte[] arrowStreamBody);
 }
