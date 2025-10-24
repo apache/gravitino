@@ -269,7 +269,7 @@ public class GravitinoLanceNamespaceWrapper extends NamespaceWrapper
     }
     if (!isLakehouseCatalog(catalog)) {
       throw LanceNamespaceException.notFound(
-          "Catalog not found: " + catalogName,
+          "Catalog is not a lakehouse catalog: " + catalogName,
           NoSuchCatalogException.class.getSimpleName(),
           catalogName,
           CommonUtil.formatCurrentStackTrace());
@@ -296,6 +296,15 @@ public class GravitinoLanceNamespaceWrapper extends NamespaceWrapper
       response.setProperties(
           createdCatalog.properties() == null ? Maps.newHashMap() : createdCatalog.properties());
       return response;
+    }
+
+    // Catalog exists, validate type
+    if (!isLakehouseCatalog(catalog)) {
+      throw LanceNamespaceException.conflict(
+          "Catalog already exists but is not a lakehouse catalog: " + catalogName,
+          CatalogAlreadyExistsException.class.getSimpleName(),
+          catalogName,
+          CommonUtil.formatCurrentStackTrace());
     }
 
     // Catalog exists, handle based on mode
@@ -333,39 +342,41 @@ public class GravitinoLanceNamespaceWrapper extends NamespaceWrapper
     CreateNamespaceResponse response = new CreateNamespaceResponse();
     Catalog loadedCatalog = loadAndValidateLakehouseCatalog(catalogName);
 
+    Schema schema;
     try {
-      Schema schema = loadedCatalog.asSchemas().loadSchema(schemaName);
-      // Schema exists, handle based on mode
-      switch (mode) {
-        case EXIST_OK:
-          response.setProperties(Maps.newHashMap());
-          return response;
-        case CREATE:
-          throw LanceNamespaceException.conflict(
-              "Schema already exists: " + schemaName,
-              SchemaAlreadyExistsException.class.getSimpleName(),
-              schemaName,
-              CommonUtil.formatCurrentStackTrace());
-        case OVERWRITE:
-          SchemaChange[] changes =
-              buildChanges(
-                  properties,
-                  schema.properties(),
-                  SchemaChange::setProperty,
-                  SchemaChange::removeProperty,
-                  SchemaChange[]::new);
-          Schema alteredSchema = loadedCatalog.asSchemas().alterSchema(schemaName, changes);
-          Optional.ofNullable(alteredSchema.properties()).ifPresent(response::setProperties);
-          return response;
-        default:
-          throw new IllegalArgumentException("Unknown mode: " + mode);
-      }
+      schema = loadedCatalog.asSchemas().loadSchema(schemaName);
     } catch (NoSuchSchemaException e) {
       // Schema does not exist, create it
       Schema createdSchema = loadedCatalog.asSchemas().createSchema(schemaName, null, properties);
       response.setProperties(
           createdSchema.properties() == null ? Maps.newHashMap() : createdSchema.properties());
       return response;
+    }
+
+    // Schema exists, handle based on mode
+    switch (mode) {
+      case EXIST_OK:
+        response.setProperties(Maps.newHashMap());
+        return response;
+      case CREATE:
+        throw LanceNamespaceException.conflict(
+            "Schema already exists: " + schemaName,
+            SchemaAlreadyExistsException.class.getSimpleName(),
+            schemaName,
+            CommonUtil.formatCurrentStackTrace());
+      case OVERWRITE:
+        SchemaChange[] changes =
+            buildChanges(
+                properties,
+                schema.properties(),
+                SchemaChange::setProperty,
+                SchemaChange::removeProperty,
+                SchemaChange[]::new);
+        Schema alteredSchema = loadedCatalog.asSchemas().alterSchema(schemaName, changes);
+        Optional.ofNullable(alteredSchema.properties()).ifPresent(response::setProperties);
+        return response;
+      default:
+        throw new IllegalArgumentException("Unknown mode: " + mode);
     }
   }
 
