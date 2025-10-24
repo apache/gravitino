@@ -65,10 +65,6 @@ public abstract class UserContext implements Closeable {
 
   public static UserContext getUserContext(
       NameIdentifier nameIdentifier, Map<String, String> properties, CatalogInfo catalogInfo) {
-    if (userContextMap.containsKey(nameIdentifier)) {
-      return userContextMap.get(nameIdentifier);
-    }
-
     Configuration configuration = FileSystemUtils.createConfiguration(GRAVITINO_BYPASS, properties);
     AuthenticationConfig authenticationConfig = new AuthenticationConfig(properties, configuration);
 
