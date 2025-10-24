@@ -80,6 +80,14 @@ public class LanceConfig extends Config implements OverwriteDefaultConfig {
     return get(CATALOG_NAME);
   }
 
+  public String getNamespaceUri() {
+    return get(NAMESPACE_URI);
+  }
+
+  public String getGravitinoMetalake() {
+    return get(METALAKE_NAME);
+  }
+
   @Override
   public Map<String, String> getOverwriteDefaultConfig() {
     return ImmutableMap.of(
