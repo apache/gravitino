@@ -30,6 +30,7 @@ import com.google.common.collect.Sets;
 import com.lancedb.lance.namespace.LanceNamespaceException;
 import com.lancedb.lance.namespace.ObjectIdentifier;
 import com.lancedb.lance.namespace.model.CreateNamespaceRequest;
+import com.lancedb.lance.namespace.model.CreateNamespaceRequest.ModeEnum;
 import com.lancedb.lance.namespace.model.CreateNamespaceResponse;
 import com.lancedb.lance.namespace.model.CreateTableResponse;
 import com.lancedb.lance.namespace.model.DescribeNamespaceResponse;
@@ -598,6 +599,37 @@ public class GravitinoLanceNamespaceWrapper extends NamespaceWrapper
     createTableProperties.put("location", tableLocation);
     createTableProperties.put("mode", mode);
     // TODO considering the mode (create, exist_ok, overwrite)
+
+    ModeEnum createMode = ModeEnum.fromValue(mode.toLowerCase());
+    switch (createMode) {
+      case EXIST_OK:
+        if (catalog.asTableCatalog().tableExists(tableIdentifier)) {
+          CreateTableResponse response = new CreateTableResponse();
+          Table existingTable = catalog.asTableCatalog().loadTable(tableIdentifier);
+          response.setProperties(existingTable.properties());
+          response.setLocation(existingTable.properties().get("location"));
+          response.setVersion(0L);
+          return response;
+        }
+        break;
+      case CREATE:
+        if (catalog.asTableCatalog().tableExists(tableIdentifier)) {
+          throw LanceNamespaceException.conflict(
+              "Table already exists: " + tableId,
+              SchemaAlreadyExistsException.class.getSimpleName(),
+              tableId,
+              CommonUtil.formatCurrentStackTrace());
+        }
+        break;
+      case OVERWRITE:
+        if (catalog.asTableCatalog().tableExists(tableIdentifier)) {
+          catalog.asTableCatalog().dropTable(tableIdentifier);
+        }
+        break;
+      default:
+        throw new IllegalArgumentException("Unknown mode: " + mode);
+    }
+
     Table t =
         catalog
             .asTableCatalog()
