@@ -18,6 +18,10 @@
  */
 package org.apache.gravitino.lance.service.rest;
 
+import static org.apache.gravitino.lance.common.ops.NamespaceWrapper.NAMESPACE_DELIMITER_DEFAULT;
+
+import com.codahale.metrics.annotation.ResponseMetered;
+import com.codahale.metrics.annotation.Timed;
 import com.lancedb.lance.namespace.model.ListTablesResponse;
 import javax.inject.Inject;
 import javax.ws.rs.Consumes;
@@ -32,6 +36,7 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.gravitino.lance.common.ops.NamespaceWrapper;
 import org.apache.gravitino.lance.service.LanceExceptionMapper;
+import org.apache.gravitino.metrics.MetricNames;
 
 @Path("/v1/namespace/{id}/table")
 @Consumes(MediaType.APPLICATION_JSON)
@@ -47,9 +52,11 @@ public class LanceTableOperations {
 
   @GET
   @Path("/list")
+  @Timed(name = "list-tables." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
+  @ResponseMetered(name = "list-tables", absolute = true)
   public Response listTables(
       @Encoded @PathParam("id") String namespaceId,
-      @DefaultValue("$") @QueryParam("delimiter") String delimiter,
+      @DefaultValue(NAMESPACE_DELIMITER_DEFAULT) @QueryParam("delimiter") String delimiter,
       @QueryParam("page_token") String pageToken,
       @QueryParam("limit") Integer limit) {
     try {

@@ -23,10 +23,14 @@ import static org.apache.gravitino.lance.common.config.LanceConfig.NAMESPACE_BAC
 import java.lang.reflect.Constructor;
 import java.util.Map;
 import javax.servlet.Servlet;
+import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.auxiliary.GravitinoAuxiliaryService;
 import org.apache.gravitino.lance.common.config.LanceConfig;
 import org.apache.gravitino.lance.common.ops.LanceNamespaceBackend;
 import org.apache.gravitino.lance.common.ops.NamespaceWrapper;
+import org.apache.gravitino.metrics.MetricsSystem;
+import org.apache.gravitino.metrics.source.MetricsSource;
+import org.apache.gravitino.server.web.HttpServerMetricsSource;
 import org.apache.gravitino.server.web.JettyServer;
 import org.apache.gravitino.server.web.JettyServerConfig;
 import org.glassfish.hk2.utilities.binding.AbstractBinder;
@@ -58,6 +62,8 @@ public class LanceRESTService implements GravitinoAuxiliaryService {
     JettyServerConfig serverConfig = JettyServerConfig.fromConfig(lanceConfig);
 
     server = new JettyServer();
+    // Get MetricsSystem directly from GravitinoEnv for zero-overhead access
+    MetricsSystem metricsSystem = GravitinoEnv.getInstance().metricsSystem();
     server.initialize(serverConfig, SERVICE_NAME, false);
 
     this.lanceNamespace = loadNamespaceImpl(lanceConfig);
@@ -72,6 +78,12 @@ public class LanceRESTService implements GravitinoAuxiliaryService {
             bind(lanceNamespace).to(NamespaceWrapper.class).ranked(1);
           }
         });
+
+    // Register metrics with shared MetricsSystem
+    HttpServerMetricsSource httpServerMetricsSource =
+        new HttpServerMetricsSource(
+            MetricsSource.LANCE_REST_SERVER_METRIC_NAME, resourceConfig, server);
+    metricsSystem.register(httpServerMetricsSource);
 
     Servlet container = new ServletContainer(resourceConfig);
     server.addServlet(container, LANCE_SPEC);

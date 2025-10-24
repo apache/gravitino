@@ -20,6 +20,8 @@ package org.apache.gravitino.lance.service.rest;
 
 import static org.apache.gravitino.lance.common.ops.NamespaceWrapper.NAMESPACE_DELIMITER_DEFAULT;
 
+import com.codahale.metrics.annotation.ResponseMetered;
+import com.codahale.metrics.annotation.Timed;
 import com.lancedb.lance.namespace.model.ListNamespacesResponse;
 import javax.inject.Inject;
 import javax.ws.rs.Consumes;
@@ -34,6 +36,7 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.gravitino.lance.common.ops.NamespaceWrapper;
 import org.apache.gravitino.lance.service.LanceExceptionMapper;
+import org.apache.gravitino.metrics.MetricNames;
 
 @Path("/v1/namespace")
 @Consumes(MediaType.APPLICATION_JSON)
@@ -49,6 +52,8 @@ public class LanceNamespaceOperations {
 
   @GET
   @Path("/{id}/list")
+  @Timed(name = "list-namespaces." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
+  @ResponseMetered(name = "list-namespaces", absolute = true)
   public Response listNamespaces(
       @Encoded @PathParam("id") String namespaceId,
       @DefaultValue(NAMESPACE_DELIMITER_DEFAULT) @QueryParam("delimiter") String delimiter,
