@@ -80,12 +80,12 @@ public class LanceConfig extends Config implements OverwriteDefaultConfig {
     return get(CATALOG_NAME);
   }
 
-  public String getGravitinoUri() {
-    return get(GRAVITINO_URI);
+  public String getNamespaceUri() {
+    return get(NAMESPACE_URI);
   }
 
   public String getGravitinoMetalake() {
-    return get(GRAVITINO_METALAKE);
+    return get(METALAKE_NAME);
   }
 
   @Override
