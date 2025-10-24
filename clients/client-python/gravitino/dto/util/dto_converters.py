@@ -16,7 +16,7 @@
 # under the License.
 
 from functools import singledispatchmethod
-from typing import Optional, Union, cast
+from typing import Optional, cast, overload
 
 from gravitino.api.audit import Audit
 from gravitino.api.rel.column import Column
@@ -322,19 +322,34 @@ class DTOConverters:
             audit_info=dto.audit_info(),
         )
 
+    @overload
     @staticmethod
-    def from_dtos(
-        dtos: list[Union[ColumnDTO, IndexDTO, SortOrderDTO, Partitioning]],
-    ) -> list[Union[Column, Index, SortOrder, Transform]]:
+    def from_dtos(dtos: list[ColumnDTO]) -> list[Column]: ...
+
+    @overload
+    @staticmethod
+    def from_dtos(dtos: list[IndexDTO]) -> list[Index]: ...
+
+    @overload
+    @staticmethod
+    def from_dtos(dtos: list[SortOrderDTO]) -> list[SortOrder]: ...
+
+    @overload
+    @staticmethod
+    def from_dtos(dtos: list[Partitioning]) -> list[Transform]: ...
+
+    @staticmethod
+    def from_dtos(dtos):
         """Converts list of `ColumnDTO`, `IndexDTO`, `SortOrderDTO`, or `Partitioning`
         to the corresponding list of `Column`s, `Index`es, `SortOrder`s, or `Transform`s.
 
         Args:
-            dtos (list[Union[ColumnDTO, IndexDTO, SortOrderDTO, Partitioning]]):
+            dtos (list[ColumnDTO] | list[IndexDTO] | list[SortOrderDTO] | list[Partitioning]):
                 The DTOs to be converted.
 
         Returns:
-            list[Union[Column, Index, SortOrder, Transform]]: The list of Indexes.
+            list[Column] | list[Index] | list[SortOrder] | list[Transform]:
+                The list of Columns, Indexes, SortOrders, or Transforms depends on the input DTOs.
         """
         if not dtos:
             return []
