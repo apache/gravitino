@@ -16,32 +16,13 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-description = "lance-common"
+package org.apache.gravitino.lance.common.ops;
 
-plugins {
-  `maven-publish`
-  id("java")
-  id("idea")
-}
+import com.lancedb.lance.namespace.model.ListTablesResponse;
 
-dependencies {
-  implementation(project(":api"))
-  implementation(project(":catalogs:catalog-common"))
-  implementation(project(":clients:client-java")) {
-    exclude("*")
-  }
-  implementation(project(":common")) {
-    exclude("*")
-  }
-  implementation(project(":core")) {
-    exclude("*")
-  }
+public interface LanceTableOperations {
 
-  implementation(libs.guava)
-  implementation(libs.commons.lang3)
-  implementation(libs.lance.namespace.core)
-  implementation(libs.slf4j.api)
+  ListTablesResponse listTables(String id, String delimiter, String pageToken, Integer limit);
 
-  testImplementation(libs.junit.jupiter.api)
-  testRuntimeOnly(libs.junit.jupiter.engine)
+  // todo: add more table operation methods
 }

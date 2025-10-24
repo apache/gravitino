@@ -30,9 +30,14 @@ import org.apache.gravitino.config.ConfigEntry;
 public class LanceConfig extends Config implements OverwriteDefaultConfig {
 
   public static final String LANCE_CONFIG_PREFIX = "gravitino.lance-rest.";
+  public static final String CONFIG_NAMESPACE_BACKEND = "namespace-backend";
+  public static final String CONFIG_METALAKE = "metalake-name";
+  public static final String CONFIG_URI = "uri";
 
   public static final int DEFAULT_LANCE_REST_SERVICE_HTTP_PORT = 9101;
   public static final int DEFAULT_LANCE_REST_SERVICE_HTTPS_PORT = 9533;
+  public static final String DEFAULT_NAMESPACE_BACKEND = "gravitino";
+  public static final String DEFAULT_URI = "http://localhost:8090";
 
   public static final ConfigEntry<String> CATALOG_NAME =
       new ConfigBuilder(LANCE_CONFIG_PREFIX + "catalog-name")
@@ -40,6 +45,27 @@ public class LanceConfig extends Config implements OverwriteDefaultConfig {
           .version(ConfigConstants.VERSION_0_1_0)
           .stringConf()
           .createWithDefault("default");
+
+  public static final ConfigEntry<String> NAMESPACE_BACKEND =
+      new ConfigBuilder(LANCE_CONFIG_PREFIX + CONFIG_NAMESPACE_BACKEND)
+          .doc("The backend implementation for namespace operations")
+          .version(ConfigConstants.VERSION_0_1_0)
+          .stringConf()
+          .createWithDefault(DEFAULT_NAMESPACE_BACKEND);
+
+  public static final ConfigEntry<String> METALAKE_NAME =
+      new ConfigBuilder(LANCE_CONFIG_PREFIX + CONFIG_METALAKE)
+          .doc("The Metalake name for Gravitino namespace backend")
+          .version(ConfigConstants.VERSION_0_1_0)
+          .stringConf()
+          .create();
+
+  public static final ConfigEntry<String> NAMESPACE_URI =
+      new ConfigBuilder(LANCE_CONFIG_PREFIX + CONFIG_URI)
+          .doc("The URI for the namespace backend, e.g., Gravitino server URI")
+          .version(ConfigConstants.VERSION_0_1_0)
+          .stringConf()
+          .createWithDefault(DEFAULT_URI);
 
   public LanceConfig(Map<String, String> properties) {
     super(false);

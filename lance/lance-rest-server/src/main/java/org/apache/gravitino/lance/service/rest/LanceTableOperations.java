@@ -18,9 +18,7 @@
  */
 package org.apache.gravitino.lance.service.rest;
 
-import static org.apache.gravitino.lance.common.ops.NamespaceWrapper.NAMESPACE_DELIMITER_DEFAULT;
-
-import com.lancedb.lance.namespace.model.ListNamespacesResponse;
+import com.lancedb.lance.namespace.model.ListTablesResponse;
 import javax.inject.Inject;
 import javax.ws.rs.Consumes;
 import javax.ws.rs.DefaultValue;
@@ -35,28 +33,28 @@ import javax.ws.rs.core.Response;
 import org.apache.gravitino.lance.common.ops.NamespaceWrapper;
 import org.apache.gravitino.lance.service.LanceExceptionMapper;
 
-@Path("/v1/namespace")
+@Path("/v1/namespace/{id}/table")
 @Consumes(MediaType.APPLICATION_JSON)
 @Produces(MediaType.APPLICATION_JSON)
-public class LanceNamespaceOperations {
+public class LanceTableOperations {
 
   private final NamespaceWrapper lanceNamespace;
 
   @Inject
-  public LanceNamespaceOperations(NamespaceWrapper lanceNamespace) {
+  public LanceTableOperations(NamespaceWrapper lanceNamespace) {
     this.lanceNamespace = lanceNamespace;
   }
 
   @GET
-  @Path("/{id}/list")
-  public Response listNamespaces(
+  @Path("/list")
+  public Response listTables(
       @Encoded @PathParam("id") String namespaceId,
-      @DefaultValue(NAMESPACE_DELIMITER_DEFAULT) @QueryParam("delimiter") String delimiter,
+      @DefaultValue("$") @QueryParam("delimiter") String delimiter,
       @QueryParam("page_token") String pageToken,
       @QueryParam("limit") Integer limit) {
     try {
-      ListNamespacesResponse response =
-          lanceNamespace.asNamespaceOps().listNamespaces(namespaceId, delimiter, pageToken, limit);
+      ListTablesResponse response =
+          lanceNamespace.asTableOps().listTables(namespaceId, delimiter, pageToken, limit);
       return Response.ok(response).build();
     } catch (Exception e) {
       return LanceExceptionMapper.toRESTResponse(namespaceId, e);

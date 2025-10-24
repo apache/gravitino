@@ -18,14 +18,18 @@
  */
 package org.apache.gravitino.lance;
 
+import static org.apache.gravitino.lance.common.config.LanceConfig.NAMESPACE_BACKEND;
+
+import java.lang.reflect.Constructor;
 import java.util.Map;
 import javax.servlet.Servlet;
 import org.apache.gravitino.auxiliary.GravitinoAuxiliaryService;
 import org.apache.gravitino.lance.common.config.LanceConfig;
-import org.apache.gravitino.lance.common.ops.LanceCatalogService;
-import org.apache.gravitino.lance.service.rest.LanceNamespaceOperations;
+import org.apache.gravitino.lance.common.ops.LanceNamespaceBackend;
+import org.apache.gravitino.lance.common.ops.NamespaceWrapper;
 import org.apache.gravitino.server.web.JettyServer;
 import org.apache.gravitino.server.web.JettyServerConfig;
+import org.glassfish.hk2.utilities.binding.AbstractBinder;
 import org.glassfish.jersey.jackson.JacksonFeature;
 import org.glassfish.jersey.server.ResourceConfig;
 import org.glassfish.jersey.servlet.ServletContainer;
@@ -41,7 +45,7 @@ public class LanceRESTService implements GravitinoAuxiliaryService {
   public static final String LANCE_SPEC = "/lance/*";
 
   private JettyServer server;
-  private LanceCatalogService catalogService;
+  private NamespaceWrapper lanceNamespace;
 
   @Override
   public String shortName() {
@@ -56,11 +60,18 @@ public class LanceRESTService implements GravitinoAuxiliaryService {
     server = new JettyServer();
     server.initialize(serverConfig, SERVICE_NAME, false);
 
-    catalogService = new LanceCatalogService(lanceConfig);
+    this.lanceNamespace = loadNamespaceImpl(lanceConfig);
 
     ResourceConfig resourceConfig = new ResourceConfig();
     resourceConfig.register(JacksonFeature.class);
-    resourceConfig.register(new LanceNamespaceOperations(catalogService));
+    resourceConfig.packages("org.apache.gravitino.lance.service.rest");
+    resourceConfig.register(
+        new AbstractBinder() {
+          @Override
+          protected void configure() {
+            bind(lanceNamespace).to(NamespaceWrapper.class).ranked(1);
+          }
+        });
 
     Servlet container = new ServletContainer(resourceConfig);
     server.addServlet(container, LANCE_SPEC);
@@ -84,14 +95,28 @@ public class LanceRESTService implements GravitinoAuxiliaryService {
       server.stop();
       LOG.info("Lance REST service stopped");
     }
-    if (catalogService != null) {
-      catalogService.close();
+    if (lanceNamespace != null) {
+      lanceNamespace.close();
     }
   }
 
   public void join() {
     if (server != null) {
       server.join();
+    }
+  }
+
+  private NamespaceWrapper loadNamespaceImpl(LanceConfig lanceConfig) {
+    String backendType = lanceConfig.get(NAMESPACE_BACKEND);
+    LanceNamespaceBackend lanceNamespaceBackend = LanceNamespaceBackend.fromType(backendType);
+
+    try {
+      Constructor<? extends NamespaceWrapper> constructor =
+          lanceNamespaceBackend.getWrapperClass().getConstructor(LanceConfig.class);
+      return constructor.newInstance(lanceConfig);
+    } catch (Exception e) {
+      LOG.error("Error loading namespace implementation for backend type: {}", backendType, e);
+      throw new RuntimeException("Failed to load namespace implementation", e);
     }
   }
 }
