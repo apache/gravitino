@@ -241,21 +241,31 @@ class Transforms(Transform):
 
         return Transforms.ApplyTransform(name=name, arguments=arguments)
 
+    @overload
+    @staticmethod
+    def list(*field_names: List[str]) -> "Transforms.ListTransform": ...
+
+    @overload
     @staticmethod
     def list(
-        *field_names: List[str], assignments: Optional[List[ListPartition]] = None
-    ) -> "Transforms.ListTransform":
-        """Create a transform that includes multiple fields in a list.
+        *, field_names: List[List[str]], assignments: List[ListPartition]
+    ) -> "Transforms.ListTransform": ...
+
+    @staticmethod
+    def list(*args, **kwargs) -> "Transforms.ListTransform":
+        """Create a transform that includes multiple fields in a list with preassigned list partitions.
 
         Args:
-            *fields (List[NamedReference]):
-                The fields to include in the list
+            field_names (List[str] or List[List[str]]):
+                The field names to include in the list
             assignments (Optional[List[ListPartition]]):
                 The preassigned list partitions
 
         Returns:
             Transforms.ListTransform: The created transform
         """
+        field_names = kwargs.get("field_names", args)
+        assignments = kwargs.get("assignments")
         return Transforms.ListTransform(
             fields=[
                 NamedReference.field(field_name=field_name)
