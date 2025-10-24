@@ -136,11 +136,11 @@ public class GravitinoLanceNamespaceWrapper extends NamespaceWrapper
   @Override
   public ListNamespacesResponse listNamespaces(
       String namespaceId, String delimiter, String pageToken, Integer limit) {
-    ObjectIdentifier nsId = ObjectIdentifier.of(namespaceId, Pattern.quote(delimiter));
+    ObjectIdentifier nsId = ObjectIdentifier.of(namespaceId, delimiter);
     Preconditions.checkArgument(
         nsId.levels() <= 2, "Expected at most 2-level namespace but got: %s", namespaceId);
 
-    java.util.List<String> namespaces;
+    List<String> namespaces;
     switch (nsId.levels()) {
       case 0:
         namespaces =
@@ -149,10 +149,16 @@ public class GravitinoLanceNamespaceWrapper extends NamespaceWrapper
                 .map(Catalog::name)
                 .collect(Collectors.toList());
         break;
+
       case 1:
         Catalog catalog = loadAndValidateLakehouseCatalog(nsId.levelAtListPos(0));
         namespaces = Lists.newArrayList(catalog.asSchemas().listSchemas());
         break;
+
+      case 2:
+        namespaces = Lists.newArrayList();
+        break;
+
       default:
         throw new IllegalArgumentException(
             "Expected at most 2-level namespace but got: " + namespaceId);
@@ -169,25 +175,27 @@ public class GravitinoLanceNamespaceWrapper extends NamespaceWrapper
 
   @Override
   public DescribeNamespaceResponse describeNamespace(String namespaceId, String delimiter) {
-    ObjectIdentifier nsId = ObjectIdentifier.of(namespaceId, Pattern.quote(delimiter));
+    ObjectIdentifier nsId = ObjectIdentifier.of(namespaceId, delimiter);
     Preconditions.checkArgument(
-        nsId.levels() <= 2, "Expected at most 2-level namespace but got: %s", namespaceId);
+        nsId.levels() <= 2 && nsId.levels() > 0,
+        "Expected at most 2-level and at least 1-level namespace but got: %s",
+        namespaceId);
 
     Catalog catalog = loadAndValidateLakehouseCatalog(nsId.levelAtListPos(0));
     Map<String, String> properties = Maps.newHashMap();
 
     switch (nsId.levels()) {
-      case 0:
+      case 1:
         Optional.ofNullable(catalog.properties()).ifPresent(properties::putAll);
         break;
-      case 1:
+      case 2:
         String schemaName = nsId.levelAtListPos(1);
         Schema schema = catalog.asSchemas().loadSchema(schemaName);
         Optional.ofNullable(schema.properties()).ifPresent(properties::putAll);
         break;
       default:
         throw new IllegalArgumentException(
-            "Expected at most 2-level namespace but got: " + namespaceId);
+            "Expected at most 2-level and at least 1-level namespace but got: " + namespaceId);
     }
 
     DescribeNamespaceResponse response = new DescribeNamespaceResponse();
@@ -201,19 +209,21 @@ public class GravitinoLanceNamespaceWrapper extends NamespaceWrapper
       String delimiter,
       CreateNamespaceRequest.ModeEnum mode,
       Map<String, String> properties) {
-    ObjectIdentifier nsId = ObjectIdentifier.of(namespaceId, Pattern.quote(delimiter));
+    ObjectIdentifier nsId = ObjectIdentifier.of(namespaceId, delimiter);
     Preconditions.checkArgument(
-        nsId.levels() <= 2, "Expected at most 2-level namespace but got: %s", namespaceId);
+        nsId.levels() <= 2 && nsId.levels() > 0,
+        "Expected at most 2-level and at least 1-level namespace but got: %s",
+        namespaceId);
 
     switch (nsId.levels()) {
-      case 0:
-        return createOrUpdateCatalog(nsId.levelAtListPos(0), mode, properties);
       case 1:
+        return createOrUpdateCatalog(nsId.levelAtListPos(0), mode, properties);
+      case 2:
         return createOrUpdateSchema(
             nsId.levelAtListPos(0), nsId.levelAtListPos(1), mode, properties);
       default:
         throw new IllegalArgumentException(
-            "Expected at most 2-level namespace but got: " + namespaceId);
+            "Expected at most 2-level and at least 1-level namespace but got: " + namespaceId);
     }
   }
 
@@ -223,29 +233,33 @@ public class GravitinoLanceNamespaceWrapper extends NamespaceWrapper
       String delimiter,
       DropNamespaceRequest.ModeEnum mode,
       DropNamespaceRequest.BehaviorEnum behavior) {
-    ObjectIdentifier nsId = ObjectIdentifier.of(namespaceId, Pattern.quote(delimiter));
+    ObjectIdentifier nsId = ObjectIdentifier.of(namespaceId, delimiter);
     Preconditions.checkArgument(
-        nsId.levels() <= 2, "Expected at most 2-level namespace but got: %s", namespaceId);
+        nsId.levels() <= 2 && nsId.levels() > 0,
+        "Expected at most 2-level and at least 1-level namespace but got: %s",
+        namespaceId);
 
     switch (nsId.levels()) {
-      case 0:
-        return dropCatalog(nsId.levelAtListPos(0), mode, behavior);
       case 1:
+        return dropCatalog(nsId.levelAtListPos(0), mode, behavior);
+      case 2:
         return dropSchema(nsId.levelAtListPos(0), nsId.levelAtListPos(1), mode, behavior);
       default:
         throw new IllegalArgumentException(
-            "Expected at most 2-level namespace but got: " + namespaceId);
+            "Expected at most 2-level and at least 1-level namespace but got: " + namespaceId);
     }
   }
 
   @Override
-  public void namespaceExists(String id, String delimiter) throws LanceNamespaceException {
-    ObjectIdentifier nsId = ObjectIdentifier.of(id, Pattern.quote(delimiter));
+  public void namespaceExists(String namespaceId, String delimiter) throws LanceNamespaceException {
+    ObjectIdentifier nsId = ObjectIdentifier.of(namespaceId, delimiter);
     Preconditions.checkArgument(
-        nsId.levels() <= 2, "Expected at most 2-level namespace but got: %s", id);
+        nsId.levels() <= 2 && nsId.levels() > 0,
+        "Expected at most 2-level and at least 1-level namespace but got: %s",
+        namespaceId);
 
     Catalog catalog = loadAndValidateLakehouseCatalog(nsId.levelAtListPos(0));
-    if (nsId.levels() == 1) {
+    if (nsId.levels() == 2) {
       String schemaName = nsId.levelAtListPos(1);
       if (!catalog.asSchemas().schemaExists(schemaName)) {
         throw LanceNamespaceException.notFound(
@@ -255,6 +269,223 @@ public class GravitinoLanceNamespaceWrapper extends NamespaceWrapper
             CommonUtil.formatCurrentStackTrace());
       }
     }
+  }
+
+  private boolean isLakehouseCatalog(Catalog catalog) {
+    return catalog.type().equals(Catalog.Type.RELATIONAL)
+        && "generic-lakehouse".equals(catalog.provider());
+  }
+
+  private Catalog loadAndValidateLakehouseCatalog(String catalogName) {
+    Catalog catalog;
+    try {
+      catalog = client.loadCatalog(catalogName);
+    } catch (NoSuchCatalogException e) {
+      throw LanceNamespaceException.notFound(
+          "Catalog not found: " + catalogName,
+          NoSuchCatalogException.class.getSimpleName(),
+          catalogName,
+          CommonUtil.formatCurrentStackTrace());
+    }
+    if (!isLakehouseCatalog(catalog)) {
+      throw LanceNamespaceException.notFound(
+          "Catalog is not a lakehouse catalog: " + catalogName,
+          NoSuchCatalogException.class.getSimpleName(),
+          catalogName,
+          CommonUtil.formatCurrentStackTrace());
+    }
+    return catalog;
+  }
+
+  private CreateNamespaceResponse createOrUpdateCatalog(
+      String catalogName, CreateNamespaceRequest.ModeEnum mode, Map<String, String> properties) {
+    CreateNamespaceResponse response = new CreateNamespaceResponse();
+
+    Catalog catalog;
+    try {
+      catalog = client.loadCatalog(catalogName);
+    } catch (NoSuchCatalogException e) {
+      // Catalog does not exist, create it
+      Catalog createdCatalog =
+          client.createCatalog(
+              catalogName,
+              Catalog.Type.RELATIONAL,
+              "generic-lakehouse",
+              "created by Lance REST server",
+              properties);
+      response.setProperties(
+          createdCatalog.properties() == null ? Maps.newHashMap() : createdCatalog.properties());
+      return response;
+    }
+
+    // Catalog exists, validate type
+    if (!isLakehouseCatalog(catalog)) {
+      throw LanceNamespaceException.conflict(
+          "Catalog already exists but is not a lakehouse catalog: " + catalogName,
+          CatalogAlreadyExistsException.class.getSimpleName(),
+          catalogName,
+          CommonUtil.formatCurrentStackTrace());
+    }
+
+    // Catalog exists, handle based on mode
+    switch (mode) {
+      case EXIST_OK:
+        response.setProperties(Maps.newHashMap());
+        return response;
+      case CREATE:
+        throw LanceNamespaceException.conflict(
+            "Catalog already exists: " + catalogName,
+            CatalogAlreadyExistsException.class.getSimpleName(),
+            catalogName,
+            CommonUtil.formatCurrentStackTrace());
+      case OVERWRITE:
+        CatalogChange[] changes =
+            buildChanges(
+                properties,
+                catalog.properties(),
+                CatalogChange::setProperty,
+                CatalogChange::removeProperty,
+                CatalogChange[]::new);
+        Catalog alteredCatalog = client.alterCatalog(catalogName, changes);
+        Optional.ofNullable(alteredCatalog.properties()).ifPresent(response::setProperties);
+        return response;
+      default:
+        throw new IllegalArgumentException("Unknown mode: " + mode);
+    }
+  }
+
+  private CreateNamespaceResponse createOrUpdateSchema(
+      String catalogName,
+      String schemaName,
+      CreateNamespaceRequest.ModeEnum mode,
+      Map<String, String> properties) {
+    CreateNamespaceResponse response = new CreateNamespaceResponse();
+    Catalog loadedCatalog = loadAndValidateLakehouseCatalog(catalogName);
+
+    Schema schema;
+    try {
+      schema = loadedCatalog.asSchemas().loadSchema(schemaName);
+    } catch (NoSuchSchemaException e) {
+      // Schema does not exist, create it
+      Schema createdSchema = loadedCatalog.asSchemas().createSchema(schemaName, null, properties);
+      response.setProperties(
+          createdSchema.properties() == null ? Maps.newHashMap() : createdSchema.properties());
+      return response;
+    }
+
+    // Schema exists, handle based on mode
+    switch (mode) {
+      case EXIST_OK:
+        response.setProperties(Maps.newHashMap());
+        return response;
+      case CREATE:
+        throw LanceNamespaceException.conflict(
+            "Schema already exists: " + schemaName,
+            SchemaAlreadyExistsException.class.getSimpleName(),
+            schemaName,
+            CommonUtil.formatCurrentStackTrace());
+      case OVERWRITE:
+        SchemaChange[] changes =
+            buildChanges(
+                properties,
+                schema.properties(),
+                SchemaChange::setProperty,
+                SchemaChange::removeProperty,
+                SchemaChange[]::new);
+        Schema alteredSchema = loadedCatalog.asSchemas().alterSchema(schemaName, changes);
+        Optional.ofNullable(alteredSchema.properties()).ifPresent(response::setProperties);
+        return response;
+      default:
+        throw new IllegalArgumentException("Unknown mode: " + mode);
+    }
+  }
+
+  private DropNamespaceResponse dropCatalog(
+      String catalogName,
+      DropNamespaceRequest.ModeEnum mode,
+      DropNamespaceRequest.BehaviorEnum behavior) {
+    try {
+      boolean dropped =
+          client.dropCatalog(catalogName, behavior == DropNamespaceRequest.BehaviorEnum.CASCADE);
+      if (dropped) {
+        return new DropNamespaceResponse();
+      } else {
+        // Catalog did not exist
+        if (mode == DropNamespaceRequest.ModeEnum.FAIL) {
+          throw LanceNamespaceException.notFound(
+              "Catalog not found: " + catalogName,
+              NoSuchCatalogException.class.getSimpleName(),
+              catalogName,
+              CommonUtil.formatCurrentStackTrace());
+        }
+        return new DropNamespaceResponse(); // SKIP mode
+      }
+    } catch (NonEmptyCatalogException e) {
+      throw LanceNamespaceException.badRequest(
+          String.format("Catalog %s is not empty.", catalogName),
+          NonEmptyCatalogException.class.getSimpleName(),
+          catalogName,
+          CommonUtil.formatCurrentStackTrace());
+    }
+  }
+
+  private DropNamespaceResponse dropSchema(
+      String catalogName,
+      String schemaName,
+      DropNamespaceRequest.ModeEnum mode,
+      DropNamespaceRequest.BehaviorEnum behavior) {
+    try {
+      boolean dropped =
+          client
+              .loadCatalog(catalogName)
+              .asSchemas()
+              .dropSchema(schemaName, behavior == DropNamespaceRequest.BehaviorEnum.CASCADE);
+      if (dropped) {
+        return new DropNamespaceResponse();
+      } else {
+        // Schema did not exist
+        if (mode == DropNamespaceRequest.ModeEnum.FAIL) {
+          throw LanceNamespaceException.notFound(
+              "Schema not found: " + schemaName,
+              NoSuchSchemaException.class.getSimpleName(),
+              schemaName,
+              CommonUtil.formatCurrentStackTrace());
+        }
+        return new DropNamespaceResponse(); // SKIP mode
+      }
+    } catch (NoSuchCatalogException e) {
+      throw LanceNamespaceException.notFound(
+          "Catalog not found: " + catalogName,
+          NoSuchCatalogException.class.getSimpleName(),
+          catalogName,
+          CommonUtil.formatCurrentStackTrace());
+    } catch (NonEmptySchemaException e) {
+      throw LanceNamespaceException.badRequest(
+          String.format("Schema %s is not empty.", schemaName),
+          NonEmptySchemaException.class.getSimpleName(),
+          schemaName,
+          CommonUtil.formatCurrentStackTrace());
+    }
+  }
+
+  private <T> T[] buildChanges(
+      Map<String, String> newProps,
+      Map<String, String> oldProps,
+      BiFunction<String, String, T> setPropertyFunc,
+      Function<String, T> removePropertyFunc,
+      IntFunction<T[]> arrayCreator) {
+    Stream<T> setPropertiesStream =
+        newProps.entrySet().stream()
+            .map(entry -> setPropertyFunc.apply(entry.getKey(), entry.getValue()));
+
+    Stream<T> removePropertiesStream =
+        oldProps == null
+            ? Stream.empty()
+            : oldProps.keySet().stream()
+                .filter(key -> !newProps.containsKey(key))
+                .map(removePropertyFunc);
+
+    return Stream.concat(setPropertiesStream, removePropertiesStream).toArray(arrayCreator);
   }
 
   @Override
@@ -359,6 +590,7 @@ public class GravitinoLanceNamespaceWrapper extends NamespaceWrapper
     Map<String, String> createTableProperties = Maps.newHashMap(tableProperties);
     createTableProperties.put("location", tableLocation);
     createTableProperties.put("mode", mode);
+    // TODO considering the mode (create, exist_ok, overwrite)
     Table t =
         catalog
             .asTableCatalog()
@@ -527,204 +759,5 @@ public class GravitinoLanceNamespaceWrapper extends NamespaceWrapper
     } else {
       return Types.UnparsedType.of(arrowType.toString());
     }
-  }
-
-  private boolean isLakehouseCatalog(Catalog catalog) {
-    return catalog.type().equals(Catalog.Type.RELATIONAL)
-        && "generic-lakehouse".equals(catalog.provider());
-  }
-
-  private Catalog loadAndValidateLakehouseCatalog(String catalogName) {
-    Catalog catalog;
-    try {
-      catalog = client.loadCatalog(catalogName);
-    } catch (NoSuchCatalogException e) {
-      throw LanceNamespaceException.notFound(
-          "Catalog not found: " + catalogName,
-          NoSuchCatalogException.class.getSimpleName(),
-          catalogName,
-          CommonUtil.formatCurrentStackTrace());
-    }
-    if (!isLakehouseCatalog(catalog)) {
-      throw LanceNamespaceException.notFound(
-          "Catalog not found: " + catalogName,
-          NoSuchCatalogException.class.getSimpleName(),
-          catalogName,
-          CommonUtil.formatCurrentStackTrace());
-    }
-    return catalog;
-  }
-
-  private CreateNamespaceResponse createOrUpdateCatalog(
-      String catalogName, CreateNamespaceRequest.ModeEnum mode, Map<String, String> properties) {
-    CreateNamespaceResponse response = new CreateNamespaceResponse();
-    try {
-      Catalog catalog = client.loadCatalog(catalogName);
-      // Catalog exists, handle based on mode
-      switch (mode) {
-        case EXIST_OK:
-          response.setProperties(Maps.newHashMap());
-          return response;
-        case CREATE:
-          throw LanceNamespaceException.conflict(
-              "Catalog already exists: " + catalogName,
-              CatalogAlreadyExistsException.class.getSimpleName(),
-              catalogName,
-              CommonUtil.formatCurrentStackTrace());
-        case OVERWRITE:
-          CatalogChange[] changes =
-              buildChanges(
-                  properties,
-                  catalog.properties(),
-                  CatalogChange::setProperty,
-                  CatalogChange::removeProperty,
-                  CatalogChange[]::new);
-          Catalog alteredCatalog = client.alterCatalog(catalogName, changes);
-          Optional.ofNullable(alteredCatalog.properties()).ifPresent(response::setProperties);
-          return response;
-        default:
-          throw new IllegalArgumentException("Unknown mode: " + mode);
-      }
-    } catch (NoSuchCatalogException e) {
-      // Catalog does not exist, create it
-      Catalog createdCatalog =
-          client.createCatalog(
-              catalogName, Catalog.Type.RELATIONAL, "generic-lakehouse", properties);
-      response.setProperties(
-          createdCatalog.properties() == null ? Maps.newHashMap() : createdCatalog.properties());
-      return response;
-    }
-  }
-
-  private CreateNamespaceResponse createOrUpdateSchema(
-      String catalogName,
-      String schemaName,
-      CreateNamespaceRequest.ModeEnum mode,
-      Map<String, String> properties) {
-    CreateNamespaceResponse response = new CreateNamespaceResponse();
-    Catalog loadedCatalog = loadAndValidateLakehouseCatalog(catalogName);
-
-    try {
-      Schema schema = loadedCatalog.asSchemas().loadSchema(schemaName);
-      // Schema exists, handle based on mode
-      switch (mode) {
-        case EXIST_OK:
-          response.setProperties(Maps.newHashMap());
-          return response;
-        case CREATE:
-          throw LanceNamespaceException.conflict(
-              "Schema already exists: " + schemaName,
-              SchemaAlreadyExistsException.class.getSimpleName(),
-              schemaName,
-              CommonUtil.formatCurrentStackTrace());
-        case OVERWRITE:
-          SchemaChange[] changes =
-              buildChanges(
-                  properties,
-                  schema.properties(),
-                  SchemaChange::setProperty,
-                  SchemaChange::removeProperty,
-                  SchemaChange[]::new);
-          Schema alteredSchema = loadedCatalog.asSchemas().alterSchema(schemaName, changes);
-          Optional.ofNullable(alteredSchema.properties()).ifPresent(response::setProperties);
-          return response;
-        default:
-          throw new IllegalArgumentException("Unknown mode: " + mode);
-      }
-    } catch (NoSuchSchemaException e) {
-      // Schema does not exist, create it
-      Schema createdSchema = loadedCatalog.asSchemas().createSchema(schemaName, null, properties);
-      response.setProperties(
-          createdSchema.properties() == null ? Maps.newHashMap() : createdSchema.properties());
-      return response;
-    }
-  }
-
-  private DropNamespaceResponse dropCatalog(
-      String catalogName,
-      DropNamespaceRequest.ModeEnum mode,
-      DropNamespaceRequest.BehaviorEnum behavior) {
-    try {
-      boolean dropped =
-          client.dropCatalog(catalogName, behavior == DropNamespaceRequest.BehaviorEnum.CASCADE);
-      if (dropped) {
-        return new DropNamespaceResponse();
-      } else {
-        // Catalog did not exist
-        if (mode == DropNamespaceRequest.ModeEnum.FAIL) {
-          throw LanceNamespaceException.notFound(
-              "Catalog not found: " + catalogName,
-              NoSuchCatalogException.class.getSimpleName(),
-              catalogName,
-              CommonUtil.formatCurrentStackTrace());
-        }
-        return new DropNamespaceResponse(); // SKIP mode
-      }
-    } catch (NonEmptyCatalogException e) {
-      throw LanceNamespaceException.badRequest(
-          String.format("Catalog %s is not empty.", catalogName),
-          NonEmptyCatalogException.class.getSimpleName(),
-          catalogName,
-          CommonUtil.formatCurrentStackTrace());
-    }
-  }
-
-  private DropNamespaceResponse dropSchema(
-      String catalogName,
-      String schemaName,
-      DropNamespaceRequest.ModeEnum mode,
-      DropNamespaceRequest.BehaviorEnum behavior) {
-    try {
-      boolean dropped =
-          client
-              .loadCatalog(catalogName)
-              .asSchemas()
-              .dropSchema(schemaName, behavior == DropNamespaceRequest.BehaviorEnum.CASCADE);
-      if (dropped) {
-        return new DropNamespaceResponse();
-      } else {
-        // Schema did not exist
-        if (mode == DropNamespaceRequest.ModeEnum.FAIL) {
-          throw LanceNamespaceException.notFound(
-              "Schema not found: " + schemaName,
-              NoSuchSchemaException.class.getSimpleName(),
-              schemaName,
-              CommonUtil.formatCurrentStackTrace());
-        }
-        return new DropNamespaceResponse(); // SKIP mode
-      }
-    } catch (NoSuchCatalogException e) {
-      throw LanceNamespaceException.notFound(
-          "Catalog not found: " + catalogName,
-          NoSuchCatalogException.class.getSimpleName(),
-          catalogName,
-          CommonUtil.formatCurrentStackTrace());
-    } catch (NonEmptySchemaException e) {
-      throw LanceNamespaceException.badRequest(
-          String.format("Schema %s is not empty.", schemaName),
-          NonEmptySchemaException.class.getSimpleName(),
-          schemaName,
-          CommonUtil.formatCurrentStackTrace());
-    }
-  }
-
-  private <T> T[] buildChanges(
-      Map<String, String> newProps,
-      Map<String, String> oldProps,
-      BiFunction<String, String, T> setPropertyFunc,
-      Function<String, T> removePropertyFunc,
-      IntFunction<T[]> arrayCreator) {
-    Stream<T> setPropertiesStream =
-        newProps.entrySet().stream()
-            .map(entry -> setPropertyFunc.apply(entry.getKey(), entry.getValue()));
-
-    Stream<T> removePropertiesStream =
-        oldProps == null
-            ? Stream.empty()
-            : oldProps.keySet().stream()
-                .filter(key -> !newProps.containsKey(key))
-                .map(removePropertyFunc);
-
-    return Stream.concat(setPropertiesStream, removePropertiesStream).toArray(arrayCreator);
   }
 }

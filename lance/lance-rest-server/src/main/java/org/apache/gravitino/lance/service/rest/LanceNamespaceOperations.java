@@ -29,6 +29,7 @@ import com.lancedb.lance.namespace.model.DropNamespaceRequest;
 import com.lancedb.lance.namespace.model.DropNamespaceResponse;
 import com.lancedb.lance.namespace.model.ListNamespacesResponse;
 import com.lancedb.lance.namespace.model.ListTablesResponse;
+import java.util.regex.Pattern;
 import javax.inject.Inject;
 import javax.ws.rs.Consumes;
 import javax.ws.rs.DefaultValue;
@@ -68,7 +69,9 @@ public class LanceNamespaceOperations {
       @QueryParam("limit") Integer limit) {
     try {
       ListNamespacesResponse response =
-          lanceNamespace.asNamespaceOps().listNamespaces(namespaceId, delimiter, pageToken, limit);
+          lanceNamespace
+              .asNamespaceOps()
+              .listNamespaces(namespaceId, Pattern.quote(delimiter), pageToken, limit);
       return Response.ok(response).build();
     } catch (Exception e) {
       return LanceExceptionMapper.toRESTResponse(namespaceId, e);
@@ -77,12 +80,14 @@ public class LanceNamespaceOperations {
 
   @POST
   @Path("/{id}/describe")
+  @Timed(name = "describe-namespaces." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
+  @ResponseMetered(name = "describe-namespaces", absolute = true)
   public Response describeNamespace(
       @Encoded @PathParam("id") String namespaceId,
       @DefaultValue(NAMESPACE_DELIMITER_DEFAULT) @QueryParam("delimiter") String delimiter) {
     try {
       DescribeNamespaceResponse response =
-          lanceNamespace.asNamespaceOps().describeNamespace(namespaceId, delimiter);
+          lanceNamespace.asNamespaceOps().describeNamespace(namespaceId, Pattern.quote(delimiter));
       return Response.ok(response).build();
     } catch (Exception e) {
       return LanceExceptionMapper.toRESTResponse(namespaceId, e);
@@ -91,6 +96,8 @@ public class LanceNamespaceOperations {
 
   @POST
   @Path("/{id}/create")
+  @Timed(name = "create-namespaces." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
+  @ResponseMetered(name = "create-namespaces", absolute = true)
   public Response createNamespace(
       @Encoded @PathParam("id") String namespaceId,
       @DefaultValue(NAMESPACE_DELIMITER_DEFAULT) @QueryParam("delimiter") String delimiter,
@@ -101,7 +108,7 @@ public class LanceNamespaceOperations {
               .asNamespaceOps()
               .createNamespace(
                   namespaceId,
-                  delimiter,
+                  Pattern.quote(delimiter),
                   request.getMode() == null
                       ? CreateNamespaceRequest.ModeEnum.CREATE
                       : request.getMode(),
@@ -114,6 +121,8 @@ public class LanceNamespaceOperations {
 
   @POST
   @Path("/{id}/drop")
+  @Timed(name = "drop-namespaces." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
+  @ResponseMetered(name = "drop-namespaces", absolute = true)
   public Response dropNamespace(
       @Encoded @PathParam("id") String namespaceId,
       @DefaultValue(NAMESPACE_DELIMITER_DEFAULT) @QueryParam("delimiter") String delimiter,
@@ -124,7 +133,7 @@ public class LanceNamespaceOperations {
               .asNamespaceOps()
               .dropNamespace(
                   namespaceId,
-                  delimiter,
+                  Pattern.quote(delimiter),
                   request.getMode() == null
                       ? DropNamespaceRequest.ModeEnum.FAIL
                       : request.getMode(),
@@ -139,11 +148,13 @@ public class LanceNamespaceOperations {
 
   @POST
   @Path("/{id}/exists")
+  @Timed(name = "namespace-exists." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
+  @ResponseMetered(name = "namespace-exists", absolute = true)
   public Response namespaceExists(
       @Encoded @PathParam("id") String namespaceId,
       @DefaultValue(NAMESPACE_DELIMITER_DEFAULT) @QueryParam("delimiter") String delimiter) {
     try {
-      lanceNamespace.asNamespaceOps().namespaceExists(namespaceId, delimiter);
+      lanceNamespace.asNamespaceOps().namespaceExists(namespaceId, Pattern.quote(delimiter));
       return Response.ok().build();
     } catch (Exception e) {
       return LanceExceptionMapper.toRESTResponse(namespaceId, e);
