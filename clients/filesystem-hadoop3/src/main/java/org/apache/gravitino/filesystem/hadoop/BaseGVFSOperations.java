@@ -133,6 +133,8 @@ public abstract class BaseGVFSOperations implements Closeable {
 
   private final boolean enableCredentialVending;
 
+  private final boolean autoCreateLocation;
+
   /**
    * Constructs a new {@link BaseGVFSOperations} with the given {@link Configuration}.
    *
@@ -176,6 +178,12 @@ public abstract class BaseGVFSOperations implements Closeable {
         configuration.getBoolean(
             GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_ENABLE_CREDENTIAL_VENDING,
             GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_ENABLE_CREDENTIAL_VENDING_DEFAULT);
+
+    this.autoCreateLocation =
+        configuration.getBoolean(
+            GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_AUTO_CREATE_LOCATION,
+            GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_AUTO_CREATE_LOCATION_DEFAULT);
+
     this.conf = configuration;
   }
 
@@ -444,6 +452,9 @@ public abstract class BaseGVFSOperations implements Closeable {
 
   private void createFilesetLocationIfNeed(
       NameIdentifier filesetIdent, FileSystem fs, Path filesetPath) {
+    if (!autoCreateLocation) {
+      return;
+    }
     NameIdentifier catalogIdent =
         NameIdentifier.of(filesetIdent.namespace().level(0), filesetIdent.namespace().level(1));
     // If the server-side filesystem ops are disabled, the fileset directory may not exist. In such
