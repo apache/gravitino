@@ -28,6 +28,7 @@ import com.lancedb.lance.namespace.model.DescribeNamespaceResponse;
 import com.lancedb.lance.namespace.model.DropNamespaceRequest;
 import com.lancedb.lance.namespace.model.DropNamespaceResponse;
 import com.lancedb.lance.namespace.model.ListNamespacesResponse;
+import com.lancedb.lance.namespace.model.ListTablesResponse;
 import java.util.regex.Pattern;
 import javax.inject.Inject;
 import javax.ws.rs.Consumes;
@@ -155,6 +156,22 @@ public class LanceNamespaceOperations {
     try {
       lanceNamespace.asNamespaceOps().namespaceExists(namespaceId, Pattern.quote(delimiter));
       return Response.ok().build();
+    } catch (Exception e) {
+      return LanceExceptionMapper.toRESTResponse(namespaceId, e);
+    }
+  }
+
+  @GET
+  @Path("{id}/table/list")
+  public Response listTables(
+      @PathParam("id") String namespaceId,
+      @DefaultValue("$") @QueryParam("delimiter") String delimiter,
+      @QueryParam("page_token") String pageToken,
+      @QueryParam("limit") Integer limit) {
+    try {
+      ListTablesResponse response =
+          lanceNamespace.asNamespaceOps().listTables(namespaceId, delimiter, pageToken, limit);
+      return Response.ok(response).build();
     } catch (Exception e) {
       return LanceExceptionMapper.toRESTResponse(namespaceId, e);
     }
