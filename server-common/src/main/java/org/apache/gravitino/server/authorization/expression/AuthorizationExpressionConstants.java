@@ -21,28 +21,38 @@ public class AuthorizationExpressionConstants {
       "ANY_USE_CATALOG || ANY(OWNER, METALAKE, CATALOG)";
 
   public static final String loadSchemaAuthorizationExpression =
-      " ANY(OWNER, METALAKE, CATALOG) || "
-          + "ANY_USE_CATALOG && (SCHEMA::OWNER || ANY_USE_SCHEMA) ";
+      """
+          ANY(OWNER, METALAKE, CATALOG) ||
+          ANY_USE_CATALOG && (SCHEMA::OWNER || ANY_USE_SCHEMA)
+           """;
 
   public static final String loadModelAuthorizationExpression =
-      "ANY(OWNER, METALAKE, CATALOG) ||"
-          + " SCHEMA_OWNER_WITH_USE_CATALOG || "
-          + " ANY_USE_CATALOG && ANY_USE_SCHEMA && (MODEL::OWNER || ANY_USE_MODEL)";
+      """
+            ANY(OWNER, METALAKE, CATALOG) ||
+             SCHEMA_OWNER_WITH_USE_CATALOG ||
+              ANY_USE_CATALOG && ANY_USE_SCHEMA && (MODEL::OWNER || ANY_USE_MODEL)
+                  """;
 
   public static final String loadTableAuthorizationExpression =
-      "ANY(OWNER, METALAKE, CATALOG) ||"
-          + "SCHEMA_OWNER_WITH_USE_CATALOG ||"
-          + "ANY_USE_CATALOG && ANY_USE_SCHEMA  && (TABLE::OWNER || ANY_SELECT_TABLE || ANY_MODIFY_TABLE)";
+      """
+                  ANY(OWNER, METALAKE, CATALOG) ||
+                  SCHEMA_OWNER_WITH_USE_CATALOG ||
+                  ANY_USE_CATALOG && ANY_USE_SCHEMA  && (TABLE::OWNER || ANY_SELECT_TABLE || ANY_MODIFY_TABLE)
+                  """;
 
   public static final String loadTopicsAuthorizationExpression =
-      "ANY(OWNER, METALAKE, CATALOG) || "
-          + "SCHEMA_OWNER_WITH_USE_CATALOG || "
-          + "ANY_USE_CATALOG && ANY_USE_SCHEMA && (TOPIC::OWNER || ANY_CONSUME_TOPIC || ANY_PRODUCE_TOPIC)";
+      """
+          ANY(OWNER, METALAKE, CATALOG) ||
+          SCHEMA_OWNER_WITH_USE_CATALOG ||
+          ANY_USE_CATALOG && ANY_USE_SCHEMA && (TOPIC::OWNER || ANY_CONSUME_TOPIC || ANY_PRODUCE_TOPIC)
+          """;
 
   public static final String loadFilesetAuthorizationExpression =
-      "ANY(OWNER, METALAKE, CATALOG) || "
-          + "SCHEMA_OWNER_WITH_USE_CATALOG || "
-          + "ANY_USE_CATALOG && ANY_USE_SCHEMA && (FILESET::OWNER || ANY_READ_FILESET || ANY_WRITE_FILESET)";
+      """
+                 ANY(OWNER, METALAKE, CATALOG) ||
+                 SCHEMA_OWNER_WITH_USE_CATALOG ||
+                 ANY_USE_CATALOG && ANY_USE_SCHEMA && (FILESET::OWNER || ANY_READ_FILESET || ANY_WRITE_FILESET)
+                  """;
 
   public static final String filterSchemaAuthorizationExpression =
       "ANY(OWNER, METALAKE, CATALOG, SCHEMA) || ANY_USE_SCHEMA";
@@ -51,17 +61,23 @@ public class AuthorizationExpressionConstants {
       "ANY(OWNER, METALAKE, CATALOG, SCHEMA, MODEL) || ANY_USE_MODEL";
 
   public static final String filterTableAuthorizationExpression =
-      "ANY(OWNER, METALAKE, CATALOG, SCHEMA, TABLE) || "
-          + "ANY_SELECT_TABLE || "
-          + "ANY_MODIFY_TABLE";
+      """
+                  ANY(OWNER, METALAKE, CATALOG, SCHEMA, TABLE) ||
+                  ANY_SELECT_TABLE ||
+                  ANY_MODIFY_TABLE
+                  """;
 
   public static final String filterTopicsAuthorizationExpression =
-      "ANY(OWNER, METALAKE, CATALOG, SCHEMA, TOPIC) || "
-          + "ANY_CONSUME_TOPIC || "
-          + "ANY_PRODUCE_TOPIC";
+      """
+              ANY(OWNER, METALAKE, CATALOG, SCHEMA, TOPIC) ||
+              ANY_CONSUME_TOPIC ||
+              ANY_PRODUCE_TOPIC
+       """;
 
   public static final String filterFilesetAuthorizationExpression =
-      "ANY(OWNER, METALAKE, CATALOG, SCHEMA, FILESET) || "
-          + "ANY_READ_FILESET || "
-          + "ANY_WRITE_FILESET";
+      """
+              ANY(OWNER, METALAKE, CATALOG, SCHEMA, FILESET) ||
+              ANY_READ_FILESET ||
+              ANY_WRITE_FILESET
+                  """;
 }
