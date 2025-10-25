@@ -94,7 +94,6 @@ public class IcebergRestMetricsStore implements IcebergMetricsStore {
         this.metricsSource = new IcebergClientMetricsSource();
       }
 
-      // Get the MetricsSystem instance from GravitinoEnv (only if not in test mode)
       if (this.metricsSystem == null) {
         this.metricsSystem = GravitinoEnv.getInstance().metricsSystem();
       }
@@ -122,14 +121,12 @@ public class IcebergRestMetricsStore implements IcebergMetricsStore {
     }
 
     try {
-      // Track report types
       if (metricsReport instanceof CommitReport) {
         metricsSource.getCounter("iceberg.reports.commit").inc();
       } else if (metricsReport instanceof ScanReport) {
         metricsSource.getCounter("iceberg.reports.scan").inc();
       }
 
-      // Extract and record all metrics
       extractAndRecordMetrics(metricsReport);
 
     } catch (Exception e) {
@@ -171,7 +168,6 @@ public class IcebergRestMetricsStore implements IcebergMetricsStore {
                   entry -> {
                     String metricName = entry.getKey();
                     JsonNode metricValue = entry.getValue();
-                    // Pattern match by structure (not by name)
                     recordMetricValue(metricName, metricValue);
                   });
         }
@@ -223,7 +219,7 @@ public class IcebergRestMetricsStore implements IcebergMetricsStore {
         long value = metricValue.get("value").asLong();
         metricsSource.getCounter("iceberg." + metricName).inc(value);
       }
-      // Unknown structure (defensive logging)
+      // Unknown structure
       else {
         LOG.debug("Unknown metric structure for '{}': {}", metricName, metricValue);
         metricsSource.getCounter("iceberg.metrics.unknown").inc();

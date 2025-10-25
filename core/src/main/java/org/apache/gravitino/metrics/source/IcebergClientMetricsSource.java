@@ -23,8 +23,8 @@ package org.apache.gravitino.metrics.source;
  * Metrics source for Iceberg REST server client operations.
  *
  * <p>Exposes metrics from Iceberg client operations (commits and scans) through Gravitino's
- * MetricsSystem. These metrics are collected from {@link org.apache.iceberg.metrics.MetricsReport}
- * instances sent by clients to the REST metrics endpoint.
+ * MetricsSystem. These metrics are collected from Iceberg MetricsReport instances sent by clients
+ * to the REST metrics endpoint.
  *
  * <p>Example metrics exposed:
  *
