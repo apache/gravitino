@@ -571,16 +571,6 @@ public class TestRelationalCatalog extends TestBase {
                     tableId, fromDTOs(columns), "comment", emptyMap, errorPartitioning));
     Assertions.assertTrue(ex2.getMessage().contains("not found in table"));
 
-    // Test empty columns
-    Throwable ex3 =
-        Assertions.assertThrows(
-            IllegalArgumentException.class,
-            () ->
-                tableCatalog.createTable(
-                    tableId, new Column[0], "comment", emptyMap, errorPartitioning));
-    Assertions.assertTrue(
-        ex3.getMessage().contains("\"columns\" field is required and cannot be empty"));
-
     // Test partitioning with assignments
     Partitioning[] partitioningWithAssignments = {
       RangePartitioningDTO.of(

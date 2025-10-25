@@ -38,6 +38,8 @@ dependencies {
   }
 
   implementation(project(":lance:lance-common"))
+  implementation(libs.lance)
+  implementation(libs.commons.lang3)
 
   implementation(libs.bundles.jetty)
   implementation(libs.bundles.jersey)

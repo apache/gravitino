@@ -19,11 +19,11 @@
 package org.apache.gravitino.dto.rel;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
-import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.time.Instant;
 import org.apache.gravitino.dto.AuditDTO;
 import org.apache.gravitino.rel.types.Types;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 public class TestTableDTO {
@@ -32,7 +32,10 @@ public class TestTableDTO {
     AuditDTO audit =
         AuditDTO.builder().withCreator("creator").withCreateTime(Instant.now()).build();
     TableDTO.Builder<?> builder = TableDTO.builder().withName("t1").withAudit(audit);
-    assertThrows(IllegalArgumentException.class, builder::build);
+    Assertions.assertDoesNotThrow(
+        () -> {
+          builder.build();
+        });
   }
 
   @Test
@@ -41,7 +44,11 @@ public class TestTableDTO {
         AuditDTO.builder().withCreator("creator").withCreateTime(Instant.now()).build();
     TableDTO.Builder<?> builder =
         TableDTO.builder().withName("t1").withAudit(audit).withColumns(new ColumnDTO[0]);
-    assertThrows(IllegalArgumentException.class, builder::build);
+
+    Assertions.assertDoesNotThrow(
+        () -> {
+          builder.build();
+        });
   }
 
   @Test

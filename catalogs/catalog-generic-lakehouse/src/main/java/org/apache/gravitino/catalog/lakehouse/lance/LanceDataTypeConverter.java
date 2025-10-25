@@ -19,6 +19,8 @@
 
 package org.apache.gravitino.catalog.lakehouse.lance;
 
+import com.google.common.collect.Lists;
+import java.util.List;
 import org.apache.arrow.vector.types.DateUnit;
 import org.apache.arrow.vector.types.FloatingPointPrecision;
 import org.apache.arrow.vector.types.TimeUnit;
@@ -27,9 +29,11 @@ import org.apache.arrow.vector.types.pojo.ArrowType.Bool;
 import org.apache.arrow.vector.types.pojo.ArrowType.FloatingPoint;
 import org.apache.arrow.vector.types.pojo.ArrowType.Int;
 import org.apache.gravitino.connector.DataTypeConverter;
+import org.apache.gravitino.json.JsonUtils;
 import org.apache.gravitino.rel.types.Type;
 import org.apache.gravitino.rel.types.Types;
 import org.apache.gravitino.rel.types.Types.FixedType;
+import org.apache.gravitino.rel.types.Types.UnparsedType;
 
 public class LanceDataTypeConverter implements DataTypeConverter<ArrowType, ArrowType> {
 
@@ -67,6 +71,30 @@ public class LanceDataTypeConverter implements DataTypeConverter<ArrowType, Arro
         return new ArrowType.FixedSizeBinary(fixedType.length());
       case BINARY:
         return new ArrowType.Binary();
+      case UNPARSED:
+        String typeStr = ((UnparsedType) type).unparsedType().toString();
+        try {
+          Type t = JsonUtils.anyFieldMapper().readValue(typeStr, Type.class);
+          if (t instanceof Types.ListType) {
+            return ArrowType.List.INSTANCE;
+          } else if (t instanceof Types.MapType) {
+            return new ArrowType.Map(false);
+          } else if (t instanceof Types.StructType) {
+            return ArrowType.Struct.INSTANCE;
+          } else {
+            throw new UnsupportedOperationException(
+                "Unsupported UnparsedType conversion: " + t.simpleString());
+          }
+        } catch (Exception e) {
+          // FixedSizeListArray(integer, 3)
+          if (typeStr.startsWith("FixedSizeListArray")) {
+            int size =
+                Integer.parseInt(
+                    typeStr.substring(typeStr.indexOf(',') + 1, typeStr.indexOf(')')).trim());
+            return new ArrowType.FixedSizeList(size);
+          }
+          throw new UnsupportedOperationException("Failed to parse UnparsedType: " + typeStr, e);
+        }
       default:
         throw new UnsupportedOperationException("Unsupported Gravitino type: " + type.name());
     }
@@ -116,8 +144,49 @@ public class LanceDataTypeConverter implements DataTypeConverter<ArrowType, Arro
       return Types.StringType.get();
     } else if (arrowType instanceof ArrowType.Binary) {
       return Types.BinaryType.get();
+      // TODO handle complex types like List, Map, Struct
     } else {
       throw new UnsupportedOperationException("Unsupported Arrow type: " + arrowType);
+    }
+  }
+
+  public List<ArrowType> getChildTypes(Type parentType) {
+    if (parentType.name() != Type.Name.UNPARSED) {
+      return List.of();
+    }
+
+    List<ArrowType> arrowTypes = Lists.newArrayList();
+    String typeStr = ((UnparsedType) parentType).unparsedType().toString();
+    try {
+      Type t = JsonUtils.anyFieldMapper().readValue(typeStr, Type.class);
+      if (t instanceof Types.ListType listType) {
+        arrowTypes.add(fromGravitino(listType.elementType()));
+      } else if (t instanceof Types.MapType mapType) {
+        arrowTypes.add(fromGravitino(mapType.keyType()));
+        arrowTypes.add(fromGravitino(mapType.valueType()));
+      } else {
+        // TODO support struct type.
+        throw new UnsupportedOperationException(
+            "Unsupported UnparsedType conversion: " + t.simpleString());
+      }
+
+      return arrowTypes;
+    } catch (Exception e) {
+      // FixedSizeListArray(integer, 3)
+
+      try {
+        if (typeStr.startsWith("FixedSizeListArray")) {
+          String type = typeStr.substring(typeStr.indexOf('(') + 1, typeStr.indexOf(',')).trim();
+          Type childType = JsonUtils.anyFieldMapper().readValue("\"" + type + "\"", Type.class);
+          arrowTypes.add(fromGravitino(childType));
+
+          return arrowTypes;
+        }
+      } catch (Exception e1) {
+        throw new UnsupportedOperationException("Failed to parse UnparsedType: " + typeStr, e1);
+      }
+
+      throw new UnsupportedOperationException("Failed to parse UnparsedType: " + typeStr, e);
     }
   }
 }

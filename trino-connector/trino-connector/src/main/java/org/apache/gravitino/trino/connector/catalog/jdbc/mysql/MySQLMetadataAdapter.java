@@ -283,6 +283,8 @@ public class MySQLMetadataAdapter extends CatalogConnectorMetadataAdapter {
                     .collect(Collectors.toUnmodifiableList());
             uniqueKeys.add(String.format("%s:%s", index.name(), Strings.join(columns, ',')));
             break;
+          default:
+            throw new UnsupportedOperationException("Unsupported index type: " + index.type());
         }
       }
       if (!primaryKeys.isEmpty()) {
