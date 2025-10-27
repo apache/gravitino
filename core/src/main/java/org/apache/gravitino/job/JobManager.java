@@ -696,8 +696,10 @@ public class JobManager implements JobOperationDispatcher {
     if (content.jobType() == JobTemplate.JobType.SHELL) {
       List<String> scripts =
           content.scripts().stream()
-              .map(script -> replacePlaceholder(script, jobConf))
-              .map(script -> fetchFileFromUri(script, stagingDir, TIMEOUT_IN_MS))
+              .map(
+                  script ->
+                      fetchFileFromUri(
+                          replacePlaceholder(script, jobConf), stagingDir, TIMEOUT_IN_MS))
               .collect(Collectors.toList());
 
       return ShellJobTemplate.builder()
@@ -716,20 +718,25 @@ public class JobManager implements JobOperationDispatcher {
       String className = replacePlaceholder(content.className(), jobConf);
       List<String> jars =
           content.jars().stream()
-              .map(jar -> replacePlaceholder(jar, jobConf))
-              .map(jar -> fetchFileFromUri(jar, stagingDir, TIMEOUT_IN_MS))
+              .map(
+                  jar ->
+                      fetchFileFromUri(replacePlaceholder(jar, jobConf), stagingDir, TIMEOUT_IN_MS))
               .collect(Collectors.toList());
 
       List<String> files =
           content.files().stream()
-              .map(file -> replacePlaceholder(file, jobConf))
-              .map(file -> fetchFileFromUri(file, stagingDir, TIMEOUT_IN_MS))
+              .map(
+                  file ->
+                      fetchFileFromUri(
+                          replacePlaceholder(file, jobConf), stagingDir, TIMEOUT_IN_MS))
               .collect(Collectors.toList());
 
       List<String> archives =
           content.archives().stream()
-              .map(archive -> replacePlaceholder(archive, jobConf))
-              .map(archive -> fetchFileFromUri(archive, stagingDir, TIMEOUT_IN_MS))
+              .map(
+                  archive ->
+                      fetchFileFromUri(
+                          replacePlaceholder(archive, jobConf), stagingDir, TIMEOUT_IN_MS))
               .collect(Collectors.toList());
 
       Map<String, String> configs =
