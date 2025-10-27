@@ -89,7 +89,7 @@ jobs:
           dev/ci/util_free_space.sh
 
       - name: Upload tests reports
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         if: ${{ (failure() && steps.integrationTest.outcome == 'failure') || contains(github.event.pull_request.labels.*.name, 'upload log') }}
         with:
           name: Gvfs-fuse integrate-test-reports-${{ matrix.java-version }}
