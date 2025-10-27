@@ -131,6 +131,7 @@ public class GvfsMultipleClusterIT extends BaseIT {
     coreSiteXml = coreSiteXml.replace("XXX_KRB_CONF_XXX", krb5Path);
     FileUtils.write(new File(tmpDir + "/core-site.xml"), coreSiteXml, StandardCharsets.UTF_8);
 
+    LOG.info("Kerberos config resources created in {}", tmpDir);
     refreshKerberosConfig();
     KerberosName.resetDefaultRealm();
 

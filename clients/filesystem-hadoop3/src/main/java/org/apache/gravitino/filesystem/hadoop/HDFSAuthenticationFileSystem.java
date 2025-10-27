@@ -35,6 +35,7 @@ import java.time.Instant;
 import java.util.Timer;
 import java.util.TimerTask;
 import org.apache.gravitino.exceptions.GravitinoRuntimeException;
+import org.apache.gravitino.shaded.org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FSDataOutputStream;
@@ -43,6 +44,7 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.hadoop.shaded.com.ctc.wstx.util.StringUtil;
 import org.apache.hadoop.util.Progressable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -56,6 +58,8 @@ public class HDFSAuthenticationFileSystem extends FileSystem {
   private static final Logger LOG = LoggerFactory.getLogger(HDFSAuthenticationFileSystem.class);
 
   private static final long DEFAULT_RENEW_INTERVAL_MS = 10 * 60 * 1000L;
+  private static final String SYSTEM_USER_NAME = System.getProperty("user.name");
+  private static final String SYSTEM_ENV_HADOOP_USER_NAME = "HADOOP_USER_NAME";
 
   private final UserGroupInformation ugi;
   private final FileSystem fs;
@@ -93,7 +97,11 @@ public class HDFSAuthenticationFileSystem extends FileSystem {
         this.ugi = UserGroupInformation.loginUserFromKeytabAndReturnUGI(principal, keytab);
         startKerberosRenewalTask(principal);
       } else {
-        this.ugi = UserGroupInformation.getLoginUser();
+        String userName = System.getenv(SYSTEM_ENV_HADOOP_USER_NAME);
+        if (StringUtils.isNoneEmpty(userName)) {
+            userName = SYSTEM_USER_NAME;
+        }
+        this.ugi = UserGroupInformation.createRemoteUser(userName);
       }
 
       this.fs =
