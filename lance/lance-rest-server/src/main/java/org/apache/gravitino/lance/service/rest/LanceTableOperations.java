@@ -18,6 +18,8 @@
  */
 package org.apache.gravitino.lance.service.rest;
 
+import com.codahale.metrics.annotation.ResponseMetered;
+import com.codahale.metrics.annotation.Timed;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.lancedb.lance.namespace.model.CreateTableResponse;
 import com.lancedb.lance.namespace.model.DescribeTableResponse;
@@ -37,6 +39,7 @@ import javax.ws.rs.core.Response;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.lance.common.ops.NamespaceWrapper;
 import org.apache.gravitino.lance.service.LanceExceptionMapper;
+import org.apache.gravitino.metrics.MetricNames;
 
 @Path("/v1/table/{id}")
 @Consumes(MediaType.APPLICATION_JSON)
@@ -52,6 +55,8 @@ public class LanceTableOperations {
 
   @POST
   @Path("/describe")
+  @Timed(name = "describe-table." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
+  @ResponseMetered(name = "describe-table", absolute = true)
   public Response describeTable(
       @PathParam("id") String tableId,
       @DefaultValue("$") @QueryParam("delimiter") String delimiter) {
@@ -68,6 +73,8 @@ public class LanceTableOperations {
   @Path("/create")
   @Consumes("application/vnd.apache.arrow.stream")
   @Produces("application/json")
+  @Timed(name = "create-table." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
+  @ResponseMetered(name = "create-table", absolute = true)
   public Response createTable(
       @PathParam("id") String tableId,
       @QueryParam("mode") @DefaultValue("create") String mode, // create, exist_ok, overwrite
@@ -92,6 +99,8 @@ public class LanceTableOperations {
 
   @POST
   @Path("/create-empty")
+  @Timed(name = "create-empty-table." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
+  @ResponseMetered(name = "create-empty-table", absolute = true)
   public Response createEmptyTable(
       @PathParam("id") String tableId,
       @QueryParam("mode") @DefaultValue("create") String mode, // create, exist_ok, overwrite

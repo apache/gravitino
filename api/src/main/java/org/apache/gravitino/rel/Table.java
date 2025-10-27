@@ -100,6 +100,33 @@ public interface Table extends Auditable {
   }
 
   /**
+   * Formats the table as a string representation.
+   *
+   * @return the formatted string representation of the table
+   */
+  default String format() {
+    throw new UnsupportedOperationException("Table format is not supported.");
+  }
+
+  /**
+   * Gets the location of the table.
+   *
+   * @return the location of the table
+   */
+  default String location() {
+    throw new UnsupportedOperationException("Table location is not supported.");
+  }
+
+  /**
+   * Indicates whether the table is external.
+   *
+   * @return true if the table is external, false otherwise
+   */
+  default boolean external() {
+    return false;
+  }
+
+  /**
    * Table method for working with partitions. If the table does not support partition operations,
    * an {@link UnsupportedOperationException} is thrown.
    *
