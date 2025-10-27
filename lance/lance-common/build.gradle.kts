@@ -25,14 +25,7 @@ plugins {
 }
 
 dependencies {
-  implementation(project(":api"))
-  implementation(project(":catalogs:catalog-common"))
-  implementation(project(":clients:client-java")) {
-    exclude("*")
-  }
-  implementation(project(":common")) {
-    exclude("*")
-  }
+  implementation(project(":clients:client-java-runtime", configuration = "shadow"))
   implementation(project(":core")) {
     exclude("*")
   }

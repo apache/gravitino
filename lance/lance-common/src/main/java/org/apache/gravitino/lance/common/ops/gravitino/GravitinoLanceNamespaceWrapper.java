@@ -19,7 +19,7 @@
 package org.apache.gravitino.lance.common.ops.gravitino;
 
 import static org.apache.gravitino.lance.common.config.LanceConfig.METALAKE_NAME;
-import static org.apache.gravitino.lance.common.config.LanceConfig.NAMESPACE_URI;
+import static org.apache.gravitino.lance.common.config.LanceConfig.NAMESPACE_BACKEND_URI;
 import static org.apache.gravitino.rel.Column.DEFAULT_VALUE_NOT_SET;
 
 import com.google.common.base.Joiner;
@@ -111,11 +111,11 @@ public class GravitinoLanceNamespaceWrapper extends NamespaceWrapper
 
   @Override
   protected void initialize() {
-    String uri = config().get(NAMESPACE_URI);
+    String uri = config().get(NAMESPACE_BACKEND_URI);
     String metalakeName = config().get(METALAKE_NAME);
     Preconditions.checkArgument(
         StringUtils.isNotBlank(metalakeName),
-        "Metalake name must be provided for Gravitino namespace backend");
+        "Metalake name must be provided for Lance Gravitino namespace backend");
 
     this.client = GravitinoClient.builder(uri).withMetalake(metalakeName).build();
   }
