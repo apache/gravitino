@@ -77,7 +77,6 @@ public class HDFSAuthenticationFileSystem extends FileSystem {
       conf.setBoolean(IPC_FALLBACK_TO_SIMPLE_AUTH_ALLOWED, true);
 
       String authType = conf.get(HADOOP_SECURITY_AUTHENTICATION, AUTH_SIMPlE);
-
       if (AUTH_KERBEROS.equalsIgnoreCase(authType)) {
         String krb5Config = conf.get(HADOOP_KRB5_CONF);
 

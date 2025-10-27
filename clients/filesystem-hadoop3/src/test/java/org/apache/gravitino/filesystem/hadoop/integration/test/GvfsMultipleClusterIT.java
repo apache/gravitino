@@ -49,10 +49,12 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.DisabledIf;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 @Tag("gravitino-docker-test")
+@DisabledIf("org.apache.gravitino.integration.test.util.ITUtils#isEmbedded")
 public class GvfsMultipleClusterIT extends BaseIT {
   private static final Logger LOG = LoggerFactory.getLogger(GvfsMultipleClusterIT.class);
   protected static final ContainerSuite containerSuite = ContainerSuite.getInstance();

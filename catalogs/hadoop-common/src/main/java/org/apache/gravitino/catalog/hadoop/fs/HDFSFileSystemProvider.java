@@ -36,10 +36,6 @@ public class HDFSFileSystemProvider implements FileSystemProvider {
   public FileSystem getFileSystem(@Nonnull Path path, @Nonnull Map<String, String> config)
       throws IOException {
     Configuration configuration = FileSystemUtils.createConfiguration(GRAVITINO_BYPASS, config);
-    if ("kerberos".equals(config.get("hadoop.security.authentication"))) {
-      configuration.set("hadoop.security.authentication", "kerberos");
-    }
-    configuration.setBoolean(IPC_FALLBACK_TO_SIMPLE_AUTH_ALLOWED, true);
     return FileSystem.newInstance(path.toUri(), configuration);
   }
 
