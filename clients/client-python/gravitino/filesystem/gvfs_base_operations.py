@@ -434,6 +434,8 @@ class BaseGVFSOperations(ABC):
         actual_fs: AbstractFileSystem,
         fileset_path: str,
     ):
+        if not self._auto_create_location:
+            return
         # If the server-side filesystem ops are disabled, the fileset directory may not exist. In
         # such case the operations like create, open, list files under this directory will fail.
         # So we need to check the existence of the fileset directory beforehand.
