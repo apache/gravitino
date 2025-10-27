@@ -34,8 +34,8 @@ import java.security.PrivilegedExceptionAction;
 import java.time.Instant;
 import java.util.Timer;
 import java.util.TimerTask;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.exceptions.GravitinoRuntimeException;
-import org.apache.gravitino.shaded.org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FSDataOutputStream;
@@ -44,7 +44,6 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.security.UserGroupInformation;
-import org.apache.hadoop.shaded.com.ctc.wstx.util.StringUtil;
 import org.apache.hadoop.util.Progressable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -99,7 +98,7 @@ public class HDFSAuthenticationFileSystem extends FileSystem {
       } else {
         String userName = System.getenv(SYSTEM_ENV_HADOOP_USER_NAME);
         if (StringUtils.isNoneEmpty(userName)) {
-            userName = SYSTEM_USER_NAME;
+          userName = SYSTEM_USER_NAME;
         }
         this.ugi = UserGroupInformation.createRemoteUser(userName);
       }
