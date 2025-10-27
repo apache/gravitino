@@ -97,7 +97,7 @@ public class HDFSAuthenticationFileSystem extends FileSystem {
         startKerberosRenewalTask(principal);
       } else {
         String userName = System.getenv(SYSTEM_ENV_HADOOP_USER_NAME);
-        if (StringUtils.isNoneEmpty(userName)) {
+        if (StringUtils.isEmpty(userName)) {
           userName = SYSTEM_USER_NAME;
         }
         this.ugi = UserGroupInformation.createRemoteUser(userName);
