@@ -19,7 +19,6 @@
 package org.apache.gravitino.catalog.lakehouse;
 
 import static org.apache.gravitino.Entity.EntityType.TABLE;
-import static org.apache.gravitino.catalog.lakehouse.GenericLakehouseTablePropertiesMetadata.LANCE_TABLE_STORAGE_OPTION_PREFIX;
 import static org.apache.gravitino.catalog.lakehouse.GenericLakehouseTablePropertiesMetadata.LOCATION;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -351,9 +350,6 @@ public class GenericLakehouseCatalogOperations
                 e.getKey()
                     .startsWith(
                         GenericLakehouseTablePropertiesMetadata.LANCE_TABLE_STORAGE_OPTION_PREFIX))
-        .collect(
-            Collectors.toMap(
-                e -> e.getKey().substring(LANCE_TABLE_STORAGE_OPTION_PREFIX.length()),
-                Map.Entry::getValue));
+        .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
   }
 }
