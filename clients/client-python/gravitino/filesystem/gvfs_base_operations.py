@@ -76,6 +76,7 @@ class BaseGVFSOperations(ABC):
     ENV_CURRENT_LOCATION_NAME_ENV_VAR_DEFAULT = "CURRENT_LOCATION_NAME"
     ENABLE_CREDENTIAL_VENDING_DEFAULT = False
     ENABLE_FILESET_METADATA_CACHE_DEFAULT = False
+    AUTO_CREATE_LOCATION_DEFAULT = True
 
     def __init__(
         self,
@@ -128,6 +129,14 @@ class BaseGVFSOperations(ABC):
             if options is None
             else options.get(
                 GVFSConfig.CACHE_EXPIRED_TIME, GVFSConfig.DEFAULT_CACHE_EXPIRED_TIME
+            )
+        )
+        self._auto_create_location = (
+            self.AUTO_CREATE_LOCATION_DEFAULT
+            if options is None
+            else options.get(
+                GVFSConfig.GVFS_FILESYSTEM_AUTO_CREATE_LOCATION,
+                self.AUTO_CREATE_LOCATION_DEFAULT,
             )
         )
         self._filesystem_cache = TTLCache(maxsize=cache_size, ttl=cache_expired_time)
@@ -425,6 +434,8 @@ class BaseGVFSOperations(ABC):
         actual_fs: AbstractFileSystem,
         fileset_path: str,
     ):
+        if not self._auto_create_location:
+            return
         # If the server-side filesystem ops are disabled, the fileset directory may not exist. In
         # such case the operations like create, open, list files under this directory will fail.
         # So we need to check the existence of the fileset directory beforehand.
