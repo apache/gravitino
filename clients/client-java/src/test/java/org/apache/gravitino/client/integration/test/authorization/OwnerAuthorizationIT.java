@@ -305,4 +305,53 @@ public class OwnerAuthorizationIT extends BaseRestApiAuthorizationIT {
     // reset
     gravitinoMetalake.deleteRole(tempRole);
   }
+
+  @Test
+  @Order(4)
+  public void testGetCatalogOwner() {
+    GravitinoMetalake gravitinoMetalake = client.loadMetalake(METALAKE);
+    gravitinoMetalake.getOwner(
+        MetadataObjects.of(ImmutableList.of(CATALOG), MetadataObject.Type.CATALOG));
+    GravitinoMetalake gravitinoMetalakeLoadByNormalUser = normalUserClient.loadMetalake(METALAKE);
+    assertThrows(
+        "Current user can not get owner",
+        ForbiddenException.class,
+        () -> {
+          gravitinoMetalakeLoadByNormalUser.getOwner(
+              MetadataObjects.of(ImmutableList.of(CATALOG), MetadataObject.Type.CATALOG));
+        });
+  }
+
+  @Test
+  @Order(5)
+  public void testGetSchemaOwner() {
+    GravitinoMetalake gravitinoMetalake = client.loadMetalake(METALAKE);
+    gravitinoMetalake.getOwner(
+        MetadataObjects.of(ImmutableList.of(CATALOG, SCHEMA), MetadataObject.Type.SCHEMA));
+    GravitinoMetalake gravitinoMetalakeLoadByNormalUser = normalUserClient.loadMetalake(METALAKE);
+    assertThrows(
+        "Current user can not get owner",
+        ForbiddenException.class,
+        () -> {
+          gravitinoMetalakeLoadByNormalUser.getOwner(
+              MetadataObjects.of(ImmutableList.of(CATALOG, SCHEMA), MetadataObject.Type.SCHEMA));
+        });
+  }
+
+  @Test
+  @Order(6)
+  public void testGetTableOwner() {
+    GravitinoMetalake gravitinoMetalake = client.loadMetalake(METALAKE);
+    gravitinoMetalake.getOwner(
+        MetadataObjects.of(ImmutableList.of(CATALOG, SCHEMA, "table1"), MetadataObject.Type.TABLE));
+    GravitinoMetalake gravitinoMetalakeLoadByNormalUser = normalUserClient.loadMetalake(METALAKE);
+    assertThrows(
+        "Current user can not get owner",
+        ForbiddenException.class,
+        () -> {
+          gravitinoMetalakeLoadByNormalUser.getOwner(
+              MetadataObjects.of(
+                  ImmutableList.of(CATALOG, SCHEMA, "table1"), MetadataObject.Type.TABLE));
+        });
+  }
 }

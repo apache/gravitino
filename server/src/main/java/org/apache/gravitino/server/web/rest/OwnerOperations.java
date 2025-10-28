@@ -45,6 +45,7 @@ import org.apache.gravitino.dto.util.DTOConverters;
 import org.apache.gravitino.metrics.MetricNames;
 import org.apache.gravitino.server.authorization.NameBindings;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationExpression;
+import org.apache.gravitino.server.authorization.annotations.AuthorizationFullName;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationMetadata;
 import org.apache.gravitino.server.web.Utils;
 import org.apache.gravitino.utils.MetadataObjectUtil;
@@ -69,10 +70,14 @@ public class OwnerOperations {
   @Produces("application/vnd.gravitino.v1+json")
   @Timed(name = "get-object-owner." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "get-object-owner", absolute = true)
+  @AuthorizationExpression(
+      expression = "CAN_GET_OWNER",
+      errorMessage = "Current user can not get this objects's owner")
   public Response getOwnerForObject(
-      @PathParam("metalake") String metalake,
+      @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
+          String metalake,
       @PathParam("metadataObjectType") String metadataObjectType,
-      @PathParam("fullName") String fullName) {
+      @PathParam("fullName") @AuthorizationFullName String fullName) {
     try {
       MetadataObject object =
           MetadataObjects.parse(

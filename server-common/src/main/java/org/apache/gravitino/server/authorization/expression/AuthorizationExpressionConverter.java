@@ -17,6 +17,13 @@
 
 package org.apache.gravitino.server.authorization.expression;
 
+import static org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants.loadCatalogAuthorizationExpression;
+import static org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants.loadFilesetAuthorizationExpression;
+import static org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants.loadModelAuthorizationExpression;
+import static org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants.loadSchemaAuthorizationExpression;
+import static org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants.loadTableAuthorizationExpression;
+import static org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants.loadTopicsAuthorizationExpression;
+
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Matcher;
@@ -73,7 +80,8 @@ public class AuthorizationExpressionConverter {
     return EXPRESSION_CACHE.computeIfAbsent(
         authorizationExpression,
         (expression) -> {
-          String replacedExpression = replaceAnyPrivilege(authorizationExpression);
+          String replacedExpression = replaceGetOwnerPrivilege(expression);
+          replacedExpression = replaceAnyPrivilege(replacedExpression);
           replacedExpression = replaceAnyExpressions(replacedExpression);
           Matcher matcher = PATTERN.matcher(replacedExpression);
           StringBuffer result = new StringBuffer();
@@ -146,6 +154,32 @@ public class AuthorizationExpressionConverter {
     }
     matcher.appendTail(result);
     return result.toString();
+  }
+
+  public static String replaceGetOwnerPrivilege(String expression) {
+    return expression.replaceAll(
+        "CAN_GET_OWNER",
+        """
+              ( p_metadataObjectType.toUpperCase() == 'CATALOG' && (%s)) ||
+              ( p_metadataObjectType.toUpperCase() == 'SCHEMA' && (%s)) ||
+              ( p_metadataObjectType.toUpperCase() == 'TABLE' && (%s)) ||
+              ( p_metadataObjectType.toUpperCase() == 'MODEL' && (%s)) ||
+              ( p_metadataObjectType.toUpperCase() == 'FILESET' && (%s)) ||
+              ( p_metadataObjectType.toUpperCase() == 'TOPIC' && (%s)) ||
+              ( p_metadataObjectType.toUpperCase() != 'CATALOG' &&
+              p_metadataObjectType.toUpperCase() != 'SCHEMA' &&
+              p_metadataObjectType.toUpperCase() != 'TABLE' &&
+              p_metadataObjectType.toUpperCase() != 'MODEL' &&
+              p_metadataObjectType.toUpperCase() != 'FILESET' &&
+              p_metadataObjectType.toUpperCase() != 'TOPIC')
+              """
+            .formatted(
+                loadCatalogAuthorizationExpression,
+                loadSchemaAuthorizationExpression,
+                loadTableAuthorizationExpression,
+                loadModelAuthorizationExpression,
+                loadFilesetAuthorizationExpression,
+                loadTopicsAuthorizationExpression));
   }
 
   /**

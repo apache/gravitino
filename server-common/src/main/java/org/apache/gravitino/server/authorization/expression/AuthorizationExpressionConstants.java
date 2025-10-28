@@ -80,4 +80,6 @@ public class AuthorizationExpressionConstants {
               ANY_READ_FILESET ||
               ANY_WRITE_FILESET
                   """;
+
+  public static final String getOwnerExpression = "CAN_GET_OWNER";
 }
