@@ -112,7 +112,7 @@ public abstract class FlinkEnvIT extends BaseIT {
   protected abstract String getProvider();
 
   private void initIcebergRestServiceEnv() {
-    ignoreIcebergRestService = false;
+    super.ignoreAuxRestService = false;
     Map<String, String> icebergRestServiceConfigs = new HashMap<>();
     icebergRestServiceConfigs.put(
         "gravitino."

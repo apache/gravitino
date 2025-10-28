@@ -127,7 +127,7 @@ public class CatalogIcebergKerberosHiveIT extends BaseIT {
       // Config kerberos configuration for Gravitino server
       addKerberosConfig();
 
-      ignoreIcebergRestService = false;
+      super.ignoreAuxRestService = false;
       // Start Gravitino server
       super.startIntegrationTest();
     } catch (Exception e) {
