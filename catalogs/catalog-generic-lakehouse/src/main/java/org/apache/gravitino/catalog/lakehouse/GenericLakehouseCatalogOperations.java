@@ -59,10 +59,14 @@ import org.apache.gravitino.rel.expressions.sorts.SortOrder;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.indexes.Index;
 import org.apache.hadoop.fs.Path;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /** Operations for interacting with a generic lakehouse catalog in Apache Gravitino. */
 public class GenericLakehouseCatalogOperations
     implements CatalogOperations, SupportsSchemas, TableCatalog {
+  private static final Logger LOG =
+      LoggerFactory.getLogger(GenericLakehouseCatalogOperations.class);
 
   private static final String SLASH = "/";
 
@@ -282,24 +286,27 @@ public class GenericLakehouseCatalogOperations
   @Override
   public boolean dropTable(NameIdentifier ident) {
     EntityStore store = GravitinoEnv.getInstance().entityStore();
-    Namespace namespace = ident.namespace();
+    GenericTableEntity tableEntity;
     try {
-      GenericTableEntity tableEntity =
-          store.get(ident, Entity.EntityType.TABLE, GenericTableEntity.class);
-      Map<String, String> tableProperties = tableEntity.getProperties();
-      String format = tableProperties.getOrDefault("format", "lance");
-      LakehouseCatalogOperations lakehouseCatalogOperations =
-          SUPPORTED_FORMATS.compute(
-              format,
-              (k, v) ->
-                  v == null
-                      ? createLakehouseCatalogOperations(
-                          format, tableProperties, catalogInfo, propertiesMetadata)
-                      : v);
-      return lakehouseCatalogOperations.dropTable(ident);
-    } catch (IOException e) {
-      throw new RuntimeException("Failed to list tables under schema " + namespace, e);
+      tableEntity = store.get(ident, Entity.EntityType.TABLE, GenericTableEntity.class);
+    } catch (NoSuchEntityException e) {
+      LOG.warn("Table {} does not exist, skip dropping.", ident);
+      return false;
+    } catch (IOException ioe) {
+      throw new RuntimeException("Failed to get table " + ident);
     }
+
+    Map<String, String> tableProperties = tableEntity.getProperties();
+    String format = tableProperties.getOrDefault("format", "lance");
+    LakehouseCatalogOperations lakehouseCatalogOperations =
+        SUPPORTED_FORMATS.compute(
+            format,
+            (k, v) ->
+                v == null
+                    ? createLakehouseCatalogOperations(
+                        format, tableProperties, catalogInfo, propertiesMetadata)
+                    : v);
+    return lakehouseCatalogOperations.dropTable(ident);
   }
 
   private String ensureTrailingSlash(String path) {
