@@ -120,8 +120,8 @@ jobs:
           distribution: 'temurin'
           cache: 'gradle'
 
-      - name: Test publish to local
-        run: ./gradlew publishToMavenLocal -x test
+#      - name: Test publish to local
+#        run: ./gradlew publishToMavenLocal -x test
 
       - name: Free up disk space
         run: |
@@ -135,8 +135,8 @@ jobs:
       - name: Build with Gradle
         run: ./gradlew build -PskipITs -PskipDockerTests=false -x :clients:client-python:build
 
-      - name: Release with Gradle
-        run: ./gradlew clean && ./gradlew release -x test --rerun-tasks
+#      - name: Release with Gradle
+#        run: ./gradlew clean && ./gradlew release -x test --rerun-tasks
 
       - name: Upload unit tests report
         uses: actions/upload-artifact@v4
