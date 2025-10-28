@@ -751,7 +751,7 @@ COMMENT ON COLUMN job_run_meta.deleted_at IS 'job run deleted at';
 
 CREATE TABLE IF NOT EXISTS table_version_info (
     table_id        BIGINT NOT NULL,
-    format          VARCHAR(64) NOT NULL,
+    format          VARCHAR(64),
     properties      TEXT,
     partitioning  TEXT,
     distribution TEXT,
