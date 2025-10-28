@@ -750,7 +750,7 @@ COMMENT ON COLUMN job_run_meta.last_version IS 'job run last version';
 COMMENT ON COLUMN job_run_meta.deleted_at IS 'job run deleted at';
 
 CREATE TABLE IF NOT EXISTS table_version_info (
-    table_id        BIGINT PRIMARY KEY,
+    table_id        BIGINT NOT NULL,
     format          VARCHAR(64) NOT NULL,
     properties      TEXT,
     partitioning  TEXT,

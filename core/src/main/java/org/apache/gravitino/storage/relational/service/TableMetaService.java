@@ -136,12 +136,10 @@ public class TableMetaService {
               SessionUtils.doWithCommit(
                   TableVersionMapper.class,
                   mapper -> {
-                    if (po.getFormat() != null) {
-                      if (overwrite) {
-                        mapper.insertTableVersionOnDuplicateKeyUpdate(po);
-                      } else {
-                        mapper.insertTableVersion(po);
-                      }
+                    if (overwrite) {
+                      mapper.insertTableVersionOnDuplicateKeyUpdate(po);
+                    } else {
+                      mapper.insertTableVersion(po);
                     }
                   }),
           () -> {
@@ -214,9 +212,9 @@ public class TableMetaService {
               SessionUtils.doWithCommit(
                   TableVersionMapper.class,
                   mapper -> {
-                    if (newTablePO.getFormat() != null) {
-                      mapper.insertTableVersionOnDuplicateKeyUpdate(newTablePO);
-                    }
+                    mapper.softDeleteTableVersionByTableIdAndVersion(
+                        oldTablePO.getTableId(), oldTablePO.getCurrentVersion());
+                    mapper.insertTableVersionOnDuplicateKeyUpdate(newTablePO);
                   }),
           () -> {
             if (updateResult.get() > 0 && (isColumnChanged || isSchemaChanged)) {
@@ -295,8 +293,18 @@ public class TableMetaService {
       baseMetricName = "deleteTableMetasByLegacyTimeline")
   public int deleteTableMetasByLegacyTimeline(Long legacyTimeline, int limit) {
     return SessionUtils.doWithCommitAndFetchResult(
-        TableMetaMapper.class,
-        mapper -> mapper.deleteTableMetasByLegacyTimeline(legacyTimeline, limit));
+            TableMetaMapper.class,
+            mapper -> mapper.deleteTableMetasByLegacyTimeline(legacyTimeline, limit))
+        + deleteTableVersionByLegacyTimeline(legacyTimeline, limit);
+  }
+
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "deleteTableVersionByLegacyTimeline")
+  public int deleteTableVersionByLegacyTimeline(Long legacyTimeline, int limit) {
+    return SessionUtils.doWithCommitAndFetchResult(
+        TableVersionMapper.class,
+        mapper -> mapper.deleteTableVersionByLegacyTimeline(legacyTimeline, limit));
   }
 
   private void fillTablePOBuilderParentEntityId(TablePO.Builder builder, Namespace namespace) {

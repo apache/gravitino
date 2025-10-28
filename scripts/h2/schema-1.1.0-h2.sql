@@ -441,6 +441,5 @@ CREATE TABLE IF NOT EXISTS `table_version_info` (
     `comment`   CLOB DEFAULT NULL COMMENT 'table comment',
     `version` BIGINT(20) UNSIGNED COMMENT 'table current version',
     `deleted_at`      BIGINT(20) UNSIGNED DEFAULT 0 COMMENT 'table deletion timestamp, 0 means not deleted',
-    PRIMARY KEY (table_id),
     UNIQUE KEY `uk_table_id_version_deleted_at` (`table_id`, `deleted_at`)
 ) ENGINE=InnoDB COMMENT 'table detail information including format, location, properties, partition, distribution, sort order, index and so on';

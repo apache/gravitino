@@ -48,6 +48,7 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.catalog.lakehouse.GenericLakehouseTablePropertiesMetadata;
 import org.apache.gravitino.catalog.lakehouse.LakehouseCatalogOperations;
+import org.apache.gravitino.catalog.lakehouse.LakehouseTableFormat;
 import org.apache.gravitino.catalog.lakehouse.utils.EntityConverter;
 import org.apache.gravitino.connector.CatalogInfo;
 import org.apache.gravitino.connector.GenericLakehouseTable;
@@ -67,14 +68,8 @@ import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.indexes.Index;
 import org.apache.gravitino.rel.indexes.Indexes.IndexImpl;
 import org.apache.gravitino.utils.PrincipalUtils;
-import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.fs.Path;
 
 public class LanceCatalogOperations implements LakehouseCatalogOperations {
-
-  @SuppressWarnings("UnusedVariable")
-  private Map<String, String> lancePropertiesMap;
 
   private EntityStore store;
 
@@ -82,7 +77,6 @@ public class LanceCatalogOperations implements LakehouseCatalogOperations {
   public void initialize(
       Map<String, String> config, CatalogInfo info, HasPropertyMetadata propertiesMetadata)
       throws RuntimeException {
-    lancePropertiesMap = ImmutableMap.copyOf(config);
     store = GravitinoEnv.getInstance().entityStore();
   }
 
@@ -100,31 +94,16 @@ public class LanceCatalogOperations implements LakehouseCatalogOperations {
 
   @Override
   public NameIdentifier[] listTables(Namespace namespace) throws NoSuchSchemaException {
-    // No need to do anything.
-    return new NameIdentifier[0];
+    // No need to do nothing here as GenericLakehouseCatalogOperations will do the work.
+    throw new UnsupportedOperationException(
+        "We should not reach here as we could get table info" + "from metastore directly.");
   }
 
   @Override
   public Table loadTable(NameIdentifier ident) throws NoSuchTableException {
-    try {
-      TableEntity tableEntity = store.get(ident, Entity.EntityType.TABLE, TableEntity.class);
-      return GenericLakehouseTable.builder()
-          .withFormat(tableEntity.getFormat())
-          .withProperties(tableEntity.getProperties())
-          .withAuditInfo(tableEntity.auditInfo())
-          .withSortOrders(tableEntity.getSortOrder())
-          .withPartitioning(tableEntity.getPartitions())
-          .withDistribution(tableEntity.getDistribution())
-          .withColumns(EntityConverter.toColumns(tableEntity.columns()))
-          .withIndexes(tableEntity.getIndexes())
-          .withName(tableEntity.name())
-          .withComment(tableEntity.getComment())
-          .build();
-    } catch (NoSuchEntityException e) {
-      throw new NoSuchTableException("No such table: %s", ident);
-    } catch (IOException ioe) {
-      throw new RuntimeException("Failed to load table entity for: " + ident, ioe);
-    }
+    // No need to do nothing here as GenericLakehouseCatalogOperations will do the work.
+    throw new UnsupportedOperationException(
+        "We should not reach here as we could get table info" + "from metastore directly.");
   }
 
   @Override
@@ -140,7 +119,7 @@ public class LanceCatalogOperations implements LakehouseCatalogOperations {
       throws NoSuchSchemaException, TableAlreadyExistsException {
     // Ignore partitions, distributions, sortOrders, and indexes for Lance tables;
     String location = properties.get(GenericLakehouseTablePropertiesMetadata.LAKEHOUSE_LOCATION);
-    try (Dataset dataset =
+    try (Dataset ignored =
         Dataset.create(
             new RootAllocator(),
             location,
@@ -161,7 +140,7 @@ public class LanceCatalogOperations implements LakehouseCatalogOperations {
                   .build())
           .withPartitioning(partitions)
           .withSortOrders(sortOrders)
-          .withFormat("lance")
+          .withFormat(LakehouseTableFormat.LANCE.lowerName())
           .build();
     }
   }
@@ -322,17 +301,16 @@ public class LanceCatalogOperations implements LakehouseCatalogOperations {
     try {
       TableEntity tableEntity = store.get(ident, Entity.EntityType.TABLE, TableEntity.class);
       Map<String, String> lancePropertiesMap = tableEntity.getProperties();
-      String location = lancePropertiesMap.get("location");
+      String location =
+          lancePropertiesMap.get(GenericLakehouseTablePropertiesMetadata.LAKEHOUSE_LOCATION);
 
-      // Remove the table entity from the metastore
       if (!store.delete(ident, Entity.EntityType.TABLE)) {
         throw new RuntimeException("Failed to drop Lance table: " + ident.name());
       }
 
-      // Remove the directory on storage, which deletes all data files. For cloud storage
-      // we need to the following code can work properly.
-      FileSystem fs = FileSystem.get(new Configuration());
-      return fs.delete(new Path(location), true);
+      // Drop the Lance dataset from cloud storage.
+      Dataset.drop(location, ImmutableMap.of());
+      return true;
     } catch (IOException e) {
       throw new RuntimeException("Failed to drop Lance table: " + ident.name(), e);
     }

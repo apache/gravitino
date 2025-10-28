@@ -19,7 +19,7 @@
 
 
 CREATE TABLE IF NOT EXISTS table_version_info (
-    table_id        BIGINT PRIMARY KEY,
+    table_id        BIGINT NOT NULL,
     format          VARCHAR(64) NOT NULL,
     properties      TEXT,
     partitions  TEXT,

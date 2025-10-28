@@ -40,8 +40,10 @@ import org.apache.gravitino.Schema;
 import org.apache.gravitino.SchemaChange;
 import org.apache.gravitino.catalog.ManagedSchemaOperations;
 import org.apache.gravitino.catalog.lakehouse.lance.LanceCatalogOperations;
+import org.apache.gravitino.catalog.lakehouse.utils.EntityConverter;
 import org.apache.gravitino.connector.CatalogInfo;
 import org.apache.gravitino.connector.CatalogOperations;
+import org.apache.gravitino.connector.GenericLakehouseTable;
 import org.apache.gravitino.connector.HasPropertyMetadata;
 import org.apache.gravitino.connector.SupportsSchemas;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
@@ -192,10 +194,18 @@ public class GenericLakehouseCatalogOperations
   public Table loadTable(NameIdentifier ident) throws NoSuchTableException {
     try {
       TableEntity tableEntity = store.get(ident, Entity.EntityType.TABLE, TableEntity.class);
-      Map<String, String> tableProperties = tableEntity.getProperties();
-      LakehouseCatalogOperations lakehouseCatalogOperations =
-          getLakehouseCatalogOperations(tableProperties);
-      return lakehouseCatalogOperations.loadTable(ident);
+      return GenericLakehouseTable.builder()
+          .withFormat(tableEntity.getFormat())
+          .withProperties(tableEntity.getProperties())
+          .withAuditInfo(tableEntity.auditInfo())
+          .withSortOrders(tableEntity.getSortOrder())
+          .withPartitioning(tableEntity.getPartitions())
+          .withDistribution(tableEntity.getDistribution())
+          .withColumns(EntityConverter.toColumns(tableEntity.columns()))
+          .withIndexes(tableEntity.getIndexes())
+          .withName(tableEntity.name())
+          .withComment(tableEntity.getComment())
+          .build();
     } catch (IOException e) {
       throw new RuntimeException("Failed to list tables under schema " + ident.namespace(), e);
     }

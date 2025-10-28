@@ -26,7 +26,7 @@ public enum LakehouseTableFormat {
 
   ICEBERG;
 
-  private String lowerName() {
+  public String lowerName() {
     return this.name().toLowerCase();
   }
 

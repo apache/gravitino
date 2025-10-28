@@ -463,23 +463,18 @@ public class POConverters {
               .withAuditInfo(JsonUtils.anyFieldMapper().writeValueAsString(newTable.auditInfo()))
               .withCurrentVersion(currentVersion)
               .withLastVersion(lastVersion)
-              .withDeletedAt(DEFAULT_DELETED_AT);
-
-      // Note: GenericTableEntity will be removed in the refactor PR, so here just keep the old
-      // logic to make the UT pass.
-      if (newTable instanceof GenericTableEntity genericTable) {
-        builder.withFormat(genericTable.getFormat());
-        builder.withComment(genericTable.getComment());
-        builder.withProperties(
-            genericTable.getProperties() == null
-                ? null
-                : JsonUtils.anyFieldMapper().writeValueAsString(genericTable.getProperties()));
-        builder.withIndexes(
-            genericTable.getIndexes() == null
-                ? null
-                : JsonUtils.anyFieldMapper().writeValueAsString(genericTable.getIndexes()));
-        // TODO other fields in the refactor PRs.
-      }
+              .withDeletedAt(DEFAULT_DELETED_AT)
+              .withComment(newTable.getComment())
+              .withProperties(
+                  newTable.getProperties() == null
+                      ? null
+                      : JsonUtils.anyFieldMapper().writeValueAsString(newTable.getProperties()))
+              .withIndexes(
+                  newTable.getIndexes() == null
+                      ? null
+                      : JsonUtils.anyFieldMapper().writeValueAsString(newTable.getIndexes()))
+              .withFormat(newTable.getFormat());
+      // TODO other fields(partitioning, distribution, sortorder) in the refactor PRs.
 
       return builder.build();
     } catch (JsonProcessingException e) {

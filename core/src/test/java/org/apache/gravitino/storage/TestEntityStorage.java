@@ -79,7 +79,6 @@ import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.CatalogEntity;
 import org.apache.gravitino.meta.ColumnEntity;
 import org.apache.gravitino.meta.FilesetEntity;
-import org.apache.gravitino.meta.GenericTableEntity;
 import org.apache.gravitino.meta.GroupEntity;
 import org.apache.gravitino.meta.ModelEntity;
 import org.apache.gravitino.meta.ModelVersionEntity;
@@ -2686,8 +2685,8 @@ public class TestEntityStorage {
       store.put(schemaEntity, false);
 
       long column1Id = RandomIdGenerator.INSTANCE.nextId();
-      GenericTableEntity table =
-          GenericTableEntity.getBuilder()
+      TableEntity table =
+          TableEntity.builder()
               .withId(RandomIdGenerator.INSTANCE.nextId())
               .withNamespace(NamespaceUtil.ofTable("metalake", "catalog", "schema"))
               .withName("table")
@@ -2707,8 +2706,8 @@ public class TestEntityStorage {
               .withProperties(ImmutableMap.of("location", "/tmp/test", "format", "lance"))
               .build();
       store.put(table, false);
-      GenericTableEntity fetchedTable =
-          store.get(table.nameIdentifier(), Entity.EntityType.TABLE, GenericTableEntity.class);
+      TableEntity fetchedTable =
+          store.get(table.nameIdentifier(), Entity.EntityType.TABLE, TableEntity.class);
 
       // check table properties
       Assertions.assertEquals("/tmp/test", fetchedTable.getProperties().get("location"));
@@ -2718,8 +2717,8 @@ public class TestEntityStorage {
       Assertions.assertEquals("column1", fetchedTable.columns().get(0).name());
 
       // Now try to update the table
-      GenericTableEntity updatedTable =
-          GenericTableEntity.getBuilder()
+      TableEntity updatedTable =
+          TableEntity.builder()
               .withId(table.id())
               .withNamespace(table.namespace())
               .withName(table.name())
@@ -2748,12 +2747,9 @@ public class TestEntityStorage {
               .build();
 
       store.update(
-          table.nameIdentifier(),
-          GenericTableEntity.class,
-          Entity.EntityType.TABLE,
-          e -> updatedTable);
-      GenericTableEntity fetchedUpdatedTable =
-          store.get(table.nameIdentifier(), Entity.EntityType.TABLE, GenericTableEntity.class);
+          table.nameIdentifier(), TableEntity.class, Entity.EntityType.TABLE, e -> updatedTable);
+      TableEntity fetchedUpdatedTable =
+          store.get(table.nameIdentifier(), Entity.EntityType.TABLE, TableEntity.class);
 
       // check updated table properties
       Assertions.assertEquals(
@@ -2772,6 +2768,11 @@ public class TestEntityStorage {
               .filter(c -> c.name().equals("column2"))
               .findFirst()
               .isPresent());
+
+      // Test drop the table
+      Assertions.assertTrue(store.delete(table.nameIdentifier(), Entity.EntityType.TABLE));
+      Assertions.assertFalse(store.exists(table.nameIdentifier(), Entity.EntityType.TABLE));
+
       destroy(type);
     } catch (IOException e) {
       throw new RuntimeException(e);
