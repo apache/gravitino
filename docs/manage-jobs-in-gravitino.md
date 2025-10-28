@@ -16,12 +16,12 @@ import TabItem from '@theme/TabItem';
 
 Starting from 1.0.0, Apache Gravitino introduces a new submodule called the job system for users to
 register, run, and manage jobs. This job system integrates with the existing metadata
-management, enabling users to execute the jobs or actions based on the metadata, 
-known as metadata-driven actions. For instance, this allows users to run jobs for tasks such as 
+management, enabling users to execute the jobs or actions based on the metadata,
+known as metadata-driven actions. For instance, this allows users to run jobs for tasks such as
 compacting Iceberg tables or cleaning old data based on TTL properties.
 
 The aim of the job system is to provide a unified way to manage job templates and jobs,
-including registering job templates, running jobs based on the job templates, and other related 
+including registering job templates, running jobs based on the job templates, and other related
 tasks. The job system itself is a unified job submitter that allows users to run jobs through it,
 but it doesn't provide the actual job execution capabilities. Instead, it relies on the
 existing job executors (schedulers), such as Apache Airflow, Apache Livy, to execute the jobs.
@@ -72,13 +72,10 @@ Here is a brief description of the fields in the job template:
 - `jobType`: The type of the job template, use `shell` for a shell job template.
 - `comment`: A comment for the job template, which can be used to describe the job template.
 - `executable`: The path to the executable script, which can be a shell script or any executable script.
-- `arguments`: The arguments to pass to the executable script, you can use placeholders like `{{arg1}}`
-  and `{{arg2}}` to be replaced with actual values when running the job.
-- `environments`: The environment variables to set when running the job, you can use placeholders like
-  `{{value1}}` and `{{value2}}` to be replaced with actual values when running the job.
+- `arguments`: The arguments to pass to the executable script.
+- `environments`: The environment variables to set when running the jo.
 - `customFields`: Custom fields for the job template, which can be used to store additional
-  information, you can use placeholders like `{{value1}}` and `{{value2}}` to be replaced with actual
-  values when running the job.
+  information.
 - `scripts`: A list of scripts that the main executable script can use.
 
 Please note that:
@@ -87,10 +84,9 @@ Please note that:
    Gravitino supports accessing files from the local file system, HTTP(S) URLs, and FTP(S) URLs
    (more distributed file system support will be added in the future). So the `executable` and
    `scripts` can be a local file path, or a URL like `http://example.com/my_script.sh`.
-2. The `arguments`, `environments`, and `customFields` can use placeholders like `{{arg1}}` and
-   `{{value1}}` to be replaced with actual values when running the job. The placeholders will be
-   replaced with the actual values when running the job, so you can use them to pass dynamic values
-   to the job template.
+2. The `executable`, `arguments`, `environments`, `customFields` and `scripts` can use placeholders
+   like `{{arg1}}` and `{{value1}}`, the style is `{{foo}}`. They will be replaced with
+   the actual values when running the job, so you can use them to pass dynamic values to the job template.
 3. Gravitino will copy the `executable` and `scripts` files to the job working directory
    when running the job, so you can use the relative path in the `executable` and `scripts` to
    refer to other scripts in the job working directory.
@@ -134,14 +130,10 @@ Here is a brief description of the fields in the Spark job template:
 - `comment`: A comment for the job template, which can be used to describe the job template.
 - `executable`: The path to the Spark application JAR file, which can be a local file path or a URL
   with a supported scheme.
-- `arguments`: The arguments to pass to the Spark application, you can use placeholders like
-  `{{arg1}}` and `{{arg2}}` to be replaced with actual values when running the job.
-- `environments`: The environment variables to set when running the job, you can use placeholders like
-  `{{value1}}` and `{{value2}}` to be replaced with actual values when running the job.
+- `arguments`: The arguments to pass to the Spark application.
+- `environments`: The environment variables to set when running the job.
 - `customFields`: Custom fields for the job template, which can be used to store additional information.
-  It can use placeholders like `{{value1}}` and `{{value2}}` to be replaced with actual values
-  when running the job.
-- `className`: The main class of the Spark application. It is required for Java/Scala Spark 
+- `className`: The main class of the Spark application. It is required for Java/Scala Spark
   application. For PySpark application, this field can be `null` instead.
 - `jars`: A list of JAR files to add to the Spark job classpath, which can be a local file path or a URL
   with a supported scheme.
@@ -149,8 +141,7 @@ Here is a brief description of the fields in the Spark job template:
   file path or a URL with a supported scheme.
 - `archives`: A list of archives to be extracted to the working directory of the Spark job, which
   can be a local file path or a URL with a supported scheme.
-- `configs`: A map of Spark configurations to set when running the Spark job, which can use placeholders
-  like `{{value1}}` to be replaced with actual values when running the job.
+- `configs`: A map of Spark configurations to set when running the Spark job.
 
 Note that:
 
@@ -159,10 +150,10 @@ Note that:
    FTP(S) URLs (more distributed file system supports will be added in the future). So the
    `executable`, `jars`, `files`, and `archives` can be a local file path, or a URL like
    `http://example.com/my_spark_app.jar`.
-2. The `arguments`, `environments`, `customFields`, and `configs` can use placeholders like
-   `{{arg1}}` and `{{value1}}` to be replaced with actual values when running the job. The placeholders
-   will be replaced with the actual values when running the job, so you can use them to pass dynamic
-   values to the job template.
+2. The `executable`, `arguments`, `environments`, `customFields`, `className`, `jars`, `files`,
+   `archives`, and `configs` can use placeholders like `{{arg1}}` and `{{value1}}`, the style is
+   `{{foo}}`. They will be replaced with the actual values when running the job, so you can use them
+   to pass dynamic values to the job template.
 3. Gravitino will copy the `executable`, `jars`, `files`, and `archives` files to the job working
    directory when running the job, so you can use the relative path in the `executable`, `jars`,
    `files`, and `archives` to refer to other files in the job working directory.
@@ -440,7 +431,7 @@ placeholders in the job template.
 
 Gravitino leverages the job executor to run the job, so you need to specify the job executor
 through configuration `gravitino.job.executor`. By default, it is set to "local", which means
-the job will be launched as a process within the same machine that runs the Gravitino server. Note 
+the job will be launched as a process within the same machine that runs the Gravitino server. Note
 that the local job executor is only for testing. If you want to run the job in a distributed environment,
 you need to implement your own `JobExecutor` and set the configuration, please see
 [Implement a custom job executor](#implement-a-custom-job-executor) section below.
