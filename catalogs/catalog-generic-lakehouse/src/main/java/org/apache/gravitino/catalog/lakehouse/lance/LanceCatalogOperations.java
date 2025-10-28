@@ -19,6 +19,9 @@
 
 package org.apache.gravitino.catalog.lakehouse.lance;
 
+import static org.apache.gravitino.catalog.lakehouse.GenericLakehouseTablePropertiesMetadata.LANCE_TABLE_STORAGE_OPTION_PREFIX;
+import static org.apache.gravitino.catalog.lakehouse.GenericLakehouseTablePropertiesMetadata.LOCATION;
+
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import com.lancedb.lance.Dataset;
@@ -114,13 +117,20 @@ public class LanceCatalogOperations implements LakehouseCatalogOperations {
       Index[] indexes)
       throws NoSuchSchemaException, TableAlreadyExistsException {
     // Ignore partitions, distributions, sortOrders, and indexes for Lance tables;
-    String location = properties.get("location");
+    String location = properties.get(LOCATION);
+    Map<String, String> storageProps =
+        properties.entrySet().stream()
+            .filter(e -> e.getKey().startsWith(LANCE_TABLE_STORAGE_OPTION_PREFIX))
+            .collect(
+                Collectors.toMap(
+                    e -> e.getKey().substring(LANCE_TABLE_STORAGE_OPTION_PREFIX.length()),
+                    Map.Entry::getValue));
     try (Dataset dataset =
         Dataset.create(
             new RootAllocator(),
             location,
             convertColumnsToSchema(columns),
-            new WriteParams.Builder().build())) {
+            new WriteParams.Builder().withStorageOptions(storageProps).build())) {
       GenericLakehouseTable.Builder builder = GenericLakehouseTable.builder();
       return builder
           .withName(ident.name())

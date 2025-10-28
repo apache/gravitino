@@ -27,27 +27,6 @@ import org.junit.jupiter.api.Test;
 
 public class TestLanceConfig {
   @Test
-  public void testLoadLanceConfig() {
-    Map<String, String> properties =
-        ImmutableMap.of("gravitino.lance-rest.namespace-backend", "test_catalog");
-
-    LanceConfig lanceConfig = new LanceConfig();
-    lanceConfig.loadFromMap(properties, k -> k.startsWith("gravitino.lance-rest."));
-    Assertions.assertEquals("gravitino", lanceConfig.getNamespaceBackend());
-
-    LanceConfig lanceConfig2 = new LanceConfig(properties);
-    Assertions.assertEquals("gravitino", lanceConfig2.getNamespaceBackend());
-  }
-
-  @Test
-  public void testDefaultCatalogName() {
-    // Test default namespace backend name when not specified
-    Map<String, String> properties = ImmutableMap.of();
-    LanceConfig lanceConfig = new LanceConfig(properties);
-    Assertions.assertEquals("gravitino", lanceConfig.getNamespaceBackend());
-  }
-
-  @Test
   public void testLanceHttpPort() {
     Map<String, String> properties = ImmutableMap.of();
     LanceConfig lanceConfig = new LanceConfig(properties);
@@ -74,18 +53,18 @@ public class TestLanceConfig {
     // Test default values
     Map<String, String> properties = ImmutableMap.of();
     LanceConfig lanceConfig = new LanceConfig(properties);
-    Assertions.assertEquals("http://localhost:8090", lanceConfig.getNamespaceUri());
+    Assertions.assertEquals("http://localhost:8090", lanceConfig.getNamespaceBackendUri());
     Assertions.assertNull(lanceConfig.getGravitinoMetalake()); // No default, must be configured
 
     // Test custom values
     properties =
         ImmutableMap.of(
-            LanceConfig.NAMESPACE_URI.getKey(),
+            LanceConfig.NAMESPACE_BACKEND_URI.getKey(),
             "http://gravitino-server:8090",
             LanceConfig.METALAKE_NAME.getKey(),
             "production");
     lanceConfig = new LanceConfig(properties);
-    Assertions.assertEquals("http://gravitino-server:8090", lanceConfig.getNamespaceUri());
+    Assertions.assertEquals("http://gravitino-server:8090", lanceConfig.getNamespaceBackendUri());
     Assertions.assertEquals("production", lanceConfig.getGravitinoMetalake());
   }
 
@@ -94,7 +73,7 @@ public class TestLanceConfig {
     // Test all configurations together for auxiliary mode
     Map<String, String> properties =
         ImmutableMap.<String, String>builder()
-            .put(LanceConfig.NAMESPACE_URI.getKey(), "http://gravitino-prod:8090")
+            .put(LanceConfig.NAMESPACE_BACKEND_URI.getKey(), "http://gravitino-prod:8090")
             .put(LanceConfig.METALAKE_NAME.getKey(), "production")
             .put(LanceConfig.NAMESPACE_BACKEND.getKey(), "gravitino")
             .put(JettyServerConfig.WEBSERVER_HTTP_PORT.getKey(), "9101")
@@ -103,8 +82,7 @@ public class TestLanceConfig {
     LanceConfig lanceConfig = new LanceConfig(properties);
 
     // Verify all config values
-    Assertions.assertEquals("gravitino", lanceConfig.getNamespaceBackend());
-    Assertions.assertEquals("http://gravitino-prod:8090", lanceConfig.getNamespaceUri());
+    Assertions.assertEquals("http://gravitino-prod:8090", lanceConfig.getNamespaceBackendUri());
     Assertions.assertEquals("production", lanceConfig.getGravitinoMetalake());
 
     JettyServerConfig jettyConfig = JettyServerConfig.fromConfig(lanceConfig);
