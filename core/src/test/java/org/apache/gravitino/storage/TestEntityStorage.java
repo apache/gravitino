@@ -79,6 +79,7 @@ import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.CatalogEntity;
 import org.apache.gravitino.meta.ColumnEntity;
 import org.apache.gravitino.meta.FilesetEntity;
+import org.apache.gravitino.meta.GenericTableEntity;
 import org.apache.gravitino.meta.GroupEntity;
 import org.apache.gravitino.meta.ModelEntity;
 import org.apache.gravitino.meta.ModelVersionEntity;
@@ -2640,6 +2641,130 @@ public class TestEntityStorage {
       Assertions.assertEquals(1, securableObjects.size());
       Assertions.assertEquals("newCatalogName", securableObjects.get(0).name());
       destroy(type);
+    }
+  }
+
+  @ParameterizedTest
+  @MethodSource("storageProvider")
+  void testLanceTableCreateAndUpdate(String type) {
+    Config config = Mockito.mock(Config.class);
+    init(type, config);
+
+    AuditInfo auditInfo =
+        AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
+
+    try (EntityStore store = EntityStoreFactory.createEntityStore(config)) {
+      store.initialize(config);
+
+      BaseMetalake metalake =
+          createBaseMakeLake(RandomIdGenerator.INSTANCE.nextId(), "metalake", auditInfo);
+      store.put(metalake, false);
+
+      CatalogEntity catalogEntity =
+          CatalogEntity.builder()
+              .withId(RandomIdGenerator.INSTANCE.nextId())
+              .withName("catalog")
+              .withNamespace(NamespaceUtil.ofCatalog("metalake"))
+              .withType(Catalog.Type.RELATIONAL)
+              .withProvider("generic-lakehouse")
+              .withComment("This is a generic-lakehouse")
+              .withProperties(ImmutableMap.of())
+              .withAuditInfo(auditInfo)
+              .build();
+
+      store.put(catalogEntity, false);
+
+      SchemaEntity schemaEntity =
+          SchemaEntity.builder()
+              .withId(RandomIdGenerator.INSTANCE.nextId())
+              .withName("schema")
+              .withNamespace(NamespaceUtil.ofSchema("metalake", "catalog"))
+              .withComment("This is a schema for generic-lakehouse")
+              .withProperties(ImmutableMap.of())
+              .withAuditInfo(auditInfo)
+              .build();
+      store.put(schemaEntity, false);
+
+      GenericTableEntity table =
+          GenericTableEntity.getBuilder()
+              .withId(RandomIdGenerator.INSTANCE.nextId())
+              .withNamespace(NamespaceUtil.ofTable("metalake", "catalog", "schema"))
+              .withName("table")
+              .withAuditInfo(auditInfo)
+              .withColumns(
+                  Lists.newArrayList(
+                      ColumnEntity.builder()
+                          .withId(RandomIdGenerator.INSTANCE.nextId())
+                          .withName("column1")
+                          .withDataType(Types.StringType.get())
+                          .withComment("test column")
+                          .withPosition(1)
+                          .withAuditInfo(auditInfo)
+                          .build()))
+              .withComment("This is a lance table")
+              .withFormat("lance")
+              .withProperties(ImmutableMap.of("location", "/tmp/test", "format", "lance"))
+              .build();
+      store.put(table, false);
+      GenericTableEntity fetchedTable =
+          store.get(table.nameIdentifier(), Entity.EntityType.TABLE, GenericTableEntity.class);
+
+      // check table properties
+      Assertions.assertEquals("/tmp/test", fetchedTable.getProperties().get("location"));
+      Assertions.assertEquals("lance", fetchedTable.getProperties().get("format"));
+      Assertions.assertEquals("This is a lance table", fetchedTable.getComment());
+      Assertions.assertEquals(1, fetchedTable.columns().size());
+      Assertions.assertEquals("column1", fetchedTable.columns().get(0).name());
+
+      // Now try to update the table
+      GenericTableEntity updatedTable =
+          GenericTableEntity.getBuilder()
+              .withId(table.id())
+              .withNamespace(table.namespace())
+              .withName(table.name())
+              .withAuditInfo(auditInfo)
+              .withFormat("lance")
+              .withColumns(
+                  Lists.newArrayList(
+                      ColumnEntity.builder()
+                          .withId(RandomIdGenerator.INSTANCE.nextId())
+                          .withName("column1")
+                          .withDataType(Types.StringType.get())
+                          .withComment("updated test column")
+                          .withPosition(1)
+                          .withAuditInfo(auditInfo)
+                          .build(),
+                      ColumnEntity.builder()
+                          .withId(RandomIdGenerator.INSTANCE.nextId())
+                          .withName("column2")
+                          .withDataType(Types.IntegerType.get())
+                          .withComment("new column")
+                          .withPosition(2)
+                          .withAuditInfo(auditInfo)
+                          .build()))
+              .withComment("This is an updated lance table")
+              .withProperties(ImmutableMap.of("location", "/tmp/updated_test", "format", "lance"))
+              .build();
+
+      store.update(
+          table.nameIdentifier(),
+          GenericTableEntity.class,
+          Entity.EntityType.TABLE,
+          e -> updatedTable);
+      GenericTableEntity fetchedUpdatedTable =
+          store.get(table.nameIdentifier(), Entity.EntityType.TABLE, GenericTableEntity.class);
+
+      // check updated table properties
+      Assertions.assertEquals(
+          "/tmp/updated_test", fetchedUpdatedTable.getProperties().get("location"));
+      Assertions.assertEquals("lance", fetchedUpdatedTable.getProperties().get("format"));
+      Assertions.assertEquals("This is an updated lance table", fetchedUpdatedTable.getComment());
+      Assertions.assertEquals(2, fetchedUpdatedTable.columns().size());
+      Assertions.assertEquals("column2", fetchedUpdatedTable.columns().get(1).name());
+
+      destroy(type);
+    } catch (IOException e) {
+      throw new RuntimeException(e);
     }
   }
 }
