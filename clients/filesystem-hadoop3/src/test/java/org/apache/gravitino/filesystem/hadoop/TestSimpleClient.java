@@ -33,6 +33,7 @@ import org.apache.gravitino.dto.MetalakeDTO;
 import org.apache.gravitino.dto.responses.MetalakeResponse;
 import org.apache.gravitino.json.JsonUtils;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hc.core5.http.HttpStatus;
 import org.apache.hc.core5.http.Method;
@@ -98,7 +99,13 @@ public class TestSimpleClient extends TestGvfsBase {
     Configuration config1 = new Configuration(conf);
     config1.set(
         GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_CLIENT_METALAKE_KEY, testMetalake);
-    newPath.getFileSystem(config1);
+    FileSystem fs = newPath.getFileSystem(config1);
+    // Trigger lazy initialization to set auth token
+    try {
+      fs.exists(newPath);
+    } catch (Exception e) {
+      // Ignore errors, we just want to trigger client initialization
+    }
 
     String userInformation = user + ":dummy";
     assertEquals(

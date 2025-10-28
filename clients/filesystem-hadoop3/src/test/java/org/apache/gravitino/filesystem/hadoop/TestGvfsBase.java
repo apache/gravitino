@@ -290,6 +290,12 @@ public class TestGvfsBase extends GravitinoMockServerBase {
                 .withBody(getJsonString(new VersionResponse(Version.getCurrentVersionDTO()))));
 
     try (FileSystem fs = new Path("gvfs://fileset/").getFileSystem(configuration)) {
+      // Trigger lazy initialization by accessing a path
+      try {
+        fs.exists(new Path("gvfs://fileset/catalog/schema/fileset/file.txt"));
+      } catch (Exception e) {
+        // Ignore errors, we just want to trigger client initialization
+      }
       mockServer().verify(req, VerificationTimes.once());
     }
   }
@@ -1011,7 +1017,10 @@ public class TestGvfsBase extends GravitinoMockServerBase {
         Assertions.assertThrows(
             IllegalArgumentException.class,
             () -> {
-              try (FileSystem fs = new Path("gvfs://fileset/").getFileSystem(configuration)) {}
+              try (FileSystem fs = new Path("gvfs://fileset/").getFileSystem(configuration)) {
+                // Trigger lazy initialization by accessing a path
+                fs.exists(new Path("gvfs://fileset/catalog/schema/fileset/file.txt"));
+              }
             });
     Assertions.assertEquals(
         "Invalid property for client: gravitino.client.xxxx", throwable.getMessage());
@@ -1037,7 +1046,10 @@ public class TestGvfsBase extends GravitinoMockServerBase {
         Assertions.assertThrows(
             RESTException.class,
             () -> {
-              try (FileSystem fs = new Path("gvfs://fileset/").getFileSystem(configuration)) {}
+              try (FileSystem fs = new Path("gvfs://fileset/").getFileSystem(configuration)) {
+                // Trigger lazy initialization by accessing a path
+                fs.exists(new Path("gvfs://fileset/catalog/schema/fileset/file.txt"));
+              }
             });
     Assertions.assertInstanceOf(SocketTimeoutException.class, throwable.getCause());
     Assertions.assertEquals("Read timed out", throwable.getCause().getMessage());

@@ -562,7 +562,6 @@ public abstract class BaseGVFSOperations implements Closeable {
    *
    * @param filesetPath the virtual path.
    * @param locationName the location name. null means the default location.
-
    * @return the actual file system.
    * @throws FileNotFoundException if the fileset path is not found.
    */
