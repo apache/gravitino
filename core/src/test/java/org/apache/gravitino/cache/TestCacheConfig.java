@@ -147,7 +147,7 @@ public class TestCacheConfig {
               .build();
       cache.put(
           EntityCacheRelationKey.of(
-              NameIdentifier.of(new String[] {"metalake1", "catalog1", "schema1", filesetName}),
+              NameIdentifier.of("metalake1", "catalog1", "schema1", filesetName),
               Entity.EntityType.FILESET),
           List.of(fileset));
     }
@@ -201,11 +201,17 @@ public class TestCacheConfig {
             "Expected significant eviction due to weight limit (max=5000). Found filesets=%d, tags=%d (total=%d/20)",
             remainingFilesets, remainingTags, remainingFilesets + remainingTags));
 
-    Assertions.assertTrue(
-        remainingFilesets > remainingTags,
-        String.format(
-            "Expected filesets (weight=200, freq=5) to be prioritized over tags (weight=500, freq=1). Found filesets=%d, tags=%d",
-            remainingFilesets, remainingTags));
+    try {
+      Awaitility.await()
+          .pollInterval(Duration.ofMillis(100))
+          .atMost(Duration.ofSeconds(30))
+          .until(() -> remainingFilesets > remainingTags);
+    } catch (Exception e) {
+      throw new AssertionError(
+          String.format(
+              "Expected filesets (weight=200, freq=5) to be prioritized over tags (weight=500, freq=1). Found filesets=%d, tags=%d",
+              remainingFilesets, remainingTags));
+    }
   }
 
   @Test
