@@ -29,6 +29,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
+import org.apache.commons.collections4.MapUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.Entity;
@@ -86,6 +87,7 @@ public class GenericLakehouseCatalogOperations
   private static final Map<LakehouseTableFormat, LakehouseCatalogOperations> SUPPORTED_FORMATS =
       Maps.newConcurrentMap();
 
+  private Map<String, String> catalogConfig;
   private CatalogInfo catalogInfo;
   private HasPropertyMetadata propertiesMetadata;
   private EntityStore store;
@@ -111,6 +113,8 @@ public class GenericLakehouseCatalogOperations
             ? Optional.of(catalogLocation).map(this::ensureTrailingSlash).map(Path::new)
             : Optional.empty();
     this.store = GravitinoEnv.getInstance().entityStore();
+    this.catalogConfig = conf;
+    this.catalogInfo = info;
     this.propertiesMetadata = propertiesMetadata;
   }
 
@@ -227,9 +231,14 @@ public class GenericLakehouseCatalogOperations
             propertiesMetadata
                 .tablePropertiesMetadata()
                 .getOrDefault(properties, GenericLakehouseTablePropertiesMetadata.LAKEHOUSE_FORMAT);
-    String tableLocation = calculateTableLocation(ident, properties);
+    Schema schema = loadSchema(NameIdentifier.of(ident.namespace().levels()));
+
+    String tableLocation = calculateTableLocation(schema, ident, properties);
+    Map<String, String> tableStorageProps = calculateTableStorageProps(schema, properties);
+
     Map<String, String> newProperties = Maps.newHashMap(properties);
     newProperties.put(GenericLakehouseTablePropertiesMetadata.LAKEHOUSE_LOCATION, tableLocation);
+    newProperties.putAll(tableStorageProps);
 
     AuditInfo auditInfo =
         AuditInfo.builder()
@@ -271,7 +280,7 @@ public class GenericLakehouseCatalogOperations
   }
 
   private String calculateTableLocation(
-      NameIdentifier tableIdent, Map<String, String> tableProperties) {
+      Schema schema, NameIdentifier tableIdent, Map<String, String> tableProperties) {
     String tableLocation =
         (String)
             propertiesMetadata
@@ -282,22 +291,10 @@ public class GenericLakehouseCatalogOperations
       return ensureTrailingSlash(tableLocation);
     }
 
-    String schemaLocation;
-    try {
-      Schema schema = loadSchema(NameIdentifier.of(tableIdent.namespace().levels()));
-      schemaLocation =
-          (String)
-              propertiesMetadata
-                  .schemaPropertiesMetadata()
-                  .getOrDefault(
-                      schema.properties(),
-                      GenericLakehouseSchemaPropertiesMetadata.LAKEHOUSE_LOCATION);
-    } catch (NoSuchSchemaException e) {
-      throw new RuntimeException(
-          String.format(
-              "Failed to load schema for table %s to determine default location.", tableIdent),
-          e);
-    }
+    String schemaLocation =
+        schema.properties() == null
+            ? null
+            : schema.properties().get(GenericLakehouseSchemaPropertiesMetadata.LAKEHOUSE_LOCATION);
 
     // If we do not set location in table properties, and schema location is set, use schema
     // location as the base path.
@@ -399,5 +396,34 @@ public class GenericLakehouseCatalogOperations
 
     operations.initialize(properties, catalogInfo, propertiesMetadata);
     return operations;
+  }
+
+  /**
+   * Calculate the table storage properties by merging catalog config, schema properties and table
+   * properties. The precedence is: table properties > schema properties > catalog config.
+   *
+   * @param schema The schema of the table.
+   * @param tableProps The table properties.
+   * @return The merged table storage properties.
+   */
+  private Map<String, String> calculateTableStorageProps(
+      Schema schema, Map<String, String> tableProps) {
+    Map<String, String> storageProps = getLanceTableStorageOptions(catalogConfig);
+    storageProps.putAll(getLanceTableStorageOptions(schema.properties()));
+    storageProps.putAll(getLanceTableStorageOptions(tableProps));
+    return storageProps;
+  }
+
+  private Map<String, String> getLanceTableStorageOptions(Map<String, String> properties) {
+    if (MapUtils.isEmpty(properties)) {
+      return Maps.newHashMap();
+    }
+    return properties.entrySet().stream()
+        .filter(
+            e ->
+                e.getKey()
+                    .startsWith(
+                        GenericLakehouseTablePropertiesMetadata.LANCE_TABLE_STORAGE_OPTION_PREFIX))
+        .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
   }
 }

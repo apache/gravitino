@@ -31,6 +31,7 @@ import org.apache.gravitino.connector.PropertyEntry;
 public class GenericLakehouseTablePropertiesMetadata extends BasePropertiesMetadata {
   public static final String LAKEHOUSE_LOCATION = "location";
   public static final String LAKEHOUSE_FORMAT = "format";
+  public static final String LANCE_TABLE_STORAGE_OPTION_PREFIX = "lance.storage.";
 
   private static final Map<String, PropertyEntry<?>> PROPERTIES_METADATA;
 
@@ -47,7 +48,15 @@ public class GenericLakehouseTablePropertiesMetadata extends BasePropertiesMetad
                 LAKEHOUSE_FORMAT,
                 "The table format of the lakehouse table (e.g., iceberg, delta, lance).",
                 false /* immutable */,
-                false /* hidden */));
+                false /* hidden */),
+            PropertyEntry.stringOptionalPropertyPrefixEntry(
+                LANCE_TABLE_STORAGE_OPTION_PREFIX,
+                "The storage options passed to Lance table.",
+                false /* immutable */,
+                null /* default value*/,
+                false /* hidden */,
+                false /* reserved */));
+
     PROPERTIES_METADATA = Maps.uniqueIndex(propertyEntries, PropertyEntry::getName);
   }
 
