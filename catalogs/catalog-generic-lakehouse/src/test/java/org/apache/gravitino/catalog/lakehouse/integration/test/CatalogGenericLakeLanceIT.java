@@ -64,12 +64,10 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-@Tag("gravitino-docker-test")
 public class CatalogGenericLakeLanceIT extends BaseIT {
   private static final Logger LOG = LoggerFactory.getLogger(CatalogGenericLakeLanceIT.class);
   public static final String metalakeName =
@@ -131,50 +129,6 @@ public class CatalogGenericLakeLanceIT extends BaseIT {
   public void resetSchema() throws InterruptedException {
     catalog.asSchemas().dropSchema(schemaName, true);
     createSchema();
-  }
-
-  private void createMetalake() {
-    GravitinoMetalake[] gravitinoMetalakes = client.listMetalakes();
-    Assertions.assertEquals(0, gravitinoMetalakes.length);
-
-    client.createMetalake(metalakeName, "comment", Collections.emptyMap());
-    GravitinoMetalake loadMetalake = client.loadMetalake(metalakeName);
-    Assertions.assertEquals(metalakeName, loadMetalake.name());
-
-    metalake = loadMetalake;
-  }
-
-  protected void createCatalog() {
-    Map<String, String> properties = Maps.newHashMap();
-    metalake.createCatalog(catalogName, Catalog.Type.RELATIONAL, provider, "comment", properties);
-
-    catalog = metalake.loadCatalog(catalogName);
-  }
-
-  private void createSchema() throws InterruptedException {
-    Map<String, String> schemaProperties = createSchemaProperties();
-    String comment = "comment";
-    catalog.asSchemas().createSchema(schemaName, comment, schemaProperties);
-    Schema loadSchema = catalog.asSchemas().loadSchema(schemaName);
-    Assertions.assertEquals(schemaName, loadSchema.name());
-    Assertions.assertEquals(comment, loadSchema.comment());
-    Assertions.assertEquals("val1", loadSchema.properties().get("key1"));
-    Assertions.assertEquals("val2", loadSchema.properties().get("key2"));
-  }
-
-  private Column[] createColumns() {
-    Column col1 = Column.of(LANCE_COL_NAME1, Types.IntegerType.get(), "col_1_comment");
-    Column col2 = Column.of(LANCE_COL_NAME2, Types.LongType.get(), "col_2_comment");
-    Column col3 = Column.of(LANCE_COL_NAME3, Types.StringType.get(), "col_3_comment");
-    return new Column[] {col1, col2, col3};
-  }
-
-  protected Map<String, String> createProperties() {
-    Map<String, String> properties = Maps.newHashMap();
-    properties.put("key1", "val1");
-    properties.put("key2", "val2");
-
-    return properties;
   }
 
   @Test
@@ -257,26 +211,6 @@ public class CatalogGenericLakeLanceIT extends BaseIT {
         Arrays.asList(catalog.asTableCatalog().listTables(nameIdentifier.namespace()));
     Assertions.assertEquals(1, tableIdentifiers.size());
     Assertions.assertEquals(nameIdentifier, tableIdentifiers.get(0));
-  }
-
-  protected Map<String, String> createSchemaProperties() {
-    Map<String, String> properties = new HashMap<>();
-    properties.put("key1", "val1");
-    properties.put("key2", "val2");
-    return properties;
-  }
-
-  private void columnEquals(Column[] expect, Column[] actual) {
-    Assertions.assertEquals(expect.length, actual.length);
-
-    for (int i = 0; i < expect.length; i++) {
-      Column expectCol = expect[i];
-      Column actualCol = actual[i];
-
-      Assertions.assertEquals(expectCol.name(), actualCol.name());
-      Assertions.assertEquals(expectCol.dataType(), actualCol.dataType());
-      Assertions.assertEquals(expectCol.comment(), actualCol.comment());
-    }
   }
 
   @Test
@@ -417,5 +351,69 @@ public class CatalogGenericLakeLanceIT extends BaseIT {
           Fragment.create(tableLocation, rootAllocator, root, new WriteParams.Builder().build());
       return fragmentMetas;
     }
+  }
+
+  protected Map<String, String> createSchemaProperties() {
+    Map<String, String> properties = new HashMap<>();
+    properties.put("key1", "val1");
+    properties.put("key2", "val2");
+    return properties;
+  }
+
+  private void columnEquals(Column[] expect, Column[] actual) {
+    Assertions.assertEquals(expect.length, actual.length);
+
+    for (int i = 0; i < expect.length; i++) {
+      Column expectCol = expect[i];
+      Column actualCol = actual[i];
+
+      Assertions.assertEquals(expectCol.name(), actualCol.name());
+      Assertions.assertEquals(expectCol.dataType(), actualCol.dataType());
+      Assertions.assertEquals(expectCol.comment(), actualCol.comment());
+    }
+  }
+
+  private void createMetalake() {
+    GravitinoMetalake[] gravitinoMetalakes = client.listMetalakes();
+    Assertions.assertEquals(0, gravitinoMetalakes.length);
+
+    client.createMetalake(metalakeName, "comment", Collections.emptyMap());
+    GravitinoMetalake loadMetalake = client.loadMetalake(metalakeName);
+    Assertions.assertEquals(metalakeName, loadMetalake.name());
+
+    metalake = loadMetalake;
+  }
+
+  protected void createCatalog() {
+    Map<String, String> properties = Maps.newHashMap();
+    metalake.createCatalog(catalogName, Catalog.Type.RELATIONAL, provider, "comment", properties);
+
+    catalog = metalake.loadCatalog(catalogName);
+  }
+
+  private void createSchema() throws InterruptedException {
+    Map<String, String> schemaProperties = createSchemaProperties();
+    String comment = "comment";
+    catalog.asSchemas().createSchema(schemaName, comment, schemaProperties);
+    Schema loadSchema = catalog.asSchemas().loadSchema(schemaName);
+    Assertions.assertEquals(schemaName, loadSchema.name());
+    Assertions.assertEquals(comment, loadSchema.comment());
+    Assertions.assertEquals("val1", loadSchema.properties().get("key1"));
+    Assertions.assertEquals("val2", loadSchema.properties().get("key2"));
+  }
+
+  private Column[] createColumns() {
+    Column col1 = Column.of(LANCE_COL_NAME1, Types.IntegerType.get(), "col_1_comment");
+    Column col2 = Column.of(LANCE_COL_NAME2, Types.LongType.get(), "col_2_comment");
+    Column col3 = Column.of(LANCE_COL_NAME3, Types.StringType.get(), "col_3_comment");
+    return new Column[] {col1, col2, col3};
+  }
+
+  protected Map<String, String> createProperties() {
+    Map<String, String> properties = Maps.newHashMap();
+    properties.put("key1", "val1");
+    properties.put("key2", "val2");
+
+    return properties;
   }
 }
