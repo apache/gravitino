@@ -2685,6 +2685,7 @@ public class TestEntityStorage {
               .build();
       store.put(schemaEntity, false);
 
+      long column1Id = RandomIdGenerator.INSTANCE.nextId();
       GenericTableEntity table =
           GenericTableEntity.getBuilder()
               .withId(RandomIdGenerator.INSTANCE.nextId())
@@ -2694,7 +2695,7 @@ public class TestEntityStorage {
               .withColumns(
                   Lists.newArrayList(
                       ColumnEntity.builder()
-                          .withId(RandomIdGenerator.INSTANCE.nextId())
+                          .withId(column1Id)
                           .withName("column1")
                           .withDataType(Types.StringType.get())
                           .withComment("test column")
@@ -2727,7 +2728,7 @@ public class TestEntityStorage {
               .withColumns(
                   Lists.newArrayList(
                       ColumnEntity.builder()
-                          .withId(RandomIdGenerator.INSTANCE.nextId())
+                          .withId(column1Id)
                           .withName("column1")
                           .withDataType(Types.StringType.get())
                           .withComment("updated test column")
@@ -2760,8 +2761,17 @@ public class TestEntityStorage {
       Assertions.assertEquals("lance", fetchedUpdatedTable.getProperties().get("format"));
       Assertions.assertEquals("This is an updated lance table", fetchedUpdatedTable.getComment());
       Assertions.assertEquals(2, fetchedUpdatedTable.columns().size());
-      Assertions.assertEquals("column2", fetchedUpdatedTable.columns().get(1).name());
+      for (ColumnEntity column : fetchedUpdatedTable.columns()) {
+        if (column.name().equals("column1")) {
+          Assertions.assertEquals("updated test column", column.comment());
+        }
+      }
 
+      Assertions.assertTrue(
+          fetchedUpdatedTable.columns().stream()
+              .filter(c -> c.name().equals("column2"))
+              .findFirst()
+              .isPresent());
       destroy(type);
     } catch (IOException e) {
       throw new RuntimeException(e);
