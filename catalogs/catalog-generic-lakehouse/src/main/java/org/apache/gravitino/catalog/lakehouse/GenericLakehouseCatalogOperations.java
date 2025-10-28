@@ -66,10 +66,14 @@ import org.apache.gravitino.rel.indexes.Index;
 import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.utils.PrincipalUtils;
 import org.apache.hadoop.fs.Path;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /** Operations for interacting with a generic lakehouse catalog in Apache Gravitino. */
 public class GenericLakehouseCatalogOperations
     implements CatalogOperations, SupportsSchemas, TableCatalog {
+  private static final Logger LOG =
+      LoggerFactory.getLogger(GenericLakehouseCatalogOperations.class);
 
   private static final String SLASH = "/";
 
@@ -187,7 +191,6 @@ public class GenericLakehouseCatalogOperations
   @Override
   public Table loadTable(NameIdentifier ident) throws NoSuchTableException {
     try {
-      // TODO:????????
       TableEntity tableEntity = store.get(ident, Entity.EntityType.TABLE, TableEntity.class);
       Map<String, String> tableProperties = tableEntity.getProperties();
       LakehouseCatalogOperations lakehouseCatalogOperations =
@@ -334,6 +337,9 @@ public class GenericLakehouseCatalogOperations
       LakehouseCatalogOperations lakehouseCatalogOperations =
           getLakehouseCatalogOperations(tableEntity.getProperties());
       return lakehouseCatalogOperations.dropTable(ident);
+    } catch (NoSuchTableException e) {
+      LOG.warn("Table {} does not exist, skip dropping it.", ident);
+      return false;
     } catch (IOException e) {
       throw new RuntimeException("Failed to list tables under schema " + namespace, e);
     }
