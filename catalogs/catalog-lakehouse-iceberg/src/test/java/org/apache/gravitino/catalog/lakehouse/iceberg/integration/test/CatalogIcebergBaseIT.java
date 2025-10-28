@@ -124,7 +124,7 @@ public abstract class CatalogIcebergBaseIT extends BaseIT {
 
   @BeforeAll
   public void startup() throws Exception {
-    ignoreIcebergRestService = false;
+    super.ignoreAuxRestService = false;
     super.startIntegrationTest();
     containerSuite.startHiveContainer();
     initIcebergCatalogProperties();
