@@ -68,8 +68,8 @@ import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class CatalogGenericLakeLanceIT extends BaseIT {
-  private static final Logger LOG = LoggerFactory.getLogger(CatalogGenericLakeLanceIT.class);
+public class CatalogGenericLakehouseLanceIT extends BaseIT {
+  private static final Logger LOG = LoggerFactory.getLogger(CatalogGenericLakehouseLanceIT.class);
   public static final String metalakeName =
       GravitinoITUtils.genRandomName("CatalogGenericLakeLanceIT_metalake");
   public String catalogName = GravitinoITUtils.genRandomName("CatalogGenericLakeLanceI_catalog");

@@ -210,6 +210,14 @@ public class TableMetaService {
                   SessionUtils.getWithoutCommit(
                       TableMetaMapper.class,
                       mapper -> mapper.updateTableMeta(newTablePO, oldTablePO, newSchemaId))),
+          () ->
+              SessionUtils.doWithCommit(
+                  TableVersionMapper.class,
+                  mapper -> {
+                    if (newTablePO.getFormat() != null) {
+                      mapper.insertTableVersionOnDuplicateKeyUpdate(newTablePO);
+                    }
+                  }),
           () -> {
             if (updateResult.get() > 0 && (isColumnChanged || isSchemaChanged)) {
               TableColumnMetaService.getInstance()
