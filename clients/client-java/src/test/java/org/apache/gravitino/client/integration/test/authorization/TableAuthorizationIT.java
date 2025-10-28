@@ -255,6 +255,25 @@ public class TableAuthorizationIT extends BaseRestApiAuthorizationIT {
         Owner.Type.USER);
     tableCatalogNormalUser.alterTable(
         NameIdentifier.of(SCHEMA, "table1"), TableChange.setProperty("key", "value"));
+    String newSchema = "newSchema";
+    Catalog catalogLoadedByAdmin = gravitinoMetalake.loadCatalog(CATALOG);
+    catalogLoadedByAdmin.asSchemas().createSchema(newSchema, "", new HashMap<>());
+    gravitinoMetalake
+        .loadCatalog(CATALOG)
+        .asTableCatalog()
+        .createTable(
+            NameIdentifier.of(SCHEMA, "table5"), createColumns(), "test5", new HashMap<>());
+    assertThrows(
+        String.format("Can not access metadata {%s.%s.%s}.", CATALOG, SCHEMA, "table5"),
+        ForbiddenException.class,
+        () -> {
+          tableCatalogNormalUser.alterTable(
+              NameIdentifier.of(SCHEMA, "table5"), TableChange.rename("table6", newSchema));
+        });
+    TableCatalog tableCatalog = catalogLoadedByAdmin.asTableCatalog();
+    tableCatalog.alterTable(
+        NameIdentifier.of(SCHEMA, "table5"), TableChange.rename("table6", newSchema));
+    tableCatalog.dropTable(NameIdentifier.of(newSchema, "table6"));
   }
 
   @Test
