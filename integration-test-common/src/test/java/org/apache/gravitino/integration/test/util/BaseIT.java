@@ -102,7 +102,7 @@ public class BaseIT {
 
   protected Map<String, String> customConfigs = new HashMap<>();
 
-  protected boolean ignoreIcebergRestService = true;
+  protected boolean ignoreAuxRestService = true;
 
   public String DOWNLOAD_MYSQL_JDBC_DRIVER_URL =
       "https://repo1.maven.org/maven2/mysql/mysql-connector-java/8.0.26/mysql-connector-java-8.0.26.jar";
@@ -330,8 +330,7 @@ public class BaseIT {
     serverConfig = new ServerConfig();
     customConfigs.put(ENTITY_RELATIONAL_JDBC_BACKEND_PATH.getKey(), file.getAbsolutePath());
     if (testMode != null && testMode.equals(ITUtils.EMBEDDED_TEST_MODE)) {
-      MiniGravitinoContext context =
-          new MiniGravitinoContext(customConfigs, ignoreIcebergRestService);
+      MiniGravitinoContext context = new MiniGravitinoContext(customConfigs, ignoreAuxRestService);
       miniGravitino = new MiniGravitino(context);
       miniGravitino.start();
       serverConfig = miniGravitino.getServerConfig();
