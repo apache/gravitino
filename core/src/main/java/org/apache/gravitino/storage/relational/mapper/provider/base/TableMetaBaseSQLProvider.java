@@ -64,7 +64,7 @@ public class TableMetaBaseSQLProvider {
         + TableVersionMapper.TABLE_NAME
         + " tv ON tm.table_id = tv.table_id AND tm.current_version = tv.version AND tv.deleted_at = 0"
         + " WHERE tm.deleted_at = 0"
-        + " AND table_id IN ("
+        + " AND tm.table_id IN ("
         + "<foreach collection='tableIds' item='tableId' separator=','>"
         + "#{tableId}"
         + "</foreach>"
