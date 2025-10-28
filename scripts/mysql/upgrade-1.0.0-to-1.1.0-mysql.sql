@@ -19,7 +19,7 @@
 
 CREATE TABLE IF NOT EXISTS `table_version_info` (
     `table_id`        BIGINT(20) UNSIGNED NOT NULL COMMENT 'table id',
-    `format`          VARCHAR(64) NOT NULL COMMENT 'table format, such as Lance, Iceberg and so on',
+    `format`          VARCHAR(64) COMMENT 'table format, such as Lance, Iceberg and so on, it will be null if it is not a lakehouse table',
     `properties`      MEDIUMTEXT DEFAULT NULL COMMENT 'table properties',
     `partitioning`  MEDIUMTEXT DEFAULT NULL COMMENT 'table partition info',
     `distribution` MEDIUMTEXT DEFAULT NULL COMMENT 'table distribution info',
