@@ -25,18 +25,6 @@ import org.apache.gravitino.meta.ColumnEntity;
 import org.apache.gravitino.rel.Column;
 
 public class EntityConverter {
-
-  public static GenericLakehouseColumn toGenericLakehouseColumn(Column column) {
-    return GenericLakehouseColumn.builder()
-        .withName(column.name())
-        .withComment(column.comment())
-        .withAutoIncrement(column.autoIncrement())
-        .withNullable(column.nullable())
-        .withType(column.dataType())
-        .withDefaultValue(column.defaultValue())
-        .build();
-  }
-
   public static Column[] toColumns(List<ColumnEntity> columnEntities) {
     return columnEntities.stream().map(EntityConverter::toColumn).toArray(Column[]::new);
   }
