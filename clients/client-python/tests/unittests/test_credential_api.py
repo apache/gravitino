@@ -61,7 +61,7 @@ class TestCredentialApi(unittest.TestCase):
         )
 
         # check the request path is ok
-
+        # pylint: disable=protected-access
         request_path = fileset._object_credential_operations._request_path
         expected_path = (
             f"api/metalakes/{metalake_name}/objects/fileset/"
