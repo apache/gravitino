@@ -1070,6 +1070,24 @@ public class TestGvfsBase extends GravitinoMockServerBase {
         null,
         catalogResponse,
         SC_OK);
+    SchemaResponse schemaResponse =
+        new SchemaResponse(
+            SchemaDTO.builder()
+                .withName(schemaNameLocal)
+                .withAudit(AuditDTO.builder().build())
+                .withProperties(ImmutableMap.of())
+                .build());
+    buildMockResource(
+        Method.GET,
+        "/api/metalakes/"
+            + metalakeName
+            + "/catalogs/"
+            + catalogNameWithFsOpsDisabled
+            + "/schemas/"
+            + schemaNameLocal,
+        null,
+        schemaResponse,
+        SC_OK);
 
     Path managedFilesetPath =
         FileSystemTestUtils.createFilesetPath(
