@@ -31,11 +31,17 @@ import javax.ws.rs.Produces;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+import org.apache.gravitino.Entity;
+import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.iceberg.service.IcebergExceptionMapper;
-import org.apache.gravitino.iceberg.service.IcebergRestUtils;
+import org.apache.gravitino.iceberg.service.IcebergRESTUtils;
 import org.apache.gravitino.iceberg.service.dispatcher.IcebergTableOperationDispatcher;
 import org.apache.gravitino.listener.api.event.IcebergRequestContext;
 import org.apache.gravitino.metrics.MetricNames;
+import org.apache.gravitino.server.authorization.annotations.AuthorizationExpression;
+import org.apache.gravitino.server.authorization.annotations.AuthorizationMetadata;
+import org.apache.gravitino.server.authorization.annotations.IcebergAuthorizationMetadata;
+import org.apache.gravitino.server.authorization.annotations.IcebergAuthorizationMetadata.RequestType;
 import org.apache.gravitino.server.web.Utils;
 import org.apache.iceberg.rest.requests.RenameTableRequest;
 import org.slf4j.Logger;
@@ -60,9 +66,17 @@ public class IcebergTableRenameOperations {
   @Produces(MediaType.APPLICATION_JSON)
   @Timed(name = "rename-table." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "rename-table", absolute = true)
+  @AuthorizationExpression(
+      expression =
+          "ANY(OWNER, METALAKE, CATALOG) || "
+              + "SCHEMA_OWNER_WITH_USE_CATALOG || "
+              + "ANY_USE_CATALOG && ANY_USE_SCHEMA  && (TABLE::OWNER || ANY_MODIFY_TABLE)",
+      accessMetadataType = MetadataObject.Type.TABLE)
   public Response renameTable(
-      @PathParam("prefix") String prefix, RenameTableRequest renameTableRequest) {
-    String catalogName = IcebergRestUtils.getCatalogName(prefix);
+      @AuthorizationMetadata(type = Entity.EntityType.CATALOG) @PathParam("prefix") String prefix,
+      @IcebergAuthorizationMetadata(type = RequestType.RENAME_TABLE)
+          RenameTableRequest renameTableRequest) {
+    String catalogName = IcebergRESTUtils.getCatalogName(prefix);
     LOG.info(
         "Rename Iceberg tables, catalog: {}, source: {}, destination: {}.",
         catalogName,
@@ -75,7 +89,7 @@ public class IcebergTableRenameOperations {
             IcebergRequestContext context =
                 new IcebergRequestContext(httpServletRequest(), catalogName);
             tableOperationDispatcher.renameTable(context, renameTableRequest);
-            return IcebergRestUtils.noContent();
+            return IcebergRESTUtils.noContent();
           });
     } catch (Exception e) {
       return IcebergExceptionMapper.toRESTResponse(e);

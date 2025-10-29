@@ -98,7 +98,7 @@ public class IcebergMetricsManager {
                 () -> {
                   Instant now = Instant.now();
                   Instant expireTime =
-                      IcebergRestUtils.calculateNewTimestamp(now, -24 * retainDays);
+                      IcebergRESTUtils.calculateNewTimestamp(now, -24 * retainDays);
                   LOG.info("Try clean Iceberg expired metrics, {}.", expireTime);
                   try {
                     icebergMetricsStore.clean(expireTime);
