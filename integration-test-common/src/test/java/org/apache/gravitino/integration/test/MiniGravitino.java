@@ -78,7 +78,7 @@ public class MiniGravitino {
     mockConfDir.mkdirs();
   }
 
-  private void removeIcebergRestConfiguration(Properties properties) {
+  private void removeAuxRestConfiguration(Properties properties) {
     // Disable Iceberg REST service
     properties.remove(
         AuxiliaryServiceManager.GRAVITINO_AUX_SERVICE_PREFIX
@@ -103,9 +103,9 @@ public class MiniGravitino {
         serverConfig.loadPropertiesFromFile(
             new File(ITUtils.joinPath(mockConfDir.getAbsolutePath(), "gravitino.conf")));
 
-    // Remove Iceberg rest service.
-    if (context.ignoreIcebergRestService) {
-      removeIcebergRestConfiguration(properties);
+    // Disable auxiliary rest service.
+    if (context.ignoreAuxRestService) {
+      removeAuxRestConfiguration(properties);
       ITUtils.overwriteConfigFile(
           ITUtils.joinPath(mockConfDir.getAbsolutePath(), "gravitino.conf"), properties);
     }
@@ -230,6 +230,22 @@ public class MiniGravitino {
     return customConfigs;
   }
 
+  private Map<String, String> getLanceRestServiceConfigs() throws IOException {
+    Map<String, String> customConfigs = new HashMap<>();
+
+    String lanceJarPath = Paths.get("lance", "lance-rest-server", "build", "libs").toString();
+    String lanceConfigPath =
+        Paths.get("lance", "lance-rest-server", "src", "main", "resources").toString();
+    customConfigs.put(
+        "gravitino.lance-rest." + AuxiliaryServiceManager.AUX_SERVICE_CLASSPATH,
+        String.join(",", lanceJarPath, lanceConfigPath));
+
+    customConfigs.put(
+        "gravitino.lance-rest." + JettyServerConfig.WEBSERVER_HTTP_PORT.getKey(),
+        String.valueOf(RESTUtils.findAvailablePort(4000, 5000)));
+    return customConfigs;
+  }
+
   // Customize the config file
   private void customizeConfigFile(String configTempFileName, String configFileName)
       throws IOException {
@@ -239,6 +255,7 @@ public class MiniGravitino {
         String.valueOf(RESTUtils.findAvailablePort(2000, 3000)));
 
     configMap.putAll(getIcebergRestServiceConfigs());
+    configMap.putAll(getLanceRestServiceConfigs());
     configMap.putAll(context.customConfig);
 
     ITUtils.rewriteConfigFile(configTempFileName, configFileName, configMap);
