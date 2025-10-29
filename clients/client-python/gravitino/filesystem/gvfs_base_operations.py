@@ -17,6 +17,7 @@
 import logging
 import os
 import sys
+import threading
 import time
 from abc import ABC, abstractmethod
 from pathlib import PurePosixPath
@@ -88,7 +89,9 @@ class BaseGVFSOperations(ABC):
         self._metalake = metalake_name
         self._options = options
 
-        request_headers = (
+        # Store client parameters for lazy initialization
+        self._server_uri = server_uri
+        self._request_headers = (
             None
             if options is None
             else {
@@ -102,7 +105,7 @@ class BaseGVFSOperations(ABC):
             }
         )
 
-        client_config = (
+        self._client_config = (
             None
             if options is None
             else {
@@ -115,9 +118,9 @@ class BaseGVFSOperations(ABC):
             }
         )
 
-        self._client = create_client(
-            options, server_uri, metalake_name, request_headers, client_config
-        )
+        # Lazy initialization - client is created on first access
+        self._client = None
+        self._client_lock = threading.Lock()
 
         cache_size = (
             GVFSConfig.DEFAULT_CACHE_SIZE
@@ -167,6 +170,23 @@ class BaseGVFSOperations(ABC):
         )
         self._current_location_name = self._init_current_location_name()
         self._kwargs = kwargs
+
+    def _get_gravitino_client(self):
+        """Get the GravitinoClient, creating it lazily on first access.
+        Uses double-checked locking for thread-safe lazy initialization.
+        :return: The GravitinoClient instance
+        """
+        if self._client is None:
+            with self._client_lock:
+                if self._client is None:
+                    self._client = create_client(
+                        self._options,
+                        self._server_uri,
+                        self._metalake,
+                        self._request_headers,
+                        self._client_config,
+                    )
+        return self._client
 
     @property
     def current_location_name(self):
@@ -549,7 +569,7 @@ class BaseGVFSOperations(ABC):
 
     def _get_fileset_catalog(self, catalog_ident: NameIdentifier):
         if not self._enable_fileset_metadata_cache:
-            return self._client.load_catalog(catalog_ident.name())
+            return self._get_gravitino_client().load_catalog(catalog_ident.name())
 
         read_lock = self._catalog_cache_lock.gen_rlock()
         try:
@@ -566,7 +586,7 @@ class BaseGVFSOperations(ABC):
             cache_value: FilesetCatalog = self._catalog_cache.get(catalog_ident)
             if cache_value is not None:
                 return cache_value
-            catalog = self._client.load_catalog(catalog_ident.name())
+            catalog = self._get_gravitino_client().load_catalog(catalog_ident.name())
             self._catalog_cache[catalog_ident] = catalog
             return catalog
         finally:
