@@ -74,7 +74,7 @@ public class AuthorizationExpressionEvaluator {
       Map<Entity.EntityType, NameIdentifier> metadataNames,
       AuthorizationRequestContext requestContext) {
     Principal currentPrincipal = PrincipalUtils.getCurrentPrincipal();
-    return evaluate(metadataNames, new HashMap<>(), requestContext, currentPrincipal);
+    return evaluate(metadataNames, new HashMap<>(), requestContext, currentPrincipal, null);
   }
 
   /**
@@ -89,8 +89,9 @@ public class AuthorizationExpressionEvaluator {
   public boolean evaluate(
       Map<Entity.EntityType, NameIdentifier> metadataNames,
       AuthorizationRequestContext requestContext,
-      Principal principal) {
-    return evaluate(metadataNames, new HashMap<>(), requestContext, principal);
+      Principal principal,
+      String entityType) {
+    return evaluate(metadataNames, new HashMap<>(), requestContext, principal, entityType);
   }
 
   /**
@@ -104,9 +105,10 @@ public class AuthorizationExpressionEvaluator {
   public boolean evaluate(
       Map<Entity.EntityType, NameIdentifier> metadataNames,
       Map<String, Object> pathParams,
-      AuthorizationRequestContext requestContext) {
+      AuthorizationRequestContext requestContext,
+      String entityType) {
     Principal currentPrincipal = PrincipalUtils.getCurrentPrincipal();
-    return evaluate(metadataNames, pathParams, requestContext, currentPrincipal);
+    return evaluate(metadataNames, pathParams, requestContext, currentPrincipal, entityType);
   }
 
   /**
@@ -123,11 +125,13 @@ public class AuthorizationExpressionEvaluator {
       Map<Entity.EntityType, NameIdentifier> metadataNames,
       Map<String, Object> pathParams,
       AuthorizationRequestContext requestContext,
-      Principal currentPrincipal) {
+      Principal currentPrincipal,
+      String entityType) {
     OgnlContext ognlContext = Ognl.createDefaultContext(null);
     ognlContext.put("principal", currentPrincipal);
     ognlContext.put("authorizer", authorizer);
     ognlContext.put("authorizationContext", requestContext);
+    ognlContext.put("entityType", entityType);
     ognlContext.putAll(pathParams);
     metadataNames.forEach(
         (type, entityNameIdent) -> {

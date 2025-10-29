@@ -131,6 +131,7 @@ public class GravitinoInterceptionService implements InterceptionService {
         if (expressionAnnotation != null) {
           String expression = expressionAnnotation.expression();
           Object[] args = methodInvocation.getArguments();
+          String entityType = extractMetadataObjectTypeFromParameters(parameters, args);
           Map<Entity.EntityType, NameIdentifier> metadataContext =
               extractNameIdentifierFromParameters(parameters, args);
           Map<String, Object> pathParams = extractPathParamsFromParameters(parameters, args);
@@ -138,7 +139,7 @@ public class GravitinoInterceptionService implements InterceptionService {
               new AuthorizationExpressionEvaluator(expression);
           boolean authorizeResult =
               authorizationExpressionEvaluator.evaluate(
-                  metadataContext, pathParams, new AuthorizationRequestContext());
+                  metadataContext, pathParams, new AuthorizationRequestContext(), entityType);
           if (!authorizeResult) {
             MetadataObject.Type type = expressionAnnotation.accessMetadataType();
             NameIdentifier accessMetadataName =
@@ -320,6 +321,18 @@ public class GravitinoInterceptionService implements InterceptionService {
       }
       return pathParams;
     }
+  }
+
+  private static String extractMetadataObjectTypeFromParameters(
+      Parameter[] parameters, Object[] args) {
+    for (int i = 0; i < parameters.length; i++) {
+      Parameter parameter = parameters[i];
+      AuthorizationObjectType objectType = parameter.getAnnotation(AuthorizationObjectType.class);
+      if (objectType != null) {
+        return String.valueOf(args[i]);
+      }
+    }
+    return null;
   }
 
   private static class ClassListFilter implements Filter {

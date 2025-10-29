@@ -160,13 +160,13 @@ public class AuthorizationExpressionConverter {
     return expression.replaceAll(
         "CAN_GET_OWNER",
         """
-              ( p_metadataObjectType.toUpperCase() == 'CATALOG' && (%s)) ||
-              ( p_metadataObjectType.toUpperCase() == 'SCHEMA' && (%s)) ||
-              ( p_metadataObjectType.toUpperCase() == 'TABLE' && (%s)) ||
-              ( p_metadataObjectType.toUpperCase() == 'MODEL' && (%s)) ||
-              ( p_metadataObjectType.toUpperCase() == 'FILESET' && (%s)) ||
-              ( p_metadataObjectType.toUpperCase() == 'TOPIC' && (%s)) ||
-              ( p_metadataObjectType.toUpperCase() != 'CATALOG' &&
+              ( entityType.toUpperCase() == 'CATALOG' && (%s)) ||
+              ( entityType.toUpperCase() == 'SCHEMA' && (%s)) ||
+              ( entityType.toUpperCase() == 'TABLE' && (%s)) ||
+              ( entityType.toUpperCase() == 'MODEL' && (%s)) ||
+              ( entityType.toUpperCase() == 'FILESET' && (%s)) ||
+              ( entityType.toUpperCase() == 'TOPIC' && (%s)) ||
+              ( entityType.toUpperCase() != 'CATALOG' &&
               p_metadataObjectType.toUpperCase() != 'SCHEMA' &&
               p_metadataObjectType.toUpperCase() != 'TABLE' &&
               p_metadataObjectType.toUpperCase() != 'MODEL' &&
