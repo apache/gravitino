@@ -61,6 +61,7 @@ import org.apache.gravitino.Catalog;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.Entity;
+import org.apache.gravitino.Entity.EntityType;
 import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
@@ -1193,6 +1194,128 @@ public class TestJDBCBackend {
     backend.insertRelation(
         OWNER_REL, role.nameIdentifier(), role.type(), user.nameIdentifier(), user.type(), true);
     assertEquals(1, countActiveOwnerRel(user.id()));
+  }
+
+  @Test
+  void testUpdateAndDropLanceTable() throws IOException, InterruptedException {
+    AuditInfo auditInfo =
+        AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
+
+    String metalakeName = "metalake" + RandomIdGenerator.INSTANCE.nextId();
+    BaseMetalake metalake =
+        BaseMetalake.builder()
+            .withId(RandomIdGenerator.INSTANCE.nextId())
+            .withName(metalakeName)
+            .withAuditInfo(auditInfo)
+            .withComment(null)
+            .withProperties(null)
+            .withVersion(SchemaVersion.V_0_1)
+            .build();
+    backend.insert(metalake, false);
+
+    CatalogEntity catalog =
+        CatalogEntity.builder()
+            .withId(RandomIdGenerator.INSTANCE.nextId())
+            .withNamespace(NamespaceUtil.ofCatalog(metalakeName))
+            .withName("catalog")
+            .withAuditInfo(auditInfo)
+            .withComment(null)
+            .withProperties(null)
+            .withType(Catalog.Type.RELATIONAL)
+            .withProvider("generic-lakehouse")
+            .build();
+
+    backend.insert(catalog, false);
+
+    SchemaEntity schema =
+        SchemaEntity.builder()
+            .withId(RandomIdGenerator.INSTANCE.nextId())
+            .withNamespace(NamespaceUtil.ofSchema(metalakeName, catalog.name()))
+            .withName("schema")
+            .withAuditInfo(auditInfo)
+            .withComment(null)
+            .withProperties(null)
+            .build();
+
+    backend.insert(schema, false);
+
+    TableEntity table =
+        TableEntity.builder()
+            .withId(RandomIdGenerator.INSTANCE.nextId())
+            .withNamespace(NamespaceUtil.ofTable(metalakeName, catalog.name(), schema.name()))
+            .withName("table")
+            .withAuditInfo(auditInfo)
+            .withFormat("lance")
+            .withComment(null)
+            .withProperties(ImmutableMap.of("format", "LANCE", "location", "/tmp/test/lance"))
+            .build();
+
+    backend.insert(table, false);
+
+    TableEntity fetchedTable = backend.get(table.nameIdentifier(), Entity.EntityType.TABLE);
+    Assertions.assertEquals("LANCE", fetchedTable.getProperties().get("format"));
+
+    TableEntity updatedTable =
+        TableEntity.builder()
+            .withId(table.id())
+            .withNamespace(table.namespace())
+            .withName(table.name())
+            .withAuditInfo(auditInfo)
+            .withComment("update comment")
+            .withProperties(ImmutableMap.of("format", "LANCE", "location", "/tmp/test/lance"))
+            .build();
+
+    backend.update(table.nameIdentifier(), EntityType.TABLE, e -> updatedTable);
+    long now = System.currentTimeMillis();
+    Thread.sleep(1000);
+
+    // For update lance table, we will do the following things
+    // 1. Update info in table table_meta;
+    // 2. Soft drop info in the table table_version_info with an old version.
+    // 3. Insert new version info in the table table_version_info.
+    // Let us check it.
+    int tableInfoCount =
+        countTableVersionInfoRow(
+            String.format(
+                "SELECT count(*) FROM table_version_info WHERE table_id = %d AND deleted_at = 0",
+                table.id()));
+    Assertions.assertEquals(1, tableInfoCount);
+    int tableInfoDeletedCount =
+        countTableVersionInfoRow(
+            String.format(
+                "SELECT count(*) FROM table_version_info WHERE table_id = %d AND deleted_at != 0",
+                table.id()));
+    Assertions.assertEquals(1, tableInfoDeletedCount);
+
+    // Now try to clean up old version data
+    int deletedCount = backend.hardDeleteLegacyData(Entity.EntityType.TABLE, now);
+    // Only one old version data should be cleaned up in table version info table.
+    Assertions.assertEquals(1, deletedCount);
+
+    // Try to drop the table
+    backend.delete(table.nameIdentifier(), Entity.EntityType.TABLE, false);
+
+    Thread.sleep(1000);
+    now = System.currentTimeMillis();
+    // After drop, there should be one more deleted record in table_version_info
+    int deleteCountNow = backend.hardDeleteLegacyData(Entity.EntityType.TABLE, now);
+    // One row from table_meta and one row from table_version_info should be cleaned up.
+    Assertions.assertEquals(2, deleteCountNow);
+  }
+
+  private int countTableVersionInfoRow(String sql) {
+    try (SqlSession sqlSession =
+            SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true);
+        Connection connection = sqlSession.getConnection();
+        Statement statement = connection.createStatement();
+        ResultSet rs = statement.executeQuery(sql)) {
+      while (rs.next()) {
+        return rs.getInt(1);
+      }
+    } catch (SQLException e) {
+      throw new RuntimeException("SQL execution failed", e);
+    }
+    return 0;
   }
 
   private boolean legacyRecordExistsInDB(Long id, Entity.EntityType entityType) {

@@ -248,7 +248,11 @@ public class TableMetaService {
     Long tableId = getTableIdBySchemaIdAndName(schemaId, tableName);
 
     AtomicInteger deleteResult = new AtomicInteger(0);
+    TablePO[] tablePOHolder = new TablePO[1];
     SessionUtils.doMultipleWithCommit(
+        () -> {
+          tablePOHolder[0] = getTablePOBySchemaIdAndName(schemaId, tableName);
+        },
         () ->
             deleteResult.set(
                 SessionUtils.getWithoutCommit(
@@ -282,6 +286,11 @@ public class TableMetaService {
             SessionUtils.doWithoutCommit(
                 PolicyMetadataObjectRelMapper.class,
                 mapper -> mapper.softDeletePolicyMetadataObjectRelsByTableId(tableId));
+            SessionUtils.doWithCommit(
+                TableVersionMapper.class,
+                mapper ->
+                    mapper.softDeleteTableVersionByTableIdAndVersion(
+                        tableId, tablePOHolder[0].getCurrentVersion()));
           }
         });
 
