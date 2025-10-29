@@ -1466,7 +1466,7 @@ public class TestGvfsBase extends GravitinoMockServerBase {
     }
   }
 
-  protected void buildMockResourceForCredential(String filesetName, String filesetLocation)
+  private void buildMockResourceForCredential(String filesetName, String filesetLocation)
       throws JsonProcessingException {
     String filesetPath =
         String.format(
