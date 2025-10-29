@@ -409,22 +409,7 @@ public class POConverters {
                   ? null
                   : JsonUtils.anyFieldMapper().writeValueAsString(tableEntity.getIndexes()));
 
-      // TODO, handle these fields later
-      //          .withDistribution(
-      //              tableEntity.getDistribution() == null
-      //                  ? null
-      //                  :
-      // JsonUtils.anyFieldMapper().writeValueAsString(tableEntity.getDistribution()))
-      //          .withPartitions(
-      //              tableEntity.getPartitions() == null
-      //                  ? null
-      //                  :
-      // JsonUtils.anyFieldMapper().writeValueAsString(tableEntity.getPartitions()))
-      //          .withSortOrders(
-      //              tableEntity.getSortOrder() == null
-      //                  ? null
-      //                  :
-      // JsonUtils.anyFieldMapper().writeValueAsString(tableEntity.getSortOrder()));
+      // TODO, handle these fields(distribution, sort order, partition) later
       return builder.build();
     } catch (JsonProcessingException e) {
       throw new RuntimeException("Failed to serialize json object:", e);

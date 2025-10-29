@@ -100,25 +100,29 @@ public interface Table extends Auditable {
   }
 
   /**
-   * Formats the table as a string representation.
+   * Table format of the table. For example, in a file-based table, it could be "parquet", "Lance",
+   * "Iceberg", etc.
    *
-   * @return the formatted string representation of the table
+   * @return the table format name, for more information: LakehouseTableFormat
    */
   default String format() {
     throw new UnsupportedOperationException("Table format is not supported.");
   }
 
   /**
-   * Gets the location of the table.
+   * Gets the location of the table if the table has a location. For example, in a file-based table,
+   * it could be the root path where the table data is stored.
    *
-   * @return the location of the table
+   * @return the location of the table as a string.
    */
   default String location() {
     throw new UnsupportedOperationException("Table location is not supported.");
   }
 
   /**
-   * Indicates whether the table is external.
+   * Indicates whether the table is external. An external table is a table that is not managed by
+   * the catalog and the drop operation will not delete the underlying data. If it's a managed
+   * table, dropping the table will delete the underlying data.
    *
    * @return true if the table is external, false otherwise
    */
