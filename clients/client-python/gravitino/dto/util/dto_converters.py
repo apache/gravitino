@@ -16,9 +16,8 @@
 # under the License.
 
 from functools import singledispatchmethod
-from typing import Optional, cast, overload
+from typing import cast, overload
 
-from gravitino.api.audit import Audit
 from gravitino.api.rel.column import Column
 from gravitino.api.rel.expressions.distributions.distribution import Distribution
 from gravitino.api.rel.expressions.distributions.distributions import Distributions
@@ -37,6 +36,7 @@ from gravitino.api.rel.partitions.list_partition import ListPartition
 from gravitino.api.rel.partitions.range_partition import RangePartition
 from gravitino.api.rel.table import Table
 from gravitino.api.rel.types.types import Types
+from gravitino.client.generic_table import GenericTable
 from gravitino.dto.rel.column_dto import ColumnDTO
 from gravitino.dto.rel.distribution_dto import DistributionDTO
 from gravitino.dto.rel.expressions.field_reference_dto import FieldReferenceDTO
@@ -258,59 +258,7 @@ class DTOConverters:
             Table: The table.
         """
 
-        class TableImpl(Table):  # pylint: disable=too-many-instance-attributes
-            """A table implementation."""
-
-            def __init__(
-                self,
-                name: str,
-                columns: list[Column],
-                partitioning: list[Transform],
-                sort_order: list[SortOrder],
-                distribution: Distribution,
-                index: list[Index],
-                comment: Optional[str],
-                properties: dict[str, str],
-                audit_info: Audit,
-            ):
-                self._name = name
-                self._columns = columns
-                self._partitioning = partitioning
-                self._sort_order = sort_order
-                self._distribution = distribution
-                self._index = index
-                self._comment = comment
-                self._properties = properties
-                self._audit_info = audit_info
-
-            def name(self) -> str:
-                return self._name
-
-            def columns(self) -> list[Column]:
-                return self._columns
-
-            def partitioning(self) -> list[Transform]:
-                return self._partitioning
-
-            def sort_order(self) -> list[SortOrder]:
-                return self._sort_order
-
-            def distribution(self) -> Distribution:
-                return self._distribution
-
-            def index(self) -> list[Index]:
-                return self._index
-
-            def comment(self) -> Optional[str]:
-                return self._comment
-
-            def properties(self) -> dict[str, str]:
-                return self._properties
-
-            def audit_info(self) -> Audit:
-                return self._audit_info
-
-        return TableImpl(
+        return GenericTable(
             name=dto.name(),
             columns=DTOConverters.from_dtos(dto.columns()),
             partitioning=DTOConverters.from_dtos(dto.partitioning()),
