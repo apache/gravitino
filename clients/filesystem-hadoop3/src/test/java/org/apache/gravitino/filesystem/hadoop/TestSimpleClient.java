@@ -19,6 +19,7 @@
 package org.apache.gravitino.filesystem.hadoop;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -31,6 +32,7 @@ import org.apache.gravitino.auth.AuthConstants;
 import org.apache.gravitino.dto.AuditDTO;
 import org.apache.gravitino.dto.MetalakeDTO;
 import org.apache.gravitino.dto.responses.MetalakeResponse;
+import org.apache.gravitino.exceptions.RESTException;
 import org.apache.gravitino.json.JsonUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
@@ -100,12 +102,9 @@ public class TestSimpleClient extends TestGvfsBase {
     config1.set(
         GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_CLIENT_METALAKE_KEY, testMetalake);
     FileSystem fs = newPath.getFileSystem(config1);
-    // Trigger lazy initialization to set auth token
-    try {
-      fs.exists(newPath);
-    } catch (Exception e) {
-      // Ignore errors, we just want to trigger client initialization
-    }
+    // Trigger lazy initialization to set auth token (throws RESTException for non-existent
+    // metalake)
+    assertThrows(RESTException.class, () -> fs.exists(newPath));
 
     String userInformation = user + ":dummy";
     assertEquals(

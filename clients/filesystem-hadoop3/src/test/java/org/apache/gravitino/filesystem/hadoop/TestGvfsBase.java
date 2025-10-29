@@ -290,12 +290,11 @@ public class TestGvfsBase extends GravitinoMockServerBase {
                 .withBody(getJsonString(new VersionResponse(Version.getCurrentVersionDTO()))));
 
     try (FileSystem fs = new Path("gvfs://fileset/").getFileSystem(configuration)) {
-      // Trigger lazy initialization by accessing a path
-      try {
-        fs.exists(new Path("gvfs://fileset/catalog/schema/fileset/file.txt"));
-      } catch (Exception e) {
-        // Ignore errors, we just want to trigger client initialization
-      }
+      // Trigger lazy initialization by accessing a path (throws RESTException for mock server 404)
+      assertThrows(
+          RESTException.class,
+          () -> fs.exists(new Path("gvfs://fileset/catalog/schema/fileset/file.txt")));
+      // Verify the request was made with correct headers during client initialization
       mockServer().verify(req, VerificationTimes.once());
     }
   }

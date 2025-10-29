@@ -198,11 +198,10 @@ public abstract class BaseGVFSOperations implements Closeable {
     if (filesetMetadataCache == null) {
       synchronized (filesetMetadataCacheLock) {
         if (filesetMetadataCache == null) {
-          if (!enableFilesetMetadataCache) {
-            this.filesetMetadataCache = Optional.empty();
-          } else {
-            this.filesetMetadataCache = Optional.of(new FilesetMetadataCache(getGravitinoClient()));
-          }
+          this.filesetMetadataCache =
+              enableFilesetMetadataCache
+                  ? Optional.of(new FilesetMetadataCache(getGravitinoClient()))
+                  : Optional.empty();
         }
       }
     }
