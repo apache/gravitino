@@ -28,6 +28,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.core.Response;
@@ -139,7 +140,10 @@ public class GravitinoInterceptionService implements InterceptionService {
               new AuthorizationExpressionEvaluator(expression);
           boolean authorizeResult =
               authorizationExpressionEvaluator.evaluate(
-                  metadataContext, pathParams, new AuthorizationRequestContext(), entityType);
+                  metadataContext,
+                  pathParams,
+                  new AuthorizationRequestContext(),
+                  Optional.ofNullable(entityType));
           if (!authorizeResult) {
             MetadataObject.Type type = expressionAnnotation.accessMetadataType();
             NameIdentifier accessMetadataName =
