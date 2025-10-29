@@ -109,17 +109,15 @@ To address this, Gravitino introduces the `External(arrow_field_json_str)` type,
 which allows you to define any Arrow data type by providing the JSON string of an Arrow `Field`.
 
 The JSON string must conform to the Apache Arrow `Field` [specification](https://github.com/apache/arrow-java/blob/ed81e5981a2bee40584b3a411ed755cb4cc5b91f/vector/src/main/java/org/apache/arrow/vector/types/pojo/Field.java#L80C1-L86C68), 
-including details such as the field name, data type, and nullability. For example, you can define a `LargeUtf8` type field using its JSON representation.
-```json
-{
-  "name": "col_name",
-  "nullable": true,
-  "type": {
-    "name": "largeutf8"
-  },
-  "children": []
-}
-```
+including details such as the field name, data type, and nullability.
+Here are some examples of how to use `External` type for various Arrow types that are not natively supported by Gravitino:
+
+| Arrow Type        | External type                                                                                                                                                                                                                                           | 
+|-------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `Large Utf8`      | `External("{\"name\":\"col_name\",\"nullable\":true,\"type\":{\"name\":\"largeutf8\"},\"children\":[]}")`                                                                                                                                               |
+| `Large Binary`    | `External("{\"name\":\"col_name\",\"nullable\":true,\"type\":{\"name\":\"largebinary\"},\"children\":[]}")`                                                                                                                                             |         
+| `Large List`      | `External("{\"name\":\"col_name\",\"nullable\":true,\"type\":{\"name\":\"largelist\"},\"children\":[{\"name\":\"element\",\"nullable\":true,\"type\":{\"name\":\"int\", \"bitWidth\":32, \"isSigned\": true},\"children\":[]}]}")`                      |
+| `Fixed-Size List` | `External("{\"name\":\"col_name\",\"nullable\":true,\"type\":{\"name\":\"fixedsizelist\", \"listSize\":10},\"children\":[{\"name\":\"element\",\"nullable\":true,\"type\":{\"name\":\"int\", \"bitWidth\":32, \"isSigned\": true},\"children\":[]}]}")` |
 
 **Important considerations:**
 - The `name` attribute and `nullable` attribute in the JSON string must exactly match the corresponding column name and nullable in the Gravitino table.

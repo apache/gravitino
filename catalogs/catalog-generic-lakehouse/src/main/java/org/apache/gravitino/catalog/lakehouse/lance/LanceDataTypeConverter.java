@@ -23,11 +23,13 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import java.util.Arrays;
+import java.util.List;
 import org.apache.arrow.vector.complex.MapVector;
 import org.apache.arrow.vector.types.DateUnit;
 import org.apache.arrow.vector.types.FloatingPointPrecision;
 import org.apache.arrow.vector.types.IntervalUnit;
 import org.apache.arrow.vector.types.TimeUnit;
+import org.apache.arrow.vector.types.UnionMode;
 import org.apache.arrow.vector.types.pojo.ArrowType;
 import org.apache.arrow.vector.types.pojo.ArrowType.Bool;
 import org.apache.arrow.vector.types.pojo.ArrowType.FloatingPoint;
@@ -87,6 +89,28 @@ public class LanceDataTypeConverter implements DataTypeConverter<ArrowType, Arro
                             mapType.valueNullable(),
                             null)),
                     false /*nullable*/)));
+
+      case UNION:
+        Types.UnionType unionType = (Types.UnionType) type;
+        List<Field> types =
+            Arrays.stream(unionType.types())
+                .map(
+                    t ->
+                        toArrowField(
+                            t.simpleString(), t, true /*nullable*/) // union members are nullable
+                    )
+                .toList();
+        int[] typeIds =
+            types.stream()
+                .mapToInt(
+                    f ->
+                        org.apache.arrow.vector.types.Types.getMinorTypeForArrowType(f.getType())
+                            .ordinal())
+                .toArray();
+        FieldType unionField =
+            new FieldType(nullable, new ArrowType.Union(UnionMode.Sparse, typeIds), null);
+        return new Field(name, unionField, types);
+
       case EXTERNAL:
         Types.ExternalType externalType = (Types.ExternalType) type;
         Field field;

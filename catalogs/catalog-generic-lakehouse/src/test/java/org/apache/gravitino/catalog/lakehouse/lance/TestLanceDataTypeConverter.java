@@ -28,6 +28,7 @@ import java.util.function.Consumer;
 import java.util.stream.Stream;
 import org.apache.arrow.vector.complex.MapVector;
 import org.apache.arrow.vector.types.TimeUnit;
+import org.apache.arrow.vector.types.UnionMode;
 import org.apache.arrow.vector.types.pojo.ArrowType;
 import org.apache.arrow.vector.types.pojo.Field;
 import org.apache.gravitino.rel.types.Type;
@@ -158,6 +159,15 @@ public class TestLanceDataTypeConverter {
         assertInstanceOf(ArrowType.Struct.class, elementField.getFieldType().getType());
         assertEquals(2, elementField.getChildren().size());
       };
+  private static Consumer<Field> UNION_VALIDATOR =
+      field -> {
+        assertInstanceOf(ArrowType.Union.class, field.getFieldType().getType());
+        ArrowType.Union unionType = (ArrowType.Union) field.getFieldType().getType();
+        assertEquals(UnionMode.Sparse, unionType.getMode());
+        assertEquals(2, field.getChildren().size());
+        assertInstanceOf(ArrowType.Int.class, field.getChildren().get(0).getFieldType().getType());
+        assertInstanceOf(ArrowType.Utf8.class, field.getChildren().get(1).getFieldType().getType());
+      };
 
   @ParameterizedTest
   @DisplayName("Test conversion of Integer types (Byte, Short, Integer, Long)")
@@ -190,6 +200,56 @@ public class TestLanceDataTypeConverter {
     ArrowType.Timestamp tsArrow = (ArrowType.Timestamp) arrowType;
     assertEquals(TimeUnit.MICROSECOND, tsArrow.getUnit());
     assertEquals("UTC", tsArrow.getTimezone());
+  }
+
+  @Test
+  public void testExternalTypeConversion() {
+    String expectedColumnName = "col_name";
+    boolean expectedNullable = true;
+    Types.ExternalType externalType =
+        Types.ExternalType.of(
+            "{\"name\":\"col_name\",\"nullable\":true,"
+                + "\"type\":{\"name\":\"largeutf8\"},\"children\":[]}");
+    Field arrowField = CONVERTER.toArrowField(expectedColumnName, externalType, expectedNullable);
+    assertEquals(expectedColumnName, arrowField.getName());
+    assertEquals(expectedNullable, arrowField.isNullable());
+    assertInstanceOf(ArrowType.LargeUtf8.class, arrowField.getFieldType().getType());
+
+    externalType =
+        Types.ExternalType.of(
+            "{\"name\":\"col_name\",\"nullable\":true,"
+                + "\"type\":{\"name\":\"largebinary\"},\"children\":[]}");
+    arrowField = CONVERTER.toArrowField(expectedColumnName, externalType, expectedNullable);
+    assertEquals(expectedColumnName, arrowField.getName());
+    assertEquals(expectedNullable, arrowField.isNullable());
+    assertInstanceOf(ArrowType.LargeBinary.class, arrowField.getFieldType().getType());
+
+    externalType =
+        Types.ExternalType.of(
+            "{\"name\":\"col_name\",\"nullable\":true,"
+                + "\"type\":{\"name\":\"largelist\"},"
+                + "\"children\":["
+                + "{\"name\":\"element\",\"nullable\":true,"
+                + "\"type\":{\"name\":\"int\", \"bitWidth\":32, \"isSigned\": true},"
+                + "\"children\":[]}]}");
+    arrowField = CONVERTER.toArrowField(expectedColumnName, externalType, expectedNullable);
+    assertEquals(expectedColumnName, arrowField.getName());
+    assertEquals(expectedNullable, arrowField.isNullable());
+    assertInstanceOf(ArrowType.LargeList.class, arrowField.getFieldType().getType());
+
+    externalType =
+        Types.ExternalType.of(
+            "{\"name\":\"col_name\",\"nullable\":true,"
+                + "\"type\":{\"name\":\"fixedsizelist\", \"listSize\":10},"
+                + "\"children\":["
+                + "{\"name\":\"element\",\"nullable\":true,"
+                + "\"type\":{\"name\":\"int\", \"bitWidth\":32, \"isSigned\": true},"
+                + "\"children\":[]}]}");
+    arrowField = CONVERTER.toArrowField(expectedColumnName, externalType, expectedNullable);
+    assertEquals(expectedColumnName, arrowField.getName());
+    assertEquals(expectedNullable, arrowField.isNullable());
+    assertInstanceOf(ArrowType.FixedSizeList.class, arrowField.getFieldType().getType());
+    assertEquals(10, ((ArrowType.FixedSizeList) arrowField.getFieldType().getType()).getListSize());
   }
 
   @ParameterizedTest(name = "[{index}] name={0}, type={1}, nullable={2}")
@@ -256,6 +316,12 @@ public class TestLanceDataTypeConverter {
             false,
             NESTED_STRUCT_VALIDATOR),
         // List of Structs
-        Arguments.of("items", LIST_OF_STRUCTS, false, LIST_OF_STRUCTS_VALIDATOR));
+        Arguments.of("items", LIST_OF_STRUCTS, false, LIST_OF_STRUCTS_VALIDATOR),
+        // Union
+        Arguments.of(
+            "union_field",
+            Types.UnionType.of(Types.IntegerType.get(), Types.StringType.get()),
+            true,
+            UNION_VALIDATOR));
   }
 }
