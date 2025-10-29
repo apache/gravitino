@@ -178,8 +178,8 @@ public class GenericLakehouseCatalogOperations
     NameIdentifier identifier = NameIdentifier.of(namespace.levels());
     try {
       store.get(identifier, Entity.EntityType.SCHEMA, SchemaEntity.class);
-    } catch (NoSuchTableException e) {
-      throw new NoSuchEntityException(e, "Schema %s does not exist", namespace);
+    } catch (NoSuchEntityException e) {
+      throw new NoSuchSchemaException(e, "Schema %s does not exist", namespace);
     } catch (IOException ioe) {
       throw new RuntimeException("Failed to get schema " + identifier);
     }
@@ -226,8 +226,8 @@ public class GenericLakehouseCatalogOperations
       SortOrder[] sortOrders,
       Index[] indexes)
       throws NoSuchSchemaException, TableAlreadyExistsException {
-    String format =
-        (String)
+    LakehouseTableFormat format =
+        (LakehouseTableFormat)
             propertiesMetadata
                 .tablePropertiesMetadata()
                 .getOrDefault(properties, GenericLakehouseTablePropertiesMetadata.LAKEHOUSE_FORMAT);
@@ -259,7 +259,7 @@ public class GenericLakehouseCatalogOperations
               .withName(ident.name())
               .withNamespace(ident.namespace())
               .withColumns(columnEntityList)
-              .withFormat(format)
+              .withFormat(format.lowerName())
               .withProperties(newProperties)
               .withComment(comment)
               .withPartitions(partitions)
@@ -354,20 +354,15 @@ public class GenericLakehouseCatalogOperations
 
   private LakehouseCatalogOperations getLakehouseCatalogOperations(
       Map<String, String> tableProperties) {
-    String format =
-        (String)
+    LakehouseTableFormat format =
+        (LakehouseTableFormat)
             propertiesMetadata
                 .tablePropertiesMetadata()
                 .getOrDefault(
                     tableProperties, GenericLakehouseTablePropertiesMetadata.LAKEHOUSE_FORMAT);
 
-    if (format == null) {
-      throw new IllegalArgumentException("Table format is not specified in table properties.");
-    }
-
-    LakehouseTableFormat lakehouseFormat = LakehouseTableFormat.fromFormatName(format);
     return SUPPORTED_FORMATS.compute(
-        lakehouseFormat,
+        format,
         (k, v) ->
             v == null
                 ? createLakehouseCatalogOperations(
@@ -380,13 +375,12 @@ public class GenericLakehouseCatalogOperations
   }
 
   private LakehouseCatalogOperations createLakehouseCatalogOperations(
-      String format,
+      LakehouseTableFormat format,
       Map<String, String> properties,
       CatalogInfo catalogInfo,
       HasPropertyMetadata propertiesMetadata) {
     LakehouseCatalogOperations operations;
-    LakehouseTableFormat lakehouseFormat = LakehouseTableFormat.fromFormatName(format);
-    switch (lakehouseFormat) {
+    switch (format) {
       case LANCE:
         operations = new LanceCatalogOperations();
         break;

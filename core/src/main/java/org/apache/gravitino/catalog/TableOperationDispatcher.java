@@ -240,25 +240,6 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
         nameIdentifierForLock.equals(ident) ? LockType.READ : LockType.WRITE,
         () -> {
           NameIdentifier catalogIdent = getCatalogIdentifier(ident);
-          if (isGenericLakehouseCatalog(catalogIdent)) {
-            // For generic lakehouse catalog, all operations will be dispatched to the underlying
-            // catalog.
-            Table alteredTable =
-                doWithCatalog(
-                    catalogIdent,
-                    c ->
-                        c.doWithTableOps(
-                            t -> t.alterTable(ident, applyCapabilities(c.capabilities(), changes))),
-                    NoSuchTableException.class,
-                    IllegalArgumentException.class);
-            return EntityCombinedTable.of(alteredTable)
-                .withHiddenProperties(
-                    getHiddenPropertyNames(
-                        getCatalogIdentifier(ident),
-                        HasPropertyMetadata::tablePropertiesMetadata,
-                        alteredTable.properties()));
-          }
-
           Table alteredTable =
               doWithCatalog(
                   catalogIdent,
@@ -267,6 +248,17 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
                           t -> t.alterTable(ident, applyCapabilities(c.capabilities(), changes))),
                   NoSuchTableException.class,
                   IllegalArgumentException.class);
+
+          if (isGenericLakehouseCatalog(catalogIdent)) {
+            // For generic lakehouse catalog, all operations will be dispatched to the underlying
+            // catalog.
+            return EntityCombinedTable.of(alteredTable)
+                .withHiddenProperties(
+                    getHiddenPropertyNames(
+                        getCatalogIdentifier(ident),
+                        HasPropertyMetadata::tablePropertiesMetadata,
+                        alteredTable.properties()));
+          }
 
           StringIdentifier stringId = getStringIdFromProperties(alteredTable.properties());
           // Case 1: The table is not created by Gravitino and this table is never imported.

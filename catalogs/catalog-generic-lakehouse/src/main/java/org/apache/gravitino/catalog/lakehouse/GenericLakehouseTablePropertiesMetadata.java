@@ -18,8 +18,8 @@
  */
 package org.apache.gravitino.catalog.lakehouse;
 
+import static org.apache.gravitino.connector.PropertyEntry.enumPropertyEntry;
 import static org.apache.gravitino.connector.PropertyEntry.stringOptionalPropertyEntry;
-import static org.apache.gravitino.connector.PropertyEntry.stringRequiredPropertyEntry;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Maps;
@@ -44,11 +44,15 @@ public class GenericLakehouseTablePropertiesMetadata extends BasePropertiesMetad
                 false /* immutable */,
                 null, /* defaultValue */
                 false /* hidden */),
-            stringRequiredPropertyEntry(
+            enumPropertyEntry(
                 LAKEHOUSE_FORMAT,
-                "The table format of the lakehouse table (e.g., iceberg, delta, lance).",
-                false /* immutable */,
-                false /* hidden */),
+                "The table format of the lakehouse table (e.g., iceberg, delta, lance)",
+                true /* required */,
+                true /* immutable */,
+                LakehouseTableFormat.class /* enumClass */,
+                null /* defaultValue */,
+                false /* hidden */,
+                false /* reserved */),
             PropertyEntry.stringOptionalPropertyPrefixEntry(
                 LANCE_TABLE_STORAGE_OPTION_PREFIX,
                 "The storage options passed to Lance table.",
