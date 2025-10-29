@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.catalog.lakehouse.lance;
+package org.apache.gravitino.lance.common.ops.gravitino;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -24,13 +24,18 @@ import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.function.Consumer;
 import java.util.stream.Stream;
 import org.apache.arrow.vector.complex.MapVector;
+import org.apache.arrow.vector.types.DateUnit;
+import org.apache.arrow.vector.types.FloatingPointPrecision;
 import org.apache.arrow.vector.types.TimeUnit;
 import org.apache.arrow.vector.types.UnionMode;
 import org.apache.arrow.vector.types.pojo.ArrowType;
 import org.apache.arrow.vector.types.pojo.Field;
+import org.apache.arrow.vector.types.pojo.FieldType;
 import org.apache.gravitino.rel.types.Type;
 import org.apache.gravitino.rel.types.Types;
 import org.junit.jupiter.api.DisplayName;
@@ -270,10 +275,11 @@ public class TestLanceDataTypeConverter {
     assertThrows(UnsupportedOperationException.class, () -> CONVERTER.fromGravitino(unparsedType));
   }
 
-  @Test
-  void testToGravitinoNotImplemented() {
-    assertThrows(
-        UnsupportedOperationException.class, () -> CONVERTER.toGravitino(ArrowType.Utf8.INSTANCE));
+  @ParameterizedTest(name = "[{index}] {0}")
+  @MethodSource("toGravitinoArguments")
+  void testToGravitino(String testName, Field arrowField, Type expectedGravitinoType) {
+    Type convertedType = CONVERTER.toGravitino(arrowField);
+    assertEquals(expectedGravitinoType, convertedType);
   }
 
   private static Stream<Arguments> toArrowFieldArguments() {
@@ -323,5 +329,145 @@ public class TestLanceDataTypeConverter {
             Types.UnionType.of(Types.IntegerType.get(), Types.StringType.get()),
             true,
             UNION_VALIDATOR));
+  }
+
+  private static Stream<Arguments> toGravitinoArguments() {
+    return Stream.of(
+        // Simple Types
+        Arguments.of(
+            "Boolean",
+            new Field("bool_col", new FieldType(true, ArrowType.Bool.INSTANCE, null), null),
+            Types.BooleanType.get()),
+        Arguments.of(
+            "Byte",
+            new Field("byte_col", new FieldType(true, new ArrowType.Int(8, true), null), null),
+            Types.ByteType.get()),
+        Arguments.of(
+            "Short",
+            new Field("short_col", new FieldType(true, new ArrowType.Int(16, true), null), null),
+            Types.ShortType.get()),
+        Arguments.of(
+            "Integer",
+            new Field("int_col", new FieldType(true, new ArrowType.Int(32, true), null), null),
+            Types.IntegerType.get()),
+        Arguments.of(
+            "Long",
+            new Field("long_col", new FieldType(true, new ArrowType.Int(64, true), null), null),
+            Types.LongType.get()),
+        Arguments.of(
+            "Float",
+            new Field(
+                "float_col",
+                new FieldType(
+                    true, new ArrowType.FloatingPoint(FloatingPointPrecision.SINGLE), null),
+                null),
+            Types.FloatType.get()),
+        Arguments.of(
+            "Double",
+            new Field(
+                "double_col",
+                new FieldType(
+                    true, new ArrowType.FloatingPoint(FloatingPointPrecision.DOUBLE), null),
+                null),
+            Types.DoubleType.get()),
+        Arguments.of(
+            "String",
+            new Field("string_col", new FieldType(true, ArrowType.Utf8.INSTANCE, null), null),
+            Types.StringType.get()),
+        Arguments.of(
+            "Binary",
+            new Field("binary_col", new FieldType(true, ArrowType.Binary.INSTANCE, null), null),
+            Types.BinaryType.get()),
+        Arguments.of(
+            "Decimal",
+            new Field(
+                "decimal_col", new FieldType(true, new ArrowType.Decimal(10, 2, 128), null), null),
+            Types.DecimalType.of(10, 2)),
+        Arguments.of(
+            "Date",
+            new Field(
+                "date_col", new FieldType(true, new ArrowType.Date(DateUnit.DAY), null), null),
+            Types.DateType.get()),
+        Arguments.of(
+            "Timestamp without TZ",
+            new Field(
+                "ts_col",
+                new FieldType(true, new ArrowType.Timestamp(TimeUnit.MICROSECOND, null), null),
+                null),
+            Types.TimestampType.withoutTimeZone(6)),
+        Arguments.of(
+            "Timestamp with TZ",
+            new Field(
+                "tstz_col",
+                new FieldType(true, new ArrowType.Timestamp(TimeUnit.MILLISECOND, "UTC"), null),
+                null),
+            Types.TimestampType.withTimeZone(3)),
+        Arguments.of(
+            "Time",
+            new Field(
+                "time_col",
+                new FieldType(true, new ArrowType.Time(TimeUnit.NANOSECOND, 64), null),
+                null),
+            Types.TimeType.get()),
+        Arguments.of(
+            "Fixed",
+            new Field(
+                "fixed_col", new FieldType(true, new ArrowType.FixedSizeBinary(16), null), null),
+            Types.FixedType.of(16)),
+        // Complex Types
+        Arguments.of(
+            "List",
+            new Field(
+                "list_col",
+                new FieldType(false, ArrowType.List.INSTANCE, null),
+                Collections.singletonList(
+                    new Field(
+                        "element", new FieldType(true, new ArrowType.Int(32, true), null), null))),
+            Types.ListType.of(Types.IntegerType.get(), true)),
+        Arguments.of(
+            "Map",
+            new Field(
+                "map_col",
+                new FieldType(true, new ArrowType.Map(false), null),
+                Collections.singletonList(
+                    new Field(
+                        MapVector.DATA_VECTOR_NAME,
+                        new FieldType(false, ArrowType.Struct.INSTANCE, null),
+                        Arrays.asList(
+                            new Field(
+                                MapVector.KEY_NAME,
+                                new FieldType(false, ArrowType.Utf8.INSTANCE, null),
+                                null),
+                            new Field(
+                                MapVector.VALUE_NAME,
+                                new FieldType(true, new ArrowType.Int(32, true), null),
+                                null))))),
+            Types.MapType.of(Types.StringType.get(), Types.IntegerType.get(), true)),
+        Arguments.of(
+            "Struct",
+            new Field(
+                "struct_col",
+                new FieldType(true, ArrowType.Struct.INSTANCE, null),
+                Arrays.asList(
+                    new Field("id", new FieldType(false, new ArrowType.Int(64, true), null), null),
+                    new Field("name", new FieldType(true, ArrowType.Utf8.INSTANCE, null), null))),
+            SIMPLE_STRUCT),
+        Arguments.of(
+            "Union",
+            new Field(
+                "union_col",
+                new FieldType(true, new ArrowType.Union(UnionMode.Sparse, new int[] {1, 2}), null),
+                Arrays.asList(
+                    new Field(
+                        "integer", new FieldType(true, new ArrowType.Int(32, true), null), null),
+                    new Field("string", new FieldType(true, ArrowType.Utf8.INSTANCE, null), null))),
+            Types.UnionType.of(Types.IntegerType.get(), Types.StringType.get())),
+        // External Type
+        Arguments.of(
+            "External (LargeUtf8)",
+            new Field(
+                "external_col", new FieldType(true, ArrowType.LargeUtf8.INSTANCE, null), null),
+            Types.ExternalType.of(
+                "{\"name\":\"external_col\",\"nullable\":true,\"type\":{\"name\":\"largeutf8\"},\"children\":[]}")));
   }
 }

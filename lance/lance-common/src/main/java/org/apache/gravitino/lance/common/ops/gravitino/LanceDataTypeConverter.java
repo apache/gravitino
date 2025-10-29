@@ -17,9 +17,9 @@
  *  under the License.
  */
 
-package org.apache.gravitino.catalog.lakehouse.lance;
+package org.apache.gravitino.lance.common.ops.gravitino;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import java.util.Arrays;
@@ -37,14 +37,14 @@ import org.apache.arrow.vector.types.pojo.ArrowType.Int;
 import org.apache.arrow.vector.types.pojo.Field;
 import org.apache.arrow.vector.types.pojo.FieldType;
 import org.apache.gravitino.connector.DataTypeConverter;
-import org.apache.gravitino.json.JsonUtils;
 import org.apache.gravitino.rel.types.Type;
 import org.apache.gravitino.rel.types.Types;
 import org.apache.gravitino.rel.types.Types.FixedType;
 
-public class LanceDataTypeConverter implements DataTypeConverter<ArrowType, ArrowType> {
+public class LanceDataTypeConverter implements DataTypeConverter<ArrowType, Field> {
 
   public static final LanceDataTypeConverter CONVERTER = new LanceDataTypeConverter();
+  private static final ObjectMapper mapper = new ObjectMapper();
 
   public Field toArrowField(String name, Type type, boolean nullable) {
     switch (type.name()) {
@@ -115,8 +115,8 @@ public class LanceDataTypeConverter implements DataTypeConverter<ArrowType, Arro
         Types.ExternalType externalType = (Types.ExternalType) type;
         Field field;
         try {
-          field = JsonUtils.anyFieldMapper().readValue(externalType.catalogString(), Field.class);
-        } catch (JsonProcessingException e) {
+          field = mapper.readValue(externalType.catalogString(), Field.class);
+        } catch (Exception e) {
           throw new RuntimeException(
               "Failed to parse external type catalog string: " + externalType.catalogString(), e);
         }
@@ -202,9 +202,125 @@ public class LanceDataTypeConverter implements DataTypeConverter<ArrowType, Arro
   }
 
   @Override
-  public Type toGravitino(ArrowType arrowType) {
-    // since the table metadata will load from Gravitino storage directly, we don't need to
-    // implement this method for now.
-    throw new UnsupportedOperationException("toGravitino is not implemented yet.");
+  public Type toGravitino(Field arrowField) {
+    FieldType fieldType = arrowField.getFieldType();
+    switch (fieldType.getType().getTypeID()) {
+      case Map:
+        Field structField = arrowField.getChildren().get(0);
+        Type keyType = toGravitino(structField.getChildren().get(0));
+        Type valueType = toGravitino(structField.getChildren().get(1));
+        boolean valueNullable = structField.getChildren().get(1).isNullable();
+        return Types.MapType.of(keyType, valueType, valueNullable);
+
+      case List:
+        Type elementType = toGravitino(arrowField.getChildren().get(0));
+        boolean containsNull = arrowField.getChildren().get(0).isNullable();
+        return Types.ListType.of(elementType, containsNull);
+
+      case Struct:
+        Types.StructType.Field[] fields =
+            arrowField.getChildren().stream()
+                .map(
+                    child ->
+                        Types.StructType.Field.of(
+                            child.getName(),
+                            toGravitino(child),
+                            child.isNullable(),
+                            null /*comment*/))
+                .toArray(Types.StructType.Field[]::new);
+        return Types.StructType.of(fields);
+
+      case Union:
+        List<Type> types = arrowField.getChildren().stream().map(this::toGravitino).toList();
+        return Types.UnionType.of(types.toArray(new Type[0]));
+
+      case Bool:
+        return Types.BooleanType.get();
+
+      case Int:
+        Int intType = (Int) fieldType.getType();
+        switch (intType.getBitWidth()) {
+          case 8:
+            return intType.getIsSigned() ? Types.ByteType.get() : Types.ByteType.unsigned();
+          case 8 * 2:
+            return intType.getIsSigned() ? Types.ShortType.get() : Types.ShortType.unsigned();
+          case 8 * 4:
+            return intType.getIsSigned() ? Types.IntegerType.get() : Types.IntegerType.unsigned();
+          case 8 * 8:
+            return intType.getIsSigned() ? Types.LongType.get() : Types.LongType.unsigned();
+        }
+        break;
+
+      case FloatingPoint:
+        FloatingPoint floatingPoint = (FloatingPoint) fieldType.getType();
+        switch (floatingPoint.getPrecision()) {
+          case SINGLE:
+            return Types.FloatType.get();
+          case DOUBLE:
+            return Types.DoubleType.get();
+          default:
+            // fallthrough
+        }
+        break;
+
+      case Utf8:
+        return Types.StringType.get();
+      case Binary:
+        return Types.BinaryType.get();
+      case Decimal:
+        ArrowType.Decimal decimalType = (ArrowType.Decimal) fieldType.getType();
+        return Types.DecimalType.of(decimalType.getPrecision(), decimalType.getScale());
+      case Date:
+        if (((ArrowType.Date) fieldType.getType()).getUnit() == DateUnit.DAY) {
+          return Types.DateType.get();
+        }
+        break;
+      case Timestamp:
+        ArrowType.Timestamp timestampType = (ArrowType.Timestamp) fieldType.getType();
+        int precision =
+            switch (timestampType.getUnit()) {
+              case SECOND -> 0;
+              case MILLISECOND -> 3;
+              case MICROSECOND -> 6;
+              case NANOSECOND -> 9;
+            };
+        boolean hasTimeZone = timestampType.getTimezone() != null;
+        return hasTimeZone
+            ? Types.TimestampType.withTimeZone(precision)
+            : Types.TimestampType.withoutTimeZone(precision);
+      case Time:
+        ArrowType.Time timeType = (ArrowType.Time) fieldType.getType();
+        if (timeType.getUnit() == TimeUnit.NANOSECOND && timeType.getBitWidth() == 8 * 8) {
+          return Types.TimeType.get();
+        }
+        break;
+      case Null:
+        return Types.NullType.get();
+      case Interval:
+        IntervalUnit intervalUnit = ((ArrowType.Interval) fieldType.getType()).getUnit();
+        if (intervalUnit == IntervalUnit.YEAR_MONTH) {
+          return Types.IntervalYearType.get();
+        }
+        break;
+      case Duration:
+        TimeUnit timeUnit = ((ArrowType.Duration) fieldType.getType()).getUnit();
+        if (timeUnit == TimeUnit.MICROSECOND) {
+          return Types.IntervalDayType.get();
+        }
+        break;
+      case FixedSizeBinary:
+        ArrowType.FixedSizeBinary fixedSizeBinary = (ArrowType.FixedSizeBinary) fieldType.getType();
+        return Types.FixedType.of(fixedSizeBinary.getByteWidth());
+      default:
+        // fallthrough
+    }
+
+    String typeString;
+    try {
+      typeString = mapper.writeValueAsString(arrowField);
+    } catch (Exception e) {
+      throw new RuntimeException("Failed to serialize Arrow field to string.", e);
+    }
+    return Types.ExternalType.of(typeString);
   }
 }

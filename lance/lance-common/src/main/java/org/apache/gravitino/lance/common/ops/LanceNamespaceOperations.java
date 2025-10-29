@@ -49,5 +49,6 @@ public interface LanceNamespaceOperations {
 
   void namespaceExists(String namespaceId, String delimiter) throws LanceNamespaceException;
 
-  ListTablesResponse listTables(String id, String delimiter, String pageToken, Integer limit);
+  ListTablesResponse listTables(
+      String namespaceId, String delimiter, String pageToken, Integer limit);
 }

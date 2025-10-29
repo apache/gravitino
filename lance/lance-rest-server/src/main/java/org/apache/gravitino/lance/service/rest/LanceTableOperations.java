@@ -18,6 +18,8 @@
  */
 package org.apache.gravitino.lance.service.rest;
 
+import static org.apache.gravitino.lance.common.ops.NamespaceWrapper.NAMESPACE_DELIMITER_DEFAULT;
+
 import com.codahale.metrics.annotation.ResponseMetered;
 import com.codahale.metrics.annotation.Timed;
 import com.fasterxml.jackson.core.type.TypeReference;
@@ -59,7 +61,7 @@ public class LanceTableOperations {
   @ResponseMetered(name = "describe-table", absolute = true)
   public Response describeTable(
       @PathParam("id") String tableId,
-      @DefaultValue("$") @QueryParam("delimiter") String delimiter) {
+      @DefaultValue(NAMESPACE_DELIMITER_DEFAULT) @QueryParam("delimiter") String delimiter) {
     try {
       DescribeTableResponse response =
           lanceNamespace.asTableOps().describeTable(tableId, delimiter);
@@ -78,14 +80,14 @@ public class LanceTableOperations {
   public Response createTable(
       @PathParam("id") String tableId,
       @QueryParam("mode") @DefaultValue("create") String mode, // create, exist_ok, overwrite
-      @QueryParam("delimiter") @DefaultValue("$") String delimiter,
+      @QueryParam("delimiter") @DefaultValue(NAMESPACE_DELIMITER_DEFAULT) String delimiter,
       @HeaderParam("x-lance-table-location") String tableLocation,
       @HeaderParam("x-lance-table-properties") String tableProperties,
       @HeaderParam("x-lance-root-catalog") String rootCatalog,
       byte[] arrowStreamBody) {
     try {
       Map<String, String> props =
-          JsonUtil.mapper().readValue(tableProperties, new TypeReference<Map<String, String>>() {});
+          JsonUtil.mapper().readValue(tableProperties, new TypeReference<>() {});
       CreateTableResponse response =
           lanceNamespace
               .asTableOps()
@@ -104,7 +106,7 @@ public class LanceTableOperations {
   public Response createEmptyTable(
       @PathParam("id") String tableId,
       @QueryParam("mode") @DefaultValue("create") String mode, // create, exist_ok, overwrite
-      @QueryParam("delimiter") @DefaultValue("$") String delimiter,
+      @QueryParam("delimiter") @DefaultValue(NAMESPACE_DELIMITER_DEFAULT) String delimiter,
       @HeaderParam("x-lance-table-location") String tableLocation,
       @HeaderParam("x-lance-root-catalog") String rootCatalog,
       @HeaderParam("x-lance-table-properties") String tableProperties) {
@@ -112,8 +114,7 @@ public class LanceTableOperations {
       Map<String, String> props =
           StringUtils.isBlank(tableProperties)
               ? Map.of()
-              : JsonUtil.mapper()
-                  .readValue(tableProperties, new TypeReference<Map<String, String>>() {});
+              : JsonUtil.mapper().readValue(tableProperties, new TypeReference<>() {});
       CreateTableResponse response =
           lanceNamespace
               .asTableOps()
