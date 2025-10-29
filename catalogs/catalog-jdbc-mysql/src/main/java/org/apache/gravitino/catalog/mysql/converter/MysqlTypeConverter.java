@@ -42,6 +42,9 @@ public class MysqlTypeConverter extends JdbcTypeConverter {
   static final String CHAR = "char";
   static final String BINARY = "binary";
   static final String DATETIME = "datetime";
+  static final String TINYTEXT = "tinytext";
+  static final String MEDIUMTEXT = "mediumtext";
+  static final String LONGTEXT = "longtext";
 
   @Override
   public Type toGravitino(JdbcTypeBean typeBean) {
@@ -97,6 +100,9 @@ public class MysqlTypeConverter extends JdbcTypeConverter {
       case CHAR:
         return Types.FixedCharType.of(typeBean.getColumnSize());
       case TEXT:
+      case TINYTEXT:
+      case MEDIUMTEXT:
+      case LONGTEXT:
         return Types.StringType.get();
       case BINARY:
         return Types.BinaryType.get();

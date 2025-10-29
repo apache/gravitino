@@ -32,7 +32,10 @@ import static org.apache.gravitino.catalog.mysql.converter.MysqlTypeConverter.DE
 import static org.apache.gravitino.catalog.mysql.converter.MysqlTypeConverter.DOUBLE;
 import static org.apache.gravitino.catalog.mysql.converter.MysqlTypeConverter.FLOAT;
 import static org.apache.gravitino.catalog.mysql.converter.MysqlTypeConverter.INT;
+import static org.apache.gravitino.catalog.mysql.converter.MysqlTypeConverter.LONGTEXT;
+import static org.apache.gravitino.catalog.mysql.converter.MysqlTypeConverter.MEDIUMTEXT;
 import static org.apache.gravitino.catalog.mysql.converter.MysqlTypeConverter.TINYINT;
+import static org.apache.gravitino.catalog.mysql.converter.MysqlTypeConverter.TINYTEXT;
 
 import org.apache.gravitino.catalog.jdbc.converter.JdbcTypeConverter;
 import org.apache.gravitino.rel.types.Type;
@@ -77,6 +80,9 @@ public class TestMysqlTypeConverter {
     checkJdbcTypeToGravitinoType(Types.VarCharType.of(20), VARCHAR, 20, null, 0);
     checkJdbcTypeToGravitinoType(Types.FixedCharType.of(20), CHAR, 20, null, 0);
     checkJdbcTypeToGravitinoType(Types.StringType.get(), TEXT, null, null, 0);
+    checkJdbcTypeToGravitinoType(Types.StringType.get(), TINYTEXT, null, null, 0);
+    checkJdbcTypeToGravitinoType(Types.StringType.get(), MEDIUMTEXT, null, null, 0);
+    checkJdbcTypeToGravitinoType(Types.StringType.get(), LONGTEXT, null, null, 0);
     checkJdbcTypeToGravitinoType(Types.BinaryType.get(), BINARY, null, null, 0);
     checkJdbcTypeToGravitinoType(
         Types.ExternalType.of(USER_DEFINED_TYPE), USER_DEFINED_TYPE, null, null, 0);
