@@ -110,6 +110,7 @@ dependencies {
   testImplementation(project(":server-common"))
   testImplementation(libs.junit.jupiter.api)
   testImplementation(libs.junit.jupiter.params)
+  testImplementation(libs.mockito.core)
   testImplementation(libs.sqlite.jdbc)
 
   testRuntimeOnly(libs.junit.jupiter.engine)

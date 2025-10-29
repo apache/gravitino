@@ -17,22 +17,20 @@
  *  under the License.
  */
 
-package org.apache.gravitino.utils;
+package org.apache.gravitino.iceberg.common.cache;
 
-public class ClassUtils {
-  public static <T> T loadAndGetInstance(String className) {
-    try {
-      return (T) Class.forName(className).getDeclaredConstructor().newInstance();
-    } catch (Exception e) {
-      throw new RuntimeException(e);
-    }
-  }
+import org.apache.iceberg.catalog.TableIdentifier;
 
-  public static <T> T loadAndGetInstance(String className, ClassLoader classLoader) {
-    try {
-      return (T) Class.forName(className, true, classLoader).getDeclaredConstructor().newInstance();
-    } catch (Exception e) {
-      throw new RuntimeException(e);
-    }
-  }
+/** An interface that supports retrieving the metadata location for a table. */
+public interface SupportsMetadataLocation {
+  /** The property key used to store or reference the metadata location of a table. */
+  String METADATA_LOCATION_PROP = "metadata_location";
+
+  /**
+   * Retrieves the metadata location for the specified table.
+   *
+   * @param tableIdentifier the identifier of the table to retrieve metadata location for
+   * @return the metadata location of the table as a String
+   */
+  String metadataLocation(TableIdentifier tableIdentifier);
 }
