@@ -20,9 +20,11 @@ package org.apache.gravitino.server.web.rest;
 
 import static org.apache.gravitino.dto.util.DTOConverters.fromDTO;
 import static org.apache.gravitino.dto.util.DTOConverters.fromDTOs;
+import static org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants.createTableAuthorizationExpression;
 
 import com.codahale.metrics.annotation.ResponseMetered;
 import com.codahale.metrics.annotation.Timed;
+import java.util.Map;
 import javax.inject.Inject;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.DELETE;
@@ -36,10 +38,12 @@ import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.Response;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.authorization.AuthorizationRequestContext;
 import org.apache.gravitino.catalog.TableDispatcher;
 import org.apache.gravitino.dto.requests.TableCreateRequest;
 import org.apache.gravitino.dto.requests.TableUpdateRequest;
@@ -48,13 +52,16 @@ import org.apache.gravitino.dto.responses.DropResponse;
 import org.apache.gravitino.dto.responses.EntityListResponse;
 import org.apache.gravitino.dto.responses.TableResponse;
 import org.apache.gravitino.dto.util.DTOConverters;
+import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.metrics.MetricNames;
 import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.TableChange;
+import org.apache.gravitino.server.authorization.GravitinoAuthorizerProvider;
 import org.apache.gravitino.server.authorization.MetadataFilterHelper;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationExpression;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationMetadata;
 import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants;
+import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionEvaluator;
 import org.apache.gravitino.server.web.Utils;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
@@ -164,10 +171,7 @@ public class TableOperations {
   @Timed(name = "load-table." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "load-table", absolute = true)
   @AuthorizationExpression(
-      expression =
-          "ANY(OWNER, METALAKE, CATALOG) || "
-              + "SCHEMA_OWNER_WITH_USE_CATALOG || "
-              + "ANY_USE_CATALOG && ANY_USE_SCHEMA  && (TABLE::OWNER || ANY_SELECT_TABLE|| ANY_MODIFY_TABLE)",
+      expression = createTableAuthorizationExpression,
       accessMetadataType = MetadataObject.Type.TABLE)
   public Response loadTable(
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
@@ -222,6 +226,32 @@ public class TableOperations {
             TableChange[] changes =
                 request.getUpdates().stream()
                     .map(TableUpdateRequest::tableChange)
+                    .peek(
+                        tableChange -> {
+                          if (tableChange
+                              instanceof TableUpdateRequest.RenameTableRequest renameTableRequest) {
+                            String newSchemaName = renameTableRequest.getNewSchemaName();
+                            if (StringUtils.isNotBlank(newSchemaName)) {
+                              boolean canRenameTableToNewSchema =
+                                  new AuthorizationExpressionEvaluator(
+                                          createTableAuthorizationExpression,
+                                          GravitinoAuthorizerProvider.getInstance()
+                                              .getGravitinoAuthorizer())
+                                      .evaluate(
+                                          Map.of(
+                                              Entity.EntityType.TABLE,
+                                              ident,
+                                              Entity.EntityType.SCHEMA,
+                                              NameIdentifierUtil.ofSchema(
+                                                  metalake, catalog, newSchemaName)),
+                                          new AuthorizationRequestContext());
+                              if (!canRenameTableToNewSchema) {
+                                throw new ForbiddenException(
+                                    "Current user cannot rename table to new schema");
+                              }
+                            }
+                          }
+                        })
                     .toArray(TableChange[]::new);
             Table t = dispatcher.alterTable(ident, changes);
             Response response = Utils.ok(new TableResponse(DTOConverters.toDTO(t)));
