@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.catalog.lakehouse;
 
+import static org.apache.gravitino.connector.PropertyEntry.booleanPropertyEntry;
 import static org.apache.gravitino.connector.PropertyEntry.stringOptionalPropertyEntry;
 import static org.apache.gravitino.connector.PropertyEntry.stringRequiredPropertyEntry;
 
@@ -32,6 +33,7 @@ public class GenericLakehouseTablePropertiesMetadata extends BasePropertiesMetad
   public static final String LAKEHOUSE_LOCATION = "location";
   public static final String LAKEHOUSE_FORMAT = "format";
   public static final String LANCE_TABLE_STORAGE_OPTION_PREFIX = "lance.storage.";
+  public static final String LAKEHOUSE_REGISTER = "register";
 
   private static final Map<String, PropertyEntry<?>> PROPERTIES_METADATA;
 
@@ -55,7 +57,15 @@ public class GenericLakehouseTablePropertiesMetadata extends BasePropertiesMetad
                 false /* immutable */,
                 null /* default value*/,
                 false /* hidden */,
-                false /* reserved */));
+                false /* reserved */),
+            booleanPropertyEntry(
+                LAKEHOUSE_REGISTER,
+                "Whether this is a table registration operation.",
+                false /* immutable */,
+                false /* defaultValue */,
+                false /* hidden */,
+                false,
+                false));
 
     PROPERTIES_METADATA = Maps.uniqueIndex(propertyEntries, PropertyEntry::getName);
   }

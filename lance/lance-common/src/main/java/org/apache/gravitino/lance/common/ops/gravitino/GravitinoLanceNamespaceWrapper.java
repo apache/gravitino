@@ -33,6 +33,7 @@ import com.lancedb.lance.namespace.model.CreateNamespaceRequest;
 import com.lancedb.lance.namespace.model.CreateNamespaceRequest.ModeEnum;
 import com.lancedb.lance.namespace.model.CreateNamespaceResponse;
 import com.lancedb.lance.namespace.model.CreateTableResponse;
+import com.lancedb.lance.namespace.model.DeregisterTableResponse;
 import com.lancedb.lance.namespace.model.DescribeNamespaceResponse;
 import com.lancedb.lance.namespace.model.DescribeTableResponse;
 import com.lancedb.lance.namespace.model.DropNamespaceRequest;
@@ -42,6 +43,8 @@ import com.lancedb.lance.namespace.model.JsonArrowField;
 import com.lancedb.lance.namespace.model.JsonArrowSchema;
 import com.lancedb.lance.namespace.model.ListNamespacesResponse;
 import com.lancedb.lance.namespace.model.ListTablesResponse;
+import com.lancedb.lance.namespace.model.RegisterTableRequest;
+import com.lancedb.lance.namespace.model.RegisterTableResponse;
 import com.lancedb.lance.namespace.util.CommonUtil;
 import com.lancedb.lance.namespace.util.PageUtil;
 import java.io.ByteArrayInputStream;
@@ -643,6 +646,96 @@ public class GravitinoLanceNamespaceWrapper extends NamespaceWrapper
     response.setProperties(t.properties());
     response.setLocation(tableLocation);
     response.setVersion(0L);
+    return response;
+  }
+
+  @Override
+  public RegisterTableResponse registerTable(
+      String tableId,
+      String mode,
+      String delimiter,
+      Map<String, String> tableProperties,
+      String rootCatalog) {
+    ObjectIdentifier nsId = ObjectIdentifier.of(tableId, Pattern.quote(delimiter));
+    Preconditions.checkArgument(
+        nsId.levels() <= 3, "Expected at most 3-level namespace but got: %s", nsId.levels());
+    if (rootCatalog != null) {
+      List<String> levels = nsId.listStyleId();
+      List<String> newLevels = Lists.newArrayList(rootCatalog);
+      newLevels.addAll(levels);
+      nsId = ObjectIdentifier.of(newLevels);
+    }
+
+    String catalogName = nsId.levelAtListPos(0);
+    Catalog catalog = loadAndValidateLakehouseCatalog(catalogName);
+
+    NameIdentifier tableIdentifier =
+        NameIdentifier.of(nsId.levelAtListPos(1), nsId.levelAtListPos(2));
+
+    // TODO Support real register API
+
+    RegisterTableRequest.ModeEnum createMode =
+        RegisterTableRequest.ModeEnum.fromValue(mode.toUpperCase());
+    if (createMode == RegisterTableRequest.ModeEnum.CREATE
+        && catalog.asTableCatalog().tableExists(tableIdentifier)) {
+      throw LanceNamespaceException.conflict(
+          "Table already exists: " + tableId,
+          SchemaAlreadyExistsException.class.getSimpleName(),
+          tableId,
+          CommonUtil.formatCurrentStackTrace());
+    }
+
+    if (createMode == RegisterTableRequest.ModeEnum.OVERWRITE
+        && catalog.asTableCatalog().tableExists(tableIdentifier)) {
+      catalog.asTableCatalog().dropTable(tableIdentifier);
+    }
+
+    Table t =
+        catalog.asTableCatalog().createTable(tableIdentifier, new Column[] {}, "", tableProperties);
+
+    RegisterTableResponse response = new RegisterTableResponse();
+    response.setProperties(t.properties());
+    response.setLocation(t.properties().get("location"));
+    return response;
+  }
+
+  @Override
+  public DeregisterTableResponse deregisterTable(
+      String tableId, String delimiter, String rootCatalog) {
+
+    ObjectIdentifier nsId = ObjectIdentifier.of(tableId, Pattern.quote(delimiter));
+    Preconditions.checkArgument(
+        nsId.levels() <= 3, "Expected at most 3-level namespace but got: %s", nsId.levels());
+    if (rootCatalog != null) {
+      List<String> levels = nsId.listStyleId();
+      List<String> newLevels = Lists.newArrayList(rootCatalog);
+      newLevels.addAll(levels);
+      nsId = ObjectIdentifier.of(newLevels);
+    }
+
+    String catalogName = nsId.levelAtListPos(0);
+    Catalog catalog = loadAndValidateLakehouseCatalog(catalogName);
+
+    NameIdentifier tableIdentifier =
+        NameIdentifier.of(nsId.levelAtListPos(1), nsId.levelAtListPos(2));
+
+    Table t = catalog.asTableCatalog().loadTable(tableIdentifier);
+    Map<String, String> properties = t.properties();
+
+    if (properties.get("location") == null || properties.get("register") == null) {
+      throw LanceNamespaceException.badRequest(
+          "Table " + tableId + " is not registered.",
+          SchemaAlreadyExistsException.class.getSimpleName(),
+          tableId,
+          CommonUtil.formatCurrentStackTrace());
+    }
+
+    // TODO Support real deregister API
+    catalog.asTableCatalog().dropTable(tableIdentifier);
+
+    DeregisterTableResponse response = new DeregisterTableResponse();
+    response.setProperties(t.properties());
+    response.setLocation(t.properties().get("location"));
     return response;
   }
 

@@ -21,8 +21,13 @@ package org.apache.gravitino.lance.service.rest;
 import com.codahale.metrics.annotation.ResponseMetered;
 import com.codahale.metrics.annotation.Timed;
 import com.fasterxml.jackson.core.type.TypeReference;
+import com.google.common.collect.Maps;
 import com.lancedb.lance.namespace.model.CreateTableResponse;
+import com.lancedb.lance.namespace.model.DeregisterTableRequest;
+import com.lancedb.lance.namespace.model.DeregisterTableResponse;
 import com.lancedb.lance.namespace.model.DescribeTableResponse;
+import com.lancedb.lance.namespace.model.RegisterTableRequest;
+import com.lancedb.lance.namespace.model.RegisterTableResponse;
 import com.lancedb.lance.namespace.util.JsonUtil;
 import java.util.Map;
 import javax.inject.Inject;
@@ -34,6 +39,8 @@ import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
+import javax.ws.rs.core.Context;
+import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.commons.lang3.StringUtils;
@@ -118,6 +125,62 @@ public class LanceTableOperations {
           lanceNamespace
               .asTableOps()
               .createTable(tableId, mode, delimiter, tableLocation, props, rootCatalog, null);
+      return Response.ok(response).build();
+    } catch (Exception e) {
+      return LanceExceptionMapper.toRESTResponse(tableId, e);
+    }
+  }
+
+  @POST
+  @Path("/register")
+  @Timed(name = "register-table." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
+  @ResponseMetered(name = "register-table", absolute = true)
+  public Response registerTable(
+      @PathParam("id") String tableId,
+      @QueryParam("mode") @DefaultValue("create") String mode, // overwrite or
+      @QueryParam("delimiter") @DefaultValue("$") String delimiter,
+      @Context HttpHeaders headers,
+      RegisterTableRequest registerTableRequest) {
+    try {
+      Map<String, String> props =
+          registerTableRequest.getProperties() == null
+              ? Map.of()
+              : Maps.newHashMap(registerTableRequest.getProperties());
+      // For lance spark compatibility
+      String rootCatalog =
+          headers.getRequestHeaders().get("x-lance-root-catalog") == null
+              ? null
+              : headers.getRequestHeaders().get("x-lance-root-catalog").get(0);
+      props.put("register", "true");
+      props.put("location", registerTableRequest.getLocation());
+      props.put("format", "lance");
+
+      RegisterTableResponse response =
+          lanceNamespace.asTableOps().registerTable(tableId, mode, delimiter, props, rootCatalog);
+      return Response.ok(response).build();
+    } catch (Exception e) {
+      return LanceExceptionMapper.toRESTResponse(tableId, e);
+    }
+  }
+
+  @POST
+  @Path("/deregister")
+  @Timed(name = "deregister-table." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
+  @ResponseMetered(name = "deregister-table", absolute = true)
+  public Response deregisterTable(
+      @PathParam("id") String tableId,
+      @QueryParam("delimiter") @DefaultValue("$") String delimiter,
+      @Context HttpHeaders headers,
+      DeregisterTableRequest deregisterTableRequest) {
+    try {
+      // For lance spark compatibility
+      String rootCatalog =
+          headers.getRequestHeaders().get("x-lance-root-catalog") == null
+              ? null
+              : headers.getRequestHeaders().get("x-lance-root-catalog").get(0);
+
+      DeregisterTableResponse response =
+          lanceNamespace.asTableOps().deregisterTable(tableId, delimiter, rootCatalog);
       return Response.ok(response).build();
     } catch (Exception e) {
       return LanceExceptionMapper.toRESTResponse(tableId, e);

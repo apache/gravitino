@@ -270,6 +270,34 @@ public class GenericLakehouseCatalogOperations
               .withAuditInfo(auditInfo)
               .build();
       store.put(entityToStore);
+
+      // Get the value of register in table properties
+      boolean register =
+          Boolean.parseBoolean(
+              properties.getOrDefault(
+                  GenericLakehouseTablePropertiesMetadata.LAKEHOUSE_REGISTER, "false"));
+      if (register) {
+        // Do not need to create the physical table if this is a registration operation.
+        // Whether we need to check the existence of the physical table?
+        GenericLakehouseTable.Builder builder = GenericLakehouseTable.builder();
+        return builder
+            .withName(ident.name())
+            .withColumns(columns)
+            .withComment(comment)
+            .withProperties(properties)
+            .withDistribution(distribution)
+            .withIndexes(indexes)
+            .withAuditInfo(
+                AuditInfo.builder()
+                    .withCreator(PrincipalUtils.getCurrentUserName())
+                    .withCreateTime(Instant.now())
+                    .build())
+            .withPartitioning(partitions)
+            .withSortOrders(sortOrders)
+            .withFormat(LakehouseTableFormat.LANCE.lowerName())
+            .build();
+      }
+
       LakehouseCatalogOperations lanceCatalogOperations =
           getLakehouseCatalogOperations(newProperties);
       return lanceCatalogOperations.createTable(

@@ -73,12 +73,14 @@ import org.apache.gravitino.utils.PrincipalUtils;
 public class LanceCatalogOperations implements LakehouseCatalogOperations {
 
   private EntityStore store;
+  private HasPropertyMetadata propertyMetadata;
 
   @Override
   public void initialize(
       Map<String, String> config, CatalogInfo info, HasPropertyMetadata propertiesMetadata)
       throws RuntimeException {
     store = GravitinoEnv.getInstance().entityStore();
+    this.propertyMetadata = propertiesMetadata;
   }
 
   @Override
@@ -315,6 +317,18 @@ public class LanceCatalogOperations implements LakehouseCatalogOperations {
 
       if (!store.delete(ident, Entity.EntityType.TABLE)) {
         throw new RuntimeException("Failed to drop Lance table: " + ident.name());
+      }
+
+      boolean isRegisteredTable =
+          (boolean)
+              propertyMetadata
+                  .tablePropertiesMetadata()
+                  .getOrDefault(
+                      tableEntity.getProperties(),
+                      GenericLakehouseTablePropertiesMetadata.LAKEHOUSE_REGISTER);
+      if (isRegisteredTable) {
+        // If this is a register table. We only delete the metadata from metastore.
+        return true;
       }
 
       // Drop the Lance dataset from cloud storage.
