@@ -47,14 +47,14 @@ public class LanceConfig extends Config implements OverwriteDefaultConfig {
           .createWithDefault(GRAVITINO_NAMESPACE_BACKEND);
 
   public static final ConfigEntry<String> METALAKE_NAME =
-      new ConfigBuilder(LANCE_CONFIG_PREFIX + GRAVITINO_NAMESPACE_BACKEND + "." + CONFIG_METALAKE)
+      new ConfigBuilder(GRAVITINO_NAMESPACE_BACKEND + "." + CONFIG_METALAKE)
           .doc("The Metalake name for Lance Gravitino namespace backend")
           .version(ConfigConstants.VERSION_0_1_0)
           .stringConf()
           .create();
 
   public static final ConfigEntry<String> NAMESPACE_BACKEND_URI =
-      new ConfigBuilder(LANCE_CONFIG_PREFIX + GRAVITINO_NAMESPACE_BACKEND + "." + CONFIG_URI)
+      new ConfigBuilder(GRAVITINO_NAMESPACE_BACKEND + "." + CONFIG_URI)
           .doc("The URI of the namespace backend, e.g., Gravitino server URI")
           .version(ConfigConstants.VERSION_0_1_0)
           .stringConf()

@@ -82,7 +82,7 @@ gravitino.authorization.serviceAdmins = anonymous
 
 # THE CONFIGURATION FOR AUXILIARY SERVICE
 # Auxiliary service names, separate by ',', currently support iceberg-rest and lance-rest
-gravitino.auxService.names = iceberg-rest
+gravitino.auxService.names = iceberg-rest,lance-rest
 # Iceberg REST service classpath
 gravitino.iceberg-rest.classpath = iceberg-rest-server/libs, iceberg-rest-server/conf
 # Iceberg REST service host
