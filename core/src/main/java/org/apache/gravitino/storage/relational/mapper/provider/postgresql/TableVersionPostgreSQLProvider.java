@@ -61,7 +61,7 @@ public class TableVersionPostgreSQLProvider extends TableVersionBaseSQLProvider 
   public String softDeleteTableVersionByTableIdAndVersion(Long tableId, Long version) {
     return "UPDATE "
         + TABLE_NAME
-        + " SET deleted_at = floor(extract(epoch from(current_timestamp -"
+        + " SET deleted_at = round(extract(epoch from(current_timestamp -"
         + " timestamp '1970-01-01 00:00:00')) * 1000)"
         + " WHERE table_id = #{tableId} AND version = #{version}";
   }
