@@ -160,18 +160,18 @@ public class AuthorizationExpressionConverter {
     return expression.replaceAll(
         "CAN_GET_OWNER",
         """
-              ( entityType.toUpperCase() == 'CATALOG' && (%s)) ||
-              ( entityType.toUpperCase() == 'SCHEMA' && (%s)) ||
-              ( entityType.toUpperCase() == 'TABLE' && (%s)) ||
-              ( entityType.toUpperCase() == 'MODEL' && (%s)) ||
-              ( entityType.toUpperCase() == 'FILESET' && (%s)) ||
-              ( entityType.toUpperCase() == 'TOPIC' && (%s)) ||
-              ( entityType.toUpperCase() != 'CATALOG' &&
-              p_metadataObjectType.toUpperCase() != 'SCHEMA' &&
-              p_metadataObjectType.toUpperCase() != 'TABLE' &&
-              p_metadataObjectType.toUpperCase() != 'MODEL' &&
-              p_metadataObjectType.toUpperCase() != 'FILESET' &&
-              p_metadataObjectType.toUpperCase() != 'TOPIC')
+              ( entityType == 'CATALOG' && (%s)) ||
+              ( entityType == 'SCHEMA' && (%s)) ||
+              ( entityType == 'TABLE' && (%s)) ||
+              ( entityType == 'MODEL' && (%s)) ||
+              ( entityType == 'FILESET' && (%s)) ||
+              ( entityType == 'TOPIC' && (%s)) ||
+              ( entityType != 'CATALOG' &&
+              entityType != 'SCHEMA' &&
+              entityType != 'TABLE' &&
+              entityType != 'MODEL' &&
+              entityType != 'FILESET' &&
+              entityType != 'TOPIC')
               """
             .formatted(
                 loadCatalogAuthorizationExpression,

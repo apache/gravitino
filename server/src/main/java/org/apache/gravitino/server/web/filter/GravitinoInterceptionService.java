@@ -329,7 +329,7 @@ public class GravitinoInterceptionService implements InterceptionService {
       Parameter parameter = parameters[i];
       AuthorizationObjectType objectType = parameter.getAnnotation(AuthorizationObjectType.class);
       if (objectType != null) {
-        return String.valueOf(args[i]);
+        return String.valueOf(args[i]).toUpperCase();
       }
     }
     return null;
