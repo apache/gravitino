@@ -93,10 +93,10 @@ public class TestPropertiesMetadata {
                 tableProperties, GenericLakehouseTablePropertiesMetadata.LAKEHOUSE_LOCATION);
     Assertions.assertEquals("/tmp/test_table", tableLocation);
 
-    String tableFormat =
-        (String)
+    LakehouseTableFormat tableFormat =
+        (LakehouseTableFormat)
             tablePropertiesMetadata.getOrDefault(
                 tableProperties, GenericLakehouseTablePropertiesMetadata.LAKEHOUSE_FORMAT);
-    Assertions.assertEquals("iceberg", tableFormat);
+    Assertions.assertEquals(LakehouseTableFormat.ICEBERG, tableFormat);
   }
 }
