@@ -698,6 +698,11 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
   private boolean isManagedTable(NameIdentifier catalogIdent) {
     CatalogManager catalogManager = GravitinoEnv.getInstance().catalogManager();
     CatalogWrapper wrapper = catalogManager.loadCatalogAndWrap(catalogIdent);
+    if (wrapper == null || wrapper.catalog() == null) {
+      // Prevention for mis-configuration or in test env.
+      return false;
+    }
+
     Capability capability = wrapper.catalog().capability();
 
     CapabilityResult result = capability.managedStorage(Capability.Scope.TABLE);
