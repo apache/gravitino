@@ -314,9 +314,9 @@ public class OwnerAuthorizationIT extends BaseRestApiAuthorizationIT {
         MetadataObjects.of(ImmutableList.of(CATALOG), MetadataObject.Type.CATALOG));
     GravitinoMetalake gravitinoMetalakeLoadByNormalUser = normalUserClient.loadMetalake(METALAKE);
     gravitinoMetalake.revokePrivilegesFromRole(
-            role,
-            MetadataObjects.of(ImmutableList.of(CATALOG), MetadataObject.Type.CATALOG),
-            ImmutableList.of(Privileges.UseCatalog.allow()));
+        role,
+        MetadataObjects.of(ImmutableList.of(CATALOG), MetadataObject.Type.CATALOG),
+        ImmutableList.of(Privileges.UseCatalog.allow()));
     assertThrows(
         "Current user can not get owner",
         ForbiddenException.class,
@@ -325,9 +325,9 @@ public class OwnerAuthorizationIT extends BaseRestApiAuthorizationIT {
               MetadataObjects.of(ImmutableList.of(CATALOG), MetadataObject.Type.CATALOG));
         });
     gravitinoMetalake.grantPrivilegesToRole(
-            role,
-            MetadataObjects.of(ImmutableList.of(CATALOG), MetadataObject.Type.CATALOG),
-            ImmutableList.of(Privileges.UseCatalog.allow()));
+        role,
+        MetadataObjects.of(ImmutableList.of(CATALOG), MetadataObject.Type.CATALOG),
+        ImmutableList.of(Privileges.UseCatalog.allow()));
   }
 
   @Test
