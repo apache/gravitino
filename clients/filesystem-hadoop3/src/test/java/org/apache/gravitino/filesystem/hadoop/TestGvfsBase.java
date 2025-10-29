@@ -290,6 +290,11 @@ public class TestGvfsBase extends GravitinoMockServerBase {
                 .withBody(getJsonString(new VersionResponse(Version.getCurrentVersionDTO()))));
 
     try (FileSystem fs = new Path("gvfs://fileset/").getFileSystem(configuration)) {
+      // Trigger lazy initialization by accessing a path (throws RESTException for mock server 404)
+      assertThrows(
+          RESTException.class,
+          () -> fs.exists(new Path("gvfs://fileset/catalog/schema/fileset/file.txt")));
+      // Verify the request was made with correct headers during client initialization
       mockServer().verify(req, VerificationTimes.once());
     }
   }
@@ -1011,7 +1016,10 @@ public class TestGvfsBase extends GravitinoMockServerBase {
         Assertions.assertThrows(
             IllegalArgumentException.class,
             () -> {
-              try (FileSystem fs = new Path("gvfs://fileset/").getFileSystem(configuration)) {}
+              try (FileSystem fs = new Path("gvfs://fileset/").getFileSystem(configuration)) {
+                // Trigger lazy initialization by accessing a path
+                fs.exists(new Path("gvfs://fileset/catalog/schema/fileset/file.txt"));
+              }
             });
     Assertions.assertEquals(
         "Invalid property for client: gravitino.client.xxxx", throwable.getMessage());
@@ -1037,7 +1045,10 @@ public class TestGvfsBase extends GravitinoMockServerBase {
         Assertions.assertThrows(
             RESTException.class,
             () -> {
-              try (FileSystem fs = new Path("gvfs://fileset/").getFileSystem(configuration)) {}
+              try (FileSystem fs = new Path("gvfs://fileset/").getFileSystem(configuration)) {
+                // Trigger lazy initialization by accessing a path
+                fs.exists(new Path("gvfs://fileset/catalog/schema/fileset/file.txt"));
+              }
             });
     Assertions.assertInstanceOf(SocketTimeoutException.class, throwable.getCause());
     Assertions.assertEquals("Read timed out", throwable.getCause().getMessage());

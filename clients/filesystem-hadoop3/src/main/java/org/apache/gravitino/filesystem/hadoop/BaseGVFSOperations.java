@@ -114,8 +114,14 @@ public abstract class BaseGVFSOperations implements Closeable {
 
   private final String metalakeName;
 
-  private final Optional<FilesetMetadataCache> filesetMetadataCache;
-  private final GravitinoClient gravitinoClient;
+  private final boolean enableFilesetMetadataCache;
+
+  // Lazy initialization of FilesetCatalogCache, see getFilesetMetadataCache() for details.
+  private volatile Optional<FilesetMetadataCache> filesetMetadataCache;
+  private final Object filesetMetadataCacheLock = new Object();
+
+  // Lazy initialization of GravitinoClient, see getGravitinoClient() for details.
+  private volatile GravitinoClient gravitinoClient;
 
   private final Configuration conf;
 
@@ -148,15 +154,10 @@ public abstract class BaseGVFSOperations implements Closeable {
         "'%s' is not set in the configuration",
         GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_CLIENT_METALAKE_KEY);
 
-    this.gravitinoClient = GravitinoVirtualFileSystemUtils.createClient(configuration);
-    boolean enableFilesetCatalogCache =
+    this.enableFilesetMetadataCache =
         configuration.getBoolean(
             FS_GRAVITINO_FILESET_METADATA_CACHE_ENABLE,
             FS_GRAVITINO_FILESET_METADATA_CACHE_ENABLE_DEFAULT);
-    this.filesetMetadataCache =
-        enableFilesetCatalogCache
-            ? Optional.of(new FilesetMetadataCache(gravitinoClient))
-            : Optional.empty();
 
     this.internalFileSystemCache = newFileSystemCache(configuration);
 
@@ -187,6 +188,26 @@ public abstract class BaseGVFSOperations implements Closeable {
     this.conf = configuration;
   }
 
+  /**
+   * Lazy initialization of FilesetMetadataCache, see getFilesetMetadataCache() for details.
+   *
+   * @return the FilesetMetadataCache.
+   */
+  @VisibleForTesting
+  protected Optional<FilesetMetadataCache> getFilesetMetadataCache() {
+    if (filesetMetadataCache == null) {
+      synchronized (filesetMetadataCacheLock) {
+        if (filesetMetadataCache == null) {
+          this.filesetMetadataCache =
+              enableFilesetMetadataCache
+                  ? Optional.of(new FilesetMetadataCache(getGravitinoClient()))
+                  : Optional.empty();
+        }
+      }
+    }
+    return filesetMetadataCache;
+  }
+
   @Override
   public void close() throws IOException {
     // close all actual FileSystems
@@ -200,10 +221,19 @@ public abstract class BaseGVFSOperations implements Closeable {
     internalFileSystemCache.invalidateAll();
 
     try {
-      if (filesetMetadataCache.isPresent()) {
+      if (filesetMetadataCache != null && filesetMetadataCache.isPresent()) {
         filesetMetadataCache.get().close();
       }
     } catch (IOException e) {
+      // ignore
+    }
+
+    // Close the GravitinoClient if it was initialized
+    try {
+      if (gravitinoClient != null) {
+        gravitinoClient.close();
+      }
+    } catch (Exception e) {
       // ignore
     }
   }
@@ -548,9 +578,9 @@ public abstract class BaseGVFSOperations implements Closeable {
    * @return the fileset catalog.
    */
   protected FilesetCatalog getFilesetCatalog(NameIdentifier catalogIdent) {
-    return filesetMetadataCache
+    return getFilesetMetadataCache()
         .map(cache -> cache.getFilesetCatalog(catalogIdent))
-        .orElseGet(() -> gravitinoClient.loadCatalog(catalogIdent.name()).asFilesetCatalog());
+        .orElseGet(() -> getGravitinoClient().loadCatalog(catalogIdent.name()).asFilesetCatalog());
   }
 
   /**
@@ -561,7 +591,7 @@ public abstract class BaseGVFSOperations implements Closeable {
    * @return the fileset.
    */
   protected Fileset getFileset(NameIdentifier filesetIdent) {
-    return filesetMetadataCache
+    return getFilesetMetadataCache()
         .map(cache -> cache.getFileset(filesetIdent))
         .orElseGet(
             () ->
@@ -575,6 +605,24 @@ public abstract class BaseGVFSOperations implements Closeable {
   @VisibleForTesting
   Cache<Pair<NameIdentifier, String>, FileSystem> internalFileSystemCache() {
     return internalFileSystemCache;
+  }
+
+  /**
+   * Lazy initialization of GravitinoClient using double-checked locking pattern. This ensures the
+   * expensive client creation only happens when actually needed.
+   *
+   * @return the GravitinoClient
+   */
+  @VisibleForTesting
+  GravitinoClient getGravitinoClient() {
+    if (gravitinoClient == null) {
+      synchronized (this) {
+        if (gravitinoClient == null) {
+          this.gravitinoClient = GravitinoVirtualFileSystemUtils.createClient(conf);
+        }
+      }
+    }
+    return gravitinoClient;
   }
 
   private void setCallerContextForGetFileLocation(FilesetDataOperation operation) {
@@ -594,7 +642,15 @@ public abstract class BaseGVFSOperations implements Closeable {
     CallerContext.CallerContextHolder.set(callerContext);
   }
 
-  private FileSystem getActualFileSystemByLocationName(
+  /**
+   * Get the actual file system corresponding to the given fileset identifier and location name.
+   *
+   * @param filesetIdent the fileset identifier.
+   * @param locationName the location name. null means the default location.
+   * @return the actual file system.
+   * @throws FileNotFoundException if the target location name is not found in the fileset.
+   */
+  protected FileSystem getActualFileSystemByLocationName(
       NameIdentifier filesetIdent, String locationName) throws FileNotFoundException {
     NameIdentifier catalogIdent =
         NameIdentifier.of(filesetIdent.namespace().level(0), filesetIdent.namespace().level(1));
