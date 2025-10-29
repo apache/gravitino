@@ -45,7 +45,7 @@ public class TableVersionPostgreSQLProvider extends TableVersionBaseSQLProvider 
         + " #{tablePO.currentVersion},"
         + " #{tablePO.deletedAt}"
         + " )"
-        + " ON CONFLICT (table_id, deleted_at) DO UPDATE SET"
+        + " ON CONFLICT (table_id, version, deleted_at) DO UPDATE SET"
         + " format = #{tablePO.format},"
         + " properties = #{tablePO.properties},"
         + " partitioning = #{tablePO.partitions},"
