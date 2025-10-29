@@ -194,11 +194,8 @@ public class TableMetaService {
                 .getParentEntityIdByNamespace(newTableEntity.namespace())
             : schemaId;
 
-    boolean isColumnChanged =
-        TableColumnMetaService.getInstance().isColumnUpdated(oldTableEntity, newTableEntity);
     TablePO newTablePO =
-        POConverters.updateTablePOWithVersionAndSchemaId(
-            oldTablePO, newTableEntity, isColumnChanged, newSchemaId);
+        POConverters.updateTablePOWithVersionAndSchemaId(oldTablePO, newTableEntity, newSchemaId);
 
     final AtomicInteger updateResult = new AtomicInteger(0);
     try {
@@ -217,7 +214,7 @@ public class TableMetaService {
                     mapper.insertTableVersionOnDuplicateKeyUpdate(newTablePO);
                   }),
           () -> {
-            if (updateResult.get() > 0 && (isColumnChanged || isSchemaChanged)) {
+            if (updateResult.get() > 0) {
               TableColumnMetaService.getInstance()
                   .updateColumnPOsFromTableDiff(oldTableEntity, newTableEntity, newTablePO);
             }
