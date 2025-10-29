@@ -1266,8 +1266,8 @@ public class TestJDBCBackend {
             .build();
 
     backend.update(table.nameIdentifier(), EntityType.TABLE, e -> updatedTable);
-    long now = System.currentTimeMillis();
     Thread.sleep(1000);
+    long now = System.currentTimeMillis();
 
     // For update lance table, we will do the following things
     // 1. Update info in table table_meta;
