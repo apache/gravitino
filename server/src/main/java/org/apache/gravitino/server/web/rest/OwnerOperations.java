@@ -47,6 +47,7 @@ import org.apache.gravitino.server.authorization.NameBindings;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationExpression;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationFullName;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationMetadata;
+import org.apache.gravitino.server.authorization.annotations.AuthorizationObjectType;
 import org.apache.gravitino.server.web.Utils;
 import org.apache.gravitino.utils.MetadataObjectUtil;
 
@@ -76,7 +77,7 @@ public class OwnerOperations {
   public Response getOwnerForObject(
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
           String metalake,
-      @PathParam("metadataObjectType") String metadataObjectType,
+      @PathParam("metadataObjectType") @AuthorizationObjectType String metadataObjectType,
       @PathParam("fullName") @AuthorizationFullName String fullName) {
     try {
       MetadataObject object =
