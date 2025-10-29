@@ -20,6 +20,7 @@ package org.apache.gravitino.client.integration.test.authorization;
 import static org.junit.Assert.assertThrows;
 
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Maps;
 import java.io.IOException;
 import java.util.Collections;
@@ -316,7 +317,7 @@ public class OwnerAuthorizationIT extends BaseRestApiAuthorizationIT {
     gravitinoMetalake.revokePrivilegesFromRole(
         role,
         MetadataObjects.of(ImmutableList.of(CATALOG), MetadataObject.Type.CATALOG),
-        ImmutableList.of(Privileges.UseCatalog.allow()));
+        ImmutableSet.of(Privileges.UseCatalog.allow()));
     assertThrows(
         "Current user can not get owner",
         ForbiddenException.class,
@@ -327,7 +328,7 @@ public class OwnerAuthorizationIT extends BaseRestApiAuthorizationIT {
     gravitinoMetalake.grantPrivilegesToRole(
         role,
         MetadataObjects.of(ImmutableList.of(CATALOG), MetadataObject.Type.CATALOG),
-        ImmutableList.of(Privileges.UseCatalog.allow()));
+        ImmutableSet.of(Privileges.UseCatalog.allow()));
   }
 
   @Test
