@@ -24,6 +24,8 @@ import static org.apache.gravitino.file.Fileset.PROPERTY_DEFAULT_LOCATION_NAME;
 import static org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_CURRENT_LOCATION_NAME;
 import static org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_FILESET_METADATA_CACHE_ENABLE;
 import static org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_FILESET_METADATA_CACHE_ENABLE_DEFAULT;
+import static org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_FILESET_PROPERT_KEYNAME_PREFIX;
+import static org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_FILESET_PROPERT_PREFIX;
 import static org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystemUtils.extractIdentifier;
 import static org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystemUtils.getConfigMap;
 import static org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystemUtils.getSubPathFromGvfsPath;
@@ -44,6 +46,7 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.net.URI;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -647,6 +650,7 @@ public abstract class BaseGVFSOperations implements Closeable {
               allProperties.putAll(schema.properties());
 
               allProperties.putAll(fileset.properties());
+              allProperties.putAll(getSpecialFilesetConfigs(filesetIdent));
 
               FileSystem actualFileSystem =
                   getActualFileSystemByPath(targetLocation, allProperties);
@@ -688,6 +692,74 @@ public abstract class BaseGVFSOperations implements Closeable {
 
       throw e;
     }
+  }
+
+  private Map<String, String> getSpecialFilesetConfigs(NameIdentifier ident) {
+    // retrieve the special fileset properties from the configuration
+    // the configuration key pattern is
+    // fs.gravitino.fileset.properties.catalog.schema.fileset.keyname.property_key
+    // e.g.,
+    // fs.gravitino.fileset.properties.my_catalog.my_schema.my_fileset.some_property_key=some_value
+    // or fs.gravitino.fileset.properties.my_catalog.my_schema.some_property_key=some_value
+    // the fileset level properties will override the schema level properties, which will override
+    // the catalog level properties
+    Map<String, String> properties = new HashMap<>();
+    Map<String, String> schemaProperties = new HashMap<>();
+    Map<String, String> filesetProperties = new HashMap<>();
+
+    int levelCount = ident.namespace().levels().length;
+    Preconditions.checkArgument(levelCount >= 2, "identifier %s is invalid.", ident);
+
+    String catalog = ident.namespace().level(1);
+    String schema = levelCount == 3 ? ident.namespace().level(2) : null;
+    String fileset = levelCount == 4 ? ident.namespace().level(3) : null;
+
+    conf.forEach(
+        entry -> {
+          String key = entry.getKey();
+          String value = entry.getValue();
+
+          String catalogPrefix =
+              String.format(
+                  "%s.%s.%s.",
+                  FS_GRAVITINO_FILESET_PROPERT_PREFIX,
+                  catalog,
+                  FS_GRAVITINO_FILESET_PROPERT_KEYNAME_PREFIX);
+          String schemaPrefix =
+              schema != null
+                  ? String.format(
+                      "%s.%s.%s.%s.",
+                      FS_GRAVITINO_FILESET_PROPERT_PREFIX,
+                      catalog,
+                      schema,
+                      FS_GRAVITINO_FILESET_PROPERT_KEYNAME_PREFIX)
+                  : null;
+          String filesetPrefix =
+              fileset != null
+                  ? String.format(
+                      "%s.%s.%s.%s.%s.",
+                      FS_GRAVITINO_FILESET_PROPERT_PREFIX,
+                      catalog,
+                      schema,
+                      fileset,
+                      FS_GRAVITINO_FILESET_PROPERT_KEYNAME_PREFIX)
+                  : null;
+
+          if (filesetPrefix != null && key.startsWith(filesetPrefix)) {
+            String configKey = key.substring(filesetPrefix.length());
+            filesetProperties.put(configKey, value);
+          } else if (schemaPrefix != null && key.startsWith(schemaPrefix)) {
+            String configKey = key.substring(schemaPrefix.length());
+            schemaProperties.put(configKey, value);
+          } else if (key.startsWith(catalogPrefix)) {
+            String configKey = key.substring(catalogPrefix.length());
+            properties.put(configKey, value);
+          }
+        });
+
+    properties.putAll(schemaProperties);
+    properties.putAll(filesetProperties);
+    return properties;
   }
 
   private FileSystem getActualFileSystemByPath(
