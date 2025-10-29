@@ -82,7 +82,7 @@ public class TableVersionBaseSQLProvider {
         + TABLE_NAME
         + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
         + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
-        + " + floor(random() * 10)::int"
+        + " + CAST(FLOOR(RAND() * 10) AS SIGNED)"
         + " WHERE table_id = #{tableId} AND version = #{version} AND deleted_at = 0";
   }
 
