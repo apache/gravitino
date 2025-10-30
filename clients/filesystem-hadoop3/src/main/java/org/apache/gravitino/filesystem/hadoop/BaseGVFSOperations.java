@@ -896,7 +896,8 @@ public abstract class BaseGVFSOperations implements Closeable {
             if (scheme.equals(SCHEME_HDFS)) {
               Configuration fsConfig =
                   FileSystemUtils.createConfiguration(GRAVITINO_BYPASS, allProperties);
-              fs = new HDFSAuthenticationFileSystem(actualFilePath, fsConfig);
+              HDFSFileSystemProxy proxy = new HDFSFileSystemProxy(actualFilePath, fsConfig);
+              fs = proxy.getProxy();
             } else {
               fs = provider.getFileSystem(actualFilePath, allProperties);
             }
