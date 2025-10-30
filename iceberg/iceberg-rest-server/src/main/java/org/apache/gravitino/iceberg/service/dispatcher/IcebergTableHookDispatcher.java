@@ -36,11 +36,13 @@ import org.apache.gravitino.utils.PrincipalUtils;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.rest.requests.CreateTableRequest;
+import org.apache.iceberg.rest.requests.PlanTableScanRequest;
 import org.apache.iceberg.rest.requests.RenameTableRequest;
 import org.apache.iceberg.rest.requests.UpdateTableRequest;
 import org.apache.iceberg.rest.responses.ListTablesResponse;
 import org.apache.iceberg.rest.responses.LoadCredentialsResponse;
 import org.apache.iceberg.rest.responses.LoadTableResponse;
+import org.apache.iceberg.rest.responses.PlanTableScanResponse;
 
 public class IcebergTableHookDispatcher implements IcebergTableOperationDispatcher {
 
@@ -159,6 +161,27 @@ public class IcebergTableHookDispatcher implements IcebergTableOperationDispatch
   public LoadCredentialsResponse getTableCredentials(
       IcebergRequestContext context, TableIdentifier tableIdentifier) {
     return dispatcher.getTableCredentials(context, tableIdentifier);
+  }
+
+  /**
+   * Plan table scan and return scan tasks.
+   *
+   * <p>This method performs server-side scan planning to optimize query performance by reducing
+   * client-side metadata loading and enabling parallel task execution.
+   *
+   * @param context Iceberg REST request context information.
+   * @param tableIdentifier The Iceberg table identifier.
+   * @param scanRequest The scan request parameters including filters, projections, snapshot-id,
+   *     etc.
+   * @return A PlanTableScanResponse containing the scan plan with plan-id and tasks. The response
+   *     format follows Iceberg REST API specification.
+   */
+  @Override
+  public PlanTableScanResponse planTableScan(
+      IcebergRequestContext context,
+      TableIdentifier tableIdentifier,
+      PlanTableScanRequest scanRequest) {
+    return dispatcher.planTableScan(context, tableIdentifier, scanRequest);
   }
 
   private void importTable(String catalogName, Namespace namespace, String tableName) {
