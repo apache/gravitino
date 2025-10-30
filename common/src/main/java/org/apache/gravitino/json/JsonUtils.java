@@ -18,6 +18,10 @@
  */
 package org.apache.gravitino.json;
 
+import static org.apache.gravitino.dto.rel.expressions.FunctionArg.ArgType.FIELD;
+import static org.apache.gravitino.dto.rel.expressions.FunctionArg.ArgType.FUNCTION;
+import static org.apache.gravitino.dto.rel.expressions.FunctionArg.ArgType.LITERAL;
+
 import com.fasterxml.jackson.annotation.JsonAutoDetect;
 import com.fasterxml.jackson.annotation.PropertyAccessor;
 import com.fasterxml.jackson.core.JacksonException;
@@ -80,11 +84,20 @@ import org.apache.gravitino.dto.rel.partitions.RangePartitionDTO;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.TableChange;
 import org.apache.gravitino.rel.expressions.Expression;
+import org.apache.gravitino.rel.expressions.FunctionExpression;
+import org.apache.gravitino.rel.expressions.NamedReference;
+import org.apache.gravitino.rel.expressions.NamedReference.FieldReference;
 import org.apache.gravitino.rel.expressions.UnparsedExpression;
+import org.apache.gravitino.rel.expressions.distributions.Distributions.DistributionImpl;
 import org.apache.gravitino.rel.expressions.distributions.Strategy;
+import org.apache.gravitino.rel.expressions.literals.Literal;
+import org.apache.gravitino.rel.expressions.literals.Literals;
 import org.apache.gravitino.rel.expressions.sorts.NullOrdering;
 import org.apache.gravitino.rel.expressions.sorts.SortDirection;
+import org.apache.gravitino.rel.expressions.sorts.SortOrders;
+import org.apache.gravitino.rel.expressions.sorts.SortOrders.SortImpl;
 import org.apache.gravitino.rel.indexes.Index;
+import org.apache.gravitino.rel.indexes.Indexes.IndexImpl;
 import org.apache.gravitino.rel.types.Type;
 import org.apache.gravitino.rel.types.Types;
 import org.apache.gravitino.stats.StatisticValue;
@@ -113,6 +126,8 @@ public class JsonUtils {
   private static final String SORT_TERM = "sortTerm";
   private static final String DIRECTION = "direction";
   private static final String NULL_ORDERING = "nullOrdering";
+
+  private static final String EXPRESSIONS = "expressions";
 
   private static final String INDEX_TYPE = "indexType";
   private static final String INDEX_NAME = "name";
@@ -304,6 +319,14 @@ public class JsonUtils {
                 new SimpleModule()
                     .addDeserializer(Type.class, new TypeDeserializer())
                     .addSerializer(Type.class, new TypeSerializer())
+                    .addDeserializer(IndexImpl.class, new IndexImplDeserializer())
+                    .addSerializer(IndexImpl.class, new IndexImplSerializer())
+                    .addDeserializer(DistributionImpl.class, new DistributionImplDeserializer())
+                    .addSerializer(DistributionImpl.class, new DistributionImplSerializer())
+                    .addDeserializer(Partitioning.class, new PartitioningDeserializer())
+                    .addSerializer(Partitioning.class, new PartitioningSerializer())
+                    .addDeserializer(SortOrders.SortImpl.class, new SortOrderImplDeserializer())
+                    .addSerializer(SortOrders.SortImpl.class, new SortOrderImplSerializer())
                     .addDeserializer(Expression.class, new ColumnDefaultValueDeserializer())
                     .addSerializer(Expression.class, new ColumnDefaultValueSerializer())
                     .addDeserializer(StatisticValue.class, new StatisticValueDeserializer())
@@ -477,6 +500,81 @@ public class JsonUtils {
         throw new IOException("Unknown function argument type: " + arg.argType());
     }
     gen.writeEndObject();
+  }
+
+  private static void writeExpression(Expression expression, JsonGenerator gen) throws IOException {
+    gen.writeStartObject();
+    if (expression instanceof Literal literal) {
+      gen.writeStringField(EXPRESSION_TYPE, LITERAL.name().toLowerCase());
+      gen.writeFieldName(DATA_TYPE);
+      writeDataType(literal.dataType(), gen);
+      gen.writeStringField(
+          LITERAL_VALUE, literal.value() == null ? null : literal.value().toString());
+    } else if (expression instanceof FieldReference fieldReference) {
+      gen.writeStringField(EXPRESSION_TYPE, FIELD.name().toLowerCase());
+      gen.writeFieldName(FIELD_NAME);
+      gen.writeObject(fieldReference.fieldName());
+    } else if (expression instanceof FunctionExpression functionExpression) {
+      gen.writeStringField(EXPRESSION_TYPE, FUNCTION.name().toLowerCase());
+      gen.writeStringField(FUNCTION_NAME, functionExpression.functionName());
+      gen.writeArrayFieldStart(FUNCTION_ARGS);
+      for (Expression funcArg : functionExpression.arguments()) {
+        writeExpression(funcArg, gen);
+      }
+      gen.writeEndArray();
+    } else if (expression instanceof UnparsedExpression unparsedExpression) {
+      gen.writeStringField(EXPRESSION_TYPE, FunctionArg.ArgType.UNPARSED.name().toLowerCase());
+      gen.writeStringField(UNPARSED_EXPRESSION, unparsedExpression.unparsedExpression());
+    } else {
+      throw new IOException("Unknown expression type: " + expression.getClass().getName());
+    }
+    gen.writeEndObject();
+  }
+
+  private static Expression readExpression(JsonNode node) {
+    Preconditions.checkArgument(
+        node != null && !node.isNull() && node.isObject(),
+        "Cannot parse expression from invalid JSON: %s",
+        node);
+    Preconditions.checkArgument(
+        node.has(EXPRESSION_TYPE), "Cannot parse expression from missing type: %s", node);
+    String type = getString(EXPRESSION_TYPE, node);
+    switch (FunctionArg.ArgType.valueOf(type.toUpperCase())) {
+      case LITERAL:
+        Preconditions.checkArgument(
+            node.has(DATA_TYPE), "Cannot parse literal from missing data type: %s", node);
+        Preconditions.checkArgument(
+            node.has(LITERAL_VALUE), "Cannot parse literal from missing literal value: %s", node);
+        Type dataType = readDataType(node.get(DATA_TYPE));
+        String value = getStringOrNull(LITERAL_VALUE, node);
+        return Literals.of(value, dataType);
+      case FIELD:
+        Preconditions.checkArgument(
+            node.has(FIELD_NAME), "Cannot parse field reference from missing field name: %s", node);
+        String[] fieldName = getStringList(FIELD_NAME, node).toArray(new String[0]);
+        return NamedReference.field(fieldName);
+      case FUNCTION:
+        Preconditions.checkArgument(
+            node.has(FUNCTION_NAME),
+            "Cannot parse function expression from missing function name: %s",
+            node);
+        Preconditions.checkArgument(
+            node.has(FUNCTION_ARGS),
+            "Cannot parse function expression from missing function args: %s",
+            node);
+        String functionName = getString(FUNCTION_NAME, node);
+        List<Expression> args = Lists.newArrayList();
+        node.get(FUNCTION_ARGS).forEach(arg -> args.add(readExpression(arg)));
+        return FunctionExpression.of(functionName, args.toArray(Expression.EMPTY_EXPRESSION));
+      case UNPARSED:
+        Preconditions.checkArgument(
+            node.has(UNPARSED_EXPRESSION) && node.get(UNPARSED_EXPRESSION).isTextual(),
+            "Cannot parse unparsed expression from missing string field unparsedExpression: %s",
+            node);
+        return UnparsedExpression.of(getString(UNPARSED_EXPRESSION, node));
+      default:
+        throw new IllegalArgumentException("Unknown expression type: " + type);
+    }
   }
 
   private static void writePartition(PartitionDTO value, JsonGenerator gen) throws IOException {
@@ -1281,6 +1379,39 @@ public class JsonUtils {
     }
   }
 
+  public static class SortOrderImplSerializer extends JsonSerializer<SortImpl> {
+    @Override
+    public void serialize(SortImpl value, JsonGenerator gen, SerializerProvider serializers)
+        throws IOException {
+      gen.writeStartObject();
+      gen.writeFieldName(SORT_TERM);
+      writeExpression(value.expression(), gen);
+      gen.writeStringField(DIRECTION, value.direction().toString());
+      gen.writeStringField(NULL_ORDERING, value.nullOrdering().toString());
+      gen.writeEndObject();
+    }
+  }
+
+  /** Custom JSON deserializer for SortOrderDTO objects. */
+  public static class SortOrderImplDeserializer extends JsonDeserializer<SortImpl> {
+    @Override
+    public SortImpl deserialize(JsonParser p, DeserializationContext ctxt)
+        throws IOException, JacksonException {
+      JsonNode node = p.getCodec().readTree(p);
+      Preconditions.checkArgument(
+          node != null && !node.isNull() && node.isObject(),
+          "Cannot parse sort order from invalid JSON: %s",
+          node);
+      Preconditions.checkArgument(
+          node.has(SORT_TERM), "Cannot parse sort order from missing sort term: %s", node);
+      Expression sortTerm = readExpression(node.get(SORT_TERM));
+      SortDirection direction = SortDirection.fromString(getString(DIRECTION, node));
+      NullOrdering nullOrdering =
+          NullOrdering.valueOf(getString(NULL_ORDERING, node).toUpperCase());
+      return SortOrders.of(sortTerm, direction, nullOrdering);
+    }
+  }
+
   /** Custom JSON serializer for DistributionDTO objects. */
   public static class DistributionSerializer extends JsonSerializer<DistributionDTO> {
     @Override
@@ -1317,6 +1448,46 @@ public class JsonUtils {
       List<FunctionArg> args = Lists.newArrayList();
       node.get(FUNCTION_ARGS).forEach(arg -> args.add(readFunctionArg(arg)));
       return builder.withArgs(args.toArray(FunctionArg.EMPTY_ARGS)).build();
+    }
+  }
+
+  /** Custom JSON serializer for DistributionDTO objects. */
+  public static class DistributionImplSerializer extends JsonSerializer<DistributionImpl> {
+    @Override
+    public void serialize(DistributionImpl value, JsonGenerator gen, SerializerProvider serializers)
+        throws IOException {
+      gen.writeStartObject();
+      gen.writeStringField(STRATEGY, value.strategy().name().toLowerCase());
+      gen.writeNumberField(NUMBER, value.number());
+      gen.writeArrayFieldStart(EXPRESSIONS);
+      for (Expression expression : value.expressions()) {
+        writeExpression(expression, gen);
+      }
+      gen.writeEndArray();
+      gen.writeEndObject();
+    }
+  }
+
+  /** Custom JSON deserializer for DistributionDTO objects. */
+  public static class DistributionImplDeserializer extends JsonDeserializer<DistributionImpl> {
+    @Override
+    public DistributionImpl deserialize(JsonParser p, DeserializationContext ctxt)
+        throws IOException {
+      JsonNode node = p.getCodec().readTree(p);
+      Preconditions.checkArgument(
+          node != null && !node.isNull() && node.isObject(),
+          "Cannot parse distribution from invalid JSON: %s",
+          node);
+      DistributionImpl.Builder builder = new DistributionImpl.Builder();
+      if (node.has(STRATEGY)) {
+        String strategy = getString(STRATEGY, node);
+        builder.withStrategy(Strategy.getByName(strategy));
+      }
+
+      builder.withNumber(getInt(NUMBER, node));
+      List<Expression> args = Lists.newArrayList();
+      node.get(EXPRESSIONS).forEach(expression -> args.add(readExpression(expression)));
+      return builder.withExpressions(args.toArray(Expression.EMPTY_EXPRESSION)).build();
     }
   }
 
@@ -1494,6 +1665,49 @@ public class JsonUtils {
       List<String[]> fieldNames = Lists.newArrayList();
       node.get(INDEX_FIELD_NAMES)
           .forEach(field -> fieldNames.add(getStringArray((ArrayNode) field)));
+      builder.withFieldNames(fieldNames.toArray(new String[0][0]));
+      return builder.build();
+    }
+  }
+
+  public static class IndexImplSerializer extends JsonSerializer<IndexImpl> {
+    @Override
+    public void serialize(IndexImpl value, JsonGenerator gen, SerializerProvider serializers)
+        throws IOException {
+      gen.writeStartObject();
+      gen.writeStringField("indexType", value.type().name().toUpperCase(Locale.ROOT));
+      if (null != value.name()) {
+        gen.writeStringField("name", value.name());
+      }
+      gen.writeFieldName("fieldNames");
+      gen.writeObject(value.fieldNames());
+      gen.writeEndObject();
+    }
+  }
+
+  /** Custom JSON deserializer for IndexImpl objects. */
+  public static class IndexImplDeserializer extends JsonDeserializer<IndexImpl> {
+
+    @Override
+    public IndexImpl deserialize(JsonParser p, DeserializationContext ctxt) throws IOException {
+      JsonNode node = p.getCodec().readTree(p);
+      Preconditions.checkArgument(
+          node != null && !node.isNull() && node.isObject(),
+          "Index must be a valid JSON object, but found: %s",
+          node);
+
+      IndexImpl.Builder builder = IndexImpl.builder();
+      Preconditions.checkArgument(
+          node.has("indexType"), "Cannot parse index from missing type: %s", node);
+      String indexType = getString("indexType", node);
+      builder.withIndexType(Index.IndexType.valueOf(indexType.toUpperCase(Locale.ROOT)));
+      if (node.has("name")) {
+        builder.withName(getString("name", node));
+      }
+      Preconditions.checkArgument(
+          node.has("fieldNames"), "Cannot parse index from missing field names: %s", node);
+      List<String[]> fieldNames = Lists.newArrayList();
+      node.get("fieldNames").forEach(field -> fieldNames.add(getStringArray((ArrayNode) field)));
       builder.withFieldNames(fieldNames.toArray(new String[0][0]));
       return builder.build();
     }

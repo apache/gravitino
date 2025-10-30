@@ -60,6 +60,8 @@ import org.apache.gravitino.policy.Policy;
 import org.apache.gravitino.policy.PolicyContent;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.expressions.Expression;
+import org.apache.gravitino.rel.expressions.distributions.Distributions.DistributionImpl;
+import org.apache.gravitino.rel.expressions.sorts.SortOrders;
 import org.apache.gravitino.rel.indexes.Indexes.IndexImpl;
 import org.apache.gravitino.rel.types.Type;
 import org.apache.gravitino.storage.relational.po.CatalogPO;
@@ -407,9 +409,16 @@ public class POConverters {
           .withIndexes(
               tableEntity.getIndexes() == null
                   ? null
-                  : JsonUtils.anyFieldMapper().writeValueAsString(tableEntity.getIndexes()));
-
-      // TODO, handle these fields(distribution, sort order, partition) later
+                  : JsonUtils.anyFieldMapper().writeValueAsString(tableEntity.getIndexes()))
+          .withDistribution(
+              tableEntity.getDistribution() == null
+                  ? null
+                  : JsonUtils.anyFieldMapper().writeValueAsString(tableEntity.getDistribution()))
+          .withSortOrders(
+              tableEntity.getSortOrder() == null
+                  ? null
+                  : JsonUtils.anyFieldMapper().writeValueAsString(tableEntity.getSortOrder()));
+      // TODO support partitions later
       return builder.build();
     } catch (JsonProcessingException e) {
       throw new RuntimeException("Failed to serialize json object:", e);
@@ -452,8 +461,16 @@ public class POConverters {
                   newTable.getIndexes() == null
                       ? null
                       : JsonUtils.anyFieldMapper().writeValueAsString(newTable.getIndexes()))
+              .withDistribution(
+                  newTable.getDistribution() == null
+                      ? null
+                      : JsonUtils.anyFieldMapper().writeValueAsString(newTable.getDistribution()))
+              .withSortOrders(
+                  newTable.getSortOrder() == null
+                      ? null
+                      : JsonUtils.anyFieldMapper().writeValueAsString(newTable.getSortOrder()))
+              // TODO support partitions later
               .withFormat(newTable.getFormat());
-      // TODO other fields(partitioning, distribution, sortorder) in the refactor PRs.
 
       return builder.build();
     } catch (JsonProcessingException e) {
@@ -482,11 +499,21 @@ public class POConverters {
           .withColumns(fromColumnPOs(columnPOs))
           .withAuditInfo(
               JsonUtils.anyFieldMapper().readValue(tablePO.getAuditInfo(), AuditInfo.class))
-          // TODO add field partition, distribution and sort order;
+          .withDistribution(
+              StringUtils.isBlank(tablePO.getDistribution())
+                  ? null
+                  : JsonUtils.anyFieldMapper()
+                      .readValue(tablePO.getDistribution(), DistributionImpl.class))
+          .withSortOrder(
+              StringUtils.isBlank(tablePO.getSortOrders())
+                  ? null
+                  : JsonUtils.anyFieldMapper()
+                      .readValue(tablePO.getSortOrders(), SortOrders.SortImpl[].class))
           .withIndexes(
               StringUtils.isBlank(tablePO.getIndexes())
                   ? null
                   : JsonUtils.anyFieldMapper().readValue(tablePO.getIndexes(), IndexImpl[].class))
+          // TODO add field partition, distribution and sort order;
           .withFormat(tablePO.getFormat())
           .withComment(tablePO.getComment())
           .withProperties(

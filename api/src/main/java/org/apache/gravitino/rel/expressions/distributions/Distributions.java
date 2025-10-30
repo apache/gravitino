@@ -129,6 +129,13 @@ public class Distributions {
     private final int number;
     private final Expression[] expressions;
 
+    // Default constructor for serialization frameworks
+    private DistributionImpl() {
+      this.strategy = null;
+      this.number = 0;
+      this.expressions = null;
+    }
+
     private DistributionImpl(Strategy strategy, int number, Expression[] expressions) {
       this.strategy = strategy;
       this.number = number;
@@ -242,7 +249,7 @@ public class Distributions {
        *
        * @return The created distribution.
        */
-      public Distribution build() {
+      public DistributionImpl build() {
         return new DistributionImpl(strategy, number, expressions);
       }
     }
