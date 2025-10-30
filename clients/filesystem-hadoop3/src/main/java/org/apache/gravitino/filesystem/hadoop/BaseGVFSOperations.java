@@ -762,7 +762,7 @@ public abstract class BaseGVFSOperations implements Closeable {
       allProperties.putAll(getSpecialFilesetConfigs(filesetIdent));
 
       FileSystem actualFileSystem = getActualFileSystemByPath(targetLocation, allProperties);
-      createFilesetLocationIfNeed(cacheKey.getLeft(), actualFileSystem, targetLocation);
+      createFilesetLocationIfNeed(filesetIdent, actualFileSystem, targetLocation);
       return actualFileSystem;
     } catch (RuntimeException e) {
       Throwable cause = e.getCause();
