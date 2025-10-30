@@ -23,6 +23,7 @@ import static org.apache.gravitino.lance.common.config.LanceConfig.NAMESPACE_BAC
 import static org.apache.gravitino.lance.common.ops.gravitino.LanceDataTypeConverter.CONVERTER;
 import static org.apache.gravitino.rel.Column.DEFAULT_VALUE_NOT_SET;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
@@ -89,6 +90,11 @@ public class GravitinoLanceNamespaceWrapper extends NamespaceWrapper
 
   private static final Logger LOG = LoggerFactory.getLogger(GravitinoLanceNamespaceWrapper.class);
   private GravitinoClient client;
+
+  @VisibleForTesting
+  GravitinoLanceNamespaceWrapper() {
+    super(null);
+  }
 
   public GravitinoLanceNamespaceWrapper(LanceConfig config) {
     super(config);
@@ -618,7 +624,8 @@ public class GravitinoLanceNamespaceWrapper extends NamespaceWrapper
         new org.apache.arrow.vector.types.pojo.Schema(fields));
   }
 
-  private org.apache.arrow.vector.types.pojo.Schema parseArrowIpcStream(byte[] stream) {
+  @VisibleForTesting
+  org.apache.arrow.vector.types.pojo.Schema parseArrowIpcStream(byte[] stream) {
     org.apache.arrow.vector.types.pojo.Schema schema;
 
     try (BufferAllocator allocator = new RootAllocator();
