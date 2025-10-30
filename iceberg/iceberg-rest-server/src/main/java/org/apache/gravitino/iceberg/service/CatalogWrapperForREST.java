@@ -29,6 +29,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
@@ -72,6 +73,8 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
 
   private final Map<String, String> catalogConfigToClients;
 
+  private final ScanPlanCache scanPlanCache;
+
   private static final Set<String> catalogPropertiesToClientKeys =
       ImmutableSet.of(
           IcebergConstants.IO_IMPL,
@@ -98,6 +101,11 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
     Map<String, String> catalogProperties =
         checkForCompatibility(config.getAllConfig(), deprecatedProperties);
     this.catalogCredentialManager = new CatalogCredentialManager(catalogName, catalogProperties);
+    // Initialize scan plan cache.
+    this.scanPlanCache =
+        new ScanPlanCache(
+            config.get(IcebergConfig.SCAN_PLAN_CACHE_CAPACITY),
+            config.get(IcebergConfig.SCAN_PLAN_CACHE_EXPIRE_MINUTES));
   }
 
   public LoadTableResponse createTable(
@@ -160,6 +168,9 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
     try {
       if (catalogCredentialManager != null) {
         catalogCredentialManager.close();
+      }
+      if (scanPlanCache != null) {
+        scanPlanCache.close();
       }
     } finally {
       // Call super.close() to release parent class resources including:
@@ -261,14 +272,21 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
 
     try {
       Table table = catalog.loadTable(tableIdentifier);
-      CloseableIterable<FileScanTask> fileScanTasks =
-          createFilePlanScanTasks(table, tableIdentifier, scanRequest);
+      if (scanPlanCache != null) {
+        PlanTableScanResponse cachedResponse =
+            scanPlanCache.get(tableIdentifier, table, scanRequest);
+        if (cachedResponse != null) {
+          LOG.info("Using cached scan plan for table: {}", tableIdentifier);
+          return cachedResponse;
+        }
+      }
 
       List<String> planTasks = new ArrayList<>();
       Map<Integer, PartitionSpec> specsById = new HashMap<>();
-      List<org.apache.iceberg.DeleteFile> deleteFiles = new ArrayList<>();
+      List<DeleteFile> deleteFiles = new ArrayList<>();
 
-      try (fileScanTasks) {
+      try (CloseableIterable<FileScanTask> fileScanTasks =
+          createFilePlanScanTasks(table, tableIdentifier, scanRequest)) {
         for (FileScanTask fileScanTask : fileScanTasks) {
           try {
             String taskString = ScanTaskParser.toJson(fileScanTask);
@@ -296,7 +314,7 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
       }
 
       List<DeleteFile> uniqueDeleteFiles =
-          deleteFiles.stream().distinct().collect(java.util.stream.Collectors.toList());
+          deleteFiles.stream().distinct().collect(Collectors.toList());
 
       if (planTasks.isEmpty()) {
         LOG.info(
@@ -318,7 +336,13 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
             tableIdentifier);
       }
 
-      return responseBuilder.build();
+      PlanTableScanResponse response = responseBuilder.build();
+
+      // Cache the scan plan response
+      if (scanPlanCache != null) {
+        scanPlanCache.put(tableIdentifier, table, scanRequest, response);
+      }
+      return response;
 
     } catch (IllegalArgumentException e) {
       LOG.error("Invalid scan request for table {}: {}", tableIdentifier, e.getMessage());
