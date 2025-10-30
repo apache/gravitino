@@ -24,6 +24,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Maps;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -133,6 +134,12 @@ public class PartitionAuthorizationIT extends BaseRestApiAuthorizationIT {
           tableCatalogNormalUser.createTable(
               NameIdentifier.of(SCHEMA, "table2"), createColumns(), "test2", new HashMap<>());
         });
+  }
+
+  @BeforeAll
+  public void stopIntegrationTest() throws IOException, InterruptedException {
+    client.loadMetalake(METALAKE).loadCatalog(CATALOG).asSchemas().dropSchema(SCHEMA, true);
+    super.stopIntegrationTest();
   }
 
   private Column[] createColumns() {
