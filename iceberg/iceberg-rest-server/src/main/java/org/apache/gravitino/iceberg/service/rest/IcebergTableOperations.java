@@ -53,11 +53,13 @@ import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.rest.RESTUtil;
 import org.apache.iceberg.rest.requests.CreateTableRequest;
+import org.apache.iceberg.rest.requests.PlanTableScanRequest;
 import org.apache.iceberg.rest.requests.ReportMetricsRequest;
 import org.apache.iceberg.rest.requests.UpdateTableRequest;
 import org.apache.iceberg.rest.responses.ListTablesResponse;
 import org.apache.iceberg.rest.responses.LoadCredentialsResponse;
 import org.apache.iceberg.rest.responses.LoadTableResponse;
+import org.apache.iceberg.rest.responses.PlanTableScanResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -370,6 +372,78 @@ public class IcebergTableOperations {
             return IcebergRestUtils.ok(credentialsResponse);
           });
     } catch (Exception e) {
+      return IcebergExceptionMapper.toRESTResponse(e);
+    }
+  }
+
+  /**
+   * Plan table scan endpoint.
+   *
+   * <p>POST /v1/{prefix}/namespaces/{namespace}/tables/{table}/scan
+   *
+   * <p>This endpoint allows clients to request a scan plan from the server, which can optimize scan
+   * planning by leveraging server-side resources and reduce network overhead.
+   *
+   * <p>Implementation referenced from:
+   *
+   * <ul>
+   *   <li>Iceberg PR #13004 - Request/Response models for REST Scan Planning
+   *   <li>Iceberg PR #13400 - Core REST Scan Planning Task Implementation
+   * </ul>
+   *
+   * <p>Now using official {@code PlanTableScanRequest} and {@code PlanTableScanResponse} from
+   * Apache Iceberg 1.10.0+.
+   *
+   * <p>Note: Iceberg 1.10.0 is a transition version. Full Builder API for PlanTableScanRequest will
+   * be available in Iceberg 1.11.0+. See:
+   * https://github.com/apache/iceberg/blob/main/core/src/main/java/org/apache/iceberg/rest/requests/PlanTableScanRequest.java
+   *
+   * @param prefix The catalog prefix
+   * @param namespace The namespace
+   * @param table The table name
+   * @param accessDelegation The access delegation header for credential vending
+   * @param scanRequest The scan request containing filters, projections, etc.
+   * @return Response containing the scan plan with tasks
+   */
+  @POST
+  @Path("{table}/scan")
+  @Produces(MediaType.APPLICATION_JSON)
+  @Consumes(MediaType.APPLICATION_JSON)
+  @Timed(name = "plan-table-scan." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
+  @ResponseMetered(name = "plan-table-scan", absolute = true)
+  public Response planTableScan(
+      @PathParam("prefix") String prefix,
+      @Encoded() @PathParam("namespace") String namespace,
+      @PathParam("table") String table,
+      @HeaderParam(X_ICEBERG_ACCESS_DELEGATION) String accessDelegation,
+      PlanTableScanRequest scanRequest) {
+    String catalogName = IcebergRestUtils.getCatalogName(prefix);
+    Namespace icebergNS = RESTUtil.decodeNamespace(namespace);
+    boolean isCredentialVending = isCredentialVending(accessDelegation);
+
+    LOG.info(
+        "Plan table scan, catalog: {}, namespace: {}, table: {}, credential vending: {}",
+        catalogName,
+        icebergNS,
+        table,
+        isCredentialVending);
+
+    try {
+      return Utils.doAs(
+          httpRequest,
+          () -> {
+            TableIdentifier tableIdentifier = TableIdentifier.of(icebergNS, table);
+            IcebergRequestContext context =
+                new IcebergRequestContext(httpServletRequest(), catalogName, isCredentialVending);
+
+            // Call dispatcher to plan scan
+            PlanTableScanResponse scanResponse =
+                tableOperationDispatcher.planTableScan(context, tableIdentifier, scanRequest);
+
+            return IcebergRestUtils.ok(scanResponse);
+          });
+    } catch (Exception e) {
+      LOG.error("Failed to plan table scan: {}", e.getMessage(), e);
       return IcebergExceptionMapper.toRESTResponse(e);
     }
   }

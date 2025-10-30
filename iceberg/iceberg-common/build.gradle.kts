@@ -47,25 +47,12 @@ dependencies {
   implementation(libs.iceberg.azure)
   implementation(libs.iceberg.hive.metastore)
   implementation(libs.iceberg.gcp)
-  implementation(libs.hadoop2.common) {
-    exclude("com.github.spotbugs")
-    exclude("com.sun.jersey")
-    exclude("javax.servlet")
-    exclude("org.apache.curator")
-    exclude("org.apache.zookeeper")
-    exclude("org.mortbay.jetty")
-  }
+  // Upgrade to Hadoop 3.3+ for Iceberg 1.10 compatibility
+  // Iceberg 1.10 requires Hadoop 3.3+ APIs like FileSystem.openFile() and FsTracer.get()
+  implementation(libs.hadoop3.client.api)
+  implementation(libs.hadoop3.client.runtime)
   // use hdfs-default.xml
-  implementation(libs.hadoop2.hdfs) {
-    exclude("*")
-  }
-  implementation(libs.hadoop2.hdfs.client) {
-    exclude("com.sun.jersey")
-    exclude("javax.servlet")
-    exclude("org.fusesource.leveldbjni")
-    exclude("org.mortbay.jetty")
-  }
-  implementation(libs.hadoop2.mapreduce.client.core) {
+  implementation(libs.hadoop3.hdfs) {
     exclude("*")
   }
   implementation(libs.hive2.metastore) {
