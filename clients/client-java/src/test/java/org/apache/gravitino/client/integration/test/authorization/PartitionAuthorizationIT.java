@@ -17,16 +17,20 @@
 
 package org.apache.gravitino.client.integration.test.authorization;
 
+import static org.apache.gravitino.client.integration.test.StatisticIT.TABLE_COMMENT;
 import static org.junit.Assert.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Maps;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.gravitino.Catalog;
+import org.apache.gravitino.MetadataObject;
+import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.authorization.Privileges;
 import org.apache.gravitino.authorization.SecurableObject;
@@ -41,6 +45,9 @@ import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.TableCatalog;
 import org.apache.gravitino.rel.expressions.literals.Literal;
 import org.apache.gravitino.rel.expressions.literals.Literals;
+import org.apache.gravitino.rel.expressions.transforms.Transform;
+import org.apache.gravitino.rel.expressions.transforms.Transforms;
+import org.apache.gravitino.rel.partitions.IdentityPartition;
 import org.apache.gravitino.rel.partitions.Partitions;
 import org.apache.gravitino.rel.types.Types;
 import org.junit.jupiter.api.BeforeAll;
@@ -55,7 +62,7 @@ import org.junit.jupiter.api.TestMethodOrder;
 public class PartitionAuthorizationIT extends BaseRestApiAuthorizationIT {
 
   private static final String CATALOG = "catalog";
-  private static final String SCHEMA = "schema";
+  private static final String SCHEMA = "partitionSchema";
   private static final ContainerSuite containerSuite = ContainerSuite.getInstance();
   private static String hmsUri;
   private static String role = "role";
@@ -95,18 +102,27 @@ public class PartitionAuthorizationIT extends BaseRestApiAuthorizationIT {
     securableObjects.add(catalogObject);
     gravitinoMetalake.createRole(role, new HashMap<>(), securableObjects);
     gravitinoMetalake.grantRolesToUser(ImmutableList.of(role), NORMAL_USER);
+    gravitinoMetalake.grantPrivilegesToRole(
+        role,
+        catalogObject,
+        ImmutableSet.of(
+            Privileges.SelectTable.allow(),
+            Privileges.UseSchema.allow(),
+            Privileges.UseCatalog.allow()));
     // normal user can load the catalog but not the schema
     Catalog catalogLoadByNormalUser = normalUserClient.loadMetalake(METALAKE).loadCatalog(CATALOG);
     assertEquals(CATALOG, catalogLoadByNormalUser.name());
-    assertThrows(
-        "Can not access metadata {" + CATALOG + "." + SCHEMA + "}.",
-        ForbiddenException.class,
-        () -> {
-          catalogLoadByNormalUser.asSchemas().loadSchema(SCHEMA);
-        });
     TableCatalog tableCatalog = client.loadMetalake(METALAKE).loadCatalog(CATALOG).asTableCatalog();
+    Column[] columns = createColumns();
+
+    NameIdentifier nameIdentifier = NameIdentifier.of(SCHEMA, "table1");
+
     tableCatalog.createTable(
-        NameIdentifier.of(SCHEMA, "table1"), createColumns(), "test", new HashMap<>());
+        nameIdentifier,
+        columns,
+        TABLE_COMMENT,
+        new HashMap<>(),
+        new Transform[] {Transforms.identity(columns[0].name())});
     // normal user cannot create table
     TableCatalog tableCatalogNormalUser =
         normalUserClient.loadMetalake(METALAKE).loadCatalog(CATALOG).asTableCatalog();
@@ -131,34 +147,24 @@ public class PartitionAuthorizationIT extends BaseRestApiAuthorizationIT {
 
     TableCatalog tableCatalogNormalUser =
         normalUserClient.loadMetalake(METALAKE).loadCatalog(CATALOG).asTableCatalog();
-    SupportsPartitions supportsPartitions =
-        tableCatalogNormalUser.loadTable(NameIdentifier.of(SCHEMA, "table1")).supportPartitions();
+    SupportsPartitions supportsPartitions = getTable1(tableCatalogNormalUser).supportPartitions();
     assertThrows(
         "Can not access metadata {" + CATALOG + "." + SCHEMA + "}.",
         ForbiddenException.class,
         () -> {
-          supportsPartitions.addPartition(
-              Partitions.list(
-                  "p1",
-                  new Literal[][] {
-                    {
-                      Literals.stringLiteral("1"),
-                    },
-                    {Literals.stringLiteral("2")}
-                  },
-                  Maps.newHashMap()));
+          supportsPartitions.addPartition(genPartition());
         });
     SupportsPartitions supportsPartitionsByAdmin = table1.supportPartitions();
-    supportsPartitionsByAdmin.addPartition(
-        Partitions.list(
-            "p1",
-            new Literal[][] {
-              {
-                Literals.stringLiteral("1"),
-              },
-              {Literals.stringLiteral("2")}
-            },
-            Maps.newHashMap()));
+    supportsPartitionsByAdmin.addPartition(genPartition());
+  }
+
+  private static Table getTable1(TableCatalog tableCatalogNormalUser) {
+    return tableCatalogNormalUser.loadTable(NameIdentifier.of(SCHEMA, "table1"));
+  }
+
+  private static IdentityPartition genPartition() {
+    return Partitions.identity(
+        new String[][] {{"col1"}}, new Literal[] {Literals.stringLiteral("1")});
   }
 
   @Test
@@ -171,12 +177,21 @@ public class PartitionAuthorizationIT extends BaseRestApiAuthorizationIT {
         normalUserClient.loadMetalake(METALAKE).loadCatalog(CATALOG).asTableCatalog();
     SupportsPartitions supportsPartitions =
         tableCatalogNormalUser.loadTable(NameIdentifier.of(SCHEMA, "table1")).supportPartitions();
+    MetadataObject metadataObject = MetadataObjects.of(null, CATALOG, MetadataObject.Type.CATALOG);
+    client
+        .loadMetalake(METALAKE)
+        .revokePrivilegesFromRole(
+            role, metadataObject, ImmutableSet.of(Privileges.SelectTable.allow()));
     assertThrows(
         "Can not access metadata {" + CATALOG + "." + SCHEMA + "}.",
         ForbiddenException.class,
         supportsPartitions::listPartitions);
     SupportsPartitions supportsPartitionsByAdmin = table1.supportPartitions();
     supportsPartitionsByAdmin.listPartitions();
+    client
+        .loadMetalake(METALAKE)
+        .grantPrivilegesToRole(
+            role, metadataObject, ImmutableSet.of(Privileges.SelectTable.allow()));
   }
 
   @Test
@@ -189,14 +204,23 @@ public class PartitionAuthorizationIT extends BaseRestApiAuthorizationIT {
         normalUserClient.loadMetalake(METALAKE).loadCatalog(CATALOG).asTableCatalog();
     SupportsPartitions supportsPartitions =
         tableCatalogNormalUser.loadTable(NameIdentifier.of(SCHEMA, "table1")).supportPartitions();
+    MetadataObject metadataObject = MetadataObjects.of(null, CATALOG, MetadataObject.Type.CATALOG);
+    client
+        .loadMetalake(METALAKE)
+        .revokePrivilegesFromRole(
+            role, metadataObject, ImmutableSet.of(Privileges.SelectTable.allow()));
     assertThrows(
         "Can not access metadata {" + CATALOG + "." + SCHEMA + "}.",
         ForbiddenException.class,
         () -> {
-          supportsPartitions.getPartition("p1");
+          supportsPartitions.getPartition("col1=1");
         });
     SupportsPartitions supportsPartitionsByAdmin = table1.supportPartitions();
-    supportsPartitionsByAdmin.getPartition("p1");
+    supportsPartitionsByAdmin.getPartition("col1=1");
+    client
+        .loadMetalake(METALAKE)
+        .grantPrivilegesToRole(
+            role, metadataObject, ImmutableSet.of(Privileges.SelectTable.allow()));
   }
 
   @Test
@@ -213,9 +237,9 @@ public class PartitionAuthorizationIT extends BaseRestApiAuthorizationIT {
         "Can not access metadata {" + CATALOG + "." + SCHEMA + "}.",
         ForbiddenException.class,
         () -> {
-          supportsPartitions.dropPartition("p1");
+          supportsPartitions.dropPartition("col1=1");
         });
     SupportsPartitions supportsPartitionsByAdmin = table1.supportPartitions();
-    supportsPartitionsByAdmin.dropPartition("p1");
+    supportsPartitionsByAdmin.dropPartition("col1=1");
   }
 }
