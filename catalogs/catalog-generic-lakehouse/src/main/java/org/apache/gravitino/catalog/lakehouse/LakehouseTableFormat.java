@@ -17,31 +17,25 @@
  *  under the License.
  */
 
-package org.apache.gravitino.rel;
+package org.apache.gravitino.catalog.lakehouse;
 
-/** A generic table interface that extends the Table interface. */
-public interface GenericTable extends Table {
+public enum LakehouseTableFormat {
+  LANCE,
 
-  /**
-   * Formats the table as a string representation.
-   *
-   * @return the formatted string representation of the table
-   */
-  String format();
+  DELTA,
 
-  /**
-   * Gets the location of the table.
-   *
-   * @return the location of the table
-   */
-  String location();
+  ICEBERG;
 
-  /**
-   * Indicates whether the table is external.
-   *
-   * @return true if the table is external, false otherwise
-   */
-  default boolean external() {
-    return false;
+  public String lowerName() {
+    return this.name().toLowerCase();
+  }
+
+  public static LakehouseTableFormat fromFormatName(String type) {
+    for (LakehouseTableFormat tableType : LakehouseTableFormat.values()) {
+      if (tableType.name().equalsIgnoreCase(type)) {
+        return tableType;
+      }
+    }
+    throw new IllegalArgumentException("Unknown LakehouseTableFormat: " + type);
   }
 }

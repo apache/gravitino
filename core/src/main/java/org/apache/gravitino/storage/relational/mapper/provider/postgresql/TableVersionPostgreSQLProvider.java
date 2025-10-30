@@ -45,7 +45,7 @@ public class TableVersionPostgreSQLProvider extends TableVersionBaseSQLProvider 
         + " #{tablePO.currentVersion},"
         + " #{tablePO.deletedAt}"
         + " )"
-        + " ON CONFLICT (table_id, deleted_at) DO UPDATE SET"
+        + " ON CONFLICT (table_id, version, deleted_at) DO UPDATE SET"
         + " format = #{tablePO.format},"
         + " properties = #{tablePO.properties},"
         + " partitioning = #{tablePO.partitions},"
@@ -55,5 +55,14 @@ public class TableVersionPostgreSQLProvider extends TableVersionBaseSQLProvider 
         + " comment = #{tablePO.comment},"
         + " version = #{tablePO.currentVersion},"
         + " deleted_at = #{tablePO.deletedAt}";
+  }
+
+  @Override
+  public String softDeleteTableVersionByTableIdAndVersion(Long tableId, Long version) {
+    return "UPDATE "
+        + TABLE_NAME
+        + " SET deleted_at = round(extract(epoch from(current_timestamp -"
+        + " timestamp '1970-01-01 00:00:00')) * 1000)"
+        + " WHERE table_id = #{tableId} AND version = #{version}";
   }
 }

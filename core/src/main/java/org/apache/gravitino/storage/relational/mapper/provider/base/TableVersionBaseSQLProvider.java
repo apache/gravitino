@@ -75,4 +75,20 @@ public class TableVersionBaseSQLProvider {
         + " version = #{tablePO.currentVersion},"
         + " deleted_at = #{tablePO.deletedAt}";
   }
+
+  public String softDeleteTableVersionByTableIdAndVersion(
+      @Param("tableId") Long tableId, @Param("version") Long version) {
+    return "UPDATE "
+        + TABLE_NAME
+        + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
+        + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
+        + " WHERE table_id = #{tableId} AND version = #{version} AND deleted_at = 0";
+  }
+
+  public String deleteTableVersionByLegacyTimeline(
+      @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit) {
+    return "DELETE FROM "
+        + TABLE_NAME
+        + " WHERE deleted_at > 0 AND deleted_at < #{legacyTimeline} LIMIT #{limit}";
+  }
 }

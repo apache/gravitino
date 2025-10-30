@@ -19,8 +19,8 @@
 
 
 CREATE TABLE IF NOT EXISTS table_version_info (
-    table_id        BIGINT PRIMARY KEY,
-    format          VARCHAR(64) NOT NULL,
+    table_id        BIGINT NOT NULL,
+    format          VARCHAR(64),
     properties      TEXT,
     partitions  TEXT,
     distribution TEXT,
@@ -29,11 +29,11 @@ CREATE TABLE IF NOT EXISTS table_version_info (
     "comment"   TEXT,
     version BIGINT,
     deleted_at      BIGINT DEFAULT 0,
-    UNIQUE (table_id, deleted_at)
+    UNIQUE (table_id, version, deleted_at)
 );
 COMMENT ON TABLE table_version_info                  IS 'table detail information including format, location, properties, partition, distribution, sort order, index and so on';
 COMMENT ON COLUMN table_version_info.table_id        IS 'table id';
-COMMENT ON COLUMN table_version_info.format          IS 'table format, such as Lance, Iceberg and so on';
+COMMENT ON COLUMN table_version_info.format          IS 'table format, such as Lance, Iceberg and so on, it will be null if it is not a lakehouse table';
 COMMENT ON COLUMN table_version_info.properties      IS 'table properties';
 COMMENT ON COLUMN table_version_info.partitions      IS 'table partition info';
 COMMENT on COLUMN table_version_info.distribution    IS 'table distribution info';

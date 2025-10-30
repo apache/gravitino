@@ -50,6 +50,7 @@ public class GenericLakehouseColumn extends BaseColumn {
       hiveColumn.dataType = dataType;
       hiveColumn.nullable = nullable;
       hiveColumn.defaultValue = defaultValue == null ? DEFAULT_VALUE_NOT_SET : defaultValue;
+      hiveColumn.autoIncrement = autoIncrement;
       return hiveColumn;
     }
   }

@@ -45,7 +45,6 @@ import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.CatalogEntity;
 import org.apache.gravitino.meta.ColumnEntity;
 import org.apache.gravitino.meta.FilesetEntity;
-import org.apache.gravitino.meta.GenericTableEntity;
 import org.apache.gravitino.meta.GroupEntity;
 import org.apache.gravitino.meta.ModelEntity;
 import org.apache.gravitino.meta.ModelVersionEntity;
@@ -398,37 +397,19 @@ public class POConverters {
           .withAuditInfo(JsonUtils.anyFieldMapper().writeValueAsString(tableEntity.auditInfo()))
           .withCurrentVersion(INIT_VERSION)
           .withLastVersion(INIT_VERSION)
-          .withDeletedAt(DEFAULT_DELETED_AT);
+          .withDeletedAt(DEFAULT_DELETED_AT)
+          .withFormat(tableEntity.getFormat())
+          .withComment(tableEntity.getComment())
+          .withProperties(
+              tableEntity.getProperties() == null
+                  ? null
+                  : JsonUtils.anyFieldMapper().writeValueAsString(tableEntity.getProperties()))
+          .withIndexes(
+              tableEntity.getIndexes() == null
+                  ? null
+                  : JsonUtils.anyFieldMapper().writeValueAsString(tableEntity.getIndexes()));
 
-      if (tableEntity instanceof GenericTableEntity genericTable) {
-        builder.withFormat(genericTable.getFormat());
-        builder.withComment(genericTable.getComment());
-        builder.withProperties(
-            genericTable.getProperties() == null
-                ? null
-                : JsonUtils.anyFieldMapper().writeValueAsString(genericTable.getProperties()));
-
-        // TODO store the following information to databases;
-        /**
-         * builder.withDistribution( genericTable.getDistribution() == null ? null :
-         * JsonUtils.anyFieldMapper().writeValueAsString(genericTable.getDistribution()));
-         * builder.withPartitions( genericTable.getPartitions() == null ? null :
-         * JsonUtils.anyFieldMapper().writeValueAsString(genericTable.getPartitions()));
-         */
-        builder.withIndexes(
-            genericTable.getIndexes() == null
-                ? null
-                : JsonUtils.anyFieldMapper().writeValueAsString(genericTable.getIndexes()));
-        builder.withProperties(
-            genericTable.getProperties() == null
-                ? null
-                : JsonUtils.anyFieldMapper().writeValueAsString(genericTable.getProperties()));
-        builder.withSortOrders(
-            genericTable.getSortOrder() == null
-                ? null
-                : JsonUtils.anyFieldMapper().writeValueAsString(genericTable.getSortOrder()));
-      }
-
+      // TODO, handle these fields(distribution, sort order, partition) later
       return builder.build();
     } catch (JsonProcessingException e) {
       throw new RuntimeException("Failed to serialize json object:", e);
@@ -440,21 +421,15 @@ public class POConverters {
    *
    * @param oldTablePO the old TablePO object
    * @param newTable the new TableEntity object
-   * @param needUpdateVersion whether need to update the version
    * @param newSchemaId the new schema id
    * @return TablePO object with updated version
    */
   public static TablePO updateTablePOWithVersionAndSchemaId(
-      TablePO oldTablePO, TableEntity newTable, boolean needUpdateVersion, Long newSchemaId) {
+      TablePO oldTablePO, TableEntity newTable, Long newSchemaId) {
     Long lastVersion;
     Long currentVersion;
-    if (needUpdateVersion) {
-      lastVersion = oldTablePO.getLastVersion() + 1;
-      currentVersion = lastVersion;
-    } else {
-      lastVersion = oldTablePO.getLastVersion();
-      currentVersion = oldTablePO.getCurrentVersion();
-    }
+    lastVersion = oldTablePO.getLastVersion() + 1;
+    currentVersion = lastVersion;
 
     try {
       TablePO.Builder builder =
@@ -467,23 +442,18 @@ public class POConverters {
               .withAuditInfo(JsonUtils.anyFieldMapper().writeValueAsString(newTable.auditInfo()))
               .withCurrentVersion(currentVersion)
               .withLastVersion(lastVersion)
-              .withDeletedAt(DEFAULT_DELETED_AT);
-
-      // Note: GenericTableEntity will be removed in the refactor PR, so here just keep the old
-      // logic to make the UT pass.
-      if (newTable instanceof GenericTableEntity genericTable) {
-        builder.withFormat(genericTable.getFormat());
-        builder.withComment(genericTable.getComment());
-        builder.withProperties(
-            genericTable.getProperties() == null
-                ? null
-                : JsonUtils.anyFieldMapper().writeValueAsString(genericTable.getProperties()));
-        builder.withIndexes(
-            genericTable.getIndexes() == null
-                ? null
-                : JsonUtils.anyFieldMapper().writeValueAsString(genericTable.getIndexes()));
-        // TODO other fields in the refactor PRs.
-      }
+              .withDeletedAt(DEFAULT_DELETED_AT)
+              .withComment(newTable.getComment())
+              .withProperties(
+                  newTable.getProperties() == null
+                      ? null
+                      : JsonUtils.anyFieldMapper().writeValueAsString(newTable.getProperties()))
+              .withIndexes(
+                  newTable.getIndexes() == null
+                      ? null
+                      : JsonUtils.anyFieldMapper().writeValueAsString(newTable.getIndexes()))
+              .withFormat(newTable.getFormat());
+      // TODO other fields(partitioning, distribution, sortorder) in the refactor PRs.
 
       return builder.build();
     } catch (JsonProcessingException e) {
@@ -505,29 +475,6 @@ public class POConverters {
   public static TableEntity fromTableAndColumnPOs(
       TablePO tablePO, List<ColumnPO> columnPOs, Namespace namespace) {
     try {
-      if (tablePO.getFormat() != null) {
-        return GenericTableEntity.getBuilder()
-            .withId(tablePO.getTableId())
-            .withName(tablePO.getTableName())
-            .withNamespace(namespace)
-            .withColumns(fromColumnPOs(columnPOs))
-            .withAuditInfo(
-                JsonUtils.anyFieldMapper().readValue(tablePO.getAuditInfo(), AuditInfo.class))
-            // TODO add field partition, distribution and sort order;
-            .withIndexes(
-                StringUtils.isBlank(tablePO.getIndexes())
-                    ? null
-                    : JsonUtils.anyFieldMapper().readValue(tablePO.getIndexes(), IndexImpl[].class))
-            .withFormat(tablePO.getFormat())
-            .withComment(tablePO.getComment())
-            .withProperties(
-                StringUtils.isBlank(tablePO.getProperties())
-                    ? null
-                    : JsonUtils.anyFieldMapper().readValue(tablePO.getProperties(), Map.class))
-            .withColumns(fromColumnPOs(columnPOs))
-            .build();
-      }
-
       return TableEntity.builder()
           .withId(tablePO.getTableId())
           .withName(tablePO.getTableName())
@@ -535,6 +482,18 @@ public class POConverters {
           .withColumns(fromColumnPOs(columnPOs))
           .withAuditInfo(
               JsonUtils.anyFieldMapper().readValue(tablePO.getAuditInfo(), AuditInfo.class))
+          // TODO add field partition, distribution and sort order;
+          .withIndexes(
+              StringUtils.isBlank(tablePO.getIndexes())
+                  ? null
+                  : JsonUtils.anyFieldMapper().readValue(tablePO.getIndexes(), IndexImpl[].class))
+          .withFormat(tablePO.getFormat())
+          .withComment(tablePO.getComment())
+          .withProperties(
+              StringUtils.isBlank(tablePO.getProperties())
+                  ? null
+                  : JsonUtils.anyFieldMapper().readValue(tablePO.getProperties(), Map.class))
+          .withColumns(fromColumnPOs(columnPOs))
           .build();
     } catch (JsonProcessingException e) {
       throw new RuntimeException("Failed to deserialize json object:", e);

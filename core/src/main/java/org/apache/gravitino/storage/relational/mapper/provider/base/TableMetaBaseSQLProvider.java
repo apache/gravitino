@@ -48,15 +48,23 @@ public class TableMetaBaseSQLProvider {
 
   public String listTablePOsByTableIds(List<Long> tableIds) {
     return "<script>"
-        + " SELECT table_id as tableId, table_name as tableName,"
-        + " metalake_id as metalakeId, catalog_id as catalogId,"
-        + " schema_id as schemaId, audit_info as auditInfo,"
-        + " current_version as currentVersion, last_version as lastVersion,"
-        + " deleted_at as deletedAt"
+        + "SELECT tm.table_id as tableId, tm.table_name as tableName,"
+        + " tm.metalake_id as metalakeId, tm.catalog_id as catalogId,"
+        + " tm.schema_id as schemaId, tm.audit_info as auditInfo,"
+        + " tm.current_version as currentVersion, tm.last_version as lastVersion,"
+        + " tm.deleted_at as deletedAt,"
+        + " tv.format as format, "
+        + " tv.properties as properties,"
+        + " tv.partitioning as partitions, tv.sort_orders as sortOrders,"
+        + " tv.distribution as distribution, tv.indexes as indexes,"
+        + " tv.comment as comment"
         + " FROM "
         + TABLE_NAME
-        + " WHERE deleted_at = 0"
-        + " AND table_id IN ("
+        + " tm LEFT JOIN "
+        + TableVersionMapper.TABLE_NAME
+        + " tv ON tm.table_id = tv.table_id AND tm.current_version = tv.version AND tv.deleted_at = 0"
+        + " WHERE tm.deleted_at = 0"
+        + " AND tm.table_id IN ("
         + "<foreach collection='tableIds' item='tableId' separator=','>"
         + "#{tableId}"
         + "</foreach>"
@@ -93,14 +101,23 @@ public class TableMetaBaseSQLProvider {
   }
 
   public String selectTableMetaById(@Param("tableId") Long tableId) {
-    return "SELECT table_id as tableId, table_name as tableName,"
-        + " metalake_id as metalakeId, catalog_id as catalogId,"
-        + " schema_id as schemaId, audit_info as auditInfo,"
-        + " current_version as currentVersion, last_version as lastVersion,"
-        + " deleted_at as deletedAt"
+    return "SELECT tm.table_id as tableId, tm.table_name as tableName,"
+        + " tm.metalake_id as metalakeId, tm.catalog_id as catalogId,"
+        + " tm.schema_id as schemaId, tm.audit_info as auditInfo,"
+        + " tm.current_version as currentVersion, tm.last_version as lastVersion,"
+        + " tm.deleted_at as deletedAt,"
+        + " tv.format as format, "
+        + " tv.properties as properties,"
+        + " tv.partitioning as partitions, tv.sort_orders as sortOrders,"
+        + " tv.distribution as distribution, tv.indexes as indexes,"
+        + " tv.comment as comment"
         + " FROM "
         + TABLE_NAME
-        + " WHERE table_id = #{tableId} AND deleted_at = 0";
+        + " tm LEFT JOIN "
+        + TableVersionMapper.TABLE_NAME
+        + " tv ON tm.table_id = tv.table_id AND tm.current_version = tv.version"
+        + " AND tv.deleted_at = 0"
+        + " WHERE tm.table_id = #{tableId} AND tm.deleted_at = 0";
   }
 
   public String insertTableMeta(@Param("tableMeta") TablePO tablePO) {

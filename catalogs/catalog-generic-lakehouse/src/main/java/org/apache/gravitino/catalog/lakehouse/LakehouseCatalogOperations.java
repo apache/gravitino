@@ -22,4 +22,18 @@ package org.apache.gravitino.catalog.lakehouse;
 import org.apache.gravitino.connector.CatalogOperations;
 import org.apache.gravitino.rel.TableCatalog;
 
+/**
+ * Interface for detailed lakehouse catalog operations, combining catalog operations and table
+ * catalog. {@link GenericLakehouseCatalog} will try to use this interface to provide detailed
+ * lakehouse catalog operations.
+ *
+ * <pre>
+ *    GenericLakehouseCatalog.createTable()
+ *       -> LakehouseCatalogOperations.createTable()
+ *         -> LanceTableOperations.createTable()
+ *         -> IcebergTableOperations.createTable()
+ *         -> DeltaTableOperations.createTable()
+ *         ...
+ * </pre>
+ */
 public interface LakehouseCatalogOperations extends CatalogOperations, TableCatalog {}
