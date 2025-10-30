@@ -163,6 +163,8 @@ public class LanceNamespaceOperations {
 
   @GET
   @Path("{id}/table/list")
+  @Timed(name = "list-tables." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
+  @ResponseMetered(name = "list-tables", absolute = true)
   public Response listTables(
       @PathParam("id") String namespaceId,
       @DefaultValue(NAMESPACE_DELIMITER_DEFAULT) @QueryParam("delimiter") String delimiter,

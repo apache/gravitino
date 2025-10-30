@@ -19,12 +19,7 @@
 
 package org.apache.gravitino.connector;
 
-import org.apache.gravitino.rel.GenericTable;
-
-public class GenericLakehouseTable extends BaseTable implements GenericTable {
-  @SuppressWarnings("unused")
-  private String schemaName;
-
+public class GenericLakehouseTable extends BaseTable {
   private String format;
 
   public static Builder builder() {
@@ -53,13 +48,7 @@ public class GenericLakehouseTable extends BaseTable implements GenericTable {
 
   public static class Builder extends BaseTableBuilder<Builder, GenericLakehouseTable> {
 
-    private String schemaName;
     private String format;
-
-    public Builder withSchemaName(String schemaName) {
-      this.schemaName = schemaName;
-      return this;
-    }
 
     public Builder withFormat(String format) {
       this.format = format;
@@ -69,7 +58,6 @@ public class GenericLakehouseTable extends BaseTable implements GenericTable {
     @Override
     protected GenericLakehouseTable internalBuild() {
       GenericLakehouseTable genericLakehouseTable = new GenericLakehouseTable();
-      genericLakehouseTable.schemaName = this.schemaName;
       genericLakehouseTable.format = this.format;
       genericLakehouseTable.columns = this.columns;
       genericLakehouseTable.comment = this.comment;
