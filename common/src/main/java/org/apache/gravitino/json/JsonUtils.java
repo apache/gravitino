@@ -504,17 +504,20 @@ public class JsonUtils {
 
   private static void writeExpression(Expression expression, JsonGenerator gen) throws IOException {
     gen.writeStartObject();
-    if (expression instanceof Literal literal) {
+    if (expression instanceof Literal) {
+      Literal<?> literal = (Literal<?>) expression;
       gen.writeStringField(EXPRESSION_TYPE, LITERAL.name().toLowerCase());
       gen.writeFieldName(DATA_TYPE);
       writeDataType(literal.dataType(), gen);
       gen.writeStringField(
           LITERAL_VALUE, literal.value() == null ? null : literal.value().toString());
-    } else if (expression instanceof FieldReference fieldReference) {
+    } else if (expression instanceof FieldReference) {
+      FieldReference fieldReference = (FieldReference) expression;
       gen.writeStringField(EXPRESSION_TYPE, FIELD.name().toLowerCase());
       gen.writeFieldName(FIELD_NAME);
       gen.writeObject(fieldReference.fieldName());
-    } else if (expression instanceof FunctionExpression functionExpression) {
+    } else if (expression instanceof FunctionExpression) {
+      FunctionExpression functionExpression = (FunctionExpression) expression;
       gen.writeStringField(EXPRESSION_TYPE, FUNCTION.name().toLowerCase());
       gen.writeStringField(FUNCTION_NAME, functionExpression.functionName());
       gen.writeArrayFieldStart(FUNCTION_ARGS);
@@ -522,7 +525,8 @@ public class JsonUtils {
         writeExpression(funcArg, gen);
       }
       gen.writeEndArray();
-    } else if (expression instanceof UnparsedExpression unparsedExpression) {
+    } else if (expression instanceof UnparsedExpression) {
+      UnparsedExpression unparsedExpression = (UnparsedExpression) expression;
       gen.writeStringField(EXPRESSION_TYPE, FunctionArg.ArgType.UNPARSED.name().toLowerCase());
       gen.writeStringField(UNPARSED_EXPRESSION, unparsedExpression.unparsedExpression());
     } else {
