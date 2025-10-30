@@ -18,6 +18,10 @@
  */
 package org.apache.gravitino.lance.service.rest;
 
+import static org.apache.gravitino.lance.service.ServiceConstants.LANCE_ROOT_CATALOG_HEADER;
+import static org.apache.gravitino.lance.service.ServiceConstants.LANCE_TABLE_LOCATION_HEADER;
+import static org.apache.gravitino.lance.service.ServiceConstants.LANCE_TABLE_PROPERTIES_PREFIX_HEADER;
+
 import com.codahale.metrics.annotation.ResponseMetered;
 import com.codahale.metrics.annotation.Timed;
 import com.fasterxml.jackson.core.type.TypeReference;
@@ -33,7 +37,6 @@ import java.util.Map;
 import javax.inject.Inject;
 import javax.ws.rs.Consumes;
 import javax.ws.rs.DefaultValue;
-import javax.ws.rs.HeaderParam;
 import javax.ws.rs.POST;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
@@ -42,6 +45,7 @@ import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
+import javax.ws.rs.core.MultivaluedMap;
 import javax.ws.rs.core.Response;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.lance.common.ops.NamespaceWrapper;
@@ -86,11 +90,15 @@ public class LanceTableOperations {
       @PathParam("id") String tableId,
       @QueryParam("mode") @DefaultValue("create") String mode, // create, exist_ok, overwrite
       @QueryParam("delimiter") @DefaultValue("$") String delimiter,
-      @HeaderParam("x-lance-table-location") String tableLocation,
-      @HeaderParam("x-lance-table-properties") String tableProperties,
-      @HeaderParam("x-lance-root-catalog") String rootCatalog,
+      @Context HttpHeaders headers,
       byte[] arrowStreamBody) {
     try {
+      // Extract table properties from header
+      MultivaluedMap<String, String> headersMap = headers.getRequestHeaders();
+      String tableLocation = headersMap.getFirst(LANCE_TABLE_LOCATION_HEADER);
+      String tableProperties = headersMap.getFirst(LANCE_TABLE_PROPERTIES_PREFIX_HEADER);
+      String rootCatalog = headersMap.getFirst(LANCE_ROOT_CATALOG_HEADER);
+
       Map<String, String> props =
           JsonUtil.mapper().readValue(tableProperties, new TypeReference<Map<String, String>>() {});
       CreateTableResponse response =
@@ -112,10 +120,14 @@ public class LanceTableOperations {
       @PathParam("id") String tableId,
       @QueryParam("mode") @DefaultValue("create") String mode, // create, exist_ok, overwrite
       @QueryParam("delimiter") @DefaultValue("$") String delimiter,
-      @HeaderParam("x-lance-table-location") String tableLocation,
-      @HeaderParam("x-lance-root-catalog") String rootCatalog,
-      @HeaderParam("x-lance-table-properties") String tableProperties) {
+      @Context HttpHeaders headers) {
     try {
+      // Extract table properties from header
+      MultivaluedMap<String, String> headersMap = headers.getRequestHeaders();
+      String tableLocation = headersMap.getFirst(LANCE_TABLE_LOCATION_HEADER);
+      String tableProperties = headersMap.getFirst(LANCE_TABLE_PROPERTIES_PREFIX_HEADER);
+      String rootCatalog = headersMap.getFirst(LANCE_ROOT_CATALOG_HEADER);
+
       Map<String, String> props =
           StringUtils.isBlank(tableProperties)
               ? Map.of()
@@ -144,13 +156,12 @@ public class LanceTableOperations {
     try {
       Map<String, String> props =
           registerTableRequest.getProperties() == null
-              ? Map.of()
+              ? Maps.newHashMap()
               : Maps.newHashMap(registerTableRequest.getProperties());
-      // For lance spark compatibility
-      String rootCatalog =
-          headers.getRequestHeaders().get("x-lance-root-catalog") == null
-              ? null
-              : headers.getRequestHeaders().get("x-lance-root-catalog").get(0);
+      // For lance spark compatibility, The Spark only support catalog, schema and table name, so we
+      // use the header to pass the root catalog, for Gravitino, it's the catalog name.
+      String rootCatalog = headers.getRequestHeaders().getFirst(LANCE_ROOT_CATALOG_HEADER);
+
       props.put("register", "true");
       props.put("location", registerTableRequest.getLocation());
       props.put("format", "lance");
@@ -173,7 +184,8 @@ public class LanceTableOperations {
       @Context HttpHeaders headers,
       DeregisterTableRequest deregisterTableRequest) {
     try {
-      // For lance spark compatibility
+      // For lance spark compatibility, The Spark only support catalog, schema and table name, so we
+      // use the header to pass the root catalog, for Gravitino, it's the catalog name.
       String rootCatalog =
           headers.getRequestHeaders().get("x-lance-root-catalog") == null
               ? null

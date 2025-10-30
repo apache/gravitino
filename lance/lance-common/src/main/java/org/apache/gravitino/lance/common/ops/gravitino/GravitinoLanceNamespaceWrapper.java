@@ -668,12 +668,10 @@ public class GravitinoLanceNamespaceWrapper extends NamespaceWrapper
 
     String catalogName = nsId.levelAtListPos(0);
     Catalog catalog = loadAndValidateLakehouseCatalog(catalogName);
-
     NameIdentifier tableIdentifier =
         NameIdentifier.of(nsId.levelAtListPos(1), nsId.levelAtListPos(2));
 
     // TODO Support real register API
-
     RegisterTableRequest.ModeEnum createMode =
         RegisterTableRequest.ModeEnum.fromValue(mode.toUpperCase());
     if (createMode == RegisterTableRequest.ModeEnum.CREATE
@@ -687,6 +685,7 @@ public class GravitinoLanceNamespaceWrapper extends NamespaceWrapper
 
     if (createMode == RegisterTableRequest.ModeEnum.OVERWRITE
         && catalog.asTableCatalog().tableExists(tableIdentifier)) {
+      LOG.info("Overwriting existing table: {}", tableId);
       catalog.asTableCatalog().dropTable(tableIdentifier);
     }
 
@@ -719,9 +718,9 @@ public class GravitinoLanceNamespaceWrapper extends NamespaceWrapper
     NameIdentifier tableIdentifier =
         NameIdentifier.of(nsId.levelAtListPos(1), nsId.levelAtListPos(2));
 
+    // Load table first to check if it's a registered table.
     Table t = catalog.asTableCatalog().loadTable(tableIdentifier);
     Map<String, String> properties = t.properties();
-
     if (properties.get("location") == null || properties.get("register") == null) {
       throw LanceNamespaceException.badRequest(
           "Table " + tableId + " is not registered.",
