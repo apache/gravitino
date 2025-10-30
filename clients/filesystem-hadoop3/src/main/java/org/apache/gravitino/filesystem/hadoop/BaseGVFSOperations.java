@@ -139,11 +139,15 @@ public abstract class BaseGVFSOperations implements Closeable {
   private final boolean enableCredentialVending;
 
   private final boolean autoCreateLocation;
-  /** A key class for caching FileSystem instances based on scheme, authority, and configuration. */
+  /**
+   * A key class for caching FileSystem instances based on scheme, authority, configuration, and
+   * credentials.
+   */
   public static class FileSystemCacheKey {
     private final String scheme;
     private final String authority;
     private final UserGroupInformation ugi;
+    private final String credentialFingerprint;
 
     /**
      * Constructor for FileSystemCacheKey.
@@ -151,11 +155,14 @@ public abstract class BaseGVFSOperations implements Closeable {
      * @param scheme the scheme of the filesystem
      * @param authority the authority of the filesystem
      * @param ugi the user group information
+     * @param credentialFingerprint the fingerprint of credentials used for authentication
      */
-    FileSystemCacheKey(String scheme, String authority, UserGroupInformation ugi) {
+    FileSystemCacheKey(
+        String scheme, String authority, UserGroupInformation ugi, String credentialFingerprint) {
       this.scheme = scheme;
       this.authority = authority;
       this.ugi = ugi;
+      this.credentialFingerprint = credentialFingerprint;
     }
 
     /**
@@ -185,18 +192,28 @@ public abstract class BaseGVFSOperations implements Closeable {
       return ugi;
     }
 
+    /**
+     * Get the credential fingerprint
+     *
+     * @return the credential fingerprint
+     */
+    public String credentialFingerprint() {
+      return credentialFingerprint;
+    }
+
     @Override
     public boolean equals(Object o) {
       if (!(o instanceof FileSystemCacheKey)) return false;
       FileSystemCacheKey that = (FileSystemCacheKey) o;
       return Objects.equals(scheme, that.scheme)
           && Objects.equals(authority, that.authority)
-          && Objects.equals(ugi, that.ugi);
+          && Objects.equals(ugi, that.ugi)
+          && Objects.equals(credentialFingerprint, that.credentialFingerprint);
     }
 
     @Override
     public int hashCode() {
-      return Objects.hash(scheme, authority, ugi);
+      return Objects.hash(scheme, authority, ugi, credentialFingerprint);
     }
   }
 
@@ -783,8 +800,13 @@ public abstract class BaseGVFSOperations implements Closeable {
       throw new GravitinoRuntimeException(
           e, "Cannot get current user for path: %s", actualFilePath);
     }
+
+    // Create credential fingerprint to include in cache key for security
+    String credentialFingerprint =
+        GravitinoVirtualFileSystemUtils.createCredentialFingerprint(allProperties, scheme, ugi);
+
     return fileSystemCache.get(
-        new FileSystemCacheKey(scheme, uri.getAuthority(), ugi),
+        new FileSystemCacheKey(scheme, uri.getAuthority(), ugi, credentialFingerprint),
         cacheKey -> {
           FileSystemProvider provider = getFileSystemProviderByScheme(scheme);
 
