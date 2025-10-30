@@ -36,15 +36,16 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import org.apache.commons.lang3.tuple.Pair;
-import org.apache.gravitino.Catalog;
 import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.StringIdentifier;
+import org.apache.gravitino.catalog.CatalogManager.CatalogWrapper;
 import org.apache.gravitino.connector.HasPropertyMetadata;
 import org.apache.gravitino.connector.capability.Capability;
+import org.apache.gravitino.connector.capability.CapabilityResult;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchTableException;
@@ -115,7 +116,7 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
   @Override
   public Table loadTable(NameIdentifier ident) throws NoSuchTableException {
     NameIdentifier catalogIdent = getCatalogIdentifier(ident);
-    if (isGenericLakehouseCatalog(catalogIdent)) {
+    if (isManagedTable(catalogIdent)) {
       return TreeLockUtils.doWithTreeLock(
           ident,
           LockType.READ,
@@ -240,25 +241,6 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
         nameIdentifierForLock.equals(ident) ? LockType.READ : LockType.WRITE,
         () -> {
           NameIdentifier catalogIdent = getCatalogIdentifier(ident);
-          if (isGenericLakehouseCatalog(catalogIdent)) {
-            // For generic lakehouse catalog, all operations will be dispatched to the underlying
-            // catalog.
-            Table alteredTable =
-                doWithCatalog(
-                    catalogIdent,
-                    c ->
-                        c.doWithTableOps(
-                            t -> t.alterTable(ident, applyCapabilities(c.capabilities(), changes))),
-                    NoSuchTableException.class,
-                    IllegalArgumentException.class);
-            return EntityCombinedTable.of(alteredTable)
-                .withHiddenProperties(
-                    getHiddenPropertyNames(
-                        getCatalogIdentifier(ident),
-                        HasPropertyMetadata::tablePropertiesMetadata,
-                        alteredTable.properties()));
-          }
-
           Table alteredTable =
               doWithCatalog(
                   catalogIdent,
@@ -267,6 +249,17 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
                           t -> t.alterTable(ident, applyCapabilities(c.capabilities(), changes))),
                   NoSuchTableException.class,
                   IllegalArgumentException.class);
+
+          if (isManagedTable(catalogIdent)) {
+            // For generic lakehouse catalog, all operations will be dispatched to the underlying
+            // catalog.
+            return EntityCombinedTable.of(alteredTable)
+                .withHiddenProperties(
+                    getHiddenPropertyNames(
+                        getCatalogIdentifier(ident),
+                        HasPropertyMetadata::tablePropertiesMetadata,
+                        alteredTable.properties()));
+          }
 
           StringIdentifier stringId = getStringIdFromProperties(alteredTable.properties());
           // Case 1: The table is not created by Gravitino and this table is never imported.
@@ -348,7 +341,7 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
         LockType.WRITE,
         () -> {
           NameIdentifier catalogIdent = getCatalogIdentifier(ident);
-          if (isGenericLakehouseCatalog(catalogIdent)) {
+          if (isManagedTable(catalogIdent)) {
             return doWithCatalog(
                 catalogIdent,
                 c -> c.doWithTableOps(t -> t.dropTable(ident)),
@@ -599,7 +592,7 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
                 }),
         IllegalArgumentException.class);
 
-    if (isGenericLakehouseCatalog(catalogIdent)) {
+    if (isManagedTable(catalogIdent)) {
       // For generic lakehouse catalog, all operations will be dispatched to the underlying catalog.
       Table table =
           doWithCatalog(
@@ -674,7 +667,7 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
     try {
       store.put(tableEntity, true /* overwrite */);
     } catch (Exception e) {
-      if (isGenericLakehouseCatalog(catalogIdent)) {
+      if (isManagedTable(catalogIdent)) {
         // Drop table
         doWithCatalog(
             catalogIdent, c -> c.doWithTableOps(t -> t.dropTable(ident)), RuntimeException.class);
@@ -702,16 +695,13 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
             .collect(Collectors.toList());
   }
 
-  private boolean isGenericLakehouseCatalog(NameIdentifier catalogIdent) {
+  private boolean isManagedTable(NameIdentifier catalogIdent) {
     CatalogManager catalogManager = GravitinoEnv.getInstance().catalogManager();
-    try {
-      Catalog catalog = catalogManager.loadCatalog(catalogIdent);
-      return catalog.type() == Catalog.Type.RELATIONAL
-          && catalog.provider().equals("generic-lakehouse");
-    } catch (NoSuchEntityException e) {
-      LOG.warn("Catalog not found: {}", catalogIdent, e);
-      return false;
-    }
+    CatalogWrapper wrapper = catalogManager.loadCatalogAndWrap(catalogIdent);
+    Capability capability = wrapper.catalog().capability();
+
+    CapabilityResult result = capability.managedStorage(Capability.Scope.TABLE);
+    return result == CapabilityResult.SUPPORTED;
   }
 
   private boolean isSameColumn(Column left, int columnPosition, ColumnEntity right) {

@@ -38,7 +38,6 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
 import org.apache.arrow.memory.RootAllocator;
-import org.apache.arrow.vector.types.pojo.ArrowType;
 import org.apache.arrow.vector.types.pojo.Field;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.gravitino.Catalog;
@@ -134,7 +133,7 @@ public class LanceCatalogOperations implements LakehouseCatalogOperations {
         Dataset.create(
             new RootAllocator(),
             location,
-            convertColumnsToSchema(columns),
+            convertColumnsToArrowSchema(columns),
             new WriteParams.Builder().withStorageOptions(storageProps).build())) {
       GenericLakehouseTable.Builder builder = GenericLakehouseTable.builder();
       return builder
@@ -156,39 +155,13 @@ public class LanceCatalogOperations implements LakehouseCatalogOperations {
     }
   }
 
-  private org.apache.arrow.vector.types.pojo.Schema convertColumnsToSchema(Column[] columns) {
-    LanceDataTypeConverter converter = new LanceDataTypeConverter();
+  private org.apache.arrow.vector.types.pojo.Schema convertColumnsToArrowSchema(Column[] columns) {
     List<Field> fields =
         Arrays.stream(columns)
             .map(
-                col -> {
-                  boolean nullable = col.nullable();
-                  ArrowType parentType = converter.fromGravitino(col.dataType());
-                  List<ArrowType> childTypes = converter.getChildTypes(col.dataType());
-                  List<Field> childFields =
-                      childTypes.stream()
-                          .map(
-                              childType ->
-                                  new org.apache.arrow.vector.types.pojo.Field(
-                                      "",
-                                      org.apache.arrow.vector.types.pojo.FieldType.nullable(
-                                          childType),
-                                      null /* child type is null */))
-                          .collect(Collectors.toList());
-
-                  if (nullable) {
-                    return new org.apache.arrow.vector.types.pojo.Field(
-                        col.name(),
-                        org.apache.arrow.vector.types.pojo.FieldType.nullable(parentType),
-                        childFields);
-                  }
-
-                  // not nullable
-                  return new org.apache.arrow.vector.types.pojo.Field(
-                      col.name(),
-                      org.apache.arrow.vector.types.pojo.FieldType.notNullable(parentType),
-                      childFields);
-                })
+                col ->
+                    LanceDataTypeConverter.CONVERTER.toArrowField(
+                        col.name(), col.dataType(), col.nullable()))
             .collect(Collectors.toList());
     return new org.apache.arrow.vector.types.pojo.Schema(fields);
   }

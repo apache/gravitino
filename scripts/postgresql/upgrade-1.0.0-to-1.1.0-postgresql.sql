@@ -29,7 +29,7 @@ CREATE TABLE IF NOT EXISTS table_version_info (
     "comment"   TEXT,
     version BIGINT,
     deleted_at      BIGINT DEFAULT 0,
-    UNIQUE (table_id, deleted_at)
+    UNIQUE (table_id, version, deleted_at)
 );
 COMMENT ON TABLE table_version_info                  IS 'table detail information including format, location, properties, partition, distribution, sort order, index and so on';
 COMMENT ON COLUMN table_version_info.table_id        IS 'table id';

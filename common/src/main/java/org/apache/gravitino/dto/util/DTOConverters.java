@@ -1138,24 +1138,6 @@ public class DTOConverters {
       public Audit auditInfo() {
         return tableDTO.auditInfo();
       }
-
-      @Override
-      public String format() {
-        if (properties() == null) {
-          return null;
-        }
-
-        return properties().get("format");
-      }
-
-      @Override
-      public String location() {
-        if (properties() == null) {
-          return null;
-        }
-
-        return properties().get("location");
-      }
     };
   }
 
