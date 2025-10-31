@@ -73,7 +73,7 @@ const FilesetView = () => {
     if (!store.filesetFiles) return []
     const startIndex = page * rowsPerPage
     const endIndex = startIndex + rowsPerPage
-    
+
     return store.filesetFiles.slice(startIndex, endIndex)
   }, [store.filesetFiles, page, rowsPerPage])
 
