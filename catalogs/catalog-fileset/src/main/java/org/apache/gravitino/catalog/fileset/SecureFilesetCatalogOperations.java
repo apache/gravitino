@@ -121,12 +121,7 @@ public class SecureFilesetCatalogOperations
       throws NoSuchSchemaException, FilesetAlreadyExistsException {
     String apiUser = PrincipalUtils.getCurrentUserName();
 
-    Map<String, String> filesetProperties = new HashMap<>(filesetCatalogOperations.getConf());
-    Schema schema =
-        filesetCatalogOperations.loadSchema(NameIdentifier.parse(ident.namespace().toString()));
-    filesetProperties.putAll(schema.properties());
-    filesetProperties.putAll(properties);
-
+    Map<String, String> filesetProperties = mergeUpLevelConfigurations(ident, properties);
     UserContext userContext =
         UserContext.getUserContext(
             ident, filesetProperties, filesetCatalogOperations.getCatalogInfo());
@@ -158,12 +153,8 @@ public class SecureFilesetCatalogOperations
       throw new RuntimeException("Failed to delete fileset " + ident, ioe);
     }
 
-    Map<String, String> filesetProperties = new HashMap<>(filesetCatalogOperations.getConf());
-    Schema schema =
-        filesetCatalogOperations.loadSchema(NameIdentifier.parse(ident.namespace().toString()));
-    filesetProperties.putAll(schema.properties());
-    filesetProperties.putAll(filesetEntity.properties());
-
+    Map<String, String> filesetProperties =
+        mergeUpLevelConfigurations(ident, filesetEntity.properties());
     UserContext userContext =
         UserContext.getUserContext(
             ident, filesetProperties, filesetCatalogOperations.getCatalogInfo());
@@ -172,11 +163,28 @@ public class SecureFilesetCatalogOperations
     return r;
   }
 
+  public Map<String, String> mergeUpLevelConfigurations(
+      NameIdentifier ident, Map<String, String> entityProperties) {
+    Map<String, String> mergedProperties = new HashMap<>(filesetCatalogOperations.getConf());
+    if (ident.namespace().levels().length == 3) {
+      // schema level
+      mergedProperties.putAll(entityProperties);
+      return mergedProperties;
+    }
+
+    // fileset level
+    NameIdentifierUtil.checkFileset(ident);
+    NameIdentifier schemaIdent = NameIdentifierUtil.getSchemaIdentifier(ident);
+    Schema schema = filesetCatalogOperations.loadSchema(schemaIdent);
+    mergedProperties.putAll(schema.properties());
+    mergedProperties.putAll(entityProperties);
+    return mergedProperties;
+  }
+
   @Override
   public Schema createSchema(NameIdentifier ident, String comment, Map<String, String> properties)
       throws NoSuchCatalogException, SchemaAlreadyExistsException {
-    Map<String, String> schemaProperties = new HashMap<>(filesetCatalogOperations.getConf());
-    schemaProperties.putAll(properties);
+    Map<String, String> schemaProperties = mergeUpLevelConfigurations(ident, properties);
     String apiUser = PrincipalUtils.getCurrentUserName();
     UserContext userContext =
         UserContext.getUserContext(
@@ -199,8 +207,8 @@ public class SecureFilesetCatalogOperations
       SchemaEntity schemaEntity =
           filesetCatalogOperations.store().get(ident, Entity.EntityType.SCHEMA, SchemaEntity.class);
 
-      Map<String, String> schemaProperties = new HashMap<>(filesetCatalogOperations.getConf());
-      schemaProperties.putAll(schemaEntity.properties());
+      Map<String, String> schemaProperties =
+          mergeUpLevelConfigurations(ident, schemaEntity.properties());
       UserContext userContext =
           UserContext.getUserContext(
               ident, schemaProperties, filesetCatalogOperations.getCatalogInfo());

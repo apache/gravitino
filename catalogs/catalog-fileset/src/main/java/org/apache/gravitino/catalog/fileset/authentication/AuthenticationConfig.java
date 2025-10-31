@@ -48,11 +48,11 @@ public class AuthenticationConfig extends Config {
 
   public AuthenticationConfig(Map<String, String> properties, Configuration configuration) {
     super(false);
-    loadFromConfiguration(configuration);
+    loadFromHdfsConfiguration(configuration);
     loadFromMap(properties, k -> true);
   }
 
-  private void loadFromConfiguration(Configuration configuration) {
+  private void loadFromHdfsConfiguration(Configuration configuration) {
     String authType = configuration.get("hadoop.security.authentication", "simple");
     configMap.put(AUTH_TYPE_KEY, authType);
   }

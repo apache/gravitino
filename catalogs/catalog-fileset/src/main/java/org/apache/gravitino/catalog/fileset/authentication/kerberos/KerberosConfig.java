@@ -73,11 +73,11 @@ public class KerberosConfig extends AuthenticationConfig {
 
   public KerberosConfig(Map<String, String> properties, Configuration configuration) {
     super(properties, configuration);
-    loadFromConfiguration(configuration);
+    loadFromHdfsConfiguration(configuration);
     loadFromMap(properties, k -> true);
   }
 
-  private void loadFromConfiguration(Configuration configuration) {
+  private void loadFromHdfsConfiguration(Configuration configuration) {
     String keyTab = configuration.get("hadoop.security.authentication.kerberos.keytab", "");
     configMap.put(KEY_TAB_URI_KEY, keyTab);
     String principal = configuration.get("hadoop.security.authentication.kerberos.principal", "");

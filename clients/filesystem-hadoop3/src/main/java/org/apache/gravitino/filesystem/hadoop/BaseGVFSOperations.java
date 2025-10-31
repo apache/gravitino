@@ -759,7 +759,7 @@ public abstract class BaseGVFSOperations implements Closeable {
       allProperties.putAll(schema.properties());
 
       allProperties.putAll(fileset.properties());
-      allProperties.putAll(getSpecialFilesetConfigs(filesetIdent));
+      allProperties.putAll(getUserDefinedFilesetConfigs(filesetIdent));
 
       FileSystem actualFileSystem = getActualFileSystemByPath(targetLocation, allProperties);
       createFilesetLocationIfNeed(filesetIdent, actualFileSystem, targetLocation);
@@ -793,7 +793,7 @@ public abstract class BaseGVFSOperations implements Closeable {
     }
   }
 
-  private Map<String, String> getSpecialFilesetConfigs(NameIdentifier ident) {
+  private Map<String, String> getUserDefinedFilesetConfigs(NameIdentifier ident) {
     // retrieve the special fileset properties from the configuration
     // the configuration key pattern is
     // fs.gravitino.fileset.properties.catalog.schema.fileset.keyname.property_key
