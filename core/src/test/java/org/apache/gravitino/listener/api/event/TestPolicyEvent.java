@@ -413,7 +413,7 @@ public class TestPolicyEvent {
     Assertions.assertEquals(AlterPolicyFailureEvent.class, event.getClass());
     Assertions.assertEquals(
         GravitinoRuntimeException.class, ((AlterPolicyFailureEvent) event).exception().getClass());
-    Assertions.assertEquals(changes, ((AlterPolicyFailureEvent) event).policyChanges());
+    Assertions.assertArrayEquals(changes, ((AlterPolicyFailureEvent) event).policyChanges());
     Assertions.assertEquals(OperationType.ALTER_POLICY, event.operationType());
     Assertions.assertEquals(OperationStatus.FAILURE, event.operationStatus());
   }
@@ -540,10 +540,10 @@ public class TestPolicyEvent {
     Assertions.assertEquals(
         MetadataObject.Type.CATALOG,
         ((AssociatePoliciesForMetadataObjectFailureEvent) event).metadataObject().type());
-    Assertions.assertEquals(
+    Assertions.assertArrayEquals(
         policiesToAssociate,
         ((AssociatePoliciesForMetadataObjectFailureEvent) event).policiesToAdd());
-    Assertions.assertEquals(
+    Assertions.assertArrayEquals(
         policiesToDisassociate,
         ((AssociatePoliciesForMetadataObjectFailureEvent) event).policiesToRemove());
     Assertions.assertEquals(
