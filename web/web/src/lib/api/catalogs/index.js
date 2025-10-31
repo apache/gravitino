@@ -18,13 +18,13 @@
  */
 
 import { defHttp } from '@/lib/utils/axios'
-import { Api } from '@mui/icons-material'
 
 const Apis = {
   GET: ({ metalake }) => `/api/metalakes/${encodeURIComponent(metalake)}/catalogs?details=true`,
   GET_DETAIL: ({ metalake, catalog }) =>
     `/api/metalakes/${encodeURIComponent(metalake)}/catalogs/${encodeURIComponent(catalog)}`,
   CREATE: ({ metalake }) => `/api/metalakes/${encodeURIComponent(metalake)}/catalogs`,
+  TEST_CONNECT: ({ metalake }) => `/api/metalakes/${encodeURIComponent(metalake)}/catalogs/testConnection`,
   UPDATE: ({ metalake, catalog }) =>
     `/api/metalakes/${encodeURIComponent(metalake)}/catalogs/${encodeURIComponent(catalog)}`,
   DELETE: ({ metalake, catalog }) =>
@@ -52,6 +52,13 @@ export const createCatalogApi = ({ data, metalake }) => {
   })
 }
 
+export const testCatalogConnectionApi = ({ data, metalake }) => {
+  return defHttp.post({
+    url: `${Apis.TEST_CONNECT({ metalake })}`,
+    data
+  })
+}
+
 export const updateCatalogApi = ({ metalake, catalog, data }) => {
   return defHttp.put({
     url: `${Apis.UPDATE({ metalake, catalog })}`,
@@ -65,7 +72,7 @@ export const deleteCatalogApi = ({ metalake, catalog }) => {
   })
 }
 
-export const switchInUseApi = ({ metalake, catalog, isInUse }) => {
+export const switchInUseCatalogApi = ({ metalake, catalog, isInUse }) => {
   return defHttp.patch({
     url: `${Apis.UPDATEINUSE({ metalake, catalog })}`,
     data: { inUse: isInUse }

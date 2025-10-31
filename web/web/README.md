@@ -105,6 +105,87 @@ If you need to add a custom icon, please add your SVG icon in the `./src/lib/ico
 pnpm gen:icons
 ```
 
+## Legacy compatibility: `dev:old` and `dist:old`
+
+This repository keeps two sets of frontend sources: the "new" implementation under `src/app` and `src/components`, and a "legacy" implementation under `src/appOld` and `src/componentsOld`. The script `scripts/select-build-target.js` switches the active code used by Next.js for development and builds.
+
+Behavior of the switcher:
+
+- When `BUILD_TARGET=old` (for example via `pnpm run dev:old` or `pnpm run dist:old`), the script will prefer to copy the contents of `src/appOld` and `src/componentsOld` into `src/app` and `src/components`. If copying fails the script falls back to creating symbolic links. Copying is preferred to avoid cases where Next.js ignores symlinked directories during development.
+- When `BUILD_TARGET=new` the script will attempt to restore any existing backups (e.g. `src/app.bak`) that were created when switching to `old`. If no `.bak` backup exists, the script will preserve the current directories to avoid accidentally deleting native source files.
+
+Available npm scripts:
+
+- `pnpm dev` — start the default (new) development server (`BUILD_TARGET=new`).
+- `pnpm dev:old` — start the legacy development server (`BUILD_TARGET=old`).
+- `pnpm run dist` — produce a static export / build with the new target.
+- `pnpm run dist:old` — produce a static export / build using the legacy target.
+
+Examples (run from the `web/web` directory):
+
+```bash
+# Legacy development (listen on port 3333)
+pnpm run dev:old -- -p 3333
+
+# Legacy build
+pnpm run dist:old
+```
+
+Notes and debugging tips:
+
+- Switching to `old` will create `.bak` backups (for example `src/app.bak`) so the original new sources can be restored later. Do not remove `.bak` files unless you intentionally want to discard the original content.
+- The script prefers copying (`fs.cpSync`) to avoid Next.js issues with symlinks; it only falls back to symlinks when copying fails.
+- If you see 404s while running `dev:old` (for example `/metalakes` returns 404), stop any existing processes that might be holding the dev port (for example port 3333), confirm that `src/app` actually contains the legacy pages (or check `src/app.bak`), and then re-run `pnpm run dev:old`.
+- To confirm that the build used the legacy Tailwind configuration, you can temporarily log `process.env.BUILD_TARGET` in `tailwind.config.js` during a build, or inspect the build output for styles that match the legacy configuration.
+
+Passing parameters
+
+You can pass parameters to both Gradle and the frontend (pnpm) to control which target is built and how the dev server runs.
+
+- Gradle: use the `-PfrontendDist` project property to select the pnpm dist script. Example:
+
+```bash
+# run Gradle and make it call `pnpm run dist:old`
+./gradlew :web:build -PfrontendDist=dist:old
+```
+
+- pnpm / environment variables: most frontend scripts read `BUILD_TARGET`. You can set it inline or export it in the shell. Examples:
+
+```bash
+# inline for one command
+BUILD_TARGET=old pnpm run dist:old
+
+# export for the session
+export BUILD_TARGET=old
+pnpm run dev:old -- -p 3333
+```
+
+- Passing arguments to `pnpm run` scripts: arguments after `--` are forwarded to the underlying command. Example to set port when starting dev:
+
+```bash
+pnpm run dev:old -- -p 3333
+```
+
+- CI example: a CI job that builds the legacy frontend then packages the WAR can run:
+
+```bash
+cd web/web
+BUILD_TARGET=old pnpm install
+BUILD_TARGET=old pnpm run dist:old
+cd ../..
+./gradlew :web:build -PfrontendDist=dist:old
+```
+
+Restoring the new target:
+
+```bash
+# Switch back to new and start development
+pnpm dev
+
+# or explicitly run the selector to restore any backups
+BUILD_TARGET=new node ./scripts/select-build-target.js
+```
+
 ## Self-hosting deployment
 
 ### Static HTML export

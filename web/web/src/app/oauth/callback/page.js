@@ -20,8 +20,10 @@
 'use client'
 
 import { useEffect } from 'react'
-import { Box, Typography, CircularProgress } from '@mui/material'
+import { Flex, Spin, Typography } from 'antd'
 import { oauthProviderFactory } from '@/lib/auth/providers/factory'
+
+const { Title, Text } = Typography
 
 export default function OAuthCallback() {
   useEffect(() => {
@@ -61,21 +63,12 @@ export default function OAuthCallback() {
   }
 
   return (
-    <Box
-      sx={{
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        justifyContent: 'center',
-        minHeight: '100vh',
-        gap: 2
-      }}
-    >
-      <CircularProgress />
-      <Typography variant='h6'>Processing authentication...</Typography>
-      <Typography variant='body2' color='text.secondary'>
-        Please wait while we complete your login.
-      </Typography>
-    </Box>
+    <Flex vertical align='center' justify='center' gap={16} style={{ minHeight: '100vh' }}>
+      <Spin size='large' />
+      <Title level={4} style={{ margin: 0 }}>
+        Processing authentication...
+      </Title>
+      <Text type='secondary'>Please wait while we complete your login.</Text>
+    </Flex>
   )
 }

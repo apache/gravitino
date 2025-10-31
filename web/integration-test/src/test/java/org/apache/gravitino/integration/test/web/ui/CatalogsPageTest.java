@@ -224,14 +224,19 @@ public class CatalogsPageTest extends BaseWebIT {
     // load metalake
     gravitinoClient.loadMetalake(METALAKE_NAME);
     metalakePage.clickMetalakeLink(METALAKE_NAME);
-    // create catalog
+    // create catalog - new UI flow: select provider first, then click Next
     clickAndWait(catalogsPage.createCatalogBtn);
+    catalogsPage.clickSelectProvider("hive");
+    clickAndWait(catalogsPage.handleNextCatalogBtn);
     catalogsPage.setCatalogNameField(DEFAULT_CATALOG_NAME);
     catalogsPage.setCatalogFixedProp("metastore.uris", hiveMetastoreUri);
     clickAndWait(catalogsPage.handleSubmitCatalogBtn);
-    // delete catalog
+    // Wait for catalog to appear in the table
+    Thread.sleep(2000);
+    // delete catalog - new UI requires inputting catalog name to confirm
     catalogsPage.clickInUseSwitch(DEFAULT_CATALOG_NAME);
     catalogsPage.clickDeleteBtn(DEFAULT_CATALOG_NAME);
+    catalogsPage.setConfirmDeleteInput(DEFAULT_CATALOG_NAME);
     clickAndWait(catalogsPage.confirmDeleteBtn);
     Assertions.assertTrue(catalogsPage.verifyEmptyTableData());
   }
@@ -239,15 +244,17 @@ public class CatalogsPageTest extends BaseWebIT {
   @Test
   @Order(1)
   public void testCreateHiveCatalog() throws InterruptedException {
-    // Create catalog
+    // Create catalog - new UI flow: select provider first, then click Next
     clickAndWait(catalogsPage.createCatalogBtn);
+    catalogsPage.clickSelectProvider("hive");
+    clickAndWait(catalogsPage.handleNextCatalogBtn);
     catalogsPage.setCatalogNameField(HIVE_CATALOG_NAME);
     catalogsPage.setCatalogCommentField("catalog comment");
     catalogsPage.setCatalogFixedProp("metastore.uris", hiveMetastoreUri);
     catalogsPage.addCatalogPropsBtn.click();
-    catalogsPage.setPropsAt(1, "key1", "value1");
+    catalogsPage.setPropsAt(0, "key1", "value1");
     catalogsPage.addCatalogPropsBtn.click();
-    catalogsPage.setPropsAt(2, "key2", "value2");
+    catalogsPage.setPropsAt(1, "key2", "value2");
     clickAndWait(catalogsPage.handleSubmitCatalogBtn);
     // load catalog
     GravitinoMetalake metalake = gravitinoClient.loadMetalake(METALAKE_NAME);
@@ -260,10 +267,10 @@ public class CatalogsPageTest extends BaseWebIT {
   @Order(2)
   public void testCreateIcebergCatalog() throws InterruptedException {
     clickAndWait(catalogsPage.createCatalogBtn);
-    catalogsPage.setCatalogNameField(ICEBERG_CATALOG_NAME);
-    // select provider as iceberg
-    clickAndWait(catalogsPage.catalogProviderSelector);
+    // select provider as iceberg - new UI uses provider cards
     catalogsPage.clickSelectProvider("lakehouse-iceberg");
+    clickAndWait(catalogsPage.handleNextCatalogBtn);
+    catalogsPage.setCatalogNameField(ICEBERG_CATALOG_NAME);
     catalogsPage.setCatalogCommentField("iceberg catalog comment");
     // set iceberg uri
     catalogsPage.setCatalogFixedProp("uri", hiveMetastoreUri);
@@ -278,10 +285,10 @@ public class CatalogsPageTest extends BaseWebIT {
   public void testCreateMysqlCatalog() throws InterruptedException {
     // create mysql catalog actions
     clickAndWait(catalogsPage.createCatalogBtn);
-    catalogsPage.setCatalogNameField(MYSQL_CATALOG_NAME);
-    // select provider as mysql
-    clickAndWait(catalogsPage.catalogProviderSelector);
+    // select provider as mysql - new UI uses provider cards
     catalogsPage.clickSelectProvider("jdbc-mysql");
+    clickAndWait(catalogsPage.handleNextCatalogBtn);
+    catalogsPage.setCatalogNameField(MYSQL_CATALOG_NAME);
     catalogsPage.setCatalogCommentField("mysql catalog comment");
     // set mysql catalog props
     catalogsPage.setCatalogFixedProp("jdbc-driver", MYSQL_JDBC_DRIVER);
@@ -297,12 +304,12 @@ public class CatalogsPageTest extends BaseWebIT {
   public void testCreatePgCatalog() throws InterruptedException {
     // create postgresql catalog actions
     clickAndWait(catalogsPage.createCatalogBtn);
-    catalogsPage.setCatalogNameField(PG_CATALOG_NAME);
-    // select provider as mysql
-    clickAndWait(catalogsPage.catalogProviderSelector);
+    // select provider as postgresql - new UI uses provider cards
     catalogsPage.clickSelectProvider("jdbc-postgresql");
+    clickAndWait(catalogsPage.handleNextCatalogBtn);
+    catalogsPage.setCatalogNameField(PG_CATALOG_NAME);
     catalogsPage.setCatalogCommentField("postgresql catalog comment");
-    // set mysql catalog props
+    // set postgresql catalog props
     catalogsPage.setCatalogFixedProp("jdbc-driver", PG_JDBC_DRIVER);
     catalogsPage.setCatalogFixedProp("jdbc-url", postgresqlUri + ":5432/" + PG_JDBC_DB);
     catalogsPage.setCatalogFixedProp("jdbc-user", COMMON_JDBC_USER);
@@ -316,10 +323,11 @@ public class CatalogsPageTest extends BaseWebIT {
   @Test
   @Order(5)
   public void testCreateFilesetCatalog() throws InterruptedException {
+    // Switch to fileset tab first (new UI flow)
+    catalogsPage.clickSelectType("fileset");
+    Thread.sleep(1000); // Wait for tab switch
     clickAndWait(catalogsPage.createCatalogBtn);
     catalogsPage.setCatalogNameField(FILESET_CATALOG_NAME);
-    clickAndWait(catalogsPage.catalogTypeSelector);
-    catalogsPage.clickSelectType("fileset");
     catalogsPage.setCatalogCommentField("fileset catalog comment");
     clickAndWait(catalogsPage.handleSubmitCatalogBtn);
     Assertions.assertTrue(catalogsPage.verifyGetCatalog(FILESET_CATALOG_NAME));
@@ -327,40 +335,21 @@ public class CatalogsPageTest extends BaseWebIT {
 
   @Test
   @Order(6)
-  public void testRefreshPage() {
+  public void testRefreshPage() throws InterruptedException {
+    // After creating fileset catalog, we're on fileset tab
+    // Switch back to relational tab to verify relational catalogs
+    catalogsPage.clickSelectType("relational");
+    Thread.sleep(1000); // Wait for tab switch
     driver.navigate().refresh();
     Assertions.assertEquals(WEB_TITLE, driver.getTitle());
     Assertions.assertTrue(catalogsPage.verifyRefreshPage());
-    List<String> catalogsNames =
-        Arrays.asList(
-            HIVE_CATALOG_NAME,
-            ICEBERG_CATALOG_NAME,
-            MYSQL_CATALOG_NAME,
-            PG_CATALOG_NAME,
-            FILESET_CATALOG_NAME);
-    Assertions.assertTrue(catalogsPage.verifyCreatedCatalogs(catalogsNames));
+    List<String> relationalCatalogsNames =
+        Arrays.asList(HIVE_CATALOG_NAME, ICEBERG_CATALOG_NAME, MYSQL_CATALOG_NAME, PG_CATALOG_NAME);
+    Assertions.assertTrue(catalogsPage.verifyCreatedCatalogs(relationalCatalogsNames));
   }
 
   @Test
   @Order(7)
-  public void testViewTabMetalakeDetails() throws InterruptedException {
-    clickAndWait(catalogsPage.tabDetailsBtn);
-    Assertions.assertTrue(catalogsPage.verifyShowDetailsContent());
-    clickAndWait(catalogsPage.tabTableBtn);
-    Assertions.assertTrue(catalogsPage.verifyShowTableContent());
-  }
-
-  @Test
-  @Order(8)
-  public void testViewCatalogDetails() throws InterruptedException {
-    catalogsPage.clickViewCatalogBtn(HIVE_CATALOG_NAME);
-    mouseMoveTo(By.xpath(".//*[@data-prev-refer='details-props-key-metastore.uris']"));
-    Assertions.assertTrue(
-        catalogsPage.verifyShowCatalogDetails(HIVE_CATALOG_NAME, hiveMetastoreUri));
-  }
-
-  @Test
-  @Order(9)
   public void testEditHiveCatalog() throws InterruptedException {
     catalogsPage.clickEditCatalogBtn(HIVE_CATALOG_NAME);
     catalogsPage.setCatalogNameField(MODIFIED_HIVE_CATALOG_NAME);
@@ -370,11 +359,19 @@ public class CatalogsPageTest extends BaseWebIT {
 
   // test catalog show schema list
   @Test
-  @Order(10)
+  @Order(8)
   public void testClickCatalogLink() {
     catalogsPage.clickCatalogLink(
         METALAKE_NAME, MODIFIED_HIVE_CATALOG_NAME, CATALOG_TYPE_RELATIONAL);
+    // Verify catalog details page displays correct information
+    // - Table title shows "Schemas"
+    // - Catalog name displayed in h3 title
+    // - Type shows "relational"
+    // - Provider shows "hive"
     Assertions.assertTrue(catalogsPage.verifyShowTableTitle(CATALOG_TABLE_TITLE));
+    Assertions.assertTrue(
+        catalogsPage.verifyCatalogDetailsPage(
+            MODIFIED_HIVE_CATALOG_NAME, "hive", CATALOG_TYPE_RELATIONAL));
     Awaitility.await()
         .atMost(MAX_WAIT_IN_SECONDS, TimeUnit.SECONDS)
         .pollInterval(WAIT_INTERVAL_IN_SECONDS, TimeUnit.SECONDS)
@@ -383,27 +380,27 @@ public class CatalogsPageTest extends BaseWebIT {
   }
 
   @Test
-  @Order(11)
+  @Order(9)
   public void testRefreshCatalogPage() {
     driver.navigate().refresh();
     Assertions.assertEquals(WEB_TITLE, driver.getTitle());
     Assertions.assertTrue(catalogsPage.verifyShowTableTitle(CATALOG_TABLE_TITLE));
     Assertions.assertTrue(catalogsPage.verifyShowDataItemInList(SCHEMA_NAME, false));
+    // Tree view only shows catalogs of current type (relational)
     List<String> treeNodes =
         Arrays.asList(
             MODIFIED_HIVE_CATALOG_NAME,
             SCHEMA_NAME,
             ICEBERG_CATALOG_NAME,
             MYSQL_CATALOG_NAME,
-            PG_CATALOG_NAME,
-            FILESET_CATALOG_NAME);
+            PG_CATALOG_NAME);
     Assertions.assertTrue(catalogsPage.verifyTreeNodes(treeNodes));
     Assertions.assertTrue(catalogsPage.verifySelectedNode(MODIFIED_HIVE_CATALOG_NAME));
   }
 
   // test schema show table list
   @Test
-  @Order(12)
+  @Order(10)
   public void testClickSchemaLink() {
     // create table
     createHiveTableAndColumn(METALAKE_NAME, MODIFIED_HIVE_CATALOG_NAME, SCHEMA_NAME, TABLE_NAME);
@@ -415,12 +412,13 @@ public class CatalogsPageTest extends BaseWebIT {
   }
 
   @Test
-  @Order(13)
+  @Order(11)
   public void testRefreshSchemaPage() {
     driver.navigate().refresh();
     Assertions.assertEquals(WEB_TITLE, driver.getTitle());
     Assertions.assertTrue(catalogsPage.verifyShowTableTitle(SCHEMA_TABLE_TITLE));
     Assertions.assertTrue(catalogsPage.verifyShowDataItemInList(TABLE_NAME, false));
+    // Tree view only shows catalogs of current type (relational)
     List<String> treeNodes =
         Arrays.asList(
             MODIFIED_HIVE_CATALOG_NAME,
@@ -428,15 +426,14 @@ public class CatalogsPageTest extends BaseWebIT {
             TABLE_NAME,
             ICEBERG_CATALOG_NAME,
             MYSQL_CATALOG_NAME,
-            PG_CATALOG_NAME,
-            FILESET_CATALOG_NAME);
+            PG_CATALOG_NAME);
     Assertions.assertTrue(catalogsPage.verifyTreeNodes(treeNodes));
     Assertions.assertTrue(catalogsPage.verifySelectedNode(SCHEMA_NAME));
   }
 
   // test table show column list
   @Test
-  @Order(14)
+  @Order(12)
   public void testClickTableLink() {
     catalogsPage.clickTableLink(
         METALAKE_NAME,
@@ -451,19 +448,26 @@ public class CatalogsPageTest extends BaseWebIT {
   }
 
   @Test
-  @Order(15)
-  public void testShowTablePropertiesTooltip() {
+  @Order(13)
+  public void testShowTablePropertiesTooltip() throws InterruptedException {
+    // Move to distribution icon and verify
     mouseMoveTo(By.xpath("//*[@data-refer='col-icon-" + DISTRIBUTION + "-" + COLUMN_NAME + "']"));
     Assertions.assertTrue(catalogsPage.verifyTableProperties(DISTRIBUTION, COLUMN_NAME));
+
+    // Move away first to close the popover, then move to sort orders icon
+    mouseMoveTo(By.xpath("//*[@data-refer='table-grid']"));
     mouseMoveTo(By.xpath("//*[@data-refer='col-icon-" + SORT_ORDERS + "-" + COLUMN_NAME_2 + "']"));
     Assertions.assertTrue(catalogsPage.verifyTableProperties(SORT_ORDERS, COLUMN_NAME_2));
+
+    // Move away first to close the popover, then move to overview
+    mouseMoveTo(By.xpath("//*[@data-refer='table-grid']"));
     mouseMoveTo(By.xpath("//*[@data-refer='overview-tip-" + SORT_ORDERS + "']"));
     Assertions.assertTrue(
         catalogsPage.verifyTablePropertiesOverview(Arrays.asList(COLUMN_NAME, COLUMN_NAME_2)));
   }
 
   @Test
-  @Order(16)
+  @Order(14)
   public void testRefreshTablePage() {
     driver.navigate().refresh();
     Assertions.assertEquals(WEB_TITLE, driver.getTitle());
@@ -471,6 +475,7 @@ public class CatalogsPageTest extends BaseWebIT {
     Assertions.assertTrue(catalogsPage.verifyShowTableTitle(TABLE_TABLE_TITLE));
     Assertions.assertTrue(catalogsPage.verifyTableColumns());
     Assertions.assertTrue(catalogsPage.verifyShowDataItemInList(COLUMN_NAME, true));
+    // Tree view only shows catalogs of current type (relational)
     List<String> treeNodes =
         Arrays.asList(
             MODIFIED_HIVE_CATALOG_NAME,
@@ -478,13 +483,12 @@ public class CatalogsPageTest extends BaseWebIT {
             TABLE_NAME,
             ICEBERG_CATALOG_NAME,
             MYSQL_CATALOG_NAME,
-            PG_CATALOG_NAME,
-            FILESET_CATALOG_NAME);
+            PG_CATALOG_NAME);
     Assertions.assertTrue(catalogsPage.verifyTreeNodes(treeNodes));
   }
 
   @Test
-  @Order(17)
+  @Order(15)
   public void testRelationalHiveCatalogTreeNode() throws InterruptedException {
     String hiveNode =
         String.format(
@@ -515,7 +519,7 @@ public class CatalogsPageTest extends BaseWebIT {
   }
 
   @Test
-  @Order(18)
+  @Order(16)
   public void testTreeNodeRefresh() throws InterruptedException {
     createHiveTableAndColumn(METALAKE_NAME, MODIFIED_HIVE_CATALOG_NAME, SCHEMA_NAME, TABLE_NAME_2);
     String hiveNode =
@@ -543,7 +547,7 @@ public class CatalogsPageTest extends BaseWebIT {
   }
 
   @Test
-  @Order(19)
+  @Order(17)
   public void testCreateTableByUI() throws InterruptedException {
     String schemaNode =
         String.format(
@@ -560,17 +564,18 @@ public class CatalogsPageTest extends BaseWebIT {
   }
 
   @Test
-  @Order(20)
+  @Order(18)
   public void testDropTableByUI() throws InterruptedException {
     // delete table of hive catalog
     catalogsPage.clickDeleteBtn(TABLE_NAME_3);
+    catalogsPage.setConfirmDeleteInput(TABLE_NAME_3);
     clickAndWait(catalogsPage.confirmDeleteBtn);
     // verify table list without table name 3
     Assertions.assertTrue(catalogsPage.verifyNoDataItemInList(TABLE_NAME_3, false));
   }
 
   @Test
-  @Order(21)
+  @Order(19)
   public void testOtherRelationalCatalogTreeNode() throws InterruptedException {
     String icebergNode =
         String.format(
@@ -590,7 +595,7 @@ public class CatalogsPageTest extends BaseWebIT {
   }
 
   @Test
-  @Order(22)
+  @Order(20)
   public void testSelectMetalake() throws InterruptedException {
     catalogsPage.metalakeSelectChange(METALAKE_SELECT_NAME);
     Assertions.assertTrue(catalogsPage.verifyEmptyTableData());
@@ -600,8 +605,11 @@ public class CatalogsPageTest extends BaseWebIT {
   }
 
   @Test
-  @Order(23)
+  @Order(21)
   public void testCreateFilesetSchema() throws InterruptedException {
+    // Switch to fileset tab first
+    catalogsPage.clickSelectType("fileset");
+    Thread.sleep(1000); // Wait for tab switch
     // 1. click fileset catalog tree node
     String filesetCatalogNode =
         String.format(
@@ -615,19 +623,13 @@ public class CatalogsPageTest extends BaseWebIT {
     // 3. verify show table title、 schema name and tree node
     Assertions.assertTrue(catalogsPage.verifyShowTableTitle(CATALOG_TABLE_TITLE));
     Assertions.assertTrue(catalogsPage.verifyShowDataItemInList(SCHEMA_NAME_FILESET, false));
-    List<String> treeNodes =
-        Arrays.asList(
-            MODIFIED_HIVE_CATALOG_NAME,
-            ICEBERG_CATALOG_NAME,
-            MYSQL_CATALOG_NAME,
-            PG_CATALOG_NAME,
-            FILESET_CATALOG_NAME,
-            SCHEMA_NAME_FILESET);
+    // Tree view only shows catalogs of current type (fileset)
+    List<String> treeNodes = Arrays.asList(FILESET_CATALOG_NAME, SCHEMA_NAME_FILESET);
     Assertions.assertTrue(catalogsPage.verifyTreeNodes(treeNodes));
   }
 
   @Test
-  @Order(24)
+  @Order(22)
   public void testCreateFileset() throws InterruptedException {
     // 1. click schema tree node
     String filesetSchemaNode =
@@ -647,15 +649,8 @@ public class CatalogsPageTest extends BaseWebIT {
     // 3. verify show table title、 fileset name and tree node
     Assertions.assertTrue(catalogsPage.verifyShowTableTitle(SCHEMA_FILESET_TITLE));
     Assertions.assertTrue(catalogsPage.verifyShowDataItemInList(FILESET_NAME, false));
-    List<String> treeNodes =
-        Arrays.asList(
-            MODIFIED_HIVE_CATALOG_NAME,
-            ICEBERG_CATALOG_NAME,
-            MYSQL_CATALOG_NAME,
-            PG_CATALOG_NAME,
-            FILESET_CATALOG_NAME,
-            SCHEMA_NAME_FILESET,
-            FILESET_NAME);
+    // Tree view only shows catalogs of current type (fileset)
+    List<String> treeNodes = Arrays.asList(FILESET_CATALOG_NAME, SCHEMA_NAME_FILESET, FILESET_NAME);
     Assertions.assertTrue(catalogsPage.verifyTreeNodes(treeNodes));
     // 4. click fileset tree node
     String filesetNode =
@@ -667,20 +662,13 @@ public class CatalogsPageTest extends BaseWebIT {
             SCHEMA_NAME_FILESET,
             FILESET_NAME);
     catalogsPage.clickTreeNode(filesetNode);
-    // 5. verify Files tab is shown by default, then switch to Details and verify details content
+    // 5. verify Files tab panel is shown by default
+    // Note: Fileset details page shows properties in a Popover, not a Details tab
     Assertions.assertTrue(catalogsPage.verifyShowFilesContent());
-    clickAndWait(catalogsPage.tabDetailsBtn);
-    Assertions.assertTrue(catalogsPage.verifyShowDetailsContent());
-    Assertions.assertTrue(
-        catalogsPage.verifyShowPropertiesItemInList(
-            "key", PROPERTIES_KEY1, PROPERTIES_KEY1, false));
-    Assertions.assertTrue(
-        catalogsPage.verifyShowPropertiesItemInList(
-            "value", PROPERTIES_KEY1, PROPERTIES_VALUE1, false));
   }
 
   @Test
-  @Order(25)
+  @Order(23)
   public void testBackHomePage() throws InterruptedException {
     clickAndWait(catalogsPage.backHomeBtn);
     Assertions.assertTrue(catalogsPage.verifyBackHomePage());

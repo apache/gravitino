@@ -81,11 +81,12 @@ public class CatalogsPageKafkaTest extends BaseWebIT {
     // load metalake
     gravitinoClient.loadMetalake(METALAKE_NAME);
     metalakePage.clickMetalakeLink(METALAKE_NAME);
-    // create kafka catalog actions
-    clickAndWait(catalogsPage.createCatalogBtn);
-    catalogsPage.setCatalogNameField(KAFKA_CATALOG_NAME);
-    clickAndWait(catalogsPage.catalogTypeSelector);
+    // create kafka catalog - new UI flow: select type first, then provider, then click Next
     catalogsPage.clickSelectType(CATALOG_TYPE_MESSAGING);
+    clickAndWait(catalogsPage.createCatalogBtn);
+    catalogsPage.clickSelectProvider("kafka");
+    clickAndWait(catalogsPage.handleNextCatalogBtn);
+    catalogsPage.setCatalogNameField(KAFKA_CATALOG_NAME);
     catalogsPage.setCatalogCommentField("kafka catalog comment");
     // set kafka catalog props
     catalogsPage.setCatalogFixedProp("bootstrap.servers", kafkaUri);
@@ -138,19 +139,12 @@ public class CatalogsPageKafkaTest extends BaseWebIT {
             "{{%s}}{{%s}}{{%s}}{{%s}}{{%s}}",
             METALAKE_NAME, KAFKA_CATALOG_NAME, CATALOG_TYPE_MESSAGING, SCHEMA_NAME, TOPIC_NAME);
     catalogsPage.clickTreeNode(topicNode);
-    // 2. verify show tab details
-    Assertions.assertTrue(catalogsPage.verifyShowDetailsContent());
-    // 3. verify show highlight properties
-    Assertions.assertTrue(
-        catalogsPage.verifyShowPropertiesItemInList(
-            "key", "partition-count", "partition-count", true));
-    Assertions.assertTrue(
-        catalogsPage.verifyShowPropertiesItemInList("value", "partition-count", "1", true));
-    Assertions.assertTrue(
-        catalogsPage.verifyShowPropertiesItemInList(
-            "key", "replication-factor", "replication-factor", true));
-    Assertions.assertTrue(
-        catalogsPage.verifyShowPropertiesItemInList("value", "replication-factor", "1", true));
+    // 2. verify topic is selected in tree
+    Assertions.assertTrue(catalogsPage.verifySelectedNode(TOPIC_NAME));
+    // 3. click properties link to open popover and verify properties
+    catalogsPage.clickPropertiesLink();
+    Assertions.assertTrue(catalogsPage.verifyPropertyInPopover("partition-count", "1"));
+    Assertions.assertTrue(catalogsPage.verifyPropertyInPopover("replication-factor", "1"));
   }
 
   @Test
@@ -162,8 +156,9 @@ public class CatalogsPageKafkaTest extends BaseWebIT {
             "{{%s}}{{%s}}{{%s}}{{%s}}",
             METALAKE_NAME, KAFKA_CATALOG_NAME, CATALOG_TYPE_MESSAGING, SCHEMA_NAME);
     catalogsPage.clickTreeNode(kafkaSchemaNode);
-    // delete topic of kafka catalog
+    // delete topic of kafka catalog - new UI requires inputting topic name to confirm
     catalogsPage.clickDeleteBtn(TOPIC_NAME);
+    catalogsPage.setConfirmDeleteInput(TOPIC_NAME);
     clickAndWait(catalogsPage.confirmDeleteBtn);
     // verify empty topic list
     Assertions.assertTrue(catalogsPage.verifyEmptyTableData());

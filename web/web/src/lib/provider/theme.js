@@ -37,9 +37,13 @@ export const useTheme = () => {
 const MuiProvider = props => {
   const { children, mode } = props
 
+  // Sanitize mode: MUI only supports 'light' or 'dark'.
+  // If a previous/local value is invalid (eg. 'default'), fall back to configured default.
+  const safeMode = mode === 'dark' || mode === 'light' ? mode : settingsConfig.mode || 'light'
+
   return (
     <StyledEngineProvider injectFirst>
-      <MuiThemeProvider theme={createMuiTheme({ mode })}>
+      <MuiThemeProvider theme={createMuiTheme({ mode: safeMode })}>
         <CssBaseline />
         {children}
       </MuiThemeProvider>

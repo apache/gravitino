@@ -52,7 +52,6 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.condition.DisabledIfSystemProperty;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -383,7 +382,7 @@ public class CatalogIT extends BaseIT {
   }
 
   @Test
-  @DisabledIfSystemProperty(named = "testMode", matches = "embedded")
+  //   @DisabledIfSystemProperty(named = "testMode", matches = "embedded")
   public void testCreateCatalogWithPackage() {
     String catalogName = GravitinoITUtils.genRandomName("catalog");
     Assertions.assertFalse(metalake.catalogExists(catalogName));

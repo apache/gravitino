@@ -21,6 +21,13 @@
       }
     ]
   },
-  "include": ["next-env.d.ts", "dist/ui/types/**/*.js", "**/*.js", "**/*.jsx", ".next/types/**/*.js"],
+  "include": [
+    "next-env.d.ts",
+    "dist/ui/types/**/*.js",
+    "**/*.js",
+    "**/*.jsx",
+    ".next/types/**/*.js",
+    "eslint.config.mjs"
+  ],
   "exclude": ["node_modules"]
 }
