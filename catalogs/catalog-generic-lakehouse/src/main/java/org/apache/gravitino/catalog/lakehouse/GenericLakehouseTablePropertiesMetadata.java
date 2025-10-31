@@ -65,10 +65,10 @@ public class GenericLakehouseTablePropertiesMetadata extends BasePropertiesMetad
             booleanPropertyEntry(
                 LAKEHOUSE_REGISTER,
                 "Whether this is a table registration operation.",
+                false,
                 true /* immutable */,
                 false /* defaultValue */,
                 false /* hidden */,
-                false,
                 false));
 
     PROPERTIES_METADATA = Maps.uniqueIndex(propertyEntries, PropertyEntry::getName);
