@@ -23,15 +23,15 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.annotation.DeveloperApi;
 import org.apache.gravitino.policy.PolicyChange;
 
-/** Represents an event triggered before altering a policy. */
+/** Represents an event that is triggered before altering a policy. */
 @DeveloperApi
 public final class AlterPolicyPreEvent extends PolicyPreEvent {
   private final PolicyChange[] policyChanges;
 
   /**
-   * Constructs an AlterPolicyPreEvent.
+   * Constructs an instance of {@code AlterPolicyPreEvent}.
    *
-   * @param user The user who is altering the policy.
+   * @param user The username of the individual who initiated the alter policy operation.
    * @param identifier The identifier of the policy to be altered.
    * @param policyChanges The changes to be applied to the policy.
    */
@@ -43,16 +43,16 @@ public final class AlterPolicyPreEvent extends PolicyPreEvent {
   /**
    * Returns the changes to be applied to the policy.
    *
-   * @return The policy changes.
+   * @return the policy changes.
    */
   public PolicyChange[] policyChanges() {
     return policyChanges;
   }
 
   /**
-   * Returns the operation type.
+   * Returns the type of operation.
    *
-   * @return The operation type (ALTER_POLICY).
+   * @return the operation type.
    */
   @Override
   public OperationType operationType() {

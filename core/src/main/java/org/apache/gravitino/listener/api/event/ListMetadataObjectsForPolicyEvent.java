@@ -23,15 +23,15 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.annotation.DeveloperApi;
 
 /**
- * Represents an event triggered after successfully listing metadata objects associated with a
- * policy.
+ * Represents an event that is triggered upon successfully listing metadata objects associated with
+ * a policy.
  */
 @DeveloperApi
 public final class ListMetadataObjectsForPolicyEvent extends PolicyEvent {
   /**
-   * Constructs a ListMetadataObjectsForPolicyEvent.
+   * Constructs an instance of {@code ListMetadataObjectsForPolicyEvent}.
    *
-   * @param user The user who listed the metadata objects for the policy.
+   * @param user The username of the individual who initiated the list metadata objects operation.
    * @param identifier The identifier of the policy.
    */
   public ListMetadataObjectsForPolicyEvent(String user, NameIdentifier identifier) {
@@ -39,9 +39,9 @@ public final class ListMetadataObjectsForPolicyEvent extends PolicyEvent {
   }
 
   /**
-   * Returns the operation type.
+   * Returns the type of operation.
    *
-   * @return The operation type (LIST_METADATA_OBJECTS_FOR_POLICY).
+   * @return the operation type.
    */
   @Override
   public OperationType operationType() {

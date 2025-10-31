@@ -22,24 +22,24 @@ package org.apache.gravitino.listener.api.event;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.annotation.DeveloperApi;
 
-/** Represents an event triggered when enabling a policy fails. */
+/** Represents an event that is triggered when an attempt to enable a policy fails. */
 @DeveloperApi
 public final class EnablePolicyFailureEvent extends PolicyFailureEvent {
   /**
-   * Constructs an EnablePolicyFailureEvent.
+   * Constructs an instance of {@code EnablePolicyFailureEvent}.
    *
-   * @param user The user who attempted to enable the policy.
+   * @param user The username of the individual who initiated the policy enablement.
    * @param identifier The identifier of the policy that failed to be enabled.
-   * @param exception The exception that caused the failure.
+   * @param exception The exception that was encountered during the policy enablement attempt.
    */
   public EnablePolicyFailureEvent(String user, NameIdentifier identifier, Exception exception) {
     super(user, identifier, exception);
   }
 
   /**
-   * Returns the operation type.
+   * Returns the type of operation.
    *
-   * @return The operation type (ENABLE_POLICY).
+   * @return the operation type.
    */
   @Override
   public OperationType operationType() {

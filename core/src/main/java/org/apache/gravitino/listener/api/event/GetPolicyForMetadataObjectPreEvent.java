@@ -29,9 +29,9 @@ public final class GetPolicyForMetadataObjectPreEvent extends PolicyPreEvent {
   private final MetadataObject metadataObject;
 
   /**
-   * Constructs a GetPolicyForMetadataObjectPreEvent.
+   * Constructs an instance of {@code GetPolicyForMetadataObjectPreEvent}.
    *
-   * @param user The user who is retrieving the policy for the metadata object.
+   * @param user The username of the individual who initiated the policy retrieval operation.
    * @param metalake The metalake from which the policy will be retrieved.
    * @param metadataObject The metadata object for which the policy will be retrieved.
    */
@@ -44,16 +44,16 @@ public final class GetPolicyForMetadataObjectPreEvent extends PolicyPreEvent {
   /**
    * Returns the metadata object for which the policy will be retrieved.
    *
-   * @return The metadata object.
+   * @return the metadata object.
    */
   public MetadataObject metadataObject() {
     return metadataObject;
   }
 
   /**
-   * Returns the operation type.
+   * Returns the type of operation.
    *
-   * @return The operation type (GET_POLICY_FOR_METADATA_OBJECT).
+   * @return the operation type.
    */
   @Override
   public OperationType operationType() {

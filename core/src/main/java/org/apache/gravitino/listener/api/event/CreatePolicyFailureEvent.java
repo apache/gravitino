@@ -23,17 +23,17 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.annotation.DeveloperApi;
 import org.apache.gravitino.listener.api.info.PolicyInfo;
 
-/** Represents an event triggered when creating a policy fails. */
+/** Represents an event that is triggered when an attempt to create a policy fails. */
 @DeveloperApi
 public final class CreatePolicyFailureEvent extends PolicyFailureEvent {
   private final PolicyInfo createPolicyRequest;
 
   /**
-   * Constructs a CreatePolicyFailureEvent.
+   * Constructs an instance of {@code CreatePolicyFailureEvent}.
    *
-   * @param user The user who attempted to create the policy.
+   * @param user The username of the individual who initiated the policy creation.
    * @param identifier The identifier of the policy that failed to be created.
-   * @param exception The exception that caused the failure.
+   * @param exception The exception that was encountered during the policy creation attempt.
    * @param createPolicyRequest The policy creation request information.
    */
   public CreatePolicyFailureEvent(
@@ -45,16 +45,16 @@ public final class CreatePolicyFailureEvent extends PolicyFailureEvent {
   /**
    * Returns the policy creation request information.
    *
-   * @return The policy creation request.
+   * @return the policy creation request.
    */
   public PolicyInfo createPolicyRequest() {
     return createPolicyRequest;
   }
 
   /**
-   * Returns the operation type.
+   * Returns the type of operation.
    *
-   * @return The operation type (CREATE_POLICY).
+   * @return the operation type.
    */
   @Override
   public OperationType operationType() {

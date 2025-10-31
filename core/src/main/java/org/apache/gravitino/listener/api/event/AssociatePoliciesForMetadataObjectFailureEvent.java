@@ -23,7 +23,10 @@ import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.annotation.DeveloperApi;
 import org.apache.gravitino.utils.MetadataObjectUtil;
 
-/** Represents an event triggered when associating policies with a metadata object fails. */
+/**
+ * Represents an event that is triggered when an attempt to associate policies with a metadata
+ * object fails.
+ */
 @DeveloperApi
 public final class AssociatePoliciesForMetadataObjectFailureEvent extends PolicyFailureEvent {
   private final MetadataObject metadataObject;
@@ -31,14 +34,14 @@ public final class AssociatePoliciesForMetadataObjectFailureEvent extends Policy
   private final String[] policiesToRemove;
 
   /**
-   * Constructs an AssociatePoliciesForMetadataObjectFailureEvent.
+   * Constructs an instance of {@code AssociatePoliciesForMetadataObjectFailureEvent}.
    *
-   * @param user The user who attempted to associate the policies with the metadata object.
+   * @param user The username of the individual who initiated the associate policies operation.
    * @param metalake The metalake from which the policies were to be associated.
    * @param metadataObject The metadata object with which the policies were to be associated.
    * @param policiesToAdd The policies to be added.
    * @param policiesToRemove The policies to be removed.
-   * @param exception The exception that caused the failure.
+   * @param exception The exception that was encountered during the associate policies attempt.
    */
   public AssociatePoliciesForMetadataObjectFailureEvent(
       String user,
@@ -56,7 +59,7 @@ public final class AssociatePoliciesForMetadataObjectFailureEvent extends Policy
   /**
    * Returns the metadata object with which policies were to be associated.
    *
-   * @return The metadata object.
+   * @return the metadata object.
    */
   public MetadataObject metadataObject() {
     return metadataObject;
@@ -65,7 +68,7 @@ public final class AssociatePoliciesForMetadataObjectFailureEvent extends Policy
   /**
    * Returns the policies to be added.
    *
-   * @return An array of policy names to be added.
+   * @return an array of policy names to be added.
    */
   public String[] policiesToAdd() {
     return policiesToAdd;
@@ -74,16 +77,16 @@ public final class AssociatePoliciesForMetadataObjectFailureEvent extends Policy
   /**
    * Returns the policies to be removed.
    *
-   * @return An array of policy names to be removed.
+   * @return an array of policy names to be removed.
    */
   public String[] policiesToRemove() {
     return policiesToRemove;
   }
 
   /**
-   * Returns the operation type.
+   * Returns the type of operation.
    *
-   * @return The operation type (ASSOCIATE_POLICIES_FOR_METADATA_OBJECT).
+   * @return the operation type.
    */
   @Override
   public OperationType operationType() {

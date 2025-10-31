@@ -23,15 +23,18 @@ import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.annotation.DeveloperApi;
 import org.apache.gravitino.utils.MetadataObjectUtil;
 
-/** Represents an event triggered before listing policy infos associated with a metadata object. */
+/**
+ * Represents an event that is triggered before listing policy infos associated with a metadata
+ * object.
+ */
 @DeveloperApi
 public final class ListPolicyInfosForMetadataObjectPreEvent extends PolicyPreEvent {
   private final MetadataObject metadataObject;
 
   /**
-   * Constructs a ListPolicyInfosForMetadataObjectPreEvent.
+   * Constructs an instance of {@code ListPolicyInfosForMetadataObjectPreEvent}.
    *
-   * @param user The user who is listing the policy infos for the metadata object.
+   * @param user The username of the individual who initiated the list policy infos operation.
    * @param metalake The metalake from which the policy infos will be listed.
    * @param metadataObject The metadata object for which policy infos will be listed.
    */
@@ -44,16 +47,16 @@ public final class ListPolicyInfosForMetadataObjectPreEvent extends PolicyPreEve
   /**
    * Returns the metadata object for which policy infos will be listed.
    *
-   * @return The metadata object.
+   * @return the metadata object.
    */
   public MetadataObject metadataObject() {
     return metadataObject;
   }
 
   /**
-   * Returns the operation type.
+   * Returns the type of operation.
    *
-   * @return The operation type (LIST_POLICY_INFOS_FOR_METADATA_OBJECT).
+   * @return the operation type.
    */
   @Override
   public OperationType operationType() {

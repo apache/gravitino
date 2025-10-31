@@ -24,19 +24,21 @@ import org.apache.gravitino.annotation.DeveloperApi;
 import org.apache.gravitino.listener.api.info.PolicyInfo;
 import org.apache.gravitino.policy.PolicyChange;
 
-/** Represents an event triggered after successfully altering a policy. */
+/** Represents an event triggered upon the successful alteration of a policy. */
 @DeveloperApi
 public final class AlterPolicyEvent extends PolicyEvent {
   private final PolicyInfo updatedPolicyInfo;
   private final PolicyChange[] policyChanges;
 
   /**
-   * Constructs an AlterPolicyEvent.
+   * Constructs an instance of {@code AlterPolicyEvent}, encapsulating the key details about the
+   * successful alteration of a policy.
    *
-   * @param user The user who altered the policy.
+   * @param user The username of the individual responsible for initiating the policy alteration.
    * @param identifier The identifier of the altered policy.
-   * @param policyChanges The changes applied to the policy.
-   * @param updatedPolicyInfo The information about the updated policy.
+   * @param policyChanges An array of {@link PolicyChange} objects representing the specific changes
+   *     applied to the policy during the alteration process.
+   * @param updatedPolicyInfo The post-alteration state of the policy.
    */
   public AlterPolicyEvent(
       String user,
@@ -44,32 +46,35 @@ public final class AlterPolicyEvent extends PolicyEvent {
       PolicyChange[] policyChanges,
       PolicyInfo updatedPolicyInfo) {
     super(user, identifier);
-    this.policyChanges = policyChanges;
+    this.policyChanges = policyChanges != null ? policyChanges.clone() : null;
     this.updatedPolicyInfo = updatedPolicyInfo;
   }
 
   /**
-   * Returns the changes applied to the policy.
+   * Retrieves the specific changes that were made to the policy during the alteration process.
    *
-   * @return The policy changes.
+   * @return An array of {@link PolicyChange} objects detailing each modification applied to the
+   *     policy.
    */
   public PolicyChange[] policyChanges() {
     return policyChanges;
   }
 
   /**
-   * Returns the information about the updated policy.
+   * Retrieves the final state of the policy as it was returned to the user after successful
+   * alteration.
    *
-   * @return The updated policy information.
+   * @return A {@link PolicyInfo} instance encapsulating the comprehensive details of the newly
+   *     altered policy.
    */
   public PolicyInfo updatedPolicyInfo() {
     return updatedPolicyInfo;
   }
 
   /**
-   * Returns the operation type.
+   * Returns the type of operation.
    *
-   * @return The operation type (ALTER_POLICY).
+   * @return the operation type.
    */
   @Override
   public OperationType operationType() {

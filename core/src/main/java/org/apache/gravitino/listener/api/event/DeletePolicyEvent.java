@@ -22,15 +22,15 @@ package org.apache.gravitino.listener.api.event;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.annotation.DeveloperApi;
 
-/** Represents an event triggered after successfully deleting a policy. */
+/** Represents an event that is triggered upon successfully deleting a policy. */
 @DeveloperApi
 public final class DeletePolicyEvent extends PolicyEvent {
   private final boolean isExists;
 
   /**
-   * Constructs a DeletePolicyEvent.
+   * Constructs an instance of {@code DeletePolicyEvent}.
    *
-   * @param user The user who deleted the policy.
+   * @param user The username of the individual who initiated the policy deletion.
    * @param identifier The identifier of the deleted policy.
    * @param isExists Whether the policy existed before deletion.
    */
@@ -42,16 +42,16 @@ public final class DeletePolicyEvent extends PolicyEvent {
   /**
    * Returns whether the policy existed before deletion.
    *
-   * @return True if the policy existed, false otherwise.
+   * @return true if the policy existed, false otherwise.
    */
   public boolean isExists() {
     return isExists;
   }
 
   /**
-   * Returns the operation type.
+   * Returns the type of operation.
    *
-   * @return The operation type (DELETE_POLICY).
+   * @return the operation type.
    */
   @Override
   public OperationType operationType() {

@@ -22,13 +22,13 @@ package org.apache.gravitino.listener.api.event;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.annotation.DeveloperApi;
 
-/** Represents an event triggered before disabling a policy. */
+/** Represents an event that is triggered before disabling a policy. */
 @DeveloperApi
 public final class DisablePolicyPreEvent extends PolicyPreEvent {
   /**
-   * Constructs a DisablePolicyPreEvent.
+   * Constructs an instance of {@code DisablePolicyPreEvent}.
    *
-   * @param user The user who is disabling the policy.
+   * @param user The username of the individual who initiated the disable policy operation.
    * @param identifier The identifier of the policy to be disabled.
    */
   public DisablePolicyPreEvent(String user, NameIdentifier identifier) {
@@ -36,9 +36,9 @@ public final class DisablePolicyPreEvent extends PolicyPreEvent {
   }
 
   /**
-   * Returns the operation type.
+   * Returns the type of operation.
    *
-   * @return The operation type (DISABLE_POLICY).
+   * @return the operation type.
    */
   @Override
   public OperationType operationType() {

@@ -23,27 +23,26 @@ import org.apache.gravitino.annotation.DeveloperApi;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 
 /**
- * Represents an event triggered when an attempt to list policy infos from a metalake fails due to
- * an exception.
+ * Represents an event that is triggered when an attempt to list policy infos from a metalake fails.
  */
 @DeveloperApi
 public class ListPolicyInfosFailureEvent extends PolicyFailureEvent {
 
   /**
-   * Creates a new instance of {@code ListPolicyInfosFailureEvent}.
+   * Constructs an instance of {@code ListPolicyInfosFailureEvent}.
    *
-   * @param initiator the user who initiated the operation
-   * @param metalake the name of the metalake where the operation was attempted
-   * @param exception the exception encountered during the operation
+   * @param initiator The username of the individual who initiated the list-policy-infos request.
+   * @param metalake The name of the metalake from which policy infos were to be listed.
+   * @param exception The exception that was encountered during the list-policy-infos attempt.
    */
   public ListPolicyInfosFailureEvent(String initiator, String metalake, Exception exception) {
     super(initiator, NameIdentifierUtil.ofMetalake(metalake), exception);
   }
 
   /**
-   * Returns the operation type for this event.
+   * Returns the type of operation.
    *
-   * @return the operation type for this event.
+   * @return the operation type.
    */
   @Override
   public OperationType operationType() {

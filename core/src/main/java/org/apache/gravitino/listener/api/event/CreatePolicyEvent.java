@@ -23,17 +23,18 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.annotation.DeveloperApi;
 import org.apache.gravitino.listener.api.info.PolicyInfo;
 
-/** Represents an event triggered after successfully creating a policy. */
+/** Represents an event that is activated upon the successful creation of a policy. */
 @DeveloperApi
 public final class CreatePolicyEvent extends PolicyEvent {
   private final PolicyInfo createdPolicyInfo;
 
   /**
-   * Constructs a CreatePolicyEvent.
+   * Constructs an instance of {@code CreatePolicyEvent}, capturing essential details about the
+   * successful creation of a policy.
    *
-   * @param user The user who created the policy.
+   * @param user The username of the individual who initiated the policy creation.
    * @param identifier The identifier of the created policy.
-   * @param createdPolicyInfo The information about the created policy.
+   * @param createdPolicyInfo The final state of the policy post-creation.
    */
   public CreatePolicyEvent(String user, NameIdentifier identifier, PolicyInfo createdPolicyInfo) {
     super(user, identifier);
@@ -41,18 +42,20 @@ public final class CreatePolicyEvent extends PolicyEvent {
   }
 
   /**
-   * Returns the information about the created policy.
+   * Provides the final state of the policy as it is presented to the user following the successful
+   * creation.
    *
-   * @return The created policy information.
+   * @return A {@link PolicyInfo} object that encapsulates the detailed characteristics of the newly
+   *     created policy.
    */
   public PolicyInfo createdPolicyInfo() {
     return createdPolicyInfo;
   }
 
   /**
-   * Returns the operation type.
+   * Returns the type of operation.
    *
-   * @return The operation type (CREATE_POLICY).
+   * @return the operation type.
    */
   @Override
   public OperationType operationType() {

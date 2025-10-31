@@ -23,17 +23,17 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.annotation.DeveloperApi;
 import org.apache.gravitino.listener.api.info.PolicyInfo;
 
-/** Represents an event triggered after successfully retrieving a policy. */
+/** Represents an event that is triggered upon successfully retrieving a policy. */
 @DeveloperApi
 public final class GetPolicyEvent extends PolicyEvent {
   private final PolicyInfo policyInfo;
 
   /**
-   * Constructs a GetPolicyEvent.
+   * Constructs an instance of {@code GetPolicyEvent}.
    *
-   * @param user The user who retrieved the policy.
+   * @param user The username of the individual who initiated the policy retrieval.
    * @param identifier The identifier of the retrieved policy.
-   * @param policyInfo The information about the retrieved policy.
+   * @param policyInfo The {@link PolicyInfo} object representing the retrieved policy.
    */
   public GetPolicyEvent(String user, NameIdentifier identifier, PolicyInfo policyInfo) {
     super(user, identifier);
@@ -41,18 +41,18 @@ public final class GetPolicyEvent extends PolicyEvent {
   }
 
   /**
-   * Returns the information about the retrieved policy.
+   * Returns the {@link PolicyInfo} object representing the retrieved policy.
    *
-   * @return The policy information.
+   * @return the policy information.
    */
   public PolicyInfo policyInfo() {
     return policyInfo;
   }
 
   /**
-   * Returns the operation type.
+   * Returns the type of operation.
    *
-   * @return The operation type (GET_POLICY).
+   * @return the operation type.
    */
   @Override
   public OperationType operationType() {

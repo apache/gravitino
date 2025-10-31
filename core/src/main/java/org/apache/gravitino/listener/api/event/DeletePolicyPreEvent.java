@@ -22,13 +22,13 @@ package org.apache.gravitino.listener.api.event;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.annotation.DeveloperApi;
 
-/** Represents an event triggered before deleting a policy. */
+/** Represents an event that is triggered before deleting a policy. */
 @DeveloperApi
 public final class DeletePolicyPreEvent extends PolicyPreEvent {
   /**
-   * Constructs a DeletePolicyPreEvent.
+   * Constructs an instance of {@code DeletePolicyPreEvent}.
    *
-   * @param user The user who is deleting the policy.
+   * @param user The username of the individual who initiated the delete policy operation.
    * @param identifier The identifier of the policy to be deleted.
    */
   public DeletePolicyPreEvent(String user, NameIdentifier identifier) {
@@ -36,9 +36,9 @@ public final class DeletePolicyPreEvent extends PolicyPreEvent {
   }
 
   /**
-   * Returns the operation type.
+   * Returns the type of operation.
    *
-   * @return The operation type (DELETE_POLICY).
+   * @return the operation type.
    */
   @Override
   public OperationType operationType() {

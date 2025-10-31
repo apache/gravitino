@@ -22,13 +22,15 @@ package org.apache.gravitino.listener.api.event;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.annotation.DeveloperApi;
 
-/** Represents an event triggered before listing metadata objects associated with a policy. */
+/**
+ * Represents an event that is triggered before listing metadata objects associated with a policy.
+ */
 @DeveloperApi
 public final class ListMetadataObjectsForPolicyPreEvent extends PolicyPreEvent {
   /**
-   * Constructs a ListMetadataObjectsForPolicyPreEvent.
+   * Constructs an instance of {@code ListMetadataObjectsForPolicyPreEvent}.
    *
-   * @param user The user who is listing the metadata objects for the policy.
+   * @param user The username of the individual who initiated the list metadata objects operation.
    * @param identifier The identifier of the policy.
    */
   public ListMetadataObjectsForPolicyPreEvent(String user, NameIdentifier identifier) {
@@ -36,9 +38,9 @@ public final class ListMetadataObjectsForPolicyPreEvent extends PolicyPreEvent {
   }
 
   /**
-   * Returns the operation type.
+   * Returns the type of operation.
    *
-   * @return The operation type (LIST_METADATA_OBJECTS_FOR_POLICY).
+   * @return the operation type.
    */
   @Override
   public OperationType operationType() {

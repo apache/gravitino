@@ -22,13 +22,13 @@ package org.apache.gravitino.listener.api.event;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.annotation.DeveloperApi;
 
-/** Represents an event triggered after successfully enabling a policy. */
+/** Represents an event that is triggered upon successfully enabling a policy. */
 @DeveloperApi
 public final class EnablePolicyEvent extends PolicyEvent {
   /**
-   * Constructs an EnablePolicyEvent.
+   * Constructs an instance of {@code EnablePolicyEvent}.
    *
-   * @param user The user who enabled the policy.
+   * @param user The username of the individual who initiated the policy enabling operation.
    * @param identifier The identifier of the enabled policy.
    */
   public EnablePolicyEvent(String user, NameIdentifier identifier) {
@@ -36,9 +36,9 @@ public final class EnablePolicyEvent extends PolicyEvent {
   }
 
   /**
-   * Returns the operation type.
+   * Returns the type of operation.
    *
-   * @return The operation type (ENABLE_POLICY).
+   * @return the operation type.
    */
   @Override
   public OperationType operationType() {

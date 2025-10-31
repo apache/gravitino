@@ -23,18 +23,21 @@ import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.annotation.DeveloperApi;
 import org.apache.gravitino.utils.MetadataObjectUtil;
 
-/** Represents an event triggered when retrieving a policy for a metadata object fails. */
+/**
+ * Represents an event that is triggered when an attempt to retrieve a policy for a metadata object
+ * fails.
+ */
 @DeveloperApi
 public final class GetPolicyForMetadataObjectFailureEvent extends PolicyFailureEvent {
   private final MetadataObject metadataObject;
 
   /**
-   * Constructs a GetPolicyForMetadataObjectFailureEvent.
+   * Constructs an instance of {@code GetPolicyForMetadataObjectFailureEvent}.
    *
-   * @param user The user who attempted to retrieve the policy for the metadata object.
+   * @param user The username of the individual who initiated the policy retrieval.
    * @param metalake The metalake from which the policy was to be retrieved.
    * @param metadataObject The metadata object for which the policy was to be retrieved.
-   * @param exception The exception that caused the failure.
+   * @param exception The exception that was encountered during the policy retrieval attempt.
    */
   public GetPolicyForMetadataObjectFailureEvent(
       String user, String metalake, MetadataObject metadataObject, Exception exception) {
@@ -43,18 +46,18 @@ public final class GetPolicyForMetadataObjectFailureEvent extends PolicyFailureE
   }
 
   /**
-   * Returns the metadata object for which the policy was to be retrieved.
+   * Returns the metadata object for which the policy retrieval was attempted.
    *
-   * @return The metadata object.
+   * @return the metadata object.
    */
   public MetadataObject metadataObject() {
     return metadataObject;
   }
 
   /**
-   * Returns the operation type.
+   * Returns the type of operation.
    *
-   * @return The operation type (GET_POLICY_FOR_METADATA_OBJECT).
+   * @return the operation type.
    */
   @Override
   public OperationType operationType() {

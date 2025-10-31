@@ -24,19 +24,22 @@ import org.apache.gravitino.annotation.DeveloperApi;
 import org.apache.gravitino.listener.api.info.PolicyInfo;
 import org.apache.gravitino.utils.MetadataObjectUtil;
 
-/** Represents an event triggered after successfully retrieving a policy for a metadata object. */
+/**
+ * Represents an event that is triggered upon successfully retrieving a policy for a metadata
+ * object.
+ */
 @DeveloperApi
 public final class GetPolicyForMetadataObjectEvent extends PolicyEvent {
   private final MetadataObject metadataObject;
   private final PolicyInfo policyInfo;
 
   /**
-   * Constructs a GetPolicyForMetadataObjectEvent.
+   * Constructs an instance of {@code GetPolicyForMetadataObjectEvent}.
    *
-   * @param user The user who retrieved the policy for the metadata object.
+   * @param user The username of the individual who initiated the policy retrieval.
    * @param metalake The metalake from which the policy was retrieved.
    * @param metadataObject The metadata object for which the policy was retrieved.
-   * @param policyInfo The information about the retrieved policy.
+   * @param policyInfo The {@link PolicyInfo} object representing the retrieved policy.
    */
   public GetPolicyForMetadataObjectEvent(
       String user, String metalake, MetadataObject metadataObject, PolicyInfo policyInfo) {
@@ -48,25 +51,25 @@ public final class GetPolicyForMetadataObjectEvent extends PolicyEvent {
   /**
    * Returns the metadata object for which the policy was retrieved.
    *
-   * @return The metadata object.
+   * @return the metadata object.
    */
   public MetadataObject metadataObject() {
     return metadataObject;
   }
 
   /**
-   * Returns the information about the retrieved policy.
+   * Returns the {@link PolicyInfo} object representing the retrieved policy.
    *
-   * @return The policy information.
+   * @return the policy information.
    */
   public PolicyInfo policyInfo() {
     return policyInfo;
   }
 
   /**
-   * Returns the operation type.
+   * Returns the type of operation.
    *
-   * @return The operation type (GET_POLICY_FOR_METADATA_OBJECT).
+   * @return the operation type.
    */
   @Override
   public OperationType operationType() {

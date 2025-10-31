@@ -22,23 +22,23 @@ package org.apache.gravitino.listener.api.event;
 import org.apache.gravitino.annotation.DeveloperApi;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 
-/** Represents an event triggered before listing policies from a specific metalake. */
+/** Represents an event that is triggered before listing policies from a specific metalake. */
 @DeveloperApi
 public class ListPoliciesPreEvent extends PolicyPreEvent {
   /**
-   * Constructs a new {@link ListPoliciesPreEvent} with the specified initiator and metalake name.
+   * Constructs an instance of {@code ListPoliciesPreEvent}.
    *
-   * @param initiator the user who initiated the list-policies request.
-   * @param metalake the name of the metalake from which policies will be listed.
+   * @param initiator The username of the individual who initiated the list-policies request.
+   * @param metalake The name of the metalake from which policies will be listed.
    */
   public ListPoliciesPreEvent(String initiator, String metalake) {
     super(initiator, NameIdentifierUtil.ofMetalake(metalake));
   }
 
   /**
-   * Returns the operation type for this event.
+   * Returns the type of operation.
    *
-   * @return the operation type for this event.
+   * @return the operation type.
    */
   @Override
   public OperationType operationType() {

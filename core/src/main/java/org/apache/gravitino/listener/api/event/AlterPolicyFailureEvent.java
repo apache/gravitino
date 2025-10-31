@@ -23,18 +23,18 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.annotation.DeveloperApi;
 import org.apache.gravitino.policy.PolicyChange;
 
-/** Represents an event triggered when altering a policy fails. */
+/** Represents an event that is triggered when an attempt to alter a policy fails. */
 @DeveloperApi
 public final class AlterPolicyFailureEvent extends PolicyFailureEvent {
   private final PolicyChange[] policyChanges;
 
   /**
-   * Constructs an AlterPolicyFailureEvent.
+   * Constructs an instance of {@code AlterPolicyFailureEvent}.
    *
-   * @param user The user who attempted to alter the policy.
+   * @param user The username of the individual who initiated the policy alteration.
    * @param identifier The identifier of the policy that failed to be altered.
-   * @param exception The exception that caused the failure.
-   * @param policyChanges The changes that were attempted.
+   * @param exception The exception that was encountered during the policy alteration attempt.
+   * @param policyChanges The changes that were attempted on the policy.
    */
   public AlterPolicyFailureEvent(
       String user, NameIdentifier identifier, Exception exception, PolicyChange[] policyChanges) {
@@ -43,18 +43,18 @@ public final class AlterPolicyFailureEvent extends PolicyFailureEvent {
   }
 
   /**
-   * Returns the changes that were attempted.
+   * Returns the changes that were attempted on the policy.
    *
-   * @return The policy changes.
+   * @return the policy changes.
    */
   public PolicyChange[] policyChanges() {
     return policyChanges;
   }
 
   /**
-   * Returns the operation type.
+   * Returns the type of operation.
    *
-   * @return The operation type (ALTER_POLICY).
+   * @return the operation type.
    */
   @Override
   public OperationType operationType() {

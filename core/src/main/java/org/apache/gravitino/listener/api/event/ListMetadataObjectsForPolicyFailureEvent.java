@@ -22,15 +22,18 @@ package org.apache.gravitino.listener.api.event;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.annotation.DeveloperApi;
 
-/** Represents an event triggered when listing metadata objects associated with a policy fails. */
+/**
+ * Represents an event that is triggered when an attempt to list metadata objects associated with a
+ * policy fails.
+ */
 @DeveloperApi
 public final class ListMetadataObjectsForPolicyFailureEvent extends PolicyFailureEvent {
   /**
-   * Constructs a ListMetadataObjectsForPolicyFailureEvent.
+   * Constructs an instance of {@code ListMetadataObjectsForPolicyFailureEvent}.
    *
-   * @param user The user who attempted to list the metadata objects for the policy.
+   * @param user The username of the individual who initiated the list metadata objects operation.
    * @param identifier The identifier of the policy.
-   * @param exception The exception that caused the failure.
+   * @param exception The exception that was encountered during the list metadata objects attempt.
    */
   public ListMetadataObjectsForPolicyFailureEvent(
       String user, NameIdentifier identifier, Exception exception) {
@@ -38,9 +41,9 @@ public final class ListMetadataObjectsForPolicyFailureEvent extends PolicyFailur
   }
 
   /**
-   * Returns the operation type.
+   * Returns the type of operation.
    *
-   * @return The operation type (LIST_METADATA_OBJECTS_FOR_POLICY).
+   * @return the operation type.
    */
   @Override
   public OperationType operationType() {

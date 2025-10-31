@@ -23,7 +23,10 @@ import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.annotation.DeveloperApi;
 import org.apache.gravitino.utils.MetadataObjectUtil;
 
-/** Represents an event triggered after successfully associating policies with a metadata object. */
+/**
+ * Represents an event that is triggered upon successfully associating policies with a metadata
+ * object.
+ */
 @DeveloperApi
 public final class AssociatePoliciesForMetadataObjectEvent extends PolicyEvent {
   private final MetadataObject metadataObject;
@@ -31,9 +34,9 @@ public final class AssociatePoliciesForMetadataObjectEvent extends PolicyEvent {
   private final String[] policiesToRemove;
 
   /**
-   * Constructs an AssociatePoliciesForMetadataObjectEvent.
+   * Constructs an instance of {@code AssociatePoliciesForMetadataObjectEvent}.
    *
-   * @param user The user who associated the policies with the metadata object.
+   * @param user The username of the individual who initiated the associate policies operation.
    * @param metalake The metalake from which the policies were associated.
    * @param metadataObject The metadata object with which the policies were associated.
    * @param policiesToAdd The policies that were added.
@@ -54,7 +57,7 @@ public final class AssociatePoliciesForMetadataObjectEvent extends PolicyEvent {
   /**
    * Returns the metadata object with which policies were associated.
    *
-   * @return The metadata object.
+   * @return the metadata object.
    */
   public MetadataObject metadataObject() {
     return metadataObject;
@@ -63,7 +66,7 @@ public final class AssociatePoliciesForMetadataObjectEvent extends PolicyEvent {
   /**
    * Returns the policies that were added.
    *
-   * @return An array of policy names that were added.
+   * @return an array of policy names that were added.
    */
   public String[] policiesToAdd() {
     return policiesToAdd;
@@ -72,16 +75,16 @@ public final class AssociatePoliciesForMetadataObjectEvent extends PolicyEvent {
   /**
    * Returns the policies that were removed.
    *
-   * @return An array of policy names that were removed.
+   * @return an array of policy names that were removed.
    */
   public String[] policiesToRemove() {
     return policiesToRemove;
   }
 
   /**
-   * Returns the operation type.
+   * Returns the type of operation.
    *
-   * @return The operation type (ASSOCIATE_POLICIES_FOR_METADATA_OBJECT).
+   * @return the operation type.
    */
   @Override
   public OperationType operationType() {

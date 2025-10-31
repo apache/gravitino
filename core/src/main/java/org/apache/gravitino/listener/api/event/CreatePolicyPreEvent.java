@@ -23,17 +23,17 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.annotation.DeveloperApi;
 import org.apache.gravitino.listener.api.info.PolicyInfo;
 
-/** Represents an event triggered before creating a policy. */
+/** Represents an event triggered before the creation of a policy. */
 @DeveloperApi
 public final class CreatePolicyPreEvent extends PolicyPreEvent {
   private final PolicyInfo createPolicyRequest;
 
   /**
-   * Constructs a CreatePolicyPreEvent.
+   * Constructs a new {@code CreatePolicyPreEvent} instance.
    *
-   * @param user The user who is creating the policy.
+   * @param user The user who initiated the policy creation operation.
    * @param identifier The identifier of the policy to be created.
-   * @param createPolicyRequest The policy creation request information.
+   * @param createPolicyRequest The information about the policy to be created.
    */
   public CreatePolicyPreEvent(
       String user, NameIdentifier identifier, PolicyInfo createPolicyRequest) {
@@ -42,18 +42,18 @@ public final class CreatePolicyPreEvent extends PolicyPreEvent {
   }
 
   /**
-   * Returns the policy creation request information.
+   * Returns the information about the policy.
    *
-   * @return The policy creation request.
+   * @return the policy information
    */
   public PolicyInfo createPolicyRequest() {
     return createPolicyRequest;
   }
 
   /**
-   * Returns the operation type.
+   * Returns the type of operation.
    *
-   * @return The operation type (CREATE_POLICY).
+   * @return the operation type.
    */
   @Override
   public OperationType operationType() {
