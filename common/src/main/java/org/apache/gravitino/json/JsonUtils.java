@@ -1400,8 +1400,7 @@ public class JsonUtils {
   /** Custom JSON deserializer for SortOrderDTO objects. */
   public static class SortOrderImplDeserializer extends JsonDeserializer<SortImpl> {
     @Override
-    public SortImpl deserialize(JsonParser p, DeserializationContext ctxt)
-        throws IOException, JacksonException {
+    public SortImpl deserialize(JsonParser p, DeserializationContext ctxt) throws IOException {
       JsonNode node = p.getCodec().readTree(p);
       Preconditions.checkArgument(
           node != null && !node.isNull() && node.isObject(),
