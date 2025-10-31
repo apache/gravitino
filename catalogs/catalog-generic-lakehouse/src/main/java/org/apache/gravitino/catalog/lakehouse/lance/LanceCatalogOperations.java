@@ -57,6 +57,7 @@ import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.exceptions.TableAlreadyExistsException;
+import org.apache.gravitino.lance.common.ops.gravitino.LanceDataTypeConverter;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.rel.Column;

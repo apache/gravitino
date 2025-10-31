@@ -26,6 +26,9 @@ plugins {
 
 dependencies {
   implementation(project(":clients:client-java-runtime", configuration = "shadow"))
+  implementation(project(":common")) {
+    exclude("*")
+  }
   implementation(project(":core")) {
     exclude("*")
   }
@@ -37,5 +40,6 @@ dependencies {
 
   testImplementation(project(":server-common"))
   testImplementation(libs.junit.jupiter.api)
+  testImplementation(libs.junit.jupiter.params)
   testRuntimeOnly(libs.junit.jupiter.engine)
 }
