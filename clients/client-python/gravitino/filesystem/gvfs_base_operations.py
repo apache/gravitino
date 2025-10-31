@@ -21,13 +21,14 @@ import threading
 import time
 from abc import ABC, abstractmethod
 from pathlib import PurePosixPath
-from typing import Dict, Tuple
+from typing import Dict, Tuple, Optional, List
+from urllib.parse import urlparse
 
 from cachetools import TTLCache, LRUCache
 from fsspec import AbstractFileSystem
+from fsspec.utils import tokenize
 from readerwriterlock import rwlock
 
-from gravitino.api.catalog import Catalog
 from gravitino.api.credential.credential import Credential
 from gravitino.api.file.fileset import Fileset
 from gravitino.audit.caller_context import CallerContextHolder, CallerContext
@@ -35,7 +36,6 @@ from gravitino.audit.fileset_audit_constants import FilesetAuditConstants
 from gravitino.audit.fileset_data_operation import FilesetDataOperation
 from gravitino.audit.internal_client_type import InternalClientType
 from gravitino.client.fileset_catalog import FilesetCatalog
-from gravitino.client.generic_fileset import GenericFileset
 from gravitino.client.gravitino_client_config import GravitinoClientConfig
 from gravitino.exceptions.base import (
     GravitinoRuntimeException,
@@ -55,6 +55,77 @@ logger = logging.getLogger(__name__)
 PROTOCOL_NAME = "gvfs"
 
 TIME_WITHOUT_EXPIRATION = sys.maxsize
+
+
+class FileSystemCacheKey:
+    """
+    A cache key for filesystem instances following fsspec's tokenization approach.
+
+    This key is based on:
+    - Process ID (ensures cache is process-specific, like fsspec)
+    - Thread ID (ensures thread safety, like fsspec)
+    - Filesystem scheme (e.g., 's3', 'gs', 'hdfs', 'file')
+    - Authority (e.g., bucket name, host:port)
+    - Configuration token (hashable representation of credentials and config)
+
+    This matches how Hadoop HDFS client caches FileSystem instances by
+    (scheme, authority, UserGroupInformation), but adapted for Python using
+    fsspec's tokenization approach since we don't have UGI.
+    """
+
+    def __init__(
+        self,
+        scheme: str,
+        authority: Optional[str],
+        credentials,
+        catalog_props: Dict[str, str],
+        options: Dict[str, str],
+        extra_kwargs: Dict,
+    ):
+        """
+        Initialize a FileSystemCacheKey.
+
+        Args:
+            scheme: The filesystem scheme (e.g., 's3', 'gs', 'hdfs', 'file')
+            authority: The authority part of the URI (e.g., bucket name, host:port)
+            credentials: The credentials for the filesystem
+            catalog_props: The catalog properties
+            options: The GVFS options
+            extra_kwargs: Extra keyword arguments
+        """
+        self._pid = os.getpid()
+        self._thread_id = threading.get_ident()
+        self._scheme = scheme
+        self._authority = authority
+
+        # Use fsspec's tokenize to create a hashable representation
+        # This ensures consistent hashing for equivalent configurations
+        self._token = tokenize(
+            scheme,
+            authority,
+            credentials,
+            catalog_props,
+            options,
+            extra_kwargs,
+        )
+
+    def __eq__(self, other):
+        if not isinstance(other, FileSystemCacheKey):
+            return False
+        return (
+            self._pid == other._pid
+            and self._thread_id == other._thread_id
+            and self._token == other._token
+        )
+
+    def __hash__(self):
+        return hash((self._pid, self._thread_id, self._token))
+
+    def __repr__(self):
+        return (
+            f"FileSystemCacheKey(pid={self._pid}, thread={self._thread_id}, "
+            f"scheme={self._scheme}, authority={self._authority})"
+        )
 
 
 class BaseGVFSOperations(ABC):
@@ -421,6 +492,10 @@ class BaseGVFSOperations(ABC):
         self, fileset_ident: NameIdentifier, location_name: str
     ) -> AbstractFileSystem:
         """Get the actual filesystem based on the fileset identifier and location name.
+
+        This method loads the fileset metadata, resolves the storage location, gathers
+        credentials, and delegates to _get_filesystem for the actual filesystem caching.
+
         :param fileset_ident: The fileset identifier
         :param location_name: The location name, None means the default location
         :return: The actual filesystem
@@ -430,23 +505,53 @@ class BaseGVFSOperations(ABC):
         )
         catalog = self._get_fileset_catalog(catalog_ident)
         fileset = self._get_fileset(fileset_ident)
+
+        # Determine target location name
         target_location_name = (
             location_name
             or fileset.properties().get(fileset.PROPERTY_DEFAULT_LOCATION_NAME)
             or fileset.LOCATION_NAME_UNKNOWN
         )
+
+        # Get the actual storage location
         actual_location = fileset.storage_locations().get(target_location_name)
         if actual_location is None:
             raise NoSuchLocationNameException(
                 f"Cannot find the location: {target_location_name} in fileset: {fileset_ident}"
             )
-        actual_fs = self._get_filesystem(
-            actual_location, catalog, fileset_ident, target_location_name
-        )
-        self._create_fileset_location_if_needed(
-            catalog.properties(), actual_fs, actual_location
-        )
-        return actual_fs
+
+        # Set caller context for credential vending
+        if location_name:
+            context = {
+                Credential.HTTP_HEADER_CURRENT_LOCATION_NAME: location_name,
+            }
+            caller_context: CallerContext = CallerContext(context)
+            CallerContextHolder.set(caller_context)
+
+        try:
+            # Get credentials if credential vending is enabled
+            credentials = (
+                fileset.support_credentials().get_credentials()
+                if self._enable_credential_vending
+                else None
+            )
+
+            # Get the filesystem using the new path-based caching approach
+            # This matches how Java GVFS caches by (scheme, authority, config)
+            actual_fs = self._get_filesystem(
+                credentials,
+                catalog.properties(),
+                self._options,
+                actual_location,
+                **self._kwargs,
+            )
+
+            self._create_fileset_location_if_needed(
+                catalog.properties(), actual_fs, actual_location
+            )
+            return actual_fs
+        finally:
+            CallerContextHolder.remove()
 
     def _create_fileset_location_if_needed(
         self,
@@ -508,16 +613,46 @@ class BaseGVFSOperations(ABC):
 
     def _get_filesystem(
         self,
-        actual_file_location: str,
-        fileset_catalog: Catalog,
-        name_identifier: NameIdentifier,
-        location_name: str,
-    ):
+        credentials: Optional[List[Credential]],
+        catalog_props: Dict[str, str],
+        options: Dict[str, str],
+        actual_path: str,
+        **kwargs,
+    ) -> AbstractFileSystem:
+        """
+        Get the filesystem for the given actual path and configuration.
+
+        This method implements filesystem-level caching based on (scheme, authority, config),
+        matching how Hadoop HDFS client caches FileSystem instances and how fsspec caches
+        filesystem instances. Multiple filesets pointing to the same storage backend with
+        the same configuration will share the same filesystem instance.
+
+        :param credentials: The credentials for accessing the filesystem
+        :param catalog_props: The catalog properties
+        :param options: The GVFS options
+        :param actual_path: The actual file path (e.g., 's3://bucket/path', 'gs://bucket/path')
+        :param kwargs: Additional keyword arguments
+        :return: The filesystem instance
+        """
+        # Parse the actual path to extract scheme and authority
+        # This matches how fsspec and Hadoop cache filesystem instances
+        parsed_uri = urlparse(actual_path)
+        scheme = parsed_uri.scheme if parsed_uri.scheme else "file"
+        authority = parsed_uri.netloc if parsed_uri.netloc else None
+
+        # Create cache key based on filesystem parameters (not fileset identity)
+        # This allows multiple filesets pointing to the same storage to share
+        # the same filesystem instance
+        cache_key = FileSystemCacheKey(
+            scheme, authority, credentials, catalog_props, options, kwargs
+        )
+
+        # Try to get from cache with read lock
         read_lock = self._cache_lock.gen_rlock()
         try:
             read_lock.acquire()
             cache_value: Tuple[int, AbstractFileSystem] = self._filesystem_cache.get(
-                (name_identifier, location_name)
+                cache_key
             )
             if cache_value is not None:
                 if not self._file_system_expired(cache_value[0]):
@@ -525,47 +660,32 @@ class BaseGVFSOperations(ABC):
         finally:
             read_lock.release()
 
+        # Not in cache or expired, create new filesystem with write lock
         write_lock = self._cache_lock.gen_wlock()
         try:
             write_lock.acquire()
+            # Double-check after acquiring write lock
             cache_value: Tuple[int, AbstractFileSystem] = self._filesystem_cache.get(
-                (name_identifier, location_name)
+                cache_key
             )
-
             if cache_value is not None:
                 if not self._file_system_expired(cache_value[0]):
                     return cache_value[1]
 
-            fileset: GenericFileset = fileset_catalog.as_fileset_catalog().load_fileset(
-                NameIdentifier.of(
-                    name_identifier.namespace().level(2), name_identifier.name()
-                )
-            )
-            if location_name:
-                context = {
-                    Credential.HTTP_HEADER_CURRENT_LOCATION_NAME: location_name,
-                }
-                caller_context: CallerContext = CallerContext(context)
-                CallerContextHolder.set(caller_context)
-            credentials = (
-                fileset.support_credentials().get_credentials()
-                if self._enable_credential_vending
-                else None
-            )
+            # Create new filesystem instance
             new_cache_value = get_storage_handler_by_path(
-                actual_file_location
+                actual_path
             ).get_filesystem_with_expiration(
                 credentials,
-                fileset_catalog.properties(),
-                self._options,
-                actual_file_location,
-                **self._kwargs,
+                catalog_props,
+                options,
+                actual_path,
+                **kwargs,
             )
-            self._filesystem_cache[(name_identifier, location_name)] = new_cache_value
+            self._filesystem_cache[cache_key] = new_cache_value
             return new_cache_value[1]
         finally:
             write_lock.release()
-            CallerContextHolder.remove()
 
     def _get_fileset_catalog(self, catalog_ident: NameIdentifier):
         if not self._enable_fileset_metadata_cache:
