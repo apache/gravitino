@@ -541,17 +541,10 @@ public class GravitinoLanceNamespaceWrapper extends NamespaceWrapper
       String delimiter,
       String tableLocation,
       Map<String, String> tableProperties,
-      String rootCatalog,
       byte[] arrowStreamBody) {
     ObjectIdentifier nsId = ObjectIdentifier.of(tableId, Pattern.quote(delimiter));
     Preconditions.checkArgument(
         nsId.levels() <= 3, "Expected at most 3-level namespace but got: %s", nsId.levels());
-    if (rootCatalog != null) {
-      List<String> levels = nsId.listStyleId();
-      List<String> newLevels = Lists.newArrayList(rootCatalog);
-      newLevels.addAll(levels);
-      nsId = ObjectIdentifier.of(newLevels);
-    }
 
     // Parser column information.
     List<Column> columns = Lists.newArrayList();
@@ -619,20 +612,10 @@ public class GravitinoLanceNamespaceWrapper extends NamespaceWrapper
 
   @Override
   public RegisterTableResponse registerTable(
-      String tableId,
-      String mode,
-      String delimiter,
-      Map<String, String> tableProperties,
-      String rootCatalog) {
+      String tableId, String mode, String delimiter, Map<String, String> tableProperties) {
     ObjectIdentifier nsId = ObjectIdentifier.of(tableId, Pattern.quote(delimiter));
     Preconditions.checkArgument(
         nsId.levels() <= 3, "Expected at most 3-level namespace but got: %s", nsId.levels());
-    if (rootCatalog != null) {
-      List<String> levels = nsId.listStyleId();
-      List<String> newLevels = Lists.newArrayList(rootCatalog);
-      newLevels.addAll(levels);
-      nsId = ObjectIdentifier.of(newLevels);
-    }
 
     String catalogName = nsId.levelAtListPos(0);
     Catalog catalog = loadAndValidateLakehouseCatalog(catalogName);
@@ -667,18 +650,11 @@ public class GravitinoLanceNamespaceWrapper extends NamespaceWrapper
   }
 
   @Override
-  public DeregisterTableResponse deregisterTable(
-      String tableId, String delimiter, String rootCatalog) {
+  public DeregisterTableResponse deregisterTable(String tableId, String delimiter) {
 
     ObjectIdentifier nsId = ObjectIdentifier.of(tableId, Pattern.quote(delimiter));
     Preconditions.checkArgument(
         nsId.levels() <= 3, "Expected at most 3-level namespace but got: %s", nsId.levels());
-    if (rootCatalog != null) {
-      List<String> levels = nsId.listStyleId();
-      List<String> newLevels = Lists.newArrayList(rootCatalog);
-      newLevels.addAll(levels);
-      nsId = ObjectIdentifier.of(newLevels);
-    }
 
     String catalogName = nsId.levelAtListPos(0);
     Catalog catalog = loadAndValidateLakehouseCatalog(catalogName);

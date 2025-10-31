@@ -34,15 +34,10 @@ public interface LanceTableOperations {
       String delimiter,
       String tableLocation,
       Map<String, String> tableProperties,
-      String rootCatalog,
       byte[] arrowStreamBody);
 
   RegisterTableResponse registerTable(
-      String tableId,
-      String mode,
-      String delimiter,
-      Map<String, String> tableProperties,
-      String rootCatalog);
+      String tableId, String mode, String delimiter, Map<String, String> tableProperties);
 
-  DeregisterTableResponse deregisterTable(String tableId, String delimiter, String rootCatalog);
+  DeregisterTableResponse deregisterTable(String tableId, String delimiter);
 }

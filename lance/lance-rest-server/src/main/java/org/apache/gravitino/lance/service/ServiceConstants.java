@@ -26,5 +26,4 @@ public class ServiceConstants {
       LANCE_HTTP_HEADER_PREFIX + "table-location";
   public static final String LANCE_TABLE_PROPERTIES_PREFIX_HEADER =
       LANCE_HTTP_HEADER_PREFIX + "table-properties";
-  public static final String LANCE_ROOT_CATALOG_HEADER = LANCE_HTTP_HEADER_PREFIX + "root-catalog";
 }

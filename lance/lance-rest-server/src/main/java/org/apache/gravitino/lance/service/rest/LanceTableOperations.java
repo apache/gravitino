@@ -19,7 +19,6 @@
 package org.apache.gravitino.lance.service.rest;
 
 import static org.apache.gravitino.lance.common.ops.NamespaceWrapper.NAMESPACE_DELIMITER_DEFAULT;
-import static org.apache.gravitino.lance.service.ServiceConstants.LANCE_ROOT_CATALOG_HEADER;
 import static org.apache.gravitino.lance.service.ServiceConstants.LANCE_TABLE_LOCATION_HEADER;
 import static org.apache.gravitino.lance.service.ServiceConstants.LANCE_TABLE_PROPERTIES_PREFIX_HEADER;
 
@@ -98,15 +97,13 @@ public class LanceTableOperations {
       MultivaluedMap<String, String> headersMap = headers.getRequestHeaders();
       String tableLocation = headersMap.getFirst(LANCE_TABLE_LOCATION_HEADER);
       String tableProperties = headersMap.getFirst(LANCE_TABLE_PROPERTIES_PREFIX_HEADER);
-      String rootCatalog = headersMap.getFirst(LANCE_ROOT_CATALOG_HEADER);
 
       Map<String, String> props =
           JsonUtil.mapper().readValue(tableProperties, new TypeReference<>() {});
       CreateTableResponse response =
           lanceNamespace
               .asTableOps()
-              .createTable(
-                  tableId, mode, delimiter, tableLocation, props, rootCatalog, arrowStreamBody);
+              .createTable(tableId, mode, delimiter, tableLocation, props, arrowStreamBody);
       return Response.ok(response).build();
     } catch (Exception e) {
       return LanceExceptionMapper.toRESTResponse(tableId, e);
@@ -127,7 +124,6 @@ public class LanceTableOperations {
       MultivaluedMap<String, String> headersMap = headers.getRequestHeaders();
       String tableLocation = headersMap.getFirst(LANCE_TABLE_LOCATION_HEADER);
       String tableProperties = headersMap.getFirst(LANCE_TABLE_PROPERTIES_PREFIX_HEADER);
-      String rootCatalog = headersMap.getFirst(LANCE_ROOT_CATALOG_HEADER);
 
       Map<String, String> props =
           StringUtils.isBlank(tableProperties)
@@ -136,7 +132,7 @@ public class LanceTableOperations {
       CreateTableResponse response =
           lanceNamespace
               .asTableOps()
-              .createTable(tableId, mode, delimiter, tableLocation, props, rootCatalog, null);
+              .createTable(tableId, mode, delimiter, tableLocation, props, null);
       return Response.ok(response).build();
     } catch (Exception e) {
       return LanceExceptionMapper.toRESTResponse(tableId, e);
@@ -158,16 +154,12 @@ public class LanceTableOperations {
           registerTableRequest.getProperties() == null
               ? Maps.newHashMap()
               : Maps.newHashMap(registerTableRequest.getProperties());
-      // For lance spark compatibility, The Spark only support catalog, schema and table name, so we
-      // use the header to pass the root catalog, for Gravitino, it's the catalog name.
-      String rootCatalog = headers.getRequestHeaders().getFirst(LANCE_ROOT_CATALOG_HEADER);
-
       props.put("register", "true");
       props.put("location", registerTableRequest.getLocation());
       props.put("format", "lance");
 
       RegisterTableResponse response =
-          lanceNamespace.asTableOps().registerTable(tableId, mode, delimiter, props, rootCatalog);
+          lanceNamespace.asTableOps().registerTable(tableId, mode, delimiter, props);
       return Response.ok(response).build();
     } catch (Exception e) {
       return LanceExceptionMapper.toRESTResponse(tableId, e);
@@ -184,15 +176,8 @@ public class LanceTableOperations {
       @Context HttpHeaders headers,
       DeregisterTableRequest deregisterTableRequest) {
     try {
-      // For lance spark compatibility, The Spark only support catalog, schema and table name, so we
-      // use the header to pass the root catalog, for Gravitino, it's the catalog name.
-      String rootCatalog =
-          headers.getRequestHeaders().get("x-lance-root-catalog") == null
-              ? null
-              : headers.getRequestHeaders().get("x-lance-root-catalog").get(0);
-
       DeregisterTableResponse response =
-          lanceNamespace.asTableOps().deregisterTable(tableId, delimiter, rootCatalog);
+          lanceNamespace.asTableOps().deregisterTable(tableId, delimiter);
       return Response.ok(response).build();
     } catch (Exception e) {
       return LanceExceptionMapper.toRESTResponse(tableId, e);
