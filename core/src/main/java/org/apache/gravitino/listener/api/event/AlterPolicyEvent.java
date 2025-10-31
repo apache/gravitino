@@ -57,7 +57,7 @@ public final class AlterPolicyEvent extends PolicyEvent {
    *     policy.
    */
   public PolicyChange[] policyChanges() {
-    return policyChanges;
+    return policyChanges != null ? policyChanges.clone() : null;
   }
 
   /**

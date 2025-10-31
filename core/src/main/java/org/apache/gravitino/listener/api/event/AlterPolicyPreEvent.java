@@ -37,7 +37,7 @@ public final class AlterPolicyPreEvent extends PolicyPreEvent {
    */
   public AlterPolicyPreEvent(String user, NameIdentifier identifier, PolicyChange[] policyChanges) {
     super(user, identifier);
-    this.policyChanges = policyChanges;
+    this.policyChanges = policyChanges != null ? policyChanges.clone() : null;
   }
 
   /**
@@ -46,7 +46,7 @@ public final class AlterPolicyPreEvent extends PolicyPreEvent {
    * @return the policy changes.
    */
   public PolicyChange[] policyChanges() {
-    return policyChanges;
+    return policyChanges != null ? policyChanges.clone() : null;
   }
 
   /**

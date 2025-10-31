@@ -52,8 +52,8 @@ public final class AssociatePoliciesForMetadataObjectFailureEvent extends Policy
       Exception exception) {
     super(user, MetadataObjectUtil.toEntityIdent(metalake, metadataObject), exception);
     this.metadataObject = metadataObject;
-    this.policiesToAdd = policiesToAdd;
-    this.policiesToRemove = policiesToRemove;
+    this.policiesToAdd = policiesToAdd != null ? policiesToAdd.clone() : new String[0];
+    this.policiesToRemove = policiesToRemove != null ? policiesToRemove.clone() : new String[0];
   }
 
   /**
@@ -71,7 +71,7 @@ public final class AssociatePoliciesForMetadataObjectFailureEvent extends Policy
    * @return an array of policy names to be added.
    */
   public String[] policiesToAdd() {
-    return policiesToAdd;
+    return policiesToAdd.clone();
   }
 
   /**
@@ -80,7 +80,7 @@ public final class AssociatePoliciesForMetadataObjectFailureEvent extends Policy
    * @return an array of policy names to be removed.
    */
   public String[] policiesToRemove() {
-    return policiesToRemove;
+    return policiesToRemove.clone();
   }
 
   /**

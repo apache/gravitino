@@ -47,8 +47,8 @@ public final class AssociatePoliciesForMetadataObjectPreEvent extends PolicyPreE
       String[] policiesToRemove) {
     super(user, MetadataObjectUtil.toEntityIdent(metalake, metadataObject));
     this.metadataObject = metadataObject;
-    this.policiesToAdd = policiesToAdd;
-    this.policiesToRemove = policiesToRemove;
+    this.policiesToAdd = policiesToAdd != null ? policiesToAdd.clone() : new String[0];
+    this.policiesToRemove = policiesToRemove != null ? policiesToRemove.clone() : new String[0];
   }
 
   /**
@@ -66,7 +66,7 @@ public final class AssociatePoliciesForMetadataObjectPreEvent extends PolicyPreE
    * @return an array of policy names to be added.
    */
   public String[] policiesToAdd() {
-    return policiesToAdd;
+    return policiesToAdd.clone();
   }
 
   /**
@@ -75,7 +75,7 @@ public final class AssociatePoliciesForMetadataObjectPreEvent extends PolicyPreE
    * @return an array of policy names to be removed.
    */
   public String[] policiesToRemove() {
-    return policiesToRemove;
+    return policiesToRemove.clone();
   }
 
   /**

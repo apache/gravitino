@@ -69,7 +69,7 @@ public final class AssociatePoliciesForMetadataObjectEvent extends PolicyEvent {
    * @return an array of policy names that were added.
    */
   public String[] policiesToAdd() {
-    return policiesToAdd;
+    return policiesToAdd.clone();
   }
 
   /**
@@ -78,7 +78,7 @@ public final class AssociatePoliciesForMetadataObjectEvent extends PolicyEvent {
    * @return an array of policy names that were removed.
    */
   public String[] policiesToRemove() {
-    return policiesToRemove;
+    return policiesToRemove.clone();
   }
 
   /**

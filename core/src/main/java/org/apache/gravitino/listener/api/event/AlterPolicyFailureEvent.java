@@ -39,7 +39,7 @@ public final class AlterPolicyFailureEvent extends PolicyFailureEvent {
   public AlterPolicyFailureEvent(
       String user, NameIdentifier identifier, Exception exception, PolicyChange[] policyChanges) {
     super(user, identifier, exception);
-    this.policyChanges = policyChanges;
+    this.policyChanges = policyChanges != null ? policyChanges.clone() : null;
   }
 
   /**
@@ -48,7 +48,7 @@ public final class AlterPolicyFailureEvent extends PolicyFailureEvent {
    * @return the policy changes.
    */
   public PolicyChange[] policyChanges() {
-    return policyChanges;
+    return policyChanges != null ? policyChanges.clone() : null;
   }
 
   /**
