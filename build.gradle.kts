@@ -94,6 +94,15 @@ project.extra["extraJvmArgs"] =
 val pythonVersion: String = project.properties["pythonVersion"] as? String ?: project.extra["pythonVersion"].toString()
 project.extra["pythonVersion"] = pythonVersion
 
+// If caller passed -PfrontendBuild=build:old, forward frontendDist=dist:old
+// into the :web project as early as possible so the :web build script
+// sees the property during its configuration phase.
+if (project.hasProperty("frontendBuild") && project.property("frontendBuild").toString() == "build:old") {
+  val fd = "dist:old"
+  println("root: detected -PfrontendBuild=build:old — forwarding frontendDist='$fd' to :web (early)")
+  project(":web").extensions.extraProperties.set("frontendDist", fd)
+}
+
 licenseReport {
   renderers = arrayOf<ReportRenderer>(InventoryHtmlReportRenderer("report.html", "Backend"))
   filters = arrayOf<DependencyFilter>(LicenseBundleNormalizer())
@@ -715,6 +724,16 @@ tasks {
   val outputDir = projectDir.dir("distribution")
 
   val compileDistribution by registering {
+    // Determine which web build task to depend on. If caller passed
+    // -PfrontendBuild=build:old, depend on the local `buildWebLegacy` task
+    // which sets the :web.frontendDist before invoking `:web:web:build`.
+    val webBuildDependency: String = if (project.hasProperty("frontendBuild") && project.property("frontendBuild").toString() == "build:old") {
+      println("compileDistribution: using legacy web build task 'buildWebLegacy'")
+      "buildWebLegacy"
+    } else {
+      ":web:web:build"
+    }
+
     dependsOn(
       "copyCatalogLibAndConfigs",
       "copySubprojectDependencies",
@@ -734,7 +753,13 @@ tasks {
       copy {
         from(projectDir.dir("conf")) { into("package/conf") }
         from(projectDir.dir("bin")) { into("package/bin") }
-        from(projectDir.dir("web/web/build/libs/${rootProject.name}-web-$version.war")) { into("package/web") }
+        // Copy both new and legacy web WARs if present. The legacy WAR uses a
+        // "-old" classifier (e.g. gravitino-web-1.1.0-old.war), old ui will not be update after v1.1.0 anymore.
+        from(projectDir.dir("web/web/build/libs")) {
+          include("${rootProject.name}-web-$version.war")
+          include("${rootProject.name}-web-1.1.0-old.war")
+          into("package/web")
+        }
         from(projectDir.dir("scripts")) { into("package/scripts") }
         into(outputDir)
         rename { fileName ->
@@ -767,6 +792,21 @@ tasks {
       val directory = File("distribution/package/data")
       directory.mkdirs()
     }
+  }
+
+  // Task to run the web subproject build using the legacy frontend dist script
+  // (sets :web frontendDist = "dist:old" before invoking :web:web:build).
+  val buildWebLegacy by registering {
+    group = "gravitino distribution"
+    description = "Build :web:web:build using legacy frontend (frontendDist=dist:old)"
+
+    doFirst {
+      val fd = "dist:old"
+      println("buildWebLegacy: setting :web frontendDist='$fd'")
+      project(":web").extensions.extraProperties.set("frontendDist", fd)
+    }
+
+    dependsOn(":web:web:build")
   }
 
   val compileIcebergRESTServer by registering {

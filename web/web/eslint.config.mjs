@@ -38,6 +38,7 @@ const eslintConfig = [
       'react-hooks/incompatible-library': 'off',
       'react-hooks/immutability': 'off',
       'react-hooks/refs': 'off',
+      'react-hooks/preserve-manual-memoization': 'off',
       'lines-around-comment': [
         'error',
         {

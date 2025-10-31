@@ -21,16 +21,17 @@
 
 import Image from 'next/image'
 import { Roboto } from 'next/font/google'
-import { Box, Card, Grid, CardContent, Typography } from '@mui/material'
-import clsx from 'clsx'
+import { Card, Flex, Typography } from 'antd'
+import { cn } from '@/lib/utils/tailwind'
 import { useEffect, useState } from 'react'
 
 import OidcLogin from './components/OidcLogin'
 import DefaultLogin from './components/DefaultLogin'
-import { useAuth } from '@/lib/provider/session'
 import { oauthProviderFactory } from '@/lib/auth/providers/factory'
 
 const fonts = Roboto({ subsets: ['latin'], weight: ['400'], display: 'swap' })
+
+const { Title } = Typography
 
 const LoginPage = () => {
   const [providerType, setProviderType] = useState(null)
@@ -51,27 +52,23 @@ const LoginPage = () => {
   const useOidcLogin = providerType === 'oidc'
 
   return (
-    <Grid container spacing={2} sx={{ justifyContent: 'center', alignItems: 'center', height: '100%' }}>
-      <Box>
-        <Card sx={{ width: 480 }}>
-          <CardContent className='twc-p-12'>
-            <Box className='twc-mb-8 twc-flex twc-items-center twc-justify-center'>
-              <Image
-                src={`${process.env.NEXT_PUBLIC_BASE_PATH ?? ''}/icons/gravitino.svg`}
-                width={24}
-                height={24}
-                alt='Gravitino Logo'
-              />
-              <Typography variant='h6' className={clsx('twc-text-[black] twc-ml-2 twc-text-[1.5rem]', fonts.className)}>
-                Gravitino
-              </Typography>
-            </Box>
+    <Flex justify='center' align='center' style={{ minHeight: '100vh' }}>
+      <Card style={{ width: 480 }} styles={{ body: { padding: 48 } }}>
+        <Flex justify='center' align='center' className='mb-8'>
+          <Image
+            src={`${process.env.NEXT_PUBLIC_BASE_PATH ?? ''}/icons/gravitino.svg`}
+            width={24}
+            height={24}
+            alt='Gravitino Logo'
+          />
+          <Title level={4} className={cn('!mb-0 ml-2 text-black', fonts.className)}>
+            Gravitino
+          </Title>
+        </Flex>
 
-            {useOidcLogin ? <OidcLogin /> : <DefaultLogin />}
-          </CardContent>
-        </Card>
-      </Box>
-    </Grid>
+        {useOidcLogin ? <OidcLogin /> : <DefaultLogin />}
+      </Card>
+    </Flex>
   )
 }
 

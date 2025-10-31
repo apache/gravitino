@@ -18,10 +18,9 @@
  */
 
 import Link from 'next/link'
-import Image from 'next/image'
-import { Box, Typography } from '@mui/material'
-import { Star } from '@mui/icons-material'
+import { Dropdown } from 'antd'
 import { useAppSelector } from '@/lib/hooks/useStore'
+import Icons from '@/components/Icons'
 
 const GitHubInfo = () => {
   const githubUrl = 'https://github.com/apache/gravitino'
@@ -30,48 +29,48 @@ const GitHubInfo = () => {
   const forkLogoUrl = (process.env.NEXT_PUBLIC_BASE_PATH ?? '') + '/icons/git-fork.svg'
   const store = useAppSelector(state => state.sys)
 
+  // Hide component if GitHub API request failed
+  if (store.githubError) {
+    return null
+  }
+
+  const dropdownItems = [
+    {
+      key: 'fork',
+      label: (
+        <a
+          href={githubForkUrl}
+          target='_blank'
+          rel='noopener noreferrer'
+          className='no-underline flex items-center justify-center'
+        >
+          <Icons.GitFork className={'text-customs-black size-4'} />
+          <span className='ml-2'>{store.forks} Forks</span>
+        </a>
+      )
+    },
+    {
+      key: 'stars',
+      label: (
+        <a
+          href={githubUrl}
+          target='_blank'
+          rel='noopener noreferrer'
+          className='no-underline flex items-center justify-center'
+        >
+          <Icons.Star className={'text-customs-black size-4'} />
+          <span className='ml-2'>{store.stars} Stars</span>
+        </a>
+      )
+    }
+  ]
+
   return (
-    <Box className={'twc-flex  twc-gap-x-3 twc-bg-customs-lightBg twc-px-3 twc-py-2 twc-rounded-full'}>
-      <Link href={githubUrl}>
-        <Image
-          className={'twc-align-middle'}
-          src={githubLogoUrl}
-          overrideSrc={githubLogoUrl}
-          width={24}
-          height={24}
-          alt='logo'
-        />
-      </Link>
-      <Box className={'twc-flex twc-items-center twc-gap-x-3 twc-ml-2'}>
-        <Link href={githubForkUrl} className={'twc-no-underline  twc-bg-customs-dark twc-rounded-full '}>
-          <Typography
-            className={
-              'twc-flex twc-items-center twc-gap-2 twc-text-customs-black twc-px-2.5 twc-py-1 twc-text-[0.75rem] twc-font-bold'
-            }
-          >
-            <Image
-              className={'twc-align-middle twc-text-customs-white'}
-              src={forkLogoUrl}
-              overrideSrc={forkLogoUrl}
-              width={24}
-              height={24}
-              alt='logo'
-            />
-            {store.forks} Forks
-          </Typography>
-        </Link>
-        <Link href={githubUrl} className={'twc-no-underline  twc-bg-customs-dark twc-rounded-full '}>
-          <Typography
-            className={
-              'twc-flex twc-items-center twc-gap-2 twc-text-customs-black twc-px-2.5 twc-py-1 twc-text-[0.75rem] twc-font-bold'
-            }
-          >
-            <Star className={'twc-text-customs-black'} />
-            {store.stars} Stars
-          </Typography>
-        </Link>
-      </Box>
-    </Box>
+    <Dropdown menu={{ items: dropdownItems }} trigger={['hover']} placement='bottomLeft'>
+      <div role={'button'} tabIndex={0} className='cursor-pointer rounded p-1.5 hover:bg-slate-700'>
+        <Icons.iconify icon='octicon:mark-github-24' className='size-6' />
+      </div>
+    </Dropdown>
   )
 }
 

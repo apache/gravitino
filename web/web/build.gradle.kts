@@ -47,12 +47,54 @@ tasks {
 
   val webpack by registering(PnpmTask::class) {
     dependsOn(lintCheck, prettierCheck)
-    args = listOf("dist")
+    // Allow overriding the frontend dist task via Gradle project property:
+    // -PfrontendDist=dist:old  -> run `pnpm run dist:old`
+    // -PfrontendDist=dist      -> run `pnpm run dist` (default)
+    val frontendDistArg: String = if (project.hasProperty("frontendDist")) {
+      project.property("frontendDist").toString()
+    } else {
+      "dist"
+    }
+    args = listOf(frontendDistArg)
     environment.put("NODE_ENV", "production")
   }
 
-  val buildWar by registering(War::class) {
+  // Separate webpack task for legacy frontend to produce the "old" dist.
+  val webpackOld by registering(PnpmTask::class) {
+    dependsOn(installDeps)
+    args = listOf("dist:old")
+    environment.put("NODE_ENV", "production")
+    doLast {
+      val srcDir = file("dist")
+      val dstDir = file("dist-old")
+      if (dstDir.exists()) {
+        dstDir.deleteRecursively()
+      }
+      if (srcDir.exists()) {
+        copy {
+          from(srcDir)
+          into(dstDir)
+        }
+      }
+    }
+  }
+
+  // War task for legacy frontend (produces classifier '-old')
+  val buildWarOld by registering(War::class) {
+    dependsOn(webpackOld)
+    archiveClassifier.set("old")
+    from("./WEB-INF") {
+      into("WEB-INF")
+    }
+    from("dist-old") {
+      into("")
+    }
+  }
+
+  // War task for default (new) frontend
+  val buildWarNew by registering(War::class) {
     dependsOn(webpack)
+    // no classifier for the new WAR
     from("./WEB-INF") {
       into("WEB-INF")
     }
@@ -61,8 +103,14 @@ tasks {
     }
   }
 
+  // Configure the `build` lifecycle to produce either only the legacy WAR
+  // (when caller set -PfrontendDist=dist:old) or both legacy+new by default.
   build {
-    dependsOn(buildWar)
+    if (project.hasProperty("frontendDist") && project.property("frontendDist").toString() == "dist:old") {
+      dependsOn(buildWarOld)
+    } else {
+      dependsOn(buildWarOld, buildWarNew)
+    }
   }
 
   clean {
@@ -70,6 +118,7 @@ tasks {
     delete("build")
     delete(".next")
     delete("dist")
+    delete("dist-old")
     delete("node_modules")
     delete("yarn-error.log")
   }
