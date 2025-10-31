@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.lance.service.rest;
 
+import static org.apache.gravitino.lance.common.ops.NamespaceWrapper.NAMESPACE_DELIMITER_DEFAULT;
 import static org.apache.gravitino.lance.service.ServiceConstants.LANCE_ROOT_CATALOG_HEADER;
 import static org.apache.gravitino.lance.service.ServiceConstants.LANCE_TABLE_LOCATION_HEADER;
 import static org.apache.gravitino.lance.service.ServiceConstants.LANCE_TABLE_PROPERTIES_PREFIX_HEADER;
@@ -70,7 +71,7 @@ public class LanceTableOperations {
   @ResponseMetered(name = "describe-table", absolute = true)
   public Response describeTable(
       @PathParam("id") String tableId,
-      @DefaultValue("$") @QueryParam("delimiter") String delimiter) {
+      @DefaultValue(NAMESPACE_DELIMITER_DEFAULT) @QueryParam("delimiter") String delimiter) {
     try {
       DescribeTableResponse response =
           lanceNamespace.asTableOps().describeTable(tableId, delimiter);
@@ -89,7 +90,7 @@ public class LanceTableOperations {
   public Response createTable(
       @PathParam("id") String tableId,
       @QueryParam("mode") @DefaultValue("create") String mode, // create, exist_ok, overwrite
-      @QueryParam("delimiter") @DefaultValue("$") String delimiter,
+      @QueryParam("delimiter") @DefaultValue(NAMESPACE_DELIMITER_DEFAULT) String delimiter,
       @Context HttpHeaders headers,
       byte[] arrowStreamBody) {
     try {
@@ -100,7 +101,7 @@ public class LanceTableOperations {
       String rootCatalog = headersMap.getFirst(LANCE_ROOT_CATALOG_HEADER);
 
       Map<String, String> props =
-          JsonUtil.mapper().readValue(tableProperties, new TypeReference<Map<String, String>>() {});
+          JsonUtil.mapper().readValue(tableProperties, new TypeReference<>() {});
       CreateTableResponse response =
           lanceNamespace
               .asTableOps()
@@ -119,7 +120,7 @@ public class LanceTableOperations {
   public Response createEmptyTable(
       @PathParam("id") String tableId,
       @QueryParam("mode") @DefaultValue("create") String mode, // create, exist_ok, overwrite
-      @QueryParam("delimiter") @DefaultValue("$") String delimiter,
+      @QueryParam("delimiter") @DefaultValue(NAMESPACE_DELIMITER_DEFAULT) String delimiter,
       @Context HttpHeaders headers) {
     try {
       // Extract table properties from header
@@ -131,8 +132,7 @@ public class LanceTableOperations {
       Map<String, String> props =
           StringUtils.isBlank(tableProperties)
               ? Map.of()
-              : JsonUtil.mapper()
-                  .readValue(tableProperties, new TypeReference<Map<String, String>>() {});
+              : JsonUtil.mapper().readValue(tableProperties, new TypeReference<>() {});
       CreateTableResponse response =
           lanceNamespace
               .asTableOps()
