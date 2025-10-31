@@ -51,6 +51,7 @@ import org.apache.gravitino.rel.expressions.transforms.Transforms;
 import org.apache.gravitino.rel.partitions.IdentityPartition;
 import org.apache.gravitino.rel.partitions.Partitions;
 import org.apache.gravitino.rel.types.Types;
+import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.MethodOrderer;
 import org.junit.jupiter.api.Order;
@@ -136,7 +137,7 @@ public class PartitionAuthorizationIT extends BaseRestApiAuthorizationIT {
         });
   }
 
-  @BeforeAll
+  @AfterAll
   public void stopIntegrationTest() throws IOException, InterruptedException {
     client.loadMetalake(METALAKE).loadCatalog(CATALOG).asSchemas().dropSchema(SCHEMA, true);
     super.stopIntegrationTest();
