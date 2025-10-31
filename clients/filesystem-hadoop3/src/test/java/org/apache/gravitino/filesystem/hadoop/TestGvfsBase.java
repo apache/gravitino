@@ -66,6 +66,7 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Version;
 import org.apache.gravitino.dto.AuditDTO;
 import org.apache.gravitino.dto.CatalogDTO;
+import org.apache.gravitino.dto.SchemaDTO;
 import org.apache.gravitino.dto.credential.CredentialDTO;
 import org.apache.gravitino.dto.file.FilesetDTO;
 import org.apache.gravitino.dto.responses.CatalogResponse;
@@ -73,6 +74,7 @@ import org.apache.gravitino.dto.responses.CredentialResponse;
 import org.apache.gravitino.dto.responses.ErrorResponse;
 import org.apache.gravitino.dto.responses.FileLocationResponse;
 import org.apache.gravitino.dto.responses.FilesetResponse;
+import org.apache.gravitino.dto.responses.SchemaResponse;
 import org.apache.gravitino.dto.responses.VersionResponse;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchFilesetException;
@@ -1142,6 +1144,24 @@ public class TestGvfsBase extends GravitinoMockServerBase {
         null,
         catalogResponse,
         SC_OK);
+    SchemaResponse schemaResponse =
+        new SchemaResponse(
+            SchemaDTO.builder()
+                .withName(schemaNameLocal)
+                .withAudit(AuditDTO.builder().build())
+                .withProperties(ImmutableMap.of())
+                .build());
+    buildMockResource(
+        Method.GET,
+        "/api/metalakes/"
+            + metalakeName
+            + "/catalogs/"
+            + catalogNameWithFsOpsDisabled
+            + "/schemas/"
+            + schemaNameLocal,
+        null,
+        schemaResponse,
+        SC_OK);
 
     Path managedFilesetPath =
         FileSystemTestUtils.createFilesetPath(
@@ -1468,6 +1488,17 @@ public class TestGvfsBase extends GravitinoMockServerBase {
 
   private void buildMockResourceForCredential(String filesetName, String filesetLocation)
       throws JsonProcessingException {
+    String schemaPath =
+        String.format(
+            "/api/metalakes/%s/catalogs/%s/schemas/%s", metalakeName, catalogName, schemaName);
+    SchemaResponse schemaResponse =
+        new SchemaResponse(
+            SchemaDTO.builder()
+                .withName(schemaName)
+                .withAudit(AuditDTO.builder().build())
+                .withProperties(ImmutableMap.of())
+                .build());
+
     String filesetPath =
         String.format(
             "/api/metalakes/%s/catalogs/%s/schemas/%s/filesets/%s",
@@ -1488,6 +1519,7 @@ public class TestGvfsBase extends GravitinoMockServerBase {
                 .build());
     CredentialResponse credentialResponse = new CredentialResponse(new CredentialDTO[] {});
 
+    buildMockResource(Method.GET, schemaPath, ImmutableMap.of(), null, schemaResponse, SC_OK);
     buildMockResource(Method.GET, filesetPath, ImmutableMap.of(), null, filesetResponse, SC_OK);
     buildMockResource(
         Method.GET, credentialsPath, ImmutableMap.of(), null, credentialResponse, SC_OK);
