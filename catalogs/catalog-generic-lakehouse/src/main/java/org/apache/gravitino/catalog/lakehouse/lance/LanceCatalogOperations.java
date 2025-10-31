@@ -301,7 +301,7 @@ public class LanceCatalogOperations implements LakehouseCatalogOperations {
                       tableEntity.getProperties(),
                       GenericLakehouseTablePropertiesMetadata.LAKEHOUSE_REGISTER);
       if (isRegisteredTable) {
-        // If this is a register table. We only delete the metadata from metastore.
+        // If this is a registered table. We only delete the metadata from metastore.
         return true;
       }
 

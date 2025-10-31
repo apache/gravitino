@@ -685,24 +685,16 @@ public class GravitinoLanceNamespaceWrapper extends NamespaceWrapper
 
     NameIdentifier tableIdentifier =
         NameIdentifier.of(nsId.levelAtListPos(1), nsId.levelAtListPos(2));
-
-    // Load table first to check if it's a registered table.
     Table t = catalog.asTableCatalog().loadTable(tableIdentifier);
     Map<String, String> properties = t.properties();
-    if (properties.get("location") == null || properties.get("register") == null) {
-      throw LanceNamespaceException.badRequest(
-          "Table " + tableId + " is not registered.",
-          SchemaAlreadyExistsException.class.getSimpleName(),
-          tableId,
-          CommonUtil.formatCurrentStackTrace());
-    }
-
-    // TODO Support real deregister API
+    // TODO Support real deregister API, currently operation will drop the lance data store
+    //  if it created by create/create-empty API. If the table is registered only, it will only
+    //  deregister the table metadata.
     catalog.asTableCatalog().dropTable(tableIdentifier);
 
     DeregisterTableResponse response = new DeregisterTableResponse();
-    response.setProperties(t.properties());
-    response.setLocation(t.properties().get("location"));
+    response.setProperties(properties);
+    response.setLocation(properties.get("location"));
     return response;
   }
 

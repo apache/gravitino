@@ -65,7 +65,7 @@ public class GenericLakehouseTablePropertiesMetadata extends BasePropertiesMetad
             booleanPropertyEntry(
                 LAKEHOUSE_REGISTER,
                 "Whether this is a table registration operation.",
-                false /* immutable */,
+                true /* immutable */,
                 false /* defaultValue */,
                 false /* hidden */,
                 false,
