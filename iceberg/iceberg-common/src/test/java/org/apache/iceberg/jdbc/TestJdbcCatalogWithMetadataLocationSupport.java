@@ -20,9 +20,13 @@
 package org.apache.iceberg.jdbc;
 
 import com.google.common.collect.ImmutableMap;
+import java.util.HashMap;
+import java.util.Map;
 import org.apache.iceberg.CatalogProperties;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 
 public class TestJdbcCatalogWithMetadataLocationSupport {
 
@@ -39,5 +43,25 @@ public class TestJdbcCatalogWithMetadataLocationSupport {
                     "jdbc:h2:mem:test",
                     CatalogProperties.WAREHOUSE_LOCATION,
                     "warehouse")));
+  }
+
+  @ParameterizedTest
+  @CsvSource({
+    "V0, false, JDBC catalog with V0 schema version should not support views",
+    "V1, true, JDBC catalog with V1 schema version should support views"
+  })
+  void testSupportsViewsWithSchemaVersion(
+      String schemaVersion, boolean expectedSupportsViews, String message) {
+    JdbcCatalogWithMetadataLocationSupport catalog =
+        new JdbcCatalogWithMetadataLocationSupport(true);
+    Map<String, String> properties = new HashMap<>();
+    properties.put(CatalogProperties.URI, "jdbc:sqlite::memory:");
+    properties.put(CatalogProperties.WAREHOUSE_LOCATION, "warehouse");
+    properties.put("jdbc.schema-version", schemaVersion);
+
+    catalog.initialize("test_jdbc_" + schemaVersion.toLowerCase(), properties);
+
+    Assertions.assertEquals(
+        expectedSupportsViews, catalog.supportsViewsWithSchemaVersion(), message);
   }
 }
