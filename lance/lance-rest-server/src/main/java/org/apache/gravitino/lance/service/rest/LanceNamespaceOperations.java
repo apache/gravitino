@@ -165,7 +165,7 @@ public class LanceNamespaceOperations {
   @Path("{id}/table/list")
   public Response listTables(
       @PathParam("id") String namespaceId,
-      @DefaultValue("$") @QueryParam("delimiter") String delimiter,
+      @DefaultValue(NAMESPACE_DELIMITER_DEFAULT) @QueryParam("delimiter") String delimiter,
       @QueryParam("page_token") String pageToken,
       @QueryParam("limit") Integer limit) {
     try {

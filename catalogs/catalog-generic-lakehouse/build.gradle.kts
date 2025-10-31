@@ -35,6 +35,7 @@ dependencies {
   implementation(project(":core")) {
     exclude("*")
   }
+  implementation(project(":lance:lance-common"))
 
   implementation(libs.bundles.log4j)
   implementation(libs.cglib)
