@@ -293,18 +293,6 @@ public class LanceCatalogOperations implements LakehouseCatalogOperations {
         throw new RuntimeException("Failed to drop Lance table: " + ident.name());
       }
 
-      boolean isRegisteredTable =
-          (boolean)
-              propertyMetadata
-                  .tablePropertiesMetadata()
-                  .getOrDefault(
-                      tableEntity.getProperties(),
-                      GenericLakehouseTablePropertiesMetadata.LAKEHOUSE_REGISTER);
-      if (isRegisteredTable) {
-        // If this is a registered table. We only delete the metadata from metastore.
-        return true;
-      }
-
       // Drop the Lance dataset from cloud storage.
       Dataset.drop(location, ImmutableMap.of());
       return true;
