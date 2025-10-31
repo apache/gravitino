@@ -64,7 +64,7 @@ const FilesetView = () => {
     setPage(newPage)
   }
 
-  const handleChangeRowsPerPage = (event) => {
+  const handleChangeRowsPerPage = event => {
     setRowsPerPage(parseInt(event.target.value, 10))
     setPage(0)
   }
@@ -215,7 +215,7 @@ const FilesetView = () => {
           <TableFooter>
             <TableRow>
               <TablePagination
-                rowsPerPageOptions={[10, 25, 50,{ value: -1, label: 'All' }]}
+                rowsPerPageOptions={[10, 25, 50, { value: -1, label: 'All' }]}
                 count={store.filesetFiles.length}
                 rowsPerPage={rowsPerPage}
                 page={page}
