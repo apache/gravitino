@@ -109,6 +109,11 @@ public class HDFSFileSystemProxy implements MethodInterceptor {
     }
   }
 
+  /**
+   * Get the proxied FileSystem instance.
+   *
+   * @return the proxied FileSystem
+   */
   public FileSystem getProxy() {
     Enhancer e = new Enhancer();
     e.setClassLoader(fs.getClass().getClassLoader());
