@@ -59,18 +59,19 @@ TIME_WITHOUT_EXPIRATION = sys.maxsize
 
 class FileSystemCacheKey:
     """
-    A cache key for filesystem instances following fsspec's tokenization approach.
+    A cache key for filesystem instances following fsspec's native caching behavior.
 
     This key is based on:
     - Process ID (ensures cache is process-specific, like fsspec)
-    - Thread ID (ensures thread safety, like fsspec)
+    - Thread ID (ensures thread-specific caching, like fsspec)
     - Filesystem scheme (e.g., 's3', 'gs', 'hdfs', 'file')
     - Authority (e.g., bucket name, host:port)
     - Configuration token (hashable representation of credentials and config)
 
-    This matches how Hadoop HDFS client caches FileSystem instances by
-    (scheme, authority, UserGroupInformation), but adapted for Python using
-    fsspec's tokenization approach since we don't have UGI.
+    This matches fsspec's _Cached metaclass caching strategy which includes both
+    process ID and thread ID in the cache key. While this differs from Java GVFS
+    (which shares filesystems across threads), it provides better thread isolation
+    and matches Python's ecosystem conventions.
     """
 
     def __init__(

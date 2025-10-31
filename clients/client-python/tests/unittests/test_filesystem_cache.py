@@ -18,8 +18,15 @@
 Unit tests for filesystem caching behavior in GVFS.
 
 These tests verify that filesystem instances are cached correctly based on
-(scheme, authority, credentials, config), matching the behavior of Java GVFS
-and how Hadoop HDFS client caches FileSystem instances.
+(scheme, authority, credentials, config), following fsspec's native caching
+behavior with process and thread isolation.
+
+Test Coverage:
+- Filesystem sharing: Multiple filesets → same storage → shared instance (per thread)
+- Concurrent access: RWLock prevents deadlocks and race conditions with TTLCache
+- Thread isolation: Different threads get separate cache entries (thread_id in key)
+- Cache expiration: TTL-based eviction and recreation
+- Cache key construction: Equality, inequality, process/thread isolation
 """
 import os
 import threading
@@ -113,41 +120,29 @@ class TestFileSystemCache(unittest.TestCase):
                 "Multiple filesets pointing to the same storage should share the same filesystem instance.",
             )
 
-    def test_cache_isolation_by_storage_location(self, *mock_methods):
+    def test_concurrent_access_without_deadlock(self, *mock_methods):
         """
-        Test that filesets pointing to the same storage type share filesystem instances.
+        Test that concurrent filesystem access doesn't cause deadlocks or crashes.
 
-        For local filesystems (file://), different paths share the same LocalFileSystem
-        instance because the filesystem is not path-specific. This matches how Hadoop
-        caches FileSystem instances - same scheme and authority = shared instance.
+        Verifies that the RWLock pattern correctly protects TTLCache from race
+        conditions during concurrent read/write operations. Each thread may get
+        its own cache entry due to thread_id being part of the cache key.
         """
-        # Create two different storage locations with file:// scheme
-        storage1 = f"file://{self._fileset_dir}/storage1"
-        storage2 = f"file://{self._fileset_dir}/storage2"
-        self.local_fs.mkdir(storage1, create_parents=True)
-        self.local_fs.mkdir(storage2, create_parents=True)
+        storage_location = f"file://{self._fileset_dir}/thread_test"
+        self.local_fs.mkdir(storage_location, create_parents=True)
 
-        fileset1_virtual = (
-            f"fileset/{self._catalog_name}/{self._schema_name}/fileset1/file.txt"
+        fileset_virtual = (
+            f"fileset/{self._catalog_name}/{self._schema_name}/thread_test/file.txt"
         )
-        fileset2_virtual = (
-            f"fileset/{self._catalog_name}/{self._schema_name}/fileset2/file.txt"
-        )
-
-        def mock_get_file_location(fileset_id, sub_path, location_name):
-            if fileset_id.name() == "fileset1":
-                return f"{storage1}/{sub_path}"
-            return f"{storage2}/{sub_path}"
 
         with patch.multiple(
             "gravitino.client.fileset_catalog.FilesetCatalog",
             load_fileset=MagicMock(
-                side_effect=lambda name_id: mock_base.mock_load_fileset(
-                    name_id.name(),
-                    storage1 if name_id.name() == "fileset1" else storage2,
+                return_value=mock_base.mock_load_fileset(
+                    "thread_test", storage_location
                 )
             ),
-            get_file_location=MagicMock(side_effect=mock_get_file_location),
+            get_file_location=MagicMock(return_value=f"{storage_location}/file.txt"),
         ):
             fs = gvfs.GravitinoVirtualFileSystem(
                 server_uri=self._server_uri,
@@ -155,24 +150,111 @@ class TestFileSystemCache(unittest.TestCase):
                 skip_instance_cache=True,
             )
 
-            # Access both filesets
-            fs.touch(fileset1_virtual)
-            fs.touch(fileset2_virtual)
+            # Create file first
+            fs.touch(fileset_virtual)
 
-            self.assertTrue(fs.exists(fileset1_virtual))
-            self.assertTrue(fs.exists(fileset2_virtual))
+            results = []
+            errors = []
 
-            # For local filesystems with same scheme (file://) and no authority,
-            # they share the same filesystem instance. This is correct behavior:
-            # - file://path1 and file://path2 use the same LocalFileSystem
-            # - s3://bucket1 and s3://bucket2 would have different cache entries
+            def access_filesystem():
+                """Thread worker that accesses the filesystem."""
+                try:
+                    # Multiple operations to stress test locking
+                    exists = fs.exists(fileset_virtual)
+                    results.append(exists)
+                except Exception as e:  # pylint: disable=broad-exception-caught
+                    errors.append(e)
+
+            # Launch multiple threads
+            threads = []
+            for _ in range(10):
+                thread = threading.Thread(target=access_filesystem)
+                threads.append(thread)
+                thread.start()
+
+            # Wait for all threads to complete
+            for thread in threads:
+                thread.join()
+
+            # Verify no errors occurred
+            self.assertEqual(len(errors), 0, f"Thread safety errors: {errors}")
+            self.assertEqual(len(results), 10, "All threads should complete")
+            self.assertTrue(all(results), "All threads should see file exists")
+
+            # With thread-specific caching (like fsspec), each thread gets its own entry
+            # This is different from Java GVFS but matches Python ecosystem conventions
             # pylint: disable=protected-access
             cache_size = len(fs._operations._filesystem_cache)
-            self.assertEqual(
+            self.assertGreaterEqual(
                 cache_size,
                 1,
-                f"Expected 1 cached filesystem (shared local), but found {cache_size}. "
-                "Local filesystem paths with same scheme should share the same instance.",
+                f"Expected at least 1 cached filesystem, but found {cache_size}",
+            )
+            self.assertLessEqual(
+                cache_size,
+                10,
+                f"Expected at most 10 cached filesystems (one per thread), but found {cache_size}",
+            )
+
+    def test_thread_isolation(self, *mock_methods):
+        """
+        Test that different threads get separate cache entries.
+
+        This validates that thread_id is part of the cache key, ensuring
+        thread-specific caching following fsspec's behavior.
+        """
+        storage_location = f"file://{self._fileset_dir}/thread_isolation"
+        self.local_fs.mkdir(storage_location, create_parents=True)
+
+        fileset_virtual = (
+            f"fileset/{self._catalog_name}/{self._schema_name}/thread_test/file.txt"
+        )
+
+        with patch.multiple(
+            "gravitino.client.fileset_catalog.FilesetCatalog",
+            load_fileset=MagicMock(
+                return_value=mock_base.mock_load_fileset(
+                    "thread_test", storage_location
+                )
+            ),
+            get_file_location=MagicMock(return_value=f"{storage_location}/file.txt"),
+        ):
+            fs = gvfs.GravitinoVirtualFileSystem(
+                server_uri=self._server_uri,
+                metalake_name=self._metalake_name,
+                skip_instance_cache=True,
+            )
+
+            # Access from main thread
+            fs.touch(fileset_virtual)
+            self.assertTrue(fs.exists(fileset_virtual))
+
+            # pylint: disable=protected-access
+            main_thread_cache_size = len(fs._operations._filesystem_cache)
+            self.assertEqual(
+                main_thread_cache_size, 1, "Main thread should have 1 cache entry"
+            )
+
+            # Access from a different thread
+            thread_cache_size = []
+
+            def access_from_thread():
+                """Access filesystem from a different thread."""
+                fs.exists(fileset_virtual)
+                # pylint: disable=protected-access
+                thread_cache_size.append(len(fs._operations._filesystem_cache))
+
+            thread = threading.Thread(target=access_from_thread)
+            thread.start()
+            thread.join()
+
+            # After thread completes, cache should have 2 entries (one per thread)
+            # pylint: disable=protected-access
+            final_cache_size = len(fs._operations._filesystem_cache)
+            self.assertEqual(
+                final_cache_size,
+                2,
+                f"Expected 2 cache entries (main thread + spawned thread), but found {final_cache_size}",
             )
 
     def test_cache_expiration(self, *mock_methods):
@@ -258,51 +340,9 @@ class TestFileSystemCacheKey(unittest.TestCase):
         self.assertEqual(key1, key2)
         self.assertEqual(hash(key1), hash(key2))
 
-    def test_cache_key_inequality_different_scheme(self):
-        """Test that cache keys with different schemes are not equal."""
-        key1 = FileSystemCacheKey(
-            scheme="s3",
-            authority="bucket1",
-            credentials=None,
-            catalog_props={},
-            options={},
-            extra_kwargs={},
-        )
-        key2 = FileSystemCacheKey(
-            scheme="gs",
-            authority="bucket1",
-            credentials=None,
-            catalog_props={},
-            options={},
-            extra_kwargs={},
-        )
-
-        self.assertNotEqual(key1, key2)
-
-    def test_cache_key_inequality_different_authority(self):
-        """Test that cache keys with different authorities are not equal."""
-        key1 = FileSystemCacheKey(
-            scheme="s3",
-            authority="bucket1",
-            credentials=None,
-            catalog_props={},
-            options={},
-            extra_kwargs={},
-        )
-        key2 = FileSystemCacheKey(
-            scheme="s3",
-            authority="bucket2",
-            credentials=None,
-            catalog_props={},
-            options={},
-            extra_kwargs={},
-        )
-
-        self.assertNotEqual(key1, key2)
-
-    def test_cache_key_inequality_different_config(self):
-        """Test that cache keys with different configurations are not equal."""
-        key1 = FileSystemCacheKey(
+    def test_cache_key_inequality(self):
+        """Test that cache keys with different parameters are not equal."""
+        base_key = FileSystemCacheKey(
             scheme="s3",
             authority="bucket1",
             credentials=None,
@@ -310,7 +350,31 @@ class TestFileSystemCacheKey(unittest.TestCase):
             options={},
             extra_kwargs={},
         )
-        key2 = FileSystemCacheKey(
+
+        # Different scheme
+        key_diff_scheme = FileSystemCacheKey(
+            scheme="gs",
+            authority="bucket1",
+            credentials=None,
+            catalog_props={"prop1": "value1"},
+            options={},
+            extra_kwargs={},
+        )
+        self.assertNotEqual(base_key, key_diff_scheme)
+
+        # Different authority
+        key_diff_authority = FileSystemCacheKey(
+            scheme="s3",
+            authority="bucket2",
+            credentials=None,
+            catalog_props={"prop1": "value1"},
+            options={},
+            extra_kwargs={},
+        )
+        self.assertNotEqual(base_key, key_diff_authority)
+
+        # Different catalog properties
+        key_diff_config = FileSystemCacheKey(
             scheme="s3",
             authority="bucket1",
             credentials=None,
@@ -318,8 +382,18 @@ class TestFileSystemCacheKey(unittest.TestCase):
             options={},
             extra_kwargs={},
         )
+        self.assertNotEqual(base_key, key_diff_config)
 
-        self.assertNotEqual(key1, key2)
+        # Different options
+        key_diff_options = FileSystemCacheKey(
+            scheme="s3",
+            authority="bucket1",
+            credentials=None,
+            catalog_props={"prop1": "value1"},
+            options={"opt1": "val1"},  # Added option
+            extra_kwargs={},
+        )
+        self.assertNotEqual(base_key, key_diff_options)
 
     def test_cache_key_includes_process_id(self):
         """Test that cache keys include process ID for isolation."""
@@ -336,7 +410,7 @@ class TestFileSystemCacheKey(unittest.TestCase):
         self.assertEqual(key._pid, os.getpid())
 
     def test_cache_key_includes_thread_id(self):
-        """Test that cache keys include thread ID for thread safety."""
+        """Test that cache keys include thread ID for thread isolation."""
         key = FileSystemCacheKey(
             scheme="s3",
             authority="bucket1",
