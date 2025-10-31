@@ -27,6 +27,7 @@ import org.apache.gravitino.utils.MetadataObjectUtil;
 @DeveloperApi
 public final class GetPolicyForMetadataObjectPreEvent extends PolicyPreEvent {
   private final MetadataObject metadataObject;
+  private final String policyName;
 
   /**
    * Constructs an instance of {@code GetPolicyForMetadataObjectPreEvent}.
@@ -34,11 +35,13 @@ public final class GetPolicyForMetadataObjectPreEvent extends PolicyPreEvent {
    * @param user The username of the individual who initiated the policy retrieval operation.
    * @param metalake The metalake from which the policy will be retrieved.
    * @param metadataObject The metadata object for which the policy will be retrieved.
+   * @param policyName The name of the policy to be retrieved.
    */
   public GetPolicyForMetadataObjectPreEvent(
-      String user, String metalake, MetadataObject metadataObject) {
+      String user, String metalake, MetadataObject metadataObject, String policyName) {
     super(user, MetadataObjectUtil.toEntityIdent(metalake, metadataObject));
     this.metadataObject = metadataObject;
+    this.policyName = policyName;
   }
 
   /**
@@ -48,6 +51,15 @@ public final class GetPolicyForMetadataObjectPreEvent extends PolicyPreEvent {
    */
   public MetadataObject metadataObject() {
     return metadataObject;
+  }
+
+  /**
+   * Returns the name of the policy to be retrieved.
+   *
+   * @return the policy name.
+   */
+  public String policyName() {
+    return policyName;
   }
 
   /**

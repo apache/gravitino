@@ -30,6 +30,7 @@ import org.apache.gravitino.utils.MetadataObjectUtil;
 @DeveloperApi
 public final class GetPolicyForMetadataObjectFailureEvent extends PolicyFailureEvent {
   private final MetadataObject metadataObject;
+  private final String policyName;
 
   /**
    * Constructs an instance of {@code GetPolicyForMetadataObjectFailureEvent}.
@@ -37,12 +38,18 @@ public final class GetPolicyForMetadataObjectFailureEvent extends PolicyFailureE
    * @param user The username of the individual who initiated the policy retrieval.
    * @param metalake The metalake from which the policy was to be retrieved.
    * @param metadataObject The metadata object for which the policy was to be retrieved.
+   * @param policyName The name of the policy that was to be retrieved.
    * @param exception The exception that was encountered during the policy retrieval attempt.
    */
   public GetPolicyForMetadataObjectFailureEvent(
-      String user, String metalake, MetadataObject metadataObject, Exception exception) {
+      String user,
+      String metalake,
+      MetadataObject metadataObject,
+      String policyName,
+      Exception exception) {
     super(user, MetadataObjectUtil.toEntityIdent(metalake, metadataObject), exception);
     this.metadataObject = metadataObject;
+    this.policyName = policyName;
   }
 
   /**
@@ -52,6 +59,15 @@ public final class GetPolicyForMetadataObjectFailureEvent extends PolicyFailureE
    */
   public MetadataObject metadataObject() {
     return metadataObject;
+  }
+
+  /**
+   * Returns the name of the policy that was to be retrieved.
+   *
+   * @return the policy name.
+   */
+  public String policyName() {
+    return policyName;
   }
 
   /**

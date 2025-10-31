@@ -355,7 +355,7 @@ public class PolicyEventDispatcher implements PolicyDispatcher {
       String metalake, MetadataObject metadataObject, String policyName) {
     eventBus.dispatchEvent(
         new GetPolicyForMetadataObjectPreEvent(
-            PrincipalUtils.getCurrentUserName(), metalake, metadataObject));
+            PrincipalUtils.getCurrentUserName(), metalake, metadataObject, policyName));
     try {
       PolicyEntity policy =
           dispatcher.getPolicyForMetadataObject(metalake, metadataObject, policyName);
@@ -367,7 +367,7 @@ public class PolicyEventDispatcher implements PolicyDispatcher {
     } catch (Exception e) {
       eventBus.dispatchEvent(
           new GetPolicyForMetadataObjectFailureEvent(
-              PrincipalUtils.getCurrentUserName(), metalake, metadataObject, e));
+              PrincipalUtils.getCurrentUserName(), metalake, metadataObject, policyName, e));
       throw e;
     }
   }
