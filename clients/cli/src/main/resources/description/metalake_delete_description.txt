@@ -1,0 +1,16 @@
+Delete a metalake; you can specify the --force option to bypass the confirmation prompt.
+
+Note:
+The Metalake for the CLI can be set using one of the following methods:
+1. Passed in on the command line via the --metalake parameter.
+2. Set via the GRAVITINO_METALAKE environment variable.
+3. Stored in the Gravitino CLI configuration file.
+4. This is a potentially dangerous command to run and result in data loss.
+
+Example commands
+
+# Delete a metalake
+gcli metalake delete --metalake my_metalake
+
+# Delete a metalake without confirmation prompt
+gcli metalake delete --metalake my_metalake --force
