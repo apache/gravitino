@@ -44,7 +44,9 @@ public class IcebergMetricsManager {
   private static final ImmutableMap<String, String> ICEBERG_METRICS_STORE_NAMES =
       ImmutableMap.of(
           DummyMetricsStore.ICEBERG_METRICS_STORE_DUMMY_NAME,
-          DummyMetricsStore.class.getCanonicalName());
+          DummyMetricsStore.class.getCanonicalName(),
+          IcebergRestMetricsStore.ICEBERG_METRICS_STORE_NAME,
+          IcebergRestMetricsStore.class.getCanonicalName());
 
   private final IcebergMetricsFormatter icebergMetricsFormatter;
   private final IcebergMetricsStore icebergMetricsStore;
