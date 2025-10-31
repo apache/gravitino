@@ -408,6 +408,10 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
                   RuntimeException.class,
                   UnsupportedOperationException.class);
 
+          if (isManagedTable(catalogIdent)) {
+            return droppedFromCatalog;
+          }
+
           // For unmanaged table, it could happen that the table:
           // 1. Is not found in the catalog (dropped directly from underlying sources)
           // 2. Is found in the catalog but not in the store (not managed by Gravitino)

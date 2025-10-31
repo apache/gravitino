@@ -16,31 +16,14 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-description = "lance-common"
 
-plugins {
-  `maven-publish`
-  id("java")
-  id("idea")
-}
+package org.apache.gravitino.lance.service;
 
-dependencies {
-  implementation(project(":clients:client-java"))
-  implementation(project(":api"))
-  implementation(project(":common")) {
-    exclude("*")
-  }
-  implementation(project(":core")) {
-    exclude("*")
-  }
+public class ServiceConstants {
+  public static final String LANCE_HTTP_HEADER_PREFIX = "x-lance-";
 
-  implementation(libs.guava)
-  implementation(libs.commons.lang3)
-  implementation(libs.lance.namespace.core)
-  implementation(libs.slf4j.api)
-
-  testImplementation(project(":server-common"))
-  testImplementation(libs.junit.jupiter.api)
-  testImplementation(libs.junit.jupiter.params)
-  testRuntimeOnly(libs.junit.jupiter.engine)
+  public static final String LANCE_TABLE_LOCATION_HEADER =
+      LANCE_HTTP_HEADER_PREFIX + "table-location";
+  public static final String LANCE_TABLE_PROPERTIES_PREFIX_HEADER =
+      LANCE_HTTP_HEADER_PREFIX + "table-properties";
 }

@@ -35,6 +35,7 @@ import com.lancedb.lance.namespace.model.CreateNamespaceRequest;
 import com.lancedb.lance.namespace.model.CreateNamespaceRequest.ModeEnum;
 import com.lancedb.lance.namespace.model.CreateNamespaceResponse;
 import com.lancedb.lance.namespace.model.CreateTableResponse;
+import com.lancedb.lance.namespace.model.DeregisterTableResponse;
 import com.lancedb.lance.namespace.model.DescribeNamespaceResponse;
 import com.lancedb.lance.namespace.model.DescribeTableResponse;
 import com.lancedb.lance.namespace.model.DropNamespaceRequest;
@@ -42,6 +43,8 @@ import com.lancedb.lance.namespace.model.DropNamespaceResponse;
 import com.lancedb.lance.namespace.model.JsonArrowSchema;
 import com.lancedb.lance.namespace.model.ListNamespacesResponse;
 import com.lancedb.lance.namespace.model.ListTablesResponse;
+import com.lancedb.lance.namespace.model.RegisterTableRequest;
+import com.lancedb.lance.namespace.model.RegisterTableResponse;
 import com.lancedb.lance.namespace.util.CommonUtil;
 import com.lancedb.lance.namespace.util.JsonArrowSchemaConverter;
 import com.lancedb.lance.namespace.util.PageUtil;
@@ -492,7 +495,7 @@ public class GravitinoLanceNamespaceWrapper extends NamespaceWrapper
       String namespaceId, String delimiter, String pageToken, Integer limit) {
     ObjectIdentifier nsId = ObjectIdentifier.of(namespaceId, Pattern.quote(delimiter));
     Preconditions.checkArgument(
-        nsId.levels() <= 2, "Expected at most 2-level namespace but got: %s", nsId.levels());
+        nsId.levels() == 2, "Expected 2-level namespace but got: %s", nsId.levels());
     String catalogName = nsId.levelAtListPos(0);
     Catalog catalog = loadAndValidateLakehouseCatalog(catalogName);
     String schemaName = nsId.levelAtListPos(1);
@@ -516,7 +519,7 @@ public class GravitinoLanceNamespaceWrapper extends NamespaceWrapper
   public DescribeTableResponse describeTable(String tableId, String delimiter) {
     ObjectIdentifier nsId = ObjectIdentifier.of(tableId, Pattern.quote(delimiter));
     Preconditions.checkArgument(
-        nsId.levels() <= 3, "Expected at most 3-level namespace but got: %s", nsId.levels());
+        nsId.levels() == 3, "Expected at 3-level namespace but got: %s", nsId.levels());
 
     String catalogName = nsId.levelAtListPos(0);
     Catalog catalog = loadAndValidateLakehouseCatalog(catalogName);
@@ -538,17 +541,10 @@ public class GravitinoLanceNamespaceWrapper extends NamespaceWrapper
       String delimiter,
       String tableLocation,
       Map<String, String> tableProperties,
-      String rootCatalog,
       byte[] arrowStreamBody) {
     ObjectIdentifier nsId = ObjectIdentifier.of(tableId, Pattern.quote(delimiter));
     Preconditions.checkArgument(
-        nsId.levels() <= 3, "Expected at most 3-level namespace but got: %s", nsId.levels());
-    if (rootCatalog != null) {
-      List<String> levels = nsId.listStyleId();
-      List<String> newLevels = Lists.newArrayList(rootCatalog);
-      newLevels.addAll(levels);
-      nsId = ObjectIdentifier.of(newLevels);
-    }
+        nsId.levels() == 3, "Expected at 3-level namespace but got: %s", nsId.levels());
 
     // Parser column information.
     List<Column> columns = Lists.newArrayList();
@@ -614,6 +610,68 @@ public class GravitinoLanceNamespaceWrapper extends NamespaceWrapper
     return response;
   }
 
+  @Override
+  public RegisterTableResponse registerTable(
+      String tableId, String mode, String delimiter, Map<String, String> tableProperties) {
+    ObjectIdentifier nsId = ObjectIdentifier.of(tableId, Pattern.quote(delimiter));
+    Preconditions.checkArgument(
+        nsId.levels() == 3, "Expected at 3-level namespace but got: %s", nsId.levels());
+
+    String catalogName = nsId.levelAtListPos(0);
+    Catalog catalog = loadAndValidateLakehouseCatalog(catalogName);
+    NameIdentifier tableIdentifier =
+        NameIdentifier.of(nsId.levelAtListPos(1), nsId.levelAtListPos(2));
+
+    // TODO Support real register API
+    RegisterTableRequest.ModeEnum createMode =
+        RegisterTableRequest.ModeEnum.fromValue(mode.toUpperCase());
+    if (createMode == RegisterTableRequest.ModeEnum.CREATE
+        && catalog.asTableCatalog().tableExists(tableIdentifier)) {
+      throw LanceNamespaceException.conflict(
+          "Table already exists: " + tableId,
+          SchemaAlreadyExistsException.class.getSimpleName(),
+          tableId,
+          CommonUtil.formatCurrentStackTrace());
+    }
+
+    if (createMode == RegisterTableRequest.ModeEnum.OVERWRITE
+        && catalog.asTableCatalog().tableExists(tableIdentifier)) {
+      LOG.info("Overwriting existing table: {}", tableId);
+      catalog.asTableCatalog().dropTable(tableIdentifier);
+    }
+
+    Table t =
+        catalog.asTableCatalog().createTable(tableIdentifier, new Column[] {}, "", tableProperties);
+
+    RegisterTableResponse response = new RegisterTableResponse();
+    response.setProperties(t.properties());
+    response.setLocation(t.properties().get("location"));
+    return response;
+  }
+
+  @Override
+  public DeregisterTableResponse deregisterTable(String tableId, String delimiter) {
+
+    ObjectIdentifier nsId = ObjectIdentifier.of(tableId, Pattern.quote(delimiter));
+    Preconditions.checkArgument(
+        nsId.levels() == 3, "Expected at 3-level namespace but got: %s", nsId.levels());
+
+    String catalogName = nsId.levelAtListPos(0);
+    Catalog catalog = loadAndValidateLakehouseCatalog(catalogName);
+
+    NameIdentifier tableIdentifier =
+        NameIdentifier.of(nsId.levelAtListPos(1), nsId.levelAtListPos(2));
+    Table t = catalog.asTableCatalog().loadTable(tableIdentifier);
+    Map<String, String> properties = t.properties();
+    // TODO Support real deregister API.
+    catalog.asTableCatalog().purgeTable(tableIdentifier);
+
+    DeregisterTableResponse response = new DeregisterTableResponse();
+    response.setProperties(properties);
+    response.setLocation(properties.get("location"));
+    return response;
+  }
+
   private JsonArrowSchema toJsonArrowSchema(Column[] columns) {
     List<Field> fields =
         Arrays.stream(columns)
@@ -627,7 +685,6 @@ public class GravitinoLanceNamespaceWrapper extends NamespaceWrapper
   @VisibleForTesting
   org.apache.arrow.vector.types.pojo.Schema parseArrowIpcStream(byte[] stream) {
     org.apache.arrow.vector.types.pojo.Schema schema;
-
     try (BufferAllocator allocator = new RootAllocator();
         ByteArrayInputStream bais = new ByteArrayInputStream(stream);
         ArrowStreamReader reader = new ArrowStreamReader(bais, allocator)) {

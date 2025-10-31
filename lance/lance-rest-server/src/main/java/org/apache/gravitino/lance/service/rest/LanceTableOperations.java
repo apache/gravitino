@@ -19,24 +19,33 @@
 package org.apache.gravitino.lance.service.rest;
 
 import static org.apache.gravitino.lance.common.ops.NamespaceWrapper.NAMESPACE_DELIMITER_DEFAULT;
+import static org.apache.gravitino.lance.service.ServiceConstants.LANCE_TABLE_LOCATION_HEADER;
+import static org.apache.gravitino.lance.service.ServiceConstants.LANCE_TABLE_PROPERTIES_PREFIX_HEADER;
 
 import com.codahale.metrics.annotation.ResponseMetered;
 import com.codahale.metrics.annotation.Timed;
 import com.fasterxml.jackson.core.type.TypeReference;
+import com.google.common.collect.Maps;
 import com.lancedb.lance.namespace.model.CreateTableResponse;
+import com.lancedb.lance.namespace.model.DeregisterTableRequest;
+import com.lancedb.lance.namespace.model.DeregisterTableResponse;
 import com.lancedb.lance.namespace.model.DescribeTableResponse;
+import com.lancedb.lance.namespace.model.RegisterTableRequest;
+import com.lancedb.lance.namespace.model.RegisterTableResponse;
 import com.lancedb.lance.namespace.util.JsonUtil;
 import java.util.Map;
 import javax.inject.Inject;
 import javax.ws.rs.Consumes;
 import javax.ws.rs.DefaultValue;
-import javax.ws.rs.HeaderParam;
 import javax.ws.rs.POST;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
+import javax.ws.rs.core.Context;
+import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
+import javax.ws.rs.core.MultivaluedMap;
 import javax.ws.rs.core.Response;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.lance.common.ops.NamespaceWrapper;
@@ -81,18 +90,20 @@ public class LanceTableOperations {
       @PathParam("id") String tableId,
       @QueryParam("mode") @DefaultValue("create") String mode, // create, exist_ok, overwrite
       @QueryParam("delimiter") @DefaultValue(NAMESPACE_DELIMITER_DEFAULT) String delimiter,
-      @HeaderParam("x-lance-table-location") String tableLocation,
-      @HeaderParam("x-lance-table-properties") String tableProperties,
-      @HeaderParam("x-lance-root-catalog") String rootCatalog,
+      @Context HttpHeaders headers,
       byte[] arrowStreamBody) {
     try {
+      // Extract table properties from header
+      MultivaluedMap<String, String> headersMap = headers.getRequestHeaders();
+      String tableLocation = headersMap.getFirst(LANCE_TABLE_LOCATION_HEADER);
+      String tableProperties = headersMap.getFirst(LANCE_TABLE_PROPERTIES_PREFIX_HEADER);
+
       Map<String, String> props =
           JsonUtil.mapper().readValue(tableProperties, new TypeReference<>() {});
       CreateTableResponse response =
           lanceNamespace
               .asTableOps()
-              .createTable(
-                  tableId, mode, delimiter, tableLocation, props, rootCatalog, arrowStreamBody);
+              .createTable(tableId, mode, delimiter, tableLocation, props, arrowStreamBody);
       return Response.ok(response).build();
     } catch (Exception e) {
       return LanceExceptionMapper.toRESTResponse(tableId, e);
@@ -107,10 +118,13 @@ public class LanceTableOperations {
       @PathParam("id") String tableId,
       @QueryParam("mode") @DefaultValue("create") String mode, // create, exist_ok, overwrite
       @QueryParam("delimiter") @DefaultValue(NAMESPACE_DELIMITER_DEFAULT) String delimiter,
-      @HeaderParam("x-lance-table-location") String tableLocation,
-      @HeaderParam("x-lance-root-catalog") String rootCatalog,
-      @HeaderParam("x-lance-table-properties") String tableProperties) {
+      @Context HttpHeaders headers) {
     try {
+      // Extract table properties from header
+      MultivaluedMap<String, String> headersMap = headers.getRequestHeaders();
+      String tableLocation = headersMap.getFirst(LANCE_TABLE_LOCATION_HEADER);
+      String tableProperties = headersMap.getFirst(LANCE_TABLE_PROPERTIES_PREFIX_HEADER);
+
       Map<String, String> props =
           StringUtils.isBlank(tableProperties)
               ? Map.of()
@@ -118,7 +132,52 @@ public class LanceTableOperations {
       CreateTableResponse response =
           lanceNamespace
               .asTableOps()
-              .createTable(tableId, mode, delimiter, tableLocation, props, rootCatalog, null);
+              .createTable(tableId, mode, delimiter, tableLocation, props, null);
+      return Response.ok(response).build();
+    } catch (Exception e) {
+      return LanceExceptionMapper.toRESTResponse(tableId, e);
+    }
+  }
+
+  @POST
+  @Path("/register")
+  @Timed(name = "register-table." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
+  @ResponseMetered(name = "register-table", absolute = true)
+  public Response registerTable(
+      @PathParam("id") String tableId,
+      @QueryParam("mode") @DefaultValue("create") String mode, // overwrite or
+      @QueryParam("delimiter") @DefaultValue("$") String delimiter,
+      @Context HttpHeaders headers,
+      RegisterTableRequest registerTableRequest) {
+    try {
+      Map<String, String> props =
+          registerTableRequest.getProperties() == null
+              ? Maps.newHashMap()
+              : Maps.newHashMap(registerTableRequest.getProperties());
+      props.put("register", "true");
+      props.put("location", registerTableRequest.getLocation());
+      props.put("format", "lance");
+
+      RegisterTableResponse response =
+          lanceNamespace.asTableOps().registerTable(tableId, mode, delimiter, props);
+      return Response.ok(response).build();
+    } catch (Exception e) {
+      return LanceExceptionMapper.toRESTResponse(tableId, e);
+    }
+  }
+
+  @POST
+  @Path("/deregister")
+  @Timed(name = "deregister-table." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
+  @ResponseMetered(name = "deregister-table", absolute = true)
+  public Response deregisterTable(
+      @PathParam("id") String tableId,
+      @QueryParam("delimiter") @DefaultValue("$") String delimiter,
+      @Context HttpHeaders headers,
+      DeregisterTableRequest deregisterTableRequest) {
+    try {
+      DeregisterTableResponse response =
+          lanceNamespace.asTableOps().deregisterTable(tableId, delimiter);
       return Response.ok(response).build();
     } catch (Exception e) {
       return LanceExceptionMapper.toRESTResponse(tableId, e);
