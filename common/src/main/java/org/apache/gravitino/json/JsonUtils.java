@@ -1383,6 +1383,7 @@ public class JsonUtils {
     }
   }
 
+  /** Custom JSON serializer for SortOrderDTO objects. */
   public static class SortOrderImplSerializer extends JsonSerializer<SortImpl> {
     @Override
     public void serialize(SortImpl value, JsonGenerator gen, SerializerProvider serializers)
@@ -1674,6 +1675,7 @@ public class JsonUtils {
     }
   }
 
+  /** Custom JSON serializer for IndexImpl objects. */
   public static class IndexImplSerializer extends JsonSerializer<IndexImpl> {
     @Override
     public void serialize(IndexImpl value, JsonGenerator gen, SerializerProvider serializers)
