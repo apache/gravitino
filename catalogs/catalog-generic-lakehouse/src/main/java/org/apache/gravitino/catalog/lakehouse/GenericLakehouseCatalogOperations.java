@@ -210,6 +210,8 @@ public class GenericLakehouseCatalogOperations
           .withName(tableEntity.name())
           .withComment(tableEntity.getComment())
           .build();
+    } catch (NoSuchEntityException e) {
+      throw new NoSuchTableException(e, "Table %s does not exist", ident);
     } catch (IOException e) {
       throw new RuntimeException("Failed to list tables under schema " + ident.namespace(), e);
     }
@@ -352,7 +354,6 @@ public class GenericLakehouseCatalogOperations
   @Override
   public Table alterTable(NameIdentifier ident, TableChange... changes)
       throws NoSuchTableException, IllegalArgumentException {
-    Namespace namespace = ident.namespace();
     try {
       TableEntity tableEntity = store.get(ident, Entity.EntityType.TABLE, TableEntity.class);
       Map<String, String> tableProperties = tableEntity.getProperties();
@@ -360,13 +361,12 @@ public class GenericLakehouseCatalogOperations
           getLakehouseCatalogOperations(tableProperties);
       return lakehouseCatalogOperations.alterTable(ident, changes);
     } catch (IOException e) {
-      throw new RuntimeException("Failed to list tables under schema " + namespace, e);
+      throw new RuntimeException("Failed to alter table " + ident, e);
     }
   }
 
   @Override
   public boolean dropTable(NameIdentifier ident) {
-    Namespace namespace = ident.namespace();
     try {
       TableEntity tableEntity = store.get(ident, Entity.EntityType.TABLE, TableEntity.class);
       LakehouseCatalogOperations lakehouseCatalogOperations =
@@ -376,7 +376,20 @@ public class GenericLakehouseCatalogOperations
       LOG.warn("Table {} does not exist, skip dropping it.", ident);
       return false;
     } catch (IOException e) {
-      throw new RuntimeException("Failed to list tables under schema " + namespace, e);
+      throw new RuntimeException("Failed to drop table: " + ident, e);
+    }
+  }
+
+  @Override
+  public boolean purgeTable(NameIdentifier ident) throws UnsupportedOperationException {
+    try {
+      // Only delete the metadata entry here. The physical data will not be deleted.
+      if (!tableExists(ident)) {
+        return false;
+      }
+      return store.delete(ident, Entity.EntityType.TABLE);
+    } catch (IOException e) {
+      throw new RuntimeException("Failed to purge table " + ident, e);
     }
   }
 

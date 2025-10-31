@@ -663,10 +663,8 @@ public class GravitinoLanceNamespaceWrapper extends NamespaceWrapper
         NameIdentifier.of(nsId.levelAtListPos(1), nsId.levelAtListPos(2));
     Table t = catalog.asTableCatalog().loadTable(tableIdentifier);
     Map<String, String> properties = t.properties();
-    // TODO Support real deregister API, currently operation will drop the lance data store
-    //  if it created by create/create-empty API. If the table is registered only, it will only
-    //  deregister the table metadata.
-    catalog.asTableCatalog().dropTable(tableIdentifier);
+    // TODO Support real deregister API.
+    catalog.asTableCatalog().purgeTable(tableIdentifier);
 
     DeregisterTableResponse response = new DeregisterTableResponse();
     response.setProperties(properties);
