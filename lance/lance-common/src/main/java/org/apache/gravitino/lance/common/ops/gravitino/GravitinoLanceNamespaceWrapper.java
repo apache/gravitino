@@ -495,7 +495,7 @@ public class GravitinoLanceNamespaceWrapper extends NamespaceWrapper
       String namespaceId, String delimiter, String pageToken, Integer limit) {
     ObjectIdentifier nsId = ObjectIdentifier.of(namespaceId, Pattern.quote(delimiter));
     Preconditions.checkArgument(
-        nsId.levels() <= 2, "Expected at most 2-level namespace but got: %s", nsId.levels());
+        nsId.levels() == 2, "Expected 2-level namespace but got: %s", nsId.levels());
     String catalogName = nsId.levelAtListPos(0);
     Catalog catalog = loadAndValidateLakehouseCatalog(catalogName);
     String schemaName = nsId.levelAtListPos(1);
@@ -519,7 +519,7 @@ public class GravitinoLanceNamespaceWrapper extends NamespaceWrapper
   public DescribeTableResponse describeTable(String tableId, String delimiter) {
     ObjectIdentifier nsId = ObjectIdentifier.of(tableId, Pattern.quote(delimiter));
     Preconditions.checkArgument(
-        nsId.levels() <= 3, "Expected at most 3-level namespace but got: %s", nsId.levels());
+        nsId.levels() == 3, "Expected at 3-level namespace but got: %s", nsId.levels());
 
     String catalogName = nsId.levelAtListPos(0);
     Catalog catalog = loadAndValidateLakehouseCatalog(catalogName);
@@ -544,7 +544,7 @@ public class GravitinoLanceNamespaceWrapper extends NamespaceWrapper
       byte[] arrowStreamBody) {
     ObjectIdentifier nsId = ObjectIdentifier.of(tableId, Pattern.quote(delimiter));
     Preconditions.checkArgument(
-        nsId.levels() <= 3, "Expected at most 3-level namespace but got: %s", nsId.levels());
+        nsId.levels() == 3, "Expected at 3-level namespace but got: %s", nsId.levels());
 
     // Parser column information.
     List<Column> columns = Lists.newArrayList();
@@ -615,7 +615,7 @@ public class GravitinoLanceNamespaceWrapper extends NamespaceWrapper
       String tableId, String mode, String delimiter, Map<String, String> tableProperties) {
     ObjectIdentifier nsId = ObjectIdentifier.of(tableId, Pattern.quote(delimiter));
     Preconditions.checkArgument(
-        nsId.levels() <= 3, "Expected at most 3-level namespace but got: %s", nsId.levels());
+        nsId.levels() == 3, "Expected at 3-level namespace but got: %s", nsId.levels());
 
     String catalogName = nsId.levelAtListPos(0);
     Catalog catalog = loadAndValidateLakehouseCatalog(catalogName);
@@ -654,7 +654,7 @@ public class GravitinoLanceNamespaceWrapper extends NamespaceWrapper
 
     ObjectIdentifier nsId = ObjectIdentifier.of(tableId, Pattern.quote(delimiter));
     Preconditions.checkArgument(
-        nsId.levels() <= 3, "Expected at most 3-level namespace but got: %s", nsId.levels());
+        nsId.levels() == 3, "Expected at 3-level namespace but got: %s", nsId.levels());
 
     String catalogName = nsId.levelAtListPos(0);
     Catalog catalog = loadAndValidateLakehouseCatalog(catalogName);

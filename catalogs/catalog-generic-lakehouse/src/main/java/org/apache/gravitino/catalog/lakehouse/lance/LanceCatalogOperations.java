@@ -73,14 +73,12 @@ import org.apache.gravitino.utils.PrincipalUtils;
 public class LanceCatalogOperations implements LakehouseCatalogOperations {
 
   private EntityStore store;
-  private HasPropertyMetadata propertyMetadata;
 
   @Override
   public void initialize(
       Map<String, String> config, CatalogInfo info, HasPropertyMetadata propertiesMetadata)
       throws RuntimeException {
     store = GravitinoEnv.getInstance().entityStore();
-    this.propertyMetadata = propertiesMetadata;
   }
 
   @Override
