@@ -149,8 +149,25 @@ public class TestDynamicIcebergConfigProvider {
     Map<String, String> icebergCatalogProperties =
         icebergCatalogConfig.get().getIcebergCatalogProperties();
     Assertions.assertEquals(icebergCatalogProperties.get(customKey1), customValue1);
-    Assertions.assertFalse(icebergCatalogProperties.containsKey(customKey2));
+    Assertions.assertTrue(icebergCatalogProperties.containsKey(customKey2));
     Assertions.assertEquals(
         icebergCatalogProperties.get(IcebergConstants.CATALOG_BACKEND_NAME), customCatalogName);
+  }
+
+  @Test
+  void testIcebergConfig() {
+    Map<String, String> catalogProperties = new HashMap<>();
+    catalogProperties.put("catalog.backend", "custom");
+    catalogProperties.put("catalog.backend-name", "custom_backend");
+    catalogProperties.put("gravitino.bypass.custom-k1", "custom-v1");
+    catalogProperties.put("custom-k2", "custom-v2");
+
+    IcebergConfig icebergConfig =
+        DynamicIcebergConfigProvider.getIcebergConfigFromCatalogProperties(catalogProperties);
+    Assertions.assertEquals(
+        icebergConfig.getIcebergCatalogProperties().get("custom-k1"), "custom-v1");
+    Assertions.assertTrue(icebergConfig.getIcebergCatalogProperties().containsKey("custom-k2"));
+    Assertions.assertEquals(
+        icebergConfig.getIcebergCatalogProperties().get("catalog.backend-name"), "custom_backend");
   }
 }
