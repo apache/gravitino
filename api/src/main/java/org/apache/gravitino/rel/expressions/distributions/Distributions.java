@@ -242,7 +242,7 @@ public class Distributions {
        *
        * @return The created distribution.
        */
-      public Distribution build() {
+      public DistributionImpl build() {
         return new DistributionImpl(strategy, number, expressions);
       }
     }
