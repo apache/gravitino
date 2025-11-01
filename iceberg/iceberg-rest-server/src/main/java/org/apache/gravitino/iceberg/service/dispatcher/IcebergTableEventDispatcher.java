@@ -39,6 +39,9 @@ import org.apache.gravitino.listener.api.event.IcebergLoadTableCredentialPreEven
 import org.apache.gravitino.listener.api.event.IcebergLoadTableEvent;
 import org.apache.gravitino.listener.api.event.IcebergLoadTableFailureEvent;
 import org.apache.gravitino.listener.api.event.IcebergLoadTablePreEvent;
+import org.apache.gravitino.listener.api.event.IcebergPlanTableScanEvent;
+import org.apache.gravitino.listener.api.event.IcebergPlanTableScanFailureEvent;
+import org.apache.gravitino.listener.api.event.IcebergPlanTableScanPreEvent;
 import org.apache.gravitino.listener.api.event.IcebergRenameTableEvent;
 import org.apache.gravitino.listener.api.event.IcebergRenameTableFailureEvent;
 import org.apache.gravitino.listener.api.event.IcebergRenameTablePreEvent;
@@ -52,11 +55,13 @@ import org.apache.gravitino.listener.api.event.IcebergUpdateTablePreEvent;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.rest.requests.CreateTableRequest;
+import org.apache.iceberg.rest.requests.PlanTableScanRequest;
 import org.apache.iceberg.rest.requests.RenameTableRequest;
 import org.apache.iceberg.rest.requests.UpdateTableRequest;
 import org.apache.iceberg.rest.responses.ListTablesResponse;
 import org.apache.iceberg.rest.responses.LoadCredentialsResponse;
 import org.apache.iceberg.rest.responses.LoadTableResponse;
+import org.apache.iceberg.rest.responses.PlanTableScanResponse;
 
 /**
  * {@code IcebergTableEventDispatcher} is a decorator for {@link IcebergTableOperationExecutor} that
@@ -262,5 +267,37 @@ public class IcebergTableEventDispatcher implements IcebergTableOperationDispatc
     }
     eventBus.dispatchEvent(new IcebergLoadTableCredentialEvent(context, gravitinoNameIdentifier));
     return loadCredentialsResponse;
+  }
+
+  /**
+   * Plan table scan and return scan tasks.
+   *
+   * <p>Dispatches pre/post events for table scan planning operation.
+   *
+   * @param context Iceberg REST request context information.
+   * @param tableIdentifier The Iceberg table identifier.
+   * @param scanRequest The scan request parameters
+   * @return A PlanTableScanResponse containing the scan plan with plan-id and tasks
+   */
+  @Override
+  public PlanTableScanResponse planTableScan(
+      IcebergRequestContext context,
+      TableIdentifier tableIdentifier,
+      PlanTableScanRequest scanRequest) {
+    NameIdentifier gravitinoNameIdentifier =
+        IcebergRestUtils.getGravitinoNameIdentifier(
+            metalakeName, context.catalogName(), tableIdentifier);
+    eventBus.dispatchEvent(new IcebergPlanTableScanPreEvent(context, gravitinoNameIdentifier));
+    PlanTableScanResponse planTableScanResponse;
+    try {
+      planTableScanResponse =
+          icebergTableOperationDispatcher.planTableScan(context, tableIdentifier, scanRequest);
+    } catch (Exception e) {
+      eventBus.dispatchEvent(
+          new IcebergPlanTableScanFailureEvent(context, gravitinoNameIdentifier, e));
+      throw e;
+    }
+    eventBus.dispatchEvent(new IcebergPlanTableScanEvent(context, gravitinoNameIdentifier));
+    return planTableScanResponse;
   }
 }
