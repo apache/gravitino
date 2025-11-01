@@ -43,6 +43,7 @@ import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.SupportsNamespaces;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.catalog.ViewCatalog;
+import org.apache.iceberg.jdbc.JdbcCatalogWithMetadataLocationSupport;
 import org.apache.iceberg.rest.CatalogHandlers;
 import org.apache.iceberg.rest.requests.CreateNamespaceRequest;
 import org.apache.iceberg.rest.requests.CreateTableRequest;
@@ -262,7 +263,18 @@ public class IcebergCatalogWrapper implements AutoCloseable {
   }
 
   public boolean supportsViewOperations() {
-    return catalog instanceof ViewCatalog;
+    if (!(catalog instanceof ViewCatalog)) {
+      return false;
+    }
+
+    // JDBC catalog only supports view operations from v1 schema version
+    if (catalog instanceof JdbcCatalogWithMetadataLocationSupport) {
+      JdbcCatalogWithMetadataLocationSupport jdbcCatalog =
+          (JdbcCatalogWithMetadataLocationSupport) catalog;
+      return jdbcCatalog.supportsViewsWithSchemaVersion();
+    }
+
+    return true;
   }
 
   @Override
