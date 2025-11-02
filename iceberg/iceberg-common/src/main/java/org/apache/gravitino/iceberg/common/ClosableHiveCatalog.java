@@ -22,7 +22,9 @@ package org.apache.gravitino.iceberg.common;
 import com.google.common.collect.Lists;
 import java.io.Closeable;
 import java.io.IOException;
+import java.lang.reflect.Field;
 import java.util.List;
+import org.apache.gravitino.iceberg.common.utils.IcebergHiveCachedClientPool;
 import org.apache.iceberg.hive.HiveCatalog;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -49,6 +51,11 @@ public class ClosableHiveCatalog extends HiveCatalog implements Closeable {
   public void close() throws IOException {
     // Do clean up work here. We need a mechanism to close the HiveCatalog; however, HiveCatalog
     // doesn't implement the Closeable interface.
+
+    // First, close the internal HiveCatalog client pool to prevent resource leaks
+    closeInternalClientPool();
+
+    // Then close any additional resources added via addResource()
     resources.forEach(
         resource -> {
           try {
@@ -59,5 +66,31 @@ public class ClosableHiveCatalog extends HiveCatalog implements Closeable {
             LOGGER.warn("Failed to close resource: {}", resource, e);
           }
         });
+  }
+
+  /**
+   * Close the internal HiveCatalog client pool using reflection. This is necessary because
+   * HiveCatalog doesn't provide a public API to close its client pool. We need to avoid closing
+   * IcebergHiveCachedClientPool twice (once here and once in resources list).
+   */
+  private void closeInternalClientPool() {
+    try {
+      Field clientsField = HiveCatalog.class.getDeclaredField("clients");
+      clientsField.setAccessible(true);
+      Object clientPool = clientsField.get(this);
+
+      if (clientPool != null && clientPool instanceof AutoCloseable) {
+        // Only close if it's NOT IcebergHiveCachedClientPool
+        if (!(clientPool instanceof IcebergHiveCachedClientPool)) {
+          ((AutoCloseable) clientPool).close();
+          LOGGER.info(
+              "Closed HiveCatalog internal client pool: {}", clientPool.getClass().getSimpleName());
+        }
+      }
+    } catch (NoSuchFieldException e) {
+      LOGGER.warn("Could not find 'clients' field in HiveCatalog, skipping cleanup", e);
+    } catch (Exception e) {
+      LOGGER.warn("Failed to close HiveCatalog internal client pool", e);
+    }
   }
 }
