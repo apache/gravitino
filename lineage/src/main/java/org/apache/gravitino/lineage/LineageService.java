@@ -65,10 +65,12 @@ public class LineageService implements LineageDispatcher, SupportsRESTPackages {
 
   @Override
   public boolean dispatchLineageEvent(OpenLineage.RunEvent runEvent) {
+    if (runEvent == null) {
+      return false;
+    }
     if (sinkManager.isHighWatermark()) {
       return false;
     }
-
     RunEvent newEvent = processor.process(runEvent);
     sinkManager.sink(newEvent);
     return true;
