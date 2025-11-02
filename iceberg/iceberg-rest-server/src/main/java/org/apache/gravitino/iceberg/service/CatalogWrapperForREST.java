@@ -136,9 +136,17 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
   }
 
   @Override
-  public void close() {
-    if (catalogCredentialManager != null) {
-      catalogCredentialManager.close();
+  public void close() throws Exception {
+    try {
+      if (catalogCredentialManager != null) {
+        catalogCredentialManager.close();
+      }
+    } finally {
+      // Call super.close() to release parent class resources including:
+      // 1. Close underlying catalog (JdbcCatalog, WrappedHiveCatalog, etc.)
+      // 2. Close metadata cache
+      // 3. Cleanup JDBC drivers and threads (MySQL AbandonedConnectionCleanupThread, etc.)
+      super.close();
     }
   }
 

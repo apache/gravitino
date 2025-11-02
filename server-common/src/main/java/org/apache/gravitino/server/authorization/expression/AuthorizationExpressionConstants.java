@@ -40,6 +40,13 @@ public class AuthorizationExpressionConstants {
                   ANY_USE_CATALOG && ANY_USE_SCHEMA  && (TABLE::OWNER || ANY_SELECT_TABLE || ANY_MODIFY_TABLE)
                   """;
 
+  public static final String alterTableAuthorizationExpression =
+      """
+                  ANY(OWNER, METALAKE, CATALOG) ||
+                  SCHEMA_OWNER_WITH_USE_CATALOG ||
+                  ANY_USE_CATALOG && ANY_USE_SCHEMA && (TABLE::OWNER || ANY_MODIFY_TABLE)
+                  """;
+
   public static final String loadTopicsAuthorizationExpression =
       """
           ANY(OWNER, METALAKE, CATALOG) ||
@@ -80,4 +87,6 @@ public class AuthorizationExpressionConstants {
               ANY_READ_FILESET ||
               ANY_WRITE_FILESET
                   """;
+
+  public static final String getOwnerExpression = "CAN_GET_OWNER";
 }

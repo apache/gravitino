@@ -28,6 +28,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.core.Response;
@@ -53,6 +54,7 @@ import org.apache.gravitino.server.web.rest.GroupOperations;
 import org.apache.gravitino.server.web.rest.MetalakeOperations;
 import org.apache.gravitino.server.web.rest.ModelOperations;
 import org.apache.gravitino.server.web.rest.OwnerOperations;
+import org.apache.gravitino.server.web.rest.PartitionOperations;
 import org.apache.gravitino.server.web.rest.PermissionOperations;
 import org.apache.gravitino.server.web.rest.RoleOperations;
 import org.apache.gravitino.server.web.rest.SchemaOperations;
@@ -92,7 +94,8 @@ public class GravitinoInterceptionService implements InterceptionService {
             PermissionOperations.class.getName(),
             RoleOperations.class.getName(),
             OwnerOperations.class.getName(),
-            StatisticOperations.class.getName()));
+            StatisticOperations.class.getName(),
+            PartitionOperations.class.getName()));
   }
 
   @Override
@@ -131,6 +134,7 @@ public class GravitinoInterceptionService implements InterceptionService {
         if (expressionAnnotation != null) {
           String expression = expressionAnnotation.expression();
           Object[] args = methodInvocation.getArguments();
+          String entityType = extractMetadataObjectTypeFromParameters(parameters, args);
           Map<Entity.EntityType, NameIdentifier> metadataContext =
               extractNameIdentifierFromParameters(parameters, args);
           Map<String, Object> pathParams = extractPathParamsFromParameters(parameters, args);
@@ -138,7 +142,10 @@ public class GravitinoInterceptionService implements InterceptionService {
               new AuthorizationExpressionEvaluator(expression);
           boolean authorizeResult =
               authorizationExpressionEvaluator.evaluate(
-                  metadataContext, pathParams, new AuthorizationRequestContext());
+                  metadataContext,
+                  pathParams,
+                  new AuthorizationRequestContext(),
+                  Optional.ofNullable(entityType));
           if (!authorizeResult) {
             MetadataObject.Type type = expressionAnnotation.accessMetadataType();
             NameIdentifier accessMetadataName =
@@ -320,6 +327,18 @@ public class GravitinoInterceptionService implements InterceptionService {
       }
       return pathParams;
     }
+  }
+
+  private static String extractMetadataObjectTypeFromParameters(
+      Parameter[] parameters, Object[] args) {
+    for (int i = 0; i < parameters.length; i++) {
+      Parameter parameter = parameters[i];
+      AuthorizationObjectType objectType = parameter.getAnnotation(AuthorizationObjectType.class);
+      if (objectType != null) {
+        return String.valueOf(args[i]).toUpperCase();
+      }
+    }
+    return null;
   }
 
   private static class ClassListFilter implements Filter {

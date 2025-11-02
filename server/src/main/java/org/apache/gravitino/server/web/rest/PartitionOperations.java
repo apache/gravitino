@@ -36,6 +36,8 @@ import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.Response;
+import org.apache.gravitino.Entity;
+import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.catalog.PartitionDispatcher;
 import org.apache.gravitino.dto.rel.partitions.PartitionDTO;
@@ -47,6 +49,9 @@ import org.apache.gravitino.dto.responses.PartitionResponse;
 import org.apache.gravitino.dto.util.DTOConverters;
 import org.apache.gravitino.metrics.MetricNames;
 import org.apache.gravitino.rel.partitions.Partition;
+import org.apache.gravitino.server.authorization.annotations.AuthorizationExpression;
+import org.apache.gravitino.server.authorization.annotations.AuthorizationMetadata;
+import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants;
 import org.apache.gravitino.server.web.Utils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -67,11 +72,15 @@ public class PartitionOperations {
   @Produces("application/vnd.gravitino.v1+json")
   @Timed(name = "list-partition-name." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "list-partition-name", absolute = true)
+  @AuthorizationExpression(
+      expression = AuthorizationExpressionConstants.loadTableAuthorizationExpression,
+      accessMetadataType = MetadataObject.Type.TABLE)
   public Response listPartitionNames(
-      @PathParam("metalake") String metalake,
-      @PathParam("catalog") String catalog,
-      @PathParam("schema") String schema,
-      @PathParam("table") String table,
+      @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
+          String metalake,
+      @PathParam("catalog") @AuthorizationMetadata(type = Entity.EntityType.CATALOG) String catalog,
+      @PathParam("schema") @AuthorizationMetadata(type = Entity.EntityType.SCHEMA) String schema,
+      @PathParam("table") @AuthorizationMetadata(type = Entity.EntityType.TABLE) String table,
       @QueryParam("details") @DefaultValue("false") boolean verbose) {
     LOG.info(
         "Received list partition {} request for table: {}.{}.{}.{}",
@@ -119,11 +128,15 @@ public class PartitionOperations {
   @Produces("application/vnd.gravitino.v1+json")
   @Timed(name = "get-partition." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "get-partition", absolute = true)
+  @AuthorizationExpression(
+      expression = AuthorizationExpressionConstants.loadTableAuthorizationExpression,
+      accessMetadataType = MetadataObject.Type.TABLE)
   public Response getPartition(
-      @PathParam("metalake") String metalake,
-      @PathParam("catalog") String catalog,
-      @PathParam("schema") String schema,
-      @PathParam("table") String table,
+      @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
+          String metalake,
+      @PathParam("catalog") @AuthorizationMetadata(type = Entity.EntityType.CATALOG) String catalog,
+      @PathParam("schema") @AuthorizationMetadata(type = Entity.EntityType.SCHEMA) String schema,
+      @PathParam("table") @AuthorizationMetadata(type = Entity.EntityType.TABLE) String table,
       @PathParam("partition") String partition) {
     LOG.info(
         "Received get partition request for partition[{}] of table[{}.{}.{}.{}]",
@@ -157,11 +170,15 @@ public class PartitionOperations {
   @Produces("application/vnd.gravitino.v1+json")
   @Timed(name = "add-partitions." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "add-partitions", absolute = true)
+  @AuthorizationExpression(
+      expression = AuthorizationExpressionConstants.alterTableAuthorizationExpression,
+      accessMetadataType = MetadataObject.Type.TABLE)
   public Response addPartitions(
-      @PathParam("metalake") String metalake,
-      @PathParam("catalog") String catalog,
-      @PathParam("schema") String schema,
-      @PathParam("table") String table,
+      @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
+          String metalake,
+      @PathParam("catalog") @AuthorizationMetadata(type = Entity.EntityType.CATALOG) String catalog,
+      @PathParam("schema") @AuthorizationMetadata(type = Entity.EntityType.SCHEMA) String schema,
+      @PathParam("table") @AuthorizationMetadata(type = Entity.EntityType.TABLE) String table,
       AddPartitionsRequest request) {
     LOG.info(
         "Received add {} partition(s) request for table {}.{}.{}.{} ",
@@ -197,11 +214,15 @@ public class PartitionOperations {
   @Produces("application/vnd.gravitino.v1+json")
   @Timed(name = "drop-partition." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "drop-partition", absolute = true)
+  @AuthorizationExpression(
+      expression = AuthorizationExpressionConstants.alterTableAuthorizationExpression,
+      accessMetadataType = MetadataObject.Type.TABLE)
   public Response dropPartition(
-      @PathParam("metalake") String metalake,
-      @PathParam("catalog") String catalog,
-      @PathParam("schema") String schema,
-      @PathParam("table") String table,
+      @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
+          String metalake,
+      @PathParam("catalog") @AuthorizationMetadata(type = Entity.EntityType.CATALOG) String catalog,
+      @PathParam("schema") @AuthorizationMetadata(type = Entity.EntityType.SCHEMA) String schema,
+      @PathParam("table") @AuthorizationMetadata(type = Entity.EntityType.TABLE) String table,
       @PathParam("partition") String partition,
       @QueryParam("purge") @DefaultValue("false") boolean purge) {
     LOG.info(

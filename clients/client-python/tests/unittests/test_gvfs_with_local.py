@@ -93,7 +93,9 @@ class TestLocalFilesystem(unittest.TestCase):
             options=options,
             skip_instance_cache=True,
         )
-        headers = fs._operations._client._rest_client.request_headers
+        # Trigger lazy client initialization
+        client = fs._operations._get_gravitino_client()
+        headers = client._rest_client.request_headers
         self.assertEqual(headers["k1"], "v1")
 
     def test_request_timeout(self, *mock_methods):
@@ -102,7 +104,9 @@ class TestLocalFilesystem(unittest.TestCase):
             metalake_name="metalake_demo",
             skip_instance_cache=True,
         )
-        self.assertEqual(fs._operations._client._rest_client.timeout, TIMEOUT)
+        # Trigger lazy client initialization
+        client = fs._operations._get_gravitino_client()
+        self.assertEqual(client._rest_client.timeout, TIMEOUT)
 
         options = {
             f"{GVFSConfig.GVFS_FILESYSTEM_CLIENT_CONFIG_PREFIX}request_timeout": 60,
@@ -113,7 +117,9 @@ class TestLocalFilesystem(unittest.TestCase):
             options=options,
             skip_instance_cache=True,
         )
-        self.assertEqual(fs._operations._client._rest_client.timeout, 60)
+        # Trigger lazy client initialization
+        client = fs._operations._get_gravitino_client()
+        self.assertEqual(client._rest_client.timeout, 60)
 
     def test_cache(self, *mock_methods):
         fileset_storage_location = f"{self._fileset_dir}/test_cache"
@@ -163,7 +169,9 @@ class TestLocalFilesystem(unittest.TestCase):
             options=options,
             skip_instance_cache=True,
         )
-        token = fs._operations._client._rest_client.auth_data_provider.get_token_data()
+        # Trigger lazy client initialization
+        client = fs._operations._get_gravitino_client()
+        token = client._rest_client.auth_data_provider.get_token_data()
         token_string = base64.b64decode(
             token.decode("utf-8")[len(AuthConstants.AUTHORIZATION_BASIC_HEADER) :]
         ).decode("utf-8")
@@ -225,12 +233,14 @@ class TestLocalFilesystem(unittest.TestCase):
             return_value=mock_authentication_with_error_authentication_type(),
         ):
             with self.assertRaises(IllegalArgumentException):
-                gvfs.GravitinoVirtualFileSystem(
+                fs = gvfs.GravitinoVirtualFileSystem(
                     server_uri=self._server_uri,
                     metalake_name=self._metalake_name,
                     options=fs_options,
                     skip_instance_cache=True,
                 )
+                # Trigger lazy client initialization to get the exception
+                fs._operations._get_gravitino_client()
 
         # test bad request
         with patch(
@@ -238,12 +248,14 @@ class TestLocalFilesystem(unittest.TestCase):
             return_value=mock_authentication_invalid_grant_error(),
         ):
             with self.assertRaises(BadRequestException):
-                gvfs.GravitinoVirtualFileSystem(
+                fs = gvfs.GravitinoVirtualFileSystem(
                     server_uri=self._server_uri,
                     metalake_name=self._metalake_name,
                     options=fs_options,
                     skip_instance_cache=True,
                 )
+                # Trigger lazy client initialization to get the exception
+                fs._operations._get_gravitino_client()
 
     def test_ls(self, *mock_methods):
         fileset_storage_location = f"{self._fileset_dir}/test_ls"

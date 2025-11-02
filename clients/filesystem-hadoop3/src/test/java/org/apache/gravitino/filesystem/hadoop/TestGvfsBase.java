@@ -33,7 +33,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -46,6 +46,7 @@ import static org.mockserver.model.HttpRequest.request;
 import static org.mockserver.model.HttpResponse.response;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.github.benmanes.caffeine.cache.Cache;
 import com.google.common.collect.ImmutableMap;
 import java.io.FileNotFoundException;
 import java.io.IOException;
@@ -60,9 +61,7 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.concurrent.TimeUnit;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Version;
 import org.apache.gravitino.dto.AuditDTO;
@@ -290,6 +289,11 @@ public class TestGvfsBase extends GravitinoMockServerBase {
                 .withBody(getJsonString(new VersionResponse(Version.getCurrentVersionDTO()))));
 
     try (FileSystem fs = new Path("gvfs://fileset/").getFileSystem(configuration)) {
+      // Trigger lazy initialization by accessing a path (throws RESTException for mock server 404)
+      assertThrows(
+          RESTException.class,
+          () -> fs.exists(new Path("gvfs://fileset/catalog/schema/fileset/file.txt")));
+      // Verify the request was made with correct headers during client initialization
       mockServer().verify(req, VerificationTimes.once());
     }
   }
@@ -338,15 +342,19 @@ public class TestGvfsBase extends GravitinoMockServerBase {
       buildMockResourceForCredential(filesetName, localPath.toString());
 
       FileSystemTestUtils.mkdirs(managedFilesetPath, gravitinoFileSystem);
-      FileSystem proxyLocalFs =
-          Objects.requireNonNull(
-              ((GravitinoVirtualFileSystem) gravitinoFileSystem)
-                  .getOperations()
-                  .internalFileSystemCache()
-                  .getIfPresent(
-                      Pair.of(
-                          NameIdentifier.of(metalakeName, catalogName, schemaName, "testFSCache"),
-                          null)));
+
+      // Verify the internal cache contains a FileSystem for the local scheme
+      Cache<BaseGVFSOperations.FileSystemCacheKey, FileSystem> cache =
+          ((GravitinoVirtualFileSystem) gravitinoFileSystem)
+              .getOperations()
+              .internalFileSystemCache();
+
+      // The cache should have one entry for the local filesystem
+      assertEquals(1, cache.asMap().size());
+
+      // Get the cached filesystem (should be a local filesystem)
+      FileSystem proxyLocalFs = cache.asMap().values().iterator().next();
+      assertNotNull(proxyLocalFs);
 
       String anotherFilesetName = "test_new_fs";
       Path diffLocalPath =
@@ -396,11 +404,71 @@ public class TestGvfsBase extends GravitinoMockServerBase {
                           .asMap()
                           .size()));
 
-      assertNull(
+      // Verify the cache is empty after eviction
+      assertTrue(
           ((GravitinoVirtualFileSystem) fs)
               .getOperations()
               .internalFileSystemCache()
-              .getIfPresent(Pair.of(NameIdentifier.of("file"), LOCATION_NAME_UNKNOWN)));
+              .asMap()
+              .isEmpty());
+    }
+  }
+
+  @Test
+  public void testCacheReuseAcrossMultipleFilesets() throws IOException {
+    // Create two different filesets that point to the same local directory
+    String fileset1Name = "fileset_cache_reuse_1";
+    String fileset2Name = "fileset_cache_reuse_2";
+
+    // Both filesets point to the same underlying local path
+    Path localPath =
+        FileSystemTestUtils.createLocalDirPrefix(catalogName, schemaName, "shared_cache");
+
+    Path filesetPath1 =
+        FileSystemTestUtils.createFilesetPath(catalogName, schemaName, fileset1Name, true);
+    Path filesetPath2 =
+        FileSystemTestUtils.createFilesetPath(catalogName, schemaName, fileset2Name, true);
+
+    String locationPath1 =
+        String.format(
+            "/api/metalakes/%s/catalogs/%s/schemas/%s/filesets/%s/location",
+            metalakeName, catalogName, schemaName, fileset1Name);
+    String locationPath2 =
+        String.format(
+            "/api/metalakes/%s/catalogs/%s/schemas/%s/filesets/%s/location",
+            metalakeName, catalogName, schemaName, fileset2Name);
+
+    try (FileSystem fs = filesetPath1.getFileSystem(conf)) {
+      // Mock server responses for both filesets pointing to the same location
+      FileLocationResponse fileLocationResponse = new FileLocationResponse(localPath.toString());
+      Map<String, String> queryParams = new HashMap<>();
+      queryParams.put("sub_path", "");
+
+      buildMockResource(Method.GET, locationPath1, queryParams, null, fileLocationResponse, SC_OK);
+      buildMockResource(Method.GET, locationPath2, queryParams, null, fileLocationResponse, SC_OK);
+      buildMockResourceForCredential(fileset1Name, localPath.toString());
+      buildMockResourceForCredential(fileset2Name, localPath.toString());
+
+      // Access first fileset
+      FileSystemTestUtils.mkdirs(filesetPath1, fs);
+
+      Cache<BaseGVFSOperations.FileSystemCacheKey, FileSystem> cache =
+          ((GravitinoVirtualFileSystem) fs).getOperations().internalFileSystemCache();
+
+      // Should have one cached filesystem for the local scheme
+      assertEquals(1, cache.asMap().size());
+      FileSystem cachedFs1 = cache.asMap().values().iterator().next();
+      assertNotNull(cachedFs1);
+
+      // Access second fileset pointing to the same location
+      FileSystemTestUtils.mkdirs(filesetPath2, fs);
+
+      // Should still have only one cached filesystem (reused)
+      assertEquals(1, cache.asMap().size());
+      FileSystem cachedFs2 = cache.asMap().values().iterator().next();
+
+      // Both should be the same instance since they share scheme/authority/user
+      assertSame(cachedFs1, cachedFs2, "FileSystem instances should be reused for same storage");
     }
   }
 
@@ -1011,7 +1079,10 @@ public class TestGvfsBase extends GravitinoMockServerBase {
         Assertions.assertThrows(
             IllegalArgumentException.class,
             () -> {
-              try (FileSystem fs = new Path("gvfs://fileset/").getFileSystem(configuration)) {}
+              try (FileSystem fs = new Path("gvfs://fileset/").getFileSystem(configuration)) {
+                // Trigger lazy initialization by accessing a path
+                fs.exists(new Path("gvfs://fileset/catalog/schema/fileset/file.txt"));
+              }
             });
     Assertions.assertEquals(
         "Invalid property for client: gravitino.client.xxxx", throwable.getMessage());
@@ -1037,7 +1108,10 @@ public class TestGvfsBase extends GravitinoMockServerBase {
         Assertions.assertThrows(
             RESTException.class,
             () -> {
-              try (FileSystem fs = new Path("gvfs://fileset/").getFileSystem(configuration)) {}
+              try (FileSystem fs = new Path("gvfs://fileset/").getFileSystem(configuration)) {
+                // Trigger lazy initialization by accessing a path
+                fs.exists(new Path("gvfs://fileset/catalog/schema/fileset/file.txt"));
+              }
             });
     Assertions.assertInstanceOf(SocketTimeoutException.class, throwable.getCause());
     Assertions.assertEquals("Read timed out", throwable.getCause().getMessage());
