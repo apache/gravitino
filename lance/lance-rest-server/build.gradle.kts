@@ -64,7 +64,6 @@ dependencies {
   testImplementation(libs.awaitility)
   testImplementation(libs.commons.io)
   testImplementation(libs.lance.namespace.core)
-  testImplementation(libs.lance.namespace.apache.client)
   testImplementation(libs.junit.jupiter.api)
   testImplementation(libs.postgresql.driver)
   testImplementation(libs.mysql.driver)

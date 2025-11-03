@@ -18,24 +18,24 @@
  */
 package org.apache.gravitino.lance.integration.test;
 
-import com.google.common.base.Joiner;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import com.lancedb.lance.namespace.client.apache.ApiClient;
 import com.lancedb.lance.namespace.client.apache.ApiException;
-import com.lancedb.lance.namespace.client.apache.api.NamespaceApi;
-import com.lancedb.lance.namespace.client.apache.api.TableApi;
 import com.lancedb.lance.namespace.model.CreateEmptyTableRequest;
 import com.lancedb.lance.namespace.model.CreateEmptyTableResponse;
+import com.lancedb.lance.namespace.model.CreateTableRequest;
 import com.lancedb.lance.namespace.model.CreateTableResponse;
 import com.lancedb.lance.namespace.model.DeregisterTableRequest;
 import com.lancedb.lance.namespace.model.DeregisterTableResponse;
 import com.lancedb.lance.namespace.model.DescribeTableRequest;
 import com.lancedb.lance.namespace.model.DescribeTableResponse;
 import com.lancedb.lance.namespace.model.JsonArrowField;
+import com.lancedb.lance.namespace.model.ListTablesRequest;
 import com.lancedb.lance.namespace.model.RegisterTableRequest;
 import com.lancedb.lance.namespace.model.RegisterTableRequest.ModeEnum;
 import com.lancedb.lance.namespace.model.RegisterTableResponse;
+import com.lancedb.lance.namespace.rest.RestNamespace;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -45,6 +45,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import org.apache.arrow.memory.RootAllocator;
 import org.apache.arrow.vector.types.pojo.ArrowType;
 import org.apache.arrow.vector.types.pojo.Field;
 import org.apache.arrow.vector.types.pojo.Schema;
@@ -59,6 +60,7 @@ import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.testcontainers.shaded.com.google.common.base.Joiner;
 
 @Tag("gravitino-docker-test")
 public class LanceRESTServiceIT extends BaseIT {
@@ -72,8 +74,7 @@ public class LanceRESTServiceIT extends BaseIT {
   protected GravitinoMetalake metalake;
   protected Catalog catalog;
   private String tempDirectory;
-  private TableApi tableApi;
-  private NamespaceApi namespaceApi;
+  private RestNamespace restNameSpace;
 
   @BeforeAll
   public void setup() throws Exception {
@@ -90,15 +91,18 @@ public class LanceRESTServiceIT extends BaseIT {
     file.deleteOnExit();
 
     ApiClient apiClient = new ApiClient();
+    String uri = DEFAULT_LANCE_REST_URL;
     if (serverConfig.getAllConfig().containsKey("gravitino.lance-rest.httpPort")) {
       int port = Integer.parseInt(serverConfig.getAllConfig().get("gravitino.lance-rest.httpPort"));
-      apiClient.setBasePath("http://localhost:" + port + "/lance");
+      uri = "http://localhost:" + port + "/lance";
       LOG.info("Lance REST HTTP Port: {}", port);
-    } else {
-      apiClient.setBasePath(DEFAULT_LANCE_REST_URL);
     }
-    tableApi = new TableApi(apiClient);
-    namespaceApi = new NamespaceApi(apiClient);
+    apiClient.setBasePath(uri);
+
+    restNameSpace = new RestNamespace();
+    Map<String, String> configs = ImmutableMap.of("delimiter", ".", "uri", uri);
+
+    restNameSpace.initialize(configs, new RootAllocator());
   }
 
   public void startIntegrationTest() throws Exception {
@@ -130,29 +134,27 @@ public class LanceRESTServiceIT extends BaseIT {
 
   @Test
   void testCreateEmptyTable() throws ApiException {
-    String delimiter = ".";
-    String ids = Joiner.on(delimiter).join(CATALOG_NAME, SCHEMA_NAME, "empty_table");
     CreateEmptyTableRequest request = new CreateEmptyTableRequest();
     String location = tempDirectory + "/" + "empty_table/";
     request.setLocation(location);
     request.setProperties(ImmutableMap.of());
+    request.setId(List.of(CATALOG_NAME, SCHEMA_NAME, "empty_table"));
 
-    CreateEmptyTableResponse response = tableApi.createEmptyTable(ids, request, delimiter);
+    CreateEmptyTableResponse response = restNameSpace.createEmptyTable(request);
     Assertions.assertNotNull(response);
 
     DescribeTableRequest describeTableRequest = new DescribeTableRequest();
+    describeTableRequest.setId(List.of(CATALOG_NAME, SCHEMA_NAME, "empty_table"));
 
-    DescribeTableResponse loadTable = tableApi.describeTable(ids, describeTableRequest, delimiter);
+    DescribeTableResponse loadTable = restNameSpace.describeTable(describeTableRequest);
     Assertions.assertNotNull(loadTable);
     Assertions.assertEquals(location, loadTable.getLocation());
   }
 
   @Test
   void testCreateTable() throws IOException, ApiException {
-    String delimiter = ".";
-    String ids = Joiner.on(delimiter).join(CATALOG_NAME, SCHEMA_NAME, "table");
     String location = tempDirectory + "/" + "table/";
-
+    List<String> ids = List.of(CATALOG_NAME, SCHEMA_NAME, "table");
     // TODO add more types here to verify it's okay.
     Schema schema =
         new Schema(
@@ -161,13 +163,16 @@ public class LanceRESTServiceIT extends BaseIT {
                 Field.nullable("value", new ArrowType.Utf8())));
     byte[] body = ArrowUtils.generateIpcStream(schema);
 
-    CreateTableResponse response =
-        tableApi.createTable(ids, body, delimiter, "create", location, "{}", ImmutableMap.of());
+    CreateTableRequest request = new CreateTableRequest();
+    request.setId(ids);
+    request.setLocation(location);
+    CreateTableResponse response = restNameSpace.createTable(request, body);
     Assertions.assertNotNull(response);
     Assertions.assertEquals(location, response.getLocation());
 
     DescribeTableRequest describeTableRequest = new DescribeTableRequest();
-    DescribeTableResponse loadTable = tableApi.describeTable(ids, describeTableRequest, delimiter);
+    describeTableRequest.setId(ids);
+    DescribeTableResponse loadTable = restNameSpace.describeTable(describeTableRequest);
     Assertions.assertNotNull(loadTable);
     Assertions.assertEquals(location, loadTable.getLocation());
 
@@ -188,67 +193,67 @@ public class LanceRESTServiceIT extends BaseIT {
 
     // Check overwrite mode
     String newLocation = tempDirectory + "/" + "table_new/";
-    response =
-        Assertions.assertDoesNotThrow(
-            () ->
-                tableApi.createTable(
-                    ids, body, delimiter, "overwrite", newLocation, "{}", ImmutableMap.of()));
+    request.setLocation(newLocation);
+    request.setMode(CreateTableRequest.ModeEnum.OVERWRITE);
+
+    response = Assertions.assertDoesNotThrow(() -> restNameSpace.createTable(request, body));
+
     Assertions.assertNotNull(response);
     Assertions.assertEquals(newLocation, response.getLocation());
     Assertions.assertTrue(new File(newLocation).exists());
     Assertions.assertFalse(new File(location).exists());
 
     // Check exist_ok mode
-    response =
-        Assertions.assertDoesNotThrow(
-            () ->
-                tableApi.createTable(
-                    ids, body, delimiter, "exist_ok", location, "{}", ImmutableMap.of()));
+    request.setMode(CreateTableRequest.ModeEnum.EXIST_OK);
+    response = Assertions.assertDoesNotThrow(() -> restNameSpace.createTable(request, body));
+
     Assertions.assertNotNull(response);
     Assertions.assertEquals(newLocation, response.getLocation());
     Assertions.assertTrue(new File(newLocation).exists());
 
     // Now test list tables
-    var listResponse =
-        namespaceApi.listTables(
-            Joiner.on(delimiter).join(CATALOG_NAME, SCHEMA_NAME), delimiter, null, null);
+    ListTablesRequest listRequest = new ListTablesRequest();
+    listRequest.setId(List.of(CATALOG_NAME, SCHEMA_NAME));
+    var listResponse = restNameSpace.listTables(listRequest);
     Set<String> stringSet = listResponse.getTables();
     Assertions.assertEquals(1, stringSet.size());
-    Assertions.assertTrue(stringSet.contains(ids));
+    Assertions.assertTrue(stringSet.contains(Joiner.on(".").join(ids)));
   }
 
   @Test
   void testRegisterTable() throws ApiException {
-    String delimiter = ".";
-    String ids = Joiner.on(delimiter).join(CATALOG_NAME, SCHEMA_NAME, "table_register");
     String location = tempDirectory + "/" + "register/";
+    List<String> ids = List.of(CATALOG_NAME, SCHEMA_NAME, "table_register");
     RegisterTableRequest registerTableRequest = new RegisterTableRequest();
     registerTableRequest.setLocation(location);
     registerTableRequest.setMode(ModeEnum.CREATE);
+    registerTableRequest.setId(ids);
+    registerTableRequest.setProperties(ImmutableMap.of("key1", "value1"));
 
-    RegisterTableResponse response =
-        tableApi.registerTable(ids, registerTableRequest, delimiter, ImmutableMap.of());
+    RegisterTableResponse response = restNameSpace.registerTable(registerTableRequest);
     Assertions.assertNotNull(response);
 
     DescribeTableRequest describeTableRequest = new DescribeTableRequest();
-    DescribeTableResponse loadTable = tableApi.describeTable(ids, describeTableRequest, delimiter);
+    describeTableRequest.setId(ids);
+    DescribeTableResponse loadTable = restNameSpace.describeTable(describeTableRequest);
     Assertions.assertNotNull(loadTable);
     Assertions.assertEquals(location, loadTable.getLocation());
+    Assertions.assertTrue(loadTable.getProperties().containsKey("key1"));
 
     // Test register again with OVERWRITE mode
     String newLocation = tempDirectory + "/" + "register_new/";
     registerTableRequest.setMode(ModeEnum.OVERWRITE);
     registerTableRequest.setLocation(newLocation);
     response =
-        Assertions.assertDoesNotThrow(
-            () -> tableApi.registerTable(ids, registerTableRequest, delimiter, ImmutableMap.of()));
+        Assertions.assertDoesNotThrow(() -> restNameSpace.registerTable(registerTableRequest));
     Assertions.assertNotNull(response);
     Assertions.assertEquals(newLocation, response.getLocation());
 
     // Test deregister table
     DeregisterTableRequest deregisterTableRequest = new DeregisterTableRequest();
+    deregisterTableRequest.setId(ids);
     DeregisterTableResponse deregisterTableResponse =
-        tableApi.deregisterTable(ids, deregisterTableRequest, delimiter);
+        restNameSpace.deregisterTable(deregisterTableRequest);
     Assertions.assertNotNull(deregisterTableResponse);
     Assertions.assertEquals(newLocation, deregisterTableResponse.getLocation());
   }

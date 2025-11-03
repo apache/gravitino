@@ -24,7 +24,7 @@ import static org.apache.gravitino.lance.service.ServiceConstants.LANCE_TABLE_PR
 
 import com.codahale.metrics.annotation.ResponseMetered;
 import com.codahale.metrics.annotation.Timed;
-import com.fasterxml.jackson.core.type.TypeReference;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import com.lancedb.lance.namespace.model.CreateEmptyTableRequest;
 import com.lancedb.lance.namespace.model.CreateTableRequest;
@@ -36,6 +36,7 @@ import com.lancedb.lance.namespace.model.RegisterTableRequest;
 import com.lancedb.lance.namespace.model.RegisterTableRequest.ModeEnum;
 import com.lancedb.lance.namespace.model.RegisterTableResponse;
 import com.lancedb.lance.namespace.util.JsonUtil;
+import java.util.HashMap;
 import java.util.Map;
 import javax.inject.Inject;
 import javax.ws.rs.Consumes;
@@ -50,6 +51,7 @@ import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.MultivaluedMap;
 import javax.ws.rs.core.Response;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.lance.common.ops.NamespaceWrapper;
 import org.apache.gravitino.lance.service.LanceExceptionMapper;
 import org.apache.gravitino.metrics.MetricNames;
@@ -100,8 +102,23 @@ public class LanceTableOperations {
       String tableLocation = headersMap.getFirst(LANCE_TABLE_LOCATION_HEADER);
       String tableProperties = headersMap.getFirst(LANCE_TABLE_PROPERTIES_PREFIX_HEADER);
       CreateTableRequest.ModeEnum modeEnum = CreateTableRequest.ModeEnum.fromValue(mode);
+
       Map<String, String> props =
-          JsonUtil.mapper().readValue(tableProperties, new TypeReference<>() {});
+          StringUtils.isBlank(tableProperties)
+              ? ImmutableMap.of()
+              : JsonUtil.parse(
+                  tableProperties,
+                  jsonNode -> {
+                    Map<String, String> map = new HashMap<>();
+                    jsonNode
+                        .fields()
+                        .forEachRemaining(
+                            entry -> {
+                              map.put(entry.getKey(), entry.getValue().asText());
+                            });
+                    return map;
+                  });
+
       CreateTableResponse response =
           lanceNamespace
               .asTableOps()

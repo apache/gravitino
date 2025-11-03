@@ -163,7 +163,6 @@ log4j-12-api = { group = "org.apache.logging.log4j", name = "log4j-1.2-api", ver
 log4j-layout-template-json = { group = "org.apache.logging.log4j", name = "log4j-layout-template-json", version.ref = "log4j" }
 lance = { group = "com.lancedb", name = "lance-core", version.ref = "lance" }
 lance-namespace-core = { group = "com.lancedb", name = "lance-namespace-core", version.ref = "lance-namespace" }
-lance-namespace-apache-client = { group = "com.lancedb", name = "lance-namespace-apache-client", version.ref = "lance-namespace" }
 jakarta-validation-api = { group = "jakarta.validation", name = "jakarta.validation-api", version.ref = "jakarta-validation" }
 jetty-server = { group = "org.eclipse.jetty", name = "jetty-server", version.ref = "jetty" }
 jetty-servlet = { group = "org.eclipse.jetty", name = "jetty-servlet", version.ref = "jetty" }
