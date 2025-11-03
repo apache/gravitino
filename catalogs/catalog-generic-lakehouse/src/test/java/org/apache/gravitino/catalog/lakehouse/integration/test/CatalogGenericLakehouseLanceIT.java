@@ -420,6 +420,9 @@ public class CatalogGenericLakehouseLanceIT extends BaseIT {
   }
 
   private void createMetalake() {
+    GravitinoMetalake[] gravitinoMetalakes = client.listMetalakes();
+    Assertions.assertEquals(0, gravitinoMetalakes.length);
+
     client.createMetalake(metalakeName, "comment", Collections.emptyMap());
     GravitinoMetalake loadMetalake = client.loadMetalake(metalakeName);
     Assertions.assertEquals(metalakeName, loadMetalake.name());
