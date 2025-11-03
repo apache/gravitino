@@ -55,11 +55,13 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.condition.EnabledIf;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 @Tag("gravitino-docker-test")
-@EnabledIf(value = "isDeploy", disabledReason = "Only run when deploy is true")
 public class LanceRESTServiceIT extends BaseIT {
+  private static final Logger LOG = LoggerFactory.getLogger(LanceRESTServiceIT.class);
+
   public static final String METALAKE_NAME = GravitinoITUtils.genRandomName("lance_reset_metalake");
   public static final String CATALOG_NAME = GravitinoITUtils.genRandomName("lance_rest_catalog");
   public static final String SCHEMA_NAME = GravitinoITUtils.genRandomName("lance_rest_schema");
@@ -72,6 +74,8 @@ public class LanceRESTServiceIT extends BaseIT {
 
   @BeforeAll
   public void setup() throws Exception {
+    startIntegrationTest();
+
     createMetalake();
     createCatalog();
     createSchema();
@@ -83,13 +87,20 @@ public class LanceRESTServiceIT extends BaseIT {
     file.deleteOnExit();
 
     ApiClient apiClient = new ApiClient();
-    apiClient.setBasePath(DEFAULT_LANCE_REST_URL);
+    if (serverConfig.getAllConfig().containsKey("gravitino.lance-rest.httpPort")) {
+      int port = Integer.parseInt(serverConfig.getAllConfig().get("gravitino.lance-rest.httpPort"));
+      apiClient.setBasePath("http://localhost:" + port + "/lance");
+      LOG.info("Lance REST HTTP Port: {}", port);
+    } else {
+      apiClient.setBasePath(DEFAULT_LANCE_REST_URL);
+    }
     tableApi = new TableApi(apiClient);
   }
 
-  protected void rewriteGravitinoServerConfig() throws IOException {
+  public void startIntegrationTest() throws Exception {
+    this.ignoreAuxRestService = false;
     customConfigs.put("gravitino.lance-rest.gravitino.metalake-name", METALAKE_NAME);
-    super.rewriteGravitinoServerConfig();
+    super.startIntegrationTest();
   }
 
   private void createMetalake() {

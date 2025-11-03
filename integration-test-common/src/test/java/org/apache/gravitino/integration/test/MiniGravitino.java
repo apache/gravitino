@@ -119,6 +119,14 @@ public class MiniGravitino {
     this.port = jettyServerConfig.getHttpPort();
     String URI = String.format("http://%s:%d", host, port);
 
+    // Add for lance rest service uri
+    if (!context.ignoreAuxRestService) {
+      properties.put("gravitino.lance-rest.gravitino.uri", URI);
+      serverConfig.loadFromProperties(properties);
+      ITUtils.overwriteConfigFile(
+          ITUtils.joinPath(mockConfDir.getAbsolutePath(), "gravitino.conf"), properties);
+    }
+
     List<String> authenticators = new ArrayList<>();
     String authenticatorStr = context.customConfig.get(Configs.AUTHENTICATORS.getKey());
     if (authenticatorStr != null) {
