@@ -21,6 +21,8 @@ package org.apache.gravitino.integration.test.util;
 import static org.apache.gravitino.Configs.ENTITY_RELATIONAL_JDBC_BACKEND_PATH;
 import static org.apache.gravitino.integration.test.util.TestDatabaseName.PG_CATALOG_POSTGRESQL_IT;
 import static org.apache.gravitino.integration.test.util.TestDatabaseName.PG_JDBC_BACKEND;
+import static org.apache.gravitino.lance.common.config.LanceConfig.LANCE_CONFIG_PREFIX;
+import static org.apache.gravitino.lance.common.config.LanceConfig.METALAKE_NAME;
 import static org.apache.gravitino.server.GravitinoServer.WEBSERVER_CONF_PREFIX;
 
 import com.google.common.base.Splitter;
@@ -131,6 +133,16 @@ public class BaseIT {
 
   public void registerCustomConfigs(Map<String, String> configs) {
     customConfigs.putAll(configs);
+  }
+
+  protected int getLanceRESTServerPort() {
+    JettyServerConfig lanceServerConfig =
+        JettyServerConfig.fromConfig(serverConfig, LANCE_CONFIG_PREFIX);
+    return lanceServerConfig.getHttpPort();
+  }
+
+  protected String getLanceRESTServerMetalakeName() {
+    return serverConfig.getRawString(LANCE_CONFIG_PREFIX + METALAKE_NAME.getKey());
   }
 
   private void rewriteGravitinoServerConfig() throws IOException {

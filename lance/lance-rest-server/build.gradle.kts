@@ -53,7 +53,21 @@ dependencies {
   implementation(libs.jackson.datatype.jdk8)
   implementation(libs.jackson.datatype.jsr310)
 
+  testImplementation(project(":clients:client-java"))
+  testImplementation(project(":server"))
+  testImplementation(project(":integration-test-common", "testArtifacts"))
+
+  testImplementation(libs.commons.io)
+  testImplementation(libs.jersey.test.framework.core) {
+    exclude(group = "org.junit.jupiter")
+  }
+  testImplementation(libs.jersey.test.framework.provider.jetty) {
+    exclude(group = "org.junit.jupiter")
+  }
+
   testImplementation(libs.junit.jupiter.api)
+  testImplementation(libs.mockito.inline)
+
   testRuntimeOnly(libs.junit.jupiter.engine)
 }
 
