@@ -27,6 +27,7 @@ import com.codahale.metrics.annotation.Timed;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.google.common.collect.Maps;
 import com.lancedb.lance.namespace.model.CreateEmptyTableRequest;
+import com.lancedb.lance.namespace.model.CreateTableRequest;
 import com.lancedb.lance.namespace.model.CreateTableResponse;
 import com.lancedb.lance.namespace.model.DeregisterTableRequest;
 import com.lancedb.lance.namespace.model.DeregisterTableResponse;
@@ -98,12 +99,13 @@ public class LanceTableOperations {
       MultivaluedMap<String, String> headersMap = headers.getRequestHeaders();
       String tableLocation = headersMap.getFirst(LANCE_TABLE_LOCATION_HEADER);
       String tableProperties = headersMap.getFirst(LANCE_TABLE_PROPERTIES_PREFIX_HEADER);
+      CreateTableRequest.ModeEnum modeEnum = CreateTableRequest.ModeEnum.fromValue(mode);
       Map<String, String> props =
           JsonUtil.mapper().readValue(tableProperties, new TypeReference<>() {});
       CreateTableResponse response =
           lanceNamespace
               .asTableOps()
-              .createTable(tableId, mode, delimiter, tableLocation, props, arrowStreamBody);
+              .createTable(tableId, modeEnum, delimiter, tableLocation, props, arrowStreamBody);
       return Response.ok(response).build();
     } catch (Exception e) {
       return LanceExceptionMapper.toRESTResponse(tableId, e);
@@ -116,7 +118,6 @@ public class LanceTableOperations {
   @ResponseMetered(name = "create-empty-table", absolute = true)
   public Response createEmptyTable(
       @PathParam("id") String tableId,
-      @QueryParam("mode") @DefaultValue("create") String mode, // create, exist_ok, overwrite
       @QueryParam("delimiter") @DefaultValue(NAMESPACE_DELIMITER_DEFAULT) String delimiter,
       CreateEmptyTableRequest request,
       @Context HttpHeaders headers) {
@@ -130,7 +131,13 @@ public class LanceTableOperations {
       CreateTableResponse response =
           lanceNamespace
               .asTableOps()
-              .createTable(tableId, mode, delimiter, tableLocation, props, null);
+              .createTable(
+                  tableId,
+                  CreateTableRequest.ModeEnum.CREATE,
+                  delimiter,
+                  tableLocation,
+                  props,
+                  null);
       return Response.ok(response).build();
     } catch (Exception e) {
       return LanceExceptionMapper.toRESTResponse(tableId, e);

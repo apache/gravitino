@@ -32,8 +32,8 @@ import com.google.common.collect.Sets;
 import com.lancedb.lance.namespace.LanceNamespaceException;
 import com.lancedb.lance.namespace.ObjectIdentifier;
 import com.lancedb.lance.namespace.model.CreateNamespaceRequest;
-import com.lancedb.lance.namespace.model.CreateNamespaceRequest.ModeEnum;
 import com.lancedb.lance.namespace.model.CreateNamespaceResponse;
+import com.lancedb.lance.namespace.model.CreateTableRequest;
 import com.lancedb.lance.namespace.model.CreateTableResponse;
 import com.lancedb.lance.namespace.model.DeregisterTableResponse;
 import com.lancedb.lance.namespace.model.DescribeNamespaceResponse;
@@ -48,7 +48,6 @@ import com.lancedb.lance.namespace.model.RegisterTableResponse;
 import com.lancedb.lance.namespace.util.CommonUtil;
 import com.lancedb.lance.namespace.util.JsonArrowSchemaConverter;
 import com.lancedb.lance.namespace.util.PageUtil;
-import java.io.ByteArrayInputStream;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -61,9 +60,6 @@ import java.util.function.IntFunction;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
-import org.apache.arrow.memory.BufferAllocator;
-import org.apache.arrow.memory.RootAllocator;
-import org.apache.arrow.vector.ipc.ArrowStreamReader;
 import org.apache.arrow.vector.types.pojo.Field;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Catalog;
@@ -538,7 +534,7 @@ public class GravitinoLanceNamespaceWrapper extends NamespaceWrapper
   @Override
   public CreateTableResponse createTable(
       String tableId,
-      String mode,
+      CreateTableRequest.ModeEnum mode,
       String delimiter,
       String tableLocation,
       Map<String, String> tableProperties,
@@ -563,12 +559,10 @@ public class GravitinoLanceNamespaceWrapper extends NamespaceWrapper
 
     Map<String, String> createTableProperties = Maps.newHashMap(tableProperties);
     createTableProperties.put("location", tableLocation);
-    createTableProperties.put("mode", mode);
+    createTableProperties.put("mode", mode.getValue());
     createTableProperties.put("format", "lance");
-    // TODO considering the mode (create, exist_ok, overwrite)
 
-    ModeEnum createMode = ModeEnum.fromValue(mode.toLowerCase());
-    switch (createMode) {
+    switch (mode) {
       case EXIST_OK:
         if (catalog.asTableCatalog().tableExists(tableIdentifier)) {
           CreateTableResponse response = new CreateTableResponse();
@@ -682,21 +676,6 @@ public class GravitinoLanceNamespaceWrapper extends NamespaceWrapper
 
     return JsonArrowSchemaConverter.convertToJsonArrowSchema(
         new org.apache.arrow.vector.types.pojo.Schema(fields));
-  }
-
-  @VisibleForTesting
-  org.apache.arrow.vector.types.pojo.Schema parseArrowIpcStream(byte[] stream) {
-    org.apache.arrow.vector.types.pojo.Schema schema;
-    try (BufferAllocator allocator = new RootAllocator();
-        ByteArrayInputStream bais = new ByteArrayInputStream(stream);
-        ArrowStreamReader reader = new ArrowStreamReader(bais, allocator)) {
-      schema = reader.getVectorSchemaRoot().getSchema();
-    } catch (Exception e) {
-      throw new RuntimeException("Failed to parse Arrow IPC stream", e);
-    }
-
-    Preconditions.checkArgument(schema != null, "No schema found in Arrow IPC stream");
-    return schema;
   }
 
   private List<Column> extractColumns(org.apache.arrow.vector.types.pojo.Schema arrowSchema) {

@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.lance.common.ops;
 
+import com.lancedb.lance.namespace.model.CreateTableRequest;
 import com.lancedb.lance.namespace.model.CreateTableResponse;
 import com.lancedb.lance.namespace.model.DeregisterTableResponse;
 import com.lancedb.lance.namespace.model.DescribeTableResponse;
@@ -31,7 +32,7 @@ public interface LanceTableOperations {
 
   CreateTableResponse createTable(
       String tableId,
-      String mode,
+      CreateTableRequest.ModeEnum mode,
       String delimiter,
       String tableLocation,
       Map<String, String> tableProperties,
