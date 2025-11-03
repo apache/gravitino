@@ -23,6 +23,7 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import com.lancedb.lance.namespace.client.apache.ApiClient;
 import com.lancedb.lance.namespace.client.apache.ApiException;
+import com.lancedb.lance.namespace.client.apache.api.NamespaceApi;
 import com.lancedb.lance.namespace.client.apache.api.TableApi;
 import com.lancedb.lance.namespace.model.CreateEmptyTableRequest;
 import com.lancedb.lance.namespace.model.CreateEmptyTableResponse;
@@ -43,6 +44,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.apache.arrow.vector.types.pojo.ArrowType;
 import org.apache.arrow.vector.types.pojo.Field;
 import org.apache.arrow.vector.types.pojo.Schema;
@@ -71,6 +73,7 @@ public class LanceRESTServiceIT extends BaseIT {
   protected Catalog catalog;
   private String tempDirectory;
   private TableApi tableApi;
+  private NamespaceApi namespaceApi;
 
   @BeforeAll
   public void setup() throws Exception {
@@ -95,6 +98,7 @@ public class LanceRESTServiceIT extends BaseIT {
       apiClient.setBasePath(DEFAULT_LANCE_REST_URL);
     }
     tableApi = new TableApi(apiClient);
+    namespaceApi = new NamespaceApi(apiClient);
   }
 
   public void startIntegrationTest() throws Exception {
@@ -203,6 +207,14 @@ public class LanceRESTServiceIT extends BaseIT {
     Assertions.assertNotNull(response);
     Assertions.assertEquals(newLocation, response.getLocation());
     Assertions.assertTrue(new File(newLocation).exists());
+
+    // Now test list tables
+    var listResponse =
+        namespaceApi.listTables(
+            Joiner.on(delimiter).join(CATALOG_NAME, SCHEMA_NAME), delimiter, null, null);
+    Set<String> stringSet = listResponse.getTables();
+    Assertions.assertEquals(1, stringSet.size());
+    Assertions.assertTrue(stringSet.contains(ids));
   }
 
   @Test
