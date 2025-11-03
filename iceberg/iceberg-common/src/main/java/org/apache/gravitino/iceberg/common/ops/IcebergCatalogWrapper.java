@@ -29,16 +29,21 @@ import lombok.Setter;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergCatalogBackend;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
+import org.apache.gravitino.iceberg.common.cache.SupportsMetadataLocation;
+import org.apache.gravitino.iceberg.common.cache.TableMetadataCache;
 import org.apache.gravitino.iceberg.common.utils.IcebergCatalogUtil;
+import org.apache.gravitino.utils.ClassUtils;
 import org.apache.gravitino.utils.IsolatedClassLoader;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.iceberg.TableMetadata;
 import org.apache.iceberg.Transaction;
 import org.apache.iceberg.catalog.Catalog;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.SupportsNamespaces;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.catalog.ViewCatalog;
+import org.apache.iceberg.jdbc.JdbcCatalogWithMetadataLocationSupport;
 import org.apache.iceberg.rest.CatalogHandlers;
 import org.apache.iceberg.rest.requests.CreateNamespaceRequest;
 import org.apache.iceberg.rest.requests.CreateTableRequest;
@@ -70,6 +75,7 @@ public class IcebergCatalogWrapper implements AutoCloseable {
   private final IcebergCatalogBackend catalogBackend;
   private String catalogUri = null;
   private Map<String, String> catalogPropertiesMap;
+  private TableMetadataCache metadataCache;
 
   public IcebergCatalogWrapper(IcebergConfig icebergConfig) {
     this.catalogBackend =
@@ -90,6 +96,7 @@ public class IcebergCatalogWrapper implements AutoCloseable {
       this.asNamespaceCatalog = (SupportsNamespaces) catalog;
     }
 
+    this.metadataCache = loadTableMetadataCache(icebergConfig, catalog);
     this.catalogPropertiesMap = icebergConfig.getIcebergCatalogProperties();
   }
 
@@ -163,19 +170,35 @@ public class IcebergCatalogWrapper implements AutoCloseable {
     if (request.stageCreate()) {
       return CatalogHandlers.stageTableCreate(catalog, namespace, request);
     }
-    return CatalogHandlers.createTable(catalog, namespace, request);
+    LoadTableResponse loadTableResponse = CatalogHandlers.createTable(catalog, namespace, request);
+    if (loadTableResponse != null) {
+      TableIdentifier tableIdentifier = TableIdentifier.of(namespace, request.name());
+      metadataCache.updateTableMetadata(tableIdentifier, loadTableResponse.tableMetadata());
+    }
+    return loadTableResponse;
   }
 
   public void dropTable(TableIdentifier tableIdentifier) {
+    metadataCache.invalidate(tableIdentifier);
     CatalogHandlers.dropTable(catalog, tableIdentifier);
   }
 
   public void purgeTable(TableIdentifier tableIdentifier) {
+    metadataCache.invalidate(tableIdentifier);
     CatalogHandlers.purgeTable(catalog, tableIdentifier);
   }
 
   public LoadTableResponse loadTable(TableIdentifier tableIdentifier) {
-    return CatalogHandlers.loadTable(catalog, tableIdentifier);
+    Optional<TableMetadata> tableMetadataOptional = metadataCache.getTableMetadata(tableIdentifier);
+    if (tableMetadataOptional.isPresent()) {
+      return LoadTableResponse.builder().withTableMetadata(tableMetadataOptional.get()).build();
+    }
+
+    LoadTableResponse loadTableResponse = CatalogHandlers.loadTable(catalog, tableIdentifier);
+    if (loadTableResponse != null) {
+      metadataCache.updateTableMetadata(tableIdentifier, loadTableResponse.tableMetadata());
+    }
+    return loadTableResponse;
   }
 
   public boolean tableExists(TableIdentifier tableIdentifier) {
@@ -187,12 +210,19 @@ public class IcebergCatalogWrapper implements AutoCloseable {
   }
 
   public void renameTable(RenameTableRequest renameTableRequest) {
+    metadataCache.invalidate(renameTableRequest.source());
     CatalogHandlers.renameTable(catalog, renameTableRequest);
   }
 
   public LoadTableResponse updateTable(
       TableIdentifier tableIdentifier, UpdateTableRequest updateTableRequest) {
-    return CatalogHandlers.updateTable(catalog, tableIdentifier, updateTableRequest);
+    metadataCache.invalidate(tableIdentifier);
+    LoadTableResponse loadTableResponse =
+        CatalogHandlers.updateTable(catalog, tableIdentifier, updateTableRequest);
+    if (loadTableResponse != null) {
+      metadataCache.updateTableMetadata(tableIdentifier, loadTableResponse.tableMetadata());
+    }
+    return loadTableResponse;
   }
 
   public LoadTableResponse updateTable(IcebergTableChange icebergTableChange) {
@@ -233,7 +263,18 @@ public class IcebergCatalogWrapper implements AutoCloseable {
   }
 
   public boolean supportsViewOperations() {
-    return catalog instanceof ViewCatalog;
+    if (!(catalog instanceof ViewCatalog)) {
+      return false;
+    }
+
+    // JDBC catalog only supports view operations from v1 schema version
+    if (catalog instanceof JdbcCatalogWithMetadataLocationSupport) {
+      JdbcCatalogWithMetadataLocationSupport jdbcCatalog =
+          (JdbcCatalogWithMetadataLocationSupport) catalog;
+      return jdbcCatalog.supportsViewsWithSchemaVersion();
+    }
+
+    return true;
   }
 
   @Override
@@ -242,6 +283,7 @@ public class IcebergCatalogWrapper implements AutoCloseable {
       // JdbcCatalog and WrappedHiveCatalog need close.
       ((AutoCloseable) catalog).close();
     }
+    metadataCache.close();
 
     // Because each catalog in Gravitino has its own classloader, after a catalog is no longer used
     // for a long time or dropped, the instance of classloader needs to be released. In order to
@@ -305,5 +347,32 @@ public class IcebergCatalogWrapper implements AutoCloseable {
       this.tableIdentifier = tableIdentifier;
       this.transaction = transaction;
     }
+  }
+
+  private TableMetadataCache loadTableMetadataCache(IcebergConfig config, Catalog catalog) {
+    String impl = config.get(IcebergConfig.TABLE_METADATA_CACHE_IMPL);
+    if (StringUtils.isBlank(impl)) {
+      return TableMetadataCache.DUMMY;
+    }
+
+    Preconditions.checkArgument(
+        catalog instanceof SupportsMetadataLocation,
+        "You shouldn't enable Iceberg metadata cache for the catalog %s,"
+            + " because the catalog impl does not support get metadata location.",
+        catalog.name());
+
+    TableMetadataCache cache =
+        ClassUtils.loadAndGetInstance(impl, Thread.currentThread().getContextClassLoader());
+    int capacity = config.get(IcebergConfig.TABLE_METADATA_CACHE_CAPACITY);
+    int expireMinutes = config.get(IcebergConfig.TABLE_METADATA_CACHE_EXPIRE_MINUTES);
+    cache.initialize(
+        capacity, expireMinutes, config.getAllConfig(), (SupportsMetadataLocation) catalog);
+    LOG.info(
+        "Load Iceberg table metadata cache for catalog: {}, impl:{}, capacity: {}, expire minutes: {}",
+        catalog.name(),
+        impl,
+        capacity,
+        expireMinutes);
+    return cache;
   }
 }
