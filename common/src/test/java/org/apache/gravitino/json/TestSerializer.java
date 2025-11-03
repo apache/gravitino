@@ -74,7 +74,9 @@ public class TestSerializer {
     actualJson = JsonUtils.anyFieldMapper().writeValueAsString(DTOConverters.toDTO(distribution));
     expectedJson =
         """
-          {"strategy":"even","number":10,"funcArgs":[{"type":"function","funcName":"bucket","funcArgs":[{"type":"literal","dataType":"integer","value":"10"},{"type":"field","fieldName":["col_1"]}]}]}""";
+          {"strategy":"even","number":10,"funcArgs":[{"type":"function","funcName":"bucket",\
+          "funcArgs":[{"type":"literal","dataType":"integer","value":"10"},{"type":"field",\
+          "fieldName":["col_1"]}]}]}""";
     Assertions.assertEquals(expectedJson, actualJson);
     deserialized = JsonUtils.anyFieldMapper().readValue(actualJson, DistributionDTO.class);
     Assertions.assertEquals(distribution, DTOConverters.fromDTO(deserialized));
@@ -89,7 +91,8 @@ public class TestSerializer {
         JsonUtils.anyFieldMapper().writeValueAsString(DTOConverters.toDTO(sortOrder));
     String expectedJson =
         """
-            {"sortTerm":{"type":"field","fieldName":["col1"]},"direction":"asc","nullOrdering":"nulls_last"}""";
+            {"sortTerm":{"type":"field","fieldName":["col1"]},"direction":"asc",\
+            "nullOrdering":"nulls_last"}""";
     Assertions.assertEquals(expectedJson, actualJson);
 
     SortOrderDTO deserialized =
@@ -103,7 +106,8 @@ public class TestSerializer {
     actualJson = JsonUtils.anyFieldMapper().writeValueAsString(DTOConverters.toDTO(sortOrder));
     expectedJson =
         """
-          {"sortTerm":{"type":"function","funcName":"lower","funcArgs":[{"type":"field","fieldName":["col_1"]}]},"direction":"desc","nullOrdering":"nulls_last"}""";
+          {"sortTerm":{"type":"function","funcName":"lower","funcArgs":[{"type":"field",\
+          "fieldName":["col_1"]}]},"direction":"desc","nullOrdering":"nulls_last"}""";
     Assertions.assertEquals(expectedJson, actualJson);
     deserialized = JsonUtils.anyFieldMapper().readValue(actualJson, SortOrderDTO.class);
     Assertions.assertEquals(sortOrder, DTOConverters.fromDTO(deserialized));
@@ -172,7 +176,9 @@ public class TestSerializer {
     actualJson = JsonUtils.anyFieldMapper().writeValueAsString(transform);
     expectedJson =
         """
-            {"type":"range_partitioning","fieldName":["dt"],"assignments":[{"name":"p1","properties":null,"upper":{"type":"literal","dataType":"string","value":"2024-01-01"},"lower":{"type":"literal","dataType":"string","value":"2023-01-01"}}]}""";
+            {"type":"range_partitioning","fieldName":["dt"],"assignments":[{"name":"p1",
+            "properties":null,"upper":{"type":"literal","dataType":"string","value":"2024-01-01"},
+            "lower":{"type":"literal","dataType":"string","value":"2023-01-01"}}]}""";
     Assertions.assertEquals(expectedJson, actualJson);
     deserialized = JsonUtils.anyFieldMapper().readValue(actualJson, Partitioning.class);
     Assertions.assertEquals(transform, DTOConverters.fromDTO(deserialized));

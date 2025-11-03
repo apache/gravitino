@@ -197,7 +197,7 @@ public class Indexes {
        *
        * @return The new instance.
        */
-      public IndexImpl build() {
+      public Index build() {
         return new IndexImpl(indexType, name, fieldNames);
       }
     }
