@@ -166,7 +166,7 @@ public class SecureFilesetCatalogOperations
   public Map<String, String> mergeUpLevelConfigurations(
       NameIdentifier ident, Map<String, String> entityProperties) {
     Map<String, String> mergedProperties = new HashMap<>(filesetCatalogOperations.getConf());
-    if (ident.namespace().levels().length == 3) {
+    if (ident.namespace().levels().length == 2) {
       // schema level
       mergedProperties.putAll(entityProperties);
       return mergedProperties;
