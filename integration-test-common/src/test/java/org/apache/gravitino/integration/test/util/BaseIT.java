@@ -355,9 +355,8 @@ public class BaseIT {
         customConfigs.put(
             LANCE_CONFIG_PREFIX + METALAKE_NAME.getKey(),
             GravitinoITUtils.genRandomName("LanceRESTService_metalake"));
-        rewriteGravitinoServerConfig();
       }
-
+      rewriteGravitinoServerConfig();
       serverConfig.loadFromFile(GravitinoServer.CONF_FILE);
 
       setupJdbcDrivers();
