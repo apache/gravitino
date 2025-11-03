@@ -84,11 +84,25 @@ public class MiniGravitino {
     mockConfDir.mkdirs();
   }
 
-  private void removeAuxRestConfiguration(Properties properties) {
-    // Disable Iceberg and Lance REST service
-    properties.remove(
-        AuxiliaryServiceManager.GRAVITINO_AUX_SERVICE_PREFIX
-            + AuxiliaryServiceManager.AUX_SERVICE_NAMES);
+  private void removeAuxRestConfiguration(Properties properties, String serviceToRemove) {
+    String value =
+        properties.getProperty(
+            AuxiliaryServiceManager.GRAVITINO_AUX_SERVICE_PREFIX
+                + AuxiliaryServiceManager.AUX_SERVICE_NAMES);
+    if (value != null && !value.isEmpty()) {
+      List<String> serviceNames = COMMA.splitToList(value);
+      List<String> updatedServiceNames = new ArrayList<>();
+      for (String serviceName : serviceNames) {
+        if (!serviceName.equalsIgnoreCase(serviceToRemove)) {
+          updatedServiceNames.add(serviceName);
+        }
+      }
+      String updatedValue = String.join(",", updatedServiceNames);
+      properties.setProperty(
+          AuxiliaryServiceManager.GRAVITINO_AUX_SERVICE_PREFIX
+              + AuxiliaryServiceManager.AUX_SERVICE_NAMES,
+          updatedValue);
+    }
   }
 
   public void start() throws Exception {
@@ -109,9 +123,18 @@ public class MiniGravitino {
         serverConfig.loadPropertiesFromFile(
             new File(ITUtils.joinPath(mockConfDir.getAbsolutePath(), "gravitino.conf")));
 
-    // Disable auxiliary rest service.
-    if (context.ignoreAuxRestService) {
-      removeAuxRestConfiguration(properties);
+    if (context.ignoreIcebergAuxRestService) {
+      // Disable auxiliary rest service.
+      removeAuxRestConfiguration(properties, "iceberg-rest");
+      LOG.info("Iceberg auxiliary REST service is disabled for MiniGravitino.");
+      ITUtils.overwriteConfigFile(
+          ITUtils.joinPath(mockConfDir.getAbsolutePath(), "gravitino.conf"), properties);
+    }
+
+    if (context.ignoreLanceAuxRestService) {
+      // Disable auxiliary rest service.
+      removeAuxRestConfiguration(properties, "lance-rest");
+      LOG.info("Lance auxiliary REST service is disabled for MiniGravitino.");
       ITUtils.overwriteConfigFile(
           ITUtils.joinPath(mockConfDir.getAbsolutePath(), "gravitino.conf"), properties);
     }
@@ -238,6 +261,10 @@ public class MiniGravitino {
 
   private Map<String, String> getLanceRestServiceConfigs(Map<String, String> configMap)
       throws IOException {
+    if (context.ignoreLanceAuxRestService) {
+      return new HashMap<>();
+    }
+
     Map<String, String> customConfigs = new HashMap<>();
 
     String lanceJarPath = Paths.get("lance", "lance-rest-server", "build", "libs").toString();
@@ -251,10 +278,8 @@ public class MiniGravitino {
         LANCE_CONFIG_PREFIX + JettyServerConfig.WEBSERVER_HTTP_PORT.getKey(),
         String.valueOf(RESTUtils.findAvailablePort(4000, 5000)));
 
-    if (!context.ignoreAuxRestService
-        && GRAVITINO_NAMESPACE_BACKEND.equals(
-            configMap.getOrDefault(
-                NAMESPACE_BACKEND.getKey(), NAMESPACE_BACKEND.getDefaultValue()))) {
+    if (GRAVITINO_NAMESPACE_BACKEND.equals(
+        configMap.getOrDefault(NAMESPACE_BACKEND.getKey(), NAMESPACE_BACKEND.getDefaultValue()))) {
       // Set the Lance REST service to use the Gravitino server URI
       String gravitinoUri =
           String.format(

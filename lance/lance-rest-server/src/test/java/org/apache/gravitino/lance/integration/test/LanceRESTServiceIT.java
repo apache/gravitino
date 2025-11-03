@@ -41,22 +41,9 @@ public class LanceRESTServiceIT extends BaseIT {
 
   @BeforeAll
   public void startIntegrationTest() throws Exception {
-    super.ignoreAuxRestService = false;
+    super.ignoreLanceAuxRestService = false;
     super.startIntegrationTest();
     this.metalake = createMetalake(getLanceRESTServerMetalakeName());
-  }
-
-  private GravitinoMetalake createMetalake(String metalakeName) {
-    return client.createMetalake(metalakeName, "metalake for lance rest service tests", null);
-  }
-
-  private Catalog createCatalog(String catalogName) {
-    return metalake.createCatalog(
-        catalogName,
-        Catalog.Type.RELATIONAL,
-        "generic-lakehouse",
-        "catalog for lance rest service tests",
-        null);
   }
 
   @Test
@@ -74,6 +61,19 @@ public class LanceRESTServiceIT extends BaseIT {
 
     Assertions.assertEquals(
         Sets.newHashSet(catalog1.name(), catalog2.name()), listNamespacesResp.getNamespaces());
+  }
+
+  private GravitinoMetalake createMetalake(String metalakeName) {
+    return client.createMetalake(metalakeName, "metalake for lance rest service tests", null);
+  }
+
+  private Catalog createCatalog(String catalogName) {
+    return metalake.createCatalog(
+        catalogName,
+        Catalog.Type.RELATIONAL,
+        "generic-lakehouse",
+        "catalog for lance rest service tests",
+        null);
   }
 
   private String getLanceRestServiceUrl() {
