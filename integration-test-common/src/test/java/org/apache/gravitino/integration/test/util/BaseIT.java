@@ -133,7 +133,7 @@ public class BaseIT {
     customConfigs.putAll(configs);
   }
 
-  private void rewriteGravitinoServerConfig() throws IOException {
+  protected void rewriteGravitinoServerConfig() throws IOException {
     String gravitinoHome = System.getenv("GRAVITINO_HOME");
     Path configPath = Paths.get(gravitinoHome, "conf", GravitinoServer.CONF_FILE);
     if (originConfig == null) {
@@ -421,7 +421,7 @@ public class BaseIT {
     }
   }
 
-  private static boolean isDeploy() {
+  public static boolean isDeploy() {
     String mode =
         System.getProperty(ITUtils.TEST_MODE) == null
             ? ITUtils.EMBEDDED_TEST_MODE

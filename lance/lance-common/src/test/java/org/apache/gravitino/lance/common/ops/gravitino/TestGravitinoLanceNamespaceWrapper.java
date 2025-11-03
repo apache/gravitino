@@ -18,17 +18,11 @@
  */
 package org.apache.gravitino.lance.common.ops.gravitino;
 
-import java.io.ByteArrayOutputStream;
-import java.io.IOException;
-import java.nio.channels.Channels;
 import java.util.Arrays;
-import org.apache.arrow.memory.BufferAllocator;
-import org.apache.arrow.memory.RootAllocator;
-import org.apache.arrow.vector.VectorSchemaRoot;
-import org.apache.arrow.vector.ipc.ArrowStreamWriter;
 import org.apache.arrow.vector.types.pojo.ArrowType;
 import org.apache.arrow.vector.types.pojo.Field;
 import org.apache.arrow.vector.types.pojo.Schema;
+import org.apache.gravitino.lance.common.utils.ArrowUtils;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -42,35 +36,9 @@ public class TestGravitinoLanceNamespaceWrapper {
                 Field.nullable("id", new ArrowType.Int(32, true)),
                 Field.nullable("value", new ArrowType.Utf8())));
 
-    GravitinoLanceNamespaceWrapper wrapper = new GravitinoLanceNamespaceWrapper();
-    byte[] ipcStream = generateIpcStream(schema);
-    Schema parsedSchema = wrapper.parseArrowIpcStream(ipcStream);
+    byte[] ipcStream = ArrowUtils.generateIpcStream(schema);
+    Schema parsedSchema = ArrowUtils.parseArrowIpcStream(ipcStream);
 
     Assertions.assertEquals(schema, parsedSchema);
-  }
-
-  private byte[] generateIpcStream(Schema arrowSchema) throws IOException {
-    try (BufferAllocator allocator = new RootAllocator()) {
-
-      // Create an empty VectorSchemaRoot with the schema
-      try (VectorSchemaRoot root = VectorSchemaRoot.create(arrowSchema, allocator)) {
-        // Allocate empty vectors (0 rows)
-        root.allocateNew();
-        root.setRowCount(0);
-
-        // Write to IPC stream
-        ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
-        try (ArrowStreamWriter writer =
-            new ArrowStreamWriter(root, null, Channels.newChannel(outputStream))) {
-          writer.start();
-          writer.writeBatch();
-          writer.end();
-        }
-
-        return outputStream.toByteArray();
-      }
-    } catch (Exception e) {
-      throw new IOException("Failed to create empty Arrow IPC stream: " + e.getMessage(), e);
-    }
   }
 }

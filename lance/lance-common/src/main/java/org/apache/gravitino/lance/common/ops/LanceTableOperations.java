@@ -21,6 +21,7 @@ package org.apache.gravitino.lance.common.ops;
 import com.lancedb.lance.namespace.model.CreateTableResponse;
 import com.lancedb.lance.namespace.model.DeregisterTableResponse;
 import com.lancedb.lance.namespace.model.DescribeTableResponse;
+import com.lancedb.lance.namespace.model.RegisterTableRequest;
 import com.lancedb.lance.namespace.model.RegisterTableResponse;
 import java.util.Map;
 
@@ -37,7 +38,10 @@ public interface LanceTableOperations {
       byte[] arrowStreamBody);
 
   RegisterTableResponse registerTable(
-      String tableId, String mode, String delimiter, Map<String, String> tableProperties);
+      String tableId,
+      RegisterTableRequest.ModeEnum mode,
+      String delimiter,
+      Map<String, String> tableProperties);
 
   DeregisterTableResponse deregisterTable(String tableId, String delimiter);
 }

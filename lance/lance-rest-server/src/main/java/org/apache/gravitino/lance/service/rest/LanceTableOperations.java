@@ -26,11 +26,13 @@ import com.codahale.metrics.annotation.ResponseMetered;
 import com.codahale.metrics.annotation.Timed;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.google.common.collect.Maps;
+import com.lancedb.lance.namespace.model.CreateEmptyTableRequest;
 import com.lancedb.lance.namespace.model.CreateTableResponse;
 import com.lancedb.lance.namespace.model.DeregisterTableRequest;
 import com.lancedb.lance.namespace.model.DeregisterTableResponse;
 import com.lancedb.lance.namespace.model.DescribeTableResponse;
 import com.lancedb.lance.namespace.model.RegisterTableRequest;
+import com.lancedb.lance.namespace.model.RegisterTableRequest.ModeEnum;
 import com.lancedb.lance.namespace.model.RegisterTableResponse;
 import com.lancedb.lance.namespace.util.JsonUtil;
 import java.util.Map;
@@ -47,7 +49,6 @@ import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.MultivaluedMap;
 import javax.ws.rs.core.Response;
-import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.lance.common.ops.NamespaceWrapper;
 import org.apache.gravitino.lance.service.LanceExceptionMapper;
 import org.apache.gravitino.metrics.MetricNames;
@@ -97,7 +98,6 @@ public class LanceTableOperations {
       MultivaluedMap<String, String> headersMap = headers.getRequestHeaders();
       String tableLocation = headersMap.getFirst(LANCE_TABLE_LOCATION_HEADER);
       String tableProperties = headersMap.getFirst(LANCE_TABLE_PROPERTIES_PREFIX_HEADER);
-
       Map<String, String> props =
           JsonUtil.mapper().readValue(tableProperties, new TypeReference<>() {});
       CreateTableResponse response =
@@ -118,17 +118,15 @@ public class LanceTableOperations {
       @PathParam("id") String tableId,
       @QueryParam("mode") @DefaultValue("create") String mode, // create, exist_ok, overwrite
       @QueryParam("delimiter") @DefaultValue(NAMESPACE_DELIMITER_DEFAULT) String delimiter,
+      CreateEmptyTableRequest request,
       @Context HttpHeaders headers) {
     try {
-      // Extract table properties from header
-      MultivaluedMap<String, String> headersMap = headers.getRequestHeaders();
-      String tableLocation = headersMap.getFirst(LANCE_TABLE_LOCATION_HEADER);
-      String tableProperties = headersMap.getFirst(LANCE_TABLE_PROPERTIES_PREFIX_HEADER);
-
+      String tableLocation = request.getLocation();
       Map<String, String> props =
-          StringUtils.isBlank(tableProperties)
-              ? Map.of()
-              : JsonUtil.mapper().readValue(tableProperties, new TypeReference<>() {});
+          request.getProperties() == null
+              ? Maps.newHashMap()
+              : Maps.newHashMap(request.getProperties());
+      props.put("format", "lance");
       CreateTableResponse response =
           lanceNamespace
               .asTableOps()
@@ -145,7 +143,6 @@ public class LanceTableOperations {
   @ResponseMetered(name = "register-table", absolute = true)
   public Response registerTable(
       @PathParam("id") String tableId,
-      @QueryParam("mode") @DefaultValue("create") String mode, // overwrite or
       @QueryParam("delimiter") @DefaultValue("$") String delimiter,
       @Context HttpHeaders headers,
       RegisterTableRequest registerTableRequest) {
@@ -157,6 +154,7 @@ public class LanceTableOperations {
       props.put("register", "true");
       props.put("location", registerTableRequest.getLocation());
       props.put("format", "lance");
+      ModeEnum mode = registerTableRequest.getMode();
 
       RegisterTableResponse response =
           lanceNamespace.asTableOps().registerTable(tableId, mode, delimiter, props);

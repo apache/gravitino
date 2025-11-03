@@ -83,6 +83,7 @@ import org.apache.gravitino.lance.common.config.LanceConfig;
 import org.apache.gravitino.lance.common.ops.LanceNamespaceOperations;
 import org.apache.gravitino.lance.common.ops.LanceTableOperations;
 import org.apache.gravitino.lance.common.ops.NamespaceWrapper;
+import org.apache.gravitino.lance.common.utils.ArrowUtils;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Table;
 import org.slf4j.Logger;
@@ -549,7 +550,8 @@ public class GravitinoLanceNamespaceWrapper extends NamespaceWrapper
     // Parser column information.
     List<Column> columns = Lists.newArrayList();
     if (arrowStreamBody != null) {
-      org.apache.arrow.vector.types.pojo.Schema schema = parseArrowIpcStream(arrowStreamBody);
+      org.apache.arrow.vector.types.pojo.Schema schema =
+          ArrowUtils.parseArrowIpcStream(arrowStreamBody);
       columns = extractColumns(schema);
     }
 
@@ -562,6 +564,7 @@ public class GravitinoLanceNamespaceWrapper extends NamespaceWrapper
     Map<String, String> createTableProperties = Maps.newHashMap(tableProperties);
     createTableProperties.put("location", tableLocation);
     createTableProperties.put("mode", mode);
+    createTableProperties.put("format", "lance");
     // TODO considering the mode (create, exist_ok, overwrite)
 
     ModeEnum createMode = ModeEnum.fromValue(mode.toLowerCase());
@@ -598,10 +601,7 @@ public class GravitinoLanceNamespaceWrapper extends NamespaceWrapper
         catalog
             .asTableCatalog()
             .createTable(
-                tableIdentifier,
-                columns.toArray(new Column[0]),
-                tableLocation,
-                createTableProperties);
+                tableIdentifier, columns.toArray(new Column[0]), null, createTableProperties);
 
     CreateTableResponse response = new CreateTableResponse();
     response.setProperties(t.properties());
@@ -612,7 +612,10 @@ public class GravitinoLanceNamespaceWrapper extends NamespaceWrapper
 
   @Override
   public RegisterTableResponse registerTable(
-      String tableId, String mode, String delimiter, Map<String, String> tableProperties) {
+      String tableId,
+      RegisterTableRequest.ModeEnum mode,
+      String delimiter,
+      Map<String, String> tableProperties) {
     ObjectIdentifier nsId = ObjectIdentifier.of(tableId, Pattern.quote(delimiter));
     Preconditions.checkArgument(
         nsId.levels() == 3, "Expected at 3-level namespace but got: %s", nsId.levels());
@@ -623,9 +626,7 @@ public class GravitinoLanceNamespaceWrapper extends NamespaceWrapper
         NameIdentifier.of(nsId.levelAtListPos(1), nsId.levelAtListPos(2));
 
     // TODO Support real register API
-    RegisterTableRequest.ModeEnum createMode =
-        RegisterTableRequest.ModeEnum.fromValue(mode.toUpperCase());
-    if (createMode == RegisterTableRequest.ModeEnum.CREATE
+    if (mode == RegisterTableRequest.ModeEnum.CREATE
         && catalog.asTableCatalog().tableExists(tableIdentifier)) {
       throw LanceNamespaceException.conflict(
           "Table already exists: " + tableId,
@@ -634,14 +635,16 @@ public class GravitinoLanceNamespaceWrapper extends NamespaceWrapper
           CommonUtil.formatCurrentStackTrace());
     }
 
-    if (createMode == RegisterTableRequest.ModeEnum.OVERWRITE
+    if (mode == RegisterTableRequest.ModeEnum.OVERWRITE
         && catalog.asTableCatalog().tableExists(tableIdentifier)) {
       LOG.info("Overwriting existing table: {}", tableId);
-      catalog.asTableCatalog().dropTable(tableIdentifier);
+      catalog.asTableCatalog().purgeTable(tableIdentifier);
     }
 
     Table t =
-        catalog.asTableCatalog().createTable(tableIdentifier, new Column[] {}, "", tableProperties);
+        catalog
+            .asTableCatalog()
+            .createTable(tableIdentifier, new Column[] {}, null, tableProperties);
 
     RegisterTableResponse response = new RegisterTableResponse();
     response.setProperties(t.properties());
@@ -651,7 +654,6 @@ public class GravitinoLanceNamespaceWrapper extends NamespaceWrapper
 
   @Override
   public DeregisterTableResponse deregisterTable(String tableId, String delimiter) {
-
     ObjectIdentifier nsId = ObjectIdentifier.of(tableId, Pattern.quote(delimiter));
     Preconditions.checkArgument(
         nsId.levels() == 3, "Expected at 3-level namespace but got: %s", nsId.levels());
@@ -699,7 +701,6 @@ public class GravitinoLanceNamespaceWrapper extends NamespaceWrapper
 
   private List<Column> extractColumns(org.apache.arrow.vector.types.pojo.Schema arrowSchema) {
     List<Column> columns = new ArrayList<>();
-
     for (org.apache.arrow.vector.types.pojo.Field field : arrowSchema.getFields()) {
       columns.add(
           Column.of(

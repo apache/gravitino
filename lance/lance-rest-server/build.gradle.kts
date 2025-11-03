@@ -53,6 +53,16 @@ dependencies {
   implementation(libs.jackson.datatype.jdk8)
   implementation(libs.jackson.datatype.jsr310)
 
+  testImplementation(project(":server")) {
+    exclude("*")
+  }
+
+  testImplementation(libs.commons.io)
+  testImplementation(libs.awaitility)
+  testImplementation(libs.testcontainers)
+  testImplementation(project(":clients:client-java"))
+  testImplementation(libs.lance.namespace.apache.client)
+  testImplementation(project(":integration-test-common", "testArtifacts"))
   testImplementation(libs.junit.jupiter.api)
   testRuntimeOnly(libs.junit.jupiter.engine)
 }
