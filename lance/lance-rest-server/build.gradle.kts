@@ -56,14 +56,20 @@ dependencies {
   testImplementation(project(":server")) {
     exclude("*")
   }
-
-  testImplementation(libs.commons.io)
-  testImplementation(libs.awaitility)
-  testImplementation(libs.testcontainers)
   testImplementation(project(":clients:client-java"))
-  testImplementation(libs.lance.namespace.apache.client)
   testImplementation(project(":integration-test-common", "testArtifacts"))
+  testImplementation(project(":lance:lance-common", "testArtifacts"))
+  testImplementation(project(":lineage"))
+
+  testImplementation(libs.awaitility)
+  testImplementation(libs.commons.io)
+  testImplementation(libs.lance.namespace.core)
+  testImplementation(libs.lance.namespace.apache.client)
   testImplementation(libs.junit.jupiter.api)
+  testImplementation(libs.postgresql.driver)
+  testImplementation(libs.mysql.driver)
+  testImplementation(libs.testcontainers)
+
   testRuntimeOnly(libs.junit.jupiter.engine)
 }
 
