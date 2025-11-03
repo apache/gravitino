@@ -21,6 +21,7 @@ package org.apache.gravitino.iceberg.service.metrics;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.Map;
+import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.metrics.MetricsReport;
 
 /** A store API to save Apache Iceberg metrics. */
@@ -40,7 +41,7 @@ public interface IcebergMetricsStore {
    * @param metricsReport the metrics to be saved
    * @throws IOException if IO error happens
    */
-  void recordMetric(MetricsReport metricsReport) throws IOException;
+  void recordMetric(Namespace namespace, MetricsReport metricsReport) throws IOException;
 
   /**
    * Clean the expired Iceberg metrics
