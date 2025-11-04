@@ -74,6 +74,7 @@ import org.apache.gravitino.Schema;
 import org.apache.gravitino.SchemaChange;
 import org.apache.gravitino.client.GravitinoClient;
 import org.apache.gravitino.exceptions.CatalogAlreadyExistsException;
+import org.apache.gravitino.exceptions.CatalogInUseException;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NonEmptyCatalogException;
@@ -332,7 +333,8 @@ public class GravitinoLanceNamespaceWrapper extends NamespaceWrapper
     // Catalog exists, handle based on mode
     switch (mode) {
       case EXIST_OK:
-        response.setProperties(Maps.newHashMap());
+        response.setProperties(
+            Optional.ofNullable(catalog.properties()).orElse(Collections.emptyMap()));
         return response;
       case CREATE:
         throw LanceNamespaceException.conflict(
@@ -344,7 +346,7 @@ public class GravitinoLanceNamespaceWrapper extends NamespaceWrapper
         CatalogChange[] changes =
             buildChanges(
                 properties,
-                catalog.properties(),
+                removeInUseProperty(catalog.properties()),
                 CatalogChange::setProperty,
                 CatalogChange::removeProperty,
                 CatalogChange[]::new);
@@ -354,6 +356,12 @@ public class GravitinoLanceNamespaceWrapper extends NamespaceWrapper
       default:
         throw new IllegalArgumentException("Unknown mode: " + mode);
     }
+  }
+
+  private Map<String, String> removeInUseProperty(Map<String, String> properties) {
+    return properties.entrySet().stream()
+        .filter(e -> !e.getKey().equalsIgnoreCase(Catalog.PROPERTY_IN_USE))
+        .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
   }
 
   private CreateNamespaceResponse createOrUpdateSchema(
@@ -378,7 +386,8 @@ public class GravitinoLanceNamespaceWrapper extends NamespaceWrapper
     // Schema exists, handle based on mode
     switch (mode) {
       case EXIST_OK:
-        response.setProperties(Maps.newHashMap());
+        response.setProperties(
+            Optional.ofNullable(schema.properties()).orElse(Collections.emptyMap()));
         return response;
       case CREATE:
         throw LanceNamespaceException.conflict(
@@ -422,9 +431,9 @@ public class GravitinoLanceNamespaceWrapper extends NamespaceWrapper
         }
         return new DropNamespaceResponse(); // SKIP mode
       }
-    } catch (NonEmptyCatalogException e) {
+    } catch (NonEmptyCatalogException | CatalogInUseException e) {
       throw LanceNamespaceException.badRequest(
-          String.format("Catalog %s is not empty.", catalogName),
+          String.format("Catalog %s is not empty or in used", catalogName),
           NonEmptyCatalogException.class.getSimpleName(),
           catalogName,
           CommonUtil.formatCurrentStackTrace());

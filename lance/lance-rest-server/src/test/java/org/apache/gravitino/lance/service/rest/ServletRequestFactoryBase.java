@@ -16,22 +16,20 @@
  * specific language governing permissions and limitations
  * under the License.
  */
+package org.apache.gravitino.lance.service.rest;
 
-package org.apache.gravitino.integration.test;
+import java.util.function.Supplier;
+import javax.servlet.http.HttpServletRequest;
+import org.glassfish.hk2.api.Factory;
 
-import java.util.Map;
+abstract class ServletRequestFactoryBase
+    implements Factory<HttpServletRequest>, Supplier<HttpServletRequest> {
 
-public class MiniGravitinoContext {
-  Map<String, String> customConfig;
-  final boolean ignoreIcebergAuxRestService;
-  final boolean ignoreLanceAuxRestService;
-
-  public MiniGravitinoContext(
-      Map<String, String> customConfig,
-      boolean ignoreIcebergAuxRestService,
-      boolean ignoreLanceAuxRestService) {
-    this.customConfig = customConfig;
-    this.ignoreIcebergAuxRestService = ignoreIcebergAuxRestService;
-    this.ignoreLanceAuxRestService = ignoreLanceAuxRestService;
+  @Override
+  public HttpServletRequest provide() {
+    return get();
   }
+
+  @Override
+  public void dispose(HttpServletRequest instance) {}
 }
