@@ -24,38 +24,64 @@ import com.google.common.collect.Sets;
 import com.lancedb.lance.namespace.LanceNamespace;
 import com.lancedb.lance.namespace.LanceNamespaceException;
 import com.lancedb.lance.namespace.LanceNamespaces;
+import com.lancedb.lance.namespace.client.apache.ApiException;
+import com.lancedb.lance.namespace.model.CreateEmptyTableRequest;
+import com.lancedb.lance.namespace.model.CreateEmptyTableResponse;
 import com.lancedb.lance.namespace.model.CreateNamespaceRequest;
 import com.lancedb.lance.namespace.model.CreateNamespaceResponse;
+import com.lancedb.lance.namespace.model.CreateTableRequest;
+import com.lancedb.lance.namespace.model.CreateTableResponse;
+import com.lancedb.lance.namespace.model.DeregisterTableRequest;
+import com.lancedb.lance.namespace.model.DeregisterTableResponse;
 import com.lancedb.lance.namespace.model.DescribeNamespaceRequest;
 import com.lancedb.lance.namespace.model.DescribeNamespaceResponse;
+import com.lancedb.lance.namespace.model.DescribeTableRequest;
+import com.lancedb.lance.namespace.model.DescribeTableResponse;
 import com.lancedb.lance.namespace.model.DropNamespaceRequest;
 import com.lancedb.lance.namespace.model.DropNamespaceResponse;
+import com.lancedb.lance.namespace.model.JsonArrowField;
 import com.lancedb.lance.namespace.model.ListNamespacesRequest;
 import com.lancedb.lance.namespace.model.ListNamespacesResponse;
+import com.lancedb.lance.namespace.model.ListTablesRequest;
 import com.lancedb.lance.namespace.model.NamespaceExistsRequest;
+import com.lancedb.lance.namespace.model.RegisterTableRequest;
+import com.lancedb.lance.namespace.model.RegisterTableRequest.ModeEnum;
+import com.lancedb.lance.namespace.model.RegisterTableResponse;
 import com.lancedb.lance.namespace.rest.RestNamespaceConfig;
+import java.io.File;
+import java.io.IOException;
+import java.nio.charset.Charset;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.apache.arrow.memory.BufferAllocator;
 import org.apache.arrow.memory.RootAllocator;
+import org.apache.arrow.vector.types.pojo.ArrowType;
+import org.apache.arrow.vector.types.pojo.Field;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Schema;
 import org.apache.gravitino.client.GravitinoMetalake;
 import org.apache.gravitino.integration.test.util.BaseIT;
 import org.apache.gravitino.integration.test.util.GravitinoITUtils;
+import org.apache.gravitino.lance.common.utils.ArrowUtils;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.testcontainers.shaded.com.google.common.base.Joiner;
 
 public class LanceRESTServiceIT extends BaseIT {
+  public static final String CATALOG_NAME = GravitinoITUtils.genRandomName("lance_rest_catalog");
+  public static final String SCHEMA_NAME = GravitinoITUtils.genRandomName("lance_rest_schema");
 
   private GravitinoMetalake metalake;
+  private Catalog catalog;
   private Map<String, String> properties =
       new HashMap<>() {
         {
@@ -372,6 +398,221 @@ public class LanceRESTServiceIT extends BaseIT {
     Assertions.assertEquals(404, exception.getCode());
   }
 
+  @Test
+  void testCreateEmptyTable() throws ApiException {
+    catalog = createCatalog(CATALOG_NAME);
+    createSchema();
+
+    CreateEmptyTableRequest request = new CreateEmptyTableRequest();
+    String location = tempDir + "/" + "empty_table/";
+    request.setLocation(location);
+    request.setProperties(ImmutableMap.of());
+    request.setId(List.of(CATALOG_NAME, SCHEMA_NAME, "empty_table"));
+
+    CreateEmptyTableResponse response = ns.createEmptyTable(request);
+    Assertions.assertNotNull(response);
+
+    DescribeTableRequest describeTableRequest = new DescribeTableRequest();
+    describeTableRequest.setId(List.of(CATALOG_NAME, SCHEMA_NAME, "empty_table"));
+
+    DescribeTableResponse loadTable = ns.describeTable(describeTableRequest);
+    Assertions.assertNotNull(loadTable);
+    Assertions.assertEquals(location, loadTable.getLocation());
+
+    // Try to create the same table again should fail
+    LanceNamespaceException exception =
+        Assertions.assertThrows(
+            LanceNamespaceException.class,
+            () -> {
+              ns.createEmptyTable(request);
+            });
+    Assertions.assertTrue(exception.getMessage().contains("Table already exists"));
+    Assertions.assertEquals(409, exception.getCode());
+  }
+
+  @Test
+  void testCreateTable() throws IOException, ApiException {
+    catalog = createCatalog(CATALOG_NAME);
+    createSchema();
+
+    String location = tempDir + "/" + "table/";
+    List<String> ids = List.of(CATALOG_NAME, SCHEMA_NAME, "table");
+    org.apache.arrow.vector.types.pojo.Schema schema =
+        new org.apache.arrow.vector.types.pojo.Schema(
+            Arrays.asList(
+                Field.nullable("id", new ArrowType.Int(32, true)),
+                Field.nullable("value", new ArrowType.Utf8())));
+    byte[] body = ArrowUtils.generateIpcStream(schema);
+
+    CreateTableRequest request = new CreateTableRequest();
+    request.setId(ids);
+    request.setLocation(location);
+    CreateTableResponse response = ns.createTable(request, body);
+    Assertions.assertNotNull(response);
+    Assertions.assertEquals(location, response.getLocation());
+
+    DescribeTableRequest describeTableRequest = new DescribeTableRequest();
+    describeTableRequest.setId(ids);
+    DescribeTableResponse loadTable = ns.describeTable(describeTableRequest);
+    Assertions.assertNotNull(loadTable);
+    Assertions.assertEquals(location, loadTable.getLocation());
+
+    List<JsonArrowField> jsonArrowFields = loadTable.getSchema().getFields();
+    for (int i = 0; i < jsonArrowFields.size(); i++) {
+      JsonArrowField jsonArrowField = jsonArrowFields.get(i);
+      Field originalField = schema.getFields().get(i);
+      Assertions.assertEquals(originalField.getName(), jsonArrowField.getName());
+
+      if (i == 0) {
+        Assertions.assertEquals("int32", jsonArrowField.getType().getType());
+      } else if (i == 1) {
+        Assertions.assertEquals("utf8", jsonArrowField.getType().getType());
+      }
+    }
+    // Check the location exists
+    Assertions.assertTrue(new File(location).exists());
+
+    // Check overwrite mode
+    String newLocation = ns + "/" + "table_new/";
+    request.setLocation(newLocation);
+    request.setMode(CreateTableRequest.ModeEnum.OVERWRITE);
+
+    response = Assertions.assertDoesNotThrow(() -> ns.createTable(request, body));
+
+    Assertions.assertNotNull(response);
+    Assertions.assertEquals(newLocation, response.getLocation());
+    Assertions.assertTrue(new File(newLocation).exists());
+    Assertions.assertFalse(new File(location).exists());
+
+    // Check exist_ok mode
+    request.setMode(CreateTableRequest.ModeEnum.EXIST_OK);
+    response = Assertions.assertDoesNotThrow(() -> ns.createTable(request, body));
+
+    Assertions.assertNotNull(response);
+    Assertions.assertEquals(newLocation, response.getLocation());
+    Assertions.assertTrue(new File(newLocation).exists());
+
+    // Create table again without overwrite or exist_ok should fail
+    request.setMode(CreateTableRequest.ModeEnum.CREATE);
+    LanceNamespaceException exception =
+        Assertions.assertThrows(LanceNamespaceException.class, () -> ns.createTable(request, body));
+    Assertions.assertTrue(exception.getMessage().contains("already exists"));
+    Assertions.assertEquals(409, exception.getCode());
+
+    // Create table with invalid schema should fail
+    byte[] invalidBody = "invalid schema".getBytes(Charset.defaultCharset());
+    CreateTableRequest invalidRequest = new CreateTableRequest();
+    invalidRequest.setId(List.of(CATALOG_NAME, SCHEMA_NAME, "invalid_table"));
+    invalidRequest.setLocation(tempDir + "/" + "invalid_table/");
+    LanceNamespaceException apiException =
+        Assertions.assertThrows(
+            LanceNamespaceException.class, () -> ns.createTable(invalidRequest, invalidBody));
+    Assertions.assertTrue(apiException.getMessage().contains("Failed to parse Arrow IPC stream"));
+    Assertions.assertEquals(400, apiException.getCode());
+
+    // Create table with wrong ids should fail
+    CreateTableRequest wrongIdRequest = new CreateTableRequest();
+    wrongIdRequest.setId(List.of(CATALOG_NAME, "wrong_schema")); // This is a schema NOT a table.
+    wrongIdRequest.setLocation(tempDir + "/" + "wrong_id_table/");
+    LanceNamespaceException wrongIdException =
+        Assertions.assertThrows(
+            LanceNamespaceException.class, () -> ns.createTable(wrongIdRequest, body));
+    Assertions.assertTrue(wrongIdException.getMessage().contains("Expected at 3-level namespace"));
+    Assertions.assertEquals(400, wrongIdException.getCode());
+
+    // Now test list tables
+    ListTablesRequest listRequest = new ListTablesRequest();
+    listRequest.setId(List.of(CATALOG_NAME, SCHEMA_NAME));
+    var listResponse = ns.listTables(listRequest);
+    Set<String> stringSet = listResponse.getTables();
+    Assertions.assertEquals(1, stringSet.size());
+    Assertions.assertTrue(stringSet.contains(Joiner.on(".").join(ids)));
+  }
+
+  @Test
+  void testRegisterTable() {
+    catalog = createCatalog(CATALOG_NAME);
+    createSchema();
+
+    String location = tempDir + "/" + "register/";
+    List<String> ids = List.of(CATALOG_NAME, SCHEMA_NAME, "table_register");
+    RegisterTableRequest registerTableRequest = new RegisterTableRequest();
+    registerTableRequest.setLocation(location);
+    registerTableRequest.setMode(ModeEnum.CREATE);
+    registerTableRequest.setId(ids);
+    registerTableRequest.setProperties(ImmutableMap.of("key1", "value1"));
+
+    RegisterTableResponse response = ns.registerTable(registerTableRequest);
+    Assertions.assertNotNull(response);
+
+    DescribeTableRequest describeTableRequest = new DescribeTableRequest();
+    describeTableRequest.setId(ids);
+    DescribeTableResponse loadTable = ns.describeTable(describeTableRequest);
+    Assertions.assertNotNull(loadTable);
+    Assertions.assertEquals(location, loadTable.getLocation());
+    Assertions.assertTrue(loadTable.getProperties().containsKey("key1"));
+
+    // Test register again with OVERWRITE mode
+    String newLocation = ns + "/" + "register_new/";
+    registerTableRequest.setMode(ModeEnum.OVERWRITE);
+    registerTableRequest.setLocation(newLocation);
+    response = Assertions.assertDoesNotThrow(() -> ns.registerTable(registerTableRequest));
+    Assertions.assertNotNull(response);
+    Assertions.assertEquals(newLocation, response.getLocation());
+
+    // Test deregister table
+    DeregisterTableRequest deregisterTableRequest = new DeregisterTableRequest();
+    deregisterTableRequest.setId(ids);
+    DeregisterTableResponse deregisterTableResponse = ns.deregisterTable(deregisterTableRequest);
+    Assertions.assertNotNull(deregisterTableResponse);
+    Assertions.assertEquals(newLocation, deregisterTableResponse.getLocation());
+  }
+
+  @Test
+  void testDeregisterNonExistingTable() {
+    catalog = createCatalog(CATALOG_NAME);
+    createSchema();
+
+    List<String> ids = List.of(CATALOG_NAME, SCHEMA_NAME, "non_existing_table");
+    DeregisterTableRequest deregisterTableRequest = new DeregisterTableRequest();
+    deregisterTableRequest.setId(ids);
+
+    LanceNamespaceException exception =
+        Assertions.assertThrows(
+            LanceNamespaceException.class, () -> ns.deregisterTable(deregisterTableRequest));
+    Assertions.assertEquals(404, exception.getCode());
+    Assertions.assertTrue(exception.getMessage().contains("does not exist"));
+
+    // Try to create a table and then deregister table
+    CreateEmptyTableRequest createEmptyTableRequest = new CreateEmptyTableRequest();
+    String location = ns + "/" + "to_be_deregistered_table/";
+    ids = List.of(CATALOG_NAME, SCHEMA_NAME, "to_be_deregistered_table");
+    createEmptyTableRequest.setLocation(location);
+    createEmptyTableRequest.setProperties(ImmutableMap.of());
+    createEmptyTableRequest.setId(ids);
+    CreateEmptyTableResponse response =
+        Assertions.assertDoesNotThrow(() -> ns.createEmptyTable(createEmptyTableRequest));
+    Assertions.assertNotNull(response);
+    Assertions.assertEquals(location, response.getLocation());
+
+    // Now try to deregister
+    deregisterTableRequest.setId(ids);
+    DeregisterTableResponse deregisterTableResponse =
+        Assertions.assertDoesNotThrow(() -> ns.deregisterTable(deregisterTableRequest));
+    Assertions.assertNotNull(deregisterTableResponse);
+    Assertions.assertEquals(location, deregisterTableResponse.getLocation());
+    Assertions.assertTrue(
+        new File(location).exists(), "Data should still exist after deregistering the table.");
+
+    // Now try to describe the table, should fail
+    DescribeTableRequest describeTableRequest = new DescribeTableRequest();
+    describeTableRequest.setId(ids);
+    LanceNamespaceException lanceNamespaceException =
+        Assertions.assertThrows(
+            LanceNamespaceException.class, () -> ns.describeTable(describeTableRequest));
+    Assertions.assertEquals(404, lanceNamespaceException.getCode());
+  }
+
   private GravitinoMetalake createMetalake(String metalakeName) {
     return client.createMetalake(metalakeName, "metalake for lance rest service tests", null);
   }
@@ -383,6 +624,13 @@ public class LanceRESTServiceIT extends BaseIT {
         "generic-lakehouse",
         "catalog for lance rest service tests",
         properties);
+  }
+
+  protected void createSchema() {
+    Map<String, String> schemaProperties = Maps.newHashMap();
+    String comment = "comment";
+    catalog.asSchemas().createSchema(SCHEMA_NAME, comment, schemaProperties);
+    catalog.asSchemas().loadSchema(SCHEMA_NAME);
   }
 
   private String getLanceRestServiceUrl() {
