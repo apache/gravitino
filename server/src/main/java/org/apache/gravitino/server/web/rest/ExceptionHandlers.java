@@ -726,6 +726,8 @@ public class ExceptionHandlers {
       } else if (e instanceof NotInUseException) {
         return Utils.notInUse(errorMsg, e);
 
+      } else if (e instanceof ForbiddenException) {
+        return Utils.forbidden(errorMsg, e);
       } else {
         return super.handle(op, tag, parent, e);
       }

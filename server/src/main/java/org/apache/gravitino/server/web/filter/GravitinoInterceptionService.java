@@ -51,6 +51,7 @@ import org.apache.gravitino.server.web.Utils;
 import org.apache.gravitino.server.web.rest.CatalogOperations;
 import org.apache.gravitino.server.web.rest.FilesetOperations;
 import org.apache.gravitino.server.web.rest.GroupOperations;
+import org.apache.gravitino.server.web.rest.MetadataObjectTagOperations;
 import org.apache.gravitino.server.web.rest.MetalakeOperations;
 import org.apache.gravitino.server.web.rest.ModelOperations;
 import org.apache.gravitino.server.web.rest.OwnerOperations;
@@ -60,6 +61,7 @@ import org.apache.gravitino.server.web.rest.RoleOperations;
 import org.apache.gravitino.server.web.rest.SchemaOperations;
 import org.apache.gravitino.server.web.rest.StatisticOperations;
 import org.apache.gravitino.server.web.rest.TableOperations;
+import org.apache.gravitino.server.web.rest.TagOperations;
 import org.apache.gravitino.server.web.rest.TopicOperations;
 import org.apache.gravitino.server.web.rest.UserOperations;
 import org.apache.gravitino.utils.MetadataObjectUtil;
@@ -95,7 +97,9 @@ public class GravitinoInterceptionService implements InterceptionService {
             RoleOperations.class.getName(),
             OwnerOperations.class.getName(),
             StatisticOperations.class.getName(),
-            PartitionOperations.class.getName()));
+            PartitionOperations.class.getName(),
+            MetadataObjectTagOperations.class.getName(),
+            TagOperations.class.getName()));
   }
 
   @Override
@@ -294,6 +298,11 @@ public class GravitinoInterceptionService implements InterceptionService {
                 nameIdentifierMap.put(
                     Entity.EntityType.ROLE,
                     NameIdentifierUtil.ofRole(metalake, entities.get(Entity.EntityType.ROLE)));
+                break;
+              case TAG:
+                nameIdentifierMap.put(
+                    Entity.EntityType.TAG,
+                    NameIdentifierUtil.ofTag(metalake, entities.get(Entity.EntityType.TAG)));
                 break;
               default:
                 break;

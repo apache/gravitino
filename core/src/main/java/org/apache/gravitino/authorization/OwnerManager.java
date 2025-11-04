@@ -110,12 +110,13 @@ public class OwnerManager implements OwnerDispatcher {
         newOwner.name = ownerName;
         newOwner.type = Owner.Type.GROUP;
       }
-
-      AuthorizationUtils.callAuthorizationPluginForMetadataObject(
-          metalake,
-          metadataObject,
-          authorizationPlugin ->
-              authorizationPlugin.onOwnerSet(metadataObject, originOwner.orElse(null), newOwner));
+      if (metadataObject.type() != MetadataObject.Type.TAG) {
+        AuthorizationUtils.callAuthorizationPluginForMetadataObject(
+            metalake,
+            metadataObject,
+            authorizationPlugin ->
+                authorizationPlugin.onOwnerSet(metadataObject, originOwner.orElse(null), newOwner));
+      }
       originOwner.ifPresent(owner -> notifyOwnerChange(owner, metalake, metadataObject));
     } catch (NoSuchEntityException nse) {
       LOG.warn(

@@ -51,6 +51,7 @@ public class MetadataObjectUtil {
           .put(MetadataObject.Type.COLUMN, Entity.EntityType.COLUMN)
           .put(MetadataObject.Type.ROLE, Entity.EntityType.ROLE)
           .put(MetadataObject.Type.MODEL, Entity.EntityType.MODEL)
+          .put(MetadataObject.Type.TAG, Entity.EntityType.TAG)
           .build();
 
   private MetadataObjectUtil() {}
@@ -104,6 +105,8 @@ public class MetadataObjectUtil {
         return NameIdentifierUtil.ofMetalake(metalakeName);
       case ROLE:
         return AuthorizationUtils.ofRole(metalakeName, metadataObject.name());
+      case TAG:
+        return NameIdentifierUtil.ofTag(metalakeName, metadataObject.name());
       case CATALOG:
       case SCHEMA:
       case TABLE:

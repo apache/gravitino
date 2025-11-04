@@ -18,6 +18,8 @@
  */
 package org.apache.gravitino.server.web.rest;
 
+import static org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants.CAN_ACCESS_METADATA;
+
 import com.codahale.metrics.annotation.ResponseMetered;
 import com.codahale.metrics.annotation.Timed;
 import java.util.Arrays;
@@ -36,6 +38,7 @@ import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.Response;
 import org.apache.commons.lang3.ArrayUtils;
+import org.apache.gravitino.Entity;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.dto.requests.TagCreateRequest;
 import org.apache.gravitino.dto.requests.TagUpdateRequest;
@@ -50,10 +53,17 @@ import org.apache.gravitino.dto.tag.MetadataObjectDTO;
 import org.apache.gravitino.dto.tag.TagDTO;
 import org.apache.gravitino.dto.util.DTOConverters;
 import org.apache.gravitino.metrics.MetricNames;
+import org.apache.gravitino.server.authorization.MetadataFilterHelper;
+import org.apache.gravitino.server.authorization.annotations.AuthorizationExpression;
+import org.apache.gravitino.server.authorization.annotations.AuthorizationFullName;
+import org.apache.gravitino.server.authorization.annotations.AuthorizationMetadata;
+import org.apache.gravitino.server.authorization.annotations.AuthorizationObjectType;
+import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants;
 import org.apache.gravitino.server.web.Utils;
 import org.apache.gravitino.tag.Tag;
 import org.apache.gravitino.tag.TagChange;
 import org.apache.gravitino.tag.TagDispatcher;
+import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -96,14 +106,26 @@ public class TagOperations {
                         .map(t -> DTOConverters.toDTO(t, Optional.empty()))
                         .toArray(TagDTO[]::new);
               }
-
+              tagDTOs =
+                  MetadataFilterHelper.filterByExpression(
+                      metalake,
+                      AuthorizationExpressionConstants.loadTagAuthorizationExpression,
+                      Entity.EntityType.TAG,
+                      tagDTOs,
+                      tagDTO -> NameIdentifierUtil.ofTag(metalake, tagDTO.name()));
               LOG.info("List {} tags info under metalake: {}", tagDTOs.length, metalake);
               return Utils.ok(new TagListResponse(tagDTOs));
 
             } else {
               String[] tagNames = tagDispatcher.listTags(metalake);
               tagNames = tagNames == null ? new String[0] : tagNames;
-
+              tagNames =
+                  MetadataFilterHelper.filterByExpression(
+                      metalake,
+                      AuthorizationExpressionConstants.loadTagAuthorizationExpression,
+                      Entity.EntityType.TAG,
+                      tagNames,
+                      tagName -> NameIdentifierUtil.ofTag(metalake, tagName));
               LOG.info("List {} tags under metalake: {}", tagNames.length, metalake);
               return Utils.ok(new NameListResponse(tagNames));
             }
@@ -117,7 +139,11 @@ public class TagOperations {
   @Produces("application/vnd.gravitino.v1+json")
   @Timed(name = "create-tag." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "create-tag", absolute = true)
-  public Response createTag(@PathParam("metalake") String metalake, TagCreateRequest request) {
+  @AuthorizationExpression(expression = "METALAKE::OWNER || METALAKE::CREATE_TAG")
+  public Response createTag(
+      @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
+          String metalake,
+      TagCreateRequest request) {
     LOG.info("Received create tag request under metalake: {}", metalake);
 
     try {
@@ -143,7 +169,13 @@ public class TagOperations {
   @Produces("application/vnd.gravitino.v1+json")
   @Timed(name = "get-tag." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "get-tag", absolute = true)
-  public Response getTag(@PathParam("metalake") String metalake, @PathParam("tag") String name) {
+  @AuthorizationExpression(
+      expression = AuthorizationExpressionConstants.loadTagAuthorizationExpression,
+      accessMetadataType = MetadataObject.Type.TAG)
+  public Response getTag(
+      @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
+          String metalake,
+      @PathParam("tag") @AuthorizationMetadata(type = Entity.EntityType.TAG) String name) {
     LOG.info("Received get tag request for tag: {} under metalake: {}", name, metalake);
 
     try {
@@ -164,9 +196,11 @@ public class TagOperations {
   @Produces("application/vnd.gravitino.v1+json")
   @Timed(name = "alter-tag." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "alter-tag", absolute = true)
+  @AuthorizationExpression(expression = "METALAKE::OWNER || TAG::OWNER")
   public Response alterTag(
-      @PathParam("metalake") String metalake,
-      @PathParam("tag") String name,
+      @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
+          String metalake,
+      @PathParam("tag") @AuthorizationMetadata(type = Entity.EntityType.TAG) String name,
       TagUpdatesRequest request) {
     LOG.info("Received alter tag request for tag: {} under metalake: {}", name, metalake);
 
@@ -195,7 +229,11 @@ public class TagOperations {
   @Produces("application/vnd.gravitino.v1+json")
   @Timed(name = "delete-tag." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "delete-tag", absolute = true)
-  public Response deleteTag(@PathParam("metalake") String metalake, @PathParam("tag") String name) {
+  @AuthorizationExpression(expression = "METALAKE::OWNER || TAG::OWNER")
+  public Response deleteTag(
+      @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
+          String metalake,
+      @PathParam("tag") @AuthorizationMetadata(type = Entity.EntityType.TAG) String name) {
     LOG.info("Received delete tag request for tag: {} under metalake: {}", name, metalake);
 
     try {
@@ -240,6 +278,7 @@ public class TagOperations {
 
             MetadataObjectDTO[] objectDTOs =
                 Arrays.stream(objects).map(DTOConverters::toDTO).toArray(MetadataObjectDTO[]::new);
+            // TODO filter by can-access-metadata
             return Utils.ok(new MetadataObjectListResponse(objectDTOs));
           });
 
@@ -258,10 +297,12 @@ public class TagOperations {
   @Produces("application/vnd.gravitino.v1+json")
   @Timed(name = "list-object-tags." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "list-object-tags", absolute = true)
+  @AuthorizationExpression(expression = CAN_ACCESS_METADATA)
   public Response listTagsForMetadataObject(
-      @PathParam("metalake") String metalake,
-      @PathParam("type") String type,
-      @PathParam("fullName") String fullName,
+      @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
+          String metalake,
+      @PathParam("type") @AuthorizationObjectType String type,
+      @PathParam("fullName") @AuthorizationFullName String fullName,
       @QueryParam("details") @DefaultValue("false") boolean verbose) {
     MetadataObjectTagOperations metadataObjectTagOperations =
         new MetadataObjectTagOperations(tagDispatcher);
@@ -279,11 +320,13 @@ public class TagOperations {
   @Produces("application/vnd.gravitino.v1+json")
   @Timed(name = "get-object-tag." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "get-object-tag", absolute = true)
+  @AuthorizationExpression(expression = "(METALAKE::OWNER || TAG::OWNER ) && CAN_ACCESS_METADATA")
   public Response getTagForObject(
-      @PathParam("metalake") String metalake,
-      @PathParam("type") String type,
-      @PathParam("fullName") String fullName,
-      @PathParam("tag") String tagName) {
+      @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
+          String metalake,
+      @PathParam("type") @AuthorizationObjectType String type,
+      @PathParam("fullName") @AuthorizationFullName String fullName,
+      @PathParam("tag") @AuthorizationMetadata(type = Entity.EntityType.TAG) String tagName) {
     MetadataObjectTagOperations metadataObjectTagOperations =
         new MetadataObjectTagOperations(tagDispatcher);
     metadataObjectTagOperations.setHttpRequest(httpRequest);
@@ -300,10 +343,12 @@ public class TagOperations {
   @Produces("application/vnd.gravitino.v1+json")
   @Timed(name = "associate-object-tags." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "associate-object-tags", absolute = true)
+  @AuthorizationExpression(expression = CAN_ACCESS_METADATA)
   public Response associateTagsForObject(
-      @PathParam("metalake") String metalake,
-      @PathParam("type") String type,
-      @PathParam("fullName") String fullName,
+      @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
+          String metalake,
+      @PathParam("type") @AuthorizationObjectType String type,
+      @PathParam("fullName") @AuthorizationFullName String fullName,
       TagsAssociateRequest request) {
     MetadataObjectTagOperations metadataObjectTagOperations =
         new MetadataObjectTagOperations(tagDispatcher);

@@ -62,7 +62,8 @@ public class MetadataIdConverter {
           MetadataObject.Type.FILESET, Entity.EntityType.FILESET,
           MetadataObject.Type.TOPIC, Entity.EntityType.TOPIC,
           MetadataObject.Type.COLUMN, Entity.EntityType.COLUMN,
-          MetadataObject.Type.ROLE, Entity.EntityType.ROLE);
+          MetadataObject.Type.ROLE, Entity.EntityType.ROLE,
+          MetadataObject.Type.TAG, Entity.EntityType.TAG);
   // Maps metadata type to capability scope
   private static final Map<MetadataObject.Type, Capability.Scope> METADATA_SCOPE_MAPPING =
       ImmutableMap.of(

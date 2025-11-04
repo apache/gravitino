@@ -128,6 +128,9 @@ public class MetadataObjectService {
       return RoleMetaService.getInstance().getRoleIdByMetalakeIdAndName(metalakeId, fullName);
     }
     List<String> names = DOT_SPLITTER.splitToList(fullName);
+    if (type == MetadataObject.Type.TAG) {
+      return TagMetaService.getInstance().getTagIdByTagName(metalakeId, fullName);
+    }
 
     long catalogId =
         CatalogMetaService.getInstance().getCatalogIdByMetalakeIdAndName(metalakeId, names.get(0));

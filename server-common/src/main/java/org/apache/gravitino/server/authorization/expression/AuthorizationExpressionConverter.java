@@ -80,7 +80,7 @@ public class AuthorizationExpressionConverter {
     return EXPRESSION_CACHE.computeIfAbsent(
         authorizationExpression,
         (expression) -> {
-          String replacedExpression = replaceGetOwnerPrivilege(expression);
+          String replacedExpression = replaceCanAccessMetadataPrivilege(expression);
           replacedExpression = replaceAnyPrivilege(replacedExpression);
           replacedExpression = replaceAnyExpressions(replacedExpression);
           Matcher matcher = PATTERN.matcher(replacedExpression);
@@ -156,9 +156,9 @@ public class AuthorizationExpressionConverter {
     return result.toString();
   }
 
-  public static String replaceGetOwnerPrivilege(String expression) {
+  public static String replaceCanAccessMetadataPrivilege(String expression) {
     return expression.replaceAll(
-        "CAN_GET_OWNER",
+        AuthorizationExpressionConstants.CAN_ACCESS_METADATA,
         """
               ( entityType == 'CATALOG' && (%s)) ||
               ( entityType == 'SCHEMA' && (%s)) ||
