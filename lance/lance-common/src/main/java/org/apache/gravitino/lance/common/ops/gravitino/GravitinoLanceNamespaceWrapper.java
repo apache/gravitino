@@ -524,7 +524,11 @@ public class GravitinoLanceNamespaceWrapper extends NamespaceWrapper
 
   @Override
   public DescribeTableResponse describeTable(String tableId, String delimiter, Long version) {
-    // TODO Currently we do not support versioned table description.
+    if (version != null) {
+      throw new UnsupportedOperationException(
+          "Describing specific table version is not supported.");
+    }
+
     ObjectIdentifier nsId = ObjectIdentifier.of(tableId, Pattern.quote(delimiter));
     Preconditions.checkArgument(
         nsId.levels() == 3, "Expected at 3-level namespace but got: %s", nsId.levels());

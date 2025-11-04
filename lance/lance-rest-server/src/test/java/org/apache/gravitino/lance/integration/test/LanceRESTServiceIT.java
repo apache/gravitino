@@ -628,6 +628,12 @@ public class LanceRESTServiceIT extends BaseIT {
         Assertions.assertThrows(
             LanceNamespaceException.class, () -> ns.describeTable(describeTableRequest));
     Assertions.assertEquals(404, lanceNamespaceException.getCode());
+
+    describeTableRequest.setVersion(1L);
+    lanceNamespaceException =
+        Assertions.assertThrows(
+            LanceNamespaceException.class, () -> ns.describeTable(describeTableRequest));
+    Assertions.assertEquals(406, lanceNamespaceException.getCode());
   }
 
   private GravitinoMetalake createMetalake(String metalakeName) {
