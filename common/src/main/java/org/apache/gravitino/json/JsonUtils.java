@@ -18,6 +18,10 @@
  */
 package org.apache.gravitino.json;
 
+import static org.apache.gravitino.dto.rel.expressions.FunctionArg.ArgType.FIELD;
+import static org.apache.gravitino.dto.rel.expressions.FunctionArg.ArgType.FUNCTION;
+import static org.apache.gravitino.dto.rel.expressions.FunctionArg.ArgType.LITERAL;
+
 import com.fasterxml.jackson.annotation.JsonAutoDetect;
 import com.fasterxml.jackson.annotation.PropertyAccessor;
 import com.fasterxml.jackson.core.JacksonException;
@@ -304,6 +308,8 @@ public class JsonUtils {
                 new SimpleModule()
                     .addDeserializer(Type.class, new TypeDeserializer())
                     .addSerializer(Type.class, new TypeSerializer())
+                    .addDeserializer(Partitioning.class, new PartitioningDeserializer())
+                    .addSerializer(Partitioning.class, new PartitioningSerializer())
                     .addDeserializer(Expression.class, new ColumnDefaultValueDeserializer())
                     .addSerializer(Expression.class, new ColumnDefaultValueSerializer())
                     .addDeserializer(StatisticValue.class, new StatisticValueDeserializer())
