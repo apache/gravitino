@@ -28,20 +28,23 @@ import static org.apache.gravitino.catalog.hadoop.fs.Constants.HADOOP_SECURITY_P
 import static org.apache.gravitino.catalog.hadoop.fs.Constants.SECURITY_KRB5_ENV;
 import static org.apache.gravitino.catalog.hadoop.fs.HDFSFileSystemProvider.IPC_FALLBACK_TO_SIMPLE_AUTH_ALLOWED;
 
-import java.lang.reflect.Method;
+import java.io.IOException;
+import java.net.URI;
 import java.security.PrivilegedExceptionAction;
 import java.time.Instant;
 import java.util.Timer;
 import java.util.TimerTask;
-import net.sf.cglib.proxy.Enhancer;
-import net.sf.cglib.proxy.MethodInterceptor;
-import net.sf.cglib.proxy.MethodProxy;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.exceptions.GravitinoRuntimeException;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FSDataInputStream;
+import org.apache.hadoop.fs.FSDataOutputStream;
+import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.hadoop.util.Progressable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -49,9 +52,9 @@ import org.slf4j.LoggerFactory;
  * A FileSystem wrapper that runs all operations under a specific UGI (UserGroupInformation).
  * Supports both simple and Kerberos authentication, with automatic ticket renewal.
  */
-public class HDFSFileSystemProxy implements MethodInterceptor {
+public class HDFSAuthenticationFileSystem extends FileSystem {
 
-  private static final Logger LOG = LoggerFactory.getLogger(HDFSFileSystemProxy.class);
+  private static final Logger LOG = LoggerFactory.getLogger(HDFSAuthenticationFileSystem.class);
 
   private static final long DEFAULT_RENEW_INTERVAL_MS = 10 * 60 * 1000L;
   private static final String SYSTEM_USER_NAME = System.getProperty("user.name");
@@ -68,7 +71,7 @@ public class HDFSFileSystemProxy implements MethodInterceptor {
    * @param path the HDFS path
    * @param conf the Hadoop configuration
    */
-  public HDFSFileSystemProxy(Path path, Configuration conf) {
+  public HDFSAuthenticationFileSystem(Path path, Configuration conf) {
     try {
       conf.setBoolean(FS_DISABLE_CACHE, true);
       conf.setBoolean(IPC_FALLBACK_TO_SIMPLE_AUTH_ALLOWED, true);
@@ -109,19 +112,6 @@ public class HDFSFileSystemProxy implements MethodInterceptor {
     }
   }
 
-  /**
-   * Get the proxied FileSystem instance.
-   *
-   * @return the proxied FileSystem
-   */
-  public FileSystem getProxy() {
-    Enhancer e = new Enhancer();
-    e.setClassLoader(fs.getClass().getClassLoader());
-    e.setSuperclass(fs.getClass());
-    e.setCallback(this);
-    return (FileSystem) e.create();
-  }
-
   /** Schedule periodic Kerberos re-login to refresh TGT before expiry. */
   private void startKerberosRenewalTask(String principal) {
     kerberosRenewTimer = new Timer(true);
@@ -147,20 +137,127 @@ public class HDFSFileSystemProxy implements MethodInterceptor {
         DEFAULT_RENEW_INTERVAL_MS);
   }
 
+  /** Run a FileSystem operation under the UGI context, with IO exception wrapping. */
+  private <T> T doAsIO(PrivilegedExceptionAction<T> action) throws IOException {
+    try {
+      return ugi.doAs(action);
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+      throw new IOException(e);
+    } catch (IOException e) {
+      throw e;
+    } catch (Exception e) {
+      throw new IOException(e);
+    }
+  }
+
   @Override
-  public Object intercept(Object o, Method method, Object[] objects, MethodProxy methodProxy)
-      throws Throwable {
-    return ugi.doAs(
-        (PrivilegedExceptionAction<Object>)
-            () -> {
-              try {
-                return methodProxy.invoke(fs, objects);
-              } catch (Throwable e) {
-                if (RuntimeException.class.isAssignableFrom(e.getClass())) {
-                  throw (RuntimeException) e;
-                }
-                throw new RuntimeException("Failed to invoke method", e);
-              }
-            });
+  public URI getUri() {
+    return fs.getUri();
+  }
+
+  @Override
+  public FSDataInputStream open(Path f, int bufferSize) throws IOException {
+    return doAsIO(() -> fs.open(f, bufferSize));
+  }
+
+  @Override
+  public FSDataOutputStream create(
+      Path f,
+      FsPermission permission,
+      boolean overwrite,
+      int bufferSize,
+      short replication,
+      long blockSize,
+      Progressable progress)
+      throws IOException {
+    return doAsIO(
+        () -> fs.create(f, permission, overwrite, bufferSize, replication, blockSize, progress));
+  }
+
+  @Override
+  public FSDataOutputStream append(Path f, int bufferSize, Progressable progress)
+      throws IOException {
+    return doAsIO(() -> fs.append(f, bufferSize, progress));
+  }
+
+  @Override
+  public boolean rename(Path src, Path dst) throws IOException {
+    return doAsIO(() -> fs.rename(src, dst));
+  }
+
+  @Override
+  public boolean delete(Path f, boolean recursive) throws IOException {
+    return doAsIO(() -> fs.delete(f, recursive));
+  }
+
+  @Override
+  public FileStatus[] listStatus(Path f) throws IOException {
+    return doAsIO(() -> fs.listStatus(f));
+  }
+
+  @Override
+  public void setWorkingDirectory(Path newDir) {
+    try {
+      doAsIO(
+          () -> {
+            fs.setWorkingDirectory(newDir);
+            return null;
+          });
+    } catch (IOException e) {
+      throw new RuntimeException(e);
+    }
+  }
+
+  @Override
+  public Path getWorkingDirectory() {
+    try {
+      return doAsIO(fs::getWorkingDirectory);
+    } catch (IOException e) {
+      throw new RuntimeException(e);
+    }
+  }
+
+  @Override
+  public boolean mkdirs(Path f, FsPermission permission) throws IOException {
+    return doAsIO(() -> fs.mkdirs(f, permission));
+  }
+
+  @Override
+  public FileStatus getFileStatus(Path f) throws IOException {
+    return doAsIO(() -> fs.getFileStatus(f));
+  }
+
+  @Override
+  public long getDefaultBlockSize(Path f) {
+    try {
+      return doAsIO(() -> fs.getDefaultBlockSize(f));
+    } catch (IOException e) {
+      throw new RuntimeException(e);
+    }
+  }
+
+  @Override
+  public short getDefaultReplication(Path path) {
+    try {
+      return doAsIO(() -> fs.getDefaultReplication(path));
+    } catch (IOException e) {
+      throw new RuntimeException(e);
+    }
+  }
+
+  @Override
+  public void close() throws IOException {
+    try {
+      if (kerberosRenewTimer != null) {
+        kerberosRenewTimer.cancel();
+      }
+    } finally {
+      doAsIO(
+          () -> {
+            fs.close();
+            return null;
+          });
+    }
   }
 }
