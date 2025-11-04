@@ -36,7 +36,7 @@ from gravitino.api.rel.partitions.list_partition import ListPartition
 from gravitino.api.rel.partitions.range_partition import RangePartition
 from gravitino.api.rel.table import Table
 from gravitino.api.rel.types.types import Types
-from gravitino.client.generic_table import GenericTable
+from gravitino.client.relational_table import RelationalTable
 from gravitino.dto.rel.column_dto import ColumnDTO
 from gravitino.dto.rel.distribution_dto import DistributionDTO
 from gravitino.dto.rel.expressions.field_reference_dto import FieldReferenceDTO
@@ -258,7 +258,7 @@ class DTOConverters:
             Table: The table.
         """
 
-        return GenericTable(
+        return RelationalTable(
             name=dto.name(),
             columns=DTOConverters.from_dtos(dto.columns()),
             partitioning=DTOConverters.from_dtos(dto.partitioning()),

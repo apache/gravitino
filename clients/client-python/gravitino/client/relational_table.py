@@ -26,7 +26,7 @@ from gravitino.api.rel.indexes.index import Index
 from gravitino.api.rel.table import Table
 
 
-class GenericTable(Table):  # pylint: disable=too-many-instance-attributes
+class RelationalTable(Table):  # pylint: disable=too-many-instance-attributes
     """A generic table implementation."""
 
     def __init__(
