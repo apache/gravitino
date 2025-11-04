@@ -366,12 +366,12 @@ public class GenericLakehouseCatalogOperations
   }
 
   @Override
-  public boolean dropTable(NameIdentifier ident) {
+  public boolean purgeTable(NameIdentifier ident) {
     try {
       TableEntity tableEntity = store.get(ident, Entity.EntityType.TABLE, TableEntity.class);
       LakehouseCatalogOperations lakehouseCatalogOperations =
           getLakehouseCatalogOperations(tableEntity.getProperties());
-      return lakehouseCatalogOperations.dropTable(ident);
+      return lakehouseCatalogOperations.purgeTable(ident);
     } catch (NoSuchTableException e) {
       LOG.warn("Table {} does not exist, skip dropping it.", ident);
       return false;
@@ -381,7 +381,7 @@ public class GenericLakehouseCatalogOperations
   }
 
   @Override
-  public boolean purgeTable(NameIdentifier ident) throws UnsupportedOperationException {
+  public boolean dropTable(NameIdentifier ident) throws UnsupportedOperationException {
     try {
       // Only delete the metadata entry here. The physical data will not be deleted.
       if (!tableExists(ident)) {

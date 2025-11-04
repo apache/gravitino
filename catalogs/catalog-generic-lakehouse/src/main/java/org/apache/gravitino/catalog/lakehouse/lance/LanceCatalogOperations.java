@@ -280,7 +280,7 @@ public class LanceCatalogOperations implements LakehouseCatalogOperations {
   }
 
   @Override
-  public boolean dropTable(NameIdentifier ident) {
+  public boolean purgeTable(NameIdentifier ident) {
     try {
       TableEntity tableEntity = store.get(ident, Entity.EntityType.TABLE, TableEntity.class);
       Map<String, String> lancePropertiesMap = tableEntity.getProperties();
@@ -297,5 +297,11 @@ public class LanceCatalogOperations implements LakehouseCatalogOperations {
     } catch (IOException e) {
       throw new RuntimeException("Failed to drop Lance table: " + ident.name(), e);
     }
+  }
+
+  @Override
+  public boolean dropTable(NameIdentifier ident) {
+    throw new UnsupportedOperationException(
+        "LanceCatalogOperations does not support dropTable operation.");
   }
 }

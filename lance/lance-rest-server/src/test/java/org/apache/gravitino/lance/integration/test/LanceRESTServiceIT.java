@@ -77,8 +77,8 @@ import org.junit.jupiter.api.Test;
 import org.testcontainers.shaded.com.google.common.base.Joiner;
 
 public class LanceRESTServiceIT extends BaseIT {
-  public static final String CATALOG_NAME = GravitinoITUtils.genRandomName("lance_rest_catalog");
-  public static final String SCHEMA_NAME = GravitinoITUtils.genRandomName("lance_rest_schema");
+  private static final String CATALOG_NAME = GravitinoITUtils.genRandomName("lance_rest_catalog");
+  private static final String SCHEMA_NAME = GravitinoITUtils.genRandomName("lance_rest_schema");
 
   private GravitinoMetalake metalake;
   private Catalog catalog;
@@ -406,11 +406,19 @@ public class LanceRESTServiceIT extends BaseIT {
     CreateEmptyTableRequest request = new CreateEmptyTableRequest();
     String location = tempDir + "/" + "empty_table/";
     request.setLocation(location);
-    request.setProperties(ImmutableMap.of());
+    request.setProperties(
+        ImmutableMap.of(
+            "key1", "v1",
+            "lance.storage.a", "value_a",
+            "lance.storage.b", "value_b"));
     request.setId(List.of(CATALOG_NAME, SCHEMA_NAME, "empty_table"));
 
     CreateEmptyTableResponse response = ns.createEmptyTable(request);
     Assertions.assertNotNull(response);
+    Assertions.assertEquals(location, response.getLocation());
+    Assertions.assertEquals("v1", response.getProperties().get("key1"));
+    Assertions.assertEquals("value_a", response.getStorageOptions().get("lance.storage.a"));
+    Assertions.assertEquals("value_b", response.getStorageOptions().get("lance.storage.b"));
 
     DescribeTableRequest describeTableRequest = new DescribeTableRequest();
     describeTableRequest.setId(List.of(CATALOG_NAME, SCHEMA_NAME, "empty_table"));
@@ -447,9 +455,18 @@ public class LanceRESTServiceIT extends BaseIT {
     CreateTableRequest request = new CreateTableRequest();
     request.setId(ids);
     request.setLocation(location);
+    request.setProperties(
+        ImmutableMap.of(
+            "key1", "v1",
+            "lance.storage.a", "value_a",
+            "lance.storage.b", "value_b"));
+
     CreateTableResponse response = ns.createTable(request, body);
     Assertions.assertNotNull(response);
     Assertions.assertEquals(location, response.getLocation());
+    Assertions.assertEquals("v1", response.getProperties().get("key1"));
+    Assertions.assertEquals("value_a", response.getStorageOptions().get("lance.storage.a"));
+    Assertions.assertEquals("value_b", response.getStorageOptions().get("lance.storage.b"));
 
     DescribeTableRequest describeTableRequest = new DescribeTableRequest();
     describeTableRequest.setId(ids);
@@ -553,7 +570,7 @@ public class LanceRESTServiceIT extends BaseIT {
     Assertions.assertTrue(loadTable.getProperties().containsKey("key1"));
 
     // Test register again with OVERWRITE mode
-    String newLocation = ns + "/" + "register_new/";
+    String newLocation = tempDir + "/" + "register_new/";
     registerTableRequest.setMode(ModeEnum.OVERWRITE);
     registerTableRequest.setLocation(newLocation);
     response = Assertions.assertDoesNotThrow(() -> ns.registerTable(registerTableRequest));
@@ -585,7 +602,7 @@ public class LanceRESTServiceIT extends BaseIT {
 
     // Try to create a table and then deregister table
     CreateEmptyTableRequest createEmptyTableRequest = new CreateEmptyTableRequest();
-    String location = ns + "/" + "to_be_deregistered_table/";
+    String location = tempDir + "/" + "to_be_deregistered_table/";
     ids = List.of(CATALOG_NAME, SCHEMA_NAME, "to_be_deregistered_table");
     createEmptyTableRequest.setLocation(location);
     createEmptyTableRequest.setProperties(ImmutableMap.of());
@@ -626,7 +643,7 @@ public class LanceRESTServiceIT extends BaseIT {
         properties);
   }
 
-  protected void createSchema() {
+  private void createSchema() {
     Map<String, String> schemaProperties = Maps.newHashMap();
     String comment = "comment";
     catalog.asSchemas().createSchema(SCHEMA_NAME, comment, schemaProperties);

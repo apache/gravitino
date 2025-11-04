@@ -16,17 +16,16 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.lance.common.ops.gravitino;
+package org.apache.gravitino.lance.common.utils;
 
 import java.util.Arrays;
 import org.apache.arrow.vector.types.pojo.ArrowType;
 import org.apache.arrow.vector.types.pojo.Field;
 import org.apache.arrow.vector.types.pojo.Schema;
-import org.apache.gravitino.lance.common.utils.ArrowUtils;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
-public class TestGravitinoLanceNamespaceWrapper {
+public class TestArrowUtils {
 
   @Test
   public void testParseArrowIpcStream() throws Exception {

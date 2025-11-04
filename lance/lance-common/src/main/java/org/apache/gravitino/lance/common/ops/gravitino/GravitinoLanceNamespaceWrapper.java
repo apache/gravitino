@@ -76,6 +76,7 @@ import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NonEmptyCatalogException;
 import org.apache.gravitino.exceptions.NonEmptySchemaException;
 import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
+import org.apache.gravitino.exceptions.TableAlreadyExistsException;
 import org.apache.gravitino.lance.common.config.LanceConfig;
 import org.apache.gravitino.lance.common.ops.LanceNamespaceOperations;
 import org.apache.gravitino.lance.common.ops.LanceTableOperations;
@@ -569,7 +570,6 @@ public class GravitinoLanceNamespaceWrapper extends NamespaceWrapper
 
     Map<String, String> createTableProperties = Maps.newHashMap(tableProperties);
     createTableProperties.put("location", tableLocation);
-    createTableProperties.put("mode", mode.getValue());
     createTableProperties.put("format", "lance");
 
     switch (mode) {
@@ -594,7 +594,7 @@ public class GravitinoLanceNamespaceWrapper extends NamespaceWrapper
         break;
       case OVERWRITE:
         if (catalog.asTableCatalog().tableExists(tableIdentifier)) {
-          catalog.asTableCatalog().dropTable(tableIdentifier);
+          catalog.asTableCatalog().purgeTable(tableIdentifier);
         }
         break;
       default:
@@ -610,6 +610,13 @@ public class GravitinoLanceNamespaceWrapper extends NamespaceWrapper
     CreateTableResponse response = new CreateTableResponse();
     response.setProperties(t.properties());
     response.setLocation(tableLocation);
+    // We have removed the prefix "lance.storage" from the table properties for storage options. So
+    // here we need to add it back.
+    Map<String, String> storageOperations =
+        t.properties().entrySet().stream()
+            .filter(entry -> entry.getKey().startsWith("lance.storage."))
+            .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+    response.setStorageOptions(storageOperations);
     response.setVersion(0L);
     return response;
   }
@@ -634,7 +641,7 @@ public class GravitinoLanceNamespaceWrapper extends NamespaceWrapper
         && catalog.asTableCatalog().tableExists(tableIdentifier)) {
       throw LanceNamespaceException.conflict(
           "Table already exists: " + tableId,
-          SchemaAlreadyExistsException.class.getSimpleName(),
+          TableAlreadyExistsException.class.getSimpleName(),
           tableId,
           CommonUtil.formatCurrentStackTrace());
     }
@@ -642,7 +649,7 @@ public class GravitinoLanceNamespaceWrapper extends NamespaceWrapper
     if (mode == RegisterTableRequest.ModeEnum.OVERWRITE
         && catalog.asTableCatalog().tableExists(tableIdentifier)) {
       LOG.info("Overwriting existing table: {}", tableId);
-      catalog.asTableCatalog().purgeTable(tableIdentifier);
+      catalog.asTableCatalog().dropTable(tableIdentifier);
     }
 
     Table t =
@@ -670,7 +677,7 @@ public class GravitinoLanceNamespaceWrapper extends NamespaceWrapper
     Table t = catalog.asTableCatalog().loadTable(tableIdentifier);
     Map<String, String> properties = t.properties();
     // TODO Support real deregister API.
-    boolean result = catalog.asTableCatalog().purgeTable(tableIdentifier);
+    boolean result = catalog.asTableCatalog().dropTable(tableIdentifier);
     if (!result) {
       throw LanceNamespaceException.notFound(
           "Table not found: " + tableId,

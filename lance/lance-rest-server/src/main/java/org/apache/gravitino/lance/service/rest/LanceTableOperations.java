@@ -147,7 +147,7 @@ public class LanceTableOperations {
           request.getProperties() == null
               ? Maps.newHashMap()
               : Maps.newHashMap(request.getProperties());
-      props.put("format", "lance");
+
       CreateTableResponse response =
           lanceNamespace
               .asTableOps()
@@ -161,6 +161,7 @@ public class LanceTableOperations {
       CreateEmptyTableResponse responseObj = new CreateEmptyTableResponse();
       responseObj.setProperties(response.getProperties());
       responseObj.setLocation(response.getLocation());
+      responseObj.setStorageOptions(response.getStorageOptions());
       return Response.ok(responseObj).build();
     } catch (Exception e) {
       return LanceExceptionMapper.toRESTResponse(tableId, e);

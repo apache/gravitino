@@ -31,7 +31,7 @@ public interface LanceTableOperations {
   /**
    * Describe the details of a table.
    *
-   * @param tableId table ids are in the format of "namespace/delimiter/table_name"
+   * @param tableId table ids are in the format of "{namespace}{delimiter}{table_name}"
    * @param delimiter the delimiter used in the namespace
    * @param version the version of the table to describe, if null, describe the latest version
    * @return the table description
