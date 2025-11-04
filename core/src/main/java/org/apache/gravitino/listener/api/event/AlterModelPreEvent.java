@@ -23,7 +23,7 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.model.ModelChange;
 
 /** Represents an event triggered before altering a model. */
-public class AlterModelPreEvent extends PreEvent {
+public class AlterModelPreEvent extends ModelPreEvent {
   private final ModelChange[] modelChanges;
 
   public AlterModelPreEvent(String user, NameIdentifier identifier, ModelChange[] modelChanges) {
