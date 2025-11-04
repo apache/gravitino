@@ -156,6 +156,35 @@ public class MetadataFilterHelper {
       Entity.EntityType entityType,
       E[] entities,
       Function<E, NameIdentifier> toNameIdentifier) {
+    GravitinoAuthorizer authorizer =
+        GravitinoAuthorizerProvider.getInstance().getGravitinoAuthorizer();
+    Principal currentPrincipal = PrincipalUtils.getCurrentPrincipal();
+    return filterByExpression(
+        metalake, expression, entityType, entities, toNameIdentifier, currentPrincipal, authorizer);
+  }
+
+  /**
+   * Call {@link AuthorizationExpressionEvaluator} and use specified Principal and
+   * GravitinoAuthorizer to filter the metadata list
+   *
+   * @param metalake metalake name
+   * @param expression authorization expression
+   * @param entityType entity type
+   * @param entities metadata entities
+   * @param toNameIdentifier function to convert entity to NameIdentifier
+   * @param currentPrincipal current principal
+   * @param authorizer authorizer to filter metadata
+   * @return Filtered Metadata Entity
+   * @param <E> Entity class
+   */
+  public static <E> E[] filterByExpression(
+      String metalake,
+      String expression,
+      Entity.EntityType entityType,
+      E[] entities,
+      Function<E, NameIdentifier> toNameIdentifier,
+      Principal currentPrincipal,
+      GravitinoAuthorizer authorizer) {
     if (!enableAuthorization()) {
       return entities;
     }
@@ -163,7 +192,6 @@ public class MetadataFilterHelper {
     AuthorizationRequestContext authorizationRequestContext = new AuthorizationRequestContext();
     List<CompletableFuture<E>> futures = new ArrayList<>();
     for (E entity : entities) {
-      Principal currentPrincipal = PrincipalUtils.getCurrentPrincipal();
       futures.add(
           CompletableFuture.supplyAsync(
               () -> {
@@ -172,7 +200,7 @@ public class MetadataFilterHelper {
                       currentPrincipal,
                       () -> {
                         AuthorizationExpressionEvaluator authorizationExpressionEvaluator =
-                            new AuthorizationExpressionEvaluator(expression);
+                            new AuthorizationExpressionEvaluator(expression, authorizer);
                         NameIdentifier nameIdentifier = toNameIdentifier.apply(entity);
                         Map<Entity.EntityType, NameIdentifier> nameIdentifierMap =
                             spiltMetadataNames(metalake, entityType, nameIdentifier);
@@ -204,7 +232,7 @@ public class MetadataFilterHelper {
    * @param nameIdentifier metadata name
    * @return A map containing the metadata object and all its parent objects, keyed by their types
    */
-  private static Map<Entity.EntityType, NameIdentifier> spiltMetadataNames(
+  public static Map<Entity.EntityType, NameIdentifier> spiltMetadataNames(
       String metalake, Entity.EntityType entityType, NameIdentifier nameIdentifier) {
     Map<Entity.EntityType, NameIdentifier> nameIdentifierMap = new HashMap<>();
     nameIdentifierMap.put(Entity.EntityType.METALAKE, NameIdentifierUtil.ofMetalake(metalake));

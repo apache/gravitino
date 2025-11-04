@@ -98,4 +98,52 @@ public class TestIcebergMetricsManager {
 
     icebergMetricsManager.close();
   }
+
+  @Test
+  void testRecordMetricReturnsTrue() {
+    IcebergConfig icebergConfig = new IcebergConfig();
+    IcebergMetricsManager icebergMetricsManager = new IcebergMetricsManager(icebergConfig);
+    icebergMetricsManager.start();
+
+    MetricsReport metricsReport = createMetricsReport();
+    boolean result = icebergMetricsManager.recordMetric(metricsReport);
+
+    Assertions.assertTrue(result, "Recording metric should return true when successful");
+    icebergMetricsManager.close();
+  }
+
+  @Test
+  void testRecordMetricReturnsFalseWhenClosed() {
+    IcebergConfig icebergConfig = new IcebergConfig();
+    IcebergMetricsManager icebergMetricsManager = new IcebergMetricsManager(icebergConfig);
+    icebergMetricsManager.start();
+    icebergMetricsManager.close();
+
+    MetricsReport metricsReport = createMetricsReport();
+    boolean result = icebergMetricsManager.recordMetric(metricsReport);
+
+    Assertions.assertFalse(result, "Recording metric should return false when manager is closed");
+  }
+
+  @Test
+  void testRecordMetricReturnsFalseWhenQueueFull() {
+    Map<String, String> properties =
+        ImmutableMap.of(IcebergConstants.ICEBERG_METRICS_QUEUE_CAPACITY, "1");
+    IcebergConfig icebergConfig = new IcebergConfig(properties);
+    IcebergMetricsManager icebergMetricsManager = new IcebergMetricsManager(icebergConfig);
+    // Don't start the manager so metrics won't be consumed from queue
+
+    MetricsReport metricsReport1 = createMetricsReport();
+    MetricsReport metricsReport2 = createMetricsReport();
+
+    // First metric should succeed
+    boolean result1 = icebergMetricsManager.recordMetric(metricsReport1);
+    Assertions.assertTrue(result1, "First metric should be queued successfully");
+
+    // Second metric should fail because queue is full
+    boolean result2 = icebergMetricsManager.recordMetric(metricsReport2);
+    Assertions.assertFalse(result2, "Second metric should fail when queue is full");
+
+    icebergMetricsManager.close();
+  }
 }

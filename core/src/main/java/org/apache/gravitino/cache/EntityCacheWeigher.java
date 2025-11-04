@@ -32,32 +32,51 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * A {@link Weigher} implementation that calculates the weight of an entity based on its type. The
- * weight is calculated as follows:
+ * A {@link Weigher} implementation that calculates the weight of an entity based on its type. In
+ * Caffeine's weight-based eviction, higher weights make entities MORE likely to be evicted (all
+ * else being equal), as the cache prefers to retain lighter entries within the maximum weight
+ * limit.
+ *
+ * <p>Weight assignments (lower weight = higher retention priority):
  *
  * <ul>
  *   <li>Metalake: 0, which means that it will never be evicted from the cache unless timeout occurs
  *       or manually cleared.
  *   <li>Catalog: 0, which means that it will never be evicted from the cache unless timeout occurs
  *       or manually cleared.
- *   <li>Schema: 10
- *   <li>Other: 100
+ *   <li>Schema: 100 (lowest weight, highest retention priority)
+ *   <li>Other (e.g., Fileset): 200 (medium weight, medium retention priority)
+ *   <li>Tag: 500 (highest weight, lowest retention priority)
+ *   <li>Policy: 500 (highest weight, lowest retention priority)
  * </ul>
+ *
+ * <p>Note: Caffeine's W-TinyLFU algorithm considers both access frequency and weight. Frequently
+ * accessed heavier entries may still be retained over infrequently accessed lighter entries.
  */
 public class EntityCacheWeigher implements Weigher<EntityCacheKey, List<Entity>> {
-  public static final int METALAKE_WEIGHT = 0;
+  public static final int METALAKE_WEIGHT = 0; // 0 means never evict
   public static final int CATALOG_WEIGHT = 0;
-  public static final int SCHEMA_WEIGHT = 10;
-  public static final int OTHER_WEIGHT = 100;
+  public static final int SCHEMA_WEIGHT = 100; // Lower weight = higher retention priority
+  public static final int OTHER_WEIGHT = 200;
+  public static final int TAG_WEIGHT = 500;
+  public static final int POLICY_WEIGHT = 500;
   private static final Logger LOG = LoggerFactory.getLogger(EntityCacheWeigher.class.getName());
   private static final EntityCacheWeigher INSTANCE = new EntityCacheWeigher();
   private static final Map<Entity.EntityType, Integer> ENTITY_WEIGHTS =
       ImmutableMap.of(
           Entity.EntityType.METALAKE, METALAKE_WEIGHT,
           Entity.EntityType.CATALOG, CATALOG_WEIGHT,
-          Entity.EntityType.SCHEMA, SCHEMA_WEIGHT);
+          Entity.EntityType.SCHEMA, SCHEMA_WEIGHT,
+          Entity.EntityType.TAG, TAG_WEIGHT,
+          Entity.EntityType.POLICY, POLICY_WEIGHT);
   private static final long MAX_WEIGHT =
-      2 * (METALAKE_WEIGHT * 10 + CATALOG_WEIGHT * (10 * 200) + SCHEMA_WEIGHT * (10 * 200 * 1000));
+      2
+          * (METALAKE_WEIGHT * 10
+              + CATALOG_WEIGHT * 100
+              + SCHEMA_WEIGHT * 1000
+              + OTHER_WEIGHT * 10000
+              + TAG_WEIGHT * 10000
+              + POLICY_WEIGHT * 10000);
 
   @VisibleForTesting
   protected EntityCacheWeigher() {}

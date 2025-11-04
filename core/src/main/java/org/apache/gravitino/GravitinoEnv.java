@@ -70,6 +70,7 @@ import org.apache.gravitino.listener.MetalakeEventDispatcher;
 import org.apache.gravitino.listener.ModelEventDispatcher;
 import org.apache.gravitino.listener.PartitionEventDispatcher;
 import org.apache.gravitino.listener.SchemaEventDispatcher;
+import org.apache.gravitino.listener.StatisticEventDispatcher;
 import org.apache.gravitino.listener.TableEventDispatcher;
 import org.apache.gravitino.listener.TagEventDispatcher;
 import org.apache.gravitino.listener.TopicEventDispatcher;
@@ -81,6 +82,7 @@ import org.apache.gravitino.metrics.MetricsSystem;
 import org.apache.gravitino.metrics.source.JVMMetricsSource;
 import org.apache.gravitino.policy.PolicyDispatcher;
 import org.apache.gravitino.policy.PolicyManager;
+import org.apache.gravitino.stats.StatisticDispatcher;
 import org.apache.gravitino.stats.StatisticManager;
 import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.storage.RandomIdGenerator;
@@ -148,7 +150,7 @@ public class GravitinoEnv {
   private OwnerDispatcher ownerDispatcher;
   private FutureGrantManager futureGrantManager;
   private GravitinoAuthorizer gravitinoAuthorizer;
-  private StatisticManager statisticManager;
+  private StatisticDispatcher statisticDispatcher;
 
   protected GravitinoEnv() {}
 
@@ -416,8 +418,8 @@ public class GravitinoEnv {
     return jobOperationDispatcher;
   }
 
-  public StatisticManager statisticManager() {
-    return statisticManager;
+  public StatisticDispatcher statisticDispatcher() {
+    return statisticDispatcher;
   }
 
   public void start() {
@@ -473,11 +475,11 @@ public class GravitinoEnv {
       }
     }
 
-    if (statisticManager != null) {
+    if (statisticDispatcher != null) {
       try {
-        statisticManager.close();
+        statisticDispatcher.close();
       } catch (Exception e) {
-        LOG.warn("Failed to close StatisticManager", e);
+        LOG.warn("Failed to close StatisticDispatcher", e);
       }
     }
 
@@ -572,7 +574,9 @@ public class GravitinoEnv {
     ModelNormalizeDispatcher modelNormalizeDispatcher =
         new ModelNormalizeDispatcher(modelHookDispatcher, catalogManager);
     this.modelDispatcher = new ModelEventDispatcher(eventBus, modelNormalizeDispatcher);
-    this.statisticManager = new StatisticManager(entityStore, idGenerator, config);
+    this.statisticDispatcher =
+        new StatisticEventDispatcher(
+            eventBus, new StatisticManager(entityStore, idGenerator, config));
 
     // Create and initialize access control related modules
     boolean enableAuthorization = config.get(Configs.ENABLE_AUTHORIZATION);

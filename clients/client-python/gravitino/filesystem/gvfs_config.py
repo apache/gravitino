@@ -81,3 +81,7 @@ class GVFSConfig:
     # Note that this cache causes a side effect: if you modify the fileset or fileset catalog metadata,
     # the client can not see the latest changes.
     GVFS_FILESYSTEM_ENABLE_FILESET_METADATA_CACHE = "enable_fileset_metadata_cache"
+
+    # The configuration key for whether to enable auto-creation of fileset location when the
+    # server-side filesystem ops are disabled and the location does not exist. The default is true.
+    GVFS_FILESYSTEM_AUTO_CREATE_LOCATION = "auto_create_location"
