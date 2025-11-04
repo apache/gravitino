@@ -343,6 +343,11 @@ public class BaseIT {
 
     serverConfig = new ServerConfig();
     customConfigs.put(ENTITY_RELATIONAL_JDBC_BACKEND_PATH.getKey(), file.getAbsolutePath());
+    if (!ignoreLanceAuxRestService) {
+      customConfigs.put(
+          LANCE_CONFIG_PREFIX + METALAKE_NAME.getKey(),
+          GravitinoITUtils.genRandomName("LanceRESTService_metalake"));
+    }
     if (testMode != null && testMode.equals(ITUtils.EMBEDDED_TEST_MODE)) {
       MiniGravitinoContext context =
           new MiniGravitinoContext(
@@ -351,11 +356,6 @@ public class BaseIT {
       miniGravitino.start();
       serverConfig = miniGravitino.getServerConfig();
     } else {
-      if (!ignoreLanceAuxRestService) {
-        customConfigs.put(
-            LANCE_CONFIG_PREFIX + METALAKE_NAME.getKey(),
-            GravitinoITUtils.genRandomName("LanceRESTService_metalake"));
-      }
       rewriteGravitinoServerConfig();
       serverConfig.loadFromFile(GravitinoServer.CONF_FILE);
 

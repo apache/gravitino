@@ -78,8 +78,6 @@ public class LanceRESTServiceIT extends BaseIT {
     this.ns = LanceNamespaces.connect("rest", props, null, allocator);
 
     this.tempDir = Files.createTempDirectory("test_lance_rest_service_it_");
-    // deleteOnExit
-    tempDir.toFile().deleteOnExit();
   }
 
   @AfterAll
@@ -91,7 +89,6 @@ public class LanceRESTServiceIT extends BaseIT {
   @AfterEach
   public void clearMetalake() {
     Arrays.stream(metalake.listCatalogs()).forEach(c -> metalake.dropCatalog(c, true));
-    tempDir.toFile().deleteOnExit();
   }
 
   @Test

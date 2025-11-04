@@ -21,7 +21,6 @@ package org.apache.gravitino.integration.test;
 import static com.google.common.util.concurrent.Uninterruptibles.sleepUninterruptibly;
 import static org.apache.gravitino.lance.common.config.LanceConfig.GRAVITINO_NAMESPACE_BACKEND;
 import static org.apache.gravitino.lance.common.config.LanceConfig.LANCE_CONFIG_PREFIX;
-import static org.apache.gravitino.lance.common.config.LanceConfig.METALAKE_NAME;
 import static org.apache.gravitino.lance.common.config.LanceConfig.NAMESPACE_BACKEND;
 import static org.apache.gravitino.lance.common.config.LanceConfig.NAMESPACE_BACKEND_URI;
 
@@ -48,7 +47,6 @@ import org.apache.gravitino.auth.AuthenticatorType;
 import org.apache.gravitino.auxiliary.AuxiliaryServiceManager;
 import org.apache.gravitino.client.HTTPClient;
 import org.apache.gravitino.client.RESTClient;
-import org.apache.gravitino.integration.test.util.GravitinoITUtils;
 import org.apache.gravitino.integration.test.util.HttpUtils;
 import org.apache.gravitino.integration.test.util.ITUtils;
 import org.apache.gravitino.integration.test.util.KerberosProviderHelper;
@@ -298,9 +296,6 @@ public class MiniGravitino {
                   GravitinoServer.WEBSERVER_CONF_PREFIX
                       + JettyServerConfig.WEBSERVER_HTTP_PORT.getKey()));
       customConfigs.put(LANCE_CONFIG_PREFIX + NAMESPACE_BACKEND_URI.getKey(), gravitinoUri);
-
-      String metalakeName = GravitinoITUtils.genRandomName("LanceRESTService_metalake");
-      customConfigs.put(LANCE_CONFIG_PREFIX + METALAKE_NAME.getKey(), metalakeName);
     }
     return ImmutableMap.copyOf(customConfigs);
   }
