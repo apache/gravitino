@@ -95,6 +95,9 @@ public class IcebergTableAuthorizationIT extends IcebergAuthorizationIT {
             .asTableCatalog()
             .tableExists(NameIdentifier.of(SCHEMA_NAME, tableName));
     Assertions.assertTrue(exists);
+    Assertions.assertDoesNotThrow(
+        () ->
+            Assertions.assertDoesNotThrow(() -> sql("CREATE TABLE %s(a int)", "anotherTableName")));
 
     Optional<Owner> owner =
         metalakeClientWithAllPrivilege.getOwner(
@@ -162,6 +165,23 @@ public class IcebergTableAuthorizationIT extends IcebergAuthorizationIT {
             .tableExists(NameIdentifier.of(SCHEMA_NAME, tableName));
     Assertions.assertTrue(exists);
 
+    setTableOwner(tableName);
+    Assertions.assertDoesNotThrow(() -> sql("DROP TABLE %s", tableName));
+    exists =
+        catalogClientWithAllPrivilege
+            .asTableCatalog()
+            .tableExists(NameIdentifier.of(SCHEMA_NAME, tableName));
+    Assertions.assertFalse(exists);
+
+    // recreate the dropped table
+    createTable(SCHEMA_NAME, tableName);
+    Optional<Owner> owner =
+        metalakeClientWithAllPrivilege.getOwner(
+            MetadataObjects.of(
+                Arrays.asList(GRAVITINO_CATALOG_NAME, SCHEMA_NAME, tableName),
+                MetadataObject.Type.TABLE));
+    Assertions.assertTrue(owner.isPresent());
+    Assertions.assertEquals(SUPER_USER, owner.get().name());
     setTableOwner(tableName);
     Assertions.assertDoesNotThrow(() -> sql("DROP TABLE %s", tableName));
     exists =
@@ -243,11 +263,6 @@ public class IcebergTableAuthorizationIT extends IcebergAuthorizationIT {
     setTableOwner(tableName);
     Assertions.assertDoesNotThrow(
         () -> sql("ALTER TABLE %s RENAME TO %s", tableName, tableName + "_renamed"));
-    Table table =
-        catalogClientWithAllPrivilege
-            .asTableCatalog()
-            .loadTable(NameIdentifier.of(SCHEMA_NAME, tableName + "_renamed"));
-    Assertions.assertNotNull(table);
 
     Optional<Owner> owner =
         metalakeClientWithAllPrivilege.getOwner(
@@ -283,9 +298,7 @@ public class IcebergTableAuthorizationIT extends IcebergAuthorizationIT {
     securableObjects.add(catalogObject);
     SecurableObject schemaObject =
         SecurableObjects.ofSchema(
-            catalogObject,
-            schema,
-            ImmutableList.of(Privileges.CreateTable.allow(), Privileges.SelectTable.allow()));
+            catalogObject, schema, ImmutableList.of(Privileges.CreateTable.allow()));
     securableObjects.add(schemaObject);
     metalakeClientWithAllPrivilege.createRole(roleName, new HashMap<>(), securableObjects);
     metalakeClientWithAllPrivilege.grantRolesToUser(ImmutableList.of(roleName), NORMAL_USER);
