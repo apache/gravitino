@@ -19,6 +19,10 @@
 package org.apache.gravitino.integration.test;
 
 import static com.google.common.util.concurrent.Uninterruptibles.sleepUninterruptibly;
+import static org.apache.gravitino.lance.common.config.LanceConfig.GRAVITINO_NAMESPACE_BACKEND;
+import static org.apache.gravitino.lance.common.config.LanceConfig.LANCE_CONFIG_PREFIX;
+import static org.apache.gravitino.lance.common.config.LanceConfig.NAMESPACE_BACKEND;
+import static org.apache.gravitino.lance.common.config.LanceConfig.NAMESPACE_BACKEND_URI;
 
 import com.google.common.base.Splitter;
 import com.google.common.collect.ImmutableMap;
@@ -27,6 +31,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -50,6 +55,7 @@ import org.apache.gravitino.rest.RESTUtils;
 import org.apache.gravitino.server.GravitinoServer;
 import org.apache.gravitino.server.ServerConfig;
 import org.apache.gravitino.server.web.JettyServerConfig;
+import org.junit.platform.commons.util.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -78,11 +84,32 @@ public class MiniGravitino {
     mockConfDir.mkdirs();
   }
 
-  private void removeAuxRestConfiguration(Properties properties) {
-    // Disable Iceberg REST service
-    properties.remove(
-        AuxiliaryServiceManager.GRAVITINO_AUX_SERVICE_PREFIX
-            + AuxiliaryServiceManager.AUX_SERVICE_NAMES);
+  private void removeAuxRestConfiguration(Properties properties, String serviceToRemove) {
+    String value =
+        properties.getProperty(
+            AuxiliaryServiceManager.GRAVITINO_AUX_SERVICE_PREFIX
+                + AuxiliaryServiceManager.AUX_SERVICE_NAMES);
+    if (StringUtils.isNotBlank(value) && StringUtils.isNotBlank(serviceToRemove)) {
+      List<String> serviceNames = COMMA.splitToList(value);
+      List<String> updatedServiceNames = new ArrayList<>();
+      for (String serviceName : serviceNames) {
+        if (!serviceName.equalsIgnoreCase(serviceToRemove)) {
+          updatedServiceNames.add(serviceName);
+        }
+      }
+
+      String updatedValue = String.join(",", updatedServiceNames);
+      if (StringUtils.isBlank(updatedValue)) {
+        properties.remove(
+            AuxiliaryServiceManager.GRAVITINO_AUX_SERVICE_PREFIX
+                + AuxiliaryServiceManager.AUX_SERVICE_NAMES);
+      } else {
+        properties.setProperty(
+            AuxiliaryServiceManager.GRAVITINO_AUX_SERVICE_PREFIX
+                + AuxiliaryServiceManager.AUX_SERVICE_NAMES,
+            updatedValue);
+      }
+    }
   }
 
   public void start() throws Exception {
@@ -103,9 +130,18 @@ public class MiniGravitino {
         serverConfig.loadPropertiesFromFile(
             new File(ITUtils.joinPath(mockConfDir.getAbsolutePath(), "gravitino.conf")));
 
-    // Disable auxiliary rest service.
-    if (context.ignoreAuxRestService) {
-      removeAuxRestConfiguration(properties);
+    if (context.ignoreIcebergAuxRestService) {
+      // Disable auxiliary rest service.
+      removeAuxRestConfiguration(properties, "iceberg-rest");
+      LOG.info("Iceberg auxiliary REST service is disabled for MiniGravitino.");
+      ITUtils.overwriteConfigFile(
+          ITUtils.joinPath(mockConfDir.getAbsolutePath(), "gravitino.conf"), properties);
+    }
+
+    if (context.ignoreLanceAuxRestService) {
+      // Disable auxiliary rest service.
+      removeAuxRestConfiguration(properties, "lance-rest");
+      LOG.info("Lance auxiliary REST service is disabled for MiniGravitino.");
       ITUtils.overwriteConfigFile(
           ITUtils.joinPath(mockConfDir.getAbsolutePath(), "gravitino.conf"), properties);
     }
@@ -230,20 +266,38 @@ public class MiniGravitino {
     return customConfigs;
   }
 
-  private Map<String, String> getLanceRestServiceConfigs() throws IOException {
+  private Map<String, String> getLanceRestServiceConfigs(Map<String, String> configMap)
+      throws IOException {
+    if (context.ignoreLanceAuxRestService) {
+      return Collections.emptyMap();
+    }
+
     Map<String, String> customConfigs = new HashMap<>();
 
     String lanceJarPath = Paths.get("lance", "lance-rest-server", "build", "libs").toString();
     String lanceConfigPath =
         Paths.get("lance", "lance-rest-server", "src", "main", "resources").toString();
     customConfigs.put(
-        "gravitino.lance-rest." + AuxiliaryServiceManager.AUX_SERVICE_CLASSPATH,
+        LANCE_CONFIG_PREFIX + AuxiliaryServiceManager.AUX_SERVICE_CLASSPATH,
         String.join(",", lanceJarPath, lanceConfigPath));
 
     customConfigs.put(
-        "gravitino.lance-rest." + JettyServerConfig.WEBSERVER_HTTP_PORT.getKey(),
+        LANCE_CONFIG_PREFIX + JettyServerConfig.WEBSERVER_HTTP_PORT.getKey(),
         String.valueOf(RESTUtils.findAvailablePort(4000, 5000)));
-    return customConfigs;
+
+    if (GRAVITINO_NAMESPACE_BACKEND.equals(
+        configMap.getOrDefault(NAMESPACE_BACKEND.getKey(), NAMESPACE_BACKEND.getDefaultValue()))) {
+      // Set the Lance REST service to use the Gravitino server URI
+      String gravitinoUri =
+          String.format(
+              "http://%s:%s",
+              "localhost",
+              configMap.get(
+                  GravitinoServer.WEBSERVER_CONF_PREFIX
+                      + JettyServerConfig.WEBSERVER_HTTP_PORT.getKey()));
+      customConfigs.put(LANCE_CONFIG_PREFIX + NAMESPACE_BACKEND_URI.getKey(), gravitinoUri);
+    }
+    return ImmutableMap.copyOf(customConfigs);
   }
 
   // Customize the config file
@@ -255,7 +309,7 @@ public class MiniGravitino {
         String.valueOf(RESTUtils.findAvailablePort(2000, 3000)));
 
     configMap.putAll(getIcebergRestServiceConfigs());
-    configMap.putAll(getLanceRestServiceConfigs());
+    configMap.putAll(getLanceRestServiceConfigs(configMap));
     configMap.putAll(context.customConfig);
 
     ITUtils.rewriteConfigFile(configTempFileName, configFileName, configMap);
