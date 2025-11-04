@@ -20,6 +20,7 @@ package org.apache.gravitino.lance.integration.test;
 
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
+import com.lancedb.lance.namespace.LanceNamespaceException;
 import com.lancedb.lance.namespace.client.apache.ApiClient;
 import com.lancedb.lance.namespace.client.apache.ApiException;
 import com.lancedb.lance.namespace.model.CreateEmptyTableRequest;
@@ -38,6 +39,7 @@ import com.lancedb.lance.namespace.model.RegisterTableResponse;
 import com.lancedb.lance.namespace.rest.RestNamespace;
 import java.io.File;
 import java.io.IOException;
+import java.nio.charset.Charset;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Arrays;
@@ -56,13 +58,11 @@ import org.apache.gravitino.integration.test.util.GravitinoITUtils;
 import org.apache.gravitino.lance.common.utils.ArrowUtils;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testcontainers.shaded.com.google.common.base.Joiner;
 
-@Tag("gravitino-docker-test")
 public class LanceRESTServiceIT extends BaseIT {
   private static final Logger LOG = LoggerFactory.getLogger(LanceRESTServiceIT.class);
 
@@ -149,6 +149,16 @@ public class LanceRESTServiceIT extends BaseIT {
     DescribeTableResponse loadTable = restNameSpace.describeTable(describeTableRequest);
     Assertions.assertNotNull(loadTable);
     Assertions.assertEquals(location, loadTable.getLocation());
+
+    // Try to create the same table again should fail
+    LanceNamespaceException exception =
+        Assertions.assertThrows(
+            LanceNamespaceException.class,
+            () -> {
+              restNameSpace.createEmptyTable(request);
+            });
+    Assertions.assertTrue(exception.getMessage().contains("Table already exists"));
+    Assertions.assertEquals(409, exception.getCode());
   }
 
   @Test
@@ -211,6 +221,36 @@ public class LanceRESTServiceIT extends BaseIT {
     Assertions.assertEquals(newLocation, response.getLocation());
     Assertions.assertTrue(new File(newLocation).exists());
 
+    // Create table again without overwrite or exist_ok should fail
+    request.setMode(CreateTableRequest.ModeEnum.CREATE);
+    LanceNamespaceException exception =
+        Assertions.assertThrows(
+            LanceNamespaceException.class, () -> restNameSpace.createTable(request, body));
+    Assertions.assertTrue(exception.getMessage().contains("already exists"));
+    Assertions.assertEquals(409, exception.getCode());
+
+    // Create table with invalid schema should fail
+    byte[] invalidBody = "invalid schema".getBytes(Charset.defaultCharset());
+    CreateTableRequest invalidRequest = new CreateTableRequest();
+    invalidRequest.setId(List.of(CATALOG_NAME, SCHEMA_NAME, "invalid_table"));
+    invalidRequest.setLocation(tempDirectory + "/" + "invalid_table/");
+    LanceNamespaceException apiException =
+        Assertions.assertThrows(
+            LanceNamespaceException.class,
+            () -> restNameSpace.createTable(invalidRequest, invalidBody));
+    Assertions.assertTrue(apiException.getMessage().contains("Failed to parse Arrow IPC stream"));
+    Assertions.assertEquals(400, apiException.getCode());
+
+    // Create table with wrong ids should fail
+    CreateTableRequest wrongIdRequest = new CreateTableRequest();
+    wrongIdRequest.setId(List.of(CATALOG_NAME, "wrong_schema")); // This is a schema NOT a talbe.
+    wrongIdRequest.setLocation(tempDirectory + "/" + "wrong_id_table/");
+    LanceNamespaceException wrongIdException =
+        Assertions.assertThrows(
+            LanceNamespaceException.class, () -> restNameSpace.createTable(wrongIdRequest, body));
+    Assertions.assertTrue(wrongIdException.getMessage().contains("Expected at 3-level namespace"));
+    Assertions.assertEquals(400, wrongIdException.getCode());
+
     // Now test list tables
     ListTablesRequest listRequest = new ListTablesRequest();
     listRequest.setId(List.of(CATALOG_NAME, SCHEMA_NAME));
@@ -221,7 +261,7 @@ public class LanceRESTServiceIT extends BaseIT {
   }
 
   @Test
-  void testRegisterTable() throws ApiException {
+  void testRegisterTable() {
     String location = tempDirectory + "/" + "register/";
     List<String> ids = List.of(CATALOG_NAME, SCHEMA_NAME, "table_register");
     RegisterTableRequest registerTableRequest = new RegisterTableRequest();
@@ -256,5 +296,49 @@ public class LanceRESTServiceIT extends BaseIT {
         restNameSpace.deregisterTable(deregisterTableRequest);
     Assertions.assertNotNull(deregisterTableResponse);
     Assertions.assertEquals(newLocation, deregisterTableResponse.getLocation());
+  }
+
+  @Test
+  void testDeregisterNonExistingTable() {
+    List<String> ids = List.of(CATALOG_NAME, SCHEMA_NAME, "non_existing_table");
+    DeregisterTableRequest deregisterTableRequest = new DeregisterTableRequest();
+    deregisterTableRequest.setId(ids);
+
+    LanceNamespaceException exception =
+        Assertions.assertThrows(
+            LanceNamespaceException.class,
+            () -> restNameSpace.deregisterTable(deregisterTableRequest));
+    Assertions.assertEquals(404, exception.getCode());
+    Assertions.assertTrue(exception.getMessage().contains("does not exist"));
+
+    // Try to create a table and then deregister table
+    CreateEmptyTableRequest createEmptyTableRequest = new CreateEmptyTableRequest();
+    String location = tempDirectory + "/" + "to_be_deregistered_table/";
+    ids = List.of(CATALOG_NAME, SCHEMA_NAME, "to_be_deregistered_table");
+    createEmptyTableRequest.setLocation(location);
+    createEmptyTableRequest.setProperties(ImmutableMap.of());
+    createEmptyTableRequest.setId(ids);
+    CreateEmptyTableResponse response =
+        Assertions.assertDoesNotThrow(
+            () -> restNameSpace.createEmptyTable(createEmptyTableRequest));
+    Assertions.assertNotNull(response);
+    Assertions.assertEquals(location, response.getLocation());
+
+    // Now try to deregister
+    deregisterTableRequest.setId(ids);
+    DeregisterTableResponse deregisterTableResponse =
+        Assertions.assertDoesNotThrow(() -> restNameSpace.deregisterTable(deregisterTableRequest));
+    Assertions.assertNotNull(deregisterTableResponse);
+    Assertions.assertEquals(location, deregisterTableResponse.getLocation());
+    Assertions.assertTrue(
+        new File(location).exists(), "Data should still exist after deregistering the table.");
+
+    // Now try to describe the table, should fail
+    DescribeTableRequest describeTableRequest = new DescribeTableRequest();
+    describeTableRequest.setId(ids);
+    LanceNamespaceException lanceNamespaceException =
+        Assertions.assertThrows(
+            LanceNamespaceException.class, () -> restNameSpace.describeTable(describeTableRequest));
+    Assertions.assertEquals(404, lanceNamespaceException.getCode());
   }
 }

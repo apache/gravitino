@@ -513,7 +513,8 @@ public class GravitinoLanceNamespaceWrapper extends NamespaceWrapper
   }
 
   @Override
-  public DescribeTableResponse describeTable(String tableId, String delimiter) {
+  public DescribeTableResponse describeTable(String tableId, String delimiter, Long version) {
+    // TODO Currently we do not support versioned table description.
     ObjectIdentifier nsId = ObjectIdentifier.of(tableId, Pattern.quote(delimiter));
     Preconditions.checkArgument(
         nsId.levels() == 3, "Expected at 3-level namespace but got: %s", nsId.levels());
@@ -660,7 +661,14 @@ public class GravitinoLanceNamespaceWrapper extends NamespaceWrapper
     Table t = catalog.asTableCatalog().loadTable(tableIdentifier);
     Map<String, String> properties = t.properties();
     // TODO Support real deregister API.
-    catalog.asTableCatalog().purgeTable(tableIdentifier);
+    boolean result = catalog.asTableCatalog().purgeTable(tableIdentifier);
+    if (!result) {
+      throw LanceNamespaceException.notFound(
+          "Table not found: " + tableId,
+          NoSuchSchemaException.class.getSimpleName(),
+          tableId,
+          CommonUtil.formatCurrentStackTrace());
+    }
 
     DeregisterTableResponse response = new DeregisterTableResponse();
     response.setProperties(properties);

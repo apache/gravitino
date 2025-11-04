@@ -63,7 +63,7 @@ public class ArrowUtils {
         ArrowStreamReader reader = new ArrowStreamReader(bais, allocator)) {
       schema = reader.getVectorSchemaRoot().getSchema();
     } catch (Exception e) {
-      throw new RuntimeException("Failed to parse Arrow IPC stream", e);
+      throw new IllegalArgumentException("Failed to parse Arrow IPC stream", e);
     }
 
     Preconditions.checkArgument(schema != null, "No schema found in Arrow IPC stream");

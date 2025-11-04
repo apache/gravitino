@@ -53,20 +53,25 @@ dependencies {
   implementation(libs.jackson.datatype.jdk8)
   implementation(libs.jackson.datatype.jsr310)
 
-  testImplementation(project(":server")) {
-    exclude("*")
-  }
+  testImplementation(project(":server"))
   testImplementation(project(":clients:client-java"))
   testImplementation(project(":integration-test-common", "testArtifacts"))
   testImplementation(project(":lance:lance-common", "testArtifacts"))
-  testImplementation(project(":lineage"))
 
   testImplementation(libs.awaitility)
   testImplementation(libs.commons.io)
   testImplementation(libs.lance.namespace.core)
+  testImplementation(libs.jersey.test.framework.core) {
+    exclude(group = "org.junit.jupiter")
+  }
+  testImplementation(libs.jersey.test.framework.provider.jetty) {
+    exclude(group = "org.junit.jupiter")
+  }
+
   testImplementation(libs.junit.jupiter.api)
-  testImplementation(libs.postgresql.driver)
+  testImplementation(libs.mockito.core)
   testImplementation(libs.mysql.driver)
+  testImplementation(libs.postgresql.driver)
   testImplementation(libs.testcontainers)
 
   testRuntimeOnly(libs.junit.jupiter.engine)

@@ -27,10 +27,12 @@ import com.codahale.metrics.annotation.Timed;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import com.lancedb.lance.namespace.model.CreateEmptyTableRequest;
+import com.lancedb.lance.namespace.model.CreateEmptyTableResponse;
 import com.lancedb.lance.namespace.model.CreateTableRequest;
 import com.lancedb.lance.namespace.model.CreateTableResponse;
 import com.lancedb.lance.namespace.model.DeregisterTableRequest;
 import com.lancedb.lance.namespace.model.DeregisterTableResponse;
+import com.lancedb.lance.namespace.model.DescribeTableRequest;
 import com.lancedb.lance.namespace.model.DescribeTableResponse;
 import com.lancedb.lance.namespace.model.RegisterTableRequest;
 import com.lancedb.lance.namespace.model.RegisterTableRequest.ModeEnum;
@@ -74,10 +76,11 @@ public class LanceTableOperations {
   @ResponseMetered(name = "describe-table", absolute = true)
   public Response describeTable(
       @PathParam("id") String tableId,
-      @DefaultValue(NAMESPACE_DELIMITER_DEFAULT) @QueryParam("delimiter") String delimiter) {
+      @DefaultValue(NAMESPACE_DELIMITER_DEFAULT) @QueryParam("delimiter") String delimiter,
+      DescribeTableRequest request) {
     try {
       DescribeTableResponse response =
-          lanceNamespace.asTableOps().describeTable(tableId, delimiter);
+          lanceNamespace.asTableOps().describeTable(tableId, delimiter, request.getVersion());
       return Response.ok(response).build();
     } catch (Exception e) {
       return LanceExceptionMapper.toRESTResponse(tableId, e);
@@ -155,7 +158,10 @@ public class LanceTableOperations {
                   tableLocation,
                   props,
                   null);
-      return Response.ok(response).build();
+      CreateEmptyTableResponse responseObj = new CreateEmptyTableResponse();
+      responseObj.setProperties(response.getProperties());
+      responseObj.setLocation(response.getLocation());
+      return Response.ok(responseObj).build();
     } catch (Exception e) {
       return LanceExceptionMapper.toRESTResponse(tableId, e);
     }
