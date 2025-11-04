@@ -158,6 +158,23 @@ public class LanceRESTServiceIT extends BaseIT {
     Assertions.assertEquals(
         IllegalArgumentException.class.getSimpleName(),
         exception.getErrorResponse().get().getType());
+
+    // test describe a non-existent catalog namespace
+    DescribeNamespaceRequest nonExistentCatalogReq = new DescribeNamespaceRequest();
+    nonExistentCatalogReq.addIdItem("non_existent_catalog");
+    exception =
+        Assertions.assertThrows(
+            LanceNamespaceException.class, () -> ns.describeNamespace(nonExistentCatalogReq));
+    Assertions.assertEquals(404, exception.getCode());
+
+    // test describe a non-existent schema namespace
+    DescribeNamespaceRequest nonExistentSchemaReq = new DescribeNamespaceRequest();
+    nonExistentSchemaReq.addIdItem(catalog.name());
+    nonExistentSchemaReq.addIdItem("non_existent_schema");
+    exception =
+        Assertions.assertThrows(
+            LanceNamespaceException.class, () -> ns.describeNamespace(nonExistentSchemaReq));
+    Assertions.assertEquals(404, exception.getCode());
   }
 
   @Test

@@ -32,6 +32,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -56,6 +57,7 @@ import org.apache.gravitino.rest.RESTUtils;
 import org.apache.gravitino.server.GravitinoServer;
 import org.apache.gravitino.server.ServerConfig;
 import org.apache.gravitino.server.web.JettyServerConfig;
+import org.junit.platform.commons.util.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -89,7 +91,7 @@ public class MiniGravitino {
         properties.getProperty(
             AuxiliaryServiceManager.GRAVITINO_AUX_SERVICE_PREFIX
                 + AuxiliaryServiceManager.AUX_SERVICE_NAMES);
-    if (value != null && !value.isEmpty()) {
+    if (StringUtils.isNotBlank(value) && StringUtils.isNotBlank(serviceToRemove)) {
       List<String> serviceNames = COMMA.splitToList(value);
       List<String> updatedServiceNames = new ArrayList<>();
       for (String serviceName : serviceNames) {
@@ -97,11 +99,18 @@ public class MiniGravitino {
           updatedServiceNames.add(serviceName);
         }
       }
+
       String updatedValue = String.join(",", updatedServiceNames);
-      properties.setProperty(
-          AuxiliaryServiceManager.GRAVITINO_AUX_SERVICE_PREFIX
-              + AuxiliaryServiceManager.AUX_SERVICE_NAMES,
-          updatedValue);
+      if (StringUtils.isBlank(updatedValue)) {
+        properties.remove(
+            AuxiliaryServiceManager.GRAVITINO_AUX_SERVICE_PREFIX
+                + AuxiliaryServiceManager.AUX_SERVICE_NAMES);
+      } else {
+        properties.setProperty(
+            AuxiliaryServiceManager.GRAVITINO_AUX_SERVICE_PREFIX
+                + AuxiliaryServiceManager.AUX_SERVICE_NAMES,
+            updatedValue);
+      }
     }
   }
 
@@ -262,7 +271,7 @@ public class MiniGravitino {
   private Map<String, String> getLanceRestServiceConfigs(Map<String, String> configMap)
       throws IOException {
     if (context.ignoreLanceAuxRestService) {
-      return new HashMap<>();
+      return Collections.emptyMap();
     }
 
     Map<String, String> customConfigs = new HashMap<>();
@@ -293,7 +302,7 @@ public class MiniGravitino {
       String metalakeName = GravitinoITUtils.genRandomName("LanceRESTService_metalake");
       customConfigs.put(LANCE_CONFIG_PREFIX + METALAKE_NAME.getKey(), metalakeName);
     }
-    return customConfigs;
+    return ImmutableMap.copyOf(customConfigs);
   }
 
   // Customize the config file
