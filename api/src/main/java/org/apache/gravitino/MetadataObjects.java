@@ -157,7 +157,7 @@ public class MetadataObjects {
     if (type == MetadataObject.Type.ROLE) {
       return MetadataObjects.of(Collections.singletonList(fullName), MetadataObject.Type.ROLE);
     }
-    if (type == MetadataObject.Type.SCHEMA) {
+    if (type == MetadataObject.Type.TAG) {
       return MetadataObjects.of(Collections.singletonList(fullName), MetadataObject.Type.TAG);
     }
 
