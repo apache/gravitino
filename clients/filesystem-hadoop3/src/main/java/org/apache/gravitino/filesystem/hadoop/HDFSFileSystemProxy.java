@@ -161,6 +161,8 @@ public class HDFSFileSystemProxy implements MethodInterceptor {
             () -> {
               try {
                 return methodProxy.invoke(fs, objects);
+              } catch (IOException e) {
+                throw e;
               } catch (Throwable e) {
                 if (RuntimeException.class.isAssignableFrom(e.getClass())) {
                   throw (RuntimeException) e;
