@@ -269,26 +269,30 @@ public class MetadataObjectTagOperations {
           httpRequest,
           () -> {
             String[] tagsToAdd = request.getTagsToAdd();
-            Arrays.stream(tagsToAdd)
-                .forEach(
-                    tag -> {
-                      boolean result =
-                          new AuthorizationExpressionEvaluator(
-                                  "METALAKE::OWNER || TAG::OWNER",
-                                  GravitinoAuthorizerProvider.getInstance()
-                                      .getGravitinoAuthorizer())
-                              .evaluate(
-                                  Map.of(
-                                      Entity.EntityType.METALAKE,
-                                      NameIdentifierUtil.ofMetalake(metalake),
-                                      Entity.EntityType.TAG,
-                                      NameIdentifierUtil.ofTag(metalake, tag)),
-                                  new AuthorizationRequestContext());
-                      if (!result) {
-                        throw new ForbiddenException(
-                            "Current user cannot associate tag {%s} to object {%s}", tag, fullName);
-                      }
-                    });
+            if (tagsToAdd != null && tagsToAdd.length > 0) {
+              Arrays.stream(tagsToAdd)
+                  .forEach(
+                      tag -> {
+                        boolean result =
+                            new AuthorizationExpressionEvaluator(
+                                    "METALAKE::OWNER || TAG::OWNER",
+                                    GravitinoAuthorizerProvider.getInstance()
+                                        .getGravitinoAuthorizer())
+                                .evaluate(
+                                    Map.of(
+                                        Entity.EntityType.METALAKE,
+                                        NameIdentifierUtil.ofMetalake(metalake),
+                                        Entity.EntityType.TAG,
+                                        NameIdentifierUtil.ofTag(metalake, tag)),
+                                    new AuthorizationRequestContext());
+                        if (!result) {
+                          throw new ForbiddenException(
+                              "Current user cannot associate tag {%s} to object {%s}",
+                              tag, fullName);
+                        }
+                      });
+            }
+
             request.validate();
             MetadataObject object =
                 MetadataObjects.parse(
@@ -312,7 +316,6 @@ public class MetadataObjectTagOperations {
                 metalake);
             return Utils.ok(new NameListResponse(tagNames));
           });
-
     } catch (Exception e) {
       return ExceptionHandlers.handleTagException(OperationType.ASSOCIATE, "", fullName, e);
     }
