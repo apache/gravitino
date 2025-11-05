@@ -15,6 +15,7 @@
 # specific language governing permissions and limitations
 # under the License.
 import importlib
+import logging
 import sys
 import time
 from abc import ABC, abstractmethod
@@ -41,6 +42,8 @@ from gravitino.filesystem.gvfs_config import GVFSConfig
 
 TIME_WITHOUT_EXPIRATION = sys.maxsize
 SLASH = "/"
+
+logger = logging.getLogger(__name__)
 
 
 class StorageType(Enum):
@@ -103,6 +106,10 @@ class StorageHandler(ABC):
             entry["name"], fileset_location, gvfs_path_prefix
         )
         last_modified = self._get_last_modified(entry)
+        if last_modified is None:
+            logger.info(
+                "The last modified time is %s for %s", last_modified, fileset_location
+            )
         return {
             "name": path,
             "size": entry["size"],
@@ -189,7 +196,7 @@ class StorageHandler(ABC):
         return actual_path
 
     def _get_last_modified(self, entry: Dict):
-        return entry["mtime"]
+        return entry["mtime"] if "mtime" in entry else None
 
 
 class LocalStorageHandler(StorageHandler):
