@@ -22,7 +22,6 @@ import static org.apache.gravitino.lance.common.config.LanceConfig.METALAKE_NAME
 import static org.apache.gravitino.lance.common.config.LanceConfig.NAMESPACE_BACKEND_URI;
 import static org.apache.gravitino.lance.common.ops.gravitino.LanceDataTypeConverter.CONVERTER;
 import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_LOCATION;
-import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_STORAGE_OPTIONS_PREFIX;
 import static org.apache.gravitino.rel.Column.DEFAULT_VALUE_NOT_SET;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -33,9 +32,11 @@ import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 import com.lancedb.lance.namespace.LanceNamespaceException;
 import com.lancedb.lance.namespace.ObjectIdentifier;
+import com.lancedb.lance.namespace.model.CreateEmptyTableResponse;
 import com.lancedb.lance.namespace.model.CreateNamespaceRequest;
 import com.lancedb.lance.namespace.model.CreateNamespaceResponse;
 import com.lancedb.lance.namespace.model.CreateTableRequest;
+import com.lancedb.lance.namespace.model.CreateTableRequest.ModeEnum;
 import com.lancedb.lance.namespace.model.CreateTableResponse;
 import com.lancedb.lance.namespace.model.DeregisterTableResponse;
 import com.lancedb.lance.namespace.model.DescribeNamespaceResponse;
@@ -581,7 +582,9 @@ public class GravitinoLanceNamespaceWrapper extends NamespaceWrapper
         NameIdentifier.of(nsId.levelAtListPos(1), nsId.levelAtListPos(2));
 
     Map<String, String> createTableProperties = Maps.newHashMap(tableProperties);
-    createTableProperties.put(LANCE_LOCATION, tableLocation);
+    if (tableLocation != null) {
+      createTableProperties.put(LANCE_LOCATION, tableLocation);
+    }
     // The format is defined in GenericLakehouseCatalog
     createTableProperties.put("format", "lance");
 
@@ -614,6 +617,8 @@ public class GravitinoLanceNamespaceWrapper extends NamespaceWrapper
         response.setProperties(existingTable.properties());
         response.setLocation(existingTable.properties().get(LANCE_LOCATION));
         response.setVersion(null);
+        response.setStorageOptions(
+            LancePropertiesUtils.getLanceStorageOptions(existingTable.properties()));
         return response;
       }
     }
@@ -623,15 +628,27 @@ public class GravitinoLanceNamespaceWrapper extends NamespaceWrapper
     response.setLocation(tableLocation);
     // Extract storage options from table properties. All storage options stores in table
     // properties.
-    Map<String, String> storageOperations =
-        t.properties().entrySet().stream()
-            .filter(entry -> entry.getKey().startsWith(LANCE_STORAGE_OPTIONS_PREFIX))
-            .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
-    response.setStorageOptions(storageOperations);
+    response.setStorageOptions(LancePropertiesUtils.getLanceStorageOptions(t.properties()));
     response.setVersion(null);
     response.setLocation(t.properties().get(LANCE_LOCATION));
     response.setProperties(t.properties());
     return response;
+  }
+
+  @Override
+  public CreateEmptyTableResponse createEmptyTable(
+      String tableId,
+      ModeEnum mode,
+      String delimiter,
+      String tableLocation,
+      Map<String, String> tableProperties) {
+    CreateTableResponse response =
+        createTable(tableId, mode, delimiter, tableLocation, tableProperties, null);
+    CreateEmptyTableResponse emptyTableResponse = new CreateEmptyTableResponse();
+    emptyTableResponse.setProperties(response.getProperties());
+    emptyTableResponse.setLocation(response.getLocation());
+    emptyTableResponse.setStorageOptions(response.getStorageOptions());
+    return emptyTableResponse;
   }
 
   @Override
@@ -649,13 +666,14 @@ public class GravitinoLanceNamespaceWrapper extends NamespaceWrapper
     NameIdentifier tableIdentifier =
         NameIdentifier.of(nsId.levelAtListPos(1), nsId.levelAtListPos(2));
 
+    Map<String, String> copiedTableProperties = Maps.newHashMap(tableProperties);
+    copiedTableProperties.put("format", "lance");
     Table t = null;
     try {
-      tableProperties.put("format", "lance");
       t =
           catalog
               .asTableCatalog()
-              .createTable(tableIdentifier, new Column[] {}, null, tableProperties);
+              .createTable(tableIdentifier, new Column[] {}, null, copiedTableProperties);
     } catch (TableAlreadyExistsException exception) {
       if (mode == RegisterTableRequest.ModeEnum.CREATE) {
         throw LanceNamespaceException.conflict(
@@ -670,7 +688,7 @@ public class GravitinoLanceNamespaceWrapper extends NamespaceWrapper
         t =
             catalog
                 .asTableCatalog()
-                .createTable(tableIdentifier, new Column[] {}, null, tableProperties);
+                .createTable(tableIdentifier, new Column[] {}, null, copiedTableProperties);
       }
     }
 

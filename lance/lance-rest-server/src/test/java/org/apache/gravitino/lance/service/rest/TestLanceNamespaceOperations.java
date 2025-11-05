@@ -394,10 +394,10 @@ public class TestLanceNamespaceOperations extends JerseyTest {
     String delimiter = ".";
 
     // Test normal
-    CreateTableResponse createTableResponse = new CreateTableResponse();
+    CreateEmptyTableResponse createTableResponse = new CreateEmptyTableResponse();
     createTableResponse.setLocation("/path/to/table");
     createTableResponse.setProperties(ImmutableMap.of("key", "value"));
-    when(tableOps.createTable(any(), any(), any(), any(), any(), any()))
+    when(tableOps.createEmptyTable(any(), any(), any(), any(), any()))
         .thenReturn(createTableResponse);
 
     CreateEmptyTableRequest tableRequest = new CreateEmptyTableRequest();
@@ -417,7 +417,7 @@ public class TestLanceNamespaceOperations extends JerseyTest {
 
     Mockito.reset(tableOps);
     // Test illegal argument
-    when(tableOps.createTable(any(), any(), any(), any(), any(), any()))
+    when(tableOps.createEmptyTable(any(), any(), any(), any(), any()))
         .thenThrow(new IllegalArgumentException("Illegal argument"));
 
     resp =
@@ -430,7 +430,7 @@ public class TestLanceNamespaceOperations extends JerseyTest {
 
     // Test runtime exception
     Mockito.reset(tableOps);
-    when(tableOps.createTable(any(), any(), any(), any(), any(), any()))
+    when(tableOps.createEmptyTable(any(), any(), any(), any(), any()))
         .thenThrow(new RuntimeException("Runtime exception"));
     resp =
         target(String.format("/v1/table/%s/create-empty", tableIds))

@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.lance.common.ops;
 
+import com.lancedb.lance.namespace.model.CreateEmptyTableResponse;
 import com.lancedb.lance.namespace.model.CreateTableRequest;
 import com.lancedb.lance.namespace.model.CreateTableResponse;
 import com.lancedb.lance.namespace.model.DeregisterTableResponse;
@@ -42,7 +43,7 @@ public interface LanceTableOperations {
   /**
    * Create a new table.
    *
-   * @param tableId table ids are in the format of "namespace/delimiter/table_name"
+   * @param tableId table ids are in the format of "{namespace}{delimiter}{table_name}"
    * @param mode it can be CREATE, OVERWRITE, or EXIST_OK
    * @param delimiter the delimiter used in the namespace
    * @param tableLocation the location where the table data will be stored
@@ -59,9 +60,26 @@ public interface LanceTableOperations {
       byte[] arrowStreamBody);
 
   /**
+   * Create an new table without schema.
+   *
+   * @param tableId table ids are in the format of "{namespace}{delimiter}{table_name}"
+   * @param mode it can be CREATE, OVERWRITE, or EXIST_OK
+   * @param delimiter the delimiter used in the namespace
+   * @param tableLocation the location where the table data will be stored
+   * @param tableProperties the properties of the table
+   * @return the response of the create table operation
+   */
+  CreateEmptyTableResponse createEmptyTable(
+      String tableId,
+      CreateTableRequest.ModeEnum mode,
+      String delimiter,
+      String tableLocation,
+      Map<String, String> tableProperties);
+
+  /**
    * Register an existing table.
    *
-   * @param tableId table ids are in the format of "namespace/delimiter/table_name"
+   * @param tableId table ids are in the format of "{namespace}{delimiter}{table_name}"
    * @param mode it can be REGISTER or OVERWRITE.
    * @param delimiter the delimiter used in the namespace
    * @param tableProperties the properties of the table, it should contain the table location
@@ -76,7 +94,7 @@ public interface LanceTableOperations {
   /**
    * Deregister a table. It will not delete the underlying lance data.
    *
-   * @param tableId table ids are in the format of "namespace/delimiter/table_name"
+   * @param tableId table ids are in the format of "{namespace}{delimiter}{table_name}"
    * @param delimiter the delimiter used in the namespace
    * @return the response of the deregister table operation
    */

@@ -421,8 +421,8 @@ public class LanceRESTServiceIT extends BaseIT {
     Assertions.assertNotNull(response);
     Assertions.assertEquals(location, response.getLocation());
     Assertions.assertEquals("v1", response.getProperties().get("key1"));
-    Assertions.assertEquals("value_a", response.getStorageOptions().get("lance.storage.a"));
-    Assertions.assertEquals("value_b", response.getStorageOptions().get("lance.storage.b"));
+    Assertions.assertEquals("value_a", response.getStorageOptions().get("a"));
+    Assertions.assertEquals("value_b", response.getStorageOptions().get("b"));
 
     DescribeTableRequest describeTableRequest = new DescribeTableRequest();
     describeTableRequest.setId(List.of(CATALOG_NAME, SCHEMA_NAME, "empty_table"));
@@ -469,8 +469,8 @@ public class LanceRESTServiceIT extends BaseIT {
     Assertions.assertNotNull(response);
     Assertions.assertEquals(location, response.getLocation());
     Assertions.assertEquals("v1", response.getProperties().get("key1"));
-    Assertions.assertEquals("value_a", response.getStorageOptions().get("lance.storage.a"));
-    Assertions.assertEquals("value_b", response.getStorageOptions().get("lance.storage.b"));
+    Assertions.assertEquals("value_a", response.getStorageOptions().get("a"));
+    Assertions.assertEquals("value_b", response.getStorageOptions().get("b"));
 
     DescribeTableRequest describeTableRequest = new DescribeTableRequest();
     describeTableRequest.setId(ids);
@@ -492,16 +492,27 @@ public class LanceRESTServiceIT extends BaseIT {
     }
     // Check the location exists
     Assertions.assertTrue(new File(location).exists());
+    Assertions.assertEquals("v1", loadTable.getProperties().get("key1"));
+    Assertions.assertEquals("value_a", loadTable.getStorageOptions().get("a"));
+    Assertions.assertEquals("value_b", loadTable.getStorageOptions().get("b"));
 
     // Check overwrite mode
     String newLocation = tempDir + "/" + "table_new/";
     request.setLocation(newLocation);
     request.setMode(CreateTableRequest.ModeEnum.OVERWRITE);
+    request.setProperties(
+        ImmutableMap.of(
+            "key1", "v2",
+            "lance.storage.a", "value_va",
+            "lance.storage.b", "value_vb"));
 
     response = Assertions.assertDoesNotThrow(() -> ns.createTable(request, body));
 
     Assertions.assertNotNull(response);
     Assertions.assertEquals(newLocation, response.getLocation());
+    Assertions.assertTrue(response.getProperties().get("key1").equals("v2"));
+    Assertions.assertEquals("value_va", response.getStorageOptions().get("a"));
+    Assertions.assertEquals("value_vb", response.getStorageOptions().get("b"));
     Assertions.assertTrue(new File(newLocation).exists());
     Assertions.assertFalse(new File(location).exists());
 
@@ -510,6 +521,9 @@ public class LanceRESTServiceIT extends BaseIT {
     response = Assertions.assertDoesNotThrow(() -> ns.createTable(request, body));
 
     Assertions.assertNotNull(response);
+    Assertions.assertEquals("v2", response.getProperties().get("key1"));
+    Assertions.assertEquals("value_va", response.getStorageOptions().get("a"));
+    Assertions.assertEquals("value_vb", response.getStorageOptions().get("b"));
     Assertions.assertEquals(newLocation, response.getLocation());
     Assertions.assertTrue(new File(newLocation).exists());
 
@@ -519,6 +533,15 @@ public class LanceRESTServiceIT extends BaseIT {
         Assertions.assertThrows(LanceNamespaceException.class, () -> ns.createTable(request, body));
     Assertions.assertTrue(exception.getMessage().contains("already exists"));
     Assertions.assertEquals(409, exception.getCode());
+
+    // Create a table without location should fail
+    CreateTableRequest noLocationRequest = new CreateTableRequest();
+    noLocationRequest.setId(List.of(CATALOG_NAME, SCHEMA_NAME, "no_location_table"));
+    LanceNamespaceException noLocationException =
+        Assertions.assertThrows(
+            LanceNamespaceException.class, () -> ns.createTable(noLocationRequest, body));
+    Assertions.assertTrue(
+        noLocationException.getMessage().contains("No location specified for table"));
 
     // Create table with invalid schema should fail
     byte[] invalidBody = "".getBytes(Charset.defaultCharset());

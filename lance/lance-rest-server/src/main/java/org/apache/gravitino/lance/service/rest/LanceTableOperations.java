@@ -52,8 +52,6 @@ import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.MultivaluedMap;
 import javax.ws.rs.core.Response;
-import org.apache.arrow.util.Preconditions;
-import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.lance.common.ops.NamespaceWrapper;
 import org.apache.gravitino.lance.common.utils.SerializationUtils;
 import org.apache.gravitino.lance.service.LanceExceptionMapper;
@@ -122,6 +120,7 @@ public class LanceTableOperations {
 
   @POST
   @Path("/create-empty")
+  @Produces("application/json")
   @Timed(name = "create-empty-table." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "create-empty-table", absolute = true)
   public Response createEmptyTable(
@@ -138,21 +137,12 @@ public class LanceTableOperations {
               ? Maps.newHashMap()
               : Maps.newHashMap(request.getProperties());
 
-      CreateTableResponse response =
+      CreateEmptyTableResponse response =
           lanceNamespace
               .asTableOps()
-              .createTable(
-                  tableId,
-                  CreateTableRequest.ModeEnum.CREATE,
-                  delimiter,
-                  tableLocation,
-                  props,
-                  null);
-      CreateEmptyTableResponse responseObj = new CreateEmptyTableResponse();
-      responseObj.setProperties(response.getProperties());
-      responseObj.setLocation(response.getLocation());
-      responseObj.setStorageOptions(response.getStorageOptions());
-      return Response.ok(responseObj).build();
+              .createEmptyTable(
+                  tableId, CreateTableRequest.ModeEnum.CREATE, delimiter, tableLocation, props);
+      return Response.ok(response).build();
     } catch (Exception e) {
       return LanceExceptionMapper.toRESTResponse(tableId, e);
     }
@@ -204,14 +194,14 @@ public class LanceTableOperations {
     }
   }
 
-  private void validateCreateEmptyTableRequest(CreateEmptyTableRequest request) {
-    Preconditions.checkArgument(
-        StringUtils.isNotBlank(request.getLocation()), "Table location must be provided.");
+  private void validateCreateEmptyTableRequest(
+      @SuppressWarnings("unused") CreateEmptyTableRequest request) {
+    // No specific fields to validate for now
   }
 
-  private void validateRegisterTableRequest(RegisterTableRequest request) {
-    Preconditions.checkArgument(
-        StringUtils.isNotBlank(request.getLocation()), "Table location must be provided.");
+  private void validateRegisterTableRequest(
+      @SuppressWarnings("unused") RegisterTableRequest request) {
+    // No specific fields to validate for now
   }
 
   private void validateDeregisterTableRequest(
