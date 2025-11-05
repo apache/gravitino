@@ -197,6 +197,7 @@ public class PolicyIT extends BaseIT {
     Assertions.assertTrue(policy.enabled());
     Assertions.assertFalse(policy.inherited().isPresent());
     Assertions.assertEquals(content, policy.content());
+    Assertions.assertEquals(content.rules(), policy.content().rules());
 
     // Test already existed policy
     Assertions.assertThrows(
@@ -212,6 +213,7 @@ public class PolicyIT extends BaseIT {
     Assertions.assertTrue(fetchedPolicy.enabled());
     Assertions.assertFalse(fetchedPolicy.inherited().isPresent());
     Assertions.assertEquals(content, fetchedPolicy.content());
+    Assertions.assertEquals(content.rules(), fetchedPolicy.content().rules());
 
     // test List names
     String policyName1 = GravitinoITUtils.genRandomName("policy_it_policy1");
