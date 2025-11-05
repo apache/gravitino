@@ -21,42 +21,42 @@ package org.apache.gravitino.listener;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.exceptions.NoSuchPolicyException;
-import org.apache.gravitino.listener.api.event.AlterPolicyEvent;
-import org.apache.gravitino.listener.api.event.AlterPolicyFailureEvent;
-import org.apache.gravitino.listener.api.event.AlterPolicyPreEvent;
-import org.apache.gravitino.listener.api.event.AssociatePoliciesForMetadataObjectEvent;
-import org.apache.gravitino.listener.api.event.AssociatePoliciesForMetadataObjectFailureEvent;
-import org.apache.gravitino.listener.api.event.AssociatePoliciesForMetadataObjectPreEvent;
-import org.apache.gravitino.listener.api.event.CreatePolicyEvent;
-import org.apache.gravitino.listener.api.event.CreatePolicyFailureEvent;
-import org.apache.gravitino.listener.api.event.CreatePolicyPreEvent;
-import org.apache.gravitino.listener.api.event.DeletePolicyEvent;
-import org.apache.gravitino.listener.api.event.DeletePolicyFailureEvent;
-import org.apache.gravitino.listener.api.event.DeletePolicyPreEvent;
-import org.apache.gravitino.listener.api.event.DisablePolicyEvent;
-import org.apache.gravitino.listener.api.event.DisablePolicyFailureEvent;
-import org.apache.gravitino.listener.api.event.DisablePolicyPreEvent;
-import org.apache.gravitino.listener.api.event.EnablePolicyEvent;
-import org.apache.gravitino.listener.api.event.EnablePolicyFailureEvent;
-import org.apache.gravitino.listener.api.event.EnablePolicyPreEvent;
-import org.apache.gravitino.listener.api.event.GetPolicyEvent;
-import org.apache.gravitino.listener.api.event.GetPolicyFailureEvent;
-import org.apache.gravitino.listener.api.event.GetPolicyForMetadataObjectEvent;
-import org.apache.gravitino.listener.api.event.GetPolicyForMetadataObjectFailureEvent;
-import org.apache.gravitino.listener.api.event.GetPolicyForMetadataObjectPreEvent;
-import org.apache.gravitino.listener.api.event.GetPolicyPreEvent;
-import org.apache.gravitino.listener.api.event.ListMetadataObjectsForPolicyEvent;
-import org.apache.gravitino.listener.api.event.ListMetadataObjectsForPolicyFailureEvent;
-import org.apache.gravitino.listener.api.event.ListMetadataObjectsForPolicyPreEvent;
-import org.apache.gravitino.listener.api.event.ListPoliciesEvent;
-import org.apache.gravitino.listener.api.event.ListPoliciesFailureEvent;
-import org.apache.gravitino.listener.api.event.ListPoliciesPreEvent;
-import org.apache.gravitino.listener.api.event.ListPolicyInfosEvent;
-import org.apache.gravitino.listener.api.event.ListPolicyInfosFailureEvent;
-import org.apache.gravitino.listener.api.event.ListPolicyInfosForMetadataObjectEvent;
-import org.apache.gravitino.listener.api.event.ListPolicyInfosForMetadataObjectFailureEvent;
-import org.apache.gravitino.listener.api.event.ListPolicyInfosForMetadataObjectPreEvent;
-import org.apache.gravitino.listener.api.event.ListPolicyInfosPreEvent;
+import org.apache.gravitino.listener.api.event.policy.AlterPolicyEvent;
+import org.apache.gravitino.listener.api.event.policy.AlterPolicyFailureEvent;
+import org.apache.gravitino.listener.api.event.policy.AlterPolicyPreEvent;
+import org.apache.gravitino.listener.api.event.policy.AssociatePoliciesForMetadataObjectEvent;
+import org.apache.gravitino.listener.api.event.policy.AssociatePoliciesForMetadataObjectFailureEvent;
+import org.apache.gravitino.listener.api.event.policy.AssociatePoliciesForMetadataObjectPreEvent;
+import org.apache.gravitino.listener.api.event.policy.CreatePolicyEvent;
+import org.apache.gravitino.listener.api.event.policy.CreatePolicyFailureEvent;
+import org.apache.gravitino.listener.api.event.policy.CreatePolicyPreEvent;
+import org.apache.gravitino.listener.api.event.policy.DeletePolicyEvent;
+import org.apache.gravitino.listener.api.event.policy.DeletePolicyFailureEvent;
+import org.apache.gravitino.listener.api.event.policy.DeletePolicyPreEvent;
+import org.apache.gravitino.listener.api.event.policy.DisablePolicyEvent;
+import org.apache.gravitino.listener.api.event.policy.DisablePolicyFailureEvent;
+import org.apache.gravitino.listener.api.event.policy.DisablePolicyPreEvent;
+import org.apache.gravitino.listener.api.event.policy.EnablePolicyEvent;
+import org.apache.gravitino.listener.api.event.policy.EnablePolicyFailureEvent;
+import org.apache.gravitino.listener.api.event.policy.EnablePolicyPreEvent;
+import org.apache.gravitino.listener.api.event.policy.GetPolicyEvent;
+import org.apache.gravitino.listener.api.event.policy.GetPolicyFailureEvent;
+import org.apache.gravitino.listener.api.event.policy.GetPolicyForMetadataObjectEvent;
+import org.apache.gravitino.listener.api.event.policy.GetPolicyForMetadataObjectFailureEvent;
+import org.apache.gravitino.listener.api.event.policy.GetPolicyForMetadataObjectPreEvent;
+import org.apache.gravitino.listener.api.event.policy.GetPolicyPreEvent;
+import org.apache.gravitino.listener.api.event.policy.ListMetadataObjectsForPolicyEvent;
+import org.apache.gravitino.listener.api.event.policy.ListMetadataObjectsForPolicyFailureEvent;
+import org.apache.gravitino.listener.api.event.policy.ListMetadataObjectsForPolicyPreEvent;
+import org.apache.gravitino.listener.api.event.policy.ListPoliciesEvent;
+import org.apache.gravitino.listener.api.event.policy.ListPoliciesFailureEvent;
+import org.apache.gravitino.listener.api.event.policy.ListPoliciesPreEvent;
+import org.apache.gravitino.listener.api.event.policy.ListPolicyInfosEvent;
+import org.apache.gravitino.listener.api.event.policy.ListPolicyInfosFailureEvent;
+import org.apache.gravitino.listener.api.event.policy.ListPolicyInfosForMetadataObjectEvent;
+import org.apache.gravitino.listener.api.event.policy.ListPolicyInfosForMetadataObjectFailureEvent;
+import org.apache.gravitino.listener.api.event.policy.ListPolicyInfosForMetadataObjectPreEvent;
+import org.apache.gravitino.listener.api.event.policy.ListPolicyInfosPreEvent;
 import org.apache.gravitino.listener.api.info.PolicyInfo;
 import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.policy.Policy;
@@ -79,16 +79,6 @@ public class PolicyEventDispatcher implements PolicyDispatcher {
   public PolicyEventDispatcher(EventBus eventBus, PolicyDispatcher dispatcher) {
     this.eventBus = eventBus;
     this.dispatcher = dispatcher;
-  }
-
-  private PolicyInfo toPolicyInfo(PolicyEntity policy) {
-    return new PolicyInfo(
-        policy.name(),
-        policy.policyType().name(),
-        policy.comment(),
-        policy.enabled(),
-        policy.content(),
-        policy.auditInfo());
   }
 
   @Override
@@ -370,5 +360,15 @@ public class PolicyEventDispatcher implements PolicyDispatcher {
               PrincipalUtils.getCurrentUserName(), metalake, metadataObject, policyName, e));
       throw e;
     }
+  }
+
+  private PolicyInfo toPolicyInfo(PolicyEntity policy) {
+    return new PolicyInfo(
+        policy.name(),
+        policy.policyType().name(),
+        policy.comment(),
+        policy.enabled(),
+        policy.content(),
+        policy.auditInfo());
   }
 }
