@@ -490,7 +490,7 @@ public class LanceRESTServiceIT extends BaseIT {
     Assertions.assertTrue(new File(location).exists());
 
     // Check overwrite mode
-    String newLocation = ns + "/" + "table_new/";
+    String newLocation = tempDir + "/" + "table_new/";
     request.setLocation(newLocation);
     request.setMode(CreateTableRequest.ModeEnum.OVERWRITE);
 
