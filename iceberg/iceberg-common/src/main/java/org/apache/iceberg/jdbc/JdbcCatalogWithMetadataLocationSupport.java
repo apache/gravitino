@@ -57,6 +57,17 @@ public class JdbcCatalogWithMetadataLocationSupport extends JdbcCatalog
     return table.get(METADATA_LOCATION_PROP);
   }
 
+  /**
+   * Check if the JDBC catalog schema version supports view operations. View operations are
+   * supported from V1 schema version onwards.
+   *
+   * @return true if the schema version supports view operations, false otherwise
+   */
+  public boolean supportsViewsWithSchemaVersion() {
+    // V0 doesn't support views, only V1 and later versions do
+    return jdbcSchemaVersion != null && jdbcSchemaVersion != SchemaVersion.V0;
+  }
+
   private void loadFields() {
     try {
       this.jdbcCatalogName = (String) FieldUtils.readField(this, "catalogName", true);

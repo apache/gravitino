@@ -164,10 +164,7 @@ public class TableOperations {
   @Timed(name = "load-table." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "load-table", absolute = true)
   @AuthorizationExpression(
-      expression =
-          "ANY(OWNER, METALAKE, CATALOG) || "
-              + "SCHEMA_OWNER_WITH_USE_CATALOG || "
-              + "ANY_USE_CATALOG && ANY_USE_SCHEMA  && (TABLE::OWNER || ANY_SELECT_TABLE|| ANY_MODIFY_TABLE)",
+      expression = AuthorizationExpressionConstants.loadTableAuthorizationExpression,
       accessMetadataType = MetadataObject.Type.TABLE)
   public Response loadTable(
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
@@ -198,12 +195,7 @@ public class TableOperations {
   @Timed(name = "alter-table." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "alter-table", absolute = true)
   @AuthorizationExpression(
-      expression =
-          """
-                      ANY(OWNER, METALAKE, CATALOG) ||
-                       SCHEMA_OWNER_WITH_USE_CATALOG ||
-                       ANY_USE_CATALOG && ANY_USE_SCHEMA  && (TABLE::OWNER || ANY_MODIFY_TABLE)
-                      """,
+      expression = AuthorizationExpressionConstants.alterTableAuthorizationExpression,
       accessMetadataType = MetadataObject.Type.TABLE)
   public Response alterTable(
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
