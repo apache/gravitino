@@ -28,6 +28,7 @@ import static org.apache.gravitino.catalog.hadoop.fs.Constants.HADOOP_SECURITY_P
 import static org.apache.gravitino.catalog.hadoop.fs.Constants.SECURITY_KRB5_ENV;
 import static org.apache.gravitino.catalog.hadoop.fs.HDFSFileSystemProvider.IPC_FALLBACK_TO_SIMPLE_AUTH_ALLOWED;
 
+import java.io.IOException;
 import java.lang.reflect.Method;
 import java.security.PrivilegedExceptionAction;
 import java.time.Instant;
@@ -59,6 +60,7 @@ public class HDFSFileSystemProxy implements MethodInterceptor {
 
   private final UserGroupInformation ugi;
   private final FileSystem fs;
+  private final Configuration configuration;
   private Timer kerberosRenewTimer;
 
   /**
@@ -72,6 +74,7 @@ public class HDFSFileSystemProxy implements MethodInterceptor {
     try {
       conf.setBoolean(FS_DISABLE_CACHE, true);
       conf.setBoolean(IPC_FALLBACK_TO_SIMPLE_AUTH_ALLOWED, true);
+      this.configuration = conf;
 
       String authType = conf.get(HADOOP_SECURITY_AUTHENTICATION, AUTH_SIMPlE);
       if (AUTH_KERBEROS.equalsIgnoreCase(authType)) {
@@ -113,13 +116,16 @@ public class HDFSFileSystemProxy implements MethodInterceptor {
    * Get the proxied FileSystem instance.
    *
    * @return the proxied FileSystem
+   * @throws IOException if an I/O error occurs
    */
-  public FileSystem getProxy() {
+  public FileSystem getProxy() throws IOException {
     Enhancer e = new Enhancer();
     e.setClassLoader(fs.getClass().getClassLoader());
     e.setSuperclass(fs.getClass());
     e.setCallback(this);
-    return (FileSystem) e.create();
+    FileSystem proxyFs = (FileSystem) e.create();
+    fs.setConf(configuration);
+    return proxyFs;
   }
 
   /** Schedule periodic Kerberos re-login to refresh TGT before expiry. */
