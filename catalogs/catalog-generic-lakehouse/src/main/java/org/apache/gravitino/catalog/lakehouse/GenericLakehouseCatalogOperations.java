@@ -33,6 +33,7 @@ import org.apache.commons.collections4.MapUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.Entity;
+import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
@@ -304,6 +305,8 @@ public class GenericLakehouseCatalogOperations
           getLakehouseCatalogOperations(newProperties);
       return lanceCatalogOperations.createTable(
           ident, columns, comment, newProperties, partitions, distribution, sortOrders, indexes);
+    } catch (EntityAlreadyExistsException e) {
+      throw new TableAlreadyExistsException(e, "Table %s already exists", ident);
     } catch (IOException e) {
       throw new RuntimeException("Failed to create table " + ident, e);
     }
@@ -366,22 +369,22 @@ public class GenericLakehouseCatalogOperations
   }
 
   @Override
-  public boolean dropTable(NameIdentifier ident) {
+  public boolean purgeTable(NameIdentifier ident) {
     try {
       TableEntity tableEntity = store.get(ident, Entity.EntityType.TABLE, TableEntity.class);
       LakehouseCatalogOperations lakehouseCatalogOperations =
           getLakehouseCatalogOperations(tableEntity.getProperties());
-      return lakehouseCatalogOperations.dropTable(ident);
+      return lakehouseCatalogOperations.purgeTable(ident);
     } catch (NoSuchTableException e) {
-      LOG.warn("Table {} does not exist, skip dropping it.", ident);
+      LOG.warn("Table {} does not exist, skip purging it.", ident);
       return false;
     } catch (IOException e) {
-      throw new RuntimeException("Failed to drop table: " + ident, e);
+      throw new RuntimeException("Failed to purge table: " + ident, e);
     }
   }
 
   @Override
-  public boolean purgeTable(NameIdentifier ident) throws UnsupportedOperationException {
+  public boolean dropTable(NameIdentifier ident) throws UnsupportedOperationException {
     try {
       // Only delete the metadata entry here. The physical data will not be deleted.
       if (!tableExists(ident)) {
@@ -389,7 +392,7 @@ public class GenericLakehouseCatalogOperations
       }
       return store.delete(ident, Entity.EntityType.TABLE);
     } catch (IOException e) {
-      throw new RuntimeException("Failed to purge table " + ident, e);
+      throw new RuntimeException("Failed to drop table " + ident, e);
     }
   }
 

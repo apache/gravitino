@@ -16,40 +16,22 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.lance.common.ops.gravitino;
+package org.apache.gravitino.lance.common.utils;
 
+import com.google.common.base.Preconditions;
+import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.channels.Channels;
-import java.util.Arrays;
 import org.apache.arrow.memory.BufferAllocator;
 import org.apache.arrow.memory.RootAllocator;
 import org.apache.arrow.vector.VectorSchemaRoot;
+import org.apache.arrow.vector.ipc.ArrowStreamReader;
 import org.apache.arrow.vector.ipc.ArrowStreamWriter;
-import org.apache.arrow.vector.types.pojo.ArrowType;
-import org.apache.arrow.vector.types.pojo.Field;
 import org.apache.arrow.vector.types.pojo.Schema;
-import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.Test;
 
-public class TestGravitinoLanceNamespaceWrapper {
-
-  @Test
-  public void testParseArrowIpcStream() throws Exception {
-    Schema schema =
-        new Schema(
-            Arrays.asList(
-                Field.nullable("id", new ArrowType.Int(32, true)),
-                Field.nullable("value", new ArrowType.Utf8())));
-
-    GravitinoLanceNamespaceWrapper wrapper = new GravitinoLanceNamespaceWrapper();
-    byte[] ipcStream = generateIpcStream(schema);
-    Schema parsedSchema = wrapper.parseArrowIpcStream(ipcStream);
-
-    Assertions.assertEquals(schema, parsedSchema);
-  }
-
-  private byte[] generateIpcStream(Schema arrowSchema) throws IOException {
+public class ArrowUtils {
+  public static byte[] generateIpcStream(Schema arrowSchema) throws IOException {
     try (BufferAllocator allocator = new RootAllocator()) {
 
       // Create an empty VectorSchemaRoot with the schema
@@ -72,5 +54,19 @@ public class TestGravitinoLanceNamespaceWrapper {
     } catch (Exception e) {
       throw new IOException("Failed to create empty Arrow IPC stream: " + e.getMessage(), e);
     }
+  }
+
+  public static Schema parseArrowIpcStream(byte[] stream) {
+    Schema schema;
+    try (BufferAllocator allocator = new RootAllocator();
+        ByteArrayInputStream bais = new ByteArrayInputStream(stream);
+        ArrowStreamReader reader = new ArrowStreamReader(bais, allocator)) {
+      schema = reader.getVectorSchemaRoot().getSchema();
+    } catch (Exception e) {
+      throw new IllegalArgumentException("Failed to parse Arrow IPC stream", e);
+    }
+
+    Preconditions.checkArgument(schema != null, "No schema found in Arrow IPC stream");
+    return schema;
   }
 }

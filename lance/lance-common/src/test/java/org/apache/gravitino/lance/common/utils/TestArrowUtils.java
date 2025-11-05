@@ -16,14 +16,27 @@
  * specific language governing permissions and limitations
  * under the License.
  */
+package org.apache.gravitino.lance.common.utils;
 
-package org.apache.gravitino.lance.service;
+import java.util.Arrays;
+import org.apache.arrow.vector.types.pojo.ArrowType;
+import org.apache.arrow.vector.types.pojo.Field;
+import org.apache.arrow.vector.types.pojo.Schema;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
 
-public class ServiceConstants {
-  public static final String LANCE_HTTP_HEADER_PREFIX = "x-lance-";
+public class TestArrowUtils {
 
-  public static final String LANCE_TABLE_LOCATION_HEADER =
-      LANCE_HTTP_HEADER_PREFIX + "table-location";
-  public static final String LANCE_TABLE_PROPERTIES_PREFIX_HEADER =
-      LANCE_HTTP_HEADER_PREFIX + "table-properties";
+  @Test
+  public void testParseArrowIpcStream() throws Exception {
+    Schema schema =
+        new Schema(
+            Arrays.asList(
+                Field.nullable("id", new ArrowType.Int(32, true)),
+                Field.nullable("value", new ArrowType.Utf8())));
+    byte[] ipcStream = ArrowUtils.generateIpcStream(schema);
+    Schema parsedSchema = ArrowUtils.parseArrowIpcStream(ipcStream);
+
+    Assertions.assertEquals(schema, parsedSchema);
+  }
 }
