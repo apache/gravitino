@@ -221,7 +221,7 @@ public class IcebergViewOperations {
   @Path("{view}")
   @Produces(MediaType.APPLICATION_JSON)
   @Timed(name = "view-exists." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
-  @ResponseMetered(name = "view-exits", absolute = true)
+  @ResponseMetered(name = "view-exists", absolute = true)
   public Response viewExists(
       @PathParam("prefix") String prefix,
       @Encoded() @PathParam("namespace") String namespace,

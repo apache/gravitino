@@ -41,11 +41,11 @@ public class LineageService implements LineageDispatcher, SupportsRESTPackages {
   public void initialize(LineageConfig lineageConfig) {
     String sourceName = lineageConfig.source();
     String sourceClass = lineageConfig.sourceClass();
-    this.source = ClassUtils.loadClass(sourceClass);
+    this.source = ClassUtils.loadAndGetInstance(sourceClass);
     this.sinkManager = new LineageSinkManager();
 
     String processorClassName = lineageConfig.processorClass();
-    this.processor = ClassUtils.loadClass(processorClassName);
+    this.processor = ClassUtils.loadAndGetInstance(processorClassName);
 
     sinkManager.initialize(lineageConfig.sinks(), lineageConfig.getSinkConfigs());
     source.initialize(lineageConfig.getConfigsWithPrefix(sourceName), this);
@@ -65,10 +65,12 @@ public class LineageService implements LineageDispatcher, SupportsRESTPackages {
 
   @Override
   public boolean dispatchLineageEvent(OpenLineage.RunEvent runEvent) {
+    if (runEvent == null) {
+      return false;
+    }
     if (sinkManager.isHighWatermark()) {
       return false;
     }
-
     RunEvent newEvent = processor.process(runEvent);
     sinkManager.sink(newEvent);
     return true;

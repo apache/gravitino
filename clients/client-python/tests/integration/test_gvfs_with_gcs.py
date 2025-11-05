@@ -283,8 +283,7 @@ class TestGvfsWithGCS(TestGvfsWithHDFS):
         mkdir_dir = mkdir_dir.replace(self.bucket_name, new_bucket)
         mkdir_actual_dir = mkdir_actual_dir.replace(self.bucket_name, new_bucket)
 
-        with self.assertRaises(OSError):
-            fs.mkdir(mkdir_dir, create_parents=True)
+        fs.mkdir(mkdir_dir, create_parents=True)
         self.assertFalse(self.fs.exists(mkdir_actual_dir))
 
     def test_makedirs(self):

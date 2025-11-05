@@ -496,4 +496,54 @@ public class TestIcebergTableOperations extends IcebergNamespaceTestBase {
   private Response doGetTableCredentials(Namespace ns, String tableName) {
     return getTableClientBuilder(ns, Optional.of(tableName + "/credentials")).get();
   }
+
+  @ParameterizedTest
+  @MethodSource("org.apache.gravitino.iceberg.service.rest.IcebergRestTestUtil#testNamespaces")
+  void testRemoteSigningNotSupported(Namespace namespace) {
+    verifyCreateNamespaceSucc(namespace);
+
+    // Attempt to create table with "remote-signing" access delegation
+    // This should fail with UnsupportedOperationException -> 406 Not Acceptable
+    CreateTableRequest createTableRequest =
+        CreateTableRequest.builder()
+            .withName("test_remote_signing")
+            .withSchema(tableSchema)
+            .build();
+
+    Response response =
+        getTableClientBuilder(namespace, Optional.empty())
+            .header(IcebergTableOperations.X_ICEBERG_ACCESS_DELEGATION, "remote-signing")
+            .post(Entity.entity(createTableRequest, MediaType.APPLICATION_JSON_TYPE));
+
+    Assertions.assertEquals(406, response.getStatus());
+    String errorBody = response.readEntity(String.class);
+    Assertions.assertTrue(
+        errorBody.contains("remote signing") || errorBody.contains("remote-signing"),
+        "Error message should mention remote signing: " + errorBody);
+  }
+
+  @ParameterizedTest
+  @MethodSource("org.apache.gravitino.iceberg.service.rest.IcebergRestTestUtil#testNamespaces")
+  void testInvalidAccessDelegation(Namespace namespace) {
+    verifyCreateNamespaceSucc(namespace);
+
+    // Attempt to create table with invalid access delegation value
+    // This should fail with IllegalArgumentException -> 400 Bad Request
+    CreateTableRequest createTableRequest =
+        CreateTableRequest.builder()
+            .withName("test_invalid_delegation")
+            .withSchema(tableSchema)
+            .build();
+
+    Response response =
+        getTableClientBuilder(namespace, Optional.empty())
+            .header(IcebergTableOperations.X_ICEBERG_ACCESS_DELEGATION, "invalid-value")
+            .post(Entity.entity(createTableRequest, MediaType.APPLICATION_JSON_TYPE));
+
+    Assertions.assertEquals(400, response.getStatus());
+    String errorBody = response.readEntity(String.class);
+    Assertions.assertTrue(
+        errorBody.contains("vended-credentials") && errorBody.contains("illegal"),
+        "Error message should mention valid values: " + errorBody);
+  }
 }

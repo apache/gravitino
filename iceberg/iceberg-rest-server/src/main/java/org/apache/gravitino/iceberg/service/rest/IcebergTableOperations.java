@@ -310,8 +310,14 @@ public class IcebergTableOperations {
       return Utils.doAs(
           httpRequest,
           () -> {
-            icebergMetricsManager.recordMetric(request.report());
-            return IcebergRestUtils.noContent();
+            boolean accepted = icebergMetricsManager.recordMetric(request.report());
+            if (accepted) {
+              return IcebergRestUtils.noContent();
+            } else {
+              return IcebergRestUtils.errorResponse(
+                  new RuntimeException("Metrics service unavailable: queue full or service closed"),
+                  Response.Status.SERVICE_UNAVAILABLE.getStatusCode());
+            }
           });
     } catch (Exception e) {
       return IcebergExceptionMapper.toRESTResponse(e);
