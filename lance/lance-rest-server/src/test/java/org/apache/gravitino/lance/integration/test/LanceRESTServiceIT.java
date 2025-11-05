@@ -58,6 +58,7 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import org.apache.arrow.memory.BufferAllocator;
@@ -625,6 +626,7 @@ public class LanceRESTServiceIT extends BaseIT {
         Assertions.assertDoesNotThrow(() -> ns.deregisterTable(deregisterTableRequest));
     Assertions.assertNotNull(deregisterTableResponse);
     Assertions.assertEquals(location, deregisterTableResponse.getLocation());
+    Assertions.assertTrue(Objects.equals(ids, deregisterTableResponse.getId()));
     Assertions.assertTrue(
         new File(location).exists(), "Data should still exist after deregistering the table.");
 

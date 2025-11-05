@@ -20,7 +20,6 @@
 package org.apache.gravitino.catalog.lakehouse.lance;
 
 import static org.apache.gravitino.Entity.EntityType.TABLE;
-import static org.apache.gravitino.catalog.lakehouse.GenericLakehouseTablePropertiesMetadata.LANCE_TABLE_STORAGE_OPTION_PREFIX;
 
 import com.google.common.collect.Lists;
 import com.lancedb.lance.Dataset;
@@ -57,6 +56,7 @@ import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.exceptions.TableAlreadyExistsException;
 import org.apache.gravitino.lance.common.ops.gravitino.LanceDataTypeConverter;
+import org.apache.gravitino.lance.common.utils.LancePropertiesUtils;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.rel.Column;
@@ -119,7 +119,7 @@ public class LanceCatalogOperations implements LakehouseCatalogOperations {
       throws NoSuchSchemaException, TableAlreadyExistsException {
     // Ignore partitions, distributions, sortOrders, and indexes for Lance tables;
     String location = properties.get(GenericLakehouseTablePropertiesMetadata.LAKEHOUSE_LOCATION);
-    Map<String, String> storageProps = getLanceStorageOptions(properties);
+    Map<String, String> storageProps = LancePropertiesUtils.getLanceStorageOptions(properties);
 
     try (Dataset ignored =
         Dataset.create(
@@ -285,7 +285,7 @@ public class LanceCatalogOperations implements LakehouseCatalogOperations {
       }
 
       // Drop the Lance dataset from cloud storage.
-      Dataset.drop(location, getLanceStorageOptions(lancePropertiesMap));
+      Dataset.drop(location, LancePropertiesUtils.getLanceStorageOptions(lancePropertiesMap));
       return true;
     } catch (IOException e) {
       throw new RuntimeException("Failed to purge Lance table: " + ident.name(), e);
@@ -300,14 +300,5 @@ public class LanceCatalogOperations implements LakehouseCatalogOperations {
     //  just remove the metadata in metastore and will not delete data in storage.
     throw new UnsupportedOperationException(
         "LanceCatalogOperations does not support dropTable operation.");
-  }
-
-  private Map<String, String> getLanceStorageOptions(Map<String, String> tableProperties) {
-    return tableProperties.entrySet().stream()
-        .filter(e -> e.getKey().startsWith(LANCE_TABLE_STORAGE_OPTION_PREFIX))
-        .collect(
-            Collectors.toMap(
-                e -> e.getKey().substring(LANCE_TABLE_STORAGE_OPTION_PREFIX.length()),
-                Map.Entry::getValue));
   }
 }

@@ -85,6 +85,7 @@ import org.apache.gravitino.lance.common.ops.LanceNamespaceOperations;
 import org.apache.gravitino.lance.common.ops.LanceTableOperations;
 import org.apache.gravitino.lance.common.ops.NamespaceWrapper;
 import org.apache.gravitino.lance.common.utils.ArrowUtils;
+import org.apache.gravitino.lance.common.utils.LancePropertiesUtils;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Table;
 import org.slf4j.Logger;
@@ -548,6 +549,8 @@ public class GravitinoLanceNamespaceWrapper extends NamespaceWrapper
     response.setProperties(table.properties());
     response.setLocation(table.properties().get(LANCE_LOCATION));
     response.setSchema(toJsonArrowSchema(table.columns()));
+    response.setVersion(null);
+    response.setStorageOptions(LancePropertiesUtils.getLanceStorageOptions(table.properties()));
     return response;
   }
 
@@ -610,7 +613,7 @@ public class GravitinoLanceNamespaceWrapper extends NamespaceWrapper
         Table existingTable = catalog.asTableCatalog().loadTable(tableIdentifier);
         response.setProperties(existingTable.properties());
         response.setLocation(existingTable.properties().get(LANCE_LOCATION));
-        response.setVersion(0L);
+        response.setVersion(null);
         return response;
       }
     }
@@ -625,7 +628,9 @@ public class GravitinoLanceNamespaceWrapper extends NamespaceWrapper
             .filter(entry -> entry.getKey().startsWith(LANCE_STORAGE_OPTIONS_PREFIX))
             .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
     response.setStorageOptions(storageOperations);
-    response.setVersion(0L);
+    response.setVersion(null);
+    response.setLocation(t.properties().get(LANCE_LOCATION));
+    response.setProperties(t.properties());
     return response;
   }
 
@@ -701,6 +706,7 @@ public class GravitinoLanceNamespaceWrapper extends NamespaceWrapper
     DeregisterTableResponse response = new DeregisterTableResponse();
     response.setProperties(properties);
     response.setLocation(properties.get(LANCE_LOCATION));
+    response.setId(nsId.listStyleId());
     return response;
   }
 
