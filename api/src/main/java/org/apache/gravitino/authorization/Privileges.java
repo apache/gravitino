@@ -919,7 +919,7 @@ public class Privileges {
 
     @Override
     public boolean canBindTo(MetadataObject.Type type) {
-      return true;
+      return type == MetadataObject.Type.METALAKE;
     }
   }
 }
