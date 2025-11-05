@@ -62,7 +62,7 @@ import org.slf4j.LoggerFactory;
 public class GravitinoLanceTableOperations implements LanceTableOperations {
   private static final Logger LOG = LoggerFactory.getLogger(GravitinoLanceTableOperations.class);
 
-  private GravitinoLanceNamespaceWrapper namespaceWrapper;
+  private final GravitinoLanceNamespaceWrapper namespaceWrapper;
 
   public GravitinoLanceTableOperations(GravitinoLanceNamespaceWrapper namespaceWrapper) {
     this.namespaceWrapper = namespaceWrapper;
