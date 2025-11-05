@@ -138,10 +138,7 @@ public class LanceTableOperations {
               : Maps.newHashMap(request.getProperties());
 
       CreateEmptyTableResponse response =
-          lanceNamespace
-              .asTableOps()
-              .createEmptyTable(
-                  tableId, CreateTableRequest.ModeEnum.CREATE, delimiter, tableLocation, props);
+          lanceNamespace.asTableOps().createEmptyTable(tableId, delimiter, tableLocation, props);
       return Response.ok(response).build();
     } catch (Exception e) {
       return LanceExceptionMapper.toRESTResponse(tableId, e);

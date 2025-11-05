@@ -637,13 +637,9 @@ public class GravitinoLanceNamespaceWrapper extends NamespaceWrapper
 
   @Override
   public CreateEmptyTableResponse createEmptyTable(
-      String tableId,
-      ModeEnum mode,
-      String delimiter,
-      String tableLocation,
-      Map<String, String> tableProperties) {
+      String tableId, String delimiter, String tableLocation, Map<String, String> tableProperties) {
     CreateTableResponse response =
-        createTable(tableId, mode, delimiter, tableLocation, tableProperties, null);
+        createTable(tableId, ModeEnum.CREATE, delimiter, tableLocation, tableProperties, null);
     CreateEmptyTableResponse emptyTableResponse = new CreateEmptyTableResponse();
     emptyTableResponse.setProperties(response.getProperties());
     emptyTableResponse.setLocation(response.getLocation());

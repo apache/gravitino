@@ -63,18 +63,13 @@ public interface LanceTableOperations {
    * Create an new table without schema.
    *
    * @param tableId table ids are in the format of "{namespace}{delimiter}{table_name}"
-   * @param mode it can be CREATE, OVERWRITE, or EXIST_OK
    * @param delimiter the delimiter used in the namespace
    * @param tableLocation the location where the table data will be stored
    * @param tableProperties the properties of the table
    * @return the response of the create table operation
    */
   CreateEmptyTableResponse createEmptyTable(
-      String tableId,
-      CreateTableRequest.ModeEnum mode,
-      String delimiter,
-      String tableLocation,
-      Map<String, String> tableProperties);
+      String tableId, String delimiter, String tableLocation, Map<String, String> tableProperties);
 
   /**
    * Register an existing table.
