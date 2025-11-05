@@ -208,6 +208,6 @@ public class TagMetaBaseSQLProvider {
         + " deleted_at as deletedAt"
         + " FROM "
         + TAG_TABLE_NAME
-        + " WHERE metalake_id = #{metalakeId} AND tag_name = #{name}";
+        + " WHERE metalake_id = #{metalakeId} AND tag_name = #{name} and deleted_at = 0";
   }
 }
