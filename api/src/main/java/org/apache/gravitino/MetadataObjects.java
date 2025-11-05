@@ -75,7 +75,7 @@ public class MetadataObjects {
             || type == MetadataObject.Type.METALAKE
             || type == MetadataObject.Type.ROLE
             || type == MetadataObject.Type.TAG,
-        "If the length of names is 1, it must be the CATALOG, METALAKE, or ROLE type");
+        "If the length of names is 1, it must be the CATALOG, METALAKE,TAG, or ROLE type");
 
     Preconditions.checkArgument(
         names.size() != 2 || type == MetadataObject.Type.SCHEMA,
@@ -156,6 +156,9 @@ public class MetadataObjects {
     List<String> parts = DOT_SPLITTER.splitToList(fullName);
     if (type == MetadataObject.Type.ROLE) {
       return MetadataObjects.of(Collections.singletonList(fullName), MetadataObject.Type.ROLE);
+    }
+    if (type == MetadataObject.Type.SCHEMA) {
+      return MetadataObjects.of(Collections.singletonList(fullName), MetadataObject.Type.TAG);
     }
 
     return MetadataObjects.of(parts, type);

@@ -141,8 +141,7 @@ public class TestNameIdentifierUtil {
     assertTrue(e1.getMessage().contains("The identifier and entity type must not be null"));
 
     // test tag
-    MetadataObject expectedTagObject =
-        MetadataObjects.parse("metalake1.tag1", MetadataObject.Type.TAG);
+    MetadataObject expectedTagObject = MetadataObjects.parse("tag1", MetadataObject.Type.TAG);
     MetadataObject tagObject =
         NameIdentifierUtil.toMetadataObject(
             NameIdentifierUtil.ofTag("metalake1", "tag1"), Entity.EntityType.TAG);
