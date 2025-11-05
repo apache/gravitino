@@ -26,6 +26,7 @@ import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Maps;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -116,8 +117,7 @@ public class TagOperationsAuthorizationIT extends BaseRestApiAuthorizationIT {
   public void stopIntegrationTest() throws IOException, InterruptedException {
     GravitinoMetalake gravitinoMetalake = client.loadMetalake(METALAKE);
     gravitinoMetalake.loadCatalog(CATALOG).asSchemas().dropSchema(SCHEMA, true);
-    gravitinoMetalake.dropCatalog(CATALOG);
-    client.dropMetalake(METALAKE, true);
+    gravitinoMetalake.dropCatalog(CATALOG, true);
     super.stopIntegrationTest();
   }
 
@@ -252,6 +252,7 @@ public class TagOperationsAuthorizationIT extends BaseRestApiAuthorizationIT {
             .loadTable(NameIdentifier.of(SCHEMA, "table1"))
             .supportsTags();
     String[] tagsLoadByAdmin = tableSupportTag.listTags();
+    Arrays.sort(tagsLoadByAdmin);
     assertArrayEquals(new String[] {"tag1", "tag2"}, tagsLoadByAdmin);
     GravitinoMetalake gravitinoMetalakeByNormalUser = normalUserClient.loadMetalake(METALAKE);
     SupportsTags tableSupportTagByNormalUser =
