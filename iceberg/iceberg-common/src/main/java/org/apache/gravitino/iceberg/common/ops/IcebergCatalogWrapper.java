@@ -280,7 +280,8 @@ public class IcebergCatalogWrapper implements AutoCloseable {
   @Override
   public void close() throws Exception {
     if (catalog instanceof AutoCloseable) {
-      // JdbcCatalog and WrappedHiveCatalog need close.
+      // JdbcCatalog and ClosableHiveCatalog implement AutoCloseable and will handle their own
+      // cleanup
       ((AutoCloseable) catalog).close();
     }
     metadataCache.close();
@@ -296,9 +297,6 @@ public class IcebergCatalogWrapper implements AutoCloseable {
       closeMySQLCatalogResource();
     } else if (catalogUri != null && catalogUri.contains("postgresql")) {
       closePostgreSQLCatalogResource();
-    } else if (catalogBackend.equals(IcebergCatalogBackend.HIVE)) {
-      // TODO(yuqi) add close for other catalog types such Hive catalog, for more, please refer to
-      // https://github.com/apache/gravitino/pull/2548/commits/ab876b69b7e094bbd8c174d48a2365a18ed5176d
     }
   }
 
