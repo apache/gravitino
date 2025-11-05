@@ -58,7 +58,22 @@ import org.apache.gravitino.integration.test.util.BaseIT;
 import org.apache.gravitino.integration.test.util.GravitinoITUtils;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Table;
+import org.apache.gravitino.rel.expressions.NamedReference;
+import org.apache.gravitino.rel.expressions.distributions.Distribution;
+import org.apache.gravitino.rel.expressions.distributions.Distributions;
+import org.apache.gravitino.rel.expressions.distributions.Strategy;
+import org.apache.gravitino.rel.expressions.literals.Literals;
+import org.apache.gravitino.rel.expressions.sorts.NullOrdering;
+import org.apache.gravitino.rel.expressions.sorts.SortDirection;
+import org.apache.gravitino.rel.expressions.sorts.SortOrder;
+import org.apache.gravitino.rel.expressions.sorts.SortOrders;
+import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.expressions.transforms.Transforms;
+import org.apache.gravitino.rel.indexes.Index;
+import org.apache.gravitino.rel.indexes.Index.IndexType;
+import org.apache.gravitino.rel.indexes.Indexes;
+import org.apache.gravitino.rel.partitions.Partitions;
+import org.apache.gravitino.rel.partitions.RangePartition;
 import org.apache.gravitino.rel.types.Types;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
@@ -176,6 +191,30 @@ public class CatalogGenericLakehouseLanceIT extends BaseIT {
     properties = createProperties();
     properties.put("format", "lance");
 
+    Distribution distribution =
+        Distributions.of(Strategy.EVEN, 10, NamedReference.field(LANCE_COL_NAME1));
+    SortOrder[] sortOrders =
+        new SortOrder[] {
+          SortOrders.of(
+              NamedReference.field(LANCE_COL_NAME2),
+              SortDirection.ASCENDING,
+              NullOrdering.NULLS_FIRST)
+        };
+    Index[] indexes =
+        new Index[] {
+          Indexes.of(IndexType.UNIQUE_KEY, "unique_index", new String[][] {{LANCE_COL_NAME3}})
+        };
+
+    RangePartition p1 =
+        Partitions.range(
+            "p1", Literals.stringLiteral("20220101"), Literals.NULL, Collections.emptyMap());
+    RangePartition p2 =
+        Partitions.range(
+            "p2", Literals.stringLiteral("20220301"), Literals.NULL, Collections.emptyMap());
+    Transform[] partitioning = {
+      Transforms.range(new String[] {LANCE_COL_NAME3}, new RangePartition[] {p1, p2})
+    };
+
     createdTable =
         catalog
             .asTableCatalog()
@@ -184,9 +223,10 @@ public class CatalogGenericLakehouseLanceIT extends BaseIT {
                 columns,
                 TABLE_COMMENT,
                 properties,
-                Transforms.EMPTY_TRANSFORM,
-                null,
-                null);
+                partitioning,
+                distribution,
+                sortOrders,
+                indexes);
     Assertions.assertEquals(createdTable.name(), tableName);
     createdTableProperties = createdTable.properties();
     Assertions.assertEquals("lance", createdTableProperties.get("format"));
@@ -197,6 +237,12 @@ public class CatalogGenericLakehouseLanceIT extends BaseIT {
     expectedTableLocation = schemaLocation + "/" + tableName + "/";
     Assertions.assertEquals(expectedTableLocation, createdTableProperties.get("location"));
     Assertions.assertTrue(new File(expectedTableLocation).exists());
+
+    Table loadTable = catalog.asTableCatalog().loadTable(nameIdentifier);
+    Assertions.assertEquals(distribution, loadTable.distribution());
+    Assertions.assertArrayEquals(sortOrders, loadTable.sortOrder());
+    Assertions.assertArrayEquals(indexes, loadTable.index());
+    Assertions.assertArrayEquals(partitioning, loadTable.partitioning());
 
     // Now try to load table
     Table loadedTable = catalog.asTableCatalog().loadTable(nameIdentifier);
