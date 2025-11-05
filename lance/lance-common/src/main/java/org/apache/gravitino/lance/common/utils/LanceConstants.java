@@ -17,13 +17,18 @@
  * under the License.
  */
 
-package org.apache.gravitino.lance.service;
+package org.apache.gravitino.lance.common.utils;
 
-public class ServiceConstants {
+public class LanceConstants {
   public static final String LANCE_HTTP_HEADER_PREFIX = "x-lance-";
 
   public static final String LANCE_TABLE_LOCATION_HEADER =
       LANCE_HTTP_HEADER_PREFIX + "table-location";
   public static final String LANCE_TABLE_PROPERTIES_PREFIX_HEADER =
       LANCE_HTTP_HEADER_PREFIX + "table-properties";
+  // Key for table location in table properties map
+  public static final String LANCE_LOCATION = "location";
+
+  // Prefix for storage options in LanceConfig
+  public static final String LANCE_STORAGE_OPTIONS_PREFIX = "lance.storage.";
 }

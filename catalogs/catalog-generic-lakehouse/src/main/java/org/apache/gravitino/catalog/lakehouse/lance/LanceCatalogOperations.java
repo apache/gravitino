@@ -22,7 +22,6 @@ package org.apache.gravitino.catalog.lakehouse.lance;
 import static org.apache.gravitino.Entity.EntityType.TABLE;
 import static org.apache.gravitino.catalog.lakehouse.GenericLakehouseTablePropertiesMetadata.LANCE_TABLE_STORAGE_OPTION_PREFIX;
 
-import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import com.lancedb.lance.Dataset;
 import com.lancedb.lance.WriteParams;
@@ -120,13 +119,7 @@ public class LanceCatalogOperations implements LakehouseCatalogOperations {
       throws NoSuchSchemaException, TableAlreadyExistsException {
     // Ignore partitions, distributions, sortOrders, and indexes for Lance tables;
     String location = properties.get(GenericLakehouseTablePropertiesMetadata.LAKEHOUSE_LOCATION);
-    Map<String, String> storageProps =
-        properties.entrySet().stream()
-            .filter(e -> e.getKey().startsWith(LANCE_TABLE_STORAGE_OPTION_PREFIX))
-            .collect(
-                Collectors.toMap(
-                    e -> e.getKey().substring(LANCE_TABLE_STORAGE_OPTION_PREFIX.length()),
-                    Map.Entry::getValue));
+    Map<String, String> storageProps = getLanceStorageOptions(properties);
 
     try (Dataset ignored =
         Dataset.create(
@@ -292,7 +285,7 @@ public class LanceCatalogOperations implements LakehouseCatalogOperations {
       }
 
       // Drop the Lance dataset from cloud storage.
-      Dataset.drop(location, ImmutableMap.of());
+      Dataset.drop(location, getLanceStorageOptions(lancePropertiesMap));
       return true;
     } catch (IOException e) {
       throw new RuntimeException("Failed to purge Lance table: " + ident.name(), e);
@@ -301,7 +294,20 @@ public class LanceCatalogOperations implements LakehouseCatalogOperations {
 
   @Override
   public boolean dropTable(NameIdentifier ident) {
+    // TODO We will handle it in GenericLakehouseCatalogOperations. However, we need
+    //  to figure out it's a external table or not first. we will introduce a property
+    //  to indicate that. Currently, all Lance tables are external tables. `drop` will
+    //  just remove the metadata in metastore and will not delete data in storage.
     throw new UnsupportedOperationException(
         "LanceCatalogOperations does not support dropTable operation.");
+  }
+
+  private Map<String, String> getLanceStorageOptions(Map<String, String> tableProperties) {
+    return tableProperties.entrySet().stream()
+        .filter(e -> e.getKey().startsWith(LANCE_TABLE_STORAGE_OPTION_PREFIX))
+        .collect(
+            Collectors.toMap(
+                e -> e.getKey().substring(LANCE_TABLE_STORAGE_OPTION_PREFIX.length()),
+                Map.Entry::getValue));
   }
 }

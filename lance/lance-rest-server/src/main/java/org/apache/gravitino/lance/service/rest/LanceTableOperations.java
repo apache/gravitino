@@ -19,8 +19,9 @@
 package org.apache.gravitino.lance.service.rest;
 
 import static org.apache.gravitino.lance.common.ops.NamespaceWrapper.NAMESPACE_DELIMITER_DEFAULT;
-import static org.apache.gravitino.lance.service.ServiceConstants.LANCE_TABLE_LOCATION_HEADER;
-import static org.apache.gravitino.lance.service.ServiceConstants.LANCE_TABLE_PROPERTIES_PREFIX_HEADER;
+import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_LOCATION;
+import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_TABLE_LOCATION_HEADER;
+import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_TABLE_PROPERTIES_PREFIX_HEADER;
 
 import com.codahale.metrics.annotation.ResponseMetered;
 import com.codahale.metrics.annotation.Timed;
@@ -173,7 +174,7 @@ public class LanceTableOperations {
           registerTableRequest.getProperties() == null
               ? Maps.newHashMap()
               : Maps.newHashMap(registerTableRequest.getProperties());
-      props.put("location", registerTableRequest.getLocation());
+      props.put(LANCE_LOCATION, registerTableRequest.getLocation());
       ModeEnum mode = registerTableRequest.getMode();
 
       RegisterTableResponse response =
@@ -215,11 +216,13 @@ public class LanceTableOperations {
 
   private void validateDeregisterTableRequest(
       @SuppressWarnings("unused") DeregisterTableRequest request) {
+    // We will ignore the id in the request body since it's already provided in the path param.
     // No specific fields to validate for now
   }
 
   private void validateDescribeTableRequest(
       @SuppressWarnings("unused") DescribeTableRequest request) {
+    // We will ignore the id in the request body since it's already provided in the path param
     // No specific fields to validate for now
   }
 }

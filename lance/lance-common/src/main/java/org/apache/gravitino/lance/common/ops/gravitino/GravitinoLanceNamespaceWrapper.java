@@ -21,6 +21,8 @@ package org.apache.gravitino.lance.common.ops.gravitino;
 import static org.apache.gravitino.lance.common.config.LanceConfig.METALAKE_NAME;
 import static org.apache.gravitino.lance.common.config.LanceConfig.NAMESPACE_BACKEND_URI;
 import static org.apache.gravitino.lance.common.ops.gravitino.LanceDataTypeConverter.CONVERTER;
+import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_LOCATION;
+import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_STORAGE_OPTIONS_PREFIX;
 import static org.apache.gravitino.rel.Column.DEFAULT_VALUE_NOT_SET;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -528,7 +530,8 @@ public class GravitinoLanceNamespaceWrapper extends NamespaceWrapper
       String tableId, String delimiter, Optional<Long> version) {
     if (!version.isEmpty()) {
       throw new UnsupportedOperationException(
-          "Describing specific table version is not supported.");
+          "Describing specific table version is not supported. It should be null to indicate the"
+              + " latest version.");
     }
 
     ObjectIdentifier nsId = ObjectIdentifier.of(tableId, Pattern.quote(delimiter));
@@ -543,7 +546,7 @@ public class GravitinoLanceNamespaceWrapper extends NamespaceWrapper
     Table table = catalog.asTableCatalog().loadTable(tableIdentifier);
     DescribeTableResponse response = new DescribeTableResponse();
     response.setProperties(table.properties());
-    response.setLocation(table.properties().get("location"));
+    response.setLocation(table.properties().get(LANCE_LOCATION));
     response.setSchema(toJsonArrowSchema(table.columns()));
     return response;
   }
@@ -575,43 +578,42 @@ public class GravitinoLanceNamespaceWrapper extends NamespaceWrapper
         NameIdentifier.of(nsId.levelAtListPos(1), nsId.levelAtListPos(2));
 
     Map<String, String> createTableProperties = Maps.newHashMap(tableProperties);
-    createTableProperties.put("location", tableLocation);
+    createTableProperties.put(LANCE_LOCATION, tableLocation);
+    // The format is defined in GenericLakehouseCatalog
     createTableProperties.put("format", "lance");
 
-    switch (mode) {
-      case EXIST_OK:
-        if (catalog.asTableCatalog().tableExists(tableIdentifier)) {
-          CreateTableResponse response = new CreateTableResponse();
-          Table existingTable = catalog.asTableCatalog().loadTable(tableIdentifier);
-          response.setProperties(existingTable.properties());
-          response.setLocation(existingTable.properties().get("location"));
-          response.setVersion(0L);
-          return response;
-        }
-        break;
-      case CREATE:
-        if (catalog.asTableCatalog().tableExists(tableIdentifier)) {
-          throw LanceNamespaceException.conflict(
-              "Table already exists: " + tableId,
-              SchemaAlreadyExistsException.class.getSimpleName(),
-              tableId,
-              CommonUtil.formatCurrentStackTrace());
-        }
-        break;
-      case OVERWRITE:
-        if (catalog.asTableCatalog().tableExists(tableIdentifier)) {
-          catalog.asTableCatalog().purgeTable(tableIdentifier);
-        }
-        break;
-      default:
-        throw new IllegalArgumentException("Unknown mode: " + mode);
-    }
+    Table t;
+    try {
+      t =
+          catalog
+              .asTableCatalog()
+              .createTable(
+                  tableIdentifier, columns.toArray(new Column[0]), null, createTableProperties);
+    } catch (TableAlreadyExistsException exception) {
+      if (mode == CreateTableRequest.ModeEnum.CREATE) {
+        throw LanceNamespaceException.conflict(
+            "Table already exists: " + tableId,
+            TableAlreadyExistsException.class.getSimpleName(),
+            tableId,
+            CommonUtil.formatCurrentStackTrace());
+      } else if (mode == CreateTableRequest.ModeEnum.OVERWRITE) {
+        LOG.info("Overwriting existing table: {}", tableId);
+        catalog.asTableCatalog().purgeTable(tableIdentifier);
 
-    Table t =
-        catalog
-            .asTableCatalog()
-            .createTable(
-                tableIdentifier, columns.toArray(new Column[0]), null, createTableProperties);
+        t =
+            catalog
+                .asTableCatalog()
+                .createTable(
+                    tableIdentifier, columns.toArray(new Column[0]), null, createTableProperties);
+      } else { // EXIST_OK
+        CreateTableResponse response = new CreateTableResponse();
+        Table existingTable = catalog.asTableCatalog().loadTable(tableIdentifier);
+        response.setProperties(existingTable.properties());
+        response.setLocation(existingTable.properties().get(LANCE_LOCATION));
+        response.setVersion(0L);
+        return response;
+      }
+    }
 
     CreateTableResponse response = new CreateTableResponse();
     response.setProperties(t.properties());
@@ -620,7 +622,7 @@ public class GravitinoLanceNamespaceWrapper extends NamespaceWrapper
     // properties.
     Map<String, String> storageOperations =
         t.properties().entrySet().stream()
-            .filter(entry -> entry.getKey().startsWith("lance.storage."))
+            .filter(entry -> entry.getKey().startsWith(LANCE_STORAGE_OPTIONS_PREFIX))
             .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
     response.setStorageOptions(storageOperations);
     response.setVersion(0L);
@@ -642,31 +644,34 @@ public class GravitinoLanceNamespaceWrapper extends NamespaceWrapper
     NameIdentifier tableIdentifier =
         NameIdentifier.of(nsId.levelAtListPos(1), nsId.levelAtListPos(2));
 
-    // TODO Support real register API
-    if (mode == RegisterTableRequest.ModeEnum.CREATE
-        && catalog.asTableCatalog().tableExists(tableIdentifier)) {
-      throw LanceNamespaceException.conflict(
-          "Table already exists: " + tableId,
-          TableAlreadyExistsException.class.getSimpleName(),
-          tableId,
-          CommonUtil.formatCurrentStackTrace());
-    }
+    Table t = null;
+    try {
+      tableProperties.put("format", "lance");
+      t =
+          catalog
+              .asTableCatalog()
+              .createTable(tableIdentifier, new Column[] {}, null, tableProperties);
+    } catch (TableAlreadyExistsException exception) {
+      if (mode == RegisterTableRequest.ModeEnum.CREATE) {
+        throw LanceNamespaceException.conflict(
+            "Table already exists: " + tableId,
+            TableAlreadyExistsException.class.getSimpleName(),
+            tableId,
+            CommonUtil.formatCurrentStackTrace());
+      } else if (mode == RegisterTableRequest.ModeEnum.OVERWRITE) {
+        LOG.info("Overwriting existing table: {}", tableId);
+        catalog.asTableCatalog().dropTable(tableIdentifier);
 
-    if (mode == RegisterTableRequest.ModeEnum.OVERWRITE
-        && catalog.asTableCatalog().tableExists(tableIdentifier)) {
-      LOG.info("Overwriting existing table: {}", tableId);
-      catalog.asTableCatalog().dropTable(tableIdentifier);
+        t =
+            catalog
+                .asTableCatalog()
+                .createTable(tableIdentifier, new Column[] {}, null, tableProperties);
+      }
     }
-
-    tableProperties.put("format", "lance");
-    Table t =
-        catalog
-            .asTableCatalog()
-            .createTable(tableIdentifier, new Column[] {}, null, tableProperties);
 
     RegisterTableResponse response = new RegisterTableResponse();
     response.setProperties(t.properties());
-    response.setLocation(t.properties().get("location"));
+    response.setLocation(t.properties().get(LANCE_LOCATION));
     return response;
   }
 
@@ -695,7 +700,7 @@ public class GravitinoLanceNamespaceWrapper extends NamespaceWrapper
 
     DeregisterTableResponse response = new DeregisterTableResponse();
     response.setProperties(properties);
-    response.setLocation(properties.get("location"));
+    response.setLocation(properties.get(LANCE_LOCATION));
     return response;
   }
 

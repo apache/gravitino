@@ -33,6 +33,7 @@ import org.apache.commons.collections4.MapUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.Entity;
+import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
@@ -304,6 +305,8 @@ public class GenericLakehouseCatalogOperations
           getLakehouseCatalogOperations(newProperties);
       return lanceCatalogOperations.createTable(
           ident, columns, comment, newProperties, partitions, distribution, sortOrders, indexes);
+    } catch (EntityAlreadyExistsException e) {
+      throw new TableAlreadyExistsException(e, "Table %s already exists", ident);
     } catch (IOException e) {
       throw new RuntimeException("Failed to create table " + ident, e);
     }
