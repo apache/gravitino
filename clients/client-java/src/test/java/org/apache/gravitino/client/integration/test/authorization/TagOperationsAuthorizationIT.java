@@ -24,6 +24,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Maps;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -44,6 +45,7 @@ import org.apache.gravitino.rel.TableCatalog;
 import org.apache.gravitino.rel.types.Types;
 import org.apache.gravitino.tag.SupportsTags;
 import org.apache.gravitino.tag.TagChange;
+import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.MethodOrderer;
 import org.junit.jupiter.api.Order;
@@ -108,6 +110,15 @@ public class TagOperationsAuthorizationIT extends BaseRestApiAuthorizationIT {
     TableCatalog tableCatalog = client.loadMetalake(METALAKE).loadCatalog(CATALOG).asTableCatalog();
     tableCatalog.createTable(
         NameIdentifier.of(SCHEMA, "table1"), createColumns(), "test", new HashMap<>());
+  }
+
+  @AfterAll
+  public void stopIntegrationTest() throws IOException, InterruptedException {
+    GravitinoMetalake gravitinoMetalake = client.loadMetalake(METALAKE);
+    gravitinoMetalake.loadCatalog(CATALOG).asSchemas().dropSchema(SCHEMA, true);
+    gravitinoMetalake.dropCatalog(CATALOG);
+    client.dropMetalake(METALAKE, true);
+    super.stopIntegrationTest();
   }
 
   @Test
