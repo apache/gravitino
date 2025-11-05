@@ -25,6 +25,7 @@ import com.lancedb.lance.namespace.model.DescribeTableResponse;
 import com.lancedb.lance.namespace.model.RegisterTableRequest;
 import com.lancedb.lance.namespace.model.RegisterTableResponse;
 import java.util.Map;
+import java.util.Optional;
 
 public interface LanceTableOperations {
 
@@ -36,7 +37,7 @@ public interface LanceTableOperations {
    * @param version the version of the table to describe, if null, describe the latest version
    * @return the table description
    */
-  DescribeTableResponse describeTable(String tableId, String delimiter, Long version);
+  DescribeTableResponse describeTable(String tableId, String delimiter, Optional<Long> version);
 
   /**
    * Create a new table.
@@ -64,7 +65,7 @@ public interface LanceTableOperations {
    * @param mode it can be REGISTER or OVERWRITE.
    * @param delimiter the delimiter used in the namespace
    * @param tableProperties the properties of the table, it should contain the table location
-   * @return
+   * @return the response of the register table operation
    */
   RegisterTableResponse registerTable(
       String tableId,

@@ -288,14 +288,14 @@ public class LanceCatalogOperations implements LakehouseCatalogOperations {
           lancePropertiesMap.get(GenericLakehouseTablePropertiesMetadata.LAKEHOUSE_LOCATION);
 
       if (!store.delete(ident, Entity.EntityType.TABLE)) {
-        throw new RuntimeException("Failed to drop Lance table: " + ident.name());
+        throw new RuntimeException("Failed to purge Lance table: " + ident.name());
       }
 
       // Drop the Lance dataset from cloud storage.
       Dataset.drop(location, ImmutableMap.of());
       return true;
     } catch (IOException e) {
-      throw new RuntimeException("Failed to drop Lance table: " + ident.name(), e);
+      throw new RuntimeException("Failed to purge Lance table: " + ident.name(), e);
     }
   }
 

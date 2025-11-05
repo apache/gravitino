@@ -39,6 +39,7 @@ import com.lancedb.lance.namespace.model.DescribeTableRequest;
 import com.lancedb.lance.namespace.model.DescribeTableResponse;
 import com.lancedb.lance.namespace.model.DropNamespaceRequest;
 import com.lancedb.lance.namespace.model.DropNamespaceResponse;
+import com.lancedb.lance.namespace.model.ErrorResponse;
 import com.lancedb.lance.namespace.model.JsonArrowField;
 import com.lancedb.lance.namespace.model.ListNamespacesRequest;
 import com.lancedb.lance.namespace.model.ListNamespacesResponse;
@@ -57,6 +58,7 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import org.apache.arrow.memory.BufferAllocator;
 import org.apache.arrow.memory.RootAllocator;
@@ -66,6 +68,7 @@ import org.apache.gravitino.Catalog;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Schema;
 import org.apache.gravitino.client.GravitinoMetalake;
+import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.integration.test.util.BaseIT;
 import org.apache.gravitino.integration.test.util.GravitinoITUtils;
 import org.apache.gravitino.lance.common.utils.ArrowUtils;
@@ -517,7 +520,7 @@ public class LanceRESTServiceIT extends BaseIT {
     Assertions.assertEquals(409, exception.getCode());
 
     // Create table with invalid schema should fail
-    byte[] invalidBody = "invalid schema".getBytes(Charset.defaultCharset());
+    byte[] invalidBody = "".getBytes(Charset.defaultCharset());
     CreateTableRequest invalidRequest = new CreateTableRequest();
     invalidRequest.setId(List.of(CATALOG_NAME, SCHEMA_NAME, "invalid_table"));
     invalidRequest.setLocation(tempDir + "/" + "invalid_table/");
@@ -599,6 +602,10 @@ public class LanceRESTServiceIT extends BaseIT {
             LanceNamespaceException.class, () -> ns.deregisterTable(deregisterTableRequest));
     Assertions.assertEquals(404, exception.getCode());
     Assertions.assertTrue(exception.getMessage().contains("does not exist"));
+    Optional<ErrorResponse> responseOptional = exception.getErrorResponse();
+    Assertions.assertTrue(responseOptional.isPresent());
+    Assertions.assertEquals(
+        NoSuchTableException.class.getSimpleName(), responseOptional.get().getType());
 
     // Try to create a table and then deregister table
     CreateEmptyTableRequest createEmptyTableRequest = new CreateEmptyTableRequest();

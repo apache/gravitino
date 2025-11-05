@@ -73,6 +73,7 @@ import org.apache.gravitino.exceptions.CatalogAlreadyExistsException;
 import org.apache.gravitino.exceptions.CatalogInUseException;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
+import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.exceptions.NonEmptyCatalogException;
 import org.apache.gravitino.exceptions.NonEmptySchemaException;
 import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
@@ -523,8 +524,9 @@ public class GravitinoLanceNamespaceWrapper extends NamespaceWrapper
   }
 
   @Override
-  public DescribeTableResponse describeTable(String tableId, String delimiter, Long version) {
-    if (version != null) {
+  public DescribeTableResponse describeTable(
+      String tableId, String delimiter, Optional<Long> version) {
+    if (!version.isEmpty()) {
       throw new UnsupportedOperationException(
           "Describing specific table version is not supported.");
     }
@@ -614,8 +616,8 @@ public class GravitinoLanceNamespaceWrapper extends NamespaceWrapper
     CreateTableResponse response = new CreateTableResponse();
     response.setProperties(t.properties());
     response.setLocation(tableLocation);
-    // We have removed the prefix "lance.storage" from the table properties for storage options. So
-    // here we need to add it back.
+    // Extract storage options from table properties. All storage options stores in table
+    // properties.
     Map<String, String> storageOperations =
         t.properties().entrySet().stream()
             .filter(entry -> entry.getKey().startsWith("lance.storage."))
@@ -656,6 +658,7 @@ public class GravitinoLanceNamespaceWrapper extends NamespaceWrapper
       catalog.asTableCatalog().dropTable(tableIdentifier);
     }
 
+    tableProperties.put("format", "lance");
     Table t =
         catalog
             .asTableCatalog()
@@ -685,7 +688,7 @@ public class GravitinoLanceNamespaceWrapper extends NamespaceWrapper
     if (!result) {
       throw LanceNamespaceException.notFound(
           "Table not found: " + tableId,
-          NoSuchSchemaException.class.getSimpleName(),
+          NoSuchTableException.class.getSimpleName(),
           tableId,
           CommonUtil.formatCurrentStackTrace());
     }

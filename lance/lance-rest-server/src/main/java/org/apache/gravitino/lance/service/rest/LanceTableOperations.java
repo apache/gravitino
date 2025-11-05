@@ -24,7 +24,6 @@ import static org.apache.gravitino.lance.service.ServiceConstants.LANCE_TABLE_PR
 
 import com.codahale.metrics.annotation.ResponseMetered;
 import com.codahale.metrics.annotation.Timed;
-import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import com.lancedb.lance.namespace.model.CreateEmptyTableRequest;
 import com.lancedb.lance.namespace.model.CreateEmptyTableResponse;
@@ -37,9 +36,8 @@ import com.lancedb.lance.namespace.model.DescribeTableResponse;
 import com.lancedb.lance.namespace.model.RegisterTableRequest;
 import com.lancedb.lance.namespace.model.RegisterTableRequest.ModeEnum;
 import com.lancedb.lance.namespace.model.RegisterTableResponse;
-import com.lancedb.lance.namespace.util.JsonUtil;
-import java.util.HashMap;
 import java.util.Map;
+import java.util.Optional;
 import javax.inject.Inject;
 import javax.ws.rs.Consumes;
 import javax.ws.rs.DefaultValue;
@@ -53,8 +51,10 @@ import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.MultivaluedMap;
 import javax.ws.rs.core.Response;
+import org.apache.arrow.util.Preconditions;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.lance.common.ops.NamespaceWrapper;
+import org.apache.gravitino.lance.common.utils.SerializationUtils;
 import org.apache.gravitino.lance.service.LanceExceptionMapper;
 import org.apache.gravitino.metrics.MetricNames;
 
@@ -79,8 +79,11 @@ public class LanceTableOperations {
       @DefaultValue(NAMESPACE_DELIMITER_DEFAULT) @QueryParam("delimiter") String delimiter,
       DescribeTableRequest request) {
     try {
+      validateDescribeTableRequest(request);
       DescribeTableResponse response =
-          lanceNamespace.asTableOps().describeTable(tableId, delimiter, request.getVersion());
+          lanceNamespace
+              .asTableOps()
+              .describeTable(tableId, delimiter, Optional.ofNullable(request.getVersion()));
       return Response.ok(response).build();
     } catch (Exception e) {
       return LanceExceptionMapper.toRESTResponse(tableId, e);
@@ -105,23 +108,7 @@ public class LanceTableOperations {
       String tableLocation = headersMap.getFirst(LANCE_TABLE_LOCATION_HEADER);
       String tableProperties = headersMap.getFirst(LANCE_TABLE_PROPERTIES_PREFIX_HEADER);
       CreateTableRequest.ModeEnum modeEnum = CreateTableRequest.ModeEnum.fromValue(mode);
-
-      Map<String, String> props =
-          StringUtils.isBlank(tableProperties)
-              ? ImmutableMap.of()
-              : JsonUtil.parse(
-                  tableProperties,
-                  jsonNode -> {
-                    Map<String, String> map = new HashMap<>();
-                    jsonNode
-                        .fields()
-                        .forEachRemaining(
-                            entry -> {
-                              map.put(entry.getKey(), entry.getValue().asText());
-                            });
-                    return map;
-                  });
-
+      Map<String, String> props = SerializationUtils.deserializeProperties(tableProperties);
       CreateTableResponse response =
           lanceNamespace
               .asTableOps()
@@ -142,6 +129,8 @@ public class LanceTableOperations {
       CreateEmptyTableRequest request,
       @Context HttpHeaders headers) {
     try {
+      validateCreateEmptyTableRequest(request);
+
       String tableLocation = request.getLocation();
       Map<String, String> props =
           request.getProperties() == null
@@ -178,13 +167,13 @@ public class LanceTableOperations {
       @Context HttpHeaders headers,
       RegisterTableRequest registerTableRequest) {
     try {
+      validateRegisterTableRequest(registerTableRequest);
+
       Map<String, String> props =
           registerTableRequest.getProperties() == null
               ? Maps.newHashMap()
               : Maps.newHashMap(registerTableRequest.getProperties());
-      props.put("register", "true");
       props.put("location", registerTableRequest.getLocation());
-      props.put("format", "lance");
       ModeEnum mode = registerTableRequest.getMode();
 
       RegisterTableResponse response =
@@ -205,11 +194,32 @@ public class LanceTableOperations {
       @Context HttpHeaders headers,
       DeregisterTableRequest deregisterTableRequest) {
     try {
+      validateDeregisterTableRequest(deregisterTableRequest);
       DeregisterTableResponse response =
           lanceNamespace.asTableOps().deregisterTable(tableId, delimiter);
       return Response.ok(response).build();
     } catch (Exception e) {
       return LanceExceptionMapper.toRESTResponse(tableId, e);
     }
+  }
+
+  private void validateCreateEmptyTableRequest(CreateEmptyTableRequest request) {
+    Preconditions.checkArgument(
+        StringUtils.isNotBlank(request.getLocation()), "Table location must be provided.");
+  }
+
+  private void validateRegisterTableRequest(RegisterTableRequest request) {
+    Preconditions.checkArgument(
+        StringUtils.isNotBlank(request.getLocation()), "Table location must be provided.");
+  }
+
+  private void validateDeregisterTableRequest(
+      @SuppressWarnings("unused") DeregisterTableRequest request) {
+    // No specific fields to validate for now
+  }
+
+  private void validateDescribeTableRequest(
+      @SuppressWarnings("unused") DescribeTableRequest request) {
+    // No specific fields to validate for now
   }
 }

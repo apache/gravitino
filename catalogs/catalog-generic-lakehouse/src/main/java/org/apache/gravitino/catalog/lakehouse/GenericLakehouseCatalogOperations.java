@@ -373,10 +373,10 @@ public class GenericLakehouseCatalogOperations
           getLakehouseCatalogOperations(tableEntity.getProperties());
       return lakehouseCatalogOperations.purgeTable(ident);
     } catch (NoSuchTableException e) {
-      LOG.warn("Table {} does not exist, skip dropping it.", ident);
+      LOG.warn("Table {} does not exist, skip purging it.", ident);
       return false;
     } catch (IOException e) {
-      throw new RuntimeException("Failed to drop table: " + ident, e);
+      throw new RuntimeException("Failed to purge table: " + ident, e);
     }
   }
 
@@ -389,7 +389,7 @@ public class GenericLakehouseCatalogOperations
       }
       return store.delete(ident, Entity.EntityType.TABLE);
     } catch (IOException e) {
-      throw new RuntimeException("Failed to purge table " + ident, e);
+      throw new RuntimeException("Failed to drop table " + ident, e);
     }
   }
 
