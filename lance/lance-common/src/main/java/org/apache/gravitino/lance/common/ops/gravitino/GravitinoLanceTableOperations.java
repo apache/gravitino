@@ -59,13 +59,12 @@ import org.apache.gravitino.rel.Table;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class GravitinoLanceTableOperationsImpl implements LanceTableOperations {
-  private static final Logger LOG =
-      LoggerFactory.getLogger(GravitinoLanceTableOperationsImpl.class);
+public class GravitinoLanceTableOperations implements LanceTableOperations {
+  private static final Logger LOG = LoggerFactory.getLogger(GravitinoLanceTableOperations.class);
 
   private GravitinoLanceNamespaceWrapper namespaceWrapper;
 
-  public GravitinoLanceTableOperationsImpl(GravitinoLanceNamespaceWrapper namespaceWrapper) {
+  public GravitinoLanceTableOperations(GravitinoLanceNamespaceWrapper namespaceWrapper) {
     this.namespaceWrapper = namespaceWrapper;
   }
 

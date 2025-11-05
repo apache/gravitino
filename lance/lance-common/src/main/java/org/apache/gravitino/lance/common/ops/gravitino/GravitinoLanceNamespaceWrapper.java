@@ -66,8 +66,8 @@ public class GravitinoLanceNamespaceWrapper extends NamespaceWrapper {
         "Metalake name must be provided for Lance Gravitino namespace backend");
 
     this.client = GravitinoClient.builder(uri).withMetalake(metalakeName).build();
-    this.namespaceOperations = new GravitinoLanceNameSpaceOperationsImpl(this);
-    this.tableOperations = new GravitinoLanceTableOperationsImpl(this);
+    this.namespaceOperations = new GravitinoLanceNameSpaceOperations(this);
+    this.tableOperations = new GravitinoLanceTableOperations(this);
   }
 
   @Override

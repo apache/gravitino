@@ -61,12 +61,12 @@ import org.apache.gravitino.exceptions.NonEmptySchemaException;
 import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
 import org.apache.gravitino.lance.common.ops.LanceNamespaceOperations;
 
-public class GravitinoLanceNameSpaceOperationsImpl implements LanceNamespaceOperations {
+public class GravitinoLanceNameSpaceOperations implements LanceNamespaceOperations {
 
   private final GravitinoLanceNamespaceWrapper namespaceWrapper;
   private final GravitinoClient client;
 
-  public GravitinoLanceNameSpaceOperationsImpl(GravitinoLanceNamespaceWrapper namespaceWrapper) {
+  public GravitinoLanceNameSpaceOperations(GravitinoLanceNamespaceWrapper namespaceWrapper) {
     this.namespaceWrapper = namespaceWrapper;
     this.client = namespaceWrapper.getClient();
   }
