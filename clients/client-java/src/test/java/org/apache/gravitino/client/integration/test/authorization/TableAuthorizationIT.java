@@ -116,7 +116,7 @@ public class TableAuthorizationIT extends BaseRestApiAuthorizationIT {
   public void stopIntegrationTest() throws IOException, InterruptedException {
     GravitinoMetalake gravitinoMetalake = client.loadMetalake(METALAKE);
     gravitinoMetalake.loadCatalog(CATALOG).asSchemas().dropSchema(SCHEMA, true);
-    gravitinoMetalake.dropCatalog(CATALOG);
+    gravitinoMetalake.dropCatalog(CATALOG,true);
     client.dropMetalake(METALAKE, true);
     super.stopIntegrationTest();
   }
