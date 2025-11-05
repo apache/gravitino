@@ -231,6 +231,8 @@ public class GvfsMultipleClusterIT extends BaseIT {
             ImmutableMap.of(
                 PROPERTY_DEFAULT_LOCATION_NAME,
                 LOCATION_NAME_UNKNOWN,
+                "gravitino.bypass.dfs.namenode.kerberos.principal.pattern",
+                "*",
                 "hdfs.config.resources",
                 configResources));
     Assertions.assertTrue(catalog.asFilesetCatalog().filesetExists(kerberosFilesetIdent));
