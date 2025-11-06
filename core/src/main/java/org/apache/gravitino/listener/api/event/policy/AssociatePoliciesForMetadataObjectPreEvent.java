@@ -19,8 +19,6 @@
 
 package org.apache.gravitino.listener.api.event.policy;
 
-import org.apache.gravitino.MetadataObject;
-import org.apache.gravitino.annotation.DeveloperApi;
 import org.apache.gravitino.listener.api.event.OperationType;
 import org.apache.gravitino.utils.MetadataObjectUtil;
 
@@ -67,7 +65,7 @@ public final class AssociatePoliciesForMetadataObjectPreEvent extends PolicyPreE
    * @return an array of policy names to be added.
    */
   public String[] policiesToAdd() {
-    return policiesToAdd.clone();
+    return policiesToAdd;
   }
 
   /**
@@ -76,7 +74,7 @@ public final class AssociatePoliciesForMetadataObjectPreEvent extends PolicyPreE
    * @return an array of policy names to be removed.
    */
   public String[] policiesToRemove() {
-    return policiesToRemove.clone();
+    return policiesToRemove;
   }
 
   /**
