@@ -93,6 +93,16 @@ class TestDTOConverters(unittest.TestCase):
             Types.VarCharType.of(10): "test",
             Types.FixedCharType.of(10): "test",
         }
+        cls.function_args = {
+            FieldReference(field_names=["score"]): FieldReferenceDTO.builder()
+            .with_field_name(field_name=["score"])
+            .build(),
+            UnparsedExpression.of(
+                unparsed_expression="unparsed"
+            ): UnparsedExpressionDTO.builder()
+            .with_unparsed_expression("unparsed")
+            .build(),
+        }
         cls.table_dto_json = """
         {
             "name": "example_table",
@@ -590,3 +600,51 @@ class TestDTOConverters(unittest.TestCase):
         )
         self.assertEqual(table.audit_info(), dto.audit_info())
         self.assertEqual(table.properties(), dto.properties())
+
+    def test_to_function_arg_function_arg(self):
+        for expression, function_arg in TestDTOConverters.function_args.items():
+            converted = DTOConverters.to_function_arg(function_arg)
+            self.assertTrue(converted == function_arg)
+            converted = DTOConverters.to_function_arg(expression)
+            self.assertTrue(converted == function_arg)
+
+        for data_type, value in TestDTOConverters.literals.items():
+            literal = Literals.of(value=value, data_type=data_type)
+            expected = (
+                LiteralDTO.builder()
+                .with_data_type(data_type)
+                .with_value(str(value))
+                .build()
+            )
+            self.assertTrue(DTOConverters.to_function_arg(literal) == expected)
+        self.assertTrue(DTOConverters.to_function_arg(Literals.NULL) == LiteralDTO.NULL)
+
+        function_name = "test_function"
+        args: list[FunctionArg] = [
+            LiteralDTO.builder()
+            .with_data_type(Types.IntegerType.get())
+            .with_value("-1")
+            .build(),
+            LiteralDTO.builder()
+            .with_data_type(Types.BooleanType.get())
+            .with_value("True")
+            .build(),
+        ]
+        expected = (
+            FuncExpressionDTO.builder()
+            .with_function_name(function_name)
+            .with_function_args(args)
+            .build()
+        )
+        func_expression = FunctionExpression.of(
+            function_name,
+            Literals.of(value="-1", data_type=Types.IntegerType.get()),
+            Literals.of(value="True", data_type=Types.BooleanType.get()),
+        )
+        converted = DTOConverters.to_function_arg(func_expression)
+        self.assertTrue(converted == expected)
+
+        with self.assertRaisesRegex(
+            IllegalArgumentException, "Unsupported expression type"
+        ):
+            DTOConverters.to_function_arg(DistributionDTO.NONE)
