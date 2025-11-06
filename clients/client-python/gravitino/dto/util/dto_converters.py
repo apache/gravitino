@@ -23,8 +23,9 @@ from gravitino.api.rel.expressions.distributions.distribution import Distributio
 from gravitino.api.rel.expressions.distributions.distributions import Distributions
 from gravitino.api.rel.expressions.expression import Expression
 from gravitino.api.rel.expressions.function_expression import FunctionExpression
+from gravitino.api.rel.expressions.literals.literal import Literal
 from gravitino.api.rel.expressions.literals.literals import Literals
-from gravitino.api.rel.expressions.named_reference import NamedReference
+from gravitino.api.rel.expressions.named_reference import FieldReference, NamedReference
 from gravitino.api.rel.expressions.sorts.sort_order import SortOrder
 from gravitino.api.rel.expressions.sorts.sort_orders import SortOrders
 from gravitino.api.rel.expressions.transforms.transform import Transform
@@ -302,3 +303,53 @@ class DTOConverters:
         if not dtos:
             return []
         return [DTOConverters.from_dto(dto) for dto in dtos]
+
+    @staticmethod
+    def to_function_arg(expression: Expression) -> FunctionArg:
+        """Converts an Expression to an FunctionArg DTO.
+
+        Args:
+            expression (Expression): The expression to be converted.
+
+        Returns:
+            FunctionArg: The expression DTO.
+        """
+
+        if isinstance(expression, FunctionArg):
+            return cast(FunctionArg, expression)
+        if isinstance(expression, Literal):
+            if expression is Literals.NULL:
+                return LiteralDTO.NULL
+            return (
+                LiteralDTO.builder()
+                .with_value(str(expression.value()))
+                .with_data_type(expression.data_type())
+                .build()
+            )
+        if isinstance(expression, FieldReference):
+            return (
+                FieldReferenceDTO.builder()
+                .with_field_name(expression.field_name())
+                .build()
+            )
+        if isinstance(expression, FunctionExpression):
+            return (
+                FuncExpressionDTO.builder()
+                .with_function_name(expression.function_name())
+                .with_function_args(
+                    [
+                        DTOConverters.to_function_arg(arg)
+                        for arg in expression.arguments()
+                    ]
+                )
+                .build()
+            )
+        if isinstance(expression, UnparsedExpression):
+            return (
+                UnparsedExpressionDTO.builder()
+                .with_unparsed_expression(expression.unparsed_expression())
+                .build()
+            )
+        raise IllegalArgumentException(
+            f"Unsupported expression type: {expression.__class__.__name__}"
+        )
