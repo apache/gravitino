@@ -41,7 +41,7 @@ CREATE TABLE IF NOT EXISTS `policy_version_info` (
     `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'policy deleted at',
     PRIMARY KEY (`id`),
     UNIQUE KEY `uk_pod_ver_del` (`policy_id`, `version`, `deleted_at`),
-    KEY `idx_mid` (`metalake_id`)
+    KEY `idx_pmid` (`metalake_id`)
 ) ENGINE=InnoDB;
 
 CREATE TABLE IF NOT EXISTS `policy_relation_meta` (
@@ -56,7 +56,7 @@ CREATE TABLE IF NOT EXISTS `policy_relation_meta` (
     PRIMARY KEY (`id`),
     UNIQUE KEY `uk_pi_mi_mo_del` (`policy_id`, `metadata_object_id`, `metadata_object_type`, `deleted_at`),
     KEY `idx_pid` (`policy_id`),
-    KEY `idx_mid` (`metadata_object_id`)
+    KEY `idx_prmid` (`metadata_object_id`)
 ) ENGINE=InnoDB;
 
 -- using default 'unknown' to fill in the new column for compatibility
