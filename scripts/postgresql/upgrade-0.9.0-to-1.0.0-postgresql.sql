@@ -107,6 +107,10 @@ CREATE TABLE IF NOT EXISTS statistic_meta (
     statistic_value TEXT NOT NULL,
     metadata_object_id BIGINT NOT NULL,
     metadata_object_type VARCHAR(64) NOT NULL,
+    audit_info TEXT NOT NULL,
+    current_version INT NOT NULL DEFAULT 1,
+    last_version INT NOT NULL DEFAULT 1,
+    deleted_at BIGINT NOT NULL DEFAULT 0,
     PRIMARY KEY (statistic_id),
     UNIQUE (statistic_name, metadata_object_id, deleted_at)
 );
