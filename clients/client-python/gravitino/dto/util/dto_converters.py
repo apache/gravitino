@@ -34,6 +34,7 @@ from gravitino.api.rel.expressions.unparsed_expression import UnparsedExpression
 from gravitino.api.rel.indexes.index import Index
 from gravitino.api.rel.indexes.indexes import Indexes
 from gravitino.api.rel.partitions.list_partition import ListPartition
+from gravitino.api.rel.partitions.partition import Partition
 from gravitino.api.rel.partitions.range_partition import RangePartition
 from gravitino.api.rel.table import Table
 from gravitino.api.rel.types.types import Types
@@ -59,6 +60,8 @@ from gravitino.dto.rel.partitioning.range_partitioning_dto import RangePartition
 from gravitino.dto.rel.partitioning.truncate_partitioning_dto import (
     TruncatePartitioningDTO,
 )
+from gravitino.dto.rel.partitions.partition_dto import PartitionDTO
+from gravitino.dto.rel.partitions.range_partition_dto import RangePartitionDTO
 from gravitino.dto.rel.sort_order_dto import SortOrderDTO
 from gravitino.dto.rel.table_dto import TableDTO
 from gravitino.exceptions.base import IllegalArgumentException
@@ -353,3 +356,24 @@ class DTOConverters:
         raise IllegalArgumentException(
             f"Unsupported expression type: {expression.__class__.__name__}"
         )
+
+    @singledispatchmethod
+    @staticmethod
+    def to_dto(obj) -> object:
+        raise IllegalArgumentException(f"Unsupported DTO type: {type(obj)}")
+
+    @to_dto.register
+    @staticmethod
+    def _(obj: Partition) -> PartitionDTO:
+        if isinstance(obj, RangePartition):
+            range_partition = cast(RangePartition, obj)
+            return RangePartitionDTO(
+                name=range_partition.name(),
+                upper=cast(
+                    LiteralDTO, DTOConverters.to_function_arg(range_partition.upper())
+                ),
+                lower=cast(
+                    LiteralDTO, DTOConverters.to_function_arg(range_partition.lower())
+                ),
+                properties=range_partition.properties(),
+            )
