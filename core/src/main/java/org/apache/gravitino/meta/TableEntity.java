@@ -33,6 +33,7 @@ import org.apache.gravitino.Field;
 import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.rel.expressions.distributions.Distribution;
+import org.apache.gravitino.rel.expressions.distributions.Distributions;
 import org.apache.gravitino.rel.expressions.sorts.SortOrder;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.expressions.transforms.Transforms;
@@ -303,6 +304,8 @@ public class TableEntity implements Entity, Auditable, HasIdentifier {
           tableEntity.partitioning == null ? Transforms.EMPTY_TRANSFORM : tableEntity.partitioning;
       tableEntity.sortOrders =
           tableEntity.sortOrders == null ? new SortOrder[0] : tableEntity.sortOrders;
+      tableEntity.distribution =
+          tableEntity.distribution == null ? Distributions.NONE : tableEntity.distribution;
 
       return tableEntity;
     }
