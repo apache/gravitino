@@ -176,8 +176,6 @@ class TestGvfsWithGCS(TestGvfsWithHDFS):
         # GCS will not create a directory, so the directory will not exist.
         self.fs.mkdir(actual_dir)
         self.assertFalse(self.fs.exists(actual_dir))
-        # with self.assertRaises(OSError):
-        #     gvfs_instance.exists(gvfs_dir)
         self.assertFalse(gvfs_instance.exists(gvfs_dir))
 
     # Object storage like GCS does not support making directory and can only create
