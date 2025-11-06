@@ -45,6 +45,28 @@ import org.apache.gravitino.tag.SupportsTags;
 public interface Table extends Auditable {
 
   /**
+   * The reserved property name for the table format. This property indicates the format of the
+   * table, such as "iceberg", "hudi", "lance", etc. Some catalog implementations may use this
+   * property to determine the table format and perform specific operations based on the format.
+   */
+  String PROPERTY_TABLE_FORMAT = "format";
+
+  /**
+   * The reserved property name to indicate whether the table is external. This property is a
+   * boolean value represented as a string ("true" or "false"). if true (the table is external), the
+   * drop operation will not delete the underlying data.
+   */
+  String PROPERTY_EXTERNAL = "external";
+
+  /**
+   * The reserved property name for the table location. This property indicates the physical
+   * location of the table's data, such as a file path or a URI. The location can be specified when
+   * creating the table. If not, the catalog implementation may use a location based on the catalog
+   * and schema location properties.
+   */
+  String PROPERTY_LOCATION = "location";
+
+  /**
    * @return Name of the table.
    */
   String name();
@@ -97,37 +119,6 @@ public interface Table extends Auditable {
    */
   default Map<String, String> properties() {
     return Collections.emptyMap();
-  }
-
-  /**
-   * Table format of the table. For example, in a file-based table, it could be "parquet", "Lance",
-   * "Iceberg", etc.
-   *
-   * @return the table format name, for more information: LakehouseTableFormat
-   */
-  default String format() {
-    throw new UnsupportedOperationException("Table format is not supported.");
-  }
-
-  /**
-   * Gets the location of the table if the table has a location. For example, in a file-based table,
-   * it could be the root path where the table data is stored.
-   *
-   * @return the location of the table as a string.
-   */
-  default String location() {
-    throw new UnsupportedOperationException("Table location is not supported.");
-  }
-
-  /**
-   * Indicates whether the table is external. An external table is a table that is not managed by
-   * the catalog and the drop operation will not delete the underlying data. If it's a managed
-   * table, dropping the table will delete the underlying data.
-   *
-   * @return true if the table is external, false otherwise
-   */
-  default boolean external() {
-    return false;
   }
 
   /**

@@ -1253,7 +1253,7 @@ public class TestJDBCBackend {
     backend.insert(table, false);
 
     TableEntity fetchedTable = backend.get(table.nameIdentifier(), Entity.EntityType.TABLE);
-    Assertions.assertEquals("LANCE", fetchedTable.getProperties().get("format"));
+    Assertions.assertEquals("LANCE", fetchedTable.properties().get("format"));
 
     TableEntity updatedTable =
         TableEntity.builder()
