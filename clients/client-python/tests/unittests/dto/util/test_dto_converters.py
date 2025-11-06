@@ -36,6 +36,7 @@ from gravitino.api.rel.expressions.transforms.transforms import Transforms
 from gravitino.api.rel.expressions.unparsed_expression import UnparsedExpression
 from gravitino.api.rel.indexes.index import Index
 from gravitino.api.rel.indexes.indexes import Indexes
+from gravitino.api.rel.partitions.partitions import Partitions
 from gravitino.api.rel.table import Table
 from gravitino.api.rel.types.types import Types
 from gravitino.dto.rel.column_dto import ColumnDTO
@@ -63,6 +64,7 @@ from gravitino.dto.rel.partitioning.truncate_partitioning_dto import (
     TruncatePartitioningDTO,
 )
 from gravitino.dto.rel.partitioning.year_partitioning_dto import YearPartitioningDTO
+from gravitino.dto.rel.partitions.range_partition_dto import RangePartitionDTO
 from gravitino.dto.rel.sort_order_dto import SortOrderDTO
 from gravitino.dto.rel.table_dto import TableDTO
 from gravitino.dto.util.dto_converters import DTOConverters
@@ -648,3 +650,27 @@ class TestDTOConverters(unittest.TestCase):
             IllegalArgumentException, "Unsupported expression type"
         ):
             DTOConverters.to_function_arg(DistributionDTO.NONE)
+
+    def test_to_dto_raise_exception(self):
+        with self.assertRaisesRegex(IllegalArgumentException, "Unsupported DTO type"):
+            DTOConverters.to_dto("test")
+
+    def test_to_dto_range_partition(self):
+        converted = DTOConverters.to_dto(
+            Partitions.range(
+                name="p0",
+                upper=Literals.NULL,
+                lower=Literals.integer_literal(6),
+                properties={},
+            )
+        )
+        expected = RangePartitionDTO(
+            name="p0",
+            upper=LiteralDTO.NULL,
+            lower=LiteralDTO.builder()
+            .with_value("6")
+            .with_data_type(Types.IntegerType.get())
+            .build(),
+            properties={},
+        )
+        self.assertTrue(converted == expected)
