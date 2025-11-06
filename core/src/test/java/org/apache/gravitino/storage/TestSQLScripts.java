@@ -40,6 +40,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.integration.test.container.MySQLContainer;
 import org.apache.gravitino.integration.test.container.PostgreSQLContainer;
 import org.apache.gravitino.integration.test.util.BaseIT;
+import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -50,6 +51,7 @@ public class TestSQLScripts extends BaseIT {
   private String jdbcBackend;
   private Path scriptDir;
   @TempDir private File tempDir;
+  private Map<String, Connection> versionConnections;
 
   @BeforeAll
   public void startIntegrationTest() {
@@ -60,17 +62,32 @@ public class TestSQLScripts extends BaseIT {
     Assertions.assertNotNull(gravitinoHome, "GRAVITINO_HOME environment variable is not set");
     scriptDir = Path.of(gravitinoHome, "scripts", jdbcBackend.toLowerCase());
     Assertions.assertTrue(Files.exists(scriptDir), "Script directory does not exist: " + scriptDir);
+    versionConnections = new HashMap<>();
+  }
+
+  @AfterAll
+  public void stopIntegrationTest() {
+    // Close all connections
+    for (Connection conn : versionConnections.values()) {
+      if (conn != null) {
+        try {
+          conn.close();
+        } catch (SQLException e) {
+          // Ignore
+        }
+      }
+    }
+    versionConnections.clear();
   }
 
   @Test
-  public void testSQLScripts() throws IOException, SQLException {
+  public void testSQLScripts() throws SQLException {
     File[] scriptFiles = scriptDir.toFile().listFiles();
     Assertions.assertNotNull(scriptFiles, "No script files found in " + scriptDir);
-    // Sort files to ensure correct execution order (schema -> upgrade)
+    // Sort files to ensure the correct execution order (schema -> upgrade)
     Arrays.sort(scriptFiles, Comparator.comparing(File::getName));
 
     // A map to store connections for different schema versions
-    Map<String, Connection> versionConnections = new HashMap<>();
     Pattern schemaPattern =
         Pattern.compile("schema-([\\d.]+)-" + jdbcBackend.toLowerCase() + "\\.sql");
     Pattern upgradePattern =
@@ -101,13 +118,6 @@ public class TestSQLScripts extends BaseIT {
             "Failed to execute upgrade script" + " in file " + scriptFile.getName());
       } else {
         Assertions.fail("Unrecognized script file name: " + scriptFile.getName());
-      }
-    }
-
-    // Close all connections
-    for (Connection conn : versionConnections.values()) {
-      if (conn != null) {
-        conn.close();
       }
     }
   }
