@@ -21,7 +21,9 @@ from unittest.mock import Mock
 from gravitino.api.rel.column import Column, ColumnImpl
 from gravitino.api.rel.expressions.expression import Expression
 from gravitino.api.rel.expressions.function_expression import FunctionExpression
+from gravitino.api.rel.expressions.literals.literals import Literals
 from gravitino.api.rel.types.type import Type
+from gravitino.api.rel.types.types import Types
 from gravitino.exceptions.base import (
     IllegalArgumentException,
     UnsupportedOperationException,
@@ -89,6 +91,20 @@ class TestColumn(unittest.TestCase):
 
         self.assertEqual(hash(col1), hash(col2))
         self.assertNotEqual(hash(col1), hash(col3))
+
+        col4 = Column.of(
+            name="test",
+            data_type=Types.StringType.get(),
+            comment="comment",
+            default_value=Literals.string_literal(value="test"),
+        )
+        col5 = Column.of(
+            name="test",
+            data_type=Types.StringType.get(),
+            comment="comment",
+            default_value=Literals.string_literal(value="test"),
+        )
+        self.assertEqual(hash(col4), hash(col5))
 
     def test_supports_tags_raises_exception(self):
         """Test that supports_tags raises `UnsupportedOperationException`."""

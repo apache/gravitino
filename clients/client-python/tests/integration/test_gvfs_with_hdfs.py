@@ -216,7 +216,9 @@ class TestGvfsWithHDFS(IntegrationTestEnv):
     @classmethod
     def _clean_test_data(cls):
         cls.gravitino_client = GravitinoClient(
-            uri="http://localhost:8090", metalake_name=cls.metalake_name
+            uri="http://localhost:8090",
+            metalake_name=cls.metalake_name,
+            client_config={"gravitino_client_request_timeout": 180},
         )
         catalog = cls.gravitino_client.load_catalog(name=cls.catalog_name)
 

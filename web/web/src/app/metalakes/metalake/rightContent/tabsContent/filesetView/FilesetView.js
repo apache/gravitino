@@ -19,7 +19,7 @@
 
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { useAppDispatch, useAppSelector } from '@/lib/hooks/useStore'
 import { getFilesetFiles } from '@/lib/store/metalakes'
@@ -32,6 +32,8 @@ import {
   Paper,
   Table,
   TableBody,
+  TableFooter,
+  TablePagination,
   TableCell,
   TableContainer,
   TableHead,
@@ -54,6 +56,26 @@ const FilesetView = () => {
 
   const [currentPath, setCurrentPath] = useState('/')
   const [pathHistory, setPathHistory] = useState(['/'])
+
+  const [page, setPage] = useState(0)
+  const [rowsPerPage, setRowsPerPage] = useState(10)
+
+  const handleChangePage = (event, newPage) => {
+    setPage(newPage)
+  }
+
+  const handleChangeRowsPerPage = event => {
+    setRowsPerPage(parseInt(event.target.value, 10))
+    setPage(0)
+  }
+
+  const paginatedFiles = useMemo(() => {
+    if (!store.filesetFiles) return []
+    const startIndex = page * rowsPerPage
+    const endIndex = startIndex + rowsPerPage
+
+    return store.filesetFiles.slice(startIndex, endIndex)
+  }, [store.filesetFiles, page, rowsPerPage])
 
   useEffect(() => {
     if (metalake && catalog && schema && fileset) {
@@ -146,7 +168,7 @@ const FilesetView = () => {
       </Box>
 
       <TableContainer component={Paper}>
-        <Table>
+        <Table size='small'>
           <TableHead>
             <TableRow>
               <TableCell>Name</TableCell>
@@ -156,8 +178,8 @@ const FilesetView = () => {
             </TableRow>
           </TableHead>
           <TableBody>
-            {store.filesetFiles && store.filesetFiles.length > 0 ? (
-              store.filesetFiles.map((file, index) => (
+            {paginatedFiles && paginatedFiles.length > 0 ? (
+              paginatedFiles.map((file, index) => (
                 <TableRow
                   key={index}
                   hover
@@ -191,6 +213,18 @@ const FilesetView = () => {
               </TableRow>
             )}
           </TableBody>
+          <TableFooter>
+            <TableRow>
+              <TablePagination
+                rowsPerPageOptions={[10, 25, 50, { value: -1, label: 'All' }]}
+                count={store.filesetFiles.length}
+                rowsPerPage={rowsPerPage}
+                page={page}
+                onPageChange={handleChangePage}
+                onRowsPerPageChange={handleChangeRowsPerPage}
+              />
+            </TableRow>
+          </TableFooter>
         </Table>
       </TableContainer>
     </Box>
