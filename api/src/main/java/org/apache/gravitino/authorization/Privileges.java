@@ -928,6 +928,7 @@ public class Privileges {
     }
   }
 
+  /** The privilege to apply tag to object. */
   public static final class ApplyTag extends GenericPrivilege<ApplyTag> {
 
     private static final ApplyTag ALLOW_INSTANCE = new ApplyTag(Condition.ALLOW, Name.CREATE_TAG);
