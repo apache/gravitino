@@ -129,16 +129,6 @@ public final class EntityCombinedTable implements Table {
     return table.index();
   }
 
-  @Override
-  public String format() {
-    return table.format();
-  }
-
-  @Override
-  public String location() {
-    return table.location();
-  }
-
   public boolean imported() {
     return imported;
   }

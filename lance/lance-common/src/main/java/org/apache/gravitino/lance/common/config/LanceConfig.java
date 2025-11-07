@@ -42,21 +42,21 @@ public class LanceConfig extends Config implements OverwriteDefaultConfig {
   public static final ConfigEntry<String> NAMESPACE_BACKEND =
       new ConfigBuilder(CONFIG_NAMESPACE_BACKEND)
           .doc("The backend implementation for namespace operations")
-          .version(ConfigConstants.VERSION_0_1_0)
+          .version(ConfigConstants.VERSION_1_1_0)
           .stringConf()
           .createWithDefault(GRAVITINO_NAMESPACE_BACKEND);
 
   public static final ConfigEntry<String> METALAKE_NAME =
       new ConfigBuilder(GRAVITINO_NAMESPACE_BACKEND + "." + CONFIG_METALAKE)
           .doc("The Metalake name for Lance Gravitino namespace backend")
-          .version(ConfigConstants.VERSION_0_1_0)
+          .version(ConfigConstants.VERSION_1_1_0)
           .stringConf()
           .create();
 
   public static final ConfigEntry<String> NAMESPACE_BACKEND_URI =
       new ConfigBuilder(GRAVITINO_NAMESPACE_BACKEND + "." + CONFIG_URI)
           .doc("The URI of the namespace backend, e.g., Gravitino server URI")
-          .version(ConfigConstants.VERSION_0_1_0)
+          .version(ConfigConstants.VERSION_1_1_0)
           .stringConf()
           .createWithDefault(GRAVITINO_URI);
 
