@@ -46,9 +46,9 @@ CREATE TABLE commit_metrics_report (
     added_records BIGINT DEFAULT 0,
     removed_records BIGINT DEFAULT 0,
     total_records BIGINT DEFAULT 0,
-    added_file_size_bytes BIGINT DEFAULT 0,
-    removed_file_size_bytes BIGINT DEFAULT 0,
-    total_file_size_bytes BIGINT DEFAULT 0,
+    added_files_size_in_bytes BIGINT DEFAULT 0,
+    removed_files_size_in_bytes BIGINT DEFAULT 0,
+    total_files_size_in_bytes BIGINT DEFAULT 0,
     added_positional_deletes BIGINT DEFAULT 0,
     removed_positional_deletes BIGINT DEFAULT 0,
     total_positional_deletes BIGINT DEFAULT 0,
@@ -90,9 +90,9 @@ COMMENT ON COLUMN commit_metrics_report.total_delete_files IS 'Total number of d
 COMMENT ON COLUMN commit_metrics_report.added_records IS 'Number of added records';
 COMMENT ON COLUMN commit_metrics_report.removed_records IS 'Number of removed records';
 COMMENT ON COLUMN commit_metrics_report.total_records IS 'Total number of records';
-COMMENT ON COLUMN commit_metrics_report.added_file_size_bytes IS 'Size of added files in bytes';
-COMMENT ON COLUMN commit_metrics_report.removed_file_size_bytes IS 'Size of removed files in bytes';
-COMMENT ON COLUMN commit_metrics_report.total_file_size_bytes IS 'Total file size in bytes';
+COMMENT ON COLUMN commit_metrics_report.added_files_size_in_bytes IS 'Size of added files in bytes';
+COMMENT ON COLUMN commit_metrics_report.removed_files_size_in_bytes IS 'Size of removed files in bytes';
+COMMENT ON COLUMN commit_metrics_report.total_files_size_in_bytes IS 'Total file size in bytes';
 COMMENT ON COLUMN commit_metrics_report.added_positional_deletes IS 'Number of added positional deletes';
 COMMENT ON COLUMN commit_metrics_report.removed_positional_deletes IS 'Number of removed positional deletes';
 COMMENT ON COLUMN commit_metrics_report.total_positional_deletes IS 'Total number of positional deletes';
@@ -136,7 +136,7 @@ CREATE TABLE scan_metrics_report (
     total_delete_file_size_in_bytes BIGINT DEFAULT 0,
     total_delete_manifests BIGINT DEFAULT 0,
     total_file_size_in_bytes BIGINT DEFAULT 0,
-    total_planning_duration_ms BIGINT DEFAULT 0
+    total_planning_duration BIGINT DEFAULT 0
 );
 
 CREATE INDEX idx_scan_report ON scan_metrics_report (timestamp, namespace, table_name);
@@ -149,7 +149,6 @@ COMMENT ON COLUMN scan_metrics_report.snapshot_id IS 'Snapshot identifier';
 COMMENT ON COLUMN scan_metrics_report.schema_id IS 'Schema identifier';
 COMMENT ON COLUMN scan_metrics_report.filter IS 'Filter condition applied during scan';
 COMMENT ON COLUMN scan_metrics_report.metadata IS 'Additional metadata in JSON format';
-COMMENT ON COLUMN scan_metrics_report.total_planning_duration_ms IS 'Total planning duration in milliseconds';
 COMMENT ON COLUMN scan_metrics_report.projected_field_ids IS 'List of projected field IDs';
 COMMENT ON COLUMN scan_metrics_report.projected_field_names IS 'List of projected field names';
 COMMENT ON COLUMN scan_metrics_report.equality_delete_files IS 'Number of equality delete files';
@@ -167,4 +166,4 @@ COMMENT ON COLUMN scan_metrics_report.total_data_manifests IS 'Total number of d
 COMMENT ON COLUMN scan_metrics_report.total_delete_file_size_in_bytes IS 'Total size of delete files in bytes';
 COMMENT ON COLUMN scan_metrics_report.total_delete_manifests IS 'Total number of delete manifests';
 COMMENT ON COLUMN scan_metrics_report.total_file_size_in_bytes IS 'Total file size in bytes';
-COMMENT ON COLUMN scan_metrics_report.total_planning_duration_ms IS 'Total planning duration in milliseconds';
+COMMENT ON COLUMN scan_metrics_report.total_planning_duration IS 'Total planning duration in milliseconds';

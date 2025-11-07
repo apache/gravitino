@@ -38,9 +38,9 @@ CREATE TABLE commit_metrics_report (
     added_records BIGINT DEFAULT 0 COMMENT 'Number of added records',
     removed_records BIGINT DEFAULT 0 COMMENT 'Number of removed records',
     total_records BIGINT DEFAULT 0 COMMENT 'Total number of records',
-    added_file_size_bytes BIGINT DEFAULT 0 COMMENT 'Size of added files in bytes',
-    removed_file_size_bytes BIGINT DEFAULT 0 COMMENT 'Size of removed files in bytes',
-    total_file_size_bytes BIGINT DEFAULT 0 COMMENT 'Total file size in bytes',
+    added_files_size_in_bytes BIGINT DEFAULT 0 COMMENT 'Size of added files in bytes',
+    removed_files_size_in_bytes BIGINT DEFAULT 0 COMMENT 'Size of removed files in bytes',
+    total_files_size_in_bytes BIGINT DEFAULT 0 COMMENT 'Total file size in bytes',
     added_positional_deletes BIGINT DEFAULT 0 COMMENT 'Number of added positional deletes',
     removed_positional_deletes BIGINT DEFAULT 0 COMMENT 'Number of removed positional deletes',
     total_positional_deletes BIGINT DEFAULT 0 COMMENT 'Total number of positional deletes',
@@ -85,6 +85,6 @@ CREATE TABLE scan_metrics_report (
     total_delete_file_size_in_bytes BIGINT DEFAULT 0 COMMENT 'Total size of delete files in bytes',
     total_delete_manifests BIGINT DEFAULT 0 COMMENT 'Total number of delete manifests',
     total_file_size_in_bytes BIGINT DEFAULT 0 COMMENT 'Total file size in bytes',
-    total_planning_duration_ms BIGINT DEFAULT 0 COMMENT 'Total planning duration in milliseconds',
+    total_planning_duration BIGINT DEFAULT 0 COMMENT 'Total planning duration in milliseconds',
     KEY `idx_scan_report` (`timestamp`, `namespace`, `table_name`)
 ) ENGINE = InnoDB;

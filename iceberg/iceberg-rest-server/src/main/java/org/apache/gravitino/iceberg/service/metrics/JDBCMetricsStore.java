@@ -25,7 +25,6 @@ import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.time.Instant;
 import java.util.Map;
-import java.util.Properties;
 import java.util.function.Consumer;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergPropertiesUtils;
 import org.apache.gravitino.json.JsonUtils;
@@ -50,7 +49,7 @@ public class JDBCMetricsStore implements IcebergMetricsStore {
           + "added_delete_files, added_equality_delete_files,  added_positional_delete_files, "
           + "removed_delete_files, removed_equality_delete_files, removed_positional_delete_files, total_delete_files,"
           + "added_records, removed_records, total_records,"
-          + "added_file_size_bytes, removed_file_size_bytes, total_file_size_bytes,"
+          + "added_files_size_in_bytes, removed_files_size_in_bytes, total_files_size_in_bytes,"
           + "added_positional_deletes, removed_positional_deletes, total_positional_deletes,"
           + "added_equality_deletes, removed_equality_deletes, total_equality_deletes,"
           + "manifests_created, manifests_replaced, manifests_kept, manifest_entries_processed,"
@@ -80,7 +79,7 @@ public class JDBCMetricsStore implements IcebergMetricsStore {
           + "skipped_delete_files, skipped_delete_manifests, "
           + "total_data_manifests, total_delete_file_size_in_bytes, "
           + "total_delete_manifests, total_file_size_in_bytes,"
-          + "total_planning_duration_ms) VALUES "
+          + "total_planning_duration) VALUES "
           + "(?, ?, ?, ?, ?,"
           + "?, ?, ?, ?,"
           + "?, ? ,?,"

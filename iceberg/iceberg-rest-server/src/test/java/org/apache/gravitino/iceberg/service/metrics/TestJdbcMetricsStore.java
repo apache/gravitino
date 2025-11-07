@@ -18,6 +18,9 @@
  */
 package org.apache.gravitino.iceberg.service.metrics;
 
+import static org.apache.gravitino.iceberg.service.metrics.JDBCMetricsStore.getCounterResult;
+import static org.apache.gravitino.iceberg.service.metrics.JDBCMetricsStore.getTimerResult;
+
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import java.io.File;
@@ -45,14 +48,10 @@ import org.apache.iceberg.metrics.ImmutableScanReport;
 import org.apache.iceberg.metrics.ScanMetrics;
 import org.apache.iceberg.metrics.ScanMetricsResult;
 import org.apache.iceberg.metrics.ScanReport;
-import org.jetbrains.annotations.NotNull;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
-
-import static org.apache.gravitino.iceberg.service.metrics.JDBCMetricsStore.getCounterResult;
-import static org.apache.gravitino.iceberg.service.metrics.JDBCMetricsStore.getTimerResult;
 
 @Tag("gravitino-docker-test")
 public class TestJdbcMetricsStore {
@@ -60,31 +59,34 @@ public class TestJdbcMetricsStore {
   private static final String CURRENT_SCRIPT_VERSION = "1.1.0";
   private static final Map<String, Map<String, String>> dbProperties = Maps.newHashMap();
 
-
   @BeforeAll
-    public static void beforeAll() {
+  public static void beforeAll() {
     ContainerSuite containerSuite = ContainerSuite.getInstance();
     containerSuite.startMySQLContainer(TestDatabaseName.MYSQL_JDBC_BACKEND);
     containerSuite.startPostgreSQLContainer(TestDatabaseName.PG_JDBC_BACKEND);
     // Prepare test configurations
     Map<String, String> h2Properties = Maps.newHashMap();
-    h2Properties.put("jdbc-driver", "org.h2.Driver");
-    h2Properties.put("uri", "jdbc:h2:mem:testdb;DB_CLOSE_DELAY=-1;MODE=MYSQL");
+    h2Properties.put("jdbc-metrics.jdbc-driver", "org.h2.Driver");
+    h2Properties.put("jdbc-metrics.uri", "jdbc:h2:mem:testdb;DB_CLOSE_DELAY=-1;MODE=MYSQL");
     dbProperties.put("h2", h2Properties);
 
     Map<String, String> mysqlProperties = Maps.newHashMap();
-    mysqlProperties.put("jdbc-driver", "com.mysql.cj.jdbc.Driver");
+    mysqlProperties.put("jdbc-metrics.jdbc-driver", "com.mysql.cj.jdbc.Driver");
     mysqlProperties.put(
-            "uri", containerSuite.getMySQLContainer().getJdbcUrl(TestDatabaseName.MYSQL_JDBC_BACKEND));
-    mysqlProperties.put("jdbc-user", containerSuite.getMySQLContainer().getUsername());
-    mysqlProperties.put("jdbc-password", containerSuite.getMySQLContainer().getPassword());
+        "jdbc-metrics.uri",
+        containerSuite.getMySQLContainer().getJdbcUrl(TestDatabaseName.MYSQL_JDBC_BACKEND));
+    mysqlProperties.put("jdbc-metrics.jdbc-user", containerSuite.getMySQLContainer().getUsername());
+    mysqlProperties.put(
+        "jdbc-metrics.jdbc-password", containerSuite.getMySQLContainer().getPassword());
     dbProperties.put("mysql", mysqlProperties);
     Map<String, String> postgresqlProperties = Maps.newHashMap();
-    postgresqlProperties.put("jdbc-driver", "org.postgresql.Driver");
-    postgresqlProperties.put("uri", containerSuite.getPostgreSQLContainer().getJdbcUrl());
-    postgresqlProperties.put("jdbc-user", containerSuite.getPostgreSQLContainer().getUsername());
+    postgresqlProperties.put("jdbc-metrics.jdbc-driver", "org.postgresql.Driver");
     postgresqlProperties.put(
-            "jdbc-password", containerSuite.getPostgreSQLContainer().getPassword());
+        "jdbc-metrics.uri", containerSuite.getPostgreSQLContainer().getJdbcUrl());
+    postgresqlProperties.put(
+        "jdbc-metrics.jdbc-user", containerSuite.getPostgreSQLContainer().getUsername());
+    postgresqlProperties.put(
+        "jdbc-metrics.jdbc-password", containerSuite.getPostgreSQLContainer().getPassword());
     dbProperties.put("postgresql", postgresqlProperties);
   }
 
@@ -214,91 +216,121 @@ public class TestJdbcMetricsStore {
     };
   }
 
-  private static ClientPool.Action<Void, Connection, SQLException> validateCommitReport(String sql, CommitReport commitReport) {
+  private static ClientPool.Action<Void, Connection, SQLException> validateCommitReport(
+      String sql, CommitReport commitReport) {
     return conn -> {
       try (var stmt = conn.createStatement()) {
         var rs = stmt.executeQuery(sql);
         if (rs.next()) {
-
           Assertions.assertEquals("a.a", rs.getString("namespace"));
-            Assertions.assertEquals(
-                  commitReport.tableName(), rs.getString("table_name"));
-            Assertions.assertEquals(
-                  commitReport.snapshotId(), rs.getLong("snapshot_id"));
-            Assertions.assertEquals(commitReport.sequenceNumber(), rs.getLong("sequence_number"));
-            Assertions.assertEquals(commitReport.operation(), rs.getString("operation"));
-            Assertions.assertEquals(getCounterResult(commitReport.commitMetrics().addedDataFiles()),
-                  rs.getLong("added_data_files"));
-            Assertions.assertEquals(getCounterResult(commitReport.commitMetrics().removedDataFiles()),
-                    rs.getLong("removed_data_files"));
-            Assertions.assertEquals(getCounterResult(commitReport.commitMetrics().totalDataFiles()),
-                    rs.getLong("total_data_files"));
-            Assertions.assertEquals(getCounterResult(commitReport.commitMetrics().addedDeleteFiles()),
-                    rs.getLong("added_delete_files"));
-            Assertions.assertEquals(getCounterResult(commitReport.commitMetrics().addedEqualityDeleteFiles()),
-                    rs.getLong("added_equality_delete_files"));
-            Assertions.assertEquals(getCounterResult(commitReport.commitMetrics().addedPositionalDeleteFiles()),
-                    rs.getLong("added_positional_delete_files"));
-            Assertions.assertEquals(getCounterResult(commitReport.commitMetrics().removedDeleteFiles()),
-                    rs.getLong("removed_delete_files"));
-            Assertions.assertEquals(getCounterResult(commitReport.commitMetrics().removedEqualityDeleteFiles()),
-                    rs.getLong("removed_equality_delete_files"));
-            Assertions.assertEquals(getCounterResult(commitReport.commitMetrics().removedPositionalDeleteFiles()),
-                    rs.getLong("removed_positional_delete_files"));
-            Assertions.assertEquals(getCounterResult(commitReport.commitMetrics().totalDeleteFiles()),
-                    rs.getLong("total_delete_files"));
-            Assertions.assertEquals(getCounterResult(commitReport.commitMetrics().addedRecords()),
-                    rs.getLong("added_records"));
-            Assertions.assertEquals(getCounterResult(commitReport.commitMetrics().removedRecords()),
-                    rs.getLong("removed_records"));
-            Assertions.assertEquals(getCounterResult(commitReport.commitMetrics().totalRecords()),
-                    rs.getLong("total_records"));
-            Assertions.assertEquals(getCounterResult(commitReport.commitMetrics().addedFilesSizeInBytes()),
-                    rs.getLong("added_files_size_in_bytes"));
-            Assertions.assertEquals(getCounterResult(commitReport.commitMetrics().removedFilesSizeInBytes()),
-                    rs.getLong("removed_files_size_in_bytes"));
-            Assertions.assertEquals(      getCounterResult(commitReport.commitMetrics().totalFilesSizeInBytes()),
-                    rs.getLong("total_files_size_in_bytes"));
-            Assertions.assertEquals(      getCounterResult(commitReport.commitMetrics().addedPositionalDeletes()),
-                    rs.getLong("added_positional_deletes"));
-           Assertions.assertEquals(getCounterResult(commitReport.commitMetrics().removedPositionalDeletes()),
-                    rs.getLong("removed_positional_deletes"));
-           Assertions.assertEquals(getCounterResult(commitReport.commitMetrics().totalPositionalDeletes()),
-                    rs.getLong("total_positional_deletes"));
-           Assertions.assertEquals(       getCounterResult(commitReport.commitMetrics().addedEqualityDeleteFiles()),
-                    rs.getLong("added_equality_deletes"));
-           Assertions.assertEquals(       getCounterResult(commitReport.commitMetrics().removedEqualityDeleteFiles()),
-                    rs.getLong("removed_equality_deletes"));
-           Assertions.assertEquals(getCounterResult(commitReport.commitMetrics().totalEqualityDeletes()),
-                    rs.getLong("total_equality_deletes"));
-           Assertions.assertEquals(getCounterResult(commitReport.commitMetrics().manifestsCreated()),
-                    rs.getLong("manifests_created"));
-           Assertions.assertEquals(       getCounterResult(commitReport.commitMetrics().manifestsReplaced()),
-                    rs.getLong("manifests_replaced"));
-           Assertions.assertEquals(       getCounterResult(commitReport.commitMetrics().manifestsKept()),
-                    rs.getLong("manifests_kept"));
-           Assertions.assertEquals(       getCounterResult(commitReport.commitMetrics().manifestEntriesProcessed()),
-                    rs.getLong("manifest_entries_processed"));
-           Assertions.assertEquals(      getCounterResult(commitReport.commitMetrics().addedDVs()),
-                    rs.getLong("added_dvs"));
-           Assertions.assertEquals(       getCounterResult(commitReport.commitMetrics().removedDVs()),
-                    rs.getLong("removed_dvs"));
-           Assertions.assertEquals(       getTimerResult(commitReport.commitMetrics().totalDuration()),
-                    rs.getLong("total_duration_ms"));
-           Assertions.assertEquals(       getCounterResult(commitReport.commitMetrics().attempts()),
-                    rs.getLong("attempts"));
-           Assertions.assertEquals(       JsonUtils.objectMapper().writeValueAsString(commitReport.metadata()),
-                    rs.getString("metadata"));
+          Assertions.assertEquals(commitReport.tableName(), rs.getString("table_name"));
+          Assertions.assertEquals(commitReport.snapshotId(), rs.getLong("snapshot_id"));
+          Assertions.assertEquals(commitReport.sequenceNumber(), rs.getLong("sequence_number"));
+          Assertions.assertEquals(commitReport.operation(), rs.getString("operation"));
+          Assertions.assertEquals(
+              getCounterResult(commitReport.commitMetrics().addedDataFiles()),
+              rs.getLong("added_data_files"));
+          Assertions.assertEquals(
+              getCounterResult(commitReport.commitMetrics().removedDataFiles()),
+              rs.getLong("removed_data_files"));
+          Assertions.assertEquals(
+              getCounterResult(commitReport.commitMetrics().totalDataFiles()),
+              rs.getLong("total_data_files"));
+          Assertions.assertEquals(
+              getCounterResult(commitReport.commitMetrics().addedDeleteFiles()),
+              rs.getLong("added_delete_files"));
+          Assertions.assertEquals(
+              getCounterResult(commitReport.commitMetrics().addedEqualityDeleteFiles()),
+              rs.getLong("added_equality_delete_files"));
+          Assertions.assertEquals(
+              getCounterResult(commitReport.commitMetrics().addedPositionalDeleteFiles()),
+              rs.getLong("added_positional_delete_files"));
+          Assertions.assertEquals(
+              getCounterResult(commitReport.commitMetrics().removedDeleteFiles()),
+              rs.getLong("removed_delete_files"));
+          Assertions.assertEquals(
+              getCounterResult(commitReport.commitMetrics().removedEqualityDeleteFiles()),
+              rs.getLong("removed_equality_delete_files"));
+          Assertions.assertEquals(
+              getCounterResult(commitReport.commitMetrics().removedPositionalDeleteFiles()),
+              rs.getLong("removed_positional_delete_files"));
+          Assertions.assertEquals(
+              getCounterResult(commitReport.commitMetrics().totalDeleteFiles()),
+              rs.getLong("total_delete_files"));
+          Assertions.assertEquals(
+              getCounterResult(commitReport.commitMetrics().addedRecords()),
+              rs.getLong("added_records"));
+          Assertions.assertEquals(
+              getCounterResult(commitReport.commitMetrics().removedRecords()),
+              rs.getLong("removed_records"));
+          Assertions.assertEquals(
+              getCounterResult(commitReport.commitMetrics().totalRecords()),
+              rs.getLong("total_records"));
+          Assertions.assertEquals(
+              getCounterResult(commitReport.commitMetrics().addedFilesSizeInBytes()),
+              rs.getLong("added_files_size_in_bytes"));
+          Assertions.assertEquals(
+              getCounterResult(commitReport.commitMetrics().removedFilesSizeInBytes()),
+              rs.getLong("removed_files_size_in_bytes"));
+          Assertions.assertEquals(
+              getCounterResult(commitReport.commitMetrics().totalFilesSizeInBytes()),
+              rs.getLong("total_files_size_in_bytes"));
+          Assertions.assertEquals(
+              getCounterResult(commitReport.commitMetrics().addedPositionalDeletes()),
+              rs.getLong("added_positional_deletes"));
+          Assertions.assertEquals(
+              getCounterResult(commitReport.commitMetrics().removedPositionalDeletes()),
+              rs.getLong("removed_positional_deletes"));
+          Assertions.assertEquals(
+              getCounterResult(commitReport.commitMetrics().totalPositionalDeletes()),
+              rs.getLong("total_positional_deletes"));
+          Assertions.assertEquals(
+              getCounterResult(commitReport.commitMetrics().addedEqualityDeleteFiles()),
+              rs.getLong("added_equality_deletes"));
+          Assertions.assertEquals(
+              getCounterResult(commitReport.commitMetrics().removedEqualityDeleteFiles()),
+              rs.getLong("removed_equality_deletes"));
+          Assertions.assertEquals(
+              getCounterResult(commitReport.commitMetrics().totalEqualityDeletes()),
+              rs.getLong("total_equality_deletes"));
+          Assertions.assertEquals(
+              getCounterResult(commitReport.commitMetrics().manifestsCreated()),
+              rs.getLong("manifests_created"));
+          Assertions.assertEquals(
+              getCounterResult(commitReport.commitMetrics().manifestsReplaced()),
+              rs.getLong("manifests_replaced"));
+          Assertions.assertEquals(
+              getCounterResult(commitReport.commitMetrics().manifestsKept()),
+              rs.getLong("manifests_kept"));
+          Assertions.assertEquals(
+              getCounterResult(commitReport.commitMetrics().manifestEntriesProcessed()),
+              rs.getLong("manifest_entries_processed"));
+          Assertions.assertEquals(
+              getCounterResult(commitReport.commitMetrics().addedDVs()), rs.getLong("added_dvs"));
+          Assertions.assertEquals(
+              getCounterResult(commitReport.commitMetrics().removedDVs()),
+              rs.getLong("removed_dvs"));
+          Assertions.assertEquals(
+              getTimerResult(commitReport.commitMetrics().totalDuration()),
+              rs.getLong("total_duration_ms"));
+          Assertions.assertEquals(
+              getCounterResult(commitReport.commitMetrics().attempts()), rs.getLong("attempts"));
+          Assertions.assertEquals(
+              JsonUtils.objectMapper().writeValueAsString(commitReport.metadata()),
+              rs.getString("metadata"));
 
         } else {
           Assertions.fail("No data found in commit_metrics_report");
         }
+      } catch (Exception e) {
+        Assertions.fail("Exception occurred while validating commit report: " + e.getMessage());
       }
       return null;
     };
   }
 
-  private static ClientPool.Action<Void, Connection, SQLException> validateScanReport(String sql, ScanReport scanReport) {
+  private static ClientPool.Action<Void, Connection, SQLException> validateScanReport(
+      String sql, ScanReport scanReport) {
     return conn -> {
       try (var stmt = conn.createStatement()) {
         var rs = stmt.executeQuery(sql);
@@ -308,31 +340,71 @@ public class TestJdbcMetricsStore {
           Assertions.assertEquals(scanReport.schemaId(), rs.getInt("schema_id"));
 
           Assertions.assertEquals(scanReport.filter().toString(), rs.getString("filter"));
-          Assertions.assertEquals(JsonUtils.objectMapper().writeValueAsString(scanReport.metadata()), rs.getString("metadata"));
-          Assertions.assertEquals(JsonUtils.objectMapper().writeValueAsString(scanReport.projectedFieldIds()), rs.getString("projected_field_ids"));
-          Assertions.assertEquals(JsonUtils.objectMapper().writeValueAsString(scanReport.projectedFieldNames().toString()), rs.getString("projected_field_names"));
+          Assertions.assertEquals(
+              JsonUtils.objectMapper().writeValueAsString(scanReport.metadata()),
+              rs.getString("metadata"));
+          Assertions.assertEquals(
+              JsonUtils.objectMapper().writeValueAsString(scanReport.projectedFieldIds()),
+              rs.getString("projected_field_ids"));
+          Assertions.assertEquals(
+              JsonUtils.objectMapper()
+                  .writeValueAsString(scanReport.projectedFieldNames().toString()),
+              rs.getString("projected_field_names"));
 
-          Assertions.assertEquals(getCounterResult(scanReport.scanMetrics().equalityDeleteFiles()), rs.getLong("equality_delete_files"));
-          Assertions.assertEquals(getCounterResult(scanReport.scanMetrics().indexedDeleteFiles()), rs.getLong("indexed_delete_files"));
-          Assertions.assertEquals(getCounterResult(scanReport.scanMetrics().positionalDeleteFiles()), rs.getLong("positional_delete_files"));
-          Assertions.assertEquals(getCounterResult(scanReport.scanMetrics().resultDataFiles()), rs.getLong("result_data_files"));
-          Assertions.assertEquals(getCounterResult(scanReport.scanMetrics().resultDeleteFiles()), rs.getLong("result_delete_files"));
-          Assertions.assertEquals(getCounterResult(scanReport.scanMetrics().scannedDataManifests()), rs.getLong("scanned_data_manifests"));
-          Assertions.assertEquals(getCounterResult(scanReport.scanMetrics().scannedDeleteManifests()), rs.getLong("scanned_delete_manifests"));
-          Assertions.assertEquals(getCounterResult(scanReport.scanMetrics().skippedDataFiles()), rs.getLong("skipped_data_files"));
-          Assertions.assertEquals(getCounterResult(scanReport.scanMetrics().skippedDataManifests()), rs.getLong("skipped_data_manifests"));
-          Assertions.assertEquals(getCounterResult(scanReport.scanMetrics().skippedDeleteFiles()), rs.getLong("skipped_delete_files"));
-          Assertions.assertEquals(getCounterResult(scanReport.scanMetrics().skippedDeleteManifests()), rs.getLong("skipped_delete_manifests"));
-          Assertions.assertEquals(getCounterResult(scanReport.scanMetrics().totalDataManifests()), rs.getLong("total_data_manifests"));
-          Assertions.assertEquals(getCounterResult(scanReport.scanMetrics().totalDeleteFileSizeInBytes()), rs.getLong("total_delete_file_size_in_bytes"));
-          Assertions.assertEquals(getCounterResult(scanReport.scanMetrics().totalDeleteManifests()), rs.getLong("total_delete_manifests"));
-          Assertions.assertEquals(getCounterResult(scanReport.scanMetrics().totalFileSizeInBytes()), rs.getLong("total_file_size_in_bytes"));
-          Assertions.assertEquals(getTimerResult(scanReport.scanMetrics().totalPlanningDuration()), rs.getLong("total_planning_duration"));
-
+          Assertions.assertEquals(
+              getCounterResult(scanReport.scanMetrics().equalityDeleteFiles()),
+              rs.getLong("equality_delete_files"));
+          Assertions.assertEquals(
+              getCounterResult(scanReport.scanMetrics().indexedDeleteFiles()),
+              rs.getLong("indexed_delete_files"));
+          Assertions.assertEquals(
+              getCounterResult(scanReport.scanMetrics().positionalDeleteFiles()),
+              rs.getLong("positional_delete_files"));
+          Assertions.assertEquals(
+              getCounterResult(scanReport.scanMetrics().resultDataFiles()),
+              rs.getLong("result_data_files"));
+          Assertions.assertEquals(
+              getCounterResult(scanReport.scanMetrics().resultDeleteFiles()),
+              rs.getLong("result_delete_files"));
+          Assertions.assertEquals(
+              getCounterResult(scanReport.scanMetrics().scannedDataManifests()),
+              rs.getLong("scanned_data_manifests"));
+          Assertions.assertEquals(
+              getCounterResult(scanReport.scanMetrics().scannedDeleteManifests()),
+              rs.getLong("scanned_delete_manifests"));
+          Assertions.assertEquals(
+              getCounterResult(scanReport.scanMetrics().skippedDataFiles()),
+              rs.getLong("skipped_data_files"));
+          Assertions.assertEquals(
+              getCounterResult(scanReport.scanMetrics().skippedDataManifests()),
+              rs.getLong("skipped_data_manifests"));
+          Assertions.assertEquals(
+              getCounterResult(scanReport.scanMetrics().skippedDeleteFiles()),
+              rs.getLong("skipped_delete_files"));
+          Assertions.assertEquals(
+              getCounterResult(scanReport.scanMetrics().skippedDeleteManifests()),
+              rs.getLong("skipped_delete_manifests"));
+          Assertions.assertEquals(
+              getCounterResult(scanReport.scanMetrics().totalDataManifests()),
+              rs.getLong("total_data_manifests"));
+          Assertions.assertEquals(
+              getCounterResult(scanReport.scanMetrics().totalDeleteFileSizeInBytes()),
+              rs.getLong("total_delete_file_size_in_bytes"));
+          Assertions.assertEquals(
+              getCounterResult(scanReport.scanMetrics().totalDeleteManifests()),
+              rs.getLong("total_delete_manifests"));
+          Assertions.assertEquals(
+              getCounterResult(scanReport.scanMetrics().totalFileSizeInBytes()),
+              rs.getLong("total_file_size_in_bytes"));
+          Assertions.assertEquals(
+              getTimerResult(scanReport.scanMetrics().totalPlanningDuration()),
+              rs.getLong("total_planning_duration"));
 
         } else {
           Assertions.fail("No data found in scan_metrics_report");
         }
+      } catch (Exception e) {
+        Assertions.fail("Exception occurred while validating scan report: " + e.getMessage());
       }
       return null;
     };
