@@ -52,6 +52,7 @@ class TestGvfsWithGCS(TestGvfsWithHDFS):
     key_file = os.environ.get("GCS_SERVICE_ACCOUNT_JSON_PATH")
     bucket_name = os.environ.get("GCS_BUCKET_NAME")
     metalake_name: str = "TestGvfsWithGCS_metalake" + str(randint(1, 10000))
+    catalog_name: str = "test_gvfs_catalog" + str(randint(1, 10000))
 
     def setUp(self):
         self.options = {
