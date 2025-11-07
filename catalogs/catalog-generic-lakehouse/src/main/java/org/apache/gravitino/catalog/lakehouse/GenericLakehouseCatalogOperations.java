@@ -200,16 +200,16 @@ public class GenericLakehouseCatalogOperations
     try {
       TableEntity tableEntity = store.get(ident, Entity.EntityType.TABLE, TableEntity.class);
       return GenericLakehouseTable.builder()
-          .withFormat(tableEntity.getFormat())
-          .withProperties(tableEntity.getProperties())
+          .withFormat(tableEntity.format())
+          .withProperties(tableEntity.properties())
           .withAuditInfo(tableEntity.auditInfo())
-          .withSortOrders(tableEntity.getSortOrder())
-          .withPartitioning(tableEntity.getPartitions())
-          .withDistribution(tableEntity.getDistribution())
+          .withSortOrders(tableEntity.sortOrders())
+          .withPartitioning(tableEntity.partitioning())
+          .withDistribution(tableEntity.distribution())
           .withColumns(EntityConverter.toColumns(tableEntity.columns()))
-          .withIndexes(tableEntity.getIndexes())
+          .withIndexes(tableEntity.indexes())
           .withName(tableEntity.name())
-          .withComment(tableEntity.getComment())
+          .withComment(tableEntity.comment())
           .build();
     } catch (NoSuchEntityException e) {
       throw new NoSuchTableException(e, "Table %s does not exist", ident);
@@ -265,8 +265,8 @@ public class GenericLakehouseCatalogOperations
               .withFormat(format.lowerName())
               .withProperties(newProperties)
               .withComment(comment)
-              .withPartitions(partitions)
-              .withSortOrder(sortOrders)
+              .withPartitioning(partitions)
+              .withSortOrders(sortOrders)
               .withDistribution(distribution)
               .withIndexes(indexes)
               .withId(idGenerator.nextId())
@@ -359,7 +359,7 @@ public class GenericLakehouseCatalogOperations
       throws NoSuchTableException, IllegalArgumentException {
     try {
       TableEntity tableEntity = store.get(ident, Entity.EntityType.TABLE, TableEntity.class);
-      Map<String, String> tableProperties = tableEntity.getProperties();
+      Map<String, String> tableProperties = tableEntity.properties();
       LakehouseCatalogOperations lakehouseCatalogOperations =
           getLakehouseCatalogOperations(tableProperties);
       return lakehouseCatalogOperations.alterTable(ident, changes);
@@ -373,7 +373,7 @@ public class GenericLakehouseCatalogOperations
     try {
       TableEntity tableEntity = store.get(ident, Entity.EntityType.TABLE, TableEntity.class);
       LakehouseCatalogOperations lakehouseCatalogOperations =
-          getLakehouseCatalogOperations(tableEntity.getProperties());
+          getLakehouseCatalogOperations(tableEntity.properties());
       return lakehouseCatalogOperations.purgeTable(ident);
     } catch (NoSuchTableException e) {
       LOG.warn("Table {} does not exist, skip purging it.", ident);

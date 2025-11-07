@@ -45,6 +45,46 @@ import org.apache.gravitino.tag.SupportsTags;
 public interface Table extends Auditable {
 
   /**
+   * The property name for the table format. This property indicates the format of the table, such
+   * as "iceberg", "hudi", "lance", etc. generic lakehouse catalog will use this property to
+   * determine the table format and perform specific operations based on the format. For other
+   * relational catalogs, this property can be ignored.
+   *
+   * <p>This property is a must-have property for generic lakehouse catalog to create tables, and
+   * cannot be modified after table creation.
+   *
+   * <p>Current supported formats include:
+   *
+   * <ul>
+   *   <li>lance
+   * </ul>
+   */
+  String PROPERTY_TABLE_FORMAT = "format";
+
+  /**
+   * The property name to indicate whether the table is external. This property is a boolean value
+   * represented as a string ("true" or "false"). if true (the table is external), the drop
+   * operation will not delete the underlying data.
+   *
+   * <p>This property is optional and defaults to "false" if not specified. Also, it depends on the
+   * catalog implementation to decide whether to leverage and allow to alter this property.
+   */
+  String PROPERTY_EXTERNAL = "external";
+
+  /**
+   * The property name for the table location. This property indicates the physical location of the
+   * table's data, such as a file path or a URI.
+   *
+   * <p>The location property is optional, it can be specified when creating the table. If not, the
+   * catalog implementation may use a location based on the catalog and schema location properties.
+   *
+   * <p>It depends on the catalog implementation to decide whether to leverage and allow to alter
+   * this property after table creation. And the behavior of altering this property (moving the
+   * table data) is also catalog specific.
+   */
+  String PROPERTY_LOCATION = "location";
+
+  /**
    * @return Name of the table.
    */
   String name();
@@ -97,37 +137,6 @@ public interface Table extends Auditable {
    */
   default Map<String, String> properties() {
     return Collections.emptyMap();
-  }
-
-  /**
-   * Table format of the table. For example, in a file-based table, it could be "parquet", "Lance",
-   * "Iceberg", etc.
-   *
-   * @return the table format name, for more information: LakehouseTableFormat
-   */
-  default String format() {
-    throw new UnsupportedOperationException("Table format is not supported.");
-  }
-
-  /**
-   * Gets the location of the table if the table has a location. For example, in a file-based table,
-   * it could be the root path where the table data is stored.
-   *
-   * @return the location of the table as a string.
-   */
-  default String location() {
-    throw new UnsupportedOperationException("Table location is not supported.");
-  }
-
-  /**
-   * Indicates whether the table is external. An external table is a table that is not managed by
-   * the catalog and the drop operation will not delete the underlying data. If it's a managed
-   * table, dropping the table will delete the underlying data.
-   *
-   * @return true if the table is external, false otherwise
-   */
-  default boolean external() {
-    return false;
   }
 
   /**

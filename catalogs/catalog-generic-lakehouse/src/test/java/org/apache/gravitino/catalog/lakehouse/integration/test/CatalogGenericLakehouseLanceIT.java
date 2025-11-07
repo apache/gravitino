@@ -53,7 +53,6 @@ import org.apache.gravitino.Catalog;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Schema;
 import org.apache.gravitino.client.GravitinoMetalake;
-import org.apache.gravitino.integration.test.container.ContainerSuite;
 import org.apache.gravitino.integration.test.util.BaseIT;
 import org.apache.gravitino.integration.test.util.GravitinoITUtils;
 import org.apache.gravitino.rel.Column;
@@ -97,7 +96,6 @@ public class CatalogGenericLakehouseLanceIT extends BaseIT {
   public static final String LANCE_COL_NAME2 = "lance_col_name2";
   public static final String LANCE_COL_NAME3 = "lance_col_name3";
   protected final String provider = "generic-lakehouse";
-  protected final ContainerSuite containerSuite = ContainerSuite.getInstance();
   protected GravitinoMetalake metalake;
   protected Catalog catalog;
   protected String tempDirectory;
