@@ -25,9 +25,11 @@ import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.time.Instant;
 import java.util.Map;
+import java.util.Properties;
 import java.util.function.Consumer;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergPropertiesUtils;
 import org.apache.gravitino.json.JsonUtils;
+import org.apache.gravitino.utils.MapUtils;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.jdbc.JdbcClientPool;
 import org.apache.iceberg.jdbc.UncheckedInterruptedException;
@@ -100,21 +102,23 @@ public class JDBCMetricsStore implements IcebergMetricsStore {
 
   @Override
   public void init(Map<String, String> properties) throws IOException {
-    String uri = properties.get(URI);
+    Map<String, String> actualProps = MapUtils.getPrefixMap(properties, "jdbc-metrics.");
+    String uri = actualProps.get(URI);
     Preconditions.checkArgument(uri != null, "JDBC metrics store requires a \"%s\" property", URI);
 
     connections =
-        new JdbcClientPool(uri, IcebergPropertiesUtils.toIcebergCatalogProperties(properties));
+        new JdbcClientPool(uri, IcebergPropertiesUtils.toIcebergCatalogProperties(actualProps));
   }
 
   @Override
-  public void recordMetric(Namespace namespace, MetricsReport metricsReport) throws IOException {
+  public void recordMetric(String catalog, Namespace namespace, MetricsReport metricsReport)
+      throws IOException {
     if (metricsReport instanceof CommitReport) {
       CommitReport commitReport = (CommitReport) metricsReport;
       execute(
           INSERT_COMMIT_REPORT_METRICS_SQL,
           Instant.now().toEpochMilli(),
-          namespace.toString(),
+          String.format("%s.%s", catalog, namespace.toString()),
           commitReport.tableName(),
           commitReport.snapshotId(),
           commitReport.sequenceNumber(),
@@ -155,7 +159,7 @@ public class JDBCMetricsStore implements IcebergMetricsStore {
       execute(
           INSERT_SCAN_REPORT_METRICS_SQL,
           Instant.now().toEpochMilli(),
-          namespace.toString(),
+          String.format("%s.%s", catalog, namespace.toString()),
           scanReport.tableName(),
           scanReport.snapshotId(),
           scanReport.schemaId(),
@@ -193,11 +197,13 @@ public class JDBCMetricsStore implements IcebergMetricsStore {
     connections.close();
   }
 
-  private long getCounterResult(CounterResult result) {
+  @VisibleForTesting
+  static long getCounterResult(CounterResult result) {
     return result != null ? result.value() : 0L;
   }
 
-  private long getTimerResult(TimerResult result) {
+  @VisibleForTesting
+  static long getTimerResult(TimerResult result) {
     return result != null ? result.count() : 0L;
   }
 

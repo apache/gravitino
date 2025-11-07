@@ -38,10 +38,13 @@ public interface IcebergMetricsStore {
   /**
    * Record metrics report.
    *
+   * @param catalog the catalog name
+   * @param namespace the namespace of the table
    * @param metricsReport the metrics to be saved
    * @throws IOException if IO error happens
    */
-  void recordMetric(Namespace namespace, MetricsReport metricsReport) throws IOException;
+  void recordMetric(String catalog, Namespace namespace, MetricsReport metricsReport)
+      throws IOException;
 
   /**
    * Clean the expired Iceberg metrics

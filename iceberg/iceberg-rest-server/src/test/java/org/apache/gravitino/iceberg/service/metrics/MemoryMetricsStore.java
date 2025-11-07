@@ -36,7 +36,7 @@ public class MemoryMetricsStore implements IcebergMetricsStore {
   }
 
   @Override
-  public void recordMetric(Namespace namespace, MetricsReport metricsReport) {
+  public void recordMetric(String catalog, Namespace namespace, MetricsReport metricsReport) {
     this.metricsReport = metricsReport;
     this.recordTime = Instant.now();
   }

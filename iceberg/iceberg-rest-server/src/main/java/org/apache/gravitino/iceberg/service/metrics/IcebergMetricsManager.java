@@ -114,17 +114,19 @@ public class IcebergMetricsManager {
   /**
    * Records a metrics report by adding it to the processing queue.
    *
+   * @param catalogName the catalog name of the metrics report
    * @param namespace the namespace of the metrics report
    * @param metricsReport the metrics report to record
    * @return true if the metric was successfully queued, false if it was rejected (manager closed or
    *     queue full)
    */
-  public boolean recordMetric(Namespace namespace, MetricsReport metricsReport) {
+  public boolean recordMetric(
+      String catalogName, Namespace namespace, MetricsReport metricsReport) {
     if (isClosed) {
       logMetrics("Drop Iceberg metrics because Iceberg Metrics Manager is closed.", metricsReport);
       return false;
     }
-    if (!queue.offer(new MetricsReportWrapper(namespace, metricsReport))) {
+    if (!queue.offer(new MetricsReportWrapper(catalogName, namespace, metricsReport))) {
       logMetrics("Drop Iceberg metrics because metrics queue is full.", metricsReport);
       return false;
     }
@@ -168,7 +170,10 @@ public class IcebergMetricsManager {
         break;
       }
 
-      doRecordMetric(metricsReport.getNamespace(), metricsReport.getMetricsReport());
+      doRecordMetric(
+          metricsReport.getCatalog(),
+          metricsReport.getNamespace(),
+          metricsReport.getMetricsReport());
     }
 
     MetricsReportWrapper metricsReport = queue.poll();
@@ -201,19 +206,21 @@ public class IcebergMetricsManager {
     LOG.info("{} {}.", message, icebergMetricsFormatter.toPrintableString(metricsReport));
   }
 
-  private void doRecordMetric(Namespace namespace, MetricsReport metricsReport) {
+  private void doRecordMetric(String catalog, Namespace namespace, MetricsReport metricsReport) {
     try {
-      icebergMetricsStore.recordMetric(namespace, metricsReport);
+      icebergMetricsStore.recordMetric(catalog, namespace, metricsReport);
     } catch (Exception e) {
       LOG.warn("Write Iceberg metrics failed.", e);
     }
   }
 
   private static class MetricsReportWrapper {
+    private final String catalog;
     private final Namespace namespace;
     private final MetricsReport metricsReport;
 
-    public MetricsReportWrapper(Namespace namespace, MetricsReport metricsReport) {
+    public MetricsReportWrapper(String catalog, Namespace namespace, MetricsReport metricsReport) {
+      this.catalog = catalog;
       this.namespace = namespace;
       this.metricsReport = metricsReport;
     }
@@ -224,6 +231,10 @@ public class IcebergMetricsManager {
 
     public MetricsReport getMetricsReport() {
       return metricsReport;
+    }
+
+    public String getCatalog() {
+      return catalog;
     }
   }
 }

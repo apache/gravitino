@@ -65,7 +65,7 @@ public class TestIcebergMetricsManager {
     icebergMetricsManager.start();
 
     MetricsReport metricsReport = createMetricsReport();
-    icebergMetricsManager.recordMetric(Namespace.of("a"), metricsReport);
+    icebergMetricsManager.recordMetric("a", Namespace.of("a"), metricsReport);
     Assertions.assertDoesNotThrow(
         () -> (DummyMetricsStore) icebergMetricsManager.getIcebergMetricsStore());
     icebergMetricsManager.close();
@@ -91,7 +91,7 @@ public class TestIcebergMetricsManager {
     icebergMetricsManager.start();
 
     MetricsReport metricsReport = createMetricsReport();
-    icebergMetricsManager.recordMetric(Namespace.of("a"), metricsReport);
+    icebergMetricsManager.recordMetric("a", Namespace.of("a"), metricsReport);
     MemoryMetricsStore memoryMetricsStore =
         (MemoryMetricsStore) icebergMetricsManager.getIcebergMetricsStore();
     Assertions.assertEquals(metricsReport, tryGetIcebergMetrics(memoryMetricsStore));
@@ -107,7 +107,7 @@ public class TestIcebergMetricsManager {
     icebergMetricsManager.start();
 
     MetricsReport metricsReport = createMetricsReport();
-    boolean result = icebergMetricsManager.recordMetric(Namespace.of("a"), metricsReport);
+    boolean result = icebergMetricsManager.recordMetric("a", Namespace.of("a"), metricsReport);
 
     Assertions.assertTrue(result, "Recording metric should return true when successful");
     icebergMetricsManager.close();
@@ -121,7 +121,7 @@ public class TestIcebergMetricsManager {
     icebergMetricsManager.close();
 
     MetricsReport metricsReport = createMetricsReport();
-    boolean result = icebergMetricsManager.recordMetric(Namespace.of("a"), metricsReport);
+    boolean result = icebergMetricsManager.recordMetric("a", Namespace.of("a"), metricsReport);
 
     Assertions.assertFalse(result, "Recording metric should return false when manager is closed");
   }
@@ -138,11 +138,11 @@ public class TestIcebergMetricsManager {
     MetricsReport metricsReport2 = createMetricsReport();
 
     // First metric should succeed
-    boolean result1 = icebergMetricsManager.recordMetric(Namespace.of("a"), metricsReport1);
+    boolean result1 = icebergMetricsManager.recordMetric("a", Namespace.of("a"), metricsReport1);
     Assertions.assertTrue(result1, "First metric should be queued successfully");
 
     // Second metric should fail because queue is full
-    boolean result2 = icebergMetricsManager.recordMetric(Namespace.of("a"), metricsReport2);
+    boolean result2 = icebergMetricsManager.recordMetric("a", Namespace.of("a"), metricsReport2);
     Assertions.assertFalse(result2, "Second metric should fail when queue is full");
 
     icebergMetricsManager.close();

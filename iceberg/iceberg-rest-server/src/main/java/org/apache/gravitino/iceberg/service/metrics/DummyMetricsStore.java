@@ -30,7 +30,7 @@ public class DummyMetricsStore implements IcebergMetricsStore {
   public void init(Map<String, String> properties) {}
 
   @Override
-  public void recordMetric(Namespace namespace, MetricsReport metricsReport) {}
+  public void recordMetric(String catalog, Namespace namespace, MetricsReport metricsReport) {}
 
   @Override
   public void close() {}
