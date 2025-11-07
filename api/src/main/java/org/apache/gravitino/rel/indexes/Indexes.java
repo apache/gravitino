@@ -74,7 +74,6 @@ public class Indexes {
         .withIndexType(indexType)
         .withName(name)
         .withFieldNames(fieldNames)
-        .withProperties(Map.of())
         .build();
   }
 
@@ -195,7 +194,7 @@ public class Indexes {
       protected String[][] fieldNames;
 
       /** The properties of the index. */
-      protected Map<String, String> properties = Map.of();
+      protected Map<String, String> properties;
 
       /**
        * Set the type of the index.
