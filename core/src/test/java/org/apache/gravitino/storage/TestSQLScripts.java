@@ -98,6 +98,7 @@ public class TestSQLScripts extends BaseIT {
     for (File scriptFile : scriptFiles) {
       Matcher schemaMatcher = schemaPattern.matcher(scriptFile.getName());
       Matcher upgradeMatcher = upgradePattern.matcher(scriptFile.getName());
+      Matcher metricsMatcher = metricsPattern.matcher(scriptFile.getName());
 
       if (schemaMatcher.matches()) {
         String version = schemaMatcher.group(1);
@@ -118,7 +119,7 @@ public class TestSQLScripts extends BaseIT {
         Assertions.assertDoesNotThrow(
             () -> executeSQLScript(conn, scriptFile),
             "Failed to execute upgrade script" + " in file " + scriptFile.getName());
-      } else if (metricsPattern.matcher(scriptFile.getName()).matches()) {
+      } else if (metricsMatcher.matches()) {
         // ignore iceberg metrics scripts for now
       } else {
         Assertions.fail("Unrecognized script file name: " + scriptFile.getName());
