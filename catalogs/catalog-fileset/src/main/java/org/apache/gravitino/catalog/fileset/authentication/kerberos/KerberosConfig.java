@@ -19,6 +19,9 @@
 
 package org.apache.gravitino.catalog.fileset.authentication.kerberos;
 
+import static org.apache.gravitino.catalog.hadoop.fs.Constants.HADOOP_SECURITY_KEYTAB;
+import static org.apache.gravitino.catalog.hadoop.fs.Constants.HADOOP_SECURITY_PRINCIPAL;
+
 import com.google.common.collect.ImmutableMap;
 import java.util.Map;
 import org.apache.commons.lang3.StringUtils;
@@ -78,9 +81,9 @@ public class KerberosConfig extends AuthenticationConfig {
   }
 
   private void loadFromHdfsConfiguration(Configuration configuration) {
-    String keyTab = configuration.get("hadoop.security.authentication.kerberos.keytab", "");
+    String keyTab = configuration.get(HADOOP_SECURITY_KEYTAB, "");
     configMap.put(KEY_TAB_URI_KEY, keyTab);
-    String principal = configuration.get("hadoop.security.authentication.kerberos.principal", "");
+    String principal = configuration.get(HADOOP_SECURITY_PRINCIPAL, "");
     configMap.put(PRINCIPAL_KEY, principal);
   }
 

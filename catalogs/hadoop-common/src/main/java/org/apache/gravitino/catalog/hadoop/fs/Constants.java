@@ -32,8 +32,6 @@ public class Constants {
   public static final String HDFS_CONFIG_RESOURCES = "hdfs.config.resources";
   // Name of the configuration property to disable HDFS FileSystem cache
   public static final String FS_DISABLE_CACHE = "fs.hdfs.impl.disable.cache";
-  // Name of the configuration property for HDFS authentication type
-  public static final String HADOOP_SECURITY_AUTHENTICATION = "hadoop.security.authentication";
   // Name of the configuration property for Kerberos principal
   public static final String HADOOP_SECURITY_PRINCIPAL =
       "hadoop.security.authentication.kerberos.principal";

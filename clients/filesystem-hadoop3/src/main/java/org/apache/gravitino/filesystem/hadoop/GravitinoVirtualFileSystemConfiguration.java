@@ -185,10 +185,10 @@ public class GravitinoVirtualFileSystemConfiguration {
   public static final boolean FS_GRAVITINO_AUTO_CREATE_LOCATION_DEFAULT = true;
 
   /** The prefix for Gravitino fileset property configuration keys. */
-  public static final String FS_GRAVITINO_FILESET_PROPERT_PREFIX =
+  public static final String FS_GRAVITINO_FILESET_PROPERTY_PREFIX =
       "fs.gravitino.fileset.properties.";
   /** The configuration key name for Gravitino fileset property 'keyname'. */
-  public static final String FS_GRAVITINO_FILESET_PROPERT_KEYNAME_PREFIX = "keyname";
+  public static final String FS_GRAVITINO_FILESET_PROPERTY_KEYNAME_PREFIX = "keyname";
 
   private GravitinoVirtualFileSystemConfiguration() {}
 }

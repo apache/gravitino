@@ -24,8 +24,8 @@ import static org.apache.gravitino.file.Fileset.PROPERTY_DEFAULT_LOCATION_NAME;
 import static org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_CURRENT_LOCATION_NAME;
 import static org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_FILESET_METADATA_CACHE_ENABLE;
 import static org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_FILESET_METADATA_CACHE_ENABLE_DEFAULT;
-import static org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_FILESET_PROPERT_KEYNAME_PREFIX;
-import static org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_FILESET_PROPERT_PREFIX;
+import static org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_FILESET_PROPERTY_KEYNAME_PREFIX;
+import static org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_FILESET_PROPERTY_PREFIX;
 import static org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystemUtils.extractIdentifier;
 import static org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystemUtils.getConfigMap;
 import static org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystemUtils.getSubPathFromGvfsPath;
@@ -670,6 +670,7 @@ public abstract class BaseGVFSOperations implements Closeable {
 
   /**
    * Get the schema by the schema identifier from the cache or load it from the server if the cache
+   * is disabled.
    *
    * @param schemaIdent the schema identifier.
    * @return the schema.
@@ -821,27 +822,27 @@ public abstract class BaseGVFSOperations implements Closeable {
           String catalogPrefix =
               String.format(
                   "%s.%s.%s.",
-                  FS_GRAVITINO_FILESET_PROPERT_PREFIX,
+                  FS_GRAVITINO_FILESET_PROPERTY_PREFIX,
                   catalog,
-                  FS_GRAVITINO_FILESET_PROPERT_KEYNAME_PREFIX);
+                  FS_GRAVITINO_FILESET_PROPERTY_KEYNAME_PREFIX);
           String schemaPrefix =
               schema != null
                   ? String.format(
                       "%s.%s.%s.%s.",
-                      FS_GRAVITINO_FILESET_PROPERT_PREFIX,
+                      FS_GRAVITINO_FILESET_PROPERTY_PREFIX,
                       catalog,
                       schema,
-                      FS_GRAVITINO_FILESET_PROPERT_KEYNAME_PREFIX)
+                      FS_GRAVITINO_FILESET_PROPERTY_KEYNAME_PREFIX)
                   : null;
           String filesetPrefix =
               fileset != null
                   ? String.format(
                       "%s.%s.%s.%s.%s.",
-                      FS_GRAVITINO_FILESET_PROPERT_PREFIX,
+                      FS_GRAVITINO_FILESET_PROPERTY_PREFIX,
                       catalog,
                       schema,
                       fileset,
-                      FS_GRAVITINO_FILESET_PROPERT_KEYNAME_PREFIX)
+                      FS_GRAVITINO_FILESET_PROPERTY_KEYNAME_PREFIX)
                   : null;
 
           if (filesetPrefix != null && key.startsWith(filesetPrefix)) {

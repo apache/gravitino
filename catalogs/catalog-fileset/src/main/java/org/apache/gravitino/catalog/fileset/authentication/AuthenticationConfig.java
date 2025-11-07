@@ -19,6 +19,8 @@
 
 package org.apache.gravitino.catalog.fileset.authentication;
 
+import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.HADOOP_SECURITY_AUTHENTICATION;
+
 import com.google.common.collect.ImmutableMap;
 import java.util.Map;
 import org.apache.gravitino.Config;
@@ -53,7 +55,7 @@ public class AuthenticationConfig extends Config {
   }
 
   private void loadFromHdfsConfiguration(Configuration configuration) {
-    String authType = configuration.get("hadoop.security.authentication", "simple");
+    String authType = configuration.get(HADOOP_SECURITY_AUTHENTICATION, "simple");
     configMap.put(AUTH_TYPE_KEY, authType);
   }
 

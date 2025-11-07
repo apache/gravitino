@@ -22,16 +22,15 @@ import static org.apache.gravitino.catalog.hadoop.fs.Constants.AUTH_KERBEROS;
 import static org.apache.gravitino.catalog.hadoop.fs.Constants.AUTH_SIMPlE;
 import static org.apache.gravitino.catalog.hadoop.fs.Constants.FS_DISABLE_CACHE;
 import static org.apache.gravitino.catalog.hadoop.fs.Constants.HADOOP_KRB5_CONF;
-import static org.apache.gravitino.catalog.hadoop.fs.Constants.HADOOP_SECURITY_AUTHENTICATION;
 import static org.apache.gravitino.catalog.hadoop.fs.Constants.HADOOP_SECURITY_KEYTAB;
 import static org.apache.gravitino.catalog.hadoop.fs.Constants.HADOOP_SECURITY_PRINCIPAL;
 import static org.apache.gravitino.catalog.hadoop.fs.Constants.SECURITY_KRB5_ENV;
 import static org.apache.gravitino.catalog.hadoop.fs.HDFSFileSystemProvider.IPC_FALLBACK_TO_SIMPLE_AUTH_ALLOWED;
+import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.HADOOP_SECURITY_AUTHENTICATION;
 
 import java.io.IOException;
 import java.lang.reflect.Method;
 import java.security.PrivilegedExceptionAction;
-import java.time.Instant;
 import java.util.Timer;
 import java.util.TimerTask;
 import net.sf.cglib.proxy.Enhancer;
@@ -141,8 +140,7 @@ public class HDFSFileSystemProxy implements MethodInterceptor {
               }
             } catch (Exception e) {
               LOG.error(
-                  Instant.now()
-                      + " [Kerberos] Failed to renew TGT for principal "
+                  "[Kerberos] Failed to renew TGT for principal "
                       + principal
                       + ": "
                       + e.getMessage());
