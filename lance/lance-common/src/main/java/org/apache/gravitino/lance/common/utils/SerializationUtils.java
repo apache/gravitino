@@ -19,6 +19,7 @@
  */
 package org.apache.gravitino.lance.common.utils;
 
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.google.common.collect.ImmutableMap;
 import com.lancedb.lance.namespace.util.JsonUtil;
 import java.util.HashMap;
@@ -49,5 +50,18 @@ public class SerializationUtils {
                       });
               return map;
             });
+  }
+
+  public static Map<String, String> objectToMap(Object obj) {
+    if (obj == null) {
+      return ImmutableMap.of();
+    }
+
+    try {
+      String jsonString = JsonUtil.mapper().writeValueAsString(obj);
+      return JsonUtil.mapper().readValue(jsonString, new TypeReference<Map<String, String>>() {});
+    } catch (Exception e) {
+      throw new RuntimeException("Failed to convert object to map", e);
+    }
   }
 }

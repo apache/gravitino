@@ -28,12 +28,18 @@ import com.codahale.metrics.annotation.Timed;
 import com.google.common.collect.Maps;
 import com.lancedb.lance.namespace.model.CreateEmptyTableRequest;
 import com.lancedb.lance.namespace.model.CreateEmptyTableResponse;
+import com.lancedb.lance.namespace.model.CreateTableIndexRequest;
+import com.lancedb.lance.namespace.model.CreateTableIndexResponse;
 import com.lancedb.lance.namespace.model.CreateTableRequest;
 import com.lancedb.lance.namespace.model.CreateTableResponse;
 import com.lancedb.lance.namespace.model.DeregisterTableRequest;
 import com.lancedb.lance.namespace.model.DeregisterTableResponse;
+import com.lancedb.lance.namespace.model.DescribeTableIndexStatsRequest;
+import com.lancedb.lance.namespace.model.DescribeTableIndexStatsResponse;
 import com.lancedb.lance.namespace.model.DescribeTableRequest;
 import com.lancedb.lance.namespace.model.DescribeTableResponse;
+import com.lancedb.lance.namespace.model.ListTableIndicesRequest;
+import com.lancedb.lance.namespace.model.ListTableIndicesResponse;
 import com.lancedb.lance.namespace.model.RegisterTableRequest;
 import com.lancedb.lance.namespace.model.RegisterTableRequest.ModeEnum;
 import com.lancedb.lance.namespace.model.RegisterTableResponse;
@@ -191,14 +197,75 @@ public class LanceTableOperations {
     }
   }
 
+  @POST
+  @Path("/create_index")
+  @Timed(name = "create-table-index." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
+  @ResponseMetered(name = "create-table-index", absolute = true)
+  public Response createTableIndex(
+      @PathParam("id") String tableId,
+      @QueryParam("delimiter") @DefaultValue("$") String delimiter,
+      @Context HttpHeaders headers,
+      CreateTableIndexRequest createTableIndexRequest) {
+    try {
+      validateCreateTableIndexRequest(createTableIndexRequest);
+      CreateTableIndexResponse response =
+          lanceNamespace.asTableOps().createTableIndex(tableId, delimiter, createTableIndexRequest);
+      return Response.ok(response).build();
+    } catch (Exception e) {
+      return LanceExceptionMapper.toRESTResponse(tableId, e);
+    }
+  }
+
+  @POST
+  @Path("/index/list")
+  @Timed(name = "list-table-indices." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
+  @ResponseMetered(name = "list-table-indices", absolute = true)
+  public Response listTableIndices(
+      @PathParam("id") String tableId,
+      @QueryParam("delimiter") @DefaultValue("$") String delimiter,
+      @Context HttpHeaders headers,
+      ListTableIndicesRequest listTableIndicesRequest) {
+    try {
+      validateListTableIndicesRequest(listTableIndicesRequest);
+      ListTableIndicesResponse response =
+          lanceNamespace.asTableOps().listTableIndices(tableId, delimiter, listTableIndicesRequest);
+      return Response.ok(response).build();
+    } catch (Exception e) {
+      return LanceExceptionMapper.toRESTResponse(tableId, e);
+    }
+  }
+
+  @POST
+  @Path("/index/{index_name}/stats")
+  @Timed(name = "describe-table-index." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
+  @ResponseMetered(name = "describe-table-index", absolute = true)
+  public Response describeTableIndex(
+      @PathParam("id") String tableId,
+      @PathParam("index_name") String indexName,
+      @QueryParam("delimiter") @DefaultValue("$") String delimiter,
+      @Context HttpHeaders headers,
+      DescribeTableIndexStatsRequest describeTableIndexStatsRequest) {
+    try {
+      validateDescribeTableIndexRequest(describeTableIndexStatsRequest);
+      DescribeTableIndexStatsResponse response =
+          lanceNamespace
+              .asTableOps()
+              .describeTableIndexStats(
+                  tableId, delimiter, indexName, describeTableIndexStatsRequest);
+      return Response.ok(response).build();
+    } catch (Exception e) {
+      return LanceExceptionMapper.toRESTResponse(tableId, e);
+    }
+  }
+
   private void validateCreateEmptyTableRequest(
       @SuppressWarnings("unused") CreateEmptyTableRequest request) {
-    // No specific fields to validate for now
+    // We will ignore the id in the request body since it's already provided in the path param.
   }
 
   private void validateRegisterTableRequest(
       @SuppressWarnings("unused") RegisterTableRequest request) {
-    // No specific fields to validate for now
+    // We will ignore the id in the request body since it's already provided in the path param.
   }
 
   private void validateDeregisterTableRequest(
@@ -209,6 +276,24 @@ public class LanceTableOperations {
 
   private void validateDescribeTableRequest(
       @SuppressWarnings("unused") DescribeTableRequest request) {
+    // We will ignore the id in the request body since it's already provided in the path param
+    // No specific fields to validate for now
+  }
+
+  private void validateCreateTableIndexRequest(
+      @SuppressWarnings("unused") CreateTableIndexRequest request) {
+    // We will ignore the id in the request body since it's already provided in the path param
+    // No specific fields to validate for now
+  }
+
+  private void validateListTableIndicesRequest(
+      @SuppressWarnings("unused") ListTableIndicesRequest request) {
+    // We will ignore the id in the request body since it's already provided in the path param
+    // No specific fields to validate for now
+  }
+
+  private void validateDescribeTableIndexRequest(
+      @SuppressWarnings("unused") DescribeTableIndexStatsRequest request) {
     // We will ignore the id in the request body since it's already provided in the path param
     // No specific fields to validate for now
   }

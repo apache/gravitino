@@ -20,25 +20,35 @@
 package org.apache.gravitino.lance.common.ops.gravitino;
 
 import static org.apache.gravitino.lance.common.ops.gravitino.LanceDataTypeConverter.CONVERTER;
+import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_INDEX_CONFIG_KEY;
 import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_LOCATION;
 import static org.apache.gravitino.rel.Column.DEFAULT_VALUE_NOT_SET;
 
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.lancedb.lance.namespace.LanceNamespaceException;
 import com.lancedb.lance.namespace.ObjectIdentifier;
 import com.lancedb.lance.namespace.model.CreateEmptyTableResponse;
+import com.lancedb.lance.namespace.model.CreateTableIndexRequest;
+import com.lancedb.lance.namespace.model.CreateTableIndexResponse;
 import com.lancedb.lance.namespace.model.CreateTableRequest;
 import com.lancedb.lance.namespace.model.CreateTableRequest.ModeEnum;
 import com.lancedb.lance.namespace.model.CreateTableResponse;
 import com.lancedb.lance.namespace.model.DeregisterTableResponse;
+import com.lancedb.lance.namespace.model.DescribeTableIndexStatsRequest;
+import com.lancedb.lance.namespace.model.DescribeTableIndexStatsResponse;
 import com.lancedb.lance.namespace.model.DescribeTableResponse;
+import com.lancedb.lance.namespace.model.IndexContent;
 import com.lancedb.lance.namespace.model.JsonArrowSchema;
+import com.lancedb.lance.namespace.model.ListTableIndicesRequest;
+import com.lancedb.lance.namespace.model.ListTableIndicesResponse;
 import com.lancedb.lance.namespace.model.RegisterTableRequest;
 import com.lancedb.lance.namespace.model.RegisterTableResponse;
 import com.lancedb.lance.namespace.util.CommonUtil;
 import com.lancedb.lance.namespace.util.JsonArrowSchemaConverter;
+import com.lancedb.lance.namespace.util.JsonUtil;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -56,6 +66,9 @@ import org.apache.gravitino.lance.common.utils.ArrowUtils;
 import org.apache.gravitino.lance.common.utils.LancePropertiesUtils;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Table;
+import org.apache.gravitino.rel.TableChange;
+import org.apache.gravitino.rel.TableChange.AddIndex;
+import org.apache.gravitino.rel.indexes.Index.IndexType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -265,6 +278,76 @@ public class GravitinoLanceTableOperations implements LanceTableOperations {
     return response;
   }
 
+  // Note: Create indices is an asynchronous operation in Lance Lakehouse.
+  @Override
+  public CreateTableIndexResponse createTableIndex(
+      String tableId, String delimiter, CreateTableIndexRequest request) {
+    ObjectIdentifier nsId = ObjectIdentifier.of(tableId, Pattern.quote(delimiter));
+    Preconditions.checkArgument(
+        nsId.levels() == 3, "Expected at 3-level namespace but got: %s", nsId.levels());
+
+    String catalogName = nsId.levelAtListPos(0);
+    Catalog catalog = namespaceWrapper.loadAndValidateLakehouseCatalog(catalogName);
+
+    NameIdentifier tableIdentifier =
+        NameIdentifier.of(nsId.levelAtListPos(1), nsId.levelAtListPos(2));
+
+    // There seem to be missing index name in the request, using Optional.empty() for now.
+    TableChange tableChange = buildAddIndex(Optional.empty(), request);
+
+    Table table = catalog.asTableCatalog().alterTable(tableIdentifier, tableChange);
+    CreateTableIndexResponse response = new CreateTableIndexResponse();
+    response.setId(nsId.listStyleId());
+    response.setLocation(table.properties().get(LANCE_LOCATION));
+    response.setProperties(table.properties());
+    return response;
+  }
+
+  @Override
+  public ListTableIndicesResponse listTableIndices(
+      String tableId, String delimiter, ListTableIndicesRequest request) {
+    ObjectIdentifier nsId = ObjectIdentifier.of(tableId, Pattern.quote(delimiter));
+    Preconditions.checkArgument(
+        nsId.levels() == 3, "Expected at 3-level namespace but got: %s", nsId.levels());
+
+    String catalogName = nsId.levelAtListPos(0);
+    Catalog catalog = namespaceWrapper.loadAndValidateLakehouseCatalog(catalogName);
+    NameIdentifier tableIdentifier =
+        NameIdentifier.of(nsId.levelAtListPos(1), nsId.levelAtListPos(2));
+
+    Table table = catalog.asTableCatalog().loadTable(tableIdentifier);
+    ListTableIndicesResponse response = new ListTableIndicesResponse();
+    List<IndexContent> contents =
+        Arrays.stream(table.index())
+            .map(
+                index -> {
+                  IndexContent content = new IndexContent();
+                  List<String> columnNames = new ArrayList<>();
+                  for (int i = 0; i < index.fieldNames().length; i++) {
+                    columnNames.add(index.fieldNames()[i][0]);
+                  }
+                  content.setColumns(columnNames);
+                  content.setIndexName(index.name());
+
+                  // Currently there is no API to get index status, setting all indexes to READY for
+                  // simplicity.
+                  content.setIndexUuid(index.name());
+                  content.setStatus("READY");
+                  return content;
+                })
+            .collect(Collectors.toList());
+    response.setIndexes(contents);
+    response.setPageToken(request.getPageToken());
+    return response;
+  }
+
+  @Override
+  public DescribeTableIndexStatsResponse describeTableIndexStats(
+      String tableId, String delimiter, String indexId, DescribeTableIndexStatsRequest request) {
+    // Do not support now as Lance dataset does not have index stats API.
+    throw new UnsupportedOperationException("Describing table index stats is not supported now.");
+  }
+
   private List<Column> extractColumns(org.apache.arrow.vector.types.pojo.Schema arrowSchema) {
     List<Column> columns = new ArrayList<>();
 
@@ -289,5 +372,19 @@ public class GravitinoLanceTableOperations implements LanceTableOperations {
 
     return JsonArrowSchemaConverter.convertToJsonArrowSchema(
         new org.apache.arrow.vector.types.pojo.Schema(fields));
+  }
+
+  private AddIndex buildAddIndex(Optional<String> indexName, CreateTableIndexRequest request) {
+    try {
+      String requestJson = JsonUtil.mapper().writeValueAsString(request);
+      return new AddIndex(
+          IndexType.valueOf(request.getIndexType().name()),
+          indexName.orElse(null),
+          // It seems that only a single column index is supported for now.
+          new String[][] {{request.getColumn()}},
+          ImmutableMap.of(LANCE_INDEX_CONFIG_KEY, requestJson));
+    } catch (Exception e) {
+      throw new RuntimeException("Failed to build AddIndex from CreateTableIndexRequest", e);
+    }
   }
 }

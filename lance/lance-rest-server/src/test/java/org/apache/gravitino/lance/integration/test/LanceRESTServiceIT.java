@@ -18,9 +18,18 @@
  */
 package org.apache.gravitino.lance.integration.test;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
+import com.lancedb.lance.Dataset;
+import com.lancedb.lance.Fragment;
+import com.lancedb.lance.FragmentMetadata;
+import com.lancedb.lance.Transaction;
+import com.lancedb.lance.WriteParams;
+import com.lancedb.lance.ipc.LanceScanner;
+import com.lancedb.lance.ipc.ScanOptions;
 import com.lancedb.lance.namespace.LanceNamespace;
 import com.lancedb.lance.namespace.LanceNamespaceException;
 import com.lancedb.lance.namespace.LanceNamespaces;
@@ -29,6 +38,10 @@ import com.lancedb.lance.namespace.model.CreateEmptyTableRequest;
 import com.lancedb.lance.namespace.model.CreateEmptyTableResponse;
 import com.lancedb.lance.namespace.model.CreateNamespaceRequest;
 import com.lancedb.lance.namespace.model.CreateNamespaceResponse;
+import com.lancedb.lance.namespace.model.CreateTableIndexRequest;
+import com.lancedb.lance.namespace.model.CreateTableIndexRequest.IndexTypeEnum;
+import com.lancedb.lance.namespace.model.CreateTableIndexRequest.MetricTypeEnum;
+import com.lancedb.lance.namespace.model.CreateTableIndexResponse;
 import com.lancedb.lance.namespace.model.CreateTableRequest;
 import com.lancedb.lance.namespace.model.CreateTableResponse;
 import com.lancedb.lance.namespace.model.DeregisterTableRequest;
@@ -40,18 +53,23 @@ import com.lancedb.lance.namespace.model.DescribeTableResponse;
 import com.lancedb.lance.namespace.model.DropNamespaceRequest;
 import com.lancedb.lance.namespace.model.DropNamespaceResponse;
 import com.lancedb.lance.namespace.model.ErrorResponse;
+import com.lancedb.lance.namespace.model.IndexContent;
 import com.lancedb.lance.namespace.model.JsonArrowField;
 import com.lancedb.lance.namespace.model.ListNamespacesRequest;
 import com.lancedb.lance.namespace.model.ListNamespacesResponse;
+import com.lancedb.lance.namespace.model.ListTableIndicesRequest;
+import com.lancedb.lance.namespace.model.ListTableIndicesResponse;
 import com.lancedb.lance.namespace.model.ListTablesRequest;
 import com.lancedb.lance.namespace.model.NamespaceExistsRequest;
 import com.lancedb.lance.namespace.model.RegisterTableRequest;
 import com.lancedb.lance.namespace.model.RegisterTableRequest.ModeEnum;
 import com.lancedb.lance.namespace.model.RegisterTableResponse;
 import com.lancedb.lance.namespace.rest.RestNamespaceConfig;
+import com.lancedb.lance.operation.Append;
 import java.io.File;
 import java.io.IOException;
 import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Arrays;
@@ -60,11 +78,22 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Random;
 import java.util.Set;
 import org.apache.arrow.memory.BufferAllocator;
 import org.apache.arrow.memory.RootAllocator;
+import org.apache.arrow.vector.FieldVector;
+import org.apache.arrow.vector.Float4Vector;
+import org.apache.arrow.vector.IntVector;
+import org.apache.arrow.vector.VarCharVector;
+import org.apache.arrow.vector.VectorSchemaRoot;
+import org.apache.arrow.vector.complex.FixedSizeListVector;
+import org.apache.arrow.vector.ipc.ArrowReader;
+import org.apache.arrow.vector.types.FloatingPointPrecision;
 import org.apache.arrow.vector.types.pojo.ArrowType;
 import org.apache.arrow.vector.types.pojo.Field;
+import org.apache.arrow.vector.types.pojo.FieldType;
+import org.apache.commons.compress.utils.Lists;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Schema;
@@ -666,6 +695,241 @@ public class LanceRESTServiceIT extends BaseIT {
         Assertions.assertThrows(
             LanceNamespaceException.class, () -> ns.describeTable(describeTableRequest));
     Assertions.assertEquals(406, lanceNamespaceException.getCode());
+  }
+
+  @Test
+  void testCreateTableIndex() throws IOException {
+    catalog = createCatalog(CATALOG_NAME);
+    createSchema();
+    List<String> ids = List.of(CATALOG_NAME, SCHEMA_NAME, "non_existing_table");
+
+    // We need to create a table first;
+    org.apache.arrow.vector.types.pojo.Schema schema =
+        new org.apache.arrow.vector.types.pojo.Schema(
+            Arrays.asList(
+                Field.nullable("id", new ArrowType.Int(32, true)),
+                Field.nullable("value", new ArrowType.Utf8()),
+                new Field(
+                    "vector",
+                    FieldType.nullable(new ArrowType.FixedSizeList(4)),
+                    ImmutableList.of(
+                        Field.nullable(
+                            "fake", new ArrowType.FloatingPoint(FloatingPointPrecision.SINGLE))))));
+    byte[] body = ArrowUtils.generateIpcStream(schema);
+
+    CreateTableRequest request = new CreateTableRequest();
+    request.setId(ids);
+    request.setLocation(tempDir + "/" + "table_for_index/");
+    request.setProperties(
+        ImmutableMap.of(
+            "key1", "v1",
+            "lance.storage.a", "value_a",
+            "lance.storage.c", "value_c"));
+
+    CreateTableResponse response = ns.createTable(request, body);
+    Assertions.assertEquals(request.getLocation(), response.getLocation());
+
+    writeDataToLance(request.getLocation());
+
+    // Now try to create Btree index on an existing table
+    CreateTableIndexRequest createTableIndexRequest = new CreateTableIndexRequest();
+    createTableIndexRequest.setId(ids);
+    createTableIndexRequest.setIndexType(IndexTypeEnum.BTREE);
+    createTableIndexRequest.setColumn("id");
+    createTableIndexRequest.setMetricType(MetricTypeEnum.L2);
+    CreateTableIndexResponse createTableIndexResponse =
+        Assertions.assertDoesNotThrow(() -> ns.createTableIndex(createTableIndexRequest));
+    Assertions.assertNotNull(createTableIndexResponse);
+
+    // Now try to create bitmap index on an existing table
+    createTableIndexRequest.setIndexType(IndexTypeEnum.BITMAP);
+    createTableIndexRequest.setColumn("value");
+    createTableIndexResponse =
+        Assertions.assertDoesNotThrow(() -> ns.createTableIndex(createTableIndexRequest));
+    Assertions.assertNotNull(createTableIndexResponse);
+    List<String> indices = listIndices(request.getLocation());
+    Assertions.assertEquals(2, indices.size());
+    // Now try to create vector index on an existing table
+    createTableIndexRequest.setIndexType(IndexTypeEnum.IVF_FLAT);
+    createTableIndexRequest.setColumn("vector");
+    createTableIndexResponse =
+        Assertions.assertDoesNotThrow(() -> ns.createTableIndex(createTableIndexRequest));
+    Assertions.assertNotNull(createTableIndexResponse);
+
+    ListTableIndicesRequest listTableIndicesRequest = new ListTableIndicesRequest();
+    listTableIndicesRequest.setId(ids);
+    ListTableIndicesResponse listTableIndicesResponse =
+        ns.listTableIndices(listTableIndicesRequest);
+    Assertions.assertEquals(3, listTableIndicesResponse.getIndexes().size());
+    List<String> expectedIndexName = listIndices(request.getLocation());
+    for (IndexContent indexContent : listTableIndicesResponse.getIndexes()) {
+      Assertions.assertTrue(
+          expectedIndexName.contains(indexContent.getIndexName()),
+          "Index name should be in the expected index names.");
+      if (indexContent.getIndexName().equals("id_idx")) {
+        Assertions.assertEquals("id", indexContent.getColumns().get(0));
+      } else if (indexContent.getIndexName().equals("value_idx")) {
+        Assertions.assertEquals("value", indexContent.getColumns().get(0));
+      } else if (indexContent.getIndexName().equals("vector_idx")) {
+        Assertions.assertEquals("vector", indexContent.getColumns().get(0));
+      }
+    }
+
+    // create another table to test other index types
+    ids = List.of(CATALOG_NAME, SCHEMA_NAME, "table_for_other_indexes");
+    request.setId(ids);
+    request.setLocation(tempDir + "/" + "table_for_other_indexes/");
+    response = ns.createTable(request, body);
+    Assertions.assertEquals(request.getLocation(), response.getLocation());
+    writeDataToLance(request.getLocation());
+
+    // Now try to create FTS index on an existing table
+    createTableIndexRequest.setId(ids);
+    createTableIndexRequest.setIndexType(IndexTypeEnum.FTS);
+    createTableIndexRequest.setColumn("value");
+
+    LanceNamespaceException exception =
+        Assertions.assertThrows(
+            LanceNamespaceException.class, () -> ns.createTableIndex(createTableIndexRequest));
+    // com.lancedb.lance.index.IndexType does not have FTS yet, so it should throw exception
+    Assertions.assertTrue(
+        exception.getMessage().contains("No enum constant com.lancedb.lance.index.IndexType.FTS"));
+  }
+
+  private List<String> listIndices(String lanceTableLocation) {
+    try (Dataset dataset = Dataset.open(lanceTableLocation)) {
+      return dataset.listIndexes();
+    } catch (Exception e) {
+      throw new RuntimeException(e);
+    }
+  }
+
+  private void writeDataToLance(String tableLocation) {
+    try (Dataset dataset = Dataset.open(tableLocation)) {
+      org.apache.arrow.vector.types.pojo.Schema lanceSchema = dataset.getSchema();
+      Transaction trans =
+          dataset
+              .newTransactionBuilder()
+              .operation(
+                  Append.builder()
+                      .fragments(
+                          createFragmentMetadata(tableLocation, generateLanceData(), lanceSchema))
+                      .build())
+              .writeParams(ImmutableMap.of())
+              .build();
+
+      Dataset newDataset = dataset.commitTransaction(trans);
+
+      try (LanceScanner scanner =
+          newDataset.newScan(
+              new ScanOptions.Builder()
+                  .columns(Arrays.asList("id", "value", "vector"))
+                  .batchSize(1000)
+                  .build())) {
+
+        List<LanceDataValue> dataValues = com.google.common.collect.Lists.newArrayList();
+        try (ArrowReader reader = scanner.scanBatches()) {
+          while (reader.loadNextBatch()) {
+            VectorSchemaRoot root = reader.getVectorSchemaRoot();
+            List<FieldVector> fieldVectors = root.getFieldVectors();
+
+            IntVector ids = (IntVector) fieldVectors.get(0);
+            VarCharVector values = (VarCharVector) fieldVectors.get(1);
+            FixedSizeListVector vectors = (FixedSizeListVector) fieldVectors.get(2);
+
+            for (int i = 0; i < root.getRowCount(); i++) {
+              int id = ids.get(i);
+              String value = new String(values.get(i), StandardCharsets.UTF_8);
+              List<Float> vector = com.google.common.collect.Lists.newArrayList();
+              for (int j = 0; j < 4; j++) {
+                Float floatValue = ((Float4Vector) vectors.getDataVector()).get(i * 4 + j);
+                vector.add(floatValue);
+              }
+
+              dataValues.add(new LanceDataValue(id, value, vector));
+            }
+          }
+        }
+
+        Assertions.assertEquals(5120, dataValues.size());
+      } catch (Exception e) {
+        throw new RuntimeException(e);
+      }
+    } catch (JsonProcessingException e) {
+      throw new RuntimeException(e);
+    } catch (Exception e) {
+      throw new RuntimeException(e);
+    }
+  }
+
+  private List<LanceDataValue> generateLanceData() {
+    List<LanceDataValue> updates = Lists.newArrayList();
+    Random random = new Random();
+    for (int i = 0; i < 5120; i++) {
+      LanceDataValue data =
+          new LanceDataValue(
+              i,
+              "value_" + i,
+              Arrays.asList(
+                  (float) random.nextInt(10000),
+                  (float) random.nextInt(10000),
+                  (float) random.nextInt(10000),
+                  (float) random.nextInt(10000)));
+      updates.add(data);
+    }
+
+    return updates;
+  }
+
+  private List<FragmentMetadata> createFragmentMetadata(
+      String tableLocation,
+      List<LanceDataValue> updates,
+      org.apache.arrow.vector.types.pojo.Schema schema)
+      throws JsonProcessingException {
+    List<FragmentMetadata> fragmentMetas;
+    int count = 0;
+    RootAllocator rootAllocator = new RootAllocator();
+    try (VectorSchemaRoot root = VectorSchemaRoot.create(schema, rootAllocator)) {
+      for (FieldVector vector : root.getFieldVectors()) {
+        vector.setInitialCapacity(count);
+      }
+      root.allocateNew();
+
+      IntVector ids = (IntVector) root.getVector("id");
+      VarCharVector values = (VarCharVector) root.getVector("value");
+      FixedSizeListVector vectors = (FixedSizeListVector) root.getVector("vector");
+      vectors.allocateNew();
+      Float4Vector dataVector = (Float4Vector) vectors.getDataVector();
+
+      int index = 0;
+      for (LanceDataValue data : updates) {
+        ids.setSafe(index, data.id);
+        values.setSafe(index, data.value.getBytes(StandardCharsets.UTF_8));
+        vectors.setNotNull(index);
+        for (int i = 0; i < 4; i++) {
+          Float floatValue = data.vector.get(i);
+          dataVector.setSafe(index * 4 + i, floatValue);
+        }
+        index++;
+      }
+      root.setRowCount(index);
+
+      fragmentMetas =
+          Fragment.create(tableLocation, rootAllocator, root, new WriteParams.Builder().build());
+      return fragmentMetas;
+    }
+  }
+
+  static class LanceDataValue {
+    public Integer id;
+    public String value;
+    public List<Float> vector;
+
+    public LanceDataValue(Integer id, String value, List<Float> vector) {
+      this.id = id;
+      this.value = value;
+      this.vector = vector;
+    }
   }
 
   private GravitinoMetalake createMetalake(String metalakeName) {

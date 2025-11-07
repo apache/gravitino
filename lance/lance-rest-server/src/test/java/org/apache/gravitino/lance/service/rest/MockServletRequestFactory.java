@@ -17,20 +17,18 @@
  * under the License.
  */
 
-package org.apache.gravitino.lance.common.utils;
+package org.apache.gravitino.lance.service.rest;
 
-public class LanceConstants {
-  public static final String LANCE_HTTP_HEADER_PREFIX = "x-lance-";
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
-  public static final String LANCE_TABLE_LOCATION_HEADER =
-      LANCE_HTTP_HEADER_PREFIX + "table-location";
-  public static final String LANCE_TABLE_PROPERTIES_PREFIX_HEADER =
-      LANCE_HTTP_HEADER_PREFIX + "table-properties";
-  // Key for table location in table properties map
-  public static final String LANCE_LOCATION = "location";
+import javax.servlet.http.HttpServletRequest;
 
-  // Prefix for storage options in LanceConfig
-  public static final String LANCE_STORAGE_OPTIONS_PREFIX = "lance.storage.";
-
-  public static final String LANCE_INDEX_CONFIG_KEY = "lance_index_config";
+public class MockServletRequestFactory extends ServletRequestFactoryBase {
+  @Override
+  public HttpServletRequest get() {
+    HttpServletRequest request = mock(HttpServletRequest.class);
+    when(request.getRemoteUser()).thenReturn(null);
+    return request;
+  }
 }

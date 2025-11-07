@@ -20,6 +20,7 @@
 package org.apache.gravitino.catalog.lakehouse.lance;
 
 import static org.apache.gravitino.Entity.EntityType.TABLE;
+import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_INDEX_CONFIG_KEY;
 
 import com.google.common.collect.Lists;
 import com.lancedb.lance.Dataset;
@@ -27,7 +28,15 @@ import com.lancedb.lance.WriteParams;
 import com.lancedb.lance.index.DistanceType;
 import com.lancedb.lance.index.IndexParams;
 import com.lancedb.lance.index.IndexType;
+import com.lancedb.lance.index.scalar.ScalarIndexParams;
+import com.lancedb.lance.index.vector.HnswBuildParams;
+import com.lancedb.lance.index.vector.IvfBuildParams;
+import com.lancedb.lance.index.vector.PQBuildParams;
+import com.lancedb.lance.index.vector.SQBuildParams;
 import com.lancedb.lance.index.vector.VectorIndexParams;
+import com.lancedb.lance.namespace.model.CreateTableIndexRequest;
+import com.lancedb.lance.namespace.model.CreateTableIndexRequest.MetricTypeEnum;
+import com.lancedb.lance.namespace.util.JsonUtil;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.Arrays;
@@ -66,6 +75,7 @@ import org.apache.gravitino.rel.expressions.distributions.Distribution;
 import org.apache.gravitino.rel.expressions.sorts.SortOrder;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.indexes.Index;
+import org.apache.gravitino.rel.indexes.Indexes;
 import org.apache.gravitino.rel.indexes.Indexes.IndexImpl;
 import org.apache.gravitino.utils.PrincipalUtils;
 
@@ -172,6 +182,7 @@ public class LanceCatalogOperations implements LakehouseCatalogOperations {
                 .withIndexType(addIndexChange.getType())
                 .withName(addIndexChange.getName())
                 .withFieldNames(addIndexChange.getFieldNames())
+                .withProperties(addIndexChange.getProperties())
                 .build();
         addedIndexes.add(index);
       }
@@ -179,7 +190,12 @@ public class LanceCatalogOperations implements LakehouseCatalogOperations {
 
     TableEntity updatedEntity;
     try {
+      // Add indexes to Lance dataset
       TableEntity entity = store.get(ident, Entity.EntityType.TABLE, TableEntity.class);
+      String location =
+          entity.properties().get(GenericLakehouseTablePropertiesMetadata.LAKEHOUSE_LOCATION);
+      // We need some information from lance to create index.
+      List<Index> addedIndex = addLanceIndex(location, addedIndexes);
       updatedEntity =
           store.update(
               ident,
@@ -200,16 +216,13 @@ public class LanceCatalogOperations implements LakehouseCatalogOperations {
                               .build())
                       .withColumns(tableEntity.columns())
                       .withIndexes(
-                          ArrayUtils.addAll(entity.indexes(), addedIndexes.toArray(new Index[0])))
+                          ArrayUtils.addAll(entity.indexes(), addedIndex.toArray(new Index[0])))
                       .withDistribution(tableEntity.distribution())
                       .withPartitioning(tableEntity.partitioning())
                       .withSortOrders(tableEntity.sortOrders())
                       .withProperties(tableEntity.properties())
                       .withComment(tableEntity.comment())
                       .build());
-
-      // Add indexes to Lance dataset
-      addLanceIndex(updatedEntity, addedIndexes);
 
       // return the updated table
       return GenericLakehouseTable.builder()
@@ -228,44 +241,6 @@ public class LanceCatalogOperations implements LakehouseCatalogOperations {
       throw new NoSuchTableException("No such table: %s", ident);
     } catch (IOException ioe) {
       throw new RuntimeException("Failed to load table entity for: " + ident, ioe);
-    }
-  }
-
-  private void addLanceIndex(TableEntity updatedEntity, List<Index> addedIndexes) {
-    String location =
-        updatedEntity.properties().get(GenericLakehouseTablePropertiesMetadata.LAKEHOUSE_LOCATION);
-    try (Dataset dataset = Dataset.open(location, new RootAllocator())) {
-      // For Lance, we only support adding indexes, so in fact, we can't handle drop index here.
-      for (Index index : addedIndexes) {
-        IndexType indexType = IndexType.valueOf(index.type().name());
-        IndexParams indexParams = getIndexParamsByIndexType(indexType);
-
-        dataset.createIndex(
-            Arrays.stream(index.fieldNames())
-                .map(fieldPath -> String.join(".", fieldPath))
-                .collect(Collectors.toList()),
-            indexType,
-            Optional.of(index.name()),
-            indexParams,
-            true);
-      }
-    }
-  }
-
-  private IndexParams getIndexParamsByIndexType(IndexType indexType) {
-    switch (indexType) {
-      case SCALAR:
-        return new IndexParams.Builder().build();
-      case VECTOR:
-        // TODO make these parameters configurable
-        int numberOfDimensions = 3; // this value should be determined dynamically based on the data
-        // Add properties to Index to set this value.
-        return new IndexParams.Builder()
-            .setVectorIndexParams(
-                VectorIndexParams.ivfPq(2, 8, numberOfDimensions, DistanceType.L2, 2))
-            .build();
-      default:
-        throw new IllegalArgumentException("Unsupported index type: " + indexType);
     }
   }
 
@@ -297,5 +272,104 @@ public class LanceCatalogOperations implements LakehouseCatalogOperations {
     //  just remove the metadata in metastore and will not delete data in storage.
     throw new UnsupportedOperationException(
         "LanceCatalogOperations does not support dropTable operation.");
+  }
+
+  private List<Index> addLanceIndex(String location, List<Index> addedIndexes) {
+    List<Index> newIndexes = Lists.newArrayList();
+    try (Dataset dataset = Dataset.open(location, new RootAllocator())) {
+      // For Lance, we only support adding indexes, so in fact, we can't handle drop index here.
+      for (Index index : addedIndexes) {
+        // IndexType indexType = IndexType.valueOf(index.type().name().toUpperCase(Locale.ROOT));
+        IndexType indexType = getIndexType(index);
+        IndexParams indexParams = generateIndexParams(index);
+        dataset.createIndex(
+            Arrays.stream(index.fieldNames())
+                .map(fieldPath -> String.join(".", fieldPath))
+                .collect(Collectors.toList()),
+            indexType,
+            Optional.ofNullable(index.name()),
+            indexParams,
+            false);
+
+        // Currently lance only supports single-field indexes, so we can use the first field name
+        String lanceIndexName =
+            index.name() == null ? index.fieldNames()[0][0] + "_idx" : index.name();
+        newIndexes.add(
+            Indexes.of(index.type(), lanceIndexName, index.fieldNames(), index.properties()));
+      }
+
+      return newIndexes;
+    }
+  }
+
+  private IndexType getIndexType(Index index) {
+    IndexType indexType = IndexType.valueOf(index.type().name());
+    return switch (indexType) {
+        // API only supports these index types for now, but there are more index types in Lance.
+      case SCALAR, BTREE, INVERTED, BITMAP -> indexType;
+      case IVF_FLAT, IVF_PQ, IVF_HNSW_SQ -> IndexType.VECTOR;
+      default -> throw new IllegalArgumentException("Unsupported index type: " + indexType);
+    };
+  }
+
+  private IndexParams generateIndexParams(Index index) {
+    IndexType indexType = IndexType.valueOf(index.type().name());
+
+    String configJson = index.properties().get(LANCE_INDEX_CONFIG_KEY);
+    CreateTableIndexRequest request;
+    try {
+      request = JsonUtil.mapper().readValue(configJson, CreateTableIndexRequest.class);
+    } catch (Exception e) {
+      throw new IllegalArgumentException("Lance index config is invalid", e);
+    }
+
+    IndexParams.Builder builder = IndexParams.builder();
+    switch (indexType) {
+      case SCALAR, BTREE, INVERTED, BITMAP -> builder.setScalarIndexParams(
+          ScalarIndexParams.create(indexType.name()));
+
+      case IVF_FLAT -> builder.setVectorIndexParams(
+          new VectorIndexParams.Builder(new IvfBuildParams.Builder().build())
+              .setDistanceType(toLanceDistanceType(request.getMetricType()))
+              .build());
+      case IVF_PQ -> builder.setVectorIndexParams(
+          new VectorIndexParams.Builder(new IvfBuildParams.Builder().build())
+              .setDistanceType(toLanceDistanceType(request.getMetricType()))
+              .setPqParams(
+                  new PQBuildParams.Builder()
+                      .setNumSubVectors(1) // others use default value.
+                      .build())
+              .build());
+
+      case IVF_SQ -> builder.setVectorIndexParams(
+          new VectorIndexParams.Builder(new IvfBuildParams.Builder().build())
+              .setDistanceType(toLanceDistanceType(request.getMetricType()))
+              .setSqParams(new SQBuildParams.Builder().build())
+              .build());
+
+      case IVF_HNSW_SQ -> builder.setVectorIndexParams(
+          new VectorIndexParams.Builder(new IvfBuildParams.Builder().build())
+              .setDistanceType(toLanceDistanceType(request.getMetricType()))
+              .setHnswParams(new HnswBuildParams.Builder().build())
+              .build());
+      default -> throw new IllegalArgumentException("Unsupported index type: " + indexType);
+    }
+
+    return builder.build();
+  }
+
+  private DistanceType toLanceDistanceType(MetricTypeEnum metricTypeEnum) {
+    if (metricTypeEnum == null) {
+      // Default to L2
+      return DistanceType.L2;
+    }
+    String metricName = metricTypeEnum.name();
+    for (DistanceType distanceType : DistanceType.values()) {
+      if (distanceType.name().equalsIgnoreCase(metricName)) {
+        return distanceType;
+      }
+    }
+
+    throw new IllegalArgumentException("Unsupported metric type: " + metricTypeEnum);
   }
 }
