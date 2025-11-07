@@ -46,6 +46,7 @@ class TestGvfsWithGCSCredential(TestGvfsWithGCS):
     key_file = os.environ.get("GCS_SERVICE_ACCOUNT_JSON_PATH_FOR_CREDENTIAL")
     bucket_name = os.environ.get("GCS_BUCKET_NAME_FOR_CREDENTIAL")
     metalake_name: str = "TestGvfsWithGCSCredential_metalake" + str(randint(1, 10000))
+    catalog_name: str = "test_gvfs_catalog" + str(randint(1, 10000))
 
     def setUp(self):
         self.options = {
