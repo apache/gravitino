@@ -24,10 +24,12 @@ from gravitino.api.rel.expressions.sorts.sort_order import SortOrder
 from gravitino.api.rel.expressions.transforms.transform import Transform
 from gravitino.api.rel.indexes.index import Index
 from gravitino.api.rel.table import Table
+from gravitino.namespace import Namespace
+from gravitino.utils import HTTPClient
 
 
 class RelationalTable(Table):  # pylint: disable=too-many-instance-attributes
-    """A generic table implementation."""
+    """Represents a relational table."""
 
     def __init__(
         self,
@@ -40,6 +42,8 @@ class RelationalTable(Table):  # pylint: disable=too-many-instance-attributes
         comment: Optional[str],
         properties: dict[str, str],
         audit_info: Audit,
+        namespace: Namespace,
+        rest_client: HTTPClient,
     ):
         self._name = name
         self._columns = columns
@@ -50,6 +54,8 @@ class RelationalTable(Table):  # pylint: disable=too-many-instance-attributes
         self._comment = comment
         self._properties = properties
         self._audit_info = audit_info
+        self._namespace = namespace
+        self._rest_client = rest_client
 
     def name(self) -> str:
         return self._name

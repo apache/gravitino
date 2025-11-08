@@ -39,7 +39,6 @@ from gravitino.api.rel.partitions.partition import Partition
 from gravitino.api.rel.partitions.range_partition import RangePartition
 from gravitino.api.rel.table import Table
 from gravitino.api.rel.types.types import Types
-from gravitino.client.relational_table import RelationalTable
 from gravitino.dto.rel.column_dto import ColumnDTO
 from gravitino.dto.rel.distribution_dto import DistributionDTO
 from gravitino.dto.rel.expressions.field_reference_dto import FieldReferenceDTO
@@ -68,6 +67,8 @@ from gravitino.dto.rel.partitions.range_partition_dto import RangePartitionDTO
 from gravitino.dto.rel.sort_order_dto import SortOrderDTO
 from gravitino.dto.rel.table_dto import TableDTO
 from gravitino.exceptions.base import IllegalArgumentException
+from gravitino.namespace import Namespace
+from gravitino.utils import HTTPClient
 
 
 class DTOConverters:
@@ -118,7 +119,7 @@ class DTOConverters:
 
     @singledispatchmethod
     @staticmethod
-    def from_dto(dto) -> object:
+    def from_dto(dto, *args) -> object:
         raise IllegalArgumentException(f"Unsupported DTO type: {type(dto)}")
 
     @from_dto.register
@@ -255,7 +256,7 @@ class DTOConverters:
 
     @from_dto.register
     @staticmethod
-    def _(dto: TableDTO) -> Table:
+    def _(dto: TableDTO, namespsce: Namespace, rest_client: HTTPClient) -> Table:
         """Converts a TableDTO to a Table.
 
         Args:
@@ -264,17 +265,24 @@ class DTOConverters:
         Returns:
             Table: The table.
         """
+        from gravitino.client.relational_table import (  # pylint: disable=import-outside-toplevel
+            RelationalTable,
+        )
 
         return RelationalTable(
             name=dto.name(),
             columns=DTOConverters.from_dtos(dto.columns()),
             partitioning=DTOConverters.from_dtos(dto.partitioning()),
             sort_order=DTOConverters.from_dtos(dto.sort_order()),
-            distribution=DTOConverters.from_dto(dto.distribution()),
+            distribution=DTOConverters.from_dto(
+                dto.distribution() or DistributionDTO.NONE
+            ),
             index=DTOConverters.from_dtos(dto.index()),
             comment=dto.comment(),
             properties=dto.properties(),
             audit_info=dto.audit_info(),
+            namespace=namespsce,
+            rest_client=rest_client,
         )
 
     @overload
