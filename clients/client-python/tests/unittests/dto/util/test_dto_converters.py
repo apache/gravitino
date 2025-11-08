@@ -16,10 +16,10 @@
 # under the License.
 
 import unittest
-from datetime import datetime
+from datetime import date, datetime
 from itertools import product
 from random import randint, random
-from typing import cast
+from typing import Dict, cast
 from unittest.mock import MagicMock, patch
 
 from gravitino.api.rel.column import Column
@@ -64,6 +64,7 @@ from gravitino.dto.rel.partitioning.truncate_partitioning_dto import (
     TruncatePartitioningDTO,
 )
 from gravitino.dto.rel.partitioning.year_partitioning_dto import YearPartitioningDTO
+from gravitino.dto.rel.partitions.identity_partition_dto import IdentityPartitionDTO
 from gravitino.dto.rel.partitions.range_partition_dto import RangePartitionDTO
 from gravitino.dto.rel.sort_order_dto import SortOrderDTO
 from gravitino.dto.rel.table_dto import TableDTO
@@ -673,4 +674,51 @@ class TestDTOConverters(unittest.TestCase):
             .build(),
             properties={},
         )
+        self.assertTrue(converted == expected)
+
+    def test_to_dto_partition_raise_exception(self):
+        from gravitino.api.rel.partitions.partition import Partition
+
+        class InvalidPartition(Partition):
+            def name(self) -> str:
+                return "invalid_partition"
+
+            def properties(self) -> Dict[str, str]:
+                return {}
+
+        with self.assertRaisesRegex(
+            IllegalArgumentException, "Unsupported partition type"
+        ):
+            DTOConverters.to_dto(InvalidPartition())
+
+    def test_to_dto_identity_partition(self):
+        partition_name = "dt=2025-08-08/country=us"
+        field_names = [["dt"], ["country"]]
+        properties = {"location": "/user/hive/warehouse/tpch_flat_orc_2.db/orders"}
+        values = [
+            LiteralDTO.builder()
+            .with_data_type(data_type=Types.DateType.get())
+            .with_value(value="2025-08-08")
+            .build(),
+            LiteralDTO.builder()
+            .with_data_type(data_type=Types.StringType.get())
+            .with_value(value="us")
+            .build(),
+        ]
+        expected = IdentityPartitionDTO(
+            name=partition_name,
+            field_names=field_names,
+            values=values,
+            properties=properties,
+        )
+        partition = Partitions.identity(
+            name=partition_name,
+            field_names=field_names,
+            values=[
+                Literals.date_literal(date(2025, 8, 8)),
+                Literals.string_literal("us"),
+            ],
+            properties=properties,
+        )
+        converted = DTOConverters.to_dto(partition)
         self.assertTrue(converted == expected)
