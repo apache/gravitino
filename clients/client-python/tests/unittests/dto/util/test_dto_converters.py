@@ -36,6 +36,7 @@ from gravitino.api.rel.expressions.transforms.transforms import Transforms
 from gravitino.api.rel.expressions.unparsed_expression import UnparsedExpression
 from gravitino.api.rel.indexes.index import Index
 from gravitino.api.rel.indexes.indexes import Indexes
+from gravitino.api.rel.partitions.partition import Partition
 from gravitino.api.rel.partitions.partitions import Partitions
 from gravitino.api.rel.table import Table
 from gravitino.api.rel.types.types import Types
@@ -65,6 +66,7 @@ from gravitino.dto.rel.partitioning.truncate_partitioning_dto import (
 )
 from gravitino.dto.rel.partitioning.year_partitioning_dto import YearPartitioningDTO
 from gravitino.dto.rel.partitions.identity_partition_dto import IdentityPartitionDTO
+from gravitino.dto.rel.partitions.list_partition_dto import ListPartitionDTO
 from gravitino.dto.rel.partitions.range_partition_dto import RangePartitionDTO
 from gravitino.dto.rel.sort_order_dto import SortOrderDTO
 from gravitino.dto.rel.table_dto import TableDTO
@@ -653,7 +655,7 @@ class TestDTOConverters(unittest.TestCase):
             DTOConverters.to_function_arg(DistributionDTO.NONE)
 
     def test_to_dto_raise_exception(self):
-        with self.assertRaisesRegex(IllegalArgumentException, "Unsupported DTO type"):
+        with self.assertRaisesRegex(IllegalArgumentException, "Unsupported type"):
             DTOConverters.to_dto("test")
 
     def test_to_dto_range_partition(self):
@@ -677,8 +679,6 @@ class TestDTOConverters(unittest.TestCase):
         self.assertTrue(converted == expected)
 
     def test_to_dto_partition_raise_exception(self):
-        from gravitino.api.rel.partitions.partition import Partition
-
         class InvalidPartition(Partition):
             def name(self) -> str:
                 return "invalid_partition"
@@ -717,6 +717,52 @@ class TestDTOConverters(unittest.TestCase):
             values=[
                 Literals.date_literal(date(2025, 8, 8)),
                 Literals.string_literal("us"),
+            ],
+            properties=properties,
+        )
+        converted = DTOConverters.to_dto(partition)
+        self.assertTrue(converted == expected)
+
+    def test_to_dto_list_partition(self):
+        partition_name = "p202508_California"
+        properties = {"key": "value"}
+        partition = Partitions.list(
+            partition_name,
+            [
+                [
+                    Literals.date_literal(date(2025, 8, 8)),
+                    Literals.string_literal("Los Angeles"),
+                ],
+                [
+                    Literals.date_literal(date(2025, 8, 8)),
+                    Literals.string_literal("San Francisco"),
+                ],
+            ],
+            properties,
+        )
+        expected = ListPartitionDTO(
+            name=partition_name,
+            lists=[
+                [
+                    LiteralDTO.builder()
+                    .with_data_type(data_type=Types.DateType.get())
+                    .with_value(value="2025-08-08")
+                    .build(),
+                    LiteralDTO.builder()
+                    .with_data_type(data_type=Types.StringType.get())
+                    .with_value(value="Los Angeles")
+                    .build(),
+                ],
+                [
+                    LiteralDTO.builder()
+                    .with_data_type(data_type=Types.DateType.get())
+                    .with_value(value="2025-08-08")
+                    .build(),
+                    LiteralDTO.builder()
+                    .with_data_type(data_type=Types.StringType.get())
+                    .with_value(value="San Francisco")
+                    .build(),
+                ],
             ],
             properties=properties,
         )
