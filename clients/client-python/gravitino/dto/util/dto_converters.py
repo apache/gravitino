@@ -62,6 +62,7 @@ from gravitino.dto.rel.partitioning.truncate_partitioning_dto import (
     TruncatePartitioningDTO,
 )
 from gravitino.dto.rel.partitions.identity_partition_dto import IdentityPartitionDTO
+from gravitino.dto.rel.partitions.list_partition_dto import ListPartitionDTO
 from gravitino.dto.rel.partitions.partition_dto import PartitionDTO
 from gravitino.dto.rel.partitions.range_partition_dto import RangePartitionDTO
 from gravitino.dto.rel.sort_order_dto import SortOrderDTO
@@ -362,7 +363,7 @@ class DTOConverters:
     @singledispatchmethod
     @staticmethod
     def to_dto(obj) -> object:
-        raise IllegalArgumentException(f"Unsupported DTO type: {type(obj)}")
+        raise IllegalArgumentException(f"Unsupported type: {type(obj)}")
 
     @to_dto.register
     @staticmethod
@@ -389,6 +390,19 @@ class DTOConverters:
                 ],
                 field_names=identity_partition.field_names(),
                 properties=identity_partition.properties(),
+            )
+        if isinstance(obj, ListPartition):
+            list_partition = cast(ListPartition, obj)
+            return ListPartitionDTO(
+                name=list_partition.name(),
+                lists=[
+                    [
+                        cast(LiteralDTO, DTOConverters.to_function_arg(v))
+                        for v in list_item
+                    ]
+                    for list_item in list_partition.lists()
+                ],
+                properties=list_partition.properties(),
             )
         raise IllegalArgumentException(
             f"Unsupported partition type: {obj.__class__.__name__}"
