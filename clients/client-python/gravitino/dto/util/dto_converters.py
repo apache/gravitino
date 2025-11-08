@@ -33,6 +33,7 @@ from gravitino.api.rel.expressions.transforms.transforms import Transforms
 from gravitino.api.rel.expressions.unparsed_expression import UnparsedExpression
 from gravitino.api.rel.indexes.index import Index
 from gravitino.api.rel.indexes.indexes import Indexes
+from gravitino.api.rel.partitions.identity_partition import IdentityPartition
 from gravitino.api.rel.partitions.list_partition import ListPartition
 from gravitino.api.rel.partitions.partition import Partition
 from gravitino.api.rel.partitions.range_partition import RangePartition
@@ -60,6 +61,7 @@ from gravitino.dto.rel.partitioning.range_partitioning_dto import RangePartition
 from gravitino.dto.rel.partitioning.truncate_partitioning_dto import (
     TruncatePartitioningDTO,
 )
+from gravitino.dto.rel.partitions.identity_partition_dto import IdentityPartitionDTO
 from gravitino.dto.rel.partitions.partition_dto import PartitionDTO
 from gravitino.dto.rel.partitions.range_partition_dto import RangePartitionDTO
 from gravitino.dto.rel.sort_order_dto import SortOrderDTO
@@ -377,3 +379,17 @@ class DTOConverters:
                 ),
                 properties=range_partition.properties(),
             )
+        if isinstance(obj, IdentityPartition):
+            identity_partition = cast(IdentityPartition, obj)
+            return IdentityPartitionDTO(
+                name=identity_partition.name(),
+                values=[
+                    cast(LiteralDTO, DTOConverters.to_function_arg(v))
+                    for v in identity_partition.values()
+                ],
+                field_names=identity_partition.field_names(),
+                properties=identity_partition.properties(),
+            )
+        raise IllegalArgumentException(
+            f"Unsupported partition type: {obj.__class__.__name__}"
+        )
