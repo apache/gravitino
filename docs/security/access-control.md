@@ -267,11 +267,10 @@ DENY `WRITE_FILESET` won‘t deny the `READ_FILESET` operation if the user has t
 
 ### Tag privileges
 
-| Name       | Supports Securable Object | Operation       |
-|------------|---------------------------|-----------------|
-| CREATE_TAG | Metalake                  | Create a tag    |
-| APPLY_TAG  | Metalake, Tag             | Apply a tag     |
-| BROWSE_TAG | Metalake, Tag             | List or get tag |
+| Name       | Supports Securable Object | Operation    |
+|------------|---------------------------|--------------|
+| CREATE_TAG | Metalake                  | Create a tag |
+| APPLY_TAG  | Metalake, Tag             | Apply a tag  |
 
 ## Inheritance Model
 
@@ -1034,9 +1033,9 @@ The following table lists the required privileges for each API.
 | grant privilege                   | `MANAGE_GRANTS` on the metalake or the owner of the securable object                                                                                                                                                                          |
 | revoke privilege                  | `MANAGE_GRANTS` on the metalake or the owner of the securable object                                                                                                                                                                          |
 | set owner                         | The owner of the securable object                                                                                                                                                                                                             |
-| list tags                         | `APPLY_TAG` or `BROWSE_TAG` on the metalake, the owner of the metalake, or the tag itself.                                                                                                                                                    |
+| list tags                         | `APPLY_TAG` on the metalake, the owner of the metalake, or the tag itself.                                                                                                                                                                    |
 | create tag                        | `CREATE_TAG` on the metalake or the owner of the metalake.                                                                                                                                                                                    |
-| get tag                           | `APPLY_TAG` or `BROWSE_TAG` on the metalake or tag, the owner of the metalake, or the tag itself.                                                                                                                                                            |
+| get tag                           | `APPLY_TAG` on the metalake or tag, the owner of the metalake, or the tag itself.                                                                                                                                                             |
 | alter tag                         | Must be the owner of the metalake or the tag.                                                                                                                                                                                                 |
 | delete tag                        | Must be the owner of the metalake or the tag.                                                                                                                                                                                                 |
 | list objects for tag              | Requires both permission to **get the tag** and permission to **load metadata objects**.                                                                                                                                                      |
