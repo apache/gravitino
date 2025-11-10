@@ -127,7 +127,7 @@ jcasbin = "1.81.0"
 ognl = "3.4.7"
 concurrent-trees = "2.6.0"
 jakarta-validation = "2.0.2"
-aspectj = "1.9.24"
+aspectj = "1.9.25"
 
 [libraries]
 aspectj-aspectjrt = { group = "org.aspectj", name = "aspectjrt", version.ref = "aspectj" }
