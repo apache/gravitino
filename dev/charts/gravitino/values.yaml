@@ -69,6 +69,44 @@ mysql:
     ##
     password: gravitino
 
+## PostgreSQL chart configuration
+## ref: https://github.com/bitnami/charts/blob/master/bitnami/postgresql/values.yaml
+##
+postgresql:
+  ## @param postgresql.enabled Deploy PostgreSQL container(s)
+  ##
+  enabled: false
+  ## Bitnami PostgreSQL image version
+  ## ref: https://hub.docker.com/r/bitnami/postgresql/tags/
+  ## @param image.registry PostgreSQL image registry
+  ## @param image.repository PostgreSQL image repository
+  ## @param image.tag PostgreSQL image tag (immutable tags are recommended)
+  ##
+  image:
+    registry: docker.io
+    repository: bitnamilegacy/postgresql
+    tag: 16.3.0-debian-12-r10
+  auth:
+    ## @param auth.username Name for a custom user to create
+    ##
+    username: gravitino
+    ## @param auth.password Password for the custom user to create
+    ##
+    password: gravitino
+    ## @param auth.database Name for a custom database to create
+    ##
+    database: gravitino
+    ## @param auth.existingSecret Name of existing secret to use for PostgreSQL credentials
+    ## `auth.postgresPassword`, `auth.password`, and `auth.replicationPassword` will be ignored and picked up from this secret
+    ## The secret must contain the keys `postgres-password` (which is the password for "postgres" admin user),
+    ## `password` (which is the password for the custom user to create when `auth.username` is set),
+    ## and `replication-password` (which is the password for replication user).
+    ## The secret might also contains the key `ldap-password` if LDAP is enabled. `ldap.bind_password` will be ignored and
+    ## picked from this secret in this case.
+    ## The value is evaluated as a template.
+    ##
+    existingSecret: ""
+
 ## THE CONFIGURATION FOR Gravitino ENTITY STORE
 ##
 entity:
