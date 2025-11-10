@@ -25,7 +25,7 @@ pandas==2.3.3
 pyarrow==15.0.2
 llama-index==0.12.41
 tenacity==8.3.0
-cachetools==5.5.2
+cachetools==6.2.1
 readerwriterlock==1.0.9
 docker==7.1.0
 pyjwt[crypto]==2.10.1
