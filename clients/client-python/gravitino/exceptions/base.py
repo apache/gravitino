@@ -191,3 +191,15 @@ class NoSuchJobException(NotFoundException):
 
 class ForbiddenException(GravitinoRuntimeException):
     """An exception thrown when a user is forbidden to perform an action."""
+
+
+class NoSuchTableException(NotFoundException):
+    """An exception thrown when a table with specified name is not existed."""
+
+
+class NoSuchPartitionException(NotFoundException):
+    """An exception thrown when a partition with specified name is not existed."""
+
+
+class PartitionAlreadyExistsException(AlreadyExistsException):
+    """An exception thrown when a partition with specified name already exists."""
