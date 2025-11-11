@@ -179,6 +179,9 @@ public abstract class ManagedTableOperations implements TableCatalog {
       return toGenericTable(newTableEntity);
     } catch (NoSuchEntityException e) {
       throw new NoSuchTableException(e, "Table %s does not exist", ident);
+    } catch (EntityAlreadyExistsException e) {
+      throw new IllegalArgumentException(
+          "Failed to rename table " + ident + " due to table already exists: ", e);
     } catch (IOException e) {
       throw new RuntimeException("Failed to alter table " + ident, e);
     }
@@ -367,10 +370,20 @@ public abstract class ManagedTableOperations implements TableCatalog {
         // Remove the old column temporarily, we will insert it back after updating.
         newColumns.remove(oldColumn);
 
-        Optional<String> newName =
-            change instanceof TableChange.RenameColumn rename
-                ? Optional.of(rename.getNewName())
-                : Optional.empty();
+        Optional<String> newName = Optional.empty();
+        if (change instanceof TableChange.RenameColumn rename) {
+          boolean columnExists =
+              newColumns.stream().anyMatch(col -> col.name().equals(rename.getNewName()));
+          if (columnExists) {
+            throw new IllegalArgumentException(
+                String.format(
+                    "Column %s already exists when renaming column %s",
+                    rename.getNewName(), DOT.join(change.fieldName())));
+          }
+
+          newName = Optional.of(rename.getNewName());
+        }
+
         Optional<Expression> newDefaultValue =
             change instanceof TableChange.UpdateColumnDefaultValue updateDefault
                 ? Optional.of(updateDefault.getNewDefaultValue())

@@ -641,6 +641,13 @@ public class TestManagedTableOperations {
                 table1Ident,
                 TableChange.renameColumn(new String[] {"non_existing_col"}, "new_name")));
 
+    // Test rename column to an existing column name
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            tableOperations.alterTable(
+                table1Ident, TableChange.renameColumn(new String[] {"col2"}, "col1_renamed")));
+
     // Test update column default value
     Expression newDefaultValue = Literals.integerLiteral(100);
     Table tableAfterUpdateDefaultValue =
