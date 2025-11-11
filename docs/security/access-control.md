@@ -267,10 +267,10 @@ DENY `WRITE_FILESET` won‘t deny the `READ_FILESET` operation if the user has t
 
 ### Tag privileges
 
-| Name       | Supports Securable Object | Operation    |
-|------------|---------------------------|--------------|
-| CREATE_TAG | Metalake                  | Create a tag |
-| APPLY_TAG  | Metalake, Tag             | Apply a tag  |
+| Name       | Supports Securable Object | Operation                             |
+|------------|---------------------------|---------------------------------------|
+| CREATE_TAG | Metalake                  | Create a tag                          |
+| APPLY_TAG  | Metalake, Tag             | Associate tags with metadata objects. |
 
 ## Inheritance Model
 
