@@ -66,18 +66,16 @@ public class FlinkIcebergRestCatalogIT extends FlinkIcebergCatalogIT {
             TestUtils.assertTableResult(
                 sql("SHOW DATABASES"),
                 ResultKind.SUCCESS_WITH_CONTENT,
-                Row.of("default"),
                 Row.of(schema),
                 Row.of(schema2),
                 Row.of(schema3));
 
             String[] schemas = catalog.asSchemas().listSchemas();
             Arrays.sort(schemas);
-            Assertions.assertEquals(4, schemas.length);
-            Assertions.assertEquals("default", schemas[0]);
-            Assertions.assertEquals(schema, schemas[1]);
-            Assertions.assertEquals(schema2, schemas[2]);
-            Assertions.assertEquals(schema3, schemas[3]);
+            Assertions.assertEquals(3, schemas.length);
+            Assertions.assertEquals(schema, schemas[0]);
+            Assertions.assertEquals(schema2, schemas[1]);
+            Assertions.assertEquals(schema3, schemas[2]);
           } finally {
             catalog.asSchemas().dropSchema(schema, supportDropCascade());
             catalog.asSchemas().dropSchema(schema2, supportDropCascade());
