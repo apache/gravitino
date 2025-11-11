@@ -19,6 +19,8 @@
 
 package org.apache.gravitino.listener.api.event.policy;
 
+import org.apache.gravitino.MetadataObject;
+import org.apache.gravitino.annotation.DeveloperApi;
 import org.apache.gravitino.listener.api.event.OperationType;
 import org.apache.gravitino.utils.MetadataObjectUtil;
 

@@ -19,7 +19,10 @@
 
 package org.apache.gravitino.listener.api.event.policy;
 
+import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.annotation.DeveloperApi;
 import org.apache.gravitino.listener.api.event.OperationType;
+import org.apache.gravitino.policy.PolicyChange;
 
 /** Represents an event that is triggered when an attempt to alter a policy fails. */
 @DeveloperApi
