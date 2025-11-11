@@ -185,7 +185,11 @@ public class LanceCatalogOperations implements LakehouseCatalogOperations {
                 .withProperties(addIndexChange.getProperties())
                 .build();
         addedIndexes.add(index);
+        continue;
       }
+
+      throw new UnsupportedOperationException(
+          "LanceCatalogOperations only supports adding indexes for now.");
     }
 
     TableEntity updatedEntity;
@@ -277,9 +281,7 @@ public class LanceCatalogOperations implements LakehouseCatalogOperations {
   private List<Index> addLanceIndex(String location, List<Index> addedIndexes) {
     List<Index> newIndexes = Lists.newArrayList();
     try (Dataset dataset = Dataset.open(location, new RootAllocator())) {
-      // For Lance, we only support adding indexes, so in fact, we can't handle drop index here.
       for (Index index : addedIndexes) {
-        // IndexType indexType = IndexType.valueOf(index.type().name().toUpperCase(Locale.ROOT));
         IndexType indexType = getIndexType(index);
         IndexParams indexParams = generateIndexParams(index);
         dataset.createIndex(
@@ -307,6 +309,8 @@ public class LanceCatalogOperations implements LakehouseCatalogOperations {
     return switch (indexType) {
         // API only supports these index types for now, but there are more index types in Lance.
       case SCALAR, BTREE, INVERTED, BITMAP -> indexType;
+        // According to real test, we need to map IVF_SQ/IVF_PQ/IVF_HNSW_SQ to VECTOR type in Lance,
+        // or it will throw exception.
       case IVF_FLAT, IVF_PQ, IVF_HNSW_SQ -> IndexType.VECTOR;
       default -> throw new IllegalArgumentException("Unsupported index type: " + indexType);
     };

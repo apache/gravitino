@@ -330,7 +330,8 @@ public class GravitinoLanceTableOperations implements LanceTableOperations {
                   content.setIndexName(index.name());
 
                   // Currently there is no API to get index status, setting all indexes to READY for
-                  // simplicity.
+                  // simplicity. So please note that this status may not reflect the actual index
+                  // status.
                   content.setIndexUuid(index.name());
                   content.setStatus("READY");
                   return content;
@@ -344,7 +345,8 @@ public class GravitinoLanceTableOperations implements LanceTableOperations {
   @Override
   public DescribeTableIndexStatsResponse describeTableIndexStats(
       String tableId, String delimiter, String indexId, DescribeTableIndexStatsRequest request) {
-    // Do not support now as Lance dataset does not have index stats API.
+    // Do not support now as Lance dataset index creation is an asynchronous operation, and Lance
+    // dataset does not have index stats API now.
     throw new UnsupportedOperationException("Describing table index stats is not supported now.");
   }
 
