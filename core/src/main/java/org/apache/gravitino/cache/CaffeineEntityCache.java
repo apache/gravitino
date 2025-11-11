@@ -373,8 +373,12 @@ public class CaffeineEntityCache extends BaseEntityCache {
                 : EntityCacheRelationKey.of(identifier, type, relTypeOpt.get()).toString());
 
     if (valueForExactKey == null) {
-      // No key to remove
-      return false;
+      // It means the key does not exist in the cache. However, we still need to handle some cases.
+      // For example, we have store a role entity in the cache and entity to role in the reverse
+      // index. This is: key -> role, reverse index: securable object -> role. When will update the
+      // securable object, we need to invalidate the role from the cache even the securable object
+      // is not in the cache.
+      valueForExactKey = EntityCacheKey.of(identifier, type);
     }
 
     Set<EntityCacheKey> visited = Sets.newHashSet();
@@ -400,18 +404,7 @@ public class CaffeineEntityCache extends BaseEntityCache {
           Lists.newArrayList(
               reverseIndex.getValuesForKeysStartingWith(
                   currentKeyToRemove.identifier().toString()));
-      reverseKeysToRemove.forEach(
-          key -> {
-            // Remove from reverse index
-            // Convert EntityCacheRelationKey to EntityCacheKey
-            key.stream()
-                .forEach(
-                    k ->
-                        reverseIndex
-                            .getValuesForKeysStartingWith(k.toString())
-                            .forEach(rsk -> reverseIndex.remove(rsk.toString())));
-          });
-
+      reverseIndex.remove(currentKeyToRemove);
       Set<EntityCacheKey> toAdd =
           Sets.newHashSet(
               reverseKeysToRemove.stream().flatMap(List::stream).collect(Collectors.toList()));
