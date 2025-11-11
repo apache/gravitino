@@ -377,10 +377,14 @@ public class CaffeineEntityCache extends BaseEntityCache {
       return false;
     }
 
+    Set<EntityCacheKey> visited = Sets.newHashSet();
     queue.offer(valueForExactKey);
-
     while (!queue.isEmpty()) {
       EntityCacheKey currentKeyToRemove = queue.poll();
+      if (visited.contains(currentKeyToRemove)) {
+        continue;
+      }
+      visited.add(currentKeyToRemove);
 
       cacheData.invalidate(currentKeyToRemove);
       cacheIndex.remove(currentKeyToRemove.toString());
@@ -392,7 +396,7 @@ public class CaffeineEntityCache extends BaseEntityCache {
       queue.addAll(relatedEntityKeysToRemove);
 
       // Look up from reverse index to go to next depth
-      List<EntityCacheKey> reverseKeysToRemove =
+      List<List<EntityCacheKey>> reverseKeysToRemove =
           Lists.newArrayList(
               reverseIndex.getValuesForKeysStartingWith(
                   currentKeyToRemove.identifier().toString()));
@@ -400,15 +404,18 @@ public class CaffeineEntityCache extends BaseEntityCache {
           key -> {
             // Remove from reverse index
             // Convert EntityCacheRelationKey to EntityCacheKey
-            reverseIndex
-                .getKeysStartingWith(key.toString())
+            key.stream()
                 .forEach(
-                    reverseIndexKey -> {
-                      reverseIndex.remove(reverseIndexKey.toString());
-                    });
+                    k ->
+                        reverseIndex
+                            .getValuesForKeysStartingWith(k.toString())
+                            .forEach(rsk -> reverseIndex.remove(rsk.toString())));
           });
 
-      queue.addAll(reverseKeysToRemove);
+      Set<EntityCacheKey> toAdd =
+          Sets.newHashSet(
+              reverseKeysToRemove.stream().flatMap(List::stream).collect(Collectors.toList()));
+      queue.addAll(toAdd);
     }
 
     return true;
