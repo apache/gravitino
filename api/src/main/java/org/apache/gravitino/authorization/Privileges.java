@@ -135,6 +135,8 @@ public class Privileges {
         return UseModel.allow();
       case CREATE_TAG:
         return CreateTag.allow();
+      case APPLY_TAG:
+        return ApplyTag.allow();
       default:
         throw new IllegalArgumentException("Doesn't support the privilege: " + name);
     }
@@ -216,7 +218,10 @@ public class Privileges {
         return CreateModelVersion.deny();
       case USE_MODEL:
         return UseModel.deny();
-
+      case CREATE_TAG:
+        return CreateTag.deny();
+      case APPLY_TAG:
+        return ApplyTag.deny();
       default:
         throw new IllegalArgumentException("Doesn't support the privilege: " + name);
     }
@@ -920,6 +925,42 @@ public class Privileges {
     @Override
     public boolean canBindTo(MetadataObject.Type type) {
       return type == MetadataObject.Type.METALAKE;
+    }
+  }
+
+  /** The privilege to apply tag to object. */
+  public static final class ApplyTag extends GenericPrivilege<ApplyTag> {
+
+    private static final ApplyTag ALLOW_INSTANCE = new ApplyTag(Condition.ALLOW, Name.CREATE_TAG);
+    private static final ApplyTag DENY_INSTANCE = new ApplyTag(Condition.DENY, Name.CREATE_TAG);
+
+    /**
+     * Constructor for GenericPrivilege.
+     *
+     * @param condition the condition of the privilege
+     * @param name the name of the privilege
+     */
+    ApplyTag(Condition condition, Name name) {
+      super(condition, name);
+    }
+
+    /**
+     * @return The instance with allow condition of the privilege.
+     */
+    public static ApplyTag allow() {
+      return ALLOW_INSTANCE;
+    }
+
+    /**
+     * @return The instance with deny condition of the privilege.
+     */
+    public static ApplyTag deny() {
+      return DENY_INSTANCE;
+    }
+
+    @Override
+    public boolean canBindTo(MetadataObject.Type type) {
+      return type == MetadataObject.Type.METALAKE || type == MetadataObject.Type.TAG;
     }
   }
 }

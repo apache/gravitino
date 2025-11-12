@@ -59,6 +59,7 @@ class TestGvfsWithS3Credential(TestGvfsWithS3):
     s3_role_arn = os.environ.get("S3_STS_ROLE_ARN")
 
     metalake_name: str = "TestGvfsWithS3Credential_metalake" + str(randint(1, 10000))
+    catalog_name: str = "test_gvfs_catalog" + str(randint(1, 10000))
 
     def setUp(self):
         self.options = {
