@@ -34,6 +34,7 @@ import static org.apache.gravitino.Configs.STORE_DELETE_AFTER_TIME;
 import static org.apache.gravitino.Configs.VERSION_RETENTION_COUNT;
 import static org.apache.gravitino.file.Fileset.LOCATION_NAME_UNKNOWN;
 import static org.apache.gravitino.storage.relational.TestJDBCBackend.createRoleEntity;
+import static org.apache.gravitino.storage.relational.TestJDBCBackend.createUserEntity;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
@@ -65,6 +66,7 @@ import org.apache.gravitino.EntityStoreFactory;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.authorization.AuthorizationUtils;
+import org.apache.gravitino.authorization.Privilege.Condition;
 import org.apache.gravitino.authorization.Privileges;
 import org.apache.gravitino.authorization.Role;
 import org.apache.gravitino.authorization.SecurableObject;
@@ -2639,6 +2641,154 @@ public class TestEntityStorage {
       List<SecurableObject> securableObjects = newRow.securableObjects();
       Assertions.assertEquals(1, securableObjects.size());
       Assertions.assertEquals("newCatalogName", securableObjects.get(0).name());
+
+      // Now try to create a schema and a fileset under the updated catalog
+      SchemaEntity schema =
+          createSchemaEntity(
+              RandomIdGenerator.INSTANCE.nextId(),
+              Namespace.of("metalake", "newCatalogName"),
+              "schema",
+              auditInfo);
+
+      store.put(schema, false);
+      FilesetEntity fileset =
+          createFilesetEntity(
+              RandomIdGenerator.INSTANCE.nextId(),
+              Namespace.of("metalake", "newCatalogName", "schema"),
+              "fileset",
+              auditInfo);
+      store.put(fileset, false);
+
+      // Now try to create two roles: one can read_fileset, another can write_fileset
+      SecurableObject catalogObject =
+          SecurableObjects.ofCatalog("newCatalogName", Lists.newArrayList());
+      SecurableObject schemaObject =
+          SecurableObjects.ofSchema(catalogObject, "schema", Lists.newArrayList());
+      SecurableObject securableFileset01 =
+          SecurableObjects.ofFileset(
+              schemaObject, "fileset", Lists.newArrayList(Privileges.ReadFileset.allow()));
+      SecurableObject securableFileset02 =
+          SecurableObjects.ofFileset(
+              schemaObject, "fileset", Lists.newArrayList(Privileges.WriteFileset.allow()));
+
+      RoleEntity readRole =
+          RoleEntity.builder()
+              .withId(RandomIdGenerator.INSTANCE.nextId())
+              .withName("roleReadFileset")
+              .withNamespace(AuthorizationUtils.ofRoleNamespace("metalake"))
+              .withProperties(null)
+              .withAuditInfo(auditInfo)
+              .withSecurableObjects(Lists.newArrayList(securableFileset01))
+              .build();
+      store.put(readRole, false);
+
+      RoleEntity writeRole =
+          RoleEntity.builder()
+              .withId(RandomIdGenerator.INSTANCE.nextId())
+              .withName("roleWriteFileset")
+              .withNamespace(AuthorizationUtils.ofRoleNamespace("metalake"))
+              .withProperties(null)
+              .withAuditInfo(auditInfo)
+              .withSecurableObjects(Lists.newArrayList(securableFileset02))
+              .build();
+      store.put(writeRole, false);
+
+      // Load the two roles and verify their securable objects
+      Role loadedReadRole =
+          store.get(readRole.nameIdentifier(), Entity.EntityType.ROLE, RoleEntity.class);
+      Role loadedWriteRole =
+          store.get(writeRole.nameIdentifier(), Entity.EntityType.ROLE, RoleEntity.class);
+      Assertions.assertEquals(1, loadedReadRole.securableObjects().size());
+      Assertions.assertEquals(
+          "newCatalogName.schema.fileset", loadedReadRole.securableObjects().get(0).fullName());
+      Assertions.assertEquals(1, loadedWriteRole.securableObjects().size());
+      Assertions.assertEquals(
+          "newCatalogName.schema.fileset", loadedReadRole.securableObjects().get(0).fullName());
+      Assertions.assertEquals(
+          Condition.ALLOW,
+          loadedReadRole.securableObjects().get(0).privileges().get(0).condition());
+      Assertions.assertEquals(
+          Condition.ALLOW,
+          loadedWriteRole.securableObjects().get(0).privileges().get(0).condition());
+
+      // first try to rename the fileset to fileset_new
+      store.update(
+          fileset.nameIdentifier(),
+          FilesetEntity.class,
+          Entity.EntityType.FILESET,
+          e ->
+              createFilesetEntity(
+                  fileset.id(), fileset.namespace(), "fileset_new", fileset.auditInfo()));
+
+      // try to load the two roles again, the securable objects should reflect the updated fileset
+      // name
+      loadedReadRole =
+          store.get(readRole.nameIdentifier(), Entity.EntityType.ROLE, RoleEntity.class);
+      loadedWriteRole =
+          store.get(writeRole.nameIdentifier(), Entity.EntityType.ROLE, RoleEntity.class);
+
+      Assertions.assertEquals(1, loadedReadRole.securableObjects().size());
+      Assertions.assertEquals(
+          "newCatalogName.schema.fileset_new", loadedReadRole.securableObjects().get(0).fullName());
+      Assertions.assertEquals(1, loadedWriteRole.securableObjects().size());
+      Assertions.assertEquals(
+          "newCatalogName.schema.fileset_new", loadedReadRole.securableObjects().get(0).fullName());
+      Assertions.assertEquals(
+          Condition.ALLOW,
+          loadedReadRole.securableObjects().get(0).privileges().get(0).condition());
+      Assertions.assertEquals(
+          Condition.ALLOW,
+          loadedWriteRole.securableObjects().get(0).privileges().get(0).condition());
+
+      // Now try to rename schema to schema_new
+      store.update(
+          NameIdentifier.of("metalake", "newCatalogName", "schema"),
+          SchemaEntity.class,
+          Entity.EntityType.SCHEMA,
+          e ->
+              createSchemaEntity(
+                  schema.id(),
+                  Namespace.of("metalake", "newCatalogName"),
+                  "schema_new",
+                  schema.auditInfo()));
+      // try to load the two roles again, the securable objects should reflect the updated schema
+      loadedReadRole =
+          store.get(readRole.nameIdentifier(), Entity.EntityType.ROLE, RoleEntity.class);
+      loadedWriteRole =
+          store.get(writeRole.nameIdentifier(), Entity.EntityType.ROLE, RoleEntity.class);
+      Assertions.assertEquals(1, loadedReadRole.securableObjects().size());
+      Assertions.assertEquals(
+          "newCatalogName.schema_new.fileset_new",
+          loadedReadRole.securableObjects().get(0).fullName());
+      Assertions.assertEquals(1, loadedWriteRole.securableObjects().size());
+      Assertions.assertEquals(
+          "newCatalogName.schema_new.fileset_new",
+          loadedReadRole.securableObjects().get(0).fullName());
+
+      // now create a user1 and assign the readRole to the user
+      UserEntity user1 =
+          createUserEntity(
+              RandomIdGenerator.INSTANCE.nextId(),
+              AuthorizationUtils.ofUserNamespace("metalake"),
+              "user1",
+              auditInfo);
+      store.put(user1, false);
+
+      // Now try to drop the fileset
+      store.delete(
+          NameIdentifier.of("metalake", "newCatalogName", "schema_new", "fileset_new"),
+          Entity.EntityType.FILESET);
+      Assertions.assertFalse(store.exists(fileset.nameIdentifier(), Entity.EntityType.FILESET));
+
+      // Now try to load the two roles again, the securable objects should be empty
+      loadedReadRole =
+          store.get(readRole.nameIdentifier(), Entity.EntityType.ROLE, RoleEntity.class);
+      loadedWriteRole =
+          store.get(writeRole.nameIdentifier(), Entity.EntityType.ROLE, RoleEntity.class);
+
+      Assertions.assertEquals(0, loadedReadRole.securableObjects().size());
+      Assertions.assertEquals(0, loadedWriteRole.securableObjects().size());
+
       destroy(type);
     }
   }
