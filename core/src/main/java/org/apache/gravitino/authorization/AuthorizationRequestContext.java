@@ -77,11 +77,9 @@ public class AuthorizationRequestContext {
   }
 
   public void loadRole(Runnable runnable) {
-    if (hasLoadRole.get()) {
-      return;
+    if (hasLoadRole.compareAndSet(false, true)) {
+      runnable.run();
     }
-    runnable.run();
-    hasLoadRole.set(true);
   }
 
   public static class AuthorizationKey {
