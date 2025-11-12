@@ -404,6 +404,18 @@ public class CaffeineEntityCache extends BaseEntityCache {
           Lists.newArrayList(
               reverseIndex.getValuesForKeysStartingWith(
                   currentKeyToRemove.identifier().toString()));
+      reverseKeysToRemove.forEach(
+          key -> {
+            // Remove from reverse index
+            // Convert EntityCacheRelationKey to EntityCacheKey
+            key.stream()
+                .forEach(
+                    k ->
+                        reverseIndex
+                            .getValuesForKeysStartingWith(k.toString())
+                            .forEach(rsk -> reverseIndex.remove(rsk.toString())));
+          });
+
       reverseIndex.remove(currentKeyToRemove);
       Set<EntityCacheKey> toAdd =
           Sets.newHashSet(
