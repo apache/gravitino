@@ -366,10 +366,10 @@ public class CaffeineEntityCache extends BaseEntityCache {
       Optional<SupportsRelationOperations.Type> relTypeOpt) {
     Queue<EntityCacheKey> queue = new ArrayDeque<>();
 
-    EntityCacheKey valueForExactKey =
+    EntityCacheRelationKey valueForExactKey =
         cacheIndex.getValueForExactKey(
             relTypeOpt.isEmpty()
-                ? EntityCacheKey.of(identifier, type).toString()
+                ? EntityCacheRelationKey.of(identifier, type).toString()
                 : EntityCacheRelationKey.of(identifier, type, relTypeOpt.get()).toString());
 
     if (valueForExactKey == null) {
@@ -378,7 +378,7 @@ public class CaffeineEntityCache extends BaseEntityCache {
       // index. This is: key -> role, reverse index: securable object -> role. When will update the
       // securable object, we need to invalidate the role from the cache even the securable object
       // is not in the cache.
-      valueForExactKey = EntityCacheKey.of(identifier, type);
+      valueForExactKey = EntityCacheRelationKey.of(identifier, type, relTypeOpt.orElse(null));
     }
 
     Set<EntityCacheKey> visited = Sets.newHashSet();
