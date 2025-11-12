@@ -278,7 +278,7 @@ public class TagOperations {
 
             MetadataObjectDTO[] objectDTOs =
                 Arrays.stream(objects).map(DTOConverters::toDTO).toArray(MetadataObjectDTO[]::new);
-            // TODO filter by can-access-metadata
+            // TODO filter by can-access-metadata, MetadataFilterHelper can not support now
             return Utils.ok(new MetadataObjectListResponse(objectDTOs));
           });
 
@@ -320,7 +320,8 @@ public class TagOperations {
   @Produces("application/vnd.gravitino.v1+json")
   @Timed(name = "get-object-tag." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "get-object-tag", absolute = true)
-  @AuthorizationExpression(expression = "(METALAKE::OWNER || TAG::OWNER ) && CAN_ACCESS_METADATA")
+  @AuthorizationExpression(
+      expression = "(METALAKE::OWNER || TAG::OWNER || ANY_APPLY_TAG ) && CAN_ACCESS_METADATA")
   public Response getTagForObject(
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
           String metalake,

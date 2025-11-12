@@ -274,6 +274,10 @@ public class AuthorizationExpressionConverter {
                 + "&& !(ANY(DENY_WRITE_FILESET, METALAKE, CATALOG, SCHEMA, FILESET)))");
     expression =
         expression.replaceAll(
+            "ANY_APPLY_TAG",
+            "((ANY(APPLY_TAG, METALAKE, TAG))" + "&& !(ANY(DENY_APPLY_TAG, METALAKE, TAG)))");
+    expression =
+        expression.replaceAll(
             CAN_SET_OWNER,
             "authorizer.hasSetOwnerPermission(p_metalake,p_metadataObjectType,p_fullName,authorizationContext)");
     expression =

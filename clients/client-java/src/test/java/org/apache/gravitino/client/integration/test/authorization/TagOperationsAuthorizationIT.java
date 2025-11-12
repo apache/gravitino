@@ -137,6 +137,7 @@ public class TagOperationsAuthorizationIT extends BaseRestApiAuthorizationIT {
         MetadataObjects.of(ImmutableList.of(METALAKE), MetadataObject.Type.METALAKE),
         ImmutableSet.of(Privileges.CreateTag.allow()));
     normalUserClient.loadMetalake(METALAKE).createTag("tag2", "tag2", Map.of());
+    client.loadMetalake(METALAKE).createTag("tag3", "tag3", Map.of());
   }
 
   @Test
@@ -157,7 +158,7 @@ public class TagOperationsAuthorizationIT extends BaseRestApiAuthorizationIT {
   public void testLoadTag() {
     GravitinoMetalake gravitinoMetalake = client.loadMetalake(METALAKE);
     String[] tagsLoadByAdmin = gravitinoMetalake.listTags();
-    assertArrayEquals(new String[] {"tag1", "tag2"}, tagsLoadByAdmin);
+    assertArrayEquals(new String[] {"tag1", "tag2", "tag3"}, tagsLoadByAdmin);
     GravitinoMetalake gravitinoMetalakeLoadByNormalUser = normalUserClient.loadMetalake(METALAKE);
     String[] tagsLoadByNormalUser = gravitinoMetalakeLoadByNormalUser.listTags();
     assertArrayEquals(new String[] {"tag2"}, tagsLoadByNormalUser);
@@ -177,6 +178,7 @@ public class TagOperationsAuthorizationIT extends BaseRestApiAuthorizationIT {
     GravitinoMetalake gravitinoMetalake = client.loadMetalake(METALAKE);
     gravitinoMetalake.getTag("tag1");
     gravitinoMetalake.getTag("tag2");
+    gravitinoMetalake.getTag("tag3");
   }
 
   @Test
@@ -239,6 +241,17 @@ public class TagOperationsAuthorizationIT extends BaseRestApiAuthorizationIT {
         .loadTable(NameIdentifier.of(SCHEMA, "table1"))
         .supportsTags()
         .associateTags(new String[] {"tag1"}, null);
+    gravitinoMetalake.grantPrivilegesToRole(
+        role,
+        MetadataObjects.of(ImmutableList.of("tag3"), MetadataObject.Type.TAG),
+        ImmutableList.of(Privileges.ApplyTag.allow()));
+    normalUserClient
+        .loadMetalake(METALAKE)
+        .loadCatalog(CATALOG)
+        .asTableCatalog()
+        .loadTable(NameIdentifier.of(SCHEMA, "table1"))
+        .supportsTags()
+        .associateTags(new String[] {"tag3"}, null);
   }
 
   @Test
@@ -253,7 +266,7 @@ public class TagOperationsAuthorizationIT extends BaseRestApiAuthorizationIT {
             .supportsTags();
     String[] tagsLoadByAdmin = tableSupportTag.listTags();
     Arrays.sort(tagsLoadByAdmin);
-    assertArrayEquals(new String[] {"tag1", "tag2"}, tagsLoadByAdmin);
+    assertArrayEquals(new String[] {"tag1", "tag2", "tag3"}, tagsLoadByAdmin);
     GravitinoMetalake gravitinoMetalakeByNormalUser = normalUserClient.loadMetalake(METALAKE);
     SupportsTags tableSupportTagByNormalUser =
         gravitinoMetalakeByNormalUser
@@ -262,7 +275,7 @@ public class TagOperationsAuthorizationIT extends BaseRestApiAuthorizationIT {
             .loadTable(NameIdentifier.of(SCHEMA, "table1"))
             .supportsTags();
     String[] tagsLoadByNormalUser = tableSupportTagByNormalUser.listTags();
-    assertArrayEquals(new String[] {"tag2"}, tagsLoadByNormalUser);
+    assertArrayEquals(new String[] {"tag2", "tag3"}, tagsLoadByNormalUser);
   }
 
   @Test

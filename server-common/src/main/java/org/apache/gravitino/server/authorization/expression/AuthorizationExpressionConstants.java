@@ -90,5 +90,9 @@ public class AuthorizationExpressionConstants {
 
   public static final String CAN_ACCESS_METADATA = "CAN_ACCESS_METADATA";
 
-  public static final String loadTagAuthorizationExpression = "METALAKE::OWNER || TAG::OWNER";
+  public static final String loadTagAuthorizationExpression =
+      "METALAKE::OWNER || TAG::OWNER || ANY_APPLY_TAG";
+
+  public static final String applyTagAuthorizationExpression =
+      "METALAKE::OWNER || TAG::OWNER || ANY_APPLY_TAG";
 }

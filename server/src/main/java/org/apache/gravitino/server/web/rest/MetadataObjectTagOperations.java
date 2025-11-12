@@ -275,7 +275,8 @@ public class MetadataObjectTagOperations {
                       tag -> {
                         boolean result =
                             new AuthorizationExpressionEvaluator(
-                                    "METALAKE::OWNER || TAG::OWNER",
+                                    AuthorizationExpressionConstants
+                                        .applyTagAuthorizationExpression,
                                     GravitinoAuthorizerProvider.getInstance()
                                         .getGravitinoAuthorizer())
                                 .evaluate(
@@ -301,13 +302,6 @@ public class MetadataObjectTagOperations {
                 tagDispatcher.associateTagsForMetadataObject(
                     metalake, object, request.getTagsToAdd(), request.getTagsToRemove());
             tagNames = tagNames == null ? new String[0] : tagNames;
-            tagNames =
-                MetadataFilterHelper.filterByExpression(
-                    metalake,
-                    AuthorizationExpressionConstants.loadTagAuthorizationExpression,
-                    Entity.EntityType.TAG,
-                    tagNames,
-                    tagName -> NameIdentifierUtil.ofTag(metalake, tagName));
             LOG.info(
                 "Associated tags: {} for object type: {}, full name: {} under metalake: {}",
                 Arrays.toString(tagNames),
