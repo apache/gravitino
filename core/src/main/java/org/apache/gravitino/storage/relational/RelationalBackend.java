@@ -30,6 +30,7 @@ import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.SupportsRelationOperations;
+import org.apache.gravitino.cache.EntityCache;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 
 /** Interface defining the operations for a Relation Backend. */
@@ -41,6 +42,13 @@ public interface RelationalBackend extends Closeable, SupportsRelationOperations
    * @param config The configuration for the backend.
    */
   void initialize(Config config);
+
+  /**
+   * Initializes the Relational Backend environment with the provided configuration and cache.
+   * @param config The configuration for the backend.
+   * @param cache The entity cache to be used by the backend.
+   */
+  void initialize(Config config, EntityCache cache);
 
   /**
    * Lists the entities associated with the given parent namespace and entityType

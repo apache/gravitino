@@ -27,6 +27,7 @@ import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.meta.StatisticEntity;
 import org.apache.gravitino.metrics.Monitored;
+import org.apache.gravitino.storage.relational.helper.MetadataObjectIds;
 import org.apache.gravitino.storage.relational.mapper.StatisticMetaMapper;
 import org.apache.gravitino.storage.relational.po.StatisticPO;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
@@ -51,16 +52,13 @@ public class StatisticMetaService {
       baseMetricName = "listStatisticsByEntity")
   public List<StatisticEntity> listStatisticsByEntity(
       NameIdentifier identifier, Entity.EntityType type) {
-    long metalakeId =
-        MetalakeMetaService.getInstance()
-            .getMetalakeIdByName(NameIdentifierUtil.getMetalake(identifier));
     MetadataObject object = NameIdentifierUtil.toMetadataObject(identifier, type);
-    long entityId =
-        MetadataObjectService.getMetadataObjectId(metalakeId, object.fullName(), object.type());
+    MetadataObjectIds metadataObjectIds =
+        MetadataObjectService.getMetadataObjectId(NameIdentifierUtil.getMetalake(identifier), object.fullName(), object.type());
     List<StatisticPO> statisticPOs =
         SessionUtils.getWithoutCommit(
             StatisticMetaMapper.class,
-            mapper -> mapper.listStatisticPOsByEntityId(metalakeId, entityId));
+            mapper -> mapper.listStatisticPOsByEntityId(metadataObjectIds.getMetalakeId(), metadataObjectIds.getObjectId()));
     return statisticPOs.stream().map(StatisticPO::fromStatisticPO).collect(Collectors.toList());
   }
 
@@ -74,13 +72,11 @@ public class StatisticMetaService {
     }
 
     String metalake = NameIdentifierUtil.getMetalake(entity);
-    Long metalakeId = MetalakeMetaService.getInstance().getMetalakeIdByName(metalake);
     MetadataObject object = NameIdentifierUtil.toMetadataObject(entity, type);
-    Long entityId =
-        MetadataObjectService.getMetadataObjectId(metalakeId, object.fullName(), object.type());
+    MetadataObjectIds metadataObjectIds = MetadataObjectService.getMetadataObjectId(metalake, object.fullName(), object.type());
 
     List<StatisticPO> pos =
-        StatisticPO.initializeStatisticPOs(statisticEntities, metalakeId, entityId, object.type());
+        StatisticPO.initializeStatisticPOs(statisticEntities, metadataObjectIds.getMetalakeId(), metadataObjectIds.getObjectId(), object.type());
     SessionUtils.doWithCommit(
         StatisticMetaMapper.class,
         mapper -> mapper.batchInsertStatisticPOsOnDuplicateKeyUpdate(pos));
@@ -94,12 +90,9 @@ public class StatisticMetaService {
     if (statisticNames == null || statisticNames.isEmpty()) {
       return 0;
     }
-    Long metalakeId =
-        MetalakeMetaService.getInstance()
-            .getMetalakeIdByName(NameIdentifierUtil.getMetalake(identifier));
     MetadataObject object = NameIdentifierUtil.toMetadataObject(identifier, type);
     Long entityId =
-        MetadataObjectService.getMetadataObjectId(metalakeId, object.fullName(), object.type());
+        MetadataObjectService.getMetadataObjectId(NameIdentifierUtil.getMetalake(identifier), object.fullName(), object.type()).getObjectId();
 
     return SessionUtils.doWithCommitAndFetchResult(
         StatisticMetaMapper.class,

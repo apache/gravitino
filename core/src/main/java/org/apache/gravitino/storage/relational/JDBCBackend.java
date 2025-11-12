@@ -40,6 +40,7 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.SupportsRelationOperations;
 import org.apache.gravitino.UnsupportedEntityTypeException;
+import org.apache.gravitino.cache.EntityCache;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.CatalogEntity;
@@ -64,6 +65,7 @@ import org.apache.gravitino.storage.relational.service.FilesetMetaService;
 import org.apache.gravitino.storage.relational.service.GroupMetaService;
 import org.apache.gravitino.storage.relational.service.JobMetaService;
 import org.apache.gravitino.storage.relational.service.JobTemplateMetaService;
+import org.apache.gravitino.storage.relational.service.MetadataObjectService;
 import org.apache.gravitino.storage.relational.service.MetalakeMetaService;
 import org.apache.gravitino.storage.relational.service.ModelMetaService;
 import org.apache.gravitino.storage.relational.service.ModelVersionMetaService;
@@ -96,14 +98,21 @@ public class JDBCBackend implements RelationalBackend {
 
   // Database instance of this JDBCBackend.
   private JDBCDatabase jdbcDatabase;
+  private EntityCache cache;
 
   /** Initialize the jdbc backend instance. */
   @Override
   public void initialize(Config config) {
     jdbcDatabase = startJDBCDatabaseIfNecessary(config);
-
+    MetadataObjectService.setCache(cache);
     SqlSessionFactoryHelper.getInstance().init(config);
     SQLExceptionConverterFactory.initConverter(config);
+  }
+
+  @Override
+  public void initialize(Config config, EntityCache cache) {
+    this.cache = cache;
+    initialize(config);
   }
 
   @Override

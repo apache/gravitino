@@ -179,10 +179,9 @@ public class TagMetaService {
 
     List<TagPO> tagPOs = null;
     try {
-      Long metalakeId = MetalakeMetaService.getInstance().getMetalakeIdByName(metalake);
       Long metadataObjectId =
           MetadataObjectService.getMetadataObjectId(
-              metalakeId, metadataObject.fullName(), metadataObject.type());
+              metalake, metadataObject.fullName(), metadataObject.type()).getObjectId();
 
       tagPOs =
           SessionUtils.getWithoutCommit(
@@ -211,10 +210,9 @@ public class TagMetaService {
 
     TagPO tagPO = null;
     try {
-      Long metalakeId = MetalakeMetaService.getInstance().getMetalakeIdByName(metalake);
       Long metadataObjectId =
           MetadataObjectService.getMetadataObjectId(
-              metalakeId, metadataObject.fullName(), metadataObject.type());
+              metalake, metadataObject.fullName(), metadataObject.type()).getObjectId();
 
       tagPO =
           SessionUtils.getWithoutCommit(
@@ -307,10 +305,9 @@ public class TagMetaService {
     String metalake = objectIdent.namespace().level(0);
 
     try {
-      Long metalakeId = MetalakeMetaService.getInstance().getMetalakeIdByName(metalake);
       Long metadataObjectId =
           MetadataObjectService.getMetadataObjectId(
-              metalakeId, metadataObject.fullName(), metadataObject.type());
+              metalake, metadataObject.fullName(), metadataObject.type()).getObjectId();
 
       // Fetch all the tags need to associate with the metadata object.
       List<String> tagNamesToAdd =

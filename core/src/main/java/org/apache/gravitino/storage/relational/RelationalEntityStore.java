@@ -60,16 +60,16 @@ public class RelationalEntityStore implements EntityStore, SupportsRelationOpera
 
   @Override
   public void initialize(Config config) throws RuntimeException {
+    this.cache =
+            config.get(Configs.CACHE_ENABLED)
+                    ? CacheFactory.getEntityCache(config)
+                    : new NoOpsCache(config);
     this.backend = createRelationalEntityBackend(config);
     this.garbageCollector = new RelationalGarbageCollector(backend, config);
     this.garbageCollector.start();
-    this.cache =
-        config.get(Configs.CACHE_ENABLED)
-            ? CacheFactory.getEntityCache(config)
-            : new NoOpsCache(config);
   }
 
-  private static RelationalBackend createRelationalEntityBackend(Config config) {
+  private RelationalBackend createRelationalEntityBackend(Config config) {
     String backendName = config.get(ENTITY_RELATIONAL_STORE);
     String className =
         RELATIONAL_BACKENDS.getOrDefault(backendName, Configs.DEFAULT_ENTITY_RELATIONAL_STORE);
@@ -77,7 +77,11 @@ public class RelationalEntityStore implements EntityStore, SupportsRelationOpera
     try {
       RelationalBackend relationalBackend =
           (RelationalBackend) Class.forName(className).getDeclaredConstructor().newInstance();
-      relationalBackend.initialize(config);
+      if (config.get(Configs.CACHE_ENABLED)) {
+        relationalBackend.initialize(config, cache);
+      } else {
+        relationalBackend.initialize(config);
+      }
       return relationalBackend;
     } catch (Exception e) {
       LOGGER.error(
