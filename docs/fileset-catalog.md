@@ -21,6 +21,120 @@ Note that Gravitino uses Hadoop 3 dependencies to build Fileset catalog. Theoret
 compatible with both Hadoop 2.x and 3.x, since Gravitino doesn't leverage any new features in
 Hadoop 3. If there's any compatibility issue, please create an [issue](https://github.com/apache/gravitino/issues).
 
+In general, all schemas and filesets under a Fileset Catalog are stored in the same Hadoop cluster,
+under the location specified by the catalog itself.
+
+The example for creating a Fileset is as follows:
+```text
+# create fileset catalog
+curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
+-H "Content-Type: application/json" -d '{
+  "name": "fileset_catalog",
+  "type": "FILESET",
+  "comment": "This is a fileset catalog",
+  "provider": "fileset",
+  "properties": {
+    "location": "hdfs://172.17.0.2:9000/fileset_catalog"
+  }
+}' http://localhost:8090/api/metalakes/test/catalogs
+
+# create a fileset schema under the catalog with inherited properties
+curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
+-H "Content-Type: application/json" -d '{
+  "name": "test_schema",
+  "comment": "This is a schema",
+  "properties": {
+  }
+}' http://localhost:8090/api/metalakes/test/catalogs/fileset_catalog/schemas
+
+# create a fileset under the schema with inherited properties
+curl -X POST -H "Accept: application/vnd.gravitino.v1+json"
+-H "Content-Type: application/json" -d '{
+  "name": "fs1",
+  "comment": "This is an example fileset",
+  "type": "MANAGED",
+  "properties": {
+  }
+}' http://localhost:8090/api/metalakes/test/catalogs/fileset_catalog/schemas/test_schema/filesets
+```
+
+Within a Fileset Catalog, schemas and filesets can automatically inherit configuration properties
+from their parent catalog. For example, the location property can be inherited — a schema can inherit
+the catalog’s location as its base path, and a fileset can in turn inherit the schema’s location as its base path.
+
+The property inheritance priority is as follows: catalog < schema < fileset.
+
+If a fileset needs to use a different storage path, it can specify its own location configuration to
+override the inherited one.
+
+The Fileset Catalog also supports multiple clusters. Each schema and fileset under a catalog can independently
+specify their own cluster locations and connection configurations.
+
+For example, a complex catalog structure might look like this:
+
+```text
+catalog1 -> hdfs://cluster1/catalog1
+    schema1 -> hdfs://cluster1/catalog1/schema1
+        fileset1 -> hdfs://cluster1/catalog1/schema1/fileset1
+        fileset2 -> hdfs://cluster1/catalog1/schema1/fileset2
+    schema2 -> hdfs://cluster2/tmp/schema2
+        fileset3 -> hdfs://cluster2/tmp/schema2/fsd
+        fileset4 -> hdfs://cluster3/customers
+```
+
+In this example, the default location of catalog1 is hdfs://cluster1/catalog1.
+schema1 and its filesets are stored in the same cluster as defined by the catalog (cluster1).
+However, schema2 and its filesets (fileset3, fileset4) are located in different clusters (cluster2 and cluster3, respectively).
+
+
+The example for creating Filesets with different clusteris as follows:
+
+```text
+# create fileset catalog
+curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
+-H "Content-Type: application/json" -d '{
+  "name": "fileset_catalog",
+  "type": "FILESET",
+  "comment": "This is a fileset catalog",
+  "provider": "fileset",
+  "properties": {
+    "location": "hdfs://172.17.0.2:9000/fileset_catalog"
+  }
+}' http://localhost:8090/api/metalakes/test/catalogs
+
+# create a fileset schema under the catalog with inherited properties
+curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
+-H "Content-Type: application/json" -d '{
+  "name": "test_schema",
+  "comment": "This is a schema",
+  "properties": {
+  }
+}' http://localhost:8090/api/metalakes/test/catalogs/fileset_catalog/schemas
+
+
+# create fileset fs1 in the default HDFS cluster
+curl -X POST -H "Accept: application/vnd.gravitino.v1+json"
+-H "Content-Type: application/json" -d '{
+  "name": "fs1",
+  "comment": "This is an example fileset",
+  "type": "MANAGED",
+  "properties": {
+  }
+}' http://localhost:8090/api/metalakes/test/catalogs/fileset_catalog/schemas/test_schema/filesets
+
+# create fileset fs2 in another HDFS cluster
+curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
+-H "Content-Type: application/json" -d '{
+  "name": "fs2",
+  "comment": "This is an example fileset",
+  "type": "MANAGED",
+  "storageLocation": "hdfs://172.17.0.3:9000/tmp/fs2",
+  "properties": {
+    "hdfs.config.resources": "/etc/conf/cluster1/core-site.xml,/etc/conf/cluster1/hdfs-site.xml"
+  }
+}' http://localhost:8090/api/metalakes/test/catalogs/fileset_catalog/schemas/test_schema/filesets
+```
+
 ## Catalog
 
 ### Catalog properties
@@ -45,14 +159,25 @@ Please refer to [Credential vending](./security/credential-vending.md) for more 
 
 Apart from the above properties, to access fileset like HDFS fileset, you need to configure the following extra properties.
 
-| Property Name                                      | Description                                                                                    | Default Value | Required                                                    | Since Version |
-|----------------------------------------------------|------------------------------------------------------------------------------------------------|---------------|-------------------------------------------------------------|---------------|
-| `authentication.impersonation-enable`              | Whether to enable impersonation for the Fileset catalog.                                        | `false`       | No                                                          | 0.5.1         |
-| `authentication.type`                              | The type of authentication for Fileset catalog, currently we only support `kerberos`, `simple`. | `simple`      | No                                                          | 0.5.1         |
-| `authentication.kerberos.principal`                | The principal of the Kerberos authentication                                                   | (none)        | required if the value of `authentication.type` is Kerberos. | 0.5.1         |
-| `authentication.kerberos.keytab-uri`               | The URI of The keytab for the Kerberos authentication.                                         | (none)        | required if the value of `authentication.type` is Kerberos. | 0.5.1         |
-| `authentication.kerberos.check-interval-sec`       | The check interval of Kerberos credential for Fileset catalog.                                  | 60            | No                                                          | 0.5.1         |
-| `authentication.kerberos.keytab-fetch-timeout-sec` | The fetch timeout of retrieving Kerberos keytab from `authentication.kerberos.keytab-uri`.     | 60            | No                                                          | 0.5.1         |
+| Property Name                                      | Description                                                                                       | Default Value | Required                                                    | Since Version |
+|----------------------------------------------------|---------------------------------------------------------------------------------------------------|---------------|-------------------------------------------------------------|---------------|
+| `authentication.impersonation-enable`              | Whether to enable impersonation for the Fileset catalog.                                          | `false`       | No                                                          | 0.5.1         |
+| `authentication.type`                              | The type of authentication for Fileset catalog, currently we only support `kerberos`, `simple`.   | `simple`      | No                                                          | 0.5.1         |
+| `authentication.kerberos.principal`                | The principal of the Kerberos authentication                                                      | (none)        | required if the value of `authentication.type` is Kerberos. | 0.5.1         |
+| `authentication.kerberos.keytab-uri`               | The URI of The keytab for the Kerberos authentication.                                            | (none)        | required if the value of `authentication.type` is Kerberos. | 0.5.1         |
+| `authentication.kerberos.check-interval-sec`       | The check interval of Kerberos credential for Fileset catalog.                                    | 60            | No                                                          | 0.5.1         |
+| `authentication.kerberos.keytab-fetch-timeout-sec` | The fetch timeout of retrieving Kerberos keytab from `authentication.kerberos.keytab-uri`.        | 60            | No                                                          | 0.5.1         |
+| `hdfs.config.resources`                            | The HDFS configuration resources, separated by comma. For example, `hdfs-site.xml,core-site.xml`. | (none)        | No                                                          | 0.5.1         |
+
+The `hdfs.config.resources` property allows users to specify custom HDFS configuration files.
+
+The Gravitino Fileset extends the following properties in the `xxx-site.xml`:
+
+| Property Name                                     | Description                                                             | Default Value | Required                                                    | Since Version |
+|---------------------------------------------------|-------------------------------------------------------------------------|---------------|-------------------------------------------------------------|---------------|
+| hadoop.security.authentication.kerberos.principal | The principal of the Kerberos authentication for HDFS client.           | (none)        | required if the value of `authentication.type` is Kerberos. | 0.1.1         |
+| hadoop.security.authentication.kerberos.keytab    | The keytab file path of the Kerberos authentication for HDFS client.    | (none)        | required if the value of `authentication.type` is Kerberos. | 0.1.1         |
+| hadoop.security.authentication.kerberos.krb5.conf | The krb5.conf file path of the Kerberos authentication for HDFS client. | (none)        | No                                                          | 0.1.1         |
 
 ### Fileset catalog with Cloud Storage
 - For S3, please refer to [Fileset-catalog-with-s3](./fileset-catalog-with-s3.md) for more details.
@@ -113,15 +238,16 @@ The Fileset catalog supports creating, updating, deleting, and listing schema.
 
 ### Schema properties
 
-| Property name                         | Description                                                                                                               | Default value             | Required | Since Version    |
-|---------------------------------------|---------------------------------------------------------------------------------------------------------------------------|---------------------------|----------|------------------|
-| `location`                            | The storage location managed by schema. Its location name is `unknown`. It's also should be a directory or path prefix.   | (none)                    | No       | 0.5.0            |
-| `location-`                           | The property prefix. User can use `location-{name}={path}` to set multiple locations with different names for the schema. | (none)                    | No       | 0.9.0-incubating |
-| `authentication.impersonation-enable` | Whether to enable impersonation for this schema of the Fileset catalog.                                                   | The parent(catalog) value | No       | 0.6.0-incubating |
-| `authentication.type`                 | The type of authentication for this schema of Fileset catalog , currently we only support `kerberos`, `simple`.           | The parent(catalog) value | No       | 0.6.0-incubating |
-| `authentication.kerberos.principal`   | The principal of the Kerberos authentication for this schema.                                                             | The parent(catalog) value | No       | 0.6.0-incubating |
-| `authentication.kerberos.keytab-uri`  | The URI of The keytab for the Kerberos authentication for this schema.                                                    | The parent(catalog) value | No       | 0.6.0-incubating |
-| `credential-providers`                | The credential provider types, separated by comma.                                                                        | (none)                    | No       | 0.8.0-incubating |
+| Property name                           | Description                                                                                                               | Default value             | Required | Since Version    |
+|-----------------------------------------|---------------------------------------------------------------------------------------------------------------------------|---------------------------|----------|------------------|
+| `location`                              | The storage location managed by schema. Its location name is `unknown`. It's also should be a directory or path prefix.   | (none)                    | No       | 0.5.0            |
+| `location-`                             | The property prefix. User can use `location-{name}={path}` to set multiple locations with different names for the schema. | (none)                    | No       | 0.9.0-incubating |
+| `authentication.impersonation-enable`   | Whether to enable impersonation for this schema of the Fileset catalog.                                                   | The parent(catalog) value | No       | 0.6.0-incubating |
+| `authentication.type`                   | The type of authentication for this schema of Fileset catalog , currently we only support `kerberos`, `simple`.           | The parent(catalog) value | No       | 0.6.0-incubating |
+| `authentication.kerberos.principal`     | The principal of the Kerberos authentication for this schema.                                                             | The parent(catalog) value | No       | 0.6.0-incubating |
+| `authentication.kerberos.keytab-uri`    | The URI of The keytab for the Kerberos authentication for this schema.                                                    | The parent(catalog) value | No       | 0.6.0-incubating |
+| `credential-providers`                  | The credential provider types, separated by comma.                                                                        | (none)                    | No       | 0.8.0-incubating |
+| `hdfs.config.resources`                 | The HDFS configuration resources, separated by comma. For example, `hdfs-site.xml,core-site.xml`.                                                                                                                  | (none)          | No       | 0.5.1            |
 
 ### Schema operations
 
@@ -151,6 +277,7 @@ This behavior is skipped in either of these cases:
 | `credential-providers`                | The credential provider types, separated by comma.                                                                   | (none)                                                                                                         | No                                         | No        | 0.8.0-incubating |
 | `placeholder-`                        | Properties that start with `placeholder-` are used to replace placeholders in the location.                          | (none)                                                                                                         | No                                         | Yes       | 0.9.0-incubating |
 | `default-location-name`               | The name of the default location of the fileset, mainly used for GVFS operations without specifying a location name. | When the fileset has only one location, its location name will be automatically selected as the default value. | Yes, if the fileset has multiple locations | Yes       | 0.9.0-incubating |
+| `hdfs.config.resources`               | The HDFS configuration resources, separated by comma. For example, `hdfs-site.xml,core-site.xml`.                                                                                                                  | (none)          | No       | 0.5.1            |
 
 Some properties are reserved and cannot be set by users:
 
