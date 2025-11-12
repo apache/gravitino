@@ -374,10 +374,11 @@ public class CaffeineEntityCache extends BaseEntityCache {
 
     if (valueForExactKey == null) {
       // It means the key does not exist in the cache. However, we still need to handle some cases.
-      // For example, we have store a role entity in the cache and entity to role in the reverse
-      // index. This is: key -> role, reverse index: securable object -> role. When will update the
-      // securable object, we need to invalidate the role from the cache even the securable object
-      // is not in the cache.
+      // For example, we have stored a role entity in the cache and entity to role mapping in the
+      // reverse index. This is: cache data: role identifier -> role entity, reverse index:
+      // the securable object -> role. When we update the securable object, we need to invalidate
+      // the
+      // role entity from the cache though the securable object is not in the cache data.
       valueForExactKey = EntityCacheRelationKey.of(identifier, type, relTypeOpt.orElse(null));
     }
 
