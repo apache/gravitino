@@ -101,4 +101,8 @@ public class TagMetaSQLProviderFactory {
       @Param("metalakeId") Long metalakeId, @Param("name") String name) {
     return getProvider().selectTagMetaByMetalakeIdAndName(metalakeId, name);
   }
+
+  public static String selectTagByTagId(@Param("tagId") Long tagId) {
+    return getProvider().selectTagByTagId(tagId);
+  }
 }

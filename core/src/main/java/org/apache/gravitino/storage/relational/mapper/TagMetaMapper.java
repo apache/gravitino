@@ -76,4 +76,7 @@ public interface TagMetaMapper {
   @DeleteProvider(type = TagMetaSQLProviderFactory.class, method = "deleteTagMetasByLegacyTimeline")
   Integer deleteTagMetasByLegacyTimeline(
       @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit);
+
+  @SelectProvider(type = TagMetaSQLProviderFactory.class, method = "selectTagByTagId")
+  TagPO selectTagByTagId(@Param("tagId") Long tagId);
 }

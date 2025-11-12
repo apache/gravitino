@@ -57,6 +57,7 @@ import org.apache.gravitino.hook.MetalakeHookDispatcher;
 import org.apache.gravitino.hook.ModelHookDispatcher;
 import org.apache.gravitino.hook.SchemaHookDispatcher;
 import org.apache.gravitino.hook.TableHookDispatcher;
+import org.apache.gravitino.hook.TagHookDispatcher;
 import org.apache.gravitino.hook.TopicHookDispatcher;
 import org.apache.gravitino.job.JobManager;
 import org.apache.gravitino.job.JobOperationDispatcher;
@@ -69,7 +70,6 @@ import org.apache.gravitino.listener.JobEventDispatcher;
 import org.apache.gravitino.listener.MetalakeEventDispatcher;
 import org.apache.gravitino.listener.ModelEventDispatcher;
 import org.apache.gravitino.listener.PartitionEventDispatcher;
-import org.apache.gravitino.listener.PolicyEventDispatcher;
 import org.apache.gravitino.listener.SchemaEventDispatcher;
 import org.apache.gravitino.listener.StatisticEventDispatcher;
 import org.apache.gravitino.listener.TableEventDispatcher;
@@ -601,10 +601,11 @@ public class GravitinoEnv {
     this.auxServiceManager.serviceInit(config);
 
     // Create and initialize Tag related modules
-    this.tagDispatcher = new TagEventDispatcher(eventBus, new TagManager(idGenerator, entityStore));
-    // Create and initialize Policy related modules
-    this.policyDispatcher =
-        new PolicyEventDispatcher(eventBus, new PolicyManager(idGenerator, entityStore));
+    TagEventDispatcher tagEventDispatcher =
+        new TagEventDispatcher(eventBus, new TagManager(idGenerator, entityStore));
+    this.tagDispatcher = new TagHookDispatcher(tagEventDispatcher);
+    // todo: support policy event dispatcher
+    this.policyDispatcher = new PolicyManager(idGenerator, entityStore);
 
     this.jobOperationDispatcher =
         new JobEventDispatcher(eventBus, new JobManager(config, entityStore, idGenerator));

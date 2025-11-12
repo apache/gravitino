@@ -370,7 +370,7 @@ public class NameIdentifierUtil {
     NamespaceUtil.checkMetalake(ident.namespace());
   }
 
-  private static void checkTag(NameIdentifier ident) {
+  public static void checkTag(NameIdentifier ident) {
     NameIdentifier.check(ident != null, "Tag identifier must not be null");
     Namespace namespace = ident.namespace();
     Namespace.check(

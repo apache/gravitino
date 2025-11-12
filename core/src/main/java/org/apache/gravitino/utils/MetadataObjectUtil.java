@@ -35,6 +35,7 @@ import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.exceptions.IllegalMetadataObjectException;
 import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
 import org.apache.gravitino.exceptions.NoSuchRoleException;
+import org.apache.gravitino.exceptions.NoSuchTagException;
 
 public class MetadataObjectUtil {
 
@@ -194,7 +195,14 @@ public class MetadataObjectUtil {
           throw checkNotNull(exceptionToThrowSupplier).get();
         }
         break;
-
+      case TAG:
+        NameIdentifierUtil.checkTag(identifier);
+        try {
+          env.tagDispatcher().getTag(metalake, object.fullName());
+        } catch (NoSuchTagException nsr) {
+          throw checkNotNull(exceptionToThrowSupplier).get();
+        }
+        break;
       default:
         throw new IllegalArgumentException(
             String.format("Doesn't support the type %s", object.type()));

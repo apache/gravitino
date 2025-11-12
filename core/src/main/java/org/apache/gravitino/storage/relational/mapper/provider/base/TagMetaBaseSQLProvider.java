@@ -210,4 +210,18 @@ public class TagMetaBaseSQLProvider {
         + TAG_TABLE_NAME
         + " WHERE metalake_id = #{metalakeId} AND tag_name = #{name} and deleted_at = 0";
   }
+
+  public String selectTagByTagId(@Param("tagId") Long tagId) {
+    return "SELECT tag_id as tagId, tag_name as tagName,"
+        + " metalake_id as metalakeId,"
+        + " tag_comment as comment,"
+        + " properties as properties,"
+        + " audit_info as auditInfo,"
+        + " current_version as currentVersion,"
+        + " last_version as lastVersion,"
+        + " deleted_at as deletedAt"
+        + " FROM "
+        + TAG_TABLE_NAME
+        + " WHERE tag_id = #{tagId} and deleted_at = 0";
+  }
 }

@@ -41,6 +41,7 @@ import org.apache.gravitino.storage.relational.mapper.ModelMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.SchemaMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.TableColumnMapper;
 import org.apache.gravitino.storage.relational.mapper.TableMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.TagMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.TopicMetaMapper;
 import org.apache.gravitino.storage.relational.po.CatalogPO;
 import org.apache.gravitino.storage.relational.po.ColumnPO;
@@ -69,14 +70,38 @@ public class MetadataObjectService {
   static final Map<MetadataObject.Type, Function<List<Long>, Map<Long, String>>>
       TYPE_TO_FULLNAME_FUNCTION_MAP =
           ImmutableMap.of(
-              MetadataObject.Type.METALAKE, MetadataObjectService::getMetalakeObjectsFullName,
-              MetadataObject.Type.CATALOG, MetadataObjectService::getCatalogObjectsFullName,
-              MetadataObject.Type.SCHEMA, MetadataObjectService::getSchemaObjectsFullName,
-              MetadataObject.Type.TABLE, MetadataObjectService::getTableObjectsFullName,
-              MetadataObject.Type.FILESET, MetadataObjectService::getFilesetObjectsFullName,
-              MetadataObject.Type.MODEL, MetadataObjectService::getModelObjectsFullName,
-              MetadataObject.Type.TOPIC, MetadataObjectService::getTopicObjectsFullName,
-              MetadataObject.Type.COLUMN, MetadataObjectService::getColumnObjectsFullName);
+              MetadataObject.Type.METALAKE,
+              MetadataObjectService::getMetalakeObjectsFullName,
+              MetadataObject.Type.CATALOG,
+              MetadataObjectService::getCatalogObjectsFullName,
+              MetadataObject.Type.SCHEMA,
+              MetadataObjectService::getSchemaObjectsFullName,
+              MetadataObject.Type.TABLE,
+              MetadataObjectService::getTableObjectsFullName,
+              MetadataObject.Type.FILESET,
+              MetadataObjectService::getFilesetObjectsFullName,
+              MetadataObject.Type.MODEL,
+              MetadataObjectService::getModelObjectsFullName,
+              MetadataObject.Type.TOPIC,
+              MetadataObjectService::getTopicObjectsFullName,
+              MetadataObject.Type.COLUMN,
+              MetadataObjectService::getColumnObjectsFullName,
+              MetadataObject.Type.TAG,
+              MetadataObjectService::getTagObjectsFullName);
+
+  private static Map<Long, String> getTagObjectsFullName(List<Long> tagIds) {
+    if (tagIds == null || tagIds.isEmpty()) {
+      return Map.of();
+    }
+    return tagIds.stream()
+        .collect(
+            Collectors.toMap(
+                tagId -> tagId,
+                tagId ->
+                    SessionUtils.getWithoutCommit(
+                        TagMetaMapper.class,
+                        tagMetaMapper -> tagMetaMapper.selectTagByTagId(tagId).getTagName())));
+  }
 
   private MetadataObjectService() {}
 
