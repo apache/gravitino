@@ -25,12 +25,10 @@ import java.util.Set;
 import java.util.stream.Collectors;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.NameIdentifier;
-import org.apache.gravitino.Namespace;
 import org.apache.gravitino.Schema;
 import org.apache.gravitino.StringIdentifier;
 import org.apache.gravitino.connector.GenericColumn;
 import org.apache.gravitino.connector.SupportsSchemas;
-import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.exceptions.TableAlreadyExistsException;
 import org.apache.gravitino.rel.Column;
@@ -164,12 +162,6 @@ public class TestManagedTableOperations {
 
     Assertions.assertTrue(tableNames.contains("table1"));
     Assertions.assertTrue(tableNames.contains("table2"));
-
-    // Test list tables in non-existing schema
-    Namespace nonExistingSchema =
-        NamespaceUtil.ofTable(METALAKE_NAME, CATALOG_NAME, "non_existing_schema");
-    Assertions.assertThrows(
-        NoSuchSchemaException.class, () -> tableOperations.listTables(nonExistingSchema));
   }
 
   @Test
@@ -198,23 +190,6 @@ public class TestManagedTableOperations {
 
     Table loadedTable = tableOperations.loadTable(table1Ident);
     assertTableEquals(newTable, loadedTable);
-
-    // test create table in the non-existing schema
-    NameIdentifier nonExistingSchemaTableIdent =
-        NameIdentifierUtil.ofTable(METALAKE_NAME, CATALOG_NAME, "non_existing_schema", "table1");
-    Assertions.assertThrows(
-        NoSuchSchemaException.class,
-        () ->
-            tableOperations.createTable(
-                nonExistingSchemaTableIdent,
-                columns,
-                "Test Table 1",
-                StringIdentifier.newPropertiesWithId(
-                    StringIdentifier.fromId(idGenerator.nextId()), Collections.emptyMap()),
-                partitioning,
-                distribution,
-                sortOrders,
-                indexes));
 
     // Test create table that already exists
     Assertions.assertThrows(

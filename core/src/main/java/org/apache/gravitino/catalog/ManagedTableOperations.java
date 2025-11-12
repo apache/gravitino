@@ -75,9 +75,10 @@ public abstract class ManagedTableOperations implements TableCatalog {
   @Override
   public NameIdentifier[] listTables(Namespace namespace) throws NoSuchSchemaException {
     try {
-      NameIdentifier schemaIdent = NameIdentifier.of(namespace.levels());
-      schemas().loadSchema(schemaIdent); // verify schema existence
-
+      // The current implementation of JDBC entity store will automatically check the existence of
+      // the namespace when listing entities under the namespace. If not, it will throw an
+      // NoSuchEntityException. So, we don't need to check the existence of the namespace here
+      // again.
       List<TableEntity> tables =
           store().list(namespace, TableEntity.class, Entity.EntityType.TABLE);
       return tables.stream()
@@ -119,13 +120,6 @@ public abstract class ManagedTableOperations implements TableCatalog {
     // It doesn't handle any additional operations like creating physical location, preprocessing
     // the properties, etc. Those operations should be handled in the specific catalog
     // implementation.
-
-    NameIdentifier schemaIdent = NameIdentifier.of(ident.namespace().levels());
-
-    if (!schemas().schemaExists(schemaIdent)) {
-      throw new NoSuchSchemaException("Schema %s does not exist", schemaIdent);
-    }
-
     StringIdentifier stringId = StringIdentifier.fromProperties(properties);
     Preconditions.checkArgument(stringId != null, "Property String identifier should not be null");
 
@@ -152,6 +146,12 @@ public abstract class ManagedTableOperations implements TableCatalog {
 
     try {
       store().put(tableEntity, false /* overwrite */);
+    } catch (NoSuchEntityException e) {
+      // The put operation in the current JDBC entity store will check the existence of the
+      // namespace when creating an entity under the namespace. If not, it will throw a
+      // NoSuchEntityException. So, we don't need to check the existence of the namespace here
+      // again.
+      throw new NoSuchSchemaException(e, "Schema %s does not exist", ident.namespace());
     } catch (EntityAlreadyExistsException e) {
       throw new TableAlreadyExistsException(e, "Table %s already exists", ident);
     } catch (IOException e) {
@@ -297,32 +297,13 @@ public abstract class ManagedTableOperations implements TableCatalog {
 
     for (TableChange.ColumnChange change : columnChanges) {
       if (change instanceof TableChange.AddColumn addColumn) {
-        // Note. The default behavior of addColumn is to add the column at the end.
-        int position = newColumns.size();
-
-        if (addColumn.getPosition() == TableChange.ColumnPosition.first()) {
-          position = 0;
-        } else if (addColumn.getPosition() instanceof TableChange.After afterColumn) {
-          boolean found = false;
-          for (int i = 0; i < newColumns.size(); i++) {
-            if (newColumns.get(i).name().equals(afterColumn.getColumn())) {
-              position = i + 1;
-              found = true;
-              break;
-            }
-          }
-          if (!found) {
-            throw new IllegalArgumentException(
-                String.format(
-                    "Column %s not found for adding column after it", afterColumn.getColumn()));
-          }
-        }
-
         String columnName = DOT.join(addColumn.getFieldName());
         boolean exists = newColumns.stream().anyMatch(col -> col.name().equals(columnName));
         if (exists) {
           throw new IllegalArgumentException(String.format("Column %s already exists", columnName));
         }
+        // Note. The default behavior of addColumn is to add the column at the end.
+        int position = calculateColumnPosition(newColumns, addColumn.getPosition(), true);
 
         ColumnEntity columnToAdd =
             ColumnEntity.builder()
@@ -407,29 +388,9 @@ public abstract class ManagedTableOperations implements TableCatalog {
 
         Optional<Integer> newPosition = Optional.empty();
         if (change instanceof TableChange.UpdateColumnPosition updateColumnPosition) {
-          if (updateColumnPosition.getPosition() == TableChange.ColumnPosition.first()) {
-            newPosition = Optional.of(0);
-
-          } else if (updateColumnPosition.getPosition() instanceof TableChange.After afterColumn) {
-            boolean found = false;
-            for (int j = 0; j < newColumns.size(); j++) {
-              if (newColumns.get(j).name().equals(afterColumn.getColumn())) {
-                newPosition = Optional.of(j + 1);
-                found = true;
-                break;
-              }
-            }
-            if (!found) {
-              throw new IllegalArgumentException(
-                  String.format(
-                      "Column %s not found for updating column position after it",
-                      afterColumn.getColumn()));
-            }
-
-          } else {
-            throw new IllegalArgumentException(
-                "Unsupported column position change: " + updateColumnPosition.getPosition());
-          }
+          newPosition =
+              Optional.of(
+                  calculateColumnPosition(newColumns, updateColumnPosition.getPosition(), false));
         }
 
         // add back the updated column
@@ -551,5 +512,27 @@ public abstract class ManagedTableOperations implements TableCatalog {
       }
     }
     return updatedColumns;
+  }
+
+  int calculateColumnPosition(
+      List<ColumnEntity> existingColumns, TableChange.ColumnPosition position, boolean forAdd) {
+    if (position == TableChange.ColumnPosition.first()) {
+      return 0;
+    } else if (position instanceof TableChange.After afterColumn) {
+      for (int i = 0; i < existingColumns.size(); i++) {
+        if (existingColumns.get(i).name().equals(afterColumn.getColumn())) {
+          return i + 1;
+        }
+      }
+      throw new IllegalArgumentException(
+          String.format("Column %s not found for adding column after it", afterColumn.getColumn()));
+    } else if (forAdd && position == TableChange.ColumnPosition.defaultPos()) {
+      // Default position of Gravitino managed table is to add the column at the end.
+      // For add column operation only. Change column operation with default position is not
+      // supported.
+      return existingColumns.size();
+    } else {
+      throw new IllegalArgumentException("Unsupported column position: " + position);
+    }
   }
 }
