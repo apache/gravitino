@@ -219,6 +219,10 @@ class ColumnImpl(Column):
                 self._comment,
                 self._nullable,
                 self._auto_increment,
-                tuple(self._default_value),
+                (
+                    tuple(self._default_value)
+                    if self._default_value is Column.DEFAULT_VALUE_NOT_SET
+                    else self._default_value
+                ),
             )
         )

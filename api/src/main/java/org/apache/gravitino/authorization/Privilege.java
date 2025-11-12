@@ -94,7 +94,11 @@ public interface Privilege {
     /** The privilege to create a model version */
     CREATE_MODEL_VERSION(0L, 1L << 19),
     /** The privilege to view the metadata of the model and download all the model versions */
-    USE_MODEL(0L, 1L << 20);
+    USE_MODEL(0L, 1L << 20),
+    /** The privilege to create a tag */
+    CREATE_TAG(0L, 1L << 21),
+    /** The privilege to apply a tag */
+    APPLY_TAG(0L, 1L << 22);
 
     private final long highBits;
     private final long lowBits;

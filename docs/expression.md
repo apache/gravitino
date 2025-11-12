@@ -9,7 +9,7 @@ license: This software is licensed under the Apache License version 2.
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
-This page introduces the expression system of Apache Gravitino. Expressions are vital component of metadata definition, through expressions, you can define [default values](./manage-relational-metadata-using-gravitino.md#table-column-default-value) for columns, function arguments for [function partitioning](./table-partitioning-bucketing-sort-order-indexes.md#table-partitioning), [bucketing](./table-partitioning-bucketing-sort-order-indexes.md#table-bucketing), and sort term of [sort ordering](./table-partitioning-bucketing-sort-order-indexes.md#sort-ordering) in tables.
+This page introduces the expression system of Apache Gravitino. Expressions are vital component of metadata definition, through expressions, you can define [default values](./manage-relational-metadata-using-gravitino.md#table-column-default-value) for columns, function arguments for [function partitioning](./table-partitioning-distribution-sort-order-indexes.md#table-partitioning), [bucketing](./table-partitioning-distribution-sort-order-indexes.md#table-distribution), and sort term of [sort ordering](./table-partitioning-distribution-sort-order-indexes.md#sort-ordering) in tables.
 Gravitino expression system divides expressions into three basic parts: field reference, literal, and function. Function expressions can contain field references, literals, and other function expressions.
 
 ## Field reference

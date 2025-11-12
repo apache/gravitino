@@ -17,6 +17,13 @@
 
 package org.apache.gravitino.server.authorization.expression;
 
+import static org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants.loadCatalogAuthorizationExpression;
+import static org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants.loadFilesetAuthorizationExpression;
+import static org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants.loadModelAuthorizationExpression;
+import static org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants.loadSchemaAuthorizationExpression;
+import static org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants.loadTableAuthorizationExpression;
+import static org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants.loadTopicsAuthorizationExpression;
+
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Matcher;
@@ -73,7 +80,8 @@ public class AuthorizationExpressionConverter {
     return EXPRESSION_CACHE.computeIfAbsent(
         authorizationExpression,
         (expression) -> {
-          String replacedExpression = replaceAnyPrivilege(authorizationExpression);
+          String replacedExpression = replaceGetOwnerPrivilege(expression);
+          replacedExpression = replaceAnyPrivilege(replacedExpression);
           replacedExpression = replaceAnyExpressions(replacedExpression);
           Matcher matcher = PATTERN.matcher(replacedExpression);
           StringBuffer result = new StringBuffer();
@@ -146,6 +154,32 @@ public class AuthorizationExpressionConverter {
     }
     matcher.appendTail(result);
     return result.toString();
+  }
+
+  public static String replaceGetOwnerPrivilege(String expression) {
+    return expression.replaceAll(
+        "CAN_GET_OWNER",
+        """
+              ( entityType == 'CATALOG' && (%s)) ||
+              ( entityType == 'SCHEMA' && (%s)) ||
+              ( entityType == 'TABLE' && (%s)) ||
+              ( entityType == 'MODEL' && (%s)) ||
+              ( entityType == 'FILESET' && (%s)) ||
+              ( entityType == 'TOPIC' && (%s)) ||
+              ( entityType != 'CATALOG' &&
+              entityType != 'SCHEMA' &&
+              entityType != 'TABLE' &&
+              entityType != 'MODEL' &&
+              entityType != 'FILESET' &&
+              entityType != 'TOPIC')
+              """
+            .formatted(
+                loadCatalogAuthorizationExpression,
+                loadSchemaAuthorizationExpression,
+                loadTableAuthorizationExpression,
+                loadModelAuthorizationExpression,
+                loadFilesetAuthorizationExpression,
+                loadTopicsAuthorizationExpression));
   }
 
   /**

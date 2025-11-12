@@ -19,6 +19,7 @@
 package org.apache.gravitino.filesystem.hadoop;
 
 import java.io.Closeable;
+import java.io.IOException;
 import java.util.Map;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.fs.FSDataInputStream;
@@ -26,6 +27,7 @@ import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.permission.FsPermission;
+import org.apache.hadoop.util.Progressable;
 
 /**
  * A hook interface for injecting custom logic before the Gravitino Virtual File System operations.
@@ -36,6 +38,16 @@ import org.apache.hadoop.fs.permission.FsPermission;
  * concurrent and idempotent issues if required.
  */
 public interface GravitinoVirtualFileSystemHook extends Closeable {
+
+  /**
+   * Set the operations context for this hook. This method will be called during GVFS initialization
+   * to provide the hook with access to the BaseGVFSOperations instance.
+   *
+   * @param operations the BaseGVFSOperations instance
+   */
+  default void setOperationsContext(BaseGVFSOperations operations) {
+    // Default implementation does nothing - hooks can override if they need operations access
+  }
 
   /**
    * Initialize the hook with the configuration. This method will be called in the GVFS initialize
@@ -317,4 +329,145 @@ public interface GravitinoVirtualFileSystemHook extends Closeable {
    * @return The default block size.
    */
   long postGetDefaultBlockSize(Path gvfsPath, long blockSize);
+
+  /**
+   * Called when setting the working directory fails.
+   *
+   * @param path the path that was attempted to be set as working directory
+   * @param e the exception that caused the failure
+   */
+  void onSetWorkingDirectoryFailure(Path path, Exception e);
+
+  /**
+   * Called when opening a file fails.
+   *
+   * @param path the path of the file that failed to open
+   * @param bufferSize the buffer size that was requested
+   * @param e the exception that caused the failure
+   * @return the fallback input stream, or null if no fallback is available
+   * @throws IOException if an I/O error occurs.
+   */
+  FSDataInputStream onOpenFailure(Path path, int bufferSize, Exception e) throws IOException;
+
+  /**
+   * Called when creating a file fails.
+   *
+   * @param path the path of the file that failed to create
+   * @param permission the file permission that was requested
+   * @param overwrite whether to overwrite existing files
+   * @param bufferSize the buffer size that was requested
+   * @param replication the replication factor that was requested
+   * @param blockSize the block size that was requested
+   * @param progress the progress callback
+   * @param e the exception that caused the failure
+   * @return the fallback output stream, or null if no fallback is available
+   * @throws IOException if an I/O error occurs.
+   */
+  FSDataOutputStream onCreateFailure(
+      Path path,
+      FsPermission permission,
+      boolean overwrite,
+      int bufferSize,
+      short replication,
+      long blockSize,
+      Progressable progress,
+      Exception e)
+      throws IOException;
+
+  /**
+   * Called when appending to a file fails.
+   *
+   * @param path the path of the file that failed to append to
+   * @param bufferSize the buffer size that was requested
+   * @param progress the progress callback
+   * @param e the exception that caused the failure
+   * @return the fallback output stream, or null if no fallback is available
+   * @throws IOException if an I/O error occurs.
+   */
+  FSDataOutputStream onAppendFailure(Path path, int bufferSize, Progressable progress, Exception e)
+      throws IOException;
+
+  /**
+   * Called when renaming a file or directory fails.
+   *
+   * @param src the source path that failed to be renamed
+   * @param dst the destination path for the rename operation
+   * @param e the exception that caused the failure
+   * @return true if the fallback operation succeeded, false otherwise
+   * @throws IOException if an I/O error occurs.
+   */
+  boolean onRenameFailure(Path src, Path dst, Exception e) throws IOException;
+
+  /**
+   * Called when deleting a file or directory fails.
+   *
+   * @param path the path that failed to be deleted
+   * @param recursive whether the deletion was requested to be recursive
+   * @param e the exception that caused the failure
+   * @return true if the fallback operation succeeded, false otherwise
+   * @throws IOException if an I/O error occurs.
+   */
+  boolean onDeleteFailure(Path path, boolean recursive, Exception e) throws IOException;
+
+  /**
+   * Called when getting file status fails.
+   *
+   * @param path the path that failed to get status for
+   * @param e the exception that caused the failure
+   * @return the fallback file status, or null if no fallback is available
+   * @throws IOException if an I/O error occurs.
+   */
+  FileStatus onGetFileStatusFailure(Path path, Exception e) throws IOException;
+
+  /**
+   * Called when listing directory contents fails.
+   *
+   * @param path the path that failed to list contents for
+   * @param e the exception that caused the failure
+   * @return the fallback file status array, or null if no fallback is available
+   * @throws IOException if an I/O error occurs.
+   */
+  FileStatus[] onListStatusFailure(Path path, Exception e) throws IOException;
+
+  /**
+   * Called when creating directories fails.
+   *
+   * @param path the path that failed to create directories for
+   * @param permission the permission that was requested for the directories
+   * @param e the exception that caused the failure
+   * @return true if the fallback operation succeeded, false otherwise
+   * @throws IOException if an I/O error occurs.
+   */
+  boolean onMkdirsFailure(Path path, FsPermission permission, Exception e) throws IOException;
+
+  /**
+   * Called when getting default replication factor fails.
+   *
+   * @param path the path that failed to get replication factor for
+   * @param e the exception that caused the failure
+   * @return the fallback replication factor, or -1 if no fallback is available
+   */
+  short onGetDefaultReplicationFailure(Path path, Exception e);
+
+  /**
+   * Called when getting default block size fails.
+   *
+   * @param f the path that failed to get block size for
+   * @param e the exception that caused the failure
+   * @param defaultBlockSize the default block size value
+   * @return the fallback block size, or -1 if no fallback is available
+   */
+  long onGetDefaultBlockSizeFailure(Path f, Exception e, long defaultBlockSize);
+
+  /**
+   * Converts a checked exception to an unchecked RuntimeException. If the exception is already a
+   * RuntimeException, it is returned as-is. Otherwise, it is wrapped in a new RuntimeException with
+   * the original as the cause.
+   *
+   * @param e the exception to convert
+   * @return the unchecked exception
+   */
+  default RuntimeException asUnchecked(Exception e) {
+    return (e instanceof RuntimeException) ? (RuntimeException) e : new RuntimeException(e);
+  }
 }
