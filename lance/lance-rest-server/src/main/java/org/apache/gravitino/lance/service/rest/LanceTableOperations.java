@@ -34,9 +34,11 @@ import com.lancedb.lance.namespace.model.DeregisterTableRequest;
 import com.lancedb.lance.namespace.model.DeregisterTableResponse;
 import com.lancedb.lance.namespace.model.DescribeTableRequest;
 import com.lancedb.lance.namespace.model.DescribeTableResponse;
+import com.lancedb.lance.namespace.model.DropTableResponse;
 import com.lancedb.lance.namespace.model.RegisterTableRequest;
 import com.lancedb.lance.namespace.model.RegisterTableRequest.ModeEnum;
 import com.lancedb.lance.namespace.model.RegisterTableResponse;
+import com.lancedb.lance.namespace.model.TableExistsRequest;
 import java.util.Map;
 import java.util.Optional;
 import javax.inject.Inject;
@@ -185,6 +187,45 @@ public class LanceTableOperations {
       validateDeregisterTableRequest(deregisterTableRequest);
       DeregisterTableResponse response =
           lanceNamespace.asTableOps().deregisterTable(tableId, delimiter);
+      return Response.ok(response).build();
+    } catch (Exception e) {
+      return LanceExceptionMapper.toRESTResponse(tableId, e);
+    }
+  }
+
+  @POST
+  @Path("/exists")
+  @Timed(name = "table-exists." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
+  @ResponseMetered(name = "table-exists", absolute = true)
+  public Response tableExists(
+      @PathParam("id") String tableId,
+      @QueryParam("delimiter") @DefaultValue("$") String delimiter,
+      @Context HttpHeaders headers,
+      TableExistsRequest tableExistsRequest) {
+    try {
+      // True if exists, false no found and other errors
+      boolean exists = lanceNamespace.asTableOps().tableExists(tableId, delimiter);
+      if (exists) {
+        return Response.status(Response.Status.OK).build();
+      }
+      return Response.status(Response.Status.NOT_FOUND).build();
+    } catch (Exception e) {
+      return LanceExceptionMapper.toRESTResponse(tableId, e);
+    }
+  }
+
+  @POST
+  @Path("/drop")
+  @Timed(name = "drop-table." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
+  @ResponseMetered(name = "drop-table", absolute = true)
+  public Response dropTable(
+      @PathParam("id") String tableId,
+      @QueryParam("delimiter") @DefaultValue("$") String delimiter,
+      @Context HttpHeaders headers,
+      DeregisterTableRequest deregisterTableRequest) {
+    try {
+
+      DropTableResponse response = lanceNamespace.asTableOps().dropTable(tableId, delimiter);
       return Response.ok(response).build();
     } catch (Exception e) {
       return LanceExceptionMapper.toRESTResponse(tableId, e);

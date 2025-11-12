@@ -39,6 +39,8 @@ import com.lancedb.lance.namespace.model.DescribeTableRequest;
 import com.lancedb.lance.namespace.model.DescribeTableResponse;
 import com.lancedb.lance.namespace.model.DropNamespaceRequest;
 import com.lancedb.lance.namespace.model.DropNamespaceResponse;
+import com.lancedb.lance.namespace.model.DropTableRequest;
+import com.lancedb.lance.namespace.model.DropTableResponse;
 import com.lancedb.lance.namespace.model.ErrorResponse;
 import com.lancedb.lance.namespace.model.JsonArrowField;
 import com.lancedb.lance.namespace.model.ListNamespacesRequest;
@@ -48,6 +50,7 @@ import com.lancedb.lance.namespace.model.NamespaceExistsRequest;
 import com.lancedb.lance.namespace.model.RegisterTableRequest;
 import com.lancedb.lance.namespace.model.RegisterTableRequest.ModeEnum;
 import com.lancedb.lance.namespace.model.RegisterTableResponse;
+import com.lancedb.lance.namespace.model.TableExistsRequest;
 import com.lancedb.lance.namespace.rest.RestNamespaceConfig;
 import java.io.File;
 import java.io.IOException;
@@ -666,6 +669,79 @@ public class LanceRESTServiceIT extends BaseIT {
         Assertions.assertThrows(
             LanceNamespaceException.class, () -> ns.describeTable(describeTableRequest));
     Assertions.assertEquals(406, lanceNamespaceException.getCode());
+  }
+
+  @Test
+  void testTableExists() {
+    catalog = createCatalog(CATALOG_NAME);
+    createSchema();
+
+    List<String> ids = List.of(CATALOG_NAME, SCHEMA_NAME, "table_exists");
+    CreateEmptyTableRequest createEmptyTableRequest = new CreateEmptyTableRequest();
+    String location = tempDir + "/" + "table_exists/";
+    createEmptyTableRequest.setLocation(location);
+    createEmptyTableRequest.setProperties(ImmutableMap.of());
+    createEmptyTableRequest.setId(ids);
+    CreateEmptyTableResponse response =
+        Assertions.assertDoesNotThrow(() -> ns.createEmptyTable(createEmptyTableRequest));
+    Assertions.assertNotNull(response);
+    Assertions.assertEquals(location, response.getLocation());
+
+    // Test existing table
+    TableExistsRequest tableExistsReq = new TableExistsRequest();
+    tableExistsReq.setId(ids);
+    Assertions.assertDoesNotThrow(() -> ns.tableExists(tableExistsReq));
+
+    // Test non-existing table
+    List<String> nonExistingIds = List.of(CATALOG_NAME, SCHEMA_NAME, "non_existing_table");
+    tableExistsReq.setId(nonExistingIds);
+    LanceNamespaceException exception =
+        Assertions.assertThrows(
+            LanceNamespaceException.class, () -> ns.tableExists(tableExistsReq));
+    Assertions.assertEquals(404, exception.getCode());
+    Assertions.assertTrue(exception.getMessage().contains("Not Found"));
+  }
+
+  @Test
+  void testDropTable() {
+    catalog = createCatalog(CATALOG_NAME);
+    createSchema();
+
+    List<String> ids = List.of(CATALOG_NAME, SCHEMA_NAME, "table_to_drop");
+    CreateEmptyTableRequest createEmptyTableRequest = new CreateEmptyTableRequest();
+    String location = tempDir + "/" + "table_to_drop/";
+    createEmptyTableRequest.setLocation(location);
+    createEmptyTableRequest.setProperties(ImmutableMap.of());
+    createEmptyTableRequest.setId(ids);
+    CreateEmptyTableResponse response =
+        Assertions.assertDoesNotThrow(() -> ns.createEmptyTable(createEmptyTableRequest));
+    Assertions.assertNotNull(response);
+    Assertions.assertEquals(location, response.getLocation());
+
+    // Drop the table
+    DropTableRequest dropTableRequest = new DropTableRequest();
+    dropTableRequest.setId(ids);
+    DropTableResponse dropTableResponse =
+        Assertions.assertDoesNotThrow(() -> ns.dropTable(dropTableRequest));
+    Assertions.assertNotNull(dropTableResponse);
+    Assertions.assertEquals(location, dropTableResponse.getLocation());
+    Assertions.assertFalse(
+        new File(location).exists(), "Data should be deleted after dropping the table.");
+
+    // Describe the dropped table should fail
+    DescribeTableRequest describeTableRequest = new DescribeTableRequest();
+    describeTableRequest.setId(ids);
+    LanceNamespaceException exception =
+        Assertions.assertThrows(
+            LanceNamespaceException.class, () -> ns.describeTable(describeTableRequest));
+    Assertions.assertEquals(404, exception.getCode());
+
+    // Drop a non-existing table should fail
+    dropTableRequest.setId(ids);
+    exception =
+        Assertions.assertThrows(
+            LanceNamespaceException.class, () -> ns.dropTable(dropTableRequest));
+    Assertions.assertEquals(404, exception.getCode());
   }
 
   private GravitinoMetalake createMetalake(String metalakeName) {
