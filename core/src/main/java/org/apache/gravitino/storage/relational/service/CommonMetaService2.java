@@ -16,23 +16,28 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.storage.relational.helper;
 
-public class EntityIds {
+package org.apache.gravitino.storage.relational.service;
 
-    private final long entityId;
-    private final long[] namespaceIds;
+import com.google.common.base.Preconditions;
+import org.apache.gravitino.Entity;
+import org.apache.gravitino.Namespace;
+import org.apache.gravitino.exceptions.NoSuchEntityException;
+import org.apache.gravitino.metrics.Monitored;
+import org.apache.gravitino.storage.relational.helper.CatalogIds;
+import org.apache.gravitino.storage.relational.helper.SchemaIds;
 
-    public EntityIds(long entityId, long... namespaceIds) {
-        this.entityId = entityId;
-        this.namespaceIds = namespaceIds;
-    }
+import static org.apache.gravitino.metrics.source.MetricsSource.GRAVITINO_RELATIONAL_STORE_METRIC_NAME;
 
-    long entityId() {
-        return entityId;
-    }
+/** The service class for common metadata operations. */
+public class CommonMetaService2 {
+  private static final CommonMetaService2 INSTANCE = new CommonMetaService2();
 
-    long[] namespaceIds() {
-        return namespaceIds;
-    }
+  public static CommonMetaService2 getInstance() {
+    return INSTANCE;
+  }
+
+  private CommonMetaService2() {}
+
+
 }

@@ -18,21 +18,10 @@
  */
 package org.apache.gravitino.storage.relational.helper;
 
-public class EntityIds {
+import org.apache.gravitino.Entity;
+import org.apache.gravitino.NameIdentifier;
 
-    private final long entityId;
-    private final long[] namespaceIds;
-
-    public EntityIds(long entityId, long... namespaceIds) {
-        this.entityId = entityId;
-        this.namespaceIds = namespaceIds;
-    }
-
-    long entityId() {
-        return entityId;
-    }
-
-    long[] namespaceIds() {
-        return namespaceIds;
-    }
+public interface EntityIdHelper {
+    EntityIds getEntityIds(NameIdentifier nameIdentifier, Entity.EntityType type);
+    EntityIds[] batchGetEntityIds(NameIdentifier[] nameIdentifiers, Entity.EntityType type);
 }
