@@ -180,6 +180,8 @@ public class TestSecurableObjects {
     Privilege createModel = Privileges.CreateModel.allow();
     Privilege createModelVersion = Privileges.CreateModelVersion.allow();
     Privilege useModel = Privileges.UseModel.allow();
+    Privilege createTag = Privileges.CreateTag.allow();
+    Privilege applyTag = Privileges.ApplyTag.allow();
 
     // Test create catalog
     Assertions.assertTrue(createCatalog.canBindTo(MetadataObject.Type.METALAKE));
@@ -382,5 +384,18 @@ public class TestSecurableObjects {
     Assertions.assertFalse(useModel.canBindTo(MetadataObject.Type.ROLE));
     Assertions.assertFalse(useModel.canBindTo(MetadataObject.Type.COLUMN));
     Assertions.assertTrue(useModel.canBindTo(MetadataObject.Type.MODEL));
+
+    Assertions.assertTrue(createTag.canBindTo(MetadataObject.Type.METALAKE));
+    Assertions.assertFalse(createTag.canBindTo(MetadataObject.Type.CATALOG));
+
+    Assertions.assertTrue(applyTag.canBindTo(MetadataObject.Type.METALAKE));
+    Assertions.assertTrue(applyTag.canBindTo(MetadataObject.Type.TAG));
+    Assertions.assertFalse(applyTag.canBindTo(MetadataObject.Type.CATALOG));
+    Assertions.assertFalse(applyTag.canBindTo(MetadataObject.Type.SCHEMA));
+    Assertions.assertFalse(applyTag.canBindTo(MetadataObject.Type.TABLE));
+    Assertions.assertFalse(applyTag.canBindTo(MetadataObject.Type.MODEL));
+    Assertions.assertFalse(useModel.canBindTo(MetadataObject.Type.TOPIC));
+    Assertions.assertFalse(useModel.canBindTo(MetadataObject.Type.FILESET));
+    Assertions.assertFalse(useModel.canBindTo(MetadataObject.Type.ROLE));
   }
 }
