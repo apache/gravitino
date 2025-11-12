@@ -155,13 +155,13 @@ For Gravitino Iceberg REST server, please ensure that the credential file can be
 
 ## Custom credentials
 
-Gravitino supports custom credentials, you can implement the `org.apache.gravitino.credential.CredentialProvider` interface to support custom credentials, and place the corresponding jar to the classpath of Iceberg catalog server or Hadoop catalog.
+Gravitino supports custom credentials, you can implement the `org.apache.gravitino.credential.CredentialProvider` interface to support custom credentials, and place the corresponding jar to the classpath of Iceberg catalog server or Fileset catalog.
 
 ## Deployment
 
 Besides setting credentials related configuration, please download Gravitino cloud bundle jar and place it in the classpath of Iceberg REST server or Hadoop catalog.
 
-For Hadoop catalog, please use Gravitino cloud bundle jar with Hadoop and cloud packages:
+For Fileset catalog, please use Gravitino cloud bundle jar with Hadoop and cloud packages:
 
 - [Gravitino AWS bundle jar with Hadoop and cloud packages](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-aws-bundle)
 - [Gravitino Aliyun bundle jar with Hadoop and cloud packages](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-aliyun-bundle)
@@ -182,7 +182,7 @@ For OSS, Iceberg doesn't provide Iceberg Aliyun bundle jar which contains OSS pa
 The classpath of the server:
 
 - Iceberg REST server: the classpath differs in different deploy mode, please refer to [Server management](../iceberg-rest-service.md#server-management) part.
-- Hadoop catalog: `catalogs/hadoop/libs/`
+- Fileset catalog: `catalogs/fileset/libs/`
 
 ## Usage example
 

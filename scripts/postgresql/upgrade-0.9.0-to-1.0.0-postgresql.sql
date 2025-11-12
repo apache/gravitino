@@ -107,12 +107,16 @@ CREATE TABLE IF NOT EXISTS statistic_meta (
     statistic_value TEXT NOT NULL,
     metadata_object_id BIGINT NOT NULL,
     metadata_object_type VARCHAR(64) NOT NULL,
+    audit_info TEXT NOT NULL,
+    current_version INT NOT NULL DEFAULT 1,
+    last_version INT NOT NULL DEFAULT 1,
+    deleted_at BIGINT NOT NULL DEFAULT 0,
     PRIMARY KEY (statistic_id),
     UNIQUE (statistic_name, metadata_object_id, deleted_at)
 );
 
-CREATE INDEX IF NOT EXISTS policy_relation_meta_idx_stid ON statistic_meta (statistic_id);
-CREATE INDEX IF NOT EXISTS policy_relation_meta_idx_moid ON statistic_meta (metadata_object_id);
+CREATE INDEX IF NOT EXISTS statistic_meta_idx_stid ON statistic_meta (statistic_id);
+CREATE INDEX IF NOT EXISTS statistic_meta_idx_moid ON statistic_meta (metadata_object_id);
 COMMENT ON TABLE statistic_meta IS 'statistic metadata';
 COMMENT ON COLUMN statistic_meta.id IS 'auto increment id';
 COMMENT ON COLUMN statistic_meta.statistic_id IS 'statistic id';
@@ -167,8 +171,8 @@ CREATE TABLE IF NOT EXISTS job_run_meta (
     UNIQUE (metalake_id, job_execution_id, deleted_at)
 );
 
-CREATE INDEX IF NOT EXISTS policy_relation_meta_idx_job_template_id ON job_run_meta (job_template_id);
-CREATE INDEX IF NOT EXISTS policy_relation_meta_idx_job_execution_id ON job_run_meta (job_execution_id);
+CREATE INDEX IF NOT EXISTS job_run_meta_idx_job_template_id ON job_run_meta (job_template_id);
+CREATE INDEX IF NOT EXISTS job_run_meta_idx_job_execution_id ON job_run_meta (job_execution_id);
 COMMENT ON TABLE job_run_meta IS 'job run metadata';
 COMMENT ON COLUMN job_run_meta.job_run_id IS 'job run id';
 COMMENT ON COLUMN job_run_meta.job_template_id IS 'job template id';

@@ -23,6 +23,9 @@ from gravitino.dto.responses.model_response import ModelResponse
 from gravitino.dto.responses.model_version_list_response import ModelVersionListResponse
 from gravitino.dto.responses.model_version_response import ModelVersionResponse
 from gravitino.dto.responses.model_version_uri_response import ModelVersionUriResponse
+from gravitino.dto.responses.partition_name_list_response import (
+    PartitionNameListResponse,
+)
 from gravitino.exceptions.base import IllegalArgumentException
 
 
@@ -275,3 +278,18 @@ class TestResponses(unittest.TestCase):
             json_str_missing_1, infer_missing=True
         )
         self.assertRaises(IllegalArgumentException, resp_missing_1.validate)
+
+    def test_partition_name_list_response(self):
+        partition_names = [f"partition_{i}" for i in range(3)]
+        json_data = {"code": 0, "names": partition_names}
+        json_str = json.dumps(json_data)
+        resp: PartitionNameListResponse = PartitionNameListResponse.from_json(json_str)
+        self.assertListEqual(resp.partition_names(), partition_names)
+        resp.validate()
+
+    def test_partition_name_list_response_exception(self):
+        json_data = {"code": 0, "names": None}
+        json_str = json.dumps(json_data)
+        resp: PartitionNameListResponse = PartitionNameListResponse.from_json(json_str)
+        with self.assertRaises(IllegalArgumentException):
+            resp.validate()

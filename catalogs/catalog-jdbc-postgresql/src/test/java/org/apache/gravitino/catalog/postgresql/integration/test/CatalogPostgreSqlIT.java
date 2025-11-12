@@ -1038,9 +1038,14 @@ public class CatalogPostgreSqlIT extends BaseIT {
             + "    date_col_5 date default '2012-12-31',\n"
             + "    decimal_6_2_col_1 decimal(6, 2) default 1.2,\n"
             + "    timestamp_col_1 timestamp default '2012-12-31 11:30:45',\n"
-            + "    time_col_1 time default '11:30:45'\n"
+            + "    time_col_1 time default '11:30:45',\n"
+            + "    uuid UUID NOT NULL,\n"
+            + "    character_col_1 CHARACTER VARYING(64) NOT NULL,\n"
+            + "    character_col_2 CHARACTER VARYING[],"
+            + "    character_col_3 CHARACTER(36) DEFAULT ''::bpchar,\n"
+            + "    character_col_4 CHARACTER VARYING[],\n"
+            + "    jsonb JSONB NOT NULL\n"
             + ");";
-    System.out.println(sql);
     postgreSqlService.executeQuery(sql);
     Table loadedTable =
         catalog.asTableCatalog().loadTable(NameIdentifier.of(schemaName, tableName));
@@ -1083,6 +1088,8 @@ public class CatalogPostgreSqlIT extends BaseIT {
           Assertions.assertEquals(UnparsedExpression.of("CURRENT_DATE"), column.defaultValue());
           break;
         case "date_col_2":
+        case "character_col_2":
+        case "character_col_4":
           Assertions.assertEquals(Literals.NULL, column.defaultValue());
           break;
         case "date_col_3":
@@ -1105,6 +1112,14 @@ public class CatalogPostgreSqlIT extends BaseIT {
         case "decimal_6_2_col_1":
           Assertions.assertEquals(
               Literals.decimalLiteral(Decimal.of("1.2", 6, 2)), column.defaultValue());
+          break;
+        case "uuid":
+        case "character_col_1":
+        case "jsonb":
+          Assertions.assertEquals(Column.DEFAULT_VALUE_NOT_SET, column.defaultValue());
+          break;
+        case "character_col_3":
+          Assertions.assertEquals(Literals.stringLiteral("''::bpchar"), column.defaultValue());
           break;
         default:
           Assertions.fail("Unexpected column name: " + column.name());
