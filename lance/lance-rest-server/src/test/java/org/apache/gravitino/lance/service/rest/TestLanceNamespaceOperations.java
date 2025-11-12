@@ -507,6 +507,9 @@ public class TestLanceNamespaceOperations extends JerseyTest {
     String tableIds = "catalog.scheme.register_table_with_property";
     String delimiter = ".";
 
+    // Reset mock to clear any previous test state
+    Mockito.reset(tableOps);
+
     // Test that the "register" property is set to "true"
     RegisterTableResponse registerTableResponse = new RegisterTableResponse();
     registerTableResponse.setLocation("/path/to/registered_table");
