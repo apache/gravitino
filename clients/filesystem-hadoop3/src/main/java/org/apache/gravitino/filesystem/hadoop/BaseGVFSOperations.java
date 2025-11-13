@@ -27,7 +27,7 @@ import static org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystemC
 import static org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_FILESET_PROPERTY_KEYNAME_PREFIX;
 import static org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_FILESET_PROPERTY_PREFIX;
 import static org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystemUtils.extractIdentifier;
-import static org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystemUtils.getConfigMap;
+import static org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystemUtils.extractNonDefaultConfig;
 import static org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystemUtils.getSubPathFromGvfsPath;
 
 import com.github.benmanes.caffeine.cache.Cache;
@@ -984,7 +984,7 @@ public abstract class BaseGVFSOperations implements Closeable {
                     filesetIdent.namespace().level(0), filesetIdent.namespace().level(1)));
 
     Map<String, String> allProperties = getNecessaryProperties(catalog.properties());
-    allProperties.putAll(getConfigMap(conf));
+    allProperties.putAll(extractNonDefaultConfig(conf));
     if (enableCredentialVending()) {
       allProperties.putAll(
           getCredentialProperties(

@@ -167,7 +167,7 @@ Apart from the above properties, to access fileset like HDFS fileset, you need t
 | `authentication.kerberos.keytab-uri`               | The URI of The keytab for the Kerberos authentication.                                            | (none)        | required if the value of `authentication.type` is Kerberos. | 0.5.1         |
 | `authentication.kerberos.check-interval-sec`       | The check interval of Kerberos credential for Fileset catalog.                                    | 60            | No                                                          | 0.5.1         |
 | `authentication.kerberos.keytab-fetch-timeout-sec` | The fetch timeout of retrieving Kerberos keytab from `authentication.kerberos.keytab-uri`.        | 60            | No                                                          | 0.5.1         |
-| `hdfs.config.resources`                            | The HDFS configuration resources, separated by comma. For example, `hdfs-site.xml,core-site.xml`. | (none)        | No                                                          | 0.5.1         |
+| `hdfs.config.resources`                            | The HDFS configuration resources, separated by comma. For example, `hdfs-site.xml,core-site.xml`. | (none)        | No                                                          | 1.1.0         |
 
 The `hdfs.config.resources` property allows users to specify custom HDFS configuration files.
 
@@ -238,16 +238,16 @@ The Fileset catalog supports creating, updating, deleting, and listing schema.
 
 ### Schema properties
 
-| Property name                           | Description                                                                                                               | Default value             | Required | Since Version    |
-|-----------------------------------------|---------------------------------------------------------------------------------------------------------------------------|---------------------------|----------|------------------|
-| `location`                              | The storage location managed by schema. Its location name is `unknown`. It's also should be a directory or path prefix.   | (none)                    | No       | 0.5.0            |
-| `location-`                             | The property prefix. User can use `location-{name}={path}` to set multiple locations with different names for the schema. | (none)                    | No       | 0.9.0-incubating |
-| `authentication.impersonation-enable`   | Whether to enable impersonation for this schema of the Fileset catalog.                                                   | The parent(catalog) value | No       | 0.6.0-incubating |
-| `authentication.type`                   | The type of authentication for this schema of Fileset catalog , currently we only support `kerberos`, `simple`.           | The parent(catalog) value | No       | 0.6.0-incubating |
-| `authentication.kerberos.principal`     | The principal of the Kerberos authentication for this schema.                                                             | The parent(catalog) value | No       | 0.6.0-incubating |
-| `authentication.kerberos.keytab-uri`    | The URI of The keytab for the Kerberos authentication for this schema.                                                    | The parent(catalog) value | No       | 0.6.0-incubating |
-| `credential-providers`                  | The credential provider types, separated by comma.                                                                        | (none)                    | No       | 0.8.0-incubating |
-| `hdfs.config.resources`                 | The HDFS configuration resources, separated by comma. For example, `hdfs-site.xml,core-site.xml`.                                                                                                                  | (none)          | No       | 0.5.1            |
+| Property name                         | Description                                                                                                               | Default value             | Required | Since Version    |
+|---------------------------------------|---------------------------------------------------------------------------------------------------------------------------|---------------------------|----------|------------------|
+| `location`                            | The storage location managed by schema. Its location name is `unknown`. It's also should be a directory or path prefix.   | (none)                    | No       | 0.5.0            |
+| `location-`                           | The property prefix. User can use `location-{name}={path}` to set multiple locations with different names for the schema. | (none)                    | No       | 0.9.0-incubating |
+| `authentication.impersonation-enable` | Whether to enable impersonation for this schema of the Fileset catalog.                                                   | The parent(catalog) value | No       | 0.6.0-incubating |
+| `authentication.type`                 | The type of authentication for this schema of Fileset catalog , currently we only support `kerberos`, `simple`.           | The parent(catalog) value | No       | 0.6.0-incubating |
+| `authentication.kerberos.principal`   | The principal of the Kerberos authentication for this schema.                                                             | The parent(catalog) value | No       | 0.6.0-incubating |
+| `authentication.kerberos.keytab-uri`  | The URI of The keytab for the Kerberos authentication for this schema.                                                    | The parent(catalog) value | No       | 0.6.0-incubating |
+| `credential-providers`                | The credential provider types, separated by comma.                                                                        | (none)                    | No       | 0.8.0-incubating |
+| `hdfs.config.resources`               | The HDFS configuration resources, separated by comma. For example, `hdfs-site.xml,core-site.xml`.                         | (none)                    | No       | 1.1.0            |
 
 ### Schema operations
 
@@ -277,7 +277,7 @@ This behavior is skipped in either of these cases:
 | `credential-providers`                | The credential provider types, separated by comma.                                                                   | (none)                                                                                                         | No                                         | No        | 0.8.0-incubating |
 | `placeholder-`                        | Properties that start with `placeholder-` are used to replace placeholders in the location.                          | (none)                                                                                                         | No                                         | Yes       | 0.9.0-incubating |
 | `default-location-name`               | The name of the default location of the fileset, mainly used for GVFS operations without specifying a location name. | When the fileset has only one location, its location name will be automatically selected as the default value. | Yes, if the fileset has multiple locations | Yes       | 0.9.0-incubating |
-| `hdfs.config.resources`               | The HDFS configuration resources, separated by comma. For example, `hdfs-site.xml,core-site.xml`.                                                                                                                  | (none)          | No       | 0.5.1            |
+| `hdfs.config.resources`               | The HDFS configuration resources, separated by comma. For example, `hdfs-site.xml,core-site.xml`.                    | (none)                                                                                                         | No                                         | NO        | 1.1.0            |
 
 Some properties are reserved and cannot be set by users:
 

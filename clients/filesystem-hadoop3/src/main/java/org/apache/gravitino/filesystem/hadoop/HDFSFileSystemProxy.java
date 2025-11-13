@@ -31,8 +31,9 @@ import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.HADOOP_SECURITY
 import java.io.IOException;
 import java.lang.reflect.Method;
 import java.security.PrivilegedExceptionAction;
-import java.util.Timer;
-import java.util.TimerTask;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 import net.sf.cglib.proxy.Enhancer;
 import net.sf.cglib.proxy.MethodInterceptor;
 import net.sf.cglib.proxy.MethodProxy;
@@ -60,7 +61,7 @@ public class HDFSFileSystemProxy implements MethodInterceptor {
   private final UserGroupInformation ugi;
   private final FileSystem fs;
   private final Configuration configuration;
-  private Timer kerberosRenewTimer;
+  private ScheduledExecutorService kerberosRenewExecutor;
 
   /**
    * Create a HDFSAuthenticationFileSystem with the given path and configuration. Supports both
@@ -129,26 +130,31 @@ public class HDFSFileSystemProxy implements MethodInterceptor {
 
   /** Schedule periodic Kerberos re-login to refresh TGT before expiry. */
   private void startKerberosRenewalTask(String principal) {
-    kerberosRenewTimer = new Timer(true);
-    kerberosRenewTimer.scheduleAtFixedRate(
-        new TimerTask() {
-          @Override
-          public void run() {
-            try {
-              if (ugi.hasKerberosCredentials()) {
-                ugi.checkTGTAndReloginFromKeytab();
-              }
-            } catch (Exception e) {
-              LOG.error(
-                  "[Kerberos] Failed to renew TGT for principal "
-                      + principal
-                      + ": "
-                      + e.getMessage());
+    kerberosRenewExecutor =
+        Executors.newSingleThreadScheduledExecutor(
+            r -> {
+              Thread t = new Thread(r, "HDFSFileSystemProxy Kerberos-Renewal-Thread");
+              t.setDaemon(true);
+              return t;
+            });
+
+    kerberosRenewExecutor.scheduleAtFixedRate(
+        () -> {
+          try {
+            if (ugi.hasKerberosCredentials()) {
+              ugi.checkTGTAndReloginFromKeytab();
             }
+          } catch (Exception e) {
+            LOG.error(
+                "[Kerberos] Failed to renew TGT for principal {}: {}",
+                principal,
+                e.getMessage(),
+                e);
           }
         },
         DEFAULT_RENEW_INTERVAL_MS,
-        DEFAULT_RENEW_INTERVAL_MS);
+        DEFAULT_RENEW_INTERVAL_MS,
+        TimeUnit.MILLISECONDS);
   }
 
   @Override

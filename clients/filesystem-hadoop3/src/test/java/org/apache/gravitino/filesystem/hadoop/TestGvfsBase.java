@@ -26,7 +26,7 @@ import static org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystemC
 import static org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_CLIENT_CONFIG_PREFIX;
 import static org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_CLIENT_REQUEST_HEADER_PREFIX;
 import static org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystemUtils.extractIdentifier;
-import static org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystemUtils.getConfigMap;
+import static org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystemUtils.extractNonDefaultConfig;
 import static org.apache.hc.core5.http.HttpStatus.SC_NOT_FOUND;
 import static org.apache.hc.core5.http.HttpStatus.SC_OK;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -1071,7 +1071,7 @@ public class TestGvfsBase extends GravitinoMockServerBase {
     configuration.set(FS_GRAVITINO_CLIENT_CONFIG_PREFIX + "connectionTimeoutMs", "8000");
     configuration.set(FS_GRAVITINO_CLIENT_CONFIG_PREFIX + "socketTimeoutMs", "4000");
     Map<String, String> clientConfig =
-        GravitinoVirtualFileSystemUtils.extractClientConfig(getConfigMap(configuration));
+        GravitinoVirtualFileSystemUtils.extractClientConfig(extractNonDefaultConfig(configuration));
     Assertions.assertEquals(clientConfig.get(CLIENT_CONNECTION_TIMEOUT_MS), "8000");
     Assertions.assertEquals(clientConfig.get(CLIENT_SOCKET_TIMEOUT_MS), "4000");
 
