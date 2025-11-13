@@ -37,7 +37,10 @@ dependencies {
   }
 
   implementation(project(":lance:lance-common"))
-  implementation(libs.lance)
+  implementation(libs.lance) {
+    exclude(group = "org.apache.commons", module = "commons-lang3") // provided by gravitino
+    exclude(group = "com.google.guava", module = "guava") // provided by gravitino
+  }
   implementation(libs.commons.lang3)
 
   implementation(libs.bundles.jetty)

@@ -133,10 +133,10 @@ public class TestSerializer {
                 IndexType.UNIQUE_KEY,
                 "index_2",
                 new String[][] {new String[] {"col1"}, new String[] {"col2"}});
-    actualJson = JsonUtils.anyFieldMapper().writeValueAsString(index);
+    actualJson = JsonUtils.anyFieldMapper().writeValueAsString(DTOConverters.toDTO(index));
     expectedJson =
         """
-            {"indexType":"unique_key","name":"index_2","fieldNames":[["col1"],["col2"]]}""";
+            {"indexType":"UNIQUE_KEY","name":"index_2","fieldNames":[["col1"],["col2"]]}""";
     Assertions.assertEquals(expectedJson, actualJson);
   }
 

@@ -19,6 +19,7 @@
 
 package org.apache.gravitino.rel.indexes;
 
+import java.util.Map;
 import org.apache.gravitino.annotation.Evolving;
 
 /**
@@ -43,6 +44,13 @@ public interface Index {
    *     "a.b.c" for nested column, but normally it could only be "a".
    */
   String[][] fieldNames();
+
+  /**
+   * @return The properties of the index.
+   */
+  default Map<String, String> properties() {
+    return Map.of();
+  }
 
   /**
    * The enum IndexType defines the type of the index. Currently, PRIMARY_KEY and UNIQUE_KEY are
@@ -111,6 +119,12 @@ public interface Index {
     /** IVF_HNSW_FLAT */
     IVF_HNSW_SQ,
     /** IVF_HNSW_PQ */
-    IVF_HNSW_PQ;
+    IVF_HNSW_PQ,
+    /**
+     * FTS index is a data structure used for efficient storage and retrieval of strings, enabling
+     * fast prefix-based searches and pattern matching. Currently, this type is only applicable to
+     * Lance.
+     */
+    FTS;
   }
 }
