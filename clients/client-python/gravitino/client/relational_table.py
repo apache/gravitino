@@ -25,7 +25,14 @@ from gravitino.api.rel.expressions.transforms.transform import Transform
 from gravitino.api.rel.indexes.index import Index
 from gravitino.api.rel.table import Table
 from gravitino.client.generic_column import GenericColumn
+from gravitino.dto.responses.partition_name_list_response import (
+    PartitionNameListResponse,
+)
+from gravitino.exceptions.handlers.partition_error_handler import (
+    PARTITION_ERROR_HANDLER,
+)
 from gravitino.namespace import Namespace
+from gravitino.rest.rest_utils import encode_string
 from gravitino.utils import HTTPClient
 
 
@@ -93,3 +100,34 @@ class RelationalTable(Table):  # pylint: disable=too-many-instance-attributes
 
     def audit_info(self) -> Audit:
         return self._audit_info
+
+    def get_partition_request_path(self) -> str:
+        """Get the partition request path.
+
+        Returns:
+            str: The partition request path.
+        """
+
+        return (
+            f"api/metalakes/{encode_string(self._namespace.level(0))}"
+            f"/catalogs/{encode_string(self._namespace.level(1))}"
+            f"/schemas/{encode_string(self._namespace.level(2))}"
+            f"/tables/{encode_string(self._name)}"
+            "/partitions/"
+        )
+
+    def list_partition_names(self) -> list[str]:
+        """Get the partition names of the table.
+
+        Returns:
+            list[str]: The partition names of the table.
+        """
+
+        resp = cast(
+            PartitionNameListResponse,
+            self._rest_client.get(
+                endpoint=self.get_partition_request_path(),
+                error_handler=PARTITION_ERROR_HANDLER,
+            ),
+        )
+        return resp.partition_names()
