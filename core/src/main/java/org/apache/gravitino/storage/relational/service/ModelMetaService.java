@@ -196,7 +196,7 @@ public class ModelMetaService {
   @Monitored(
       metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
       baseMetricName = "getModelIdBySchemaIdAndModelName")
-  Long getModelIdBySchemaIdAndModelName(Long schemaId, String modelName) {
+  public Long getModelIdBySchemaIdAndModelName(Long schemaId, String modelName) {
     Long modelId =
         SessionUtils.getWithoutCommit(
             ModelMetaMapper.class,
