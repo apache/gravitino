@@ -240,4 +240,17 @@ public class TestLocalJobExecutor {
     long actualValue = (long) field.get(exec);
     Assertions.assertEquals(10L, actualValue);
   }
+
+  @Test
+  public void TestInitializeWithLargeJobStatusKeepTimeIsClampedToSameValue()
+      throws NoSuchFieldException, IllegalAccessException {
+    LocalJobExecutor exec = new LocalJobExecutor();
+
+    exec.initialize(ImmutableMap.of(LocalJobExecutorConfigs.JOB_STATUS_KEEP_TIME_MS, "11"));
+
+    Field field = LocalJobExecutor.class.getDeclaredField("jobStatusKeepTimeInMs");
+    field.setAccessible(true);
+    long actualValue = (long) field.get(exec);
+    Assertions.assertEquals(11L, actualValue);
+  }
 }
