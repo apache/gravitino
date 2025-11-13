@@ -469,6 +469,26 @@ public class LanceRESTServiceIT extends BaseIT {
             });
     Assertions.assertTrue(exception.getMessage().contains("Table already exists"));
     Assertions.assertEquals(409, exception.getCode());
+
+    // Try to create a table with wrong location should fail
+    CreateEmptyTableRequest wrongLocationRequest = new CreateEmptyTableRequest();
+    wrongLocationRequest.setId(List.of(CATALOG_NAME, SCHEMA_NAME, "wrong_location_table"));
+    wrongLocationRequest.setLocation("hdfs://localhost:9000/invalid_path/");
+    LanceNamespaceException apiException =
+        Assertions.assertThrows(
+            LanceNamespaceException.class,
+            () -> {
+              ns.createEmptyTable(wrongLocationRequest);
+            });
+    Assertions.assertTrue(apiException.getMessage().contains("Invalid user input"));
+
+    // Correct the location and try again
+    String correctedLocation = tempDir + "/" + "wrong_location_table/";
+    wrongLocationRequest.setLocation(correctedLocation);
+    CreateEmptyTableResponse wrongLocationResponse =
+        Assertions.assertDoesNotThrow(() -> ns.createEmptyTable(wrongLocationRequest));
+    Assertions.assertNotNull(wrongLocationResponse);
+    Assertions.assertEquals(correctedLocation, wrongLocationResponse.getLocation());
   }
 
   @Test
