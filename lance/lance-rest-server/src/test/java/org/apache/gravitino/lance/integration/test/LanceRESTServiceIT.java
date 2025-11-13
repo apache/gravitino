@@ -617,6 +617,8 @@ public class LanceRESTServiceIT extends BaseIT {
 
     RegisterTableResponse response = ns.registerTable(registerTableRequest);
     Assertions.assertNotNull(response);
+    // Will not create the location on register
+    Assertions.assertFalse(new File(response.getLocation()).exists());
 
     DescribeTableRequest describeTableRequest = new DescribeTableRequest();
     describeTableRequest.setId(ids);
