@@ -93,11 +93,15 @@ public class TestTypeUtils {
     Assertions.assertEquals(
         Types.MapType.of(Types.StringType.get(), Types.IntegerType.get(), true),
         TypeUtils.toGravitinoType(
-            new MapType(true, new VarCharType(Integer.MAX_VALUE), new IntType())));
+            new MapType(true, new VarCharType(Integer.MAX_VALUE), new IntType(true))));
     Assertions.assertEquals(
         Types.MapType.of(Types.StringType.get(), Types.IntegerType.get(), false),
         TypeUtils.toGravitinoType(
-            new MapType(false, new VarCharType(Integer.MAX_VALUE), new IntType())));
+            new MapType(true, new VarCharType(Integer.MAX_VALUE), new IntType(false))));
+    Assertions.assertEquals(
+        Types.MapType.of(Types.StringType.get(), Types.IntegerType.get(), false),
+        TypeUtils.toGravitinoType(
+            new MapType(false, new VarCharType(Integer.MAX_VALUE), new IntType(false))));
     Assertions.assertEquals(
         Types.StructType.of(
             Types.StructType.Field.nullableField("a", Types.IntegerType.get()),
