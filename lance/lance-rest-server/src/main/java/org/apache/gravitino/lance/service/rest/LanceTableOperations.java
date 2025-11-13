@@ -168,6 +168,7 @@ public class LanceTableOperations {
               ? Maps.newHashMap()
               : Maps.newHashMap(registerTableRequest.getProperties());
       props.put(LANCE_LOCATION, registerTableRequest.getLocation());
+      props.put("register", "true");
       ModeEnum mode = registerTableRequest.getMode();
 
       RegisterTableResponse response =

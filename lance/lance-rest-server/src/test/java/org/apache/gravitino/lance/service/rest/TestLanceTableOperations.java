@@ -19,6 +19,7 @@
 package org.apache.gravitino.lance.service.rest;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -485,5 +486,46 @@ public class TestLanceTableOperations extends JerseyTest {
             .request(MediaType.APPLICATION_JSON_TYPE)
             .post(Entity.entity(tableRequest, MediaType.APPLICATION_JSON_TYPE));
     Assertions.assertEquals(Response.Status.NOT_FOUND.getStatusCode(), resp.getStatus());
+  }
+
+  @Test
+  void testRegisterTableSetsRegisterPropertyToTrue() {
+    String tableIds = "catalog.scheme.register_table_with_property";
+    String delimiter = ".";
+
+    // Reset mock to clear any previous test state
+    Mockito.reset(tableOps);
+
+    // Test that the "register" property is set to "true"
+    RegisterTableResponse registerTableResponse = new RegisterTableResponse();
+    registerTableResponse.setLocation("/path/to/registered_table");
+    registerTableResponse.setProperties(ImmutableMap.of("key", "value", "register", "true"));
+    when(tableOps.registerTable(any(), any(), any(), any())).thenReturn(registerTableResponse);
+
+    RegisterTableRequest tableRequest = new RegisterTableRequest();
+    tableRequest.setLocation("/path/to/registered_table");
+    tableRequest.setMode(RegisterTableRequest.ModeEnum.CREATE);
+    tableRequest.setProperties(ImmutableMap.of("custom-key", "custom-value"));
+
+    Response resp =
+        target(String.format("/v1/table/%s/register", tableIds))
+            .queryParam("delimiter", delimiter)
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .post(Entity.entity(tableRequest, MediaType.APPLICATION_JSON_TYPE));
+
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp.getStatus());
+
+    // Verify that registerTable was called with properties containing "register": "true"
+    Mockito.verify(tableOps)
+        .registerTable(
+            eq(tableIds),
+            eq(RegisterTableRequest.ModeEnum.CREATE),
+            eq(delimiter),
+            Mockito.argThat(
+                props ->
+                    props != null
+                        && "true".equals(props.get("register"))
+                        && "/path/to/registered_table".equals(props.get("location"))
+                        && "custom-value".equals(props.get("custom-key"))));
   }
 }
