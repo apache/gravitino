@@ -99,13 +99,9 @@ public interface Privilege {
     CREATE_TAG(0L, 1L << 21),
     /** The privilege to apply a tag */
     APPLY_TAG(0L, 1L << 22),
-    /**
-     * The privilege to create a policy
-     */
+    /** The privilege to create a policy */
     CREATE_POLICY(0L, 1L << 23),
-    /**
-     * The privilege to apply a policy
-     */
+    /** The privilege to apply a policy */
     APPLY_POLICY(0L, 1L << 24),
     ;
 

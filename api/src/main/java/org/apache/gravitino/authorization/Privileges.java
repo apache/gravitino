@@ -970,8 +970,10 @@ public class Privileges {
 
   /** The privilege to create a tag */
   public static class CreatePolicy extends GenericPrivilege<CreatePolicy> {
-    private static final CreatePolicy ALLOW_INSTANCE = new CreatePolicy(Condition.ALLOW, Name.CREATE_POLICY);
-    private static final CreatePolicy DENY_INSTANCE = new CreatePolicy(Condition.DENY, Name.CREATE_POLICY);
+    private static final CreatePolicy ALLOW_INSTANCE =
+        new CreatePolicy(Condition.ALLOW, Name.CREATE_POLICY);
+    private static final CreatePolicy DENY_INSTANCE =
+        new CreatePolicy(Condition.DENY, Name.CREATE_POLICY);
 
     /**
      * Constructor for GenericPrivilege.
@@ -1006,8 +1008,10 @@ public class Privileges {
   /** The privilege to apply policy to object. */
   public static final class ApplyPolicy extends GenericPrivilege<ApplyPolicy> {
 
-    private static final ApplyPolicy ALLOW_INSTANCE = new ApplyPolicy(Condition.ALLOW, Name.APPLY_POLICY);
-    private static final ApplyPolicy DENY_INSTANCE = new ApplyPolicy(Condition.DENY, Name.APPLY_POLICY);
+    private static final ApplyPolicy ALLOW_INSTANCE =
+        new ApplyPolicy(Condition.ALLOW, Name.APPLY_POLICY);
+    private static final ApplyPolicy DENY_INSTANCE =
+        new ApplyPolicy(Condition.DENY, Name.APPLY_POLICY);
 
     /**
      * Constructor for GenericPrivilege.
