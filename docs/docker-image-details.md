@@ -20,6 +20,10 @@ docker run --rm -d -p 8090:8090 -p 9001:9001 apache/gravitino:0.7.0-incubating
 Changelog
 
 
+- apache/gravitino:1.0.1
+    - Replace based image from `openjdk:17-jdk-buster` to `eclipse-temurin:17.0.16_8-jdk-jammy`
+    - Based on Gravitino 1.0.1, you can know more information from 1.0.1 [release notes](https://github.com/apache/gravitino/releases/tag/v1.0.1).
+
 - apache/gravitino:1.0.0
   - Based on Gravitino 1.0.0, you can know more information from 1.0.0 [release notes](https://github.com/apache/gravitino/releases/tag/v1.0.0).
 
@@ -72,6 +76,9 @@ docker run --rm -d -p 9001:9001 apache/gravitino-iceberg-rest:0.7.0-incubating
 ```
 
 Changelog
+- apache/gravitino-iceberg-rest:1.0.1
+    - Fix start Iceberg REST server start failed.
+
 - apache/gravitino-iceberg-rest:1.0.0
   - Upgrade Iceberg version to 1.9
   - Supports to specify the catalog name using warehouse parameter
@@ -116,6 +123,9 @@ docker run --rm -d -p 8000:8000 apache/gravitino-mcp-server:latest --metalake te
 ```
 
 Changelog
+- apache/gravitino-mcp-server:1.0.1
+    - Based on Gravitino 1.0.1, you can know more information from 1.0.1 [release notes](https://github.com/apache/gravitino/releases/tag/v1.0.1).
+
 - apache/gravitino-mcp-server:1.0.0
   - Supports read operations for `catalog`, `schema`, `table`, `fileset`, `model`, `policy`, `topic`, `statistic`, `job`.
   - Supports associate&disassociate tag, policy to metadata
@@ -146,6 +156,8 @@ Changelog
 
 Changelog
 
+- apache/gravitino-playground:trino-435-gravitino-1.0.1
+    - Use Gravitino release 1.0.1 Dockerfile to build the image.
 
 - apache/gravitino-playground:trino-435-gravitino-1.0.0
   - Use Gravitino release 1.0.0 Dockerfile to build the image.
