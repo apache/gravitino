@@ -310,7 +310,8 @@ public class LanceCatalogOperations implements LakehouseCatalogOperations {
         // API only supports these index types for now, but there are more index types in Lance.
       case SCALAR, BTREE, INVERTED, BITMAP -> indexType;
         // According to real test, we need to map IVF_SQ/IVF_PQ/IVF_HNSW_SQ to VECTOR type in Lance,
-        // or it will throw exception.
+        // or it will throw exception. For more, please refer to
+        // https://github.com/lancedb/lance/issues/5182#issuecomment-3524372490
       case IVF_FLAT, IVF_PQ, IVF_HNSW_SQ -> IndexType.VECTOR;
       default -> throw new IllegalArgumentException("Unsupported index type: " + indexType);
     };
