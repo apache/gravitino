@@ -225,3 +225,11 @@ CREATE TABLE gt_mysql_test_column_properties.demo_default_value_with_expression
   timestamp_col_1 timestamp default CURRENT_TIMESTAMP,
   timestamp_col_2 timestamp(6) default CURRENT_TIMESTAMP(6)
 );
+CREATE DATABASE gt_mysql_test_table_statistics;
+CREATE TABLE gt_mysql_test_table_statistics.table01
+(
+  key1 int PRIMARY KEY,
+  value1 int
+);
+INSERT INTO gt_mysql_test_table_statistics.table01 VALUES (1, 1), (2, 2);
+ANALYZE TABLE gt_mysql_test_table_statistics.table01;
