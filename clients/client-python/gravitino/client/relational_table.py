@@ -15,7 +15,7 @@
 # specific language governing permissions and limitations
 # under the License.
 
-from typing import Optional
+from typing import Optional, cast
 
 from gravitino.api.audit import Audit
 from gravitino.api.rel.column import Column
@@ -24,6 +24,7 @@ from gravitino.api.rel.expressions.sorts.sort_order import SortOrder
 from gravitino.api.rel.expressions.transforms.transform import Transform
 from gravitino.api.rel.indexes.index import Index
 from gravitino.api.rel.table import Table
+from gravitino.client.generic_column import GenericColumn
 from gravitino.namespace import Namespace
 from gravitino.utils import HTTPClient
 
@@ -61,7 +62,16 @@ class RelationalTable(Table):  # pylint: disable=too-many-instance-attributes
         return self._name
 
     def columns(self) -> list[Column]:
-        return self._columns
+        metalake, catalog, schema = self._namespace.levels()
+        return [
+            cast(
+                Column,
+                GenericColumn(
+                    c, self._rest_client, metalake, catalog, schema, self._name
+                ),
+            )
+            for c in self._columns
+        ]
 
     def partitioning(self) -> list[Transform]:
         return self._partitioning
