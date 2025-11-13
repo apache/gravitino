@@ -1245,15 +1245,14 @@ public class TestJDBCBackend {
             .withNamespace(NamespaceUtil.ofTable(metalakeName, catalog.name(), schema.name()))
             .withName("table")
             .withAuditInfo(auditInfo)
-            .withFormat("lance")
             .withComment(null)
-            .withProperties(ImmutableMap.of("format", "LANCE", "location", "/tmp/test/lance"))
+            .withProperties(ImmutableMap.of("format", "lance", "location", "/tmp/test/lance"))
             .build();
 
     backend.insert(table, false);
 
     TableEntity fetchedTable = backend.get(table.nameIdentifier(), Entity.EntityType.TABLE);
-    Assertions.assertEquals("LANCE", fetchedTable.properties().get("format"));
+    Assertions.assertEquals("lance", fetchedTable.properties().get("format"));
 
     TableEntity updatedTable =
         TableEntity.builder()
