@@ -82,7 +82,7 @@ public class RelationalEntityStoreIdResolver implements EntityIdResolver {
                 long groupId = GroupMetaService.getInstance().getGroupIdByMetalakeIdAndName(metalakeId, nameIdentifier.name());
                 return new EntityIds(groupId, metalakeId);
             default:
-                throw new I
+                throw new IllegalArgumentException("Unsupported entity type: " + type);
         }
     }
 }
