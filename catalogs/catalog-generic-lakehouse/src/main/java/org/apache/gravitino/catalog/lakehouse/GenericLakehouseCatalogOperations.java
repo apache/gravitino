@@ -307,7 +307,16 @@ public class GenericLakehouseCatalogOperations
           ident, columns, comment, newProperties, partitions, distribution, sortOrders, indexes);
     } catch (EntityAlreadyExistsException e) {
       throw new TableAlreadyExistsException(e, "Table %s already exists", ident);
-    } catch (IOException e) {
+    } catch (Exception e) {
+      // Try to roll back the metadata entry in Gravitino store
+      try {
+        store.delete(ident, Entity.EntityType.TABLE);
+      } catch (IOException ioException) {
+        LOG.error(
+            "Failed to roll back the metadata entry for table {} after physical table creation failure.",
+            ident,
+            ioException);
+      }
       throw new RuntimeException("Failed to create table " + ident, e);
     }
   }
