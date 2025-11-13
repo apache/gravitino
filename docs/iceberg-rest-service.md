@@ -425,7 +425,9 @@ Gravitino provides a pluggable metrics store interface to store and delete Icebe
 | `gravitino.iceberg-rest.metricsStoreRetainDays` | The days to retain Iceberg metrics in store, the value not greater than 0 means retain forever.                                     | -1            | No       | 0.4.0         |
 | `gravitino.iceberg-rest.metricsQueueCapacity`   | The size of queue to store metrics temporally before storing to the persistent storage. Metrics will be dropped when queue is full. | 1000          | No       | 0.4.0         |
 
-If you want to use jdbc as metrics store, you can set the `gravitino.iceberg-rest.metricsStore` to `jdbc`, and set the following configurations to connect to the database. You should initialize the database using the sql scripts in the directory `scripts`.
+If you want to use jdbc as metrics store, you can set the `gravitino.iceberg-rest.metricsStore` to `jdbc`, and set the following configurations to connect to the database.
+You should initialize the database using the sql scripts in the directory `scripts`.
+You must download the corresponding JDBC driver to the `iceberg-rest-server/libs` directory.
 
 | Configuration item                                  | Description                                                                                                                        | Default value | Required | Since Version |
 |-----------------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------|---------------|----------|---------------|

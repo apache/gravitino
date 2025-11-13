@@ -21,7 +21,9 @@ package org.apache.gravitino.iceberg.service.metrics;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.io.IOException;
+import java.sql.DatabaseMetaData;
 import java.sql.PreparedStatement;
+import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.Instant;
 import java.util.Map;
@@ -101,6 +103,39 @@ public class JDBCMetricsStore implements IcebergMetricsStore {
 
   @Override
   public void init(Map<String, String> properties) throws IOException {
+    initProperties(properties);
+    checkMetricsReportTableExists();
+  }
+
+  private void checkMetricsReportTableExists() {
+    try {
+      Preconditions.checkArgument(
+          connections.run(
+              conn -> {
+                DatabaseMetaData dbMeta = conn.getMetaData();
+                ResultSet commitReportTableExists =
+                    dbMeta.getTables(
+                        null /* catalog name */,
+                        null /* schemaPattern */,
+                        "commit_metrics_report" /* tableNamePattern */,
+                        null /* types */);
+                ResultSet scanReportTableExists =
+                    dbMeta.getTables(
+                        null /* catalog name */,
+                        null /* schemaPattern */,
+                        "scan_metrics_report" /* tableNamePattern */,
+                        null /* types */);
+
+                return commitReportTableExists.next() && scanReportTableExists.next();
+              }),
+          "JDBC metrics store tables do not exist. You should use the sql scripts under directory `scripts` to initialize the database");
+    } catch (SQLException | InterruptedException exception) {
+      throw new RuntimeException(exception);
+    }
+  }
+
+  @VisibleForTesting
+  void initProperties(Map<String, String> properties) {
     Map<String, String> actualProps = MapUtils.getPrefixMap(properties, "jdbc-metrics.");
     String uri = actualProps.get(URI);
     Preconditions.checkArgument(uri != null, "JDBC metrics store requires a \"%s\" property", URI);
@@ -193,7 +228,9 @@ public class JDBCMetricsStore implements IcebergMetricsStore {
 
   @Override
   public void close() throws IOException {
-    connections.close();
+    if (connections != null) {
+      connections.close();
+    }
   }
 
   @VisibleForTesting

@@ -156,7 +156,7 @@ public class TestJdbcMetricsStore {
 
     for (Map.Entry<String, Map<String, String>> entry : dbProperties.entrySet()) {
       JDBCMetricsStore metricsStore = new JDBCMetricsStore();
-      metricsStore.init(entry.getValue());
+      metricsStore.initProperties(entry.getValue());
 
       String gravitinoHome = System.getenv("GRAVITINO_ROOT_DIR");
       String mysqlContent =
