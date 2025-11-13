@@ -108,7 +108,8 @@ public class TypeUtils {
         MapType mapType = (MapType) logicalType;
         Type keyType = toGravitinoType(mapType.getKeyType());
         Type valueType = toGravitinoType(mapType.getValueType());
-        return Types.MapType.of(keyType, valueType, mapType.isNullable());
+        // Fix: Map value nullability should be derived from the Flink map's value type, not the map itself.
+        return Types.MapType.of(keyType, valueType, mapType.getValueType().isNullable());
       case ROW:
         RowType rowType = (RowType) logicalType;
         Types.StructType.Field[] fields =
@@ -186,64 +187,13 @@ public class TypeUtils {
           }
         }
         if (timestampType.hasTimeZone()) {
-          return DataTypes.TIMESTAMP_LTZ(precision);
+          return DataTypes.TIMESTAMP_WITH_LOCAL_TIME_ZONE(precision);
         } else {
           return DataTypes.TIMESTAMP(precision);
         }
-      case LIST:
-        Types.ListType listType = (Types.ListType) gravitinoType;
-        return DataTypes.ARRAY(
-            nullable(toFlinkType(listType.elementType()), listType.elementNullable()));
-      case MAP:
-        Types.MapType mapType = (Types.MapType) gravitinoType;
-        return DataTypes.MAP(
-            toFlinkType(mapType.keyType()),
-            nullable(toFlinkType(mapType.valueType()), mapType.valueNullable()));
-      case STRUCT:
-        Types.StructType structType = (Types.StructType) gravitinoType;
-        List<DataTypes.Field> fields =
-            Arrays.stream(structType.fields())
-                .map(
-                    f -> {
-                      if (f.comment() == null) {
-                        return DataTypes.FIELD(
-                            f.name(), nullable(toFlinkType(f.type()), f.nullable()));
-                      } else {
-                        return DataTypes.FIELD(
-                            f.name(), nullable(toFlinkType(f.type()), f.nullable()), f.comment());
-                      }
-                    })
-                .collect(Collectors.toList());
-        return DataTypes.ROW(fields);
-      case NULL:
-        return DataTypes.NULL();
-      case TIME:
-        Types.TimeType timeType = (Types.TimeType) gravitinoType;
-        int timePrecision = FLINK_SECONDS_PRECISION;
-        if (timeType.hasPrecisionSet()) {
-          timePrecision = timeType.precision();
-          if (timePrecision < FLINK_SECONDS_PRECISION || timePrecision > FLINK_NANOS_PRECISION) {
-            throw new UnsupportedOperationException(
-                "Unsupported time precision for Flink: "
-                    + timePrecision
-                    + ". Flink supports precision from 0 to 9.");
-          }
-        }
-        return DataTypes.TIME(timePrecision);
-      case INTERVAL_YEAR:
-        return DataTypes.INTERVAL(DataTypes.YEAR());
-      case INTERVAL_DAY:
-        return DataTypes.INTERVAL(DataTypes.DAY());
       default:
-        throw new UnsupportedOperationException("Not support " + gravitinoType.toString());
-    }
-  }
-
-  private static DataType nullable(DataType dataType, boolean nullable) {
-    if (nullable) {
-      return dataType.nullable();
-    } else {
-      return dataType.notNull();
+        throw new UnsupportedOperationException(
+            String.format("Not support to convert Gravitino type %s to Flink type.", gravitinoType.name()));
     }
   }
 }
