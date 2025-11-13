@@ -255,9 +255,8 @@ public class GenericLakehouseCatalogOperations
                 i -> ColumnEntity.toColumnEntity(columns[i], i, idGenerator.nextId(), auditInfo))
             .collect(Collectors.toList());
 
-    TableEntity entityToStore;
     try {
-      entityToStore =
+      TableEntity entityToStore =
           TableEntity.builder()
               .withName(ident.name())
               .withNamespace(ident.namespace())
@@ -273,40 +272,44 @@ public class GenericLakehouseCatalogOperations
               .withAuditInfo(auditInfo)
               .build();
       store.put(entityToStore);
+    } catch (EntityAlreadyExistsException e) {
+      throw new TableAlreadyExistsException(e, "Table %s already exists in the metadata", ident);
+    } catch (IOException e) {
+      throw new RuntimeException("Failed to create table metadata for " + ident, e);
+    }
 
-      // Get the value of register in table properties
-      boolean register =
-          Boolean.parseBoolean(
-              properties.getOrDefault(
-                  GenericLakehouseTablePropertiesMetadata.LAKEHOUSE_REGISTER, "false"));
-      if (register) {
-        // Do not need to create the physical table if this is a registration operation.
-        // Whether we need to check the existence of the physical table?
-        GenericLakehouseTable.Builder builder = GenericLakehouseTable.builder();
-        return builder
-            .withName(ident.name())
-            .withColumns(columns)
-            .withComment(comment)
-            .withProperties(properties)
-            .withDistribution(distribution)
-            .withIndexes(indexes)
-            .withAuditInfo(
-                AuditInfo.builder()
-                    .withCreator(PrincipalUtils.getCurrentUserName())
-                    .withCreateTime(Instant.now())
-                    .build())
-            .withPartitioning(partitions)
-            .withSortOrders(sortOrders)
-            .withFormat(LakehouseTableFormat.LANCE.lowerName())
-            .build();
-      }
+    // Get the value of register in table properties
+    boolean register =
+        Boolean.parseBoolean(
+            properties.getOrDefault(
+                GenericLakehouseTablePropertiesMetadata.LAKEHOUSE_REGISTER, "false"));
+    if (register) {
+      // Do not need to create the physical table if this is a registration operation.
+      // Whether we need to check the existence of the physical table?
+      GenericLakehouseTable.Builder builder = GenericLakehouseTable.builder();
+      return builder
+          .withName(ident.name())
+          .withColumns(columns)
+          .withComment(comment)
+          .withProperties(properties)
+          .withDistribution(distribution)
+          .withIndexes(indexes)
+          .withAuditInfo(
+              AuditInfo.builder()
+                  .withCreator(PrincipalUtils.getCurrentUserName())
+                  .withCreateTime(Instant.now())
+                  .build())
+          .withPartitioning(partitions)
+          .withSortOrders(sortOrders)
+          .withFormat(LakehouseTableFormat.LANCE.lowerName())
+          .build();
+    }
 
+    try {
       LakehouseCatalogOperations lanceCatalogOperations =
           getLakehouseCatalogOperations(newProperties);
       return lanceCatalogOperations.createTable(
           ident, columns, comment, newProperties, partitions, distribution, sortOrders, indexes);
-    } catch (EntityAlreadyExistsException e) {
-      throw new TableAlreadyExistsException(e, "Table %s already exists", ident);
     } catch (Exception e) {
       // Try to roll back the metadata entry in Gravitino store
       try {
@@ -317,6 +320,10 @@ public class GenericLakehouseCatalogOperations
             ident,
             ioException);
       }
+      if (e.getClass().isAssignableFrom(RuntimeException.class)) {
+        throw e;
+      }
+
       throw new RuntimeException("Failed to create table " + ident, e);
     }
   }
