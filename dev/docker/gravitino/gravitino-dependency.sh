@@ -95,7 +95,7 @@ cp "${gravitino_staging_dir}/${pg_driver}" "${gravitino_package_dir}/catalogs/jd
 cp "${gravitino_staging_dir}/${pg_driver}" "${gravitino_package_dir}/catalogs/lakehouse-iceberg/libs/"
 cp "${gravitino_staging_dir}/${pg_driver}" "${gravitino_iceberg_rest_dir}"
 
-iceberg_version="1.9.2"
+iceberg_version="1.10.0"
 iceberg_aws_bundle="iceberg-aws-bundle-${iceberg_version}.jar"
 wget "https://repo1.maven.org/maven2/org/apache/iceberg/iceberg-aws-bundle/${iceberg_version}/${iceberg_aws_bundle}" -O "${gravitino_staging_dir}/${iceberg_aws_bundle}"
 cp "${gravitino_staging_dir}/${iceberg_aws_bundle}" "${gravitino_iceberg_rest_dir}"
