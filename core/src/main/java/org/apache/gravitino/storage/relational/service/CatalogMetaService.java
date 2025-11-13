@@ -167,7 +167,6 @@ public class CatalogMetaService {
 
       Long metalakeId =
           CommonMetaService.getInstance().getParentEntityIdByNamespace(catalogEntity.namespace());
-      Long metalakeId =
 
 
       SessionUtils.doWithCommit(

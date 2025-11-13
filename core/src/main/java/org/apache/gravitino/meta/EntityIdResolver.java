@@ -16,12 +16,16 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.storage.relational.helper;
+package org.apache.gravitino.meta;
 
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.NameIdentifier;
 
-public interface EntityIdHelper {
+
+public interface EntityIdResolver {
     EntityIds getEntityIds(NameIdentifier nameIdentifier, Entity.EntityType type);
-    EntityIds[] batchGetEntityIds(NameIdentifier[] nameIdentifiers, Entity.EntityType type);
+
+    long getEntityId(NameIdentifier nameIdentifier, Entity.EntityType type);
+
+
 }

@@ -16,23 +16,38 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.storage.relational.helper;
+package org.apache.gravitino.meta;
+
+import com.google.common.base.Preconditions;
 
 public class EntityIds {
 
     private final long entityId;
     private final long[] namespaceIds;
 
+
     public EntityIds(long entityId, long... namespaceIds) {
+        Preconditions.checkArgument(namespaceIds != null, "namespaceIds cannot be null");
         this.entityId = entityId;
         this.namespaceIds = namespaceIds;
     }
 
-    long entityId() {
+    public EntityIds(long entityId) {
+        this(entityId, new long[0]);
+    }
+
+    public long entityId() {
         return entityId;
     }
 
-    long[] namespaceIds() {
+    public long[] namespaceIds() {
         return namespaceIds;
+    }
+
+    public long[] fullIds() {
+        long[] allIds = new long[namespaceIds.length + 1];
+        System.arraycopy(namespaceIds, 0, allIds, 0, namespaceIds.length);
+        allIds[allIds.length - 1] = entityId;
+        return allIds;
     }
 }

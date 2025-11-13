@@ -22,8 +22,11 @@ import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
+
+import com.google.common.collect.ImmutableSet;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
@@ -31,6 +34,8 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.exceptions.IllegalNameIdentifierException;
+
+import static org.apache.gravitino.Entity.EntityType.*;
 
 /**
  * A name identifier is a sequence of names separated by dots. It's used to identify a metalake, a
@@ -589,4 +594,47 @@ public class NameIdentifierUtil {
     }
     return NameIdentifier.of(allElems.get(0), allElems.get(1), allElems.get(2), allElems.get(3));
   }
+
+  public static NameIdentifier parentNameIdentifier(NameIdentifier nameIdentifier, Entity.EntityType type) {
+    Set<Entity.EntityType> supportsVirtualNamespaceTypes = ImmutableSet.of(USER, GROUP, ROLE, TAG, POLICY, JOB, JOB_TEMPLATE);
+    if (supportsVirtualNamespaceTypes.contains(type)) {
+      return NameIdentifier.of(NameIdentifierUtil.getMetalake(nameIdentifier));
+    } else if (nameIdentifier.hasNamespace()) {
+      return NameIdentifier.of(nameIdentifier.namespace().levels());
+    } else {
+      throw new IllegalArgumentException("The entity has no parent name identifier");
+    }
+  }
+
+  public static Entity.EntityType parentEntityType(Entity.EntityType type) {
+    switch (type) {
+      case COLUMN:
+        return Entity.EntityType.TABLE;
+      case MODEL_VERSION:
+        return Entity.EntityType.MODEL;
+
+      case TABLE:
+      case FILESET:
+      case MODEL:
+      case TOPIC:
+        return Entity.EntityType.SCHEMA;
+
+      case SCHEMA:
+        return Entity.EntityType.CATALOG;
+
+      case CATALOG:
+      case USER:
+      case GROUP:
+      case ROLE:
+      case TAG:
+      case POLICY:
+      case JOB:
+      case JOB_TEMPLATE:
+        return Entity.EntityType.METALAKE;
+
+      case METALAKE:
+      default:
+        throw new IllegalArgumentException("Metalake has no parent entity type");
+    }
+    }
 }
