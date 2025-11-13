@@ -74,7 +74,8 @@ public class MetadataObjects {
             || type == MetadataObject.Type.CATALOG
             || type == MetadataObject.Type.METALAKE
             || type == MetadataObject.Type.ROLE
-            || type == MetadataObject.Type.TAG,
+            || type == MetadataObject.Type.TAG
+            || type == MetadataObject.Type.POLICY,
         "If the length of names is 1, it must be the CATALOG, METALAKE,TAG, or ROLE type");
 
     Preconditions.checkArgument(

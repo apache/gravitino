@@ -182,6 +182,8 @@ public class TestSecurableObjects {
     Privilege useModel = Privileges.UseModel.allow();
     Privilege createTag = Privileges.CreateTag.allow();
     Privilege applyTag = Privileges.ApplyTag.allow();
+    Privilege createPolicy = Privileges.CreatePolicy.allow();
+    Privilege applyPolicy = Privileges.ApplyPolicy.allow();
 
     // Test create catalog
     Assertions.assertTrue(createCatalog.canBindTo(MetadataObject.Type.METALAKE));
@@ -390,6 +392,26 @@ public class TestSecurableObjects {
 
     Assertions.assertTrue(applyTag.canBindTo(MetadataObject.Type.METALAKE));
     Assertions.assertTrue(applyTag.canBindTo(MetadataObject.Type.TAG));
+    Assertions.assertFalse(applyTag.canBindTo(MetadataObject.Type.CATALOG));
+    Assertions.assertFalse(applyTag.canBindTo(MetadataObject.Type.SCHEMA));
+    Assertions.assertFalse(applyTag.canBindTo(MetadataObject.Type.TABLE));
+    Assertions.assertFalse(applyTag.canBindTo(MetadataObject.Type.MODEL));
+    Assertions.assertFalse(useModel.canBindTo(MetadataObject.Type.TOPIC));
+    Assertions.assertFalse(useModel.canBindTo(MetadataObject.Type.FILESET));
+    Assertions.assertFalse(useModel.canBindTo(MetadataObject.Type.ROLE));
+
+    Assertions.assertTrue(createPolicy.canBindTo(MetadataObject.Type.METALAKE));
+    Assertions.assertFalse(createPolicy.canBindTo(MetadataObject.Type.POLICY));
+    Assertions.assertFalse(createPolicy.canBindTo(MetadataObject.Type.CATALOG));
+    Assertions.assertFalse(createPolicy.canBindTo(MetadataObject.Type.SCHEMA));
+    Assertions.assertFalse(createPolicy.canBindTo(MetadataObject.Type.TABLE));
+    Assertions.assertFalse(createPolicy.canBindTo(MetadataObject.Type.MODEL));
+    Assertions.assertFalse(createPolicy.canBindTo(MetadataObject.Type.TOPIC));
+    Assertions.assertFalse(createPolicy.canBindTo(MetadataObject.Type.FILESET));
+    Assertions.assertFalse(createPolicy.canBindTo(MetadataObject.Type.ROLE));
+
+    Assertions.assertTrue(applyPolicy.canBindTo(MetadataObject.Type.METALAKE));
+    Assertions.assertTrue(applyPolicy.canBindTo(MetadataObject.Type.POLICY));
     Assertions.assertFalse(applyTag.canBindTo(MetadataObject.Type.CATALOG));
     Assertions.assertFalse(applyTag.canBindTo(MetadataObject.Type.SCHEMA));
     Assertions.assertFalse(applyTag.canBindTo(MetadataObject.Type.TABLE));
