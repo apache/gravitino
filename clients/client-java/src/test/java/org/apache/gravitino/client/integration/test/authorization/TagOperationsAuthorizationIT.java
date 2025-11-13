@@ -275,6 +275,7 @@ public class TagOperationsAuthorizationIT extends BaseRestApiAuthorizationIT {
             .loadTable(NameIdentifier.of(SCHEMA, "table1"))
             .supportsTags();
     String[] tagsLoadByNormalUser = tableSupportTagByNormalUser.listTags();
+    Arrays.sort(tagsLoadByNormalUser);
     assertArrayEquals(new String[] {"tag2", "tag3"}, tagsLoadByNormalUser);
   }
 
