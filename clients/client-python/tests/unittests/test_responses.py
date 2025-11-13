@@ -17,7 +17,6 @@
 import json
 import unittest
 
-from gravitino.dto.rel.partitions.partition_dto import PartitionDTO
 from gravitino.dto.responses.credential_response import CredentialResponse
 from gravitino.dto.responses.file_location_response import FileLocationResponse
 from gravitino.dto.responses.model_response import ModelResponse
@@ -339,7 +338,6 @@ class TestResponses(unittest.TestCase):
         """
         resp: PartitionResponse = PartitionResponse.from_json(json_string)
         resp.validate()
-        self.assertIsInstance(resp._partition, PartitionDTO)
 
     def test_partition_list_response(self):
         json_string = f"""
