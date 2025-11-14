@@ -21,10 +21,10 @@ Note that Gravitino uses Hadoop 3 dependencies to build Fileset catalog. Theoret
 compatible with both Hadoop 2.x and 3.x, since Gravitino doesn't leverage any new features in
 Hadoop 3. If there's any compatibility issue, please create an [issue](https://github.com/apache/gravitino/issues).
 
-In general, all schemas and filesets under a Fileset Catalog are stored in the same Hadoop cluster,
-under the location specified by the catalog itself.
+In general, the locations of all schemas and filesets under a fileset
+catalog belong to a single Hadoop cluster if they are HDFS location.
 
-The example for creating a Fileset is as follows:
+The example for creating a fileset is as follows:
 ```text
 # create fileset catalog
 curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
@@ -58,7 +58,7 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json"
 }' http://localhost:8090/api/metalakes/test/catalogs/fileset_catalog/schemas/test_schema/filesets
 ```
 
-Within a Fileset Catalog, schemas and filesets can automatically inherit configuration properties
+Within a fileset catalog, schemas and filesets can automatically inherit configuration properties
 from their parent catalog. For example, the location property can be inherited — a schema can inherit
 the catalog’s location as its base path, and a fileset can in turn inherit the schema’s location as its base path.
 
@@ -67,7 +67,7 @@ The property inheritance priority is as follows: catalog < schema < fileset.
 If a fileset needs to use a different storage path, it can specify its own location configuration to
 override the inherited one.
 
-The Fileset Catalog also supports multiple clusters. Each schema and fileset under a catalog can independently
+The fileset catalog also supports multiple clusters. Each schema and fileset under a catalog can independently
 specify their own cluster locations and connection configurations.
 
 For example, a complex catalog structure might look like this:
@@ -175,9 +175,9 @@ The Gravitino Fileset extends the following properties in the `xxx-site.xml`:
 
 | Property Name                                     | Description                                                             | Default Value | Required                                                    | Since Version |
 |---------------------------------------------------|-------------------------------------------------------------------------|---------------|-------------------------------------------------------------|---------------|
-| hadoop.security.authentication.kerberos.principal | The principal of the Kerberos authentication for HDFS client.           | (none)        | required if the value of `authentication.type` is Kerberos. | 0.1.1         |
-| hadoop.security.authentication.kerberos.keytab    | The keytab file path of the Kerberos authentication for HDFS client.    | (none)        | required if the value of `authentication.type` is Kerberos. | 0.1.1         |
-| hadoop.security.authentication.kerberos.krb5.conf | The krb5.conf file path of the Kerberos authentication for HDFS client. | (none)        | No                                                          | 0.1.1         |
+| hadoop.security.authentication.kerberos.principal | The principal of the Kerberos authentication for HDFS client.           | (none)        | required if the value of `authentication.type` is Kerberos. | 1.1.0         |
+| hadoop.security.authentication.kerberos.keytab    | The keytab file path of the Kerberos authentication for HDFS client.    | (none)        | required if the value of `authentication.type` is Kerberos. | 1.1.0         |
+| hadoop.security.authentication.kerberos.krb5.conf | The krb5.conf file path of the Kerberos authentication for HDFS client. | (none)        | No                                                          | 1.1.0         |
 
 ### Fileset catalog with Cloud Storage
 - For S3, please refer to [Fileset-catalog-with-s3](./fileset-catalog-with-s3.md) for more details.
@@ -215,7 +215,7 @@ After implementing the `FileSystemProvider` interface, you need to put the jar f
 `$GRAVITINO_HOME/catalogs/fileset/libs` directory. Then you can set the `filesystem-providers`
 property to use your custom file system provider.
 
-### Authentication for Fileset Catalog
+### Authentication for fileset catalog
 
 The Fileset catalog supports multi-level authentication to control access, allowing different authentication settings for the catalog, schema, and fileset. The priority of authentication settings is as follows: catalog < schema < fileset. Specifically:
 
