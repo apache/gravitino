@@ -53,8 +53,8 @@ import org.apache.hadoop.fs.Path;
 /**
  * Operations for interacting with a generic lakehouse catalog in Apache Gravitino.
  *
- * <p>This catalog provides a unified interface for managing lakehouse table formats. It is
- * designed to be extensible and can support various table formats through a common interface.
+ * <p>This catalog provides a unified interface for managing lakehouse table formats. It is designed
+ * to be extensible and can support various table formats through a common interface.
  *
  * <p><b>Current Implementation Status:</b>
  *
