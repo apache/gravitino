@@ -418,6 +418,13 @@ public class TagMetaService {
     return tagPO;
   }
 
+  public Long getTagIdByTagName(Long metalakeId, String tagName) {
+    return SessionUtils.getWithoutCommit(
+            TagMetaMapper.class,
+            mapper -> mapper.selectTagMetaByMetalakeIdAndName(metalakeId, tagName))
+        .getTagId();
+  }
+
   private List<TagPO> getTagPOsByMetalakeAndNames(String metalakeName, List<String> tagNames) {
     return SessionUtils.getWithoutCommit(
         TagMetaMapper.class,

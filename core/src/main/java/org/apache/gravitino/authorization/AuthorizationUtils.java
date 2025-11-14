@@ -195,6 +195,9 @@ public class AuthorizationUtils {
 
   public static void callAuthorizationPluginForMetadataObject(
       String metalake, MetadataObject metadataObject, Consumer<AuthorizationPlugin> consumer) {
+    if (metadataObject.type() == MetadataObject.Type.TAG) {
+      return;
+    }
     List<Catalog> loadedCatalogs = loadMetadataObjectCatalog(metalake, metadataObject);
     for (Catalog catalog : loadedCatalogs) {
       callAuthorizationPluginImpl(consumer, catalog);
@@ -357,7 +360,9 @@ public class AuthorizationUtils {
   }
 
   private static boolean needApplyAuthorization(MetadataObject.Type type) {
-    return type != MetadataObject.Type.ROLE && type != MetadataObject.Type.METALAKE;
+    return type != MetadataObject.Type.ROLE
+        && type != MetadataObject.Type.METALAKE
+        && type != MetadataObject.Type.TAG;
   }
 
   private static void callAuthorizationPluginImpl(

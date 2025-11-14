@@ -88,5 +88,11 @@ public class AuthorizationExpressionConstants {
               ANY_WRITE_FILESET
                   """;
 
-  public static final String getOwnerExpression = "CAN_GET_OWNER";
+  public static final String CAN_ACCESS_METADATA = "CAN_ACCESS_METADATA";
+
+  public static final String loadTagAuthorizationExpression =
+      "METALAKE::OWNER || TAG::OWNER || ANY_APPLY_TAG";
+
+  public static final String applyTagAuthorizationExpression =
+      "METALAKE::OWNER || TAG::OWNER || ANY_APPLY_TAG";
 }

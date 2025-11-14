@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.server.web.rest;
 
+import static org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants.CAN_ACCESS_METADATA;
 import static org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConverter.CAN_SET_OWNER;
 
 import com.codahale.metrics.annotation.ResponseMetered;
@@ -72,7 +73,7 @@ public class OwnerOperations {
   @Timed(name = "get-object-owner." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "get-object-owner", absolute = true)
   @AuthorizationExpression(
-      expression = "CAN_GET_OWNER",
+      expression = CAN_ACCESS_METADATA,
       errorMessage = "Current user can not get this objects's owner")
   public Response getOwnerForObject(
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)

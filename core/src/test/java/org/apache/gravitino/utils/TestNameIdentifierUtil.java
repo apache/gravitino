@@ -140,12 +140,12 @@ public class TestNameIdentifierUtil {
             IllegalArgumentException.class, () -> NameIdentifierUtil.toMetadataObject(null, null));
     assertTrue(e1.getMessage().contains("The identifier and entity type must not be null"));
 
-    // test unsupported
-    Throwable e2 =
-        assertThrows(
-            IllegalArgumentException.class,
-            () -> NameIdentifierUtil.toMetadataObject(fileset, Entity.EntityType.TAG));
-    assertTrue(e2.getMessage().contains("Entity type TAG is not supported"));
+    // test tag
+    MetadataObject expectedTagObject = MetadataObjects.parse("tag1", MetadataObject.Type.TAG);
+    MetadataObject tagObject =
+        NameIdentifierUtil.toMetadataObject(
+            NameIdentifierUtil.ofTag("metalake1", "tag1"), Entity.EntityType.TAG);
+    assertEquals(expectedTagObject, tagObject);
 
     // test model version
     Throwable e3 =

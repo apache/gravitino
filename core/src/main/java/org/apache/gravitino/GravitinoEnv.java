@@ -57,6 +57,7 @@ import org.apache.gravitino.hook.MetalakeHookDispatcher;
 import org.apache.gravitino.hook.ModelHookDispatcher;
 import org.apache.gravitino.hook.SchemaHookDispatcher;
 import org.apache.gravitino.hook.TableHookDispatcher;
+import org.apache.gravitino.hook.TagHookDispatcher;
 import org.apache.gravitino.hook.TopicHookDispatcher;
 import org.apache.gravitino.job.JobManager;
 import org.apache.gravitino.job.JobOperationDispatcher;
@@ -601,8 +602,10 @@ public class GravitinoEnv {
     this.auxServiceManager.serviceInit(config);
 
     // Create and initialize Tag related modules
-    this.tagDispatcher = new TagEventDispatcher(eventBus, new TagManager(idGenerator, entityStore));
-    // Create and initialize Policy related modules
+    TagEventDispatcher tagEventDispatcher =
+        new TagEventDispatcher(eventBus, new TagManager(idGenerator, entityStore));
+    this.tagDispatcher = new TagHookDispatcher(tagEventDispatcher);
+
     this.policyDispatcher =
         new PolicyEventDispatcher(eventBus, new PolicyManager(idGenerator, entityStore));
 
