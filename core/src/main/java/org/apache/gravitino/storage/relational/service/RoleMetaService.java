@@ -54,6 +54,7 @@ import org.apache.gravitino.storage.relational.po.SecurableObjectPO;
 import org.apache.gravitino.storage.relational.utils.ExceptionUtils;
 import org.apache.gravitino.storage.relational.utils.POConverters;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
+import org.apache.gravitino.utils.MetadataObjectUtil;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -119,8 +120,7 @@ public class RoleMetaService {
     MetadataObject metadataObject =
         NameIdentifierUtil.toMetadataObject(metadataObjectIdent, metadataObjectType);
     long metadataObjectId =
-        MetadataObjectService.getMetadataObjectId(
-            metalake, metadataObject.fullName(), metadataObject.type()).getObjectId();
+            EntityIdService.getEntityId(metadataObjectIdent, metadataObjectType);
     List<RolePO> rolePOs =
         SessionUtils.getWithoutCommit(
             RoleMetaMapper.class,
@@ -163,10 +163,10 @@ public class RoleMetaService {
       for (SecurableObject object : roleEntity.securableObjects()) {
         SecurableObjectPO.Builder objectBuilder =
             POConverters.initializeSecurablePOBuilderWithVersion(
-                roleEntity.id(), object, getEntityType(object));
-        objectBuilder.withMetadataObjectId(
-            MetadataObjectService.getMetadataObjectId(
-                metalake, object.fullName(), object.type()).getObjectId());
+                roleEntity.id(), object, getType(object));
+        NameIdentifier identifier = MetadataObjectUtil.toEntityIdent(metalake, object);
+        Entity.EntityType entityType = MetadataObjectUtil.toEntityType(object.type());
+        objectBuilder.withMetadataObjectId(EntityIdService.getEntityId(identifier, entityType));
         securableObjectPOs.add(objectBuilder.build());
       }
 
@@ -276,9 +276,12 @@ public class RoleMetaService {
     for (SecurableObject object : deleteObjects) {
       SecurableObjectPO.Builder objectBuilder =
           POConverters.initializeSecurablePOBuilderWithVersion(
-              oldRoleEntity.id(), object, getEntityType(object));
+              oldRoleEntity.id(), object, getType(object));
+      NameIdentifier nameIdentifier = MetadataObjectUtil.toEntityIdent(metalake, object);
+      Entity.EntityType entityType = MetadataObjectUtil.toEntityType(object.type());
+
       objectBuilder.withMetadataObjectId(
-          MetadataObjectService.getMetadataObjectId(metalake, object.fullName(), object.type()).getObjectId());
+          EntityIdService.getEntityId(nameIdentifier, entityType));
       securableObjectPOs.add(objectBuilder.build());
     }
     return securableObjectPOs;
@@ -456,7 +459,7 @@ public class RoleMetaService {
     return MetadataObject.Type.valueOf(type);
   }
 
-  private static String getEntityType(SecurableObject securableObject) {
+  private static String getType(SecurableObject securableObject) {
     return securableObject.type().name();
   }
 }

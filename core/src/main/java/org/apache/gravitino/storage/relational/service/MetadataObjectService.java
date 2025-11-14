@@ -21,25 +21,16 @@ package org.apache.gravitino.storage.relational.service;
 import static org.apache.gravitino.metrics.source.MetricsSource.GRAVITINO_RELATIONAL_STORE_METRIC_NAME;
 
 import com.google.common.base.Joiner;
-import com.google.common.base.Splitter;
 import com.google.common.collect.ImmutableMap;
-import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Lists;
 
 import java.util.*;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
-import org.apache.gravitino.Entity;
-import org.apache.gravitino.HasIdentifier;
-import org.apache.gravitino.MetadataObject;
-import org.apache.gravitino.MetadataObjects;
-import org.apache.gravitino.NameIdentifier;
-import org.apache.gravitino.cache.EntityCache;
+import org.apache.gravitino.*;
 import org.apache.gravitino.meta.GenericEntity;
 import org.apache.gravitino.metrics.Monitored;
-import org.apache.gravitino.storage.relational.helper.MetadataObjectIds;
-import org.apache.gravitino.storage.relational.helper.SchemaIds;
 import org.apache.gravitino.storage.relational.mapper.CatalogMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.FilesetMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.MetalakeMetaMapper;
@@ -57,8 +48,6 @@ import org.apache.gravitino.storage.relational.po.SchemaPO;
 import org.apache.gravitino.storage.relational.po.TablePO;
 import org.apache.gravitino.storage.relational.po.TopicPO;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
-import org.apache.gravitino.utils.MetadataObjectUtil;
-import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -70,11 +59,7 @@ public class MetadataObjectService {
 
   private static final String DOT = ".";
   private static final Joiner DOT_JOINER = Joiner.on(DOT);
-  private static final Splitter DOT_SPLITTER = Splitter.on(DOT);
-
   private static final Logger LOG = LoggerFactory.getLogger(MetadataObjectService.class);
-
-  private static Optional<EntityCache> entityCache = java.util.Optional.empty();
 
   static final Map<MetadataObject.Type, Function<List<Long>, Map<Long, String>>>
       TYPE_TO_FULLNAME_FUNCTION_MAP =
@@ -89,10 +74,6 @@ public class MetadataObjectService {
               MetadataObject.Type.COLUMN, MetadataObjectService::getColumnObjectsFullName);
 
   private MetadataObjectService() {}
-
-  public static void setCache(EntityCache cache) {
-    entityCache = Optional.of(cache);
-  }
 
   @Monitored(
       metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
@@ -128,81 +109,6 @@ public class MetadataObjectService {
 
     return metadataObjects;
   }
-
-  @Monitored(
-          metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
-          baseMetricName = "getMetadataObjectId")
-  public static MetadataObjectIds getMetadataObjectId(String metalake, String fullName, MetadataObject.Type type) {
-    Set<MetadataObject.Type> needMetalakeIdTypes = ImmutableSet.of(MetadataObject.Type.METALAKE, MetadataObject.Type.ROLE);
-    long metalakeId = 0L;
-
-    NameIdentifier identifier = MetadataObjectUtil.toEntityIdent(metalake, MetadataObjects.parse(fullName, type));
-    Entity.EntityType entityType = MetadataObjectUtil.toEntityType(type);
-
-    Optional<Long> objectId = entityCache.flatMap(cache -> cache.getIfPresent(identifier, entityType)).map(e -> ((HasIdentifier) e).id());
-    Optional<Long> cacheMetalakeId = entityCache.flatMap(cache -> cache.getIfPresent(NameIdentifierUtil.ofMetalake(metalake), Entity.EntityType.METALAKE)).map(e -> ((HasIdentifier) e).id());
-
-    if (objectId.isPresent() && cacheMetalakeId.isPresent()) {
-        return new MetadataObjectIds(cacheMetalakeId.get(), objectId.get());
-    }
-
-    if (objectId.isPresent() && cacheMetalakeId.isEmpty()) {
-      return new MetadataObjectIds(MetalakeMetaService.getInstance().getMetalakeIdByName(metalake), objectId.get());
-    }
-
-    if (needMetalakeIdTypes.contains(type)) {
-        metalakeId = cacheMetalakeId.orElse(MetalakeMetaService.getInstance().getMetalakeIdByName(metalake));
-    }
-
-    if (type == MetadataObject.Type.METALAKE) {
-      return new MetadataObjectIds(metalakeId, metalakeId);
-    }
-
-    if (type == MetadataObject.Type.ROLE) {
-      long roleId = RoleMetaService.getInstance().getRoleIdByMetalakeIdAndName(metalakeId, fullName);
-      return new MetadataObjectIds(metalakeId, roleId);
-    }
-
-    if (type == MetadataObject.Type.CATALOG) {
-      long catalogId = CatalogMetaService.getInstance().getCatalogIdByMetalakeAndCatalogName(metalake, fullName).getCatalogId();
-      return new MetadataObjectIds(metalakeId, catalogId);
-    }
-
-    List<String> names = DOT_SPLITTER.splitToList(fullName);
-
-    SchemaIds schemaIds = SchemaMetaService.getInstance().getSchemaIdByMetalakeNameAndCatalogNameAndSchemaName(metalake, names.get(0), names.get(1));
-
-    if (type == MetadataObject.Type.SCHEMA) {
-      return new MetadataObjectIds(schemaIds.getMetalakeId(), schemaIds.getSchemaId());
-    }
-
-    if (type == MetadataObject.Type.FILESET) {
-      long filesetId = FilesetMetaService.getInstance().getFilesetIdBySchemaIdAndName(schemaIds.getSchemaId(), names.get(2));
-      return new MetadataObjectIds(schemaIds.getMetalakeId(), filesetId);
-    } else if (type == MetadataObject.Type.TOPIC) {
-      long topicId = TopicMetaService.getInstance().getTopicIdBySchemaIdAndName(schemaIds.getSchemaId(), names.get(2));
-      return new MetadataObjectIds(schemaIds.getMetalakeId(), topicId);
-    } else if (type == MetadataObject.Type.MODEL) {
-      long modelId = ModelMetaService.getInstance()
-              .getModelIdBySchemaIdAndModelName(schemaIds.getSchemaId(), names.get(2));
-      return new MetadataObjectIds(schemaIds.getMetalakeId(), modelId);
-    }
-
-    long tableId =
-            TableMetaService.getInstance().getTableIdBySchemaIdAndName(schemaIds.getSchemaId(), names.get(2));
-    if (type == MetadataObject.Type.TABLE) {
-      return new MetadataObjectIds(schemaIds.getMetalakeId(), tableId);
-    }
-
-    if (type == MetadataObject.Type.COLUMN) {
-      long columnId = TableColumnMetaService.getInstance()
-              .getColumnIdByTableIdAndName(tableId, names.get(3));
-      return new MetadataObjectIds(schemaIds.getMetalakeId(), columnId);
-    }
-
-    throw new IllegalArgumentException(String.format("Doesn't support the type %s", type));
-  }
-
 
   /**
    * Retrieves a map of Metalake object IDs to their full names.

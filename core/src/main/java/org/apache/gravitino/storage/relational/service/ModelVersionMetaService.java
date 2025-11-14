@@ -163,7 +163,8 @@ public class ModelVersionMetaService {
     NameIdentifierUtil.checkModel(modelIdent);
 
     Long schemaId =
-        CommonMetaService.getInstance().getParentEntityIdByNamespace(modelIdent.namespace());
+        EntityIdService.getEntityId(
+            NameIdentifier.of(modelIdent.namespace().levels()), Entity.EntityType.SCHEMA);
     Long modelId =
         ModelMetaService.getInstance()
             .getModelIdBySchemaIdAndModelName(schemaId, modelIdent.name());

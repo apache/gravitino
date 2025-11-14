@@ -35,11 +35,10 @@ import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.SupportsRelationOperations;
-import org.apache.gravitino.cache.CacheFactory;
-import org.apache.gravitino.cache.EntityCache;
-import org.apache.gravitino.cache.EntityCacheRelationKey;
-import org.apache.gravitino.cache.NoOpsCache;
+import org.apache.gravitino.cache.*;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
+import org.apache.gravitino.meta.EntityIdResolver;
+import org.apache.gravitino.storage.relational.service.EntityIdService;
 import org.apache.gravitino.utils.Executable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -60,10 +59,14 @@ public class RelationalEntityStore implements EntityStore, SupportsRelationOpera
 
   @Override
   public void initialize(Config config) throws RuntimeException {
-    this.cache =
-            config.get(Configs.CACHE_ENABLED)
-                    ? CacheFactory.getEntityCache(config)
-                    : new NoOpsCache(config);
+    if (config.get(Configs.CACHE_ENABLED)) {
+      this.cache = CacheFactory.getEntityCache(config);
+      EntityIdService.initialize(new CachedEntityIdResolver(cache, new RelationalEntityStoreIdResolver()));
+    } else {
+      this.cache = new NoOpsCache(config);
+      EntityIdService.initialize(new RelationalEntityStoreIdResolver());
+    }
+
     this.backend = createRelationalEntityBackend(config);
     this.garbageCollector = new RelationalGarbageCollector(backend, config);
     this.garbageCollector.start();

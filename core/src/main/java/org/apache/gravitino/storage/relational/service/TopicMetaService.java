@@ -31,6 +31,7 @@ import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
+import org.apache.gravitino.meta.EntityIds;
 import org.apache.gravitino.meta.TopicEntity;
 import org.apache.gravitino.metrics.Monitored;
 import org.apache.gravitino.storage.relational.mapper.OwnerMetaMapper;
@@ -91,7 +92,7 @@ public class TopicMetaService {
   public List<TopicEntity> listTopicsByNamespace(Namespace namespace) {
     NamespaceUtil.checkTopic(namespace);
 
-    Long schemaId = CommonMetaService.getInstance().getParentEntityIdByNamespace(namespace);
+    Long schemaId = EntityIdService.getEntityId(NameIdentifier.of(namespace.levels()), Entity.EntityType.SCHEMA);
 
     List<TopicPO> topicPOs =
         SessionUtils.getWithoutCommit(
@@ -107,7 +108,7 @@ public class TopicMetaService {
 
     String topicName = ident.name();
 
-    Long schemaId = CommonMetaService.getInstance().getParentEntityIdByNamespace(ident.namespace());
+    Long schemaId = EntityIdService.getEntityId(NameIdentifier.of(ident.namespace().levels()), Entity.EntityType.SCHEMA);
 
     TopicPO oldTopicPO = getTopicPOBySchemaIdAndName(schemaId, topicName);
     TopicEntity oldTopicEntity = POConverters.fromTopicPO(oldTopicPO, ident.namespace());
@@ -156,11 +157,10 @@ public class TopicMetaService {
 
   private void fillTopicPOBuilderParentEntityId(TopicPO.Builder builder, Namespace namespace) {
     NamespaceUtil.checkTopic(namespace);
-    Long[] parentEntityIds =
-        CommonMetaService.getInstance().getParentEntityIdsByNamespace(namespace);
-    builder.withMetalakeId(parentEntityIds[0]);
-    builder.withCatalogId(parentEntityIds[1]);
-    builder.withSchemaId(parentEntityIds[2]);
+    EntityIds entityIds = EntityIdService.getEntityIds(NameIdentifier.of(namespace.levels()), Entity.EntityType.SCHEMA);
+    builder.withMetalakeId(entityIds.namespaceIds()[0]);
+    builder.withCatalogId(entityIds.namespaceIds()[1]);
+    builder.withSchemaId(entityIds.entityId());
   }
 
   @Monitored(
@@ -170,7 +170,7 @@ public class TopicMetaService {
     NameIdentifierUtil.checkTopic(identifier);
 
     Long schemaId =
-        CommonMetaService.getInstance().getParentEntityIdByNamespace(identifier.namespace());
+        EntityIdService.getEntityId(NameIdentifier.of(identifier.namespace().levels()), Entity.EntityType.SCHEMA);
 
     TopicPO topicPO = getTopicPOBySchemaIdAndName(schemaId, identifier.name());
 
@@ -183,8 +183,8 @@ public class TopicMetaService {
 
     String topicName = identifier.name();
 
-    Long schemaId =
-        CommonMetaService.getInstance().getParentEntityIdByNamespace(identifier.namespace());
+    Long schemaId = EntityIdService.getEntityId(NameIdentifier.of(identifier.namespace().levels()), Entity.EntityType.SCHEMA);
+
 
     Long topicId = getTopicIdBySchemaIdAndName(schemaId, topicName);
 

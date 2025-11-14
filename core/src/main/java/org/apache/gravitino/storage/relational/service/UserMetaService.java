@@ -174,9 +174,7 @@ public class UserMetaService {
   public boolean deleteUser(NameIdentifier identifier) {
     AuthorizationUtils.checkUser(identifier);
 
-    Long metalakeId =
-        MetalakeMetaService.getInstance().getMetalakeIdByName(identifier.namespace().level(0));
-    Long userId = getUserIdByMetalakeIdAndName(metalakeId, identifier.name());
+    Long userId = EntityIdService.getEntityId(identifier, Entity.EntityType.USER);
 
     SessionUtils.doMultipleWithCommit(
         () ->

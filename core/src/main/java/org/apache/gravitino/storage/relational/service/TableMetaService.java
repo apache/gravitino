@@ -33,6 +33,7 @@ import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
+import org.apache.gravitino.meta.EntityIds;
 import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.metrics.Monitored;
 import org.apache.gravitino.storage.relational.mapper.OwnerMetaMapper;
@@ -84,7 +85,8 @@ public class TableMetaService {
     NameIdentifierUtil.checkTable(identifier);
 
     Long schemaId =
-        CommonMetaService.getInstance().getParentEntityIdByNamespace(identifier.namespace());
+       EntityIdService.getEntityId(NameIdentifier.of(identifier.namespace().levels()),
+           Entity.EntityType.SCHEMA);
 
     TablePO tablePO = getTablePOBySchemaIdAndName(schemaId, identifier.name());
     List<ColumnPO> columnPOs =
@@ -100,7 +102,8 @@ public class TableMetaService {
   public List<TableEntity> listTablesByNamespace(Namespace namespace) {
     NamespaceUtil.checkTable(namespace);
 
-    Long schemaId = CommonMetaService.getInstance().getParentEntityIdByNamespace(namespace);
+    Long schemaId = EntityIdService.getEntityId(
+        NameIdentifier.of(namespace.levels()), Entity.EntityType.SCHEMA);
 
     List<TablePO> tablePOs =
         SessionUtils.getWithoutCommit(
@@ -160,7 +163,8 @@ public class TableMetaService {
     String tableName = identifier.name();
 
     Long schemaId =
-        CommonMetaService.getInstance().getParentEntityIdByNamespace(identifier.namespace());
+        EntityIdService.getEntityId(
+            NameIdentifier.of(identifier.namespace().levels()), Entity.EntityType.SCHEMA);
 
     TablePO oldTablePO = getTablePOBySchemaIdAndName(schemaId, tableName);
     List<ColumnPO> oldTableColumns =
@@ -179,8 +183,9 @@ public class TableMetaService {
     boolean isSchemaChanged = !newTableEntity.namespace().equals(oldTableEntity.namespace());
     Long newSchemaId =
         isSchemaChanged
-            ? CommonMetaService.getInstance()
-                .getParentEntityIdByNamespace(newTableEntity.namespace())
+            ? EntityIdService.getEntityId(
+                NameIdentifier.of(newTableEntity.namespace().levels()),
+                Entity.EntityType.SCHEMA)
             : schemaId;
 
     boolean isColumnChanged =
@@ -224,7 +229,8 @@ public class TableMetaService {
     String tableName = identifier.name();
 
     Long schemaId =
-        CommonMetaService.getInstance().getParentEntityIdByNamespace(identifier.namespace());
+        EntityIdService.getEntityId(
+            NameIdentifier.of(identifier.namespace().levels()), Entity.EntityType.SCHEMA);
 
     Long tableId = getTableIdBySchemaIdAndName(schemaId, tableName);
 
@@ -280,11 +286,11 @@ public class TableMetaService {
 
   private void fillTablePOBuilderParentEntityId(TablePO.Builder builder, Namespace namespace) {
     NamespaceUtil.checkTable(namespace);
-    Long[] parentEntityIds =
-        CommonMetaService.getInstance().getParentEntityIdsByNamespace(namespace);
-    builder.withMetalakeId(parentEntityIds[0]);
-    builder.withCatalogId(parentEntityIds[1]);
-    builder.withSchemaId(parentEntityIds[2]);
+    EntityIds entityIds = EntityIdService.getEntityIds(
+        NameIdentifier.of(namespace.levels()), Entity.EntityType.SCHEMA);
+    builder.withMetalakeId(entityIds.namespaceIds()[0]);
+    builder.withCatalogId(entityIds.namespaceIds()[1]);
+    builder.withSchemaId(entityIds.entityId());
   }
 
   private TablePO getTablePOBySchemaIdAndName(Long schemaId, String tableName) {

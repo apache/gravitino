@@ -31,6 +31,7 @@ import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
+import org.apache.gravitino.meta.EntityIds;
 import org.apache.gravitino.meta.FilesetEntity;
 import org.apache.gravitino.metrics.Monitored;
 import org.apache.gravitino.storage.relational.mapper.FilesetMetaMapper;
@@ -110,7 +111,7 @@ public class FilesetMetaService {
     String filesetName = identifier.name();
 
     Long schemaId =
-        CommonMetaService.getInstance().getParentEntityIdByNamespace(identifier.namespace());
+            EntityIdService.getEntityId(NameIdentifier.of(identifier.namespace().levels()), Entity.EntityType.SCHEMA);
 
     FilesetPO filesetPO = getFilesetPOBySchemaIdAndName(schemaId, filesetName);
 
@@ -123,7 +124,8 @@ public class FilesetMetaService {
   public List<FilesetEntity> listFilesetsByNamespace(Namespace namespace) {
     NamespaceUtil.checkFileset(namespace);
 
-    Long schemaId = CommonMetaService.getInstance().getParentEntityIdByNamespace(namespace);
+    Long schemaId = EntityIdService.getEntityId(
+            NameIdentifier.of(namespace.levels()), Entity.EntityType.SCHEMA);
 
     List<FilesetPO> filesetPOs =
         SessionUtils.getWithoutCommit(
@@ -182,8 +184,8 @@ public class FilesetMetaService {
 
     String filesetName = identifier.name();
 
-    Long schemaId =
-        CommonMetaService.getInstance().getParentEntityIdByNamespace(identifier.namespace());
+    Long schemaId = EntityIdService.getEntityId(
+            NameIdentifier.of(identifier.namespace().levels()), Entity.EntityType.SCHEMA);
 
     FilesetPO oldFilesetPO = getFilesetPOBySchemaIdAndName(schemaId, filesetName);
     FilesetEntity oldFilesetEntity =
@@ -247,7 +249,8 @@ public class FilesetMetaService {
     String filesetName = identifier.name();
 
     Long schemaId =
-        CommonMetaService.getInstance().getParentEntityIdByNamespace(identifier.namespace());
+            EntityIdService.getEntityId(
+                    NameIdentifier.of(identifier.namespace().levels()), Entity.EntityType.SCHEMA);
 
     Long filesetId = getFilesetIdBySchemaIdAndName(schemaId, filesetName);
 
@@ -349,10 +352,10 @@ public class FilesetMetaService {
 
   private void fillFilesetPOBuilderParentEntityId(FilesetPO.Builder builder, Namespace namespace) {
     NamespaceUtil.checkFileset(namespace);
-    Long[] parentEntityIds =
-        CommonMetaService.getInstance().getParentEntityIdsByNamespace(namespace);
-    builder.withMetalakeId(parentEntityIds[0]);
-    builder.withCatalogId(parentEntityIds[1]);
-    builder.withSchemaId(parentEntityIds[2]);
+    EntityIds entityIds = EntityIdService.getEntityIds(
+            NameIdentifier.of(namespace.levels()), Entity.EntityType.SCHEMA);
+    builder.withMetalakeId(entityIds.namespaceIds()[0]);
+    builder.withCatalogId(entityIds.namespaceIds()[1]);
+    builder.withSchemaId(entityIds.entityId());
   }
 }

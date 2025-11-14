@@ -165,9 +165,9 @@ public class CatalogMetaService {
     try {
       NameIdentifierUtil.checkCatalog(catalogEntity.nameIdentifier());
 
-      Long metalakeId =
-          CommonMetaService.getInstance().getParentEntityIdByNamespace(catalogEntity.namespace());
-
+      String metalake = NameIdentifierUtil.getMetalake(
+              catalogEntity.nameIdentifier());
+      Long metalakeId = EntityIdService.getEntityId(NameIdentifier.of(metalake), Entity.EntityType.METALAKE);
 
       SessionUtils.doWithCommit(
           CatalogMetaMapper.class,

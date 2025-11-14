@@ -219,8 +219,7 @@ public class PolicyMetaService {
     List<PolicyPO> PolicyPOs;
     try {
       Long metadataObjectId =
-          MetadataObjectService.getMetadataObjectId(
-              metalake, metadataObject.fullName(), metadataObject.type()).getObjectId();
+          EntityIdService.getEntityId(objectIdent, objectType);
 
       PolicyPOs =
           SessionUtils.getWithoutCommit(
@@ -249,9 +248,8 @@ public class PolicyMetaService {
 
     PolicyPO policyPO;
     try {
-      Long metadataObjectId =
-          MetadataObjectService.getMetadataObjectId(
-              metalake, metadataObject.fullName(), metadataObject.type()).getObjectId();
+      Long metadataObjectId = EntityIdService.getEntityId(
+          objectIdent, objectType);
 
       policyPO =
           SessionUtils.getWithoutCommit(
@@ -321,8 +319,7 @@ public class PolicyMetaService {
 
     try {
       Long metadataObjectId =
-          MetadataObjectService.getMetadataObjectId(
-              metalake, metadataObject.fullName(), metadataObject.type()).getObjectId();
+            EntityIdService.getEntityId(objectIdent, objectType);
 
       // Fetch all the policies need to associate with the metadata object.
       List<String> policyNamesToAdd =

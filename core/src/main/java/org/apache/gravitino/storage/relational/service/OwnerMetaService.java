@@ -23,7 +23,6 @@ import static org.apache.gravitino.metrics.source.MetricsSource.GRAVITINO_RELATI
 import java.util.Collections;
 import java.util.Optional;
 import org.apache.gravitino.Entity;
-import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.metrics.Monitored;
@@ -49,7 +48,7 @@ public class OwnerMetaService {
   @Monitored(metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME, baseMetricName = "getOwner")
   public Optional<Entity> getOwner(NameIdentifier identifier, Entity.EntityType type) {
 
-    Long entityId = getEntityId(identifier, type);
+    Long entityId = EntityIdService.getEntityId(identifier, type);
 
     UserPO userPO =
         SessionUtils.getWithoutCommit(
@@ -90,8 +89,8 @@ public class OwnerMetaService {
         MetalakeMetaService.getInstance()
             .getMetalakeIdByName(NameIdentifierUtil.getMetalake(entity));
 
-    Long entityId = getEntityId(entity, entityType);
-    Long ownerId = getEntityId(owner, ownerType);
+    Long entityId = EntityIdService.getEntityId(entity, entityType);
+    Long ownerId = EntityIdService.getEntityId(owner, ownerType);
 
     OwnerRelPO ownerRelPO =
         POConverters.initializeOwnerRelPOsWithVersion(
@@ -107,22 +106,5 @@ public class OwnerMetaService {
         () ->
             SessionUtils.doWithoutCommit(
                 OwnerMetaMapper.class, mapper -> mapper.insertOwnerRel(ownerRelPO)));
-  }
-
-  private static long getEntityId(NameIdentifier identifier, Entity.EntityType type) {
-    switch (type) {
-      case USER:
-        return UserMetaService.getInstance()
-            .getUserIdByMetalakeIdAndName(MetalakeMetaService.getInstance()
-                    .getMetalakeIdByName(NameIdentifierUtil.getMetalake(identifier)), identifier.name());
-      case GROUP:
-        return GroupMetaService.getInstance()
-            .getGroupIdByMetalakeIdAndName(MetalakeMetaService.getInstance()
-                    .getMetalakeIdByName(NameIdentifierUtil.getMetalake(identifier)), identifier.name());
-      default:
-        MetadataObject object = NameIdentifierUtil.toMetadataObject(identifier, type);
-        return MetadataObjectService.getMetadataObjectId(
-            NameIdentifierUtil.getMetalake(identifier), object.fullName(), object.type()).getObjectId();
-    }
   }
 }
