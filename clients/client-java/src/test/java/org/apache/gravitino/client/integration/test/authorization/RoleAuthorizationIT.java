@@ -20,6 +20,7 @@ package org.apache.gravitino.client.integration.test.authorization;
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertThrows;
 
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import org.apache.gravitino.MetadataObject;
@@ -32,6 +33,7 @@ import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestMethodOrder;
 import org.testcontainers.shaded.com.google.common.collect.ImmutableList;
+import org.testcontainers.shaded.com.google.common.collect.ImmutableSet;
 
 @Tag("gravitino-docker-test")
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
@@ -69,9 +71,25 @@ public class RoleAuthorizationIT extends BaseRestApiAuthorizationIT {
   @Order(2)
   public void testListRole() {
     String[] roleNames = client.loadMetalake(METALAKE).listRoleNames();
+    Arrays.sort(roleNames);
     assertArrayEquals(new String[] {"role1", "role2", "role3", "role4"}, roleNames);
     roleNames = normalUserClient.loadMetalake(METALAKE).listRoleNames();
+    Arrays.sort(roleNames);
     assertArrayEquals(new String[] {"role1", "role4"}, roleNames);
+    client
+        .loadMetalake(METALAKE)
+        .grantPrivilegesToRole(
+            "role1",
+            MetadataObjects.of(ImmutableList.of(METALAKE), MetadataObject.Type.METALAKE),
+            ImmutableSet.of(Privileges.ManageGrants.allow()));
+    roleNames = normalUserClient.loadMetalake(METALAKE).listRoleNames();
+    assertArrayEquals(new String[] {"role1", "role2", "role3", "role4"}, roleNames);
+    client
+        .loadMetalake(METALAKE)
+        .revokePrivilegesFromRole(
+            "role1",
+            MetadataObjects.of(ImmutableList.of(METALAKE), MetadataObject.Type.METALAKE),
+            ImmutableSet.of(Privileges.ManageGrants.allow()));
   }
 
   @Test

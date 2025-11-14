@@ -88,5 +88,9 @@ public class AuthorizationExpressionConstants {
               ANY_WRITE_FILESET
                   """;
 
-  public static final String getOwnerExpression = "CAN_GET_OWNER";
+  public static final String loadRoleAuthorizationExpression =
+      """
+          METALAKE::OWNER || METALAKE::MANAGE_GRANTS
+          || ROLE::OWNER || ROLE::SELF
+          """;
 }
