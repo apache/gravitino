@@ -99,12 +99,15 @@ public class SchemaMetaService {
             mapper ->
                 mapper.selectSchemaIdByMetalakeNameAndCatalogNameAndSchemaName(
                     metalakeName, catalogName, schemaName));
+
     if (schemaIds == null) {
       throw new NoSuchEntityException(
           NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
           Entity.EntityType.SCHEMA.name().toLowerCase(),
           schemaName);
     }
+
+    return schemaIds;
   }
 
   @Monitored(

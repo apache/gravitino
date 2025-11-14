@@ -24,5 +24,5 @@ import org.apache.gravitino.NameIdentifier;
 public interface EntityIdResolver {
   EntityIds getEntityIds(NameIdentifier nameIdentifier, Entity.EntityType type);
 
-  long getEntityId(NameIdentifier nameIdentifier, Entity.EntityType type);
+  Long getEntityId(NameIdentifier nameIdentifier, Entity.EntityType type);
 }

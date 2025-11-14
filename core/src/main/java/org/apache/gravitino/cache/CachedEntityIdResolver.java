@@ -55,7 +55,7 @@ public class CachedEntityIdResolver implements EntityIdResolver {
   }
 
   @Override
-  public long getEntityId(NameIdentifier nameIdentifier, Entity.EntityType type) {
+  public Long getEntityId(NameIdentifier nameIdentifier, Entity.EntityType type) {
     return entityCache
         .getIfPresent(nameIdentifier, type)
         .map(HasIdentifier::id)

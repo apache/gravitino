@@ -33,6 +33,7 @@ import org.apache.gravitino.storage.relational.service.MetalakeMetaService;
 import org.apache.gravitino.storage.relational.service.ModelMetaService;
 import org.apache.gravitino.storage.relational.service.RoleMetaService;
 import org.apache.gravitino.storage.relational.service.SchemaMetaService;
+import org.apache.gravitino.storage.relational.service.TableColumnMetaService;
 import org.apache.gravitino.storage.relational.service.TableMetaService;
 import org.apache.gravitino.storage.relational.service.TopicMetaService;
 import org.apache.gravitino.storage.relational.service.UserMetaService;
@@ -53,7 +54,8 @@ public class RelationalEntityStoreIdResolver implements EntityIdResolver {
           Entity.EntityType.TABLE,
           Entity.EntityType.FILESET,
           Entity.EntityType.TOPIC,
-          Entity.EntityType.MODEL);
+          Entity.EntityType.MODEL,
+          Entity.EntityType.COLUMN);
 
   @Override
   public EntityIds getEntityIds(NameIdentifier nameIdentifier, Entity.EntityType type) {
@@ -77,7 +79,7 @@ public class RelationalEntityStoreIdResolver implements EntityIdResolver {
   }
 
   @Override
-  public long getEntityId(NameIdentifier nameIdentifier, Entity.EntityType type) {
+  public Long getEntityId(NameIdentifier nameIdentifier, Entity.EntityType type) {
     if (needMetalakeId.contains(type)) {
       return getEntityIdsAboutMetalake(nameIdentifier, type).entityId();
 
@@ -141,6 +143,22 @@ public class RelationalEntityStoreIdResolver implements EntityIdResolver {
                 .getTableIdBySchemaIdAndName(schemaIds.getSchemaId(), nameIdentifier.name());
         return new EntityIds(
             tableId, schemaIds.getMetalakeId(), schemaIds.getCatalogId(), schemaIds.getSchemaId());
+      case COLUMN:
+        long columnTableId =
+            TableMetaService.getInstance()
+                .getTableIdBySchemaIdAndName(
+                    schemaIds.getSchemaId(),
+                    NameIdentifier.of(nameIdentifier.namespace().levels()).name());
+        long columnId =
+            TableColumnMetaService.getInstance()
+                .getColumnIdByTableIdAndName(columnTableId, nameIdentifier.name());
+        return new EntityIds(
+            columnId,
+            schemaIds.getMetalakeId(),
+            schemaIds.getCatalogId(),
+            schemaIds.getSchemaId(),
+            columnTableId);
+
       case FILESET:
         long filesetId =
             FilesetMetaService.getInstance()

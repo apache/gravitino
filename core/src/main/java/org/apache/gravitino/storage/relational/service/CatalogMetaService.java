@@ -92,9 +92,18 @@ public class CatalogMetaService {
       metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
       baseMetricName = "getCatalogIdByMetalakeAndCatalogName")
   public CatalogIds getCatalogIdByMetalakeAndCatalogName(String metalakeName, String catalogName) {
-    return SessionUtils.getWithoutCommit(
-        CatalogMetaMapper.class,
-        mapper -> mapper.selectCatalogIdByMetalakeNameAndCatalogName(metalakeName, catalogName));
+    CatalogIds catalogIds =
+        SessionUtils.getWithoutCommit(
+            CatalogMetaMapper.class,
+            mapper ->
+                mapper.selectCatalogIdByMetalakeNameAndCatalogName(metalakeName, catalogName));
+    if (catalogIds == null) {
+      throw new NoSuchEntityException(
+          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
+          Entity.EntityType.CATALOG.name().toLowerCase(),
+          catalogName);
+    }
+    return catalogIds;
   }
 
   @Monitored(
