@@ -249,13 +249,7 @@ public class FilesetMetaService {
   public boolean deleteFileset(NameIdentifier identifier) {
     NameIdentifierUtil.checkFileset(identifier);
 
-    String filesetName = identifier.name();
-
-    Long schemaId =
-        EntityIdService.getEntityId(
-            NameIdentifier.of(identifier.namespace().levels()), Entity.EntityType.SCHEMA);
-
-    Long filesetId = getFilesetIdBySchemaIdAndName(schemaId, filesetName);
+    Long filesetId = EntityIdService.getEntityId(identifier, Entity.EntityType.FILESET);
 
     // We should delete meta and version info
     SessionUtils.doMultipleWithCommit(

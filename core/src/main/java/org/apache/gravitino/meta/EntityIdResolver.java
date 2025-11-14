@@ -21,8 +21,24 @@ package org.apache.gravitino.meta;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.NameIdentifier;
 
+/** Interface for resolving entity IDs based on NameIdentifiers and Entity types. */
 public interface EntityIdResolver {
+
+  /**
+   * Get EntityIds for the given NameIdentifier and Entity type.
+   *
+   * @param nameIdentifier NameIdentifier of the entity.
+   * @param type Entity type.
+   * @return EntityIds corresponding to the NameIdentifier and Entity type.
+   */
   EntityIds getEntityIds(NameIdentifier nameIdentifier, Entity.EntityType type);
 
+  /**
+   * Get the entity ID for the given NameIdentifier and Entity type.
+   *
+   * @param nameIdentifier NameIdentifier of the entity.
+   * @param type Entity type.
+   * @return Entity ID corresponding to the NameIdentifier and Entity type.
+   */
   Long getEntityId(NameIdentifier nameIdentifier, Entity.EntityType type);
 }

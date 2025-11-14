@@ -244,9 +244,8 @@ public class CatalogMetaService {
   public boolean deleteCatalog(NameIdentifier identifier, boolean cascade) {
     NameIdentifierUtil.checkCatalog(identifier);
 
-    String metalakeName = identifier.namespace().level(0);
     String catalogName = identifier.name();
-    long catalogId = getCatalogIdByName(metalakeName, catalogName);
+    long catalogId = EntityIdService.getEntityId(identifier, Entity.EntityType.CATALOG);
 
     if (cascade) {
       SessionUtils.doMultipleWithCommit(

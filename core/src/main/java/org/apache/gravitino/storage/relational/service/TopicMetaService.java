@@ -188,13 +188,7 @@ public class TopicMetaService {
   public boolean deleteTopic(NameIdentifier identifier) {
     NameIdentifierUtil.checkTopic(identifier);
 
-    String topicName = identifier.name();
-
-    Long schemaId =
-        EntityIdService.getEntityId(
-            NameIdentifier.of(identifier.namespace().levels()), Entity.EntityType.SCHEMA);
-
-    Long topicId = getTopicIdBySchemaIdAndName(schemaId, topicName);
+    Long topicId = EntityIdService.getEntityId(identifier, Entity.EntityType.TOPIC);
 
     SessionUtils.doMultipleWithCommit(
         () ->

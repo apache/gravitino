@@ -40,7 +40,6 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.SupportsRelationOperations;
 import org.apache.gravitino.UnsupportedEntityTypeException;
-import org.apache.gravitino.cache.EntityCache;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.CatalogEntity;
@@ -104,11 +103,6 @@ public class JDBCBackend implements RelationalBackend {
     jdbcDatabase = startJDBCDatabaseIfNecessary(config);
     SqlSessionFactoryHelper.getInstance().init(config);
     SQLExceptionConverterFactory.initConverter(config);
-  }
-
-  @Override
-  public void initialize(Config config, EntityCache cache) {
-    initialize(config);
   }
 
   @Override

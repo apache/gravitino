@@ -84,11 +84,8 @@ public class RelationalEntityStore implements EntityStore, SupportsRelationOpera
     try {
       RelationalBackend relationalBackend =
           (RelationalBackend) Class.forName(className).getDeclaredConstructor().newInstance();
-      if (config.get(Configs.CACHE_ENABLED)) {
-        relationalBackend.initialize(config, cache);
-      } else {
-        relationalBackend.initialize(config);
-      }
+      relationalBackend.initialize(config);
+
       return relationalBackend;
     } catch (Exception e) {
       LOGGER.error(

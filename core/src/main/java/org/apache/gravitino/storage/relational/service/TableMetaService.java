@@ -228,11 +228,7 @@ public class TableMetaService {
 
     String tableName = identifier.name();
 
-    Long schemaId =
-        EntityIdService.getEntityId(
-            NameIdentifier.of(identifier.namespace().levels()), Entity.EntityType.SCHEMA);
-
-    Long tableId = getTableIdBySchemaIdAndName(schemaId, tableName);
+    Long tableId = EntityIdService.getEntityId(identifier, Entity.EntityType.TABLE);
 
     AtomicInteger deleteResult = new AtomicInteger(0);
     SessionUtils.doMultipleWithCommit(

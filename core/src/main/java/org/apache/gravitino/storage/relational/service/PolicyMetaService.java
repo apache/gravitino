@@ -93,7 +93,8 @@ public class PolicyMetaService {
     String metalakeName = ns.level(0);
 
     try {
-      Long metalakeId = MetalakeMetaService.getInstance().getMetalakeIdByName(metalakeName);
+      Long metalakeId =
+          EntityIdService.getEntityId(NameIdentifier.of(metalakeName), Entity.EntityType.METALAKE);
 
       PolicyPO.Builder builder = PolicyPO.builder().withMetalakeId(metalakeId);
       PolicyPO policyPO = POConverters.initializePolicyPOWithVersion(policyEntity, builder);
