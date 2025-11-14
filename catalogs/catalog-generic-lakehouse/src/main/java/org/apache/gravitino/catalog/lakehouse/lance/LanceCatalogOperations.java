@@ -68,8 +68,11 @@ import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.indexes.Index;
 import org.apache.gravitino.rel.indexes.Indexes.IndexImpl;
 import org.apache.gravitino.utils.PrincipalUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class LanceCatalogOperations implements LakehouseCatalogOperations {
+  private static final Logger LOG = LoggerFactory.getLogger(LanceCatalogOperations.class);
 
   private EntityStore store;
 
@@ -163,7 +166,8 @@ public class LanceCatalogOperations implements LakehouseCatalogOperations {
       throws NoSuchTableException, IllegalArgumentException {
     // Lance only supports adding indexes for now.
     List<Index> addedIndexes = Lists.newArrayList();
-
+    List<String> droppedColumns = Lists.newArrayList();
+    List<TableChange.DeleteColumn> dropColumnChanges = Lists.newArrayList();
     // Only support for adding index for now.
     for (TableChange change : changes) {
       if (change instanceof TableChange.AddIndex addIndexChange) {
@@ -174,64 +178,97 @@ public class LanceCatalogOperations implements LakehouseCatalogOperations {
                 .withFieldNames(addIndexChange.getFieldNames())
                 .build();
         addedIndexes.add(index);
+      } else if (change instanceof TableChange.DeleteColumn deleteColumn) {
+        droppedColumns.add(deleteColumn.fieldName()[0]);
+        dropColumnChanges.add(deleteColumn);
+      } else {
+        throw new UnsupportedOperationException(
+            "LanceCatalogOperations only support adding index and dropping columns for now.");
       }
     }
 
-    TableEntity updatedEntity;
+    // Check columns to drop already exist in the table.
+
+    TableEntity oldEntity;
+    TableEntity newEntity;
     try {
-      TableEntity entity = store.get(ident, Entity.EntityType.TABLE, TableEntity.class);
-      updatedEntity =
-          store.update(
-              ident,
-              TableEntity.class,
-              TABLE,
-              tableEntity ->
-                  TableEntity.builder()
-                      .withId(tableEntity.id())
-                      .withName(tableEntity.name())
-                      .withNamespace(tableEntity.namespace())
-                      .withFormat(entity.format())
-                      .withAuditInfo(
-                          AuditInfo.builder()
-                              .withCreator(tableEntity.auditInfo().creator())
-                              .withCreateTime(tableEntity.auditInfo().createTime())
-                              .withLastModifier(PrincipalUtils.getCurrentPrincipal().getName())
-                              .withLastModifiedTime(Instant.now())
-                              .build())
-                      .withColumns(tableEntity.columns())
-                      .withIndexes(
-                          ArrayUtils.addAll(entity.indexes(), addedIndexes.toArray(new Index[0])))
-                      .withDistribution(tableEntity.distribution())
-                      .withPartitioning(tableEntity.partitioning())
-                      .withSortOrders(tableEntity.sortOrders())
-                      .withProperties(tableEntity.properties())
-                      .withComment(tableEntity.comment())
-                      .build());
+      oldEntity = store.get(ident, Entity.EntityType.TABLE, TableEntity.class);
+      for (TableChange.DeleteColumn dropColumnChange : dropColumnChanges) {
+        String colName = dropColumnChange.fieldName()[0];
+        boolean exist =
+            oldEntity.columns().stream().anyMatch(col -> col.name().equalsIgnoreCase(colName));
+        if (!exist && !dropColumnChange.getIfExists()) {
+          throw new IllegalArgumentException(
+              String.format(
+                  "Cannot drop column %s as it does not exist in table %s and ifExists is set to false.",
+                  colName, ident));
+        }
+      }
 
-      // Add indexes to Lance dataset
-      addLanceIndex(updatedEntity, addedIndexes);
-
-      // return the updated table
-      return GenericLakehouseTable.builder()
-          .withFormat(updatedEntity.format())
-          .withProperties(updatedEntity.properties())
-          .withAuditInfo(updatedEntity.auditInfo())
-          .withSortOrders(updatedEntity.sortOrders())
-          .withPartitioning(updatedEntity.partitioning())
-          .withDistribution(updatedEntity.distribution())
-          .withColumns(EntityConverter.toColumns(updatedEntity.columns()))
-          .withIndexes(updatedEntity.indexes())
-          .withName(updatedEntity.name())
-          .withComment(updatedEntity.comment())
-          .build();
+      newEntity =
+          TableEntity.builder()
+              .withId(oldEntity.id())
+              .withName(oldEntity.name())
+              .withNamespace(oldEntity.namespace())
+              .withFormat(oldEntity.format())
+              .withAuditInfo(
+                  AuditInfo.builder()
+                      .withCreator(oldEntity.auditInfo().creator())
+                      .withCreateTime(oldEntity.auditInfo().createTime())
+                      .withLastModifier(PrincipalUtils.getCurrentPrincipal().getName())
+                      .withLastModifiedTime(Instant.now())
+                      .build())
+              .withColumns(
+                  oldEntity.columns().stream()
+                      .filter(col -> !droppedColumns.contains(col.name()))
+                      .collect(Collectors.toList()))
+              .withIndexes(
+                  ArrayUtils.addAll(oldEntity.indexes(), addedIndexes.toArray(new Index[0])))
+              .withDistribution(oldEntity.distribution())
+              .withPartitioning(oldEntity.partitioning())
+              .withSortOrders(oldEntity.sortOrders())
+              .withProperties(oldEntity.properties())
+              .withComment(oldEntity.comment())
+              .build();
+      store.update(ident, TableEntity.class, TABLE, tableEntity -> newEntity);
     } catch (NoSuchEntityException e) {
-      throw new NoSuchTableException("No such table: %s", ident);
-    } catch (IOException ioe) {
-      throw new RuntimeException("Failed to load table entity for: " + ident, ioe);
+      throw new NoSuchTableException("Table does not exist: %s", ident);
+    } catch (IOException e) {
+      throw new RuntimeException("Failed to load table entity for: " + ident, e);
+    }
+
+    try {
+      handleTableChange(newEntity, addedIndexes, droppedColumns);
+      return GenericLakehouseTable.builder()
+          .withFormat(newEntity.format())
+          .withProperties(newEntity.properties())
+          .withAuditInfo(newEntity.auditInfo())
+          .withSortOrders(newEntity.sortOrders())
+          .withPartitioning(newEntity.partitioning())
+          .withDistribution(newEntity.distribution())
+          .withColumns(EntityConverter.toColumns(newEntity.columns()))
+          .withIndexes(newEntity.indexes())
+          .withName(newEntity.name())
+          .withComment(newEntity.comment())
+          .build();
+    } catch (Exception e) {
+      try {
+        // Rollback to old entity if update fails.
+        store.update(ident, TableEntity.class, TABLE, tableEntity -> oldEntity);
+      } catch (Exception ex) {
+        LOG.error("Failed to rollback table entity for: " + ident, ex);
+      }
+
+      if (e.getClass().isAssignableFrom(RuntimeException.class)) {
+        throw e;
+      }
+
+      throw new RuntimeException("Failed to update table entity for: " + ident, e);
     }
   }
 
-  private void addLanceIndex(TableEntity updatedEntity, List<Index> addedIndexes) {
+  private void handleTableChange(
+      TableEntity updatedEntity, List<Index> addedIndexes, List<String> columnsToDrop) {
     String location =
         updatedEntity.properties().get(GenericLakehouseTablePropertiesMetadata.LAKEHOUSE_LOCATION);
     try (Dataset dataset = Dataset.open(location, new RootAllocator())) {
@@ -248,6 +285,10 @@ public class LanceCatalogOperations implements LakehouseCatalogOperations {
             Optional.of(index.name()),
             indexParams,
             true);
+      }
+
+      if (!columnsToDrop.isEmpty()) {
+        dataset.dropColumns(columnsToDrop);
       }
     }
   }
