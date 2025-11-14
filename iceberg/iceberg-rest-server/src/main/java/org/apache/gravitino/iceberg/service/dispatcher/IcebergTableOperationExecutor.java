@@ -28,11 +28,13 @@ import org.apache.gravitino.listener.api.event.IcebergRequestContext;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.rest.requests.CreateTableRequest;
+import org.apache.iceberg.rest.requests.PlanTableScanRequest;
 import org.apache.iceberg.rest.requests.RenameTableRequest;
 import org.apache.iceberg.rest.requests.UpdateTableRequest;
 import org.apache.iceberg.rest.responses.ListTablesResponse;
 import org.apache.iceberg.rest.responses.LoadCredentialsResponse;
 import org.apache.iceberg.rest.responses.LoadTableResponse;
+import org.apache.iceberg.rest.responses.PlanTableScanResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -139,5 +141,15 @@ public class IcebergTableOperationExecutor implements IcebergTableOperationDispa
     return icebergCatalogWrapperManager
         .getCatalogWrapper(context.catalogName())
         .getTableCredentials(tableIdentifier);
+  }
+
+  @Override
+  public PlanTableScanResponse planTableScan(
+      IcebergRequestContext context,
+      TableIdentifier tableIdentifier,
+      PlanTableScanRequest scanRequest) {
+    return icebergCatalogWrapperManager
+        .getCatalogWrapper(context.catalogName())
+        .planTableScan(tableIdentifier, scanRequest);
   }
 }
