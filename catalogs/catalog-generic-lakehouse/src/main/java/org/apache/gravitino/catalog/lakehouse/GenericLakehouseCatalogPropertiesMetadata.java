@@ -16,25 +16,21 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.iceberg.service.metrics;
 
-import java.time.Instant;
+package org.apache.gravitino.catalog.lakehouse;
+
+import com.google.common.collect.ImmutableMap;
 import java.util.Map;
-import org.apache.iceberg.catalog.Namespace;
-import org.apache.iceberg.metrics.MetricsReport;
+import org.apache.gravitino.connector.BaseCatalogPropertiesMetadata;
+import org.apache.gravitino.connector.PropertyEntry;
 
-public class DummyMetricsStore implements IcebergMetricsStore {
-  public static final String ICEBERG_METRICS_STORE_DUMMY_NAME = "dummy";
+public class GenericLakehouseCatalogPropertiesMetadata extends BaseCatalogPropertiesMetadata {
 
-  @Override
-  public void init(Map<String, String> properties) {}
-
-  @Override
-  public void recordMetric(String catalog, Namespace namespace, MetricsReport metricsReport) {}
+  private static final Map<String, PropertyEntry<?>> GENERIC_LAKEHOUSE_CATALOG_PROPERTY_ENTRIES =
+      ImmutableMap.<String, PropertyEntry<?>>builder().build();
 
   @Override
-  public void close() {}
-
-  @Override
-  public synchronized void clean(Instant expireTime) {}
+  protected Map<String, PropertyEntry<?>> specificPropertyEntries() {
+    return GENERIC_LAKEHOUSE_CATALOG_PROPERTY_ENTRIES;
+  }
 }

@@ -310,7 +310,8 @@ public class IcebergTableOperations {
       return Utils.doAs(
           httpRequest,
           () -> {
-            boolean accepted = icebergMetricsManager.recordMetric(request.report());
+            boolean accepted =
+                icebergMetricsManager.recordMetric(catalogName, icebergNS, request.report());
             if (accepted) {
               return IcebergRestUtils.noContent();
             } else {

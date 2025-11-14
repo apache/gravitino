@@ -80,6 +80,9 @@ dependencies {
     exclude("org.rocksdb")
   }
 
+  testImplementation(libs.h2db)
+  testImplementation(libs.mysql.driver)
+  testImplementation(libs.postgresql.driver)
   testImplementation(libs.iceberg.aws.bundle)
   testImplementation(libs.iceberg.gcp.bundle)
   testImplementation(libs.iceberg.azure.bundle) {
