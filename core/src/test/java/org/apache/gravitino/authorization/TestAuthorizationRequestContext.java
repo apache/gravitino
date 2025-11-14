@@ -71,7 +71,6 @@ public class TestAuthorizationRequestContext {
     CountDownLatch failingStarted = new CountDownLatch(1);
     CountDownLatch allowFailToThrow = new CountDownLatch(1);
 
-    // --- Thread 1: Starts loading but FAILS ---
     Thread failingThread =
         new Thread(
             () -> {
