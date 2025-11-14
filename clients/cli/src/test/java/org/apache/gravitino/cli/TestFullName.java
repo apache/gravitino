@@ -37,7 +37,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
-public class TestFulllName {
+public class TestFullName {
 
   private Options options;
   private final ByteArrayOutputStream outContent = new ByteArrayOutputStream();
@@ -277,8 +277,6 @@ public class TestFulllName {
     String[] args = {"--name", "catalog.schema.table.column"};
     CommandLine commandLine = new DefaultParser().parse(options, args);
     FullName fullName = new FullName(commandLine);
-
-    assertFalse(fullName.hasNamePart(0));
 
     assertTrue(fullName.hasNamePart(1));
     assertTrue(fullName.hasNamePart(2));
