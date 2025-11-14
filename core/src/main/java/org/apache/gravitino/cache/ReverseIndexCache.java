@@ -29,8 +29,11 @@ import java.util.Map;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.meta.GenericEntity;
 import org.apache.gravitino.meta.GroupEntity;
+import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.meta.RoleEntity;
+import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.meta.UserEntity;
 
 /**
@@ -48,6 +51,10 @@ public class ReverseIndexCache {
     registerReverseRule(UserEntity.class, ReverseIndexRules.USER_REVERSE_RULE);
     registerReverseRule(GroupEntity.class, ReverseIndexRules.GROUP_REVERSE_RULE);
     registerReverseRule(RoleEntity.class, ReverseIndexRules.ROLE_REVERSE_RULE);
+    registerReverseRule(PolicyEntity.class, ReverseIndexRules.POLICY_REVERSE_RULE);
+    registerReverseRule(TagEntity.class, ReverseIndexRules.TAG_REVERSE_RULE);
+    registerReverseRule(
+        GenericEntity.class, ReverseIndexRules.GENERIC_METADATA_OBJECT_REVERSE_RULE);
   }
 
   public boolean remove(EntityCacheKey key) {
@@ -73,6 +80,7 @@ public class ReverseIndexCache {
   public void put(
       NameIdentifier nameIdentifier, Entity.EntityType type, EntityCacheRelationKey key) {
     EntityCacheKey entityCacheKey = EntityCacheKey.of(nameIdentifier, type);
+
     List<EntityCacheKey> existingKeys = reverseIndex.getValueForExactKey(entityCacheKey.toString());
     if (existingKeys == null) {
       reverseIndex.put(entityCacheKey.toString(), List.of(key));
