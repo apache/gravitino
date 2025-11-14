@@ -92,7 +92,9 @@ public class TopicMetaService {
   public List<TopicEntity> listTopicsByNamespace(Namespace namespace) {
     NamespaceUtil.checkTopic(namespace);
 
-    Long schemaId = EntityIdService.getEntityId(NameIdentifier.of(namespace.levels()), Entity.EntityType.SCHEMA);
+    Long schemaId =
+        EntityIdService.getEntityId(
+            NameIdentifier.of(namespace.levels()), Entity.EntityType.SCHEMA);
 
     List<TopicPO> topicPOs =
         SessionUtils.getWithoutCommit(
@@ -108,7 +110,9 @@ public class TopicMetaService {
 
     String topicName = ident.name();
 
-    Long schemaId = EntityIdService.getEntityId(NameIdentifier.of(ident.namespace().levels()), Entity.EntityType.SCHEMA);
+    Long schemaId =
+        EntityIdService.getEntityId(
+            NameIdentifier.of(ident.namespace().levels()), Entity.EntityType.SCHEMA);
 
     TopicPO oldTopicPO = getTopicPOBySchemaIdAndName(schemaId, topicName);
     TopicEntity oldTopicEntity = POConverters.fromTopicPO(oldTopicPO, ident.namespace());
@@ -157,7 +161,9 @@ public class TopicMetaService {
 
   private void fillTopicPOBuilderParentEntityId(TopicPO.Builder builder, Namespace namespace) {
     NamespaceUtil.checkTopic(namespace);
-    EntityIds entityIds = EntityIdService.getEntityIds(NameIdentifier.of(namespace.levels()), Entity.EntityType.SCHEMA);
+    EntityIds entityIds =
+        EntityIdService.getEntityIds(
+            NameIdentifier.of(namespace.levels()), Entity.EntityType.SCHEMA);
     builder.withMetalakeId(entityIds.namespaceIds()[0]);
     builder.withCatalogId(entityIds.namespaceIds()[1]);
     builder.withSchemaId(entityIds.entityId());
@@ -170,7 +176,8 @@ public class TopicMetaService {
     NameIdentifierUtil.checkTopic(identifier);
 
     Long schemaId =
-        EntityIdService.getEntityId(NameIdentifier.of(identifier.namespace().levels()), Entity.EntityType.SCHEMA);
+        EntityIdService.getEntityId(
+            NameIdentifier.of(identifier.namespace().levels()), Entity.EntityType.SCHEMA);
 
     TopicPO topicPO = getTopicPOBySchemaIdAndName(schemaId, identifier.name());
 
@@ -183,8 +190,9 @@ public class TopicMetaService {
 
     String topicName = identifier.name();
 
-    Long schemaId = EntityIdService.getEntityId(NameIdentifier.of(identifier.namespace().levels()), Entity.EntityType.SCHEMA);
-
+    Long schemaId =
+        EntityIdService.getEntityId(
+            NameIdentifier.of(identifier.namespace().levels()), Entity.EntityType.SCHEMA);
 
     Long topicId = getTopicIdBySchemaIdAndName(schemaId, topicName);
 

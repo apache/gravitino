@@ -22,32 +22,31 @@ import com.google.common.base.Preconditions;
 
 public class EntityIds {
 
-    private final long entityId;
-    private final long[] namespaceIds;
+  private final long entityId;
+  private final long[] namespaceIds;
 
+  public EntityIds(long entityId, long... namespaceIds) {
+    Preconditions.checkArgument(namespaceIds != null, "namespaceIds cannot be null");
+    this.entityId = entityId;
+    this.namespaceIds = namespaceIds;
+  }
 
-    public EntityIds(long entityId, long... namespaceIds) {
-        Preconditions.checkArgument(namespaceIds != null, "namespaceIds cannot be null");
-        this.entityId = entityId;
-        this.namespaceIds = namespaceIds;
-    }
+  public EntityIds(long entityId) {
+    this(entityId, new long[0]);
+  }
 
-    public EntityIds(long entityId) {
-        this(entityId, new long[0]);
-    }
+  public long entityId() {
+    return entityId;
+  }
 
-    public long entityId() {
-        return entityId;
-    }
+  public long[] namespaceIds() {
+    return namespaceIds;
+  }
 
-    public long[] namespaceIds() {
-        return namespaceIds;
-    }
-
-    public long[] fullIds() {
-        long[] allIds = new long[namespaceIds.length + 1];
-        System.arraycopy(namespaceIds, 0, allIds, 0, namespaceIds.length);
-        allIds[allIds.length - 1] = entityId;
-        return allIds;
-    }
+  public long[] fullIds() {
+    long[] allIds = new long[namespaceIds.length + 1];
+    System.arraycopy(namespaceIds, 0, allIds, 0, namespaceIds.length);
+    allIds[allIds.length - 1] = entityId;
+    return allIds;
+  }
 }

@@ -26,11 +26,12 @@ import org.apache.gravitino.meta.EntityIdResolver;
 import org.apache.gravitino.meta.EntityIds;
 
 /**
- * Service class to resolve entity IDs based on NameIdentifiers and Entity types.
- * This class must be initialized with an EntityIdResolver before use.
+ * Service class to resolve entity IDs based on NameIdentifiers and Entity types. This class must be
+ * initialized with an EntityIdResolver before use.
  */
 public class EntityIdService {
   private static EntityIdResolver entityIdResolver;
+
   private EntityIdService() {}
 
   public static void initialize(EntityIdResolver idResolver) {

@@ -111,7 +111,8 @@ public class FilesetMetaService {
     String filesetName = identifier.name();
 
     Long schemaId =
-            EntityIdService.getEntityId(NameIdentifier.of(identifier.namespace().levels()), Entity.EntityType.SCHEMA);
+        EntityIdService.getEntityId(
+            NameIdentifier.of(identifier.namespace().levels()), Entity.EntityType.SCHEMA);
 
     FilesetPO filesetPO = getFilesetPOBySchemaIdAndName(schemaId, filesetName);
 
@@ -124,7 +125,8 @@ public class FilesetMetaService {
   public List<FilesetEntity> listFilesetsByNamespace(Namespace namespace) {
     NamespaceUtil.checkFileset(namespace);
 
-    Long schemaId = EntityIdService.getEntityId(
+    Long schemaId =
+        EntityIdService.getEntityId(
             NameIdentifier.of(namespace.levels()), Entity.EntityType.SCHEMA);
 
     List<FilesetPO> filesetPOs =
@@ -184,7 +186,8 @@ public class FilesetMetaService {
 
     String filesetName = identifier.name();
 
-    Long schemaId = EntityIdService.getEntityId(
+    Long schemaId =
+        EntityIdService.getEntityId(
             NameIdentifier.of(identifier.namespace().levels()), Entity.EntityType.SCHEMA);
 
     FilesetPO oldFilesetPO = getFilesetPOBySchemaIdAndName(schemaId, filesetName);
@@ -249,8 +252,8 @@ public class FilesetMetaService {
     String filesetName = identifier.name();
 
     Long schemaId =
-            EntityIdService.getEntityId(
-                    NameIdentifier.of(identifier.namespace().levels()), Entity.EntityType.SCHEMA);
+        EntityIdService.getEntityId(
+            NameIdentifier.of(identifier.namespace().levels()), Entity.EntityType.SCHEMA);
 
     Long filesetId = getFilesetIdBySchemaIdAndName(schemaId, filesetName);
 
@@ -352,7 +355,8 @@ public class FilesetMetaService {
 
   private void fillFilesetPOBuilderParentEntityId(FilesetPO.Builder builder, Namespace namespace) {
     NamespaceUtil.checkFileset(namespace);
-    EntityIds entityIds = EntityIdService.getEntityIds(
+    EntityIds entityIds =
+        EntityIdService.getEntityIds(
             NameIdentifier.of(namespace.levels()), Entity.EntityType.SCHEMA);
     builder.withMetalakeId(entityIds.namespaceIds()[0]);
     builder.withCatalogId(entityIds.namespaceIds()[1]);

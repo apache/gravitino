@@ -19,19 +19,19 @@
 package org.apache.gravitino.storage.relational.helper;
 
 public class MetadataObjectIds {
-    private final Long metalakeId;
-    private final Long objectId;
+  private final Long metalakeId;
+  private final Long objectId;
 
-    public MetadataObjectIds(Long metalakeId, Long objectId) {
-        this.metalakeId = metalakeId;
-        this.objectId = objectId;
-    }
+  public MetadataObjectIds(Long metalakeId, Long objectId) {
+    this.metalakeId = metalakeId;
+    this.objectId = objectId;
+  }
 
-    public Long getMetalakeId() {
-        return metalakeId;
-    }
+  public Long getMetalakeId() {
+    return metalakeId;
+  }
 
-    public Long getObjectId() {
-        return objectId;
-    }
+  public Long getObjectId() {
+    return objectId;
+  }
 }

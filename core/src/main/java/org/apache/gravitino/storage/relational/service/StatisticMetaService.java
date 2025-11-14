@@ -55,7 +55,9 @@ public class StatisticMetaService {
     List<StatisticPO> statisticPOs =
         SessionUtils.getWithoutCommit(
             StatisticMetaMapper.class,
-            mapper -> mapper.listStatisticPOsByEntityId(entityIds.namespaceIds()[0], entityIds.entityId()));
+            mapper ->
+                mapper.listStatisticPOsByEntityId(
+                    entityIds.namespaceIds()[0], entityIds.entityId()));
     return statisticPOs.stream().map(StatisticPO::fromStatisticPO).collect(Collectors.toList());
   }
 
@@ -70,7 +72,11 @@ public class StatisticMetaService {
 
     EntityIds entityIds = EntityIdService.getEntityIds(entity, type);
     List<StatisticPO> pos =
-        StatisticPO.initializeStatisticPOs(statisticEntities, entityIds.namespaceIds()[0], entityIds.entityId() , NameIdentifierUtil.toMetadataObject(entity, type).type());
+        StatisticPO.initializeStatisticPOs(
+            statisticEntities,
+            entityIds.namespaceIds()[0],
+            entityIds.entityId(),
+            NameIdentifierUtil.toMetadataObject(entity, type).type());
     SessionUtils.doWithCommit(
         StatisticMetaMapper.class,
         mapper -> mapper.batchInsertStatisticPOsOnDuplicateKeyUpdate(pos));
@@ -84,8 +90,7 @@ public class StatisticMetaService {
     if (statisticNames == null || statisticNames.isEmpty()) {
       return 0;
     }
-    Long entityId =
-            EntityIdService.getEntityId(identifier, type);
+    Long entityId = EntityIdService.getEntityId(identifier, type);
 
     return SessionUtils.doWithCommitAndFetchResult(
         StatisticMetaMapper.class,

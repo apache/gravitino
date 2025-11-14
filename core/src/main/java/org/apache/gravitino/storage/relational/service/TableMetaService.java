@@ -85,8 +85,8 @@ public class TableMetaService {
     NameIdentifierUtil.checkTable(identifier);
 
     Long schemaId =
-       EntityIdService.getEntityId(NameIdentifier.of(identifier.namespace().levels()),
-           Entity.EntityType.SCHEMA);
+        EntityIdService.getEntityId(
+            NameIdentifier.of(identifier.namespace().levels()), Entity.EntityType.SCHEMA);
 
     TablePO tablePO = getTablePOBySchemaIdAndName(schemaId, identifier.name());
     List<ColumnPO> columnPOs =
@@ -102,8 +102,9 @@ public class TableMetaService {
   public List<TableEntity> listTablesByNamespace(Namespace namespace) {
     NamespaceUtil.checkTable(namespace);
 
-    Long schemaId = EntityIdService.getEntityId(
-        NameIdentifier.of(namespace.levels()), Entity.EntityType.SCHEMA);
+    Long schemaId =
+        EntityIdService.getEntityId(
+            NameIdentifier.of(namespace.levels()), Entity.EntityType.SCHEMA);
 
     List<TablePO> tablePOs =
         SessionUtils.getWithoutCommit(
@@ -184,8 +185,7 @@ public class TableMetaService {
     Long newSchemaId =
         isSchemaChanged
             ? EntityIdService.getEntityId(
-                NameIdentifier.of(newTableEntity.namespace().levels()),
-                Entity.EntityType.SCHEMA)
+                NameIdentifier.of(newTableEntity.namespace().levels()), Entity.EntityType.SCHEMA)
             : schemaId;
 
     boolean isColumnChanged =
@@ -286,8 +286,9 @@ public class TableMetaService {
 
   private void fillTablePOBuilderParentEntityId(TablePO.Builder builder, Namespace namespace) {
     NamespaceUtil.checkTable(namespace);
-    EntityIds entityIds = EntityIdService.getEntityIds(
-        NameIdentifier.of(namespace.levels()), Entity.EntityType.SCHEMA);
+    EntityIds entityIds =
+        EntityIdService.getEntityIds(
+            NameIdentifier.of(namespace.levels()), Entity.EntityType.SCHEMA);
     builder.withMetalakeId(entityIds.namespaceIds()[0]);
     builder.withCatalogId(entityIds.namespaceIds()[1]);
     builder.withSchemaId(entityIds.entityId());

@@ -45,6 +45,7 @@ public interface RelationalBackend extends Closeable, SupportsRelationOperations
 
   /**
    * Initializes the Relational Backend environment with the provided configuration and cache.
+   *
    * @param config The configuration for the backend.
    * @param cache The entity cache to be used by the backend.
    */

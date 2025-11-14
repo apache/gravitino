@@ -18,15 +18,22 @@
  */
 package org.apache.gravitino.utils;
 
+import static org.apache.gravitino.Entity.EntityType.GROUP;
+import static org.apache.gravitino.Entity.EntityType.JOB;
+import static org.apache.gravitino.Entity.EntityType.JOB_TEMPLATE;
+import static org.apache.gravitino.Entity.EntityType.POLICY;
+import static org.apache.gravitino.Entity.EntityType.ROLE;
+import static org.apache.gravitino.Entity.EntityType.TAG;
+import static org.apache.gravitino.Entity.EntityType.USER;
+
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableSet;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
-
-import com.google.common.collect.ImmutableSet;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
@@ -34,8 +41,6 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.exceptions.IllegalNameIdentifierException;
-
-import static org.apache.gravitino.Entity.EntityType.*;
 
 /**
  * A name identifier is a sequence of names separated by dots. It's used to identify a metalake, a
@@ -595,8 +600,10 @@ public class NameIdentifierUtil {
     return NameIdentifier.of(allElems.get(0), allElems.get(1), allElems.get(2), allElems.get(3));
   }
 
-  public static NameIdentifier parentNameIdentifier(NameIdentifier nameIdentifier, Entity.EntityType type) {
-    Set<Entity.EntityType> supportsVirtualNamespaceTypes = ImmutableSet.of(USER, GROUP, ROLE, TAG, POLICY, JOB, JOB_TEMPLATE);
+  public static NameIdentifier parentNameIdentifier(
+      NameIdentifier nameIdentifier, Entity.EntityType type) {
+    Set<Entity.EntityType> supportsVirtualNamespaceTypes =
+        ImmutableSet.of(USER, GROUP, ROLE, TAG, POLICY, JOB, JOB_TEMPLATE);
     if (supportsVirtualNamespaceTypes.contains(type)) {
       return NameIdentifier.of(NameIdentifierUtil.getMetalake(nameIdentifier));
     } else if (nameIdentifier.hasNamespace()) {
@@ -636,5 +643,5 @@ public class NameIdentifierUtil {
       default:
         throw new IllegalArgumentException("Metalake has no parent entity type");
     }
-    }
+  }
 }

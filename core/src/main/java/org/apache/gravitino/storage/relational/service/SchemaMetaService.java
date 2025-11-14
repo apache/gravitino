@@ -32,7 +32,11 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NonEmptyEntityException;
-import org.apache.gravitino.meta.*;
+import org.apache.gravitino.meta.EntityIds;
+import org.apache.gravitino.meta.FilesetEntity;
+import org.apache.gravitino.meta.ModelEntity;
+import org.apache.gravitino.meta.SchemaEntity;
+import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.metrics.Monitored;
 import org.apache.gravitino.storage.relational.helper.SchemaIds;
 import org.apache.gravitino.storage.relational.mapper.FilesetMetaMapper;
@@ -89,11 +93,18 @@ public class SchemaMetaService {
       baseMetricName = "getSchemaIdByMetalakeNameAndCatalogNameAndSchemaName")
   public SchemaIds getSchemaIdByMetalakeNameAndCatalogNameAndSchemaName(
       String metalakeName, String catalogName, String schemaName) {
-    return SessionUtils.getWithoutCommit(
-        SchemaMetaMapper.class,
-        mapper ->
-            mapper.selectSchemaIdByMetalakeNameAndCatalogNameAndSchemaName(
-                metalakeName, catalogName, schemaName));
+    SchemaIds schemaIds =
+        SessionUtils.getWithoutCommit(
+            SchemaMetaMapper.class,
+            mapper ->
+                mapper.selectSchemaIdByMetalakeNameAndCatalogNameAndSchemaName(
+                    metalakeName, catalogName, schemaName));
+    if (schemaIds == null) {
+      throw new NoSuchEntityException(
+          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
+          Entity.EntityType.SCHEMA.name().toLowerCase(),
+          schemaName);
+    }
   }
 
   @Monitored(
@@ -122,7 +133,8 @@ public class SchemaMetaService {
     String schemaName = identifier.name();
 
     Long catalogId =
-        EntityIdService.getEntityId(NameIdentifier.of(identifier.namespace().levels()), Entity.EntityType.CATALOG);
+        EntityIdService.getEntityId(
+            NameIdentifier.of(identifier.namespace().levels()), Entity.EntityType.CATALOG);
 
     SchemaPO schemaPO = getSchemaPOByCatalogIdAndName(catalogId, schemaName);
 
@@ -135,8 +147,9 @@ public class SchemaMetaService {
   public List<SchemaEntity> listSchemasByNamespace(Namespace namespace) {
     NamespaceUtil.checkSchema(namespace);
 
-    Long catalogId = EntityIdService.getEntityId(
-        NameIdentifier.of(namespace.levels()), Entity.EntityType.CATALOG);
+    Long catalogId =
+        EntityIdService.getEntityId(
+            NameIdentifier.of(namespace.levels()), Entity.EntityType.CATALOG);
 
     List<SchemaPO> schemaPOs =
         SessionUtils.getWithoutCommit(
@@ -180,8 +193,8 @@ public class SchemaMetaService {
 
     String schemaName = identifier.name();
     Long catalogId =
-            EntityIdService.getEntityId(
-                NameIdentifier.of(identifier.namespace().levels()), Entity.EntityType.CATALOG);
+        EntityIdService.getEntityId(
+            NameIdentifier.of(identifier.namespace().levels()), Entity.EntityType.CATALOG);
 
     SchemaPO oldSchemaPO = getSchemaPOByCatalogIdAndName(catalogId, schemaName);
 
@@ -371,8 +384,8 @@ public class SchemaMetaService {
   private void fillSchemaPOBuilderParentEntityId(SchemaPO.Builder builder, Namespace namespace) {
     NamespaceUtil.checkSchema(namespace);
     EntityIds entityIds =
-            EntityIdService.getEntityIds(
-                NameIdentifier.of(namespace.levels()), Entity.EntityType.CATALOG);
+        EntityIdService.getEntityIds(
+            NameIdentifier.of(namespace.levels()), Entity.EntityType.CATALOG);
     builder.withMetalakeId(entityIds.namespaceIds()[0]);
     builder.withCatalogId(entityIds.entityId());
   }

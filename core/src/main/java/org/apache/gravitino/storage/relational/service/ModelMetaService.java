@@ -73,7 +73,8 @@ public class ModelMetaService {
   public List<ModelEntity> listModelsByNamespace(Namespace ns) {
     NamespaceUtil.checkModel(ns);
 
-    Long schemaId = EntityIdService.getEntityId(NameIdentifier.of(ns.levels()), Entity.EntityType.SCHEMA);
+    Long schemaId =
+        EntityIdService.getEntityId(NameIdentifier.of(ns.levels()), Entity.EntityType.SCHEMA);
 
     List<ModelPO> modelPOs =
         SessionUtils.getWithoutCommit(
@@ -123,7 +124,8 @@ public class ModelMetaService {
     Long modelId;
     try {
       schemaId =
-              EntityIdService.getEntityId(NameIdentifier.of(ident.namespace().levels()), Entity.EntityType.SCHEMA);
+          EntityIdService.getEntityId(
+              NameIdentifier.of(ident.namespace().levels()), Entity.EntityType.SCHEMA);
       modelId = getModelIdBySchemaIdAndModelName(schemaId, ident.name());
     } catch (NoSuchEntityException e) {
       LOG.warn("Failed to delete model: {}", ident, e);
@@ -234,7 +236,8 @@ public class ModelMetaService {
 
   private void fillModelPOBuilderParentEntityId(ModelPO.Builder builder, Namespace ns) {
     NamespaceUtil.checkModel(ns);
-    EntityIds entityIds = EntityIdService.getEntityIds(NameIdentifier.of(ns.levels()), Entity.EntityType.SCHEMA);
+    EntityIds entityIds =
+        EntityIdService.getEntityIds(NameIdentifier.of(ns.levels()), Entity.EntityType.SCHEMA);
     builder.withMetalakeId(entityIds.namespaceIds()[0]);
     builder.withCatalogId(entityIds.namespaceIds()[1]);
     builder.withSchemaId(entityIds.entityId());
@@ -246,7 +249,9 @@ public class ModelMetaService {
   ModelPO getModelPOByIdentifier(NameIdentifier ident) {
     NameIdentifierUtil.checkModel(ident);
 
-    Long schemaId = EntityIdService.getEntityId(NameIdentifier.of(ident.namespace().levels()), Entity.EntityType.SCHEMA);
+    Long schemaId =
+        EntityIdService.getEntityId(
+            NameIdentifier.of(ident.namespace().levels()), Entity.EntityType.SCHEMA);
 
     ModelPO modelPO =
         SessionUtils.getWithoutCommit(

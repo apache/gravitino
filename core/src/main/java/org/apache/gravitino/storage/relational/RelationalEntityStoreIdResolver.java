@@ -19,97 +19,151 @@
 package org.apache.gravitino.storage.relational;
 
 import com.google.common.collect.ImmutableSet;
+import java.util.Set;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.meta.EntityIdResolver;
 import org.apache.gravitino.meta.EntityIds;
 import org.apache.gravitino.storage.relational.helper.CatalogIds;
 import org.apache.gravitino.storage.relational.helper.SchemaIds;
-import org.apache.gravitino.storage.relational.service.*;
+import org.apache.gravitino.storage.relational.service.CatalogMetaService;
+import org.apache.gravitino.storage.relational.service.FilesetMetaService;
+import org.apache.gravitino.storage.relational.service.GroupMetaService;
+import org.apache.gravitino.storage.relational.service.MetalakeMetaService;
+import org.apache.gravitino.storage.relational.service.ModelMetaService;
+import org.apache.gravitino.storage.relational.service.RoleMetaService;
+import org.apache.gravitino.storage.relational.service.SchemaMetaService;
+import org.apache.gravitino.storage.relational.service.TableMetaService;
+import org.apache.gravitino.storage.relational.service.TopicMetaService;
+import org.apache.gravitino.storage.relational.service.UserMetaService;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 
-import java.util.Set;
-
 public class RelationalEntityStoreIdResolver implements EntityIdResolver {
-    private static final Set<Entity.EntityType> needMetalakeId = ImmutableSet.of(Entity.EntityType.METALAKE, Entity.EntityType.ROLE, Entity.EntityType.USER, Entity.EntityType.GROUP);
-    private static final Set<Entity.EntityType> needCatalogIds = ImmutableSet.of(Entity.EntityType.CATALOG);
-    private static final Set<Entity.EntityType> needSchemaIds = ImmutableSet.of(Entity.EntityType.SCHEMA, Entity.EntityType.TABLE, Entity.EntityType.FILESET, Entity.EntityType.TOPIC, Entity.EntityType.MODEL);
+  private static final Set<Entity.EntityType> needMetalakeId =
+      ImmutableSet.of(
+          Entity.EntityType.METALAKE,
+          Entity.EntityType.ROLE,
+          Entity.EntityType.USER,
+          Entity.EntityType.GROUP);
+  private static final Set<Entity.EntityType> needCatalogIds =
+      ImmutableSet.of(Entity.EntityType.CATALOG);
+  private static final Set<Entity.EntityType> needSchemaIds =
+      ImmutableSet.of(
+          Entity.EntityType.SCHEMA,
+          Entity.EntityType.TABLE,
+          Entity.EntityType.FILESET,
+          Entity.EntityType.TOPIC,
+          Entity.EntityType.MODEL);
 
-    @Override
-    public EntityIds getEntityIds(NameIdentifier nameIdentifier, Entity.EntityType type) {
-        if (needMetalakeId.contains(type)) {
-            return getEntityIdsAboutMetalake(nameIdentifier, type);
+  @Override
+  public EntityIds getEntityIds(NameIdentifier nameIdentifier, Entity.EntityType type) {
+    if (needMetalakeId.contains(type)) {
+      return getEntityIdsAboutMetalake(nameIdentifier, type);
 
-        } else if (needCatalogIds.contains(type)) {
-            CatalogIds catalogIds = CatalogMetaService.getInstance().getCatalogIdByMetalakeAndCatalogName(NameIdentifierUtil.getMetalake(nameIdentifier), NameIdentifierUtil.getCatalogIdentifier(nameIdentifier).name());
-            return new EntityIds(catalogIds.getCatalogId(), catalogIds.getMetalakeId());
+    } else if (needCatalogIds.contains(type)) {
+      CatalogIds catalogIds =
+          CatalogMetaService.getInstance()
+              .getCatalogIdByMetalakeAndCatalogName(
+                  NameIdentifierUtil.getMetalake(nameIdentifier),
+                  NameIdentifierUtil.getCatalogIdentifier(nameIdentifier).name());
+      return new EntityIds(catalogIds.getCatalogId(), catalogIds.getMetalakeId());
 
-        } else if (needSchemaIds.contains(type)) {
-            return getEntityIdsAboutSchema(nameIdentifier, type);
+    } else if (needSchemaIds.contains(type)) {
+      return getEntityIdsAboutSchema(nameIdentifier, type);
 
-        } else {
-            throw new IllegalArgumentException("Unsupported entity type: " + type);
-        }
+    } else {
+      throw new IllegalArgumentException("Unsupported entity type: " + type);
     }
+  }
 
-    @Override
-    public long getEntityId(NameIdentifier nameIdentifier, Entity.EntityType type) {
-        if (needMetalakeId.contains(type)) {
-            return getEntityIdsAboutMetalake(nameIdentifier, type).entityId();
+  @Override
+  public long getEntityId(NameIdentifier nameIdentifier, Entity.EntityType type) {
+    if (needMetalakeId.contains(type)) {
+      return getEntityIdsAboutMetalake(nameIdentifier, type).entityId();
 
-        } else if (needCatalogIds.contains(type)) {
-            return CatalogMetaService.getInstance().getCatalogIdByMetalakeAndCatalogName(NameIdentifierUtil.getMetalake(nameIdentifier), NameIdentifierUtil.getCatalogIdentifier(nameIdentifier).name()).getCatalogId();
+    } else if (needCatalogIds.contains(type)) {
+      return CatalogMetaService.getInstance()
+          .getCatalogIdByMetalakeAndCatalogName(
+              NameIdentifierUtil.getMetalake(nameIdentifier),
+              NameIdentifierUtil.getCatalogIdentifier(nameIdentifier).name())
+          .getCatalogId();
 
-        } else if (needSchemaIds.contains(type)) {
-            return getEntityIdsAboutSchema(nameIdentifier, type).entityId();
+    } else if (needSchemaIds.contains(type)) {
+      return getEntityIdsAboutSchema(nameIdentifier, type).entityId();
 
-        } else {
-            throw new IllegalArgumentException("Unsupported entity type: " + type);
-        }
+    } else {
+      throw new IllegalArgumentException("Unsupported entity type: " + type);
     }
+  }
 
-    private EntityIds getEntityIdsAboutMetalake(NameIdentifier nameIdentifier, Entity.EntityType type) {
-        long metalakeId = MetalakeMetaService.getInstance().getMetalakeIdByName(NameIdentifierUtil.getMetalake(nameIdentifier));
-        switch (type) {
-            case METALAKE:
-                return new EntityIds(metalakeId);
-            case ROLE:
-                long roleId = RoleMetaService.getInstance().getRoleIdByMetalakeIdAndName(metalakeId, nameIdentifier.name());
-                return new EntityIds(roleId, metalakeId);
-            case USER:
-                long userId = UserMetaService.getInstance().getUserIdByMetalakeIdAndName(metalakeId, nameIdentifier.name());
-                return new EntityIds(userId, metalakeId);
-            case GROUP:
-                long groupId = GroupMetaService.getInstance().getGroupIdByMetalakeIdAndName(metalakeId, nameIdentifier.name());
-                return new EntityIds(groupId, metalakeId);
-            default:
-                throw new IllegalArgumentException("Unsupported entity type: " + type);
-        }
+  private EntityIds getEntityIdsAboutMetalake(
+      NameIdentifier nameIdentifier, Entity.EntityType type) {
+    long metalakeId =
+        MetalakeMetaService.getInstance()
+            .getMetalakeIdByName(NameIdentifierUtil.getMetalake(nameIdentifier));
+    switch (type) {
+      case METALAKE:
+        return new EntityIds(metalakeId);
+      case ROLE:
+        long roleId =
+            RoleMetaService.getInstance()
+                .getRoleIdByMetalakeIdAndName(metalakeId, nameIdentifier.name());
+        return new EntityIds(roleId, metalakeId);
+      case USER:
+        long userId =
+            UserMetaService.getInstance()
+                .getUserIdByMetalakeIdAndName(metalakeId, nameIdentifier.name());
+        return new EntityIds(userId, metalakeId);
+      case GROUP:
+        long groupId =
+            GroupMetaService.getInstance()
+                .getGroupIdByMetalakeIdAndName(metalakeId, nameIdentifier.name());
+        return new EntityIds(groupId, metalakeId);
+      default:
+        throw new IllegalArgumentException("Unsupported entity type: " + type);
     }
+  }
 
-    private EntityIds getEntityIdsAboutSchema(NameIdentifier nameIdentifier, Entity.EntityType type) {
-        SchemaIds schemaIds = SchemaMetaService.getInstance().getSchemaIdByMetalakeNameAndCatalogNameAndSchemaName(
+  private EntityIds getEntityIdsAboutSchema(NameIdentifier nameIdentifier, Entity.EntityType type) {
+    SchemaIds schemaIds =
+        SchemaMetaService.getInstance()
+            .getSchemaIdByMetalakeNameAndCatalogNameAndSchemaName(
                 NameIdentifierUtil.getMetalake(nameIdentifier),
                 NameIdentifierUtil.getCatalogIdentifier(nameIdentifier).name(),
-                NameIdentifierUtil.getSchemaIdentifier(nameIdentifier).name()
-        );
-        switch (type) {
-            case SCHEMA:
-                return new EntityIds(schemaIds.getSchemaId(), schemaIds.getMetalakeId(), schemaIds.getCatalogId());
-            case TABLE:
-                long tableId = TableMetaService.getInstance().getTableIdBySchemaIdAndName(schemaIds.getSchemaId(), nameIdentifier.name());
-                return new EntityIds(tableId, schemaIds.getMetalakeId(), schemaIds.getCatalogId(), schemaIds.getSchemaId());
-            case FILESET:
-                long filesetId = FilesetMetaService.getInstance().getFilesetIdBySchemaIdAndName(schemaIds.getSchemaId(), nameIdentifier.name());
-                return new EntityIds(filesetId, schemaIds.getMetalakeId(), schemaIds.getCatalogId(), schemaIds.getSchemaId());
-            case TOPIC:
-                long topicId = TopicMetaService.getInstance().getTopicIdBySchemaIdAndName(schemaIds.getSchemaId(), nameIdentifier.name());
-                return new EntityIds(topicId, schemaIds.getMetalakeId(), schemaIds.getCatalogId(), schemaIds.getSchemaId());
-            case MODEL:
-                long modelId = ModelMetaService.getInstance().getModelIdBySchemaIdAndModelName(schemaIds.getSchemaId(), nameIdentifier.name());
-                return new EntityIds(modelId, schemaIds.getMetalakeId(), schemaIds.getCatalogId(), schemaIds.getSchemaId());
-            default:
-                throw new IllegalArgumentException("Unsupported entity type: " + type);
-        }
+                NameIdentifierUtil.getSchemaIdentifier(nameIdentifier).name());
+    switch (type) {
+      case SCHEMA:
+        return new EntityIds(
+            schemaIds.getSchemaId(), schemaIds.getMetalakeId(), schemaIds.getCatalogId());
+      case TABLE:
+        long tableId =
+            TableMetaService.getInstance()
+                .getTableIdBySchemaIdAndName(schemaIds.getSchemaId(), nameIdentifier.name());
+        return new EntityIds(
+            tableId, schemaIds.getMetalakeId(), schemaIds.getCatalogId(), schemaIds.getSchemaId());
+      case FILESET:
+        long filesetId =
+            FilesetMetaService.getInstance()
+                .getFilesetIdBySchemaIdAndName(schemaIds.getSchemaId(), nameIdentifier.name());
+        return new EntityIds(
+            filesetId,
+            schemaIds.getMetalakeId(),
+            schemaIds.getCatalogId(),
+            schemaIds.getSchemaId());
+      case TOPIC:
+        long topicId =
+            TopicMetaService.getInstance()
+                .getTopicIdBySchemaIdAndName(schemaIds.getSchemaId(), nameIdentifier.name());
+        return new EntityIds(
+            topicId, schemaIds.getMetalakeId(), schemaIds.getCatalogId(), schemaIds.getSchemaId());
+      case MODEL:
+        long modelId =
+            ModelMetaService.getInstance()
+                .getModelIdBySchemaIdAndModelName(schemaIds.getSchemaId(), nameIdentifier.name());
+        return new EntityIds(
+            modelId, schemaIds.getMetalakeId(), schemaIds.getCatalogId(), schemaIds.getSchemaId());
+      default:
+        throw new IllegalArgumentException("Unsupported entity type: " + type);
     }
+  }
 }

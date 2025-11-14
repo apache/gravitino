@@ -111,8 +111,8 @@ public class JobMetaService {
     String metalakeName = jobEntity.namespace().level(0);
 
     try {
-      long metalakeId = EntityIdService.getEntityId(
-          NameIdentifier.of(metalakeName), Entity.EntityType.METALAKE);
+      long metalakeId =
+          EntityIdService.getEntityId(NameIdentifier.of(metalakeName), Entity.EntityType.METALAKE);
 
       JobPO.JobPOBuilder builder = JobPO.builder().withMetalakeId(metalakeId);
       JobPO jobPO = JobPO.initializeJobPO(jobEntity, builder);

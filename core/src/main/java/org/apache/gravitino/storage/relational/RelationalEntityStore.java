@@ -35,9 +35,12 @@ import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.SupportsRelationOperations;
-import org.apache.gravitino.cache.*;
+import org.apache.gravitino.cache.CacheFactory;
+import org.apache.gravitino.cache.CachedEntityIdResolver;
+import org.apache.gravitino.cache.EntityCache;
+import org.apache.gravitino.cache.EntityCacheRelationKey;
+import org.apache.gravitino.cache.NoOpsCache;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
-import org.apache.gravitino.meta.EntityIdResolver;
 import org.apache.gravitino.storage.relational.service.EntityIdService;
 import org.apache.gravitino.utils.Executable;
 import org.slf4j.Logger;
@@ -61,7 +64,8 @@ public class RelationalEntityStore implements EntityStore, SupportsRelationOpera
   public void initialize(Config config) throws RuntimeException {
     if (config.get(Configs.CACHE_ENABLED)) {
       this.cache = CacheFactory.getEntityCache(config);
-      EntityIdService.initialize(new CachedEntityIdResolver(cache, new RelationalEntityStoreIdResolver()));
+      EntityIdService.initialize(
+          new CachedEntityIdResolver(cache, new RelationalEntityStoreIdResolver()));
     } else {
       this.cache = new NoOpsCache(config);
       EntityIdService.initialize(new RelationalEntityStoreIdResolver());

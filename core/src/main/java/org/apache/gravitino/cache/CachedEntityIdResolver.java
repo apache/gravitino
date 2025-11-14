@@ -21,36 +21,44 @@ package org.apache.gravitino.cache;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.NameIdentifier;
-import org.apache.gravitino.meta.EntityIds;
 import org.apache.gravitino.meta.EntityIdResolver;
+import org.apache.gravitino.meta.EntityIds;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 
 public class CachedEntityIdResolver implements EntityIdResolver {
 
-    private final EntityCache entityCache;
-    private final EntityIdResolver underlyingResolver;
+  private final EntityCache entityCache;
+  private final EntityIdResolver underlyingResolver;
 
-    public CachedEntityIdResolver(EntityCache entityCache, EntityIdResolver underlyingResolver) {
-        this.entityCache = entityCache;
-        this.underlyingResolver = underlyingResolver;
-    }
+  public CachedEntityIdResolver(EntityCache entityCache, EntityIdResolver underlyingResolver) {
+    this.entityCache = entityCache;
+    this.underlyingResolver = underlyingResolver;
+  }
 
-    @Override
-    public EntityIds getEntityIds(NameIdentifier nameIdentifier, Entity.EntityType type) {
-        return entityCache.getIfPresent(nameIdentifier, type).map(entity -> {
-                    if (nameIdentifier.hasNamespace()) {
-                        EntityIds namespaceIds = getEntityIds(NameIdentifierUtil.parentNameIdentifier(nameIdentifier, type), NameIdentifierUtil.parentEntityType(type));
-                        return new EntityIds(entity.id(), namespaceIds.fullIds());
-                    } else {
-                        return new EntityIds(entity.id());
-                    }
-                }).orElse(underlyingResolver.getEntityIds(nameIdentifier, type));
+  @Override
+  public EntityIds getEntityIds(NameIdentifier nameIdentifier, Entity.EntityType type) {
+    return entityCache
+        .getIfPresent(nameIdentifier, type)
+        .map(
+            entity -> {
+              if (nameIdentifier.hasNamespace()) {
+                EntityIds namespaceIds =
+                    getEntityIds(
+                        NameIdentifierUtil.parentNameIdentifier(nameIdentifier, type),
+                        NameIdentifierUtil.parentEntityType(type));
+                return new EntityIds(entity.id(), namespaceIds.fullIds());
+              } else {
+                return new EntityIds(entity.id());
+              }
+            })
+        .orElse(underlyingResolver.getEntityIds(nameIdentifier, type));
+  }
 
-    }
-
-
-    @Override
-    public long getEntityId(NameIdentifier nameIdentifier, Entity.EntityType type) {
-        return entityCache.getIfPresent(nameIdentifier, type).map(HasIdentifier::id).orElse(underlyingResolver.getEntityId(nameIdentifier, type));
-    }
+  @Override
+  public long getEntityId(NameIdentifier nameIdentifier, Entity.EntityType type) {
+    return entityCache
+        .getIfPresent(nameIdentifier, type)
+        .map(HasIdentifier::id)
+        .orElse(underlyingResolver.getEntityId(nameIdentifier, type));
+  }
 }

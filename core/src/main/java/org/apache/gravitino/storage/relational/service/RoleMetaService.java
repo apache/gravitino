@@ -119,8 +119,7 @@ public class RoleMetaService {
     String metalake = NameIdentifierUtil.getMetalake(metadataObjectIdent);
     MetadataObject metadataObject =
         NameIdentifierUtil.toMetadataObject(metadataObjectIdent, metadataObjectType);
-    long metadataObjectId =
-            EntityIdService.getEntityId(metadataObjectIdent, metadataObjectType);
+    long metadataObjectId = EntityIdService.getEntityId(metadataObjectIdent, metadataObjectType);
     List<RolePO> rolePOs =
         SessionUtils.getWithoutCommit(
             RoleMetaMapper.class,
@@ -155,8 +154,7 @@ public class RoleMetaService {
       AuthorizationUtils.checkRole(roleEntity.nameIdentifier());
 
       String metalake = NameIdentifierUtil.getMetalake(roleEntity.nameIdentifier());
-      Long metalakeId =
-          MetalakeMetaService.getInstance().getMetalakeIdByName(metalake);
+      Long metalakeId = MetalakeMetaService.getInstance().getMetalakeIdByName(metalake);
       RolePO.Builder builder = RolePO.builder().withMetalakeId(metalakeId);
       RolePO rolePO = POConverters.initializeRolePOWithVersion(roleEntity, builder);
       List<SecurableObjectPO> securableObjectPOs = Lists.newArrayList();
@@ -280,8 +278,7 @@ public class RoleMetaService {
       NameIdentifier nameIdentifier = MetadataObjectUtil.toEntityIdent(metalake, object);
       Entity.EntityType entityType = MetadataObjectUtil.toEntityType(object.type());
 
-      objectBuilder.withMetadataObjectId(
-          EntityIdService.getEntityId(nameIdentifier, entityType));
+      objectBuilder.withMetadataObjectId(EntityIdService.getEntityId(nameIdentifier, entityType));
       securableObjectPOs.add(objectBuilder.build());
     }
     return securableObjectPOs;

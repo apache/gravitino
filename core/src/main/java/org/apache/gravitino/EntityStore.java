@@ -25,7 +25,6 @@ import java.util.function.Function;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.gravitino.Entity.EntityType;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
-import org.apache.gravitino.meta.EntityIdResolver;
 import org.apache.gravitino.utils.Executable;
 
 public interface EntityStore extends Closeable {

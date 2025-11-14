@@ -201,8 +201,7 @@ public class GroupMetaService {
       NameIdentifier identifier, Function<E, E> updater) throws IOException {
     AuthorizationUtils.checkGroup(identifier);
 
-    NameIdentifier metalakeIdent =
-        NameIdentifier.of(NameIdentifierUtil.getMetalake(identifier));
+    NameIdentifier metalakeIdent = NameIdentifier.of(NameIdentifierUtil.getMetalake(identifier));
     Long metalakeId = EntityIdService.getEntityId(metalakeIdent, Entity.EntityType.METALAKE);
 
     GroupPO oldGroupPO = getGroupPOByMetalakeIdAndName(metalakeId, identifier.name());

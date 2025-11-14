@@ -65,7 +65,6 @@ import org.apache.gravitino.storage.relational.service.FilesetMetaService;
 import org.apache.gravitino.storage.relational.service.GroupMetaService;
 import org.apache.gravitino.storage.relational.service.JobMetaService;
 import org.apache.gravitino.storage.relational.service.JobTemplateMetaService;
-import org.apache.gravitino.storage.relational.service.MetadataObjectService;
 import org.apache.gravitino.storage.relational.service.MetalakeMetaService;
 import org.apache.gravitino.storage.relational.service.ModelMetaService;
 import org.apache.gravitino.storage.relational.service.ModelVersionMetaService;
@@ -98,7 +97,6 @@ public class JDBCBackend implements RelationalBackend {
 
   // Database instance of this JDBCBackend.
   private JDBCDatabase jdbcDatabase;
-  private EntityCache cache;
 
   /** Initialize the jdbc backend instance. */
   @Override
@@ -110,7 +108,6 @@ public class JDBCBackend implements RelationalBackend {
 
   @Override
   public void initialize(Config config, EntityCache cache) {
-    this.cache = cache;
     initialize(config);
   }
 

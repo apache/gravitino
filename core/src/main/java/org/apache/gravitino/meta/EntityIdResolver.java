@@ -21,11 +21,8 @@ package org.apache.gravitino.meta;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.NameIdentifier;
 
-
 public interface EntityIdResolver {
-    EntityIds getEntityIds(NameIdentifier nameIdentifier, Entity.EntityType type);
+  EntityIds getEntityIds(NameIdentifier nameIdentifier, Entity.EntityType type);
 
-    long getEntityId(NameIdentifier nameIdentifier, Entity.EntityType type);
-
-
+  long getEntityId(NameIdentifier nameIdentifier, Entity.EntityType type);
 }
