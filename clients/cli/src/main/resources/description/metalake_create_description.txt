@@ -1,0 +1,15 @@
+Create a new Metalake. You can specify a comment option to add a comment to the metalake.If no comment is provided, a default comment will be added.
+
+Note:
+The Metalake for the CLI can be set using one of the following methods:
+1. Passed in on the command line via the --metalake parameter.
+2. Set via the GRAVITINO_METALAKE environment variable.
+3. Stored in the Gravitino CLI configuration file.
+
+Example commands
+
+# Create a metalake with comment
+gcli metalake create --metalake my_metalake --comment 'This is my metalake'
+
+# Create a metalake with default settings
+gcli metalake create --metalake my_metalake

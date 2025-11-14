@@ -128,6 +128,7 @@ ognl = "3.4.7"
 concurrent-trees = "2.6.0"
 jakarta-validation = "2.0.2"
 aspectj = "1.9.24"
+picocli = "4.7.7"
 
 [libraries]
 aspectj-aspectjrt = { group = "org.aspectj", name = "aspectjrt", version.ref = "aspectj" }
@@ -302,6 +303,7 @@ concurrent-trees = { group = "com.googlecode.concurrent-trees", name = "concurre
 jcasbin = { group='org.casbin', name='jcasbin', version.ref="jcasbin" }
 openlineage-java= { group = "io.openlineage", name = "openlineage-java", version.ref = "openlineage" }
 ognl = { group='ognl', name='ognl', version.ref="ognl" }
+picocli = { group = "info.picocli", name="picocli", version.ref="picocli" }
 
 [bundles]
 log4j = ["slf4j-api", "log4j-slf4j2-impl", "log4j-api", "log4j-core", "log4j-12-api", "log4j-layout-template-json"]

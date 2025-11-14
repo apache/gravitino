@@ -1,0 +1,15 @@
+Register a new model, use --comment to add a comment and --properties to add properties.
+
+Example commands
+
+# Register a model
+gcli model create -m my_metalake --name hadoop.schema.model
+
+# Register a model with comment
+gcli model create -m my_metalake --name hadoop.schema.model --comment comment
+
+# Register a model with properties
+gcli model create -m my_metalake --name hadoop.schema.model --properties key1=val1 key2=val2
+
+# Register a model with properties" and comment
+gcli model create -m my_metalake --name hadoop.schema.model --properties key1=val1 key2=val2 --comment comment

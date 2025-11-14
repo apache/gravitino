@@ -1,0 +1,13 @@
+Set property of a model version by alias or version, use --property and --value options to set the
+property and its value, use --version or --alias specify the model version.
+
+Example commands
+
+# Set property of a model
+gcli model set -m my_metalake --name catlaog.schema.model --property key1 --value value1
+
+# Set property of a model version by alias
+gcli model set -m my_metalake --alias version_alias --property key1 --value value1
+
+# Set property of a model version by version
+gcli model set -m my_metalake --version 1 --property key1 --value value1
