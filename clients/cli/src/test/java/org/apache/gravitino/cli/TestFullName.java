@@ -271,4 +271,23 @@ public class TestFulllName {
     FullName fullName = new FullName(commandLine);
     assertEquals(4, fullName.getLevel());
   }
+
+  @Test
+  void testHasNamePartWithNegativeIndex() throws Exception {
+    String[] args = {"--name", "catalog.schema.table.column"};
+    CommandLine commandLine = new DefaultParser().parse(options, args);
+    FullName fullName = new FullName(commandLine);
+
+    assertFalse(fullName.hasNamePart(0));
+
+    assertTrue(fullName.hasNamePart(1));
+    assertTrue(fullName.hasNamePart(2));
+    assertTrue(fullName.hasNamePart(3));
+    assertTrue(fullName.hasNamePart(4));
+
+    assertFalse(fullName.hasNamePart(5));
+
+    assertFalse(fullName.hasNamePart(-1));
+    assertFalse(fullName.hasNamePart(-10));
+  }
 }
