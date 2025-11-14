@@ -35,6 +35,7 @@ mockito = "4.11.0"
 airlift-json = "237"
 airlift-resolver = "1.6"
 hive2 = "2.3.9"
+hive3 = "3.1.3"
 hadoop2 = "2.10.2"
 hadoop3 = "3.3.1"
 hadoop3-gcs = "1.9.4-hadoop3"
@@ -180,6 +181,8 @@ hive2-metastore = { group = "org.apache.hive", name = "hive-metastore", version.
 hive2-exec = { group = "org.apache.hive", name = "hive-exec", version.ref = "hive2"}
 hive2-common = { group = "org.apache.hive", name = "hive-common", version.ref = "hive2"}
 hive2-jdbc = { group = "org.apache.hive", name = "hive-jdbc", version.ref = "hive2"}
+hive3-metastore = { group = "org.apache.hive", name = "hive-metastore", version.ref = "hive3"}
+hive3-common = { group = "org.apache.hive", name = "hive-common", version.ref = "hive3"}
 hadoop2-auth = { group = "org.apache.hadoop", name = "hadoop-auth", version.ref = "hadoop2" }
 hadoop2-hdfs = { group = "org.apache.hadoop", name = "hadoop-hdfs", version.ref = "hadoop2" }
 hadoop2-hdfs-client = { group = "org.apache.hadoop", name = "hadoop-hdfs-client", version.ref = "hadoop2" }
