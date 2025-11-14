@@ -35,6 +35,7 @@ import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
+import org.apache.gravitino.meta.EntityIds;
 import org.apache.gravitino.meta.ModelEntity;
 import org.apache.gravitino.metrics.Monitored;
 import org.apache.gravitino.storage.relational.mapper.ModelMetaMapper;
@@ -72,7 +73,8 @@ public class ModelMetaService {
   public List<ModelEntity> listModelsByNamespace(Namespace ns) {
     NamespaceUtil.checkModel(ns);
 
-    Long schemaId = CommonMetaService.getInstance().getParentEntityIdByNamespace(ns);
+    Long schemaId =
+        EntityIdService.getEntityId(NameIdentifier.of(ns.levels()), Entity.EntityType.SCHEMA);
 
     List<ModelPO> modelPOs =
         SessionUtils.getWithoutCommit(
@@ -121,7 +123,9 @@ public class ModelMetaService {
     Long schemaId;
     Long modelId;
     try {
-      schemaId = CommonMetaService.getInstance().getParentEntityIdByNamespace(ident.namespace());
+      schemaId =
+          EntityIdService.getEntityId(
+              NameIdentifier.of(ident.namespace().levels()), Entity.EntityType.SCHEMA);
       modelId = getModelIdBySchemaIdAndModelName(schemaId, ident.name());
     } catch (NoSuchEntityException e) {
       LOG.warn("Failed to delete model: {}", ident, e);
@@ -196,7 +200,7 @@ public class ModelMetaService {
   @Monitored(
       metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
       baseMetricName = "getModelIdBySchemaIdAndModelName")
-  Long getModelIdBySchemaIdAndModelName(Long schemaId, String modelName) {
+  public Long getModelIdBySchemaIdAndModelName(Long schemaId, String modelName) {
     Long modelId =
         SessionUtils.getWithoutCommit(
             ModelMetaMapper.class,
@@ -232,10 +236,11 @@ public class ModelMetaService {
 
   private void fillModelPOBuilderParentEntityId(ModelPO.Builder builder, Namespace ns) {
     NamespaceUtil.checkModel(ns);
-    Long[] parentEntityIds = CommonMetaService.getInstance().getParentEntityIdsByNamespace(ns);
-    builder.withMetalakeId(parentEntityIds[0]);
-    builder.withCatalogId(parentEntityIds[1]);
-    builder.withSchemaId(parentEntityIds[2]);
+    EntityIds entityIds =
+        EntityIdService.getEntityIds(NameIdentifier.of(ns.levels()), Entity.EntityType.SCHEMA);
+    builder.withMetalakeId(entityIds.namespaceIds()[0]);
+    builder.withCatalogId(entityIds.namespaceIds()[1]);
+    builder.withSchemaId(entityIds.entityId());
   }
 
   @Monitored(
@@ -244,7 +249,9 @@ public class ModelMetaService {
   ModelPO getModelPOByIdentifier(NameIdentifier ident) {
     NameIdentifierUtil.checkModel(ident);
 
-    Long schemaId = CommonMetaService.getInstance().getParentEntityIdByNamespace(ident.namespace());
+    Long schemaId =
+        EntityIdService.getEntityId(
+            NameIdentifier.of(ident.namespace().levels()), Entity.EntityType.SCHEMA);
 
     ModelPO modelPO =
         SessionUtils.getWithoutCommit(

@@ -92,6 +92,7 @@ import org.apache.gravitino.storage.relational.mapper.CatalogMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.GroupMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.UserMetaMapper;
 import org.apache.gravitino.storage.relational.service.CatalogMetaService;
+import org.apache.gravitino.storage.relational.service.EntityIdService;
 import org.apache.gravitino.storage.relational.service.MetalakeMetaService;
 import org.apache.gravitino.storage.relational.service.RoleMetaService;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
@@ -159,6 +160,7 @@ public class TestJDBCBackend {
     try {
       backend = (RelationalBackend) Class.forName(className).getDeclaredConstructor().newInstance();
       backend.initialize(config);
+      EntityIdService.initialize(new RelationalEntityStoreIdResolver());
     } catch (Exception e) {
       throw new RuntimeException(
           "Failed to create and initialize RelationalBackend by name: " + backendName, e);

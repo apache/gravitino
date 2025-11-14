@@ -50,6 +50,7 @@ import org.apache.gravitino.storage.relational.po.RolePO;
 import org.apache.gravitino.storage.relational.utils.ExceptionUtils;
 import org.apache.gravitino.storage.relational.utils.POConverters;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
+import org.apache.gravitino.utils.NameIdentifierUtil;
 
 /** The service class for group metadata. It provides the basic database operations for group. */
 public class GroupMetaService {
@@ -100,8 +101,8 @@ public class GroupMetaService {
   public GroupEntity getGroupByIdentifier(NameIdentifier identifier) {
     AuthorizationUtils.checkGroup(identifier);
 
-    Long metalakeId =
-        MetalakeMetaService.getInstance().getMetalakeIdByName(identifier.namespace().level(0));
+    NameIdentifier metalakeIdent = NameIdentifier.of(NameIdentifierUtil.getMetalake(identifier));
+    long metalakeId = EntityIdService.getEntityId(metalakeIdent, Entity.EntityType.METALAKE);
     GroupPO groupPO = getGroupPOByMetalakeIdAndName(metalakeId, identifier.name());
     List<RolePO> rolePOs = RoleMetaService.getInstance().listRolesByGroupId(groupPO.getGroupId());
 
@@ -131,8 +132,10 @@ public class GroupMetaService {
     try {
       AuthorizationUtils.checkGroup(groupEntity.nameIdentifier());
 
-      Long metalakeId =
-          MetalakeMetaService.getInstance().getMetalakeIdByName(groupEntity.namespace().level(0));
+      NameIdentifier metalakeIdent =
+          NameIdentifier.of(NameIdentifierUtil.getMetalake(groupEntity.nameIdentifier()));
+      Long metalakeId = EntityIdService.getEntityId(metalakeIdent, Entity.EntityType.METALAKE);
+
       GroupPO.Builder builder = GroupPO.builder().withMetalakeId(metalakeId);
       GroupPO GroupPO = POConverters.initializeGroupPOWithVersion(groupEntity, builder);
 
@@ -174,9 +177,7 @@ public class GroupMetaService {
   public boolean deleteGroup(NameIdentifier identifier) {
     AuthorizationUtils.checkGroup(identifier);
 
-    Long metalakeId =
-        MetalakeMetaService.getInstance().getMetalakeIdByName(identifier.namespace().level(0));
-    Long groupId = getGroupIdByMetalakeIdAndName(metalakeId, identifier.name());
+    Long groupId = EntityIdService.getEntityId(identifier, Entity.EntityType.GROUP);
 
     SessionUtils.doMultipleWithCommit(
         () ->
@@ -200,8 +201,9 @@ public class GroupMetaService {
       NameIdentifier identifier, Function<E, E> updater) throws IOException {
     AuthorizationUtils.checkGroup(identifier);
 
-    Long metalakeId =
-        MetalakeMetaService.getInstance().getMetalakeIdByName(identifier.namespace().level(0));
+    NameIdentifier metalakeIdent = NameIdentifier.of(NameIdentifierUtil.getMetalake(identifier));
+    Long metalakeId = EntityIdService.getEntityId(metalakeIdent, Entity.EntityType.METALAKE);
+
     GroupPO oldGroupPO = getGroupPOByMetalakeIdAndName(metalakeId, identifier.name());
     List<RolePO> rolePOs =
         RoleMetaService.getInstance().listRolesByGroupId(oldGroupPO.getGroupId());
@@ -274,7 +276,8 @@ public class GroupMetaService {
     String metalakeName = namespace.level(0);
 
     if (allFields) {
-      Long metalakeId = MetalakeMetaService.getInstance().getMetalakeIdByName(metalakeName);
+      NameIdentifier metalakeIdent = NameIdentifier.of(metalakeName);
+      long metalakeId = EntityIdService.getEntityId(metalakeIdent, Entity.EntityType.METALAKE);
       List<ExtendedGroupPO> groupPOs =
           SessionUtils.getWithoutCommit(
               GroupMetaMapper.class, mapper -> mapper.listExtendedGroupPOsByMetalakeId(metalakeId));
