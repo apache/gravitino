@@ -18,6 +18,7 @@
 package org.apache.gravitino.authorization;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.concurrent.CountDownLatch;
@@ -60,5 +61,45 @@ public class TestAuthorizationRequestContext {
 
     context.loadRole(counter::incrementAndGet);
     assertEquals(1, counter.get(), "Subsequent loadRole calls should be ignored");
+  }
+
+  @Test
+  public void testLoadRoleFailThenSuccessThenIgnored() throws Exception {
+    AuthorizationRequestContext context = new AuthorizationRequestContext();
+    AtomicInteger counter = new AtomicInteger();
+
+    CountDownLatch failingStarted = new CountDownLatch(1);
+    CountDownLatch allowFailToThrow = new CountDownLatch(1);
+
+    // --- Thread 1: Starts loading but FAILS ---
+    Thread failingThread =
+        new Thread(
+            () -> {
+              try {
+                context.loadRole(
+                    () -> {
+                      counter.incrementAndGet();
+                      failingStarted.countDown();
+                      try {
+                        allowFailToThrow.await(2, TimeUnit.SECONDS);
+                      } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                      }
+                      throw new IllegalStateException("Simulated failure");
+                    });
+              } catch (RuntimeException e) {
+                assertTrue(e.getMessage().contains("Failed to load role"));
+                assertInstanceOf(IllegalStateException.class, e.getCause());
+              }
+            });
+
+    failingThread.start();
+    assertTrue(failingStarted.await(2, TimeUnit.SECONDS));
+    allowFailToThrow.countDown();
+    failingThread.join();
+    context.loadRole(counter::incrementAndGet);
+    assertEquals(2, counter.get(), "Flag should remain false after failure so next call runs.");
+    context.loadRole(counter::incrementAndGet);
+    assertEquals(2, counter.get(), "After a successful loadRole, further calls must be ignored.");
   }
 }
