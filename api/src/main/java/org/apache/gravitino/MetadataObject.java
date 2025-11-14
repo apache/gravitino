@@ -63,7 +63,12 @@ public interface MetadataObject {
     /** A model is mapped to the model artifact in ML. */
     MODEL,
     /** A tag is used to help manage other metadata object. */
-    TAG;
+    TAG,
+    /**
+     * A policy can be associated with a metadata object for data governance and similar purposes.
+     */
+    POLICY,
+    ;
   }
 
   /**
