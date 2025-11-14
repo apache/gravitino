@@ -50,7 +50,31 @@ import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.indexes.Index;
 import org.apache.hadoop.fs.Path;
 
-/** Operations for interacting with a generic lakehouse catalog in Apache Gravitino. */
+/**
+ * Operations for interacting with a generic lakehouse catalog in Apache Gravitino.
+ *
+ * <p>This catalog provides a unified interface for managing lakehouse table formats. It is
+ * designed to be extensible and can support various table formats through a common interface.
+ *
+ * <p><b>Current Implementation Status:</b>
+ *
+ * <ul>
+ *   <li>✅ <b>Schema Operations:</b> Fully supported (create, list, load, alter, drop)
+ *   <li>⚠️ <b>Table Operations:</b> In development - will be added in subsequent releases
+ *   <li>⚠️ <b>Managed Storage:</b> Framework in place, format-specific implementations required
+ * </ul>
+ *
+ * <p><b>Configuration:</b>
+ *
+ * <ul>
+ *   <li>{@code lakehouse-dir}: Root directory for the catalog (optional)
+ *   <li>{@code gravitino.bypass.*}: Properties passed to underlying storage implementation
+ * </ul>
+ *
+ * <p>For detailed documentation, see: <a
+ * href="https://gravitino.apache.org/docs/generic-lakehouse-catalog">Generic Lakehouse Catalog
+ * Documentation</a>
+ */
 public class GenericLakehouseCatalogOperations
     implements CatalogOperations, SupportsSchemas, TableCatalog {
 
@@ -139,14 +163,28 @@ public class GenericLakehouseCatalogOperations
     return managedSchemaOps.dropSchema(ident, cascade);
   }
 
+  // ==================== Table Operations (In Development) ====================
+  // TODO: Implement table operations in subsequent releases
+  // See: https://github.com/apache/gravitino/issues/8838
+  // The table operations will delegate to format-specific implementations
+  // (e.g., LanceCatalogOperations for Lance tables)
+
   @Override
   public NameIdentifier[] listTables(Namespace namespace) throws NoSuchSchemaException {
-    throw new UnsupportedOperationException("Not implemented yet.");
+    // TODO(#8838): Implement table listing
+    throw new UnsupportedOperationException(
+        "Table operations are not yet implemented. "
+            + "This feature is planned for a future release. "
+            + "See documentation: https://gravitino.apache.org/docs/generic-lakehouse-catalog");
   }
 
   @Override
   public Table loadTable(NameIdentifier ident) throws NoSuchTableException {
-    throw new UnsupportedOperationException("Not implemented yet.");
+    // TODO(#8838): Implement table loading
+    throw new UnsupportedOperationException(
+        "Table operations are not yet implemented. "
+            + "This feature is planned for a future release. "
+            + "See documentation: https://gravitino.apache.org/docs/generic-lakehouse-catalog");
   }
 
   @Override
@@ -160,18 +198,34 @@ public class GenericLakehouseCatalogOperations
       SortOrder[] sortOrders,
       Index[] indexes)
       throws NoSuchSchemaException, TableAlreadyExistsException {
-    throw new UnsupportedOperationException("Not implemented yet.");
+    // TODO(#8838): Implement table creation
+    // This should:
+    // 1. Determine table format from properties
+    // 2. Delegate to format-specific implementation (e.g., LanceCatalogOperations)
+    // 3. Store metadata in Gravitino entity store
+    throw new UnsupportedOperationException(
+        "Table operations are not yet implemented. "
+            + "This feature is planned for a future release. "
+            + "See documentation: https://gravitino.apache.org/docs/generic-lakehouse-catalog");
   }
 
   @Override
   public Table alterTable(NameIdentifier ident, TableChange... changes)
       throws NoSuchTableException, IllegalArgumentException {
-    throw new UnsupportedOperationException("Not implemented yet.");
+    // TODO(#8838): Implement table alteration
+    throw new UnsupportedOperationException(
+        "Table operations are not yet implemented. "
+            + "This feature is planned for a future release. "
+            + "See documentation: https://gravitino.apache.org/docs/generic-lakehouse-catalog");
   }
 
   @Override
   public boolean dropTable(NameIdentifier ident) {
-    throw new UnsupportedOperationException("Not implemented yet.");
+    // TODO(#8838): Implement table dropping
+    throw new UnsupportedOperationException(
+        "Table operations are not yet implemented. "
+            + "This feature is planned for a future release. "
+            + "See documentation: https://gravitino.apache.org/docs/generic-lakehouse-catalog");
   }
 
   private String ensureTrailingSlash(String path) {
