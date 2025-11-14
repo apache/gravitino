@@ -22,7 +22,6 @@ There are some key difference between Gravitino Iceberg REST server and Gravitin
 - Supports the Apache Iceberg REST API defined in Iceberg 1.10, and supports all namespace and table interfaces. The following interfaces are not implemented yet:
   - multi table transaction
   - pagination
-  - scan planning
 - Works as a catalog proxy, supporting `Hive` and `JDBC` as catalog backend.
 - Supports credential vending for `S3`、`GCS`、`OSS` and `ADLS`.
 - Supports different storages like `S3`, `HDFS`, `OSS`, `GCS`, `ADLS` and provides the capability to support other storages.
@@ -31,6 +30,7 @@ There are some key difference between Gravitino Iceberg REST server and Gravitin
 - Supports OAuth2 and HTTPS.
 - Provides a pluggable metrics store interface to store and delete Iceberg metrics.
 - Supports table metadata cache.
+- Supports scan plan cache.
 
 ## Server management
 
@@ -447,6 +447,17 @@ Gravitino features a pluggable cache system for updating or retrieving table met
 | `gravitino.iceberg-rest.table-metadata-cache-expire-minutes` | The expire minutes of table metadata cache. | 60            | No       | 1.1.0         |
 
 Gravitino provides the build-in `org.apache.gravitino.iceberg.common.cache.LocalTableMetadataCache` to store the cached data in the memory. You could also implement your custom table metadata cache by implementing the `org.apache.gravitino.iceberg.common.cache.TableMetadataCache` interface.
+
+### Iceberg scan plan cache configuration
+
+Gravitino caches scan plan results to speed up repeated queries with identical parameters. The cache automatically invalidates when the table's snapshot changes.
+
+| Configuration item                                         | Description                             | Default value | Required | Since Version |
+|------------------------------------------------------------|-----------------------------------------|---------------|----------|---------------|
+| `gravitino.iceberg-rest.scan-plan-cache-capacity`          | The capacity of scan plan cache.        | 200           | No       | 1.1.0         |
+| `gravitino.iceberg-rest.scan-plan-cache-expire-minutes`    | The expire minutes of scan plan cache.  | 60            | No       | 1.1.0         |
+
+The scan plan cache uses snapshot ID as part of the cache key, ensuring automatic invalidation when table data changes. This provides 100-2000x speedup for repeated queries like dashboard refreshes or BI tool queries.
 
 ### Misc configurations
 

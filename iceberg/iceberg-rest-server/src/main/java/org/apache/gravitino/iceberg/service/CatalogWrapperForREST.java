@@ -22,8 +22,11 @@ package org.apache.gravitino.iceberg.service;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
+import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Stream;
@@ -34,20 +37,31 @@ import org.apache.gravitino.credential.Credential;
 import org.apache.gravitino.credential.CredentialConstants;
 import org.apache.gravitino.credential.CredentialPropertyUtils;
 import org.apache.gravitino.credential.PathBasedCredentialContext;
+import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
 import org.apache.gravitino.iceberg.common.ops.IcebergCatalogWrapper;
 import org.apache.gravitino.storage.GCSProperties;
 import org.apache.gravitino.utils.MapUtils;
 import org.apache.gravitino.utils.PrincipalUtils;
+import org.apache.iceberg.DeleteFile;
+import org.apache.iceberg.FileScanTask;
+import org.apache.iceberg.PartitionSpec;
+import org.apache.iceberg.ScanTaskParser;
+import org.apache.iceberg.Table;
 import org.apache.iceberg.TableMetadata;
 import org.apache.iceberg.TableProperties;
+import org.apache.iceberg.TableScan;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.exceptions.ServiceUnavailableException;
+import org.apache.iceberg.io.CloseableIterable;
+import org.apache.iceberg.rest.PlanStatus;
 import org.apache.iceberg.rest.requests.CreateTableRequest;
+import org.apache.iceberg.rest.requests.PlanTableScanRequest;
 import org.apache.iceberg.rest.responses.ImmutableLoadCredentialsResponse;
 import org.apache.iceberg.rest.responses.LoadCredentialsResponse;
 import org.apache.iceberg.rest.responses.LoadTableResponse;
+import org.apache.iceberg.rest.responses.PlanTableScanResponse;
 
 /** Process Iceberg REST specific operations, like credential vending. */
 public class CatalogWrapperForREST extends IcebergCatalogWrapper {
@@ -55,6 +69,8 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
   private final CatalogCredentialManager catalogCredentialManager;
 
   private final Map<String, String> catalogConfigToClients;
+
+  private final ScanPlanCache scanPlanCache;
 
   private static final Set<String> catalogPropertiesToClientKeys =
       ImmutableSet.of(
@@ -82,6 +98,11 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
     Map<String, String> catalogProperties =
         checkForCompatibility(config.getAllConfig(), deprecatedProperties);
     this.catalogCredentialManager = new CatalogCredentialManager(catalogName, catalogProperties);
+    // Initialize scan plan cache.
+    this.scanPlanCache =
+        new ScanPlanCache(
+            config.get(IcebergConfig.SCAN_PLAN_CACHE_CAPACITY),
+            config.get(IcebergConfig.SCAN_PLAN_CACHE_EXPIRE_MINUTES));
   }
 
   public LoadTableResponse createTable(
@@ -141,6 +162,9 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
       if (catalogCredentialManager != null) {
         catalogCredentialManager.close();
       }
+      if (scanPlanCache != null) {
+        scanPlanCache.close();
+      }
     } finally {
       // Call super.close() to release parent class resources including:
       // 1. Close underlying catalog (JdbcCatalog, WrappedHiveCatalog, etc.)
@@ -190,6 +214,198 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
       throw new ServiceUnavailableException("Couldn't generate credential, %s", context);
     }
     return credential;
+  }
+
+  /**
+   * Plan table scan and return scan tasks.
+   *
+   * <p>This method performs server-side scan planning to optimize query performance by reducing
+   * client-side metadata loading and enabling parallel task execution.
+   *
+   * <p>Implementation uses synchronous scan planning (COMPLETED status) where tasks are returned
+   * immediately as serialized JSON strings. This is different from asynchronous mode (SUBMITTED
+   * status) where a plan ID is returned for later retrieval.
+   *
+   * <p>Referenced from Iceberg PR #13400 for scan planning implementation.
+   *
+   * @param tableIdentifier The table identifier.
+   * @param scanRequest The scan request parameters including filters, projections, snapshot-id,
+   *     etc.
+   * @return PlanTableScanResponse with status=COMPLETED and serialized planTasks.
+   * @throws IllegalArgumentException if scan request validation fails
+   * @throws org.apache.gravitino.exceptions.NoSuchTableException if table doesn't exist
+   * @throws RuntimeException for other scan planning failures
+   */
+  public PlanTableScanResponse planTableScan(
+      TableIdentifier tableIdentifier, PlanTableScanRequest scanRequest) {
+
+    LOG.debug(
+        "Planning scan for table: {}, snapshotId: {}, select: {}, caseSensitive: {}",
+        tableIdentifier,
+        scanRequest.snapshotId(),
+        scanRequest.select(),
+        scanRequest.caseSensitive());
+
+    try {
+      Table table = catalog.loadTable(tableIdentifier);
+      if (table == null) {
+        throw new NoSuchTableException("Table not found: %s", tableIdentifier);
+      }
+
+      if (scanPlanCache != null) {
+        PlanTableScanResponse cachedResponse = scanPlanCache.get(table, scanRequest);
+        if (cachedResponse != null) {
+          LOG.info("Using cached scan plan for table: {}", tableIdentifier);
+          return cachedResponse;
+        }
+      }
+
+      TableScan tableScan = table.newScan();
+      tableScan = applyScanRequest(tableScan, scanRequest);
+
+      List<String> planTasks = new ArrayList<>();
+      Map<Integer, PartitionSpec> specsById = new HashMap<>();
+      List<org.apache.iceberg.DeleteFile> deleteFiles = new ArrayList<>();
+
+      try (CloseableIterable<FileScanTask> fileScanTasks = tableScan.planFiles()) {
+        for (FileScanTask fileScanTask : fileScanTasks) {
+          try {
+            String taskString = ScanTaskParser.toJson(fileScanTask);
+            planTasks.add(taskString);
+
+            int specId = fileScanTask.spec().specId();
+            if (!specsById.containsKey(specId)) {
+              specsById.put(specId, fileScanTask.spec());
+            }
+
+            if (!fileScanTask.deletes().isEmpty()) {
+              deleteFiles.addAll(fileScanTask.deletes());
+            }
+          } catch (Exception e) {
+            LOG.warn(
+                "Failed to serialize scan task for table: {}, skipping task. Error: {}",
+                tableIdentifier,
+                e.getMessage());
+          }
+        }
+      } catch (IOException e) {
+        LOG.error("Failed to close scan task iterator for table: {}", tableIdentifier, e);
+        throw new RuntimeException("Failed to plan scan tasks: " + e.getMessage(), e);
+      }
+
+      List<DeleteFile> uniqueDeleteFiles =
+          deleteFiles.stream().distinct().collect(java.util.stream.Collectors.toList());
+
+      if (planTasks.isEmpty()) {
+        LOG.info(
+            "Scan planning returned no tasks for table: {}. Table may be empty or fully filtered.",
+            tableIdentifier);
+      }
+
+      if (!planTasks.isEmpty() && specsById.isEmpty()) {
+        LOG.error(
+            "Internal error: planTasks is not empty ({} tasks) but specsById is empty for table: {}",
+            planTasks.size(),
+            tableIdentifier);
+        throw new IllegalStateException("Scan planning produced tasks but no partition specs");
+      }
+
+      PlanTableScanResponse.Builder responseBuilder =
+          PlanTableScanResponse.builder()
+              .withPlanStatus(PlanStatus.COMPLETED)
+              .withPlanTasks(planTasks)
+              .withSpecsById(specsById);
+
+      if (!uniqueDeleteFiles.isEmpty()) {
+        responseBuilder.withDeleteFiles(uniqueDeleteFiles);
+        LOG.debug(
+            "Included {} delete files in scan plan for table: {}",
+            uniqueDeleteFiles.size(),
+            tableIdentifier);
+      }
+
+      PlanTableScanResponse response = responseBuilder.build();
+
+      String snapshotInfo =
+          scanRequest.snapshotId() != null ? String.valueOf(scanRequest.snapshotId()) : "current";
+      LOG.info(
+          "Successfully planned {} scan tasks for table: {}, snapshot: {}",
+          planTasks.size(),
+          tableIdentifier,
+          snapshotInfo);
+
+      if (scanPlanCache != null) {
+        scanPlanCache.put(table, scanRequest, response);
+      }
+
+      return response;
+
+    } catch (IllegalArgumentException e) {
+      LOG.error("Invalid scan request for table {}: {}", tableIdentifier, e.getMessage());
+      throw new IllegalArgumentException("Invalid scan parameters: " + e.getMessage(), e);
+    } catch (org.apache.iceberg.exceptions.NoSuchTableException e) {
+      LOG.error("Table not found during scan planning: {}", tableIdentifier);
+      throw e;
+    } catch (Exception e) {
+      LOG.error("Unexpected error during scan planning for table: {}", tableIdentifier, e);
+      throw new RuntimeException(
+          "Scan planning failed for table " + tableIdentifier + ": " + e.getMessage(), e);
+    }
+  }
+
+  private TableScan applyScanRequest(TableScan tableScan, PlanTableScanRequest scanRequest) {
+    if (scanRequest.snapshotId() != null && scanRequest.snapshotId() != 0L) {
+      tableScan = tableScan.useSnapshot(scanRequest.snapshotId());
+      LOG.debug("Applied snapshot filter: snapshot-id={}", scanRequest.snapshotId());
+    }
+
+    tableScan = tableScan.caseSensitive(scanRequest.caseSensitive());
+    LOG.debug("Applied case-sensitive: {}", scanRequest.caseSensitive());
+
+    tableScan = applyScanFilter(tableScan, scanRequest);
+    tableScan = applyScanSelect(tableScan, scanRequest);
+    tableScan = applyScanStatsFields(tableScan, scanRequest);
+
+    return tableScan;
+  }
+
+  private TableScan applyScanFilter(TableScan tableScan, PlanTableScanRequest scanRequest) {
+    if (scanRequest.filter() != null) {
+      try {
+        tableScan = tableScan.filter(scanRequest.filter());
+        LOG.debug("Applied filter expression: {}", scanRequest.filter());
+      } catch (Exception e) {
+        LOG.error("Failed to apply filter expression: {}", e.getMessage(), e);
+        throw new IllegalArgumentException("Invalid filter expression: " + e.getMessage(), e);
+      }
+    }
+    return tableScan;
+  }
+
+  private TableScan applyScanSelect(TableScan tableScan, PlanTableScanRequest scanRequest) {
+    if (scanRequest.select() != null && !scanRequest.select().isEmpty()) {
+      try {
+        tableScan = tableScan.select(scanRequest.select());
+        LOG.debug("Applied column projection: {}", scanRequest.select());
+      } catch (Exception e) {
+        LOG.error("Failed to apply column projection: {}", e.getMessage(), e);
+        throw new IllegalArgumentException("Invalid column selection: " + e.getMessage(), e);
+      }
+    }
+    return tableScan;
+  }
+
+  private TableScan applyScanStatsFields(TableScan tableScan, PlanTableScanRequest scanRequest) {
+    if (scanRequest.statsFields() != null && !scanRequest.statsFields().isEmpty()) {
+      try {
+        tableScan = tableScan.includeColumnStats(scanRequest.statsFields());
+        LOG.debug("Applied statistics fields: {}", scanRequest.statsFields());
+      } catch (Exception e) {
+        LOG.error("Failed to apply statistics fields: {}", e.getMessage(), e);
+        throw new IllegalArgumentException("Invalid statistics fields: " + e.getMessage(), e);
+      }
+    }
+    return tableScan;
   }
 
   @VisibleForTesting
