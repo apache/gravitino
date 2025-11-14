@@ -429,12 +429,12 @@ If you want to use jdbc as metrics store, you can set the `gravitino.iceberg-res
 You should initialize the database using the sql scripts in the directory `scripts`.
 You must download the corresponding JDBC driver to the `iceberg-rest-server/libs` directory.
 
-| Configuration item                                  | Description                                                                                                                        | Default value | Required | Since Version |
-|-----------------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------|---------------|----------|---------------|
-| `gravitino.iceberg-rest.jdbc-metrics.url`           | The JDBC connection address, such as `jdbc:postgresql://127.0.0.1:5432` for Postgres, or `jdbc:mysql://127.0.0.1:3306/` for mysql. | (none)        | Yes      | 1.1.0         |
-| `gravitino.iceberg-rest.jdbc-metrics.jdbc-user`     | The username of the JDBC connection.                                                                                               | (none)        | No       | 1.1.0         |
-| `gravitino.iceberg-rest.jdbc-metrics.jdbc-password` | The password of the JDBC connection.                                                                                               | (none)        | No       | 1.1.0         |
-| `gravitino.iceberg-rest.jdbc-metrics.jdbc-driver`   | `com.mysql.jdbc.Driver` or `com.mysql.cj.jdbc.Driver` for MySQL, `org.postgresql.Driver` for PostgreSQL.                           | (none)        | Yes      | 1.1.0         |
+| Configuration item                                  | Description                                                                                                                                         | Default value | Required | Since Version |
+|-----------------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------|---------------|----------|---------------|
+| `gravitino.iceberg-rest.jdbc-metrics.url`           | The JDBC connection address, such as `jdbc:postgresql://127.0.0.1:5432/database` for Postgres, or `jdbc:mysql://127.0.0.1:3306/database` for mysql. | (none)        | Yes      | 1.1.0         |
+| `gravitino.iceberg-rest.jdbc-metrics.jdbc-user`     | The username of the JDBC connection.                                                                                                                | (none)        | No       | 1.1.0         |
+| `gravitino.iceberg-rest.jdbc-metrics.jdbc-password` | The password of the JDBC connection.                                                                                                                | (none)        | No       | 1.1.0         |
+| `gravitino.iceberg-rest.jdbc-metrics.jdbc-driver`   | `com.mysql.jdbc.Driver` or `com.mysql.cj.jdbc.Driver` for MySQL, `org.postgresql.Driver` for PostgreSQL.                                            | (none)        | Yes      | 1.1.0         |
 
 ### Iceberg table metadata cache configuration
 
