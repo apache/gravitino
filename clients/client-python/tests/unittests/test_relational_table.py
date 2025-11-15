@@ -30,6 +30,7 @@ from gravitino.dto.responses.partition_list_response import PartitionListRespons
 from gravitino.dto.responses.partition_name_list_response import (
     PartitionNameListResponse,
 )
+from gravitino.dto.responses.partition_response import PartitionResponse
 from gravitino.dto.util.dto_converters import DTOConverters
 from gravitino.namespace import Namespace
 from gravitino.rest.rest_utils import encode_string
@@ -167,6 +168,30 @@ class TestRelationalTable(unittest.TestCase):
         }
         """
 
+        cls.PARTITION_JSON_STRING = """
+            {
+                "type": "identity",
+                "name": "test_identity_partition",
+                "fieldNames": [
+                    [
+                        "column_name"
+                    ]
+                ],
+                "values": [
+                    {
+                        "type": "literal",
+                        "dataType": "integer",
+                        "value": "0"
+                    },
+                    {
+                        "type": "literal",
+                        "dataType": "integer",
+                        "value": "100"
+                    }
+                ]
+            }
+        """
+
         cls.table_dto = TableDTO.from_json(cls.TABLE_DTO_JSON_STRING)
         cls.namespace = Namespace.of("metalake_demo", "test_catalog", "test_schema")
         cls.rest_client = HTTPClient("http://localhost:8090")
@@ -201,30 +226,7 @@ class TestRelationalTable(unittest.TestCase):
         self.assertTrue(all(isinstance(col, GenericColumn) for col in cols))
 
     def test_list_partitions(self):
-        expected_json_string = """
-            {
-                "type": "identity",
-                "name": "test_identity_partition",
-                "fieldNames": [
-                    [
-                        "column_name"
-                    ]
-                ],
-                "values": [
-                    {
-                        "type": "literal",
-                        "dataType": "integer",
-                        "value": "0"
-                    },
-                    {
-                        "type": "literal",
-                        "dataType": "integer",
-                        "value": "100"
-                    }
-                ]
-            }
-        """
-        expected_serialized = json.loads(expected_json_string)
+        expected_serialized = json.loads(TestRelationalTable.PARTITION_JSON_STRING)
         partitions = [PartitionDTOSerdes.deserialize(expected_serialized)]
         resp = PartitionListResponse(0, partitions)
 
@@ -234,3 +236,15 @@ class TestRelationalTable(unittest.TestCase):
         ):
             partitions = self.relational_table.list_partitions()
             self.assertListEqual(partitions, resp.get_partitions())
+
+    def test_get_partition(self):
+        expected_serialized = json.loads(TestRelationalTable.PARTITION_JSON_STRING)
+        partition_dto = PartitionDTOSerdes.deserialize(expected_serialized)
+        resp = PartitionResponse(0, partition_dto)
+
+        with patch(
+            "gravitino.utils.http_client.HTTPClient.get",
+            return_value=resp,
+        ):
+            partition = self.relational_table.get_partition("partition_name")
+            self.assertEqual(partition, resp.get_partition())

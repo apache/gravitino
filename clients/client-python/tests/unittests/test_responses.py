@@ -339,8 +339,12 @@ class TestResponses(unittest.TestCase):
             "partition": {TestResponses.PARTITION_JSON_STRING}
         }}
         """
+        partition = PartitionDTOSerdes.deserialize(
+            json.loads(TestResponses.PARTITION_JSON_STRING)
+        )
         resp: PartitionResponse = PartitionResponse.from_json(json_string)
         resp.validate()
+        self.assertEqual(resp.get_partition(), partition)
 
     def test_partition_list_response(self):
         json_string = f"""
