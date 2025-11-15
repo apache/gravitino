@@ -30,6 +30,7 @@ from gravitino.dto.responses.partition_list_response import PartitionListRespons
 from gravitino.dto.responses.partition_name_list_response import (
     PartitionNameListResponse,
 )
+from gravitino.dto.responses.partition_response import PartitionResponse
 from gravitino.exceptions.handlers.partition_error_handler import (
     PARTITION_ERROR_HANDLER,
 )
@@ -151,3 +152,26 @@ class RelationalTable(Table):  # pylint: disable=too-many-instance-attributes
             ),
         )
         return resp.get_partitions()
+
+    def get_partition(self, partition_name: str) -> Partition:
+        """Returns the partition with the given name.
+
+        Args:
+            partition_name (str): the name of the partition
+
+        Returns:
+            Partition: the partition with the given name
+
+        Raises:
+            NoSuchPartitionException:
+                if the partition does not exist, throws this exception.
+        """
+
+        resp = cast(
+            PartitionResponse,
+            self._rest_client.get(
+                endpoint=f"{self.get_partition_request_path()}/{partition_name}",
+                error_handler=PARTITION_ERROR_HANDLER,
+            ),
+        )
+        return resp.get_partition()
