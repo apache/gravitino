@@ -15,13 +15,18 @@
 # specific language governing permissions and limitations
 # under the License.
 
+import json
 import unittest
 from typing import cast
 from unittest.mock import patch
 
 from gravitino.client.generic_column import GenericColumn
 from gravitino.client.relational_table import RelationalTable
+from gravitino.dto.rel.partitions.json_serdes.partition_dto_serdes import (
+    PartitionDTOSerdes,
+)
 from gravitino.dto.rel.table_dto import TableDTO
+from gravitino.dto.responses.partition_list_response import PartitionListResponse
 from gravitino.dto.responses.partition_name_list_response import (
     PartitionNameListResponse,
 )
@@ -194,3 +199,38 @@ class TestRelationalTable(unittest.TestCase):
         cols = self.relational_table.columns()
         self.assertEqual(len(cols), len(self.table_dto.columns()))
         self.assertTrue(all(isinstance(col, GenericColumn) for col in cols))
+
+    def test_list_partitions(self):
+        expected_json_string = """
+            {
+                "type": "identity",
+                "name": "test_identity_partition",
+                "fieldNames": [
+                    [
+                        "column_name"
+                    ]
+                ],
+                "values": [
+                    {
+                        "type": "literal",
+                        "dataType": "integer",
+                        "value": "0"
+                    },
+                    {
+                        "type": "literal",
+                        "dataType": "integer",
+                        "value": "100"
+                    }
+                ]
+            }
+        """
+        expected_serialized = json.loads(expected_json_string)
+        partitions = [PartitionDTOSerdes.deserialize(expected_serialized)]
+        resp = PartitionListResponse(0, partitions)
+
+        with patch(
+            "gravitino.utils.http_client.HTTPClient.get",
+            return_value=resp,
+        ):
+            partitions = self.relational_table.list_partitions()
+            self.assertListEqual(partitions, resp.get_partitions())

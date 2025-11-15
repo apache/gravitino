@@ -17,6 +17,9 @@
 import json
 import unittest
 
+from gravitino.dto.rel.partitions.json_serdes.partition_dto_serdes import (
+    PartitionDTOSerdes,
+)
 from gravitino.dto.responses.credential_response import CredentialResponse
 from gravitino.dto.responses.file_location_response import FileLocationResponse
 from gravitino.dto.responses.model_response import ModelResponse
@@ -346,5 +349,11 @@ class TestResponses(unittest.TestCase):
             "partitions": [{TestResponses.PARTITION_JSON_STRING}]
         }}
         """
+        partitions = [
+            PartitionDTOSerdes.deserialize(
+                json.loads(TestResponses.PARTITION_JSON_STRING)
+            )
+        ]
         resp: PartitionListResponse = PartitionListResponse.from_json(json_string)
         resp.validate()
+        self.assertListEqual(resp.get_partitions(), partitions)
