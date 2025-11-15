@@ -23,8 +23,10 @@ from gravitino.api.rel.expressions.distributions.distribution import Distributio
 from gravitino.api.rel.expressions.sorts.sort_order import SortOrder
 from gravitino.api.rel.expressions.transforms.transform import Transform
 from gravitino.api.rel.indexes.index import Index
+from gravitino.api.rel.partitions.partition import Partition
 from gravitino.api.rel.table import Table
 from gravitino.client.generic_column import GenericColumn
+from gravitino.dto.responses.partition_list_response import PartitionListResponse
 from gravitino.dto.responses.partition_name_list_response import (
     PartitionNameListResponse,
 )
@@ -131,3 +133,21 @@ class RelationalTable(Table):  # pylint: disable=too-many-instance-attributes
             ),
         )
         return resp.partition_names()
+
+    def list_partitions(self) -> list[Partition]:
+        """Get the partitions of the table.
+
+        Returns:
+            list[Partition]: The partitions of the table.
+        """
+
+        params = {"details": "true"}
+        resp = cast(
+            PartitionListResponse,
+            self._rest_client.get(
+                endpoint=self.get_partition_request_path(),
+                params=params,
+                error_handler=PARTITION_ERROR_HANDLER,
+            ),
+        )
+        return resp.get_partitions()
