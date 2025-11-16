@@ -16,8 +16,9 @@
 # under the License.
 
 from functools import singledispatchmethod
-from typing import cast, overload
+from typing import Optional, cast, overload
 
+from gravitino.api.audit import Audit
 from gravitino.api.rel.column import Column
 from gravitino.api.rel.expressions.distributions.distribution import Distribution
 from gravitino.api.rel.expressions.distributions.distributions import Distributions
@@ -67,8 +68,6 @@ from gravitino.dto.rel.partitions.range_partition_dto import RangePartitionDTO
 from gravitino.dto.rel.sort_order_dto import SortOrderDTO
 from gravitino.dto.rel.table_dto import TableDTO
 from gravitino.exceptions.base import IllegalArgumentException
-from gravitino.namespace import Namespace
-from gravitino.utils import HTTPClient
 
 
 class DTOConverters:
@@ -119,7 +118,7 @@ class DTOConverters:
 
     @singledispatchmethod
     @staticmethod
-    def from_dto(dto, *args) -> object:
+    def from_dto(dto) -> object:
         raise IllegalArgumentException(f"Unsupported DTO type: {type(dto)}")
 
     @from_dto.register
@@ -256,7 +255,7 @@ class DTOConverters:
 
     @from_dto.register
     @staticmethod
-    def _(dto: TableDTO, namespsce: Namespace, rest_client: HTTPClient) -> Table:
+    def _(dto: TableDTO) -> Table:
         """Converts a TableDTO to a Table.
 
         Args:
@@ -265,24 +264,69 @@ class DTOConverters:
         Returns:
             Table: The table.
         """
-        from gravitino.client.relational_table import (  # pylint: disable=import-outside-toplevel
-            RelationalTable,
-        )
 
-        return RelationalTable(
+        class TableImpl(Table):  # pylint: disable=too-many-instance-attributes
+            """A table implementation."""
+
+            def __init__(
+                self,
+                name: str,
+                columns: list[Column],
+                partitioning: list[Transform],
+                sort_order: list[SortOrder],
+                distribution: Distribution,
+                index: list[Index],
+                comment: Optional[str],
+                properties: dict[str, str],
+                audit_info: Audit,
+            ):
+                self._name = name
+                self._columns = columns
+                self._partitioning = partitioning
+                self._sort_order = sort_order
+                self._distribution = distribution
+                self._index = index
+                self._comment = comment
+                self._properties = properties
+                self._audit_info = audit_info
+
+            def name(self) -> str:
+                return self._name
+
+            def columns(self) -> list[Column]:
+                return self._columns
+
+            def partitioning(self) -> list[Transform]:
+                return self._partitioning
+
+            def sort_order(self) -> list[SortOrder]:
+                return self._sort_order
+
+            def distribution(self) -> Distribution:
+                return self._distribution
+
+            def index(self) -> list[Index]:
+                return self._index
+
+            def comment(self) -> Optional[str]:
+                return self._comment
+
+            def properties(self) -> dict[str, str]:
+                return self._properties
+
+            def audit_info(self) -> Audit:
+                return self._audit_info
+
+        return TableImpl(
             name=dto.name(),
             columns=DTOConverters.from_dtos(dto.columns()),
             partitioning=DTOConverters.from_dtos(dto.partitioning()),
             sort_order=DTOConverters.from_dtos(dto.sort_order()),
-            distribution=DTOConverters.from_dto(
-                dto.distribution() or DistributionDTO.NONE
-            ),
+            distribution=DTOConverters.from_dto(dto.distribution()),
             index=DTOConverters.from_dtos(dto.index()),
             comment=dto.comment(),
             properties=dto.properties(),
             audit_info=dto.audit_info(),
-            namespace=namespsce,
-            rest_client=rest_client,
         )
 
     @overload

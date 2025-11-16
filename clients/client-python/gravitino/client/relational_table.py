@@ -26,6 +26,7 @@ from gravitino.api.rel.indexes.index import Index
 from gravitino.api.rel.partitions.partition import Partition
 from gravitino.api.rel.table import Table
 from gravitino.client.generic_column import GenericColumn
+from gravitino.dto.rel.table_dto import TableDTO
 from gravitino.dto.responses.drop_response import DropResponse
 from gravitino.dto.responses.partition_list_response import PartitionListResponse
 from gravitino.dto.responses.partition_name_list_response import (
@@ -40,37 +41,18 @@ from gravitino.rest.rest_utils import encode_string
 from gravitino.utils import HTTPClient
 
 
-class RelationalTable(Table):  # pylint: disable=too-many-instance-attributes
+class RelationalTable(Table):
     """Represents a relational table."""
 
     def __init__(
-        self,
-        name: str,
-        columns: list[Column],
-        partitioning: list[Transform],
-        sort_order: list[SortOrder],
-        distribution: Distribution,
-        index: list[Index],
-        comment: Optional[str],
-        properties: dict[str, str],
-        audit_info: Audit,
-        namespace: Namespace,
-        rest_client: HTTPClient,
+        self, namespace: Namespace, table_dto: TableDTO, rest_client: HTTPClient
     ):
-        self._name = name
-        self._columns = columns
-        self._partitioning = partitioning
-        self._sort_order = sort_order
-        self._distribution = distribution
-        self._index = index
-        self._comment = comment
-        self._properties = properties
-        self._audit_info = audit_info
         self._namespace = namespace
+        self._table = cast(Table, DTOConverters.from_dto(table_dto))
         self._rest_client = rest_client
 
     def name(self) -> str:
-        return self._name
+        return self._table.name()
 
     def columns(self) -> list[Column]:
         metalake, catalog, schema = self._namespace.levels()
@@ -78,32 +60,32 @@ class RelationalTable(Table):  # pylint: disable=too-many-instance-attributes
             cast(
                 Column,
                 GenericColumn(
-                    c, self._rest_client, metalake, catalog, schema, self._name
+                    c, self._rest_client, metalake, catalog, schema, self._table.name()
                 ),
             )
-            for c in self._columns
+            for c in self._table.columns()
         ]
 
     def partitioning(self) -> list[Transform]:
-        return self._partitioning
+        return self._table.partitioning()
 
     def sort_order(self) -> list[SortOrder]:
-        return self._sort_order
+        return self._table.sort_order()
 
     def distribution(self) -> Distribution:
-        return self._distribution
+        return self._table.distribution()
 
     def index(self) -> list[Index]:
-        return self._index
+        return self._table.index()
 
     def comment(self) -> Optional[str]:
-        return self._comment
+        return self._table.comment()
 
     def properties(self) -> dict[str, str]:
-        return self._properties
+        return self._table.properties()
 
     def audit_info(self) -> Audit:
-        return self._audit_info
+        return self._table.audit_info()
 
     def get_partition_request_path(self) -> str:
         """Get the partition request path.
@@ -116,7 +98,7 @@ class RelationalTable(Table):  # pylint: disable=too-many-instance-attributes
             f"api/metalakes/{encode_string(self._namespace.level(0))}"
             f"/catalogs/{encode_string(self._namespace.level(1))}"
             f"/schemas/{encode_string(self._namespace.level(2))}"
-            f"/tables/{encode_string(self._name)}"
+            f"/tables/{encode_string(self._table.name())}"
             "/partitions/"
         )
 
