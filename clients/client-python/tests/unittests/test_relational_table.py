@@ -18,7 +18,6 @@
 import json
 import unittest
 from http.client import HTTPResponse
-from typing import cast
 from unittest.mock import Mock, patch
 
 from gravitino.client.generic_column import GenericColumn
@@ -33,7 +32,6 @@ from gravitino.dto.responses.partition_name_list_response import (
     PartitionNameListResponse,
 )
 from gravitino.dto.responses.partition_response import PartitionResponse
-from gravitino.dto.util.dto_converters import DTOConverters
 from gravitino.namespace import Namespace
 from gravitino.rest.rest_utils import encode_string
 from gravitino.utils import HTTPClient, Response
@@ -197,9 +195,8 @@ class TestRelationalTable(unittest.TestCase):
         cls.table_dto = TableDTO.from_json(cls.TABLE_DTO_JSON_STRING)
         cls.namespace = Namespace.of("metalake_demo", "test_catalog", "test_schema")
         cls.rest_client = HTTPClient("http://localhost:8090")
-        cls.relational_table = cast(
-            RelationalTable,
-            DTOConverters.from_dto(cls.table_dto, cls.namespace, cls.rest_client),
+        cls.relational_table = RelationalTable(
+            cls.namespace, cls.table_dto, cls.rest_client
         )
 
     def _get_mock_http_resp(self, json_str: str):
