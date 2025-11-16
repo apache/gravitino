@@ -27,6 +27,7 @@ from gravitino.dto.rel.partitions.json_serdes.partition_dto_serdes import (
     PartitionDTOSerdes,
 )
 from gravitino.dto.rel.table_dto import TableDTO
+from gravitino.dto.responses.drop_response import DropResponse
 from gravitino.dto.responses.partition_list_response import PartitionListResponse
 from gravitino.dto.responses.partition_name_list_response import (
     PartitionNameListResponse,
@@ -261,3 +262,13 @@ class TestRelationalTable(unittest.TestCase):
         ):
             partition = self.relational_table.get_partition("partition_name")
             self.assertEqual(partition, resp_body.get_partition())
+
+    def test_drop_partition(self):
+        resp_body = DropResponse(0, True)
+        mock_resp = self._get_mock_http_resp(resp_body.to_json())
+
+        with patch(
+            "gravitino.utils.http_client.HTTPClient.delete",
+            return_value=mock_resp,
+        ):
+            self.assertTrue(self.relational_table.drop_partition("partition_name"))
