@@ -17,8 +17,9 @@
 
 import json
 import unittest
+from http.client import HTTPResponse
 from typing import cast
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 from gravitino.client.generic_column import GenericColumn
 from gravitino.client.relational_table import RelationalTable
@@ -34,7 +35,7 @@ from gravitino.dto.responses.partition_response import PartitionResponse
 from gravitino.dto.util.dto_converters import DTOConverters
 from gravitino.namespace import Namespace
 from gravitino.rest.rest_utils import encode_string
-from gravitino.utils import HTTPClient
+from gravitino.utils import HTTPClient, Response
 
 
 class TestRelationalTable(unittest.TestCase):
@@ -200,6 +201,15 @@ class TestRelationalTable(unittest.TestCase):
             DTOConverters.from_dto(cls.table_dto, cls.namespace, cls.rest_client),
         )
 
+    def _get_mock_http_resp(self, json_str: str):
+        mock_http_resp = Mock(HTTPResponse)
+        mock_http_resp.getcode.return_value = 200
+        mock_http_resp.read.return_value = json_str
+        mock_http_resp.info.return_value = None
+        mock_http_resp.url = None
+        mock_resp = Response(mock_http_resp)
+        return mock_resp
+
     def test_get_partition_request_path(self):
         expected = (
             f"api/metalakes/{encode_string(self.namespace.level(0))}"
@@ -211,14 +221,15 @@ class TestRelationalTable(unittest.TestCase):
         self.assertEqual(self.relational_table.get_partition_request_path(), expected)
 
     def test_list_partition_names(self):
-        resp = PartitionNameListResponse(0, ["partition_1", "partition_2"])
+        resp_body = PartitionNameListResponse(0, ["partition_1", "partition_2"])
+        mock_resp = self._get_mock_http_resp(resp_body.to_json())
 
         with patch(
             "gravitino.utils.http_client.HTTPClient.get",
-            return_value=resp,
+            return_value=mock_resp,
         ):
             names = self.relational_table.list_partition_names()
-            self.assertListEqual(names, resp.partition_names())
+            self.assertListEqual(names, resp_body.partition_names())
 
     def test_columns(self):
         cols = self.relational_table.columns()
@@ -228,23 +239,25 @@ class TestRelationalTable(unittest.TestCase):
     def test_list_partitions(self):
         expected_serialized = json.loads(TestRelationalTable.PARTITION_JSON_STRING)
         partitions = [PartitionDTOSerdes.deserialize(expected_serialized)]
-        resp = PartitionListResponse(0, partitions)
+        resp_body = PartitionListResponse(0, partitions)
+        mock_resp = self._get_mock_http_resp(resp_body.to_json())
 
         with patch(
             "gravitino.utils.http_client.HTTPClient.get",
-            return_value=resp,
+            return_value=mock_resp,
         ):
             partitions = self.relational_table.list_partitions()
-            self.assertListEqual(partitions, resp.get_partitions())
+            self.assertListEqual(partitions, resp_body.get_partitions())
 
     def test_get_partition(self):
         expected_serialized = json.loads(TestRelationalTable.PARTITION_JSON_STRING)
         partition_dto = PartitionDTOSerdes.deserialize(expected_serialized)
-        resp = PartitionResponse(0, partition_dto)
+        resp_body = PartitionResponse(0, partition_dto)
+        mock_resp = self._get_mock_http_resp(resp_body.to_json())
 
         with patch(
             "gravitino.utils.http_client.HTTPClient.get",
-            return_value=resp,
+            return_value=mock_resp,
         ):
             partition = self.relational_table.get_partition("partition_name")
-            self.assertEqual(partition, resp.get_partition())
+            self.assertEqual(partition, resp_body.get_partition())
