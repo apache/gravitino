@@ -26,13 +26,16 @@ from gravitino.api.rel.indexes.index import Index
 from gravitino.api.rel.partitions.partition import Partition
 from gravitino.api.rel.table import Table
 from gravitino.client.generic_column import GenericColumn
+from gravitino.dto.rel.partitions.partition_dto import PartitionDTO
 from gravitino.dto.rel.table_dto import TableDTO
+from gravitino.dto.requests.add_partitions_request import AddPartitionsRequest
 from gravitino.dto.responses.drop_response import DropResponse
 from gravitino.dto.responses.partition_list_response import PartitionListResponse
 from gravitino.dto.responses.partition_name_list_response import (
     PartitionNameListResponse,
 )
 from gravitino.dto.responses.partition_response import PartitionResponse
+from gravitino.dto.util.dto_converters import DTOConverters
 from gravitino.exceptions.handlers.partition_error_handler import (
     PARTITION_ERROR_HANDLER,
 )
@@ -180,3 +183,33 @@ class RelationalTable(Table):
         drop_resp.validate()
 
         return drop_resp.dropped()
+
+    def add_partition(self, partition: Partition) -> Partition:
+        """Adds a partition to the table.
+
+        Args:
+            partition (Partition): The partition to add.
+
+        Returns:
+            Partition: The added partition.
+
+        Raises:
+            PartitionAlreadyExistsException:
+                if the partition already exists, throws this exception.
+        """
+
+        req = AddPartitionsRequest(
+            [cast(PartitionDTO, DTOConverters.to_dto(partition))]
+        )
+        req.validate()
+
+        resp = self._rest_client.post(
+            endpoint=self.get_partition_request_path(),
+            json=req,
+            error_handler=PARTITION_ERROR_HANDLER,
+        )
+        partition_list_resp = PartitionListResponse.from_json(
+            resp.body, infer_missing=True
+        )
+        partition_list_resp.validate()
+        return partition_list_resp.get_partitions()[0]
