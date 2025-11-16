@@ -18,9 +18,15 @@
 import json
 import unittest
 from http.client import HTTPResponse
+from typing import cast
 from unittest.mock import Mock, patch
 
+from gravitino.api.rel.expressions.distributions.strategy import Strategy
 from gravitino.api.rel.expressions.literals.literals import Literals
+from gravitino.api.rel.expressions.sorts.null_ordering import NullOrdering
+from gravitino.api.rel.expressions.sorts.sort_direction import SortDirection
+from gravitino.api.rel.expressions.transforms.transforms import Transforms
+from gravitino.api.rel.indexes.index import Index
 from gravitino.api.rel.partitions.partitions import Partitions
 from gravitino.client.generic_column import GenericColumn
 from gravitino.client.relational_table import RelationalTable
@@ -289,3 +295,45 @@ class TestRelationalTable(unittest.TestCase):
         ):
             added_partition = self.relational_table.add_partition(partition)
             self.assertEqual(added_partition, resp_body.get_partitions()[0])
+
+    def test_get_name(self):
+        self.assertEqual(self.relational_table.name(), "example_table")
+
+    def test_get_comment(self):
+        self.assertEqual(self.relational_table.comment(), "This is an example table")
+
+    def test_get_partitioning(self):
+        partitioning_list = self.relational_table.partitioning()
+        partitioning = cast(Transforms.IdentityTransform, partitioning_list[0])
+
+        self.assertEqual(len(partitioning_list), 1)
+        self.assertListEqual(partitioning.field_name(), ["dt"])
+
+    def test_get_sort_order(self):
+        sort_order_list = self.relational_table.sort_order()
+        sort_order = sort_order_list[0]
+
+        self.assertEqual(len(sort_order_list), 1)
+        self.assertEqual(sort_order.direction(), SortDirection.ASCENDING)
+        self.assertEqual(sort_order.null_ordering(), NullOrdering.NULLS_FIRST)
+
+    def test_get_distribution(self):
+        distribution = self.relational_table.distribution()
+        self.assertEqual(distribution.strategy(), Strategy.HASH)
+        self.assertEqual(distribution.number(), 32)
+
+    def test_get_index(self):
+        index_list = self.relational_table.index()
+        index = index_list[0]
+        self.assertEqual(len(index_list), 1)
+        self.assertEqual(index.name(), "PRIMARY")
+        self.assertEqual(index.type(), Index.IndexType.PRIMARY_KEY)
+
+    def test_get_audit_info(self):
+        audit_info = self.relational_table.audit_info()
+        self.assertEqual(audit_info.creator(), "Apache Gravitino")
+        self.assertEqual(audit_info.create_time(), "2025-10-10T00:00:00")
+
+    def test_get_properties(self):
+        properties = self.relational_table.properties()
+        self.assertDictEqual(properties, {"format": "ORC"})
