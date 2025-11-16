@@ -126,14 +126,16 @@ class RelationalTable(Table):  # pylint: disable=too-many-instance-attributes
             list[str]: The partition names of the table.
         """
 
-        resp = cast(
-            PartitionNameListResponse,
-            self._rest_client.get(
-                endpoint=self.get_partition_request_path(),
-                error_handler=PARTITION_ERROR_HANDLER,
-            ),
+        resp = self._rest_client.get(
+            endpoint=self.get_partition_request_path(),
+            error_handler=PARTITION_ERROR_HANDLER,
         )
-        return resp.partition_names()
+        partition_name_list_resp = PartitionNameListResponse.from_json(
+            resp.body, infer_missing=True
+        )
+        partition_name_list_resp.validate()
+
+        return partition_name_list_resp.partition_names()
 
     def list_partitions(self) -> list[Partition]:
         """Get the partitions of the table.
@@ -143,15 +145,17 @@ class RelationalTable(Table):  # pylint: disable=too-many-instance-attributes
         """
 
         params = {"details": "true"}
-        resp = cast(
-            PartitionListResponse,
-            self._rest_client.get(
-                endpoint=self.get_partition_request_path(),
-                params=params,
-                error_handler=PARTITION_ERROR_HANDLER,
-            ),
+        resp = self._rest_client.get(
+            endpoint=self.get_partition_request_path(),
+            params=params,
+            error_handler=PARTITION_ERROR_HANDLER,
         )
-        return resp.get_partitions()
+        partition_list_resp = PartitionListResponse.from_json(
+            resp.body, infer_missing=True
+        )
+        partition_list_resp.validate()
+
+        return partition_list_resp.get_partitions()
 
     def get_partition(self, partition_name: str) -> Partition:
         """Returns the partition with the given name.
@@ -167,11 +171,11 @@ class RelationalTable(Table):  # pylint: disable=too-many-instance-attributes
                 if the partition does not exist, throws this exception.
         """
 
-        resp = cast(
-            PartitionResponse,
-            self._rest_client.get(
-                endpoint=f"{self.get_partition_request_path()}/{partition_name}",
-                error_handler=PARTITION_ERROR_HANDLER,
-            ),
+        resp = self._rest_client.get(
+            endpoint=f"{self.get_partition_request_path()}/{partition_name}",
+            error_handler=PARTITION_ERROR_HANDLER,
         )
-        return resp.get_partition()
+        partition_resp = PartitionResponse.from_json(resp.body, infer_missing=True)
+        partition_resp.validate()
+
+        return partition_resp.get_partition()
