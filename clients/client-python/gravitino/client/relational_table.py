@@ -26,6 +26,7 @@ from gravitino.api.rel.indexes.index import Index
 from gravitino.api.rel.partitions.partition import Partition
 from gravitino.api.rel.table import Table
 from gravitino.client.generic_column import GenericColumn
+from gravitino.dto.responses.drop_response import DropResponse
 from gravitino.dto.responses.partition_list_response import PartitionListResponse
 from gravitino.dto.responses.partition_name_list_response import (
     PartitionNameListResponse,
@@ -179,3 +180,21 @@ class RelationalTable(Table):  # pylint: disable=too-many-instance-attributes
         partition_resp.validate()
 
         return partition_resp.get_partition()
+
+    def drop_partition(self, partition_name: str) -> bool:
+        """Drops the partition with the given name.
+
+        Args:
+            partition_name (str): The name of the partition.
+
+        Returns:
+            bool: `True` if the partition is dropped, `False` if the partition does not exist.
+        """
+        resp = self._rest_client.delete(
+            endpoint=f"{self.get_partition_request_path()}/{partition_name}",
+            error_handler=PARTITION_ERROR_HANDLER,
+        )
+        drop_resp = DropResponse.from_json(resp.body, infer_missing=True)
+        drop_resp.validate()
+
+        return drop_resp.dropped()
