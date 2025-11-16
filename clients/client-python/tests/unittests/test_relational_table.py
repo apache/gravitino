@@ -20,6 +20,8 @@ import unittest
 from http.client import HTTPResponse
 from unittest.mock import Mock, patch
 
+from gravitino.api.rel.expressions.literals.literals import Literals
+from gravitino.api.rel.partitions.partitions import Partitions
 from gravitino.client.generic_column import GenericColumn
 from gravitino.client.relational_table import RelationalTable
 from gravitino.dto.rel.partitions.json_serdes.partition_dto_serdes import (
@@ -269,3 +271,21 @@ class TestRelationalTable(unittest.TestCase):
             return_value=mock_resp,
         ):
             self.assertTrue(self.relational_table.drop_partition("partition_name"))
+
+    def test_add_partition(self):
+        partition = Partitions.identity(
+            "test_identity_partition",
+            [["column_name"]],
+            [Literals.integer_literal(0), Literals.integer_literal(100)],
+        )
+        expected_serialized = json.loads(TestRelationalTable.PARTITION_JSON_STRING)
+        partitions = [PartitionDTOSerdes.deserialize(expected_serialized)]
+        resp_body = PartitionListResponse(0, partitions)
+        mock_resp = self._get_mock_http_resp(resp_body.to_json())
+
+        with patch(
+            "gravitino.utils.http_client.HTTPClient.post",
+            return_value=mock_resp,
+        ):
+            added_partition = self.relational_table.add_partition(partition)
+            self.assertEqual(added_partition, resp_body.get_partitions()[0])
