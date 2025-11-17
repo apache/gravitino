@@ -100,7 +100,7 @@ public abstract class ManagedSchemaOperations implements SupportsSchemas {
     }
 
     StringIdentifier stringId = StringIdentifier.fromProperties(properties);
-    Preconditions.checkNotNull(stringId, "Property String identifier should not be null");
+    Preconditions.checkArgument(stringId != null, "Property String identifier should not be null");
 
     SchemaEntity schemaEntity =
         SchemaEntity.builder()

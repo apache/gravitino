@@ -47,11 +47,16 @@ public class GenericLakehouseTable extends BaseTable {
       GenericLakehouseTable genericLakehouseTable = new GenericLakehouseTable();
       genericLakehouseTable.columns = this.columns;
       genericLakehouseTable.comment = this.comment;
-      genericLakehouseTable.properties =
-          ImmutableMap.<String, String>builder()
-              .putAll(this.properties)
-              .put(Table.PROPERTY_TABLE_FORMAT, this.format)
-              .buildKeepingLast();
+
+      if (format != null) {
+        genericLakehouseTable.properties =
+            ImmutableMap.<String, String>builder()
+                .putAll(this.properties)
+                .put(Table.PROPERTY_TABLE_FORMAT, this.format)
+                .buildKeepingLast();
+      } else {
+        genericLakehouseTable.properties = this.properties;
+      }
       genericLakehouseTable.auditInfo = this.auditInfo;
       genericLakehouseTable.distribution = this.distribution;
       genericLakehouseTable.indexes = this.indexes;
