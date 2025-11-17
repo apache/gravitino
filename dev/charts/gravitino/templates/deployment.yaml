@@ -97,11 +97,11 @@ spec:
             fi
             echo "Schema file: $schema_file"
             echo "Upgrade file: $upgrade_file"
-            if ! mysql -h {{ .Release.Name }}-mysql -u root -D gravitino <"$upgrade_file"; then
+            if ! mysql -h {{ .Release.Name }}-mysql -u root -D $GRAVITINO_DB <"$upgrade_file"; then
               echo "WARNING: Upgrade script failed: $upgrade_file" >&2
               echo "Continuing with schema script..." >&2
             fi
-            mysql -h {{ .Release.Name }}-mysql -u root -D gravitino <$schema_file 
+            mysql -h {{ .Release.Name }}-mysql -u root -D $GRAVITINO_DB <$schema_file
         resources:
           {{- toYaml .Values.initResources | nindent 10 }}
         env:
@@ -110,10 +110,63 @@ spec:
               secretKeyRef:
                 name: {{ .Release.Name }}-mysql
                 key: mysql-root-password
+          - name: GRAVITINO_DB
+            value: {{ .Values.mysql.auth.database }}
         volumeMounts:
           - mountPath: /scripts
             name: scripts-emptydir
       {{- end }}
+      {{- if .Values.postgresql.enabled }}
+      - name: init-postgresql
+        image: {{ include "init-postgresql.image" . }}
+        imagePullPolicy: "{{ .Values.image.pullPolicy }}"
+        command:
+          - /bin/bash
+          - -c
+          - |
+            while ! PGPASSWORD=$POSTGRES_PASSWORD psql -h {{ .Release.Name }}-postgresql -U $POSTGRES_USER -c "SELECT 1"; do
+              echo "Waiting for PostgreSQL to be ready..."
+              sleep 2
+            done
+            VERSION=$(cat /scripts/version.txt)
+            if [ -z "$VERSION" ]; then
+              echo "ERROR:Please set VERSION"
+              exit 1
+            fi
+            dir="/scripts/postgresql"
+            schema_file=$(ls $dir/schema-*-postgresql.sql | sort -V | awk -F'[-]' '$2 <= '$VERSION' {print $0}' | tail -n 1)
+            if [ ! -f "$schema_file" ]; then
+              echo "ERROR:Failed to find schema file $schema_file"
+              exit 1
+            fi
+            upgrade_file=$(ls $dir/upgrade-*-to-*-postgresql.sql | sort -V | awk -F'[-]' '$4 <= '$VERSION' {print $0}' | tail -n 1)
+            if [ ! -f "$upgrade_file" ]; then
+              echo "ERROR:Failed to find upgrade file $upgrade_file"
+              exit 1
+            fi
+            echo "Schema file: $schema_file"
+            echo "Upgrade file: $upgrade_file"
+            if ! PGPASSWORD=$POSTGRES_PASSWORD psql -h {{ .Release.Name }}-postgresql -U $POSTGRES_USER -d $GRAVITINO_DB -f "$upgrade_file"; then
+              echo "WARNING: Upgrade script failed: $upgrade_file" >&2
+              echo "Continuing with schema script..." >&2 
+            fi
+            PGPASSWORD=$POSTGRES_PASSWORD psql -h {{ .Release.Name }}-postgresql -U $POSTGRES_USER -d $GRAVITINO_DB -f "$schema_file"
+        resources:
+          {{- toYaml .Values.initResources | nindent 10 }}
+        env:
+          - name: POSTGRES_USER
+            value: {{ .Values.postgresql.auth.username }}
+          - name: GRAVITINO_DB
+            value: {{ .Values.postgresql.auth.database }}
+          - name: POSTGRES_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                name: {{ .Release.Name }}-postgresql
+                key: password
+        volumeMounts:
+          - mountPath: /scripts
+            name: scripts-emptydir
+        {{- end }}
       containers:
         - name: {{ include "gravitino.name" . }}
           image: {{ include "gravitino.image" . }}
@@ -181,21 +234,6 @@ spec:
         - name: storage
           persistentVolumeClaim:
             claimName: {{ .Values.persistence.existingClaim }}
-        {{- else }}
-        volumeClaimTemplates:
-          - metadata:
-              name: storage
-              labels:
-                {{- toYaml .Values.persistence.labels | nindent 8 }}
-              annotations:
-                {{- toYaml .Values.persistence.annotations | nindent 8 }}
-            spec:
-              accessModes:
-                {{- toYaml .Values.persistence.accessModes | nindent 8 }}
-              resources:
-                requests:
-                  storage: {{ .Values.persistence.size | quote }}
-              storageClassName: {{ .Values.persistence.storageClassName }}
         {{- end }}
         {{- if .Values.extraVolumes }}
           {{- toYaml .Values.extraVolumes | nindent 8 }}
