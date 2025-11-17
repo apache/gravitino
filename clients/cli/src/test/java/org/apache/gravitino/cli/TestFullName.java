@@ -278,6 +278,8 @@ public class TestFullName {
     CommandLine commandLine = new DefaultParser().parse(options, args);
     FullName fullName = new FullName(commandLine);
 
+    assertFalse(fullName.hasNamePart(0));
+
     assertTrue(fullName.hasNamePart(1));
     assertTrue(fullName.hasNamePart(2));
     assertTrue(fullName.hasNamePart(3));
