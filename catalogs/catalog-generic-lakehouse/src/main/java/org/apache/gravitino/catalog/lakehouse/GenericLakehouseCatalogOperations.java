@@ -55,25 +55,6 @@ import org.apache.hadoop.fs.Path;
  *
  * <p>This catalog provides a unified interface for managing lakehouse table formats. It is designed
  * to be extensible and can support various table formats through a common interface.
- *
- * <p><b>Current Implementation Status:</b>
- *
- * <ul>
- *   <li>✅ <b>Schema Operations:</b> Fully supported (create, list, load, alter, drop)
- *   <li>⚠️ <b>Table Operations:</b> In development - will be added in subsequent releases
- *   <li>⚠️ <b>Managed Storage:</b> Framework in place, format-specific implementations required
- * </ul>
- *
- * <p><b>Configuration:</b>
- *
- * <ul>
- *   <li>{@code lakehouse-dir}: Root directory for the catalog (optional)
- *   <li>{@code gravitino.bypass.*}: Properties passed to underlying storage implementation
- * </ul>
- *
- * <p>For detailed documentation, see: <a
- * href="https://gravitino.apache.org/docs/generic-lakehouse-catalog">Generic Lakehouse Catalog
- * Documentation</a>
  */
 public class GenericLakehouseCatalogOperations
     implements CatalogOperations, SupportsSchemas, TableCatalog {
@@ -97,14 +78,14 @@ public class GenericLakehouseCatalogOperations
   public void initialize(
       Map<String, String> conf, CatalogInfo info, HasPropertyMetadata propertiesMetadata)
       throws RuntimeException {
-    String catalogDir =
+    String catalogLocation =
         (String)
             propertiesMetadata
                 .catalogPropertiesMetadata()
-                .getOrDefault(conf, GenericLakehouseCatalogPropertiesMetadata.LAKEHOUSE_DIR);
-    this.catalogLakehouseDir =
-        StringUtils.isNotBlank(catalogDir)
-            ? Optional.of(catalogDir).map(this::ensureTrailingSlash).map(Path::new)
+                .getOrDefault(conf, GenericLakehouseCatalogPropertiesMetadata.LAKEHOUSE_LOCATION);
+    this.catalogLakehouseLocation =
+        StringUtils.isNotBlank(catalogLocation)
+            ? Optional.of(catalogLocation).map(this::ensureTrailingSlash).map(Path::new)
             : Optional.empty();
   }
 
@@ -174,8 +155,7 @@ public class GenericLakehouseCatalogOperations
     // TODO(#8838): Implement table listing
     throw new UnsupportedOperationException(
         "Table operations are not yet implemented. "
-            + "This feature is planned for a future release. "
-            + "See documentation: https://gravitino.apache.org/docs/generic-lakehouse-catalog");
+            + "This feature is planned for a future release.");
   }
 
   @Override
@@ -183,8 +163,7 @@ public class GenericLakehouseCatalogOperations
     // TODO(#8838): Implement table loading
     throw new UnsupportedOperationException(
         "Table operations are not yet implemented. "
-            + "This feature is planned for a future release. "
-            + "See documentation: https://gravitino.apache.org/docs/generic-lakehouse-catalog");
+            + "This feature is planned for a future release.");
   }
 
   @Override
@@ -205,8 +184,7 @@ public class GenericLakehouseCatalogOperations
     // 3. Store metadata in Gravitino entity store
     throw new UnsupportedOperationException(
         "Table operations are not yet implemented. "
-            + "This feature is planned for a future release. "
-            + "See documentation: https://gravitino.apache.org/docs/generic-lakehouse-catalog");
+            + "This feature is planned for a future release.");
   }
 
   @Override
@@ -215,8 +193,7 @@ public class GenericLakehouseCatalogOperations
     // TODO(#8838): Implement table alteration
     throw new UnsupportedOperationException(
         "Table operations are not yet implemented. "
-            + "This feature is planned for a future release. "
-            + "See documentation: https://gravitino.apache.org/docs/generic-lakehouse-catalog");
+            + "This feature is planned for a future release.");
   }
 
   @Override
@@ -224,8 +201,7 @@ public class GenericLakehouseCatalogOperations
     // TODO(#8838): Implement table dropping
     throw new UnsupportedOperationException(
         "Table operations are not yet implemented. "
-            + "This feature is planned for a future release. "
-            + "See documentation: https://gravitino.apache.org/docs/generic-lakehouse-catalog");
+            + "This feature is planned for a future release.");
   }
 
   private String ensureTrailingSlash(String path) {

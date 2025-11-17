@@ -30,7 +30,7 @@ import org.apache.gravitino.connector.PropertyEntry;
 
 public class GenericLakehouseCatalogPropertiesMetadata extends BaseCatalogPropertiesMetadata {
 
-  public static final String LAKEHOUSE_DIR = "lakehouse-dir";
+  public static final String LAKEHOUSE_LOCATION = "location";
 
   private static final Map<String, PropertyEntry<?>> PROPERTIES_METADATA;
 
@@ -38,7 +38,7 @@ public class GenericLakehouseCatalogPropertiesMetadata extends BaseCatalogProper
     List<PropertyEntry<?>> propertyEntries =
         ImmutableList.of(
             stringOptionalPropertyEntry(
-                LAKEHOUSE_DIR,
+                LAKEHOUSE_LOCATION,
                 "The root directory of the lakehouse catalog.",
                 false /* immutable */,
                 null, /* defaultValue */

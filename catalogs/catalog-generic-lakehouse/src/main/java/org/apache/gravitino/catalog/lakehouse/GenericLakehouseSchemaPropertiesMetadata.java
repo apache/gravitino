@@ -28,8 +28,8 @@ import org.apache.gravitino.connector.BasePropertiesMetadata;
 import org.apache.gravitino.connector.PropertyEntry;
 
 public class GenericLakehouseSchemaPropertiesMetadata extends BasePropertiesMetadata {
-  public static final String LAKEHOUSE_DIR =
-      GenericLakehouseCatalogPropertiesMetadata.LAKEHOUSE_DIR;
+  public static final String LAKEHOUSE_LOCATION =
+      GenericLakehouseCatalogPropertiesMetadata.LAKEHOUSE_LOCATION;
 
   private static final Map<String, PropertyEntry<?>> PROPERTIES_METADATA;
 
@@ -37,7 +37,7 @@ public class GenericLakehouseSchemaPropertiesMetadata extends BasePropertiesMeta
     List<PropertyEntry<?>> propertyEntries =
         ImmutableList.of(
             stringOptionalPropertyEntry(
-                LAKEHOUSE_DIR,
+                LAKEHOUSE_LOCATION,
                 "The root directory of the lakehouse schema.",
                 false /* immutable */,
                 null, /* defaultValue */
