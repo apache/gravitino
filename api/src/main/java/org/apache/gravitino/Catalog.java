@@ -138,9 +138,10 @@ public interface Catalog extends Auditable {
    *
    * <p>The location property is optional, it can be specified when creating the catalog.
    *
-   * <p>It depends on the catalog implementation to decide whether to leverage this property.
-   * It also depends on the catalog implementation to decide whether to allow altering this
-   * property after catalog creation.
+   * <p>It depends on the catalog implementation to decide whether to leverage this property. It
+   * also depends on the catalog implementation to decide whether to allow altering this property
+   * after catalog creation.
+   *
    * <p>The behavior of altering this property (moving the catalog data) is also catalog specific.
    */
   String PROPERTY_LOCATION = "location";
