@@ -21,6 +21,7 @@ package org.apache.gravitino.storage.relational.utils;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.google.common.collect.Lists;
+import com.google.common.collect.Maps;
 import java.time.Instant;
 import java.util.Collections;
 import java.util.List;
@@ -63,6 +64,7 @@ import org.apache.gravitino.meta.UserEntity;
 import org.apache.gravitino.policy.Policy;
 import org.apache.gravitino.policy.PolicyContent;
 import org.apache.gravitino.rel.Column;
+import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.expressions.Expression;
 import org.apache.gravitino.rel.types.Type;
 import org.apache.gravitino.storage.relational.po.CatalogPO;
@@ -401,7 +403,10 @@ public class POConverters {
           .withCurrentVersion(INIT_VERSION)
           .withLastVersion(INIT_VERSION)
           .withDeletedAt(DEFAULT_DELETED_AT)
-          .withFormat(tableEntity.format())
+          .withFormat(
+              tableEntity.properties() == null
+                  ? null
+                  : tableEntity.properties().getOrDefault(Table.PROPERTY_TABLE_FORMAT, null))
           .withComment(tableEntity.comment())
           .withProperties(
               tableEntity.properties() == null
@@ -485,8 +490,10 @@ public class POConverters {
                       ? null
                       : JsonUtils.anyFieldMapper()
                           .writeValueAsString(DTOConverters.toDTOs(newTable.partitioning())))
-              // TODO support partitions later
-              .withFormat(newTable.format());
+              .withFormat(
+                  newTable.properties() == null
+                      ? null
+                      : newTable.properties().getOrDefault(Table.PROPERTY_TABLE_FORMAT, null));
 
       return builder.build();
     } catch (JsonProcessingException e) {
@@ -508,6 +515,14 @@ public class POConverters {
   public static TableEntity fromTableAndColumnPOs(
       TablePO tablePO, List<ColumnPO> columnPOs, Namespace namespace) {
     try {
+      Map<String, String> properties =
+          StringUtils.isBlank(tablePO.getProperties())
+              ? Maps.newHashMap()
+              : JsonUtils.anyFieldMapper().readValue(tablePO.getProperties(), Map.class);
+      if (StringUtils.isNotBlank(tablePO.getFormat())) {
+        properties.put(Table.PROPERTY_TABLE_FORMAT, tablePO.getFormat());
+      }
+
       return TableEntity.builder()
           .withId(tablePO.getTableId())
           .withName(tablePO.getTableName())
@@ -538,12 +553,8 @@ public class POConverters {
                   ? null
                   : JsonUtils.anyFieldMapper()
                       .readValue(tablePO.getPartitions(), Partitioning[].class))
-          .withFormat(tablePO.getFormat())
           .withComment(tablePO.getComment())
-          .withProperties(
-              StringUtils.isBlank(tablePO.getProperties())
-                  ? null
-                  : JsonUtils.anyFieldMapper().readValue(tablePO.getProperties(), Map.class))
+          .withProperties(properties)
           .withColumns(fromColumnPOs(columnPOs))
           .build();
     } catch (JsonProcessingException e) {
