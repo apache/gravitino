@@ -52,6 +52,7 @@ public class TestFilesetAuthorizationExpression {
     assertFalse(mockEvaluator.getResult(ImmutableSet.of("METALAKE::USE_METALAKE")));
     assertFalse(mockEvaluator.getResult(ImmutableSet.of("CATALOG::CREATE_CATALOG")));
     assertFalse(mockEvaluator.getResult(ImmutableSet.of("SCHEMA::CREATE_FILESET")));
+    assertFalse(mockEvaluator.getResult(ImmutableSet.of("TABLE::CREATE_FILESET")));
     assertFalse(
         mockEvaluator.getResult(ImmutableSet.of("SCHEMA::CREATE_FILESET", "CATALOG::USE_CATALOG")));
     assertTrue(
@@ -94,7 +95,6 @@ public class TestFilesetAuthorizationExpression {
     assertFalse(mockEvaluator.getResult(ImmutableSet.of("METALAKE::USE_METALAKE")));
     assertFalse(mockEvaluator.getResult(ImmutableSet.of("CATALOG::CREATE_CATALOG")));
     assertFalse(mockEvaluator.getResult(ImmutableSet.of("SCHEMA::CREATE_FILESET")));
-    assertFalse(mockEvaluator.getResult(ImmutableSet.of("TABLE::CREATE_FILESET")));
     assertFalse(
         mockEvaluator.getResult(
             ImmutableSet.of("SCHEMA::CREATE_FILESET", "CATALOG::CREATE_CATALOG")));
