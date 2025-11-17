@@ -103,24 +103,29 @@ public class RelationalEntityStoreIdResolver implements EntityIdResolver {
     long metalakeId =
         MetalakeMetaService.getInstance()
             .getMetalakeIdByName(NameIdentifierUtil.getMetalake(nameIdentifier));
+
     switch (type) {
       case METALAKE:
         return new EntityIds(metalakeId);
+
       case ROLE:
         long roleId =
             RoleMetaService.getInstance()
                 .getRoleIdByMetalakeIdAndName(metalakeId, nameIdentifier.name());
         return new EntityIds(roleId, metalakeId);
+
       case USER:
         long userId =
             UserMetaService.getInstance()
                 .getUserIdByMetalakeIdAndName(metalakeId, nameIdentifier.name());
         return new EntityIds(userId, metalakeId);
+
       case GROUP:
         long groupId =
             GroupMetaService.getInstance()
                 .getGroupIdByMetalakeIdAndName(metalakeId, nameIdentifier.name());
         return new EntityIds(groupId, metalakeId);
+
       default:
         throw new IllegalArgumentException("Unsupported entity type: " + type);
     }
@@ -133,16 +138,19 @@ public class RelationalEntityStoreIdResolver implements EntityIdResolver {
                 NameIdentifierUtil.getMetalake(nameIdentifier),
                 NameIdentifierUtil.getCatalogIdentifier(nameIdentifier).name(),
                 NameIdentifierUtil.getSchemaIdentifier(nameIdentifier).name());
+
     switch (type) {
       case SCHEMA:
         return new EntityIds(
             schemaIds.getSchemaId(), schemaIds.getMetalakeId(), schemaIds.getCatalogId());
+
       case TABLE:
         long tableId =
             TableMetaService.getInstance()
                 .getTableIdBySchemaIdAndName(schemaIds.getSchemaId(), nameIdentifier.name());
         return new EntityIds(
             tableId, schemaIds.getMetalakeId(), schemaIds.getCatalogId(), schemaIds.getSchemaId());
+
       case COLUMN:
         long columnTableId =
             TableMetaService.getInstance()
@@ -168,18 +176,21 @@ public class RelationalEntityStoreIdResolver implements EntityIdResolver {
             schemaIds.getMetalakeId(),
             schemaIds.getCatalogId(),
             schemaIds.getSchemaId());
+
       case TOPIC:
         long topicId =
             TopicMetaService.getInstance()
                 .getTopicIdBySchemaIdAndName(schemaIds.getSchemaId(), nameIdentifier.name());
         return new EntityIds(
             topicId, schemaIds.getMetalakeId(), schemaIds.getCatalogId(), schemaIds.getSchemaId());
+
       case MODEL:
         long modelId =
             ModelMetaService.getInstance()
                 .getModelIdBySchemaIdAndModelName(schemaIds.getSchemaId(), nameIdentifier.name());
         return new EntityIds(
             modelId, schemaIds.getMetalakeId(), schemaIds.getCatalogId(), schemaIds.getSchemaId());
+
       default:
         throw new IllegalArgumentException("Unsupported entity type: " + type);
     }
