@@ -117,7 +117,7 @@ public class TreeLockNode {
     holdingThreadTimestamp.put(ThreadIdentifier.of(currentThread, identifier), timestamp);
   }
 
-  long removeHoldingThreadTimestamp(Thread currentThread, NameIdentifier identifier) {
+  Long removeHoldingThreadTimestamp(Thread currentThread, NameIdentifier identifier) {
     return holdingThreadTimestamp.remove(ThreadIdentifier.of(currentThread, identifier));
   }
 
