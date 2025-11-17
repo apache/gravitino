@@ -64,7 +64,7 @@ public class GenericLakehouseCatalogOperations
   private final ManagedSchemaOperations managedSchemaOps;
 
   @SuppressWarnings("unused") // todo: remove this after implementing table operations
-  private Optional<Path> catalogLakehouseDir;
+  private Optional<Path> catalogLakehouseLocation;
 
   /**
    * Initializes the generic lakehouse catalog operations with the provided configuration.
