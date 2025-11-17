@@ -96,7 +96,7 @@ public class CatalogGenericLakehouseLanceIT extends BaseIT {
   public static final String LANCE_COL_NAME1 = "lance_col_name1";
   public static final String LANCE_COL_NAME2 = "lance_col_name2";
   public static final String LANCE_COL_NAME3 = "lance_col_name3";
-  protected final String provider = "generic-lakehouse";
+  protected final String provider = "lakehouse-generic";
   protected GravitinoMetalake metalake;
   protected Catalog catalog;
   protected String tempDirectory;
