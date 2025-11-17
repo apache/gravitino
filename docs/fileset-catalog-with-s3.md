@@ -288,13 +288,11 @@ Similar to Spark configurations, you need to add S3 (bundle) jars to the classpa
     <artifactId>gravitino-filesystem-hadoop3-runtime</artifactId>
     <version>${GRAVITINO_VERSION}</version>
   </dependency>
-
-  <dependency>
-    <groupId>org.apache.gravitino</groupId>
-    <artifactId>gravitino-aws</artifactId>
-    <version>${GRAVITINO_VERSION}</version>
-  </dependency>
 ```
+
+:::note
+Since version 1.1.0, the `gravitino-aws` JAR is no longer required, as it is now included in the `gravitino-filesystem-hadoop3-runtime` JAR.
+:::
 
 Or use the bundle jar with Hadoop environment if there is no Hadoop environment:
 
@@ -337,7 +335,7 @@ schema_name = "your_s3_schema"
 fileset_name = "your_s3_fileset"
 
 # JDK8 as follows, JDK17 will be slightly different, you need to add '--conf \"spark.driver.extraJavaOptions=--add-opens=java.base/sun.nio.ch=ALL-UNNAMED\" --conf \"spark.executor.extraJavaOptions=--add-opens=java.base/sun.nio.ch=ALL-UNNAMED\"' to the submit args.
-os.environ["PYSPARK_SUBMIT_ARGS"] = "--jars /path/to/gravitino-aws-${gravitino-version}.jar,/path/to/gravitino-filesystem-hadoop3-runtime-${gravitino-version}-SNAPSHOT.jar,/path/to/hadoop-aws-3.3.4.jar,/path/to/aws-java-sdk-bundle-1.12.262.jar --master local[1] pyspark-shell"
+os.environ["PYSPARK_SUBMIT_ARGS"] = "--jars /path/to/gravitino-filesystem-hadoop3-runtime-${gravitino-version}-SNAPSHOT.jar,/path/to/hadoop-aws-3.3.4.jar,/path/to/aws-java-sdk-bundle-1.12.262.jar --master local[1] pyspark-shell"
 spark = SparkSession.builder
     .appName("s3_fileset_test")
     .config("spark.hadoop.fs.AbstractFileSystem.gvfs.impl", "org.apache.gravitino.filesystem.hadoop.Gvfs")
@@ -370,7 +368,7 @@ os.environ["PYSPARK_SUBMIT_ARGS"] = "--jars /path/to/gravitino-aws-bundle-${grav
 ```
 
 - [`gravitino-aws-bundle-${gravitino-version}.jar`](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-aws-bundle) is the Gravitino AWS jar with Hadoop environment(3.3.1) and `hadoop-aws` jar.
-- [`gravitino-aws-${gravitino-version}.jar`](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-aws) is a condensed version of the Gravitino AWS bundle jar without Hadoop environment and `hadoop-aws` jar.
+- [`gravitino-aws-${gravitino-version}.jar`](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-aws) is bundled with the `gravitino-filesystem-hadoop3-runtime-${gravitino-version}.jar` and `gravitino-aws-bundle-${gravitino-version}.jar` since version 1.1.0.
 - `hadoop-aws-3.3.4.jar` and `aws-java-sdk-bundle-1.12.262.jar` can be found in the Hadoop distribution in the `${HADOOP_HOME}/share/hadoop/tools/lib` directory.
 
 Please choose the correct jar according to your environment.
@@ -424,7 +422,7 @@ The following are examples of how to use the `hadoop fs` command to access the f
 
 2. Add the necessary jars to the Hadoop classpath. 
 
-For S3, you need to add `gravitino-filesystem-hadoop3-runtime-${gravitino-version}.jar`, `gravitino-aws-${gravitino-version}.jar` and `hadoop-aws-${hadoop-version}.jar` located at `${HADOOP_HOME}/share/hadoop/tools/lib/` to Hadoop classpath. 
+For S3, you need to add `gravitino-filesystem-hadoop3-runtime-${gravitino-version}.jar` and `hadoop-aws-${hadoop-version}.jar` located at `${HADOOP_HOME}/share/hadoop/tools/lib/` to Hadoop classpath. 
 
 3. Run the following command to access the fileset:
 

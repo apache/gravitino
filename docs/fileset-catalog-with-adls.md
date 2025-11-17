@@ -260,7 +260,7 @@ fs.mkdirs(filesetPath);
 
 Similar to Spark configurations, you need to add ADLS (bundle) jars to the classpath according to your environment.
 
-If your wants to custom your hadoop version or there is already a hadoop version in your project, you can add the following dependencies to your `pom.xml`:
+If you want to custom your hadoop version or there is already a hadoop version in your project, you can add the following dependencies to your `pom.xml`:
 
 ```xml
   <dependency>
@@ -280,13 +280,11 @@ If your wants to custom your hadoop version or there is already a hadoop version
     <artifactId>gravitino-filesystem-hadoop3-runtime</artifactId>
     <version>${GRAVITINO_VERSION}</version>
   </dependency>
-
-  <dependency>
-    <groupId>org.apache.gravitino</groupId>
-    <artifactId>gravitino-azure</artifactId>
-    <version>${GRAVITINO_VERSION}</version>
-  </dependency>
 ```
+
+:::note
+Since version 1.1.0, the `gravitino-azure` JAR is no longer required, as it is now included in the `gravitino-filesystem-hadoop3-runtime` JAR.
+:::
 
 Or use the bundle jar with Hadoop environment if there is no Hadoop environment:
 
@@ -327,7 +325,7 @@ catalog_name = "your_adls_catalog"
 schema_name = "your_adls_schema"
 fileset_name = "your_adls_fileset"
 # JDK8 as follows, JDK17 will be slightly different, you need to add '--conf \"spark.driver.extraJavaOptions=--add-opens=java.base/sun.nio.ch=ALL-UNNAMED\" --conf \"spark.executor.extraJavaOptions=--add-opens=java.base/sun.nio.ch=ALL-UNNAMED\"' to the submit args.
-os.environ["PYSPARK_SUBMIT_ARGS"] = "--jars /path/to/gravitino-azure-{gravitino-version}.jar,/path/to/gravitino-filesystem-hadoop3-runtime-{gravitino-version}.jar,/path/to/hadoop-azure-3.3.4.jar,/path/to/azure-storage-7.0.1.jar,/path/to/wildfly-openssl-1.0.7.Final.jar --master local[1] pyspark-shell"
+os.environ["PYSPARK_SUBMIT_ARGS"] = "--jars /path/to/gravitino-filesystem-hadoop3-runtime-{gravitino-version}.jar,/path/to/hadoop-azure-3.3.4.jar,/path/to/azure-storage-7.0.1.jar,/path/to/wildfly-openssl-1.0.7.Final.jar --master local[1] pyspark-shell"
 spark = SparkSession.builder
     .appName("adls_fileset_test")
     .config("spark.hadoop.fs.AbstractFileSystem.gvfs.impl", "org.apache.gravitino.filesystem.hadoop.Gvfs")
@@ -375,7 +373,7 @@ os.environ["PYSPARK_SUBMIT_ARGS"] = (
 ```
 
 - [`gravitino-azure-bundle-${gravitino-version}.jar`](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-azure-bundle) is the Gravitino ADLS jar with Hadoop environment(3.3.1), `hadoop-azure.jar` and all packages needed to access ADLS.
-- [`gravitino-azure-${gravitino-version}.jar`](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-azure) is a condensed version of the Gravitino ADLS bundle jar without Hadoop environment and `hadoop-azure.jar`.
+- [`gravitino-azure-${gravitino-version}.jar`](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-azure) is bundled with the `gravitino-filesystem-hadoop3-runtime-${gravitino-version}.jar` and `gravitino-azure-bundle-${gravitino-version}.jar` since version 1.1.0.
 - `hadoop-azure-3.3.4.jar` and `azure-storage-7.0.1.jar` can be found in the Hadoop distribution in the `${HADOOP_HOME}/share/hadoop/tools/lib` directory.
 
 Please choose the correct jar according to your environment.
@@ -423,7 +421,7 @@ The following are examples of how to use the `hadoop fs` command to access the f
 
 2. Add the necessary jars to the Hadoop classpath.
 
-For ADLS, you need to add `gravitino-filesystem-hadoop3-runtime-${gravitino-version}.jar`, `gravitino-azure-${gravitino-version}.jar` and `hadoop-azure-${hadoop-version}.jar` located at `${HADOOP_HOME}/share/hadoop/tools/lib/` to the Hadoop classpath. 
+For ADLS, you need to add `gravitino-filesystem-hadoop3-runtime-${gravitino-version}.jar` and `hadoop-azure-${hadoop-version}.jar` located at `${HADOOP_HOME}/share/hadoop/tools/lib/` to the Hadoop classpath. 
 
 3. Run the following command to access the fileset:
 
