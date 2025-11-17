@@ -133,6 +133,19 @@ public interface Catalog extends Auditable {
   String PROPERTY_IN_USE = "in-use";
 
   /**
+   * The property name for the catalog location. This property indicates the physical location of
+   * the catalog's data, such as a file path or a URI.
+   *
+   * <p>The location property is optional, it can be specified when creating the catalog.
+   *
+   * <p>It depends on the catalog implementation to decide whether to leverage this property.
+   * Besides. It also depends on the catalog implementation to decide whether to allow altering this
+   * property after catalog creation. Besides, the behavior of altering this property (moving the
+   * catalog data) is also catalog specific.
+   */
+  String PROPERTY_LOCATION = "location";
+
+  /**
    * The property to specify the cloud that the catalog is running on. The value should be one of
    * the {@link CloudName}.
    */

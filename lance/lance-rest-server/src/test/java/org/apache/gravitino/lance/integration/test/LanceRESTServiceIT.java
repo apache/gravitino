@@ -696,7 +696,7 @@ public class LanceRESTServiceIT extends BaseIT {
     return metalake.createCatalog(
         catalogName,
         Catalog.Type.RELATIONAL,
-        "generic-lakehouse",
+        "lakehouse-generic",
         "catalog for lance rest service tests",
         properties);
   }
