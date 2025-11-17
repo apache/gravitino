@@ -604,10 +604,13 @@ public class NameIdentifierUtil {
       NameIdentifier nameIdentifier, Entity.EntityType type) {
     Set<Entity.EntityType> supportsVirtualNamespaceTypes =
         ImmutableSet.of(USER, GROUP, ROLE, TAG, POLICY, JOB, JOB_TEMPLATE);
+
     if (supportsVirtualNamespaceTypes.contains(type)) {
       return NameIdentifier.of(NameIdentifierUtil.getMetalake(nameIdentifier));
+
     } else if (nameIdentifier.hasNamespace()) {
       return NameIdentifier.of(nameIdentifier.namespace().levels());
+
     } else {
       throw new IllegalArgumentException("The entity has no parent name identifier");
     }

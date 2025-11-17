@@ -226,8 +226,6 @@ public class TableMetaService {
   public boolean deleteTable(NameIdentifier identifier) {
     NameIdentifierUtil.checkTable(identifier);
 
-    String tableName = identifier.name();
-
     Long tableId = EntityIdService.getEntityId(identifier, Entity.EntityType.TABLE);
 
     AtomicInteger deleteResult = new AtomicInteger(0);
