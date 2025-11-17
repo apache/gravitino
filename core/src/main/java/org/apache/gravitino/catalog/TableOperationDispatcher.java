@@ -510,7 +510,7 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
                   catalogIdentifier,
                   HasPropertyMetadata::tablePropertiesMetadata,
                   table.properties()))
-          // The metadata of managed table is store by Gravitino, so it is always imported.
+          // The metadata of managed table is stored by Gravitino, so it is always imported.
           .withImported(true /* imported */);
     }
 
@@ -539,7 +539,7 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
                   HasPropertyMetadata::tablePropertiesMetadata,
                   table.properties()))
           // For some catalogs like PG, the identifier information is not stored in the table's
-          // metadata, we need to check if this table is existed in the store, if so we don't
+          // metadata, we need to check if this table exists in the store, if so we don't
           // need to import.
           .withImported(true);
     }

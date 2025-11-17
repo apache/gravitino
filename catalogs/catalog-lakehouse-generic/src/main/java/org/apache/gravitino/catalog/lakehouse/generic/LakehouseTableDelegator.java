@@ -46,7 +46,7 @@ public interface LakehouseTableDelegator {
   List<PropertyEntry<?>> tablePropertyEntries();
 
   /**
-   * Create the managed table operations for the specific table format. This method should be return
+   * Create the managed table operations for the specific table format. This method should  return
    * a new instance of {@link ManagedTableOperations} each time it is called. The returned instance
    * will be used in {@link GenericCatalogOperations} to perform the specific table operation.
    *
