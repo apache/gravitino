@@ -41,12 +41,7 @@ public class TestPropertiesMetadata {
     PropertiesMetadata catalogPropertiesMetadata = genericCatalog.catalogPropertiesMetadata();
     Assertions.assertNotNull(catalogPropertiesMetadata);
 
-    Map<String, String> catalogProperties =
-        ImmutableMap.of(
-            "storage.type", "s3",
-            "storage.s3.bucket", "my-bucket",
-            "storage.s3.region", "us-west-2",
-            "location", "/tmp/test1");
+    Map<String, String> catalogProperties = ImmutableMap.of("location", "/tmp/test1");
 
     String catalogLocation =
         (String)
@@ -60,12 +55,7 @@ public class TestPropertiesMetadata {
     PropertiesMetadata schemaPropertiesMetadata = genericCatalog.schemaPropertiesMetadata();
     Assertions.assertNotNull(schemaPropertiesMetadata);
 
-    Map<String, String> schemaProperties =
-        ImmutableMap.of(
-            "storage.type", "s3",
-            "storage.s3.bucket", "my-bucket",
-            "storage.s3.region", "us-west-2",
-            "location", "/tmp/test_schema");
+    Map<String, String> schemaProperties = ImmutableMap.of("location", "/tmp/test_schema");
 
     String schemaLocation =
         (String) schemaPropertiesMetadata.getOrDefault(schemaProperties, Schema.PROPERTY_LOCATION);

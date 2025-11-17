@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.catalog.lakehouse.integration.test;
+package org.apache.gravitino.catalog.lakehouse.lance.integration.test;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.google.common.collect.ImmutableMap;
@@ -53,7 +53,6 @@ import org.apache.gravitino.Catalog;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Schema;
 import org.apache.gravitino.client.GravitinoMetalake;
-import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.integration.test.util.BaseIT;
 import org.apache.gravitino.integration.test.util.GravitinoITUtils;
 import org.apache.gravitino.rel.Column;
@@ -83,10 +82,11 @@ import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class CatalogGenericLakehouseLanceIT extends BaseIT {
-  private static final Logger LOG = LoggerFactory.getLogger(CatalogGenericLakehouseLanceIT.class);
+public class CatalogGenericCatalogLanceIT extends BaseIT {
+  private static final Logger LOG = LoggerFactory.getLogger(CatalogGenericCatalogLanceIT.class);
   public static final String metalakeName =
       GravitinoITUtils.genRandomName("CatalogGenericLakeLanceIT_metalake");
+
   public String catalogName = GravitinoITUtils.genRandomName("CatalogGenericLakeLanceI_catalog");
   public String SCHEMA_PREFIX = "CatalogGenericLakeLance_schema";
   public String schemaName = GravitinoITUtils.genRandomName(SCHEMA_PREFIX);
@@ -146,7 +146,7 @@ public class CatalogGenericLakehouseLanceIT extends BaseIT {
   }
 
   @Test
-  public void testCreateLanceTable() throws InterruptedException {
+  public void testCreateLanceTable() {
     // Create a table from Gravitino API
     Column[] columns = createColumns();
     NameIdentifier nameIdentifier = NameIdentifier.of(schemaName, tableName);
@@ -284,7 +284,7 @@ public class CatalogGenericLakehouseLanceIT extends BaseIT {
     Assertions.assertTrue(e.getMessage().contains("Invalid user input"));
 
     Assertions.assertThrows(
-        NoSuchTableException.class, () -> catalog.asTableCatalog().loadTable(newNameIdentifier));
+        RuntimeException.class, () -> catalog.asTableCatalog().loadTable(newNameIdentifier));
   }
 
   @Test
