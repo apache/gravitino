@@ -89,7 +89,7 @@ public class RevokePrivilegesFromRole extends MetadataCommand {
     } catch (NoSuchRoleException err) {
       exitWithError(ErrorMessages.UNKNOWN_ROLE);
     } catch (NoSuchMetadataObjectException err) {
-      exitWithError(ErrorMessages.UNKNOWN_USER);
+      exitWithError(ErrorMessages.UNKNOWN_ENTITY);
     } catch (Exception exp) {
       exitWithError(exp.getMessage());
     }
