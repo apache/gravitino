@@ -42,6 +42,7 @@ dependencies {
   implementation(libs.commons.io)
   implementation(libs.commons.lang3)
   implementation(libs.guava)
+  implementation(libs.hadoop3.client.api)
 
   annotationProcessor(libs.lombok)
 
