@@ -224,8 +224,8 @@ public class AuthorizationExpressionConverter {
     expression =
         expression.replaceAll(
             "ANY_CREATE_FILESET",
-            "((ANY(CREATE_FILESET, METALAKE, CATALOG, SCHEMA, TABLE)) "
-                + "&& !(ANY(DENY_CREATE_FILESET, METALAKE, CATALOG, SCHEMA, TABLE)))");
+            "((ANY(CREATE_FILESET, METALAKE, CATALOG, SCHEMA)) "
+                + "&& !(ANY(DENY_CREATE_FILESET, METALAKE, CATALOG, SCHEMA)))");
     expression =
         expression.replaceAll(
             "SCHEMA_OWNER_WITH_USE_CATALOG",

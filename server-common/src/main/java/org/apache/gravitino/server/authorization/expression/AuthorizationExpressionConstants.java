@@ -88,6 +88,12 @@ public class AuthorizationExpressionConstants {
               ANY_WRITE_FILESET
                   """;
 
+  public static final String loadRoleAuthorizationExpression =
+      """
+          METALAKE::OWNER || METALAKE::MANAGE_GRANTS
+          || ROLE::OWNER || ROLE::SELF
+          """;
+
   public static final String CAN_ACCESS_METADATA = "CAN_ACCESS_METADATA";
 
   public static final String loadTagAuthorizationExpression =

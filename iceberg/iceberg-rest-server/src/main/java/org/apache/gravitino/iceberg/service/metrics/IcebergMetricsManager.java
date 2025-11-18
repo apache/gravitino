@@ -31,6 +31,7 @@ import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
 import org.apache.gravitino.iceberg.service.IcebergRestUtils;
+import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.metrics.MetricsReport;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -44,13 +45,15 @@ public class IcebergMetricsManager {
   private static final ImmutableMap<String, String> ICEBERG_METRICS_STORE_NAMES =
       ImmutableMap.of(
           DummyMetricsStore.ICEBERG_METRICS_STORE_DUMMY_NAME,
-          DummyMetricsStore.class.getCanonicalName());
+          DummyMetricsStore.class.getCanonicalName(),
+          JDBCMetricsStore.ICEBERG_METRICS_STORE_JDBC_NAME,
+          JDBCMetricsStore.class.getCanonicalName());
 
   private final IcebergMetricsFormatter icebergMetricsFormatter;
   private final IcebergMetricsStore icebergMetricsStore;
   private final int retainDays;
 
-  private BlockingQueue<MetricsReport> queue;
+  private BlockingQueue<MetricsReportWrapper> queue;
   private Thread metricsWriterThread;
   private volatile boolean isClosed = false;
   private Optional<ScheduledExecutorService> metricsCleanerExecutor = Optional.empty();
@@ -111,16 +114,19 @@ public class IcebergMetricsManager {
   /**
    * Records a metrics report by adding it to the processing queue.
    *
+   * @param catalogName the catalog name of the metrics report
+   * @param namespace the namespace of the metrics report
    * @param metricsReport the metrics report to record
    * @return true if the metric was successfully queued, false if it was rejected (manager closed or
    *     queue full)
    */
-  public boolean recordMetric(MetricsReport metricsReport) {
+  public boolean recordMetric(
+      String catalogName, Namespace namespace, MetricsReport metricsReport) {
     if (isClosed) {
       logMetrics("Drop Iceberg metrics because Iceberg Metrics Manager is closed.", metricsReport);
       return false;
     }
-    if (!queue.offer(metricsReport)) {
+    if (!queue.offer(new MetricsReportWrapper(catalogName, namespace, metricsReport))) {
       logMetrics("Drop Iceberg metrics because metrics queue is full.", metricsReport);
       return false;
     }
@@ -156,21 +162,25 @@ public class IcebergMetricsManager {
 
   private void writeMetrics() {
     while (!Thread.currentThread().isInterrupted()) {
-      MetricsReport metricsReport;
+      MetricsReportWrapper metricsReport;
       try {
         metricsReport = queue.take();
       } catch (InterruptedException e) {
         LOG.warn("Iceberg Metrics writer thread is interrupted.");
         break;
       }
-      if (metricsReport != null) {
-        doRecordMetric(metricsReport);
-      }
+
+      doRecordMetric(
+          metricsReport.getCatalog(),
+          metricsReport.getNamespace(),
+          metricsReport.getMetricsReport());
     }
 
-    MetricsReport metricsReport = queue.poll();
+    MetricsReportWrapper metricsReport = queue.poll();
     while (metricsReport != null) {
-      logMetrics("Drop Iceberg metrics because it's time to close metrics store.", metricsReport);
+      logMetrics(
+          "Drop Iceberg metrics because it's time to close metrics store.",
+          metricsReport.getMetricsReport());
       metricsReport = queue.poll();
     }
   }
@@ -196,11 +206,35 @@ public class IcebergMetricsManager {
     LOG.info("{} {}.", message, icebergMetricsFormatter.toPrintableString(metricsReport));
   }
 
-  private void doRecordMetric(MetricsReport metricsReport) {
+  private void doRecordMetric(String catalog, Namespace namespace, MetricsReport metricsReport) {
     try {
-      icebergMetricsStore.recordMetric(metricsReport);
+      icebergMetricsStore.recordMetric(catalog, namespace, metricsReport);
     } catch (Exception e) {
       LOG.warn("Write Iceberg metrics failed.", e);
+    }
+  }
+
+  private static class MetricsReportWrapper {
+    private final String catalog;
+    private final Namespace namespace;
+    private final MetricsReport metricsReport;
+
+    public MetricsReportWrapper(String catalog, Namespace namespace, MetricsReport metricsReport) {
+      this.catalog = catalog;
+      this.namespace = namespace;
+      this.metricsReport = metricsReport;
+    }
+
+    public Namespace getNamespace() {
+      return namespace;
+    }
+
+    public MetricsReport getMetricsReport() {
+      return metricsReport;
+    }
+
+    public String getCatalog() {
+      return catalog;
     }
   }
 }
