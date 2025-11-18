@@ -80,6 +80,9 @@ dependencies {
     exclude("org.rocksdb")
   }
 
+  testImplementation(libs.h2db)
+  testImplementation(libs.mysql.driver)
+  testImplementation(libs.postgresql.driver)
   testImplementation(libs.iceberg.aws.bundle)
   testImplementation(libs.iceberg.gcp.bundle)
   testImplementation(libs.iceberg.azure.bundle) {
@@ -97,6 +100,11 @@ dependencies {
   testImplementation(libs.sqlite.jdbc)
   testImplementation(libs.slf4j.api)
   testImplementation(libs.testcontainers)
+
+  // Add Hadoop 3.3+ dependencies since Spark's Hadoop is excluded
+  // Required for Iceberg 1.10+ which uses newer Hadoop APIs like FileSystem.openFile()
+  testImplementation(libs.hadoop3.client.api)
+  testImplementation(libs.hadoop3.client.runtime)
 
   testRuntimeOnly(libs.junit.jupiter.engine)
 }

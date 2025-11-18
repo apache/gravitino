@@ -69,6 +69,7 @@ import org.apache.gravitino.listener.JobEventDispatcher;
 import org.apache.gravitino.listener.MetalakeEventDispatcher;
 import org.apache.gravitino.listener.ModelEventDispatcher;
 import org.apache.gravitino.listener.PartitionEventDispatcher;
+import org.apache.gravitino.listener.PolicyEventDispatcher;
 import org.apache.gravitino.listener.SchemaEventDispatcher;
 import org.apache.gravitino.listener.StatisticEventDispatcher;
 import org.apache.gravitino.listener.TableEventDispatcher;
@@ -601,8 +602,9 @@ public class GravitinoEnv {
 
     // Create and initialize Tag related modules
     this.tagDispatcher = new TagEventDispatcher(eventBus, new TagManager(idGenerator, entityStore));
-    // todo: support policy event dispatcher
-    this.policyDispatcher = new PolicyManager(idGenerator, entityStore);
+    // Create and initialize Policy related modules
+    this.policyDispatcher =
+        new PolicyEventDispatcher(eventBus, new PolicyManager(idGenerator, entityStore));
 
     this.jobOperationDispatcher =
         new JobEventDispatcher(eventBus, new JobManager(config, entityStore, idGenerator));

@@ -19,32 +19,40 @@ import unittest
 
 from gravitino.dto.responses.error_response import ErrorResponse
 from gravitino.exceptions.base import (
+    AlreadyExistsException,
+    CatalogAlreadyExistsException,
+    CatalogNotInUseException,
+    ConnectionFailedException,
+    IllegalArgumentException,
+    InternalError,
+    MetalakeAlreadyExistsException,
+    MetalakeNotInUseException,
+    NonEmptySchemaException,
     NoSuchCatalogException,
-    NoSuchSchemaException,
+    NoSuchCredentialException,
     NoSuchFilesetException,
     NoSuchMetalakeException,
-    MetalakeAlreadyExistsException,
-    InternalError,
-    RESTException,
-    NotFoundException,
-    IllegalArgumentException,
-    AlreadyExistsException,
+    NoSuchPartitionException,
+    NoSuchSchemaException,
+    NoSuchTableException,
     NotEmptyException,
-    NonEmptySchemaException,
+    NotFoundException,
+    NotInUseException,
+    PartitionAlreadyExistsException,
+    RESTException,
     SchemaAlreadyExistsException,
     UnsupportedOperationException,
-    ConnectionFailedException,
-    CatalogAlreadyExistsException,
-    NoSuchCredentialException,
 )
+from gravitino.exceptions.handlers.catalog_error_handler import CATALOG_ERROR_HANDLER
 from gravitino.exceptions.handlers.credential_error_handler import (
     CREDENTIAL_ERROR_HANDLER,
 )
-
-from gravitino.exceptions.handlers.rest_error_handler import REST_ERROR_HANDLER
 from gravitino.exceptions.handlers.fileset_error_handler import FILESET_ERROR_HANDLER
 from gravitino.exceptions.handlers.metalake_error_handler import METALAKE_ERROR_HANDLER
-from gravitino.exceptions.handlers.catalog_error_handler import CATALOG_ERROR_HANDLER
+from gravitino.exceptions.handlers.partition_error_handler import (
+    PARTITION_ERROR_HANDLER,
+)
+from gravitino.exceptions.handlers.rest_error_handler import REST_ERROR_HANDLER
 from gravitino.exceptions.handlers.schema_error_handler import SCHEMA_ERROR_HANDLER
 
 
@@ -253,5 +261,82 @@ class TestErrorHandler(unittest.TestCase):
 
         with self.assertRaises(RESTException):
             SCHEMA_ERROR_HANDLER.handle(
+                ErrorResponse.generate_error_response(Exception, "mock error")
+            )
+
+    def test_partition_error_handler(self):
+        with self.assertRaises(IllegalArgumentException):
+            PARTITION_ERROR_HANDLER.handle(
+                ErrorResponse.generate_error_response(
+                    IllegalArgumentException, "mock error"
+                )
+            )
+
+        with self.assertRaises(NoSuchSchemaException):
+            PARTITION_ERROR_HANDLER.handle(
+                ErrorResponse.generate_error_response(
+                    NoSuchSchemaException, "mock error"
+                )
+            )
+
+        with self.assertRaises(NoSuchTableException):
+            PARTITION_ERROR_HANDLER.handle(
+                ErrorResponse.generate_error_response(
+                    NoSuchTableException, "mock error"
+                )
+            )
+
+        with self.assertRaises(NoSuchPartitionException):
+            PARTITION_ERROR_HANDLER.handle(
+                ErrorResponse.generate_error_response(
+                    NoSuchPartitionException, "mock error"
+                )
+            )
+
+        with self.assertRaises(NotFoundException):
+            PARTITION_ERROR_HANDLER.handle(
+                ErrorResponse.generate_error_response(NotFoundException, "mock error")
+            )
+
+        with self.assertRaises(PartitionAlreadyExistsException):
+            PARTITION_ERROR_HANDLER.handle(
+                ErrorResponse.generate_error_response(
+                    PartitionAlreadyExistsException, "mock error"
+                )
+            )
+
+        with self.assertRaises(RuntimeError):
+            PARTITION_ERROR_HANDLER.handle(
+                ErrorResponse.generate_error_response(RuntimeError, "mock error")
+            )
+
+        with self.assertRaises(UnsupportedOperationException):
+            PARTITION_ERROR_HANDLER.handle(
+                ErrorResponse.generate_error_response(
+                    UnsupportedOperationException, "mock error"
+                )
+            )
+
+        with self.assertRaises(CatalogNotInUseException):
+            PARTITION_ERROR_HANDLER.handle(
+                ErrorResponse.generate_error_response(
+                    CatalogNotInUseException, "mock error"
+                )
+            )
+
+        with self.assertRaises(MetalakeNotInUseException):
+            PARTITION_ERROR_HANDLER.handle(
+                ErrorResponse.generate_error_response(
+                    MetalakeNotInUseException, "mock error"
+                )
+            )
+
+        with self.assertRaises(NotInUseException):
+            PARTITION_ERROR_HANDLER.handle(
+                ErrorResponse.generate_error_response(NotInUseException, "mock error")
+            )
+
+        with self.assertRaises(RESTException):
+            PARTITION_ERROR_HANDLER.handle(
                 ErrorResponse.generate_error_response(Exception, "mock error")
             )

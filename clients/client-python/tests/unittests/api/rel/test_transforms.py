@@ -153,7 +153,7 @@ class TestTransforms(unittest.TestCase):
     def test_list_transform(self):
         list_transform = Transforms.list(["createTime"], ["city"])
         list_transform_with_assignments = Transforms.list(
-            ["createTime", "city"], assignments=[]
+            field_names=[["createTime", "city"]], assignments=[]
         )
         trans_dict = {
             list_transform: 1,
