@@ -64,6 +64,16 @@ public class TagManager implements TagDispatcher {
 
   private final EntityStore entityStore;
 
+  private static final Set<MetadataObject.Type> SUPPORTED_METADATA_OBJECT_TYPES_FOR_TAGS =
+      Sets.newHashSet(
+          MetadataObject.Type.CATALOG,
+          MetadataObject.Type.SCHEMA,
+          MetadataObject.Type.TABLE,
+          MetadataObject.Type.FILESET,
+          MetadataObject.Type.TOPIC,
+          MetadataObject.Type.COLUMN,
+          MetadataObject.Type.MODEL);
+
   public TagManager(IdGenerator idGenerator, EntityStore entityStore) {
     this.idGenerator = idGenerator;
     this.entityStore = entityStore;
@@ -298,8 +308,7 @@ public class TagManager implements TagDispatcher {
       String metalake, MetadataObject metadataObject, String[] tagsToAdd, String[] tagsToRemove)
       throws NoSuchMetadataObjectException, TagAlreadyAssociatedException {
     Preconditions.checkArgument(
-        !metadataObject.type().equals(MetadataObject.Type.METALAKE)
-            && !metadataObject.type().equals(MetadataObject.Type.ROLE),
+        SUPPORTED_METADATA_OBJECT_TYPES_FOR_TAGS.contains(metadataObject.type()),
         "Cannot associate tags for unsupported metadata object type %s",
         metadataObject.type());
 

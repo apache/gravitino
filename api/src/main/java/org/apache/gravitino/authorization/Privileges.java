@@ -133,14 +133,29 @@ public class Privileges {
         return CreateModelVersion.allow();
       case USE_MODEL:
         return UseModel.allow();
+
+        // Tag
       case CREATE_TAG:
         return CreateTag.allow();
       case APPLY_TAG:
         return ApplyTag.allow();
+
+        // Policy
       case APPLY_POLICY:
         return ApplyPolicy.allow();
       case CREATE_POLICY:
         return CreatePolicy.allow();
+
+        // Job template
+      case CREATE_JOB_TEMPLATE:
+        return CreateJobTemplate.allow();
+      case USE_JOB_TEMPLATE:
+        return UseJobTemplate.allow();
+
+        // Job
+      case RUN_JOB:
+        return RunJob.allow();
+
       default:
         throw new IllegalArgumentException("Doesn't support the privilege: " + name);
     }
@@ -222,10 +237,22 @@ public class Privileges {
         return CreateModelVersion.deny();
       case USE_MODEL:
         return UseModel.deny();
+
+        // Tag
       case CREATE_TAG:
         return CreateTag.deny();
       case APPLY_TAG:
         return ApplyTag.deny();
+
+        // Job template
+      case CREATE_JOB_TEMPLATE:
+        return CreateJobTemplate.deny();
+      case USE_JOB_TEMPLATE:
+        return UseJobTemplate.deny();
+
+        // Job
+      case RUN_JOB:
+        return RunJob.deny();
       default:
         throw new IllegalArgumentException("Doesn't support the privilege: " + name);
     }
@@ -984,7 +1011,6 @@ public class Privileges {
     protected CreatePolicy(Condition condition, Name name) {
       super(condition, name);
     }
-
     /**
      * @return The instance with allow condition of the privilege.
      */
@@ -996,6 +1022,29 @@ public class Privileges {
      * @return The instance with deny condition of the privilege.
      */
     public static CreatePolicy deny() {
+      return DENY_INSTANCE;
+    }
+
+    @Override
+    public boolean canBindTo(MetadataObject.Type type) {
+      return type == MetadataObject.Type.METALAKE;
+    }
+  }
+
+  /** The privilege to create a job. */
+  public static class RunJob extends GenericPrivilege<RunJob> {
+    private static final RunJob ALLOW_INSTANCE = new RunJob(Condition.ALLOW, Name.RUN_JOB);
+    private static final RunJob DENY_INSTANCE = new RunJob(Condition.DENY, Name.RUN_JOB);
+
+    private RunJob(Condition condition, Name name) {
+      super(condition, name);
+    }
+
+    public static RunJob allow() {
+      return ALLOW_INSTANCE;
+    }
+
+    public static RunJob deny() {
       return DENY_INSTANCE;
     }
 
@@ -1023,16 +1072,10 @@ public class Privileges {
       super(condition, name);
     }
 
-    /**
-     * @return The instance with allow condition of the privilege.
-     */
     public static ApplyPolicy allow() {
       return ALLOW_INSTANCE;
     }
 
-    /**
-     * @return The instance with deny condition of the privilege.
-     */
     public static ApplyPolicy deny() {
       return DENY_INSTANCE;
     }
@@ -1040,6 +1083,68 @@ public class Privileges {
     @Override
     public boolean canBindTo(MetadataObject.Type type) {
       return type == MetadataObject.Type.METALAKE || type == MetadataObject.Type.POLICY;
+    }
+  }
+
+  /** The privilege to create a job template. */
+  public static class CreateJobTemplate extends GenericPrivilege<CreateJobTemplate> {
+    private static final CreateJobTemplate ALLOW_INSTANCE =
+        new CreateJobTemplate(Condition.ALLOW, Name.CREATE_JOB_TEMPLATE);
+    private static final CreateJobTemplate DENY_INSTANCE =
+        new CreateJobTemplate(Condition.DENY, Name.CREATE_JOB_TEMPLATE);
+
+    private CreateJobTemplate(Condition condition, Name name) {
+      super(condition, name);
+    }
+
+    /**
+     * @return The instance with allow condition of the privilege.
+     */
+    public static CreateJobTemplate allow() {
+      return ALLOW_INSTANCE;
+    }
+
+    /**
+     * @return The instance with deny condition of the privilege.
+     */
+    public static CreateJobTemplate deny() {
+      return DENY_INSTANCE;
+    }
+
+    @Override
+    public boolean canBindTo(MetadataObject.Type type) {
+      return type == MetadataObject.Type.METALAKE;
+    }
+  }
+
+  /** The privilege to use a job template. */
+  public static class UseJobTemplate extends GenericPrivilege<UseJobTemplate> {
+    private static final UseJobTemplate ALLOW_INSTANCE =
+        new UseJobTemplate(Condition.ALLOW, Name.USE_JOB_TEMPLATE);
+    private static final UseJobTemplate DENY_INSTANCE =
+        new UseJobTemplate(Condition.DENY, Name.USE_JOB_TEMPLATE);
+
+    private UseJobTemplate(Condition condition, Name name) {
+      super(condition, name);
+    }
+
+    /**
+     * @return The instance with allow condition of the privilege.
+     */
+    public static UseJobTemplate allow() {
+      return ALLOW_INSTANCE;
+    }
+
+    /**
+     * @return The instance with deny condition of the privilege.
+     */
+    public static UseJobTemplate deny() {
+      return DENY_INSTANCE;
+    }
+
+    @Override
+    public boolean canBindTo(MetadataObject.Type type) {
+      return type == MetadataObject.Type.METALAKE || type == MetadataObject.Type.JOB_TEMPLATE;
     }
   }
 }
