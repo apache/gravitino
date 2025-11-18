@@ -16,12 +16,15 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-description = "catalog-hive"
-
 plugins {
   `maven-publish`
   id("java")
   id("idea")
+  alias(libs.plugins.shadow)
+}
+
+repositories {
+  mavenCentral()
 }
 
 val scalaVersion: String = project.properties["scalaVersion"] as? String ?: extra["defaultScalaVersion"].toString()
@@ -30,38 +33,6 @@ val icebergVersion: String = libs.versions.iceberg.get()
 val scalaCollectionCompatVersion: String = libs.versions.scala.collection.compat.get()
 
 dependencies {
-  implementation(project(":api")) {
-    exclude("*")
-  }
-  implementation(project(":catalogs:catalog-common")) {
-    exclude("*")
-  }
-  implementation(project(":catalogs:hive-metastore-common"))
-  implementation(project(":core")) {
-    exclude("*")
-  }
-
-  implementation(libs.commons.collections3)
-  implementation(libs.commons.configuration1)
-  implementation(libs.htrace.core4)
-  implementation(libs.commons.io)
-  implementation(libs.guava)
-  implementation(libs.hadoop2.auth) {
-    exclude("*")
-  }
-  implementation(libs.woodstox.core)
-  implementation(libs.hadoop2.mapreduce.client.core) {
-    exclude("*")
-  }
-  implementation(libs.slf4j.api)
-
-  compileOnly(libs.hive2.metastore)
-  compileOnly(libs.immutables.value)
-  compileOnly(libs.lombok)
-
-  annotationProcessor(libs.immutables.value)
-  annotationProcessor(libs.lombok)
-
   testImplementation(project(":catalogs:hive-metastore-common", "testArtifacts"))
   testImplementation(project(":common"))
   testImplementation(project(":clients:client-java"))
@@ -116,63 +87,4 @@ dependencies {
   // testImplementation(libs.hadoop3.common)
 
   testRuntimeOnly(libs.junit.jupiter.engine)
-}
-
-tasks {
-  val runtimeJars by registering(Copy::class) {
-    from(configurations.runtimeClasspath)
-    into("build/libs")
-  }
-
-  val copyCatalogLibs by registering(Copy::class) {
-    dependsOn("jar", "runtimeJars")
-    from("build/libs") {
-      exclude("guava-*.jar")
-      exclude("log4j-*.jar")
-      exclude("slf4j-*.jar")
-      // Exclude the following jars to avoid conflict with the jars in authorization-gcp
-      exclude("protobuf-java-*.jar")
-    }
-    into("$rootDir/distribution/package/catalogs/hive/libs")
-  }
-
-  val copyCatalogConfig by registering(Copy::class) {
-    from("src/main/resources")
-    into("$rootDir/distribution/package/catalogs/hive/conf")
-
-    include("hive.conf")
-    include("hive-site.xml.template")
-
-    rename { original ->
-      if (original.endsWith(".template")) {
-        original.replace(".template", "")
-      } else {
-        original
-      }
-    }
-
-    exclude { details ->
-      details.file.isDirectory()
-    }
-
-    fileMode = 0b111101101
-  }
-
-  register("copyLibAndConfig", Copy::class) {
-    dependsOn(copyCatalogConfig, copyCatalogLibs)
-  }
-}
-
-tasks.test {
-  val skipITs = project.hasProperty("skipITs")
-  if (skipITs) {
-    // Exclude integration tests
-    exclude("**/integration/test/**")
-  } else {
-    dependsOn(tasks.jar)
-  }
-}
-
-tasks.getByName("generateMetadataFileForMavenJavaPublication") {
-  dependsOn("runtimeJars")
 }

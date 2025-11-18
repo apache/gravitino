@@ -78,6 +78,8 @@ project(":spark-connector:spark-runtime-3.5").projectDir = file("spark-connector
 include("web:web", "web:integration-test")
 include("docs")
 include("integration-test-common")
+include("integration-test")
+include(":integration-test:catalog-hive-it")
 include(":bundles:aws", ":bundles:aws-bundle")
 include(":bundles:gcp", ":bundles:gcp-bundle")
 include(":bundles:aliyun", ":bundles:aliyun-bundle")

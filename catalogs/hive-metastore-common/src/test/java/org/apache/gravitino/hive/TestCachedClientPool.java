@@ -22,6 +22,7 @@ package org.apache.gravitino.hive;
 import com.google.common.collect.ImmutableMap;
 import java.security.PrivilegedAction;
 import java.util.Map;
+import java.util.Properties;
 import java.util.concurrent.TimeUnit;
 import org.apache.gravitino.catalog.hive.HiveConstants;
 import org.apache.gravitino.hive.hms.MiniHiveMetastoreService;
@@ -40,7 +41,8 @@ public class TestCachedClientPool extends MiniHiveMetastoreService {
             "1",
             HiveConstants.CLIENT_POOL_CACHE_EVICTION_INTERVAL_MS,
             "5000");
-    CachedClientPool clientPool = new CachedClientPool(MiniHiveMetastoreService.hiveConf, props);
+    // todo yuhui
+    CachedClientPool clientPool = new CachedClientPool(new Properties(), props);
     HiveClientPool clientPool1 = clientPool.clientPool();
     HiveClientPool cachedClientPool =
         clientPool.clientPoolCache().getIfPresent(CachedClientPool.extractKey());

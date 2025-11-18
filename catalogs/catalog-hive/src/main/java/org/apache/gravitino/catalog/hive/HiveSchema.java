@@ -22,6 +22,7 @@ import com.google.common.collect.Maps;
 import java.util.Map;
 import java.util.Optional;
 import lombok.ToString;
+import org.apache.gravitino.Schema;
 import org.apache.gravitino.connector.BaseSchema;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.hadoop.hive.metastore.api.Database;
@@ -38,32 +39,20 @@ public class HiveSchema extends BaseSchema {
    * @param db The Database representing the HiveSchema.
    * @return A new HiveSchema instance.
    */
-  public static HiveSchema fromHiveDB(Database db) {
-    Map<String, String> properties = buildSchemaProperties(db);
+  public static HiveSchema fromHiveDB(Schema db) {
+    Map<String, String> properties = db.properties();
 
     // Get audit info from Hive's Database object. Because Hive's database doesn't store create
     // time, last modifier and last modified time, we only get creator from Hive's database.
     AuditInfo.Builder auditInfoBuilder = AuditInfo.builder();
-    Optional.ofNullable(db.getOwnerName()).ifPresent(auditInfoBuilder::withCreator);
+    Optional.ofNullable(db.auditInfo().creator()).ifPresent(auditInfoBuilder::withCreator);
 
     return HiveSchema.builder()
-        .withName(db.getName())
-        .withComment(db.getDescription())
+        .withName(db.name())
+        .withComment(db.comment())
         .withProperties(properties)
         .withAuditInfo(auditInfoBuilder.build())
         .build();
-  }
-
-  /**
-   * Build schema properties from a Hive Database object.
-   *
-   * @param database The Hive Database object.
-   * @return A map of schema properties.
-   */
-  public static Map<String, String> buildSchemaProperties(Database database) {
-    Map<String, String> properties = Maps.newHashMap(database.getParameters());
-    properties.put(HiveSchemaPropertiesMetadata.LOCATION, database.getLocationUri());
-    return properties;
   }
 
   /**

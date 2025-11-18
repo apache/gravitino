@@ -30,6 +30,7 @@ import java.util.List;
 import java.util.Map;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.Schema;
 import org.apache.gravitino.SchemaChange;
 import org.apache.gravitino.catalog.lakehouse.hudi.HudiSchema;
 import org.apache.gravitino.catalog.lakehouse.hudi.HudiTable;
@@ -45,6 +46,7 @@ import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
 import org.apache.gravitino.exceptions.TableAlreadyExistsException;
 import org.apache.gravitino.hive.CachedClientPool;
 import org.apache.gravitino.rel.Column;
+import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.TableChange;
 import org.apache.gravitino.rel.expressions.distributions.Distribution;
 import org.apache.gravitino.rel.expressions.sorts.SortOrder;
@@ -52,11 +54,6 @@ import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.indexes.Index;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hive.conf.HiveConf;
-import org.apache.hadoop.hive.metastore.api.Database;
-import org.apache.hadoop.hive.metastore.api.NoSuchObjectException;
-import org.apache.hadoop.hive.metastore.api.Table;
-import org.apache.hadoop.hive.metastore.api.UnknownDBException;
-import org.apache.thrift.TException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -75,24 +72,15 @@ public class HudiHMSBackendOps implements HudiCatalogBackendOps {
   @Override
   public void initialize(Map<String, String> properties) {
     HiveConf hiveConf = buildHiveConfAndInitKerberosAuth(properties);
-    this.clientPool = new CachedClientPool(hiveConf, properties);
+    // todo yuhui: add more configurations if needed
+    this.clientPool = new CachedClientPool(null, properties);
   }
 
   @Override
   public HudiSchema loadSchema(NameIdentifier schemaIdent) throws NoSuchSchemaException {
     try {
-      Database database = clientPool.run(client -> client.getDatabase(schemaIdent.name()));
-      return HudiHMSSchema.builder().withBackendSchema(database).build();
-
-    } catch (NoSuchObjectException | UnknownDBException e) {
-      throw new NoSuchSchemaException(
-          e, "Hudi schema (database) does not exist: %s in Hive Metastore", schemaIdent.name());
-
-    } catch (TException e) {
-      throw new RuntimeException(
-          "Failed to load Hudi schema (database) " + schemaIdent.name() + " from Hive Metastore",
-          e);
-
+      Schema database = clientPool.run(client -> client.getDatabase(schemaIdent.name()));
+      return HudiHMSSchema.builder().buildFromSchema(database);
     } catch (InterruptedException e) {
       throw new RuntimeException(e);
     }
@@ -106,14 +94,6 @@ public class HudiHMSBackendOps implements HudiCatalogBackendOps {
               c.getAllDatabases().stream()
                   .map(db -> NameIdentifier.of(namespace, db))
                   .toArray(NameIdentifier[]::new));
-
-    } catch (TException e) {
-      throw new RuntimeException(
-          "Failed to list all schemas (database) under namespace : "
-              + namespace
-              + " in Hive Metastore",
-          e);
-
     } catch (InterruptedException e) {
       throw new RuntimeException(e);
     }
@@ -150,18 +130,9 @@ public class HudiHMSBackendOps implements HudiCatalogBackendOps {
             List<String> allTables = c.getAllTables(schemaIdent.name());
             return c.getTableObjectsByName(schemaIdent.name(), allTables).stream()
                 .filter(this::checkHudiTable)
-                .map(t -> NameIdentifier.of(namespace, t.getTableName()))
+                .map(t -> NameIdentifier.of(namespace, t.name()))
                 .toArray(NameIdentifier[]::new);
           });
-
-    } catch (UnknownDBException e) {
-      throw new NoSuchSchemaException(
-          "Schema (database) does not exist %s in Hive Metastore", namespace);
-
-    } catch (TException e) {
-      throw new RuntimeException(
-          "Failed to list all tables under the namespace : " + namespace + " in Hive Metastore", e);
-
     } catch (InterruptedException e) {
       throw new RuntimeException(e);
     }
@@ -179,14 +150,6 @@ public class HudiHMSBackendOps implements HudiCatalogBackendOps {
             "Table %s is not a Hudi table in Hive Metastore", tableIdent.name());
       }
       return HudiHMSTable.builder().withBackendTable(table).build();
-
-    } catch (NoSuchObjectException e) {
-      throw new NoSuchTableException(
-          e, "Hudi table does not exist: %s in Hive Metastore", tableIdent.name());
-
-    } catch (TException e) {
-      throw new RuntimeException(
-          "Failed to load Hudi table " + tableIdent.name() + " from Hive metastore", e);
 
     } catch (InterruptedException e) {
       throw new RuntimeException(e);
@@ -231,8 +194,9 @@ public class HudiHMSBackendOps implements HudiCatalogBackendOps {
     // uses `org.apache.hudi.hadoop.HoodieParquetInputFormat` and MOR table
     // uses `org.apache.hudi.hadoop.HoodieParquetRealtimeInputFormat`, to
     // simplify the logic, we just check the prefix of the input format
-    return table.getSd().getInputFormat() != null
-        && table.getSd().getInputFormat().startsWith(HUDI_PACKAGE_PREFIX);
+
+    // todo yuhui: better way to identify Hudi table?
+    return true;
   }
 
   private HiveConf buildHiveConfAndInitKerberosAuth(Map<String, String> properties) {

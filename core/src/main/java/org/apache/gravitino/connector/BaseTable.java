@@ -158,6 +158,10 @@ public abstract class BaseTable implements Table {
     return indexes;
   }
 
+  public Optional<ProxyPlugin> proxyPlugin() {
+    return proxyPlugin;
+  }
+
   /**
    * Builder interface for creating instances of {@link BaseTable}.
    *

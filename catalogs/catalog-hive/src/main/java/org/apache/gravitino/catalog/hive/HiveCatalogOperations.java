@@ -54,6 +54,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.Schema;
 import org.apache.gravitino.SchemaChange;
 import org.apache.gravitino.connector.CatalogInfo;
 import org.apache.gravitino.connector.CatalogOperations;
@@ -68,6 +69,7 @@ import org.apache.gravitino.exceptions.NonEmptySchemaException;
 import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
 import org.apache.gravitino.exceptions.TableAlreadyExistsException;
 import org.apache.gravitino.hive.CachedClientPool;
+import org.apache.gravitino.hive.client.HiveClient;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Table;
@@ -83,18 +85,10 @@ import org.apache.gravitino.rel.indexes.Index;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.conf.HiveConf.ConfVars;
-import org.apache.hadoop.hive.metastore.IMetaStoreClient;
-import org.apache.hadoop.hive.metastore.api.AlreadyExistsException;
-import org.apache.hadoop.hive.metastore.api.Database;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
-import org.apache.hadoop.hive.metastore.api.InvalidOperationException;
-import org.apache.hadoop.hive.metastore.api.NoSuchObjectException;
-import org.apache.hadoop.hive.metastore.api.StorageDescriptor;
-import org.apache.hadoop.hive.metastore.api.UnknownDBException;
 import org.apache.hadoop.hive.metastore.api.hive_metastoreConstants;
 import org.apache.hadoop.security.SecurityUtil;
 import org.apache.hadoop.security.UserGroupInformation;
-import org.apache.thrift.TException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -173,7 +167,8 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
 
     initKerberosIfNecessary(conf, hadoopConf);
 
-    this.clientPool = new CachedClientPool(hiveConf, conf);
+    // todo yuhui: handle hiveConfig
+    this.clientPool = new CachedClientPool(null, conf);
 
     this.listAllTables = enableListAllTables(conf);
   }
@@ -331,16 +326,14 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
                       .map(db -> NameIdentifier.of(namespace, db))
                       .toArray(NameIdentifier[]::new));
       return schemas;
-
-    } catch (TException e) {
+    } catch (InterruptedException e) {
+      throw new RuntimeException(e);
+    } catch (Exception e) {
       throw new RuntimeException(
           "Failed to list all schemas (database) under namespace : "
               + namespace
               + " in Hive Metastore",
           e);
-
-    } catch (InterruptedException e) {
-      throw new RuntimeException(e);
     }
   }
 
@@ -373,20 +366,12 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
 
       clientPool.run(
           client -> {
-            client.createDatabase(hiveSchema.toHiveDB());
+            client.createDatabase(hiveSchema);
             return null;
           });
 
       LOG.info("Created Hive schema (database) {} in Hive Metastore", ident.name());
       return hiveSchema;
-
-    } catch (AlreadyExistsException e) {
-      throw new SchemaAlreadyExistsException(
-          e, "Hive schema (database) '%s' already exists in Hive Metastore", ident.name());
-
-    } catch (TException e) {
-      throw new RuntimeException(
-          "Failed to create Hive schema (database) " + ident.name() + " in Hive Metastore", e);
 
     } catch (Exception e) {
       throw new RuntimeException(e);
@@ -403,20 +388,11 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
   @Override
   public HiveSchema loadSchema(NameIdentifier ident) throws NoSuchSchemaException {
     try {
-      Database database = clientPool.run(client -> client.getDatabase(ident.name()));
+      Schema database = clientPool.run(client -> client.getDatabase(ident.name()));
       HiveSchema hiveSchema = HiveSchema.fromHiveDB(database);
 
       LOG.info("Loaded Hive schema (database) {} from Hive Metastore ", ident.name());
       return hiveSchema;
-
-    } catch (NoSuchObjectException | UnknownDBException e) {
-      throw new NoSuchSchemaException(
-          e, "Hive schema (database) does not exist: %s in Hive Metastore", ident.name());
-
-    } catch (TException e) {
-      throw new RuntimeException(
-          "Failed to load Hive schema (database) " + ident.name() + " from Hive Metastore", e);
-
     } catch (InterruptedException e) {
       throw new RuntimeException(e);
     }
@@ -435,8 +411,9 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
       throws NoSuchSchemaException {
     try {
       // load the database parameters
-      Database database = clientPool.run(client -> client.getDatabase(ident.name()));
-      Map<String, String> properties = HiveSchema.buildSchemaProperties(database);
+      Schema database = clientPool.run(client -> client.getDatabase(ident.name()));
+      HiveSchema hiveSchema = HiveSchema.fromHiveDB(database);
+      Map<String, String> properties = hiveSchema.properties();
       if (LOG.isDebugEnabled()) {
         LOG.debug(
             "Loaded properties for Hive schema (database) {} found {}",
@@ -457,26 +434,14 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
         }
       }
 
-      // alter the Hive database parameters
-      Database alteredDatabase = database.deepCopy();
-      alteredDatabase.setParameters(properties);
-
       clientPool.run(
           client -> {
-            client.alterDatabase(ident.name(), alteredDatabase);
+            client.alterDatabase(ident.name(), database);
             return null;
           });
 
       LOG.info("Altered Hive schema (database) {} in Hive Metastore", ident.name());
-      return HiveSchema.fromHiveDB(alteredDatabase);
-
-    } catch (NoSuchObjectException e) {
-      throw new NoSuchSchemaException(
-          e, "Hive schema (database) %s does not exist in Hive Metastore", ident.name());
-
-    } catch (TException | InterruptedException e) {
-      throw new RuntimeException(
-          "Failed to alter Hive schema (database) " + ident.name() + " in Hive metastore", e);
+      return hiveSchema;
 
     } catch (Exception e) {
       throw new RuntimeException(e);
@@ -501,18 +466,6 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
           });
       LOG.info("Dropped Hive schema (database) {}", ident.name());
       return true;
-
-    } catch (InvalidOperationException e) {
-      throw new NonEmptySchemaException(
-          e, "Hive schema (database) %s is not empty. One or more tables exist.", ident.name());
-
-    } catch (NoSuchObjectException e) {
-      LOG.warn("Hive schema (database) {} does not exist in Hive Metastore", ident.name());
-      return false;
-
-    } catch (TException e) {
-      throw new RuntimeException(
-          "Failed to drop Hive schema (database) " + ident.name() + " in Hive Metastore", e);
 
     } catch (Exception e) {
       throw new RuntimeException(e);
@@ -572,14 +525,6 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
           .map(tbName -> NameIdentifier.of(namespace, tbName))
           .toArray(NameIdentifier[]::new);
 
-    } catch (UnknownDBException e) {
-      throw new NoSuchSchemaException(
-          "Schema (database) does not exist %s in Hive Metastore", namespace);
-
-    } catch (TException e) {
-      throw new RuntimeException(
-          "Failed to list all tables under the namespace : " + namespace + " in Hive Metastore", e);
-
     } catch (InterruptedException e) {
       throw new RuntimeException(e);
     }
@@ -614,30 +559,20 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
    */
   @Override
   public Table loadTable(NameIdentifier tableIdent) throws NoSuchTableException {
-    org.apache.hadoop.hive.metastore.api.Table table = loadHiveTable(tableIdent);
-    HiveTable hiveTable =
-        HiveTable.fromHiveTable(table)
-            .withProxyPlugin(proxyPlugin)
-            .withClientPool(clientPool)
-            .build();
+    HiveTable hiveTable = loadHiveTable(tableIdent);
 
     LOG.info("Loaded Hive table {} from Hive Metastore ", tableIdent.name());
     return hiveTable;
   }
 
-  private org.apache.hadoop.hive.metastore.api.Table loadHiveTable(NameIdentifier tableIdent) {
+  private HiveTable loadHiveTable(NameIdentifier tableIdent) {
     NameIdentifier schemaIdent = NameIdentifier.of(tableIdent.namespace().levels());
 
     try {
-      org.apache.hadoop.hive.metastore.api.Table table =
-          clientPool.run(c -> c.getTable(schemaIdent.name(), tableIdent.name()));
-      return table;
+      Table table = clientPool.run(c -> c.getTable(schemaIdent.name(), tableIdent.name()));
+      return HiveTable.fromHiveTable(schemaIdent.name(), table).build();
 
-    } catch (NoSuchObjectException e) {
-      throw new NoSuchTableException(
-          e, "Hive table does not exist: %s in Hive Metastore", tableIdent.name());
-
-    } catch (InterruptedException | TException e) {
+    } catch (InterruptedException e) {
       throw new RuntimeException(
           "Failed to load Hive table " + tableIdent.name() + " from Hive metastore", e);
     }
@@ -805,20 +740,13 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
               .build();
       clientPool.run(
           c -> {
-            c.createTable(hiveTable.toHiveTable(propertiesMetadata.tablePropertiesMetadata()));
+            c.createTable(hiveTable);
             return null;
           });
 
       LOG.info("Created Hive table {} in Hive Metastore", tableIdent.name());
       return hiveTable;
 
-    } catch (AlreadyExistsException e) {
-      throw new TableAlreadyExistsException(e, "Table already exists: %s", tableIdent.name());
-    } catch (TException | InterruptedException e) {
-      throw new RuntimeException(
-          "Failed to create Hive table " + tableIdent.name() + " in Hive Metastore", e);
-    } catch (RuntimeException e) {
-      throw e;
     } catch (Exception e) {
       throw new RuntimeException(e);
     }
@@ -846,10 +774,8 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
     try {
       // TODO(@Minghuang): require a table lock to avoid race condition
       HiveTable table = (HiveTable) loadTable(tableIdent);
-      org.apache.hadoop.hive.metastore.api.Table alteredHiveTable =
-          table.toHiveTable(propertiesMetadata.tablePropertiesMetadata());
-
-      validateColumnChangeForAlter(changes, alteredHiveTable);
+      /*
+      validateColumnChangeForAlter(changes, table);
 
       for (TableChange change : changes) {
         // Table change
@@ -902,33 +828,17 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
                   + (change == null ? "null" : change.getClass().getSimpleName()));
         }
       }
+       */
 
       clientPool.run(
           c -> {
-            c.alter_table(schemaIdent.name(), tableIdent.name(), alteredHiveTable);
+            c.alterTable(schemaIdent.name(), tableIdent.name(), table);
             return null;
           });
 
       LOG.info("Altered Hive table {} in Hive Metastore", tableIdent.name());
-      return HiveTable.fromHiveTable(alteredHiveTable)
-          .withProxyPlugin(proxyPlugin)
-          .withClientPool(clientPool)
-          .build();
+      return table;
 
-    } catch (TException | InterruptedException e) {
-      if (e.getMessage() != null
-          && e.getMessage().contains("types incompatible with the existing columns")) {
-        throw new IllegalArgumentException(
-            "Failed to alter Hive table ["
-                + tableIdent.name()
-                + "] in Hive metastore, "
-                + "since Hive metastore will check the compatibility of column type between the old and new column positions, "
-                + "please ensure that the type of the new column position is compatible with the old one, "
-                + "otherwise the alter operation will fail in Hive metastore.",
-            e);
-      }
-      throw new RuntimeException(
-          "Failed to alter Hive table " + tableIdent.name() + " in Hive metastore", e);
     } catch (IllegalArgumentException | NoSuchTableException e) {
       throw e;
     } catch (Exception e) {
@@ -1120,7 +1030,7 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
       String comment,
       Map<String, String> properties) {
     try {
-      clientPool.run(IMetaStoreClient::getAllDatabases);
+      clientPool.run(HiveClient::getAllDatabases);
     } catch (Exception e) {
       throw new ConnectionFailedException(
           e, "Failed to run getAllDatabases in Hive Metastore: %s", e.getMessage());
@@ -1148,12 +1058,6 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
       LOG.info("Dropped Hive table {}", tableIdent.name());
       return true;
 
-    } catch (NoSuchObjectException e) {
-      LOG.warn("Hive table {} does not exist in Hive Metastore", tableIdent.name());
-      return false;
-    } catch (TException | InterruptedException e) {
-      throw new RuntimeException(
-          "Failed to drop Hive table " + tableIdent.name() + " in Hive Metastore", e);
     } catch (Exception e) {
       throw new RuntimeException(e);
     }
@@ -1168,8 +1072,8 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
   }
 
   private boolean isExternalTable(NameIdentifier tableIdent) {
-    org.apache.hadoop.hive.metastore.api.Table hiveTable = loadHiveTable(tableIdent);
-    return EXTERNAL_TABLE.name().equalsIgnoreCase(hiveTable.getTableType());
+    HiveTable hiveTable = loadHiveTable(tableIdent);
+    return EXTERNAL_TABLE.name().equalsIgnoreCase(hiveTable.properties().getOrDefault("type", ""));
   }
 
   private static ThreadFactory getThreadFactory(String factoryName) {

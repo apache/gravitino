@@ -37,7 +37,24 @@ dependencies {
 
   implementation(libs.caffeine)
   implementation(libs.guava)
-  implementation(libs.hive2.metastore) {
+  implementation(libs.slf4j.api)
+
+  compileOnly(libs.hive2.metastore)
+  compileOnly(libs.immutables.value)
+  compileOnly(libs.lombok)
+
+  annotationProcessor(libs.immutables.value)
+  annotationProcessor(libs.lombok)
+
+  testImplementation(libs.bundles.log4j)
+  testImplementation(libs.commons.collections3)
+  testImplementation(libs.commons.configuration1)
+  testImplementation(libs.datanucleus.core)
+  testImplementation(libs.datanucleus.api.jdo)
+  testImplementation(libs.datanucleus.rdbms)
+  testImplementation(libs.datanucleus.jdo)
+  testImplementation(libs.derby)
+  testImplementation(libs.hive2.metastore) {
     exclude("ant")
     exclude("co.cask.tephra")
     exclude("com.github.joshelser")
@@ -62,23 +79,9 @@ dependencies {
     exclude("org.openjdk.jol")
     exclude("org.slf4j")
   }
-  implementation(libs.hadoop2.common) {
+  testImplementation(libs.hadoop2.common) {
     exclude("*")
   }
-  implementation(libs.slf4j.api)
-
-  compileOnly(libs.immutables.value)
-
-  annotationProcessor(libs.immutables.value)
-
-  testImplementation(libs.bundles.log4j)
-  testImplementation(libs.commons.collections3)
-  testImplementation(libs.commons.configuration1)
-  testImplementation(libs.datanucleus.core)
-  testImplementation(libs.datanucleus.api.jdo)
-  testImplementation(libs.datanucleus.rdbms)
-  testImplementation(libs.datanucleus.jdo)
-  testImplementation(libs.derby)
   testImplementation(libs.hadoop2.auth) {
     exclude("*")
   }
