@@ -87,7 +87,7 @@ schema1 and its filesets are stored in the same cluster as defined by the catalo
 However, schema2 and its filesets (fileset3, fileset4) are located in different clusters (cluster2 and cluster3, respectively).
 
 
-The example for creating Filesets with different clusteris as follows:
+The example for creating Filesets with different clusters as follows:
 
 ```text
 # create fileset catalog
