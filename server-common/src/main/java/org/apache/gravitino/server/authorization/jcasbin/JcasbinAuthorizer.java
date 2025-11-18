@@ -200,7 +200,7 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
       result = false;
     }
     LOG.debug(
-        "principal {},metalake {},metadata object {},privilege {},deny result {}",
+        "principal {},metalake {},metadata object {},privilege {},owner result {}",
         principal,
         metalake,
         metadataObject,

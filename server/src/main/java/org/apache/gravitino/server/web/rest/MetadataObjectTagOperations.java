@@ -19,13 +19,13 @@
 package org.apache.gravitino.server.web.rest;
 
 import static org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants.CAN_ACCESS_METADATA;
+import static org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants.CAN_ACCESS_METADATA_AND_TAG;
 
 import com.codahale.metrics.annotation.ResponseMetered;
 import com.codahale.metrics.annotation.Timed;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Locale;
-import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import javax.inject.Inject;
@@ -43,24 +43,22 @@ import org.apache.commons.lang3.ArrayUtils;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
-import org.apache.gravitino.authorization.AuthorizationRequestContext;
 import org.apache.gravitino.dto.requests.TagsAssociateRequest;
 import org.apache.gravitino.dto.responses.NameListResponse;
 import org.apache.gravitino.dto.responses.TagListResponse;
 import org.apache.gravitino.dto.responses.TagResponse;
 import org.apache.gravitino.dto.tag.TagDTO;
 import org.apache.gravitino.dto.util.DTOConverters;
-import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.exceptions.NoSuchTagException;
 import org.apache.gravitino.metrics.MetricNames;
-import org.apache.gravitino.server.authorization.GravitinoAuthorizerProvider;
 import org.apache.gravitino.server.authorization.MetadataFilterHelper;
+import org.apache.gravitino.server.authorization.annotations.AuthorizationBatch;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationExpression;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationFullName;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationMetadata;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationObjectType;
+import org.apache.gravitino.server.authorization.annotations.AuthorizationRequest;
 import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants;
-import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionEvaluator;
 import org.apache.gravitino.server.web.Utils;
 import org.apache.gravitino.tag.Tag;
 import org.apache.gravitino.tag.TagDispatcher;
@@ -253,13 +251,14 @@ public class MetadataObjectTagOperations {
   @Produces("application/vnd.gravitino.v1+json")
   @Timed(name = "associate-object-tags." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "associate-object-tags", absolute = true)
-  @AuthorizationExpression(expression = CAN_ACCESS_METADATA)
+  @AuthorizationExpression(expression = CAN_ACCESS_METADATA_AND_TAG)
+  @AuthorizationBatch
   public Response associateTagsForObject(
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
           String metalake,
       @PathParam("type") @AuthorizationObjectType String type,
       @PathParam("fullName") @AuthorizationFullName String fullName,
-      TagsAssociateRequest request) {
+      @AuthorizationRequest TagsAssociateRequest request) {
     LOG.info(
         "Received associate tags request for object type: {}, full name: {} under metalake: {}",
         type,
@@ -269,32 +268,6 @@ public class MetadataObjectTagOperations {
       return Utils.doAs(
           httpRequest,
           () -> {
-            String[] tagsToAdd = request.getTagsToAdd();
-            if (tagsToAdd != null && tagsToAdd.length > 0) {
-              Arrays.stream(tagsToAdd)
-                  .forEach(
-                      tag -> {
-                        boolean result =
-                            new AuthorizationExpressionEvaluator(
-                                    AuthorizationExpressionConstants
-                                        .applyTagAuthorizationExpression,
-                                    GravitinoAuthorizerProvider.getInstance()
-                                        .getGravitinoAuthorizer())
-                                .evaluate(
-                                    Map.of(
-                                        Entity.EntityType.METALAKE,
-                                        NameIdentifierUtil.ofMetalake(metalake),
-                                        Entity.EntityType.TAG,
-                                        NameIdentifierUtil.ofTag(metalake, tag)),
-                                    new AuthorizationRequestContext());
-                        if (!result) {
-                          throw new ForbiddenException(
-                              "Current user cannot associate tag {%s} to object {%s}",
-                              tag, fullName);
-                        }
-                      });
-            }
-
             request.validate();
             MetadataObject object =
                 MetadataObjects.parse(

@@ -20,6 +20,7 @@ package org.apache.gravitino.server.web.filter;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.lang.reflect.Parameter;
 import java.util.Collections;
@@ -28,6 +29,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import javax.ws.rs.PathParam;
@@ -40,12 +42,15 @@ import org.apache.gravitino.Entity;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.auth.AuthorizationBatchTarget;
 import org.apache.gravitino.authorization.AuthorizationRequestContext;
 import org.apache.gravitino.server.authorization.MetadataFilterHelper;
+import org.apache.gravitino.server.authorization.annotations.AuthorizationBatch;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationExpression;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationFullName;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationMetadata;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationObjectType;
+import org.apache.gravitino.server.authorization.annotations.AuthorizationRequest;
 import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionEvaluator;
 import org.apache.gravitino.server.web.Utils;
 import org.apache.gravitino.server.web.rest.CatalogOperations;
@@ -135,6 +140,7 @@ public class GravitinoInterceptionService implements InterceptionService {
         Parameter[] parameters = method.getParameters();
         AuthorizationExpression expressionAnnotation =
             method.getAnnotation(AuthorizationExpression.class);
+        boolean isBatch = method.isAnnotationPresent(AuthorizationBatch.class);
         if (expressionAnnotation != null) {
           String expression = expressionAnnotation.expression();
           Object[] args = methodInvocation.getArguments();
@@ -144,28 +150,48 @@ public class GravitinoInterceptionService implements InterceptionService {
           Map<String, Object> pathParams = extractPathParamsFromParameters(parameters, args);
           AuthorizationExpressionEvaluator authorizationExpressionEvaluator =
               new AuthorizationExpressionEvaluator(expression);
-          boolean authorizeResult =
-              authorizationExpressionEvaluator.evaluate(
-                  metadataContext,
-                  pathParams,
-                  new AuthorizationRequestContext(),
-                  Optional.ofNullable(entityType));
-          if (!authorizeResult) {
-            MetadataObject.Type type = expressionAnnotation.accessMetadataType();
-            NameIdentifier accessMetadataName =
-                metadataContext.get(Entity.EntityType.valueOf(type.name()));
-            String errorMessage = expressionAnnotation.errorMessage();
-            String currentUser = PrincipalUtils.getCurrentUserName();
-            String methodName = method.getName();
-
-            LOG.warn(
-                "Authorization failed - User: {}, Operation: {}, Metadata: {}, Expression: {}",
-                currentUser,
-                methodName,
-                accessMetadataName,
-                expression);
-
-            return buildNoAuthResponse(errorMessage, accessMetadataName, currentUser, methodName);
+          if (!isBatch) {
+            boolean authorizeResult =
+                authorizationExpressionEvaluator.evaluate(
+                    metadataContext,
+                    pathParams,
+                    new AuthorizationRequestContext(),
+                    Optional.ofNullable(entityType));
+            if (!authorizeResult) {
+              return buildNoAuthResponse(expressionAnnotation, metadataContext, method, expression);
+            }
+          } else {
+            Object request = extractFromParameters(parameters, args);
+            Field[] declaredFields = request.getClass().getDeclaredFields();
+            AuthorizationRequestContext authorizationRequestContext =
+                new AuthorizationRequestContext();
+            for (int i = 0; i < declaredFields.length; i++) {
+              Field declaredField = declaredFields[i];
+              AuthorizationBatchTarget target =
+                  declaredField.getAnnotation(AuthorizationBatchTarget.class);
+              if (target != null) {
+                declaredField.setAccessible(true);
+                MetadataObject.Type type = target.accessMetadataType();
+                String[] batchAuthorizeTargets = (String[]) declaredField.get(request);
+                if (batchAuthorizeTargets == null) {
+                  continue;
+                }
+                for (String authorizeTarget : batchAuthorizeTargets) {
+                  buildNameIdentifierForBatchAuthorization(
+                      metadataContext, authorizeTarget, Entity.EntityType.valueOf(type.name()));
+                  boolean authorizeResult =
+                      authorizationExpressionEvaluator.evaluate(
+                          metadataContext,
+                          pathParams,
+                          authorizationRequestContext,
+                          Optional.ofNullable(entityType));
+                  if (!authorizeResult) {
+                    return buildNoAuthResponse(
+                        expressionAnnotation, metadataContext, method, expression);
+                  }
+                }
+              }
+            }
           }
         }
         return methodInvocation.proceed();
@@ -181,6 +207,28 @@ public class GravitinoInterceptionService implements InterceptionService {
         return Utils.internalError(
             "Authorization failed due to system internal error. Please contact administrator.", ex);
       }
+    }
+
+    private Response buildNoAuthResponse(
+        AuthorizationExpression expressionAnnotation,
+        Map<Entity.EntityType, NameIdentifier> metadataContext,
+        Method method,
+        String expression) {
+      MetadataObject.Type type = expressionAnnotation.accessMetadataType();
+      NameIdentifier accessMetadataName =
+          metadataContext.get(Entity.EntityType.valueOf(type.name()));
+      String errorMessage = expressionAnnotation.errorMessage();
+      String currentUser = PrincipalUtils.getCurrentUserName();
+      String methodName = method.getName();
+
+      LOG.warn(
+          "Authorization failed - User: {}, Operation: {}, Metadata: {}, Expression: {}",
+          currentUser,
+          methodName,
+          accessMetadataName,
+          expression);
+
+      return buildNoAuthResponse(errorMessage, accessMetadataName, currentUser, methodName);
     }
 
     private Response buildNoAuthResponse(
@@ -205,6 +253,19 @@ public class GravitinoInterceptionService implements InterceptionService {
                 currentUser, methodName, accessMetadataMessage);
       }
       return Utils.forbidden(contextualMessage, null);
+    }
+
+    private void buildNameIdentifierForBatchAuthorization(
+        Map<Entity.EntityType, NameIdentifier> metadataNames, String name, Entity.EntityType type) {
+      NameIdentifier metalake = metadataNames.get(Entity.EntityType.METALAKE);
+      if (Objects.requireNonNull(type) == Entity.EntityType.TAG) {
+        metadataNames.put(
+            Entity.EntityType.TAG,
+            NameIdentifierUtil.ofTag(NameIdentifierUtil.getMetalake(metalake), name));
+        return;
+      }
+      throw new UnsupportedOperationException(
+          "Unsupported to build NameIdentifier for batch authorization target");
     }
 
     private Map<Entity.EntityType, NameIdentifier> extractNameIdentifierFromParameters(
@@ -321,6 +382,19 @@ public class GravitinoInterceptionService implements InterceptionService {
       }
 
       return nameIdentifierMap;
+    }
+
+    private Object extractFromParameters(Parameter[] parameters, Object[] args) {
+      for (int i = 0; i < parameters.length; i++) {
+        Parameter parameter = parameters[i];
+        AuthorizationRequest authorizationBatchTarget =
+            parameter.getAnnotation(AuthorizationRequest.class);
+        if (authorizationBatchTarget == null) {
+          continue;
+        }
+        return args[i];
+      }
+      return null;
     }
 
     private Map<String, Object> extractPathParamsFromParameters(
