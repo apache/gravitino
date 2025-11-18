@@ -36,7 +36,9 @@ public class PartitionRange {
 
   private SortOrder comparator;
 
-  private PartitionRange() {}
+  private PartitionRange() {
+    this.comparator = DEFAULT_COMPARATOR;
+  }
 
   /** A PartitionRange that includes all partitions. */
   public static final PartitionRange ALL_PARTITIONS = new PartitionRange();
