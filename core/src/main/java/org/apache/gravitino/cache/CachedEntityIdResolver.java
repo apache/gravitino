@@ -51,7 +51,7 @@ public class CachedEntityIdResolver implements EntityIdResolver {
                 return new EntityIds(entity.id());
               }
             })
-        .orElse(underlyingResolver.getEntityIds(nameIdentifier, type));
+        .orElseGet(() -> underlyingResolver.getEntityIds(nameIdentifier, type));
   }
 
   @Override
@@ -59,6 +59,6 @@ public class CachedEntityIdResolver implements EntityIdResolver {
     return entityCache
         .getIfPresent(nameIdentifier, type)
         .map(HasIdentifier::id)
-        .orElse(underlyingResolver.getEntityId(nameIdentifier, type));
+        .orElseGet(() -> underlyingResolver.getEntityId(nameIdentifier, type));
   }
 }
