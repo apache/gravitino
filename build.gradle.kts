@@ -683,6 +683,7 @@ tasks {
       "copyCliLib",
       ":authorizations:copyLibAndConfig",
       ":iceberg:iceberg-rest-server:copyLibAndConfigs",
+      ":lance:lance-rest-server:copyLibAndConfigs",
       ":web:web:build"
     )
 
@@ -916,6 +917,7 @@ tasks {
         !it.name.startsWith("filesystem") &&
         !it.name.startsWith("flink") &&
         !it.name.startsWith("iceberg") &&
+        !it.name.startsWith("lance") &&
         !it.name.startsWith("integration-test") &&
         !it.name.startsWith("spark") &&
         !it.name.startsWith("trino-connector") &&

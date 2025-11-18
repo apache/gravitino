@@ -25,15 +25,11 @@ plugins {
 }
 
 dependencies {
+  implementation(project(":clients:client-java"))
   implementation(project(":api"))
-  implementation(project(":catalogs:catalog-common"))
-  implementation(project(":clients:client-java")) {
-    exclude("*")
-  }
   implementation(project(":common")) {
     exclude("*")
   }
-
   implementation(project(":core")) {
     exclude("*")
   }
