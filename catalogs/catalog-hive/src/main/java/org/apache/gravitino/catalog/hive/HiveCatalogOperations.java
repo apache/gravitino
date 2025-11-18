@@ -366,7 +366,7 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
 
       clientPool.run(
           client -> {
-            client.createDatabase(hiveSchema);
+            client.createDatabase("", hiveSchema);
             return null;
           });
 
@@ -388,7 +388,7 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
   @Override
   public HiveSchema loadSchema(NameIdentifier ident) throws NoSuchSchemaException {
     try {
-      Schema database = clientPool.run(client -> client.getDatabase(ident.name()));
+      Schema database = clientPool.run(client -> client.getDatabase("", ident.name()));
       HiveSchema hiveSchema = HiveSchema.fromHiveDB(database);
 
       LOG.info("Loaded Hive schema (database) {} from Hive Metastore ", ident.name());
@@ -411,7 +411,7 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
       throws NoSuchSchemaException {
     try {
       // load the database parameters
-      Schema database = clientPool.run(client -> client.getDatabase(ident.name()));
+      Schema database = clientPool.run(client -> client.getDatabase("", ident.name()));
       HiveSchema hiveSchema = HiveSchema.fromHiveDB(database);
       Map<String, String> properties = hiveSchema.properties();
       if (LOG.isDebugEnabled()) {

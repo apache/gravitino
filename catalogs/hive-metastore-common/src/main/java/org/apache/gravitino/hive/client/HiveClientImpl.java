@@ -21,6 +21,7 @@ package org.apache.gravitino.hive.client;
 import static org.apache.gravitino.hive.client.HiveClient.HiveVersion.HIVE3;
 
 import java.util.List;
+import org.apache.gravitino.Schema;
 import org.apache.hadoop.hive.metastore.HiveMetaStoreClient;
 
 /**
@@ -47,5 +48,15 @@ public class HiveClientImpl implements HiveClient {
   @Override
   public List<String> getAllDatabases() {
     return shim.getAllDatabase();
+  }
+
+  @Override
+  public void createDatabase(String catalogName, Schema database) {
+    shim.createDatabase(catalogName, database);
+  }
+
+  @Override
+  public Schema getDatabase(String catalogName, String dbName) {
+    return shim.getDatabase(catalogName, dbName);
   }
 }

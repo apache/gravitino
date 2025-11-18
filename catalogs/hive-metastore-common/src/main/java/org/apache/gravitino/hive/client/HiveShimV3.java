@@ -19,17 +19,26 @@ package org.apache.gravitino.hive.client;
 
 import java.lang.reflect.Method;
 import java.util.List;
+import org.apache.gravitino.Schema;
+import org.apache.gravitino.exceptions.NoSuchSchemaException;
+import org.apache.gravitino.hive.converter.HiveDatabaseConverter;
 import org.apache.hadoop.hive.metastore.HiveMetaStoreClient;
+import org.apache.hadoop.hive.metastore.api.Database;
 
 class HiveShimV3 extends Shim {
 
   private HiveMetaStoreClient client;
   Method getAllDatabasesMethod;
+  Method createDatabaseMethod;
+  Method getDabaseMethod;
 
   HiveShimV3(HiveMetaStoreClient client) {
     try {
       this.client = client;
       getAllDatabasesMethod = HiveMetaStoreClient.class.getMethod("getAllDatabases");
+      createDatabaseMethod = HiveMetaStoreClient.class.getMethod("createDatabase", Database.class);
+      getDabaseMethod =
+          HiveMetaStoreClient.class.getMethod("getDatabase", String.class, String.class);
     } catch (NoSuchMethodException e) {
       throw new RuntimeException("Failed to initialize HiveShimV2", e);
     } catch (Exception e) {
@@ -43,6 +52,33 @@ class HiveShimV3 extends Shim {
       return (List<String>) getAllDatabasesMethod.invoke(client);
     } catch (Exception e) {
       throw new RuntimeException("Failed to get all databases using HiveShimV2", e);
+    }
+  }
+
+  @Override
+  public void createDatabase(String catalogName, Schema database) {
+    try {
+      Database db = new Database();
+      db.setName(database.name());
+      db.setDescription(database.comment());
+      Util.findMethod(Database.class, "setCatalogName", String.class).invoke(db, catalogName);
+      createDatabaseMethod.invoke(client, db);
+    } catch (Exception e) {
+      throw new RuntimeException("Failed to create database using HiveShimV2", e);
+    }
+  }
+
+  @Override
+  public Schema getDatabase(String catalogName, String dbName) {
+    try {
+      Database db = (Database) getDabaseMethod.invoke(client, dbName, catalogName);
+      if (db == null) {
+        throw new NoSuchSchemaException(
+            "Database " + dbName + " does not exist in catalog " + catalogName);
+      }
+      return HiveDatabaseConverter.fromHiveDB(db);
+    } catch (Exception e) {
+      throw new RuntimeException("Failed to get database using HiveShimV2", e);
     }
   }
 }

@@ -79,7 +79,7 @@ public class HudiHMSBackendOps implements HudiCatalogBackendOps {
   @Override
   public HudiSchema loadSchema(NameIdentifier schemaIdent) throws NoSuchSchemaException {
     try {
-      Schema database = clientPool.run(client -> client.getDatabase(schemaIdent.name()));
+      Schema database = clientPool.run(client -> client.getDatabase("", schemaIdent.name()));
       return HudiHMSSchema.builder().buildFromSchema(database);
     } catch (InterruptedException e) {
       throw new RuntimeException(e);

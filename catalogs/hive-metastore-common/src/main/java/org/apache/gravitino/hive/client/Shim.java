@@ -19,6 +19,7 @@
 package org.apache.gravitino.hive.client;
 
 import java.util.List;
+import org.apache.gravitino.Schema;
 
 /**
  * Java translation of Scala's `Shim` sealed abstract class.
@@ -29,4 +30,10 @@ import java.util.List;
  */
 public abstract class Shim {
   protected abstract List<String> getAllDatabase();
+
+  public void createDatabase(String catalogName, Schema schema) {}
+
+  public Schema getDatabase(String catalogName, String dbName) {
+    return null;
+  }
 }

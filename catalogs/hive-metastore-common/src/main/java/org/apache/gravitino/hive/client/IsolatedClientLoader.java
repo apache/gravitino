@@ -31,6 +31,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.stream.Collectors;
+import org.apache.hadoop.hive.metastore.RetryingMetaStoreClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -160,7 +161,7 @@ public final class IsolatedClientLoader {
       Thread.currentThread().setContextClassLoader(classLoader);
       try {
         Class<?> clientClass =
-            classLoader.loadClass("org.apache.hadoop.hive.metastore.HiveMetaStoreClient");
+            classLoader.loadClass("org.apache.hadoop.hive.metastore.RetryingMetaStoreClient");
         Class<?> hiveConfClass = classLoader.loadClass("org.apache.hadoop.hive.conf.HiveConf");
         Class<?> confClass = classLoader.loadClass("org.apache.hadoop.conf.Configuration");
         Object conf = confClass.getDeclaredConstructor().newInstance();
@@ -175,16 +176,17 @@ public final class IsolatedClientLoader {
             setMethod.invoke(hiveConfInstance, v.getKey(), v.getValue());
           }
 
-          Constructor<?> ctor = clientClass.getConstructor(hiveConfClass);
-          client = ctor.newInstance(hiveConfInstance);
+          Method ctorMethod = clientClass.getMethod("proxy", hiveConfClass);
+          client = ctorMethod.invoke(null, RetryingMetaStoreClient.class, hiveConfInstance);
         } else if (version == HiveClient.HiveVersion.HIVE3) {
           // Set any Hive3 specific configurations here
           Method setMethod = confClass.getMethod("set", String.class, String.class);
           for (Map.Entry<Object, Object> v : properties.entrySet()) {
             setMethod.invoke(conf, v.getKey(), v.getValue());
           }
-          Constructor<?> ctor = clientClass.getConstructor(confClass);
-          client = ctor.newInstance(conf);
+
+          Method ctorMethod = clientClass.getMethod("proxy", confClass);
+          client = ctorMethod.invoke(null, RetryingMetaStoreClient.class, conf);
         }
 
         return (HiveClient)
