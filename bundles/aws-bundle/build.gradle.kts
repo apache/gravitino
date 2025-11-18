@@ -28,6 +28,9 @@ plugins {
 dependencies {
   implementation(project(":bundles:aws"))
   implementation(libs.hadoop3.aws)
+  implementation(libs.aws.iam)
+  implementation(libs.aws.policy)
+  implementation(libs.aws.sts)
   implementation(libs.hadoop3.client.api)
   implementation(libs.hadoop3.client.runtime)
 }
