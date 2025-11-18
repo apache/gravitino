@@ -458,4 +458,124 @@ public class TestJobTemplate {
                 .collect(Collectors.toList());
     Assertions.assertTrue(archiveNames.contains(archive1.getName()));
   }
+
+  @Test
+  public void testCreateHttpRuntimeJobTemplate() throws IOException {
+    HttpJobTemplate httpJobTemplate =
+        HttpJobTemplate.builder()
+            .withName("testHttpJob")
+            .withComment("This is a test HTTP job template")
+            .withExecutable("GET")
+            .withArguments(Lists.newArrayList("arg1", "arg2", "{{arg3}}"))
+            .withEnvironments(ImmutableMap.of("ENV_VAR1", "{{val1}}", "ENV_VAR2", "{{val2}}"))
+            .withCustomFields(ImmutableMap.of("customField1", "{{customVal1}}"))
+            .withUrl("http://example.com/api")
+            .withHeaders(
+                ImmutableMap.of(
+                    "Content-Type", "application/json", "Authorization", "Bearer {{token}}"))
+            .withBody("{\"key\": \"{{value}}\"}")
+            .withQueryParams(Lists.newArrayList("param1=value1", "param2={{paramVal}}"))
+            .build();
+
+    JobTemplateEntity entity =
+        JobTemplateEntity.builder()
+            .withId(1L)
+            .withName(httpJobTemplate.name())
+            .withComment(httpJobTemplate.comment())
+            .withNamespace(NamespaceUtil.ofJobTemplate("test"))
+            .withTemplateContent(JobTemplateEntity.TemplateContent.fromJobTemplate(httpJobTemplate))
+            .withAuditInfo(
+                AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build())
+            .build();
+
+    JobTemplate result =
+        JobManager.createRuntimeJobTemplate(
+            entity,
+            ImmutableMap.of(
+                "arg3", "value3",
+                "val1", "value1",
+                "val2", "value2",
+                "customVal1", "customValue1",
+                "token", "secret-token",
+                "value", "test-value",
+                "paramVal", "test-param"),
+            tempStagingDir);
+
+    Assertions.assertEquals(httpJobTemplate.name(), result.name());
+    Assertions.assertEquals(httpJobTemplate.comment(), result.comment());
+    Assertions.assertEquals("GET", result.executable);
+    Assertions.assertEquals(Lists.newArrayList("arg1", "arg2", "value3"), result.arguments());
+    Assertions.assertEquals(
+        ImmutableMap.of("ENV_VAR1", "value1", "ENV_VAR2", "value2"), result.environments());
+    Assertions.assertEquals(ImmutableMap.of("customField1", "customValue1"), result.customFields());
+
+    Assertions.assertEquals("http://example.com/api", ((HttpJobTemplate) result).url());
+    Assertions.assertEquals(
+        ImmutableMap.of("Content-Type", "application/json", "Authorization", "Bearer secret-token"),
+        ((HttpJobTemplate) result).headers());
+    Assertions.assertEquals("{\"key\": \"test-value\"}", ((HttpJobTemplate) result).body());
+    Assertions.assertEquals(
+        Lists.newArrayList("param1=value1", "param2=test-param"),
+        ((HttpJobTemplate) result).queryParams());
+  }
+
+  @Test
+  public void testCreateHttpRuntimeJobTemplateWithReplacements() throws IOException {
+    HttpJobTemplate httpJobTemplate =
+        HttpJobTemplate.builder()
+            .withName("testHttpJob")
+            .withComment("This is a test HTTP job template")
+            .withExecutable("POST")
+            .withArguments(Lists.newArrayList("arg1", "arg2", "{{arg3}}"))
+            .withEnvironments(ImmutableMap.of("ENV_VAR1", "{{val1}}", "ENV_VAR2", "{{val2}}"))
+            .withCustomFields(ImmutableMap.of("customField1", "{{customVal1}}"))
+            .withUrl("http://{{host}}/api")
+            .withHeaders(
+                ImmutableMap.of(
+                    "Content-Type", "application/json", "Authorization", "Bearer {{token}}"))
+            .withBody("{\"key\": \"{{value}}\"}")
+            .withQueryParams(Lists.newArrayList("param1={{param1Val}}", "param2={{paramVal}}"))
+            .build();
+
+    JobTemplateEntity entity =
+        JobTemplateEntity.builder()
+            .withId(1L)
+            .withName(httpJobTemplate.name())
+            .withComment(httpJobTemplate.comment())
+            .withNamespace(NamespaceUtil.ofJobTemplate("test"))
+            .withTemplateContent(JobTemplateEntity.TemplateContent.fromJobTemplate(httpJobTemplate))
+            .withAuditInfo(
+                AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build())
+            .build();
+
+    JobTemplate result =
+        JobManager.createRuntimeJobTemplate(
+            entity,
+            ImmutableMap.of(
+                "arg3", "value3",
+                "val1", "value1",
+                "val2", "value2",
+                "customVal1", "customValue1",
+                "host", "example.com",
+                "token", "secret-token",
+                "value", "test-value",
+                "param1Val", "value1",
+                "paramVal", "test-param"),
+            tempStagingDir);
+
+    Assertions.assertEquals("POST", result.executable);
+    Assertions.assertEquals(Lists.newArrayList("arg1", "arg2", "value3"), result.arguments());
+    Assertions.assertEquals(
+        ImmutableMap.of("ENV_VAR1", "value1", "ENV_VAR2", "value2"), result.environments());
+    Assertions.assertEquals(ImmutableMap.of("customField1", "customValue1"), result.customFields());
+
+    Assertions.assertEquals("http://example.com/api", ((HttpJobTemplate) result).url());
+    Assertions.assertEquals(
+        ImmutableMap.of("Content-Type", "application/json", "Authorization", "Bearer secret-token"),
+        ((HttpJobTemplate) result).headers());
+    Assertions.assertEquals("{\"key\": \"test-value\"}", ((HttpJobTemplate) result).body());
+    Assertions.assertEquals(
+        Lists.newArrayList("param1=value1", "param2=test-param"),
+        ((HttpJobTemplate) result).queryParams());
+  }
 }

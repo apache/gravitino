@@ -30,6 +30,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import java.io.File;
 import java.io.IOException;
@@ -142,17 +143,20 @@ public class TestJobManager {
         newShellJobTemplateEntity("shell_job", "A shell job template");
     JobTemplateEntity sparkJobTemplate =
         newSparkJobTemplateEntity("spark_job", "A spark job template");
+    JobTemplateEntity httpJobTemplate =
+        newHttpJobTemplateEntity("http_job", "An http job template");
 
     when(entityStore.list(
             NamespaceUtil.ofJobTemplate(metalake),
             JobTemplateEntity.class,
             Entity.EntityType.JOB_TEMPLATE))
-        .thenReturn(Lists.newArrayList(shellJobTemplate, sparkJobTemplate));
+        .thenReturn(Lists.newArrayList(shellJobTemplate, sparkJobTemplate, httpJobTemplate));
 
     List<JobTemplateEntity> templates = jobManager.listJobTemplates(metalake);
-    Assertions.assertEquals(2, templates.size());
+    Assertions.assertEquals(3, templates.size());
     Assertions.assertTrue(templates.contains(shellJobTemplate));
     Assertions.assertTrue(templates.contains(sparkJobTemplate));
+    Assertions.assertTrue(templates.contains(httpJobTemplate));
 
     // Throw exception if metalake does not exist
     mockedMetalake
@@ -360,6 +364,7 @@ public class TestJobManager {
 
     JobEntity job1 = newJobEntity("shell_job", JobHandle.Status.QUEUED);
     JobEntity job2 = newJobEntity("spark_job", JobHandle.Status.QUEUED);
+    JobEntity job3 = newJobEntity("http_job", JobHandle.Status.QUEUED);
 
     String[] levels =
         ArrayUtils.add(shellJobTemplate.namespace().levels(), shellJobTemplate.name());
@@ -371,16 +376,18 @@ public class TestJobManager {
     Assertions.assertEquals(1, jobs.size());
     Assertions.assertTrue(jobs.contains(job1));
     Assertions.assertFalse(jobs.contains(job2));
+    Assertions.assertFalse(jobs.contains(job3));
 
     // List all jobs without filtering by job template
     // Mock the listJobs method to return a list of jobs associated with the job template
     when(entityStore.list(NamespaceUtil.ofJob(metalake), JobEntity.class, Entity.EntityType.JOB))
-        .thenReturn(Lists.newArrayList(job1, job2));
+        .thenReturn(Lists.newArrayList(job1, job2, job3));
 
     jobs = jobManager.listJobs(metalake, Optional.empty());
-    Assertions.assertEquals(2, jobs.size());
+    Assertions.assertEquals(3, jobs.size());
     Assertions.assertTrue(jobs.contains(job1));
     Assertions.assertTrue(jobs.contains(job2));
+    Assertions.assertTrue(jobs.contains(job3));
 
     // Throw exception if job template does not exist
     when(jobManager.getJobTemplate(metalake, "non_existent"))
@@ -810,6 +817,107 @@ public class TestJobManager {
                 oldJobTemplateEntity.nameIdentifier(), oldJobTemplateEntity, invalidChange));
   }
 
+  @Test
+  public void testUpdateHttpJobTemplateEntity() {
+    String jobTemplateName = "old_http_job";
+    String jobTemplateComment = "An old http job template";
+    JobTemplateEntity oldJobTemplateEntity =
+        newHttpJobTemplateEntity(jobTemplateName, jobTemplateComment);
+
+    // Update the executable and URL of the HTTP job template
+    JobTemplateChange updateHttpTemplate =
+        JobTemplateChange.updateTemplate(
+            JobTemplateChange.HttpTemplateUpdate.builder()
+                .withNewExecutable("GET")
+                .withNewUrl("http://newexample.com/api")
+                .build());
+    JobTemplateEntity newJobTemplateEntity =
+        jobManager.updateJobTemplateEntity(
+            oldJobTemplateEntity.nameIdentifier(), oldJobTemplateEntity, updateHttpTemplate);
+    Assertions.assertEquals(oldJobTemplateEntity.id(), newJobTemplateEntity.id());
+    Assertions.assertEquals(oldJobTemplateEntity.name(), newJobTemplateEntity.name());
+    Assertions.assertEquals(oldJobTemplateEntity.namespace(), newJobTemplateEntity.namespace());
+    Assertions.assertEquals(oldJobTemplateEntity.comment(), newJobTemplateEntity.comment());
+    Assertions.assertNotEquals(
+        oldJobTemplateEntity.templateContent(), newJobTemplateEntity.templateContent());
+    JobTemplateEntity.TemplateContent oldContent = oldJobTemplateEntity.templateContent();
+    JobTemplateEntity.TemplateContent newContent = newJobTemplateEntity.templateContent();
+    Assertions.assertEquals(oldContent.jobType(), newContent.jobType());
+    Assertions.assertEquals("GET", newContent.executable());
+    Assertions.assertEquals("http://newexample.com/api", newContent.url());
+    Assertions.assertEquals(oldContent.arguments(), newContent.arguments());
+    Assertions.assertEquals(oldContent.environments(), newContent.environments());
+    Assertions.assertEquals(oldContent.customFields(), newContent.customFields());
+    Assertions.assertEquals(oldContent.headers(), newContent.headers());
+    Assertions.assertEquals(oldContent.body(), newContent.body());
+    Assertions.assertEquals(oldContent.queryParams(), newContent.queryParams());
+
+    // Update the headers, body, and query parameters of the HTTP job template
+    JobTemplateChange updateHttpTemplate2 =
+        JobTemplateChange.updateTemplate(
+            JobTemplateChange.HttpTemplateUpdate.builder()
+                .withNewHeaders(ImmutableMap.of("Authorization", "Bearer token"))
+                .withNewBody("{\"newKey\": \"newValue\"}")
+                .withNewQueryParams(ImmutableList.of("param1=value1", "param2=value2"))
+                .build());
+    newJobTemplateEntity =
+        jobManager.updateJobTemplateEntity(
+            oldJobTemplateEntity.nameIdentifier(), oldJobTemplateEntity, updateHttpTemplate2);
+    JobTemplateEntity.TemplateContent newContent2 = newJobTemplateEntity.templateContent();
+    Assertions.assertEquals(oldContent.jobType(), newContent2.jobType());
+    Assertions.assertEquals(oldContent.executable(), newContent2.executable());
+    Assertions.assertEquals(oldContent.url(), newContent2.url());
+    Assertions.assertEquals(oldContent.arguments(), newContent2.arguments());
+    Assertions.assertEquals(oldContent.environments(), newContent2.environments());
+    Assertions.assertEquals(oldContent.customFields(), newContent2.customFields());
+    Assertions.assertEquals(
+        ImmutableMap.of("Authorization", "Bearer token"), newContent2.headers());
+    Assertions.assertEquals("{\"newKey\": \"newValue\"}", newContent2.body());
+    Assertions.assertEquals(
+        ImmutableList.of("param1=value1", "param2=value2"), newContent2.queryParams());
+
+    // Update the arguments, environments, and custom fields of the HTTP job template
+    JobTemplateChange updateHttpTemplate3 =
+        JobTemplateChange.updateTemplate(
+            JobTemplateChange.HttpTemplateUpdate.builder()
+                .withNewArguments(ImmutableList.of("arg1", "arg2"))
+                .withNewEnvironments(Collections.singletonMap("env1", "value1"))
+                .withNewCustomFields(Collections.singletonMap("field1", "value1"))
+                .build());
+    newJobTemplateEntity =
+        jobManager.updateJobTemplateEntity(
+            oldJobTemplateEntity.nameIdentifier(), oldJobTemplateEntity, updateHttpTemplate3);
+    JobTemplateEntity.TemplateContent newContent3 = newJobTemplateEntity.templateContent();
+    Assertions.assertEquals(oldContent.jobType(), newContent3.jobType());
+    Assertions.assertEquals(oldContent.executable(), newContent3.executable());
+    Assertions.assertEquals(oldContent.url(), newContent3.url());
+    Assertions.assertEquals(ImmutableList.of("arg1", "arg2"), newContent3.arguments());
+    Assertions.assertEquals(Collections.singletonMap("env1", "value1"), newContent3.environments());
+    Assertions.assertEquals(
+        Collections.singletonMap("field1", "value1"), newContent3.customFields());
+    Assertions.assertEquals(oldContent.headers(), newContent3.headers());
+    Assertions.assertEquals(oldContent.body(), newContent3.body());
+    Assertions.assertEquals(oldContent.queryParams(), newContent3.queryParams());
+
+    // Update with no changes
+    JobTemplateChange noChange =
+        JobTemplateChange.updateTemplate(JobTemplateChange.HttpTemplateUpdate.builder().build());
+    newJobTemplateEntity =
+        jobManager.updateJobTemplateEntity(
+            oldJobTemplateEntity.nameIdentifier(), oldJobTemplateEntity, noChange);
+    Assertions.assertEquals(
+        oldJobTemplateEntity.templateContent(), newJobTemplateEntity.templateContent());
+
+    // Update job template with ShellJobTemplateChange should throw IllegalArgumentException
+    JobTemplateChange invalidChange =
+        JobTemplateChange.updateTemplate(JobTemplateChange.ShellTemplateUpdate.builder().build());
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            jobManager.updateJobTemplateEntity(
+                oldJobTemplateEntity.nameIdentifier(), oldJobTemplateEntity, invalidChange));
+  }
+
   private static JobTemplateEntity newShellJobTemplateEntity(String name, String comment) {
     ShellJobTemplate shellJobTemplate =
         ShellJobTemplate.builder()
@@ -844,6 +952,28 @@ public class TestJobManager {
         .withName(name)
         .withNamespace(NamespaceUtil.ofJobTemplate(metalake))
         .withTemplateContent(JobTemplateEntity.TemplateContent.fromJobTemplate(sparkJobTemplate))
+        .withAuditInfo(
+            AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build())
+        .build();
+  }
+
+  private static JobTemplateEntity newHttpJobTemplateEntity(String name, String comment) {
+    HttpJobTemplate httpJobTemplate =
+        HttpJobTemplate.builder()
+            .withName(name)
+            .withComment(comment)
+            .withExecutable("POST")
+            .withUrl("http://example.com/api")
+            .withHeaders(ImmutableMap.of("Content-Type", "application/json"))
+            .withBody("{\"key\": \"value\"}")
+            .build();
+
+    Random rand = new Random();
+    return JobTemplateEntity.builder()
+        .withId(rand.nextLong())
+        .withName(name)
+        .withNamespace(NamespaceUtil.ofJobTemplate(metalake))
+        .withTemplateContent(JobTemplateEntity.TemplateContent.fromJobTemplate(httpJobTemplate))
         .withAuditInfo(
             AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build())
         .build();

@@ -35,6 +35,7 @@ import org.apache.gravitino.Entity;
 import org.apache.gravitino.Field;
 import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.job.HttpJobTemplate;
 import org.apache.gravitino.job.JobTemplate;
 import org.apache.gravitino.job.ShellJobTemplate;
 import org.apache.gravitino.job.SparkJobTemplate;
@@ -70,6 +71,11 @@ public class JobTemplateEntity implements Entity, Auditable, HasIdentifier {
     private List<String> files;
     private List<String> archives;
     private Map<String, String> configs;
+    // Fields for HTTP job template content
+    private String url;
+    private Map<String, String> headers;
+    private String body;
+    private List<String> queryParams;
 
     public static TemplateContent fromJobTemplate(JobTemplate jobTemplate) {
       TemplateContentBuilder builder =
@@ -92,6 +98,13 @@ public class JobTemplateEntity implements Entity, Auditable, HasIdentifier {
             .withFiles(sparkJobTemplate.files())
             .withArchives(sparkJobTemplate.archives())
             .withConfigs(sparkJobTemplate.configs());
+      } else if (jobTemplate instanceof HttpJobTemplate) {
+        HttpJobTemplate httpJobTemplate = (HttpJobTemplate) jobTemplate;
+        builder
+            .withUrl(httpJobTemplate.url())
+            .withHeaders(httpJobTemplate.headers())
+            .withBody(httpJobTemplate.body())
+            .withQueryParams(httpJobTemplate.queryParams());
       }
 
       return builder.build();
@@ -215,6 +228,19 @@ public class JobTemplateEntity implements Entity, Auditable, HasIdentifier {
           .withFiles(this.templateContent.files())
           .withArchives(this.templateContent.archives())
           .withConfigs(this.templateContent.configs())
+          .build();
+    } else if (jobType == JobTemplate.JobType.HTTP) {
+      return HttpJobTemplate.builder()
+          .withName(name)
+          .withComment(comment)
+          .withExecutable(this.templateContent.executable())
+          .withArguments(this.templateContent.arguments())
+          .withEnvironments(this.templateContent.environments())
+          .withCustomFields(this.templateContent.customFields())
+          .withUrl(this.templateContent.url())
+          .withHeaders(this.templateContent.headers())
+          .withBody(this.templateContent.body())
+          .withQueryParams(this.templateContent.queryParams())
           .build();
     } else {
       throw new IllegalStateException("Unsupported job type: " + jobType);

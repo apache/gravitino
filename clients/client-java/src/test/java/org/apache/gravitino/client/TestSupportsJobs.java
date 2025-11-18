@@ -26,6 +26,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
 import org.apache.gravitino.dto.AuditDTO;
+import org.apache.gravitino.dto.job.HttpJobTemplateDTO;
 import org.apache.gravitino.dto.job.JobDTO;
 import org.apache.gravitino.dto.job.JobTemplateDTO;
 import org.apache.gravitino.dto.job.ShellJobTemplateDTO;
@@ -71,13 +72,14 @@ public class TestSupportsJobs extends TestBase {
   public void testListJobTemplates() throws JsonProcessingException {
     JobTemplateDTO template1 = newShellJobTemplateDTO("shell-job-template");
     JobTemplateDTO template2 = newSparkJobTemplateDTO("spark-job-template");
-    List<JobTemplateDTO> templates = Lists.newArrayList(template1, template2);
+    JobTemplateDTO template3 = newHttpJobTemplateDTO("http-job-template");
+    List<JobTemplateDTO> templates = Lists.newArrayList(template1, template2, template3);
     JobTemplateListResponse resp = new JobTemplateListResponse(templates);
 
     buildMockResource(Method.GET, jobTemplatesPath(), null, resp, HttpStatus.SC_OK);
 
     List<JobTemplate> jobTemplates = metalake.listJobTemplates();
-    Assertions.assertEquals(2, jobTemplates.size());
+    Assertions.assertEquals(3, jobTemplates.size());
 
     List<JobTemplate> expected =
         templates.stream()
@@ -119,6 +121,15 @@ public class TestSupportsJobs extends TestBase {
 
     Assertions.assertDoesNotThrow(() -> metalake.registerJobTemplate(template));
 
+    // Test with HTTP job template
+    JobTemplateDTO httpTemplateDTO = newHttpJobTemplateDTO("http-job-template");
+    JobTemplate httpTemplate = org.apache.gravitino.dto.util.DTOConverters.fromDTO(httpTemplateDTO);
+    JobTemplateRegisterRequest httpReq = new JobTemplateRegisterRequest(httpTemplateDTO);
+
+    buildMockResource(Method.POST, jobTemplatesPath(), httpReq, resp, HttpStatus.SC_OK);
+
+    Assertions.assertDoesNotThrow(() -> metalake.registerJobTemplate(httpTemplate));
+
     // Test throw JobTemplateAlreadyExistsException
     ErrorResponse errorResp =
         ErrorResponse.alreadyExists(
@@ -142,6 +153,22 @@ public class TestSupportsJobs extends TestBase {
     JobTemplate actual = metalake.getJobTemplate(jobTemplateName);
     Assertions.assertEquals(expected, actual);
 
+    // Test with HTTP job template
+    String httpJobTemplateName = "http-job-template";
+    JobTemplateDTO httpTemplateDTO = newHttpJobTemplateDTO(httpJobTemplateName);
+    JobTemplate httpExpected = org.apache.gravitino.dto.util.DTOConverters.fromDTO(httpTemplateDTO);
+    JobTemplateResponse httpResp = new JobTemplateResponse(httpTemplateDTO);
+
+    buildMockResource(
+        Method.GET,
+        jobTemplatesPath() + "/" + httpJobTemplateName,
+        null,
+        httpResp,
+        HttpStatus.SC_OK);
+
+    JobTemplate httpActual = metalake.getJobTemplate(httpJobTemplateName);
+    Assertions.assertEquals(httpExpected, httpActual);
+
     // Test throw NoSuchJobTemplateException
     ErrorResponse errorResp =
         ErrorResponse.notFound(NoSuchJobTemplateException.class.getSimpleName(), "mock error");
@@ -164,6 +191,17 @@ public class TestSupportsJobs extends TestBase {
         Method.DELETE, jobTemplatesPath() + "/" + jobTemplateName, null, resp, HttpStatus.SC_OK);
 
     Assertions.assertTrue(metalake.deleteJobTemplate(jobTemplateName));
+
+    // Test with HTTP job template
+    String httpJobTemplateName = "http-job-template";
+    buildMockResource(
+        Method.DELETE,
+        jobTemplatesPath() + "/" + httpJobTemplateName,
+        null,
+        resp,
+        HttpStatus.SC_OK);
+
+    Assertions.assertTrue(metalake.deleteJobTemplate(httpJobTemplateName));
 
     // Test throw InUseException
     ErrorResponse errorResp2 =
@@ -195,6 +233,23 @@ public class TestSupportsJobs extends TestBase {
 
     JobTemplate actual = metalake.alterJobTemplate(jobTemplateName, rename.jobTemplateChange());
     Assertions.assertEquals(expected, actual);
+
+    // Test with HTTP job template
+    String httpJobTemplateName = "http-job-template";
+    JobTemplateDTO httpTemplateDTO = newHttpJobTemplateDTO(httpJobTemplateName);
+    JobTemplate httpExpected = org.apache.gravitino.dto.util.DTOConverters.fromDTO(httpTemplateDTO);
+    JobTemplateResponse httpResp = new JobTemplateResponse(httpTemplateDTO);
+
+    buildMockResource(
+        Method.PUT,
+        jobTemplatesPath() + "/" + httpJobTemplateName,
+        req,
+        httpResp,
+        HttpStatus.SC_OK);
+
+    JobTemplate httpActual =
+        metalake.alterJobTemplate(httpJobTemplateName, rename.jobTemplateChange());
+    Assertions.assertEquals(httpExpected, httpActual);
 
     // Test throw NoSuchJobTemplateException
     ErrorResponse errorResp =
@@ -239,18 +294,24 @@ public class TestSupportsJobs extends TestBase {
     String jobTemplateName = "shell-job-template";
     String jobId1 = "job-1";
     String jobId2 = "job-2";
+    String httpJobTemplateName = "http-job-template";
+    String httpJobId = "http-job-1";
 
     List<JobDTO> jobs =
-        Lists.newArrayList(newJobDTO(jobId1, jobTemplateName), newJobDTO(jobId2, jobTemplateName));
+        Lists.newArrayList(
+            newJobDTO(jobId1, jobTemplateName),
+            newJobDTO(jobId2, jobTemplateName),
+            newJobDTO(httpJobId, httpJobTemplateName));
 
     JobListResponse resp = new JobListResponse(jobs);
 
     buildMockResource(Method.GET, jobRunsPath(), null, resp, HttpStatus.SC_OK);
 
     List<JobHandle> actualJobs = metalake.listJobs();
-    Assertions.assertEquals(2, actualJobs.size());
+    Assertions.assertEquals(3, actualJobs.size());
     compare(jobs.get(0), actualJobs.get(0));
     compare(jobs.get(1), actualJobs.get(1));
+    compare(jobs.get(2), actualJobs.get(2));
 
     // Test throw NoSuchJobTemplateException
     ErrorResponse errorResp =
@@ -269,9 +330,10 @@ public class TestSupportsJobs extends TestBase {
         HttpStatus.SC_OK);
 
     List<JobHandle> jobsByTemplate = metalake.listJobs(jobTemplateName);
-    Assertions.assertEquals(2, jobsByTemplate.size());
+    Assertions.assertEquals(3, jobsByTemplate.size());
     compare(jobs.get(0), jobsByTemplate.get(0));
     compare(jobs.get(1), jobsByTemplate.get(1));
+    compare(jobs.get(2), jobsByTemplate.get(2));
   }
 
   @Test
@@ -285,6 +347,18 @@ public class TestSupportsJobs extends TestBase {
 
     JobHandle actualHandle = metalake.getJob(jobId);
     compare(expectedJob, actualHandle);
+
+    // Test with HTTP job
+    String httpJobId = "http-job-1";
+    String httpJobTemplateName = "http-job-template";
+    JobDTO expectedHttpJob = newJobDTO(httpJobId, httpJobTemplateName);
+    JobResponse httpResp = new JobResponse(expectedHttpJob);
+
+    buildMockResource(
+        Method.GET, jobRunsPath() + "/" + httpJobId, null, httpResp, HttpStatus.SC_OK);
+
+    JobHandle actualHttpHandle = metalake.getJob(httpJobId);
+    compare(expectedHttpJob, actualHttpHandle);
 
     // Test throw NoSuchJobTemplateException
     ErrorResponse errorResp =
@@ -307,6 +381,18 @@ public class TestSupportsJobs extends TestBase {
     JobHandle actualHandle = metalake.runJob(jobTemplateName, ImmutableMap.of());
     compare(expectedJob, actualHandle);
 
+    // Test with HTTP job template
+    String httpJobTemplateName = "http-job-template";
+    String httpJobId = "http-job-1";
+    JobDTO expectedHttpJob = newJobDTO(httpJobId, httpJobTemplateName);
+    JobResponse httpResp = new JobResponse(expectedHttpJob);
+    JobRunRequest httpReq = new JobRunRequest(httpJobTemplateName, ImmutableMap.of());
+
+    buildMockResource(Method.POST, jobRunsPath(), httpReq, httpResp, HttpStatus.SC_OK);
+
+    JobHandle actualHttpHandle = metalake.runJob(httpJobTemplateName, ImmutableMap.of());
+    compare(expectedHttpJob, actualHttpHandle);
+
     // Test throw NoSuchJobTemplateException
     ErrorResponse errorResp =
         ErrorResponse.notFound(NoSuchJobTemplateException.class.getSimpleName(), "mock error");
@@ -327,6 +413,18 @@ public class TestSupportsJobs extends TestBase {
 
     JobHandle actualHandle = metalake.cancelJob(jobId);
     compare(expectedJob, actualHandle);
+
+    // Test with HTTP job
+    String httpJobId = "http-job-1";
+    String httpJobTemplateName = "http-job-template";
+    JobDTO expectedHttpJob = newJobDTO(httpJobId, httpJobTemplateName);
+    JobResponse httpResp = new JobResponse(expectedHttpJob);
+
+    buildMockResource(
+        Method.POST, jobRunsPath() + "/" + httpJobId, null, httpResp, HttpStatus.SC_OK);
+
+    JobHandle actualHttpHandle = metalake.cancelJob(httpJobId);
+    compare(expectedHttpJob, actualHttpHandle);
 
     // Test throw NoSuchJobException
     ErrorResponse errorResp =
@@ -377,6 +475,22 @@ public class TestSupportsJobs extends TestBase {
         .withFiles(Collections.emptyList())
         .withArchives(Collections.emptyList())
         .withConfigs(Collections.emptyMap())
+        .build();
+  }
+
+  private JobTemplateDTO newHttpJobTemplateDTO(String name) {
+    return HttpJobTemplateDTO.builder()
+        .withJobType(JobTemplate.JobType.HTTP)
+        .withName(name)
+        .withComment("This is a http job template")
+        .withExecutable("GET")
+        .withArguments(Collections.emptyList())
+        .withEnvironments(Collections.emptyMap())
+        .withCustomFields(Collections.emptyMap())
+        .withUrl("http://example.com/api")
+        .withHeaders(Collections.emptyMap())
+        .withBody("")
+        .withQueryParams(Collections.emptyList())
         .build();
   }
 
