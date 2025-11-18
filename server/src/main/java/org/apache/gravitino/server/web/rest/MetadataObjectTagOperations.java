@@ -92,7 +92,8 @@ public class MetadataObjectTagOperations {
   @Produces("application/vnd.gravitino.v1+json")
   @Timed(name = "get-object-tag." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "get-object-tag", absolute = true)
-  @AuthorizationExpression(expression = "CAN_ACCESS_METADATA && ( METALAKE::OWNER || TAG::OWNER)")
+  @AuthorizationExpression(
+      expression = "METALAKE::OWNER || ((TAG::OWNER || ANY_APPLY_TAG) && CAN_ACCESS_METADATA)")
   public Response getTagForObject(
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
           String metalake,
