@@ -112,17 +112,27 @@ public class StaticSignKeyValidator implements OAuthTokenValidator {
       SignatureAlgorithmFamilyType algFamilyType =
           SignatureAlgorithmFamilyType.valueOf(SignatureAlgorithm.valueOf(algType).getFamilyName());
 
-      if (SignatureAlgorithmFamilyType.HMAC == algFamilyType) {
-        return Keys.hmacShaKeyFor(key);
-      } else if (SignatureAlgorithmFamilyType.RSA == algFamilyType
-          || SignatureAlgorithmFamilyType.ECDSA == algFamilyType) {
-        X509EncodedKeySpec spec = new X509EncodedKeySpec(key);
-        KeyFactory kf = KeyFactory.getInstance(algFamilyType.name());
-        return kf.generatePublic(spec);
-      }
+      return generateKeyByFamilyType(algFamilyType, key, algType);
     } catch (Exception e) {
       throw new IllegalArgumentException("Failed to decode key", e);
     }
-    throw new IllegalArgumentException("Unsupported signature algorithm type: " + algType);
+  }
+
+  private static Key generateKeyByFamilyType(
+      SignatureAlgorithmFamilyType algFamilyType, byte[] key, String algType) throws Exception {
+
+    switch (algFamilyType) {
+      case RSA:
+        return KeyFactory.getInstance("RSA").generatePublic(new X509EncodedKeySpec(key));
+
+      case ECDSA:
+        return KeyFactory.getInstance("EC").generatePublic(new X509EncodedKeySpec(key));
+
+      case HMAC:
+        return Keys.hmacShaKeyFor(key);
+
+      default:
+        throw new IllegalArgumentException("Unsupported signature algorithm type: " + algType);
+    }
   }
 }

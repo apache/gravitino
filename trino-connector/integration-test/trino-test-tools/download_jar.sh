@@ -61,8 +61,8 @@ download_postgresql_jar() {
 }
 
 download_iceberg_aws_bundle() {
-  download_jar "iceberg-aws-bundle-1.9.2.jar" \
-  "https://repo1.maven.org/maven2/org/apache/iceberg/iceberg-aws-bundle/1.9.2/iceberg-aws-bundle-1.9.2.jar" \
+  download_jar "iceberg-aws-bundle-1.10.0.jar" \
+  "https://repo1.maven.org/maven2/org/apache/iceberg/iceberg-aws-bundle/1.10.0/iceberg-aws-bundle-1.10.0.jar" \
   "$GRAVITINO_SERVER_DIR/catalogs/lakehouse-iceberg/libs"
 }
 

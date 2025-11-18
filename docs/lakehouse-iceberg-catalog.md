@@ -18,7 +18,7 @@ Apache Gravitino provides the ability to manage Apache Iceberg metadata.
 ### Requirements and limitations
 
 :::info
-Builds with Apache Iceberg `1.9.2`. The Apache Iceberg table format version is `2` by default.
+Builds with Apache Iceberg `1.10.0`. The Apache Iceberg table format version is `2` by default.
 :::
 
 ## Catalog
@@ -124,7 +124,7 @@ Please make sure the credential file is accessible by Gravitino, like using `exp
 Please set `warehouse` to `gs://{bucket_name}/${prefix_name}`, and download [Iceberg GCP bundle jar](https://mvnrepository.com/artifact/org.apache.iceberg/iceberg-gcp-bundle) and place it to `catalogs/lakehouse-iceberg/libs/`.
 :::
 
-#### ADLS 
+#### ADLS
 
 Supports using Azure account name and secret key to access ADLS data.
 
@@ -208,13 +208,13 @@ Please refer to [Manage Relational Metadata Using Gravitino](./manage-relational
 
 Supports transforms:
 
-  - `IdentityTransform`
-  - `BucketTransform`
-  - `TruncateTransform`
-  - `YearTransform`
-  - `MonthTransform`
-  - `DayTransform`
-  - `HourTransform`
+- `IdentityTransform`
+- `BucketTransform`
+- `TruncateTransform`
+- `YearTransform`
+- `MonthTransform`
+- `DayTransform`
+- `HourTransform`
 
 :::info
 Iceberg doesn't support multi fields in `BucketTransform`.

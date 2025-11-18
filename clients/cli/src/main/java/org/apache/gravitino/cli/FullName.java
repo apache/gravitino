@@ -215,7 +215,7 @@ public class FullName {
       int length = names.length;
       int position = partNo;
 
-      return position <= length;
+      return position > 0 && position <= length;
     }
 
     return false;

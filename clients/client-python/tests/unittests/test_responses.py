@@ -23,13 +23,48 @@ from gravitino.dto.responses.model_response import ModelResponse
 from gravitino.dto.responses.model_version_list_response import ModelVersionListResponse
 from gravitino.dto.responses.model_version_response import ModelVersionResponse
 from gravitino.dto.responses.model_version_uri_response import ModelVersionUriResponse
+from gravitino.dto.responses.partition_list_response import PartitionListResponse
 from gravitino.dto.responses.partition_name_list_response import (
     PartitionNameListResponse,
 )
+from gravitino.dto.responses.partition_response import PartitionResponse
 from gravitino.exceptions.base import IllegalArgumentException
 
 
 class TestResponses(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.PARTITION_JSON_STRING = """
+            {
+                "type": "identity",
+                "name": "test_identity_partition",
+                "fieldNames": [
+                    [
+                        "upper"
+                    ],
+                    [
+                        "lower"
+                    ]
+                ],
+                "values": [
+                    {
+                        "type": "literal",
+                        "dataType": "integer",
+                        "value": "0"
+                    },
+                    {
+                        "type": "literal",
+                        "dataType": "integer",
+                        "value": "100"
+                    }
+                ],
+                "properties": {
+                    "key1": "value1",
+                    "key2": "value2"
+                }
+            }
+        """
+
     def test_file_location_response(self):
         json_data = {"code": 0, "fileLocation": "file:/test/1"}
         json_str = json.dumps(json_data)
@@ -293,3 +328,23 @@ class TestResponses(unittest.TestCase):
         resp: PartitionNameListResponse = PartitionNameListResponse.from_json(json_str)
         with self.assertRaises(IllegalArgumentException):
             resp.validate()
+
+    def test_partition_response(self):
+        json_string = f"""
+        {{
+            "code": 0,
+            "partition": {TestResponses.PARTITION_JSON_STRING}
+        }}
+        """
+        resp: PartitionResponse = PartitionResponse.from_json(json_string)
+        resp.validate()
+
+    def test_partition_list_response(self):
+        json_string = f"""
+        {{
+            "code": 0,
+            "partitions": [{TestResponses.PARTITION_JSON_STRING}]
+        }}
+        """
+        resp: PartitionListResponse = PartitionListResponse.from_json(json_string)
+        resp.validate()

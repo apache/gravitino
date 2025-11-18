@@ -161,7 +161,10 @@ public class TableCreateRequest implements RESTRequest {
               index -> {
                 Preconditions.checkArgument(index.type() != null, "Index type cannot be null");
                 Preconditions.checkArgument(
-                    index.fieldNames().length > 0, "Index field names cannot be null");
+                    index.fieldNames() != null, "Index fieldNames cannot be null");
+                Preconditions.checkArgument(
+                    index.fieldNames().length > 0,
+                    "Index fieldNames length must be greater than 0");
               });
     }
   }

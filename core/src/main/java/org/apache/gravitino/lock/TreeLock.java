@@ -153,15 +153,18 @@ public class TreeLock {
       LockType type = pair.getRight();
       current.unlock(type);
 
-      long holdStartTime = current.removeHoldingThreadTimestamp(Thread.currentThread(), identifier);
+      Long holdStartTime = current.removeHoldingThreadTimestamp(Thread.currentThread(), identifier);
       if (LOG.isTraceEnabled()) {
+        long duration =
+            (holdStartTime == null) ? -1L : (System.currentTimeMillis() - holdStartTime);
+
         LOG.trace(
             "Node {} has been unlock with '{}' lock, hold by {} with ident '{}' for {} ms",
             this,
             type,
             Thread.currentThread(),
             identifier,
-            System.currentTimeMillis() - holdStartTime);
+            duration);
       }
     }
 
