@@ -147,11 +147,15 @@ public class IcebergTableAuthorizationIT extends IcebergAuthorizationIT {
 
     setSchemaOwner(NORMAL_USER);
     Assertions.assertDoesNotThrow(() -> sql("DESC TABLE %s", tableName));
+    // With ownership: non-existent table returns 404 (AnalysisException)
     Assertions.assertThrowsExactly(
         AnalysisException.class, () -> sql("DESC TABLE %s_not_exist", tableName));
 
     setSchemaOwner(SUPER_USER);
     Assertions.assertThrowsExactly(ForbiddenException.class, () -> sql("DESC TABLE %s", tableName));
+    // Without ownership: non-existent table also returns 403 (ForbiddenException)
+    Assertions.assertThrowsExactly(
+        ForbiddenException.class, () -> sql("DESC TABLE %s_not_exist", tableName));
   }
 
   @Test
@@ -213,6 +217,20 @@ public class IcebergTableAuthorizationIT extends IcebergAuthorizationIT {
             .loadTable(NameIdentifier.of(SCHEMA_NAME, tableName));
     Assertions.assertTrue(table.properties().containsKey("a"));
     Assertions.assertEquals("b", table.properties().get("a"));
+
+    // Test with explicit ModifyTable privilege
+    String tableName2 = "test_update_with_privilege";
+    createTable(SCHEMA_NAME, tableName2);
+    String roleName = grantModifyTableRole(tableName2);
+    Assertions.assertDoesNotThrow(
+        () -> sql("ALTER TABLE %s SET TBLPROPERTIES ('c'='d')", tableName2));
+    table =
+        catalogClientWithAllPrivilege
+            .asTableCatalog()
+            .loadTable(NameIdentifier.of(SCHEMA_NAME, tableName2));
+    Assertions.assertTrue(table.properties().containsKey("c"));
+    Assertions.assertEquals("d", table.properties().get("c"));
+    revokeRole(roleName);
   }
 
   @Test
@@ -273,6 +291,74 @@ public class IcebergTableAuthorizationIT extends IcebergAuthorizationIT {
     Assertions.assertEquals(NORMAL_USER, owner.get().name());
   }
 
+  @Test
+  void testTableDenyOverridesSchemaAllow() {
+    // Test that table-level DENY overrides schema-level ALLOW
+    String tableName = "test_table_deny_override";
+    createTable(SCHEMA_NAME, tableName);
+
+    // Create a role that:
+    // 1. Grants ALLOW on SelectTable at schema level (should apply to all tables)
+    // 2. Denies SelectTable at specific table level (should override schema allow)
+    String roleName = "tableDenyOverride_" + UUID.randomUUID();
+    List<SecurableObject> securableObjects = new ArrayList<>();
+
+    SecurableObject catalogObject =
+        SecurableObjects.ofCatalog(
+            GRAVITINO_CATALOG_NAME, ImmutableList.of(Privileges.UseCatalog.allow()));
+    securableObjects.add(catalogObject);
+
+    // ALLOW SelectTable at schema level
+    SecurableObject schemaObject =
+        SecurableObjects.ofSchema(
+            catalogObject,
+            SCHEMA_NAME,
+            ImmutableList.of(Privileges.UseSchema.allow(), Privileges.SelectTable.allow()));
+    securableObjects.add(schemaObject);
+
+    // DENY SelectTable at table level - this should override the schema-level allow
+    SecurableObject tableObject =
+        SecurableObjects.ofTable(
+            schemaObject, tableName, ImmutableList.of(Privileges.SelectTable.deny()));
+    securableObjects.add(tableObject);
+
+    metalakeClientWithAllPrivilege.createRole(roleName, new HashMap<>(), securableObjects);
+    metalakeClientWithAllPrivilege.grantRolesToUser(ImmutableList.of(roleName), NORMAL_USER);
+
+    // Table-level DENY should override schema-level ALLOW, so access should be denied
+    Assertions.assertThrowsExactly(ForbiddenException.class, () -> sql("DESC TABLE %s", tableName));
+
+    revokeRole(roleName);
+  }
+
+  @Test
+  void testSelectTablePrivilegeCannotModifyTable() {
+    // Test that SELECT privilege does not grant modification rights
+    String tableName = "test_select_no_modify";
+    createTable(SCHEMA_NAME, tableName);
+
+    // Grant only SELECT privilege
+    String roleName = grantSelectTableRole(tableName);
+
+    // User should be able to read the table
+    Assertions.assertDoesNotThrow(() -> sql("DESC TABLE %s", tableName));
+    Assertions.assertDoesNotThrow(() -> sql("SELECT * FROM %s", tableName));
+
+    // But should NOT be able to modify it
+    Assertions.assertThrowsExactly(
+        ForbiddenException.class,
+        () -> sql("ALTER TABLE %s SET TBLPROPERTIES ('key'='value')", tableName));
+
+    // Verify the property was not added
+    Table table =
+        catalogClientWithAllPrivilege
+            .asTableCatalog()
+            .loadTable(NameIdentifier.of(SCHEMA_NAME, tableName));
+    Assertions.assertFalse(table.properties().containsKey("key"));
+
+    revokeRole(roleName);
+  }
+
   private void grantUseSchemaRole(String schema) {
     String roleName = "useSchema_" + UUID.randomUUID();
     List<SecurableObject> securableObjects = new ArrayList<>();
@@ -318,6 +404,25 @@ public class IcebergTableAuthorizationIT extends IcebergAuthorizationIT {
     SecurableObject tableObject =
         SecurableObjects.ofTable(
             schemaObject, tableName, ImmutableList.of(Privileges.SelectTable.allow()));
+    securableObjects.add(tableObject);
+    metalakeClientWithAllPrivilege.createRole(roleName, new HashMap<>(), securableObjects);
+    metalakeClientWithAllPrivilege.grantRolesToUser(ImmutableList.of(roleName), NORMAL_USER);
+    return roleName;
+  }
+
+  private String grantModifyTableRole(String tableName) {
+    String roleName = "modifyTable_" + UUID.randomUUID();
+    List<SecurableObject> securableObjects = new ArrayList<>();
+    SecurableObject catalogObject =
+        SecurableObjects.ofCatalog(
+            GRAVITINO_CATALOG_NAME, ImmutableList.of(Privileges.UseCatalog.allow()));
+    securableObjects.add(catalogObject);
+    SecurableObject schemaObject =
+        SecurableObjects.ofSchema(
+            catalogObject, SCHEMA_NAME, ImmutableList.of(Privileges.UseSchema.allow()));
+    SecurableObject tableObject =
+        SecurableObjects.ofTable(
+            schemaObject, tableName, ImmutableList.of(Privileges.ModifyTable.allow()));
     securableObjects.add(tableObject);
     metalakeClientWithAllPrivilege.createRole(roleName, new HashMap<>(), securableObjects);
     metalakeClientWithAllPrivilege.grantRolesToUser(ImmutableList.of(roleName), NORMAL_USER);
