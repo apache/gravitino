@@ -23,6 +23,7 @@ import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import com.github.benmanes.caffeine.cache.RemovalCause;
 import com.github.benmanes.caffeine.cache.stats.CacheStats;
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
@@ -89,6 +90,11 @@ public class CaffeineEntityCache extends BaseEntityCache {
   private RadixTree<EntityCacheRelationKey> cacheIndex;
 
   private ScheduledExecutorService scheduler;
+
+  @VisibleForTesting
+  public ReverseIndexCache getReverseIndex() {
+    return reverseIndex;
+  }
 
   /**
    * Constructs a new {@link CaffeineEntityCache}.
@@ -414,7 +420,7 @@ public class CaffeineEntityCache extends BaseEntityCache {
                     k ->
                         reverseIndex
                             .getValuesForKeysStartingWith(k.toString())
-                            .forEach(rsk -> reverseIndex.remove(rsk.toString())));
+                            .forEach(rsk -> rsk.forEach(v -> reverseIndex.remove(v))));
           });
 
       reverseIndex.remove(currentKeyToRemove);

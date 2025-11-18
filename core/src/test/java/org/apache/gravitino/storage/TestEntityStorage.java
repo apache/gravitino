@@ -52,6 +52,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
+import java.util.stream.Collectors;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.reflect.FieldUtils;
@@ -71,6 +72,9 @@ import org.apache.gravitino.authorization.Privileges;
 import org.apache.gravitino.authorization.Role;
 import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.authorization.SecurableObjects;
+import org.apache.gravitino.cache.CaffeineEntityCache;
+import org.apache.gravitino.cache.EntityCacheKey;
+import org.apache.gravitino.cache.ReverseIndexCache;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NonEmptyEntityException;
 import org.apache.gravitino.file.Fileset;
@@ -2710,6 +2714,48 @@ public class TestEntityStorage {
       Assertions.assertEquals(
           Condition.ALLOW,
           loadedWriteRole.securableObjects().get(0).privileges().get(0).condition());
+
+      // Now try to drop and then recreate the role
+      store.delete(readRole.nameIdentifier(), Entity.EntityType.ROLE);
+
+      ReverseIndexCache reverseIndexCache =
+          ((CaffeineEntityCache) ((RelationalEntityStore) store).getCache()).getReverseIndex();
+      List<EntityCacheKey> reverseIndexValue =
+          reverseIndexCache.get(
+              NameIdentifier.of("metalake", "newCatalogName", "schema", "fileset"),
+              Entity.EntityType.FILESET);
+      // As read role is deleted, the reverse index cache should not have it anymore.
+      Assertions.assertEquals(1, reverseIndexValue.size());
+      Assertions.assertEquals(writeRole.nameIdentifier(), reverseIndexValue.get(0).identifier());
+
+      store.put(readRole, true);
+      store.get(readRole.nameIdentifier(), Entity.EntityType.ROLE, RoleEntity.class);
+      reverseIndexValue =
+          reverseIndexCache.get(
+              NameIdentifier.of("metalake", "newCatalogName", "schema", "fileset"),
+              Entity.EntityType.FILESET);
+      // As read role is recreated, the reverse index cache should have it again.
+      Assertions.assertEquals(2, reverseIndexValue.size());
+      List<NameIdentifier> ids =
+          reverseIndexValue.stream().map(EntityCacheKey::identifier).collect(Collectors.toList());
+      Assertions.assertTrue(ids.contains(readRole.nameIdentifier()));
+      Assertions.assertTrue(ids.contains(writeRole.nameIdentifier()));
+
+      // Drop role1 and role2
+      store.delete(readRole.nameIdentifier(), Entity.EntityType.ROLE);
+      store.delete(writeRole.nameIdentifier(), Entity.EntityType.ROLE);
+
+      reverseIndexValue =
+          reverseIndexCache.get(
+              NameIdentifier.of("metalake", "newCatalogName", "schema", "fileset"),
+              Entity.EntityType.FILESET);
+      // As both roles are deleted, the reverse index cache should not have them anymore.
+      Assertions.assertNull(reverseIndexValue);
+
+      store.put(readRole, true);
+      store.put(writeRole, true);
+      store.get(readRole.nameIdentifier(), Entity.EntityType.ROLE, RoleEntity.class);
+      store.get(writeRole.nameIdentifier(), Entity.EntityType.ROLE, RoleEntity.class);
 
       // first try to rename the fileset to fileset_new
       store.update(
