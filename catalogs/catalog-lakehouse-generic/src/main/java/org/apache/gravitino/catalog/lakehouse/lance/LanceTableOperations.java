@@ -52,8 +52,11 @@ import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.indexes.Index;
 import org.apache.gravitino.rel.indexes.Indexes;
 import org.apache.gravitino.storage.IdGenerator;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class LanceTableOperations extends ManagedTableOperations {
+  private static final Logger LOG = LoggerFactory.getLogger(LanceTableOperations.class);
 
   private final EntityStore store;
 
@@ -116,9 +119,23 @@ public class LanceTableOperations extends ManagedTableOperations {
             location,
             convertColumnsToArrowSchema(columns),
             new WriteParams.Builder().withStorageOptions(storageProps).build())) {
-      // Only the lance table is created will we create the table metadata in Gravitino.
+      // Only create the table metadata in Gravitino after the Lance dataset is successfully
+      // created.
       return super.createTable(
           ident, columns, comment, properties, partitions, distribution, sortOrders, indexes);
+    } catch (NoSuchSchemaException e) {
+      throw e;
+    } catch (TableAlreadyExistsException e) {
+      // If the table metadata already exists, but the underlying lance table was just created
+      // successfully, we need to clean up the created lance table to avoid orphaned datasets.
+      Dataset.drop(location, LancePropertiesUtils.getLanceStorageOptions(properties));
+      throw e;
+    } catch (IllegalArgumentException e) {
+      if (e.getMessage().contains("Dataset already exists")) {
+        throw new TableAlreadyExistsException(
+            e, "Lance dataset already exists at location %s", location);
+      }
+      throw e;
     } catch (Exception e) {
       throw new RuntimeException("Failed to create Lance dataset at location " + location, e);
     }
@@ -162,6 +179,8 @@ public class LanceTableOperations extends ManagedTableOperations {
 
       // Delete the Lance dataset at the location
       Dataset.drop(location, LancePropertiesUtils.getLanceStorageOptions(table.properties()));
+      LOG.info("Deleted Lance dataset at location {}", location);
+
       // After deleting the dataset, we can delete the table metadata in Gravitino
       return super.purgeTable(ident);
 
@@ -190,6 +209,7 @@ public class LanceTableOperations extends ManagedTableOperations {
 
       // Delete the Lance dataset at the location
       Dataset.drop(location, LancePropertiesUtils.getLanceStorageOptions(table.properties()));
+      LOG.info("Deleted Lance dataset at location {}", location);
       // After deleting the dataset, we can delete the table metadata in Gravitino
       return super.dropTable(ident);
 

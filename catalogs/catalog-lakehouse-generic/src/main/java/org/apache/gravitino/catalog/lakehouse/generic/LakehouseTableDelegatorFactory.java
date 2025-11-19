@@ -24,14 +24,17 @@ import java.util.Locale;
 import java.util.Optional;
 import java.util.ServiceLoader;
 import java.util.stream.Collectors;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class LakehouseTableDelegatorFactory {
+  private static final Logger LOG = LoggerFactory.getLogger(LakehouseTableDelegatorFactory.class);
 
   private static ImmutableMap<String, LakehouseTableDelegator> delegators;
 
   private LakehouseTableDelegatorFactory() {}
 
-  public static synchronized void createTableDelegators() {
+  private static synchronized void createTableDelegators() {
     if (delegators != null) {
       return;
     }
@@ -47,6 +50,12 @@ public class LakehouseTableDelegatorFactory {
                 .collect(
                     Collectors.toMap(
                         provider -> provider.get().tableFormat(), ServiceLoader.Provider::get)));
+    Preconditions.checkArgument(
+        !delegators.isEmpty(),
+        "No LakehouseTableDelegator implementation found via ServiceLoader, this is unexpected, "
+            + "please check the code to see what is going on.");
+
+    LOG.info("Loaded LakehouseTableDelegators: {}", delegators.keySet());
   }
 
   public static ImmutableMap<String, LakehouseTableDelegator> tableDelegators() {

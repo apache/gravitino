@@ -22,13 +22,17 @@ import static org.apache.gravitino.Entity.EntityType.TABLE;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import com.google.common.base.Suppliers;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.collect.Maps;
 import java.io.IOException;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Catalog;
@@ -69,7 +73,7 @@ public class GenericCatalogOperations implements CatalogOperations, SupportsSche
 
   private final ManagedSchemaOperations schemaOps;
 
-  private final Map<String, ManagedTableOperations> tableOpsCache;
+  private final Map<String, Supplier<ManagedTableOperations>> tableOpsCache;
 
   private Optional<String> catalogLocation;
 
@@ -97,14 +101,21 @@ public class GenericCatalogOperations implements CatalogOperations, SupportsSche
 
     this.tableFormatCache = CacheBuilder.newBuilder().maximumSize(1000).build();
 
+    // Initialize all the table operations for different table formats.
     Map<String, LakehouseTableDelegator> tableDelegators =
         LakehouseTableDelegatorFactory.tableDelegators();
     tableOpsCache =
-        tableDelegators.entrySet().stream()
-            .collect(
-                Collectors.toMap(
-                    Map.Entry::getKey,
-                    e -> e.getValue().createTableOps(store, schemaOps, idGenerator)));
+        Collections.unmodifiableMap(
+            tableDelegators.entrySet().stream()
+                .collect(
+                    Collectors.toMap(
+                        Map.Entry::getKey,
+                        // Lazy initialize the table operations when needed.
+                        e -> {
+                          LakehouseTableDelegator delegator = e.getValue();
+                          return Suppliers.memoize(
+                              () -> delegator.createTableOps(store, schemaOps, idGenerator));
+                        })));
   }
 
   @Override
@@ -189,13 +200,21 @@ public class GenericCatalogOperations implements CatalogOperations, SupportsSche
   public NameIdentifier[] listTables(Namespace namespace) throws NoSuchSchemaException {
     // We get the table operations from any cached table ops, since listing tables is not
     // format-specific.
-    ManagedTableOperations tableOps = tableOpsCache.values().iterator().next();
+    ManagedTableOperations tableOps = tableOpsCache.values().iterator().next().get();
     return tableOps.listTables(namespace);
   }
 
   @Override
   public Table loadTable(NameIdentifier ident) throws NoSuchTableException {
-    return tableOps(ident).loadTable(ident);
+    Table loadedTable = tableOps(ident).loadTable(ident);
+
+    Optional<String> tableFormat =
+        Optional.ofNullable(
+                loadedTable.properties().getOrDefault(Table.PROPERTY_TABLE_FORMAT, null))
+            .map(s -> s.toLowerCase(Locale.ROOT));
+    tableFormat.ifPresent(s -> tableFormatCache.put(ident, s));
+
+    return loadedTable;
   }
 
   @Override
@@ -211,34 +230,39 @@ public class GenericCatalogOperations implements CatalogOperations, SupportsSche
       throws NoSuchSchemaException, TableAlreadyExistsException {
     Schema schema = loadSchema(NameIdentifier.of(ident.namespace().levels()));
     String tableLocation = calculateTableLocation(schema, ident, properties);
+
     String format = properties.getOrDefault(Table.PROPERTY_TABLE_FORMAT, null);
     Preconditions.checkArgument(
         format != null, "Table format must be specified in table properties");
+    format = format.toLowerCase(Locale.ROOT);
 
     Map<String, String> newProperties = Maps.newHashMap(properties);
     newProperties.put(Table.PROPERTY_LOCATION, tableLocation);
-    tableFormatCache.put(ident, format.toLowerCase(Locale.ROOT));
+    newProperties.put(Table.PROPERTY_TABLE_FORMAT, format);
 
-    try {
-      return tableOps(ident)
-          .createTable(
-              ident,
-              columns,
-              comment,
-              newProperties,
-              partitions,
-              distribution,
-              sortOrders,
-              indexes);
-    } finally {
-      tableFormatCache.invalidate(ident);
-    }
+    // Get the table operations for the specified table format.
+    ManagedTableOperations tableOps = tableOpsCache.get(format).get();
+
+    Table createdTable =
+        tableOps.createTable(
+            ident, columns, comment, newProperties, partitions, distribution, sortOrders, indexes);
+    // Cache the table format for future use.
+    tableFormatCache.put(ident, format);
+    return createdTable;
   }
 
   @Override
   public Table alterTable(NameIdentifier ident, TableChange... changes)
       throws NoSuchTableException, IllegalArgumentException {
-    return tableOps(ident).alterTable(ident, changes);
+    Table alteredTable = tableOps(ident).alterTable(ident, changes);
+
+    boolean isRenameChange =
+        Arrays.stream(changes).anyMatch(c -> c instanceof TableChange.RenameTable);
+    if (isRenameChange) {
+      tableFormatCache.invalidate(ident);
+    }
+
+    return alteredTable;
   }
 
   @Override
@@ -302,30 +326,33 @@ public class GenericCatalogOperations implements CatalogOperations, SupportsSche
           tableFormatCache.get(
               tableIdent,
               () -> {
-                try {
-                  TableEntity table = store.get(tableIdent, TABLE, TableEntity.class);
-                  String format =
-                      table.properties().getOrDefault(Table.PROPERTY_TABLE_FORMAT, null);
-                  Preconditions.checkArgument(
-                      format != null,
-                      "Table format for %s is null, this is unexpected",
-                      tableIdent);
+                TableEntity table = store.get(tableIdent, TABLE, TableEntity.class);
+                String format = table.properties().getOrDefault(Table.PROPERTY_TABLE_FORMAT, null);
+                Preconditions.checkArgument(
+                    format != null, "Table format for %s is null, this is unexpected", tableIdent);
 
-                  return format.toLowerCase(Locale.ROOT);
-                } catch (IOException e) {
-                  throw new RuntimeException("Failed to get table format for " + tableIdent, e);
-                } catch (NoSuchEntityException e) {
-                  throw new NoSuchTableException(e, "Table %s does not exist", tableIdent);
-                }
+                return format.toLowerCase(Locale.ROOT);
               });
 
-      ManagedTableOperations ops = tableOpsCache.get(tableFormat);
+      ManagedTableOperations ops = tableOpsCache.get(tableFormat).get();
       Preconditions.checkArgument(
           ops != null, "No table operations found for table format %s", tableFormat);
       return ops;
 
     } catch (Exception e) {
-      throw new RuntimeException("Failed to get table operations for " + tableIdent, e);
+      Throwable t = e.getCause();
+
+      if (t instanceof NoSuchEntityException) {
+        throw new NoSuchTableException("Table %s does not exist", tableIdent);
+      } else if (t instanceof IllegalArgumentException) {
+        throw (IllegalArgumentException) t;
+      } else if (t instanceof IOException) {
+        throw new RuntimeException(
+            String.format("Failed to load table %s: %s", tableIdent, t.getMessage()), t);
+      } else {
+        throw new RuntimeException(
+            String.format("Unexpected exception when loading table %s", tableIdent), t);
+      }
     }
   }
 }

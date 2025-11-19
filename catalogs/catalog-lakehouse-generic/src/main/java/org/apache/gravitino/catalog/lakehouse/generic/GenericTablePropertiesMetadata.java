@@ -55,6 +55,8 @@ public class GenericTablePropertiesMetadata extends BasePropertiesMetadata {
 
   @Override
   protected Map<String, PropertyEntry<?>> specificPropertyEntries() {
+    // Get all the table specific property entries from the registered table delegators, and merge
+    // them with the generic table properties.
     Map<String, PropertyEntry<?>> tableSpecificPropertyEntries =
         LakehouseTableDelegatorFactory.tableDelegators().entrySet().stream()
             .flatMap(kv -> kv.getValue().tablePropertyEntries().stream())

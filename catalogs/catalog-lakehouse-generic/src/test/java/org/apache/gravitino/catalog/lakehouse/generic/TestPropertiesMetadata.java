@@ -69,9 +69,9 @@ public class TestPropertiesMetadata {
 
     Map<String, String> tableProperties =
         ImmutableMap.of(
-            "storage.type", "s3",
-            "storage.s3.bucket", "my-bucket",
-            "storage.s3.region", "us-west-2",
+            "lance.storage.type", "s3",
+            "lance.storage.s3.bucket", "my-bucket",
+            "lance.storage.s3.region", "us-west-2",
             "location", "/tmp/test_table",
             "format", "iceberg");
 
