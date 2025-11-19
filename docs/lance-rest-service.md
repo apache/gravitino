@@ -6,6 +6,8 @@ keywords:
 license: "This software is licensed under the Apache License version 2."
 ---
 
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
 
 ## Background
 
