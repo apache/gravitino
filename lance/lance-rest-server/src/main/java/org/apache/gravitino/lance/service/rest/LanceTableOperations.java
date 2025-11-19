@@ -157,7 +157,7 @@ public class LanceTableOperations {
   @ResponseMetered(name = "register-table", absolute = true)
   public Response registerTable(
       @PathParam("id") String tableId,
-      @QueryParam("delimiter") @DefaultValue("$") String delimiter,
+      @QueryParam("delimiter") @DefaultValue(NAMESPACE_DELIMITER_DEFAULT) String delimiter,
       @Context HttpHeaders headers,
       RegisterTableRequest registerTableRequest) {
     try {
@@ -185,7 +185,7 @@ public class LanceTableOperations {
   @ResponseMetered(name = "deregister-table", absolute = true)
   public Response deregisterTable(
       @PathParam("id") String tableId,
-      @QueryParam("delimiter") @DefaultValue("$") String delimiter,
+      @QueryParam("delimiter") @DefaultValue(NAMESPACE_DELIMITER_DEFAULT) String delimiter,
       @Context HttpHeaders headers,
       DeregisterTableRequest deregisterTableRequest) {
     try {
@@ -204,7 +204,7 @@ public class LanceTableOperations {
   @ResponseMetered(name = "create-table-index", absolute = true)
   public Response createTableIndex(
       @PathParam("id") String tableId,
-      @QueryParam("delimiter") @DefaultValue("$") String delimiter,
+      @QueryParam("delimiter") @DefaultValue(NAMESPACE_DELIMITER_DEFAULT) String delimiter,
       @Context HttpHeaders headers,
       CreateTableIndexRequest createTableIndexRequest) {
     try {
@@ -223,7 +223,7 @@ public class LanceTableOperations {
   @ResponseMetered(name = "list-table-indices", absolute = true)
   public Response listTableIndices(
       @PathParam("id") String tableId,
-      @QueryParam("delimiter") @DefaultValue("$") String delimiter,
+      @QueryParam("delimiter") @DefaultValue(NAMESPACE_DELIMITER_DEFAULT) String delimiter,
       @Context HttpHeaders headers,
       ListTableIndicesRequest listTableIndicesRequest) {
     try {
@@ -243,7 +243,7 @@ public class LanceTableOperations {
   public Response describeTableIndex(
       @PathParam("id") String tableId,
       @PathParam("index_name") String indexName,
-      @QueryParam("delimiter") @DefaultValue("$") String delimiter,
+      @QueryParam("delimiter") @DefaultValue(NAMESPACE_DELIMITER_DEFAULT) String delimiter,
       @Context HttpHeaders headers,
       DescribeTableIndexStatsRequest describeTableIndexStatsRequest) {
     try {
