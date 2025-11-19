@@ -27,6 +27,13 @@ plugins {
   alias(libs.plugins.aspectj.post.compile.weaving)
 }
 
+// Force lance-core to avoid conflict with transitive 0.26.1 from lance-namespace-core
+configurations.all {
+  resolutionStrategy {
+    force(libs.lance)
+  }
+}
+
 dependencies {
   implementation(project(":api"))
   implementation(project(":common"))
