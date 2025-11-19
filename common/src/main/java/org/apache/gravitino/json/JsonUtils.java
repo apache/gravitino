@@ -121,6 +121,7 @@ public class JsonUtils {
   private static final String INDEX_TYPE = "indexType";
   private static final String INDEX_NAME = "name";
   private static final String INDEX_FIELD_NAMES = "fieldNames";
+  private static final String INDEX_PROPERTIES = "properties";
   private static final String NUMBER = "number";
   private static final String TYPE = "type";
   private static final String STRUCT = "struct";
@@ -1473,6 +1474,12 @@ public class JsonUtils {
       }
       gen.writeFieldName(INDEX_FIELD_NAMES);
       gen.writeObject(value.fieldNames());
+
+      if (value.properties() != null) {
+        gen.writeFieldName(INDEX_PROPERTIES);
+        gen.writeObject(value.properties());
+      }
+
       gen.writeEndObject();
     }
   }
@@ -1501,6 +1508,11 @@ public class JsonUtils {
       node.get(INDEX_FIELD_NAMES)
           .forEach(field -> fieldNames.add(getStringArray((ArrayNode) field)));
       builder.withFieldNames(fieldNames.toArray(new String[0][0]));
+
+      if (node.has(INDEX_PROPERTIES)) {
+        builder.withProperties(getStringMapOrNull(INDEX_PROPERTIES, node));
+      }
+
       return builder.build();
     }
   }

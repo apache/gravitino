@@ -19,10 +19,16 @@
 package org.apache.gravitino.lance.common.ops;
 
 import com.lancedb.lance.namespace.model.CreateEmptyTableResponse;
+import com.lancedb.lance.namespace.model.CreateTableIndexRequest;
+import com.lancedb.lance.namespace.model.CreateTableIndexResponse;
 import com.lancedb.lance.namespace.model.CreateTableRequest;
 import com.lancedb.lance.namespace.model.CreateTableResponse;
 import com.lancedb.lance.namespace.model.DeregisterTableResponse;
+import com.lancedb.lance.namespace.model.DescribeTableIndexStatsRequest;
+import com.lancedb.lance.namespace.model.DescribeTableIndexStatsResponse;
 import com.lancedb.lance.namespace.model.DescribeTableResponse;
+import com.lancedb.lance.namespace.model.ListTableIndicesRequest;
+import com.lancedb.lance.namespace.model.ListTableIndicesResponse;
 import com.lancedb.lance.namespace.model.RegisterTableRequest;
 import com.lancedb.lance.namespace.model.RegisterTableResponse;
 import java.util.Map;
@@ -94,4 +100,38 @@ public interface LanceTableOperations {
    * @return the response of the deregister table operation
    */
   DeregisterTableResponse deregisterTable(String tableId, String delimiter);
+
+  /**
+   * Create an index on a Lance table.
+   *
+   * @param tableId table ids are in the format of "{namespace}{delimiter}{table_name}"
+   * @param delimiter the delimiter used in the namespace
+   * @param request the request containing index creation details
+   * @return the response of the create index operation.
+   */
+  CreateTableIndexResponse createTableIndex(
+      String tableId, String delimiter, CreateTableIndexRequest request);
+
+  /**
+   * List indices of a Lance table.
+   *
+   * @param tableId table ids are in the format of "{namespace}{delimiter}{table_name}"
+   * @param delimiter the delimiter used in the namespace
+   * @param request the request containing table id and other parameters
+   * @return the response containing the list of indices
+   */
+  ListTableIndicesResponse listTableIndices(
+      String tableId, String delimiter, ListTableIndicesRequest request);
+
+  /**
+   * Describe statistics of a specific index on a Lance table.
+   *
+   * @param tableId table ids are in the format of "{namespace}{delimiter}{table_name}"
+   * @param delimiter the delimiter used in the namespace
+   * @param indexId the identifier of the index to describe
+   * @param request the request containing table id and other parameters
+   * @return the response containing index statistics
+   */
+  DescribeTableIndexStatsResponse describeTableIndexStats(
+      String tableId, String delimiter, String indexId, DescribeTableIndexStatsRequest request);
 }
