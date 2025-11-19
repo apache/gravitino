@@ -24,4 +24,12 @@ import java.lang.annotation.Target;
 
 @Target({ElementType.PARAMETER})
 @Retention(RetentionPolicy.RUNTIME)
-public @interface AuthorizationRequest {}
+public @interface AuthorizationRequest {
+
+  RequestType type() default RequestType.COMMON;
+
+  enum RequestType {
+    COMMON,
+    ASSOCIATE_TAG
+  }
+}

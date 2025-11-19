@@ -24,8 +24,6 @@ import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.ToString;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.gravitino.MetadataObject;
-import org.apache.gravitino.auth.AuthorizationBatchTarget;
 import org.apache.gravitino.rest.RESTRequest;
 
 /** Represents a request to associate tags. */
@@ -35,11 +33,9 @@ import org.apache.gravitino.rest.RESTRequest;
 public class TagsAssociateRequest implements RESTRequest {
 
   @JsonProperty("tagsToAdd")
-  @AuthorizationBatchTarget(accessMetadataType = MetadataObject.Type.TAG)
   private final String[] tagsToAdd;
 
   @JsonProperty("tagsToRemove")
-  @AuthorizationBatchTarget(accessMetadataType = MetadataObject.Type.TAG)
   private final String[] tagsToRemove;
 
   /**

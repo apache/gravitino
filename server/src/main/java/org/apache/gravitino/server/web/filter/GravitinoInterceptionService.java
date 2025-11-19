@@ -42,10 +42,8 @@ import org.apache.gravitino.Entity;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.NameIdentifier;
-import org.apache.gravitino.auth.AuthorizationBatchTarget;
 import org.apache.gravitino.authorization.AuthorizationRequestContext;
 import org.apache.gravitino.server.authorization.MetadataFilterHelper;
-import org.apache.gravitino.server.authorization.annotations.AuthorizationBatch;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationExpression;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationFullName;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationMetadata;
@@ -140,7 +138,7 @@ public class GravitinoInterceptionService implements InterceptionService {
         Parameter[] parameters = method.getParameters();
         AuthorizationExpression expressionAnnotation =
             method.getAnnotation(AuthorizationExpression.class);
-        boolean isBatch = method.isAnnotationPresent(AuthorizationBatch.class);
+        AuthorizeExecutor executor;
         if (expressionAnnotation != null) {
           String expression = expressionAnnotation.expression();
           Object[] args = methodInvocation.getArguments();
@@ -150,48 +148,29 @@ public class GravitinoInterceptionService implements InterceptionService {
           Map<String, Object> pathParams = extractPathParamsFromParameters(parameters, args);
           AuthorizationExpressionEvaluator authorizationExpressionEvaluator =
               new AuthorizationExpressionEvaluator(expression);
-          if (!isBatch) {
-            boolean authorizeResult =
-                authorizationExpressionEvaluator.evaluate(
-                    metadataContext,
-                    pathParams,
-                    new AuthorizationRequestContext(),
-                    Optional.ofNullable(entityType));
-            if (!authorizeResult) {
-              return buildNoAuthResponse(expressionAnnotation, metadataContext, method, expression);
-            }
+          AuthorizationRequest authorizationRequest =
+              extractAuthorizationRequestFromParameters(parameters);
+          if (authorizationRequest == null) {
+            executor =
+                new CommonAuthorizerExecutor(
+                    metadataContext, authorizationExpressionEvaluator, pathParams, entityType);
           } else {
-            Object request = extractFromParameters(parameters, args);
-            Field[] declaredFields = request.getClass().getDeclaredFields();
-            AuthorizationRequestContext authorizationRequestContext =
-                new AuthorizationRequestContext();
-            for (int i = 0; i < declaredFields.length; i++) {
-              Field declaredField = declaredFields[i];
-              AuthorizationBatchTarget target =
-                  declaredField.getAnnotation(AuthorizationBatchTarget.class);
-              if (target != null) {
-                declaredField.setAccessible(true);
-                MetadataObject.Type type = target.accessMetadataType();
-                String[] batchAuthorizeTargets = (String[]) declaredField.get(request);
-                if (batchAuthorizeTargets == null) {
-                  continue;
-                }
-                for (String authorizeTarget : batchAuthorizeTargets) {
-                  buildNameIdentifierForBatchAuthorization(
-                      metadataContext, authorizeTarget, Entity.EntityType.valueOf(type.name()));
-                  boolean authorizeResult =
-                      authorizationExpressionEvaluator.evaluate(
-                          metadataContext,
-                          pathParams,
-                          authorizationRequestContext,
-                          Optional.ofNullable(entityType));
-                  if (!authorizeResult) {
-                    return buildNoAuthResponse(
-                        expressionAnnotation, metadataContext, method, expression);
-                  }
-                }
-              }
-            }
+            executor =
+                switch (authorizationRequest.type()) {
+                  case COMMON -> new CommonAuthorizerExecutor(
+                      metadataContext, authorizationExpressionEvaluator, pathParams, entityType);
+                  case ASSOCIATE_TAG -> new AssociateTagAuthorizeExecutor(
+                      parameters,
+                      args,
+                      metadataContext,
+                      authorizationExpressionEvaluator,
+                      pathParams,
+                      entityType);
+                };
+          }
+          boolean authorizeResult = executor.execute();
+          if (!authorizeResult) {
+            return buildNoAuthResponse(expressionAnnotation, metadataContext, method, expression);
           }
         }
         return methodInvocation.proceed();
@@ -206,6 +185,141 @@ public class GravitinoInterceptionService implements InterceptionService {
             ex);
         return Utils.internalError(
             "Authorization failed due to system internal error. Please contact administrator.", ex);
+      }
+    }
+
+    private AuthorizationRequest extractAuthorizationRequestFromParameters(Parameter[] parameters) {
+      for (Parameter parameter : parameters) {
+        AuthorizationRequest authorizationRequest =
+            parameter.getAnnotation(AuthorizationRequest.class);
+        if (authorizationRequest != null) {
+          return authorizationRequest;
+        }
+      }
+      return null;
+    }
+
+    private interface AuthorizeExecutor {
+
+      boolean execute() throws Exception;
+    }
+
+    private static class CommonAuthorizerExecutor implements AuthorizeExecutor {
+
+      private Map<Entity.EntityType, NameIdentifier> metadataContext;
+      private AuthorizationExpressionEvaluator authorizationExpressionEvaluator;
+      private Map<String, Object> pathParams;
+      String entityType;
+
+      public CommonAuthorizerExecutor(
+          Map<Entity.EntityType, NameIdentifier> metadataContext,
+          AuthorizationExpressionEvaluator authorizationExpressionEvaluator,
+          Map<String, Object> pathParams,
+          String entityType) {
+        this.metadataContext = metadataContext;
+        this.authorizationExpressionEvaluator = authorizationExpressionEvaluator;
+        this.pathParams = pathParams;
+        this.entityType = entityType;
+      }
+
+      @Override
+      public boolean execute() {
+        return authorizationExpressionEvaluator.evaluate(
+            metadataContext,
+            pathParams,
+            new AuthorizationRequestContext(),
+            Optional.ofNullable(entityType));
+      }
+    }
+
+    private class AssociateTagAuthorizeExecutor implements AuthorizeExecutor {
+
+      private final Parameter[] parameters;
+      private final Object[] args;
+      private final Map<Entity.EntityType, NameIdentifier> metadataContext;
+      private final AuthorizationExpressionEvaluator authorizationExpressionEvaluator;
+      private final Map<String, Object> pathParams;
+      private final String entityType;
+
+      public AssociateTagAuthorizeExecutor(
+          Parameter[] parameters,
+          Object[] args,
+          Map<Entity.EntityType, NameIdentifier> metadataContext,
+          AuthorizationExpressionEvaluator authorizationExpressionEvaluator,
+          Map<String, Object> pathParams,
+          String entityType) {
+        this.parameters = parameters;
+        this.args = args;
+        this.metadataContext = metadataContext;
+        this.authorizationExpressionEvaluator = authorizationExpressionEvaluator;
+        this.pathParams = pathParams;
+        this.entityType = entityType;
+      }
+
+      @Override
+      public boolean execute() throws Exception {
+        Object request = extractFromParameters(parameters, args);
+        if (request == null) {
+          return false;
+        }
+
+        AuthorizationRequestContext context = new AuthorizationRequestContext();
+        Entity.EntityType targetType =
+            Entity.EntityType.TAG; // Tags are the only supported batch target here
+
+        // Authorize both 'tagsToAdd' and 'tagsToRemove' fields.
+        // Short-circuit on first failure.
+        return authorizeTagField(request, "tagsToAdd", context, targetType)
+            && authorizeTagField(request, "tagsToRemove", context, targetType);
+      }
+
+      /**
+       * Performs batch authorization for a given field (e.g., "tagsToAdd" or "tagsToRemove")
+       * containing an array of tag names.
+       *
+       * @param request The request object containing the field.
+       * @param fieldName The name of the field to reflect and read (must be a String[]).
+       * @param context The shared authorization request context.
+       * @param targetType The entity type being authorized (expected to be TAG).
+       * @return {@code true} if all tags in the field pass authorization; {@code false} otherwise.
+       * @throws IllegalAccessException if the field is not accessible.
+       */
+      private boolean authorizeTagField(
+          Object request,
+          String fieldName,
+          AuthorizationRequestContext context,
+          Entity.EntityType targetType)
+          throws IllegalAccessException, NoSuchFieldException {
+
+        Field field = request.getClass().getDeclaredField(fieldName);
+        field.setAccessible(true);
+        String[] tagNames = (String[]) field.get(request);
+
+        // Treat null or empty arrays as no-op (implicitly authorized)
+        if (tagNames == null) {
+          return true;
+        }
+
+        for (String tagName : tagNames) {
+          // Skip null entries defensively
+          if (tagName == null) {
+            continue;
+          }
+
+          // Use a fresh context copy for each tag to avoid cross-contamination
+          Map<Entity.EntityType, NameIdentifier> currentContext =
+              new HashMap<>(this.metadataContext);
+          buildNameIdentifierForBatchAuthorization(currentContext, tagName, targetType);
+
+          boolean authorized =
+              authorizationExpressionEvaluator.evaluate(
+                  currentContext, pathParams, context, Optional.ofNullable(entityType));
+
+          if (!authorized) {
+            return false; // Fail fast on first unauthorized tag
+          }
+        }
+        return true;
       }
     }
 
