@@ -258,7 +258,8 @@ public class MetadataObjectTagOperations {
           String metalake,
       @PathParam("type") @AuthorizationObjectType String type,
       @PathParam("fullName") @AuthorizationFullName String fullName,
-      @AuthorizationRequest TagsAssociateRequest request) {
+      @AuthorizationRequest(type = AuthorizationRequest.RequestType.ASSOCIATE_TAG)
+          TagsAssociateRequest request) {
     LOG.info(
         "Received associate tags request for object type: {}, full name: {} under metalake: {}",
         type,

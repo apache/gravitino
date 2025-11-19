@@ -354,7 +354,8 @@ public class TagOperations {
           String metalake,
       @PathParam("type") @AuthorizationObjectType String type,
       @PathParam("fullName") @AuthorizationFullName String fullName,
-      @AuthorizationRequest TagsAssociateRequest request) {
+      @AuthorizationRequest(type = AuthorizationRequest.RequestType.ASSOCIATE_TAG)
+          TagsAssociateRequest request) {
     MetadataObjectTagOperations metadataObjectTagOperations =
         new MetadataObjectTagOperations(tagDispatcher);
     metadataObjectTagOperations.setHttpRequest(httpRequest);

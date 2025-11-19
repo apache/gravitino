@@ -148,26 +148,20 @@ public class GravitinoInterceptionService implements InterceptionService {
           Map<String, Object> pathParams = extractPathParamsFromParameters(parameters, args);
           AuthorizationExpressionEvaluator authorizationExpressionEvaluator =
               new AuthorizationExpressionEvaluator(expression);
-          AuthorizationRequest authorizationRequest =
-              extractAuthorizationRequestFromParameters(parameters);
-          if (authorizationRequest == null) {
-            executor =
-                new CommonAuthorizerExecutor(
+          AuthorizationRequest.RequestType requestType =
+              extractAuthorizationRequestTypeFromParameters(parameters);
+          executor =
+              switch (requestType) {
+                case COMMON -> new CommonAuthorizerExecutor(
                     metadataContext, authorizationExpressionEvaluator, pathParams, entityType);
-          } else {
-            executor =
-                switch (authorizationRequest.type()) {
-                  case COMMON -> new CommonAuthorizerExecutor(
-                      metadataContext, authorizationExpressionEvaluator, pathParams, entityType);
-                  case ASSOCIATE_TAG -> new AssociateTagAuthorizeExecutor(
-                      parameters,
-                      args,
-                      metadataContext,
-                      authorizationExpressionEvaluator,
-                      pathParams,
-                      entityType);
-                };
-          }
+                case ASSOCIATE_TAG -> new AssociateTagAuthorizeExecutor(
+                    parameters,
+                    args,
+                    metadataContext,
+                    authorizationExpressionEvaluator,
+                    pathParams,
+                    entityType);
+              };
           boolean authorizeResult = executor.execute();
           if (!authorizeResult) {
             return buildNoAuthResponse(expressionAnnotation, metadataContext, method, expression);
@@ -188,15 +182,16 @@ public class GravitinoInterceptionService implements InterceptionService {
       }
     }
 
-    private AuthorizationRequest extractAuthorizationRequestFromParameters(Parameter[] parameters) {
+    private AuthorizationRequest.RequestType extractAuthorizationRequestTypeFromParameters(
+        Parameter[] parameters) {
       for (Parameter parameter : parameters) {
         AuthorizationRequest authorizationRequest =
             parameter.getAnnotation(AuthorizationRequest.class);
         if (authorizationRequest != null) {
-          return authorizationRequest;
+          return authorizationRequest.type();
         }
       }
-      return null;
+      return AuthorizationRequest.RequestType.COMMON;
     }
 
     private interface AuthorizeExecutor {
@@ -538,10 +533,8 @@ public class GravitinoInterceptionService implements InterceptionService {
     return null;
   }
 
-  private static class ClassListFilter implements Filter {
-    private final Set<String> targetClasses;
-
-    public ClassListFilter(Set<String> targetClasses) {
+  private record ClassListFilter(Set<String> targetClasses) implements Filter {
+    private ClassListFilter(Set<String> targetClasses) {
       this.targetClasses = new HashSet<>(targetClasses);
     }
 
