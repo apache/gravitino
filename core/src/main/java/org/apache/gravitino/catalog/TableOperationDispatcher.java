@@ -42,10 +42,8 @@ import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.StringIdentifier;
-import org.apache.gravitino.catalog.CatalogManager.CatalogWrapper;
 import org.apache.gravitino.connector.HasPropertyMetadata;
 import org.apache.gravitino.connector.capability.Capability;
-import org.apache.gravitino.connector.capability.CapabilityResult;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchTableException;
@@ -115,18 +113,6 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
    */
   @Override
   public Table loadTable(NameIdentifier ident) throws NoSuchTableException {
-    NameIdentifier catalogIdent = getCatalogIdentifier(ident);
-    if (isManagedTable(catalogIdent)) {
-      return TreeLockUtils.doWithTreeLock(
-          ident,
-          LockType.READ,
-          () ->
-              doWithCatalog(
-                  catalogIdent,
-                  c -> c.doWithTableOps(t -> t.loadTable(ident)),
-                  NoSuchTableException.class));
-    }
-
     EntityCombinedTable entityCombinedTable =
         TreeLockUtils.doWithTreeLock(ident, LockType.READ, () -> internalLoadTable(ident));
 
@@ -250,9 +236,8 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
                   NoSuchTableException.class,
                   IllegalArgumentException.class);
 
-          if (isManagedTable(catalogIdent)) {
-            // For generic lakehouse catalog, all operations will be dispatched to the underlying
-            // catalog.
+          boolean isManagedTable = isManagedEntity(catalogIdent, Capability.Scope.TABLE);
+          if (isManagedTable) {
             return EntityCombinedTable.of(alteredTable)
                 .withHiddenProperties(
                     getHiddenPropertyNames(
@@ -341,18 +326,16 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
         LockType.WRITE,
         () -> {
           NameIdentifier catalogIdent = getCatalogIdentifier(ident);
-          if (isManagedTable(catalogIdent)) {
-            return doWithCatalog(
-                catalogIdent,
-                c -> c.doWithTableOps(t -> t.dropTable(ident)),
-                RuntimeException.class);
-          }
-
           boolean droppedFromCatalog =
               doWithCatalog(
                   catalogIdent,
                   c -> c.doWithTableOps(t -> t.dropTable(ident)),
                   RuntimeException.class);
+
+          boolean isManagedTable = isManagedEntity(catalogIdent, Capability.Scope.TABLE);
+          if (isManagedTable) {
+            return droppedFromCatalog;
+          }
 
           // For unmanaged table, it could happen that the table:
           // 1. Is not found in the catalog (dropped directly from underlying sources)
@@ -362,20 +345,14 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
           // In all situations, we try to delete the schema from the store, but we don't take the
           // return value of the store operation into account. We only take the return value of the
           // catalog into account.
-          //
-          // For managed table, we should take the return value of the store operation into account.
-          boolean droppedFromStore = false;
           try {
-            droppedFromStore = store.delete(ident, TABLE);
+            store.delete(ident, TABLE);
           } catch (NoSuchEntityException e) {
             LOG.warn("The table to be dropped does not exist in the store: {}", ident, e);
           } catch (Exception e) {
             throw new RuntimeException(e);
           }
-
-          return isManagedEntity(catalogIdent, Capability.Scope.TABLE)
-              ? droppedFromStore
-              : droppedFromCatalog;
+          return droppedFromCatalog;
         });
   }
 
@@ -408,7 +385,8 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
                   RuntimeException.class,
                   UnsupportedOperationException.class);
 
-          if (isManagedTable(catalogIdent)) {
+          boolean isManagedTable = isManagedEntity(catalogIdent, Capability.Scope.TABLE);
+          if (isManagedTable) {
             return droppedFromCatalog;
           }
 
@@ -420,21 +398,15 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
           // In all situations, we try to delete the schema from the store, but we don't take the
           // return value of the store operation into account. We only take the return value of the
           // catalog into account.
-          //
-          // For managed table, we should take the return value of the store operation into account.
-          boolean droppedFromStore;
           try {
-            droppedFromStore = store.delete(ident, TABLE);
+            store.delete(ident, TABLE);
           } catch (NoSuchEntityException e) {
             LOG.warn("The table to be purged does not exist in the store: {}", ident, e);
             return false;
           } catch (Exception e) {
             throw new RuntimeException(e);
           }
-
-          return isManagedEntity(catalogIdent, Capability.Scope.TABLE)
-              ? droppedFromStore
-              : droppedFromCatalog;
+          return droppedFromCatalog;
         });
   }
 
@@ -530,6 +502,18 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
             c -> c.doWithTableOps(t -> t.loadTable(ident)),
             NoSuchTableException.class);
 
+    boolean isManagedTable = isManagedEntity(catalogIdentifier, Capability.Scope.TABLE);
+    if (isManagedTable) {
+      return EntityCombinedTable.of(table)
+          .withHiddenProperties(
+              getHiddenPropertyNames(
+                  catalogIdentifier,
+                  HasPropertyMetadata::tablePropertiesMetadata,
+                  table.properties()))
+          // The metadata of managed table is stored by Gravitino, so it is always imported.
+          .withImported(true /* imported */);
+    }
+
     StringIdentifier stringId = getStringIdFromProperties(table.properties());
     // Case 1: The table is not created by Gravitino or the external system does not support storing
     // string identifier.
@@ -554,9 +538,9 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
                   catalogIdentifier,
                   HasPropertyMetadata::tablePropertiesMetadata,
                   table.properties()))
-          // Some tables don't have properties or are not created by Gravitino,
-          // we can't use stringIdentifier to judge whether schema is ever imported or not.
-          // We need to check whether the entity exists.
+          // For some catalogs like PG, the identifier information is not stored in the table's
+          // metadata, we need to check if this table exists in the store, if so we don't
+          // need to import.
           .withImported(true);
     }
 
@@ -596,31 +580,6 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
                 }),
         IllegalArgumentException.class);
 
-    if (isManagedTable(catalogIdent)) {
-      // For generic lakehouse catalog, all operations will be dispatched to the underlying catalog.
-      Table table =
-          doWithCatalog(
-              catalogIdent,
-              c ->
-                  c.doWithTableOps(
-                      t ->
-                          t.createTable(
-                              ident,
-                              columns,
-                              comment,
-                              properties,
-                              partitions == null ? EMPTY_TRANSFORM : partitions,
-                              distribution == null ? Distributions.NONE : distribution,
-                              sortOrders == null ? new SortOrder[0] : sortOrders,
-                              indexes == null ? Indexes.EMPTY_INDEXES : indexes)),
-              NoSuchSchemaException.class,
-              TableAlreadyExistsException.class);
-      return EntityCombinedTable.of(table)
-          .withHiddenProperties(
-              getHiddenPropertyNames(
-                  catalogIdent, HasPropertyMetadata::tablePropertiesMetadata, table.properties()));
-    }
-
     long uid = idGenerator.nextId();
     // Add StringIdentifier to the properties, the specific catalog will handle this
     // StringIdentifier to make sure only when the operation is successful, the related
@@ -649,6 +608,15 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
             NoSuchSchemaException.class,
             TableAlreadyExistsException.class);
 
+    // If the table is managed by Gravitino, we don't need to create TableEntity and store it again.
+    boolean isManagedTable = isManagedEntity(catalogIdent, Capability.Scope.TABLE);
+    if (isManagedTable) {
+      return EntityCombinedTable.of(table)
+          .withHiddenProperties(
+              getHiddenPropertyNames(
+                  catalogIdent, HasPropertyMetadata::tablePropertiesMetadata, table.properties()));
+    }
+
     AuditInfo audit =
         AuditInfo.builder()
             .withCreator(PrincipalUtils.getCurrentPrincipal().getName())
@@ -671,12 +639,6 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
     try {
       store.put(tableEntity, true /* overwrite */);
     } catch (Exception e) {
-      if (isManagedTable(catalogIdent)) {
-        // Drop table
-        doWithCatalog(
-            catalogIdent, c -> c.doWithTableOps(t -> t.dropTable(ident)), RuntimeException.class);
-      }
-
       LOG.error(FormattedErrorMessages.STORE_OP_FAILURE, "put", ident, e);
       return EntityCombinedTable.of(table)
           .withHiddenProperties(
@@ -684,7 +646,7 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
                   catalogIdent, HasPropertyMetadata::tablePropertiesMetadata, table.properties()));
     }
 
-    // For managed table, we can use table entity to indicate the table is created successfully.
+    // Merge both the metadata from catalog operation and the metadata from entity store.
     return EntityCombinedTable.of(table, tableEntity)
         .withHiddenProperties(
             getHiddenPropertyNames(
@@ -697,15 +659,6 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
         : IntStream.range(0, columns.length)
             .mapToObj(i -> ColumnEntity.toColumnEntity(columns[i], i, idGenerator.nextId(), audit))
             .collect(Collectors.toList());
-  }
-
-  private boolean isManagedTable(NameIdentifier catalogIdent) {
-    CatalogManager catalogManager = GravitinoEnv.getInstance().catalogManager();
-    CatalogWrapper wrapper = catalogManager.loadCatalogAndWrap(catalogIdent);
-    Capability capability = wrapper.catalog().capability();
-
-    CapabilityResult result = capability.managedStorage(Capability.Scope.TABLE);
-    return result == CapabilityResult.SUPPORTED;
   }
 
   private boolean isSameColumn(Column left, int columnPosition, ColumnEntity right) {

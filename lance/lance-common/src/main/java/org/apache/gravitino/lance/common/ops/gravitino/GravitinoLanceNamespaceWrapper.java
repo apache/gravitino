@@ -93,7 +93,7 @@ public class GravitinoLanceNamespaceWrapper extends NamespaceWrapper {
 
   public boolean isLakehouseCatalog(Catalog catalog) {
     return catalog.type().equals(Catalog.Type.RELATIONAL)
-        && "generic-lakehouse".equals(catalog.provider());
+        && "lakehouse-generic".equals(catalog.provider());
   }
 
   public Catalog loadAndValidateLakehouseCatalog(String catalogName) {
