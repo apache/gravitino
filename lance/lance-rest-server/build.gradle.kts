@@ -44,7 +44,10 @@ dependencies {
   implementation(libs.bundles.log4j)
   implementation(libs.bundles.metrics)
   implementation(libs.bundles.prometheus)
-  implementation(libs.lance.namespace.core)
+  implementation(libs.commons.lang3)
+  implementation(libs.lance.namespace.core) {
+    exclude(group = "com.lancedb", module = "lance-core")
+  }
   implementation(libs.metrics.jersey2)
   implementation(libs.guava)
   implementation(libs.jackson.annotations)
