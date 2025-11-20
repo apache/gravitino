@@ -145,6 +145,7 @@ public final class IsolatedClientLoader {
         || name.startsWith("javax.")
         || name.startsWith("com.sun.")
         || name.startsWith("org.ietf.jgss.")
+        || name.startsWith("org.apache.gravitino.")
         || name.startsWith(HiveClient.class.getName());
   }
 
@@ -152,7 +153,8 @@ public final class IsolatedClientLoader {
     return name.startsWith(HiveClientImpl.class.getName())
         || name.startsWith(Shim.class.getName())
         || name.startsWith(HiveShimV2.class.getName())
-        || name.startsWith(HiveShimV3.class.getName());
+        || name.startsWith(HiveShimV3.class.getName())
+        || name.startsWith("org.apache.gravitino.hive.converter.");
   }
 
   public HiveClient createClient(Properties properties) throws Exception {
@@ -176,8 +178,8 @@ public final class IsolatedClientLoader {
             setMethod.invoke(hiveConfInstance, v.getKey(), v.getValue());
           }
 
-          Method ctorMethod = clientClass.getMethod("proxy", hiveConfClass);
-          client = ctorMethod.invoke(null, RetryingMetaStoreClient.class, hiveConfInstance);
+          Method ctorMethod = clientClass.getMethod("getProxy", hiveConfClass, boolean.class);
+          client = ctorMethod.invoke(null, hiveConfInstance, false);
         } else if (version == HiveClient.HiveVersion.HIVE3) {
           // Set any Hive3 specific configurations here
           Method setMethod = confClass.getMethod("set", String.class, String.class);

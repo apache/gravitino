@@ -37,6 +37,7 @@ dependencies {
   implementation(project(":core")) {
     exclude("*")
   }
+  implementation(project(":clients:client-java-runtime", configuration = "shadow"))
 
   implementation(libs.caffeine)
   implementation(libs.guava)

@@ -22,25 +22,25 @@ import java.util.List;
 import org.apache.gravitino.Schema;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.hive.converter.HiveDatabaseConverter;
-import org.apache.hadoop.hive.metastore.HiveMetaStoreClient;
+import org.apache.hadoop.hive.metastore.IMetaStoreClient;
 import org.apache.hadoop.hive.metastore.api.Database;
 
 class HiveShimV2 extends Shim {
 
-  private HiveMetaStoreClient client;
+  private IMetaStoreClient client;
   Method getAllDatabasesMethod;
   Method createDatabaseMethod;
   Method getDabaseMethod;
 
-  HiveShimV2(HiveMetaStoreClient client) {
+  HiveShimV2(IMetaStoreClient client) {
     try {
       this.client = client;
 
-      this.getAllDatabasesMethod = HiveMetaStoreClient.class.getMethod("getAllDatabases");
+      this.getAllDatabasesMethod = IMetaStoreClient.class.getMethod("getAllDatabases");
       this.createDatabaseMethod =
-          HiveMetaStoreClient.class.getMethod(
+          IMetaStoreClient.class.getMethod(
               "createDatabase", org.apache.hadoop.hive.metastore.api.Database.class);
-      this.getDabaseMethod = HiveMetaStoreClient.class.getMethod("getDatabase", String.class);
+      this.getDabaseMethod = IMetaStoreClient.class.getMethod("getDatabase", String.class);
     } catch (NoSuchMethodException e) {
       throw new RuntimeException("Failed to initialize HiveShimV2", e);
     } catch (Exception e) {
@@ -73,7 +73,7 @@ class HiveShimV2 extends Shim {
     try {
       Database db = (Database) getDabaseMethod.invoke(client, dbName);
       if (db == null) {
-        throw new NoSuchSchemaException("Database " + dbName + " does not exist");
+        throw new NoSuchSchemaException("Database %s does not exist", dbName);
       }
       return HiveDatabaseConverter.fromHiveDB(db);
     } catch (Exception e) {

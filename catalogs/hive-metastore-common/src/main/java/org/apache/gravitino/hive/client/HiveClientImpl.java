@@ -18,11 +18,9 @@
  */
 package org.apache.gravitino.hive.client;
 
-import static org.apache.gravitino.hive.client.HiveClient.HiveVersion.HIVE3;
-
 import java.util.List;
 import org.apache.gravitino.Schema;
-import org.apache.hadoop.hive.metastore.HiveMetaStoreClient;
+import org.apache.hadoop.hive.metastore.IMetaStoreClient;
 
 /**
  * Java version of HiveClientImpl from Spark Hive module. Provides full database, table, and
@@ -32,7 +30,7 @@ public class HiveClientImpl implements HiveClient {
 
   Shim shim;
 
-  public HiveClientImpl(HiveVersion hiveVersion, HiveMetaStoreClient hiveClient) {
+  public HiveClientImpl(HiveVersion hiveVersion, IMetaStoreClient hiveClient) {
     switch (hiveVersion) {
       case HIVE2:
         shim = new HiveShimV2(hiveClient);
