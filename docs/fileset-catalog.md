@@ -21,120 +21,6 @@ Note that Gravitino uses Hadoop 3 dependencies to build Fileset catalog. Theoret
 compatible with both Hadoop 2.x and 3.x, since Gravitino doesn't leverage any new features in
 Hadoop 3. If there's any compatibility issue, please create an [issue](https://github.com/apache/gravitino/issues).
 
-In general, the locations of all schemas and filesets under a fileset
-catalog belong to a single Hadoop cluster if they are HDFS location.
-
-The example for creating a fileset is as follows:
-```text
-# create fileset catalog
-curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
--H "Content-Type: application/json" -d '{
-  "name": "fileset_catalog",
-  "type": "FILESET",
-  "comment": "This is a fileset catalog",
-  "provider": "fileset",
-  "properties": {
-    "location": "hdfs://172.17.0.2:9000/fileset_catalog"
-  }
-}' http://localhost:8090/api/metalakes/test/catalogs
-
-# create a fileset schema under the catalog with inherited properties
-curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
--H "Content-Type: application/json" -d '{
-  "name": "test_schema",
-  "comment": "This is a schema",
-  "properties": {
-  }
-}' http://localhost:8090/api/metalakes/test/catalogs/fileset_catalog/schemas
-
-# create a fileset under the schema with inherited properties
-curl -X POST -H "Accept: application/vnd.gravitino.v1+json"
--H "Content-Type: application/json" -d '{
-  "name": "fs1",
-  "comment": "This is an example fileset",
-  "type": "MANAGED",
-  "properties": {
-  }
-}' http://localhost:8090/api/metalakes/test/catalogs/fileset_catalog/schemas/test_schema/filesets
-```
-
-Within a fileset catalog, schemas and filesets can automatically inherit configuration properties
-from their parent catalog. For example, the location property can be inherited — a schema can inherit
-the catalog’s location as its base path, and a fileset can in turn inherit the schema’s location as its base path.
-
-The property inheritance priority is as follows: catalog < schema < fileset.
-
-If a fileset needs to use a different storage path, it can specify its own location configuration to
-override the inherited one.
-
-The fileset catalog also supports multiple clusters. Each schema and fileset under a catalog can independently
-specify their own cluster locations and connection configurations.
-
-For example, a complex catalog structure might look like this:
-
-```text
-catalog1 -> hdfs://cluster1/catalog1
-    schema1 -> hdfs://cluster1/catalog1/schema1
-        fileset1 -> hdfs://cluster1/catalog1/schema1/fileset1
-        fileset2 -> hdfs://cluster1/catalog1/schema1/fileset2
-    schema2 -> hdfs://cluster2/tmp/schema2
-        fileset3 -> hdfs://cluster2/tmp/schema2/fsd
-        fileset4 -> hdfs://cluster3/customers
-```
-
-In this example, the default location of catalog1 is hdfs://cluster1/catalog1.
-schema1 and its filesets are stored in the same cluster as defined by the catalog (cluster1).
-However, schema2 and its filesets (fileset3, fileset4) are located in different clusters (cluster2 and cluster3, respectively).
-
-
-The example for creating Filesets with different clusters as follows:
-
-```text
-# create fileset catalog
-curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
--H "Content-Type: application/json" -d '{
-  "name": "fileset_catalog",
-  "type": "FILESET",
-  "comment": "This is a fileset catalog",
-  "provider": "fileset",
-  "properties": {
-    "location": "hdfs://172.17.0.2:9000/fileset_catalog"
-  }
-}' http://localhost:8090/api/metalakes/test/catalogs
-
-# create a fileset schema under the catalog with inherited properties
-curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
--H "Content-Type: application/json" -d '{
-  "name": "test_schema",
-  "comment": "This is a schema",
-  "properties": {
-  }
-}' http://localhost:8090/api/metalakes/test/catalogs/fileset_catalog/schemas
-
-
-# create fileset fs1 in the default HDFS cluster
-curl -X POST -H "Accept: application/vnd.gravitino.v1+json"
--H "Content-Type: application/json" -d '{
-  "name": "fs1",
-  "comment": "This is an example fileset",
-  "type": "MANAGED",
-  "properties": {
-  }
-}' http://localhost:8090/api/metalakes/test/catalogs/fileset_catalog/schemas/test_schema/filesets
-
-# create fileset fs2 in another HDFS cluster
-curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
--H "Content-Type: application/json" -d '{
-  "name": "fs2",
-  "comment": "This is an example fileset",
-  "type": "MANAGED",
-  "storageLocation": "hdfs://172.17.0.3:9000/tmp/fs2",
-  "properties": {
-    "hdfs.config.resources": "/etc/conf/cluster1/core-site.xml,/etc/conf/cluster1/hdfs-site.xml"
-  }
-}' http://localhost:8090/api/metalakes/test/catalogs/fileset_catalog/schemas/test_schema/filesets
-```
-
 ## Catalog
 
 ### Catalog properties
@@ -152,6 +38,7 @@ Besides the [common catalog properties](./gravitino-server-config.md#apache-grav
 | `disable-filesystem-ops`             | The configuration to disable file system operations in the server side. If set to true, the Fileset catalog in the server side will not create, drop files or folder when the schema, fileset is created, dropped.                                                                                                  | false           | No       | 0.9.0-incubating |
 | `fileset-cache-eviction-interval-ms` | The interval in milliseconds to evict the fileset cache, -1 means never evict.                                                                                                                                                                                                                                      | 3600000         | No       | 0.9.0-incubating |
 | `fileset-cache-max-size`             | The maximum number of the filesets the cache may contain, -1 means no limit.                                                                                                                                                                                                                                        | 200000          | No       | 0.9.0-incubating |
+| `hdfs.config.resources`              | The HDFS configuration resources, separated by comma. For example, `hdfs-site.xml,core-site.xml`. | (none)        | No                                                          | 1.1.0         |
 
 Please refer to [Credential vending](./security/credential-vending.md) for more details about credential vending.
 
@@ -167,7 +54,6 @@ Apart from the above properties, to access fileset like HDFS fileset, you need t
 | `authentication.kerberos.keytab-uri`               | The URI of The keytab for the Kerberos authentication.                                            | (none)        | required if the value of `authentication.type` is Kerberos. | 0.5.1         |
 | `authentication.kerberos.check-interval-sec`       | The check interval of Kerberos credential for Fileset catalog.                                    | 60            | No                                                          | 0.5.1         |
 | `authentication.kerberos.keytab-fetch-timeout-sec` | The fetch timeout of retrieving Kerberos keytab from `authentication.kerberos.keytab-uri`.        | 60            | No                                                          | 0.5.1         |
-| `hdfs.config.resources`                            | The HDFS configuration resources, separated by comma. For example, `hdfs-site.xml,core-site.xml`. | (none)        | No                                                          | 1.1.0         |
 
 The `hdfs.config.resources` property allows users to specify custom HDFS configuration files.
 
@@ -180,6 +66,10 @@ The Gravitino Fileset extends the following properties in the `xxx-site.xml`:
 | hadoop.security.authentication.kerberos.krb5.conf | The krb5.conf file path of the Kerberos authentication for HDFS client. | (none)        | No                                                          | 1.1.0         |
 
 ### Fileset catalog with Cloud Storage
+
+In the current implementation, the fileset uses the HDFS protocol to access its location. If users use S3, GCS, OSS,
+or Azure Blob Storage, they can also configure the `hdfs.config.resources property` to specify custom configuration files.
+
 - For S3, please refer to [Fileset-catalog-with-s3](./fileset-catalog-with-s3.md) for more details.
 - For GCS, please refer to [Fileset-catalog-with-gcs](./fileset-catalog-with-gcs.md) for more details.
 - For OSS, please refer to [Fileset-catalog-with-oss](./fileset-catalog-with-oss.md) for more details.
@@ -238,6 +128,8 @@ The Fileset catalog supports creating, updating, deleting, and listing schema.
 
 ### Schema properties
 
+All the catalog properties are inherited by the schema. Besides, the Fileset catalog schema has the following properties:
+
 | Property name                         | Description                                                                                                               | Default value             | Required | Since Version    |
 |---------------------------------------|---------------------------------------------------------------------------------------------------------------------------|---------------------------|----------|------------------|
 | `location`                            | The storage location managed by schema. Its location name is `unknown`. It's also should be a directory or path prefix.   | (none)                    | No       | 0.5.0            |
@@ -268,8 +160,12 @@ This behavior is skipped in either of these cases:
 
 ### Fileset properties
 
+All the schema properties are inherited by the fileset. include the properties inherited from the catalog.
+Besides, the Fileset catalog fileset has the following properties:
+
 | Property name                         | Description                                                                                                          | Default value                                                                                                  | Required                                   | Immutable | Since Version    |
 |---------------------------------------|----------------------------------------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------|--------------------------------------------|-----------|------------------|
+| `location`                            | The storage location managed by schema. Its location name is `unknown`. It's also should be a directory or path prefix.   | (none)                    | No       | 0.5.0            |
 | `authentication.impersonation-enable` | Whether to enable impersonation for the Fileset catalog fileset.                                                     | The parent(schema) value                                                                                       | No                                         | Yes       | 0.6.0-incubating |
 | `authentication.type`                 | The type of authentication for Fileset catalog fileset, currently we only support `kerberos`, `simple`.              | The parent(schema) value                                                                                       | No                                         | No        | 0.6.0-incubating |
 | `authentication.kerberos.principal`   | The principal of the Kerberos authentication for the fileset.                                                        | The parent(schema) value                                                                                       | No                                         | No        | 0.6.0-incubating |
