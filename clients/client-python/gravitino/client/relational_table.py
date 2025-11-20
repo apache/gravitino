@@ -102,7 +102,7 @@ class RelationalTable(Table):
             f"/catalogs/{encode_string(self._namespace.level(1))}"
             f"/schemas/{encode_string(self._namespace.level(2))}"
             f"/tables/{encode_string(self._table.name())}"
-            "/partitions/"
+            "/partitions"
         )
 
     def list_partition_names(self) -> list[str]:
