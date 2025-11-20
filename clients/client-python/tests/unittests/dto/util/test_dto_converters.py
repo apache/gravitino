@@ -16,10 +16,10 @@
 # under the License.
 
 import unittest
-from datetime import datetime
+from datetime import date, datetime
 from itertools import product
 from random import randint, random
-from typing import cast
+from typing import Dict, cast
 from unittest.mock import MagicMock, patch
 
 from gravitino.api.rel.column import Column
@@ -36,6 +36,8 @@ from gravitino.api.rel.expressions.transforms.transforms import Transforms
 from gravitino.api.rel.expressions.unparsed_expression import UnparsedExpression
 from gravitino.api.rel.indexes.index import Index
 from gravitino.api.rel.indexes.indexes import Indexes
+from gravitino.api.rel.partitions.partition import Partition
+from gravitino.api.rel.partitions.partitions import Partitions
 from gravitino.api.rel.table import Table
 from gravitino.api.rel.types.types import Types
 from gravitino.dto.rel.column_dto import ColumnDTO
@@ -63,6 +65,9 @@ from gravitino.dto.rel.partitioning.truncate_partitioning_dto import (
     TruncatePartitioningDTO,
 )
 from gravitino.dto.rel.partitioning.year_partitioning_dto import YearPartitioningDTO
+from gravitino.dto.rel.partitions.identity_partition_dto import IdentityPartitionDTO
+from gravitino.dto.rel.partitions.list_partition_dto import ListPartitionDTO
+from gravitino.dto.rel.partitions.range_partition_dto import RangePartitionDTO
 from gravitino.dto.rel.sort_order_dto import SortOrderDTO
 from gravitino.dto.rel.table_dto import TableDTO
 from gravitino.dto.util.dto_converters import DTOConverters
@@ -92,6 +97,16 @@ class TestDTOConverters(unittest.TestCase):
             Types.BinaryType.get(): bytes("test", "utf-8"),
             Types.VarCharType.of(10): "test",
             Types.FixedCharType.of(10): "test",
+        }
+        cls.function_args = {
+            FieldReference(field_names=["score"]): FieldReferenceDTO.builder()
+            .with_field_name(field_name=["score"])
+            .build(),
+            UnparsedExpression.of(
+                unparsed_expression="unparsed"
+            ): UnparsedExpressionDTO.builder()
+            .with_unparsed_expression("unparsed")
+            .build(),
         }
         cls.table_dto_json = """
         {
@@ -590,3 +605,166 @@ class TestDTOConverters(unittest.TestCase):
         )
         self.assertEqual(table.audit_info(), dto.audit_info())
         self.assertEqual(table.properties(), dto.properties())
+
+    def test_to_function_arg_function_arg(self):
+        for expression, function_arg in TestDTOConverters.function_args.items():
+            converted = DTOConverters.to_function_arg(function_arg)
+            self.assertTrue(converted == function_arg)
+            converted = DTOConverters.to_function_arg(expression)
+            self.assertTrue(converted == function_arg)
+
+        for data_type, value in TestDTOConverters.literals.items():
+            literal = Literals.of(value=value, data_type=data_type)
+            expected = (
+                LiteralDTO.builder()
+                .with_data_type(data_type)
+                .with_value(str(value))
+                .build()
+            )
+            self.assertTrue(DTOConverters.to_function_arg(literal) == expected)
+        self.assertTrue(DTOConverters.to_function_arg(Literals.NULL) == LiteralDTO.NULL)
+
+        function_name = "test_function"
+        args: list[FunctionArg] = [
+            LiteralDTO.builder()
+            .with_data_type(Types.IntegerType.get())
+            .with_value("-1")
+            .build(),
+            LiteralDTO.builder()
+            .with_data_type(Types.BooleanType.get())
+            .with_value("True")
+            .build(),
+        ]
+        expected = (
+            FuncExpressionDTO.builder()
+            .with_function_name(function_name)
+            .with_function_args(args)
+            .build()
+        )
+        func_expression = FunctionExpression.of(
+            function_name,
+            Literals.of(value="-1", data_type=Types.IntegerType.get()),
+            Literals.of(value="True", data_type=Types.BooleanType.get()),
+        )
+        converted = DTOConverters.to_function_arg(func_expression)
+        self.assertTrue(converted == expected)
+
+        with self.assertRaisesRegex(
+            IllegalArgumentException, "Unsupported expression type"
+        ):
+            DTOConverters.to_function_arg(DistributionDTO.NONE)
+
+    def test_to_dto_raise_exception(self):
+        with self.assertRaisesRegex(IllegalArgumentException, "Unsupported type"):
+            DTOConverters.to_dto("test")
+
+    def test_to_dto_range_partition(self):
+        converted = DTOConverters.to_dto(
+            Partitions.range(
+                name="p0",
+                upper=Literals.NULL,
+                lower=Literals.integer_literal(6),
+                properties={},
+            )
+        )
+        expected = RangePartitionDTO(
+            name="p0",
+            upper=LiteralDTO.NULL,
+            lower=LiteralDTO.builder()
+            .with_value("6")
+            .with_data_type(Types.IntegerType.get())
+            .build(),
+            properties={},
+        )
+        self.assertTrue(converted == expected)
+
+    def test_to_dto_partition_raise_exception(self):
+        class InvalidPartition(Partition):
+            def name(self) -> str:
+                return "invalid_partition"
+
+            def properties(self) -> Dict[str, str]:
+                return {}
+
+        with self.assertRaisesRegex(
+            IllegalArgumentException, "Unsupported partition type"
+        ):
+            DTOConverters.to_dto(InvalidPartition())
+
+    def test_to_dto_identity_partition(self):
+        partition_name = "dt=2025-08-08/country=us"
+        field_names = [["dt"], ["country"]]
+        properties = {"location": "/user/hive/warehouse/tpch_flat_orc_2.db/orders"}
+        values = [
+            LiteralDTO.builder()
+            .with_data_type(data_type=Types.DateType.get())
+            .with_value(value="2025-08-08")
+            .build(),
+            LiteralDTO.builder()
+            .with_data_type(data_type=Types.StringType.get())
+            .with_value(value="us")
+            .build(),
+        ]
+        expected = IdentityPartitionDTO(
+            name=partition_name,
+            field_names=field_names,
+            values=values,
+            properties=properties,
+        )
+        partition = Partitions.identity(
+            name=partition_name,
+            field_names=field_names,
+            values=[
+                Literals.date_literal(date(2025, 8, 8)),
+                Literals.string_literal("us"),
+            ],
+            properties=properties,
+        )
+        converted = DTOConverters.to_dto(partition)
+        self.assertTrue(converted == expected)
+
+    def test_to_dto_list_partition(self):
+        partition_name = "p202508_California"
+        properties = {"key": "value"}
+        partition = Partitions.list(
+            partition_name,
+            [
+                [
+                    Literals.date_literal(date(2025, 8, 8)),
+                    Literals.string_literal("Los Angeles"),
+                ],
+                [
+                    Literals.date_literal(date(2025, 8, 8)),
+                    Literals.string_literal("San Francisco"),
+                ],
+            ],
+            properties,
+        )
+        expected = ListPartitionDTO(
+            name=partition_name,
+            lists=[
+                [
+                    LiteralDTO.builder()
+                    .with_data_type(data_type=Types.DateType.get())
+                    .with_value(value="2025-08-08")
+                    .build(),
+                    LiteralDTO.builder()
+                    .with_data_type(data_type=Types.StringType.get())
+                    .with_value(value="Los Angeles")
+                    .build(),
+                ],
+                [
+                    LiteralDTO.builder()
+                    .with_data_type(data_type=Types.DateType.get())
+                    .with_value(value="2025-08-08")
+                    .build(),
+                    LiteralDTO.builder()
+                    .with_data_type(data_type=Types.StringType.get())
+                    .with_value(value="San Francisco")
+                    .build(),
+                ],
+            ],
+            properties=properties,
+        )
+        converted = DTOConverters.to_dto(partition)
+        self.assertTrue(converted == expected)

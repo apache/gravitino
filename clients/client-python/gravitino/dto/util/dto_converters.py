@@ -23,8 +23,9 @@ from gravitino.api.rel.expressions.distributions.distribution import Distributio
 from gravitino.api.rel.expressions.distributions.distributions import Distributions
 from gravitino.api.rel.expressions.expression import Expression
 from gravitino.api.rel.expressions.function_expression import FunctionExpression
+from gravitino.api.rel.expressions.literals.literal import Literal
 from gravitino.api.rel.expressions.literals.literals import Literals
-from gravitino.api.rel.expressions.named_reference import NamedReference
+from gravitino.api.rel.expressions.named_reference import FieldReference, NamedReference
 from gravitino.api.rel.expressions.sorts.sort_order import SortOrder
 from gravitino.api.rel.expressions.sorts.sort_orders import SortOrders
 from gravitino.api.rel.expressions.transforms.transform import Transform
@@ -32,7 +33,9 @@ from gravitino.api.rel.expressions.transforms.transforms import Transforms
 from gravitino.api.rel.expressions.unparsed_expression import UnparsedExpression
 from gravitino.api.rel.indexes.index import Index
 from gravitino.api.rel.indexes.indexes import Indexes
+from gravitino.api.rel.partitions.identity_partition import IdentityPartition
 from gravitino.api.rel.partitions.list_partition import ListPartition
+from gravitino.api.rel.partitions.partition import Partition
 from gravitino.api.rel.partitions.range_partition import RangePartition
 from gravitino.api.rel.table import Table
 from gravitino.api.rel.types.types import Types
@@ -58,6 +61,10 @@ from gravitino.dto.rel.partitioning.range_partitioning_dto import RangePartition
 from gravitino.dto.rel.partitioning.truncate_partitioning_dto import (
     TruncatePartitioningDTO,
 )
+from gravitino.dto.rel.partitions.identity_partition_dto import IdentityPartitionDTO
+from gravitino.dto.rel.partitions.list_partition_dto import ListPartitionDTO
+from gravitino.dto.rel.partitions.partition_dto import PartitionDTO
+from gravitino.dto.rel.partitions.range_partition_dto import RangePartitionDTO
 from gravitino.dto.rel.sort_order_dto import SortOrderDTO
 from gravitino.dto.rel.table_dto import TableDTO
 from gravitino.exceptions.base import IllegalArgumentException
@@ -302,3 +309,101 @@ class DTOConverters:
         if not dtos:
             return []
         return [DTOConverters.from_dto(dto) for dto in dtos]
+
+    @staticmethod
+    def to_function_arg(expression: Expression) -> FunctionArg:
+        """Converts an Expression to an FunctionArg DTO.
+
+        Args:
+            expression (Expression): The expression to be converted.
+
+        Returns:
+            FunctionArg: The expression DTO.
+        """
+
+        if isinstance(expression, FunctionArg):
+            return cast(FunctionArg, expression)
+        if isinstance(expression, Literal):
+            if expression is Literals.NULL:
+                return LiteralDTO.NULL
+            return (
+                LiteralDTO.builder()
+                .with_value(str(expression.value()))
+                .with_data_type(expression.data_type())
+                .build()
+            )
+        if isinstance(expression, FieldReference):
+            return (
+                FieldReferenceDTO.builder()
+                .with_field_name(expression.field_name())
+                .build()
+            )
+        if isinstance(expression, FunctionExpression):
+            return (
+                FuncExpressionDTO.builder()
+                .with_function_name(expression.function_name())
+                .with_function_args(
+                    [
+                        DTOConverters.to_function_arg(arg)
+                        for arg in expression.arguments()
+                    ]
+                )
+                .build()
+            )
+        if isinstance(expression, UnparsedExpression):
+            return (
+                UnparsedExpressionDTO.builder()
+                .with_unparsed_expression(expression.unparsed_expression())
+                .build()
+            )
+        raise IllegalArgumentException(
+            f"Unsupported expression type: {expression.__class__.__name__}"
+        )
+
+    @singledispatchmethod
+    @staticmethod
+    def to_dto(obj) -> object:
+        raise IllegalArgumentException(f"Unsupported type: {type(obj)}")
+
+    @to_dto.register
+    @staticmethod
+    def _(obj: Partition) -> PartitionDTO:
+        if isinstance(obj, RangePartition):
+            range_partition = cast(RangePartition, obj)
+            return RangePartitionDTO(
+                name=range_partition.name(),
+                upper=cast(
+                    LiteralDTO, DTOConverters.to_function_arg(range_partition.upper())
+                ),
+                lower=cast(
+                    LiteralDTO, DTOConverters.to_function_arg(range_partition.lower())
+                ),
+                properties=range_partition.properties(),
+            )
+        if isinstance(obj, IdentityPartition):
+            identity_partition = cast(IdentityPartition, obj)
+            return IdentityPartitionDTO(
+                name=identity_partition.name(),
+                values=[
+                    cast(LiteralDTO, DTOConverters.to_function_arg(v))
+                    for v in identity_partition.values()
+                ],
+                field_names=identity_partition.field_names(),
+                properties=identity_partition.properties(),
+            )
+        if isinstance(obj, ListPartition):
+            list_partition = cast(ListPartition, obj)
+            return ListPartitionDTO(
+                name=list_partition.name(),
+                lists=[
+                    [
+                        cast(LiteralDTO, DTOConverters.to_function_arg(v))
+                        for v in list_item
+                    ]
+                    for list_item in list_partition.lists()
+                ],
+                properties=list_partition.properties(),
+            )
+        raise IllegalArgumentException(
+            f"Unsupported partition type: {obj.__class__.__name__}"
+        )

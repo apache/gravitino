@@ -216,12 +216,15 @@ public class CatalogOperations {
           String catalogName,
       CatalogSetRequest request) {
     LOG.info("Received set request for catalog: {}.{}", metalake, catalogName);
+
+    OperationType op = request.isInUse() ? OperationType.ENABLE : OperationType.DISABLE;
+
     try {
       return Utils.doAs(
           httpRequest,
           () -> {
             NameIdentifier ident = NameIdentifierUtil.ofCatalog(metalake, catalogName);
-            if (request.isInUse()) {
+            if (op == OperationType.ENABLE) {
               catalogDispatcher.enableCatalog(ident);
             } else {
               catalogDispatcher.disableCatalog(ident);
@@ -242,8 +245,7 @@ public class CatalogOperations {
           request.isInUse() ? "enable" : "disable",
           metalake,
           catalogName);
-      return ExceptionHandlers.handleCatalogException(
-          OperationType.ENABLE, catalogName, metalake, e);
+      return ExceptionHandlers.handleCatalogException(op, catalogName, metalake, e);
     }
   }
 

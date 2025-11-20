@@ -157,10 +157,10 @@ public class ReverseIndexRules {
         EntityType type = entity.type();
         if (genericEntity.name() != null) {
           String[] levels = genericEntity.name().split("\\.");
-          String metadataName = key.identifier().namespace().levels()[0];
-          NameIdentifier objectsNameIdentifier =
-              NameIdentifier.of(ArrayUtils.addFirst(levels, metadataName));
-          reverseIndexCache.put(objectsNameIdentifier, type, key);
+          String metalakeName = key.identifier().namespace().levels()[0];
+          NameIdentifier objectNameIdentifier =
+              NameIdentifier.of(ArrayUtils.addFirst(levels, metalakeName));
+          reverseIndexCache.put(objectNameIdentifier, type, key);
         }
       };
 
@@ -174,13 +174,12 @@ public class ReverseIndexRules {
         reverseIndexCache.put(nameIdentifier, Entity.EntityType.POLICY, key);
       };
 
-  // Keep objects to policies reverse index for tag objects, so the key are tags and the
+  // Keep objects to tags reverse index for tag objects, so the key are tags and the
   // values are objects.
   public static final ReverseIndexCache.ReverseIndexRule TAG_REVERSE_RULE =
       (entity, key, reverseIndexCache) -> {
-        TagEntity policyEntity = (TagEntity) entity;
-        NameIdentifier nameIdentifier =
-            NameIdentifier.of(policyEntity.namespace(), policyEntity.name());
+        TagEntity tagEntity = (TagEntity) entity;
+        NameIdentifier nameIdentifier = NameIdentifier.of(tagEntity.namespace(), tagEntity.name());
         reverseIndexCache.put(nameIdentifier, Entity.EntityType.TAG, key);
       };
 }
