@@ -23,6 +23,7 @@ import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import com.github.benmanes.caffeine.cache.RemovalCause;
 import com.github.benmanes.caffeine.cache.stats.CacheStats;
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
@@ -43,12 +44,15 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
+import org.apache.commons.lang3.ArrayUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.SupportsRelationOperations;
+import org.apache.gravitino.meta.GenericEntity;
 import org.apache.gravitino.meta.ModelVersionEntity;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -89,6 +93,14 @@ public class CaffeineEntityCache extends BaseEntityCache {
   private RadixTree<EntityCacheRelationKey> cacheIndex;
 
   private ScheduledExecutorService scheduler;
+
+  private static final Set<SupportsRelationOperations.Type> RELATION_TYPES =
+      Sets.newHashSet(
+          SupportsRelationOperations.Type.METADATA_OBJECT_ROLE_REL,
+          SupportsRelationOperations.Type.ROLE_USER_REL,
+          SupportsRelationOperations.Type.ROLE_GROUP_REL,
+          SupportsRelationOperations.Type.POLICY_METADATA_OBJECT_REL,
+          SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL);
 
   /**
    * Constructs a new {@link CaffeineEntityCache}.
@@ -133,6 +145,11 @@ public class CaffeineEntityCache extends BaseEntityCache {
     }
   }
 
+  @VisibleForTesting
+  public Cache<EntityCacheRelationKey, List<Entity>> getCacheData() {
+    return this.cacheData;
+  }
+
   /** {@inheritDoc} */
   @Override
   public <E extends Entity & HasIdentifier> Optional<List<E>> getIfPresent(
@@ -167,7 +184,10 @@ public class CaffeineEntityCache extends BaseEntityCache {
 
     return segmentedLock.withLock(
         EntityCacheRelationKey.of(ident, type, relType),
-        () -> invalidateEntities(ident, type, Optional.of(relType)));
+        () -> {
+          invalidateEntities(ident, type, Optional.of(relType));
+          return true;
+        });
   }
 
   /** {@inheritDoc} */
@@ -176,7 +196,47 @@ public class CaffeineEntityCache extends BaseEntityCache {
     checkArguments(ident, type);
     return segmentedLock.withLock(
         EntityCacheRelationKey.of(ident, type),
-        () -> invalidateEntities(ident, type, Optional.empty()));
+        () -> {
+          // Clear possible relation first, then clear the main entity cache.
+          // For example, if a tag has been updated, apart from invalidating the relation:
+          // metadata_object_to_tag_rel, we also need to invalidate the tag_to_metadata_object_rel.
+          // Assuming a tag "tag1" is related to a metadata object "catalog", when "catalog" is
+          // renamed to `catalog_new`, we need to invalidate both relations to avoid stale data.
+          // that is: before: tag1:TAG_METADATA_OBJECT_REL -> catalog,
+          // catalog:TAG_METADATA_OBJECT_REL -> tag1, after: tag1:TAG_METADATA_OBJECT_REL -> null,
+          // catalog:TAG_METADATA_OBJECT_REL -> null.
+          RELATION_TYPES.forEach(
+              relType -> {
+                List<Entity> relatedEntities =
+                    cacheData.getIfPresent(EntityCacheRelationKey.of(ident, type, relType));
+                if (relatedEntities != null) {
+                  relatedEntities.stream()
+                      .filter(e -> StringUtils.isNotBlank(((HasIdentifier) e).name()))
+                      .forEach(
+                          entity -> {
+                            NameIdentifier identifier = ((HasIdentifier) entity).nameIdentifier();
+                            if (entity instanceof GenericEntity) {
+                              String metalakeName = ident.namespace().level(0);
+                              String[] names =
+                                  ArrayUtils.addFirst(
+                                      identifier.namespace().levels(), metalakeName);
+                              names = ArrayUtils.add(names, identifier.name());
+                              identifier = NameIdentifier.of(names);
+                            }
+
+                            invalidateEntities(identifier, entity.type(), Optional.of(relType));
+                          });
+                }
+              });
+
+          RELATION_TYPES.forEach(
+              relType -> {
+                invalidateEntities(ident, type, Optional.of(relType));
+              });
+
+          invalidateEntities(ident, type, Optional.empty());
+          return true;
+        });
   }
 
   /** {@inheritDoc} */
@@ -222,10 +282,12 @@ public class CaffeineEntityCache extends BaseEntityCache {
     segmentedLock.withLock(
         entityCacheKey,
         () -> {
-          // We still need to cache the entities even if the list is empty, to avoid cache
-          // misses. Consider the scenario where a user queries for an entity's relations and the
-          // result is empty. If we don't cache this empty result, the next query will still hit the
-          // backend, this is not desired.
+          // Return directly if entities are empty. No need to put an empty list to cache, we will
+          // use another PR to resolve the performance problem.
+          if (entities.isEmpty()) {
+            return;
+          }
+
           syncEntitiesToCache(
               entityCacheKey, entities.stream().map(e -> (Entity) e).collect(Collectors.toList()));
         });
@@ -296,15 +358,13 @@ public class CaffeineEntityCache extends BaseEntityCache {
   }
 
   /**
-   * Syncs the entities to the cache, if entities is too big and can not put to the cache, then it
-   * will be removed from the cache and cacheIndex will not be updated.
+   * Syncs the entities to the cache, if entities are too big and cannot put to the cache, then it
+   * will be removed from the cache, and cacheIndex will not be updated.
    *
    * @param key The key of the entities.
    * @param newEntities The new entities to sync to the cache.
    */
   private void syncEntitiesToCache(EntityCacheRelationKey key, List<Entity> newEntities) {
-    if (key.relationType() != null) return;
-
     List<Entity> existingEntities = cacheData.getIfPresent(key);
 
     if (existingEntities != null && key.relationType() != null) {
@@ -377,11 +437,12 @@ public class CaffeineEntityCache extends BaseEntityCache {
       // For example, we have stored a role entity in the cache and entity to role mapping in the
       // reverse index. This is: cache data: role identifier -> role entity, reverse index:
       // the securable object -> role. When we update the securable object, we need to invalidate
-      // the
-      // role entity from the cache though the securable object is not in the cache data.
+      // the role entity from the cache though the securable object is not in the cache data.
       valueForExactKey = EntityCacheRelationKey.of(identifier, type, relTypeOpt.orElse(null));
     }
 
+    // The visited set to avoid processing the same key multiple times and thus causing infinite
+    // loop.
     Set<EntityCacheKey> visited = Sets.newHashSet();
     queue.offer(valueForExactKey);
     while (!queue.isEmpty()) {
@@ -405,6 +466,7 @@ public class CaffeineEntityCache extends BaseEntityCache {
           Lists.newArrayList(
               reverseIndex.getValuesForKeysStartingWith(
                   currentKeyToRemove.identifier().toString()));
+
       reverseKeysToRemove.forEach(
           key -> {
             // Remove from reverse index
