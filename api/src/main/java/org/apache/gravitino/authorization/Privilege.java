@@ -107,7 +107,7 @@ public interface Privilege {
     CREATE_JOB_TEMPLATE(0L, 1L << 25),
     /** The privilege to use a job template */
     USE_JOB_TEMPLATE(0L, 1L << 26),
-    /** The privilege to create a job */
+    /** The privilege to run a job */
     RUN_JOB(0L, 1L << 27);
 
     private final long highBits;

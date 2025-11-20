@@ -1031,7 +1031,7 @@ public class Privileges {
     }
   }
 
-  /** The privilege to create a job. */
+  /** The privilege to run a job. */
   public static class RunJob extends GenericPrivilege<RunJob> {
     private static final RunJob ALLOW_INSTANCE = new RunJob(Condition.ALLOW, Name.RUN_JOB);
     private static final RunJob DENY_INSTANCE = new RunJob(Condition.DENY, Name.RUN_JOB);
@@ -1072,10 +1072,17 @@ public class Privileges {
       super(condition, name);
     }
 
+
+    /**
+     * @return The instance with allow condition of the privilege.
+     */
     public static ApplyPolicy allow() {
       return ALLOW_INSTANCE;
     }
 
+    /**
+     * @return The instance with deny condition of the privilege.
+     */
     public static ApplyPolicy deny() {
       return DENY_INSTANCE;
     }
