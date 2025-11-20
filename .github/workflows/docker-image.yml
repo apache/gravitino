@@ -20,6 +20,7 @@ on:
           - 'gravitino-playground:ranger'
           - 'gravitino-iceberg-rest-server'
           - 'gravitino-mcp-server'
+          - 'gravitino-lance-rest-server'
       docker_repo_name:
         description: 'Docker repository name (default is apache)'
         required: false
@@ -92,6 +93,9 @@ jobs:
           elif [ "${{ github.event.inputs.image }}" == "gravitino-iceberg-rest-server" ]; then
             echo "image_type=iceberg-rest-server" >> $GITHUB_ENV
             echo "image_name=${{ github.event.inputs.docker_repo_name }}/gravitino-iceberg-rest" >> $GITHUB_ENV
+          elif [ "${{ github.event.inputs.image }}" == "gravitino-lance-rest-server" ]; then
+            echo "image_type=lance-rest-server" >> $GITHUB_ENV
+            echo "image_name=${{ github.event.inputs.docker_repo_name }}/gravitino-lance-rest" >> $GITHUB_ENV
           elif [ "${{ github.event.inputs.image }}" == "gravitino-mcp-server" ]; then
             echo "image_type=mcp-server" >> $GITHUB_ENV
             echo "image_name=${{ github.event.inputs.docker_repo_name }}/gravitino-mcp-server" >> $GITHUB_ENV
