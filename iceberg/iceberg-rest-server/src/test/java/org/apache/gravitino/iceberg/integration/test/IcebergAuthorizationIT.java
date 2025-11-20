@@ -143,7 +143,7 @@ public class IcebergAuthorizationIT extends BaseIT {
   }
 
   private void startGravitinoServerWithIcebergREST() throws Exception {
-    ignoreIcebergRestService = false;
+    ignoreAuxRestService = false;
     // Enable authorization
     customConfigs.putAll(
         ImmutableMap.of(
