@@ -289,9 +289,9 @@ DENY `WRITE_FILESET` won‘t deny the `READ_FILESET` operation if the user has t
 | USE_JOB_TEMPLATE    | Metalake, JobTemplate     | Use a job template when creating the job |
 
 ### Job privileges
-| Name        | Supports Securable Object | Operation             |
-|-------------|---------------------------|-----------------------|
-| CREATE_JOB  | Metalake                  | Create a job          |
+| Name    | Supports Securable Object | Operation |
+|---------|---------------------------|-----------|
+| RUN_JOB | Metalake                  | Run a job |
 
 
 ## Inheritance Model
