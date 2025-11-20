@@ -150,6 +150,16 @@ public class SecurableObjects {
   }
 
   /**
+   * Create the policy {@link SecurableObject} with the given policy name and privileges.
+   * @param policy The policy name
+   * @param privileges The privileges of the policy
+   * @return The created policy {@link SecurableObject}
+   */
+  public static SecurableObject ofPolicy(String policy, List<Privilege> privileges) {
+    return of(MetadataObject.Type.POLICY, Lists.newArrayList(policy), privileges);
+  }
+
+  /**
    * Create the job {@link SecurableObject} with the given job name and privileges.
    *
    * @param jobTemplate The job template name
