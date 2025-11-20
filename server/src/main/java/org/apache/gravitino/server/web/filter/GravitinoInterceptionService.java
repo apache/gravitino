@@ -30,7 +30,6 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
-import javax.ws.rs.PathParam;
 import javax.ws.rs.core.Response;
 import org.aopalliance.intercept.ConstructorInterceptor;
 import org.aopalliance.intercept.MethodInterceptor;
@@ -137,7 +136,7 @@ public class GravitinoInterceptionService implements InterceptionService {
           String entityType = extractMetadataObjectTypeFromParameters(parameters, args);
           Map<Entity.EntityType, NameIdentifier> metadataContext =
               extractNameIdentifierFromParameters(parameters, args);
-          Map<String, Object> pathParams = extractPathParamsFromParameters(parameters, args);
+          Map<String, Object> pathParams = Utils.extractPathParamsFromParameters(parameters, args);
           AuthorizationExpressionEvaluator authorizationExpressionEvaluator =
               new AuthorizationExpressionEvaluator(expression);
           boolean authorizeResult =
@@ -312,20 +311,6 @@ public class GravitinoInterceptionService implements InterceptionService {
       }
 
       return nameIdentifierMap;
-    }
-
-    private Map<String, Object> extractPathParamsFromParameters(
-        Parameter[] parameters, Object[] args) {
-      Map<String, Object> pathParams = new HashMap<>();
-      for (int i = 0; i < parameters.length; i++) {
-        Parameter parameter = parameters[i];
-        PathParam pathParam = parameter.getAnnotation(PathParam.class);
-        if (pathParam == null) {
-          continue;
-        }
-        pathParams.put("p_" + pathParam.value(), args[i]);
-      }
-      return pathParams;
     }
   }
 

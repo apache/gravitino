@@ -27,7 +27,7 @@ import javax.ws.rs.Produces;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
-import org.apache.gravitino.iceberg.service.IcebergRestUtils;
+import org.apache.gravitino.iceberg.service.IcebergRESTUtils;
 
 @Path("/hello")
 @Consumes(MediaType.APPLICATION_JSON)
@@ -44,6 +44,6 @@ public class HelloOperations {
   @GET
   @Produces(MediaType.APPLICATION_JSON)
   public Response hello() {
-    return IcebergRestUtils.ok(new HelloResponse(HELLO_MSG));
+    return IcebergRESTUtils.ok(new HelloResponse(HELLO_MSG));
   }
 }

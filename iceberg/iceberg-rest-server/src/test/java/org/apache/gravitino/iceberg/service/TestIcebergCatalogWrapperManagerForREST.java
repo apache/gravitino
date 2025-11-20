@@ -22,6 +22,7 @@ import com.google.common.collect.Maps;
 import java.util.Map;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.iceberg.common.ops.IcebergCatalogWrapper;
+import org.apache.gravitino.iceberg.service.authorization.IcebergRESTServerContext;
 import org.apache.gravitino.iceberg.service.provider.IcebergConfigProvider;
 import org.apache.gravitino.iceberg.service.provider.IcebergConfigProviderFactory;
 import org.junit.jupiter.api.Assertions;
@@ -60,6 +61,7 @@ public class TestIcebergCatalogWrapperManagerForREST {
     Map<String, String> config = Maps.newHashMap();
     IcebergConfigProvider configProvider = IcebergConfigProviderFactory.create(config);
     configProvider.initialize(config);
+    IcebergRESTServerContext.create(configProvider, false);
     IcebergCatalogWrapperManager manager = new IcebergCatalogWrapperManager(config, configProvider);
 
     Assertions.assertThrowsExactly(IllegalArgumentException.class, () -> manager.getOps(rawPrefix));
