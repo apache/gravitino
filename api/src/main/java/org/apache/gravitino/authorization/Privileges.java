@@ -1040,10 +1040,16 @@ public class Privileges {
       super(condition, name);
     }
 
+    /**
+     * @return The instance with allow condition of the privilege.
+     */
     public static RunJob allow() {
       return ALLOW_INSTANCE;
     }
 
+    /**
+     * @return The instance with deny condition of the privilege.
+     */
     public static RunJob deny() {
       return DENY_INSTANCE;
     }
