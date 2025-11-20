@@ -52,7 +52,6 @@ import org.apache.gravitino.dto.util.DTOConverters;
 import org.apache.gravitino.exceptions.NoSuchTagException;
 import org.apache.gravitino.metrics.MetricNames;
 import org.apache.gravitino.server.authorization.MetadataFilterHelper;
-import org.apache.gravitino.server.authorization.annotations.AuthorizationBatch;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationExpression;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationFullName;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationMetadata;
@@ -252,7 +251,6 @@ public class MetadataObjectTagOperations {
   @Timed(name = "associate-object-tags." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "associate-object-tags", absolute = true)
   @AuthorizationExpression(expression = CAN_ACCESS_METADATA_AND_TAG)
-  @AuthorizationBatch
   public Response associateTagsForObject(
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
           String metalake,
