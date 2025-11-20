@@ -249,12 +249,12 @@ public class LanceCatalogOperations implements LakehouseCatalogOperations {
   private IndexParams getIndexParamsByIndexType(IndexType indexType) {
     switch (indexType) {
       case SCALAR:
-        return new IndexParams.Builder().build();
+        return IndexParams.builder().build();
       case VECTOR:
         // TODO make these parameters configurable
         int numberOfDimensions = 3; // this value should be determined dynamically based on the data
         // Add properties to Index to set this value.
-        return new IndexParams.Builder()
+        return IndexParams.builder()
             .setVectorIndexParams(
                 VectorIndexParams.ivfPq(2, 8, numberOfDimensions, DistanceType.L2, 2))
             .build();
