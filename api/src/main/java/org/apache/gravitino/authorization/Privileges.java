@@ -137,6 +137,10 @@ public class Privileges {
         return CreateTag.allow();
       case APPLY_TAG:
         return ApplyTag.allow();
+      case APPLY_POLICY:
+        return ApplyPolicy.allow();
+      case CREATE_POLICY:
+        return CreatePolicy.allow();
       default:
         throw new IllegalArgumentException("Doesn't support the privilege: " + name);
     }
@@ -961,6 +965,81 @@ public class Privileges {
     @Override
     public boolean canBindTo(MetadataObject.Type type) {
       return type == MetadataObject.Type.METALAKE || type == MetadataObject.Type.TAG;
+    }
+  }
+
+  /** The privilege to create a tag */
+  public static class CreatePolicy extends GenericPrivilege<CreatePolicy> {
+    private static final CreatePolicy ALLOW_INSTANCE =
+        new CreatePolicy(Condition.ALLOW, Name.CREATE_POLICY);
+    private static final CreatePolicy DENY_INSTANCE =
+        new CreatePolicy(Condition.DENY, Name.CREATE_POLICY);
+
+    /**
+     * Constructor for GenericPrivilege.
+     *
+     * @param condition the condition of the privilege
+     * @param name the name of the privilege
+     */
+    protected CreatePolicy(Condition condition, Name name) {
+      super(condition, name);
+    }
+
+    /**
+     * @return The instance with allow condition of the privilege.
+     */
+    public static CreatePolicy allow() {
+      return ALLOW_INSTANCE;
+    }
+
+    /**
+     * @return The instance with deny condition of the privilege.
+     */
+    public static CreatePolicy deny() {
+      return DENY_INSTANCE;
+    }
+
+    @Override
+    public boolean canBindTo(MetadataObject.Type type) {
+      return type == MetadataObject.Type.METALAKE;
+    }
+  }
+
+  /** The privilege to apply policy to object. */
+  public static final class ApplyPolicy extends GenericPrivilege<ApplyPolicy> {
+
+    private static final ApplyPolicy ALLOW_INSTANCE =
+        new ApplyPolicy(Condition.ALLOW, Name.APPLY_POLICY);
+    private static final ApplyPolicy DENY_INSTANCE =
+        new ApplyPolicy(Condition.DENY, Name.APPLY_POLICY);
+
+    /**
+     * Constructor for GenericPrivilege.
+     *
+     * @param condition the condition of the privilege
+     * @param name the name of the privilege
+     */
+    ApplyPolicy(Condition condition, Name name) {
+      super(condition, name);
+    }
+
+    /**
+     * @return The instance with allow condition of the privilege.
+     */
+    public static ApplyPolicy allow() {
+      return ALLOW_INSTANCE;
+    }
+
+    /**
+     * @return The instance with deny condition of the privilege.
+     */
+    public static ApplyPolicy deny() {
+      return DENY_INSTANCE;
+    }
+
+    @Override
+    public boolean canBindTo(MetadataObject.Type type) {
+      return type == MetadataObject.Type.METALAKE || type == MetadataObject.Type.POLICY;
     }
   }
 }
