@@ -148,6 +148,8 @@ tasks.test {
     exclude("**/integration/test/**")
   } else {
     dependsOn(tasks.jar)
+    dependsOn(":iceberg:iceberg-rest-server:jar")
+    dependsOn(":lance:lance-rest-server:jar")
   }
 }
 
