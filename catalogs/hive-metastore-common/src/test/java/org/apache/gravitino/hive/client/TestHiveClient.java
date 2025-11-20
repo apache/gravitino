@@ -30,12 +30,13 @@ public class TestHiveClient {
   @Test
   void testClient() throws Exception {
     Properties properties = new Properties();
-    properties.setProperty("hive.metastore.uris", "thrift://localhost:9083");
-    IsolatedClientLoader loader = IsolatedClientLoader.forVersion("HIVE2", Map.of());
+    // properties.setProperty("hive.metastore.uris", "thrift://localhost:9083");
+    properties.setProperty("hive.metastore.uris", "thrift://172.17.0.3:9083");
+    IsolatedClientLoader loader = IsolatedClientLoader.forVersion("HIVE3", Map.of());
     HiveClient client = loader.createClient(properties);
     List<String> allDatabases = client.getAllDatabases();
     System.out.println("Databases: " + allDatabases);
-    Schema db = client.getDatabase("", "s1");
+    Schema db = client.getDatabase("hive", "default");
     System.out.println("Database s1: " + db.name());
   }
 }

@@ -31,7 +31,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.stream.Collectors;
-import org.apache.hadoop.hive.metastore.RetryingMetaStoreClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -187,8 +186,8 @@ public final class IsolatedClientLoader {
             setMethod.invoke(conf, v.getKey(), v.getValue());
           }
 
-          Method ctorMethod = clientClass.getMethod("proxy", confClass);
-          client = ctorMethod.invoke(null, RetryingMetaStoreClient.class, conf);
+          Method ctorMethod = clientClass.getMethod("getProxy", confClass, boolean.class);
+          client = ctorMethod.invoke(null, conf, true);
         }
 
         return (HiveClient)

@@ -70,14 +70,14 @@ class HiveShimV3 extends Shim {
   @Override
   public Schema getDatabase(String catalogName, String dbName) {
     try {
-      Database db = (Database) getDabaseMethod.invoke(client, dbName, catalogName);
+      Database db = (Database) getDabaseMethod.invoke(client, catalogName, dbName);
       if (db == null) {
         throw new NoSuchSchemaException(
             "Database %s does not exist in catalog %s", dbName, catalogName);
       }
       return HiveDatabaseConverter.fromHiveDB(db);
     } catch (Exception e) {
-      throw new RuntimeException("Failed to get database using HiveShimV2", e);
+      throw new RuntimeException("Failed to get database using HiveShimV3", e);
     }
   }
 }
