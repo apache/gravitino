@@ -366,21 +366,30 @@ public class CaffeineEntityCache extends BaseEntityCache {
       Optional<SupportsRelationOperations.Type> relTypeOpt) {
     Queue<EntityCacheKey> queue = new ArrayDeque<>();
 
-    EntityCacheKey valueForExactKey =
+    EntityCacheRelationKey valueForExactKey =
         cacheIndex.getValueForExactKey(
             relTypeOpt.isEmpty()
-                ? EntityCacheKey.of(identifier, type).toString()
+                ? EntityCacheRelationKey.of(identifier, type).toString()
                 : EntityCacheRelationKey.of(identifier, type, relTypeOpt.get()).toString());
 
     if (valueForExactKey == null) {
-      // No key to remove
-      return false;
+      // It means the key does not exist in the cache. However, we still need to handle some cases.
+      // For example, we have stored a role entity in the cache and entity to role mapping in the
+      // reverse index. This is: cache data: role identifier -> role entity, reverse index:
+      // the securable object -> role. When we update the securable object, we need to invalidate
+      // the
+      // role entity from the cache though the securable object is not in the cache data.
+      valueForExactKey = EntityCacheRelationKey.of(identifier, type, relTypeOpt.orElse(null));
     }
 
+    Set<EntityCacheKey> visited = Sets.newHashSet();
     queue.offer(valueForExactKey);
-
     while (!queue.isEmpty()) {
       EntityCacheKey currentKeyToRemove = queue.poll();
+      if (visited.contains(currentKeyToRemove)) {
+        continue;
+      }
+      visited.add(currentKeyToRemove);
 
       cacheData.invalidate(currentKeyToRemove);
       cacheIndex.remove(currentKeyToRemove.toString());
@@ -392,7 +401,7 @@ public class CaffeineEntityCache extends BaseEntityCache {
       queue.addAll(relatedEntityKeysToRemove);
 
       // Look up from reverse index to go to next depth
-      List<EntityCacheKey> reverseKeysToRemove =
+      List<List<EntityCacheKey>> reverseKeysToRemove =
           Lists.newArrayList(
               reverseIndex.getValuesForKeysStartingWith(
                   currentKeyToRemove.identifier().toString()));
@@ -400,15 +409,19 @@ public class CaffeineEntityCache extends BaseEntityCache {
           key -> {
             // Remove from reverse index
             // Convert EntityCacheRelationKey to EntityCacheKey
-            reverseIndex
-                .getKeysStartingWith(key.toString())
+            key.stream()
                 .forEach(
-                    reverseIndexKey -> {
-                      reverseIndex.remove(reverseIndexKey.toString());
-                    });
+                    k ->
+                        reverseIndex
+                            .getValuesForKeysStartingWith(k.toString())
+                            .forEach(rsk -> reverseIndex.remove(rsk.toString())));
           });
 
-      queue.addAll(reverseKeysToRemove);
+      reverseIndex.remove(currentKeyToRemove);
+      Set<EntityCacheKey> toAdd =
+          Sets.newHashSet(
+              reverseKeysToRemove.stream().flatMap(List::stream).collect(Collectors.toList()));
+      queue.addAll(toAdd);
     }
 
     return true;

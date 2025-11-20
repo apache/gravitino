@@ -232,7 +232,7 @@ public class MetadataFilterHelper {
    * @param nameIdentifier metadata name
    * @return A map containing the metadata object and all its parent objects, keyed by their types
    */
-  private static Map<Entity.EntityType, NameIdentifier> spiltMetadataNames(
+  public static Map<Entity.EntityType, NameIdentifier> spiltMetadataNames(
       String metalake, Entity.EntityType entityType, NameIdentifier nameIdentifier) {
     Map<Entity.EntityType, NameIdentifier> nameIdentifierMap = new HashMap<>();
     nameIdentifierMap.put(Entity.EntityType.METALAKE, NameIdentifierUtil.ofMetalake(metalake));

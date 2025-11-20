@@ -33,15 +33,22 @@ public class WebUIFilter implements Filter {
   @Override
   public void doFilter(ServletRequest request, ServletResponse response, FilterChain chain)
       throws IOException, ServletException {
+
     HttpServletRequest httpRequest = (HttpServletRequest) request;
     String path = httpRequest.getRequestURI();
     String lastPathSegment = path.substring(path.lastIndexOf("/") + 1);
+
     if (path.equals("/") || path.equals("/ui") || path.equals("/ui/")) {
       // Redirect to the index page.
       httpRequest.getRequestDispatcher("/ui/index.html").forward(request, response);
+
+    } else if (path.startsWith("/ui/") && path.endsWith("/")) {
+      httpRequest.getRequestDispatcher(path + "index.html").forward(request, response);
+
     } else if (path.startsWith("/ui/") && !lastPathSegment.contains(".")) {
       // Redirect to the static HTML file.
       httpRequest.getRequestDispatcher(path + ".html").forward(request, response);
+
     } else {
       // Continue processing the rest of the filter chain.
       chain.doFilter(request, response);

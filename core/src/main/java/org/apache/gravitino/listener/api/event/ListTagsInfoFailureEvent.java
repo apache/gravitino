@@ -26,7 +26,7 @@ import org.apache.gravitino.annotation.DeveloperApi;
  * Represents an event triggered when an attempt to list tag information fails due to an exception.
  */
 @DeveloperApi
-public class ListTagsInfoFailureEvent extends FailureEvent {
+public class ListTagsInfoFailureEvent extends TagFailureEvent {
 
   /**
    * Constructs a new {@code ListTagsInfoFailureEvent} instance.

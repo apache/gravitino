@@ -13,7 +13,7 @@ This page introduces how to create, modify, view, and delete [metalakes](./gloss
 
 ## Prerequisites
 
-You have installed and launched Gravitino. For more details, see [Get started](./getting-started.md).
+You have installed and launched Gravitino. For more details, see [Get started](./getting-started/index.md).
 
 Let's say, the access is [http://localhost:8090](http://localhost:8090).
 

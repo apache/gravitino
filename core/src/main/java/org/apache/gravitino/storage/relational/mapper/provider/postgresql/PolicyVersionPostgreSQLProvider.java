@@ -48,7 +48,7 @@ public class PolicyVersionPostgreSQLProvider extends PolicyVersionBaseSQLProvide
         + POLICY_VERSION_TABLE_NAME
         + " WHERE id IN (SELECT id FROM "
         + POLICY_VERSION_TABLE_NAME
-        + " WHERE deleted_at = 0 AND legacy_timeline < #{legacyTimeline} LIMIT #{limit})";
+        + " WHERE deleted_at > 0 AND deleted_at < #{legacyTimeline} LIMIT #{limit})";
   }
 
   @Override
