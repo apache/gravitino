@@ -24,27 +24,7 @@ import org.apache.gravitino.connector.capability.CapabilityResult;
 public class GenericLakehouseCatalogCapability implements Capability {
 
   @Override
-  public CapabilityResult columnNotNull() {
-    throw new UnsupportedOperationException(
-        "Not implemented yet: GenericLakehouseCatalogCapability.columnNotNull");
-  }
-
-  @Override
-  public CapabilityResult columnDefaultValue() {
-    throw new UnsupportedOperationException(
-        "Not implemented yet: GenericLakehouseCatalogCapability.columnDefaultValue");
-  }
-
-  @Override
-  public CapabilityResult caseSensitiveOnName(Scope scope) {
-    switch (scope) {
-      case SCHEMA:
-      case TABLE:
-      case COLUMN:
-        throw new UnsupportedOperationException(
-            "Not implemented yet: GenericLakehouseCatalogCapability.caseSensitiveOnName");
-      default:
-        return CapabilityResult.SUPPORTED;
-    }
+  public CapabilityResult managedStorage(Scope scope) {
+    return CapabilityResult.SUPPORTED;
   }
 }

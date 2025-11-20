@@ -59,6 +59,8 @@ if (gradle.startParameter.projectProperties["enableFuse"]?.toBoolean() == true) 
 }
 include("iceberg:iceberg-common")
 include("iceberg:iceberg-rest-server")
+include("lance:lance-common")
+include("lance:lance-rest-server")
 include("authorizations:authorization-ranger", "authorizations:authorization-common", "authorizations:authorization-chain")
 include("trino-connector:trino-connector", "trino-connector:integration-test")
 include("spark-connector:spark-common")

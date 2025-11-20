@@ -18,20 +18,44 @@
  */
 package org.apache.gravitino.catalog.lakehouse;
 
-import com.google.common.collect.ImmutableMap;
+import static org.apache.gravitino.catalog.lakehouse.GenericLakehouseTablePropertiesMetadata.LANCE_TABLE_STORAGE_OPTION_PREFIX;
+import static org.apache.gravitino.connector.PropertyEntry.stringOptionalPropertyEntry;
+
+import com.google.common.collect.ImmutableList;
+import com.google.common.collect.Maps;
+import java.util.List;
 import java.util.Map;
 import org.apache.gravitino.connector.BasePropertiesMetadata;
 import org.apache.gravitino.connector.PropertyEntry;
 
 public class GenericLakehouseSchemaPropertiesMetadata extends BasePropertiesMetadata {
-  private static final Map<String, PropertyEntry<?>> propertiesMetadata;
+  public static final String LAKEHOUSE_LOCATION =
+      GenericLakehouseCatalogPropertiesMetadata.LAKEHOUSE_LOCATION;
+
+  private static final Map<String, PropertyEntry<?>> PROPERTIES_METADATA;
 
   static {
-    propertiesMetadata = ImmutableMap.of();
+    List<PropertyEntry<?>> propertyEntries =
+        ImmutableList.of(
+            stringOptionalPropertyEntry(
+                LAKEHOUSE_LOCATION,
+                "The root directory of the lakehouse schema.",
+                false /* immutable */,
+                null, /* defaultValue */
+                false /* hidden */),
+            PropertyEntry.stringOptionalPropertyPrefixEntry(
+                LANCE_TABLE_STORAGE_OPTION_PREFIX,
+                "The storage options passed to Lance table.",
+                false /* immutable */,
+                null /* default value*/,
+                false /* hidden */,
+                false /* reserved */));
+
+    PROPERTIES_METADATA = Maps.uniqueIndex(propertyEntries, PropertyEntry::getName);
   }
 
   @Override
   protected Map<String, PropertyEntry<?>> specificPropertyEntries() {
-    return propertiesMetadata;
+    return PROPERTIES_METADATA;
   }
 }

@@ -47,6 +47,9 @@ dependencies {
     exclude(group = "com.fasterxml.jackson.core", module = "*") // provided by gravitino
     exclude(group = "com.fasterxml.jackson.datatype", module = "*") // provided by gravitino
     exclude(group = "commons-codec", module = "commons-codec") // provided by jcasbin
+    exclude(group = "com.google.guava", module = "guava") // provided by gravitino
+    exclude(group = "org.apache.commons", module = "commons-lang3") // provided by gravitino
+    exclude(group = "org.junit.jupiter", module = "*") // provided by test scope
   }
   implementation(libs.mybatis)
 
