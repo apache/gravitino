@@ -24,7 +24,7 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.authorization.AuthorizationRequestContext;
 import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionEvaluator;
 
-public class CommonAuthorizerExecutor implements AuthorizeExecutor {
+public class CommonAuthorizerExecutor implements AuthorizationExecutor {
 
   private Map<Entity.EntityType, NameIdentifier> metadataContext;
   private AuthorizationExpressionEvaluator authorizationExpressionEvaluator;

@@ -44,7 +44,7 @@ import org.apache.gravitino.server.authorization.annotations.AuthorizationExpres
 import org.apache.gravitino.server.authorization.annotations.AuthorizationRequest;
 import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionEvaluator;
 import org.apache.gravitino.server.web.Utils;
-import org.apache.gravitino.server.web.filter.authorization.AuthorizeExecutor;
+import org.apache.gravitino.server.web.filter.authorization.AuthorizationExecutor;
 import org.apache.gravitino.server.web.filter.authorization.AuthorizeExecutorFactory;
 import org.apache.gravitino.server.web.rest.CatalogOperations;
 import org.apache.gravitino.server.web.rest.FilesetOperations;
@@ -131,7 +131,7 @@ public class GravitinoInterceptionService implements InterceptionService {
         Parameter[] parameters = method.getParameters();
         AuthorizationExpression expressionAnnotation =
             method.getAnnotation(AuthorizationExpression.class);
-        AuthorizeExecutor executor;
+        AuthorizationExecutor executor;
         if (expressionAnnotation != null) {
           String expression = expressionAnnotation.expression();
           Object[] args = methodInvocation.getArguments();

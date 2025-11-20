@@ -28,9 +28,15 @@ import java.util.Optional;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.authorization.AuthorizationRequestContext;
+import org.apache.gravitino.dto.requests.TagsAssociateRequest;
 import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionEvaluator;
+import org.apache.gravitino.server.web.rest.MetadataObjectTagOperations;
 
-public class AssociateTagAuthorizeExecutor implements AuthorizeExecutor {
+/**
+ * Metadata object authorization for {@link
+ * MetadataObjectTagOperations#associateTagsForObject(String, String, String, TagsAssociateRequest)}
+ */
+public class AssociateTagAuthorizationExecutor implements AuthorizationExecutor {
 
   private final Parameter[] parameters;
   private final Object[] args;
@@ -39,7 +45,7 @@ public class AssociateTagAuthorizeExecutor implements AuthorizeExecutor {
   private final Map<String, Object> pathParams;
   private final String entityType;
 
-  public AssociateTagAuthorizeExecutor(
+  public AssociateTagAuthorizationExecutor(
       Parameter[] parameters,
       Object[] args,
       Map<Entity.EntityType, NameIdentifier> metadataContext,

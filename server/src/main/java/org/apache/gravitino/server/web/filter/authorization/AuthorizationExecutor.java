@@ -17,7 +17,7 @@
 
 package org.apache.gravitino.server.web.filter.authorization;
 
-public interface AuthorizeExecutor {
+public interface AuthorizationExecutor {
 
   boolean execute() throws Exception;
 }
