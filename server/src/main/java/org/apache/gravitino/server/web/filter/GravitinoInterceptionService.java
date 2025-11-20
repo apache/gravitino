@@ -17,22 +17,21 @@
 
 package org.apache.gravitino.server.web.filter;
 
+import static org.apache.gravitino.server.web.filter.ParameterUtil.extractAuthorizationRequestTypeFromParameters;
+import static org.apache.gravitino.server.web.filter.ParameterUtil.extractMetadataObjectTypeFromParameters;
+import static org.apache.gravitino.server.web.filter.ParameterUtil.extractNameIdentifierFromParameters;
+import static org.apache.gravitino.server.web.filter.ParameterUtil.extractPathParamsFromParameters;
+
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import java.lang.reflect.Constructor;
-import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.lang.reflect.Parameter;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
-import java.util.Objects;
-import java.util.Optional;
 import java.util.Set;
-import javax.ws.rs.PathParam;
 import javax.ws.rs.core.Response;
 import org.aopalliance.intercept.ConstructorInterceptor;
 import org.aopalliance.intercept.MethodInterceptor;
@@ -40,17 +39,13 @@ import org.aopalliance.intercept.MethodInvocation;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.MetadataObject;
-import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.NameIdentifier;
-import org.apache.gravitino.authorization.AuthorizationRequestContext;
-import org.apache.gravitino.server.authorization.MetadataFilterHelper;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationExpression;
-import org.apache.gravitino.server.authorization.annotations.AuthorizationFullName;
-import org.apache.gravitino.server.authorization.annotations.AuthorizationMetadata;
-import org.apache.gravitino.server.authorization.annotations.AuthorizationObjectType;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationRequest;
 import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionEvaluator;
 import org.apache.gravitino.server.web.Utils;
+import org.apache.gravitino.server.web.filter.authorization.AuthorizeExecutor;
+import org.apache.gravitino.server.web.filter.authorization.AuthorizeExecutorFactory;
 import org.apache.gravitino.server.web.rest.CatalogOperations;
 import org.apache.gravitino.server.web.rest.FilesetOperations;
 import org.apache.gravitino.server.web.rest.GroupOperations;
@@ -67,8 +62,6 @@ import org.apache.gravitino.server.web.rest.TableOperations;
 import org.apache.gravitino.server.web.rest.TagOperations;
 import org.apache.gravitino.server.web.rest.TopicOperations;
 import org.apache.gravitino.server.web.rest.UserOperations;
-import org.apache.gravitino.utils.MetadataObjectUtil;
-import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.PrincipalUtils;
 import org.glassfish.hk2.api.Descriptor;
 import org.glassfish.hk2.api.Filter;
@@ -151,17 +144,14 @@ public class GravitinoInterceptionService implements InterceptionService {
           AuthorizationRequest.RequestType requestType =
               extractAuthorizationRequestTypeFromParameters(parameters);
           executor =
-              switch (requestType) {
-                case COMMON -> new CommonAuthorizerExecutor(
-                    metadataContext, authorizationExpressionEvaluator, pathParams, entityType);
-                case ASSOCIATE_TAG -> new AssociateTagAuthorizeExecutor(
-                    parameters,
-                    args,
-                    metadataContext,
-                    authorizationExpressionEvaluator,
-                    pathParams,
-                    entityType);
-              };
+              AuthorizeExecutorFactory.create(
+                  requestType,
+                  metadataContext,
+                  authorizationExpressionEvaluator,
+                  pathParams,
+                  entityType,
+                  parameters,
+                  args);
           boolean authorizeResult = executor.execute();
           if (!authorizeResult) {
             return buildNoAuthResponse(expressionAnnotation, metadataContext, method, expression);
@@ -179,142 +169,6 @@ public class GravitinoInterceptionService implements InterceptionService {
             ex);
         return Utils.internalError(
             "Authorization failed due to system internal error. Please contact administrator.", ex);
-      }
-    }
-
-    private AuthorizationRequest.RequestType extractAuthorizationRequestTypeFromParameters(
-        Parameter[] parameters) {
-      for (Parameter parameter : parameters) {
-        AuthorizationRequest authorizationRequest =
-            parameter.getAnnotation(AuthorizationRequest.class);
-        if (authorizationRequest != null) {
-          return authorizationRequest.type();
-        }
-      }
-      return AuthorizationRequest.RequestType.COMMON;
-    }
-
-    private interface AuthorizeExecutor {
-
-      boolean execute() throws Exception;
-    }
-
-    private static class CommonAuthorizerExecutor implements AuthorizeExecutor {
-
-      private Map<Entity.EntityType, NameIdentifier> metadataContext;
-      private AuthorizationExpressionEvaluator authorizationExpressionEvaluator;
-      private Map<String, Object> pathParams;
-      String entityType;
-
-      public CommonAuthorizerExecutor(
-          Map<Entity.EntityType, NameIdentifier> metadataContext,
-          AuthorizationExpressionEvaluator authorizationExpressionEvaluator,
-          Map<String, Object> pathParams,
-          String entityType) {
-        this.metadataContext = metadataContext;
-        this.authorizationExpressionEvaluator = authorizationExpressionEvaluator;
-        this.pathParams = pathParams;
-        this.entityType = entityType;
-      }
-
-      @Override
-      public boolean execute() {
-        return authorizationExpressionEvaluator.evaluate(
-            metadataContext,
-            pathParams,
-            new AuthorizationRequestContext(),
-            Optional.ofNullable(entityType));
-      }
-    }
-
-    private class AssociateTagAuthorizeExecutor implements AuthorizeExecutor {
-
-      private final Parameter[] parameters;
-      private final Object[] args;
-      private final Map<Entity.EntityType, NameIdentifier> metadataContext;
-      private final AuthorizationExpressionEvaluator authorizationExpressionEvaluator;
-      private final Map<String, Object> pathParams;
-      private final String entityType;
-
-      public AssociateTagAuthorizeExecutor(
-          Parameter[] parameters,
-          Object[] args,
-          Map<Entity.EntityType, NameIdentifier> metadataContext,
-          AuthorizationExpressionEvaluator authorizationExpressionEvaluator,
-          Map<String, Object> pathParams,
-          String entityType) {
-        this.parameters = parameters;
-        this.args = args;
-        this.metadataContext = metadataContext;
-        this.authorizationExpressionEvaluator = authorizationExpressionEvaluator;
-        this.pathParams = pathParams;
-        this.entityType = entityType;
-      }
-
-      @Override
-      public boolean execute() throws Exception {
-        Object request = extractFromParameters(parameters, args);
-        if (request == null) {
-          return false;
-        }
-
-        AuthorizationRequestContext context = new AuthorizationRequestContext();
-        Entity.EntityType targetType =
-            Entity.EntityType.TAG; // Tags are the only supported batch target here
-
-        // Authorize both 'tagsToAdd' and 'tagsToRemove' fields.
-        // Short-circuit on first failure.
-        return authorizeTagField(request, "tagsToAdd", context, targetType)
-            && authorizeTagField(request, "tagsToRemove", context, targetType);
-      }
-
-      /**
-       * Performs batch authorization for a given field (e.g., "tagsToAdd" or "tagsToRemove")
-       * containing an array of tag names.
-       *
-       * @param request The request object containing the field.
-       * @param fieldName The name of the field to reflect and read (must be a String[]).
-       * @param context The shared authorization request context.
-       * @param targetType The entity type being authorized (expected to be TAG).
-       * @return {@code true} if all tags in the field pass authorization; {@code false} otherwise.
-       * @throws IllegalAccessException if the field is not accessible.
-       */
-      private boolean authorizeTagField(
-          Object request,
-          String fieldName,
-          AuthorizationRequestContext context,
-          Entity.EntityType targetType)
-          throws IllegalAccessException, NoSuchFieldException {
-
-        Field field = request.getClass().getDeclaredField(fieldName);
-        field.setAccessible(true);
-        String[] tagNames = (String[]) field.get(request);
-
-        // Treat null or empty arrays as no-op (implicitly authorized)
-        if (tagNames == null) {
-          return true;
-        }
-
-        for (String tagName : tagNames) {
-          // Skip null entries defensively
-          if (tagName == null) {
-            continue;
-          }
-
-          // Use a fresh context copy for each tag to avoid cross-contamination
-          Map<Entity.EntityType, NameIdentifier> currentContext =
-              new HashMap<>(this.metadataContext);
-          buildNameIdentifierForBatchAuthorization(currentContext, tagName, targetType);
-
-          boolean authorized =
-              authorizationExpressionEvaluator.evaluate(
-                  currentContext, pathParams, context, Optional.ofNullable(entityType));
-
-          if (!authorized) {
-            return false; // Fail fast on first unauthorized tag
-          }
-        }
-        return true;
       }
     }
 
@@ -363,174 +217,6 @@ public class GravitinoInterceptionService implements InterceptionService {
       }
       return Utils.forbidden(contextualMessage, null);
     }
-
-    private void buildNameIdentifierForBatchAuthorization(
-        Map<Entity.EntityType, NameIdentifier> metadataNames, String name, Entity.EntityType type) {
-      NameIdentifier metalake = metadataNames.get(Entity.EntityType.METALAKE);
-      if (Objects.requireNonNull(type) == Entity.EntityType.TAG) {
-        metadataNames.put(
-            Entity.EntityType.TAG,
-            NameIdentifierUtil.ofTag(NameIdentifierUtil.getMetalake(metalake), name));
-        return;
-      }
-      throw new UnsupportedOperationException(
-          "Unsupported to build NameIdentifier for batch authorization target");
-    }
-
-    private Map<Entity.EntityType, NameIdentifier> extractNameIdentifierFromParameters(
-        Parameter[] parameters, Object[] args) {
-      Map<Entity.EntityType, String> entities = new HashMap<>();
-      Map<Entity.EntityType, NameIdentifier> nameIdentifierMap = new HashMap<>();
-      // Extract AuthorizationMetadata
-      for (int i = 0; i < parameters.length; i++) {
-        Parameter parameter = parameters[i];
-        AuthorizationMetadata authorizeResource =
-            parameter.getAnnotation(AuthorizationMetadata.class);
-        if (authorizeResource == null) {
-          continue;
-        }
-        Entity.EntityType type = authorizeResource.type();
-        entities.put(type, String.valueOf(args[i]));
-      }
-
-      String metalake = entities.get(Entity.EntityType.METALAKE);
-      String catalog = entities.get(Entity.EntityType.CATALOG);
-      String schema = entities.get(Entity.EntityType.SCHEMA);
-      String table = entities.get(Entity.EntityType.TABLE);
-      String topic = entities.get(Entity.EntityType.TOPIC);
-      String fileset = entities.get(Entity.EntityType.FILESET);
-
-      // Extract full name and types
-      String fullName = null;
-      String metadataObjectType = null;
-      for (int i = 0; i < parameters.length; i++) {
-        Parameter parameter = parameters[i];
-        AuthorizationFullName authorizeFullName =
-            parameter.getAnnotation(AuthorizationFullName.class);
-        if (authorizeFullName != null) {
-          fullName = String.valueOf(args[i]);
-        }
-
-        AuthorizationObjectType objectType = parameter.getAnnotation(AuthorizationObjectType.class);
-        if (objectType != null) {
-          metadataObjectType = String.valueOf(args[i]);
-        }
-      }
-
-      entities.forEach(
-          (type, metadata) -> {
-            switch (type) {
-              case CATALOG:
-                nameIdentifierMap.put(
-                    Entity.EntityType.CATALOG, NameIdentifierUtil.ofCatalog(metalake, catalog));
-                break;
-              case SCHEMA:
-                nameIdentifierMap.put(
-                    Entity.EntityType.SCHEMA,
-                    NameIdentifierUtil.ofSchema(metalake, catalog, schema));
-                break;
-              case TABLE:
-                nameIdentifierMap.put(
-                    Entity.EntityType.TABLE,
-                    NameIdentifierUtil.ofTable(metalake, catalog, schema, table));
-                break;
-              case TOPIC:
-                nameIdentifierMap.put(
-                    Entity.EntityType.TOPIC,
-                    NameIdentifierUtil.ofTopic(metalake, catalog, schema, topic));
-                break;
-              case FILESET:
-                nameIdentifierMap.put(
-                    Entity.EntityType.FILESET,
-                    NameIdentifierUtil.ofFileset(metalake, catalog, schema, fileset));
-                break;
-              case MODEL:
-                String model = entities.get(Entity.EntityType.MODEL);
-                nameIdentifierMap.put(
-                    Entity.EntityType.MODEL,
-                    NameIdentifierUtil.ofModel(metalake, catalog, schema, model));
-                break;
-              case METALAKE:
-                nameIdentifierMap.put(
-                    Entity.EntityType.METALAKE, NameIdentifierUtil.ofMetalake(metalake));
-                break;
-              case USER:
-                nameIdentifierMap.put(
-                    Entity.EntityType.USER,
-                    NameIdentifierUtil.ofUser(metadata, entities.get(Entity.EntityType.USER)));
-                break;
-              case GROUP:
-                nameIdentifierMap.put(
-                    Entity.EntityType.GROUP,
-                    NameIdentifierUtil.ofGroup(metalake, entities.get(Entity.EntityType.GROUP)));
-                break;
-              case ROLE:
-                nameIdentifierMap.put(
-                    Entity.EntityType.ROLE,
-                    NameIdentifierUtil.ofRole(metalake, entities.get(Entity.EntityType.ROLE)));
-                break;
-              case TAG:
-                nameIdentifierMap.put(
-                    Entity.EntityType.TAG,
-                    NameIdentifierUtil.ofTag(metalake, entities.get(Entity.EntityType.TAG)));
-                break;
-              default:
-                break;
-            }
-          });
-
-      // Extract fullName and metadataObjectType
-      if (fullName != null && metadataObjectType != null && metalake != null) {
-        MetadataObject.Type type =
-            MetadataObject.Type.valueOf(metadataObjectType.toUpperCase(Locale.ROOT));
-        NameIdentifier nameIdentifier =
-            MetadataObjectUtil.toEntityIdent(metalake, MetadataObjects.parse(fullName, type));
-        nameIdentifierMap.putAll(
-            MetadataFilterHelper.spiltMetadataNames(
-                metalake, MetadataObjectUtil.toEntityType(type), nameIdentifier));
-      }
-
-      return nameIdentifierMap;
-    }
-
-    private Object extractFromParameters(Parameter[] parameters, Object[] args) {
-      for (int i = 0; i < parameters.length; i++) {
-        Parameter parameter = parameters[i];
-        AuthorizationRequest authorizationBatchTarget =
-            parameter.getAnnotation(AuthorizationRequest.class);
-        if (authorizationBatchTarget == null) {
-          continue;
-        }
-        return args[i];
-      }
-      return null;
-    }
-
-    private Map<String, Object> extractPathParamsFromParameters(
-        Parameter[] parameters, Object[] args) {
-      Map<String, Object> pathParams = new HashMap<>();
-      for (int i = 0; i < parameters.length; i++) {
-        Parameter parameter = parameters[i];
-        PathParam pathParam = parameter.getAnnotation(PathParam.class);
-        if (pathParam == null) {
-          continue;
-        }
-        pathParams.put("p_" + pathParam.value(), args[i]);
-      }
-      return pathParams;
-    }
-  }
-
-  private static String extractMetadataObjectTypeFromParameters(
-      Parameter[] parameters, Object[] args) {
-    for (int i = 0; i < parameters.length; i++) {
-      Parameter parameter = parameters[i];
-      AuthorizationObjectType objectType = parameter.getAnnotation(AuthorizationObjectType.class);
-      if (objectType != null) {
-        return String.valueOf(args[i]).toUpperCase();
-      }
-    }
-    return null;
   }
 
   private record ClassListFilter(Set<String> targetClasses) implements Filter {
