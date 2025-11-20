@@ -457,17 +457,35 @@ public class POConverters {
     }
 
     try {
-      return TablePO.builder()
-          .withTableId(oldTablePO.getTableId())
-          .withTableName(newTable.name())
-          .withMetalakeId(oldTablePO.getMetalakeId())
-          .withCatalogId(oldTablePO.getCatalogId())
-          .withSchemaId(newSchemaId)
-          .withAuditInfo(JsonUtils.anyFieldMapper().writeValueAsString(newTable.auditInfo()))
-          .withCurrentVersion(currentVersion)
-          .withLastVersion(lastVersion)
-          .withDeletedAt(DEFAULT_DELETED_AT)
-          .build();
+      TablePO.Builder builder =
+          TablePO.builder()
+              .withTableId(oldTablePO.getTableId())
+              .withTableName(newTable.name())
+              .withMetalakeId(oldTablePO.getMetalakeId())
+              .withCatalogId(oldTablePO.getCatalogId())
+              .withSchemaId(newSchemaId)
+              .withAuditInfo(JsonUtils.anyFieldMapper().writeValueAsString(newTable.auditInfo()))
+              .withCurrentVersion(currentVersion)
+              .withLastVersion(lastVersion)
+              .withDeletedAt(DEFAULT_DELETED_AT);
+
+      // Note: GenericTableEntity will be removed in the refactor PR, so here just keep the old
+      // logic to make the UT pass.
+      if (newTable instanceof GenericTableEntity genericTable) {
+        builder.withFormat(genericTable.getFormat());
+        builder.withComment(genericTable.getComment());
+        builder.withProperties(
+            genericTable.getProperties() == null
+                ? null
+                : JsonUtils.anyFieldMapper().writeValueAsString(genericTable.getProperties()));
+        builder.withIndexes(
+            genericTable.getIndexes() == null
+                ? null
+                : JsonUtils.anyFieldMapper().writeValueAsString(genericTable.getIndexes()));
+        // TODO other fields in the refactor PRs.
+      }
+
+      return builder.build();
     } catch (JsonProcessingException e) {
       throw new RuntimeException("Failed to serialize json object:", e);
     }
