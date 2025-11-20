@@ -198,7 +198,7 @@ public class CaffeineEntityCache extends BaseEntityCache {
         EntityCacheRelationKey.of(ident, type),
         () -> {
           // Clear possible relation first, then clear the main entity cache.
-          // For example, if a tag has been updated, apart from invalidating the the relation:
+          // For example, if a tag has been updated, apart from invalidating the relation:
           // metadata_object_to_tag_rel, we also need to invalidate the tag_to_metadata_object_rel.
           // Assuming a tag "tag1" is related to a metadata object "catalog", when "catalog" is
           // renamed to `catalog_new`, we need to invalidate both relations to avoid stale data.
@@ -358,8 +358,8 @@ public class CaffeineEntityCache extends BaseEntityCache {
   }
 
   /**
-   * Syncs the entities to the cache, if entities is too big and can not put to the cache, then it
-   * will be removed from the cache and cacheIndex will not be updated.
+   * Syncs the entities to the cache, if entities are too big and cannot put to the cache, then it
+   * will be removed from the cache, and cacheIndex will not be updated.
    *
    * @param key The key of the entities.
    * @param newEntities The new entities to sync to the cache.
@@ -437,8 +437,7 @@ public class CaffeineEntityCache extends BaseEntityCache {
       // For example, we have stored a role entity in the cache and entity to role mapping in the
       // reverse index. This is: cache data: role identifier -> role entity, reverse index:
       // the securable object -> role. When we update the securable object, we need to invalidate
-      // the
-      // role entity from the cache though the securable object is not in the cache data.
+      // the role entity from the cache though the securable object is not in the cache data.
       valueForExactKey = EntityCacheRelationKey.of(identifier, type, relTypeOpt.orElse(null));
     }
 
