@@ -1072,7 +1072,6 @@ public class Privileges {
       super(condition, name);
     }
 
-
     /**
      * @return The instance with allow condition of the privilege.
      */
