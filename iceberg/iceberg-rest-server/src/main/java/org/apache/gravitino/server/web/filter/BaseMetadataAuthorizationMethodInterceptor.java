@@ -31,7 +31,6 @@ import org.apache.gravitino.authorization.AuthorizationRequestContext;
 import org.apache.gravitino.iceberg.service.IcebergExceptionMapper;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationExpression;
 import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionEvaluator;
-import org.apache.gravitino.server.web.Utils;
 import org.apache.gravitino.utils.PrincipalUtils;
 import org.apache.iceberg.exceptions.ForbiddenException;
 import org.slf4j.Logger;
@@ -73,12 +72,11 @@ public abstract class BaseMetadataAuthorizationMethodInterceptor implements Meth
         Object[] args = methodInvocation.getArguments();
         Map<Entity.EntityType, NameIdentifier> metadataContext =
             extractNameIdentifierFromParameters(parameters, args);
-        Map<String, Object> pathParams = Utils.extractPathParamsFromParameters(parameters, args);
         AuthorizationExpressionEvaluator authorizationExpressionEvaluator =
             new AuthorizationExpressionEvaluator(expression);
         boolean authorizeResult =
             authorizationExpressionEvaluator.evaluate(
-                metadataContext, pathParams, new AuthorizationRequestContext());
+                metadataContext, new AuthorizationRequestContext());
         if (!authorizeResult) {
           MetadataObject.Type type = expressionAnnotation.accessMetadataType();
           NameIdentifier accessMetadataName =

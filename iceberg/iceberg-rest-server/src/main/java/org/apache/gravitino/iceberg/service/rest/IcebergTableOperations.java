@@ -373,9 +373,9 @@ public class IcebergTableOperations {
             boolean accepted =
                 icebergMetricsManager.recordMetric(catalogName, icebergNS, request.report());
             if (accepted) {
-              return IcebergRestUtils.noContent();
+              return IcebergRESTUtils.noContent();
             } else {
-              return IcebergRestUtils.errorResponse(
+              return IcebergRESTUtils.errorResponse(
                   new RuntimeException("Metrics service unavailable: queue full or service closed"),
                   Response.Status.SERVICE_UNAVAILABLE.getStatusCode());
             }
