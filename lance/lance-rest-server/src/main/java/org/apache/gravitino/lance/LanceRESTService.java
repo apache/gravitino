@@ -48,6 +48,8 @@ public class LanceRESTService implements GravitinoAuxiliaryService {
   public static final String SERVICE_NAME = "lance-rest";
   public static final String LANCE_SPEC = "/lance/*";
 
+  private static final String LANCE_REST_SPEC_PACKAGE = "org.apache.gravitino.lance.service.rest";
+
   private JettyServer server;
   private NamespaceWrapper lanceNamespace;
 
@@ -70,7 +72,7 @@ public class LanceRESTService implements GravitinoAuxiliaryService {
 
     ResourceConfig resourceConfig = new ResourceConfig();
     resourceConfig.register(JacksonFeature.class);
-    resourceConfig.packages("org.apache.gravitino.lance.service.rest");
+    resourceConfig.packages(LANCE_REST_SPEC_PACKAGE);
     resourceConfig.register(
         new AbstractBinder() {
           @Override
@@ -90,7 +92,7 @@ public class LanceRESTService implements GravitinoAuxiliaryService {
     server.addCustomFilters(LANCE_SPEC);
     server.addSystemFilters(LANCE_SPEC);
 
-    LOG.info("Initialized Lance REST service for catalog {}", lanceConfig.getCatalogName());
+    LOG.info("Initialized Lance REST service for backend {}", lanceConfig.getNamespaceBackend());
   }
 
   @Override

@@ -715,7 +715,7 @@ public class JsonUtils {
       String text = node.asText().toLowerCase();
       return text.equals(Types.NullType.get().simpleString())
           ? Types.NullType.get()
-          : fromPrimitiveTypeString(text);
+          : fromPrimitiveTypeString(text, node.asText());
     }
 
     if (node.isObject() && node.has(TYPE)) {
@@ -834,49 +834,49 @@ public class JsonUtils {
     gen.writeEndObject();
   }
 
-  private static Type fromPrimitiveTypeString(String typeString) {
-    Type.PrimitiveType primitiveType = TYPES.get(typeString);
+  private static Type fromPrimitiveTypeString(String lowerTypeString, String orignalTypeString) {
+    Type.PrimitiveType primitiveType = TYPES.get(lowerTypeString);
     if (primitiveType != null) {
       return primitiveType;
     }
 
-    Matcher fixed = FIXED.matcher(typeString);
+    Matcher fixed = FIXED.matcher(lowerTypeString);
     if (fixed.matches()) {
       return Types.FixedType.of(Integer.parseInt(fixed.group(1)));
     }
 
-    Matcher fixedChar = FIXEDCHAR.matcher(typeString);
+    Matcher fixedChar = FIXEDCHAR.matcher(lowerTypeString);
     if (fixedChar.matches()) {
       return Types.FixedCharType.of(Integer.parseInt(fixedChar.group(1)));
     }
 
-    Matcher varchar = VARCHAR.matcher(typeString);
+    Matcher varchar = VARCHAR.matcher(lowerTypeString);
     if (varchar.matches()) {
       return Types.VarCharType.of(Integer.parseInt(varchar.group(1)));
     }
 
-    Matcher decimal = DECIMAL.matcher(typeString);
+    Matcher decimal = DECIMAL.matcher(lowerTypeString);
     if (decimal.matches()) {
       return Types.DecimalType.of(
           Integer.parseInt(decimal.group(1)), Integer.parseInt(decimal.group(2)));
     }
 
-    Matcher time = TIME.matcher(typeString);
+    Matcher time = TIME.matcher(lowerTypeString);
     if (time.matches()) {
       return Types.TimeType.of(Integer.parseInt(time.group(1)));
     }
 
-    Matcher timestampTz = TIMESTAMP_TZ.matcher(typeString);
+    Matcher timestampTz = TIMESTAMP_TZ.matcher(lowerTypeString);
     if (timestampTz.matches()) {
       return Types.TimestampType.withTimeZone(Integer.parseInt(timestampTz.group(1)));
     }
 
-    Matcher timestamp = TIMESTAMP.matcher(typeString);
+    Matcher timestamp = TIMESTAMP.matcher(lowerTypeString);
     if (timestamp.matches()) {
       return Types.TimestampType.withoutTimeZone(Integer.parseInt(timestamp.group(1)));
     }
 
-    return Types.UnparsedType.of(typeString);
+    return Types.UnparsedType.of(orignalTypeString);
   }
 
   private static Types.StructType readStructType(JsonNode node) {
