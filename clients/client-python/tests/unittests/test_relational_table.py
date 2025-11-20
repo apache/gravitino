@@ -222,7 +222,7 @@ class TestRelationalTable(unittest.TestCase):
             f"/catalogs/{encode_string(self.namespace.level(1))}"
             f"/schemas/{encode_string(self.namespace.level(2))}"
             f"/tables/{encode_string(self.relational_table.name())}"
-            "/partitions/"
+            "/partitions"
         )
         self.assertEqual(self.relational_table.get_partition_request_path(), expected)
 
