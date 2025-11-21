@@ -32,7 +32,7 @@ import javax.ws.rs.core.Context;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.gravitino.iceberg.service.IcebergExceptionMapper;
-import org.apache.gravitino.iceberg.service.IcebergRestUtils;
+import org.apache.gravitino.iceberg.service.IcebergRESTUtils;
 import org.apache.gravitino.iceberg.service.dispatcher.IcebergViewOperationDispatcher;
 import org.apache.gravitino.listener.api.event.IcebergRequestContext;
 import org.apache.gravitino.metrics.MetricNames;
@@ -62,7 +62,7 @@ public class IcebergViewRenameOperations {
   @ResponseMetered(name = "rename-view", absolute = true)
   public Response renameView(
       @PathParam("prefix") String prefix, RenameTableRequest renameViewRequest) {
-    String catalogName = IcebergRestUtils.getCatalogName(prefix);
+    String catalogName = IcebergRESTUtils.getCatalogName(prefix);
     LOG.info(
         "Rename Iceberg view, catalog: {}, source: {}, destination: {}.",
         catalogName,
@@ -75,7 +75,7 @@ public class IcebergViewRenameOperations {
             IcebergRequestContext context =
                 new IcebergRequestContext(httpServletRequest(), catalogName);
             viewOperationDispatcher.renameView(context, renameViewRequest);
-            return IcebergRestUtils.noContent();
+            return IcebergRESTUtils.noContent();
           });
     } catch (Exception e) {
       return IcebergExceptionMapper.toRESTResponse(e);

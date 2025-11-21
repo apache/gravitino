@@ -48,6 +48,7 @@ import org.apache.gravitino.cli.commands.RevokePrivilegesFromRole;
 import org.apache.gravitino.cli.commands.RoleAudit;
 import org.apache.gravitino.cli.commands.RoleDetails;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -422,5 +423,29 @@ class TestRoleCommands {
     doReturn(details).when(details).validate();
     RuntimeException thrown = assertThrows(RuntimeException.class, commandLine::handleCommandLine);
     assertEquals(org.apache.gravitino.cli.ErrorMessages.UNKNOWN_ROLE, thrown.getMessage());
+  }
+
+  @Test
+  void testRevokePrivilegesFromRoleNoSuchMetadataObjectExceptionShowsUnknownEntity() {
+    Main.useExit = false;
+    RoleDetails details =
+        spy(new RoleDetails(mock(CommandContext.class), "metalake_demo", "admin"));
+    doThrow(new org.apache.gravitino.exceptions.NoSuchMetadataObjectException("Unknown entity."))
+        .when(details)
+        .handle();
+    when(mockCommandLine.hasOption(GravitinoOptions.METALAKE)).thenReturn(true);
+    when(mockCommandLine.getOptionValue(GravitinoOptions.METALAKE)).thenReturn("metalake_demo");
+    when(mockCommandLine.hasOption(GravitinoOptions.ROLE)).thenReturn(true);
+    when(mockCommandLine.getOptionValues(GravitinoOptions.ROLE)).thenReturn(new String[] {"admin"});
+    GravitinoCommandLine commandLine =
+        spy(
+            new GravitinoCommandLine(
+                mockCommandLine, mockOptions, CommandEntities.ROLE, CommandActions.DETAILS));
+    doReturn(details)
+        .when(commandLine)
+        .newRoleDetails(any(CommandContext.class), eq("metalake_demo"), eq("admin"));
+    doReturn(details).when(details).validate();
+    RuntimeException thrown = assertThrows(RuntimeException.class, commandLine::handleCommandLine);
+    Assertions.assertEquals(ErrorMessages.UNKNOWN_ENTITY, thrown.getMessage());
   }
 }

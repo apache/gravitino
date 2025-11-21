@@ -94,6 +94,7 @@ wget "https://jdbc.postgresql.org/download/${pg_driver}" -O "${gravitino_staging
 cp "${gravitino_staging_dir}/${pg_driver}" "${gravitino_package_dir}/catalogs/jdbc-postgresql/libs/"
 cp "${gravitino_staging_dir}/${pg_driver}" "${gravitino_package_dir}/catalogs/lakehouse-iceberg/libs/"
 cp "${gravitino_staging_dir}/${pg_driver}" "${gravitino_iceberg_rest_dir}"
+cp "${gravitino_staging_dir}/${pg_driver}" "${gravitino_package_dir}/libs/"
 
 iceberg_version="1.10.0"
 iceberg_aws_bundle="iceberg-aws-bundle-${iceberg_version}.jar"

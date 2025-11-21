@@ -23,10 +23,10 @@ import java.util.Map;
 
 public class MiniGravitinoContext {
   Map<String, String> customConfig;
-  final boolean ignoreIcebergRestService;
+  final boolean ignoreAuxRestService;
 
-  public MiniGravitinoContext(Map<String, String> customConfig, boolean ignoreIcebergRestService) {
+  public MiniGravitinoContext(Map<String, String> customConfig, boolean ignoreAuxRestService) {
     this.customConfig = customConfig;
-    this.ignoreIcebergRestService = ignoreIcebergRestService;
+    this.ignoreAuxRestService = ignoreAuxRestService;
   }
 }

@@ -93,6 +93,9 @@ class MetadataObjectStatisticsOperations implements SupportsStatistics {
 
   @Override
   public boolean dropStatistics(List<String> statistics) throws UnmodifiableStatisticException {
+    Preconditions.checkArgument(
+        statistics != null && !statistics.isEmpty(), "Statistics list must not be null or empty");
+
     StatisticsDropRequest request = new StatisticsDropRequest(statistics.toArray(new String[0]));
     request.validate();
 

@@ -95,4 +95,16 @@ public class TestPartitionRange {
         IllegalArgumentException.class,
         () -> PartitionRange.upTo("upper", PartitionRange.BoundType.CLOSED, null));
   }
+
+  @Test
+  public void testAllPartitionsComparator() {
+    SortOrder defaultSortOrder =
+        SortOrders.of(NamedReference.MetadataField.PARTITION_NAME_FIELD, SortDirection.ASCENDING);
+
+    PartitionRange allPartitions = PartitionRange.ALL_PARTITIONS;
+
+    Assertions.assertFalse(allPartitions.lowerPartitionName().isPresent());
+    Assertions.assertFalse(allPartitions.upperPartitionName().isPresent());
+    Assertions.assertEquals(defaultSortOrder, allPartitions.comparator());
+  }
 }

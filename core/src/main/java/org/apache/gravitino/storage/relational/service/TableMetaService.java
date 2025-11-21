@@ -40,6 +40,7 @@ import org.apache.gravitino.storage.relational.mapper.PolicyMetadataObjectRelMap
 import org.apache.gravitino.storage.relational.mapper.SecurableObjectMapper;
 import org.apache.gravitino.storage.relational.mapper.StatisticMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.TableMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.TableVersionMapper;
 import org.apache.gravitino.storage.relational.mapper.TagMetadataObjectRelMapper;
 import org.apache.gravitino.storage.relational.po.ColumnPO;
 import org.apache.gravitino.storage.relational.po.TablePO;
@@ -118,17 +119,29 @@ public class TableMetaService {
       fillTablePOBuilderParentEntityId(builder, tableEntity.namespace());
 
       AtomicReference<TablePO> tablePORef = new AtomicReference<>();
+      TablePO po = POConverters.initializeTablePOWithVersion(tableEntity, builder);
       SessionUtils.doMultipleWithCommit(
           () ->
               SessionUtils.doWithoutCommit(
                   TableMetaMapper.class,
                   mapper -> {
-                    TablePO po = POConverters.initializeTablePOWithVersion(tableEntity, builder);
                     tablePORef.set(po);
                     if (overwrite) {
                       mapper.insertTableMetaOnDuplicateKeyUpdate(po);
                     } else {
                       mapper.insertTableMeta(po);
+                    }
+                  }),
+          () ->
+              SessionUtils.doWithCommit(
+                  TableVersionMapper.class,
+                  mapper -> {
+                    if (po.getFormat() != null) {
+                      if (overwrite) {
+                        mapper.insertTableVersionOnDuplicateKeyUpdate(po);
+                      } else {
+                        mapper.insertTableVersion(po);
+                      }
                     }
                   }),
           () -> {
@@ -197,6 +210,14 @@ public class TableMetaService {
                   SessionUtils.getWithoutCommit(
                       TableMetaMapper.class,
                       mapper -> mapper.updateTableMeta(newTablePO, oldTablePO, newSchemaId))),
+          () ->
+              SessionUtils.doWithCommit(
+                  TableVersionMapper.class,
+                  mapper -> {
+                    if (newTablePO.getFormat() != null) {
+                      mapper.insertTableVersionOnDuplicateKeyUpdate(newTablePO);
+                    }
+                  }),
           () -> {
             if (updateResult.get() > 0 && (isColumnChanged || isSchemaChanged)) {
               TableColumnMetaService.getInstance()
@@ -292,7 +313,6 @@ public class TableMetaService {
         SessionUtils.getWithoutCommit(
             TableMetaMapper.class,
             mapper -> mapper.selectTableMetaBySchemaIdAndName(schemaId, tableName));
-
     if (tablePO == null) {
       throw new NoSuchEntityException(
           NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
