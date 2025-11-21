@@ -291,6 +291,9 @@ public class MetadataFilterHelper {
       case USER:
         nameIdentifierMap.put(entityType, nameIdentifier);
         break;
+      case TAG:
+        nameIdentifierMap.put(entityType, nameIdentifier);
+        break;
       default:
         throw new IllegalArgumentException("Unsupported entity type: " + entityType);
     }

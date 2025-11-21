@@ -80,7 +80,7 @@ public class AuthorizationExpressionConverter {
     return EXPRESSION_CACHE.computeIfAbsent(
         authorizationExpression,
         (expression) -> {
-          String replacedExpression = replaceGetOwnerPrivilege(expression);
+          String replacedExpression = replaceCanAccessMetadataPrivilege(expression);
           replacedExpression = replaceAnyPrivilege(replacedExpression);
           replacedExpression = replaceAnyExpressions(replacedExpression);
           Matcher matcher = PATTERN.matcher(replacedExpression);
@@ -156,9 +156,9 @@ public class AuthorizationExpressionConverter {
     return result.toString();
   }
 
-  public static String replaceGetOwnerPrivilege(String expression) {
+  public static String replaceCanAccessMetadataPrivilege(String expression) {
     return expression.replaceAll(
-        "CAN_GET_OWNER",
+        AuthorizationExpressionConstants.CAN_ACCESS_METADATA,
         """
               ( entityType == 'CATALOG' && (%s)) ||
               ( entityType == 'SCHEMA' && (%s)) ||
@@ -272,6 +272,10 @@ public class AuthorizationExpressionConverter {
             "ANY_WRITE_FILESET",
             "((ANY(WRITE_FILESET, METALAKE, CATALOG, SCHEMA, FILESET))"
                 + "&& !(ANY(DENY_WRITE_FILESET, METALAKE, CATALOG, SCHEMA, FILESET)))");
+    expression =
+        expression.replaceAll(
+            "ANY_APPLY_TAG",
+            "((ANY(APPLY_TAG, METALAKE, TAG))" + "&& !(ANY(DENY_APPLY_TAG, METALAKE, TAG)))");
     expression =
         expression.replaceAll(
             CAN_SET_OWNER,
