@@ -20,6 +20,7 @@ package org.apache.gravitino.server.web.filter.authorization;
 import static org.apache.gravitino.server.web.filter.ParameterUtil.buildNameIdentifierForBatchAuthorization;
 import static org.apache.gravitino.server.web.filter.ParameterUtil.extractFromParameters;
 
+import com.google.common.base.Preconditions;
 import java.lang.reflect.Parameter;
 import java.util.HashMap;
 import java.util.Map;
@@ -69,13 +70,12 @@ public class AssociateTagAuthorizationExecutor implements AuthorizationExecutor 
     AuthorizationRequestContext context = new AuthorizationRequestContext();
     Entity.EntityType targetType =
         Entity.EntityType.TAG; // Tags are the only supported batch target here
-
+    Preconditions.checkArgument(request instanceof TagsAssociateRequest);
+    TagsAssociateRequest tagsAssociateRequest = (TagsAssociateRequest) request;
+    tagsAssociateRequest.validate();
     // Authorize both 'tagsToAdd' and 'tagsToRemove' fields.
-    if (request instanceof TagsAssociateRequest tagsAssociateRequest) {
-      return authorizeTagField(tagsAssociateRequest.getTagsToAdd(), context, targetType)
-          && authorizeTagField(tagsAssociateRequest.getTagsToRemove(), context, targetType);
-    }
-    throw new UnsupportedOperationException("Unsupported request type: " + request.getClass());
+    return authorizeTag(tagsAssociateRequest.getTagsToAdd(), context, targetType)
+        && authorizeTag(tagsAssociateRequest.getTagsToRemove(), context, targetType);
   }
 
   /**
@@ -87,7 +87,7 @@ public class AssociateTagAuthorizationExecutor implements AuthorizationExecutor 
    * @param targetType The entity type being authorized (expected to be TAG).
    * @return {@code true} if all tags in the field pass authorization; {@code false} otherwise.
    */
-  private boolean authorizeTagField(
+  private boolean authorizeTag(
       String[] tagNames, AuthorizationRequestContext context, Entity.EntityType targetType) {
 
     // Treat null or empty arrays as no-op (implicitly authorized)
