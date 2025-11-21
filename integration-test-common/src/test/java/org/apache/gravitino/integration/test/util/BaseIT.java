@@ -344,7 +344,7 @@ public class BaseIT {
 
     serverConfig = new ServerConfig();
     customConfigs.put(ENTITY_RELATIONAL_JDBC_BACKEND_PATH.getKey(), file.getAbsolutePath());
-    if (ignoreAuxRestService) {
+    if (ignoreLanceAuxRestService && ignoreIcebergAuxRestService) {
       customConfigs.put(
           AuxiliaryServiceManager.GRAVITINO_AUX_SERVICE_PREFIX
               + AuxiliaryServiceManager.AUX_SERVICE_NAMES,
