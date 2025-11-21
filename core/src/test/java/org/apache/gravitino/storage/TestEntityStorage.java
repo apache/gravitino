@@ -3175,25 +3175,4 @@ public class TestEntityStorage {
       throw new RuntimeException(e);
     }
   }
-
-  @ParameterizedTest
-  @MethodSource("storageProvider")
-  void testOwnerRelationship(String type) {
-    Config config = Mockito.mock(Config.class);
-    init(type, config);
-
-    AuditInfo auditInfo =
-        AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
-
-    try (EntityStore store = EntityStoreFactory.createEntityStore(config)) {
-      store.initialize(config);
-
-      BaseMetalake metalake =
-          createBaseMakeLake(RandomIdGenerator.INSTANCE.nextId(), "metalake", auditInfo);
-      store.put(metalake, false);
-
-    } catch (Exception e) {
-
-    }
-  }
 }
