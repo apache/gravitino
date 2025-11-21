@@ -121,7 +121,7 @@ public class TagEventDispatcher implements TagDispatcher {
 
   @Override
   public Tag createTag(String metalake, String name, String comment, Map<String, String> properties)
-      throws Exception {
+       {
     TagInfo tagInfo = new TagInfo(name, comment, properties);
     eventBus.dispatchEvent(
         new CreateTagPreEvent(PrincipalUtils.getCurrentUserName(), metalake, tagInfo));

@@ -56,7 +56,7 @@ public class TagHookDispatcher implements TagDispatcher {
 
   @Override
   public Tag createTag(String metalake, String name, String comment, Map<String, String> properties)
-      throws Exception {
+       {
     AuthorizationUtils.checkCurrentUser(metalake, PrincipalUtils.getCurrentUserName());
     Tag tag = dispatcher.createTag(metalake, name, comment, properties);
 

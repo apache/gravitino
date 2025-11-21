@@ -64,7 +64,7 @@ public interface TagDispatcher {
    * @return The created tag.
    */
   Tag createTag(String metalake, String name, String comment, Map<String, String> properties)
-      throws Exception;
+     ;
 
   /**
    * Alter an existing tag in the specified metalake
