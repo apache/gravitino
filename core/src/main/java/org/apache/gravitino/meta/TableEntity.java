@@ -77,10 +77,6 @@ public class TableEntity implements Entity, Auditable, HasIdentifier {
 
   @Getter
   @Accessors(fluent = true)
-  private String format;
-
-  @Getter
-  @Accessors(fluent = true)
   private Map<String, String> properties;
 
   @Getter
@@ -115,7 +111,6 @@ public class TableEntity implements Entity, Auditable, HasIdentifier {
     fields.put(NAME, name);
     fields.put(AUDIT_INFO, auditInfo);
     fields.put(COLUMNS, columns);
-    fields.put(FORMAT, format);
     fields.put(PROPERTIES, properties);
     fields.put(PARTITIONING, partitioning);
     fields.put(SORT_ORDERS, sortOrders);
@@ -195,7 +190,6 @@ public class TableEntity implements Entity, Auditable, HasIdentifier {
         && Objects.equal(namespace, baseTable.namespace)
         && Objects.equal(auditInfo, baseTable.auditInfo)
         && CollectionUtils.isEqualCollection(columns, baseTable.columns)
-        && Objects.equal(format, baseTable.format)
         // Please check the correctness of this comparison.
         && Objects.equal(properties, baseTable.properties)
         && Arrays.equals(partitioning, baseTable.partitioning)
@@ -213,7 +207,6 @@ public class TableEntity implements Entity, Auditable, HasIdentifier {
         auditInfo,
         columns,
         namespace,
-        format,
         properties,
         Arrays.hashCode(partitioning),
         Arrays.hashCode(sortOrders),
@@ -253,11 +246,6 @@ public class TableEntity implements Entity, Auditable, HasIdentifier {
 
     public Builder withColumns(List<ColumnEntity> columns) {
       tableEntity.columns = columns;
-      return this;
-    }
-
-    public Builder withFormat(String format) {
-      tableEntity.format = format;
       return this;
     }
 

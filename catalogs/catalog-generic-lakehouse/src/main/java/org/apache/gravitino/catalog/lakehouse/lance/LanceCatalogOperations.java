@@ -210,7 +210,6 @@ public class LanceCatalogOperations implements LakehouseCatalogOperations {
               .withId(oldEntity.id())
               .withName(oldEntity.name())
               .withNamespace(oldEntity.namespace())
-              .withFormat(oldEntity.format())
               .withAuditInfo(
                   AuditInfo.builder()
                       .withCreator(oldEntity.auditInfo().creator())
@@ -240,7 +239,7 @@ public class LanceCatalogOperations implements LakehouseCatalogOperations {
     try {
       handleTableChange(newEntity, addedIndexes, droppedColumns);
       return GenericLakehouseTable.builder()
-          .withFormat(newEntity.format())
+          .withFormat(LakehouseTableFormat.LANCE.lowerName())
           .withProperties(newEntity.properties())
           .withAuditInfo(newEntity.auditInfo())
           .withSortOrders(newEntity.sortOrders())

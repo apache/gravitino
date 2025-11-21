@@ -2702,7 +2702,6 @@ public class TestEntityStorage {
                           .withAuditInfo(auditInfo)
                           .build()))
               .withComment("This is a lance table")
-              .withFormat("lance")
               .withProperties(ImmutableMap.of("location", "/tmp/test", "format", "lance"))
               .build();
       store.put(table, false);
@@ -2723,7 +2722,6 @@ public class TestEntityStorage {
               .withNamespace(table.namespace())
               .withName(table.name())
               .withAuditInfo(auditInfo)
-              .withFormat("lance")
               .withColumns(
                   Lists.newArrayList(
                       ColumnEntity.builder()

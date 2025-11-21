@@ -288,12 +288,9 @@ public class GravitinoLanceTableOperations implements LanceTableOperations {
             .map(colName -> TableChange.deleteColumn(new String[] {colName}, false))
             .toArray(TableChange[]::new);
 
-    @SuppressWarnings("unused")
-    Table t = catalog.asTableCatalog().alterTable(tableIdentifier, changes);
+    catalog.asTableCatalog().alterTable(tableIdentifier, changes);
 
-    AlterTableDropColumnsResponse response = new AlterTableDropColumnsResponse();
-    response.setVersion(null);
-    return response;
+    return new AlterTableDropColumnsResponse();
   }
 
   @Override
