@@ -29,8 +29,7 @@ public class PolicyMetaPostgreSQLProvider extends PolicyMetaBaseSQLProvider {
   public String softDeletePolicyByMetalakeAndPolicyName(String metalakeName, String policyName) {
     return "UPDATE "
         + POLICY_META_TABLE_NAME
-        + " SET deleted_at = floor(extract(epoch from(current_timestamp -"
-        + " timestamp '1970-01-01 00:00:00')) * 1000)"
+        + " SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
         + " WHERE metalake_id = (SELECT metalake_id FROM "
         + " metalake_meta mm WHERE mm.metalake_name = #{metalakeName} AND mm.deleted_at = 0)"
         + " AND policy_name = #{policyName} AND deleted_at = 0";
@@ -40,8 +39,7 @@ public class PolicyMetaPostgreSQLProvider extends PolicyMetaBaseSQLProvider {
   public String softDeletePolicyMetasByMetalakeId(Long metalakeId) {
     return "UPDATE "
         + POLICY_META_TABLE_NAME
-        + " SET deleted_at = floor(extract(epoch from(current_timestamp -"
-        + " timestamp '1970-01-01 00:00:00')) * 1000)"
+        + " SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
         + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0";
   }
 
@@ -61,21 +59,21 @@ public class PolicyMetaPostgreSQLProvider extends PolicyMetaBaseSQLProvider {
         + " (policy_id, policy_name, policy_type, metalake_id,"
         + " audit_info, current_version, last_version, deleted_at)"
         + " VALUES ("
-        + " #{policyPO.policyId},"
-        + " #{policyPO.policyName},"
-        + " #{policyPO.policyType},"
-        + " #{policyPO.metalakeId},"
-        + " #{policyPO.auditInfo},"
-        + " #{policyPO.currentVersion},"
-        + " #{policyPO.lastVersion},"
-        + " #{policyPO.deletedAt})"
+        + " #{policyMeta.policyId},"
+        + " #{policyMeta.policyName},"
+        + " #{policyMeta.policyType},"
+        + " #{policyMeta.metalakeId},"
+        + " #{policyMeta.auditInfo},"
+        + " #{policyMeta.currentVersion},"
+        + " #{policyMeta.lastVersion},"
+        + " #{policyMeta.deletedAt})"
         + " ON CONFLICT (policy_id) DO UPDATE SET"
-        + " policy_name = #{policyPO.policyName},"
-        + " policy_type = #{policyPO.policyType},"
-        + " metalake_id = #{policyPO.metalakeId},"
-        + " audit_info = #{policyPO.auditInfo},"
-        + " current_version = #{policyPO.currentVersion},"
-        + " last_version = #{policyPO.lastVersion},"
-        + " deleted_at = #{policyPO.deletedAt}";
+        + " policy_name = #{policyMeta.policyName},"
+        + " policy_type = #{policyMeta.policyType},"
+        + " metalake_id = #{policyMeta.metalakeId},"
+        + " audit_info = #{policyMeta.auditInfo},"
+        + " current_version = #{policyMeta.currentVersion},"
+        + " last_version = #{policyMeta.lastVersion},"
+        + " deleted_at = #{policyMeta.deletedAt}";
   }
 }
