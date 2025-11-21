@@ -53,6 +53,7 @@ import org.apache.gravitino.credential.CredentialOperationDispatcher;
 import org.apache.gravitino.hook.AccessControlHookDispatcher;
 import org.apache.gravitino.hook.CatalogHookDispatcher;
 import org.apache.gravitino.hook.FilesetHookDispatcher;
+import org.apache.gravitino.hook.JobHookDispatcher;
 import org.apache.gravitino.hook.MetalakeHookDispatcher;
 import org.apache.gravitino.hook.ModelHookDispatcher;
 import org.apache.gravitino.hook.PolicyHookDispatcher;
@@ -603,15 +604,16 @@ public class GravitinoEnv {
     this.auxServiceManager.serviceInit(config);
 
     // Create and initialize Tag related modules
-    TagEventDispatcher tagEventDispatcher =
-        new TagEventDispatcher(eventBus, new TagManager(idGenerator, entityStore));
-    this.tagDispatcher = new TagHookDispatcher(tagEventDispatcher);
+    this.tagDispatcher =
+        new TagEventDispatcher(
+            eventBus, new TagHookDispatcher(new TagManager(idGenerator, entityStore)));
 
     PolicyEventDispatcher policyEventDispatcher =
         new PolicyEventDispatcher(eventBus, new PolicyManager(idGenerator, entityStore));
     this.policyDispatcher = new PolicyHookDispatcher(policyEventDispatcher);
 
     this.jobOperationDispatcher =
-        new JobEventDispatcher(eventBus, new JobManager(config, entityStore, idGenerator));
+        new JobEventDispatcher(
+            eventBus, new JobHookDispatcher(new JobManager(config, entityStore, idGenerator)));
   }
 }

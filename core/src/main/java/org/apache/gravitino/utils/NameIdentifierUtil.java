@@ -518,6 +518,28 @@ public class NameIdentifierUtil {
   }
 
   /**
+   * Check the given {@link NameIdentifier} is a job identifier. Throw an {@link
+   * IllegalNameIdentifierException} if it's not.
+   *
+   * @param ident The job {@link NameIdentifier} to check.
+   */
+  public static void checkJob(NameIdentifier ident) {
+    NameIdentifier.check(ident != null, "Job identifier must not be null");
+    NamespaceUtil.checkJob(ident.namespace());
+  }
+
+  /**
+   * Check the given {@link NameIdentifier} is a job template identifier. Throw an {@link
+   * IllegalNameIdentifierException} if it's not.
+   *
+   * @param ident The job template {@link NameIdentifier} to check.
+   */
+  public static void checkJobTemplate(NameIdentifier ident) {
+    NameIdentifier.check(ident != null, "Job template identifier must not be null");
+    NamespaceUtil.checkJobTemplate(ident.namespace());
+  }
+
+  /**
    * Convert the given {@link NameIdentifier} and {@link Entity.EntityType} to {@link
    * MetadataObject}.
    *
@@ -578,9 +600,19 @@ public class NameIdentifierUtil {
       case TAG:
         checkTag(ident);
         return MetadataObjects.of(null, ident.name(), MetadataObject.Type.TAG);
+
       case POLICY:
         checkPolicy(ident);
         return MetadataObjects.of(null, ident.name(), MetadataObject.Type.POLICY);
+
+      case JOB:
+        checkJob(ident);
+        return MetadataObjects.of(null, ident.name(), MetadataObject.Type.JOB);
+
+      case JOB_TEMPLATE:
+        checkJobTemplate(ident);
+        return MetadataObjects.of(null, ident.name(), MetadataObject.Type.JOB_TEMPLATE);
+
       default:
         throw new IllegalArgumentException(
             "Entity type " + entityType + " is not supported to convert to MetadataObject");
