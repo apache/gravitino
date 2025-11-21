@@ -84,12 +84,6 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
    */
   private Set<Long> loadedRoles = ConcurrentHashMap.newKeySet();
 
-  /**
-   * loadedOwners is used to cache owners that have loaded permissions. When the permissions of a
-   * role are updated, they should be removed from it.
-   */
-  private Set<Long> loadedOwners = ConcurrentHashMap.newKeySet();
-
   private Map<Long, Long> ownerRel = new ConcurrentHashMap<>();
 
   private Executor executor = null;
@@ -365,7 +359,6 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
     MetadataObject metadataObject = NameIdentifierUtil.toMetadataObject(nameIdentifier, type);
     Long metadataId = MetadataIdConverter.getID(metadataObject, metalake);
     ownerRel.remove(metadataId);
-    loadedOwners.remove(metadataId);
   }
 
   @Override
@@ -491,7 +484,7 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
   }
 
   private void loadOwnerPolicy(String metalake, MetadataObject metadataObject, Long metadataId) {
-    if (loadedOwners.contains(metadataId)) {
+    if (ownerRel.containsKey(metadataId)) {
       LOG.debug("Metadata {} OWNER has bean loaded.", metadataId);
       return;
     }
@@ -509,7 +502,6 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
         if (ownerEntity instanceof UserEntity) {
           UserEntity user = (UserEntity) ownerEntity;
           ownerRel.put(metadataId, user.id());
-          loadedOwners.add(metadataId);
         }
       }
     } catch (IOException e) {
