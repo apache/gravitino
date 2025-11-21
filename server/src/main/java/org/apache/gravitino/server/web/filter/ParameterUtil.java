@@ -22,7 +22,6 @@ import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
-import javax.ws.rs.PathParam;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
@@ -177,20 +176,6 @@ public class ParameterUtil {
     }
 
     return nameIdentifierMap;
-  }
-
-  public static Map<String, Object> extractPathParamsFromParameters(
-      Parameter[] parameters, Object[] args) {
-    Map<String, Object> pathParams = new HashMap<>();
-    for (int i = 0; i < parameters.length; i++) {
-      Parameter parameter = parameters[i];
-      PathParam pathParam = parameter.getAnnotation(PathParam.class);
-      if (pathParam == null) {
-        continue;
-      }
-      pathParams.put("p_" + pathParam.value(), args[i]);
-    }
-    return pathParams;
   }
 
   public static String extractMetadataObjectTypeFromParameters(

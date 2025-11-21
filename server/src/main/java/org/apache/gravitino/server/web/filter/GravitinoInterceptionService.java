@@ -20,7 +20,6 @@ package org.apache.gravitino.server.web.filter;
 import static org.apache.gravitino.server.web.filter.ParameterUtil.extractAuthorizationRequestTypeFromParameters;
 import static org.apache.gravitino.server.web.filter.ParameterUtil.extractMetadataObjectTypeFromParameters;
 import static org.apache.gravitino.server.web.filter.ParameterUtil.extractNameIdentifierFromParameters;
-import static org.apache.gravitino.server.web.filter.ParameterUtil.extractPathParamsFromParameters;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
@@ -138,7 +137,7 @@ public class GravitinoInterceptionService implements InterceptionService {
           String entityType = extractMetadataObjectTypeFromParameters(parameters, args);
           Map<Entity.EntityType, NameIdentifier> metadataContext =
               extractNameIdentifierFromParameters(parameters, args);
-          Map<String, Object> pathParams = extractPathParamsFromParameters(parameters, args);
+          Map<String, Object> pathParams = Utils.extractPathParamsFromParameters(parameters, args);
           AuthorizationExpressionEvaluator authorizationExpressionEvaluator =
               new AuthorizationExpressionEvaluator(expression);
           AuthorizationRequest.RequestType requestType =
