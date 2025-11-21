@@ -96,11 +96,6 @@ public class AssociateTagAuthorizationExecutor implements AuthorizationExecutor 
     }
 
     for (String tagName : tagNames) {
-      // Skip null entries defensively
-      if (tagName == null) {
-        continue;
-      }
-
       // Use a fresh context copy for each tag to avoid cross-contamination
       Map<Entity.EntityType, NameIdentifier> currentContext = new HashMap<>(this.metadataContext);
       buildNameIdentifierForBatchAuthorization(currentContext, tagName, targetType);
