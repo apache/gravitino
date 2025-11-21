@@ -35,14 +35,14 @@ import javax.ws.rs.core.Response;
 import javax.ws.rs.core.Response.Status;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.NameIdentifier;
-import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
+import org.apache.gravitino.iceberg.service.authorization.IcebergRESTServerContext;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.rest.responses.ErrorResponse;
 
-public class IcebergRestUtils {
+public class IcebergRESTUtils {
 
-  private IcebergRestUtils() {}
+  private IcebergRESTUtils() {}
 
   public static <T> Response ok(T t) {
     return Response.status(Response.Status.OK).entity(t).type(MediaType.APPLICATION_JSON).build();
@@ -60,7 +60,7 @@ public class IcebergRestUtils {
     return Response.status(Status.NOT_FOUND).build();
   }
 
-  public static Response errorResponse(Exception ex, int httpStatus) {
+  public static Response errorResponse(Throwable ex, int httpStatus) {
     ErrorResponse errorResponse =
         ErrorResponse.builder()
             .responseCode(httpStatus)
@@ -100,7 +100,7 @@ public class IcebergRestUtils {
   public static String getCatalogName(String rawPrefix) {
     String catalogName = normalizePrefix(rawPrefix);
     if (StringUtils.isBlank(catalogName)) {
-      return IcebergConstants.ICEBERG_REST_DEFAULT_CATALOG;
+      return IcebergRESTServerContext.getInstance().defaultCatalogName();
     }
     return catalogName;
   }

@@ -19,6 +19,41 @@
 
 package org.apache.gravitino.storage.relational.mapper.provider.postgresql;
 
-import org.apache.gravitino.storage.relational.mapper.provider.base.TableVersionBaseSQLProvider;
+import static org.apache.gravitino.storage.relational.mapper.TableVersionMapper.TABLE_NAME;
 
-public class TableVersionPostgreSQLProvider extends TableVersionBaseSQLProvider {}
+import org.apache.gravitino.storage.relational.mapper.provider.base.TableVersionBaseSQLProvider;
+import org.apache.gravitino.storage.relational.po.TablePO;
+import org.apache.ibatis.annotations.Param;
+
+public class TableVersionPostgreSQLProvider extends TableVersionBaseSQLProvider {
+
+  public String insertTableVersionOnDuplicateKeyUpdate(@Param("tablePO") TablePO tablePO) {
+    return "INSERT INTO "
+        + TABLE_NAME
+        + " (table_id, format, properties, partitioning,"
+        + " distribution, sort_orders, indexes, comment,"
+        + " version, deleted_at)"
+        + " VALUES ("
+        + " #{tablePO.tableId},"
+        + " #{tablePO.format},"
+        + " #{tablePO.properties},"
+        + " #{tablePO.partitions},"
+        + " #{tablePO.distribution},"
+        + " #{tablePO.sortOrders},"
+        + " #{tablePO.indexes},"
+        + " #{tablePO.comment},"
+        + " #{tablePO.currentVersion},"
+        + " #{tablePO.deletedAt}"
+        + " )"
+        + " ON CONFLICT (table_id, deleted_at) DO UPDATE SET"
+        + " format = #{tablePO.format},"
+        + " properties = #{tablePO.properties},"
+        + " partitioning = #{tablePO.partitions},"
+        + " distribution = #{tablePO.distribution},"
+        + " sort_orders = #{tablePO.sortOrders},"
+        + " indexes = #{tablePO.indexes},"
+        + " comment = #{tablePO.comment},"
+        + " version = #{tablePO.currentVersion},"
+        + " deleted_at = #{tablePO.deletedAt}";
+  }
+}

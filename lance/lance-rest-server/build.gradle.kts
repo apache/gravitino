@@ -26,7 +26,6 @@ plugins {
 
 dependencies {
   implementation(project(":api"))
-  implementation(project(":catalogs:catalog-common"))
   implementation(project(":common")) {
     exclude("*")
   }
@@ -38,6 +37,8 @@ dependencies {
   }
 
   implementation(project(":lance:lance-common"))
+  implementation(libs.lance)
+  implementation(libs.commons.lang3)
 
   implementation(libs.bundles.jetty)
   implementation(libs.bundles.jersey)

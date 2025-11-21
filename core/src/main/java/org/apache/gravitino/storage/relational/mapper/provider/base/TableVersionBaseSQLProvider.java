@@ -29,9 +29,9 @@ public class TableVersionBaseSQLProvider {
   public String insertTableVersion(@Param("tablePO") TablePO tablePO) {
     return "INSERT INTO "
         + TABLE_NAME
-        + " (table_id, format, properties, partitioning"
+        + " (table_id, format, properties, partitioning,"
         + " distribution, sort_orders, indexes, comment,"
-        + " version, last_version, deleted_at)"
+        + " version, deleted_at)"
         + " VALUES ("
         + " #{tablePO.tableId},"
         + " #{tablePO.format},"
@@ -42,7 +42,6 @@ public class TableVersionBaseSQLProvider {
         + " #{tablePO.indexes},"
         + " #{tablePO.comment},"
         + " #{tablePO.currentVersion},"
-        + " #{tablePO.lastVersion},"
         + " #{tablePO.deletedAt}"
         + " )";
   }

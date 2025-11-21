@@ -19,10 +19,13 @@
 package org.apache.gravitino.server.web;
 
 import com.google.common.collect.Maps;
+import java.lang.reflect.Parameter;
 import java.security.PrivilegedExceptionAction;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
 import javax.servlet.http.HttpServletRequest;
+import javax.ws.rs.PathParam;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.Response.Status;
@@ -244,5 +247,19 @@ public class Utils {
     }
 
     return StringUtils.isBlank(clientVersion) ? null : Version.parseVersionNumber(clientVersion);
+  }
+
+  public static Map<String, Object> extractPathParamsFromParameters(
+      Parameter[] parameters, Object[] args) {
+    Map<String, Object> pathParams = new HashMap<>();
+    for (int i = 0; i < parameters.length; i++) {
+      Parameter parameter = parameters[i];
+      PathParam pathParam = parameter.getAnnotation(PathParam.class);
+      if (pathParam == null) {
+        continue;
+      }
+      pathParams.put("p_" + pathParam.value(), args[i]);
+    }
+    return pathParams;
   }
 }

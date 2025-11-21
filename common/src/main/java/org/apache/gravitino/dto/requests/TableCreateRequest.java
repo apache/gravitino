@@ -122,9 +122,6 @@ public class TableCreateRequest implements RESTRequest {
   public void validate() throws IllegalArgumentException {
     Preconditions.checkArgument(
         StringUtils.isNotBlank(name), "\"name\" field is required and cannot be empty");
-    Preconditions.checkArgument(
-        columns != null && columns.length != 0,
-        "\"columns\" field is required and cannot be empty");
 
     if (sortOrders != null) {
       Arrays.stream(sortOrders).forEach(sortOrder -> sortOrder.validate(columns));

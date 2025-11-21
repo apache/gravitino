@@ -19,6 +19,7 @@
 package org.apache.gravitino.catalog.lakehouse;
 
 import static org.apache.gravitino.Entity.EntityType.TABLE;
+import static org.apache.gravitino.catalog.lakehouse.GenericLakehouseTablePropertiesMetadata.LOCATION;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.Maps;
@@ -26,6 +27,8 @@ import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Collectors;
+import org.apache.commons.collections4.MapUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.Entity;
@@ -59,6 +62,8 @@ import org.apache.gravitino.rel.expressions.sorts.SortOrder;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.indexes.Index;
 import org.apache.hadoop.fs.Path;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Operations for interacting with a generic lakehouse catalog in Apache Gravitino.
@@ -68,6 +73,8 @@ import org.apache.hadoop.fs.Path;
  */
 public class GenericLakehouseCatalogOperations
     implements CatalogOperations, SupportsSchemas, TableCatalog {
+  private static final Logger LOG =
+      LoggerFactory.getLogger(GenericLakehouseCatalogOperations.class);
 
   private static final String SLASH = "/";
 
@@ -79,8 +86,10 @@ public class GenericLakehouseCatalogOperations
   private static final Map<String, LakehouseCatalogOperations> SUPPORTED_FORMATS =
       Maps.newHashMap();
 
+  private Map<String, String> catalogConfig;
   private CatalogInfo catalogInfo;
   private HasPropertyMetadata propertiesMetadata;
+
   /**
    * Initializes the generic lakehouse catalog operations with the provided configuration.
    *
@@ -102,6 +111,9 @@ public class GenericLakehouseCatalogOperations
         StringUtils.isNotBlank(catalogLocation)
             ? Optional.of(catalogLocation).map(this::ensureTrailingSlash).map(Path::new)
             : Optional.empty();
+    this.catalogConfig = conf;
+    this.catalogInfo = info;
+    this.propertiesMetadata = propertiesMetadata;
   }
 
   public GenericLakehouseCatalogOperations() {
@@ -207,11 +219,15 @@ public class GenericLakehouseCatalogOperations
       SortOrder[] sortOrders,
       Index[] indexes)
       throws NoSuchSchemaException, TableAlreadyExistsException {
-    String format = properties.getOrDefault("format", "lance");
-    String tableLocation = calculateTableLocation(ident, properties);
-    Map<String, String> newProperties = Maps.newHashMap(properties);
-    newProperties.put("location", tableLocation);
+    Schema schema = loadSchema(NameIdentifier.of(ident.namespace().levels()));
+    String tableLocation = calculateTableLocation(schema, ident, properties);
+    Map<String, String> tableStorageProps = calculateTableStorageProps(schema, properties);
 
+    Map<String, String> newProperties = Maps.newHashMap(properties);
+    newProperties.put(LOCATION, tableLocation);
+    newProperties.putAll(tableStorageProps);
+
+    String format = properties.getOrDefault("format", "lance");
     LakehouseCatalogOperations lakehouseCatalogOperations =
         SUPPORTED_FORMATS.compute(
             format,
@@ -226,22 +242,13 @@ public class GenericLakehouseCatalogOperations
   }
 
   private String calculateTableLocation(
-      NameIdentifier tableIdent, Map<String, String> tableProperties) {
-    String tableLocation = tableProperties.get("location");
+      Schema schema, NameIdentifier tableIdent, Map<String, String> tableProperties) {
+    String tableLocation = tableProperties.get(LOCATION);
     if (StringUtils.isNotBlank(tableLocation)) {
       return ensureTrailingSlash(tableLocation);
     }
 
-    String schemaLocation;
-    try {
-      Schema schema = loadSchema(NameIdentifier.of(tableIdent.namespace().levels()));
-      schemaLocation = schema.properties().get("location");
-    } catch (NoSuchSchemaException e) {
-      throw new RuntimeException(
-          String.format(
-              "Failed to load schema for table %s to determine default location.", tableIdent),
-          e);
-    }
+    String schemaLocation = schema.properties() == null ? null : schema.properties().get(LOCATION);
 
     // If we do not set location in table properties, and schema location is set, use schema
     // location
@@ -272,14 +279,6 @@ public class GenericLakehouseCatalogOperations
   @Override
   public Table alterTable(NameIdentifier ident, TableChange... changes)
       throws NoSuchTableException, IllegalArgumentException {
-    // TODO(#8838): Implement table alteration
-    throw new UnsupportedOperationException(
-        "Table operations are not yet implemented. "
-            + "This feature is planned for a future release.");
-  }
-
-  @Override
-  public boolean dropTable(NameIdentifier ident) {
     EntityStore store = GravitinoEnv.getInstance().entityStore();
     Namespace namespace = ident.namespace();
     try {
@@ -295,10 +294,36 @@ public class GenericLakehouseCatalogOperations
                       ? createLakehouseCatalogOperations(
                           format, tableProperties, catalogInfo, propertiesMetadata)
                       : v);
-      return lakehouseCatalogOperations.dropTable(ident);
+      return lakehouseCatalogOperations.alterTable(ident, changes);
     } catch (IOException e) {
       throw new RuntimeException("Failed to list tables under schema " + namespace, e);
     }
+  }
+
+  @Override
+  public boolean dropTable(NameIdentifier ident) {
+    EntityStore store = GravitinoEnv.getInstance().entityStore();
+    GenericTableEntity tableEntity;
+    try {
+      tableEntity = store.get(ident, Entity.EntityType.TABLE, GenericTableEntity.class);
+    } catch (NoSuchEntityException e) {
+      LOG.warn("Table {} does not exist, skip dropping.", ident);
+      return false;
+    } catch (IOException ioe) {
+      throw new RuntimeException("Failed to get table " + ident);
+    }
+
+    Map<String, String> tableProperties = tableEntity.getProperties();
+    String format = tableProperties.getOrDefault("format", "lance");
+    LakehouseCatalogOperations lakehouseCatalogOperations =
+        SUPPORTED_FORMATS.compute(
+            format,
+            (k, v) ->
+                v == null
+                    ? createLakehouseCatalogOperations(
+                        format, tableProperties, catalogInfo, propertiesMetadata)
+                    : v);
+    return lakehouseCatalogOperations.dropTable(ident);
   }
 
   private String ensureTrailingSlash(String path) {
@@ -321,5 +346,34 @@ public class GenericLakehouseCatalogOperations
 
     operations.initialize(properties, catalogInfo, propertiesMetadata);
     return operations;
+  }
+
+  /**
+   * Calculate the table storage properties by merging catalog config, schema properties and table
+   * properties. The precedence is: table properties > schema properties > catalog config.
+   *
+   * @param schema The schema of the table.
+   * @param tableProps The table properties.
+   * @return The merged table storage properties.
+   */
+  private Map<String, String> calculateTableStorageProps(
+      Schema schema, Map<String, String> tableProps) {
+    Map<String, String> storageProps = getLanceTableStorageOptions(catalogConfig);
+    storageProps.putAll(getLanceTableStorageOptions(schema.properties()));
+    storageProps.putAll(getLanceTableStorageOptions(tableProps));
+    return storageProps;
+  }
+
+  private Map<String, String> getLanceTableStorageOptions(Map<String, String> properties) {
+    if (MapUtils.isEmpty(properties)) {
+      return Maps.newHashMap();
+    }
+    return properties.entrySet().stream()
+        .filter(
+            e ->
+                e.getKey()
+                    .startsWith(
+                        GenericLakehouseTablePropertiesMetadata.LANCE_TABLE_STORAGE_OPTION_PREFIX))
+        .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
   }
 }
