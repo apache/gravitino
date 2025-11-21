@@ -55,24 +55,22 @@ public class TagHookDispatcher implements TagDispatcher {
   }
 
   @Override
-  public Tag createTag(
-      String metalake, String name, String comment, Map<String, String> properties) {
+  public Tag createTag(String metalake, String name, String comment, Map<String, String> properties)
+      throws Exception {
     AuthorizationUtils.checkCurrentUser(metalake, PrincipalUtils.getCurrentUserName());
     Tag tag = dispatcher.createTag(metalake, name, comment, properties);
-    try {
-      // Set the creator as the owner of the catalog.
-      OwnerDispatcher ownerDispatcher = GravitinoEnv.getInstance().ownerDispatcher();
-      if (ownerDispatcher != null) {
-        ownerDispatcher.setOwner(
-            metalake,
-            NameIdentifierUtil.toMetadataObject(
-                NameIdentifierUtil.ofTag(metalake, name), Entity.EntityType.TAG),
-            PrincipalUtils.getCurrentUserName(),
-            Owner.Type.USER);
-      }
-    } catch (Exception e) {
-      throw new RuntimeException(e);
+
+    // Set the creator as the owner of the catalog.
+    OwnerDispatcher ownerDispatcher = GravitinoEnv.getInstance().ownerDispatcher();
+    if (ownerDispatcher != null) {
+      ownerDispatcher.setOwner(
+          metalake,
+          NameIdentifierUtil.toMetadataObject(
+              NameIdentifierUtil.ofTag(metalake, name), Entity.EntityType.TAG),
+          PrincipalUtils.getCurrentUserName(),
+          Owner.Type.USER);
     }
+
     return tag;
   }
 
