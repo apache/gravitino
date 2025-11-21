@@ -70,7 +70,9 @@ public class AssociateTagAuthorizationExecutor implements AuthorizationExecutor 
     AuthorizationRequestContext context = new AuthorizationRequestContext();
     Entity.EntityType targetType =
         Entity.EntityType.TAG; // Tags are the only supported batch target here
-    Preconditions.checkArgument(request instanceof TagsAssociateRequest);
+    Preconditions.checkArgument(
+        request instanceof TagsAssociateRequest,
+        "Only tag can use AssociateTagAuthorizationExecutor, please contact the administrator.");
     TagsAssociateRequest tagsAssociateRequest = (TagsAssociateRequest) request;
     tagsAssociateRequest.validate();
     // Authorize both 'tagsToAdd' and 'tagsToRemove' fields.
