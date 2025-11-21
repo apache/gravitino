@@ -22,6 +22,8 @@ env_map = {
     "LANCE_REST_NAMESPACE_BACKEND": "namespace-backend",
     "LANCE_REST_GRAVITINO_URI": "gravitino.uri",
     "LANCE_REST_GRAVITINO_METALAKE_NAME": "gravitino.metalake-name",
+    "LANCE_REST_HOST": "host",
+    "LANCE_REST_PORT": "httpPort"
 }
 
 init_config = {
@@ -29,7 +31,7 @@ init_config = {
     "gravitino.uri": "http://localhost:8090",
     "gravitino.metalake-name": "metalake",
     "host": "0.0.0.0",
-    "port": "9101"
+    "httpPort": "9101"
 }
 
 

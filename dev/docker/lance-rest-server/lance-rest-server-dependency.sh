@@ -33,3 +33,7 @@ mkdir -p "${lance_rest_server_dir}/packages"
 cd distribution
 tar xfz gravitino-lance-rest-server-*.tar.gz
 cp -r gravitino-lance-rest-server*-bin ${lance_rest_server_dir}/packages/gravitino-lance-rest-server
+
+cd ${lance_rest_server_dir}
+cp start-lance-rest-server.sh ${lance_rest_server_dir}/packages/gravitino-lance-rest-server/bin/
+cp rewrite_config.py ${lance_rest_server_dir}/packages/gravitino-lance-rest-server/bin/
