@@ -86,7 +86,6 @@ public class AssociateTagAuthorizationExecutor implements AuthorizationExecutor 
    * @param context The shared authorization request context.
    * @param targetType The entity type being authorized (expected to be TAG).
    * @return {@code true} if all tags in the field pass authorization; {@code false} otherwise.
-   * @throws IllegalAccessException if the field is not accessible.
    */
   private boolean authorizeTagField(
       String[] tagNames, AuthorizationRequestContext context, Entity.EntityType targetType) {
