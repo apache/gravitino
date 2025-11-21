@@ -26,6 +26,8 @@ import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_TABLE
 import com.codahale.metrics.annotation.ResponseMetered;
 import com.codahale.metrics.annotation.Timed;
 import com.google.common.collect.Maps;
+import com.lancedb.lance.namespace.model.AlterTableDropColumnsRequest;
+import com.lancedb.lance.namespace.model.AlterTableDropColumnsResponse;
 import com.lancedb.lance.namespace.model.CreateEmptyTableRequest;
 import com.lancedb.lance.namespace.model.CreateEmptyTableResponse;
 import com.lancedb.lance.namespace.model.CreateTableRequest;
@@ -52,6 +54,7 @@ import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.MultivaluedMap;
 import javax.ws.rs.core.Response;
+import org.apache.arrow.util.Preconditions;
 import org.apache.gravitino.lance.common.ops.NamespaceWrapper;
 import org.apache.gravitino.lance.common.utils.SerializationUtils;
 import org.apache.gravitino.lance.service.LanceExceptionMapper;
@@ -192,6 +195,27 @@ public class LanceTableOperations {
     }
   }
 
+  @POST
+  @Path("/drop_columns")
+  @Timed(name = "drop-columns." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
+  @ResponseMetered(name = "drop-columns", absolute = true)
+  public Response dropColumns(
+      @PathParam("id") String tableId,
+      @QueryParam("delimiter") @DefaultValue("$") String delimiter,
+      @Context HttpHeaders headers,
+      AlterTableDropColumnsRequest alterTableDropColumnsRequest) {
+    try {
+      validateDropColumnsRequest(alterTableDropColumnsRequest);
+      AlterTableDropColumnsResponse response =
+          lanceNamespace
+              .asTableOps()
+              .alterTableDropColumns(tableId, delimiter, alterTableDropColumnsRequest);
+      return Response.ok(response).build();
+    } catch (Exception e) {
+      return LanceExceptionMapper.toRESTResponse(tableId, e);
+    }
+  }
+
   private void validateCreateEmptyTableRequest(
       @SuppressWarnings("unused") CreateEmptyTableRequest request) {
     // No specific fields to validate for now
@@ -212,5 +236,10 @@ public class LanceTableOperations {
       @SuppressWarnings("unused") DescribeTableRequest request) {
     // We will ignore the id in the request body since it's already provided in the path param
     // No specific fields to validate for now
+  }
+
+  private void validateDropColumnsRequest(AlterTableDropColumnsRequest request) {
+    Preconditions.checkArgument(
+        !request.getColumns().isEmpty(), "Columns to drop cannot be empty.");
   }
 }
