@@ -20,8 +20,10 @@
 package org.apache.gravitino.storage.relational.mapper;
 
 import org.apache.gravitino.storage.relational.po.TablePO;
+import org.apache.ibatis.annotations.DeleteProvider;
 import org.apache.ibatis.annotations.InsertProvider;
 import org.apache.ibatis.annotations.Param;
+import org.apache.ibatis.annotations.UpdateProvider;
 
 public interface TableVersionMapper {
   String TABLE_NAME = "table_version_info";
@@ -33,4 +35,16 @@ public interface TableVersionMapper {
       type = TableVersionSQLProviderFactory.class,
       method = "insertTableVersionOnDuplicateKeyUpdate")
   void insertTableVersionOnDuplicateKeyUpdate(@Param("tablePO") TablePO tablePO);
+
+  @UpdateProvider(
+      type = TableVersionSQLProviderFactory.class,
+      method = "softDeleteTableVersionByTableIdAndVersion")
+  void softDeleteTableVersionByTableIdAndVersion(
+      @Param("tableId") Long tableId, @Param("version") Long version);
+
+  @DeleteProvider(
+      type = TableVersionSQLProviderFactory.class,
+      method = "deleteTableVersionByLegacyTimeline")
+  Integer deleteTableVersionByLegacyTimeline(
+      @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit);
 }

@@ -59,4 +59,14 @@ public class TableVersionSQLProviderFactory {
   public static String insertTableVersionOnDuplicateKeyUpdate(@Param("tablePO") TablePO tablePO) {
     return getProvider().insertTableVersionOnDuplicateKeyUpdate(tablePO);
   }
+
+  public static String softDeleteTableVersionByTableIdAndVersion(
+      @Param("tableId") Long tableId, @Param("version") Long version) {
+    return getProvider().softDeleteTableVersionByTableIdAndVersion(tableId, version);
+  }
+
+  public static String deleteTableVersionByLegacyTimeline(
+      @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit) {
+    return getProvider().deleteTableVersionByLegacyTimeline(legacyTimeline, limit);
+  }
 }
