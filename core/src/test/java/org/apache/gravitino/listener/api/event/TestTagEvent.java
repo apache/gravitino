@@ -536,7 +536,7 @@ public class TestTagEvent {
     Assertions.assertEquals(expectedTag.properties(), actualTagInfo.properties());
   }
 
-  private TagDispatcher mockTagDispatcher() {
+  private TagDispatcher mockTagDispatcher() throws Exception {
     TagDispatcher dispatcher = mock(TagDispatcher.class);
     String metalake = "metalake";
     String[] tagNames = new String[] {"tag1", "tag2"};
