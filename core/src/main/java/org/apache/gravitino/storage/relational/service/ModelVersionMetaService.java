@@ -162,11 +162,7 @@ public class ModelVersionMetaService {
     NameIdentifier modelIdent = modelVersionEntity.modelIdentifier();
     NameIdentifierUtil.checkModel(modelIdent);
 
-    Long schemaId =
-        CommonMetaService.getInstance().getParentEntityIdByNamespace(modelIdent.namespace());
-    Long modelId =
-        ModelMetaService.getInstance()
-            .getModelIdBySchemaIdAndModelName(schemaId, modelIdent.name());
+    Long modelId = EntityIdService.getEntityId(modelIdent, Entity.EntityType.MODEL);
 
     List<ModelVersionPO> modelVersionPOs =
         POConverters.initializeModelVersionPO(modelVersionEntity, modelId);

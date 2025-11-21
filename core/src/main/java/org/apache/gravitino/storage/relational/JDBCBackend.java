@@ -101,7 +101,6 @@ public class JDBCBackend implements RelationalBackend {
   @Override
   public void initialize(Config config) {
     jdbcDatabase = startJDBCDatabaseIfNecessary(config);
-
     SqlSessionFactoryHelper.getInstance().init(config);
     SQLExceptionConverterFactory.initConverter(config);
   }

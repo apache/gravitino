@@ -37,10 +37,12 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.SupportsRelationOperations;
 import org.apache.gravitino.cache.CacheFactory;
+import org.apache.gravitino.cache.CachedEntityIdResolver;
 import org.apache.gravitino.cache.EntityCache;
 import org.apache.gravitino.cache.EntityCacheRelationKey;
 import org.apache.gravitino.cache.NoOpsCache;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
+import org.apache.gravitino.storage.relational.service.EntityIdService;
 import org.apache.gravitino.utils.Executable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -66,16 +68,21 @@ public class RelationalEntityStore implements EntityStore, SupportsRelationOpera
 
   @Override
   public void initialize(Config config) throws RuntimeException {
+    if (config.get(Configs.CACHE_ENABLED)) {
+      this.cache = CacheFactory.getEntityCache(config);
+      EntityIdService.initialize(
+          new CachedEntityIdResolver(cache, new RelationalEntityStoreIdResolver()));
+    } else {
+      this.cache = new NoOpsCache(config);
+      EntityIdService.initialize(new RelationalEntityStoreIdResolver());
+    }
+
     this.backend = createRelationalEntityBackend(config);
     this.garbageCollector = new RelationalGarbageCollector(backend, config);
     this.garbageCollector.start();
-    this.cache =
-        config.get(Configs.CACHE_ENABLED)
-            ? CacheFactory.getEntityCache(config)
-            : new NoOpsCache(config);
   }
 
-  private static RelationalBackend createRelationalEntityBackend(Config config) {
+  private RelationalBackend createRelationalEntityBackend(Config config) {
     String backendName = config.get(ENTITY_RELATIONAL_STORE);
     String className =
         RELATIONAL_BACKENDS.getOrDefault(backendName, Configs.DEFAULT_ENTITY_RELATIONAL_STORE);
@@ -84,6 +91,7 @@ public class RelationalEntityStore implements EntityStore, SupportsRelationOpera
       RelationalBackend relationalBackend =
           (RelationalBackend) Class.forName(className).getDeclaredConstructor().newInstance();
       relationalBackend.initialize(config);
+
       return relationalBackend;
     } catch (Exception e) {
       LOGGER.error(
