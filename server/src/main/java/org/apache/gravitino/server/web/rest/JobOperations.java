@@ -21,6 +21,7 @@ package org.apache.gravitino.server.web.rest;
 import com.codahale.metrics.annotation.ResponseMetered;
 import com.codahale.metrics.annotation.Timed;
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.collect.Lists;
 import java.time.Instant;
 import java.util.Collections;
 import java.util.List;
@@ -40,6 +41,7 @@ import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.Response;
+import org.apache.gravitino.Entity;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.dto.job.JobDTO;
 import org.apache.gravitino.dto.job.JobTemplateDTO;
@@ -63,7 +65,12 @@ import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.JobEntity;
 import org.apache.gravitino.meta.JobTemplateEntity;
 import org.apache.gravitino.metrics.MetricNames;
+import org.apache.gravitino.server.authorization.MetadataAuthzHelper;
+import org.apache.gravitino.server.authorization.annotations.AuthorizationExpression;
+import org.apache.gravitino.server.authorization.annotations.AuthorizationMetadata;
+import org.apache.gravitino.server.authorization.annotations.AuthorizationRequest;
 import org.apache.gravitino.server.web.Utils;
+import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
 import org.apache.gravitino.utils.PrincipalUtils;
 import org.slf4j.Logger;
@@ -89,7 +96,8 @@ public class JobOperations {
   @Timed(name = "list-job-templates." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "list-job-templates", absolute = true)
   public Response listJobTemplates(
-      @PathParam("metalake") String metalake,
+      @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
+          String metalake,
       @QueryParam("details") @DefaultValue("false") boolean details) {
     LOG.info(
         "Received request to list job templates in metalake: {}, details: {}", metalake, details);
@@ -98,8 +106,19 @@ public class JobOperations {
       return Utils.doAs(
           httpRequest,
           () -> {
-            List<JobTemplateDTO> jobTemplates =
-                toJobTemplateDTOs(jobOperationDispatcher.listJobTemplates(metalake));
+            List<JobTemplateEntity> jobTemplateEntities =
+                Lists.newArrayList(
+                    MetadataAuthzHelper.filterByExpression(
+                        metalake,
+                        "METALAKE::OWNER || JOB_TEMPLATE::OWNER || METALAKE::USE_JOB_TEMPLATE || JOB_TEMPLATE::USE_JOB_TEMPLATE",
+                        Entity.EntityType.JOB_TEMPLATE,
+                        jobOperationDispatcher
+                            .listJobTemplates(metalake)
+                            .toArray(new JobTemplateEntity[0]),
+                        jobTemplateEntity ->
+                            NameIdentifierUtil.ofJobTemplate(metalake, jobTemplateEntity.name())));
+            List<JobTemplateDTO> jobTemplates = toJobTemplateDTOs(jobTemplateEntities);
+
             if (details) {
               LOG.info("List {} job templates in metalake: {}", jobTemplates.size(), metalake);
               return Utils.ok(new JobTemplateListResponse(jobTemplates));
@@ -124,8 +143,11 @@ public class JobOperations {
   @Produces("application/vnd.gravitino.v1+json")
   @Timed(name = "register-job-template." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "register-job-template", absolute = true)
+  @AuthorizationExpression(expression = "METALAKE::OWNER || METALAKE::REGISTER_JOB_TEMPLATE")
   public Response registerJobTemplate(
-      @PathParam("metalake") String metalake, JobTemplateRegisterRequest request) {
+      @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
+          String metalake,
+      JobTemplateRegisterRequest request) {
     LOG.info(
         "Received request to register job template {} in metalake: {}",
         request.getJobTemplate().name(),
@@ -158,8 +180,14 @@ public class JobOperations {
   @Produces("application/vnd.gravitino.v1+json")
   @Timed(name = "get-job-template." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "get-job-template", absolute = true)
+  @AuthorizationExpression(
+      expression =
+          "METALAKE::OWNER || JOB_TEMPLATE::OWNER || METALAKE::USE_JOB_TEMPLATE || JOB_TEMPLATE::USE_JOB_TEMPLATE")
   public Response getJobTemplate(
-      @PathParam("metalake") String metalake, @PathParam("name") String name) {
+      @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
+          String metalake,
+      @PathParam("name") @AuthorizationMetadata(type = Entity.EntityType.JOB_TEMPLATE)
+          String name) {
     LOG.info("Received request to get job template: {} in metalake: {}", name, metalake);
 
     try {
@@ -183,8 +211,12 @@ public class JobOperations {
   @Produces("application/vnd.gravitino.v1+json")
   @Timed(name = "delete-job-template." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "delete-job-template", absolute = true)
+  @AuthorizationExpression(expression = "METALAKE::OWNER || JOB_TEMPLATE::OWNER")
   public Response deleteJobTemplate(
-      @PathParam("metalake") String metalake, @PathParam("name") String name) {
+      @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
+          String metalake,
+      @PathParam("name") @AuthorizationMetadata(type = Entity.EntityType.JOB_TEMPLATE)
+          String name) {
     LOG.info("Received request to delete job template: {} in metalake: {}", name, metalake);
 
     try {
@@ -211,9 +243,12 @@ public class JobOperations {
   @Produces("application/vnd.gravitino.v1+json")
   @Timed(name = "alter-job-template." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "alter-job-template", absolute = true)
+  @AuthorizationExpression(expression = "METALAKE::OWNER || JOB_TEMPLATE::OWNER")
   public Response alterJobTemplate(
-      @PathParam("metalake") String metalake,
-      @PathParam("name") String jobTemplateName,
+      @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
+          String metalake,
+      @PathParam("name") @AuthorizationMetadata(type = Entity.EntityType.JOB_TEMPLATE)
+          String jobTemplateName,
       JobTemplateUpdatesRequest request) {
     LOG.info(
         "Received request to alter job template: {} in metalake: {}", jobTemplateName, metalake);
@@ -246,7 +281,8 @@ public class JobOperations {
   @Timed(name = "list-jobs." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "list-jobs", absolute = true)
   public Response listJobs(
-      @PathParam("metalake") String metalake,
+      @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
+          String metalake,
       @QueryParam("jobTemplateName") String jobTemplateName) {
     LOG.info(
         "Received request to list jobs in metalake {}{}",
@@ -258,7 +294,15 @@ public class JobOperations {
           httpRequest,
           () -> {
             List<JobEntity> jobEntities =
-                jobOperationDispatcher.listJobs(metalake, Optional.ofNullable(jobTemplateName));
+                Lists.newArrayList(
+                    MetadataAuthzHelper.filterByExpression(
+                        metalake,
+                        "METALAKE::OWNER || JOB::OWNER",
+                        Entity.EntityType.JOB,
+                        jobOperationDispatcher
+                            .listJobs(metalake, Optional.ofNullable(jobTemplateName))
+                            .toArray(new JobEntity[0]),
+                        jobEntity -> NameIdentifierUtil.ofJob(metalake, jobEntity.name())));
             List<JobDTO> jobDTOs = toJobDTOs(jobEntities);
 
             LOG.info("Listed {} jobs in metalake {}", jobEntities.size(), metalake);
@@ -275,7 +319,11 @@ public class JobOperations {
   @Produces("application/vnd.gravitino.v1+json")
   @Timed(name = "get-job." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "get-job", absolute = true)
-  public Response getJob(@PathParam("metalake") String metalake, @PathParam("jobId") String jobId) {
+  @AuthorizationExpression(expression = "METALAKE::OWNER || JOB::OWNER")
+  public Response getJob(
+      @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
+          String metalake,
+      @PathParam("jobId") @AuthorizationMetadata(type = Entity.EntityType.JOB) String jobId) {
     LOG.info("Received request to get job {} in metalake {}", jobId, metalake);
 
     try {
@@ -297,7 +345,14 @@ public class JobOperations {
   @Produces("application/vnd.gravitino.v1+json")
   @Timed(name = "run-job." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "run-job", absolute = true)
-  public Response runJob(@PathParam("metalake") String metalake, JobRunRequest request) {
+  @AuthorizationExpression(
+      expression =
+          "METALAKE::OWNER || (METALAKE::RUN_JOB || (METALAKE::USE_JOB_TEMPLATE || JOB_TEMPLATE::USE_JOB_TEMPLATE))")
+  public Response runJob(
+      @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
+          String metalake,
+      @AuthorizationRequest(type = AuthorizationRequest.RequestType.RUN_JOB)
+          JobRunRequest request) {
     LOG.info(
         "Received request to run job {} in metalake: {}", request.getJobTemplateName(), metalake);
 
@@ -329,8 +384,11 @@ public class JobOperations {
   @Path("runs/{jobId}")
   @Produces("application/vnd.gravitino.v1+json")
   @Timed(name = "cancel-job." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
+  @AuthorizationExpression(expression = "METALAKE::OWNER || JOB::OWNER")
   public Response cancelJob(
-      @PathParam("metalake") String metalake, @PathParam("jobId") String jobId) {
+      @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
+          String metalake,
+      @AuthorizationMetadata(type = Entity.EntityType.JOB) @PathParam("jobId") String jobId) {
     LOG.info("Received request to cancel job {} in metalake {}", jobId, metalake);
 
     try {
