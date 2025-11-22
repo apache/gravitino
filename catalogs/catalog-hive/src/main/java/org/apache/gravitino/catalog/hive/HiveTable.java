@@ -22,33 +22,19 @@ import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 import java.util.Arrays;
 import java.util.List;
-import java.util.Map;
-import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 import lombok.ToString;
-import org.apache.commons.lang3.ArrayUtils;
 import org.apache.gravitino.connector.BaseTable;
-import org.apache.gravitino.connector.PropertiesMetadata;
 import org.apache.gravitino.connector.TableOperations;
 import org.apache.gravitino.hive.CachedClientPool;
 import org.apache.gravitino.hive.converter.HiveDataTypeConverter;
-import org.apache.gravitino.hive.converter.HiveTableConverter;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.SupportsPartitions;
-import org.apache.gravitino.rel.expressions.NamedReference;
-import org.apache.gravitino.rel.expressions.distributions.Distribution;
-import org.apache.gravitino.rel.expressions.distributions.Distributions;
-import org.apache.gravitino.rel.expressions.sorts.SortDirection;
-import org.apache.gravitino.rel.expressions.sorts.SortOrder;
-import org.apache.gravitino.rel.expressions.transforms.Transform;
+import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.expressions.transforms.Transforms;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
-import org.apache.hadoop.hive.metastore.api.Order;
-import org.apache.hadoop.hive.metastore.api.SerDeInfo;
-import org.apache.hadoop.hive.metastore.api.StorageDescriptor;
-import org.apache.hadoop.hive.metastore.api.Table;
 
 /** Represents an Apache Hive Table entity in the Hive Metastore catalog. */
 @ToString
@@ -59,11 +45,10 @@ public class HiveTable extends BaseTable {
       Sets.newHashSet(TableType.MANAGED_TABLE.name(), TableType.EXTERNAL_TABLE.name());
   public static final String ICEBERG_TABLE_TYPE_VALUE = "ICEBERG";
   public static final String TABLE_TYPE_PROP = "table_type";
-  private String schemaName;
-  private CachedClientPool clientPool;
-  private StorageDescriptor sd;
+  protected String schemaName;
+  protected CachedClientPool clientPool;
 
-  private HiveTable() {}
+  protected HiveTable() {}
 
   /**
    * Creates a new HiveTable instance from a Table and a Builder.
@@ -71,28 +56,17 @@ public class HiveTable extends BaseTable {
    * @param table The inner Table representing the HiveTable.
    * @return A new HiveTable instance Builder.
    */
-  public static HiveTable.Builder fromHiveTable(Table table) {
-    AuditInfo auditInfo = HiveTableConverter.getAuditInfo(table);
-
-    Distribution distribution = HiveTableConverter.getDistribution(table);
-
-    SortOrder[] sortOrders = HiveTableConverter.getSortOrders(table);
-
-    Column[] columns = HiveTableConverter.getColumns(table, HiveColumn.builder());
-
-    Transform[] partitioning = HiveTableConverter.getPartitioning(table);
-
+  public static HiveTable.Builder fromHiveTable(String dbName, Table table) {
     return HiveTable.builder()
-        .withName(table.getTableName())
-        .withComment(table.getParameters().get(HiveTablePropertiesMetadata.COMMENT))
-        .withProperties(buildTableProperties(table))
-        .withColumns(columns)
-        .withDistribution(distribution)
-        .withSortOrders(sortOrders)
-        .withAuditInfo(auditInfo)
-        .withPartitioning(partitioning)
-        .withSchemaName(table.getDbName())
-        .withStorageDescriptor(table.getSd());
+        .withName(table.name())
+        .withComment(table.comment())
+        .withProperties(table.properties())
+        .withColumns(table.columns())
+        .withDistribution(table.distribution())
+        .withSortOrders(table.sortOrder())
+        .withAuditInfo((AuditInfo) table.auditInfo())
+        .withPartitioning(table.partitioning())
+        .withSchemaName(dbName);
   }
 
   public CachedClientPool clientPool() {
@@ -108,91 +82,6 @@ public class HiveTable extends BaseTable {
 
   public String schemaName() {
     return schemaName;
-  }
-
-  public StorageDescriptor storageDescriptor() {
-    return sd;
-  }
-
-  private static Map<String, String> buildTableProperties(Table table) {
-    Map<String, String> properties = Maps.newHashMap(table.getParameters());
-
-    Optional.ofNullable(table.getTableType())
-        .ifPresent(t -> properties.put(HiveTablePropertiesMetadata.TABLE_TYPE, t));
-
-    StorageDescriptor sd = table.getSd();
-    properties.put(HiveTablePropertiesMetadata.LOCATION, sd.getLocation());
-    properties.put(HiveTablePropertiesMetadata.INPUT_FORMAT, sd.getInputFormat());
-    properties.put(HiveTablePropertiesMetadata.OUTPUT_FORMAT, sd.getOutputFormat());
-
-    SerDeInfo serdeInfo = sd.getSerdeInfo();
-    Optional.ofNullable(serdeInfo.getName())
-        .ifPresent(name -> properties.put(HiveTablePropertiesMetadata.SERDE_NAME, name));
-    Optional.ofNullable(serdeInfo.getSerializationLib())
-        .ifPresent(lib -> properties.put(HiveTablePropertiesMetadata.SERDE_LIB, lib));
-    Optional.ofNullable(serdeInfo.getParameters())
-        .ifPresent(
-            p ->
-                p.forEach(
-                    (k, v) ->
-                        properties.put(HiveTablePropertiesMetadata.SERDE_PARAMETER_PREFIX + k, v)));
-
-    return properties;
-  }
-
-  /**
-   * Converts this HiveTable to its corresponding Table in the Hive Metastore.
-   *
-   * @param tablePropertiesMetadata metadata for configuring the Hive Metastore table
-   * @return The converted Table.
-   */
-  public Table toHiveTable(PropertiesMetadata tablePropertiesMetadata) {
-    Table hiveTable = new Table();
-
-    hiveTable.setTableName(name);
-    hiveTable.setDbName(schemaName);
-    hiveTable.setTableType(
-        ((TableType)
-                tablePropertiesMetadata.getOrDefault(
-                    properties(), HiveTablePropertiesMetadata.TABLE_TYPE))
-            .name());
-    List<FieldSchema> partitionFields = buildPartitionKeys();
-    hiveTable.setSd(buildStorageDescriptor(tablePropertiesMetadata, partitionFields));
-    hiveTable.setParameters(buildTableParameters());
-    hiveTable.setPartitionKeys(partitionFields);
-
-    // Set AuditInfo to Hive's Table object. Hive's Table doesn't support setting last modifier
-    // and last modified time, so we only set creator and create time.
-    hiveTable.setOwner(auditInfo.creator());
-    hiveTable.setCreateTime(Math.toIntExact(auditInfo.createTime().getEpochSecond()));
-
-    return hiveTable;
-  }
-
-  private Map<String, String> buildTableParameters() {
-    Map<String, String> parameters = Maps.newHashMap(properties());
-    Optional.ofNullable(comment)
-        .ifPresent(c -> parameters.put(HiveTablePropertiesMetadata.COMMENT, c));
-
-    if (TableType.EXTERNAL_TABLE
-        .name()
-        .equalsIgnoreCase(properties().get(HiveTablePropertiesMetadata.TABLE_TYPE))) {
-      parameters.put(HiveTablePropertiesMetadata.EXTERNAL, "TRUE");
-    } else {
-      parameters.put(HiveTablePropertiesMetadata.EXTERNAL, "FALSE");
-    }
-
-    parameters.remove(HiveTablePropertiesMetadata.LOCATION);
-    parameters.remove(HiveTablePropertiesMetadata.TABLE_TYPE);
-    parameters.remove(HiveTablePropertiesMetadata.INPUT_FORMAT);
-    parameters.remove(HiveTablePropertiesMetadata.OUTPUT_FORMAT);
-    parameters.remove(HiveTablePropertiesMetadata.SERDE_NAME);
-    parameters.remove(HiveTablePropertiesMetadata.SERDE_LIB);
-    parameters.remove(HiveTablePropertiesMetadata.FORMAT);
-    parameters
-        .keySet()
-        .removeIf(k -> k.startsWith(HiveTablePropertiesMetadata.SERDE_PARAMETER_PREFIX));
-    return parameters;
   }
 
   public List<FieldSchema> buildPartitionKeys() {
@@ -214,85 +103,6 @@ public class HiveTable extends BaseTable {
         partitionColumns.get(0).comment());
   }
 
-  private StorageDescriptor buildStorageDescriptor(
-      PropertiesMetadata tablePropertiesMetadata, List<FieldSchema> partitionFields) {
-    StorageDescriptor strgDesc = new StorageDescriptor();
-    List<String> partitionKeys =
-        partitionFields.stream().map(FieldSchema::getName).collect(Collectors.toList());
-    strgDesc.setCols(
-        Arrays.stream(columns)
-            .filter(c -> !partitionKeys.contains(c.name()))
-            .map(
-                c ->
-                    new FieldSchema(
-                        c.name(),
-                        HiveDataTypeConverter.CONVERTER
-                            .fromGravitino(c.dataType())
-                            .getQualifiedName(),
-                        c.comment()))
-            .collect(Collectors.toList()));
-
-    // `location` must not be null, otherwise it will result in an NPE when calling HMS `alterTable`
-    // interface
-    Optional.ofNullable(properties().get(HiveTablePropertiesMetadata.LOCATION))
-        .ifPresent(
-            l -> strgDesc.setLocation(properties().get(HiveTablePropertiesMetadata.LOCATION)));
-
-    strgDesc.setSerdeInfo(buildSerDeInfo(tablePropertiesMetadata));
-    StorageFormat storageFormat =
-        (StorageFormat)
-            tablePropertiesMetadata.getOrDefault(properties(), HiveTablePropertiesMetadata.FORMAT);
-    strgDesc.setInputFormat(storageFormat.getInputFormat());
-    strgDesc.setOutputFormat(storageFormat.getOutputFormat());
-    // Individually specified INPUT_FORMAT and OUTPUT_FORMAT can override the inputFormat and
-    // outputFormat of FORMAT
-    Optional.ofNullable(properties().get(HiveTablePropertiesMetadata.INPUT_FORMAT))
-        .ifPresent(strgDesc::setInputFormat);
-    Optional.ofNullable(properties().get(HiveTablePropertiesMetadata.OUTPUT_FORMAT))
-        .ifPresent(strgDesc::setOutputFormat);
-
-    if (ArrayUtils.isNotEmpty(sortOrders)) {
-      for (SortOrder sortOrder : sortOrders) {
-        String columnName = ((NamedReference.FieldReference) sortOrder.expression()).fieldName()[0];
-        strgDesc.addToSortCols(
-            new Order(columnName, sortOrder.direction() == SortDirection.ASCENDING ? 1 : 0));
-      }
-    }
-
-    if (!Distributions.NONE.equals(distribution)) {
-      strgDesc.setBucketCols(
-          Arrays.stream(distribution.expressions())
-              .map(t -> ((NamedReference.FieldReference) t).fieldName()[0])
-              .collect(Collectors.toList()));
-      strgDesc.setNumBuckets(distribution.number());
-    }
-
-    return strgDesc;
-  }
-
-  private SerDeInfo buildSerDeInfo(PropertiesMetadata tablePropertiesMetadata) {
-    SerDeInfo serDeInfo = new SerDeInfo();
-    serDeInfo.setName(properties().getOrDefault(HiveTablePropertiesMetadata.SERDE_NAME, name()));
-
-    StorageFormat storageFormat =
-        (StorageFormat)
-            tablePropertiesMetadata.getOrDefault(properties(), HiveTablePropertiesMetadata.FORMAT);
-    serDeInfo.setSerializationLib(storageFormat.getSerde());
-    // Individually specified SERDE_LIB can override the serdeLib of FORMAT
-    Optional.ofNullable(properties().get(HiveTablePropertiesMetadata.SERDE_LIB))
-        .ifPresent(serDeInfo::setSerializationLib);
-
-    properties().entrySet().stream()
-        .filter(e -> e.getKey().startsWith(HiveTablePropertiesMetadata.SERDE_PARAMETER_PREFIX))
-        .forEach(
-            e ->
-                serDeInfo.putToParameters(
-                    e.getKey()
-                        .substring(HiveTablePropertiesMetadata.SERDE_PARAMETER_PREFIX.length()),
-                    e.getValue()));
-    return serDeInfo;
-  }
-
   @Override
   protected TableOperations newOps() {
     return new HiveTableOperations(this);
@@ -308,7 +118,6 @@ public class HiveTable extends BaseTable {
 
     private String schemaName;
     private CachedClientPool clientPool;
-    private StorageDescriptor sd;
 
     /**
      * Sets the Hive schema (database) name to be used for building the HiveTable.
@@ -318,17 +127,6 @@ public class HiveTable extends BaseTable {
      */
     public Builder withSchemaName(String schemaName) {
       this.schemaName = schemaName;
-      return this;
-    }
-
-    /**
-     * Sets the StorageDescriptor to be used for adding partition.
-     *
-     * @param sd The StorageDescriptor instance of the HiveTable.
-     * @return This Builder instance.
-     */
-    public Builder withStorageDescriptor(StorageDescriptor sd) {
-      this.sd = sd;
       return this;
     }
 
@@ -364,7 +162,6 @@ public class HiveTable extends BaseTable {
       hiveTable.partitioning = partitioning;
       hiveTable.schemaName = schemaName;
       hiveTable.clientPool = clientPool;
-      hiveTable.sd = sd;
       hiveTable.proxyPlugin = proxyPlugin;
 
       // HMS put table comment in parameters

@@ -189,7 +189,8 @@ public class MiniHiveMetastore {
           HiveConf.ConfVars.METASTOREURIS.varname,
           hiveConf.getVar(HiveConf.ConfVars.METASTOREURIS));
 
-      this.clientPool = new HiveClientPool(1, hiveConf);
+      // todo yuhui
+      this.clientPool = new HiveClientPool(1, null);
     } catch (Exception e) {
       throw new RuntimeException("Cannot start TestHiveMetastore", e);
     }

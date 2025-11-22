@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.catalog.hive;
 
+import static org.apache.gravitino.catalog.hive.HiveConstants.LOCATION;
 import static org.apache.gravitino.connector.PropertyEntry.stringOptionalPropertyEntry;
 
 import com.google.common.collect.ImmutableList;
@@ -28,7 +29,7 @@ import org.apache.gravitino.connector.BasePropertiesMetadata;
 import org.apache.gravitino.connector.PropertyEntry;
 
 public class HiveSchemaPropertiesMetadata extends BasePropertiesMetadata {
-  public static final String LOCATION = HiveConstants.LOCATION;
+
   private static final Map<String, PropertyEntry<?>> propertiesMetadata;
 
   static {
