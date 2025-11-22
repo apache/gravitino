@@ -46,7 +46,7 @@ import org.apache.gravitino.dto.responses.UserListResponse;
 import org.apache.gravitino.dto.responses.UserResponse;
 import org.apache.gravitino.dto.util.DTOConverters;
 import org.apache.gravitino.metrics.MetricNames;
-import org.apache.gravitino.server.authorization.MetadataFilterHelper;
+import org.apache.gravitino.server.authorization.MetadataAuthzHelper;
 import org.apache.gravitino.server.authorization.NameBindings;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationExpression;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationMetadata;
@@ -113,7 +113,7 @@ public class UserOperations {
             if (verbose) {
               User[] users = accessControlManager.listUsers(metalake);
               users =
-                  MetadataFilterHelper.filterByExpression(
+                  MetadataAuthzHelper.filterByExpression(
                       metalake,
                       LOAD_USER_PRIVILEGE,
                       Entity.EntityType.USER,
@@ -124,7 +124,7 @@ public class UserOperations {
             } else {
               String[] users = accessControlManager.listUserNames(metalake);
               users =
-                  MetadataFilterHelper.filterByExpression(
+                  MetadataAuthzHelper.filterByExpression(
                       metalake,
                       LOAD_USER_PRIVILEGE,
                       Entity.EntityType.USER,

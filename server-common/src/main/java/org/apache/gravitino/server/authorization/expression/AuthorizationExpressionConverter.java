@@ -29,7 +29,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.apache.gravitino.auth.AuthConstants;
-import org.apache.gravitino.server.authorization.MetadataFilterHelper;
+import org.apache.gravitino.server.authorization.MetadataAuthzHelper;
 
 /**
  * Convert the authorization expression into an executable expression, such as OGNL expression, etc.
@@ -73,7 +73,7 @@ public class AuthorizationExpressionConverter {
    * extras such as list projection and selection and lambda expressions. You use the same
    * expression for both getting and setting the value of a property.
    *
-   * @param authorizationExpression authorization expression from {@link MetadataFilterHelper}
+   * @param authorizationExpression authorization expression from {@link MetadataAuthzHelper}
    * @return an OGNL expression used to call GravitinoAuthorizer
    */
   public static String convertToOgnlExpression(String authorizationExpression) {

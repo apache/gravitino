@@ -63,7 +63,7 @@ import org.apache.gravitino.model.Model;
 import org.apache.gravitino.model.ModelChange;
 import org.apache.gravitino.model.ModelVersion;
 import org.apache.gravitino.model.ModelVersionChange;
-import org.apache.gravitino.server.authorization.MetadataFilterHelper;
+import org.apache.gravitino.server.authorization.MetadataAuthzHelper;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationExpression;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationMetadata;
 import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants;
@@ -109,7 +109,7 @@ public class ModelOperations {
             NameIdentifier[] modelIds = modelDispatcher.listModels(modelNs);
             modelIds = modelIds == null ? new NameIdentifier[0] : modelIds;
             modelIds =
-                MetadataFilterHelper.filterByExpression(
+                MetadataAuthzHelper.filterByExpression(
                     metalake,
                     AuthorizationExpressionConstants.filterModelAuthorizationExpression,
                     Entity.EntityType.MODEL,
@@ -275,7 +275,7 @@ public class ModelOperations {
                                   NameIdentifierUtil.ofModelVersion(
                                       metalake, catalog, schema, model, modelVersion.version())
                                 };
-                            return MetadataFilterHelper.filterByExpression(
+                            return MetadataAuthzHelper.filterByExpression(
                                         metalake,
                                         AuthorizationExpressionConstants
                                             .loadModelAuthorizationExpression,
@@ -300,7 +300,7 @@ public class ModelOperations {
                                   NameIdentifierUtil.ofModelVersion(
                                       metalake, catalog, schema, model, modelVersion)
                                 };
-                            return MetadataFilterHelper.filterByExpression(
+                            return MetadataAuthzHelper.filterByExpression(
                                         metalake,
                                         AuthorizationExpressionConstants
                                             .loadModelAuthorizationExpression,

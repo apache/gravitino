@@ -51,7 +51,7 @@ import org.apache.gravitino.dto.tag.TagDTO;
 import org.apache.gravitino.dto.util.DTOConverters;
 import org.apache.gravitino.exceptions.NoSuchTagException;
 import org.apache.gravitino.metrics.MetricNames;
-import org.apache.gravitino.server.authorization.MetadataFilterHelper;
+import org.apache.gravitino.server.authorization.MetadataAuthzHelper;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationExpression;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationFullName;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationMetadata;
@@ -213,7 +213,7 @@ public class MetadataObjectTagOperations {
                   metalake);
               TagDTO[] tagDTOS = tags.toArray(new TagDTO[0]);
               tagDTOS =
-                  MetadataFilterHelper.filterByExpression(
+                  MetadataAuthzHelper.filterByExpression(
                       metalake,
                       AuthorizationExpressionConstants.loadTagAuthorizationExpression,
                       Entity.EntityType.TAG,
@@ -225,7 +225,7 @@ public class MetadataObjectTagOperations {
               // We have used Set to avoid duplicate tag names
               String[] tagNames = tags.stream().map(TagDTO::name).toArray(String[]::new);
               tagNames =
-                  MetadataFilterHelper.filterByExpression(
+                  MetadataAuthzHelper.filterByExpression(
                       metalake,
                       AuthorizationExpressionConstants.loadTagAuthorizationExpression,
                       Entity.EntityType.TAG,

@@ -74,6 +74,12 @@ public class AuthorizationExpressionConstants {
                   ANY_MODIFY_TABLE
                   """;
 
+  public static final String filterModifyTableAuthorizationExpression =
+      """
+                  ANY(OWNER, METALAKE, CATALOG, SCHEMA, TABLE) ||
+                  ANY_MODIFY_TABLE
+                  """;
+
   public static final String filterTopicsAuthorizationExpression =
       """
               ANY(OWNER, METALAKE, CATALOG, SCHEMA, TOPIC) ||

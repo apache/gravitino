@@ -51,7 +51,7 @@ import org.apache.gravitino.iceberg.service.authorization.IcebergRESTServerConte
 import org.apache.gravitino.iceberg.service.dispatcher.IcebergNamespaceOperationDispatcher;
 import org.apache.gravitino.listener.api.event.IcebergRequestContext;
 import org.apache.gravitino.metrics.MetricNames;
-import org.apache.gravitino.server.authorization.MetadataFilterHelper;
+import org.apache.gravitino.server.authorization.MetadataAuthzHelper;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationExpression;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationMetadata;
 import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants;
@@ -341,7 +341,7 @@ public class IcebergNamespaceOperations {
   private ListNamespacesResponse filterListNamespacesResponse(
       ListNamespacesResponse listNamespacesResponse, String metalake, String catalogName) {
     NameIdentifier[] idents =
-        MetadataFilterHelper.filterByExpression(
+        MetadataAuthzHelper.filterByExpression(
             metalake,
             AuthorizationExpressionConstants.filterSchemaAuthorizationExpression,
             Entity.EntityType.SCHEMA,

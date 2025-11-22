@@ -54,7 +54,7 @@ import org.apache.gravitino.dto.util.DTOConverters;
 import org.apache.gravitino.exceptions.IllegalMetadataObjectException;
 import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
 import org.apache.gravitino.metrics.MetricNames;
-import org.apache.gravitino.server.authorization.MetadataFilterHelper;
+import org.apache.gravitino.server.authorization.MetadataAuthzHelper;
 import org.apache.gravitino.server.authorization.NameBindings;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationExpression;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationMetadata;
@@ -94,7 +94,7 @@ public class RoleOperations {
                         role -> {
                           NameIdentifier[] nameIdentifiers =
                               new NameIdentifier[] {NameIdentifierUtil.ofRole(metalake, role)};
-                          return MetadataFilterHelper.filterByExpression(
+                          return MetadataAuthzHelper.filterByExpression(
                                       metalake,
                                       AuthorizationExpressionConstants
                                           .loadRoleAuthorizationExpression,

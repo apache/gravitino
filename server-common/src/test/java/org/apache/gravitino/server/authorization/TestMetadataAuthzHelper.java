@@ -40,8 +40,8 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.mockito.MockedStatic;
 
-/** Test of {@link MetadataFilterHelper} */
-public class TestMetadataFilterHelper {
+/** Test of {@link MetadataAuthzHelper} */
+public class TestMetadataAuthzHelper {
 
   private static MockedStatic<GravitinoEnv> mockedStaticGravitinoEnv;
 
@@ -83,7 +83,7 @@ public class TestMetadataFilterHelper {
       nameIdentifiers[2] =
           NameIdentifierUtil.ofSchema("testMetalake", "testCatalog2", "testSchema");
       NameIdentifier[] filtered =
-          MetadataFilterHelper.filterByPrivilege(
+          MetadataAuthzHelper.filterByPrivilege(
               "testMetalake",
               Entity.EntityType.SCHEMA,
               Privilege.Name.USE_SCHEMA.name(),
@@ -115,7 +115,7 @@ public class TestMetadataFilterHelper {
       nameIdentifiers[2] =
           NameIdentifierUtil.ofSchema("testMetalake", "testCatalog2", "testSchema");
       NameIdentifier[] filtered =
-          MetadataFilterHelper.filterByExpression(
+          MetadataAuthzHelper.filterByExpression(
               "testMetalake",
               "CATALOG::USE_CATALOG && SCHEMA::USE_SCHEMA",
               Entity.EntityType.SCHEMA,
@@ -123,7 +123,7 @@ public class TestMetadataFilterHelper {
       Assertions.assertEquals(1, filtered.length);
       Assertions.assertEquals("testMetalake.testCatalog.testSchema", filtered[0].toString());
       NameIdentifier[] filtered2 =
-          MetadataFilterHelper.filterByExpression(
+          MetadataAuthzHelper.filterByExpression(
               "testMetalake", "CATALOG::USE_CATALOG", Entity.EntityType.SCHEMA, nameIdentifiers);
       Assertions.assertEquals(2, filtered2.length);
       Assertions.assertEquals("testMetalake.testCatalog.testSchema", filtered2[0].toString());
@@ -134,7 +134,7 @@ public class TestMetadataFilterHelper {
   private static void makeCompletableFutureUseCurrentThread() {
     try {
       Executor currentThread = Runnable::run;
-      Class<MetadataFilterHelper> jcasbinAuthorizerClass = MetadataFilterHelper.class;
+      Class<MetadataAuthzHelper> jcasbinAuthorizerClass = MetadataAuthzHelper.class;
       Field field = jcasbinAuthorizerClass.getDeclaredField("executor");
       field.setAccessible(true);
       field.set(null, currentThread);

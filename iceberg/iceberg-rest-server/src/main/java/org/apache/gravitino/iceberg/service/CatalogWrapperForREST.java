@@ -32,6 +32,7 @@ import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import org.apache.gravitino.credential.CatalogCredentialManager;
 import org.apache.gravitino.credential.Credential;
 import org.apache.gravitino.credential.CredentialConstants;
+import org.apache.gravitino.credential.CredentialPrivilege;
 import org.apache.gravitino.credential.CredentialPropertyUtils;
 import org.apache.gravitino.credential.PathBasedCredentialContext;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
@@ -89,15 +90,18 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
     LoadTableResponse loadTableResponse = super.createTable(namespace, request);
     if (requestCredential) {
       return injectCredentialConfig(
-          TableIdentifier.of(namespace, request.name()), loadTableResponse);
+          TableIdentifier.of(namespace, request.name()),
+          loadTableResponse,
+          CredentialPrivilege.WRITE);
     }
     return loadTableResponse;
   }
 
-  public LoadTableResponse loadTable(TableIdentifier identifier, boolean requestCredential) {
+  public LoadTableResponse loadTable(
+      TableIdentifier identifier, boolean requestCredential, CredentialPrivilege privilege) {
     LoadTableResponse loadTableResponse = super.loadTable(identifier);
     if (requestCredential) {
-      return injectCredentialConfig(identifier, loadTableResponse);
+      return injectCredentialConfig(identifier, loadTableResponse, privilege);
     }
     return loadTableResponse;
   }
@@ -109,10 +113,11 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
    * @return A {@link org.apache.iceberg.rest.responses.LoadCredentialsResponse} object containing
    *     the credentials.
    */
-  public LoadCredentialsResponse getTableCredentials(TableIdentifier identifier) {
+  public LoadCredentialsResponse getTableCredentials(
+      TableIdentifier identifier, CredentialPrivilege privilege) {
     try {
       LoadTableResponse loadTableResponse = super.loadTable(identifier);
-      Credential credential = getCredential(loadTableResponse);
+      Credential credential = getCredential(loadTableResponse, privilege);
       org.apache.iceberg.rest.credentials.Credential icebergCredential =
           new org.apache.iceberg.rest.credentials.Credential() {
             @Override
@@ -155,8 +160,10 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
   }
 
   private LoadTableResponse injectCredentialConfig(
-      TableIdentifier tableIdentifier, LoadTableResponse loadTableResponse) {
-    final Credential credential = getCredential(loadTableResponse);
+      TableIdentifier tableIdentifier,
+      LoadTableResponse loadTableResponse,
+      CredentialPrivilege privilege) {
+    final Credential credential = getCredential(loadTableResponse, privilege);
 
     LOG.info(
         "Generate credential: {} for Iceberg table: {}",
@@ -172,7 +179,8 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
         .build();
   }
 
-  private Credential getCredential(LoadTableResponse loadTableResponse) {
+  private Credential getCredential(
+      LoadTableResponse loadTableResponse, CredentialPrivilege privilege) {
     TableMetadata tableMetadata = loadTableResponse.tableMetadata();
     String[] path =
         Stream.of(
@@ -183,8 +191,15 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
             .toArray(String[]::new);
 
     PathBasedCredentialContext context =
-        new PathBasedCredentialContext(
-            PrincipalUtils.getCurrentUserName(), ImmutableSet.copyOf(path), Collections.emptySet());
+        privilege == CredentialPrivilege.WRITE
+            ? new PathBasedCredentialContext(
+                PrincipalUtils.getCurrentUserName(),
+                ImmutableSet.copyOf(path),
+                Collections.emptySet())
+            : new PathBasedCredentialContext(
+                PrincipalUtils.getCurrentUserName(),
+                Collections.emptySet(),
+                ImmutableSet.copyOf(path));
     Credential credential = catalogCredentialManager.getCredential(context);
     if (credential == null) {
       throw new ServiceUnavailableException("Couldn't generate credential, %s", context);
