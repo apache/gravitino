@@ -154,7 +154,7 @@ public abstract class SparkEnvIT extends SparkUtilIT {
   protected void initCatalogEnv() throws Exception {}
 
   private void initIcebergRestServiceEnv() {
-    super.ignoreAuxRestService = false;
+    super.ignoreIcebergAuxRestService = false;
     Map<String, String> icebergRestServiceConfigs = new HashMap<>();
     icebergRestServiceConfigs.put(
         "gravitino."

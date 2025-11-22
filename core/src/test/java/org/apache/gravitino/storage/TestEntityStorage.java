@@ -3107,9 +3107,9 @@ public class TestEntityStorage {
           store.get(table.nameIdentifier(), Entity.EntityType.TABLE, TableEntity.class);
 
       // check table properties
-      Assertions.assertEquals("/tmp/test", fetchedTable.getProperties().get("location"));
-      Assertions.assertEquals("lance", fetchedTable.getProperties().get("format"));
-      Assertions.assertEquals("This is a lance table", fetchedTable.getComment());
+      Assertions.assertEquals("/tmp/test", fetchedTable.properties().get("location"));
+      Assertions.assertEquals("lance", fetchedTable.properties().get("format"));
+      Assertions.assertEquals("This is a lance table", fetchedTable.comment());
       Assertions.assertEquals(1, fetchedTable.columns().size());
       Assertions.assertEquals("column1", fetchedTable.columns().get(0).name());
 
@@ -3150,9 +3150,9 @@ public class TestEntityStorage {
 
       // check updated table properties
       Assertions.assertEquals(
-          "/tmp/updated_test", fetchedUpdatedTable.getProperties().get("location"));
-      Assertions.assertEquals("lance", fetchedUpdatedTable.getProperties().get("format"));
-      Assertions.assertEquals("This is an updated lance table", fetchedUpdatedTable.getComment());
+          "/tmp/updated_test", fetchedUpdatedTable.properties().get("location"));
+      Assertions.assertEquals("lance", fetchedUpdatedTable.properties().get("format"));
+      Assertions.assertEquals("This is an updated lance table", fetchedUpdatedTable.comment());
       Assertions.assertEquals(2, fetchedUpdatedTable.columns().size());
       for (ColumnEntity column : fetchedUpdatedTable.columns()) {
         if (column.name().equals("column1")) {
@@ -3161,10 +3161,7 @@ public class TestEntityStorage {
       }
 
       Assertions.assertTrue(
-          fetchedUpdatedTable.columns().stream()
-              .filter(c -> c.name().equals("column2"))
-              .findFirst()
-              .isPresent());
+          fetchedUpdatedTable.columns().stream().anyMatch(c -> c.name().equals("column2")));
 
       // Test drop the table
       Assertions.assertTrue(store.delete(table.nameIdentifier(), Entity.EntityType.TABLE));

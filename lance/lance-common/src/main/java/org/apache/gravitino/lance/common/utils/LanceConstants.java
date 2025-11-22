@@ -17,21 +17,18 @@
  * under the License.
  */
 
-package org.apache.gravitino.integration.test;
+package org.apache.gravitino.lance.common.utils;
 
-import java.util.Map;
+public class LanceConstants {
+  public static final String LANCE_HTTP_HEADER_PREFIX = "x-lance-";
 
-public class MiniGravitinoContext {
-  Map<String, String> customConfig;
-  final boolean ignoreIcebergAuxRestService;
-  final boolean ignoreLanceAuxRestService;
+  public static final String LANCE_TABLE_LOCATION_HEADER =
+      LANCE_HTTP_HEADER_PREFIX + "table-location";
+  public static final String LANCE_TABLE_PROPERTIES_PREFIX_HEADER =
+      LANCE_HTTP_HEADER_PREFIX + "table-properties";
+  // Key for table location in table properties map
+  public static final String LANCE_LOCATION = "location";
 
-  public MiniGravitinoContext(
-      Map<String, String> customConfig,
-      boolean ignoreIcebergAuxRestService,
-      boolean ignoreLanceAuxRestService) {
-    this.customConfig = customConfig;
-    this.ignoreIcebergAuxRestService = ignoreIcebergAuxRestService;
-    this.ignoreLanceAuxRestService = ignoreLanceAuxRestService;
-  }
+  // Prefix for storage options in LanceConfig
+  public static final String LANCE_STORAGE_OPTIONS_PREFIX = "lance.storage.";
 }

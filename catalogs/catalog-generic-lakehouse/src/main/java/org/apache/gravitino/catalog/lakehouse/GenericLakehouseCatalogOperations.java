@@ -33,6 +33,7 @@ import org.apache.commons.collections4.MapUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.Entity;
+import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
@@ -210,16 +211,16 @@ public class GenericLakehouseCatalogOperations
     try {
       TableEntity tableEntity = store.get(ident, Entity.EntityType.TABLE, TableEntity.class);
       return GenericLakehouseTable.builder()
-          .withFormat(tableEntity.getFormat())
-          .withProperties(tableEntity.getProperties())
+          .withFormat(tableEntity.format())
+          .withProperties(tableEntity.properties())
           .withAuditInfo(tableEntity.auditInfo())
-          .withSortOrders(tableEntity.getSortOrder())
-          .withPartitioning(tableEntity.getPartitions())
-          .withDistribution(tableEntity.getDistribution())
+          .withSortOrders(tableEntity.sortOrders())
+          .withPartitioning(tableEntity.partitioning())
+          .withDistribution(tableEntity.distribution())
           .withColumns(EntityConverter.toColumns(tableEntity.columns()))
-          .withIndexes(tableEntity.getIndexes())
+          .withIndexes(tableEntity.indexes())
           .withName(tableEntity.name())
-          .withComment(tableEntity.getComment())
+          .withComment(tableEntity.comment())
           .build();
     } catch (NoSuchEntityException e) {
       throw new NoSuchTableException(e, "Table %s does not exist", ident);
@@ -265,9 +266,8 @@ public class GenericLakehouseCatalogOperations
                 i -> ColumnEntity.toColumnEntity(columns[i], i, idGenerator.nextId(), auditInfo))
             .collect(Collectors.toList());
 
-    TableEntity entityToStore;
     try {
-      entityToStore =
+      TableEntity entityToStore =
           TableEntity.builder()
               .withName(ident.name())
               .withNamespace(ident.namespace())
@@ -275,47 +275,66 @@ public class GenericLakehouseCatalogOperations
               .withFormat(format.lowerName())
               .withProperties(newProperties)
               .withComment(comment)
-              .withPartitions(partitions)
-              .withSortOrder(sortOrders)
+              .withPartitioning(partitions)
+              .withSortOrders(sortOrders)
               .withDistribution(distribution)
               .withIndexes(indexes)
               .withId(idGenerator.nextId())
               .withAuditInfo(auditInfo)
               .build();
       store.put(entityToStore);
+    } catch (EntityAlreadyExistsException e) {
+      throw new TableAlreadyExistsException(e, "Table %s already exists in the metadata", ident);
+    } catch (IOException e) {
+      throw new RuntimeException("Failed to create table metadata for " + ident, e);
+    }
 
-      // Get the value of register in table properties
-      boolean register =
-          Boolean.parseBoolean(
-              properties.getOrDefault(
-                  GenericLakehouseTablePropertiesMetadata.LAKEHOUSE_REGISTER, "false"));
-      if (register) {
-        // Do not need to create the physical table if this is a registration operation.
-        // Whether we need to check the existence of the physical table?
-        GenericLakehouseTable.Builder builder = GenericLakehouseTable.builder();
-        return builder
-            .withName(ident.name())
-            .withColumns(columns)
-            .withComment(comment)
-            .withProperties(properties)
-            .withDistribution(distribution)
-            .withIndexes(indexes)
-            .withAuditInfo(
-                AuditInfo.builder()
-                    .withCreator(PrincipalUtils.getCurrentUserName())
-                    .withCreateTime(Instant.now())
-                    .build())
-            .withPartitioning(partitions)
-            .withSortOrders(sortOrders)
-            .withFormat(LakehouseTableFormat.LANCE.lowerName())
-            .build();
-      }
+    // Get the value of register in table properties
+    boolean register =
+        Boolean.parseBoolean(
+            properties.getOrDefault(
+                GenericLakehouseTablePropertiesMetadata.LAKEHOUSE_REGISTER, "false"));
+    if (register) {
+      // Do not need to create the physical table if this is a registration operation.
+      // Whether we need to check the existence of the physical table?
+      GenericLakehouseTable.Builder builder = GenericLakehouseTable.builder();
+      return builder
+          .withName(ident.name())
+          .withColumns(columns)
+          .withComment(comment)
+          .withProperties(properties)
+          .withDistribution(distribution)
+          .withIndexes(indexes)
+          .withAuditInfo(
+              AuditInfo.builder()
+                  .withCreator(PrincipalUtils.getCurrentUserName())
+                  .withCreateTime(Instant.now())
+                  .build())
+          .withPartitioning(partitions)
+          .withSortOrders(sortOrders)
+          .withFormat(LakehouseTableFormat.LANCE.lowerName())
+          .build();
+    }
 
+    try {
       LakehouseCatalogOperations lanceCatalogOperations =
           getLakehouseCatalogOperations(newProperties);
       return lanceCatalogOperations.createTable(
           ident, columns, comment, newProperties, partitions, distribution, sortOrders, indexes);
-    } catch (IOException e) {
+    } catch (Exception e) {
+      // Try to roll back the metadata entry in Gravitino store
+      try {
+        store.delete(ident, Entity.EntityType.TABLE);
+      } catch (IOException ioException) {
+        LOG.error(
+            "Failed to roll back the metadata entry for table {} after physical table creation failure.",
+            ident,
+            ioException);
+      }
+      if (e.getClass().isAssignableFrom(RuntimeException.class)) {
+        throw e;
+      }
+
       throw new RuntimeException("Failed to create table " + ident, e);
     }
   }
@@ -367,7 +386,7 @@ public class GenericLakehouseCatalogOperations
       throws NoSuchTableException, IllegalArgumentException {
     try {
       TableEntity tableEntity = store.get(ident, Entity.EntityType.TABLE, TableEntity.class);
-      Map<String, String> tableProperties = tableEntity.getProperties();
+      Map<String, String> tableProperties = tableEntity.properties();
       LakehouseCatalogOperations lakehouseCatalogOperations =
           getLakehouseCatalogOperations(tableProperties);
       return lakehouseCatalogOperations.alterTable(ident, changes);
@@ -377,22 +396,22 @@ public class GenericLakehouseCatalogOperations
   }
 
   @Override
-  public boolean dropTable(NameIdentifier ident) {
+  public boolean purgeTable(NameIdentifier ident) {
     try {
       TableEntity tableEntity = store.get(ident, Entity.EntityType.TABLE, TableEntity.class);
       LakehouseCatalogOperations lakehouseCatalogOperations =
-          getLakehouseCatalogOperations(tableEntity.getProperties());
-      return lakehouseCatalogOperations.dropTable(ident);
+          getLakehouseCatalogOperations(tableEntity.properties());
+      return lakehouseCatalogOperations.purgeTable(ident);
     } catch (NoSuchTableException e) {
-      LOG.warn("Table {} does not exist, skip dropping it.", ident);
+      LOG.warn("Table {} does not exist, skip purging it.", ident);
       return false;
     } catch (IOException e) {
-      throw new RuntimeException("Failed to drop table: " + ident, e);
+      throw new RuntimeException("Failed to purge table: " + ident, e);
     }
   }
 
   @Override
-  public boolean purgeTable(NameIdentifier ident) throws UnsupportedOperationException {
+  public boolean dropTable(NameIdentifier ident) throws UnsupportedOperationException {
     try {
       // Only delete the metadata entry here. The physical data will not be deleted.
       if (!tableExists(ident)) {
@@ -400,7 +419,7 @@ public class GenericLakehouseCatalogOperations
       }
       return store.delete(ident, Entity.EntityType.TABLE);
     } catch (IOException e) {
-      throw new RuntimeException("Failed to purge table " + ident, e);
+      throw new RuntimeException("Failed to drop table " + ident, e);
     }
   }
 

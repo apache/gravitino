@@ -26,15 +26,19 @@ import java.util.List;
 import java.util.Map;
 import lombok.Getter;
 import lombok.ToString;
+import lombok.experimental.Accessors;
 import org.apache.gravitino.Auditable;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.Field;
 import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.rel.expressions.distributions.Distribution;
+import org.apache.gravitino.rel.expressions.distributions.Distributions;
 import org.apache.gravitino.rel.expressions.sorts.SortOrder;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
+import org.apache.gravitino.rel.expressions.transforms.Transforms;
 import org.apache.gravitino.rel.indexes.Index;
+import org.apache.gravitino.rel.indexes.Indexes;
 import org.apache.gravitino.utils.CollectionUtils;
 
 /** A class representing a table entity in Apache Gravitino. */
@@ -47,23 +51,17 @@ public class TableEntity implements Entity, Auditable, HasIdentifier {
       Field.required("audit_info", AuditInfo.class, "The audit details of the table");
   public static final Field COLUMNS =
       Field.optional("columns", List.class, "The columns of the table");
-
   public static final Field FORMAT = Field.optional("format", String.class, "The table's format");
   public static final Field PROPERTIES =
       Field.optional("properties", Map.class, "The table's properties");
-
-  public static final Field PARTITIONS =
-      Field.optional("partitions", Transform[].class, "The table's partition");
-
-  public static final Field SORT_ORDER =
+  public static final Field PARTITIONING =
+      Field.optional("partitioning", Transform[].class, "The table's partitioning");
+  public static final Field SORT_ORDERS =
       Field.optional("sortOrders", SortOrder[].class, "The table's sort order");
-
   public static final Field DISTRIBUTION =
       Field.optional("distribution", Distribution.class, "The table's distribution");
-
   public static final Field INDEXES =
       Field.optional("indexes", Index[].class, "The table's indexes");
-
   public static final Field COMMENT =
       Field.optional("comment", String.class, "The table's comment");
 
@@ -77,13 +75,33 @@ public class TableEntity implements Entity, Auditable, HasIdentifier {
 
   private List<ColumnEntity> columns;
 
-  @Getter private String format;
-  @Getter private Map<String, String> properties;
-  @Getter private Transform[] partitions;
-  @Getter private SortOrder[] sortOrder;
-  @Getter private Distribution distribution;
-  @Getter private Index[] indexes;
-  @Getter private String comment;
+  @Getter
+  @Accessors(fluent = true)
+  private String format;
+
+  @Getter
+  @Accessors(fluent = true)
+  private Map<String, String> properties;
+
+  @Getter
+  @Accessors(fluent = true)
+  private Transform[] partitioning;
+
+  @Getter
+  @Accessors(fluent = true)
+  private SortOrder[] sortOrders;
+
+  @Getter
+  @Accessors(fluent = true)
+  private Distribution distribution;
+
+  @Getter
+  @Accessors(fluent = true)
+  private Index[] indexes;
+
+  @Getter
+  @Accessors(fluent = true)
+  private String comment;
 
   /**
    * Returns a map of the fields and their corresponding values for this table.
@@ -97,11 +115,10 @@ public class TableEntity implements Entity, Auditable, HasIdentifier {
     fields.put(NAME, name);
     fields.put(AUDIT_INFO, auditInfo);
     fields.put(COLUMNS, columns);
-
     fields.put(FORMAT, format);
     fields.put(PROPERTIES, properties);
-    fields.put(PARTITIONS, partitions);
-    fields.put(SORT_ORDER, sortOrder);
+    fields.put(PARTITIONING, partitioning);
+    fields.put(SORT_ORDERS, sortOrders);
     fields.put(DISTRIBUTION, distribution);
     fields.put(INDEXES, indexes);
     fields.put(COMMENT, comment);
@@ -181,8 +198,8 @@ public class TableEntity implements Entity, Auditable, HasIdentifier {
         && Objects.equal(format, baseTable.format)
         // Please check the correctness of this comparison.
         && Objects.equal(properties, baseTable.properties)
-        && Arrays.equals(partitions, baseTable.partitions)
-        && Arrays.equals(sortOrder, baseTable.sortOrder)
+        && Arrays.equals(partitioning, baseTable.partitioning)
+        && Arrays.equals(sortOrders, baseTable.sortOrders)
         && Objects.equal(distribution, baseTable.distribution)
         && Arrays.equals(indexes, baseTable.indexes)
         && Objects.equal(comment, baseTable.comment);
@@ -190,7 +207,20 @@ public class TableEntity implements Entity, Auditable, HasIdentifier {
 
   @Override
   public int hashCode() {
-    return Objects.hashCode(id, name, auditInfo, columns, namespace);
+    return Objects.hashCode(
+        id,
+        name,
+        auditInfo,
+        columns,
+        namespace,
+        format,
+        properties,
+        Arrays.hashCode(partitioning),
+        Arrays.hashCode(sortOrders),
+        distribution,
+        distribution,
+        Arrays.hashCode(indexes),
+        comment);
   }
 
   public static class Builder {
@@ -236,13 +266,13 @@ public class TableEntity implements Entity, Auditable, HasIdentifier {
       return this;
     }
 
-    public Builder withPartitions(Transform[] partitions) {
-      tableEntity.partitions = partitions;
+    public Builder withPartitioning(Transform[] partitioning) {
+      tableEntity.partitioning = partitioning;
       return this;
     }
 
-    public Builder withSortOrder(SortOrder[] sortOrder) {
-      tableEntity.sortOrder = sortOrder;
+    public Builder withSortOrders(SortOrder[] sortOrders) {
+      tableEntity.sortOrders = sortOrders;
       return this;
     }
 
@@ -264,25 +294,18 @@ public class TableEntity implements Entity, Auditable, HasIdentifier {
     public TableEntity build() {
       tableEntity.validate();
 
-      if (tableEntity.columns == null) {
-        tableEntity.columns = Collections.emptyList();
-      }
-
-      if (tableEntity.properties == null) {
-        tableEntity.properties = Collections.emptyMap();
-      }
-
-      if (tableEntity.indexes == null) {
-        tableEntity.indexes = new Index[0];
-      }
-
-      if (tableEntity.partitions == null) {
-        tableEntity.partitions = new Transform[0];
-      }
-
-      if (tableEntity.sortOrder == null) {
-        tableEntity.sortOrder = new SortOrder[0];
-      }
+      tableEntity.columns =
+          tableEntity.columns == null ? Collections.emptyList() : tableEntity.columns;
+      tableEntity.properties =
+          tableEntity.properties == null ? Collections.emptyMap() : tableEntity.properties;
+      tableEntity.indexes =
+          tableEntity.indexes == null ? Indexes.EMPTY_INDEXES : tableEntity.indexes;
+      tableEntity.partitioning =
+          tableEntity.partitioning == null ? Transforms.EMPTY_TRANSFORM : tableEntity.partitioning;
+      tableEntity.sortOrders =
+          tableEntity.sortOrders == null ? new SortOrder[0] : tableEntity.sortOrders;
+      tableEntity.distribution =
+          tableEntity.distribution == null ? Distributions.NONE : tableEntity.distribution;
 
       return tableEntity;
     }
