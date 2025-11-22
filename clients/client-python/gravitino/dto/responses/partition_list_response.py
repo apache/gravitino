@@ -19,6 +19,7 @@ from dataclasses import dataclass, field
 
 from dataclasses_json import config
 
+from gravitino.api.rel.partitions.partition import Partition
 from gravitino.dto.rel.partitions.json_serdes.partition_dto_serdes import (
     PartitionDTOSerdes,
 )
@@ -41,3 +42,6 @@ class PartitionListResponse(BaseResponse):
             ],
         )
     )
+
+    def get_partitions(self) -> list[Partition]:
+        return self._partitions
