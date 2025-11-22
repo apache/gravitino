@@ -31,6 +31,8 @@ dependencies {
     exclude(group = "commons-logging", module = "commons-logging")
   }
 
+  implementation(libs.azure.identity)
+  implementation(libs.azure.storage.file.datalake)
   implementation(libs.hadoop3.abs)
   implementation(libs.hadoop3.client.api)
   implementation(libs.hadoop3.client.runtime)

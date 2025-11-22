@@ -271,13 +271,11 @@ If your wants to custom your hadoop version or there is already a hadoop version
     <artifactId>gravitino-filesystem-hadoop3-runtime</artifactId>
     <version>${GRAVITINO_VERSION}</version>
   </dependency>
-
-  <dependency>
-    <groupId>org.apache.gravitino</groupId>
-    <artifactId>gravitino-gcp</artifactId>
-    <version>${GRAVITINO_VERSION}</version>
-  </dependency>
 ```
+
+:::note
+Since version 1.1.0, the `gravitino-gcp` JAR is no longer required, as it is now included in the `gravitino-filesystem-hadoop3-runtime` JAR.
+:::
 
 Or use the bundle jar with Hadoop environment if there is no Hadoop environment:
 
@@ -319,7 +317,7 @@ schema_name = "your_gcs_schema"
 fileset_name = "your_gcs_fileset"
 
 # JDK8 as follows, JDK17 will be slightly different, you need to add '--conf \"spark.driver.extraJavaOptions=--add-opens=java.base/sun.nio.ch=ALL-UNNAMED\" --conf \"spark.executor.extraJavaOptions=--add-opens=java.base/sun.nio.ch=ALL-UNNAMED\"' to the submit args.
-os.environ["PYSPARK_SUBMIT_ARGS"] = "--jars /path/to/gravitino-gcp-{gravitino-version}.jar,/path/to/gravitino-filesystem-hadoop3-runtime-{gravitino-version}.jar,/path/to/gcs-connector-hadoop3-2.2.22-shaded.jar --master local[1] pyspark-shell"
+os.environ["PYSPARK_SUBMIT_ARGS"] = "--jars /path/to/gravitino-filesystem-hadoop3-runtime-{gravitino-version}.jar,/path/to/gcs-connector-hadoop3-2.2.22-shaded.jar --master local[1] pyspark-shell"
 spark = SparkSession.builder
     .appName("gcs_fielset_test")
     .config("spark.hadoop.fs.AbstractFileSystem.gvfs.impl", "org.apache.gravitino.filesystem.hadoop.Gvfs")
@@ -366,7 +364,7 @@ os.environ["PYSPARK_SUBMIT_ARGS"] = (
 ```
 
 - [`gravitino-gcp-bundle-${gravitino-version}.jar`](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-gcp-bundle) is the Gravitino GCP jar with Hadoop environment(3.3.1) and `gcs-connector`.
-- [`gravitino-gcp-${gravitino-version}.jar`](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-gcp) is a condensed version of the Gravitino GCP bundle jar without Hadoop environment and [`gcs-connector`](https://github.com/GoogleCloudDataproc/hadoop-connectors/releases/download/v2.2.22/gcs-connector-hadoop3-2.2.22-shaded.jar) 
+- [`gravitino-gcp-${gravitino-version}.jar`](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-gcp) is bundled with the `gravitino-filesystem-hadoop3-runtime-${gravitino-version}.jar` and `gravitino-gcp-bundle-${gravitino-version}.jar` since version 1.1.0.
 
 Please choose the correct jar according to your environment.
 
@@ -409,7 +407,7 @@ The following are examples of how to use the `hadoop fs` command to access the f
 
 2. Add the necessary jars to the Hadoop classpath.
 
-For GCS, you need to add `gravitino-filesystem-hadoop3-runtime-${gravitino-version}.jar`, `gravitino-gcp-${gravitino-version}.jar` and [`gcs-connector-hadoop3-2.2.22-shaded.jar`](https://github.com/GoogleCloudDataproc/hadoop-connectors/releases/download/v2.2.22/gcs-connector-hadoop3-2.2.22-shaded.jar) to Hadoop classpath.
+For GCS, you need to add `gravitino-filesystem-hadoop3-runtime-${gravitino-version}.jar` and [`gcs-connector-hadoop3-2.2.22-shaded.jar`](https://github.com/GoogleCloudDataproc/hadoop-connectors/releases/download/v2.2.22/gcs-connector-hadoop3-2.2.22-shaded.jar) to Hadoop classpath.
 
 3. Run the following command to access the fileset:
 

@@ -26,11 +26,16 @@ plugins {
 
 dependencies {
   implementation(project(":bundles:aliyun"))
+
+  implementation(libs.aliyun.credentials.sdk)
   implementation(libs.commons.collections3)
   implementation(libs.hadoop3.client.api)
   implementation(libs.hadoop3.client.runtime)
   implementation(libs.hadoop3.oss)
   implementation(libs.httpclient)
+  // Aliyun oss SDK depends on this package, and JDK >= 9 requires manual add
+  // https://www.alibabacloud.com/help/en/oss/developer-reference/java-installation?spm=a2c63.p38356.0.i1
+  implementation(libs.sun.activation)
 }
 
 tasks.withType(ShadowJar::class.java) {
