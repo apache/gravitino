@@ -21,8 +21,10 @@ package org.apache.gravitino;
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Splitter;
+import com.google.common.collect.Sets;
 import java.util.Collections;
 import java.util.List;
+import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 
@@ -35,6 +37,29 @@ public class MetadataObjects {
   private static final Splitter DOT_SPLITTER = Splitter.on('.');
 
   private static final Joiner DOT_JOINER = Joiner.on('.');
+
+  private static final Set<MetadataObject.Type> validSingleNameTypes =
+      Sets.newHashSet(
+          MetadataObject.Type.CATALOG,
+          MetadataObject.Type.METALAKE,
+          MetadataObject.Type.ROLE,
+          MetadataObject.Type.TAG,
+          MetadataObject.Type.JOB,
+          MetadataObject.Type.JOB_TEMPLATE,
+          MetadataObject.Type.POLICY);
+
+  private static final Set<MetadataObject.Type> validTwoNameTypes =
+      Sets.newHashSet(MetadataObject.Type.SCHEMA);
+
+  private static final Set<MetadataObject.Type> validThreeNameTypes =
+      Sets.newHashSet(
+          MetadataObject.Type.FILESET,
+          MetadataObject.Type.TABLE,
+          MetadataObject.Type.TOPIC,
+          MetadataObject.Type.MODEL);
+
+  private static final Set<MetadataObject.Type> validFourNameTypes =
+      Sets.newHashSet(MetadataObject.Type.COLUMN);
 
   private MetadataObjects() {}
 
@@ -49,6 +74,10 @@ public class MetadataObjects {
   public static MetadataObject of(String parent, String name, MetadataObject.Type type) {
     Preconditions.checkArgument(name != null, "Cannot create a metadata object with null name");
     Preconditions.checkArgument(type != null, "Cannot create a metadata object with no type");
+    if (validSingleNameTypes.contains(type)) {
+      Preconditions.checkArgument(
+          parent == null, "If the type is " + type + ", parent must be null");
+    }
 
     String fullName = parent == null ? name : DOT_JOINER.join(parent, name);
     return parse(fullName, type);
@@ -69,30 +98,21 @@ public class MetadataObjects {
         "Cannot create a metadata object with the name length which is greater than 4");
     Preconditions.checkArgument(type != null, "Cannot create a metadata object with no type");
 
-    Preconditions.checkArgument(
-        names.size() != 1
-            || type == MetadataObject.Type.CATALOG
-            || type == MetadataObject.Type.METALAKE
-            || type == MetadataObject.Type.ROLE
-            || type == MetadataObject.Type.TAG
-            || type == MetadataObject.Type.POLICY,
-        "If the length of names is 1, it must be the CATALOG, METALAKE,TAG, or ROLE type");
-
-    Preconditions.checkArgument(
-        names.size() != 2 || type == MetadataObject.Type.SCHEMA,
-        "If the length of names is 2, it must be the SCHEMA type");
-
-    Preconditions.checkArgument(
-        names.size() != 3
-            || type == MetadataObject.Type.FILESET
-            || type == MetadataObject.Type.TABLE
-            || type == MetadataObject.Type.TOPIC
-            || type == MetadataObject.Type.MODEL,
-        "If the length of names is 3, it must be FILESET, TABLE, TOPIC or MODEL");
-
-    Preconditions.checkArgument(
-        names.size() != 4 || type == MetadataObject.Type.COLUMN,
-        "If the length of names is 4, it must be COLUMN");
+    if (validSingleNameTypes.contains(type)) {
+      Preconditions.checkArgument(
+          names.size() == 1, "If the type is " + type + ", the length of names must be 1");
+    } else if (validTwoNameTypes.contains(type)) {
+      Preconditions.checkArgument(
+          names.size() == 2, "If the type is " + type + ", the length of names must be 2");
+    } else if (validThreeNameTypes.contains(type)) {
+      Preconditions.checkArgument(
+          names.size() == 3, "If the type is " + type + ", the length of names must be 3");
+    } else if (validFourNameTypes.contains(type)) {
+      Preconditions.checkArgument(
+          names.size() == 4, "If the type is COLUMN, the length of names must be 4");
+    } else {
+      throw new IllegalArgumentException("Unsupported metadata object type: " + type);
+    }
 
     for (String name : names) {
       checkName(name);
@@ -114,9 +134,7 @@ public class MetadataObjects {
     }
 
     // Return null if the object is the root object
-    if (object.type() == MetadataObject.Type.METALAKE
-        || object.type() == MetadataObject.Type.CATALOG
-        || object.type() == MetadataObject.Type.ROLE) {
+    if (validSingleNameTypes.contains(object.type())) {
       return null;
     }
 
@@ -155,11 +173,8 @@ public class MetadataObjects {
         StringUtils.isNotBlank(fullName), "Metadata object full name cannot be blank");
 
     List<String> parts = DOT_SPLITTER.splitToList(fullName);
-    if (type == MetadataObject.Type.ROLE) {
-      return MetadataObjects.of(Collections.singletonList(fullName), MetadataObject.Type.ROLE);
-    }
-    if (type == MetadataObject.Type.TAG) {
-      return MetadataObjects.of(Collections.singletonList(fullName), MetadataObject.Type.TAG);
+    if (validSingleNameTypes.contains(type)) {
+      return of(Collections.singletonList(fullName), type);
     }
 
     return MetadataObjects.of(parts, type);
