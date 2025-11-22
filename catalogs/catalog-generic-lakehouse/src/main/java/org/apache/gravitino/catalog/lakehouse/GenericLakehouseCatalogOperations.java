@@ -211,7 +211,6 @@ public class GenericLakehouseCatalogOperations
     try {
       TableEntity tableEntity = store.get(ident, Entity.EntityType.TABLE, TableEntity.class);
       return GenericLakehouseTable.builder()
-          .withFormat(tableEntity.format())
           .withProperties(tableEntity.properties())
           .withAuditInfo(tableEntity.auditInfo())
           .withSortOrders(tableEntity.sortOrders())
@@ -240,11 +239,6 @@ public class GenericLakehouseCatalogOperations
       SortOrder[] sortOrders,
       Index[] indexes)
       throws NoSuchSchemaException, TableAlreadyExistsException {
-    LakehouseTableFormat format =
-        (LakehouseTableFormat)
-            propertiesMetadata
-                .tablePropertiesMetadata()
-                .getOrDefault(properties, GenericLakehouseTablePropertiesMetadata.LAKEHOUSE_FORMAT);
     Schema schema = loadSchema(NameIdentifier.of(ident.namespace().levels()));
 
     String tableLocation = calculateTableLocation(schema, ident, properties);
@@ -272,7 +266,6 @@ public class GenericLakehouseCatalogOperations
               .withName(ident.name())
               .withNamespace(ident.namespace())
               .withColumns(columnEntityList)
-              .withFormat(format.lowerName())
               .withProperties(newProperties)
               .withComment(comment)
               .withPartitioning(partitions)

@@ -160,7 +160,6 @@ public class TestEntity {
 
   @Test
   public void testTable() {
-    String format = "parquet";
     String comment = "test table comment";
     Map<String, String> tableProperties = ImmutableMap.of("tableKey1", "tableValue1");
     SortOrder[] sortOrders =
@@ -174,7 +173,6 @@ public class TestEntity {
             .withId(tableId)
             .withName(tableName)
             .withAuditInfo(auditInfo)
-            .withFormat(format)
             .withSortOrders(sortOrders)
             .withProperties(tableProperties)
             .withComment(comment)
@@ -186,7 +184,6 @@ public class TestEntity {
     Assertions.assertEquals(tableId, fields.get(TableEntity.ID));
     Assertions.assertEquals(tableName, fields.get(TableEntity.NAME));
     Assertions.assertEquals(auditInfo, fields.get(TableEntity.AUDIT_INFO));
-    Assertions.assertEquals(format, fields.get(TableEntity.FORMAT));
     Assertions.assertEquals(tableProperties, fields.get(TableEntity.PROPERTIES));
     Assertions.assertEquals(comment, fields.get(TableEntity.COMMENT));
     Assertions.assertEquals(sortOrders, fields.get(TableEntity.SORT_ORDERS));
