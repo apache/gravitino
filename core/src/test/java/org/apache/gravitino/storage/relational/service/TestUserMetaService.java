@@ -19,6 +19,11 @@
 
 package org.apache.gravitino.storage.relational.service;
 
+import static org.apache.gravitino.SupportsRelationOperations.Type.OWNER_REL;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
 import java.io.IOException;
@@ -40,23 +45,188 @@ import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.CatalogEntity;
+import org.apache.gravitino.meta.FilesetEntity;
 import org.apache.gravitino.meta.RoleEntity;
+import org.apache.gravitino.meta.SchemaEntity;
+import org.apache.gravitino.meta.TableEntity;
+import org.apache.gravitino.meta.TopicEntity;
 import org.apache.gravitino.meta.UserEntity;
 import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.storage.relational.TestJDBCBackend;
 import org.apache.gravitino.storage.relational.mapper.RoleMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.UserMetaMapper;
 import org.apache.gravitino.storage.relational.po.RolePO;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
+import org.apache.gravitino.utils.NamespaceUtil;
 import org.apache.ibatis.session.SqlSession;
 import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestTemplate;
 
 class TestUserMetaService extends TestJDBCBackend {
 
-  String metalakeName = "metalake";
+  private final String metalakeName = "metalake_for_user_test";
 
-  @Test
+  @TestTemplate
+  public void testMetaLifeCycleFromCreationToDeletion() throws IOException {
+    BaseMetalake metalake = createAndInsertMakeLake(metalakeName);
+    BaseMetalake anotherMetaLake = createAndInsertMakeLake("another-metalake");
+    CatalogEntity catalog = createAndInsertCatalog(metalakeName, "catalog");
+    createAndInsertCatalog("another-metalake", "another-catalog");
+
+    RoleEntity role =
+        createRoleEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofRoleNamespace(metalakeName),
+            "role",
+            AUDIT_INFO,
+            "catalog");
+    backend.insert(role, false);
+
+    UserEntity user =
+        createUserEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofUserNamespace(metalakeName),
+            "user",
+            AUDIT_INFO,
+            Lists.newArrayList(role.name()),
+            Lists.newArrayList(role.id()));
+    backend.insert(user, false);
+
+    RoleEntity anotherRole =
+        createRoleEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofRoleNamespace("another-metalake"),
+            "another-role",
+            AUDIT_INFO,
+            "another-catalog");
+    backend.insert(anotherRole, false);
+
+    UserEntity anotherUser =
+        createUserEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofUserNamespace("another-metalake"),
+            "another-user",
+            AUDIT_INFO,
+            Lists.newArrayList(anotherRole.name()),
+            Lists.newArrayList(anotherRole.id()));
+    backend.insert(anotherUser, false);
+
+    assertEquals(1, RoleMetaService.getInstance().listRolesByUserId(user.id()).size());
+
+    UserEntity userEntity = backend.get(user.nameIdentifier(), Entity.EntityType.USER);
+    assertEquals(user, userEntity);
+    assertEquals(
+        1,
+        SessionUtils.doWithCommitAndFetchResult(
+                UserMetaMapper.class, mapper -> mapper.listUsersByRoleId(role.id()))
+            .size());
+
+    backend.insertRelation(
+        OWNER_REL,
+        metalake.nameIdentifier(),
+        metalake.type(),
+        user.nameIdentifier(),
+        user.type(),
+        true);
+
+    backend.insertRelation(
+        OWNER_REL,
+        anotherMetaLake.nameIdentifier(),
+        anotherMetaLake.type(),
+        anotherUser.nameIdentifier(),
+        anotherUser.type(),
+        true);
+
+    backend.insertRelation(
+        OWNER_REL,
+        catalog.nameIdentifier(),
+        catalog.type(),
+        user.nameIdentifier(),
+        user.type(),
+        true);
+
+    SchemaEntity schema =
+        createSchemaEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            NamespaceUtil.ofSchema(metalakeName, "catalog"),
+            "schema",
+            AUDIT_INFO);
+    backend.insert(schema, false);
+    backend.insertRelation(
+        OWNER_REL,
+        schema.nameIdentifier(),
+        schema.type(),
+        user.nameIdentifier(),
+        user.type(),
+        true);
+
+    TableEntity table =
+        createTableEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            NamespaceUtil.ofTable(metalakeName, "catalog", "schema"),
+            "table",
+            AUDIT_INFO);
+    backend.insert(table, false);
+    backend.insertRelation(
+        OWNER_REL, table.nameIdentifier(), table.type(), user.nameIdentifier(), user.type(), true);
+
+    TopicEntity topic =
+        createTopicEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            NamespaceUtil.ofFileset(metalakeName, "catalog", "schema"),
+            "topic",
+            AUDIT_INFO);
+    backend.insert(topic, false);
+    backend.insertRelation(
+        OWNER_REL, topic.nameIdentifier(), topic.type(), user.nameIdentifier(), user.type(), true);
+
+    FilesetEntity fileset =
+        createFilesetEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            NamespaceUtil.ofFileset(metalakeName, "catalog", "schema"),
+            "fileset",
+            AUDIT_INFO);
+    backend.insert(fileset, false);
+    backend.insertRelation(
+        OWNER_REL,
+        fileset.nameIdentifier(),
+        fileset.type(),
+        user.nameIdentifier(),
+        user.type(),
+        true);
+
+    backend.insertRelation(
+        OWNER_REL, role.nameIdentifier(), role.type(), user.nameIdentifier(), user.type(), true);
+
+    // meta data soft delete
+    backend.delete(metalake.nameIdentifier(), Entity.EntityType.METALAKE, true);
+
+    // check existence after soft delete
+    assertEquals(0, RoleMetaService.getInstance().listRolesByUserId(user.id()).size());
+    assertFalse(backend.exists(user.nameIdentifier(), Entity.EntityType.USER));
+    assertEquals(
+        0,
+        SessionUtils.doWithCommitAndFetchResult(
+                UserMetaMapper.class, mapper -> mapper.listUsersByRoleId(role.id()))
+            .size());
+    assertTrue(backend.exists(anotherUser.nameIdentifier(), Entity.EntityType.USER));
+
+    // check legacy record after soft delete
+    assertTrue(legacyRecordExistsInDB(user.id(), Entity.EntityType.USER));
+    assertEquals(7, countOwnerRel(metalake.id()));
+    assertEquals(1, countOwnerRel(anotherMetaLake.id()));
+
+    // meta data hard delete
+    for (Entity.EntityType entityType : Entity.EntityType.values()) {
+      backend.hardDeleteLegacyData(entityType, Instant.now().toEpochMilli() + 1000);
+    }
+    assertFalse(legacyRecordExistsInDB(user.id(), Entity.EntityType.USER));
+    assertEquals(0, countOwnerRel(metalake.id()));
+    assertEquals(1, countOwnerRel(anotherMetaLake.id()));
+  }
+
+  @TestTemplate
   void getUserByIdentifier() throws IOException {
     AuditInfo auditInfo =
         AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
@@ -120,7 +290,7 @@ class TestUserMetaService extends TestJDBCBackend {
         Sets.newHashSet(user2.roleNames()), Sets.newHashSet(actualUser.roleNames()));
   }
 
-  @Test
+  @TestTemplate
   void testListUsers() throws IOException {
     AuditInfo auditInfo =
         AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
@@ -143,7 +313,7 @@ class TestUserMetaService extends TestJDBCBackend {
     RoleEntity role1 =
         createRoleEntity(
             RandomIdGenerator.INSTANCE.nextId(),
-            AuthorizationUtils.ofRoleNamespace("metalake"),
+            AuthorizationUtils.ofRoleNamespace(metalakeName),
             "role1",
             auditInfo,
             "catalog");
@@ -152,7 +322,7 @@ class TestUserMetaService extends TestJDBCBackend {
     RoleEntity role2 =
         createRoleEntity(
             RandomIdGenerator.INSTANCE.nextId(),
-            AuthorizationUtils.ofRoleNamespace("metalake"),
+            AuthorizationUtils.ofRoleNamespace(metalakeName),
             "role2",
             auditInfo,
             "catalog");
@@ -161,7 +331,7 @@ class TestUserMetaService extends TestJDBCBackend {
     UserEntity user2 =
         createUserEntity(
             RandomIdGenerator.INSTANCE.nextId(),
-            AuthorizationUtils.ofUserNamespace("metalake"),
+            AuthorizationUtils.ofUserNamespace(metalakeName),
             "user2",
             auditInfo,
             Lists.newArrayList(role1.name(), role2.name()),
@@ -218,7 +388,7 @@ class TestUserMetaService extends TestJDBCBackend {
     Assertions.assertEquals(expectUsers.size(), actualUsers.size());
   }
 
-  @Test
+  @TestTemplate
   void insertUser() throws IOException {
     AuditInfo auditInfo =
         AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
@@ -370,7 +540,7 @@ class TestUserMetaService extends TestJDBCBackend {
     Assertions.assertNull(actualOverwriteUser4.roleNames());
   }
 
-  @Test
+  @TestTemplate
   void deleteUser() throws IOException {
     AuditInfo auditInfo =
         AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
@@ -460,7 +630,7 @@ class TestUserMetaService extends TestJDBCBackend {
     Assertions.assertEquals(0, rolePOs.size());
   }
 
-  @Test
+  @TestTemplate
   void updateUser() throws IOException {
     AuditInfo auditInfo =
         AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
@@ -680,7 +850,7 @@ class TestUserMetaService extends TestJDBCBackend {
     Assertions.assertEquals(Sets.newHashSet("role4"), Sets.newHashSet(userEntity.roleNames()));
   }
 
-  @Test
+  @TestTemplate
   void deleteMetalake() throws IOException {
     AuditInfo auditInfo =
         AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
@@ -761,7 +931,7 @@ class TestUserMetaService extends TestJDBCBackend {
     Assertions.assertEquals(0, roleMetaService.listRolesByUserId(user2.id()).size());
   }
 
-  @Test
+  @TestTemplate
   void deleteMetalakeCascade() throws IOException {
     AuditInfo auditInfo =
         AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
@@ -840,7 +1010,7 @@ class TestUserMetaService extends TestJDBCBackend {
     Assertions.assertEquals(0, roleMetaService.listRolesByUserId(user2.id()).size());
   }
 
-  @Test
+  @TestTemplate
   void deleteUserMetasByLegacyTimeline() throws IOException {
     AuditInfo auditInfo =
         AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();

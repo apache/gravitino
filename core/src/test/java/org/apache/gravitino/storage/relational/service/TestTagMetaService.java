@@ -18,9 +18,17 @@
  */
 package org.apache.gravitino.storage.relational.service;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import java.io.IOException;
+import java.sql.Connection;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.Statement;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -29,7 +37,6 @@ import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
-import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.CatalogEntity;
 import org.apache.gravitino.meta.ColumnEntity;
@@ -43,33 +50,76 @@ import org.apache.gravitino.meta.TopicEntity;
 import org.apache.gravitino.rel.types.Types;
 import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.storage.relational.TestJDBCBackend;
+import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
+import org.apache.ibatis.session.SqlSession;
 import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestTemplate;
 
 public class TestTagMetaService extends TestJDBCBackend {
 
-  private final String metalakeName = "metalake_for_tag_test";
-
-  private final AuditInfo auditInfo =
-      AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
+  private static final String METALAKE_NAME = "metalake_for_tag_test";
 
   private final Map<String, String> props = ImmutableMap.of("k1", "v1");
 
-  @Test
-  public void testInsertAndGetTagByIdentifier() throws IOException {
-    BaseMetalake metalake =
-        createBaseMakeLake(RandomIdGenerator.INSTANCE.nextId(), metalakeName, auditInfo);
-    backend.insert(metalake, false);
+  @TestTemplate
+  public void testMetaLifeCycleFromCreationToDeletion() throws IOException {
+    BaseMetalake metalake = createAndInsertMakeLake(METALAKE_NAME);
+    String anotherMetalakeName = METALAKE_NAME + "_another";
+    BaseMetalake anotherMetaLake = createAndInsertMakeLake(anotherMetalakeName);
 
+    TagEntity tag =
+        TagEntity.builder()
+            .withId(RandomIdGenerator.INSTANCE.nextId())
+            .withName("tag")
+            .withNamespace(NamespaceUtil.ofTag(metalake.name()))
+            .withComment("tag comment")
+            .withAuditInfo(AUDIT_INFO)
+            .build();
+    backend.insert(tag, false);
+
+    TagEntity anotherTagEntity =
+        TagEntity.builder()
+            .withId(RandomIdGenerator.INSTANCE.nextId())
+            .withName("another-tag")
+            .withNamespace(NamespaceUtil.ofTag(anotherMetaLake.name()))
+            .withComment("another-tag comment")
+            .withAuditInfo(AUDIT_INFO)
+            .build();
+    backend.insert(anotherTagEntity, false);
+
+    TagEntity tagEntity = backend.get(tag.nameIdentifier(), Entity.EntityType.TAG);
+    assertEquals(tag, tagEntity);
+    List<TagEntity> tags = backend.list(tag.namespace(), Entity.EntityType.TAG, true);
+    assertTrue(tags.contains(tag));
+    assertEquals(1, tags.size());
+
+    // meta data soft delete
+    backend.delete(metalake.nameIdentifier(), Entity.EntityType.METALAKE, true);
+
+    // check existence after soft delete
+    assertFalse(backend.exists(tag.nameIdentifier(), Entity.EntityType.TAG));
+    assertTrue(backend.exists(anotherTagEntity.nameIdentifier(), Entity.EntityType.TAG));
+    assertTrue(legacyRecordExistsInDB(tag.id(), Entity.EntityType.TAG));
+
+    // meta data hard delete
+    for (Entity.EntityType entityType : Entity.EntityType.values()) {
+      backend.hardDeleteLegacyData(entityType, Instant.now().toEpochMilli() + 1000);
+    }
+    assertFalse(legacyRecordExistsInDB(tag.id(), Entity.EntityType.TAG));
+  }
+
+  @TestTemplate
+  public void testInsertAndGetTagByIdentifier() throws IOException {
+    createAndInsertMakeLake(METALAKE_NAME);
     // Test no tag entity.
     TagMetaService tagMetaService = TagMetaService.getInstance();
     Exception excep =
         Assertions.assertThrows(
             NoSuchEntityException.class,
             () ->
-                tagMetaService.getTagByIdentifier(NameIdentifierUtil.ofTag(metalakeName, "tag1")));
+                tagMetaService.getTagByIdentifier(NameIdentifierUtil.ofTag(METALAKE_NAME, "tag1")));
     Assertions.assertEquals("No such tag entity: tag1", excep.getMessage());
 
     // Test get tag entity
@@ -77,15 +127,15 @@ public class TestTagMetaService extends TestJDBCBackend {
         TagEntity.builder()
             .withId(RandomIdGenerator.INSTANCE.nextId())
             .withName("tag1")
-            .withNamespace(NamespaceUtil.ofTag(metalakeName))
+            .withNamespace(NamespaceUtil.ofTag(METALAKE_NAME))
             .withComment("comment")
             .withProperties(props)
-            .withAuditInfo(auditInfo)
+            .withAuditInfo(AUDIT_INFO)
             .build();
     tagMetaService.insertTag(tagEntity, false);
 
     TagEntity resultTagEntity =
-        tagMetaService.getTagByIdentifier(NameIdentifierUtil.ofTag(metalakeName, "tag1"));
+        tagMetaService.getTagByIdentifier(NameIdentifierUtil.ofTag(METALAKE_NAME, "tag1"));
     Assertions.assertEquals(tagEntity, resultTagEntity);
 
     // Test with null comment and properties.
@@ -93,13 +143,13 @@ public class TestTagMetaService extends TestJDBCBackend {
         TagEntity.builder()
             .withId(RandomIdGenerator.INSTANCE.nextId())
             .withName("tag2")
-            .withNamespace(NamespaceUtil.ofTag(metalakeName))
-            .withAuditInfo(auditInfo)
+            .withNamespace(NamespaceUtil.ofTag(METALAKE_NAME))
+            .withAuditInfo(AUDIT_INFO)
             .build();
 
     tagMetaService.insertTag(tagEntity1, false);
     TagEntity resultTagEntity1 =
-        tagMetaService.getTagByIdentifier(NameIdentifierUtil.ofTag(metalakeName, "tag2"));
+        tagMetaService.getTagByIdentifier(NameIdentifierUtil.ofTag(METALAKE_NAME, "tag2"));
     Assertions.assertEquals(tagEntity1, resultTagEntity1);
     Assertions.assertNull(resultTagEntity1.comment());
     Assertions.assertNull(resultTagEntity1.properties());
@@ -109,10 +159,10 @@ public class TestTagMetaService extends TestJDBCBackend {
         TagEntity.builder()
             .withId(tagEntity1.id())
             .withName("tag3")
-            .withNamespace(NamespaceUtil.ofTag(metalakeName))
+            .withNamespace(NamespaceUtil.ofTag(METALAKE_NAME))
             .withComment("comment")
             .withProperties(props)
-            .withAuditInfo(auditInfo)
+            .withAuditInfo(AUDIT_INFO)
             .build();
 
     Assertions.assertThrows(Exception.class, () -> tagMetaService.insertTag(tagEntity2, false));
@@ -120,25 +170,23 @@ public class TestTagMetaService extends TestJDBCBackend {
     tagMetaService.insertTag(tagEntity2, true);
 
     TagEntity resultTagEntity2 =
-        tagMetaService.getTagByIdentifier(NameIdentifierUtil.ofTag(metalakeName, "tag3"));
+        tagMetaService.getTagByIdentifier(NameIdentifierUtil.ofTag(METALAKE_NAME, "tag3"));
     Assertions.assertEquals(tagEntity2, resultTagEntity2);
   }
 
-  @Test
+  @TestTemplate
   public void testCreateAndListTags() throws IOException {
-    BaseMetalake metalake =
-        createBaseMakeLake(RandomIdGenerator.INSTANCE.nextId(), metalakeName, auditInfo);
-    backend.insert(metalake, false);
+    createAndInsertMakeLake(METALAKE_NAME);
 
     TagMetaService tagMetaService = TagMetaService.getInstance();
     TagEntity tagEntity1 =
         TagEntity.builder()
             .withId(RandomIdGenerator.INSTANCE.nextId())
             .withName("tag1")
-            .withNamespace(NamespaceUtil.ofTag(metalakeName))
+            .withNamespace(NamespaceUtil.ofTag(METALAKE_NAME))
             .withComment("comment")
             .withProperties(props)
-            .withAuditInfo(auditInfo)
+            .withAuditInfo(AUDIT_INFO)
             .build();
     tagMetaService.insertTag(tagEntity1, false);
 
@@ -146,35 +194,33 @@ public class TestTagMetaService extends TestJDBCBackend {
         TagEntity.builder()
             .withId(RandomIdGenerator.INSTANCE.nextId())
             .withName("tag2")
-            .withNamespace(NamespaceUtil.ofTag(metalakeName))
+            .withNamespace(NamespaceUtil.ofTag(METALAKE_NAME))
             .withComment("comment")
             .withProperties(props)
-            .withAuditInfo(auditInfo)
+            .withAuditInfo(AUDIT_INFO)
             .build();
     tagMetaService.insertTag(tagEntity2, false);
 
     List<TagEntity> tagEntities =
-        tagMetaService.listTagsByNamespace(NamespaceUtil.ofTag(metalakeName));
+        tagMetaService.listTagsByNamespace(NamespaceUtil.ofTag(METALAKE_NAME));
     Assertions.assertEquals(2, tagEntities.size());
     Assertions.assertTrue(tagEntities.contains(tagEntity1));
     Assertions.assertTrue(tagEntities.contains(tagEntity2));
   }
 
-  @Test
+  @TestTemplate
   public void testUpdateTag() throws IOException {
-    BaseMetalake metalake =
-        createBaseMakeLake(RandomIdGenerator.INSTANCE.nextId(), metalakeName, auditInfo);
-    backend.insert(metalake, false);
+    createAndInsertMakeLake(METALAKE_NAME);
 
     TagMetaService tagMetaService = TagMetaService.getInstance();
     TagEntity tagEntity1 =
         TagEntity.builder()
             .withId(RandomIdGenerator.INSTANCE.nextId())
             .withName("tag1")
-            .withNamespace(NamespaceUtil.ofTag(metalakeName))
+            .withNamespace(NamespaceUtil.ofTag(METALAKE_NAME))
             .withComment("comment")
             .withProperties(props)
-            .withAuditInfo(auditInfo)
+            .withAuditInfo(AUDIT_INFO)
             .build();
     tagMetaService.insertTag(tagEntity1, false);
 
@@ -184,7 +230,7 @@ public class TestTagMetaService extends TestJDBCBackend {
             NoSuchEntityException.class,
             () ->
                 tagMetaService.updateTag(
-                    NameIdentifierUtil.ofTag(metalakeName, "tag2"), tagEntity -> tagEntity));
+                    NameIdentifierUtil.ofTag(METALAKE_NAME, "tag2"), tagEntity -> tagEntity));
     Assertions.assertEquals("No such tag entity: tag2", excep.getMessage());
 
     // Update tag entity.
@@ -192,18 +238,18 @@ public class TestTagMetaService extends TestJDBCBackend {
         TagEntity.builder()
             .withId(tagEntity1.id())
             .withName("tag1")
-            .withNamespace(NamespaceUtil.ofTag(metalakeName))
+            .withNamespace(NamespaceUtil.ofTag(METALAKE_NAME))
             .withComment("comment1")
             .withProperties(ImmutableMap.of("k2", "v2"))
-            .withAuditInfo(auditInfo)
+            .withAuditInfo(AUDIT_INFO)
             .build();
     TagEntity updatedTagEntity =
         tagMetaService.updateTag(
-            NameIdentifierUtil.ofTag(metalakeName, "tag1"), tagEntity -> tagEntity2);
+            NameIdentifierUtil.ofTag(METALAKE_NAME, "tag1"), tagEntity -> tagEntity2);
     Assertions.assertEquals(tagEntity2, updatedTagEntity);
 
     TagEntity loadedTagEntity =
-        tagMetaService.getTagByIdentifier(NameIdentifierUtil.ofTag(metalakeName, "tag1"));
+        tagMetaService.getTagByIdentifier(NameIdentifierUtil.ofTag(METALAKE_NAME, "tag1"));
     Assertions.assertEquals(tagEntity2, loadedTagEntity);
 
     // Update with different id.
@@ -211,10 +257,10 @@ public class TestTagMetaService extends TestJDBCBackend {
         TagEntity.builder()
             .withId(RandomIdGenerator.INSTANCE.nextId())
             .withName("tag1")
-            .withNamespace(NamespaceUtil.ofTag(metalakeName))
+            .withNamespace(NamespaceUtil.ofTag(METALAKE_NAME))
             .withComment("comment1")
             .withProperties(ImmutableMap.of("k2", "v2"))
-            .withAuditInfo(auditInfo)
+            .withAuditInfo(AUDIT_INFO)
             .build();
 
     Exception excep1 =
@@ -222,7 +268,7 @@ public class TestTagMetaService extends TestJDBCBackend {
             IllegalArgumentException.class,
             () ->
                 tagMetaService.updateTag(
-                    NameIdentifierUtil.ofTag(metalakeName, "tag1"), tagEntity -> tagEntity3));
+                    NameIdentifierUtil.ofTag(METALAKE_NAME, "tag1"), tagEntity -> tagEntity3));
     Assertions.assertEquals(
         "The updated tag entity id: "
             + tagEntity3.id()
@@ -232,57 +278,53 @@ public class TestTagMetaService extends TestJDBCBackend {
         excep1.getMessage());
 
     TagEntity loadedTagEntity1 =
-        tagMetaService.getTagByIdentifier(NameIdentifierUtil.ofTag(metalakeName, "tag1"));
+        tagMetaService.getTagByIdentifier(NameIdentifierUtil.ofTag(METALAKE_NAME, "tag1"));
     Assertions.assertEquals(tagEntity2, loadedTagEntity1);
   }
 
-  @Test
+  @TestTemplate
   public void testDeleteTag() throws IOException {
-    BaseMetalake metalake =
-        createBaseMakeLake(RandomIdGenerator.INSTANCE.nextId(), metalakeName, auditInfo);
-    backend.insert(metalake, false);
+    createAndInsertMakeLake(METALAKE_NAME);
 
     TagMetaService tagMetaService = TagMetaService.getInstance();
     TagEntity tagEntity1 =
         TagEntity.builder()
             .withId(RandomIdGenerator.INSTANCE.nextId())
             .withName("tag1")
-            .withNamespace(NamespaceUtil.ofTag(metalakeName))
+            .withNamespace(NamespaceUtil.ofTag(METALAKE_NAME))
             .withComment("comment")
             .withProperties(props)
-            .withAuditInfo(auditInfo)
+            .withAuditInfo(AUDIT_INFO)
             .build();
     tagMetaService.insertTag(tagEntity1, false);
 
-    boolean deleted = tagMetaService.deleteTag(NameIdentifierUtil.ofTag(metalakeName, "tag1"));
+    boolean deleted = tagMetaService.deleteTag(NameIdentifierUtil.ofTag(METALAKE_NAME, "tag1"));
     Assertions.assertTrue(deleted);
 
-    deleted = tagMetaService.deleteTag(NameIdentifierUtil.ofTag(metalakeName, "tag1"));
+    deleted = tagMetaService.deleteTag(NameIdentifierUtil.ofTag(METALAKE_NAME, "tag1"));
     Assertions.assertFalse(deleted);
 
     Exception excep =
         Assertions.assertThrows(
             NoSuchEntityException.class,
             () ->
-                tagMetaService.getTagByIdentifier(NameIdentifierUtil.ofTag(metalakeName, "tag1")));
+                tagMetaService.getTagByIdentifier(NameIdentifierUtil.ofTag(METALAKE_NAME, "tag1")));
     Assertions.assertEquals("No such tag entity: tag1", excep.getMessage());
   }
 
-  @Test
+  @TestTemplate
   public void testDeleteMetalake() throws IOException {
-    BaseMetalake metalake =
-        createBaseMakeLake(RandomIdGenerator.INSTANCE.nextId(), metalakeName, auditInfo);
-    backend.insert(metalake, false);
+    BaseMetalake metalake = createAndInsertMakeLake(METALAKE_NAME);
 
     TagMetaService tagMetaService = TagMetaService.getInstance();
     TagEntity tagEntity1 =
         TagEntity.builder()
             .withId(RandomIdGenerator.INSTANCE.nextId())
             .withName("tag1")
-            .withNamespace(NamespaceUtil.ofTag(metalakeName))
+            .withNamespace(NamespaceUtil.ofTag(METALAKE_NAME))
             .withComment("comment")
             .withProperties(props)
-            .withAuditInfo(auditInfo)
+            .withAuditInfo(AUDIT_INFO)
             .build();
     tagMetaService.insertTag(tagEntity1, false);
 
@@ -290,21 +332,21 @@ public class TestTagMetaService extends TestJDBCBackend {
         MetalakeMetaService.getInstance().deleteMetalake(metalake.nameIdentifier(), false));
     Assertions.assertThrows(
         NoSuchEntityException.class,
-        () -> tagMetaService.getTagByIdentifier(NameIdentifierUtil.ofTag(metalakeName, "tag1")));
+        () -> tagMetaService.getTagByIdentifier(NameIdentifierUtil.ofTag(METALAKE_NAME, "tag1")));
 
     // Test delete metalake with cascade.
     BaseMetalake metalake1 =
-        createBaseMakeLake(RandomIdGenerator.INSTANCE.nextId(), metalakeName + "1", auditInfo);
+        createBaseMakeLake(RandomIdGenerator.INSTANCE.nextId(), METALAKE_NAME + "1", AUDIT_INFO);
     backend.insert(metalake1, false);
 
     TagEntity tagEntity2 =
         TagEntity.builder()
             .withId(RandomIdGenerator.INSTANCE.nextId())
             .withName("tag2")
-            .withNamespace(NamespaceUtil.ofTag(metalakeName + "1"))
+            .withNamespace(NamespaceUtil.ofTag(METALAKE_NAME + "1"))
             .withComment("comment")
             .withProperties(props)
-            .withAuditInfo(auditInfo)
+            .withAuditInfo(AUDIT_INFO)
             .build();
 
     tagMetaService.insertTag(tagEntity2, false);
@@ -314,34 +356,23 @@ public class TestTagMetaService extends TestJDBCBackend {
         NoSuchEntityException.class,
         () ->
             tagMetaService.getTagByIdentifier(
-                NameIdentifierUtil.ofTag(metalakeName + "1", "tag2")));
+                NameIdentifierUtil.ofTag(METALAKE_NAME + "1", "tag2")));
   }
 
-  @Test
+  @TestTemplate
   public void testAssociateAndDisassociateTagsWithMetadataObject() throws IOException {
-    BaseMetalake metalake =
-        createBaseMakeLake(RandomIdGenerator.INSTANCE.nextId(), metalakeName, auditInfo);
-    backend.insert(metalake, false);
-
-    CatalogEntity catalog =
-        createCatalog(
-            RandomIdGenerator.INSTANCE.nextId(), Namespace.of(metalakeName), "catalog1", auditInfo);
-    backend.insert(catalog, false);
-
-    SchemaEntity schema =
-        createSchemaEntity(
-            RandomIdGenerator.INSTANCE.nextId(),
-            Namespace.of(metalakeName, catalog.name()),
-            "schema1",
-            auditInfo);
-    backend.insert(schema, false);
+    createAndInsertMakeLake(METALAKE_NAME);
+    String catalogName = "catalog1";
+    CatalogEntity catalog = createAndInsertCatalog(METALAKE_NAME, catalogName);
+    String schemaName = "schema1";
+    SchemaEntity schema = createAndInsertSchema(METALAKE_NAME, catalogName, schemaName);
 
     TableEntity table =
         createTableEntity(
             RandomIdGenerator.INSTANCE.nextId(),
-            Namespace.of(metalakeName, catalog.name(), schema.name()),
+            Namespace.of(METALAKE_NAME, catalog.name(), schema.name()),
             "table1",
-            auditInfo);
+            AUDIT_INFO);
     backend.insert(table, false);
 
     // Create tags to associate
@@ -350,10 +381,10 @@ public class TestTagMetaService extends TestJDBCBackend {
         TagEntity.builder()
             .withId(RandomIdGenerator.INSTANCE.nextId())
             .withName("tag1")
-            .withNamespace(NamespaceUtil.ofTag(metalakeName))
+            .withNamespace(NamespaceUtil.ofTag(METALAKE_NAME))
             .withComment("comment")
             .withProperties(props)
-            .withAuditInfo(auditInfo)
+            .withAuditInfo(AUDIT_INFO)
             .build();
     tagMetaService.insertTag(tagEntity1, false);
 
@@ -361,10 +392,10 @@ public class TestTagMetaService extends TestJDBCBackend {
         TagEntity.builder()
             .withId(RandomIdGenerator.INSTANCE.nextId())
             .withName("tag2")
-            .withNamespace(NamespaceUtil.ofTag(metalakeName))
+            .withNamespace(NamespaceUtil.ofTag(METALAKE_NAME))
             .withComment("comment")
             .withProperties(props)
-            .withAuditInfo(auditInfo)
+            .withAuditInfo(AUDIT_INFO)
             .build();
     tagMetaService.insertTag(tagEntity2, false);
 
@@ -372,19 +403,19 @@ public class TestTagMetaService extends TestJDBCBackend {
         TagEntity.builder()
             .withId(RandomIdGenerator.INSTANCE.nextId())
             .withName("tag3")
-            .withNamespace(NamespaceUtil.ofTag(metalakeName))
+            .withNamespace(NamespaceUtil.ofTag(METALAKE_NAME))
             .withComment("comment")
             .withProperties(props)
-            .withAuditInfo(auditInfo)
+            .withAuditInfo(AUDIT_INFO)
             .build();
     tagMetaService.insertTag(tagEntity3, false);
 
     // Test associate tags with metadata object
     NameIdentifier[] tagsToAdd =
         new NameIdentifier[] {
-          NameIdentifierUtil.ofTag(metalakeName, "tag1"),
-          NameIdentifierUtil.ofTag(metalakeName, "tag2"),
-          NameIdentifierUtil.ofTag(metalakeName, "tag3")
+          NameIdentifierUtil.ofTag(METALAKE_NAME, "tag1"),
+          NameIdentifierUtil.ofTag(METALAKE_NAME, "tag2"),
+          NameIdentifierUtil.ofTag(METALAKE_NAME, "tag3")
         };
 
     List<TagEntity> tagEntities =
@@ -397,7 +428,7 @@ public class TestTagMetaService extends TestJDBCBackend {
 
     // Test disassociate tags with metadata object
     NameIdentifier[] tagsToRemove =
-        new NameIdentifier[] {NameIdentifierUtil.ofTag(metalakeName, "tag1")};
+        new NameIdentifier[] {NameIdentifierUtil.ofTag(METALAKE_NAME, "tag1")};
 
     List<TagEntity> tagEntities1 =
         tagMetaService.associateTagsWithMetadataObject(
@@ -430,14 +461,14 @@ public class TestTagMetaService extends TestJDBCBackend {
     // Test associate and disassociate in-existent tags with metadata object
     NameIdentifier[] tagsToAdd1 =
         new NameIdentifier[] {
-          NameIdentifierUtil.ofTag(metalakeName, "tag4"),
-          NameIdentifierUtil.ofTag(metalakeName, "tag5")
+          NameIdentifierUtil.ofTag(METALAKE_NAME, "tag4"),
+          NameIdentifierUtil.ofTag(METALAKE_NAME, "tag5")
         };
 
     NameIdentifier[] tagsToRemove1 =
         new NameIdentifier[] {
-          NameIdentifierUtil.ofTag(metalakeName, "tag6"),
-          NameIdentifierUtil.ofTag(metalakeName, "tag7")
+          NameIdentifierUtil.ofTag(METALAKE_NAME, "tag6"),
+          NameIdentifierUtil.ofTag(METALAKE_NAME, "tag7")
         };
 
     List<TagEntity> tagEntities4 =
@@ -469,7 +500,7 @@ public class TestTagMetaService extends TestJDBCBackend {
         NoSuchEntityException.class,
         () ->
             tagMetaService.associateTagsWithMetadataObject(
-                NameIdentifier.of(metalakeName, "non-existent-catalog"),
+                NameIdentifier.of(METALAKE_NAME, "non-existent-catalog"),
                 catalog.type(),
                 tagsToAdd,
                 tagsToRemove));
@@ -493,7 +524,7 @@ public class TestTagMetaService extends TestJDBCBackend {
     Assertions.assertTrue(tagEntities7.contains(tagEntity3));
   }
 
-  @Test
+  @TestTemplate
   public void testListTagsForMetadataObject() throws IOException {
     testAssociateAndDisassociateTagsWithMetadataObject();
 
@@ -502,7 +533,7 @@ public class TestTagMetaService extends TestJDBCBackend {
     // Test list tags for catalog
     List<TagEntity> tagEntities =
         tagMetaService.listTagsForMetadataObject(
-            NameIdentifier.of(metalakeName, "catalog1"), Entity.EntityType.CATALOG);
+            NameIdentifier.of(METALAKE_NAME, "catalog1"), Entity.EntityType.CATALOG);
     Assertions.assertEquals(2, tagEntities.size());
     Assertions.assertTrue(
         tagEntities.stream().anyMatch(tagEntity -> tagEntity.name().equals("tag2")));
@@ -512,7 +543,7 @@ public class TestTagMetaService extends TestJDBCBackend {
     // Test list tags for schema
     List<TagEntity> tagEntities1 =
         tagMetaService.listTagsForMetadataObject(
-            NameIdentifier.of(metalakeName, "catalog1", "schema1"), Entity.EntityType.SCHEMA);
+            NameIdentifier.of(METALAKE_NAME, "catalog1", "schema1"), Entity.EntityType.SCHEMA);
 
     Assertions.assertEquals(2, tagEntities1.size());
     Assertions.assertTrue(
@@ -523,7 +554,7 @@ public class TestTagMetaService extends TestJDBCBackend {
     // Test list tags for table
     List<TagEntity> tagEntities2 =
         tagMetaService.listTagsForMetadataObject(
-            NameIdentifier.of(metalakeName, "catalog1", "schema1", "table1"),
+            NameIdentifier.of(METALAKE_NAME, "catalog1", "schema1", "table1"),
             Entity.EntityType.TABLE);
 
     Assertions.assertEquals(2, tagEntities2.size());
@@ -537,11 +568,11 @@ public class TestTagMetaService extends TestJDBCBackend {
         NoSuchEntityException.class,
         () ->
             tagMetaService.listTagsForMetadataObject(
-                NameIdentifier.of(metalakeName, "catalog1", "schema1", "table2"),
+                NameIdentifier.of(METALAKE_NAME, "catalog1", "schema1", "table2"),
                 Entity.EntityType.TABLE));
   }
 
-  @Test
+  @TestTemplate
   public void testGetTagForMetadataObject() throws IOException {
     testAssociateAndDisassociateTagsWithMetadataObject();
 
@@ -550,25 +581,25 @@ public class TestTagMetaService extends TestJDBCBackend {
     // Test get tag for catalog
     TagEntity tagEntity =
         tagMetaService.getTagForMetadataObject(
-            NameIdentifier.of(metalakeName, "catalog1"),
+            NameIdentifier.of(METALAKE_NAME, "catalog1"),
             Entity.EntityType.CATALOG,
-            NameIdentifierUtil.ofTag(metalakeName, "tag2"));
+            NameIdentifierUtil.ofTag(METALAKE_NAME, "tag2"));
     Assertions.assertEquals("tag2", tagEntity.name());
 
     // Test get tag for schema
     TagEntity tagEntity1 =
         tagMetaService.getTagForMetadataObject(
-            NameIdentifier.of(metalakeName, "catalog1", "schema1"),
+            NameIdentifier.of(METALAKE_NAME, "catalog1", "schema1"),
             Entity.EntityType.SCHEMA,
-            NameIdentifierUtil.ofTag(metalakeName, "tag3"));
+            NameIdentifierUtil.ofTag(METALAKE_NAME, "tag3"));
     Assertions.assertEquals("tag3", tagEntity1.name());
 
     // Test get tag for table
     TagEntity tagEntity2 =
         tagMetaService.getTagForMetadataObject(
-            NameIdentifier.of(metalakeName, "catalog1", "schema1", "table1"),
+            NameIdentifier.of(METALAKE_NAME, "catalog1", "schema1", "table1"),
             Entity.EntityType.TABLE,
-            NameIdentifierUtil.ofTag(metalakeName, "tag2"));
+            NameIdentifierUtil.ofTag(METALAKE_NAME, "tag2"));
     Assertions.assertEquals("tag2", tagEntity2.name());
 
     // Test get tag for non-existent metadata object
@@ -576,9 +607,9 @@ public class TestTagMetaService extends TestJDBCBackend {
         NoSuchEntityException.class,
         () ->
             tagMetaService.getTagForMetadataObject(
-                NameIdentifier.of(metalakeName, "catalog1", "schema1", "table2"),
+                NameIdentifier.of(METALAKE_NAME, "catalog1", "schema1", "table2"),
                 Entity.EntityType.TABLE,
-                NameIdentifierUtil.ofTag(metalakeName, "tag2")));
+                NameIdentifierUtil.ofTag(METALAKE_NAME, "tag2")));
 
     // Test get tag for non-existent tag
     Throwable e =
@@ -586,18 +617,13 @@ public class TestTagMetaService extends TestJDBCBackend {
             NoSuchEntityException.class,
             () ->
                 tagMetaService.getTagForMetadataObject(
-                    NameIdentifier.of(metalakeName, "catalog1", "schema1", "table1"),
+                    NameIdentifier.of(METALAKE_NAME, "catalog1", "schema1", "table1"),
                     Entity.EntityType.TABLE,
-                    NameIdentifierUtil.ofTag(metalakeName, "tag4")));
+                    NameIdentifierUtil.ofTag(METALAKE_NAME, "tag4")));
     Assertions.assertTrue(e.getMessage().contains("No such tag entity: tag4"));
   }
 
-  private boolean containsGenericEntity(
-      List<GenericEntity> genericEntities, String name, Entity.EntityType entityType) {
-    return genericEntities.stream().anyMatch(e -> e.name().equals(name) && e.type() == entityType);
-  }
-
-  @Test
+  @TestTemplate
   public void testListAssociatedMetadataObjectsForTag() throws IOException {
     testAssociateAndDisassociateTagsWithMetadataObject();
 
@@ -606,7 +632,7 @@ public class TestTagMetaService extends TestJDBCBackend {
     // Test list associated metadata objects for tag2
     List<GenericEntity> metadataObjects =
         tagMetaService.listAssociatedMetadataObjectsForTag(
-            NameIdentifierUtil.ofTag(metalakeName, "tag2"));
+            NameIdentifierUtil.ofTag(METALAKE_NAME, "tag2"));
 
     Assertions.assertEquals(3, metadataObjects.size());
     Assertions.assertTrue(
@@ -619,7 +645,7 @@ public class TestTagMetaService extends TestJDBCBackend {
     // Test list associated metadata objects for tag3
     List<GenericEntity> metadataObjects1 =
         tagMetaService.listAssociatedMetadataObjectsForTag(
-            NameIdentifierUtil.ofTag(metalakeName, "tag3"));
+            NameIdentifierUtil.ofTag(METALAKE_NAME, "tag3"));
 
     Assertions.assertEquals(3, metadataObjects1.size());
 
@@ -634,18 +660,18 @@ public class TestTagMetaService extends TestJDBCBackend {
     // Test list associated metadata objects for non-existent tag
     List<GenericEntity> metadataObjects2 =
         tagMetaService.listAssociatedMetadataObjectsForTag(
-            NameIdentifierUtil.ofTag(metalakeName, "tag4"));
+            NameIdentifierUtil.ofTag(METALAKE_NAME, "tag4"));
     Assertions.assertEquals(0, metadataObjects2.size());
 
     // Test metadata object non-exist scenario.
     backend.delete(
-        NameIdentifier.of(metalakeName, "catalog1", "schema1", "table1"),
+        NameIdentifier.of(METALAKE_NAME, "catalog1", "schema1", "table1"),
         Entity.EntityType.TABLE,
         false);
 
     List<GenericEntity> metadataObjects3 =
         tagMetaService.listAssociatedMetadataObjectsForTag(
-            NameIdentifierUtil.ofTag(metalakeName, "tag2"));
+            NameIdentifierUtil.ofTag(METALAKE_NAME, "tag2"));
 
     Assertions.assertEquals(2, metadataObjects3.size());
 
@@ -655,42 +681,45 @@ public class TestTagMetaService extends TestJDBCBackend {
         containsGenericEntity(metadataObjects3, "catalog1.schema1", Entity.EntityType.SCHEMA));
 
     backend.delete(
-        NameIdentifier.of(metalakeName, "catalog1", "schema1"), Entity.EntityType.SCHEMA, false);
+        NameIdentifier.of(METALAKE_NAME, "catalog1", "schema1"), Entity.EntityType.SCHEMA, false);
 
     List<GenericEntity> metadataObjects4 =
         tagMetaService.listAssociatedMetadataObjectsForTag(
-            NameIdentifierUtil.ofTag(metalakeName, "tag2"));
+            NameIdentifierUtil.ofTag(METALAKE_NAME, "tag2"));
 
     Assertions.assertEquals(1, metadataObjects4.size());
     Assertions.assertTrue(
         containsGenericEntity(metadataObjects4, "catalog1", Entity.EntityType.CATALOG));
 
-    backend.delete(NameIdentifier.of(metalakeName, "catalog1"), Entity.EntityType.CATALOG, false);
+    backend.delete(NameIdentifier.of(METALAKE_NAME, "catalog1"), Entity.EntityType.CATALOG, false);
 
     List<GenericEntity> metadataObjects5 =
         tagMetaService.listAssociatedMetadataObjectsForTag(
-            NameIdentifierUtil.ofTag(metalakeName, "tag2"));
+            NameIdentifierUtil.ofTag(METALAKE_NAME, "tag2"));
 
     Assertions.assertEquals(0, metadataObjects5.size());
   }
 
-  @Test
+  @TestTemplate
   public void testDeleteMetadataObjectForTag() throws IOException {
     BaseMetalake metalake =
-        createBaseMakeLake(RandomIdGenerator.INSTANCE.nextId(), metalakeName, auditInfo);
+        createBaseMakeLake(RandomIdGenerator.INSTANCE.nextId(), METALAKE_NAME, AUDIT_INFO);
     backend.insert(metalake, false);
 
     CatalogEntity catalog =
         createCatalog(
-            RandomIdGenerator.INSTANCE.nextId(), Namespace.of(metalakeName), "catalog1", auditInfo);
+            RandomIdGenerator.INSTANCE.nextId(),
+            Namespace.of(METALAKE_NAME),
+            "catalog1",
+            AUDIT_INFO);
     backend.insert(catalog, false);
 
     SchemaEntity schema =
         createSchemaEntity(
             RandomIdGenerator.INSTANCE.nextId(),
-            Namespace.of(metalakeName, catalog.name()),
+            Namespace.of(METALAKE_NAME, catalog.name()),
             "schema1",
-            auditInfo);
+            AUDIT_INFO);
     backend.insert(schema, false);
 
     ColumnEntity column =
@@ -701,7 +730,7 @@ public class TestTagMetaService extends TestJDBCBackend {
             .withAutoIncrement(false)
             .withNullable(false)
             .withDataType(Types.IntegerType.get())
-            .withAuditInfo(auditInfo)
+            .withAuditInfo(AUDIT_INFO)
             .build();
 
     List<ColumnEntity> columns = Lists.newArrayList();
@@ -710,10 +739,10 @@ public class TestTagMetaService extends TestJDBCBackend {
     TableEntity table =
         TableEntity.builder()
             .withName("table")
-            .withNamespace(Namespace.of(metalakeName, catalog.name(), schema.name()))
+            .withNamespace(Namespace.of(METALAKE_NAME, catalog.name(), schema.name()))
             .withId(RandomIdGenerator.INSTANCE.nextId())
             .withColumns(columns)
-            .withAuditInfo(auditInfo)
+            .withAuditInfo(AUDIT_INFO)
             .build();
 
     backend.insert(table, false);
@@ -721,28 +750,28 @@ public class TestTagMetaService extends TestJDBCBackend {
     TopicEntity topic =
         createTopicEntity(
             RandomIdGenerator.INSTANCE.nextId(),
-            Namespace.of(metalakeName, catalog.name(), schema.name()),
+            Namespace.of(METALAKE_NAME, catalog.name(), schema.name()),
             "topic1",
-            auditInfo);
+            AUDIT_INFO);
     backend.insert(topic, false);
 
     FilesetEntity fileset =
         createFilesetEntity(
             RandomIdGenerator.INSTANCE.nextId(),
-            Namespace.of(metalakeName, catalog.name(), schema.name()),
+            Namespace.of(METALAKE_NAME, catalog.name(), schema.name()),
             "fileset1",
-            auditInfo);
+            AUDIT_INFO);
     backend.insert(fileset, false);
 
     ModelEntity model =
         createModelEntity(
             RandomIdGenerator.INSTANCE.nextId(),
-            Namespace.of(metalakeName, catalog.name(), schema.name()),
+            Namespace.of(METALAKE_NAME, catalog.name(), schema.name()),
             "model1",
             "comment",
             1,
             null,
-            auditInfo);
+            AUDIT_INFO);
     backend.insert(model, false);
 
     TagMetaService tagMetaService = TagMetaService.getInstance();
@@ -750,10 +779,10 @@ public class TestTagMetaService extends TestJDBCBackend {
         TagEntity.builder()
             .withId(RandomIdGenerator.INSTANCE.nextId())
             .withName("tag1")
-            .withNamespace(NamespaceUtil.ofTag(metalakeName))
+            .withNamespace(NamespaceUtil.ofTag(METALAKE_NAME))
             .withComment("comment")
             .withProperties(props)
-            .withAuditInfo(auditInfo)
+            .withAuditInfo(AUDIT_INFO)
             .build();
     tagMetaService.insertTag(tagEntity1, false);
     tagMetaService.associateTagsWithMetadataObject(
@@ -830,15 +859,18 @@ public class TestTagMetaService extends TestJDBCBackend {
     // Test to drop a catalog using cascade mode
     catalog =
         createCatalog(
-            RandomIdGenerator.INSTANCE.nextId(), Namespace.of(metalakeName), "catalog1", auditInfo);
+            RandomIdGenerator.INSTANCE.nextId(),
+            Namespace.of(METALAKE_NAME),
+            "catalog1",
+            AUDIT_INFO);
     backend.insert(catalog, false);
 
     schema =
         createSchemaEntity(
             RandomIdGenerator.INSTANCE.nextId(),
-            Namespace.of(metalakeName, catalog.name()),
+            Namespace.of(METALAKE_NAME, catalog.name()),
             "schema1",
-            auditInfo);
+            AUDIT_INFO);
     backend.insert(schema, false);
 
     column =
@@ -849,7 +881,7 @@ public class TestTagMetaService extends TestJDBCBackend {
             .withAutoIncrement(false)
             .withNullable(false)
             .withDataType(Types.IntegerType.get())
-            .withAuditInfo(auditInfo)
+            .withAuditInfo(AUDIT_INFO)
             .build();
 
     columns = Lists.newArrayList();
@@ -858,10 +890,10 @@ public class TestTagMetaService extends TestJDBCBackend {
     table =
         TableEntity.builder()
             .withName("table")
-            .withNamespace(Namespace.of(metalakeName, catalog.name(), schema.name()))
+            .withNamespace(Namespace.of(METALAKE_NAME, catalog.name(), schema.name()))
             .withId(RandomIdGenerator.INSTANCE.nextId())
             .withColumns(columns)
-            .withAuditInfo(auditInfo)
+            .withAuditInfo(AUDIT_INFO)
             .build();
 
     backend.insert(table, false);
@@ -869,28 +901,28 @@ public class TestTagMetaService extends TestJDBCBackend {
     topic =
         createTopicEntity(
             RandomIdGenerator.INSTANCE.nextId(),
-            Namespace.of(metalakeName, catalog.name(), schema.name()),
+            Namespace.of(METALAKE_NAME, catalog.name(), schema.name()),
             "topic1",
-            auditInfo);
+            AUDIT_INFO);
     backend.insert(topic, false);
 
     fileset =
         createFilesetEntity(
             RandomIdGenerator.INSTANCE.nextId(),
-            Namespace.of(metalakeName, catalog.name(), schema.name()),
+            Namespace.of(METALAKE_NAME, catalog.name(), schema.name()),
             "fileset1",
-            auditInfo);
+            AUDIT_INFO);
     backend.insert(fileset, false);
 
     model =
         createModelEntity(
             RandomIdGenerator.INSTANCE.nextId(),
-            Namespace.of(metalakeName, catalog.name(), schema.name()),
+            Namespace.of(METALAKE_NAME, catalog.name(), schema.name()),
             "model1",
             "comment",
             1,
             null,
-            auditInfo);
+            AUDIT_INFO);
     backend.insert(model, false);
 
     tagMetaService.associateTagsWithMetadataObject(
@@ -938,15 +970,18 @@ public class TestTagMetaService extends TestJDBCBackend {
     // Test to drop a schema using cascade mode
     catalog =
         createCatalog(
-            RandomIdGenerator.INSTANCE.nextId(), Namespace.of(metalakeName), "catalog1", auditInfo);
+            RandomIdGenerator.INSTANCE.nextId(),
+            Namespace.of(METALAKE_NAME),
+            "catalog1",
+            AUDIT_INFO);
     backend.insert(catalog, false);
 
     schema =
         createSchemaEntity(
             RandomIdGenerator.INSTANCE.nextId(),
-            Namespace.of(metalakeName, catalog.name()),
+            Namespace.of(METALAKE_NAME, catalog.name()),
             "schema1",
-            auditInfo);
+            AUDIT_INFO);
     backend.insert(schema, false);
 
     column =
@@ -957,7 +992,7 @@ public class TestTagMetaService extends TestJDBCBackend {
             .withAutoIncrement(false)
             .withNullable(false)
             .withDataType(Types.IntegerType.get())
-            .withAuditInfo(auditInfo)
+            .withAuditInfo(AUDIT_INFO)
             .build();
 
     columns = Lists.newArrayList();
@@ -966,10 +1001,10 @@ public class TestTagMetaService extends TestJDBCBackend {
     table =
         TableEntity.builder()
             .withName("table")
-            .withNamespace(Namespace.of(metalakeName, catalog.name(), schema.name()))
+            .withNamespace(Namespace.of(METALAKE_NAME, catalog.name(), schema.name()))
             .withId(RandomIdGenerator.INSTANCE.nextId())
             .withColumns(columns)
-            .withAuditInfo(auditInfo)
+            .withAuditInfo(AUDIT_INFO)
             .build();
 
     backend.insert(table, false);
@@ -977,28 +1012,28 @@ public class TestTagMetaService extends TestJDBCBackend {
     topic =
         createTopicEntity(
             RandomIdGenerator.INSTANCE.nextId(),
-            Namespace.of(metalakeName, catalog.name(), schema.name()),
+            Namespace.of(METALAKE_NAME, catalog.name(), schema.name()),
             "topic1",
-            auditInfo);
+            AUDIT_INFO);
     backend.insert(topic, false);
 
     fileset =
         createFilesetEntity(
             RandomIdGenerator.INSTANCE.nextId(),
-            Namespace.of(metalakeName, catalog.name(), schema.name()),
+            Namespace.of(METALAKE_NAME, catalog.name(), schema.name()),
             "fileset1",
-            auditInfo);
+            AUDIT_INFO);
     backend.insert(fileset, false);
 
     model =
         createModelEntity(
             RandomIdGenerator.INSTANCE.nextId(),
-            Namespace.of(metalakeName, catalog.name(), schema.name()),
+            Namespace.of(METALAKE_NAME, catalog.name(), schema.name()),
             "model1",
             "comment",
             1,
             null,
-            auditInfo);
+            AUDIT_INFO);
     backend.insert(model, false);
 
     tagMetaService.associateTagsWithMetadataObject(
@@ -1043,5 +1078,48 @@ public class TestTagMetaService extends TestJDBCBackend {
     SchemaMetaService.getInstance().deleteSchema(schema.nameIdentifier(), true);
     Assertions.assertEquals(1, countActiveTagRel(tagEntity1.id()));
     Assertions.assertEquals(21, countAllTagRel(tagEntity1.id()));
+  }
+
+  private boolean containsGenericEntity(
+      List<GenericEntity> genericEntities, String name, Entity.EntityType entityType) {
+    return genericEntities.stream().anyMatch(e -> e.name().equals(name) && e.type() == entityType);
+  }
+
+  private Integer countAllTagRel(Long tagId) {
+    try (SqlSession sqlSession =
+            SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true);
+        Connection connection = sqlSession.getConnection();
+        Statement statement1 = connection.createStatement();
+        ResultSet rs1 =
+            statement1.executeQuery(
+                String.format("SELECT count(*) FROM tag_relation_meta WHERE tag_id = %d", tagId))) {
+      if (rs1.next()) {
+        return rs1.getInt(1);
+      } else {
+        throw new RuntimeException("Doesn't contain data");
+      }
+    } catch (SQLException se) {
+      throw new RuntimeException("SQL execution failed", se);
+    }
+  }
+
+  private Integer countActiveTagRel(Long tagId) {
+    try (SqlSession sqlSession =
+            SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true);
+        Connection connection = sqlSession.getConnection();
+        Statement statement1 = connection.createStatement();
+        ResultSet rs1 =
+            statement1.executeQuery(
+                String.format(
+                    "SELECT count(*) FROM tag_relation_meta WHERE tag_id = %d AND deleted_at = 0",
+                    tagId))) {
+      if (rs1.next()) {
+        return rs1.getInt(1);
+      } else {
+        throw new RuntimeException("Doesn't contain data");
+      }
+    } catch (SQLException se) {
+      throw new RuntimeException("SQL execution failed", se);
+    }
   }
 }

@@ -32,8 +32,7 @@ public class UserRoleRelPostgreSQLProvider extends UserRoleRelBaseSQLProvider {
   public String softDeleteUserRoleRelByUserId(Long userId) {
     return "UPDATE "
         + USER_ROLE_RELATION_TABLE_NAME
-        + " SET deleted_at = floor(extract(epoch from(current_timestamp -"
-        + " timestamp '1970-01-01 00:00:00')) * 1000)"
+        + " SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
         + " WHERE user_id = #{userId} AND deleted_at = 0";
   }
 
@@ -42,8 +41,7 @@ public class UserRoleRelPostgreSQLProvider extends UserRoleRelBaseSQLProvider {
     return "<script>"
         + "UPDATE "
         + USER_ROLE_RELATION_TABLE_NAME
-        + " SET deleted_at = floor(extract(epoch from(current_timestamp -"
-        + " timestamp '1970-01-01 00:00:00')) * 1000)"
+        + " SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
         + " WHERE user_id = #{userId} AND role_id IN ("
         + "<foreach collection='roleIds' item='roleId' separator=','>"
         + "#{roleId}"
@@ -57,8 +55,7 @@ public class UserRoleRelPostgreSQLProvider extends UserRoleRelBaseSQLProvider {
   public String softDeleteUserRoleRelByMetalakeId(Long metalakeId) {
     return "UPDATE "
         + USER_ROLE_RELATION_TABLE_NAME
-        + " SET deleted_at = floor(extract(epoch from(current_timestamp -"
-        + " timestamp '1970-01-01 00:00:00')) * 1000)"
+        + " SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
         + " WHERE user_id IN (SELECT user_id FROM "
         + USER_TABLE_NAME
         + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0)"
@@ -69,8 +66,7 @@ public class UserRoleRelPostgreSQLProvider extends UserRoleRelBaseSQLProvider {
   public String softDeleteUserRoleRelByRoleId(Long roleId) {
     return "UPDATE "
         + USER_ROLE_RELATION_TABLE_NAME
-        + " SET deleted_at = floor(extract(epoch from(current_timestamp -"
-        + " timestamp '1970-01-01 00:00:00')) * 1000)"
+        + " SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
         + " WHERE role_id = #{roleId} AND deleted_at = 0";
   }
 

@@ -29,8 +29,7 @@ public class FilesetMetaPostgreSQLProvider extends FilesetMetaBaseSQLProvider {
   public String softDeleteFilesetMetasByMetalakeId(Long metalakeId) {
     return "UPDATE "
         + META_TABLE_NAME
-        + " SET deleted_at = floor(extract(epoch from(current_timestamp -"
-        + " timestamp '1970-01-01 00:00:00')) * 1000)"
+        + " SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
         + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0";
   }
 
@@ -38,8 +37,7 @@ public class FilesetMetaPostgreSQLProvider extends FilesetMetaBaseSQLProvider {
   public String softDeleteFilesetMetasByCatalogId(Long catalogId) {
     return "UPDATE "
         + META_TABLE_NAME
-        + " SET deleted_at = floor(extract(epoch from(current_timestamp -"
-        + " timestamp '1970-01-01 00:00:00')) * 1000)"
+        + " SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
         + " WHERE catalog_id = #{catalogId} AND deleted_at = 0";
   }
 
@@ -47,8 +45,7 @@ public class FilesetMetaPostgreSQLProvider extends FilesetMetaBaseSQLProvider {
   public String softDeleteFilesetMetasBySchemaId(Long schemaId) {
     return "UPDATE "
         + META_TABLE_NAME
-        + " SET deleted_at = floor(extract(epoch from(current_timestamp -"
-        + " timestamp '1970-01-01 00:00:00')) * 1000)"
+        + " SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
         + " WHERE schema_id = #{schemaId} AND deleted_at = 0";
   }
 
@@ -56,8 +53,7 @@ public class FilesetMetaPostgreSQLProvider extends FilesetMetaBaseSQLProvider {
   public String softDeleteFilesetMetasByFilesetId(Long filesetId) {
     return "UPDATE "
         + META_TABLE_NAME
-        + " SET deleted_at = floor(extract(epoch from(current_timestamp -"
-        + " timestamp '1970-01-01 00:00:00')) * 1000)"
+        + " SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
         + " WHERE fileset_id = #{filesetId} AND deleted_at = 0";
   }
 

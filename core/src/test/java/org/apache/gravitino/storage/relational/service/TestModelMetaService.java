@@ -18,24 +18,29 @@
  */
 package org.apache.gravitino.storage.relational.service;
 
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
 import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
+import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
-import org.apache.gravitino.meta.AuditInfo;
+import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.ModelEntity;
 import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.storage.relational.TestJDBCBackend;
 import org.apache.gravitino.storage.relational.po.ModelPO;
 import org.apache.gravitino.storage.relational.utils.POConverters;
+import org.apache.gravitino.utils.NamespaceUtil;
 import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestTemplate;
 
 public class TestModelMetaService extends TestJDBCBackend {
 
@@ -47,12 +52,43 @@ public class TestModelMetaService extends TestJDBCBackend {
 
   private static final Namespace MODEL_NS = Namespace.of(METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME);
 
-  private final AuditInfo auditInfo =
-      AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build();
+  @TestTemplate
+  public void testMetaLifeCycleFromCreationToDeletion() throws IOException {
+    BaseMetalake metalake = createAndInsertMakeLake(METALAKE_NAME);
+    createAndInsertCatalog(METALAKE_NAME, CATALOG_NAME);
+    createAndInsertSchema(METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME);
 
-  @Test
+    ModelEntity model =
+        createModelEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            NamespaceUtil.ofModel(METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME),
+            "model",
+            "model comment",
+            1,
+            ImmutableMap.of("key", "value"),
+            AUDIT_INFO);
+    backend.insert(model, false);
+
+    List<ModelEntity> models = backend.list(model.namespace(), Entity.EntityType.MODEL, true);
+    assertTrue(models.contains(model));
+
+    // meta data soft delete
+    backend.delete(metalake.nameIdentifier(), Entity.EntityType.METALAKE, true);
+    assertFalse(backend.exists(model.nameIdentifier(), Entity.EntityType.MODEL));
+
+    // check legacy record after soft delete
+    assertTrue(legacyRecordExistsInDB(model.id(), Entity.EntityType.MODEL));
+
+    // meta data hard delete
+    for (Entity.EntityType entityType : Entity.EntityType.values()) {
+      backend.hardDeleteLegacyData(entityType, Instant.now().toEpochMilli() + 1000);
+    }
+    assertFalse(legacyRecordExistsInDB(model.id(), Entity.EntityType.MODEL));
+  }
+
+  @TestTemplate
   public void testInsertAndSelectModel() throws IOException {
-    createParentEntities(METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME, auditInfo);
+    createParentEntities(METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME, AUDIT_INFO);
     Map<String, String> properties = ImmutableMap.of("k1", "v1");
 
     ModelEntity modelEntity =
@@ -63,7 +99,7 @@ public class TestModelMetaService extends TestJDBCBackend {
             "model1 comment",
             0,
             properties,
-            auditInfo);
+            AUDIT_INFO);
 
     Assertions.assertDoesNotThrow(
         () -> ModelMetaService.getInstance().insertModel(modelEntity, false));
@@ -86,7 +122,7 @@ public class TestModelMetaService extends TestJDBCBackend {
             null,
             modelEntity.latestVersion(),
             null,
-            auditInfo);
+            AUDIT_INFO);
     Assertions.assertDoesNotThrow(
         () -> ModelMetaService.getInstance().insertModel(modelEntity2, true));
     ModelEntity registeredModelEntity2 =
@@ -121,9 +157,9 @@ public class TestModelMetaService extends TestJDBCBackend {
         () -> ModelMetaService.getInstance().getModelIdBySchemaIdAndModelName(schemaId, "model3"));
   }
 
-  @Test
+  @TestTemplate
   public void testInsertAndListModels() throws IOException {
-    createParentEntities(METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME, auditInfo);
+    createParentEntities(METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME, AUDIT_INFO);
     Map<String, String> properties = ImmutableMap.of("k1", "v1");
 
     ModelEntity modelEntity1 =
@@ -134,7 +170,7 @@ public class TestModelMetaService extends TestJDBCBackend {
             "model1 comment",
             0,
             properties,
-            auditInfo);
+            AUDIT_INFO);
     ModelEntity modelEntity2 =
         createModelEntity(
             RandomIdGenerator.INSTANCE.nextId(),
@@ -143,7 +179,7 @@ public class TestModelMetaService extends TestJDBCBackend {
             "model2 comment",
             0,
             properties,
-            auditInfo);
+            AUDIT_INFO);
 
     Assertions.assertDoesNotThrow(
         () -> ModelMetaService.getInstance().insertModel(modelEntity1, false));
@@ -164,9 +200,9 @@ public class TestModelMetaService extends TestJDBCBackend {
                 .listModelsByNamespace(Namespace.of(METALAKE_NAME, CATALOG_NAME, "inexistent")));
   }
 
-  @Test
+  @TestTemplate
   public void testInsertAndDeleteModel() throws IOException {
-    createParentEntities(METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME, auditInfo);
+    createParentEntities(METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME, AUDIT_INFO);
     Map<String, String> properties = ImmutableMap.of("k1", "v1");
 
     ModelEntity modelEntity =
@@ -177,7 +213,7 @@ public class TestModelMetaService extends TestJDBCBackend {
             "model1 comment",
             0,
             properties,
-            auditInfo);
+            AUDIT_INFO);
 
     Assertions.assertDoesNotThrow(
         () -> ModelMetaService.getInstance().insertModel(modelEntity, false));
@@ -201,9 +237,9 @@ public class TestModelMetaService extends TestJDBCBackend {
             .deleteModel(NameIdentifier.of(METALAKE_NAME, CATALOG_NAME, "inexistent", "model1")));
   }
 
-  @Test
+  @TestTemplate
   void testInsertAndRenameModel() throws IOException {
-    createParentEntities(METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME, auditInfo);
+    createParentEntities(METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME, AUDIT_INFO);
     Map<String, String> properties = ImmutableMap.of("k1", "v1");
     String newName = "new_model_name";
 
@@ -215,7 +251,7 @@ public class TestModelMetaService extends TestJDBCBackend {
             "model1 comment",
             0,
             properties,
-            auditInfo);
+            AUDIT_INFO);
 
     Assertions.assertDoesNotThrow(
         () -> ModelMetaService.getInstance().insertModel(modelEntity, false));
@@ -244,9 +280,9 @@ public class TestModelMetaService extends TestJDBCBackend {
                 .updateModel(NameIdentifier.of(MODEL_NS, "model3"), renameUpdater));
   }
 
-  @Test
+  @TestTemplate
   void testInsertAndUpdateModelComment() throws IOException {
-    createParentEntities(METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME, auditInfo);
+    createParentEntities(METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME, AUDIT_INFO);
     Map<String, String> properties = ImmutableMap.of("k1", "v1");
     String newComment = "new_model_comment";
 
@@ -258,7 +294,7 @@ public class TestModelMetaService extends TestJDBCBackend {
             "model1 comment",
             0,
             properties,
-            auditInfo);
+            AUDIT_INFO);
 
     Assertions.assertDoesNotThrow(
         () -> ModelMetaService.getInstance().insertModel(modelEntity, false));
@@ -287,9 +323,9 @@ public class TestModelMetaService extends TestJDBCBackend {
                 .updateModel(NameIdentifier.of(MODEL_NS, "model3"), renameUpdater));
   }
 
-  @Test
+  @TestTemplate
   void testInsertAndUpdateModelProperties() throws IOException {
-    createParentEntities(METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME, auditInfo);
+    createParentEntities(METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME, AUDIT_INFO);
     Map<String, String> properties = ImmutableMap.of("k1", "v1", "k2", "v2");
     Map<String, String> newProps = ImmutableMap.of("k1", "v1", "k3", "v3");
 
@@ -301,7 +337,7 @@ public class TestModelMetaService extends TestJDBCBackend {
             "model1 comment",
             0,
             properties,
-            auditInfo);
+            AUDIT_INFO);
 
     Assertions.assertDoesNotThrow(
         () -> ModelMetaService.getInstance().insertModel(modelEntity, false));

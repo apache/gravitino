@@ -19,6 +19,10 @@
 package org.apache.gravitino.storage.relational.service;
 
 import com.google.common.collect.Lists;
+import java.sql.Connection;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.Statement;
 import java.time.Instant;
 import java.util.List;
 import org.apache.gravitino.Entity;
@@ -36,13 +40,15 @@ import org.apache.gravitino.meta.TopicEntity;
 import org.apache.gravitino.stats.StatisticValues;
 import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.storage.relational.TestJDBCBackend;
+import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
+import org.apache.ibatis.session.SqlSession;
 import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestTemplate;
 
 public class TestStatisticMetaService extends TestJDBCBackend {
-  StatisticMetaService statisticMetaService = StatisticMetaService.getInstance();
+  private final StatisticMetaService statisticMetaService = StatisticMetaService.getInstance();
 
-  @Test
+  @TestTemplate
   public void testStatisticsLifeCycle() throws Exception {
     String metalakeName = "metalake";
     AuditInfo auditInfo =
@@ -107,7 +113,7 @@ public class TestStatisticMetaService extends TestJDBCBackend {
     Assertions.assertEquals(0, listEntities.size());
   }
 
-  @Test
+  @TestTemplate
   public void testDeleteMetadataObject() throws Exception {
     String metalakeName = "metalake";
     AuditInfo auditInfo =
@@ -392,12 +398,51 @@ public class TestStatisticMetaService extends TestJDBCBackend {
     Assertions.assertEquals(12, countAllStats(metalake.id()));
   }
 
-  private static StatisticEntity createStatisticEntity(AuditInfo auditInfo, long value) {
+  private StatisticEntity createStatisticEntity(AuditInfo auditInfo, long value) {
     return TableStatisticEntity.builder()
         .withId(RandomIdGenerator.INSTANCE.nextId())
         .withName("test")
         .withValue(StatisticValues.longValue(value))
         .withAuditInfo(auditInfo)
         .build();
+  }
+
+  private Integer countAllStats(Long metalakeId) {
+    try (SqlSession sqlSession =
+            SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true);
+        Connection connection = sqlSession.getConnection();
+        Statement statement1 = connection.createStatement();
+        ResultSet rs1 =
+            statement1.executeQuery(
+                String.format(
+                    "SELECT count(*) FROM statistic_meta WHERE metalake_id = %d", metalakeId))) {
+      if (rs1.next()) {
+        return rs1.getInt(1);
+      } else {
+        throw new RuntimeException("Doesn't contain data");
+      }
+    } catch (SQLException se) {
+      throw new RuntimeException("SQL execution failed", se);
+    }
+  }
+
+  private Integer countActiveStats(Long metalakeId) {
+    try (SqlSession sqlSession =
+            SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true);
+        Connection connection = sqlSession.getConnection();
+        Statement statement1 = connection.createStatement();
+        ResultSet rs1 =
+            statement1.executeQuery(
+                String.format(
+                    "SELECT count(*) FROM statistic_meta WHERE metalake_id = %d AND deleted_at = 0",
+                    metalakeId))) {
+      if (rs1.next()) {
+        return rs1.getInt(1);
+      } else {
+        throw new RuntimeException("Doesn't contain data");
+      }
+    } catch (SQLException se) {
+      throw new RuntimeException("SQL execution failed", se);
+    }
   }
 }

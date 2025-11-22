@@ -19,163 +19,195 @@
 package org.apache.gravitino.storage.relational.service;
 
 import static org.apache.gravitino.file.Fileset.LOCATION_NAME_UNKNOWN;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.google.common.collect.Lists;
-import java.io.File;
 import java.io.IOException;
 import java.sql.Connection;
-import java.sql.DriverManager;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.time.Instant;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
-import org.apache.commons.io.FileUtils;
-import org.apache.commons.lang3.ArrayUtils;
-import org.apache.commons.lang3.StringUtils;
-import org.apache.gravitino.Catalog;
-import org.apache.gravitino.Config;
-import org.apache.gravitino.Configs;
+import org.apache.gravitino.Entity;
+import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
-import org.apache.gravitino.config.ConfigConstants;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.file.Fileset;
-import org.apache.gravitino.integration.test.container.ContainerSuite;
-import org.apache.gravitino.integration.test.container.MySQLContainer;
 import org.apache.gravitino.integration.test.util.GravitinoITUtils;
-import org.apache.gravitino.integration.test.util.TestDatabaseName;
 import org.apache.gravitino.meta.AuditInfo;
-import org.apache.gravitino.meta.BaseMetalake;
-import org.apache.gravitino.meta.CatalogEntity;
 import org.apache.gravitino.meta.FilesetEntity;
-import org.apache.gravitino.meta.SchemaEntity;
-import org.apache.gravitino.meta.SchemaVersion;
-import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.storage.RandomIdGenerator;
+import org.apache.gravitino.storage.relational.TestJDBCBackend;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
+import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
 import org.apache.ibatis.session.SqlSession;
-import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.api.Tag;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
-import org.mockito.Mockito;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.TestTemplate;
 import org.testcontainers.shaded.com.google.common.collect.ImmutableMap;
 import org.testcontainers.shaded.org.apache.commons.lang3.tuple.Pair;
 
-@Tag("gravitino-docker-test")
-@EnabledIfEnvironmentVariable(named = "jdbcBackend", matches = "MySQL")
-public class TestFilesetMetaService {
-  private static final Logger LOG = LoggerFactory.getLogger(TestFilesetMetaService.class);
-  private static final ContainerSuite containerSuite = ContainerSuite.getInstance();
-  private static final IdGenerator idGenerator = new RandomIdGenerator();
+public class TestFilesetMetaService extends TestJDBCBackend {
+  private final String metalakeName = GravitinoITUtils.genRandomName("tst_metalake");
+  private final String catalogName = GravitinoITUtils.genRandomName("tst_fs_catalog");
+  private final String schemaName = GravitinoITUtils.genRandomName("tst_fs_schema");
 
-  private static final AuditInfo auditInfo =
-      AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
-  private static final String metalakeName = GravitinoITUtils.genRandomName("tst_metalake");
-  private static final String catalogName = GravitinoITUtils.genRandomName("tst_fs_catalog");
-  private static final String schemaName = GravitinoITUtils.genRandomName("tst_fs_schema");
+  @BeforeEach
+  public void prepare() throws IOException {
+    createAndInsertMakeLake(metalakeName);
+    createAndInsertCatalog(metalakeName, catalogName);
+    createAndInsertSchema(metalakeName, catalogName, schemaName);
+  }
 
-  @BeforeAll
-  public static void setup() throws IOException {
-    TestDatabaseName META_DATA = TestDatabaseName.MYSQL_JDBC_BACKEND;
-    containerSuite.startMySQLContainer(META_DATA);
-    MySQLContainer MYSQL_CONTAINER = containerSuite.getMySQLContainer();
+  @TestTemplate
+  public void testInsertAlreadyExistsException() throws IOException {
+    FilesetEntity fileset =
+        createFilesetEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            NamespaceUtil.ofFileset(metalakeName, catalogName, schemaName),
+            "fileset",
+            AUDIT_INFO);
+    FilesetEntity filesetCopy =
+        createFilesetEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            NamespaceUtil.ofFileset(metalakeName, catalogName, schemaName),
+            "fileset",
+            AUDIT_INFO);
+    backend.insert(fileset, false);
+    assertThrows(EntityAlreadyExistsException.class, () -> backend.insert(filesetCopy, false));
+  }
 
-    String mysqlUrl = MYSQL_CONTAINER.getJdbcUrl(META_DATA);
-    LOG.info("MySQL URL: {}", mysqlUrl);
-    // Connect to the mysql docker and create a databases
-    try (Connection connection =
-            DriverManager.getConnection(
-                StringUtils.substring(mysqlUrl, 0, mysqlUrl.lastIndexOf("/")), "root", "root");
-        final Statement statement = connection.createStatement()) {
-      statement.execute("drop database if exists " + META_DATA);
-      statement.execute("create database " + META_DATA);
-      String gravitinoHome = System.getenv("GRAVITINO_ROOT_DIR");
-      String mysqlContent =
-          FileUtils.readFileToString(
-              new File(
-                  gravitinoHome
-                      + String.format(
-                          "/scripts/mysql/schema-%s-mysql.sql",
-                          ConfigConstants.CURRENT_SCRIPT_VERSION)),
-              "UTF-8");
-      String[] initMySQLBackendSqls =
-          Arrays.stream(mysqlContent.split(";"))
-              .map(String::trim)
-              .filter(s -> !s.isEmpty())
-              .toArray(String[]::new);
-      initMySQLBackendSqls = ArrayUtils.addFirst(initMySQLBackendSqls, "use " + META_DATA + ";");
-      for (String sql : initMySQLBackendSqls) {
-        statement.execute(sql);
-      }
-    } catch (Exception e) {
-      LOG.error("Failed to create database in mysql", e);
-      throw new RuntimeException(e);
+  @TestTemplate
+  public void testUpdateAlreadyExistsException() throws IOException {
+    FilesetEntity fileset =
+        createFilesetEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            NamespaceUtil.ofFileset(metalakeName, catalogName, schemaName),
+            "fileset",
+            AUDIT_INFO);
+    FilesetEntity filesetCopy =
+        createFilesetEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            NamespaceUtil.ofFileset(metalakeName, catalogName, schemaName),
+            "fileset1",
+            AUDIT_INFO);
+    backend.insert(fileset, false);
+    backend.insert(filesetCopy, false);
+    assertThrows(
+        EntityAlreadyExistsException.class,
+        () ->
+            backend.update(
+                filesetCopy.nameIdentifier(),
+                Entity.EntityType.FILESET,
+                e ->
+                    createFilesetEntity(
+                        filesetCopy.id(), filesetCopy.namespace(), "fileset", AUDIT_INFO)));
+  }
+
+  @TestTemplate
+  public void testMetaLifeCycleFromCreationToDeletion() throws IOException {
+    FilesetEntity fileset =
+        createFilesetEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            NamespaceUtil.ofFileset(metalakeName, catalogName, schemaName),
+            "fileset",
+            AUDIT_INFO);
+    backend.insert(fileset, false);
+
+    // update fileset properties and version
+    FilesetEntity filesetV2 =
+        createFilesetEntity(
+            fileset.id(),
+            NamespaceUtil.ofFileset(metalakeName, catalogName, schemaName),
+            "fileset",
+            AUDIT_INFO);
+    filesetV2.properties().put("version", "2");
+    backend.update(fileset.nameIdentifier(), Entity.EntityType.FILESET, e -> filesetV2);
+
+    String anotherMetalakeName = GravitinoITUtils.genRandomName("another-metalake");
+    String anotherCatalogName = GravitinoITUtils.genRandomName("another-catalog");
+    String anotherSchemaName = GravitinoITUtils.genRandomName("another-schema");
+    createAndInsertMakeLake(anotherMetalakeName);
+    createAndInsertCatalog(anotherMetalakeName, anotherCatalogName);
+    createAndInsertSchema(anotherMetalakeName, anotherCatalogName, anotherSchemaName);
+
+    FilesetEntity anotherFileset =
+        createFilesetEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            NamespaceUtil.ofFileset(anotherMetalakeName, anotherCatalogName, anotherSchemaName),
+            "anotherFileset",
+            AUDIT_INFO);
+    backend.insert(anotherFileset, false);
+
+    FilesetEntity anotherFilesetV2 =
+        createFilesetEntity(
+            anotherFileset.id(),
+            NamespaceUtil.ofFileset(anotherMetalakeName, anotherCatalogName, anotherSchemaName),
+            "anotherFileset",
+            AUDIT_INFO);
+    anotherFilesetV2.properties().put("version", "2");
+    backend.update(
+        anotherFileset.nameIdentifier(), Entity.EntityType.FILESET, e -> anotherFilesetV2);
+
+    FilesetEntity anotherFilesetV3 =
+        createFilesetEntity(
+            anotherFileset.id(),
+            NamespaceUtil.ofFileset(anotherMetalakeName, anotherCatalogName, anotherSchemaName),
+            "anotherFileset",
+            AUDIT_INFO);
+    anotherFilesetV3.properties().put("version", "3");
+    backend.update(
+        anotherFileset.nameIdentifier(), Entity.EntityType.FILESET, e -> anotherFilesetV3);
+
+    List<FilesetEntity> filesets =
+        backend.list(fileset.namespace(), Entity.EntityType.FILESET, true);
+    assertFalse(filesets.contains(fileset));
+    assertTrue(filesets.contains(filesetV2));
+    assertEquals("2", filesets.get(filesets.indexOf(filesetV2)).properties().get("version"));
+
+    // meta data soft delete
+    backend.delete(NameIdentifierUtil.ofMetalake(metalakeName), Entity.EntityType.METALAKE, true);
+    assertFalse(backend.exists(fileset.nameIdentifier(), Entity.EntityType.FILESET));
+    assertTrue(backend.exists(anotherFileset.nameIdentifier(), Entity.EntityType.FILESET));
+
+    // check legacy record after soft delete
+    assertTrue(legacyRecordExistsInDB(fileset.id(), Entity.EntityType.FILESET));
+    assertEquals(2, listFilesetVersions(fileset.id()).size());
+    assertEquals(3, listFilesetVersions(anotherFileset.id()).size());
+
+    // meta data hard delete
+    for (Entity.EntityType entityType : Entity.EntityType.values()) {
+      backend.hardDeleteLegacyData(entityType, Instant.now().toEpochMilli() + 1000);
     }
+    assertFalse(legacyRecordExistsInDB(fileset.id(), Entity.EntityType.FILESET));
+    assertEquals(0, listFilesetVersions(fileset.id()).size());
+    assertEquals(3, listFilesetVersions(anotherFileset.id()).size());
 
-    Config config = Mockito.mock(Config.class);
-    Mockito.when(config.get(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_URL)).thenReturn(mysqlUrl);
-    Mockito.when(config.get(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_DRIVER))
-        .thenReturn("com.mysql.cj.jdbc.Driver");
-    Mockito.when(config.get(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_USER)).thenReturn("root");
-    Mockito.when(config.get(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_PASSWORD)).thenReturn("root");
+    // soft delete for old version fileset
+    for (Entity.EntityType entityType : Entity.EntityType.values()) {
+      backend.deleteOldVersionData(entityType, 1);
+    }
+    Map<Integer, Long> versionDeletedMap = listFilesetVersions(anotherFileset.id());
+    assertEquals(3, versionDeletedMap.size());
+    assertEquals(1, versionDeletedMap.values().stream().filter(value -> value == 0L).count());
+    assertEquals(2, versionDeletedMap.values().stream().filter(value -> value != 0L).count());
 
-    SqlSessionFactoryHelper.getInstance().init(config);
-
-    prepareMetalake();
-    prepareCatalog();
-    prepareSchema();
+    // hard delete for old version fileset
+    backend.hardDeleteLegacyData(Entity.EntityType.FILESET, Instant.now().toEpochMilli() + 1000);
+    assertEquals(1, listFilesetVersions(anotherFileset.id()).size());
   }
 
-  private static void prepareSchema() throws IOException {
-    SchemaEntity schemaEntity =
-        createSchemaEntity(
-            idGenerator.nextId(),
-            NamespaceUtil.ofSchema(metalakeName, catalogName),
-            schemaName,
-            auditInfo);
-    SchemaMetaService.getInstance().insertSchema(schemaEntity, true);
-    assertNotNull(
-        SchemaMetaService.getInstance()
-            .getSchemaByIdentifier(NameIdentifier.of(metalakeName, catalogName, schemaName)));
-  }
-
-  private static void prepareMetalake() throws IOException {
-    BaseMetalake metalake = createBaseMakeLake(idGenerator.nextId(), metalakeName, auditInfo);
-    MetalakeMetaService.getInstance().insertMetalake(metalake, true);
-    assertNotNull(
-        MetalakeMetaService.getInstance().getMetalakeByIdentifier(NameIdentifier.of(metalakeName)));
-  }
-
-  private static void prepareCatalog() throws IOException {
-    CatalogEntity catalogEntity =
-        createCatalog(
-            idGenerator.nextId(), NamespaceUtil.ofCatalog(metalakeName), catalogName, auditInfo);
-    CatalogMetaService.getInstance().insertCatalog(catalogEntity, true);
-    assertNotNull(
-        CatalogMetaService.getInstance()
-            .getCatalogByIdentifier(NameIdentifier.of(metalakeName, catalogName)));
-  }
-
-  @AfterEach
-  public void cleanFilesets() throws IOException {
-    SchemaMetaService.getInstance()
-        .deleteSchema(NameIdentifier.of(metalakeName, catalogName, schemaName), true);
-    prepareSchema();
-  }
-
-  @Test
+  @TestTemplate
   public void testFilesetMultipleLocations() {
     // test create
     String filesetName = GravitinoITUtils.genRandomName("multiple_location_fileset");
@@ -187,14 +219,14 @@ public class TestFilesetMetaService {
     Namespace filesetNs = NamespaceUtil.ofFileset(metalakeName, catalogName, schemaName);
     FilesetEntity filesetEntity =
         FilesetEntity.builder()
-            .withId(idGenerator.nextId())
+            .withId(RandomIdGenerator.INSTANCE.nextId())
             .withName(filesetName)
             .withNamespace(filesetNs)
             .withFilesetType(Fileset.Type.MANAGED)
             .withStorageLocations(locations)
             .withComment("")
             .withProperties(null)
-            .withAuditInfo(auditInfo)
+            .withAuditInfo(AUDIT_INFO)
             .build();
     Assertions.assertDoesNotThrow(
         () -> FilesetMetaService.getInstance().insertFileset(filesetEntity, true));
@@ -232,14 +264,14 @@ public class TestFilesetMetaService {
         NameIdentifier.of(metalakeName, catalogName, schemaName, filesetName2);
     FilesetEntity filesetEntity2 =
         FilesetEntity.builder()
-            .withId(idGenerator.nextId())
+            .withId(RandomIdGenerator.INSTANCE.nextId())
             .withName(filesetName2)
             .withNamespace(filesetNs)
             .withFilesetType(Fileset.Type.MANAGED)
             .withStorageLocations(locations)
             .withComment("")
             .withProperties(null)
-            .withAuditInfo(auditInfo)
+            .withAuditInfo(AUDIT_INFO)
             .build();
     Assertions.assertDoesNotThrow(
         () -> FilesetMetaService.getInstance().insertFileset(filesetEntity2, true));
@@ -261,15 +293,15 @@ public class TestFilesetMetaService {
     Assertions.assertTrue(locationNames.contains(locationName));
   }
 
-  @Test
+  @TestTemplate
   public void testDeleteFilesetVersionsByRetentionCount() throws IOException {
     String filesetName = GravitinoITUtils.genRandomName("tst_fs_fileset");
     FilesetEntity filesetEntity =
         createFilesetEntity(
-            idGenerator.nextId(),
+            RandomIdGenerator.INSTANCE.nextId(),
             NamespaceUtil.ofFileset(metalakeName, catalogName, schemaName),
             filesetName,
-            auditInfo,
+            AUDIT_INFO,
             "/tmp");
     FilesetMetaService.getInstance().insertFileset(filesetEntity, true);
     assertNotNull(
@@ -317,44 +349,7 @@ public class TestFilesetMetaService {
     return deletedVersions;
   }
 
-  public static BaseMetalake createBaseMakeLake(Long id, String name, AuditInfo auditInfo) {
-    return BaseMetalake.builder()
-        .withId(id)
-        .withName(name)
-        .withAuditInfo(auditInfo)
-        .withComment("")
-        .withProperties(null)
-        .withVersion(SchemaVersion.V_0_1)
-        .build();
-  }
-
-  public static CatalogEntity createCatalog(
-      Long id, Namespace namespace, String name, AuditInfo auditInfo) {
-    return CatalogEntity.builder()
-        .withId(id)
-        .withName(name)
-        .withNamespace(namespace)
-        .withType(Catalog.Type.RELATIONAL)
-        .withProvider("test")
-        .withComment("")
-        .withProperties(null)
-        .withAuditInfo(auditInfo)
-        .build();
-  }
-
-  public static SchemaEntity createSchemaEntity(
-      Long id, Namespace namespace, String name, AuditInfo auditInfo) {
-    return SchemaEntity.builder()
-        .withId(id)
-        .withName(name)
-        .withNamespace(namespace)
-        .withComment("")
-        .withProperties(null)
-        .withAuditInfo(auditInfo)
-        .build();
-  }
-
-  public static FilesetEntity createFilesetEntity(
+  private FilesetEntity createFilesetEntity(
       Long id, Namespace namespace, String name, AuditInfo auditInfo, String location) {
     return FilesetEntity.builder()
         .withId(id)

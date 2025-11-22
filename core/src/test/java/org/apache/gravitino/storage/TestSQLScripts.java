@@ -18,70 +18,36 @@
  */
 package org.apache.gravitino.storage;
 
-import static org.apache.gravitino.integration.test.util.TestDatabaseName.MYSQL_JDBC_BACKEND;
-import static org.apache.gravitino.integration.test.util.TestDatabaseName.PG_JDBC_BACKEND;
-
 import java.io.File;
 import java.io.IOException;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.sql.Connection;
-import java.sql.DriverManager;
+import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.apache.commons.io.FileUtils;
-import org.apache.commons.lang3.StringUtils;
-import org.apache.gravitino.integration.test.container.MySQLContainer;
-import org.apache.gravitino.integration.test.container.PostgreSQLContainer;
-import org.apache.gravitino.integration.test.util.BaseIT;
-import org.junit.jupiter.api.AfterAll;
+import org.apache.gravitino.storage.relational.TestJDBCBackend;
+import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
+import org.apache.ibatis.session.SqlSession;
 import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.api.TestTemplate;
 
-public class TestSQLScripts extends BaseIT {
+public class TestSQLScripts extends TestJDBCBackend {
 
-  private String jdbcBackend;
-  private Path scriptDir;
-  @TempDir private File tempDir;
-  private Map<String, Connection> versionConnections;
-
-  @BeforeAll
-  public void startIntegrationTest() {
-    jdbcBackend = System.getenv("jdbcBackend");
-    Assertions.assertNotNull(jdbcBackend, "jdbcBackend environment variable is not set");
-
+  @TestTemplate
+  public void testSQLScripts() throws SQLException, IOException {
     String gravitinoHome = System.getenv("GRAVITINO_HOME");
     Assertions.assertNotNull(gravitinoHome, "GRAVITINO_HOME environment variable is not set");
-    scriptDir = Path.of(gravitinoHome, "scripts", jdbcBackend.toLowerCase());
-    Assertions.assertTrue(Files.exists(scriptDir), "Script directory does not exist: " + scriptDir);
-    versionConnections = new HashMap<>();
-  }
+    Path scriptDir = Path.of(gravitinoHome, "scripts", backendType.toLowerCase());
 
-  @AfterAll
-  public void stopIntegrationTest() {
-    // Close all connections
-    for (Connection conn : versionConnections.values()) {
-      if (conn != null) {
-        try {
-          conn.close();
-        } catch (SQLException e) {
-          // Ignore
-        }
-      }
-    }
-    versionConnections.clear();
-  }
-
-  @Test
-  public void testSQLScripts() throws SQLException {
     File[] scriptFiles = scriptDir.toFile().listFiles();
     Assertions.assertNotNull(scriptFiles, "No script files found in " + scriptDir);
     // Sort files to ensure the correct execution order (schema -> upgrade)
@@ -89,12 +55,13 @@ public class TestSQLScripts extends BaseIT {
 
     // A map to store connections for different schema versions
     Pattern schemaPattern =
-        Pattern.compile("schema-([\\d.]+)-" + jdbcBackend.toLowerCase() + "\\.sql");
+        Pattern.compile("schema-([\\d.]+)-" + backendType.toLowerCase() + "\\.sql");
     Pattern upgradePattern =
-        Pattern.compile("upgrade-([\\d.]+)-to-([\\d.]+)-" + jdbcBackend.toLowerCase() + "\\.sql");
+        Pattern.compile("upgrade-([\\d.]+)-to-([\\d.]+)-" + backendType.toLowerCase() + "\\.sql");
     Pattern metricsPattern =
-        Pattern.compile("iceberg-metrics-schema-([\\d.]+)-" + jdbcBackend.toLowerCase() + "\\.sql");
+        Pattern.compile("iceberg-metrics-schema-([\\d.]+)-" + backendType.toLowerCase() + "\\.sql");
 
+    Map<String, List<File>> versionScrips = new HashMap<>();
     for (File scriptFile : scriptFiles) {
       Matcher schemaMatcher = schemaPattern.matcher(scriptFile.getName());
       Matcher upgradeMatcher = upgradePattern.matcher(scriptFile.getName());
@@ -102,80 +69,88 @@ public class TestSQLScripts extends BaseIT {
 
       if (schemaMatcher.matches()) {
         String version = schemaMatcher.group(1);
-        String dbName = "schema_" + version.replace('.', '_');
-
-        Connection conn = getSQLConnection(jdbcBackend, dbName);
-        Assertions.assertDoesNotThrow(
-            () -> executeSQLScript(conn, scriptFile),
-            "Failed to execute schema script for version " + version);
-        versionConnections.put(version, conn);
+        versionScrips.computeIfAbsent(version, k -> new ArrayList<>()).add(scriptFile);
 
       } else if (upgradeMatcher.matches()) {
         String fromVersion = upgradeMatcher.group(1);
+        Assertions.assertTrue(
+            versionScrips.containsKey(fromVersion), "No schema script found for " + fromVersion);
 
-        Connection conn = versionConnections.get(fromVersion);
-        Assertions.assertNotNull(
-            conn, "No existing database connection found for version " + fromVersion);
-        Assertions.assertDoesNotThrow(
-            () -> executeSQLScript(conn, scriptFile),
-            "Failed to execute upgrade script" + " in file " + scriptFile.getName());
       } else if (metricsMatcher.matches()) {
-        // ignore iceberg metrics scripts for now
+        String version = metricsMatcher.group(1);
+        versionScrips.computeIfAbsent(version, k -> new ArrayList<>()).add(scriptFile);
+
       } else {
         Assertions.fail("Unrecognized script file name: " + scriptFile.getName());
       }
     }
-  }
 
-  private void executeSQLScript(Connection connection, File scriptFile) throws IOException {
-    String sqlContent = FileUtils.readFileToString(scriptFile, "UTF-8");
-    Arrays.stream(sqlContent.split(";"))
-        .map(String::trim)
-        .filter(s -> !s.isEmpty())
-        .forEach(
-            sql -> {
-              try (Statement stmt = connection.createStatement()) {
-                stmt.execute(sql);
-              } catch (SQLException e) {
-                throw new RuntimeException("Failed to execute SQL: " + sql, e);
+    for (List<File> scripts : versionScrips.values()) {
+      dropAllTables();
+      for (File scriptFile : scripts) {
+        String sqlContent = FileUtils.readFileToString(scriptFile, "UTF-8");
+        List<String> ddls =
+            Arrays.stream(sqlContent.split(";"))
+                .map(String::trim)
+                .filter(s -> !s.isEmpty())
+                .toList();
+
+        try (SqlSession sqlSession =
+            SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true)) {
+          try (Connection connection = sqlSession.getConnection()) {
+            try (Statement statement = connection.createStatement()) {
+              for (String ddl : ddls) {
+                Assertions.assertDoesNotThrow(
+                    () -> statement.execute(ddl),
+                    "Failed to execute DDL in file " + scriptFile.getName() + "ddl: " + ddl);
               }
-            });
+            }
+          }
+        }
+      }
+    }
   }
 
-  private Connection getSQLConnection(String jdbcBackend, String dBName) throws SQLException {
-    if ("h2".equalsIgnoreCase(jdbcBackend)) {
-      // Use a temporary directory for the database files
-      String dbPath = new File(tempDir, dBName).getAbsolutePath();
-      // AUTO_SERVER=TRUE allows multiple connections to the same database in the same process
-      String url = String.format("jdbc:h2:file:%s;MODE=MYSQL;AUTO_SERVER=TRUE", dbPath);
-      return DriverManager.getConnection(url, "sa", "");
-
-    } else if ("mysql".equalsIgnoreCase(jdbcBackend)) {
-      containerSuite.startMySQLContainer(MYSQL_JDBC_BACKEND);
-      MySQLContainer mySQLContainer = containerSuite.getMySQLContainer();
-      String mysqlUrl = mySQLContainer.getJdbcUrl(MYSQL_JDBC_BACKEND);
-      Connection connection =
-          DriverManager.getConnection(
-              StringUtils.substring(mysqlUrl, 0, mysqlUrl.lastIndexOf("/")), "root", "root");
-      Statement statement = connection.createStatement();
-      statement.execute("create database if not exists " + dBName);
-      connection.setCatalog(dBName);
-      return connection;
-
-    } else if ("PostgreSQL".equalsIgnoreCase(jdbcBackend)) {
-      containerSuite.startPostgreSQLContainer(PG_JDBC_BACKEND);
-      PostgreSQLContainer pgContainer = containerSuite.getPostgreSQLContainer();
-      String pgUrlWithoutSchema = pgContainer.getJdbcUrl(PG_JDBC_BACKEND);
-      Connection connection =
-          DriverManager.getConnection(
-              pgUrlWithoutSchema, pgContainer.getUsername(), pgContainer.getPassword());
-      connection.setCatalog(PG_JDBC_BACKEND.toString().toLowerCase());
-      Statement statement = connection.createStatement();
-      statement.execute("create schema if not exists " + dBName);
-      connection.setSchema(dBName);
-      return connection;
+  private void dropAllTables() throws SQLException {
+    try (SqlSession sqlSession =
+        SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true)) {
+      try (Connection connection = sqlSession.getConnection()) {
+        try (Statement statement = connection.createStatement()) {
+          if ("postgresql".equals(backendType)) {
+            dropAllTablesForPostgreSQL(connection);
+          } else {
+            String query = "SHOW TABLES";
+            List<String> tableList = new ArrayList<>();
+            try (ResultSet rs = statement.executeQuery(query)) {
+              while (rs.next()) {
+                tableList.add(rs.getString(1));
+              }
+            }
+            for (String table : tableList) {
+              statement.execute("DROP TABLE " + table);
+            }
+          }
+        }
+      }
     }
-    Assertions.fail("Unsupported JDBC backend: " + jdbcBackend);
-    return null;
+  }
+
+  private void dropAllTablesForPostgreSQL(Connection connection) throws SQLException {
+    String query =
+        "SELECT table_name FROM information_schema.tables WHERE table_schema = current_schema()";
+    List<String> tableList = new ArrayList<>();
+    try (ResultSet rs = connection.createStatement().executeQuery(query)) {
+      while (rs.next()) {
+        tableList.add(rs.getString(1));
+      }
+    }
+
+    if (tableList.isEmpty()) {
+      return;
+    }
+
+    for (String table : tableList) {
+      connection.createStatement().execute("DROP TABLE " + table);
+    }
   }
 }

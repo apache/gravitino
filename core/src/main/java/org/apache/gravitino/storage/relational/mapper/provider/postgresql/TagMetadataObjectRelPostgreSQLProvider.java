@@ -40,8 +40,7 @@ public class TagMetadataObjectRelPostgreSQLProvider extends TagMetadataObjectRel
       String metalakeName, String tagName) {
     return "UPDATE "
         + TAG_METADATA_OBJECT_RELATION_TABLE_NAME
-        + " te SET deleted_at = floor(extract(epoch from(current_timestamp -"
-        + " timestamp '1970-01-01 00:00:00')) * 1000)"
+        + " te SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
         + " WHERE te.tag_id IN (SELECT tm.tag_id FROM "
         + TagMetaMapper.TAG_TABLE_NAME
         + " tm WHERE tm.metalake_id IN (SELECT mm.metalake_id FROM "
@@ -54,8 +53,7 @@ public class TagMetadataObjectRelPostgreSQLProvider extends TagMetadataObjectRel
   public String softDeleteTagMetadataObjectRelsByMetalakeId(Long metalakeId) {
     return "UPDATE "
         + TAG_METADATA_OBJECT_RELATION_TABLE_NAME
-        + " te SET deleted_at = floor(extract(epoch from(current_timestamp -"
-        + " timestamp '1970-01-01 00:00:00')) * 1000)"
+        + " te SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
         + " WHERE EXISTS (SELECT * FROM "
         + TagMetaMapper.TAG_TABLE_NAME
         + " tm WHERE tm.metalake_id = #{metalakeId} AND tm.tag_id = te.tag_id"
@@ -68,8 +66,7 @@ public class TagMetadataObjectRelPostgreSQLProvider extends TagMetadataObjectRel
       @Param("metadataObjectType") String metadataObjectType) {
     return " UPDATE "
         + TAG_METADATA_OBJECT_RELATION_TABLE_NAME
-        + " SET deleted_at = floor(extract(epoch from(current_timestamp -"
-        + " timestamp '1970-01-01 00:00:00')) * 1000)"
+        + " SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
         + " WHERE metadata_object_id = #{metadataObjectId} AND deleted_at = 0"
         + " AND metadata_object_type = #{metadataObjectType}";
   }
@@ -78,8 +75,7 @@ public class TagMetadataObjectRelPostgreSQLProvider extends TagMetadataObjectRel
   public String softDeleteTagMetadataObjectRelsByCatalogId(@Param("catalogId") Long catalogId) {
     return " UPDATE "
         + TagMetadataObjectRelMapper.TAG_METADATA_OBJECT_RELATION_TABLE_NAME
-        + " tmt SET deleted_at = floor(extract(epoch from(current_timestamp -"
-        + " timestamp '1970-01-01 00:00:00')) * 1000)"
+        + " tmt SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
         + " WHERE tmt.deleted_at = 0 AND EXISTS ("
         + " SELECT ct.catalog_id FROM "
         + CatalogMetaMapper.TABLE_NAME
@@ -122,8 +118,7 @@ public class TagMetadataObjectRelPostgreSQLProvider extends TagMetadataObjectRel
   public String softDeleteTagMetadataObjectRelsBySchemaId(@Param("schemaId") Long schemaId) {
     return " UPDATE "
         + TagMetadataObjectRelMapper.TAG_METADATA_OBJECT_RELATION_TABLE_NAME
-        + " tmt SET deleted_at = floor(extract(epoch from(current_timestamp -"
-        + " timestamp '1970-01-01 00:00:00')) * 1000)"
+        + " tmt SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
         + " WHERE tmt.deleted_at = 0 AND EXISTS ("
         + " SELECT st.schema_id FROM "
         + SchemaMetaMapper.TABLE_NAME
@@ -161,8 +156,7 @@ public class TagMetadataObjectRelPostgreSQLProvider extends TagMetadataObjectRel
   public String softDeleteTagMetadataObjectRelsByTableId(@Param("tableId") Long tableId) {
     return " UPDATE "
         + TagMetadataObjectRelMapper.TAG_METADATA_OBJECT_RELATION_TABLE_NAME
-        + " tmt SET deleted_at = floor(extract(epoch from(current_timestamp -"
-        + " timestamp '1970-01-01 00:00:00')) * 1000)"
+        + " tmt SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
         + " WHERE tmt.deleted_at = 0 AND EXISTS ("
         + " SELECT tat.table_id FROM "
         + TableMetaMapper.TABLE_NAME
@@ -182,8 +176,7 @@ public class TagMetadataObjectRelPostgreSQLProvider extends TagMetadataObjectRel
     return "<script>"
         + "UPDATE "
         + TAG_METADATA_OBJECT_RELATION_TABLE_NAME
-        + " SET deleted_at = floor(extract(epoch from(current_timestamp -"
-        + " timestamp '1970-01-01 00:00:00')) * 1000)"
+        + " SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
         + " WHERE tag_id IN "
         + "<foreach item='tagId' collection='tagIds' open='(' separator=',' close=')'>"
         + "#{tagId}"

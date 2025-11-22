@@ -33,8 +33,6 @@ import static org.apache.gravitino.Configs.RELATIONAL_ENTITY_STORE;
 import static org.apache.gravitino.Configs.STORE_DELETE_AFTER_TIME;
 import static org.apache.gravitino.Configs.VERSION_RETENTION_COUNT;
 import static org.apache.gravitino.file.Fileset.LOCATION_NAME_UNKNOWN;
-import static org.apache.gravitino.storage.relational.TestJDBCBackend.createRoleEntity;
-import static org.apache.gravitino.storage.relational.TestJDBCBackend.createUserEntity;
 
 import com.github.benmanes.caffeine.cache.Cache;
 import com.google.common.base.Preconditions;
@@ -52,6 +50,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
@@ -102,7 +101,6 @@ import org.apache.gravitino.rel.types.Types;
 import org.apache.gravitino.storage.relational.RelationalBackend;
 import org.apache.gravitino.storage.relational.RelationalEntityStore;
 import org.apache.gravitino.storage.relational.RelationalGarbageCollector;
-import org.apache.gravitino.storage.relational.TestJDBCBackend;
 import org.apache.gravitino.storage.relational.converters.H2ExceptionConverter;
 import org.apache.gravitino.storage.relational.converters.MySQLExceptionConverter;
 import org.apache.gravitino.storage.relational.converters.PostgreSQLExceptionConverter;
@@ -136,6 +134,8 @@ public class TestEntityStorage {
 
   @AfterEach
   void closeSuit() throws IOException {
+    // todo: refactor TestEntityStorage to extend TestJDBCBackend, otherwise, each test will start
+    // and stop the container suite.
     ContainerSuite.getInstance().close();
   }
 
@@ -314,7 +314,7 @@ public class TestEntityStorage {
               "topic1",
               auditInfo);
       ModelEntity model1 =
-          TestJDBCBackend.createModelEntity(
+          createModelEntity(
               RandomIdGenerator.INSTANCE.nextId(),
               Namespace.of("metalake", "catalog", "schema1"),
               "model1",
@@ -323,7 +323,7 @@ public class TestEntityStorage {
               null,
               auditInfo);
       ModelVersionEntity modelVersion1 =
-          TestJDBCBackend.createModelVersionEntity(
+          createModelVersionEntity(
               model1.nameIdentifier(),
               0,
               ImmutableMap.of(ModelVersion.URI_NAME_UNKNOWN, "model_path"),
@@ -707,7 +707,7 @@ public class TestEntityStorage {
           createTopicEntity(
               1L, Namespace.of("metalake", "catalog", "schema1"), "topic1", auditInfo);
       ModelEntity model1 =
-          TestJDBCBackend.createModelEntity(
+          createModelEntity(
               RandomIdGenerator.INSTANCE.nextId(),
               Namespace.of("metalake", "catalog", "schema1"),
               "model1",
@@ -716,7 +716,7 @@ public class TestEntityStorage {
               null,
               auditInfo);
       ModelVersionEntity modelVersion1 =
-          TestJDBCBackend.createModelVersionEntity(
+          createModelVersionEntity(
               model1.nameIdentifier(),
               0,
               ImmutableMap.of(ModelVersion.URI_NAME_UNKNOWN, "model_path"),
@@ -747,7 +747,7 @@ public class TestEntityStorage {
           createTopicEntity(
               2L, Namespace.of("metalake", "catalog", "schema2"), "topic1", auditInfo);
       ModelEntity model1InSchema2 =
-          TestJDBCBackend.createModelEntity(
+          createModelEntity(
               RandomIdGenerator.INSTANCE.nextId(),
               Namespace.of("metalake", "catalog", "schema2"),
               "model1",
@@ -756,7 +756,7 @@ public class TestEntityStorage {
               null,
               auditInfo);
       ModelVersionEntity modelVersion1InSchema2 =
-          TestJDBCBackend.createModelVersionEntity(
+          createModelVersionEntity(
               model1InSchema2.nameIdentifier(),
               0,
               ImmutableMap.of(ModelVersion.URI_NAME_UNKNOWN, "model_path"),
@@ -938,7 +938,7 @@ public class TestEntityStorage {
 
       // model
       ModelEntity model1New =
-          TestJDBCBackend.createModelEntity(
+          createModelEntity(
               RandomIdGenerator.INSTANCE.nextId(),
               model1.namespace(),
               model1.name(),
@@ -1015,7 +1015,7 @@ public class TestEntityStorage {
           createTopicEntity(RandomIdGenerator.INSTANCE.nextId(), namespace, "sameName", auditInfo);
 
       ModelEntity model1 =
-          TestJDBCBackend.createModelEntity(
+          createModelEntity(
               RandomIdGenerator.INSTANCE.nextId(),
               namespace,
               "sameName",
@@ -1706,7 +1706,7 @@ public class TestEntityStorage {
     store.put(topic1New);
 
     ModelEntity model1New =
-        TestJDBCBackend.createModelEntity(
+        createModelEntity(
             RandomIdGenerator.INSTANCE.nextId(),
             model1.namespace(),
             model1.name(),
@@ -1908,7 +1908,7 @@ public class TestEntityStorage {
     store.put(topic1New);
 
     ModelEntity model1New =
-        TestJDBCBackend.createModelEntity(
+        createModelEntity(
             RandomIdGenerator.INSTANCE.nextId(),
             model1.namespace(),
             model1.name(),
@@ -3174,5 +3174,70 @@ public class TestEntityStorage {
     } catch (IOException e) {
       throw new RuntimeException(e);
     }
+  }
+
+  private UserEntity createUserEntity(
+      Long id, Namespace namespace, String name, AuditInfo auditInfo) {
+    return UserEntity.builder()
+        .withId(id)
+        .withName(name)
+        .withNamespace(namespace)
+        .withRoleNames(null)
+        .withRoleIds(null)
+        .withAuditInfo(auditInfo)
+        .build();
+  }
+
+  private RoleEntity createRoleEntity(
+      Long id, Namespace namespace, String name, AuditInfo auditInfo, String catalogName) {
+    SecurableObject securableObject =
+        SecurableObjects.ofCatalog(catalogName, Lists.newArrayList(Privileges.UseCatalog.allow()));
+
+    return RoleEntity.builder()
+        .withId(id)
+        .withName(name)
+        .withNamespace(namespace)
+        .withProperties(null)
+        .withAuditInfo(auditInfo)
+        .withSecurableObjects(Lists.newArrayList(securableObject))
+        .build();
+  }
+
+  private ModelEntity createModelEntity(
+      Long id,
+      Namespace namespace,
+      String name,
+      String comment,
+      Integer latestVersion,
+      Map<String, String> properties,
+      AuditInfo auditInfo) {
+    return ModelEntity.builder()
+        .withId(id)
+        .withName(name)
+        .withNamespace(namespace)
+        .withComment(comment)
+        .withLatestVersion(latestVersion)
+        .withProperties(properties)
+        .withAuditInfo(auditInfo)
+        .build();
+  }
+
+  private ModelVersionEntity createModelVersionEntity(
+      NameIdentifier modelId,
+      Integer version,
+      Map<String, String> modelUris,
+      List<String> aliases,
+      String comment,
+      Map<String, String> properties,
+      AuditInfo auditInfo) {
+    return ModelVersionEntity.builder()
+        .withModelIdentifier(modelId)
+        .withVersion(version)
+        .withUris(modelUris)
+        .withAliases(aliases)
+        .withComment(comment)
+        .withProperties(properties)
+        .withAuditInfo(auditInfo)
+        .build();
   }
 }

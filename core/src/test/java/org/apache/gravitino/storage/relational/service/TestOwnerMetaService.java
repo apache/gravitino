@@ -19,7 +19,10 @@
 package org.apache.gravitino.storage.relational.service;
 
 import java.io.IOException;
-import java.time.Instant;
+import java.sql.Connection;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.Statement;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.authorization.AuthorizationUtils;
@@ -36,34 +39,37 @@ import org.apache.gravitino.meta.TopicEntity;
 import org.apache.gravitino.meta.UserEntity;
 import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.storage.relational.TestJDBCBackend;
+import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
+import org.apache.ibatis.session.SqlSession;
 import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestTemplate;
 
 class TestOwnerMetaService extends TestJDBCBackend {
 
-  String metalakeName = "metalake";
+  private static final String METALAKE_NAME = "metalake_for_owner_test";
+  private static final String CATALOG_NAME = "catalog_for_owner_test";
+  private static final String SCHEMA_NAME = "schema_for_owner_test";
+  private static final String TABLE_NAME = "table_for_owner_test";
+  private static final String FILESET_NAME = "fileset_for_owner_test";
+  private static final String TOPIC_NAME = "topic_for_owner_test";
 
-  private final AuditInfo auditInfo =
-      AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
-
-  @Test
+  @TestTemplate
   void testDifferentOwners() throws IOException {
-    BaseMetalake metalake =
-        createBaseMakeLake(RandomIdGenerator.INSTANCE.nextId(), metalakeName, auditInfo);
-    backend.insert(metalake, false);
+    BaseMetalake metalake = createAndInsertMakeLake(METALAKE_NAME);
+
     UserEntity user =
         createUserEntity(
             RandomIdGenerator.INSTANCE.nextId(),
-            AuthorizationUtils.ofUserNamespace(metalakeName),
+            AuthorizationUtils.ofUserNamespace(METALAKE_NAME),
             "user",
-            auditInfo);
+            AUDIT_INFO);
     backend.insert(user, false);
     GroupEntity group =
         createGroupEntity(
             RandomIdGenerator.INSTANCE.nextId(),
-            AuthorizationUtils.ofGroupNamespace(metalakeName),
+            AuthorizationUtils.ofGroupNamespace(METALAKE_NAME),
             "group",
-            auditInfo);
+            AUDIT_INFO);
     backend.insert(group, false);
 
     // Test no owner
@@ -91,84 +97,63 @@ class TestOwnerMetaService extends TestJDBCBackend {
     Assertions.assertEquals("group", ((GroupEntity) entity).name());
   }
 
-  @Test
+  @TestTemplate
   void testDifferentEntities() throws IOException {
-    String catalogName = "catalog";
-    String schemaName = "schema";
-    String tableName = "table";
-    String filesetName = "fileset";
-    String topicName = "topic";
     String userName = "user";
     String groupName = "group";
     String roleName = "role";
 
-    BaseMetalake metalake =
-        createBaseMakeLake(RandomIdGenerator.INSTANCE.nextId(), metalakeName, auditInfo);
-    backend.insert(metalake, false);
-
-    CatalogEntity catalog =
-        createCatalog(
-            RandomIdGenerator.INSTANCE.nextId(),
-            Namespace.of(metalakeName),
-            catalogName,
-            auditInfo);
-    backend.insert(catalog, false);
-
-    SchemaEntity schema =
-        createSchemaEntity(
-            RandomIdGenerator.INSTANCE.nextId(),
-            Namespace.of(metalakeName, catalogName),
-            schemaName,
-            auditInfo);
-    backend.insert(schema, false);
+    BaseMetalake metalake = createAndInsertMakeLake(METALAKE_NAME);
+    CatalogEntity catalog = createAndInsertCatalog(METALAKE_NAME, CATALOG_NAME);
+    SchemaEntity schema = createAndInsertSchema(METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME);
 
     TableEntity table =
         createTableEntity(
             RandomIdGenerator.INSTANCE.nextId(),
-            Namespace.of(metalakeName, catalogName, schemaName),
-            tableName,
-            auditInfo);
+            Namespace.of(METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME),
+            TABLE_NAME,
+            AUDIT_INFO);
     backend.insert(table, false);
 
     TopicEntity topic =
         createTopicEntity(
             RandomIdGenerator.INSTANCE.nextId(),
-            Namespace.of(metalakeName, catalogName, schemaName),
-            topicName,
-            auditInfo);
+            Namespace.of(METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME),
+            TOPIC_NAME,
+            AUDIT_INFO);
     backend.insert(topic, false);
 
     FilesetEntity fileset =
         createFilesetEntity(
             RandomIdGenerator.INSTANCE.nextId(),
-            Namespace.of(metalakeName, catalogName, schemaName),
-            filesetName,
-            auditInfo);
+            Namespace.of(METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME),
+            FILESET_NAME,
+            AUDIT_INFO);
     backend.insert(fileset, false);
 
     UserEntity user =
         createUserEntity(
             RandomIdGenerator.INSTANCE.nextId(),
-            AuthorizationUtils.ofUserNamespace(metalakeName),
+            AuthorizationUtils.ofUserNamespace(METALAKE_NAME),
             userName,
-            auditInfo);
+            AUDIT_INFO);
     backend.insert(user, false);
 
     GroupEntity group =
         createGroupEntity(
             RandomIdGenerator.INSTANCE.nextId(),
-            AuthorizationUtils.ofGroupNamespace(metalakeName),
+            AuthorizationUtils.ofGroupNamespace(METALAKE_NAME),
             groupName,
-            auditInfo);
+            AUDIT_INFO);
     backend.insert(group, false);
 
     RoleEntity role =
         createRoleEntity(
             RandomIdGenerator.INSTANCE.nextId(),
-            AuthorizationUtils.ofRoleNamespace(metalakeName),
+            AuthorizationUtils.ofRoleNamespace(METALAKE_NAME),
             roleName,
-            auditInfo,
-            catalogName);
+            AUDIT_INFO,
+            CATALOG_NAME);
     backend.insert(role, false);
 
     OwnerMetaService.getInstance()
@@ -188,96 +173,80 @@ class TestOwnerMetaService extends TestJDBCBackend {
 
     Entity entity =
         OwnerMetaService.getInstance().getOwner(metalake.nameIdentifier(), metalake.type()).get();
-    Assertions.assertTrue(entity instanceof UserEntity);
+    Assertions.assertInstanceOf(UserEntity.class, entity);
     Assertions.assertEquals("user", ((UserEntity) entity).name());
 
     entity =
         OwnerMetaService.getInstance().getOwner(catalog.nameIdentifier(), catalog.type()).get();
-    Assertions.assertTrue(entity instanceof UserEntity);
+    Assertions.assertInstanceOf(UserEntity.class, entity);
     Assertions.assertEquals("user", ((UserEntity) entity).name());
 
     entity = OwnerMetaService.getInstance().getOwner(schema.nameIdentifier(), schema.type()).get();
-    Assertions.assertTrue(entity instanceof UserEntity);
+    Assertions.assertInstanceOf(UserEntity.class, entity);
     Assertions.assertEquals("user", ((UserEntity) entity).name());
 
     entity = OwnerMetaService.getInstance().getOwner(table.nameIdentifier(), table.type()).get();
-    Assertions.assertTrue(entity instanceof UserEntity);
+    Assertions.assertInstanceOf(UserEntity.class, entity);
     Assertions.assertEquals("user", ((UserEntity) entity).name());
 
     entity = OwnerMetaService.getInstance().getOwner(topic.nameIdentifier(), topic.type()).get();
-    Assertions.assertTrue(entity instanceof UserEntity);
+    Assertions.assertInstanceOf(UserEntity.class, entity);
     Assertions.assertEquals("user", ((UserEntity) entity).name());
 
     entity =
         OwnerMetaService.getInstance().getOwner(fileset.nameIdentifier(), fileset.type()).get();
-    Assertions.assertTrue(entity instanceof UserEntity);
+    Assertions.assertInstanceOf(UserEntity.class, entity);
     Assertions.assertEquals("user", ((UserEntity) entity).name());
 
     entity = OwnerMetaService.getInstance().getOwner(role.nameIdentifier(), role.type()).get();
-    Assertions.assertTrue(entity instanceof UserEntity);
+    Assertions.assertInstanceOf(UserEntity.class, entity);
     Assertions.assertEquals("user", ((UserEntity) entity).name());
   }
 
-  @Test
+  @TestTemplate
   public void testDeleteMetadataObject() throws IOException {
-    String metalakeName = "metalake";
-    AuditInfo auditInfo =
-        AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
-    BaseMetalake metalake =
-        createBaseMakeLake(RandomIdGenerator.INSTANCE.nextId(), metalakeName, auditInfo);
-    backend.insert(metalake, false);
-
-    CatalogEntity catalog =
-        createCatalog(
-            RandomIdGenerator.INSTANCE.nextId(), Namespace.of("metalake"), "catalog", auditInfo);
-    backend.insert(catalog, false);
-
-    SchemaEntity schema =
-        createSchemaEntity(
-            RandomIdGenerator.INSTANCE.nextId(),
-            Namespace.of("metalake", "catalog"),
-            "schema",
-            auditInfo);
-    backend.insert(schema, false);
+    createAndInsertMakeLake(METALAKE_NAME);
+    CatalogEntity catalog = createAndInsertCatalog(METALAKE_NAME, CATALOG_NAME);
+    SchemaEntity schema = createAndInsertSchema(METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME);
 
     FilesetEntity fileset =
         createFilesetEntity(
             RandomIdGenerator.INSTANCE.nextId(),
-            Namespace.of("metalake", "catalog", "schema"),
+            Namespace.of(TestOwnerMetaService.METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME),
             "fileset",
-            auditInfo);
+            AUDIT_INFO);
     backend.insert(fileset, false);
     TableEntity table =
         createTableEntity(
             RandomIdGenerator.INSTANCE.nextId(),
-            Namespace.of("metalake", "catalog", "schema"),
+            Namespace.of(TestOwnerMetaService.METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME),
             "table",
-            auditInfo);
+            AUDIT_INFO);
     backend.insert(table, false);
     TopicEntity topic =
         createTopicEntity(
             RandomIdGenerator.INSTANCE.nextId(),
-            Namespace.of("metalake", "catalog", "schema"),
+            Namespace.of(TestOwnerMetaService.METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME),
             "topic",
-            auditInfo);
+            AUDIT_INFO);
     backend.insert(topic, false);
     ModelEntity model =
         createModelEntity(
             RandomIdGenerator.INSTANCE.nextId(),
-            Namespace.of("metalake", "catalog", "schema"),
+            Namespace.of(TestOwnerMetaService.METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME),
             "model",
             "comment",
             1,
             null,
-            auditInfo);
+            AUDIT_INFO);
     backend.insert(model, false);
 
     UserEntity user =
         createUserEntity(
             RandomIdGenerator.INSTANCE.nextId(),
-            AuthorizationUtils.ofUserNamespace(metalakeName),
+            AuthorizationUtils.ofUserNamespace(METALAKE_NAME),
             "user",
-            auditInfo);
+            AUDIT_INFO);
     backend.insert(user, false);
 
     OwnerMetaService.getInstance()
@@ -329,47 +298,50 @@ class TestOwnerMetaService extends TestJDBCBackend {
     // Test to delete catalog with cascade mode
     catalog =
         createCatalog(
-            RandomIdGenerator.INSTANCE.nextId(), Namespace.of("metalake"), "catalog", auditInfo);
+            RandomIdGenerator.INSTANCE.nextId(),
+            Namespace.of(TestOwnerMetaService.METALAKE_NAME),
+            CATALOG_NAME,
+            AUDIT_INFO);
     backend.insert(catalog, false);
 
     schema =
         createSchemaEntity(
             RandomIdGenerator.INSTANCE.nextId(),
-            Namespace.of("metalake", "catalog"),
-            "schema",
-            auditInfo);
+            Namespace.of(TestOwnerMetaService.METALAKE_NAME, CATALOG_NAME),
+            SCHEMA_NAME,
+            AUDIT_INFO);
     backend.insert(schema, false);
 
     fileset =
         createFilesetEntity(
             RandomIdGenerator.INSTANCE.nextId(),
-            Namespace.of("metalake", "catalog", "schema"),
+            Namespace.of(TestOwnerMetaService.METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME),
             "fileset",
-            auditInfo);
+            AUDIT_INFO);
     backend.insert(fileset, false);
     table =
         createTableEntity(
             RandomIdGenerator.INSTANCE.nextId(),
-            Namespace.of("metalake", "catalog", "schema"),
+            Namespace.of(TestOwnerMetaService.METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME),
             "table",
-            auditInfo);
+            AUDIT_INFO);
     backend.insert(table, false);
     topic =
         createTopicEntity(
             RandomIdGenerator.INSTANCE.nextId(),
-            Namespace.of("metalake", "catalog", "schema"),
+            Namespace.of(TestOwnerMetaService.METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME),
             "topic",
-            auditInfo);
+            AUDIT_INFO);
     backend.insert(topic, false);
     model =
         createModelEntity(
             RandomIdGenerator.INSTANCE.nextId(),
-            Namespace.of("metalake", "catalog", "schema"),
+            Namespace.of(TestOwnerMetaService.METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME),
             "model",
             "comment",
             1,
             null,
-            auditInfo);
+            AUDIT_INFO);
     backend.insert(model, false);
 
     OwnerMetaService.getInstance()
@@ -392,50 +364,53 @@ class TestOwnerMetaService extends TestJDBCBackend {
     // Test to delete schema with cascade mode
     catalog =
         createCatalog(
-            RandomIdGenerator.INSTANCE.nextId(), Namespace.of("metalake"), "catalog", auditInfo);
+            RandomIdGenerator.INSTANCE.nextId(),
+            Namespace.of(TestOwnerMetaService.METALAKE_NAME),
+            CATALOG_NAME,
+            AUDIT_INFO);
     backend.insert(catalog, false);
 
     schema =
         createSchemaEntity(
             RandomIdGenerator.INSTANCE.nextId(),
-            Namespace.of("metalake", "catalog"),
-            "schema",
-            auditInfo);
+            Namespace.of(TestOwnerMetaService.METALAKE_NAME, CATALOG_NAME),
+            SCHEMA_NAME,
+            AUDIT_INFO);
     backend.insert(schema, false);
 
     fileset =
         createFilesetEntity(
             RandomIdGenerator.INSTANCE.nextId(),
-            Namespace.of("metalake", "catalog", "schema"),
+            Namespace.of(TestOwnerMetaService.METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME),
             "fileset",
-            auditInfo);
+            AUDIT_INFO);
     backend.insert(fileset, false);
 
     table =
         createTableEntity(
             RandomIdGenerator.INSTANCE.nextId(),
-            Namespace.of("metalake", "catalog", "schema"),
+            Namespace.of(TestOwnerMetaService.METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME),
             "table",
-            auditInfo);
+            AUDIT_INFO);
     backend.insert(table, false);
 
     topic =
         createTopicEntity(
             RandomIdGenerator.INSTANCE.nextId(),
-            Namespace.of("metalake", "catalog", "schema"),
+            Namespace.of(TestOwnerMetaService.METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME),
             "topic",
-            auditInfo);
+            AUDIT_INFO);
     backend.insert(topic, false);
 
     model =
         createModelEntity(
             RandomIdGenerator.INSTANCE.nextId(),
-            Namespace.of("metalake", "catalog", "schema"),
+            Namespace.of(TestOwnerMetaService.METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME),
             "model",
             "comment",
             1,
             null,
-            auditInfo);
+            AUDIT_INFO);
     backend.insert(model, false);
 
     OwnerMetaService.getInstance()
@@ -459,43 +434,43 @@ class TestOwnerMetaService extends TestJDBCBackend {
     schema =
         createSchemaEntity(
             RandomIdGenerator.INSTANCE.nextId(),
-            Namespace.of("metalake", "catalog"),
-            "schema",
-            auditInfo);
+            Namespace.of(TestOwnerMetaService.METALAKE_NAME, CATALOG_NAME),
+            SCHEMA_NAME,
+            AUDIT_INFO);
     backend.insert(schema, false);
 
     fileset =
         createFilesetEntity(
             RandomIdGenerator.INSTANCE.nextId(),
-            Namespace.of("metalake", "catalog", "schema"),
+            Namespace.of(TestOwnerMetaService.METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME),
             "fileset",
-            auditInfo);
+            AUDIT_INFO);
     backend.insert(fileset, false);
     table =
         createTableEntity(
             RandomIdGenerator.INSTANCE.nextId(),
-            Namespace.of("metalake", "catalog", "schema"),
+            Namespace.of(TestOwnerMetaService.METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME),
             "table",
-            auditInfo);
+            AUDIT_INFO);
     backend.insert(table, false);
     topic =
         createTopicEntity(
             RandomIdGenerator.INSTANCE.nextId(),
-            Namespace.of("metalake", "catalog", "schema"),
+            Namespace.of(TestOwnerMetaService.METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME),
             "topic",
-            auditInfo);
+            AUDIT_INFO);
 
     backend.insert(topic, false);
 
     model =
         createModelEntity(
             RandomIdGenerator.INSTANCE.nextId(),
-            Namespace.of("metalake", "catalog", "schema"),
+            Namespace.of(TestOwnerMetaService.METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME),
             "model",
             "comment",
             1,
             null,
-            auditInfo);
+            AUDIT_INFO);
     backend.insert(model, false);
 
     OwnerMetaService.getInstance()
@@ -514,5 +489,35 @@ class TestOwnerMetaService extends TestJDBCBackend {
     UserMetaService.getInstance().deleteUser(user.nameIdentifier());
     Assertions.assertEquals(24, countAllOwnerRel(user.id()));
     Assertions.assertEquals(0, countActiveOwnerRel(user.id()));
+  }
+
+  private Integer countAllOwnerRel(Long ownerId) {
+    try (SqlSession sqlSession =
+            SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true);
+        Connection connection = sqlSession.getConnection();
+        Statement statement1 = connection.createStatement();
+        ResultSet rs1 =
+            statement1.executeQuery(
+                String.format("SELECT count(*) FROM owner_meta WHERE owner_id = %d", ownerId))) {
+      if (rs1.next()) {
+        return rs1.getInt(1);
+      } else {
+        throw new RuntimeException("Doesn't contain data");
+      }
+    } catch (SQLException se) {
+      throw new RuntimeException("SQL execution failed", se);
+    }
+  }
+
+  private GroupEntity createGroupEntity(
+      Long id, Namespace namespace, String name, AuditInfo auditInfo) {
+    return GroupEntity.builder()
+        .withId(id)
+        .withName(name)
+        .withNamespace(namespace)
+        .withRoleNames(null)
+        .withRoleIds(null)
+        .withAuditInfo(auditInfo)
+        .build();
   }
 }

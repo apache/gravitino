@@ -35,7 +35,7 @@ import org.apache.gravitino.storage.relational.TestJDBCBackend;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
 import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestTemplate;
 
 public class TestJobTemplateMetaService extends TestJDBCBackend {
 
@@ -44,7 +44,7 @@ public class TestJobTemplateMetaService extends TestJDBCBackend {
   private static final AuditInfo AUDIT_INFO =
       AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build();
 
-  @Test
+  @TestTemplate
   public void testInsertAndListJobTemplates() throws IOException {
     BaseMetalake metalake =
         createBaseMakeLake(RandomIdGenerator.INSTANCE.nextId(), METALAKE_NAME, AUDIT_INFO);
@@ -110,7 +110,7 @@ public class TestJobTemplateMetaService extends TestJDBCBackend {
     Assertions.assertFalse(jobTemplates.contains(testJobTemplateEntity1));
   }
 
-  @Test
+  @TestTemplate
   public void testInsertAndSelectJobTemplate() throws IOException {
     BaseMetalake metalake =
         createBaseMakeLake(RandomIdGenerator.INSTANCE.nextId(), METALAKE_NAME, AUDIT_INFO);
@@ -145,7 +145,7 @@ public class TestJobTemplateMetaService extends TestJDBCBackend {
                 NameIdentifierUtil.ofJobTemplate(METALAKE_NAME, "non_existent_template")));
   }
 
-  @Test
+  @TestTemplate
   public void testInsertAndDeleteJobTemplate() throws IOException {
     BaseMetalake metalake =
         createBaseMakeLake(RandomIdGenerator.INSTANCE.nextId(), METALAKE_NAME, AUDIT_INFO);
@@ -176,7 +176,7 @@ public class TestJobTemplateMetaService extends TestJDBCBackend {
     Assertions.assertFalse(deleted);
   }
 
-  @Test
+  @TestTemplate
   public void testDeleteJobTemplateWithJobs() throws IOException {
     BaseMetalake metalake =
         createBaseMakeLake(RandomIdGenerator.INSTANCE.nextId(), METALAKE_NAME, AUDIT_INFO);
@@ -209,7 +209,7 @@ public class TestJobTemplateMetaService extends TestJDBCBackend {
     Assertions.assertEquals(0, jobs.size());
   }
 
-  @Test
+  @TestTemplate
   public void testUpdateJobTemplate() throws IOException {
     BaseMetalake metalake =
         createBaseMakeLake(RandomIdGenerator.INSTANCE.nextId(), METALAKE_NAME, AUDIT_INFO);

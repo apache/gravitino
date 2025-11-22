@@ -23,7 +23,6 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -32,7 +31,6 @@ import java.util.stream.Collectors;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
-import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.ColumnEntity;
 import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.rel.expressions.literals.Literals;
@@ -43,21 +41,18 @@ import org.apache.gravitino.storage.relational.mapper.TableColumnMapper;
 import org.apache.gravitino.storage.relational.po.ColumnPO;
 import org.apache.gravitino.storage.relational.session.SqlSessions;
 import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestTemplate;
 import org.testcontainers.shaded.com.google.common.collect.Lists;
 
 public class TestTableColumnMetaService extends TestJDBCBackend {
 
   private static final String METALAKE_NAME = "metalake_for_table_column_test";
 
-  private final AuditInfo auditInfo =
-      AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
-
-  @Test
+  @TestTemplate
   public void testInsertAndGetTableColumns() throws IOException {
     String catalogName = "catalog1";
     String schemaName = "schema1";
-    createParentEntities(METALAKE_NAME, catalogName, schemaName, auditInfo);
+    createParentEntities(METALAKE_NAME, catalogName, schemaName, AUDIT_INFO);
 
     // Create a table entity without columns
     TableEntity createdTable =
@@ -65,7 +60,7 @@ public class TestTableColumnMetaService extends TestJDBCBackend {
             RandomIdGenerator.INSTANCE.nextId(),
             Namespace.of(METALAKE_NAME, catalogName, schemaName),
             "table1",
-            auditInfo);
+            AUDIT_INFO);
     TableMetaService.getInstance().insertTable(createdTable, false);
 
     TableEntity retrievedTable =
@@ -87,7 +82,7 @@ public class TestTableColumnMetaService extends TestJDBCBackend {
             .withNullable(true)
             .withAutoIncrement(false)
             .withDefaultValue(Literals.integerLiteral(1))
-            .withAuditInfo(auditInfo)
+            .withAuditInfo(AUDIT_INFO)
             .build();
     ColumnEntity column2 =
         ColumnEntity.builder()
@@ -99,7 +94,7 @@ public class TestTableColumnMetaService extends TestJDBCBackend {
             .withNullable(false)
             .withAutoIncrement(false)
             .withDefaultValue(Literals.stringLiteral("1"))
-            .withAuditInfo(auditInfo)
+            .withAuditInfo(AUDIT_INFO)
             .build();
     TableEntity createdTable2 =
         TableEntity.builder()
@@ -107,7 +102,7 @@ public class TestTableColumnMetaService extends TestJDBCBackend {
             .withName("table2")
             .withNamespace(Namespace.of(METALAKE_NAME, catalogName, schemaName))
             .withColumns(Lists.newArrayList(column1, column2))
-            .withAuditInfo(auditInfo)
+            .withAuditInfo(AUDIT_INFO)
             .build();
     TableMetaService.getInstance().insertTable(createdTable2, false);
 
@@ -131,7 +126,7 @@ public class TestTableColumnMetaService extends TestJDBCBackend {
             .withNullable(true)
             .withAutoIncrement(false)
             .withDefaultValue(Literals.integerLiteral(1))
-            .withAuditInfo(auditInfo)
+            .withAuditInfo(AUDIT_INFO)
             .build();
 
     TableEntity createdTable3 =
@@ -140,7 +135,7 @@ public class TestTableColumnMetaService extends TestJDBCBackend {
             .withName("table3")
             .withNamespace(Namespace.of(METALAKE_NAME, catalogName, schemaName))
             .withColumns(Lists.newArrayList(column3))
-            .withAuditInfo(auditInfo)
+            .withAuditInfo(AUDIT_INFO)
             .build();
 
     TableMetaService.getInstance().insertTable(createdTable3, true);
@@ -154,11 +149,11 @@ public class TestTableColumnMetaService extends TestJDBCBackend {
     compareTwoColumns(createdTable3.columns(), retrievedTable3.columns());
   }
 
-  @Test
+  @TestTemplate
   public void testUpdateTable() throws IOException {
     String catalogName = "catalog1";
     String schemaName = "schema1";
-    createParentEntities(METALAKE_NAME, catalogName, schemaName, auditInfo);
+    createParentEntities(METALAKE_NAME, catalogName, schemaName, AUDIT_INFO);
 
     // Create a table entity without columns
     TableEntity createdTable =
@@ -166,7 +161,7 @@ public class TestTableColumnMetaService extends TestJDBCBackend {
             RandomIdGenerator.INSTANCE.nextId(),
             Namespace.of(METALAKE_NAME, catalogName, schemaName),
             "table1",
-            auditInfo);
+            AUDIT_INFO);
     TableMetaService.getInstance().insertTable(createdTable, false);
 
     // Test update table with new name
@@ -176,7 +171,7 @@ public class TestTableColumnMetaService extends TestJDBCBackend {
             .withName("table2")
             .withNamespace(createdTable.namespace())
             .withColumns(createdTable.columns())
-            .withAuditInfo(auditInfo)
+            .withAuditInfo(AUDIT_INFO)
             .build();
     Function<TableEntity, TableEntity> updater = oldTable -> updatedTable;
 
@@ -201,7 +196,7 @@ public class TestTableColumnMetaService extends TestJDBCBackend {
             .withNullable(true)
             .withAutoIncrement(false)
             .withDefaultValue(Literals.integerLiteral(1))
-            .withAuditInfo(auditInfo)
+            .withAuditInfo(AUDIT_INFO)
             .build();
 
     TableEntity updatedTable2 =
@@ -210,7 +205,7 @@ public class TestTableColumnMetaService extends TestJDBCBackend {
             .withName(updatedTable.name())
             .withNamespace(updatedTable.namespace())
             .withColumns(Lists.newArrayList(column1))
-            .withAuditInfo(auditInfo)
+            .withAuditInfo(AUDIT_INFO)
             .build();
 
     Function<TableEntity, TableEntity> updater2 = oldTable -> updatedTable2;
@@ -237,7 +232,7 @@ public class TestTableColumnMetaService extends TestJDBCBackend {
             .withNullable(false)
             .withAutoIncrement(false)
             .withDefaultValue(Literals.stringLiteral("1"))
-            .withAuditInfo(auditInfo)
+            .withAuditInfo(AUDIT_INFO)
             .build();
 
     TableEntity updatedTable3 =
@@ -246,7 +241,7 @@ public class TestTableColumnMetaService extends TestJDBCBackend {
             .withName(updatedTable2.name())
             .withNamespace(updatedTable2.namespace())
             .withColumns(Lists.newArrayList(column1, column2))
-            .withAuditInfo(auditInfo)
+            .withAuditInfo(AUDIT_INFO)
             .build();
 
     Function<TableEntity, TableEntity> updater3 = oldTable -> updatedTable3;
@@ -273,7 +268,7 @@ public class TestTableColumnMetaService extends TestJDBCBackend {
             .withNullable(column1.nullable())
             .withAutoIncrement(column1.autoIncrement())
             .withDefaultValue(null)
-            .withAuditInfo(auditInfo)
+            .withAuditInfo(AUDIT_INFO)
             .build();
     TableEntity updatedTable4 =
         TableEntity.builder()
@@ -281,7 +276,7 @@ public class TestTableColumnMetaService extends TestJDBCBackend {
             .withName(updatedTable3.name())
             .withNamespace(updatedTable3.namespace())
             .withColumns(Lists.newArrayList(updatedColumn1, column2))
-            .withAuditInfo(auditInfo)
+            .withAuditInfo(AUDIT_INFO)
             .build();
 
     Function<TableEntity, TableEntity> updater4 = oldTable -> updatedTable4;
@@ -304,7 +299,7 @@ public class TestTableColumnMetaService extends TestJDBCBackend {
             .withName(updatedTable4.name())
             .withNamespace(updatedTable4.namespace())
             .withColumns(Lists.newArrayList(column2))
-            .withAuditInfo(auditInfo)
+            .withAuditInfo(AUDIT_INFO)
             .build();
 
     Function<TableEntity, TableEntity> updater5 = oldTable -> updatedTable5;
@@ -320,7 +315,7 @@ public class TestTableColumnMetaService extends TestJDBCBackend {
             .withId(updatedTable5.id())
             .withName(updatedTable5.name())
             .withNamespace(updatedTable5.namespace())
-            .withAuditInfo(auditInfo)
+            .withAuditInfo(AUDIT_INFO)
             .build();
 
     Function<TableEntity, TableEntity> updater6 = oldTable -> updatedTable6;
@@ -331,11 +326,11 @@ public class TestTableColumnMetaService extends TestJDBCBackend {
     Assertions.assertTrue(retrievedTable6.columns().isEmpty());
   }
 
-  @Test
+  @TestTemplate
   public void testCreateAndDeleteTable() throws IOException {
     String catalogName = "catalog1";
     String schemaName = "schema1";
-    createParentEntities(METALAKE_NAME, catalogName, schemaName, auditInfo);
+    createParentEntities(METALAKE_NAME, catalogName, schemaName, AUDIT_INFO);
 
     // Create a table entity with column
     ColumnEntity column =
@@ -348,7 +343,7 @@ public class TestTableColumnMetaService extends TestJDBCBackend {
             .withNullable(true)
             .withAutoIncrement(false)
             .withDefaultValue(Literals.integerLiteral(1))
-            .withAuditInfo(auditInfo)
+            .withAuditInfo(AUDIT_INFO)
             .build();
 
     TableEntity createdTable =
@@ -357,7 +352,7 @@ public class TestTableColumnMetaService extends TestJDBCBackend {
             .withName("table1")
             .withNamespace(Namespace.of(METALAKE_NAME, catalogName, schemaName))
             .withColumns(Lists.newArrayList(column))
-            .withAuditInfo(auditInfo)
+            .withAuditInfo(AUDIT_INFO)
             .build();
 
     TableMetaService.getInstance().insertTable(createdTable, false);
@@ -378,11 +373,11 @@ public class TestTableColumnMetaService extends TestJDBCBackend {
         () -> TableMetaService.getInstance().getTableByIdentifier(retrievedTable.nameIdentifier()));
   }
 
-  @Test
+  @TestTemplate
   public void testDeleteMetalake() throws IOException {
     String catalogName = "catalog1";
     String schemaName = "schema1";
-    createParentEntities(METALAKE_NAME, catalogName, schemaName, auditInfo);
+    createParentEntities(METALAKE_NAME, catalogName, schemaName, AUDIT_INFO);
 
     // Create a table entity with column
     ColumnEntity column =
@@ -395,7 +390,7 @@ public class TestTableColumnMetaService extends TestJDBCBackend {
             .withNullable(true)
             .withAutoIncrement(false)
             .withDefaultValue(Literals.integerLiteral(1))
-            .withAuditInfo(auditInfo)
+            .withAuditInfo(AUDIT_INFO)
             .build();
 
     TableEntity createdTable =
@@ -404,7 +399,7 @@ public class TestTableColumnMetaService extends TestJDBCBackend {
             .withName("table1")
             .withNamespace(Namespace.of(METALAKE_NAME, catalogName, schemaName))
             .withColumns(Lists.newArrayList(column))
-            .withAuditInfo(auditInfo)
+            .withAuditInfo(AUDIT_INFO)
             .build();
 
     TableMetaService.getInstance().insertTable(createdTable, false);
@@ -425,11 +420,11 @@ public class TestTableColumnMetaService extends TestJDBCBackend {
         () -> TableMetaService.getInstance().getTableByIdentifier(retrievedTable.nameIdentifier()));
   }
 
-  @Test
+  @TestTemplate
   public void testGetColumnIdAndPO() throws IOException {
     String catalogName = "catalog1";
     String schemaName = "schema1";
-    createParentEntities(METALAKE_NAME, catalogName, schemaName, auditInfo);
+    createParentEntities(METALAKE_NAME, catalogName, schemaName, AUDIT_INFO);
 
     // Create a table entity with column
     ColumnEntity column =
@@ -442,7 +437,7 @@ public class TestTableColumnMetaService extends TestJDBCBackend {
             .withNullable(true)
             .withAutoIncrement(false)
             .withDefaultValue(Literals.integerLiteral(1))
-            .withAuditInfo(auditInfo)
+            .withAuditInfo(AUDIT_INFO)
             .build();
 
     TableEntity createdTable =
@@ -451,7 +446,7 @@ public class TestTableColumnMetaService extends TestJDBCBackend {
             .withName("table1")
             .withNamespace(Namespace.of(METALAKE_NAME, catalogName, schemaName))
             .withColumns(Lists.newArrayList(column))
-            .withAuditInfo(auditInfo)
+            .withAuditInfo(AUDIT_INFO)
             .build();
 
     TableMetaService.getInstance().insertTable(createdTable, false);
@@ -485,7 +480,7 @@ public class TestTableColumnMetaService extends TestJDBCBackend {
             .withNullable(column.nullable())
             .withAutoIncrement(column.autoIncrement())
             .withDefaultValue(column.defaultValue())
-            .withAuditInfo(auditInfo)
+            .withAuditInfo(AUDIT_INFO)
             .build();
 
     TableEntity updatedTable =
@@ -555,11 +550,11 @@ public class TestTableColumnMetaService extends TestJDBCBackend {
         });
   }
 
-  @Test
+  @TestTemplate
   public void testDeleteColumnsByLegacyTimeline() throws IOException {
     String catalogName = "catalog1";
     String schemaName = "schema1";
-    createParentEntities(METALAKE_NAME, catalogName, schemaName, auditInfo);
+    createParentEntities(METALAKE_NAME, catalogName, schemaName, AUDIT_INFO);
 
     List<ColumnEntity> columns = new ArrayList<>();
     for (int i = 0; i < 5; i++) {
@@ -572,7 +567,7 @@ public class TestTableColumnMetaService extends TestJDBCBackend {
               .withDataType(Types.StringType.get())
               .withNullable(true)
               .withAutoIncrement(false)
-              .withAuditInfo(auditInfo)
+              .withAuditInfo(AUDIT_INFO)
               .build());
     }
 
@@ -582,7 +577,7 @@ public class TestTableColumnMetaService extends TestJDBCBackend {
             .withName("legacy_table")
             .withNamespace(Namespace.of(METALAKE_NAME, catalogName, schemaName))
             .withColumns(columns)
-            .withAuditInfo(auditInfo)
+            .withAuditInfo(AUDIT_INFO)
             .build();
 
     TableMetaService.getInstance().insertTable(createdTable, false);

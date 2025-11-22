@@ -52,8 +52,7 @@ public class ModelMetaPostgreSQLProvider extends ModelMetaBaseSQLProvider {
       @Param("schemaId") Long schemaId, @Param("modelName") String modelName) {
     return "UPDATE "
         + ModelMetaMapper.TABLE_NAME
-        + " SET deleted_at = floor(extract(epoch from(current_timestamp -"
-        + " timestamp '1970-01-01 00:00:00')) * 1000)"
+        + " SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
         + " WHERE schema_id = #{schemaId} AND model_name = #{modelName} AND deleted_at = 0";
   }
 
@@ -61,8 +60,7 @@ public class ModelMetaPostgreSQLProvider extends ModelMetaBaseSQLProvider {
   public String softDeleteModelMetasByCatalogId(@Param("catalogId") Long catalogId) {
     return "UPDATE "
         + ModelMetaMapper.TABLE_NAME
-        + " SET deleted_at = floor(extract(epoch from(current_timestamp -"
-        + " timestamp '1970-01-01 00:00:00')) * 1000)"
+        + " SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
         + " WHERE catalog_id = #{catalogId} AND deleted_at = 0";
   }
 
@@ -70,8 +68,7 @@ public class ModelMetaPostgreSQLProvider extends ModelMetaBaseSQLProvider {
   public String softDeleteModelMetasByMetalakeId(@Param("metalakeId") Long metalakeId) {
     return "UPDATE "
         + ModelMetaMapper.TABLE_NAME
-        + " SET deleted_at = floor(extract(epoch from(current_timestamp -"
-        + " timestamp '1970-01-01 00:00:00')) * 1000)"
+        + " SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
         + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0";
   }
 
@@ -79,8 +76,7 @@ public class ModelMetaPostgreSQLProvider extends ModelMetaBaseSQLProvider {
   public String softDeleteModelMetasBySchemaId(@Param("schemaId") Long schemaId) {
     return "UPDATE "
         + ModelMetaMapper.TABLE_NAME
-        + " SET deleted_at = floor(extract(epoch from(current_timestamp -"
-        + " timestamp '1970-01-01 00:00:00')) * 1000)"
+        + " SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
         + " WHERE schema_id = #{schemaId} AND deleted_at = 0";
   }
 
