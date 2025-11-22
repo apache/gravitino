@@ -25,8 +25,6 @@ import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.authorization.AuthorizationUtils;
-import org.apache.gravitino.authorization.Owner;
-import org.apache.gravitino.authorization.OwnerDispatcher;
 import org.apache.gravitino.catalog.TableDispatcher;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.iceberg.common.utils.IcebergIdentifierUtils;
@@ -34,7 +32,6 @@ import org.apache.gravitino.iceberg.service.authorization.IcebergRESTServerConte
 import org.apache.gravitino.listener.api.event.IcebergRequestContext;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.TableEntity;
-import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.PrincipalUtils;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
@@ -62,7 +59,13 @@ public class IcebergTableHookDispatcher implements IcebergTableOperationDispatch
 
     LoadTableResponse response = dispatcher.createTable(context, namespace, createTableRequest);
     importTable(context.catalogName(), namespace, createTableRequest.name());
-    setTableOwner(context.catalogName(), namespace, createTableRequest.name(), context.userName());
+    IcebergOwnershipUtils.setTableOwner(
+        metalake,
+        context.catalogName(),
+        namespace,
+        createTableRequest.name(),
+        context.userName(),
+        GravitinoEnv.getInstance().ownerDispatcher());
 
     return response;
   }
@@ -162,22 +165,6 @@ public class IcebergTableHookDispatcher implements IcebergTableOperationDispatch
       tableDispatcher.loadTable(
           IcebergIdentifierUtils.toGravitinoTableIdentifier(
               metalake, catalogName, TableIdentifier.of(namespace, tableName)));
-    }
-  }
-
-  private void setTableOwner(
-      String catalogName, Namespace namespace, String tableName, String user) {
-    // Set the creator as the owner of the table.
-    OwnerDispatcher ownerManager = GravitinoEnv.getInstance().ownerDispatcher();
-    if (ownerManager != null) {
-      ownerManager.setOwner(
-          metalake,
-          NameIdentifierUtil.toMetadataObject(
-              IcebergIdentifierUtils.toGravitinoTableIdentifier(
-                  metalake, catalogName, TableIdentifier.of(namespace, tableName)),
-              Entity.EntityType.TABLE),
-          user,
-          Owner.Type.USER);
     }
   }
 }
