@@ -19,26 +19,13 @@
 
 package org.apache.gravitino.connector;
 
+import com.google.common.collect.ImmutableMap;
+import org.apache.gravitino.rel.Table;
+
 public class GenericLakehouseTable extends BaseTable {
-  private String format;
 
   public static Builder builder() {
     return new Builder();
-  }
-
-  @Override
-  public String format() {
-    return format;
-  }
-
-  @Override
-  public String location() {
-    return properties.get("location");
-  }
-
-  @Override
-  public boolean external() {
-    return properties.get("external") != null && Boolean.parseBoolean(properties.get("external"));
   }
 
   @Override
@@ -58,10 +45,13 @@ public class GenericLakehouseTable extends BaseTable {
     @Override
     protected GenericLakehouseTable internalBuild() {
       GenericLakehouseTable genericLakehouseTable = new GenericLakehouseTable();
-      genericLakehouseTable.format = this.format;
       genericLakehouseTable.columns = this.columns;
       genericLakehouseTable.comment = this.comment;
-      genericLakehouseTable.properties = this.properties;
+      genericLakehouseTable.properties =
+          ImmutableMap.<String, String>builder()
+              .putAll(this.properties)
+              .put(Table.PROPERTY_TABLE_FORMAT, this.format)
+              .buildKeepingLast();
       genericLakehouseTable.auditInfo = this.auditInfo;
       genericLakehouseTable.distribution = this.distribution;
       genericLakehouseTable.indexes = this.indexes;

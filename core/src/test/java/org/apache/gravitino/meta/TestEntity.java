@@ -175,7 +175,7 @@ public class TestEntity {
             .withName(tableName)
             .withAuditInfo(auditInfo)
             .withFormat(format)
-            .withSortOrder(sortOrders)
+            .withSortOrders(sortOrders)
             .withProperties(tableProperties)
             .withComment(comment)
             .withIndexes(indexes)
@@ -189,7 +189,7 @@ public class TestEntity {
     Assertions.assertEquals(format, fields.get(TableEntity.FORMAT));
     Assertions.assertEquals(tableProperties, fields.get(TableEntity.PROPERTIES));
     Assertions.assertEquals(comment, fields.get(TableEntity.COMMENT));
-    Assertions.assertEquals(sortOrders, fields.get(TableEntity.SORT_ORDER));
+    Assertions.assertEquals(sortOrders, fields.get(TableEntity.SORT_ORDERS));
     Assertions.assertEquals(indexes, fields.get(TableEntity.INDEXES));
     Assertions.assertEquals(distribution, fields.get(TableEntity.DISTRIBUTION));
   }
