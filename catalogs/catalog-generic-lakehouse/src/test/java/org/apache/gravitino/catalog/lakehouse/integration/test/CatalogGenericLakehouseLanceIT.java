@@ -53,6 +53,7 @@ import org.apache.gravitino.Catalog;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Schema;
 import org.apache.gravitino.client.GravitinoMetalake;
+import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.integration.test.util.BaseIT;
 import org.apache.gravitino.integration.test.util.GravitinoITUtils;
 import org.apache.gravitino.rel.Column;
@@ -255,6 +256,35 @@ public class CatalogGenericLakehouseLanceIT extends BaseIT {
         Arrays.asList(catalog.asTableCatalog().listTables(nameIdentifier.namespace()));
     Assertions.assertEquals(1, tableIdentifiers.size());
     Assertions.assertEquals(nameIdentifier, tableIdentifiers.get(0));
+
+    // Now try to simulate the location of lance table does not exist.
+    Map<String, String> newProperties = createProperties();
+    newProperties.put("format", "lance");
+    // Use a wrong location to let the table creation fail
+    newProperties.put("location", "hdfs://localhost:9000/wrong_location");
+
+    String nameNew = GravitinoITUtils.genRandomName(TABLE_PREFIX);
+    NameIdentifier newNameIdentifier = NameIdentifier.of(schemaName, nameNew);
+    Exception e =
+        Assertions.assertThrows(
+            Exception.class,
+            () -> {
+              catalog
+                  .asTableCatalog()
+                  .createTable(
+                      newNameIdentifier,
+                      columns,
+                      TABLE_COMMENT,
+                      newProperties,
+                      Transforms.EMPTY_TRANSFORM,
+                      null,
+                      null);
+            });
+
+    Assertions.assertTrue(e.getMessage().contains("Invalid user input"));
+
+    Assertions.assertThrows(
+        NoSuchTableException.class, () -> catalog.asTableCatalog().loadTable(newNameIdentifier));
   }
 
   @Test
