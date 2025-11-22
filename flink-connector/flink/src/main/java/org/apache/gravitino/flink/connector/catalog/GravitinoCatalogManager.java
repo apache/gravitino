@@ -56,10 +56,10 @@ public class GravitinoCatalogManager {
    */
   public static GravitinoCatalogManager create(
       String gravitinoUri, String metalakeName, Map<String, String> gravitinoClientConfig) {
-    Preconditions.checkState(
-        gravitinoCatalogManager == null, "Should not create duplicate GravitinoCatalogManager");
-    gravitinoCatalogManager =
-        new GravitinoCatalogManager(gravitinoUri, metalakeName, gravitinoClientConfig);
+    if (gravitinoCatalogManager == null) {
+      gravitinoCatalogManager =
+          new GravitinoCatalogManager(gravitinoUri, metalakeName, gravitinoClientConfig);
+    }
     return gravitinoCatalogManager;
   }
 
