@@ -76,6 +76,8 @@ public class IcebergConfigOperations {
           .add(Endpoint.V1_REPORT_METRICS)
           .add(Endpoint.V1_COMMIT_TRANSACTION)
           .add(Endpoint.V1_TABLE_CREDENTIALS)
+          // Note: Scan planning endpoints are available in Iceberg 1.10.0+
+          .add(Endpoint.V1_SUBMIT_TABLE_SCAN_PLAN)
           .build();
 
   private static final List<Endpoint> DEFAULT_VIEW_ENDPOINTS =
