@@ -15,23 +15,31 @@
  * KIND, either express or implied.  See the License for the
  * specific language governing permissions and limitations
  * under the License.
+ *
  */
+package org.apache.gravitino.lance.common.utils;
 
-package org.apache.gravitino.integration.test;
+import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_STORAGE_OPTIONS_PREFIX;
 
 import java.util.Map;
+import java.util.stream.Collectors;
 
-public class MiniGravitinoContext {
-  Map<String, String> customConfig;
-  final boolean ignoreIcebergAuxRestService;
-  final boolean ignoreLanceAuxRestService;
+public class LancePropertiesUtils {
 
-  public MiniGravitinoContext(
-      Map<String, String> customConfig,
-      boolean ignoreIcebergAuxRestService,
-      boolean ignoreLanceAuxRestService) {
-    this.customConfig = customConfig;
-    this.ignoreIcebergAuxRestService = ignoreIcebergAuxRestService;
-    this.ignoreLanceAuxRestService = ignoreLanceAuxRestService;
+  private LancePropertiesUtils() {
+    // Private constructor to prevent instantiation
+  }
+
+  public static Map<String, String> getLanceStorageOptions(Map<String, String> tableProperties) {
+    if (tableProperties == null) {
+      return Map.of();
+    }
+
+    return tableProperties.entrySet().stream()
+        .filter(e -> e.getKey().startsWith(LANCE_STORAGE_OPTIONS_PREFIX))
+        .collect(
+            Collectors.toMap(
+                e -> e.getKey().substring(LANCE_STORAGE_OPTIONS_PREFIX.length()),
+                Map.Entry::getValue));
   }
 }
