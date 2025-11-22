@@ -23,6 +23,7 @@ import org.apache.gravitino.Entity;
 import org.apache.gravitino.Entity.EntityType;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.SupportsRelationOperations;
 import org.apache.gravitino.meta.GenericEntity;
 import org.apache.gravitino.meta.GroupEntity;
 import org.apache.gravitino.meta.PolicyEntity;
@@ -55,6 +56,12 @@ public class ReverseIndexRules {
                     reverseIndexCache.put(nameIdentifier, Entity.EntityType.ROLE, key);
                   });
         }
+
+        // Handle Securable Objects -> User reverse index, so the key type is User and the value
+        // type is securable Object.
+        if (key.relationType() == SupportsRelationOperations.Type.OWNER_REL) {
+          reverseIndexCache.put(userEntity.nameIdentifier(), EntityType.USER, key);
+        }
       };
 
   /** GroupEntity reverse index processor */
@@ -70,6 +77,12 @@ public class ReverseIndexRules {
                     NameIdentifier nameIdentifier = NameIdentifier.of(ns, role);
                     reverseIndexCache.put(nameIdentifier, Entity.EntityType.ROLE, key);
                   });
+        }
+
+        // Handle Securable Objects -> Group reverse index, so the key type is group and the value
+        // type is securable Object.
+        if (key.relationType() == SupportsRelationOperations.Type.OWNER_REL) {
+          reverseIndexCache.put(groupEntity.nameIdentifier(), EntityType.GROUP, key);
         }
       };
 
