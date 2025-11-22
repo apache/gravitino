@@ -110,4 +110,11 @@ tasks {
   named("generateMetadataFileForMavenJavaPublication") {
     dependsOn(copyDepends)
   }
+
+  test {
+    val testMode = project.properties["testMode"] as? String ?: "embedded"
+    if (testMode == "embedded") {
+      dependsOn(":catalogs:catalog-generic-lakehouse:build")
+    }
+  }
 }
