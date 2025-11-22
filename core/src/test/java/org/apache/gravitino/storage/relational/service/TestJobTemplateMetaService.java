@@ -18,11 +18,14 @@
  */
 package org.apache.gravitino.storage.relational.service;
 
+import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.Lists;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.List;
 import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
+import org.apache.gravitino.job.HttpJobTemplate;
 import org.apache.gravitino.job.JobHandle;
 import org.apache.gravitino.job.ShellJobTemplate;
 import org.apache.gravitino.job.SparkJobTemplate;
@@ -71,13 +74,21 @@ public class TestJobTemplateMetaService extends TestJDBCBackend {
     Assertions.assertDoesNotThrow(
         () -> jobTemplateMetaService.insertJobTemplate(testJobTemplateEntity2, false));
 
+    JobTemplateEntity testJobTemplateEntity3 =
+        newHttpJobTemplateEntity(
+            "test_http_template_1", "This is a test http job template 1", METALAKE_NAME);
+
+    Assertions.assertDoesNotThrow(
+        () -> jobTemplateMetaService.insertJobTemplate(testJobTemplateEntity3, false));
+
     List<JobTemplateEntity> jobTemplates =
         jobTemplateMetaService.listJobTemplatesByNamespace(
             NamespaceUtil.ofJobTemplate(METALAKE_NAME));
 
-    Assertions.assertEquals(2, jobTemplates.size());
+    Assertions.assertEquals(3, jobTemplates.size());
     Assertions.assertTrue(jobTemplates.contains(testJobTemplateEntity1));
     Assertions.assertTrue(jobTemplates.contains(testJobTemplateEntity2));
+    Assertions.assertTrue(jobTemplates.contains(testJobTemplateEntity3));
 
     // Test insert duplicate job template without overwrite
     Assertions.assertThrows(
@@ -104,9 +115,10 @@ public class TestJobTemplateMetaService extends TestJDBCBackend {
     jobTemplates =
         jobTemplateMetaService.listJobTemplatesByNamespace(
             NamespaceUtil.ofJobTemplate(METALAKE_NAME));
-    Assertions.assertEquals(2, jobTemplates.size());
+    Assertions.assertEquals(3, jobTemplates.size());
     Assertions.assertTrue(jobTemplates.contains(updatedJobTemplateEntity1));
     Assertions.assertTrue(jobTemplates.contains(testJobTemplateEntity2));
+    Assertions.assertTrue(jobTemplates.contains(testJobTemplateEntity3));
     Assertions.assertFalse(jobTemplates.contains(testJobTemplateEntity1));
   }
 
@@ -126,6 +138,10 @@ public class TestJobTemplateMetaService extends TestJDBCBackend {
         newSparkJobTemplateEntity("spark_template", "A spark job template", METALAKE_NAME);
     jobTemplateMetaService.insertJobTemplate(sparkJobTemplate, false);
 
+    JobTemplateEntity httpJobTemplate =
+        newHttpJobTemplateEntity("http_template", "An http job template", METALAKE_NAME);
+    jobTemplateMetaService.insertJobTemplate(httpJobTemplate, false);
+
     // Test select by identifier
     JobTemplateEntity fetchedShellJobTemplate =
         jobTemplateMetaService.getJobTemplateByIdentifier(
@@ -136,6 +152,11 @@ public class TestJobTemplateMetaService extends TestJDBCBackend {
         jobTemplateMetaService.getJobTemplateByIdentifier(
             NameIdentifierUtil.ofJobTemplate(METALAKE_NAME, "spark_template"));
     Assertions.assertEquals(sparkJobTemplate, fetchedSparkJobTemplate);
+
+    JobTemplateEntity fetchedHttpJobTemplate =
+        jobTemplateMetaService.getJobTemplateByIdentifier(
+            NameIdentifierUtil.ofJobTemplate(METALAKE_NAME, "http_template"));
+    Assertions.assertEquals(httpJobTemplate, fetchedHttpJobTemplate);
 
     // Test select non-existent template
     Assertions.assertThrows(
@@ -158,17 +179,32 @@ public class TestJobTemplateMetaService extends TestJDBCBackend {
             "job_template_to_delete", "A job template to delete", METALAKE_NAME);
     jobTemplateMetaService.insertJobTemplate(jobTemplateEntity, false);
 
+    JobTemplateEntity httpJobTemplateEntity =
+        newHttpJobTemplateEntity(
+            "http_job_template_to_delete", "An http job template to delete", METALAKE_NAME);
+    jobTemplateMetaService.insertJobTemplate(httpJobTemplateEntity, false);
+
     // Verify insertion
     JobTemplateEntity fetchedJobTemplate =
         jobTemplateMetaService.getJobTemplateByIdentifier(
             NameIdentifierUtil.ofJobTemplate(METALAKE_NAME, "job_template_to_delete"));
     Assertions.assertEquals(jobTemplateEntity, fetchedJobTemplate);
 
+    JobTemplateEntity fetchedHttpJobTemplate =
+        jobTemplateMetaService.getJobTemplateByIdentifier(
+            NameIdentifierUtil.ofJobTemplate(METALAKE_NAME, "http_job_template_to_delete"));
+    Assertions.assertEquals(httpJobTemplateEntity, fetchedHttpJobTemplate);
+
     // Delete the job template
     boolean deleted =
         jobTemplateMetaService.deleteJobTemplate(
             NameIdentifierUtil.ofJobTemplate(METALAKE_NAME, "job_template_to_delete"));
     Assertions.assertTrue(deleted);
+
+    boolean deletedHttp =
+        jobTemplateMetaService.deleteJobTemplate(
+            NameIdentifierUtil.ofJobTemplate(METALAKE_NAME, "http_job_template_to_delete"));
+    Assertions.assertTrue(deletedHttp);
 
     deleted =
         jobTemplateMetaService.deleteJobTemplate(
@@ -189,6 +225,11 @@ public class TestJobTemplateMetaService extends TestJDBCBackend {
             "job_template_with_jobs", "A job template with jobs", METALAKE_NAME);
     jobTemplateMetaService.insertJobTemplate(jobTemplateEntity, false);
 
+    JobTemplateEntity httpJobTemplateEntity =
+        newHttpJobTemplateEntity(
+            "http_job_template_with_jobs", "An http job template with jobs", METALAKE_NAME);
+    jobTemplateMetaService.insertJobTemplate(httpJobTemplateEntity, false);
+
     // Create a job using the template
     JobEntity jobEntity1 =
         newJobEntity("job_template_with_jobs", JobHandle.Status.STARTED, METALAKE_NAME);
@@ -198,10 +239,23 @@ public class TestJobTemplateMetaService extends TestJDBCBackend {
         newJobEntity("job_template_with_jobs", JobHandle.Status.SUCCEEDED, METALAKE_NAME);
     backend.insert(jobEntity2, false);
 
+    JobEntity httpJobEntity1 =
+        newJobEntity("http_job_template_with_jobs", JobHandle.Status.STARTED, METALAKE_NAME);
+    backend.insert(httpJobEntity1, false);
+
+    JobEntity httpJobEntity2 =
+        newJobEntity("http_job_template_with_jobs", JobHandle.Status.SUCCEEDED, METALAKE_NAME);
+    backend.insert(httpJobEntity2, false);
+
     boolean deleted =
         jobTemplateMetaService.deleteJobTemplate(
             NameIdentifierUtil.ofJobTemplate(METALAKE_NAME, "job_template_with_jobs"));
     Assertions.assertTrue(deleted);
+
+    boolean httpDeleted =
+        jobTemplateMetaService.deleteJobTemplate(
+            NameIdentifierUtil.ofJobTemplate(METALAKE_NAME, "http_job_template_with_jobs"));
+    Assertions.assertTrue(httpDeleted);
 
     // Verify that the jobs are deleted
     List<JobEntity> jobs =
@@ -221,6 +275,11 @@ public class TestJobTemplateMetaService extends TestJDBCBackend {
         newShellJobTemplateEntity("updatable_template", "An updatable job template", METALAKE_NAME);
     jobTemplateMetaService.insertJobTemplate(jobTemplateEntity, false);
 
+    JobTemplateEntity httpJobTemplateEntity =
+        newHttpJobTemplateEntity(
+            "updatable_http_template", "An updatable http job template", METALAKE_NAME);
+    jobTemplateMetaService.insertJobTemplate(httpJobTemplateEntity, false);
+
     // Update the job template's comment
     JobTemplateEntity updatedJobTemplateEntity =
         JobTemplateEntity.builder()
@@ -235,6 +294,20 @@ public class TestJobTemplateMetaService extends TestJDBCBackend {
     jobTemplateMetaService.updateJobTemplate(
         jobTemplateEntity.nameIdentifier(), e -> updatedJobTemplateEntity);
 
+    // Update the http job template's comment
+    JobTemplateEntity updatedHttpJobTemplateEntity =
+        JobTemplateEntity.builder()
+            .withId(httpJobTemplateEntity.id())
+            .withName("updated_http_template")
+            .withNamespace(httpJobTemplateEntity.namespace())
+            .withTemplateContent(httpJobTemplateEntity.templateContent())
+            .withComment("Updated comment for the http job template")
+            .withAuditInfo(httpJobTemplateEntity.auditInfo())
+            .build();
+
+    jobTemplateMetaService.updateJobTemplate(
+        httpJobTemplateEntity.nameIdentifier(), e -> updatedHttpJobTemplateEntity);
+
     // Verify the update
     JobTemplateEntity fetchedJobTemplate =
         jobTemplateMetaService.getJobTemplateByIdentifier(
@@ -242,12 +315,24 @@ public class TestJobTemplateMetaService extends TestJDBCBackend {
 
     Assertions.assertEquals(updatedJobTemplateEntity, fetchedJobTemplate);
 
+    JobTemplateEntity fetchedHttpJobTemplate =
+        jobTemplateMetaService.getJobTemplateByIdentifier(
+            NameIdentifierUtil.ofJobTemplate(METALAKE_NAME, "updated_http_template"));
+
+    Assertions.assertEquals(updatedHttpJobTemplateEntity, fetchedHttpJobTemplate);
+
     // Verify that the old name no longer exists
     Assertions.assertThrows(
         NoSuchEntityException.class,
         () ->
             jobTemplateMetaService.getJobTemplateByIdentifier(
                 NameIdentifierUtil.ofJobTemplate(METALAKE_NAME, "updatable_template")));
+
+    Assertions.assertThrows(
+        NoSuchEntityException.class,
+        () ->
+            jobTemplateMetaService.getJobTemplateByIdentifier(
+                NameIdentifierUtil.ofJobTemplate(METALAKE_NAME, "updatable_http_template")));
 
     // Test update an non-existent job template
     Assertions.assertThrows(
@@ -309,6 +394,27 @@ public class TestJobTemplateMetaService extends TestJDBCBackend {
         .withName(name)
         .withNamespace(NamespaceUtil.ofJobTemplate(metalake))
         .withTemplateContent(JobTemplateEntity.TemplateContent.fromJobTemplate(sparkJobTemplate))
+        .withAuditInfo(AUDIT_INFO)
+        .build();
+  }
+
+  static JobTemplateEntity newHttpJobTemplateEntity(String name, String comment, String metalake) {
+    HttpJobTemplate httpJobTemplate =
+        HttpJobTemplate.builder()
+            .withName(name)
+            .withComment(comment)
+            .withExecutable("GET")
+            .withUrl("http://example.com/api")
+            .withHeaders(ImmutableMap.of("Content-Type", "application/json"))
+            .withBody("{\"key\": \"value\"}")
+            .withQueryParams(Lists.newArrayList("param1=value1", "param2=value2"))
+            .build();
+
+    return JobTemplateEntity.builder()
+        .withId(RandomIdGenerator.INSTANCE.nextId())
+        .withName(name)
+        .withNamespace(NamespaceUtil.ofJobTemplate(metalake))
+        .withTemplateContent(JobTemplateEntity.TemplateContent.fromJobTemplate(httpJobTemplate))
         .withAuditInfo(AUDIT_INFO)
         .build();
   }
