@@ -27,7 +27,7 @@ usage() {
   cat << EOF
 Usage:
 
-./build-docker.sh --platform [all|linux/amd64|linux/arm64] --type [gravitino|hive|kerberos-hive|trino|doris|ranger|iceberg-rest-server|mcp-server] --image {image_name} --tag {tag_name} --latest
+./build-docker.sh --platform [all|linux/amd64|linux/arm64] --type [gravitino|hive|kerberos-hive|trino|doris|ranger|iceberg-rest-server|lance-rest-server|mcp-server] --image {image_name} --tag {tag_name} --latest
 
 Notice: You shouldn't use 'all' for the platform if you don't use the Github action to publish the Docker image.
 EOF
@@ -117,6 +117,8 @@ elif [ "${component_type}" == "iceberg-rest-server" ]; then
   . ${script_dir}/iceberg-rest-server/iceberg-rest-server-dependency.sh
 elif [ "${component_type}" == "mcp-server" ]; then
   . ${script_dir}/mcp-server/mcp-server-dependency.sh
+elif [ "${component_type}" == "lance-rest-server" ]; then
+  . ${script_dir}/lance-rest-server/lance-rest-server-dependency.sh
 else
   echo "ERROR : ${component_type} is not a valid component type"
   usage
