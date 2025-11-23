@@ -21,6 +21,7 @@ package org.apache.gravitino.server.authentication;
 
 import java.security.Principal;
 import org.apache.gravitino.Config;
+import javax.servlet.http.HttpServletRequest;
 
 /** The interface provides authentication mechanism. */
 public interface Authenticator {
@@ -43,6 +44,18 @@ public interface Authenticator {
   default Principal authenticateToken(byte[] tokenData) {
     throw new UnsupportedOperationException(
         "Authenticator doesn't support to authenticate the data from the token");
+  }
+
+  /**
+   * Use the token data and HTTP request to authenticate (overload for request-aware authentication).
+   *
+   * @param tokenData The data is used for authentication
+   * @param request The HTTP request context
+   * @return The identifier of user
+   */
+  default Principal authenticateToken(byte[] tokenData, HttpServletRequest request) {
+    throw new UnsupportedOperationException(
+            "Authenticator doesn't support to authenticate the data from the token");
   }
 
   /**
