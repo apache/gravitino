@@ -54,7 +54,7 @@ import org.apache.gravitino.dto.tag.MetadataObjectDTO;
 import org.apache.gravitino.dto.tag.TagDTO;
 import org.apache.gravitino.dto.util.DTOConverters;
 import org.apache.gravitino.metrics.MetricNames;
-import org.apache.gravitino.server.authorization.MetadataFilterHelper;
+import org.apache.gravitino.server.authorization.MetadataAuthzHelper;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationExpression;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationFullName;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationMetadata;
@@ -109,7 +109,7 @@ public class TagOperations {
                         .toArray(TagDTO[]::new);
               }
               tagDTOs =
-                  MetadataFilterHelper.filterByExpression(
+                  MetadataAuthzHelper.filterByExpression(
                       metalake,
                       AuthorizationExpressionConstants.loadTagAuthorizationExpression,
                       Entity.EntityType.TAG,
@@ -122,7 +122,7 @@ public class TagOperations {
               String[] tagNames = tagDispatcher.listTags(metalake);
               tagNames = tagNames == null ? new String[0] : tagNames;
               tagNames =
-                  MetadataFilterHelper.filterByExpression(
+                  MetadataAuthzHelper.filterByExpression(
                       metalake,
                       AuthorizationExpressionConstants.loadTagAuthorizationExpression,
                       Entity.EntityType.TAG,
