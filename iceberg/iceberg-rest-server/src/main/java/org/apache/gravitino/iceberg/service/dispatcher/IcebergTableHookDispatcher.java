@@ -116,6 +116,8 @@ public class IcebergTableHookDispatcher implements IcebergTableOperationDispatch
 
   @Override
   public void renameTable(IcebergRequestContext context, RenameTableRequest renameTableRequest) {
+    AuthorizationUtils.checkCurrentUser(metalake, context.userName());
+
     dispatcher.renameTable(context, renameTableRequest);
     NameIdentifier tableSource =
         IcebergIdentifierUtils.toGravitinoTableIdentifier(

@@ -22,6 +22,7 @@ package org.apache.gravitino.server.web.filter;
 import java.lang.reflect.Parameter;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Optional;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.Entity.EntityType;
 import org.apache.gravitino.NameIdentifier;
@@ -29,12 +30,10 @@ import org.apache.gravitino.iceberg.service.IcebergRESTUtils;
 import org.apache.gravitino.iceberg.service.authorization.IcebergRESTServerContext;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationMetadata;
 import org.apache.gravitino.server.authorization.annotations.IcebergAuthorizationMetadata;
+import org.apache.gravitino.server.authorization.annotations.IcebergAuthorizationMetadata.RequestType;
 import org.apache.gravitino.utils.NameIdentifierUtil;
-import org.apache.iceberg.MetadataTableType;
 import org.apache.iceberg.catalog.Namespace;
-import org.apache.iceberg.exceptions.NoSuchTableException;
 import org.apache.iceberg.rest.RESTUtil;
-import org.apache.iceberg.rest.requests.RenameTableRequest;
 
 /**
  * Through dynamic proxy, obtain the annotations on the method and parameter list to perform
@@ -42,6 +41,7 @@ import org.apache.iceberg.rest.requests.RenameTableRequest;
  */
 public class IcebergMetadataAuthorizationMethodInterceptor
     extends BaseMetadataAuthorizationMethodInterceptor {
+
   private final String metalakeName = IcebergRESTServerContext.getInstance().metalakeName();
 
   @Override
@@ -57,34 +57,6 @@ public class IcebergMetadataAuthorizationMethodInterceptor
       Parameter parameter = parameters[i];
       AuthorizationMetadata authorizeResource =
           parameter.getAnnotation(AuthorizationMetadata.class);
-      IcebergAuthorizationMetadata icebergAuthorizeResource =
-          parameter.getAnnotation(IcebergAuthorizationMetadata.class);
-      if (icebergAuthorizeResource != null) {
-        switch (icebergAuthorizeResource.type()) {
-          case RENAME_TABLE:
-            RenameTableRequest renameTableRequest = (RenameTableRequest) args[i];
-            schema = renameTableRequest.source().namespace().level(0);
-            nameIdentifierMap.put(
-                Entity.EntityType.SCHEMA,
-                NameIdentifierUtil.ofSchema(metalakeName, catalog, schema));
-            nameIdentifierMap.put(
-                Entity.EntityType.TABLE,
-                NameIdentifierUtil.ofTable(
-                    metalakeName, catalog, schema, renameTableRequest.source().name()));
-            break;
-          case LOAD_TABLE:
-            String tableName = String.valueOf(args[i]);
-            if (isMetadataTable(tableName, rawNamespace)) {
-              throw new NoSuchTableException("Table %s not found", tableName);
-            }
-            nameIdentifierMap.put(
-                Entity.EntityType.TABLE,
-                NameIdentifierUtil.ofTable(metalakeName, catalog, schema, tableName));
-            break;
-          default:
-            break;
-        }
-      }
       if (authorizeResource == null) {
         continue;
       }
@@ -113,21 +85,34 @@ public class IcebergMetadataAuthorizationMethodInterceptor
     return nameIdentifierMap;
   }
 
+  /**
+   * Creates an authorization handler for Iceberg-specific operations that require custom logic
+   * beyond standard annotation-based authorization.
+   */
+  @Override
+  protected Optional<AuthorizationHandler> createAuthorizationHandler(
+      Parameter[] parameters, Object[] args) {
+    for (Parameter parameter : parameters) {
+      IcebergAuthorizationMetadata icebergMetadata =
+          parameter.getAnnotation(IcebergAuthorizationMetadata.class);
+      if (icebergMetadata != null) {
+        // Create handler with parameters and args for processing
+        RequestType type = icebergMetadata.type();
+        switch (type) {
+          case LOAD_TABLE:
+            return Optional.of(new LoadTableAuthzHandler(parameters, args));
+          case RENAME_TABLE:
+            return Optional.of(new RenameTableAuthzHandler(parameters, args));
+          default:
+            break;
+        }
+      }
+    }
+    return Optional.empty();
+  }
+
   @Override
   protected boolean isExceptionPropagate(Exception e) {
     return e.getClass().getName().startsWith("org.apache.iceberg.exceptions");
-  }
-
-  // Check if the table is a metadata table, for metadata table, the namespace is `catalog.db.table`
-  private boolean isMetadataTable(String tableName, Namespace namespace) {
-    MetadataTableType metadataTableType = MetadataTableType.from(tableName);
-    if (metadataTableType == null) {
-      return false;
-    }
-
-    if (namespace.levels().length > 1) {
-      return true;
-    }
-    return false;
   }
 }
