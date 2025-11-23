@@ -1,0 +1,9 @@
+Delete a model; you can specify the --force option to bypass the confirmation prompt
+
+Example commands
+
+# Delete a model
+gcli model delete -m my_metalake --name hadoop.schema.model
+
+# Force delete a model
+gcli model delete -m my_metalake --name hadoop.schema.model --force

@@ -19,12 +19,31 @@
 package org.apache.gravitino.cli.outputs;
 
 import com.google.common.base.Joiner;
+import picocli.CommandLine;
 
 /**
  * Defines formatting behavior for command-line interface output. Implementations of this interface
  * handle the conversion of entities to their string representation in specific output formats.
  */
 public interface OutputFormat<T> {
+
+  /** Converter for converting an output type from string to enum */
+  class CaseInsensitiveOutputFormatConverter
+      implements CommandLine.ITypeConverter<OutputFormat.OutputType> {
+    @Override
+    public OutputFormat.OutputType convert(String value) throws Exception {
+      return OutputFormat.OutputType.valueOf(value.toUpperCase());
+    }
+  }
+
+  /** Defines the output type for the command-line interface */
+  enum OutputType {
+    /** Output in plain text format */
+    PLAIN,
+    /** Output in Tabular format */
+    TABLE;
+  }
+
   /** Joiner for creating comma-separated output strings, ignoring null values */
   Joiner COMMA_JOINER = Joiner.on(",").skipNulls();
   /** Joiner for creating line-separated output strings, ignoring null values */

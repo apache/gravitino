@@ -1,0 +1,15 @@
+Get details of a Metalake, or show its audit information.
+
+Note:
+The Metalake for the CLI can be set using one of the following methods:
+1. Passed in on the command line via the --metalake parameter.
+2. Set via the GRAVITINO_METALAKE environment variable.
+3. Stored in the Gravitino CLI configuration file.
+
+Example commands
+
+# Show details of a metalake
+gcli metalake details -m demo_metalake
+
+# Show metalake's audit information
+gcli metalake details -m demo_metalake --audit
