@@ -161,7 +161,7 @@ public class SecurableObjects {
   }
 
   /**
-   * Create the job {@link SecurableObject} with the given job name and privileges.
+   * Create the job template {@link SecurableObject} with the given job template name and privileges.
    *
    * @param jobTemplate The job template name
    * @param privileges The privileges of the job template
