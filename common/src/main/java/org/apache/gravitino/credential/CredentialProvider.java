@@ -20,15 +20,20 @@
 package org.apache.gravitino.credential;
 
 import java.io.Closeable;
+import java.lang.reflect.Constructor;
 import java.util.Map;
 import javax.annotation.Nullable;
 
 /**
  * Interface for credential providers.
  *
- * <p>A credential provider is responsible for managing and retrieving credentials.
+ * <p>A credential provider is responsible for managing and retrieving credentials. To avoid
+ * classloading issues with {@link java.util.ServiceLoader}, implementations should be lightweight.
+ * Any heavy dependencies should be isolated in a {@link CredentialGenerator} class, which is loaded
+ * via reflection.
  */
 public interface CredentialProvider extends Closeable {
+
   /**
    * Initializes the credential provider with catalog properties.
    *
@@ -53,4 +58,37 @@ public interface CredentialProvider extends Closeable {
    */
   @Nullable
   Credential getCredential(CredentialContext context);
+
+  /**
+   * Returns the fully qualified class name of the {@link CredentialGenerator} implementation. This
+   * generator will be loaded via reflection to perform the actual credential creation.
+   *
+   * @return The class name of the credential generator.
+   * @throws UnsupportedOperationException if the provider does not use a generator.
+   */
+  default String getGeneratorClassName() {
+    throw new UnsupportedOperationException(
+        "This CredentialProvider does not use a CredentialGenerator.");
+  }
+
+  /**
+   * Lazily loads and returns an instance of the {@link CredentialGenerator}. This default
+   * implementation uses reflection and a no-argument constructor.
+   *
+   * @param <T> The type of the credential.
+   * @return An instance of the credential generator.
+   * @throws RuntimeException if the generator cannot be instantiated.
+   */
+  @SuppressWarnings("unchecked")
+  default <T extends Credential> CredentialGenerator<T> loadGenerator() {
+    try {
+      Class<?> generatorClass = Class.forName(getGeneratorClassName());
+      Constructor<?> constructor = generatorClass.getDeclaredConstructor();
+      constructor.setAccessible(true); // Allow instantiation of non-public classes/constructors
+      return (CredentialGenerator<T>) constructor.newInstance();
+    } catch (Exception e) {
+      throw new RuntimeException(
+          "Failed to load or instantiate CredentialGenerator: " + getGeneratorClassName(), e);
+    }
+  }
 }

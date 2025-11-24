@@ -41,7 +41,7 @@ public class TestGCSTokenProvider {
 
     checkResults.forEach(
         (key, value) -> {
-          List<String> parentResources = GCSTokenProvider.getAllResources(key);
+          List<String> parentResources = GCSTokenCredentialGenerator.getAllResources(key);
           Assertions.assertArrayEquals(value.toArray(), parentResources.toArray());
         });
   }
@@ -59,7 +59,7 @@ public class TestGCSTokenProvider {
 
     checkResults.forEach(
         (k, v) -> {
-          String normalizedPath = GCSTokenProvider.normalizeUriPath(k);
+          String normalizedPath = GCSTokenCredentialGenerator.normalizeUriPath(k);
           Assertions.assertEquals(v, normalizedPath);
         });
   }
