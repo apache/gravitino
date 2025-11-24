@@ -44,9 +44,6 @@ public class EntityIds {
   }
 
   public long[] fullIds() {
-    long[] allIds = new long[namespaceIds.length + 1];
-    System.arraycopy(namespaceIds, 0, allIds, 0, namespaceIds.length);
-    allIds[allIds.length - 1] = entityId;
-    return allIds;
+return ArrayUtils.add(namespaceIds, entityId);
   }
 }
