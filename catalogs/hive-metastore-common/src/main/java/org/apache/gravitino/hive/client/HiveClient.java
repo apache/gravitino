@@ -57,8 +57,7 @@ public interface HiveClient {
   List<String> listPartitionNames(
       String catalogName, String dbName, String tableName, short pageSize);
 
-  List<Partition> listPartitions(
-      String catalogName, String dbName, Table table, short pageSize);
+  List<Partition> listPartitions(String catalogName, String dbName, Table table, short pageSize);
 
   List<Partition> listPartitions(
       String catalogName,
@@ -67,9 +66,9 @@ public interface HiveClient {
       List<String> filterPartitionValueList,
       short pageSize);
 
-  Partition getPartition(String catalogName, String dbName, String tableName, String partitionName);
+  Partition getPartition(String catalogName, String dbName, Table table, String partitionName);
 
-  Partition addPartition(String catalogName, String dbName, String tableName, Partition partition);
+  Partition addPartition(String catalogName, String dbName, Table table, Partition partition);
 
   void dropPartition(
       String catalogName, String dbName, String tableName, String partitionName, boolean b);

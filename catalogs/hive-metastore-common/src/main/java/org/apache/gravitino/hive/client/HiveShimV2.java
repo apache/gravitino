@@ -36,7 +36,7 @@ class HiveShimV2 extends Shim {
     super(client, HIVE2);
   }
 
-  HiveShimV2(IMetaStoreClient client,  HiveClient.HiveVersion version) {
+  HiveShimV2(IMetaStoreClient client, HiveClient.HiveVersion version) {
     super(client, HIVE2);
   }
 
@@ -75,7 +75,7 @@ class HiveShimV2 extends Shim {
   @Override
   public void dropDatabase(String catalogName, String dbName, boolean cascade) {
     try {
-       client.dropDatabase(dbName, cascade, false);
+      client.dropDatabase(dbName, cascade, false);
     } catch (Exception e) {
       throw new RuntimeException("Failed to drop database", e);
     }
@@ -124,11 +124,11 @@ class HiveShimV2 extends Shim {
   @Override
   public void dropTable(
       String catalogName, String dbName, String tableName, boolean deleteData, boolean ifPurge) {
-     try {
-       client.dropTable(dbName, tableName, deleteData, ifPurge);
-     } catch (Exception e) {
-       throw new RuntimeException("Failed to drop table", e);
-     }
+    try {
+      client.dropTable(dbName, tableName, deleteData, ifPurge);
+    } catch (Exception e) {
+      throw new RuntimeException("Failed to drop table", e);
+    }
   }
 
   @Override
@@ -156,9 +156,7 @@ class HiveShimV2 extends Shim {
       String catalogName, String dbName, Table table, short pageSize) {
     try {
       var partitions = client.listPartitions(dbName, table.name(), pageSize);
-      return partitions.stream()
-          .map( p -> HiveTableConverter.fromHivePartition(table, p))
-          .toList();
+      return partitions.stream().map(p -> HiveTableConverter.fromHivePartition(table, p)).toList();
     } catch (Exception e) {
       throw new RuntimeException("Failed to list partitions", e);
     }
@@ -172,10 +170,9 @@ class HiveShimV2 extends Shim {
       List<String> filterPartitionValueList,
       short pageSize) {
     try {
-      var partitions = client.listPartitions(dbName, table.name(), filterPartitionValueList, pageSize);
-      return partitions.stream()
-          .map( p -> HiveTableConverter.fromHivePartition(table, p))
-          .toList();
+      var partitions =
+          client.listPartitions(dbName, table.name(), filterPartitionValueList, pageSize);
+      return partitions.stream().map(p -> HiveTableConverter.fromHivePartition(table, p)).toList();
     } catch (Exception e) {
       throw new RuntimeException("Failed to list partitions", e);
     }
@@ -186,30 +183,53 @@ class HiveShimV2 extends Shim {
       String catalogName, String dbName, Table table, String partitionName) {
     try {
       var partitionValues = HiveTableConverter.parsePartitionValues(partitionName);
-      var partition = client.getPartition(dbName, tableName, partitionValues);
-      var table = getTable(catalogName, dbName, tableName);
+      var partition = client.getPartition(dbName, table.name(), partitionValues);
       return HiveTableConverter.fromHivePartition(table, partition);
     } catch (Exception e) {
       throw new RuntimeException("Failed to get partition", e);
+    }
   }
 
   @Override
   public Partition addPartition(
-      String catalogName, String dbName, String tableName, Partition partition) {
-    return null;
+      String catalogName, String dbName, Table table, Partition partition) {
+    try {
+      var hivePartition = HiveTableConverter.toHivePartition(dbName, table, partition);
+      var addedPartition = client.add_partition(hivePartition);
+      return HiveTableConverter.fromHivePartition(table, addedPartition);
+    } catch (Exception e) {
+      throw new RuntimeException("Failed to add partition", e);
+    }
   }
 
   @Override
   public void dropPartition(
-      String catalogName, String dbName, String tableName, String partitionName, boolean b) {}
+      String catalogName, String dbName, String tableName, String partitionName, boolean b) {
+    try {
+      var partitionValues = HiveTableConverter.parsePartitionValues(partitionName);
+      client.dropPartition(dbName, tableName, partitionValues, b);
+    } catch (Exception e) {
+
+      throw new RuntimeException("Failed to drop partition", e);
+    }
+  }
 
   @Override
   public String getDelegationToken(String finalPrincipalName, String userName) {
-    return "";
+    try {
+      return client.getDelegationToken(finalPrincipalName, userName);
+    } catch (Exception e) {
+      throw new RuntimeException("Failed to get delegation token", e);
+    }
   }
 
   @Override
   public List<Table> getTableObjectsByName(String name, List<String> allTables) {
-    return List.of();
+    try {
+      var tables = client.getTableObjectsByName(name, allTables);
+      return tables.stream().map(HiveTableConverter::fromHiveTable).toList();
+    } catch (Exception e) {
+      throw new RuntimeException("Failed to get table objects by name", e);
+    }
   }
 }

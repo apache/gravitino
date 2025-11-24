@@ -88,10 +88,10 @@ public abstract class Shim {
       short pageSize);
 
   public abstract Partition getPartition(
-      String catalogName, String dbName, String tableName, String partitionName);
+      String catalogName, String dbName, Table table, String partitionName);
 
   public abstract Partition addPartition(
-      String catalogName, String dbName, String tableName, Partition partition);
+      String catalogName, String dbName, Table table, Partition partition);
 
   public abstract void dropPartition(
       String catalogName, String dbName, String tableName, String partitionName, boolean b);

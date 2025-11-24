@@ -18,6 +18,8 @@
  */
 package org.apache.gravitino.catalog.hive;
 
+import static org.apache.gravitino.catalog.hive.HiveConstants.LOCATION;
+
 import com.google.common.collect.Maps;
 import java.util.Map;
 import java.util.Optional;
@@ -64,8 +66,7 @@ public class HiveSchema extends BaseSchema {
     Database hiveDb = new Database();
 
     hiveDb.setName(name());
-    Optional.ofNullable(properties().get(HiveSchemaPropertiesMetadata.LOCATION))
-        .ifPresent(hiveDb::setLocationUri);
+    Optional.ofNullable(properties().get(LOCATION)).ifPresent(hiveDb::setLocationUri);
     Optional.ofNullable(comment()).ifPresent(hiveDb::setDescription);
 
     // TODO: Add more privilege info to Hive's Database object after Gravitino supports privilege.
@@ -73,7 +74,7 @@ public class HiveSchema extends BaseSchema {
     hiveDb.setOwnerType(PrincipalType.USER);
 
     Map<String, String> parameters = Maps.newHashMap(properties());
-    parameters.remove(HiveSchemaPropertiesMetadata.LOCATION);
+    parameters.remove(LOCATION);
     hiveDb.setParameters(parameters);
 
     return hiveDb;

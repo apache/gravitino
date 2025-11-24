@@ -328,7 +328,7 @@ public class HiveTableConverter {
   }
 
   public static Partition fromHivePartition(
-    Table table, org.apache.hadoop.hive.metastore.api.Partition partition) {
+      Table table, org.apache.hadoop.hive.metastore.api.Partition partition) {
     List<String> partCols =
         buildPartitionKeys(table).stream().map(FieldSchema::getName).collect(Collectors.toList());
     String partitionName = FileUtils.makePartName(partCols, partition.getValues());
@@ -345,5 +345,35 @@ public class HiveTableConverter {
     return Arrays.stream(fields)
         .map(field -> new String[] {field.split(PARTITION_VALUE_DELIMITER)[0]})
         .toArray(String[][]::new);
+  }
+
+  public static java.util.List<String> parsePartitionValues(String partitionName) {
+    if (partitionName == null || partitionName.isEmpty()) {
+      return java.util.List.of();
+    }
+    return Arrays.stream(partitionName.split(PARTITION_NAME_DELIMITER))
+        .map(
+            field -> {
+              String[] kv = field.split(PARTITION_VALUE_DELIMITER, 2);
+              return kv.length > 1 ? kv[1] : "";
+            })
+        .collect(Collectors.toList());
+  }
+
+  public static org.apache.hadoop.hive.metastore.api.Partition toHivePartition(
+      String dbName, Table table, Partition partition) {
+    org.apache.hadoop.hive.metastore.api.Partition hivePartition =
+        new org.apache.hadoop.hive.metastore.api.Partition();
+    hivePartition.setDbName(dbName);
+    hivePartition.setTableName(table.name());
+
+    // todo: support custom serde and location if necessary
+    StorageDescriptor sd = buildStorageDescriptor(table, buildPartitionKeys(table));
+    hivePartition.setSd(sd);
+    hivePartition.setParameters(partition.properties());
+
+    List<String> values = parsePartitionValues(partition.name());
+    hivePartition.setValues(values);
+    return hivePartition;
   }
 }

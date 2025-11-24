@@ -87,7 +87,7 @@ public class HiveTableOperations implements TableOperations, SupportsPartitions 
     try {
       return table
           .clientPool()
-          .run(c -> c.getPartition("", table.schemaName(), table.name(), partitionName));
+          .run(c -> c.getPartition("", table.schemaName(), table, partitionName));
 
     } catch (InterruptedException e) {
       throw new RuntimeException(
@@ -151,7 +151,7 @@ public class HiveTableOperations implements TableOperations, SupportsPartitions 
                     f[0]));
 
     try {
-      return table.clientPool().run(c -> c.addPartition("", "", "", identityPartition));
+      return table.clientPool().run(c -> c.addPartition("", "", table, identityPartition));
     } catch (InterruptedException e) {
       throw new RuntimeException(e);
     }

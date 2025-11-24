@@ -18,6 +18,8 @@
  */
 package org.apache.gravitino.catalog.hive;
 
+import static org.apache.gravitino.catalog.hive.HiveConstants.COMMENT;
+
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 import java.util.Arrays;
@@ -166,7 +168,7 @@ public class HiveTable extends BaseTable {
 
       // HMS put table comment in parameters
       if (comment != null) {
-        hiveTable.properties.put(HiveTablePropertiesMetadata.COMMENT, comment);
+        hiveTable.properties.put(COMMENT, comment);
       }
 
       return hiveTable;

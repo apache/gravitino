@@ -127,14 +127,14 @@ public class HiveClientImpl implements HiveClient {
 
   @Override
   public Partition getPartition(
-      String catalogName, String dbName, String tableName, String partitionName) {
-    return shim.getPartition(catalogName, dbName, tableName, partitionName);
+      String catalogName, String dbName, Table table, String partitionName) {
+    return shim.getPartition(catalogName, dbName, table, partitionName);
   }
 
   @Override
   public Partition addPartition(
-      String catalogName, String dbName, String tableName, Partition partition) {
-    return shim.addPartition(catalogName, dbName, tableName, partition);
+      String catalogName, String dbName, Table table, Partition partition) {
+    return shim.addPartition(catalogName, dbName, table, partition);
   }
 
   @Override

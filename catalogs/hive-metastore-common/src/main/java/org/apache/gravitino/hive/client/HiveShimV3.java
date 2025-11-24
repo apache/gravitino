@@ -29,7 +29,7 @@ import org.apache.gravitino.rel.partitions.Partition;
 import org.apache.hadoop.hive.metastore.IMetaStoreClient;
 import org.apache.hadoop.hive.metastore.api.Database;
 
-class HiveShimV3 extends HiveShimV2{
+class HiveShimV3 extends HiveShimV2 {
 
   Method createDatabaseMethod;
   Method getDabaseMethod;
@@ -130,13 +130,21 @@ class HiveShimV3 extends HiveShimV2{
 
   @Override
   public Partition getPartition(
-      String catalogName, String dbName, String tableName, String partitionName) {
-    return null;
+      String catalogName, String dbName, Table table, String partitionName) {
+    try {
+      Table tableObj = table;
+      if (tableObj == null) {
+        tableObj = getTable(catalogName, dbName, tableObj.name());
+      }
+      return super.getPartition(catalogName, dbName, tableObj, partitionName);
+    } catch (Exception e) {
+      throw new RuntimeException("Failed to get partition using HiveShimV3", e);
+    }
   }
 
   @Override
   public Partition addPartition(
-      String catalogName, String dbName, String tableName, Partition partition) {
+      String catalogName, String dbName, Table table, Partition partition) {
     return null;
   }
 
