@@ -249,6 +249,7 @@ public class Privileges {
         return ApplyPolicy.deny();
       case CREATE_POLICY:
         return CreatePolicy.deny();
+
         // Job template
       case CREATE_JOB_TEMPLATE:
         return CreateJobTemplate.deny();
