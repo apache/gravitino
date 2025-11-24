@@ -46,10 +46,11 @@ public class TestHiveClient {
 
   @Test
   void testHive2Client() throws Exception {
-    String catalogName = "";
-    String version = "HIVE2";
+    String catalogName = "sample_catalog";
+    String version = "HIVE3";
     Properties properties = new Properties();
-    properties.setProperty("hive.metastore.uris", "thrift://localhost:9083");
+    // properties.setProperty("hive.metastore.uris", "thrift://localhost:9083");
+    properties.setProperty("hive.metastore.uris", "thrift://172.17.0.3:9083");
     IsolatedClientLoader loader = IsolatedClientLoader.forVersion(version, Map.of());
     HiveClient client = loader.createClient(properties);
 
@@ -123,7 +124,8 @@ public class TestHiveClient {
 
       try {
         String token =
-            client.getDelegationToken(System.getProperty("user.name"), System.getProperty("user.name"));
+            client.getDelegationToken(
+                System.getProperty("user.name"), System.getProperty("user.name"));
         System.out.println("Delegation token: " + token);
       } catch (Exception e) {
         System.out.println("Delegation token not available: " + e.getMessage());
@@ -141,6 +143,7 @@ public class TestHiveClient {
     }
   }
 
+  /*
   void testHive3Client() throws Exception {
     String catalogName = "";
     String version = "HIVE3";
@@ -153,6 +156,7 @@ public class TestHiveClient {
     Schema db = client.getDatabase(catalogName, "default");
     System.out.println("Database s1: " + db.name());
   }
+    */
 
   private Schema createTestSchema(String dbName, Path location) throws Exception {
     Files.createDirectories(location);
@@ -227,12 +231,15 @@ public class TestHiveClient {
       if (root == null || !Files.exists(root)) {
         return;
       }
-      Files.walk(root).sorted(Comparator.reverseOrder()).forEach(path -> {
-        try {
-          Files.deleteIfExists(path);
-        } catch (Exception ignored) {
-        }
-      });
+      Files.walk(root)
+          .sorted(Comparator.reverseOrder())
+          .forEach(
+              path -> {
+                try {
+                  Files.deleteIfExists(path);
+                } catch (Exception ignored) {
+                }
+              });
     } catch (Exception ignored) {
       // ignore cleanup failures
     }

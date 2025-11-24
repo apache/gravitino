@@ -42,6 +42,7 @@ import java.util.stream.Stream;
 import org.apache.gravitino.catalog.hive.StorageFormat;
 import org.apache.gravitino.dto.rel.ColumnDTO;
 import org.apache.gravitino.dto.rel.TableDTO;
+import org.apache.gravitino.dto.rel.partitioning.Partitioning;
 import org.apache.gravitino.dto.util.DTOConverters;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.rel.Column;
@@ -140,8 +141,29 @@ public class HiveTableConverter {
 
   public static List<FieldSchema> buildPartitionKeys(Table table) {
     return Arrays.stream(table.partitioning())
-        .map(p -> getPartitionKey(((Transforms.IdentityTransform) p).fieldName(), table))
+        .map(HiveTableConverter::getPartitionFieldNames)
+        .map(fieldName -> getPartitionKey(fieldName, table))
         .collect(Collectors.toList());
+  }
+
+  private static String[] getPartitionFieldNames(Transform partitioning) {
+    if (partitioning instanceof Transforms.IdentityTransform) {
+      return ((Transforms.IdentityTransform) partitioning).fieldName();
+    }
+
+    if (partitioning instanceof Partitioning partitioningDTO) {
+      if (partitioningDTO instanceof Partitioning.SingleFieldPartitioning singleFieldPartitioning) {
+        return singleFieldPartitioning.fieldName();
+      }
+    }
+
+    if (partitioning.arguments().length > 0
+        && partitioning.arguments()[0] instanceof NamedReference.FieldReference fieldReference) {
+      return fieldReference.fieldName();
+    }
+
+    throw new IllegalArgumentException(
+        String.format("Unsupported partition transform type: %s", partitioning.getClass()));
   }
 
   private static FieldSchema getPartitionKey(String[] fieldName, Table table) {
@@ -199,7 +221,7 @@ public class HiveTableConverter {
       }
     }
 
-    if (!Distributions.NONE.equals(table.distribution())) {
+    if (table.distribution() != null && !Distributions.NONE.equals(table.distribution())) {
       strgDesc.setBucketCols(
           Arrays.stream(table.distribution().expressions())
               .map(t -> ((NamedReference.FieldReference) t).fieldName()[0])

@@ -24,8 +24,6 @@ import java.util.List;
 import org.apache.gravitino.Schema;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.hive.converter.HiveDatabaseConverter;
-import org.apache.gravitino.rel.Table;
-import org.apache.gravitino.rel.partitions.Partition;
 import org.apache.hadoop.hive.metastore.IMetaStoreClient;
 import org.apache.hadoop.hive.metastore.api.Database;
 
@@ -33,12 +31,14 @@ class HiveShimV3 extends HiveShimV2 {
 
   Method createDatabaseMethod;
   Method getDabaseMethod;
+  Method getAllDatabasesMethod;
 
   HiveShimV3(IMetaStoreClient client) {
     super(client, HIVE3);
     try {
       createDatabaseMethod = IMetaStoreClient.class.getMethod("createDatabase", Database.class);
       getDabaseMethod = IMetaStoreClient.class.getMethod("getDatabase", String.class, String.class);
+      getAllDatabasesMethod = IMetaStoreClient.class.getMethod("getAllDatabases", String.class);
     } catch (NoSuchMethodException e) {
       throw new RuntimeException("Failed to initialize HiveShimV2", e);
     } catch (Exception e) {
@@ -60,6 +60,15 @@ class HiveShimV3 extends HiveShimV2 {
   }
 
   @Override
+  public List<String> getAllDatabases(String catalogName) {
+    try {
+      return (List<String>) getAllDatabasesMethod.invoke(client, catalogName);
+    } catch (Exception e) {
+      throw new RuntimeException("Failed to get all databases", e);
+    }
+  }
+
+  @Override
   public Schema getDatabase(String catalogName, String dbName) {
     try {
       Database db = (Database) getDabaseMethod.invoke(client, catalogName, dbName);
@@ -71,94 +80,5 @@ class HiveShimV3 extends HiveShimV2 {
     } catch (Exception e) {
       throw new RuntimeException("Failed to get database using HiveShimV3", e);
     }
-  }
-
-  @Override
-  public void alterDatabase(String catalogName, String dbName, Schema database) {}
-
-  @Override
-  public void dropDatabase(String catalogName, String dbName, boolean cascade) {}
-
-  @Override
-  public List<String> getAllTables(String catalogName, String dbName) {
-    return List.of();
-  }
-
-  @Override
-  public List<String> getAllDatabTables(
-      String catalogName, String dbName, String filter, short maxTables) {
-    return List.of();
-  }
-
-  @Override
-  public Table getTable(String catalogName, String dbName, String tableName) {
-    return null;
-  }
-
-  @Override
-  public void alterTable(
-      String catalogName, String dbName, String tableName, Table alteredHiveTable) {}
-
-  @Override
-  public void dropTable(
-      String catalogName, String dbName, String tableName, boolean deleteData, boolean ifPurge) {}
-
-  @Override
-  public void createTable(String catalogName, String dbName, Table hiveTable) {}
-
-  @Override
-  public List<String> listPartitionNames(
-      String catalogName, String dbName, String tableName, short pageSize) {
-    return List.of();
-  }
-
-  @Override
-  public List<Partition> listPartitions(
-      String catalogName, String dbName, Table table, short pageSize) {
-    return List.of();
-  }
-
-  @Override
-  public List<Partition> listPartitions(
-      String catalogName,
-      String dbName,
-      Table tabel,
-      List<String> filterPartitionValueList,
-      short pageSize) {
-    return List.of();
-  }
-
-  @Override
-  public Partition getPartition(
-      String catalogName, String dbName, Table table, String partitionName) {
-    try {
-      Table tableObj = table;
-      if (tableObj == null) {
-        tableObj = getTable(catalogName, dbName, tableObj.name());
-      }
-      return super.getPartition(catalogName, dbName, tableObj, partitionName);
-    } catch (Exception e) {
-      throw new RuntimeException("Failed to get partition using HiveShimV3", e);
-    }
-  }
-
-  @Override
-  public Partition addPartition(
-      String catalogName, String dbName, Table table, Partition partition) {
-    return null;
-  }
-
-  @Override
-  public void dropPartition(
-      String catalogName, String dbName, String tableName, String partitionName, boolean b) {}
-
-  @Override
-  public String getDelegationToken(String finalPrincipalName, String userName) {
-    return "";
-  }
-
-  @Override
-  public List<Table> getTableObjectsByName(String name, List<String> allTables) {
-    return List.of();
   }
 }

@@ -47,7 +47,7 @@ public class HiveClientImpl implements HiveClient {
 
   @Override
   public List<String> getAllDatabases(String catalogName) {
-    return shim.getAllDatabase();
+    return shim.getAllDatabases(catalogName);
   }
 
   @Override

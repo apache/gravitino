@@ -23,7 +23,7 @@ import java.lang.reflect.Modifier;
 
 public class Util {
 
-  protected static Method findMethod(Class<?> klass, String name, Class<?>... args)
+  public static Method findMethod(Class<?> klass, String name, Class<?>... args)
       throws NoSuchMethodException {
     return klass.getMethod(name, args);
   }

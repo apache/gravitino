@@ -153,6 +153,7 @@ public final class IsolatedClientLoader {
         || name.startsWith(Shim.class.getName())
         || name.startsWith(HiveShimV2.class.getName())
         || name.startsWith(HiveShimV3.class.getName())
+        || name.startsWith(Util.class.getName())
         || name.startsWith("org.apache.gravitino.hive.converter.");
   }
 

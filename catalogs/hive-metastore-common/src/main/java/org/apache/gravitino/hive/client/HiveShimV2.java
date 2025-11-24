@@ -37,7 +37,7 @@ class HiveShimV2 extends Shim {
   }
 
   HiveShimV2(IMetaStoreClient client, HiveClient.HiveVersion version) {
-    super(client, HIVE2);
+    super(client, version);
   }
 
   public void createDatabase(String catalogName, Schema database) {

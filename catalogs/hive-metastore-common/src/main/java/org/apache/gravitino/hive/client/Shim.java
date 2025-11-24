@@ -41,7 +41,7 @@ public abstract class Shim {
     this.version = version;
   }
 
-  public List<String> getAllDatabase() {
+  public List<String> getAllDatabases(String catalogName) {
     try {
       return client.getAllDatabases();
     } catch (TException e) {
