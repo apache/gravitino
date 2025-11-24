@@ -116,6 +116,9 @@ public class GenericCatalogOperations implements CatalogOperations, SupportsSche
                           return Suppliers.memoize(
                               () -> delegator.createTableOps(store, schemaOps, idGenerator));
                         })));
+    if (tableOpsCache.isEmpty()) {
+      throw new IllegalArgumentException("No table delegators found, this is unexpected.");
+    }
   }
 
   @Override
@@ -241,7 +244,9 @@ public class GenericCatalogOperations implements CatalogOperations, SupportsSche
     newProperties.put(Table.PROPERTY_TABLE_FORMAT, format);
 
     // Get the table operations for the specified table format.
-    ManagedTableOperations tableOps = tableOpsCache.get(format).get();
+    Supplier<ManagedTableOperations> tableOpsSupplier = tableOpsCache.get(format);
+    Preconditions.checkArgument(tableOpsSupplier != null, "Unsupported table format: %s", format);
+    ManagedTableOperations tableOps = tableOpsSupplier.get();
 
     Table createdTable =
         tableOps.createTable(
