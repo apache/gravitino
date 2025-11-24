@@ -27,6 +27,6 @@ WORKDIR /root/gravitino-lance-rest-server
 
 COPY packages/gravitino-lance-rest-server /root/gravitino-lance-rest-server
 
-EXPOSE 9001
+EXPOSE 9101
 
 ENTRYPOINT ["/bin/bash", "/root/gravitino-lance-rest-server/bin/start-lance-rest-server.sh"]
