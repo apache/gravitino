@@ -38,7 +38,7 @@ import org.apache.gravitino.tag.SupportsTags;
 public interface Schema extends Auditable {
 
   /**
-   * The property name for the location of the Schema. This property indicates the physical storage
+   * The property name for the location of the schema. This property indicates the physical storage
    * location of the schema, such as a directory path in a file system or a URI.
    *
    * <p>This property is optional, and it can be specified during schema creation.
