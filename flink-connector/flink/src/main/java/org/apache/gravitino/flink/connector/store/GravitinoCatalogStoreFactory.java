@@ -61,7 +61,7 @@ public class GravitinoCatalogStoreFactory implements CatalogStoreFactory {
     String gravitinoName = options.get(GRAVITINO_METALAKE);
     Preconditions.checkArgument(
         gravitinoUri != null && gravitinoName != null,
-        "Either %s or %s must be set.",
+        "Both %s and %s must be set",
         GRAVITINO_METALAKE.key(),
         GRAVITINO_URI.key());
 
