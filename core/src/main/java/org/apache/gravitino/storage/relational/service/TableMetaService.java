@@ -242,52 +242,53 @@ public class TableMetaService {
   public boolean deleteTable(NameIdentifier identifier) {
     NameIdentifierUtil.checkTable(identifier);
 
-    Long tableId = EntityIdService.getEntityId(identifier, Entity.EntityType.TABLE);
+    EntityIds entityIds = EntityIdService.getEntityIds(identifier, Entity.EntityType.TABLE);
 
     AtomicInteger deleteResult = new AtomicInteger(0);
     TablePO[] tablePOHolder = new TablePO[1];
     SessionUtils.doMultipleWithCommit(
         () -> {
-          tablePOHolder[0] = getTablePOBySchemaIdAndName(schemaId, tableName);
+          tablePOHolder[0] =
+              getTablePOBySchemaIdAndName(entityIds.namespaceIds()[2], identifier.name());
         },
         () ->
             deleteResult.set(
                 SessionUtils.getWithoutCommit(
                     TableMetaMapper.class,
-                    mapper -> mapper.softDeleteTableMetasByTableId(tableId))),
+                    mapper -> mapper.softDeleteTableMetasByTableId(entityIds.entityId()))),
         () -> {
           if (deleteResult.get() > 0) {
             SessionUtils.doWithoutCommit(
                 OwnerMetaMapper.class,
                 mapper ->
                     mapper.softDeleteOwnerRelByMetadataObjectIdAndType(
-                        tableId, MetadataObject.Type.TABLE.name()));
-            TableColumnMetaService.getInstance().deleteColumnsByTableId(tableId);
+                        entityIds.entityId(), MetadataObject.Type.TABLE.name()));
+            TableColumnMetaService.getInstance().deleteColumnsByTableId(entityIds.entityId());
             SessionUtils.doWithoutCommit(
                 SecurableObjectMapper.class,
                 mapper ->
                     mapper.softDeleteObjectRelsByMetadataObject(
-                        tableId, MetadataObject.Type.TABLE.name()));
+                        entityIds.entityId(), MetadataObject.Type.TABLE.name()));
             SessionUtils.doWithoutCommit(
                 TagMetadataObjectRelMapper.class,
                 mapper ->
                     mapper.softDeleteTagMetadataObjectRelsByMetadataObject(
-                        tableId, MetadataObject.Type.TABLE.name()));
+                        entityIds.entityId(), MetadataObject.Type.TABLE.name()));
             SessionUtils.doWithoutCommit(
                 TagMetadataObjectRelMapper.class,
-                mapper -> mapper.softDeleteTagMetadataObjectRelsByTableId(tableId));
+                mapper -> mapper.softDeleteTagMetadataObjectRelsByTableId(entityIds.entityId()));
 
             SessionUtils.doWithoutCommit(
                 StatisticMetaMapper.class,
-                mapper -> mapper.softDeleteStatisticsByEntityId(tableId));
+                mapper -> mapper.softDeleteStatisticsByEntityId(entityIds.entityId()));
             SessionUtils.doWithoutCommit(
                 PolicyMetadataObjectRelMapper.class,
-                mapper -> mapper.softDeletePolicyMetadataObjectRelsByTableId(tableId));
+                mapper -> mapper.softDeletePolicyMetadataObjectRelsByTableId(entityIds.entityId()));
             SessionUtils.doWithCommit(
                 TableVersionMapper.class,
                 mapper ->
                     mapper.softDeleteTableVersionByTableIdAndVersion(
-                        tableId, tablePOHolder[0].getCurrentVersion()));
+                        entityIds.entityId(), tablePOHolder[0].getCurrentVersion()));
           }
         });
 
