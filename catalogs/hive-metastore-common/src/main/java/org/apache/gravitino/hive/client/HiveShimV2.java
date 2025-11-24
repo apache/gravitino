@@ -171,13 +171,26 @@ class HiveShimV2 extends Shim {
       Table table,
       List<String> filterPartitionValueList,
       short pageSize) {
-    return List.of();
+    try {
+      var partitions = client.listPartitions(dbName, table.name(), filterPartitionValueList, pageSize);
+      return partitions.stream()
+          .map( p -> HiveTableConverter.fromHivePartition(table, p))
+          .toList();
+    } catch (Exception e) {
+      throw new RuntimeException("Failed to list partitions", e);
+    }
   }
 
   @Override
   public Partition getPartition(
-      String catalogName, String dbName, String tableName, String partitionName) {
-    return null;
+      String catalogName, String dbName, Table table, String partitionName) {
+    try {
+      var partitionValues = HiveTableConverter.parsePartitionValues(partitionName);
+      var partition = client.getPartition(dbName, tableName, partitionValues);
+      var table = getTable(catalogName, dbName, tableName);
+      return HiveTableConverter.fromHivePartition(table, partition);
+    } catch (Exception e) {
+      throw new RuntimeException("Failed to get partition", e);
   }
 
   @Override
