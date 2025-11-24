@@ -41,18 +41,21 @@ import org.apache.gravitino.meta.UserEntity;
  * efficiently store and retrieve relationships between entities based on their keys.
  */
 public class ReverseIndexCache {
-  private RadixTree<List<EntityCacheKey>> reverseIndex;
+  private final RadixTree<List<EntityCacheKey>> reverseIndex;
   /** Registers a reverse index processor for a specific entity class. */
-  private final Map<Class<? extends Entity>, ReverseIndexRule> reverseIndexRules = new HashMap<>();
+  private final Map<Class<? extends Entity>, List<ReverseIndexRule>> reverseIndexRules =
+      new HashMap<>();
 
   public ReverseIndexCache() {
     this.reverseIndex = new ConcurrentRadixTree<>(new DefaultCharArrayNodeFactory());
 
-    registerReverseRule(UserEntity.class, ReverseIndexRules.USER_REVERSE_RULE);
-    registerReverseRule(GroupEntity.class, ReverseIndexRules.GROUP_REVERSE_RULE);
-    registerReverseRule(RoleEntity.class, ReverseIndexRules.ROLE_REVERSE_RULE);
-    registerReverseRule(PolicyEntity.class, ReverseIndexRules.POLICY_REVERSE_RULE);
-    registerReverseRule(TagEntity.class, ReverseIndexRules.TAG_REVERSE_RULE);
+    registerReverseRule(UserEntity.class, ReverseIndexRules.USER_ROLE_REVERSE_RULE);
+    registerReverseRule(UserEntity.class, ReverseIndexRules.USER_OWNERSHIP_REVERSE_RULE);
+    registerReverseRule(GroupEntity.class, ReverseIndexRules.GROUP_ROLE_REVERSE_RULE);
+    registerReverseRule(GroupEntity.class, ReverseIndexRules.GROUP_OWNERSHIP_REVERSE_RULE);
+    registerReverseRule(RoleEntity.class, ReverseIndexRules.ROLE_SECURABLE_OBJECT_REVERSE_RULE);
+    registerReverseRule(PolicyEntity.class, ReverseIndexRules.POLICY_SECURABLE_OBJECT_REVERSE_RULE);
+    registerReverseRule(TagEntity.class, ReverseIndexRules.TAG_SECURABLE_OBJECT_REVERSE_RULE);
     registerReverseRule(
         GenericEntity.class, ReverseIndexRules.GENERIC_METADATA_OBJECT_REVERSE_RULE);
   }
@@ -110,14 +113,24 @@ public class ReverseIndexCache {
   }
 
   public void registerReverseRule(Class<? extends Entity> entityClass, ReverseIndexRule rule) {
-    reverseIndexRules.put(entityClass, rule);
+    reverseIndexRules.compute(
+        entityClass,
+        (k, v) -> {
+          if (v == null) {
+            v = Lists.newArrayList();
+          }
+          v.add(rule);
+          return v;
+        });
   }
 
   /** Processes an entity and updates the reverse index accordingly. */
   public void indexEntity(Entity entity, EntityCacheRelationKey key) {
-    ReverseIndexRule rule = reverseIndexRules.get(entity.getClass());
-    if (rule != null) {
-      rule.indexEntity(entity, key, this);
+    List<ReverseIndexRule> rule = reverseIndexRules.get(entity.getClass());
+    if (rule != null && !rule.isEmpty()) {
+      for (ReverseIndexRule r : rule) {
+        r.indexEntity(entity, key, this);
+      }
     }
   }
 
