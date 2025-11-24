@@ -41,16 +41,16 @@ import org.apache.gravitino.storage.relational.service.UserMetaService;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 
 public class RelationalEntityStoreIdResolver implements EntityIdResolver {
-  private static final Set<Entity.EntityType> needMetalakeId =
+  private static final Set<Entity.EntityType> ENTITY_TYPES_REQUIRING_METALAKE_ID =
       ImmutableSet.of(
           Entity.EntityType.METALAKE,
           Entity.EntityType.ROLE,
           Entity.EntityType.USER,
           Entity.EntityType.GROUP,
           Entity.EntityType.TAG);
-  private static final Set<Entity.EntityType> needCatalogIds =
+  private static final Set<Entity.EntityType> ENTITY_TYPES_REQURING_CATALOG_IDS =
       ImmutableSet.of(Entity.EntityType.CATALOG);
-  private static final Set<Entity.EntityType> needSchemaIds =
+  private static final Set<Entity.EntityType> ENTITY_TYPES_REQURING_SCHEMA_IDS =
       ImmutableSet.of(
           Entity.EntityType.SCHEMA,
           Entity.EntityType.TABLE,
@@ -61,10 +61,10 @@ public class RelationalEntityStoreIdResolver implements EntityIdResolver {
 
   @Override
   public EntityIds getEntityIds(NameIdentifier nameIdentifier, Entity.EntityType type) {
-    if (needMetalakeId.contains(type)) {
+    if (ENTITY_TYPES_REQUIRING_METALAKE_ID.contains(type)) {
       return getEntityIdsAboutMetalake(nameIdentifier, type);
 
-    } else if (needCatalogIds.contains(type)) {
+    } else if (ENTITY_TYPES_REQURING_CATALOG_IDS.contains(type)) {
       CatalogIds catalogIds =
           CatalogMetaService.getInstance()
               .getCatalogIdByMetalakeAndCatalogName(
@@ -72,7 +72,7 @@ public class RelationalEntityStoreIdResolver implements EntityIdResolver {
                   NameIdentifierUtil.getCatalogIdentifier(nameIdentifier).name());
       return new EntityIds(catalogIds.getCatalogId(), catalogIds.getMetalakeId());
 
-    } else if (needSchemaIds.contains(type)) {
+    } else if (ENTITY_TYPES_REQURING_SCHEMA_IDS.contains(type)) {
       return getEntityIdsAboutSchema(nameIdentifier, type);
 
     } else {
@@ -82,17 +82,17 @@ public class RelationalEntityStoreIdResolver implements EntityIdResolver {
 
   @Override
   public Long getEntityId(NameIdentifier nameIdentifier, Entity.EntityType type) {
-    if (needMetalakeId.contains(type)) {
+    if (ENTITY_TYPES_REQUIRING_METALAKE_ID.contains(type)) {
       return getEntityIdsAboutMetalake(nameIdentifier, type).entityId();
 
-    } else if (needCatalogIds.contains(type)) {
+    } else if (ENTITY_TYPES_REQURING_CATALOG_IDS.contains(type)) {
       return CatalogMetaService.getInstance()
           .getCatalogIdByMetalakeAndCatalogName(
               NameIdentifierUtil.getMetalake(nameIdentifier),
               NameIdentifierUtil.getCatalogIdentifier(nameIdentifier).name())
           .getCatalogId();
 
-    } else if (needSchemaIds.contains(type)) {
+    } else if (ENTITY_TYPES_REQURING_SCHEMA_IDS.contains(type)) {
       return getEntityIdsAboutSchema(nameIdentifier, type).entityId();
 
     } else {

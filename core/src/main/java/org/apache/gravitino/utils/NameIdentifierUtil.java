@@ -52,6 +52,9 @@ public class NameIdentifierUtil {
 
   private NameIdentifierUtil() {}
 
+  private static final Set<Entity.EntityType> SUPPORT_VIRTUAL_NAMESPACE_TYPES =
+          ImmutableSet.of(USER, GROUP, ROLE, TAG, POLICY, JOB, JOB_TEMPLATE);
+
   /**
    * Create the metalake {@link NameIdentifierUtil} with the given name.
    *
@@ -613,10 +616,9 @@ public class NameIdentifierUtil {
 
   public static NameIdentifier parentNameIdentifier(
       NameIdentifier nameIdentifier, Entity.EntityType type) {
-    Set<Entity.EntityType> supportsVirtualNamespaceTypes =
-        ImmutableSet.of(USER, GROUP, ROLE, TAG, POLICY, JOB, JOB_TEMPLATE);
 
-    if (supportsVirtualNamespaceTypes.contains(type)) {
+
+    if (SUPPORT_VIRTUAL_NAMESPACE_TYPES.contains(type)) {
       return NameIdentifier.of(NameIdentifierUtil.getMetalake(nameIdentifier));
 
     } else if (nameIdentifier.hasNamespace()) {

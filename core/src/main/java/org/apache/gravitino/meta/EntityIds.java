@@ -44,6 +44,6 @@ public class EntityIds {
   }
 
   public long[] fullIds() {
-return ArrayUtils.add(namespaceIds, entityId);
+    return ArrayUtils.add(namespaceIds, entityId);
   }
 }
