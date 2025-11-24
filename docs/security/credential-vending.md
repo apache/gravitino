@@ -171,8 +171,8 @@ For Fileset catalog, please use Gravitino cloud bundle jar with Hadoop and cloud
 For Iceberg REST catalog server, please download the corresponding Iceberg cloud packages.
 
 - [Iceberg AWS bundle JAR](https://mvnrepository.com/artifact/org.apache.iceberg/iceberg-aws-bundle)
-- [Iceberg GCP bundle JAR](https://mvnrepository.com/artifact/com.github.apache.incubator-iceberg/iceberg-gcp-bundle)
-- [Iceberg Azure bundle JAR](https://mvnrepository.com/artifact/com.github.apache.incubator-iceberg/iceberg-azure-bundle)
+- [Iceberg GCP bundle JAR](https://mvnrepository.com/artifact/org.apache.iceberg/iceberg-gcp-bundle)
+- [Iceberg Azure bundle JAR](https://mvnrepository.com/artifact/org.apache.iceberg/iceberg-azure-bundle)
 
 :::note
 For OSS, Iceberg doesn't provide Iceberg Aliyun bundle jar which contains OSS packages, you could provide the OSS jar by yourself or use [Gravitino Aliyun bundle jar with Hadoop and cloud packages](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-aliyun-bundle), please refer to [OSS configuration](../iceberg-rest-service.md#oss-configuration) for more details.
