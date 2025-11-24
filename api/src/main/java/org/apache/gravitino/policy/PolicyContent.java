@@ -38,6 +38,16 @@ public interface PolicyContent {
   Map<String, String> properties();
 
   /**
+   * A convenience method to get all rules in the policy content.
+   *
+   * @return A map of rule names to their corresponding rule objects.
+   */
+  default Map<String, Object> rules() {
+    // backward compatibility
+    throw new UnsupportedOperationException("Does support get all rules.");
+  }
+
+  /**
    * Validates the policy content.
    *
    * @throws IllegalArgumentException if the content is invalid.

@@ -61,7 +61,7 @@ import org.apache.gravitino.file.Fileset;
 import org.apache.gravitino.file.FilesetChange;
 import org.apache.gravitino.metrics.MetricNames;
 import org.apache.gravitino.rest.RESTUtils;
-import org.apache.gravitino.server.authorization.MetadataFilterHelper;
+import org.apache.gravitino.server.authorization.MetadataAuthzHelper;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationExpression;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationMetadata;
 import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants;
@@ -106,7 +106,7 @@ public class FilesetOperations {
             Namespace filesetNS = NamespaceUtil.ofFileset(metalake, catalog, schema);
             NameIdentifier[] idents = dispatcher.listFilesets(filesetNS);
             idents =
-                MetadataFilterHelper.filterByExpression(
+                MetadataAuthzHelper.filterByExpression(
                     metalake,
                     AuthorizationExpressionConstants.filterFilesetAuthorizationExpression,
                     Entity.EntityType.FILESET,

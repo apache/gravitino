@@ -63,7 +63,7 @@ find ${gravitino_home}/bundles/aws/build/libs/ -name 'gravitino-aws-*.jar' ! -na
 find ${gravitino_home}/bundles/azure/build/libs/ -name 'gravitino-azure-*.jar' ! -name '*-empty.jar' -exec cp -v {} bundles/ \;
 find ${gravitino_home}/bundles/aliyun/build/libs/ -name 'gravitino-aliyun-*.jar' ! -name '*-empty.jar' -exec cp -v {} bundles/ \;
 
-iceberg_version="1.9.2"
+iceberg_version="1.10.0"
 
 iceberg_gcp_bundle="iceberg-gcp-bundle-${iceberg_version}.jar"
 if [ ! -f "bundles/${iceberg_gcp_bundle}" ]; then

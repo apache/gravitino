@@ -18,6 +18,9 @@
  */
 package org.apache.gravitino.rel.indexes;
 
+import com.google.common.base.Objects;
+import java.util.Arrays;
+
 /** Helper methods to create index to pass into Apache Gravitino. */
 public class Indexes {
 
@@ -76,7 +79,9 @@ public class Indexes {
   /** The user side implementation of the index. */
   public static final class IndexImpl implements Index {
     private final IndexType indexType;
+
     private final String name;
+
     private final String[][] fieldNames;
 
     /**
@@ -114,6 +119,25 @@ public class Indexes {
     @Override
     public String[][] fieldNames() {
       return fieldNames;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+      if (this == o) {
+        return true;
+      }
+      if (o == null || getClass() != o.getClass()) {
+        return false;
+      }
+      IndexImpl index = (IndexImpl) o;
+      return indexType == index.indexType
+          && Objects.equal(name, index.name)
+          && Arrays.deepEquals(fieldNames, index.fieldNames);
+    }
+
+    @Override
+    public int hashCode() {
+      return Objects.hashCode(indexType, name, Arrays.hashCode(fieldNames));
     }
 
     /**

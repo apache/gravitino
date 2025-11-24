@@ -74,7 +74,7 @@ public class IcebergCatalogWrapperManager implements AutoCloseable {
    * @return the instance of IcebergCatalogWrapper.
    */
   public CatalogWrapperForREST getOps(String rawPrefix) {
-    String catalogName = IcebergRestUtils.getCatalogName(rawPrefix);
+    String catalogName = IcebergRESTUtils.getCatalogName(rawPrefix);
     return getCatalogWrapper(catalogName);
   }
 

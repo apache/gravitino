@@ -40,6 +40,13 @@ public class AuthorizationExpressionConstants {
                   ANY_USE_CATALOG && ANY_USE_SCHEMA  && (TABLE::OWNER || ANY_SELECT_TABLE || ANY_MODIFY_TABLE)
                   """;
 
+  public static final String alterTableAuthorizationExpression =
+      """
+                  ANY(OWNER, METALAKE, CATALOG) ||
+                  SCHEMA_OWNER_WITH_USE_CATALOG ||
+                  ANY_USE_CATALOG && ANY_USE_SCHEMA && (TABLE::OWNER || ANY_MODIFY_TABLE)
+                  """;
+
   public static final String loadTopicsAuthorizationExpression =
       """
           ANY(OWNER, METALAKE, CATALOG) ||
@@ -67,6 +74,12 @@ public class AuthorizationExpressionConstants {
                   ANY_MODIFY_TABLE
                   """;
 
+  public static final String filterModifyTableAuthorizationExpression =
+      """
+                  ANY(OWNER, METALAKE, CATALOG, SCHEMA, TABLE) ||
+                  ANY_MODIFY_TABLE
+                  """;
+
   public static final String filterTopicsAuthorizationExpression =
       """
               ANY(OWNER, METALAKE, CATALOG, SCHEMA, TOPIC) ||
@@ -81,5 +94,23 @@ public class AuthorizationExpressionConstants {
               ANY_WRITE_FILESET
                   """;
 
-  public static final String getOwnerExpression = "CAN_GET_OWNER";
+  public static final String loadRoleAuthorizationExpression =
+      """
+          METALAKE::OWNER || METALAKE::MANAGE_GRANTS
+          || ROLE::OWNER || ROLE::SELF
+          """;
+
+  public static final String CAN_ACCESS_METADATA = "CAN_ACCESS_METADATA";
+
+  public static final String CAN_ACCESS_METADATA_AND_TAG =
+      """
+          METALAKE::OWNER ||
+          ((CAN_ACCESS_METADATA) && (TAG::OWNER || ANY_APPLY_TAG))
+          """;
+
+  public static final String loadTagAuthorizationExpression =
+      "METALAKE::OWNER || TAG::OWNER || ANY_APPLY_TAG";
+
+  public static final String applyTagAuthorizationExpression =
+      "METALAKE::OWNER || TAG::OWNER || ANY_APPLY_TAG";
 }

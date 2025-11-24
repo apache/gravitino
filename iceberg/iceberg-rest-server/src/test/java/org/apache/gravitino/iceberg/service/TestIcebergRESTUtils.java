@@ -21,6 +21,8 @@ package org.apache.gravitino.iceberg.service;
 
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
+import org.apache.gravitino.iceberg.service.authorization.IcebergRESTServerContext;
+import org.apache.gravitino.iceberg.service.provider.IcebergConfigProvider;
 import org.apache.iceberg.Schema;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.rest.requests.CreateTableRequest;
@@ -28,10 +30,23 @@ import org.apache.iceberg.types.Types.IntegerType;
 import org.apache.iceberg.types.Types.NestedField;
 import org.apache.iceberg.types.Types.StringType;
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInstance;
+import org.mockito.Mockito;
 
 @SuppressWarnings("deprecation")
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
 public class TestIcebergRESTUtils {
+
+  @BeforeAll
+  public void init() {
+    IcebergConfigProvider icebergConfigProvider = Mockito.mock(IcebergConfigProvider.class);
+    Mockito.when(icebergConfigProvider.getMetalakeName()).thenReturn("metalake");
+    Mockito.when(icebergConfigProvider.getDefaultCatalogName())
+        .thenReturn(IcebergConstants.ICEBERG_REST_DEFAULT_CATALOG);
+    IcebergRESTServerContext.create(icebergConfigProvider, false);
+  }
 
   @Test
   void testGetGravitinoNameIdentifier() {
@@ -39,7 +54,7 @@ public class TestIcebergRESTUtils {
     String catalogName = "catalog";
     TableIdentifier tableIdentifier = TableIdentifier.of("ns1", "ns2", "table");
     NameIdentifier nameIdentifier =
-        IcebergRestUtils.getGravitinoNameIdentifier(metalakeName, catalogName, tableIdentifier);
+        IcebergRESTUtils.getGravitinoNameIdentifier(metalakeName, catalogName, tableIdentifier);
     Assertions.assertEquals(
         NameIdentifier.of(metalakeName, catalogName, "ns1", "ns2", "table"), nameIdentifier);
   }
@@ -47,9 +62,9 @@ public class TestIcebergRESTUtils {
   @Test
   void testGetCatalogName() {
     String prefix = "catalog/";
-    Assertions.assertEquals("catalog", IcebergRestUtils.getCatalogName(prefix));
+    Assertions.assertEquals("catalog", IcebergRESTUtils.getCatalogName(prefix));
     Assertions.assertEquals(
-        IcebergConstants.ICEBERG_REST_DEFAULT_CATALOG, IcebergRestUtils.getCatalogName(""));
+        IcebergConstants.ICEBERG_REST_DEFAULT_CATALOG, IcebergRESTUtils.getCatalogName(""));
   }
 
   @Test
@@ -61,7 +76,7 @@ public class TestIcebergRESTUtils {
     CreateTableRequest createTableRequest =
         CreateTableRequest.builder().withName("table").withSchema(tableSchema).build();
     CreateTableRequest clonedIcebergRESTObject =
-        IcebergRestUtils.cloneIcebergRESTObject(createTableRequest, CreateTableRequest.class);
+        IcebergRESTUtils.cloneIcebergRESTObject(createTableRequest, CreateTableRequest.class);
     Assertions.assertEquals(createTableRequest.name(), clonedIcebergRESTObject.name());
     Assertions.assertEquals(
         createTableRequest.schema().columns().size(),

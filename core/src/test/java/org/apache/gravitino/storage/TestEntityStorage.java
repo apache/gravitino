@@ -34,7 +34,9 @@ import static org.apache.gravitino.Configs.STORE_DELETE_AFTER_TIME;
 import static org.apache.gravitino.Configs.VERSION_RETENTION_COUNT;
 import static org.apache.gravitino.file.Fileset.LOCATION_NAME_UNKNOWN;
 import static org.apache.gravitino.storage.relational.TestJDBCBackend.createRoleEntity;
+import static org.apache.gravitino.storage.relational.TestJDBCBackend.createUserEntity;
 
+import com.github.benmanes.caffeine.cache.Cache;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
@@ -64,11 +66,15 @@ import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.EntityStoreFactory;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.SupportsRelationOperations;
 import org.apache.gravitino.authorization.AuthorizationUtils;
+import org.apache.gravitino.authorization.Privilege.Condition;
 import org.apache.gravitino.authorization.Privileges;
 import org.apache.gravitino.authorization.Role;
 import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.authorization.SecurableObjects;
+import org.apache.gravitino.cache.CaffeineEntityCache;
+import org.apache.gravitino.cache.EntityCacheRelationKey;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NonEmptyEntityException;
 import org.apache.gravitino.file.Fileset;
@@ -79,6 +85,7 @@ import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.CatalogEntity;
 import org.apache.gravitino.meta.ColumnEntity;
 import org.apache.gravitino.meta.FilesetEntity;
+import org.apache.gravitino.meta.GenericEntity;
 import org.apache.gravitino.meta.GroupEntity;
 import org.apache.gravitino.meta.ModelEntity;
 import org.apache.gravitino.meta.ModelVersionEntity;
@@ -86,6 +93,7 @@ import org.apache.gravitino.meta.RoleEntity;
 import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.meta.SchemaVersion;
 import org.apache.gravitino.meta.TableEntity;
+import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.meta.TopicEntity;
 import org.apache.gravitino.meta.UserEntity;
 import org.apache.gravitino.model.ModelVersion;
@@ -100,6 +108,7 @@ import org.apache.gravitino.storage.relational.converters.MySQLExceptionConverte
 import org.apache.gravitino.storage.relational.converters.PostgreSQLExceptionConverter;
 import org.apache.gravitino.storage.relational.converters.SQLExceptionConverterFactory;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
+import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
 import org.apache.ibatis.session.SqlSession;
 import org.junit.jupiter.api.AfterEach;
@@ -2639,7 +2648,526 @@ public class TestEntityStorage {
       List<SecurableObject> securableObjects = newRow.securableObjects();
       Assertions.assertEquals(1, securableObjects.size());
       Assertions.assertEquals("newCatalogName", securableObjects.get(0).name());
+
+      // Now try to create a schema and a fileset under the updated catalog
+      SchemaEntity schema =
+          createSchemaEntity(
+              RandomIdGenerator.INSTANCE.nextId(),
+              Namespace.of("metalake", "newCatalogName"),
+              "schema",
+              auditInfo);
+
+      store.put(schema, false);
+      FilesetEntity fileset =
+          createFilesetEntity(
+              RandomIdGenerator.INSTANCE.nextId(),
+              Namespace.of("metalake", "newCatalogName", "schema"),
+              "fileset",
+              auditInfo);
+      store.put(fileset, false);
+
+      // Now try to create two roles: one can read_fileset, another can write_fileset
+      SecurableObject catalogObject =
+          SecurableObjects.ofCatalog("newCatalogName", Lists.newArrayList());
+      SecurableObject schemaObject =
+          SecurableObjects.ofSchema(catalogObject, "schema", Lists.newArrayList());
+      SecurableObject securableFileset01 =
+          SecurableObjects.ofFileset(
+              schemaObject, "fileset", Lists.newArrayList(Privileges.ReadFileset.allow()));
+      SecurableObject securableFileset02 =
+          SecurableObjects.ofFileset(
+              schemaObject, "fileset", Lists.newArrayList(Privileges.WriteFileset.allow()));
+
+      RoleEntity readRole =
+          RoleEntity.builder()
+              .withId(RandomIdGenerator.INSTANCE.nextId())
+              .withName("roleReadFileset")
+              .withNamespace(AuthorizationUtils.ofRoleNamespace("metalake"))
+              .withProperties(null)
+              .withAuditInfo(auditInfo)
+              .withSecurableObjects(Lists.newArrayList(securableFileset01))
+              .build();
+      store.put(readRole, false);
+
+      RoleEntity writeRole =
+          RoleEntity.builder()
+              .withId(RandomIdGenerator.INSTANCE.nextId())
+              .withName("roleWriteFileset")
+              .withNamespace(AuthorizationUtils.ofRoleNamespace("metalake"))
+              .withProperties(null)
+              .withAuditInfo(auditInfo)
+              .withSecurableObjects(Lists.newArrayList(securableFileset02))
+              .build();
+      store.put(writeRole, false);
+
+      // Load the two roles and verify their securable objects
+      Role loadedReadRole =
+          store.get(readRole.nameIdentifier(), Entity.EntityType.ROLE, RoleEntity.class);
+      Role loadedWriteRole =
+          store.get(writeRole.nameIdentifier(), Entity.EntityType.ROLE, RoleEntity.class);
+      Assertions.assertEquals(1, loadedReadRole.securableObjects().size());
+      Assertions.assertEquals(
+          "newCatalogName.schema.fileset", loadedReadRole.securableObjects().get(0).fullName());
+      Assertions.assertEquals(1, loadedWriteRole.securableObjects().size());
+      Assertions.assertEquals(
+          "newCatalogName.schema.fileset", loadedReadRole.securableObjects().get(0).fullName());
+      Assertions.assertEquals(
+          Condition.ALLOW,
+          loadedReadRole.securableObjects().get(0).privileges().get(0).condition());
+      Assertions.assertEquals(
+          Condition.ALLOW,
+          loadedWriteRole.securableObjects().get(0).privileges().get(0).condition());
+
+      // first try to rename the fileset to fileset_new
+      store.update(
+          fileset.nameIdentifier(),
+          FilesetEntity.class,
+          Entity.EntityType.FILESET,
+          e ->
+              createFilesetEntity(
+                  fileset.id(), fileset.namespace(), "fileset_new", fileset.auditInfo()));
+
+      // try to load the two roles again, the securable objects should reflect the updated fileset
+      // name
+      loadedReadRole =
+          store.get(readRole.nameIdentifier(), Entity.EntityType.ROLE, RoleEntity.class);
+      loadedWriteRole =
+          store.get(writeRole.nameIdentifier(), Entity.EntityType.ROLE, RoleEntity.class);
+
+      Assertions.assertEquals(1, loadedReadRole.securableObjects().size());
+      Assertions.assertEquals(
+          "newCatalogName.schema.fileset_new", loadedReadRole.securableObjects().get(0).fullName());
+      Assertions.assertEquals(1, loadedWriteRole.securableObjects().size());
+      Assertions.assertEquals(
+          "newCatalogName.schema.fileset_new", loadedReadRole.securableObjects().get(0).fullName());
+      Assertions.assertEquals(
+          Condition.ALLOW,
+          loadedReadRole.securableObjects().get(0).privileges().get(0).condition());
+      Assertions.assertEquals(
+          Condition.ALLOW,
+          loadedWriteRole.securableObjects().get(0).privileges().get(0).condition());
+
+      // Now try to rename schema to schema_new
+      store.update(
+          NameIdentifier.of("metalake", "newCatalogName", "schema"),
+          SchemaEntity.class,
+          Entity.EntityType.SCHEMA,
+          e ->
+              createSchemaEntity(
+                  schema.id(),
+                  Namespace.of("metalake", "newCatalogName"),
+                  "schema_new",
+                  schema.auditInfo()));
+      // try to load the two roles again, the securable objects should reflect the updated schema
+      loadedReadRole =
+          store.get(readRole.nameIdentifier(), Entity.EntityType.ROLE, RoleEntity.class);
+      loadedWriteRole =
+          store.get(writeRole.nameIdentifier(), Entity.EntityType.ROLE, RoleEntity.class);
+      Assertions.assertEquals(1, loadedReadRole.securableObjects().size());
+      Assertions.assertEquals(
+          "newCatalogName.schema_new.fileset_new",
+          loadedReadRole.securableObjects().get(0).fullName());
+      Assertions.assertEquals(1, loadedWriteRole.securableObjects().size());
+      Assertions.assertEquals(
+          "newCatalogName.schema_new.fileset_new",
+          loadedReadRole.securableObjects().get(0).fullName());
+
+      // now create a user1 and assign the readRole to the user
+      UserEntity user1 =
+          createUserEntity(
+              RandomIdGenerator.INSTANCE.nextId(),
+              AuthorizationUtils.ofUserNamespace("metalake"),
+              "user1",
+              auditInfo);
+      store.put(user1, false);
+
+      // Now try to drop the fileset
+      store.delete(
+          NameIdentifier.of("metalake", "newCatalogName", "schema_new", "fileset_new"),
+          Entity.EntityType.FILESET);
+      Assertions.assertFalse(store.exists(fileset.nameIdentifier(), Entity.EntityType.FILESET));
+
+      // Now try to load the two roles again, the securable objects should be empty
+      loadedReadRole =
+          store.get(readRole.nameIdentifier(), Entity.EntityType.ROLE, RoleEntity.class);
+      loadedWriteRole =
+          store.get(writeRole.nameIdentifier(), Entity.EntityType.ROLE, RoleEntity.class);
+
+      Assertions.assertEquals(0, loadedReadRole.securableObjects().size());
+      Assertions.assertEquals(0, loadedWriteRole.securableObjects().size());
+
       destroy(type);
+    }
+  }
+
+  @ParameterizedTest
+  @MethodSource("storageProvider")
+  void testTagRelationCache(String type) throws Exception {
+    Config config = Mockito.mock(Config.class);
+    init(type, config);
+
+    AuditInfo auditInfo =
+        AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
+
+    try (EntityStore store = EntityStoreFactory.createEntityStore(config)) {
+      store.initialize(config);
+
+      BaseMetalake metalake =
+          createBaseMakeLake(RandomIdGenerator.INSTANCE.nextId(), "metalake", auditInfo);
+      store.put(metalake, false);
+
+      Namespace namespace = NameIdentifierUtil.ofTag("metalake", "tag1").namespace();
+      TagEntity tag1 =
+          TagEntity.builder()
+              .withId(RandomIdGenerator.INSTANCE.nextId())
+              .withNamespace(namespace)
+              .withName("tag1")
+              .withAuditInfo(auditInfo)
+              .withProperties(Collections.emptyMap())
+              .build();
+      CatalogEntity catalog =
+          createCatalog(
+              RandomIdGenerator.INSTANCE.nextId(),
+              NamespaceUtil.ofCatalog("metalake"),
+              "catalog",
+              auditInfo);
+
+      store.put(catalog, false);
+      store.put(tag1, false);
+
+      SupportsRelationOperations relationOperations = (SupportsRelationOperations) store;
+
+      relationOperations.updateEntityRelations(
+          SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL,
+          catalog.nameIdentifier(),
+          EntityType.CATALOG,
+          new NameIdentifier[] {tag1.nameIdentifier()},
+          new NameIdentifier[] {});
+
+      // Now try to load the relation
+      List<TagEntity> tags =
+          relationOperations.listEntitiesByRelation(
+              SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL,
+              catalog.nameIdentifier(),
+              EntityType.CATALOG,
+              true);
+      Assertions.assertEquals(1, tags.size());
+      Assertions.assertEquals(tag1, tags.get(0));
+
+      // Check whether tags exists in entity store cache
+      RelationalEntityStore relationalEntityStore = (RelationalEntityStore) store;
+      CaffeineEntityCache caffeineEntityCache =
+          (CaffeineEntityCache) relationalEntityStore.getCache();
+      Cache<EntityCacheRelationKey, List<Entity>> cache = caffeineEntityCache.getCacheData();
+
+      List<Entity> cachedTags =
+          cache.get(
+              EntityCacheRelationKey.of(
+                  catalog.nameIdentifier(),
+                  EntityType.CATALOG,
+                  SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL),
+              k -> null);
+
+      // Check cached tags is correct
+      Assertions.assertNotNull(cachedTags);
+      Assertions.assertEquals(1, cachedTags.size());
+      Assertions.assertEquals(tag1, cachedTags.get(0));
+
+      List<GenericEntity> genericEntities =
+          relationOperations.listEntitiesByRelation(
+              SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL,
+              tag1.nameIdentifier(),
+              EntityType.TAG,
+              true);
+      Assertions.assertEquals(1, genericEntities.size());
+      Assertions.assertEquals(catalog.id(), genericEntities.get(0).id());
+      Assertions.assertEquals(catalog.name(), genericEntities.get(0).name());
+
+      // Now we are going to alter the catalog
+      CatalogEntity updatedCatalog =
+          CatalogEntity.builder()
+              .withId(catalog.id())
+              .withNamespace(catalog.namespace())
+              .withName("newCatalogName")
+              .withAuditInfo(auditInfo)
+              .withComment(catalog.getComment())
+              .withProperties(catalog.getProperties())
+              .withType(catalog.getType())
+              .withProvider(catalog.getProvider())
+              .build();
+      store.update(
+          catalog.nameIdentifier(),
+          CatalogEntity.class,
+          Entity.EntityType.CATALOG,
+          e -> updatedCatalog);
+      // Now try to load the relation again from cache, it should be empty.
+      List<Entity> cachedTagsAfterCatalogUpdate =
+          cache.get(
+              EntityCacheRelationKey.of(
+                  catalog.nameIdentifier(),
+                  EntityType.CATALOG,
+                  SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL),
+              k -> null);
+      Assertions.assertNull(cachedTagsAfterCatalogUpdate);
+
+      List<Entity> cachedTagsByTagAfterCatalogUpdate =
+          cache.get(
+              EntityCacheRelationKey.of(
+                  tag1.nameIdentifier(),
+                  EntityType.TAG,
+                  SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL),
+              k -> null);
+      Assertions.assertNull(cachedTagsByTagAfterCatalogUpdate);
+
+      // Load tags again, it should repopulate the cache
+      List<TagEntity> tagsAfterCatalogUpdate =
+          relationOperations.listEntitiesByRelation(
+              SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL,
+              updatedCatalog.nameIdentifier(),
+              EntityType.CATALOG,
+              true);
+      Assertions.assertEquals(1, tagsAfterCatalogUpdate.size());
+      Assertions.assertEquals(tag1, tagsAfterCatalogUpdate.get(0));
+
+      List<Entity> cachedTagsAfterReload =
+          cache.get(
+              EntityCacheRelationKey.of(
+                  updatedCatalog.nameIdentifier(),
+                  EntityType.CATALOG,
+                  SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL),
+              k -> null);
+      Assertions.assertNotNull(cachedTagsAfterReload);
+      Assertions.assertEquals(1, cachedTagsAfterReload.size());
+      Assertions.assertEquals(tag1, cachedTagsAfterReload.get(0));
+
+      List<GenericEntity> genericEntitiesAfterCatalogUpdate =
+          relationOperations.listEntitiesByRelation(
+              SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL,
+              tag1.nameIdentifier(),
+              EntityType.TAG,
+              true);
+      Assertions.assertEquals(1, genericEntitiesAfterCatalogUpdate.size());
+      Assertions.assertEquals(catalog.id(), genericEntitiesAfterCatalogUpdate.get(0).id());
+      Assertions.assertEquals(
+          updatedCatalog.name(), genericEntitiesAfterCatalogUpdate.get(0).name());
+
+      List<Entity> cachedTagsByTagAfterReload =
+          cache.get(
+              EntityCacheRelationKey.of(
+                  tag1.nameIdentifier(),
+                  EntityType.TAG,
+                  SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL),
+              k -> null);
+      Assertions.assertNotNull(cachedTagsByTagAfterReload);
+      Assertions.assertEquals(1, cachedTagsByTagAfterReload.size());
+      Assertions.assertEquals(
+          updatedCatalog.id(), ((GenericEntity) cachedTagsByTagAfterReload.get(0)).id());
+      Assertions.assertEquals(
+          updatedCatalog.name(), ((GenericEntity) cachedTagsByTagAfterReload.get(0)).name());
+
+      // Now try to alter the tag: rename tag1 -> tagChanged.
+      TagEntity updatedTag1 =
+          TagEntity.builder()
+              .withId(tag1.id())
+              .withNamespace(tag1.namespace())
+              .withName("tagChanged")
+              .withAuditInfo(auditInfo)
+              .withProperties(tag1.properties())
+              .build();
+      store.update(tag1.nameIdentifier(), TagEntity.class, Entity.EntityType.TAG, e -> updatedTag1);
+
+      // Now try to load the relation again from cache, it should be empty.
+      List<Entity> cachedTagsAfterTagUpdate =
+          cache.get(
+              EntityCacheRelationKey.of(
+                  updatedCatalog.nameIdentifier(),
+                  EntityType.CATALOG,
+                  SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL),
+              k -> null);
+      Assertions.assertNull(cachedTagsAfterTagUpdate);
+
+      List<Entity> cachedEntitiesAfterTagUpdate =
+          cache.get(
+              EntityCacheRelationKey.of(
+                  tag1.nameIdentifier(),
+                  EntityType.TAG,
+                  SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL),
+              k -> null);
+      Assertions.assertNull(cachedEntitiesAfterTagUpdate);
+
+      List<TagEntity> tagsAfterTagUpdate =
+          relationOperations.listEntitiesByRelation(
+              SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL,
+              updatedCatalog.nameIdentifier(),
+              EntityType.CATALOG,
+              true);
+      Assertions.assertEquals(1, tagsAfterTagUpdate.size());
+      Assertions.assertEquals(updatedTag1, tagsAfterTagUpdate.get(0));
+
+      List<Entity> cachedTagsAfterTagReload =
+          cache.get(
+              EntityCacheRelationKey.of(
+                  updatedCatalog.nameIdentifier(),
+                  EntityType.CATALOG,
+                  SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL),
+              k -> null);
+      Assertions.assertNotNull(cachedTagsAfterTagReload);
+      Assertions.assertEquals(1, cachedTagsAfterTagReload.size());
+      Assertions.assertEquals(updatedTag1, cachedTagsAfterTagReload.get(0));
+
+      List<GenericEntity> genericEntitiesAfterTagUpdate =
+          relationOperations.listEntitiesByRelation(
+              SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL,
+              updatedTag1.nameIdentifier(),
+              EntityType.TAG,
+              true);
+      Assertions.assertEquals(1, genericEntitiesAfterTagUpdate.size());
+      Assertions.assertEquals(catalog.id(), genericEntitiesAfterTagUpdate.get(0).id());
+      Assertions.assertEquals(updatedCatalog.name(), genericEntitiesAfterTagUpdate.get(0).name());
+      List<Entity> cachedTagsByTagAfterTagReload =
+          cache.get(
+              EntityCacheRelationKey.of(
+                  updatedTag1.nameIdentifier(),
+                  EntityType.TAG,
+                  SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL),
+              k -> null);
+      Assertions.assertNotNull(cachedTagsByTagAfterTagReload);
+      Assertions.assertEquals(1, cachedTagsByTagAfterTagReload.size());
+      Assertions.assertEquals(
+          updatedCatalog.id(), ((GenericEntity) cachedTagsByTagAfterTagReload.get(0)).id());
+      Assertions.assertEquals(
+          updatedCatalog.name(), ((GenericEntity) cachedTagsByTagAfterTagReload.get(0)).name());
+    }
+  }
+
+  @ParameterizedTest
+  @MethodSource("storageProvider")
+  void testLanceTableCreateAndUpdate(String type) {
+    Config config = Mockito.mock(Config.class);
+    init(type, config);
+
+    AuditInfo auditInfo =
+        AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
+
+    try (EntityStore store = EntityStoreFactory.createEntityStore(config)) {
+      store.initialize(config);
+
+      BaseMetalake metalake =
+          createBaseMakeLake(RandomIdGenerator.INSTANCE.nextId(), "metalake", auditInfo);
+      store.put(metalake, false);
+
+      CatalogEntity catalogEntity =
+          CatalogEntity.builder()
+              .withId(RandomIdGenerator.INSTANCE.nextId())
+              .withName("catalog")
+              .withNamespace(NamespaceUtil.ofCatalog("metalake"))
+              .withType(Catalog.Type.RELATIONAL)
+              .withProvider("generic-lakehouse")
+              .withComment("This is a generic-lakehouse")
+              .withProperties(ImmutableMap.of())
+              .withAuditInfo(auditInfo)
+              .build();
+
+      store.put(catalogEntity, false);
+
+      SchemaEntity schemaEntity =
+          SchemaEntity.builder()
+              .withId(RandomIdGenerator.INSTANCE.nextId())
+              .withName("schema")
+              .withNamespace(NamespaceUtil.ofSchema("metalake", "catalog"))
+              .withComment("This is a schema for generic-lakehouse")
+              .withProperties(ImmutableMap.of())
+              .withAuditInfo(auditInfo)
+              .build();
+      store.put(schemaEntity, false);
+
+      long column1Id = RandomIdGenerator.INSTANCE.nextId();
+      TableEntity table =
+          TableEntity.builder()
+              .withId(RandomIdGenerator.INSTANCE.nextId())
+              .withNamespace(NamespaceUtil.ofTable("metalake", "catalog", "schema"))
+              .withName("table")
+              .withAuditInfo(auditInfo)
+              .withColumns(
+                  Lists.newArrayList(
+                      ColumnEntity.builder()
+                          .withId(column1Id)
+                          .withName("column1")
+                          .withDataType(Types.StringType.get())
+                          .withComment("test column")
+                          .withPosition(1)
+                          .withAuditInfo(auditInfo)
+                          .build()))
+              .withComment("This is a lance table")
+              .withProperties(ImmutableMap.of("location", "/tmp/test", "format", "lance"))
+              .build();
+      store.put(table, false);
+      TableEntity fetchedTable =
+          store.get(table.nameIdentifier(), Entity.EntityType.TABLE, TableEntity.class);
+
+      // check table properties
+      Assertions.assertEquals("/tmp/test", fetchedTable.properties().get("location"));
+      Assertions.assertEquals("lance", fetchedTable.properties().get("format"));
+      Assertions.assertEquals("This is a lance table", fetchedTable.comment());
+      Assertions.assertEquals(1, fetchedTable.columns().size());
+      Assertions.assertEquals("column1", fetchedTable.columns().get(0).name());
+
+      // Now try to update the table
+      TableEntity updatedTable =
+          TableEntity.builder()
+              .withId(table.id())
+              .withNamespace(table.namespace())
+              .withName(table.name())
+              .withAuditInfo(auditInfo)
+              .withColumns(
+                  Lists.newArrayList(
+                      ColumnEntity.builder()
+                          .withId(column1Id)
+                          .withName("column1")
+                          .withDataType(Types.StringType.get())
+                          .withComment("updated test column")
+                          .withPosition(1)
+                          .withAuditInfo(auditInfo)
+                          .build(),
+                      ColumnEntity.builder()
+                          .withId(RandomIdGenerator.INSTANCE.nextId())
+                          .withName("column2")
+                          .withDataType(Types.IntegerType.get())
+                          .withComment("new column")
+                          .withPosition(2)
+                          .withAuditInfo(auditInfo)
+                          .build()))
+              .withComment("This is an updated lance table")
+              .withProperties(ImmutableMap.of("location", "/tmp/updated_test", "format", "lance"))
+              .build();
+
+      store.update(
+          table.nameIdentifier(), TableEntity.class, Entity.EntityType.TABLE, e -> updatedTable);
+      TableEntity fetchedUpdatedTable =
+          store.get(table.nameIdentifier(), Entity.EntityType.TABLE, TableEntity.class);
+
+      // check updated table properties
+      Assertions.assertEquals(
+          "/tmp/updated_test", fetchedUpdatedTable.properties().get("location"));
+      Assertions.assertEquals("lance", fetchedUpdatedTable.properties().get("format"));
+      Assertions.assertEquals("This is an updated lance table", fetchedUpdatedTable.comment());
+      Assertions.assertEquals(2, fetchedUpdatedTable.columns().size());
+      for (ColumnEntity column : fetchedUpdatedTable.columns()) {
+        if (column.name().equals("column1")) {
+          Assertions.assertEquals("updated test column", column.comment());
+        }
+      }
+
+      Assertions.assertTrue(
+          fetchedUpdatedTable.columns().stream().anyMatch(c -> c.name().equals("column2")));
+
+      // Test drop the table
+      Assertions.assertTrue(store.delete(table.nameIdentifier(), Entity.EntityType.TABLE));
+      Assertions.assertFalse(store.exists(table.nameIdentifier(), Entity.EntityType.TABLE));
+
+      destroy(type);
+    } catch (IOException e) {
+      throw new RuntimeException(e);
     }
   }
 }

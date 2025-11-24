@@ -81,8 +81,8 @@ gravitino.authorization.enable = false
 gravitino.authorization.serviceAdmins = anonymous
 
 # THE CONFIGURATION FOR AUXILIARY SERVICE
-# Auxiliary service names, separate by ','
-gravitino.auxService.names = iceberg-rest
+# Auxiliary service names, separate by ',', currently support iceberg-rest and lance-rest
+gravitino.auxService.names = iceberg-rest,lance-rest
 # Iceberg REST service classpath
 gravitino.iceberg-rest.classpath = iceberg-rest-server/libs, iceberg-rest-server/conf
 # Iceberg REST service host
@@ -93,3 +93,18 @@ gravitino.iceberg-rest.httpPort = 9001
 gravitino.iceberg-rest.catalog-backend = memory
 # The warehouse directory of Iceberg catalog for Iceberg REST service
 gravitino.iceberg-rest.warehouse = /tmp/
+
+# Lance REST service classpath
+gravitino.lance-rest.classpath = lance-rest-server/libs
+# Lance REST service host
+gravitino.lance-rest.host = 0.0.0.0
+# Lance REST service http port
+gravitino.lance-rest.httpPort = 9101
+
+# THE CONFIGURATION FOR Lance namespace backend
+# The backend Lance namespace for Lance REST service, it's recommended to use Gravitino
+gravitino.lance-rest.namespace-backend = gravitino
+# The uri of the Lance REST service gravitino namespace backend
+gravitino.lance-rest.gravitino.uri = http://localhost:8090
+# The metalake name used for Lance REST service gravitino namespace backend, please create the metalake first before using it, and configure the metalake name here.
+# gravitino.lance-rest.gravitino.metalake-name = metalake

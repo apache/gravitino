@@ -42,8 +42,10 @@ import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.StringIdentifier;
+import org.apache.gravitino.catalog.CatalogManager.CatalogWrapper;
 import org.apache.gravitino.connector.HasPropertyMetadata;
 import org.apache.gravitino.connector.capability.Capability;
+import org.apache.gravitino.connector.capability.CapabilityResult;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchTableException;
@@ -113,6 +115,18 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
    */
   @Override
   public Table loadTable(NameIdentifier ident) throws NoSuchTableException {
+    NameIdentifier catalogIdent = getCatalogIdentifier(ident);
+    if (isManagedTable(catalogIdent)) {
+      return TreeLockUtils.doWithTreeLock(
+          ident,
+          LockType.READ,
+          () ->
+              doWithCatalog(
+                  catalogIdent,
+                  c -> c.doWithTableOps(t -> t.loadTable(ident)),
+                  NoSuchTableException.class));
+    }
+
     EntityCombinedTable entityCombinedTable =
         TreeLockUtils.doWithTreeLock(ident, LockType.READ, () -> internalLoadTable(ident));
 
@@ -236,6 +250,17 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
                   NoSuchTableException.class,
                   IllegalArgumentException.class);
 
+          if (isManagedTable(catalogIdent)) {
+            // For generic lakehouse catalog, all operations will be dispatched to the underlying
+            // catalog.
+            return EntityCombinedTable.of(alteredTable)
+                .withHiddenProperties(
+                    getHiddenPropertyNames(
+                        getCatalogIdentifier(ident),
+                        HasPropertyMetadata::tablePropertiesMetadata,
+                        alteredTable.properties()));
+          }
+
           StringIdentifier stringId = getStringIdFromProperties(alteredTable.properties());
           // Case 1: The table is not created by Gravitino and this table is never imported.
           TableEntity te = null;
@@ -316,6 +341,13 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
         LockType.WRITE,
         () -> {
           NameIdentifier catalogIdent = getCatalogIdentifier(ident);
+          if (isManagedTable(catalogIdent)) {
+            return doWithCatalog(
+                catalogIdent,
+                c -> c.doWithTableOps(t -> t.dropTable(ident)),
+                RuntimeException.class);
+          }
+
           boolean droppedFromCatalog =
               doWithCatalog(
                   catalogIdent,
@@ -375,6 +407,10 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
                   c -> c.doWithTableOps(t -> t.purgeTable(ident)),
                   RuntimeException.class,
                   UnsupportedOperationException.class);
+
+          if (isManagedTable(catalogIdent)) {
+            return droppedFromCatalog;
+          }
 
           // For unmanaged table, it could happen that the table:
           // 1. Is not found in the catalog (dropped directly from underlying sources)
@@ -559,6 +595,32 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
                   return null;
                 }),
         IllegalArgumentException.class);
+
+    if (isManagedTable(catalogIdent)) {
+      // For generic lakehouse catalog, all operations will be dispatched to the underlying catalog.
+      Table table =
+          doWithCatalog(
+              catalogIdent,
+              c ->
+                  c.doWithTableOps(
+                      t ->
+                          t.createTable(
+                              ident,
+                              columns,
+                              comment,
+                              properties,
+                              partitions == null ? EMPTY_TRANSFORM : partitions,
+                              distribution == null ? Distributions.NONE : distribution,
+                              sortOrders == null ? new SortOrder[0] : sortOrders,
+                              indexes == null ? Indexes.EMPTY_INDEXES : indexes)),
+              NoSuchSchemaException.class,
+              TableAlreadyExistsException.class);
+      return EntityCombinedTable.of(table)
+          .withHiddenProperties(
+              getHiddenPropertyNames(
+                  catalogIdent, HasPropertyMetadata::tablePropertiesMetadata, table.properties()));
+    }
+
     long uid = idGenerator.nextId();
     // Add StringIdentifier to the properties, the specific catalog will handle this
     // StringIdentifier to make sure only when the operation is successful, the related
@@ -609,6 +671,12 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
     try {
       store.put(tableEntity, true /* overwrite */);
     } catch (Exception e) {
+      if (isManagedTable(catalogIdent)) {
+        // Drop table
+        doWithCatalog(
+            catalogIdent, c -> c.doWithTableOps(t -> t.dropTable(ident)), RuntimeException.class);
+      }
+
       LOG.error(FormattedErrorMessages.STORE_OP_FAILURE, "put", ident, e);
       return EntityCombinedTable.of(table)
           .withHiddenProperties(
@@ -616,6 +684,7 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
                   catalogIdent, HasPropertyMetadata::tablePropertiesMetadata, table.properties()));
     }
 
+    // For managed table, we can use table entity to indicate the table is created successfully.
     return EntityCombinedTable.of(table, tableEntity)
         .withHiddenProperties(
             getHiddenPropertyNames(
@@ -628,6 +697,15 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
         : IntStream.range(0, columns.length)
             .mapToObj(i -> ColumnEntity.toColumnEntity(columns[i], i, idGenerator.nextId(), audit))
             .collect(Collectors.toList());
+  }
+
+  private boolean isManagedTable(NameIdentifier catalogIdent) {
+    CatalogManager catalogManager = GravitinoEnv.getInstance().catalogManager();
+    CatalogWrapper wrapper = catalogManager.loadCatalogAndWrap(catalogIdent);
+    Capability capability = wrapper.catalog().capability();
+
+    CapabilityResult result = capability.managedStorage(Capability.Scope.TABLE);
+    return result == CapabilityResult.SUPPORTED;
   }
 
   private boolean isSameColumn(Column left, int columnPosition, ColumnEntity right) {

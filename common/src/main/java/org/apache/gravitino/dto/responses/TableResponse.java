@@ -63,9 +63,6 @@ public class TableResponse extends BaseResponse {
     Preconditions.checkArgument(table != null, "table must not be null");
     Preconditions.checkArgument(
         StringUtils.isNotBlank(table.name()), "table 'name' must not be null and empty");
-    Preconditions.checkArgument(
-        table.columns() != null && table.columns().length > 0,
-        "table 'columns' must not be null and empty");
     Preconditions.checkArgument(table.auditInfo() != null, "table 'audit' must not be null");
     Preconditions.checkArgument(
         table.partitioning() != null, "table 'partitions' must not be null");

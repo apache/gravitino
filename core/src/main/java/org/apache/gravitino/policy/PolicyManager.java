@@ -387,7 +387,7 @@ public class PolicyManager implements PolicyDispatcher {
                     entityType,
                     policyIdent);
           } catch (NoSuchEntityException e) {
-            if (e.getMessage().contains("No such policy entity")) {
+            if (e.getMessage().contains("No such entity")) {
               throw new NoSuchPolicyException(
                   e, "Policy %s does not exist for metadata object %s", policyName, metadataObject);
             } else {
