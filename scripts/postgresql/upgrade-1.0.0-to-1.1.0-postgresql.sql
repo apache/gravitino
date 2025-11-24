@@ -17,7 +17,10 @@
 -- under the License.
 --
 
+<<<<<<< HEAD
 
+=======
+>>>>>>> 866eef7a8caee627e5c40793a9cfbdf74745de83
 CREATE TABLE IF NOT EXISTS table_version_info (
     table_id        BIGINT NOT NULL,
     format          VARCHAR(64),

@@ -57,6 +57,7 @@ import org.apache.gravitino.hook.MetalakeHookDispatcher;
 import org.apache.gravitino.hook.ModelHookDispatcher;
 import org.apache.gravitino.hook.SchemaHookDispatcher;
 import org.apache.gravitino.hook.TableHookDispatcher;
+import org.apache.gravitino.hook.TagHookDispatcher;
 import org.apache.gravitino.hook.TopicHookDispatcher;
 import org.apache.gravitino.job.JobManager;
 import org.apache.gravitino.job.JobOperationDispatcher;
@@ -69,7 +70,9 @@ import org.apache.gravitino.listener.JobEventDispatcher;
 import org.apache.gravitino.listener.MetalakeEventDispatcher;
 import org.apache.gravitino.listener.ModelEventDispatcher;
 import org.apache.gravitino.listener.PartitionEventDispatcher;
+import org.apache.gravitino.listener.PolicyEventDispatcher;
 import org.apache.gravitino.listener.SchemaEventDispatcher;
+import org.apache.gravitino.listener.StatisticEventDispatcher;
 import org.apache.gravitino.listener.TableEventDispatcher;
 import org.apache.gravitino.listener.TagEventDispatcher;
 import org.apache.gravitino.listener.TopicEventDispatcher;
@@ -81,6 +84,7 @@ import org.apache.gravitino.metrics.MetricsSystem;
 import org.apache.gravitino.metrics.source.JVMMetricsSource;
 import org.apache.gravitino.policy.PolicyDispatcher;
 import org.apache.gravitino.policy.PolicyManager;
+import org.apache.gravitino.stats.StatisticDispatcher;
 import org.apache.gravitino.stats.StatisticManager;
 import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.storage.RandomIdGenerator;
@@ -148,7 +152,7 @@ public class GravitinoEnv {
   private OwnerDispatcher ownerDispatcher;
   private FutureGrantManager futureGrantManager;
   private GravitinoAuthorizer gravitinoAuthorizer;
-  private StatisticManager statisticManager;
+  private StatisticDispatcher statisticDispatcher;
 
   protected GravitinoEnv() {}
 
@@ -416,8 +420,8 @@ public class GravitinoEnv {
     return jobOperationDispatcher;
   }
 
-  public StatisticManager statisticManager() {
-    return statisticManager;
+  public StatisticDispatcher statisticDispatcher() {
+    return statisticDispatcher;
   }
 
   public void start() {
@@ -473,11 +477,11 @@ public class GravitinoEnv {
       }
     }
 
-    if (statisticManager != null) {
+    if (statisticDispatcher != null) {
       try {
-        statisticManager.close();
+        statisticDispatcher.close();
       } catch (Exception e) {
-        LOG.warn("Failed to close StatisticManager", e);
+        LOG.warn("Failed to close StatisticDispatcher", e);
       }
     }
 
@@ -572,7 +576,9 @@ public class GravitinoEnv {
     ModelNormalizeDispatcher modelNormalizeDispatcher =
         new ModelNormalizeDispatcher(modelHookDispatcher, catalogManager);
     this.modelDispatcher = new ModelEventDispatcher(eventBus, modelNormalizeDispatcher);
-    this.statisticManager = new StatisticManager(entityStore, idGenerator, config);
+    this.statisticDispatcher =
+        new StatisticEventDispatcher(
+            eventBus, new StatisticManager(entityStore, idGenerator, config));
 
     // Create and initialize access control related modules
     boolean enableAuthorization = config.get(Configs.ENABLE_AUTHORIZATION);
@@ -596,9 +602,12 @@ public class GravitinoEnv {
     this.auxServiceManager.serviceInit(config);
 
     // Create and initialize Tag related modules
-    this.tagDispatcher = new TagEventDispatcher(eventBus, new TagManager(idGenerator, entityStore));
-    // todo: support policy event dispatcher
-    this.policyDispatcher = new PolicyManager(idGenerator, entityStore);
+    TagEventDispatcher tagEventDispatcher =
+        new TagEventDispatcher(eventBus, new TagManager(idGenerator, entityStore));
+    this.tagDispatcher = new TagHookDispatcher(tagEventDispatcher);
+
+    this.policyDispatcher =
+        new PolicyEventDispatcher(eventBus, new PolicyManager(idGenerator, entityStore));
 
     this.jobOperationDispatcher =
         new JobEventDispatcher(eventBus, new JobManager(config, entityStore, idGenerator));

@@ -118,13 +118,6 @@ public class FilesetMetadataCache implements Closeable {
   public void close() throws IOException {
     catalogCache.invalidateAll();
     filesetCache.invalidateAll();
-    // close the client
-    try {
-      if (client != null) {
-        client.close();
-      }
-    } catch (Exception e) {
-      // ignore
-    }
+    // Note: We don't close the client here since it's owned and managed by BaseGVFSOperations
   }
 }

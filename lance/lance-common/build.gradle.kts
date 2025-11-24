@@ -36,7 +36,9 @@ dependencies {
 
   implementation(libs.guava)
   implementation(libs.commons.lang3)
-  implementation(libs.lance.namespace.core)
+  implementation(libs.lance.namespace.core) {
+    exclude(group = "com.lancedb", module = "lance-core")
+  }
   implementation(libs.slf4j.api)
 
   testImplementation(project(":server-common"))

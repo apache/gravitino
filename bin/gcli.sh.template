@@ -29,7 +29,7 @@ AUXLIB_DIR="${GRAVITINO_HOME}/auxlib"
 
 # Search strategy for finding the Gravitino CLI JAR:
 if [ -z "$CLI_JAR" ]; then
-    CLI_JAR=$(find "${AUXLIB_DIR}" -name "gravitino-cli-*.jar" 2>/dev/null)
+    CLI_JAR=$(ls -1 "${AUXLIB_DIR}"/gravitino-cli-*.jar 2>/dev/null | sort -V | tail -n 1)
 fi
 
 if [ -z "$CLI_JAR" ]; then

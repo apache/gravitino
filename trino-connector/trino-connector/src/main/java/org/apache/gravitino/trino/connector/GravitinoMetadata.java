@@ -56,6 +56,7 @@ import io.trino.spi.connector.TopNApplicationResult;
 import io.trino.spi.expression.ConnectorExpression;
 import io.trino.spi.expression.Constant;
 import io.trino.spi.security.TrinoPrincipal;
+import io.trino.spi.statistics.ColumnStatistics;
 import io.trino.spi.statistics.ComputedStatistics;
 import io.trino.spi.statistics.TableStatistics;
 import io.trino.spi.type.Type;
@@ -585,7 +586,20 @@ public class GravitinoMetadata implements ConnectorMetadata {
   @Override
   public TableStatistics getTableStatistics(
       ConnectorSession session, ConnectorTableHandle tableHandle) {
-    return internalMetadata.getTableStatistics(session, GravitinoHandle.unWrap(tableHandle));
+    TableStatistics originTableStatistics =
+        internalMetadata.getTableStatistics(session, GravitinoHandle.unWrap(tableHandle));
+    Map<ColumnHandle, ColumnStatistics> columnStatistics =
+        originTableStatistics.getColumnStatistics().entrySet().stream()
+            .collect(
+                Collectors.toMap(
+                    entry ->
+                        new GravitinoColumnHandle(
+                            getColumnName(
+                                session, GravitinoHandle.unWrap(tableHandle), entry.getKey()),
+                            entry.getKey()),
+                    entry -> entry.getValue()));
+
+    return new TableStatistics(originTableStatistics.getRowCount(), columnStatistics);
   }
 
   @Override

@@ -74,7 +74,8 @@ public class AuthorizationExpressionEvaluator {
       Map<Entity.EntityType, NameIdentifier> metadataNames,
       AuthorizationRequestContext requestContext) {
     Principal currentPrincipal = PrincipalUtils.getCurrentPrincipal();
-    return evaluate(metadataNames, new HashMap<>(), requestContext, currentPrincipal);
+    return evaluate(
+        metadataNames, new HashMap<>(), requestContext, currentPrincipal, Optional.empty());
   }
 
   /**
@@ -84,13 +85,15 @@ public class AuthorizationExpressionEvaluator {
    * @param metadataNames key-metadata type, value-metadata NameIdentifier
    * @param requestContext authorization request context
    * @param principal current principal
+   * @param entityType entityType
    * @return authorization result
    */
   public boolean evaluate(
       Map<Entity.EntityType, NameIdentifier> metadataNames,
       AuthorizationRequestContext requestContext,
-      Principal principal) {
-    return evaluate(metadataNames, new HashMap<>(), requestContext, principal);
+      Principal principal,
+      Optional<String> entityType) {
+    return evaluate(metadataNames, new HashMap<>(), requestContext, principal, entityType);
   }
 
   /**
@@ -99,14 +102,16 @@ public class AuthorizationExpressionEvaluator {
    *
    * @param metadataNames key-metadata type, value-metadata NameIdentifier
    * @param pathParams params from request path
+   * @param entityType entityType
    * @return authorization result
    */
   public boolean evaluate(
       Map<Entity.EntityType, NameIdentifier> metadataNames,
       Map<String, Object> pathParams,
-      AuthorizationRequestContext requestContext) {
+      AuthorizationRequestContext requestContext,
+      Optional<String> entityType) {
     Principal currentPrincipal = PrincipalUtils.getCurrentPrincipal();
-    return evaluate(metadataNames, pathParams, requestContext, currentPrincipal);
+    return evaluate(metadataNames, pathParams, requestContext, currentPrincipal, entityType);
   }
 
   /**
@@ -123,11 +128,13 @@ public class AuthorizationExpressionEvaluator {
       Map<Entity.EntityType, NameIdentifier> metadataNames,
       Map<String, Object> pathParams,
       AuthorizationRequestContext requestContext,
-      Principal currentPrincipal) {
+      Principal currentPrincipal,
+      Optional<String> entityType) {
     OgnlContext ognlContext = Ognl.createDefaultContext(null);
     ognlContext.put("principal", currentPrincipal);
     ognlContext.put("authorizer", authorizer);
     ognlContext.put("authorizationContext", requestContext);
+    ognlContext.put("entityType", entityType.orElse(null));
     ognlContext.putAll(pathParams);
     metadataNames.forEach(
         (type, entityNameIdent) -> {

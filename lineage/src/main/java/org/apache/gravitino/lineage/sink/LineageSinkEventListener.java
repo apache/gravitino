@@ -40,7 +40,7 @@ public class LineageSinkEventListener implements EventListenerPlugin {
     Preconditions.checkArgument(
         StringUtils.isNotBlank(sinkClassName),
         LineageConfig.LINEAGE_SINK_CLASS_NAME + " is not set.");
-    this.lineageSink = ClassUtils.loadClass(sinkClassName);
+    this.lineageSink = ClassUtils.loadAndGetInstance(sinkClassName);
     lineageSink.initialize(properties);
   }
 

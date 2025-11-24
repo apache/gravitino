@@ -18,14 +18,20 @@
  */
 package org.apache.gravitino.filesystem.hadoop;
 
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.Map;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.gravitino.exceptions.CatalogNotInUseException;
+import org.apache.gravitino.exceptions.NoSuchCatalogException;
+import org.apache.gravitino.exceptions.NoSuchFilesetException;
+import org.apache.gravitino.exceptions.NoSuchLocationNameException;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.permission.FsPermission;
+import org.apache.hadoop.util.Progressable;
 
 /**
  * The default implementation of {@link GravitinoVirtualFileSystemHook}. This class does nothing.
@@ -155,6 +161,139 @@ public class NoOpHook implements GravitinoVirtualFileSystemHook {
   @Override
   public long postGetDefaultBlockSize(Path gvfsPath, long blockSize) {
     return blockSize;
+  }
+
+  @Override
+  public void onSetWorkingDirectoryFailure(Path path, Exception e) {
+    throw asUnchecked(e);
+  }
+
+  @Override
+  public FSDataInputStream onOpenFailure(Path path, int bufferSize, Exception e)
+      throws IOException {
+    if (e instanceof IOException) {
+      throw (IOException) e;
+    }
+    throw asUnchecked(e);
+  }
+
+  @Override
+  public FSDataOutputStream onCreateFailure(
+      Path path,
+      FsPermission permission,
+      boolean overwrite,
+      int bufferSize,
+      short replication,
+      long blockSize,
+      Progressable progress,
+      Exception e)
+      throws IOException {
+    if (e instanceof NoSuchCatalogException
+        || e instanceof CatalogNotInUseException
+        || e instanceof NoSuchFilesetException
+        || e instanceof NoSuchLocationNameException) {
+      String message =
+          "Fileset is not found for path: "
+              + path
+              + " for operation CREATE. "
+              + "This may be caused by fileset related metadata not found or not in use in "
+              + "Gravitino, please check the fileset metadata in Gravitino.";
+      throw new IOException(message, e);
+    }
+
+    if (e instanceof IOException) {
+      throw (IOException) e;
+    }
+
+    throw asUnchecked(e);
+  }
+
+  @Override
+  public FSDataOutputStream onAppendFailure(
+      Path path, int bufferSize, Progressable progress, Exception e) throws IOException {
+    if (e instanceof IOException) {
+      throw (IOException) e;
+    }
+
+    throw asUnchecked(e);
+  }
+
+  @Override
+  public boolean onRenameFailure(Path src, Path dst, Exception e) throws IOException {
+    if (e instanceof IOException) {
+      throw (IOException) e;
+    }
+    throw asUnchecked(e);
+  }
+
+  @Override
+  public boolean onDeleteFailure(Path path, boolean recursive, Exception e) throws IOException {
+    if (e instanceof FileNotFoundException) {
+      return false;
+    }
+
+    if (e instanceof IOException) {
+      throw (IOException) e;
+    }
+
+    throw asUnchecked(e);
+  }
+
+  @Override
+  public FileStatus onGetFileStatusFailure(Path path, Exception e) throws IOException {
+    if (e instanceof IOException) {
+      throw (IOException) e;
+    }
+    throw asUnchecked(e);
+  }
+
+  @Override
+  public FileStatus[] onListStatusFailure(Path path, Exception e) throws IOException {
+    if (e instanceof IOException) {
+      throw (IOException) e;
+    }
+    throw asUnchecked(e);
+  }
+
+  @Override
+  public boolean onMkdirsFailure(Path path, FsPermission permission, Exception e)
+      throws IOException {
+    if (e instanceof NoSuchCatalogException
+        || e instanceof CatalogNotInUseException
+        || e instanceof NoSuchFilesetException
+        || e instanceof NoSuchLocationNameException) {
+      String message =
+          "Fileset is not found for path: "
+              + path
+              + " for operation MKDIRS. "
+              + "This may be caused by fileset related metadata not found or not in use in "
+              + "Gravitino, please check the fileset metadata in Gravitino.";
+      throw new IOException(message, e);
+    }
+
+    if (e instanceof IOException) {
+      throw (IOException) e;
+    }
+
+    throw asUnchecked(e);
+  }
+
+  @Override
+  public short onGetDefaultReplicationFailure(Path path, Exception e) {
+    if (e instanceof IOException) {
+      return 1;
+    }
+
+    throw asUnchecked(e);
+  }
+
+  @Override
+  public long onGetDefaultBlockSizeFailure(Path f, Exception e, long defaultBlockSize) {
+    if (e instanceof IOException) {
+      return defaultBlockSize;
+    }
+
+    throw asUnchecked(e);
   }
 
   @Override

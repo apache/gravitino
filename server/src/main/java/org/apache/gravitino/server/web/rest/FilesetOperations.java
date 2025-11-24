@@ -61,7 +61,7 @@ import org.apache.gravitino.file.Fileset;
 import org.apache.gravitino.file.FilesetChange;
 import org.apache.gravitino.metrics.MetricNames;
 import org.apache.gravitino.rest.RESTUtils;
-import org.apache.gravitino.server.authorization.MetadataFilterHelper;
+import org.apache.gravitino.server.authorization.MetadataAuthzHelper;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationExpression;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationMetadata;
 import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants;
@@ -106,7 +106,7 @@ public class FilesetOperations {
             Namespace filesetNS = NamespaceUtil.ofFileset(metalake, catalog, schema);
             NameIdentifier[] idents = dispatcher.listFilesets(filesetNS);
             idents =
-                MetadataFilterHelper.filterByExpression(
+                MetadataAuthzHelper.filterByExpression(
                     metalake,
                     AuthorizationExpressionConstants.filterFilesetAuthorizationExpression,
                     Entity.EntityType.FILESET,
@@ -132,9 +132,11 @@ public class FilesetOperations {
   @ResponseMetered(name = "create-fileset", absolute = true)
   @AuthorizationExpression(
       expression =
-          "ANY(OWNER, METALAKE, CATALOG) || "
-              + "SCHEMA_OWNER_WITH_USE_CATALOG || "
-              + "ANY_USE_CATALOG && ANY_USE_SCHEMA && ANY_CREATE_FILESET",
+          """
+                      ANY(OWNER, METALAKE, CATALOG) ||
+                      SCHEMA_OWNER_WITH_USE_CATALOG ||
+                      ANY_USE_CATALOG && ANY_USE_SCHEMA && ANY_CREATE_FILESET
+                      """,
       accessMetadataType = MetadataObject.Type.SCHEMA)
   public Response createFileset(
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
@@ -273,9 +275,11 @@ public class FilesetOperations {
   @ResponseMetered(name = "alter-fileset", absolute = true)
   @AuthorizationExpression(
       expression =
-          "ANY(OWNER, METALAKE, CATALOG) || "
-              + "SCHEMA_OWNER_WITH_USE_CATALOG || "
-              + "ANY_USE_CATALOG && ANY_USE_SCHEMA && (FILESET::OWNER || ANY_WRITE_FILESET)",
+          """
+                      ANY(OWNER, METALAKE, CATALOG) ||
+                      SCHEMA_OWNER_WITH_USE_CATALOG ||
+                      ANY_USE_CATALOG && ANY_USE_SCHEMA && (FILESET::OWNER || ANY_WRITE_FILESET)
+                      """,
       accessMetadataType = MetadataObject.Type.FILESET)
   public Response alterFileset(
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
@@ -313,9 +317,11 @@ public class FilesetOperations {
   @ResponseMetered(name = "drop-fileset", absolute = true)
   @AuthorizationExpression(
       expression =
-          "ANY(OWNER, METALAKE, CATALOG) || "
-              + "SCHEMA_OWNER_WITH_USE_CATALOG || "
-              + "ANY_USE_CATALOG && ANY_USE_SCHEMA && FILESET::OWNER",
+          """
+                      ANY(OWNER, METALAKE, CATALOG) ||
+                      SCHEMA_OWNER_WITH_USE_CATALOG ||
+                      ANY_USE_CATALOG && ANY_USE_SCHEMA && FILESET::OWNER
+                      """,
       accessMetadataType = MetadataObject.Type.FILESET)
   public Response dropFileset(
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)

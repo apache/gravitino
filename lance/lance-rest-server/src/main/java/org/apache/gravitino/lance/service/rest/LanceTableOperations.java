@@ -262,11 +262,13 @@ public class LanceTableOperations {
   private void validateCreateEmptyTableRequest(
       @SuppressWarnings("unused") CreateEmptyTableRequest request) {
     // We will ignore the id in the request body since it's already provided in the path param.
+    // No specific fields to validate for now
   }
 
   private void validateRegisterTableRequest(
       @SuppressWarnings("unused") RegisterTableRequest request) {
     // We will ignore the id in the request body since it's already provided in the path param.
+    // No specific fields to validate for now
   }
 
   private void validateDeregisterTableRequest(

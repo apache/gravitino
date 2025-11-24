@@ -116,9 +116,18 @@ public interface Index {
     IVF_SQ,
     /** IVF_PQ (Inverted File with Product Quantization) is an indexing method used for efficient */
     IVF_PQ,
-    /** IVF_HNSW_FLAT */
+
+    /**
+     * IVF_HNSW_SQ is an indexing method that combines Inverted File (IVF) with Hierarchical
+     * Navigable Small World (HNSW) graphs and Scalar Quantization (SQ) for efficient approximate
+     * nearest neighbor search in high-dimensional vector spaces.
+     */
     IVF_HNSW_SQ,
-    /** IVF_HNSW_PQ */
+    /**
+     * IVF_HNSW_PQ is an indexing method that combines Inverted File (IVF) with Hierarchical
+     * Navigable Small World (HNSW) graphs and Product Quantization (PQ) for efficient approximate
+     * nearest neighbor search in high-dimensional vector spaces.
+     */
     IVF_HNSW_PQ,
     /**
      * FTS index is a data structure used for efficient storage and retrieval of strings, enabling

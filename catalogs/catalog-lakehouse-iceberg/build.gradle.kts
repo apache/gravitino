@@ -85,6 +85,11 @@ dependencies {
   testImplementation(libs.testcontainers.mysql)
   testImplementation(libs.testcontainers.postgresql)
 
+  // Add Hadoop 3.3+ dependencies since Spark's Hadoop is excluded
+  // Required for Iceberg 1.10+ which uses newer Hadoop APIs like FileSystem.openFile()
+  testImplementation(libs.hadoop3.client.api)
+  testImplementation(libs.hadoop3.client.runtime)
+
   testRuntimeOnly(libs.junit.jupiter.engine)
 }
 

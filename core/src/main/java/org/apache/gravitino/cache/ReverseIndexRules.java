@@ -18,11 +18,16 @@
  */
 package org.apache.gravitino.cache;
 
+import org.apache.commons.lang3.ArrayUtils;
 import org.apache.gravitino.Entity;
+import org.apache.gravitino.Entity.EntityType;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.meta.GenericEntity;
 import org.apache.gravitino.meta.GroupEntity;
+import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.meta.RoleEntity;
+import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.meta.UserEntity;
 import org.apache.gravitino.utils.NamespaceUtil;
 
@@ -141,5 +146,40 @@ public class ReverseIndexRules {
                     reverseIndexCache.put(securableObjectIdent, entityType, key);
                   });
         }
+      };
+
+  // Keep policies/tags to objects reverse index for metadata objects, so the key are objects and
+  // the values are policies/tags.
+  public static final ReverseIndexCache.ReverseIndexRule GENERIC_METADATA_OBJECT_REVERSE_RULE =
+      (entity, key, reverseIndexCache) -> {
+        // Name in GenericEntity contains no metalake.
+        GenericEntity genericEntity = (GenericEntity) entity;
+        EntityType type = entity.type();
+        if (genericEntity.name() != null) {
+          String[] levels = genericEntity.name().split("\\.");
+          String metalakeName = key.identifier().namespace().levels()[0];
+          NameIdentifier objectNameIdentifier =
+              NameIdentifier.of(ArrayUtils.addFirst(levels, metalakeName));
+          reverseIndexCache.put(objectNameIdentifier, type, key);
+        }
+      };
+
+  // Keep objects to policies reverse index for policy objects, so the key are policies and the
+  // values are objects.
+  public static final ReverseIndexCache.ReverseIndexRule POLICY_REVERSE_RULE =
+      (entity, key, reverseIndexCache) -> {
+        PolicyEntity policyEntity = (PolicyEntity) entity;
+        NameIdentifier nameIdentifier =
+            NameIdentifier.of(policyEntity.namespace(), policyEntity.name());
+        reverseIndexCache.put(nameIdentifier, Entity.EntityType.POLICY, key);
+      };
+
+  // Keep objects to tags reverse index for tag objects, so the key are tags and the
+  // values are objects.
+  public static final ReverseIndexCache.ReverseIndexRule TAG_REVERSE_RULE =
+      (entity, key, reverseIndexCache) -> {
+        TagEntity tagEntity = (TagEntity) entity;
+        NameIdentifier nameIdentifier = NameIdentifier.of(tagEntity.namespace(), tagEntity.name());
+        reverseIndexCache.put(nameIdentifier, Entity.EntityType.TAG, key);
       };
 }
