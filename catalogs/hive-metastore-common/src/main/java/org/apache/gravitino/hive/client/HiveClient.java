@@ -30,68 +30,53 @@ import org.apache.gravitino.rel.partitions.Partition;
  */
 public interface HiveClient {
 
-  default void createDatabase(String catalogName, Schema schema) {}
+  void createDatabase(String catalogName, Schema schema);
 
-  default Schema getDatabase(String catalogName, String name) {
-    return null;
-  }
+  Schema getDatabase(String catalogName, String name);
 
-  List<String> getAllDatabases();
+  List<String> getAllDatabases(String catalogName);
 
-  default void alterDatabase(String name, Schema database) {}
+  void alterDatabase(String catalogName, String dbName, Schema database);
 
-  default void dropDatabase(String name, boolean b, boolean b1, boolean cascade) {}
+  void dropDatabase(String catalogName, String dbName, boolean cascade);
 
-  default List<String> getAllTables(String name) {
-    return null;
-  }
+  List<String> getAllTables(String catalogName, String dbName);
 
-  default List<String> listTableNamesByFilter(
-      String name, String icebergAndPaimonFilter, short maxTables) {
-    return null;
-  }
+  List<String> listTableNamesByFilter(
+      String catalogName, String dbName, String filter, short maxTables);
 
-  default Table getTable(String name, String name1) {
-    return null;
-  }
+  Table getTable(String catalogName, String dbName, String tableName);
 
-  default void alterTable(String name, String name1, Table alteredHiveTable) {}
+  void alterTable(String catalogName, String dbName, String tableName, Table alteredHiveTable);
 
-  default void dropTable(
-      String name, String name1, boolean deleteData, boolean b, boolean ifPurge) {}
+  void dropTable(
+      String catalogName, String dbName, String tableName, boolean deleteData, boolean ifPurge);
 
-  default void createTable(Table hiveTable) {}
+  void createTable(String catalogName, String dbName, Table hiveTable);
 
-  default List<String> listPartitionNames(String s, String name, short i) {
-    return null;
-  }
+  List<String> listPartitionNames(
+      String catalogName, String dbName, String tableName, short pageSize);
 
-  default List<Partition> listPartitions(String s, String name, short i) {
-    return null;
-  }
+  List<Partition> listPartitions(
+      String catalogName, String dbName, String tableName, short pageSize);
 
-  default List<Partition> listPartitions(
-      String s, String name, List<String> filterPartitionValueList, short i) {
-    return null;
-  }
+  List<Partition> listPartitions(
+      String catalogName,
+      String dbName,
+      String tableName,
+      List<String> filterPartitionValueList,
+      short pageSize);
 
-  default Partition getPartition(String s, String name, String partitionName) {
-    return null;
-  }
+  Partition getPartition(String catalogName, String dbName, String tableName, String partitionName);
 
-  default Partition addPartition(Partition partition) {
-    return null;
-  }
+  Partition addPartition(String catalogName, String dbName, String tableName, Partition partition);
 
-  default void dropPartition(String dbName, String tableName, String partitionName, boolean b) {}
+  void dropPartition(
+      String catalogName, String dbName, String tableName, String partitionName, boolean b);
 
-  default String getDelegationToken(String finalPrincipalName, String userName) {
-    return null;
-  }
+  String getDelegationToken(String finalPrincipalName, String userName);
 
-  default List<Table> getTableObjectsByName(String name, List<String> allTables) {
-    return null;
-  }
+  List<Table> getTableObjectsByName(String name, List<String> allTables);
 
   public enum HiveVersion {
     HIVE2,

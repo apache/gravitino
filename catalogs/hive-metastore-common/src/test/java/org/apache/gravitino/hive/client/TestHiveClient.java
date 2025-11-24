@@ -37,7 +37,7 @@ public class TestHiveClient {
     HiveClient client = loader.createClient(properties);
     List<String> allDatabases = client.getAllDatabases();
     System.out.println("Databases: " + allDatabases);
-    Schema db = client.getDatabase(version.equals("HIVE3")?"hive": "", "default");
+    Schema db = client.getDatabase(version.equals("HIVE3") ? "hive" : "", "default");
     System.out.println("Database s1: " + db.name());
   }
 }

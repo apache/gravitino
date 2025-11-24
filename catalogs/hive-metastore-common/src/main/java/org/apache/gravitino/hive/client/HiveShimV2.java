@@ -22,12 +22,14 @@ import java.util.List;
 import org.apache.gravitino.Schema;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.hive.converter.HiveDatabaseConverter;
+import org.apache.gravitino.rel.Table;
+import org.apache.gravitino.rel.partitions.Partition;
 import org.apache.hadoop.hive.metastore.IMetaStoreClient;
 import org.apache.hadoop.hive.metastore.api.Database;
 
 class HiveShimV2 extends Shim {
 
-  private IMetaStoreClient client;
+  private final IMetaStoreClient client;
   Method getAllDatabasesMethod;
   Method createDatabaseMethod;
   Method getDabaseMethod;
@@ -59,9 +61,7 @@ class HiveShimV2 extends Shim {
 
   public void createDatabase(String catalogName, Schema database) {
     try {
-      Database db = new Database();
-      db.setName(database.name());
-      db.setDescription(database.comment());
+      Database db = HiveDatabaseConverter.toHiveDb(database);
       createDatabaseMethod.invoke(client, db);
     } catch (Exception e) {
       throw new RuntimeException("Failed to create database using HiveShimV2", e);
@@ -79,5 +79,86 @@ class HiveShimV2 extends Shim {
     } catch (Exception e) {
       throw new RuntimeException("Failed to get database using HiveShimV2", e);
     }
+  }
+
+  @Override
+  public void alterDatabase(String catalogName, String dbName, Schema database) {}
+
+  @Override
+  public void dropDatabase(String catalogName, String dbName, boolean cascade) {}
+
+  @Override
+  public List<String> getAllTables(String catalogName, String dbName) {
+    return List.of();
+  }
+
+  @Override
+  public List<String> getAllDatabTables(
+      String catalogName, String dbName, String filter, short maxTables) {
+    return List.of();
+  }
+
+  @Override
+  public Table getTable(String catalogName, String dbName, String tableName) {
+    return null;
+  }
+
+  @Override
+  public void alterTable(
+      String catalogName, String dbName, String tableName, Table alteredHiveTable) {}
+
+  @Override
+  public void dropTable(
+      String catalogName, String dbName, String tableName, boolean deleteData, boolean ifPurge) {}
+
+  @Override
+  public void createTable(String catalogName, String dbName, Table hiveTable) {}
+
+  @Override
+  public List<String> listPartitionNames(
+      String catalogName, String dbName, String tableName, short pageSize) {
+    return List.of();
+  }
+
+  @Override
+  public List<Partition> listPartitions(
+      String catalogName, String dbName, String tableName, short pageSize) {
+    return List.of();
+  }
+
+  @Override
+  public List<Partition> listPartitions(
+      String catalogName,
+      String dbName,
+      String tableName,
+      List<String> filterPartitionValueList,
+      short pageSize) {
+    return List.of();
+  }
+
+  @Override
+  public Partition getPartition(
+      String catalogName, String dbName, String tableName, String partitionName) {
+    return null;
+  }
+
+  @Override
+  public Partition addPartition(
+      String catalogName, String dbName, String tableName, Partition partition) {
+    return null;
+  }
+
+  @Override
+  public void dropPartition(
+      String catalogName, String dbName, String tableName, String partitionName, boolean b) {}
+
+  @Override
+  public String getDelegationToken(String finalPrincipalName, String userName) {
+    return "";
+  }
+
+  @Override
+  public List<Table> getTableObjectsByName(String name, List<String> allTables) {
+    return List.of();
   }
 }

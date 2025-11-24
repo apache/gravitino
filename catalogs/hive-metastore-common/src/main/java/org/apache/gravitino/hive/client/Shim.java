@@ -20,6 +20,8 @@ package org.apache.gravitino.hive.client;
 
 import java.util.List;
 import org.apache.gravitino.Schema;
+import org.apache.gravitino.rel.Table;
+import org.apache.gravitino.rel.partitions.Partition;
 
 /**
  * Java translation of Scala's `Shim` sealed abstract class.
@@ -36,4 +38,49 @@ public abstract class Shim {
   public Schema getDatabase(String catalogName, String dbName) {
     return null;
   }
+
+  public abstract void alterDatabase(String catalogName, String dbName, Schema database);
+
+  public abstract void dropDatabase(String catalogName, String dbName, boolean cascade);
+
+  public abstract List<String> getAllTables(String catalogName, String dbName);
+
+  public abstract List<String> getAllDatabTables(
+      String catalogName, String dbName, String filter, short maxTables);
+
+  public abstract Table getTable(String catalogName, String dbName, String tableName);
+
+  public abstract void alterTable(
+      String catalogName, String dbName, String tableName, Table alteredHiveTable);
+
+  public abstract void dropTable(
+      String catalogName, String dbName, String tableName, boolean deleteData, boolean ifPurge);
+
+  public abstract void createTable(String catalogName, String dbName, Table hiveTable);
+
+  public abstract List<String> listPartitionNames(
+      String catalogName, String dbName, String tableName, short pageSize);
+
+  public abstract List<Partition> listPartitions(
+      String catalogName, String dbName, String tableName, short pageSize);
+
+  public abstract List<Partition> listPartitions(
+      String catalogName,
+      String dbName,
+      String tableName,
+      List<String> filterPartitionValueList,
+      short pageSize);
+
+  public abstract Partition getPartition(
+      String catalogName, String dbName, String tableName, String partitionName);
+
+  public abstract Partition addPartition(
+      String catalogName, String dbName, String tableName, Partition partition);
+
+  public abstract void dropPartition(
+      String catalogName, String dbName, String tableName, String partitionName, boolean b);
+
+  public abstract String getDelegationToken(String finalPrincipalName, String userName);
+
+  public abstract List<Table> getTableObjectsByName(String name, List<String> allTables);
 }

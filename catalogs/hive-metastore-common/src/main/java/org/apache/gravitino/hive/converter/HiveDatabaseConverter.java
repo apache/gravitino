@@ -27,6 +27,7 @@ import org.apache.gravitino.Schema;
 import org.apache.gravitino.dto.AuditDTO;
 import org.apache.gravitino.dto.SchemaDTO;
 import org.apache.hadoop.hive.metastore.api.Database;
+import org.apache.hadoop.hive.metastore.api.PrincipalType;
 
 public class HiveDatabaseConverter {
   public static Schema fromHiveDB(Database db) {
@@ -57,5 +58,23 @@ public class HiveDatabaseConverter {
     Map<String, String> properties = Maps.newHashMap(database.getParameters());
     properties.put(LOCATION, database.getLocationUri());
     return properties;
+  }
+
+  public static Database toHiveDb(Schema db) {
+    Database hiveDb = new Database();
+
+    hiveDb.setName(db.name());
+    Optional.ofNullable(db.properties().get(LOCATION)).ifPresent(hiveDb::setLocationUri);
+    Optional.ofNullable(db.comment()).ifPresent(hiveDb::setDescription);
+
+    // TODO: Add more privilege info to Hive's Database object after Gravitino supports privilege.
+    hiveDb.setOwnerName(db.auditInfo().creator());
+    hiveDb.setOwnerType(PrincipalType.USER);
+
+    Map<String, String> parameters = Maps.newHashMap(db.properties());
+    parameters.remove(LOCATION);
+    hiveDb.setParameters(parameters);
+
+    return hiveDb;
   }
 }

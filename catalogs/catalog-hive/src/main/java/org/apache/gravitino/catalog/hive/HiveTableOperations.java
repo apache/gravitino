@@ -62,7 +62,7 @@ public class HiveTableOperations implements TableOperations, SupportsPartitions 
           .clientPool()
           .run(
               c ->
-                  c.listPartitionNames(table.schemaName(), table.name(), (short) -1)
+                  c.listPartitionNames("", table.schemaName(), table.name(), (short) -1)
                       .toArray(new String[0]));
     } catch (InterruptedException e) {
       throw new RuntimeException(
@@ -75,7 +75,7 @@ public class HiveTableOperations implements TableOperations, SupportsPartitions 
     try {
       return table
           .clientPool()
-          .run(c -> c.listPartitions(table.schemaName(), table.name(), (short) -1))
+          .run(c -> c.listPartitions("", table.schemaName(), table.name(), (short) -1))
           .toArray(new Partition[0]);
     } catch (InterruptedException e) {
       throw new RuntimeException(e);
@@ -87,7 +87,7 @@ public class HiveTableOperations implements TableOperations, SupportsPartitions 
     try {
       return table
           .clientPool()
-          .run(c -> c.getPartition(table.schemaName(), table.name(), partitionName));
+          .run(c -> c.getPartition("", table.schemaName(), table.name(), partitionName));
 
     } catch (InterruptedException e) {
       throw new RuntimeException(
@@ -151,7 +151,7 @@ public class HiveTableOperations implements TableOperations, SupportsPartitions 
                     f[0]));
 
     try {
-      return table.clientPool().run(c -> c.addPartition(identityPartition));
+      return table.clientPool().run(c -> c.addPartition("", "", "", identityPartition));
     } catch (InterruptedException e) {
       throw new RuntimeException(e);
     }
@@ -178,7 +178,7 @@ public class HiveTableOperations implements TableOperations, SupportsPartitions 
   @Override
   public boolean dropPartition(String partitionName) {
     try {
-      Table tb = table.clientPool().run(c -> c.getTable(table.schemaName(), table.name()));
+      Table tb = table.clientPool().run(c -> c.getTable("", table.schemaName(), table.name()));
       HiveTable hiveTable = HiveTable.fromHiveTable(table.schemaName(), tb).build();
       // Get partitions that need to drop
       // If the partition has child partition, then drop all the child partitions
@@ -189,6 +189,7 @@ public class HiveTableOperations implements TableOperations, SupportsPartitions 
               .run(
                   c ->
                       c.listPartitions(
+                          "",
                           table.schemaName(),
                           table.name(),
                           getFilterPartitionValueList(hiveTable, partitionName),
@@ -203,7 +204,7 @@ public class HiveTableOperations implements TableOperations, SupportsPartitions 
             .clientPool()
             .run(
                 cc -> {
-                  cc.dropPartition(table.schemaName(), table.name(), partition.name(), true);
+                  cc.dropPartition("", table.schemaName(), table.name(), partition.name(), true);
                   return null;
                 });
       }

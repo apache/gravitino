@@ -21,6 +21,8 @@ package org.apache.gravitino.catalog.hive;
 import static org.apache.gravitino.catalog.hive.HiveCatalogPropertiesMetadata.LIST_ALL_TABLES;
 import static org.apache.gravitino.catalog.hive.HiveCatalogPropertiesMetadata.METASTORE_URIS;
 import static org.apache.gravitino.catalog.hive.HiveCatalogPropertiesMetadata.PRINCIPAL;
+import static org.apache.gravitino.catalog.hive.HiveConstants.COMMENT;
+import static org.apache.gravitino.catalog.hive.HiveConstants.TABLE_TYPE;
 import static org.apache.gravitino.catalog.hive.HiveTable.SUPPORT_TABLE_TYPES;
 import static org.apache.gravitino.catalog.hive.HiveTablePropertiesMetadata.COMMENT;
 import static org.apache.gravitino.catalog.hive.HiveTablePropertiesMetadata.TABLE_TYPE;
@@ -69,7 +71,6 @@ import org.apache.gravitino.exceptions.NonEmptySchemaException;
 import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
 import org.apache.gravitino.exceptions.TableAlreadyExistsException;
 import org.apache.gravitino.hive.CachedClientPool;
-import org.apache.gravitino.hive.client.HiveClient;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Table;
@@ -322,7 +323,7 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
       NameIdentifier[] schemas =
           clientPool.run(
               c ->
-                  c.getAllDatabases().stream()
+                  c.getAllDatabases("").stream()
                       .map(db -> NameIdentifier.of(namespace, db))
                       .toArray(NameIdentifier[]::new));
       return schemas;
@@ -436,7 +437,7 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
 
       clientPool.run(
           client -> {
-            client.alterDatabase(ident.name(), database);
+            client.alterDatabase("", ident.name(), database);
             return null;
           });
 
@@ -461,7 +462,7 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
     try {
       clientPool.run(
           client -> {
-            client.dropDatabase(ident.name(), false, false, cascade);
+            client.dropDatabase("", ident.name(), cascade);
             return null;
           });
       LOG.info("Dropped Hive schema (database) {}", ident.name());
@@ -498,7 +499,7 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
       // first time is to retrieve all types of table names (including the missing type tables), and
       // then based on
       // those names we can obtain metadata for each individual table and get the type we needed.
-      List<String> allTables = clientPool.run(c -> c.getAllTables(schemaIdent.name()));
+      List<String> allTables = clientPool.run(c -> c.getAllTables("", schemaIdent.name()));
       if (!listAllTables) {
         // The reason for using the listTableNamesByFilter function is that the
         // getTableObjectiesByName function has poor performance. Currently, we focus on the
@@ -509,7 +510,7 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
             clientPool.run(
                 c ->
                     c.listTableNamesByFilter(
-                        schemaIdent.name(), icebergAndPaimonFilter, MAX_TABLES));
+                        "", schemaIdent.name(), icebergAndPaimonFilter, MAX_TABLES));
         allTables.removeAll(icebergAndPaimonTables);
 
         // filter out the Hudi tables
@@ -518,7 +519,7 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
                 "%sprovider like \"hudi\"", hive_metastoreConstants.HIVE_FILTER_FIELD_PARAMS);
         List<String> hudiTables =
             clientPool.run(
-                c -> c.listTableNamesByFilter(schemaIdent.name(), hudiFilter, MAX_TABLES));
+                c -> c.listTableNamesByFilter("", schemaIdent.name(), hudiFilter, MAX_TABLES));
         removeHudiTables(allTables, hudiTables);
       }
       return allTables.stream()
@@ -569,7 +570,7 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
     NameIdentifier schemaIdent = NameIdentifier.of(tableIdent.namespace().levels());
 
     try {
-      Table table = clientPool.run(c -> c.getTable(schemaIdent.name(), tableIdent.name()));
+      Table table = clientPool.run(c -> c.getTable("", schemaIdent.name(), tableIdent.name()));
       return HiveTable.fromHiveTable(schemaIdent.name(), table).build();
 
     } catch (InterruptedException e) {
@@ -740,7 +741,7 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
               .build();
       clientPool.run(
           c -> {
-            c.createTable(hiveTable);
+            c.createTable("", schemaIdent.name(), hiveTable);
             return null;
           });
 
@@ -832,7 +833,7 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
 
       clientPool.run(
           c -> {
-            c.alterTable(schemaIdent.name(), tableIdent.name(), table);
+            c.alterTable("", schemaIdent.name(), tableIdent.name(), table);
             return null;
           });
 
@@ -1030,7 +1031,7 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
       String comment,
       Map<String, String> properties) {
     try {
-      clientPool.run(HiveClient::getAllDatabases);
+      clientPool.run(c -> c.getAllDatabases(""));
     } catch (Exception e) {
       throw new ConnectionFailedException(
           e, "Failed to run getAllDatabases in Hive Metastore: %s", e.getMessage());
@@ -1051,7 +1052,7 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
     try {
       clientPool.run(
           c -> {
-            c.dropTable(schemaIdent.name(), tableIdent.name(), deleteData, false, ifPurge);
+            c.dropTable("", schemaIdent.name(), tableIdent.name(), deleteData, ifPurge);
             return null;
           });
 
