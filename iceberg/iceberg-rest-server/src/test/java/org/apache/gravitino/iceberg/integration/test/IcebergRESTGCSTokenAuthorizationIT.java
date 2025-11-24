@@ -24,36 +24,44 @@ import java.util.HashMap;
 import java.util.Map;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import org.apache.gravitino.credential.CredentialConstants;
-import org.apache.gravitino.credential.S3TokenCredential;
+import org.apache.gravitino.credential.GCSTokenCredential;
 import org.apache.gravitino.integration.test.util.BaseIT;
 import org.apache.gravitino.integration.test.util.DownloaderUtils;
 import org.apache.gravitino.integration.test.util.ITUtils;
-import org.apache.gravitino.storage.S3Properties;
+import org.apache.gravitino.storage.GCSProperties;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
-import org.junit.platform.commons.util.StringUtils;
 
+/**
+ * Integration tests for Iceberg REST credential vending with GCS (Google Cloud Storage).
+ *
+ * <p>Authentication: Supports both service account key file and Application Default Credentials
+ * (ADC).
+ *
+ * <p>Required environment variables:
+ *
+ * <ul>
+ *   <li>GRAVITINO_TEST_CLOUD_IT=true - enables cloud integration tests
+ *   <li>GRAVITINO_GCS_BUCKET - GCS bucket name (e.g., "my-bucket")
+ *   <li>GRAVITINO_GCS_PATH_PREFIX - path prefix within bucket (e.g., "test/gravitino")
+ *   <li>GRAVITINO_GCS_SERVICE_ACCOUNT_FILE (optional) - path to service account JSON key. If
+ *       omitted, uses ADC (requires: gcloud auth application-default login)
+ * </ul>
+ */
 @SuppressWarnings("FormatStringAnnotation")
 @EnabledIfEnvironmentVariable(named = "GRAVITINO_TEST_CLOUD_IT", matches = "true")
-public class IcebergRESTS3TokenAuthorizationIT extends IcebergRESTCloudTokenAuthorizationBaseIT {
+public class IcebergRESTGCSTokenAuthorizationIT extends IcebergRESTCloudTokenAuthorizationBaseIT {
 
-  private String s3Warehouse;
-  private String accessKey;
-  private String secretKey;
-  private String region;
-  private String roleArn;
-  private String externalId;
+  private String gcsWarehouse;
+  private String serviceAccountFile;
 
   @BeforeAll
   public void startIntegrationTest() throws Exception {
-    this.s3Warehouse =
-        String.format(
-            "s3://%s/test1", System.getenv().getOrDefault("GRAVITINO_S3_BUCKET", "{BUCKET_NAME}"));
-    this.accessKey = System.getenv().getOrDefault("GRAVITINO_S3_ACCESS_KEY", "{ACCESS_KEY}");
-    this.secretKey = System.getenv().getOrDefault("GRAVITINO_S3_SECRET_KEY", "{SECRET_KEY}");
-    this.region = System.getenv().getOrDefault("GRAVITINO_S3_REGION", "ap-southeast-2");
-    this.roleArn = System.getenv().getOrDefault("GRAVITINO_S3_ROLE_ARN", "{ROLE_ARN}");
-    this.externalId = System.getenv().getOrDefault("GRAVITINO_S3_EXTERNAL_ID", "");
+    String bucket = System.getenv().getOrDefault("GRAVITINO_GCS_BUCKET", "{BUCKET_NAME}");
+    String pathPrefix = System.getenv().getOrDefault("GRAVITINO_GCS_PATH_PREFIX", "test1");
+    this.gcsWarehouse = String.format("gs://%s/%s", bucket, pathPrefix);
+    // Use null to trigger ADC (Application Default Credentials) if not explicitly provided
+    this.serviceAccountFile = System.getenv().get("GRAVITINO_GCS_SERVICE_ACCOUNT_FILE");
 
     super.startIntegrationTest();
 
@@ -65,13 +73,13 @@ public class IcebergRESTS3TokenAuthorizationIT extends IcebergRESTCloudTokenAuth
   @Override
   public Map<String, String> getCustomProperties() {
     HashMap<String, String> m = new HashMap<>();
-    m.putAll(getS3Config());
+    m.putAll(getGCSConfig());
     return m;
   }
 
   @Override
   protected String getCloudProviderName() {
-    return "s3";
+    return "gcs";
   }
 
   @Override
@@ -79,7 +87,7 @@ public class IcebergRESTS3TokenAuthorizationIT extends IcebergRESTCloudTokenAuth
     String icebergBundleJarUri =
         String.format(
             "https://repo1.maven.org/maven2/org/apache/iceberg/"
-                + "iceberg-aws-bundle/%s/iceberg-aws-bundle-%s.jar",
+                + "iceberg-gcp-bundle/%s/iceberg-gcp-bundle-%s.jar",
             ITUtils.icebergVersion(), ITUtils.icebergVersion());
     String gravitinoHome = System.getenv("GRAVITINO_HOME");
     String targetDir = String.format("%s/iceberg-rest-server/libs/", gravitinoHome);
@@ -90,24 +98,21 @@ public class IcebergRESTS3TokenAuthorizationIT extends IcebergRESTCloudTokenAuth
   protected void copyCloudBundleJar() {
     String gravitinoHome = System.getenv("GRAVITINO_HOME");
     String targetDir = String.format("%s/iceberg-rest-server/libs/", gravitinoHome);
-    BaseIT.copyBundleJarsToDirectory("aws", targetDir);
+    BaseIT.copyBundleJarsToDirectory("gcp", targetDir);
   }
 
-  private Map<String, String> getS3Config() {
-    Map configMap = new HashMap<String, String>();
+  private Map<String, String> getGCSConfig() {
+    Map<String, String> configMap = new HashMap<>();
 
     configMap.put(
-        CredentialConstants.CREDENTIAL_PROVIDERS, S3TokenCredential.S3_TOKEN_CREDENTIAL_TYPE);
-    configMap.put(S3Properties.GRAVITINO_S3_REGION, region);
-    configMap.put(S3Properties.GRAVITINO_S3_ACCESS_KEY_ID, accessKey);
-    configMap.put(S3Properties.GRAVITINO_S3_SECRET_ACCESS_KEY, secretKey);
-    configMap.put(S3Properties.GRAVITINO_S3_ROLE_ARN, roleArn);
-    if (StringUtils.isNotBlank(externalId)) {
-      configMap.put(S3Properties.GRAVITINO_S3_EXTERNAL_ID, externalId);
+        CredentialConstants.CREDENTIAL_PROVIDERS, GCSTokenCredential.GCS_TOKEN_CREDENTIAL_TYPE);
+    // Only set service account file if explicitly provided, otherwise use ADC
+    if (serviceAccountFile != null && !serviceAccountFile.isEmpty()) {
+      configMap.put(GCSProperties.GRAVITINO_GCS_SERVICE_ACCOUNT_FILE, serviceAccountFile);
     }
 
-    configMap.put(IcebergConstants.IO_IMPL, "org.apache.iceberg.aws.s3.S3FileIO");
-    configMap.put(IcebergConstants.WAREHOUSE, s3Warehouse);
+    configMap.put(IcebergConstants.IO_IMPL, "org.apache.iceberg.gcp.gcs.GCSFileIO");
+    configMap.put(IcebergConstants.WAREHOUSE, gcsWarehouse);
 
     return configMap;
   }
