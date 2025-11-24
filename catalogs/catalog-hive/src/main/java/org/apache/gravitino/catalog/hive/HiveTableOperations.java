@@ -75,7 +75,7 @@ public class HiveTableOperations implements TableOperations, SupportsPartitions 
     try {
       return table
           .clientPool()
-          .run(c -> c.listPartitions("", table.schemaName(), table.name(), (short) -1))
+          .run(c -> c.listPartitions("", table.schemaName(), table, (short) -1))
           .toArray(new Partition[0]);
     } catch (InterruptedException e) {
       throw new RuntimeException(e);
@@ -191,7 +191,7 @@ public class HiveTableOperations implements TableOperations, SupportsPartitions 
                       c.listPartitions(
                           "",
                           table.schemaName(),
-                          table.name(),
+                          table,
                           getFilterPartitionValueList(hiveTable, partitionName),
                           (short) -1));
       if (partitions.isEmpty()) {

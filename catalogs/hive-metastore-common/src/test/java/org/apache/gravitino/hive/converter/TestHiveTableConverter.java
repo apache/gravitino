@@ -23,6 +23,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import java.util.Arrays;
 import java.util.List;
 import org.apache.gravitino.connector.BaseColumn;
+import org.apache.gravitino.dto.rel.ColumnDTO;
 import org.apache.gravitino.rel.Column;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.metastore.api.StorageDescriptor;
@@ -208,5 +209,5 @@ public class TestHiveTableConverter {
   }
 
   // Test column builder helper
-  static class TestColumnBuilder extends TestColumn.Builder {}
+  static class TestColumnBuilder extends ColumnDTO.Builder {}
 }

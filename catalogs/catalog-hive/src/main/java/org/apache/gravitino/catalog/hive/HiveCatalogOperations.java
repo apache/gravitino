@@ -24,8 +24,6 @@ import static org.apache.gravitino.catalog.hive.HiveCatalogPropertiesMetadata.PR
 import static org.apache.gravitino.catalog.hive.HiveConstants.COMMENT;
 import static org.apache.gravitino.catalog.hive.HiveConstants.TABLE_TYPE;
 import static org.apache.gravitino.catalog.hive.HiveTable.SUPPORT_TABLE_TYPES;
-import static org.apache.gravitino.catalog.hive.HiveTablePropertiesMetadata.COMMENT;
-import static org.apache.gravitino.catalog.hive.HiveTablePropertiesMetadata.TABLE_TYPE;
 import static org.apache.gravitino.connector.BaseCatalog.CATALOG_BYPASS_PREFIX;
 import static org.apache.gravitino.hive.converter.HiveDataTypeConverter.CONVERTER;
 import static org.apache.hadoop.hive.metastore.TableType.EXTERNAL_TABLE;

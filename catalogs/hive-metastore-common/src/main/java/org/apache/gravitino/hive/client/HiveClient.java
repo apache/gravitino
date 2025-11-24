@@ -58,12 +58,12 @@ public interface HiveClient {
       String catalogName, String dbName, String tableName, short pageSize);
 
   List<Partition> listPartitions(
-      String catalogName, String dbName, String tableName, short pageSize);
+      String catalogName, String dbName, Table table, short pageSize);
 
   List<Partition> listPartitions(
       String catalogName,
       String dbName,
-      String tableName,
+      Table table,
       List<String> filterPartitionValueList,
       short pageSize);
 

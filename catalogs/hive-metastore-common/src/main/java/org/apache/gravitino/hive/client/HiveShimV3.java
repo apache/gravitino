@@ -17,6 +17,8 @@
 
 package org.apache.gravitino.hive.client;
 
+import static org.apache.gravitino.hive.client.HiveClient.HiveVersion.HIVE3;
+
 import java.lang.reflect.Method;
 import java.util.List;
 import org.apache.gravitino.Schema;
@@ -27,32 +29,20 @@ import org.apache.gravitino.rel.partitions.Partition;
 import org.apache.hadoop.hive.metastore.IMetaStoreClient;
 import org.apache.hadoop.hive.metastore.api.Database;
 
-class HiveShimV3 extends Shim {
+class HiveShimV3 extends HiveShimV2{
 
-  private IMetaStoreClient client;
-  Method getAllDatabasesMethod;
   Method createDatabaseMethod;
   Method getDabaseMethod;
 
   HiveShimV3(IMetaStoreClient client) {
+    super(client, HIVE3);
     try {
-      this.client = client;
-      getAllDatabasesMethod = IMetaStoreClient.class.getMethod("getAllDatabases");
       createDatabaseMethod = IMetaStoreClient.class.getMethod("createDatabase", Database.class);
       getDabaseMethod = IMetaStoreClient.class.getMethod("getDatabase", String.class, String.class);
     } catch (NoSuchMethodException e) {
       throw new RuntimeException("Failed to initialize HiveShimV2", e);
     } catch (Exception e) {
       throw new RuntimeException(e);
-    }
-  }
-
-  @Override
-  protected List<String> getAllDatabase() {
-    try {
-      return (List<String>) getAllDatabasesMethod.invoke(client);
-    } catch (Exception e) {
-      throw new RuntimeException("Failed to get all databases using HiveShimV2", e);
     }
   }
 
@@ -124,7 +114,7 @@ class HiveShimV3 extends Shim {
 
   @Override
   public List<Partition> listPartitions(
-      String catalogName, String dbName, String tableName, short pageSize) {
+      String catalogName, String dbName, Table table, short pageSize) {
     return List.of();
   }
 
@@ -132,7 +122,7 @@ class HiveShimV3 extends Shim {
   public List<Partition> listPartitions(
       String catalogName,
       String dbName,
-      String tableName,
+      Table tabel,
       List<String> filterPartitionValueList,
       short pageSize) {
     return List.of();

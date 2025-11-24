@@ -50,11 +50,16 @@ import org.apache.gravitino.rel.expressions.Expression;
 import org.apache.gravitino.rel.expressions.NamedReference;
 import org.apache.gravitino.rel.expressions.distributions.Distribution;
 import org.apache.gravitino.rel.expressions.distributions.Distributions;
+import org.apache.gravitino.rel.expressions.literals.Literal;
+import org.apache.gravitino.rel.expressions.literals.Literals;
 import org.apache.gravitino.rel.expressions.sorts.SortDirection;
 import org.apache.gravitino.rel.expressions.sorts.SortOrder;
 import org.apache.gravitino.rel.expressions.sorts.SortOrders;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.expressions.transforms.Transforms;
+import org.apache.gravitino.rel.partitions.Partition;
+import org.apache.gravitino.rel.partitions.Partitions;
+import org.apache.hadoop.hive.common.FileUtils;
 import org.apache.hadoop.hive.metastore.TableType;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.metastore.api.Order;
@@ -62,6 +67,9 @@ import org.apache.hadoop.hive.metastore.api.SerDeInfo;
 import org.apache.hadoop.hive.metastore.api.StorageDescriptor;
 
 public class HiveTableConverter {
+
+  private static final String PARTITION_NAME_DELIMITER = "/";
+  private static final String PARTITION_VALUE_DELIMITER = "=";
 
   public static Table fromHiveTable(org.apache.hadoop.hive.metastore.api.Table table) {
     AuditInfo auditInfo = HiveTableConverter.getAuditInfo(table);
@@ -317,5 +325,25 @@ public class HiveTableConverter {
                             .withComment(p.getComment())
                             .build()))
         .toArray(ColumnDTO[]::new);
+  }
+
+  public static Partition fromHivePartition(
+    Table table, org.apache.hadoop.hive.metastore.api.Partition partition) {
+    List<String> partCols =
+        buildPartitionKeys(table).stream().map(FieldSchema::getName).collect(Collectors.toList());
+    String partitionName = FileUtils.makePartName(partCols, partition.getValues());
+    String[][] fieldNames = getFieldNames(partitionName);
+    Literal[] values =
+        partition.getValues().stream().map(Literals::stringLiteral).toArray(Literal[]::new);
+    // todo: support partition properties metadata to get more necessary information
+    return Partitions.identity(partitionName, fieldNames, values, partition.getParameters());
+  }
+
+  private static String[][] getFieldNames(String partitionName) {
+    // Hive partition name is in the format of "field1=value1/field2=value2/..."
+    String[] fields = partitionName.split(PARTITION_NAME_DELIMITER);
+    return Arrays.stream(fields)
+        .map(field -> new String[] {field.split(PARTITION_VALUE_DELIMITER)[0]})
+        .toArray(String[][]::new);
   }
 }

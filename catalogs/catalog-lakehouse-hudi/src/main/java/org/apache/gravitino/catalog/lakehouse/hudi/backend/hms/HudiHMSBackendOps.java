@@ -91,7 +91,7 @@ public class HudiHMSBackendOps implements HudiCatalogBackendOps {
     try {
       return clientPool.run(
           c ->
-              c.getAllDatabases().stream()
+              c.getAllDatabases("").stream()
                   .map(db -> NameIdentifier.of(namespace, db))
                   .toArray(NameIdentifier[]::new));
     } catch (InterruptedException e) {
@@ -127,7 +127,7 @@ public class HudiHMSBackendOps implements HudiCatalogBackendOps {
     try {
       return clientPool.run(
           c -> {
-            List<String> allTables = c.getAllTables(schemaIdent.name());
+            List<String> allTables = c.getAllTables("", schemaIdent.name());
             return c.getTableObjectsByName(schemaIdent.name(), allTables).stream()
                 .filter(this::checkHudiTable)
                 .map(t -> NameIdentifier.of(namespace, t.name()))
@@ -144,7 +144,7 @@ public class HudiHMSBackendOps implements HudiCatalogBackendOps {
 
     try {
       Table table =
-          clientPool.run(client -> client.getTable(schemaIdent.name(), tableIdent.name()));
+          clientPool.run(client -> client.getTable("", schemaIdent.name(), tableIdent.name()));
       if (!checkHudiTable(table)) {
         throw new NoSuchTableException(
             "Table %s is not a Hudi table in Hive Metastore", tableIdent.name());

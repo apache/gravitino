@@ -226,11 +226,11 @@ public class MiniHiveMetastore {
 
   public void reset() throws Exception {
     if (clientPool != null) {
-      for (String dbName : clientPool.run(client -> client.getAllDatabases())) {
-        for (String tblName : clientPool.run(client -> client.getAllTables(dbName))) {
+      for (String dbName : clientPool.run(client -> client.getAllDatabases(""))) {
+        for (String tblName : clientPool.run(client -> client.getAllTables("", dbName))) {
           clientPool.run(
               client -> {
-                client.dropTable(dbName, tblName, true, true, true);
+                client.dropTable("", dbName, tblName, true, true);
                 return null;
               });
         }
@@ -239,7 +239,7 @@ public class MiniHiveMetastore {
           // Drop cascade, functions dropped by cascade
           clientPool.run(
               client -> {
-                client.dropDatabase(dbName, true, true, true);
+                client.dropDatabase("", dbName, true);
                 return null;
               });
         }

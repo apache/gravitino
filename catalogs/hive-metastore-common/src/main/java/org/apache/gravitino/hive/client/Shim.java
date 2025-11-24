@@ -22,6 +22,8 @@ import java.util.List;
 import org.apache.gravitino.Schema;
 import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.partitions.Partition;
+import org.apache.hadoop.hive.metastore.IMetaStoreClient;
+import org.apache.thrift.TException;
 
 /**
  * Java translation of Scala's `Shim` sealed abstract class.
@@ -31,7 +33,21 @@ import org.apache.gravitino.rel.partitions.Partition;
  * methods according to the behavior of the corresponding Hive release.
  */
 public abstract class Shim {
-  protected abstract List<String> getAllDatabase();
+  protected final IMetaStoreClient client;
+  protected final HiveClient.HiveVersion version;
+
+  protected Shim(IMetaStoreClient client, HiveClient.HiveVersion version) {
+    this.client = client;
+    this.version = version;
+  }
+
+  public List<String> getAllDatabase() {
+    try {
+      return client.getAllDatabases();
+    } catch (TException e) {
+      throw new RuntimeException("Failed to get all databases in " + version, e);
+    }
+  }
 
   public void createDatabase(String catalogName, Schema schema) {}
 
@@ -62,12 +78,12 @@ public abstract class Shim {
       String catalogName, String dbName, String tableName, short pageSize);
 
   public abstract List<Partition> listPartitions(
-      String catalogName, String dbName, String tableName, short pageSize);
+      String catalogName, String dbName, Table table, short pageSize);
 
   public abstract List<Partition> listPartitions(
       String catalogName,
       String dbName,
-      String tableName,
+      Table table,
       List<String> filterPartitionValueList,
       short pageSize);
 

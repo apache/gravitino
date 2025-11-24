@@ -111,18 +111,18 @@ public class HiveClientImpl implements HiveClient {
 
   @Override
   public List<Partition> listPartitions(
-      String catalogName, String dbName, String tableName, short pageSize) {
-    return shim.listPartitions(catalogName, dbName, tableName, pageSize);
+      String catalogName, String dbName, Table table, short pageSize) {
+    return shim.listPartitions(catalogName, dbName, table, pageSize);
   }
 
   @Override
   public List<Partition> listPartitions(
       String catalogName,
       String dbName,
-      String tableName,
+      Table table,
       List<String> filterPartitionValueList,
       short pageSize) {
-    return shim.listPartitions(catalogName, dbName, tableName, filterPartitionValueList, pageSize);
+    return shim.listPartitions(catalogName, dbName, table, filterPartitionValueList, pageSize);
   }
 
   @Override

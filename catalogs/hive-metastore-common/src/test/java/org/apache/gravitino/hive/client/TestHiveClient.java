@@ -28,16 +28,28 @@ import org.junit.jupiter.api.Test;
 public class TestHiveClient {
 
   @Test
-  void testClient() throws Exception {
+  void testHive2Client() throws Exception {
+    String version = "HIVE2";
+    Properties properties = new Properties();
+    properties.setProperty("hive.metastore.uris", "thrift://localhost:9083");
+    IsolatedClientLoader loader = IsolatedClientLoader.forVersion(version, Map.of());
+    HiveClient client = loader.createClient(properties);
+    List<String> allDatabases = client.getAllDatabases("");
+    System.out.println("Databases: " + allDatabases);
+    Schema db = client.getDatabase("", "default");
+    System.out.println("Database s1: " + db.name());
+  }
+
+  void testHive3Client() throws Exception {
+    String catalogName = "";
     String version = "HIVE3";
     Properties properties = new Properties();
-    // properties.setProperty("hive.metastore.uris", "thrift://localhost:9083");
     properties.setProperty("hive.metastore.uris", "thrift://172.17.0.3:9083");
     IsolatedClientLoader loader = IsolatedClientLoader.forVersion(version, Map.of());
     HiveClient client = loader.createClient(properties);
-    List<String> allDatabases = client.getAllDatabases();
+    List<String> allDatabases = client.getAllDatabases(catalogName);
     System.out.println("Databases: " + allDatabases);
-    Schema db = client.getDatabase(version.equals("HIVE3") ? "hive" : "", "default");
+    Schema db = client.getDatabase(catalogName, "default");
     System.out.println("Database s1: " + db.name());
   }
 }
