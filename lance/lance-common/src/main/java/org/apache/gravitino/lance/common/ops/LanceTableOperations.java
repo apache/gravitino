@@ -23,6 +23,7 @@ import com.lancedb.lance.namespace.model.CreateTableRequest;
 import com.lancedb.lance.namespace.model.CreateTableResponse;
 import com.lancedb.lance.namespace.model.DeregisterTableResponse;
 import com.lancedb.lance.namespace.model.DescribeTableResponse;
+import com.lancedb.lance.namespace.model.DropTableResponse;
 import com.lancedb.lance.namespace.model.RegisterTableRequest;
 import com.lancedb.lance.namespace.model.RegisterTableResponse;
 import java.util.Map;
@@ -94,4 +95,22 @@ public interface LanceTableOperations {
    * @return the response of the deregister table operation
    */
   DeregisterTableResponse deregisterTable(String tableId, String delimiter);
+
+  /**
+   * Check if a table exists.
+   *
+   * @param tableId table ids are in the format of "{namespace}{delimiter}{table_name}"
+   * @param delimiter the delimiter used in the namespace
+   * @return true if the table exists, false otherwise
+   */
+  boolean tableExists(String tableId, String delimiter);
+
+  /**
+   * Drop a table. It will delete the underlying lance data.
+   *
+   * @param tableId table ids are in the format of "{namespace}{delimiter}{table_name}"
+   * @param delimiter the delimiter used in the namespace
+   * @return the response of the drop table operation
+   */
+  DropTableResponse dropTable(String tableId, String delimiter);
 }
