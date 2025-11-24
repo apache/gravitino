@@ -91,6 +91,15 @@ public class PolicyMetaSQLProviderFactory {
     return getProvider().softDeletePolicyMetasByMetalakeId(metalakeId);
   }
 
+  public static String selectPolicyMetaByMetalakeIdAndName(
+      @Param("metalakeId") Long metalakeId, @Param("policyName") String policyName) {
+    return getProvider().selectPolicyMetaByMetalakeIdAndName(metalakeId, policyName);
+  }
+
+  public static String selectPolicyByTagId(@Param("policyId") Long policyId) {
+    return getProvider().selectPolicyByPolicyId(policyId);
+  }
+
   static class PolicyMetaMySQLProvider extends PolicyMetaBaseSQLProvider {}
 
   static class PolicyMetaH2Provider extends PolicyMetaBaseSQLProvider {}

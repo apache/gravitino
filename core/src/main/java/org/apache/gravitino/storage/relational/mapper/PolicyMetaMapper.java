@@ -132,4 +132,12 @@ public interface PolicyMetaMapper {
       method = "deletePolicyMetasByLegacyTimeline")
   Integer deletePolicyMetasByLegacyTimeline(
       @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit);
+
+  @SelectProvider(
+      type = PolicyMetaSQLProviderFactory.class,
+      method = "selectPolicyMetaByMetalakeIdAndName")
+  PolicyPO selectPolicyMetaByMetalakeIdAndName(long metalakeId, String policyName);
+
+  @SelectProvider(type = PolicyMetaSQLProviderFactory.class, method = "selectPolicyByPolicyId")
+  PolicyPO selectPolicyByPolicyId(Long policyId);
 }

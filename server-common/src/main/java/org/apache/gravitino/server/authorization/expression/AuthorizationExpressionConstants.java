@@ -113,4 +113,9 @@ public class AuthorizationExpressionConstants {
 
   public static final String applyTagAuthorizationExpression =
       "METALAKE::OWNER || TAG::OWNER || ANY_APPLY_TAG";
+
+  public static final String loadPolicyAuthorizationExpression =
+      """
+          METALAKE::OWNER || POLICY::OWNER || ANY_APPLY_POLICY
+          """;
 }

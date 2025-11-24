@@ -469,4 +469,11 @@ public class PolicyMetaService {
         PolicyMetaMapper.class,
         mapper -> mapper.listPolicyPOsByMetalakeAndPolicyNames(metalakeName, policyNames));
   }
+
+  public long getPolicyIdByTagName(long metalakeId, String policyName) {
+    return SessionUtils.getWithoutCommit(
+            PolicyMetaMapper.class,
+            mapper -> mapper.selectPolicyMetaByMetalakeIdAndName(metalakeId, policyName))
+        .getPolicyId();
+  }
 }

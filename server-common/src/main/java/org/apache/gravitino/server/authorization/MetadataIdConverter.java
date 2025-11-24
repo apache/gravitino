@@ -24,6 +24,7 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.GravitinoEnv;
@@ -53,17 +54,8 @@ public class MetadataIdConverter {
 
   // Maps metadata type to entity type
   private static final Map<MetadataObject.Type, Entity.EntityType> METADATA_TO_ENTITY_TYPE_MAPPING =
-      ImmutableMap.of(
-          MetadataObject.Type.METALAKE, Entity.EntityType.METALAKE,
-          MetadataObject.Type.CATALOG, Entity.EntityType.CATALOG,
-          MetadataObject.Type.SCHEMA, Entity.EntityType.SCHEMA,
-          MetadataObject.Type.TABLE, Entity.EntityType.TABLE,
-          MetadataObject.Type.MODEL, Entity.EntityType.MODEL,
-          MetadataObject.Type.FILESET, Entity.EntityType.FILESET,
-          MetadataObject.Type.TOPIC, Entity.EntityType.TOPIC,
-          MetadataObject.Type.COLUMN, Entity.EntityType.COLUMN,
-          MetadataObject.Type.ROLE, Entity.EntityType.ROLE,
-          MetadataObject.Type.TAG, Entity.EntityType.TAG);
+      new ConcurrentHashMap<>();
+
   // Maps metadata type to capability scope
   private static final Map<MetadataObject.Type, Capability.Scope> METADATA_SCOPE_MAPPING =
       ImmutableMap.of(
@@ -92,6 +84,20 @@ public class MetadataIdConverter {
           .build();
 
   private MetadataIdConverter() {}
+
+  static {
+    METADATA_TO_ENTITY_TYPE_MAPPING.put(MetadataObject.Type.METALAKE, Entity.EntityType.METALAKE);
+    METADATA_TO_ENTITY_TYPE_MAPPING.put(MetadataObject.Type.CATALOG, Entity.EntityType.CATALOG);
+    METADATA_TO_ENTITY_TYPE_MAPPING.put(MetadataObject.Type.SCHEMA, Entity.EntityType.SCHEMA);
+    METADATA_TO_ENTITY_TYPE_MAPPING.put(MetadataObject.Type.TABLE, Entity.EntityType.TABLE);
+    METADATA_TO_ENTITY_TYPE_MAPPING.put(MetadataObject.Type.MODEL, Entity.EntityType.MODEL);
+    METADATA_TO_ENTITY_TYPE_MAPPING.put(MetadataObject.Type.FILESET, Entity.EntityType.FILESET);
+    METADATA_TO_ENTITY_TYPE_MAPPING.put(MetadataObject.Type.TOPIC, Entity.EntityType.TOPIC);
+    METADATA_TO_ENTITY_TYPE_MAPPING.put(MetadataObject.Type.COLUMN, Entity.EntityType.COLUMN);
+    METADATA_TO_ENTITY_TYPE_MAPPING.put(MetadataObject.Type.ROLE, Entity.EntityType.ROLE);
+    METADATA_TO_ENTITY_TYPE_MAPPING.put(MetadataObject.Type.TAG, Entity.EntityType.TAG);
+    METADATA_TO_ENTITY_TYPE_MAPPING.put(MetadataObject.Type.POLICY, Entity.EntityType.POLICY);
+  }
 
   /**
    * Converts the given metadata object to metadata id.

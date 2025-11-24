@@ -313,6 +313,9 @@ public class MetadataAuthzHelper {
       case TAG:
         nameIdentifierMap.put(entityType, nameIdentifier);
         break;
+      case POLICY:
+        nameIdentifierMap.put(entityType, nameIdentifier);
+        break;
       default:
         throw new IllegalArgumentException("Unsupported entity type: " + entityType);
     }

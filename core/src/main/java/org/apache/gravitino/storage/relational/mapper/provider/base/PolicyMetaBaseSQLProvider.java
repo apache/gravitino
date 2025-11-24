@@ -171,4 +171,29 @@ public class PolicyMetaBaseSQLProvider {
         + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
         + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0";
   }
+
+  public String selectPolicyByPolicyId(Long policyId) {
+    return "SELECT pm.policy_id, pm.policy_name, pm.policy_type, pm.metalake_id,"
+        + " pm.audit_info, pm.current_version, pm.last_version,"
+        + " pm.deleted_at"
+        + " FROM "
+        + POLICY_META_TABLE_NAME
+        + " pm "
+        + " WHERE"
+        + " pm.policy_id = #{policyId}"
+        + " AND pm.deleted_at = 0 ";
+  }
+
+  public String selectPolicyMetaByMetalakeIdAndName(Long metalakeId, String policyName) {
+    return "SELECT pm.policy_id, pm.policy_name, pm.policy_type, pm.metalake_id,"
+        + " pm.audit_info, pm.current_version, pm.last_version,"
+        + " pm.deleted_at"
+        + " FROM "
+        + POLICY_META_TABLE_NAME
+        + " pm "
+        + " WHERE"
+        + " pm.metalake_id = #{metalakeId}"
+        + " AND pm.policy_name = #{policyName}"
+        + " AND pm.deleted_at = 0 ";
+  }
 }

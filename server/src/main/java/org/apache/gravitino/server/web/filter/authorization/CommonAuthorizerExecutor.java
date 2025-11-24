@@ -29,7 +29,7 @@ public class CommonAuthorizerExecutor implements AuthorizationExecutor {
   private Map<Entity.EntityType, NameIdentifier> metadataContext;
   private AuthorizationExpressionEvaluator authorizationExpressionEvaluator;
   private Map<String, Object> pathParams;
-  String entityType;
+  private String entityType;
 
   public CommonAuthorizerExecutor(
       Map<Entity.EntityType, NameIdentifier> metadataContext,

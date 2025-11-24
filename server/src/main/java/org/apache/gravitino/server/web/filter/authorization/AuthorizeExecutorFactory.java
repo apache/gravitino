@@ -44,6 +44,7 @@ public class AuthorizeExecutorFactory {
           authorizationExpressionEvaluator,
           pathParams,
           entityType);
+      case ASSOCIATE_POLICY -> null;
     };
   }
 }
