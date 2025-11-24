@@ -24,7 +24,7 @@ import java.util.List;
 import java.util.stream.Collectors;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.NameIdentifier;
-import org.apache.gravitino.meta.EntityIds;
+import org.apache.gravitino.meta.NamespacedEntityId;
 import org.apache.gravitino.meta.StatisticEntity;
 import org.apache.gravitino.metrics.Monitored;
 import org.apache.gravitino.storage.relational.mapper.StatisticMetaMapper;
@@ -51,13 +51,13 @@ public class StatisticMetaService {
       baseMetricName = "listStatisticsByEntity")
   public List<StatisticEntity> listStatisticsByEntity(
       NameIdentifier identifier, Entity.EntityType type) {
-    EntityIds entityIds = EntityIdService.getEntityIds(identifier, type);
+    NamespacedEntityId namespacedEntityId = EntityIdService.getEntityIds(identifier, type);
     List<StatisticPO> statisticPOs =
         SessionUtils.getWithoutCommit(
             StatisticMetaMapper.class,
             mapper ->
                 mapper.listStatisticPOsByEntityId(
-                    entityIds.namespaceIds()[0], entityIds.entityId()));
+                    namespacedEntityId.namespaceIds()[0], namespacedEntityId.entityId()));
     return statisticPOs.stream().map(StatisticPO::fromStatisticPO).collect(Collectors.toList());
   }
 
@@ -70,12 +70,12 @@ public class StatisticMetaService {
       return;
     }
 
-    EntityIds entityIds = EntityIdService.getEntityIds(entity, type);
+    NamespacedEntityId namespacedEntityId = EntityIdService.getEntityIds(entity, type);
     List<StatisticPO> pos =
         StatisticPO.initializeStatisticPOs(
             statisticEntities,
-            entityIds.namespaceIds()[0],
-            entityIds.entityId(),
+            namespacedEntityId.namespaceIds()[0],
+            namespacedEntityId.entityId(),
             NameIdentifierUtil.toMetadataObject(entity, type).type());
     SessionUtils.doWithCommit(
         StatisticMetaMapper.class,

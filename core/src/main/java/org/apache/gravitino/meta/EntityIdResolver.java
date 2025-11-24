@@ -31,7 +31,7 @@ public interface EntityIdResolver {
    * @param type Entity type.
    * @return EntityIds corresponding to the NameIdentifier and Entity type.
    */
-  EntityIds getEntityIds(NameIdentifier nameIdentifier, Entity.EntityType type);
+  NamespacedEntityId getEntityIds(NameIdentifier nameIdentifier, Entity.EntityType type);
 
   /**
    * Get the entity ID for the given NameIdentifier and Entity type.

@@ -35,8 +35,8 @@ import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
-import org.apache.gravitino.meta.EntityIds;
 import org.apache.gravitino.meta.ModelEntity;
+import org.apache.gravitino.meta.NamespacedEntityId;
 import org.apache.gravitino.metrics.Monitored;
 import org.apache.gravitino.storage.relational.mapper.ModelMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.ModelVersionAliasRelMapper;
@@ -236,11 +236,11 @@ public class ModelMetaService {
 
   private void fillModelPOBuilderParentEntityId(ModelPO.Builder builder, Namespace ns) {
     NamespaceUtil.checkModel(ns);
-    EntityIds entityIds =
+    NamespacedEntityId namespacedEntityId =
         EntityIdService.getEntityIds(NameIdentifier.of(ns.levels()), Entity.EntityType.SCHEMA);
-    builder.withMetalakeId(entityIds.namespaceIds()[0]);
-    builder.withCatalogId(entityIds.namespaceIds()[1]);
-    builder.withSchemaId(entityIds.entityId());
+    builder.withMetalakeId(namespacedEntityId.namespaceIds()[0]);
+    builder.withCatalogId(namespacedEntityId.namespaceIds()[1]);
+    builder.withSchemaId(namespacedEntityId.entityId());
   }
 
   @Monitored(

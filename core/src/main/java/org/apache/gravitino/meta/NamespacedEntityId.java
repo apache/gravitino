@@ -19,19 +19,20 @@
 package org.apache.gravitino.meta;
 
 import com.google.common.base.Preconditions;
+import org.apache.commons.lang3.ArrayUtils;
 
-public class EntityIds {
+public class NamespacedEntityId {
 
   private final long entityId;
   private final long[] namespaceIds;
 
-  public EntityIds(long entityId, long... namespaceIds) {
+  public NamespacedEntityId(long entityId, long... namespaceIds) {
     Preconditions.checkArgument(namespaceIds != null, "namespaceIds cannot be null");
     this.entityId = entityId;
     this.namespaceIds = namespaceIds;
   }
 
-  public EntityIds(long entityId) {
+  public NamespacedEntityId(long entityId) {
     this(entityId, new long[0]);
   }
 

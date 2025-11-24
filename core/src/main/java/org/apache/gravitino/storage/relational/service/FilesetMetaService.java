@@ -31,8 +31,8 @@ import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
-import org.apache.gravitino.meta.EntityIds;
 import org.apache.gravitino.meta.FilesetEntity;
+import org.apache.gravitino.meta.NamespacedEntityId;
 import org.apache.gravitino.metrics.Monitored;
 import org.apache.gravitino.storage.relational.mapper.FilesetMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.FilesetVersionMapper;
@@ -349,11 +349,11 @@ public class FilesetMetaService {
 
   private void fillFilesetPOBuilderParentEntityId(FilesetPO.Builder builder, Namespace namespace) {
     NamespaceUtil.checkFileset(namespace);
-    EntityIds entityIds =
+    NamespacedEntityId namespacedEntityId =
         EntityIdService.getEntityIds(
             NameIdentifier.of(namespace.levels()), Entity.EntityType.SCHEMA);
-    builder.withMetalakeId(entityIds.namespaceIds()[0]);
-    builder.withCatalogId(entityIds.namespaceIds()[1]);
-    builder.withSchemaId(entityIds.entityId());
+    builder.withMetalakeId(namespacedEntityId.namespaceIds()[0]);
+    builder.withCatalogId(namespacedEntityId.namespaceIds()[1]);
+    builder.withSchemaId(namespacedEntityId.entityId());
   }
 }

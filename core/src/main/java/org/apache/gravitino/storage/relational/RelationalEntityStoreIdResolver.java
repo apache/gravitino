@@ -23,7 +23,7 @@ import java.util.Set;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.meta.EntityIdResolver;
-import org.apache.gravitino.meta.EntityIds;
+import org.apache.gravitino.meta.NamespacedEntityId;
 import org.apache.gravitino.storage.relational.helper.CatalogIds;
 import org.apache.gravitino.storage.relational.helper.SchemaIds;
 import org.apache.gravitino.storage.relational.service.CatalogMetaService;
@@ -60,7 +60,7 @@ public class RelationalEntityStoreIdResolver implements EntityIdResolver {
           Entity.EntityType.COLUMN);
 
   @Override
-  public EntityIds getEntityIds(NameIdentifier nameIdentifier, Entity.EntityType type) {
+  public NamespacedEntityId getEntityIds(NameIdentifier nameIdentifier, Entity.EntityType type) {
     if (ENTITY_TYPES_REQUIRING_METALAKE_ID.contains(type)) {
       return getEntityIdsAboutMetalake(nameIdentifier, type);
 
@@ -70,7 +70,7 @@ public class RelationalEntityStoreIdResolver implements EntityIdResolver {
               .getCatalogIdByMetalakeAndCatalogName(
                   NameIdentifierUtil.getMetalake(nameIdentifier),
                   NameIdentifierUtil.getCatalogIdentifier(nameIdentifier).name());
-      return new EntityIds(catalogIds.getCatalogId(), catalogIds.getMetalakeId());
+      return new NamespacedEntityId(catalogIds.getCatalogId(), catalogIds.getMetalakeId());
 
     } else if (ENTITY_TYPES_REQURING_SCHEMA_IDS.contains(type)) {
       return getEntityIdsAboutSchema(nameIdentifier, type);
@@ -100,7 +100,7 @@ public class RelationalEntityStoreIdResolver implements EntityIdResolver {
     }
   }
 
-  private EntityIds getEntityIdsAboutMetalake(
+  private NamespacedEntityId getEntityIdsAboutMetalake(
       NameIdentifier nameIdentifier, Entity.EntityType type) {
     long metalakeId =
         MetalakeMetaService.getInstance()
@@ -108,37 +108,38 @@ public class RelationalEntityStoreIdResolver implements EntityIdResolver {
 
     switch (type) {
       case METALAKE:
-        return new EntityIds(metalakeId);
+        return new NamespacedEntityId(metalakeId);
 
       case ROLE:
         long roleId =
             RoleMetaService.getInstance()
                 .getRoleIdByMetalakeIdAndName(metalakeId, nameIdentifier.name());
-        return new EntityIds(roleId, metalakeId);
+        return new NamespacedEntityId(roleId, metalakeId);
 
       case USER:
         long userId =
             UserMetaService.getInstance()
                 .getUserIdByMetalakeIdAndName(metalakeId, nameIdentifier.name());
-        return new EntityIds(userId, metalakeId);
+        return new NamespacedEntityId(userId, metalakeId);
 
       case GROUP:
         long groupId =
             GroupMetaService.getInstance()
                 .getGroupIdByMetalakeIdAndName(metalakeId, nameIdentifier.name());
-        return new EntityIds(groupId, metalakeId);
+        return new NamespacedEntityId(groupId, metalakeId);
 
       case TAG:
         long tagId =
             TagMetaService.getInstance().getTagIdByTagName(metalakeId, nameIdentifier.name());
-        return new EntityIds(tagId, metalakeId);
+        return new NamespacedEntityId(tagId, metalakeId);
 
       default:
         throw new IllegalArgumentException("Unsupported entity type: " + type);
     }
   }
 
-  private EntityIds getEntityIdsAboutSchema(NameIdentifier nameIdentifier, Entity.EntityType type) {
+  private NamespacedEntityId getEntityIdsAboutSchema(
+      NameIdentifier nameIdentifier, Entity.EntityType type) {
     SchemaIds schemaIds =
         SchemaMetaService.getInstance()
             .getSchemaIdByMetalakeNameAndCatalogNameAndSchemaName(
@@ -148,14 +149,14 @@ public class RelationalEntityStoreIdResolver implements EntityIdResolver {
 
     switch (type) {
       case SCHEMA:
-        return new EntityIds(
+        return new NamespacedEntityId(
             schemaIds.getSchemaId(), schemaIds.getMetalakeId(), schemaIds.getCatalogId());
 
       case TABLE:
         long tableId =
             TableMetaService.getInstance()
                 .getTableIdBySchemaIdAndName(schemaIds.getSchemaId(), nameIdentifier.name());
-        return new EntityIds(
+        return new NamespacedEntityId(
             tableId, schemaIds.getMetalakeId(), schemaIds.getCatalogId(), schemaIds.getSchemaId());
 
       case COLUMN:
@@ -167,7 +168,7 @@ public class RelationalEntityStoreIdResolver implements EntityIdResolver {
         long columnId =
             TableColumnMetaService.getInstance()
                 .getColumnIdByTableIdAndName(columnTableId, nameIdentifier.name());
-        return new EntityIds(
+        return new NamespacedEntityId(
             columnId,
             schemaIds.getMetalakeId(),
             schemaIds.getCatalogId(),
@@ -178,7 +179,7 @@ public class RelationalEntityStoreIdResolver implements EntityIdResolver {
         long filesetId =
             FilesetMetaService.getInstance()
                 .getFilesetIdBySchemaIdAndName(schemaIds.getSchemaId(), nameIdentifier.name());
-        return new EntityIds(
+        return new NamespacedEntityId(
             filesetId,
             schemaIds.getMetalakeId(),
             schemaIds.getCatalogId(),
@@ -188,14 +189,14 @@ public class RelationalEntityStoreIdResolver implements EntityIdResolver {
         long topicId =
             TopicMetaService.getInstance()
                 .getTopicIdBySchemaIdAndName(schemaIds.getSchemaId(), nameIdentifier.name());
-        return new EntityIds(
+        return new NamespacedEntityId(
             topicId, schemaIds.getMetalakeId(), schemaIds.getCatalogId(), schemaIds.getSchemaId());
 
       case MODEL:
         long modelId =
             ModelMetaService.getInstance()
                 .getModelIdBySchemaIdAndModelName(schemaIds.getSchemaId(), nameIdentifier.name());
-        return new EntityIds(
+        return new NamespacedEntityId(
             modelId, schemaIds.getMetalakeId(), schemaIds.getCatalogId(), schemaIds.getSchemaId());
 
       default:

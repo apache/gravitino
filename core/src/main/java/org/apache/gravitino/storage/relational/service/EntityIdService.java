@@ -23,7 +23,7 @@ import com.google.common.base.Preconditions;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.meta.EntityIdResolver;
-import org.apache.gravitino.meta.EntityIds;
+import org.apache.gravitino.meta.NamespacedEntityId;
 
 /**
  * Service class to resolve entity IDs based on NameIdentifiers and Entity types. This class must be
@@ -43,7 +43,7 @@ public class EntityIdService {
     return entityIdResolver.getEntityId(identifier, type);
   }
 
-  public static EntityIds getEntityIds(NameIdentifier identifier, Entity.EntityType type) {
+  public static NamespacedEntityId getEntityIds(NameIdentifier identifier, Entity.EntityType type) {
     Preconditions.checkArgument(entityIdResolver != null, "EntityIdService is not initialized");
     return entityIdResolver.getEntityIds(identifier, type);
   }

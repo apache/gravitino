@@ -32,9 +32,9 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NonEmptyEntityException;
-import org.apache.gravitino.meta.EntityIds;
 import org.apache.gravitino.meta.FilesetEntity;
 import org.apache.gravitino.meta.ModelEntity;
+import org.apache.gravitino.meta.NamespacedEntityId;
 import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.metrics.Monitored;
@@ -377,10 +377,10 @@ public class SchemaMetaService {
 
   private void fillSchemaPOBuilderParentEntityId(SchemaPO.Builder builder, Namespace namespace) {
     NamespaceUtil.checkSchema(namespace);
-    EntityIds entityIds =
+    NamespacedEntityId namespacedEntityId =
         EntityIdService.getEntityIds(
             NameIdentifier.of(namespace.levels()), Entity.EntityType.CATALOG);
-    builder.withMetalakeId(entityIds.namespaceIds()[0]);
-    builder.withCatalogId(entityIds.entityId());
+    builder.withMetalakeId(namespacedEntityId.namespaceIds()[0]);
+    builder.withCatalogId(namespacedEntityId.entityId());
   }
 }

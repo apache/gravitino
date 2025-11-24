@@ -22,7 +22,7 @@ import org.apache.gravitino.Entity;
 import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.meta.EntityIdResolver;
-import org.apache.gravitino.meta.EntityIds;
+import org.apache.gravitino.meta.NamespacedEntityId;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 
 public class CachedEntityIdResolver implements EntityIdResolver {
@@ -36,19 +36,19 @@ public class CachedEntityIdResolver implements EntityIdResolver {
   }
 
   @Override
-  public EntityIds getEntityIds(NameIdentifier nameIdentifier, Entity.EntityType type) {
+  public NamespacedEntityId getEntityIds(NameIdentifier nameIdentifier, Entity.EntityType type) {
     return entityCache
         .getIfPresent(nameIdentifier, type)
         .map(
             entity -> {
               if (nameIdentifier.hasNamespace()) {
-                EntityIds namespaceIds =
+                NamespacedEntityId namespaceIds =
                     getEntityIds(
                         NameIdentifierUtil.parentNameIdentifier(nameIdentifier, type),
                         NameIdentifierUtil.parentEntityType(type));
-                return new EntityIds(entity.id(), namespaceIds.fullIds());
+                return new NamespacedEntityId(entity.id(), namespaceIds.fullIds());
               } else {
-                return new EntityIds(entity.id());
+                return new NamespacedEntityId(entity.id());
               }
             })
         .orElseGet(() -> underlyingResolver.getEntityIds(nameIdentifier, type));

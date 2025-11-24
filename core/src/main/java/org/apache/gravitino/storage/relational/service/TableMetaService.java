@@ -33,7 +33,7 @@ import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
-import org.apache.gravitino.meta.EntityIds;
+import org.apache.gravitino.meta.NamespacedEntityId;
 import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.metrics.Monitored;
 import org.apache.gravitino.storage.relational.mapper.OwnerMetaMapper;
@@ -242,53 +242,58 @@ public class TableMetaService {
   public boolean deleteTable(NameIdentifier identifier) {
     NameIdentifierUtil.checkTable(identifier);
 
-    EntityIds entityIds = EntityIdService.getEntityIds(identifier, Entity.EntityType.TABLE);
+    NamespacedEntityId namespacedEntityId =
+        EntityIdService.getEntityIds(identifier, Entity.EntityType.TABLE);
 
     AtomicInteger deleteResult = new AtomicInteger(0);
     TablePO[] tablePOHolder = new TablePO[1];
     SessionUtils.doMultipleWithCommit(
         () -> {
           tablePOHolder[0] =
-              getTablePOBySchemaIdAndName(entityIds.namespaceIds()[2], identifier.name());
+              getTablePOBySchemaIdAndName(namespacedEntityId.namespaceIds()[2], identifier.name());
         },
         () ->
             deleteResult.set(
                 SessionUtils.getWithoutCommit(
                     TableMetaMapper.class,
-                    mapper -> mapper.softDeleteTableMetasByTableId(entityIds.entityId()))),
+                    mapper -> mapper.softDeleteTableMetasByTableId(namespacedEntityId.entityId()))),
         () -> {
           if (deleteResult.get() > 0) {
             SessionUtils.doWithoutCommit(
                 OwnerMetaMapper.class,
                 mapper ->
                     mapper.softDeleteOwnerRelByMetadataObjectIdAndType(
-                        entityIds.entityId(), MetadataObject.Type.TABLE.name()));
-            TableColumnMetaService.getInstance().deleteColumnsByTableId(entityIds.entityId());
+                        namespacedEntityId.entityId(), MetadataObject.Type.TABLE.name()));
+            TableColumnMetaService.getInstance()
+                .deleteColumnsByTableId(namespacedEntityId.entityId());
             SessionUtils.doWithoutCommit(
                 SecurableObjectMapper.class,
                 mapper ->
                     mapper.softDeleteObjectRelsByMetadataObject(
-                        entityIds.entityId(), MetadataObject.Type.TABLE.name()));
+                        namespacedEntityId.entityId(), MetadataObject.Type.TABLE.name()));
             SessionUtils.doWithoutCommit(
                 TagMetadataObjectRelMapper.class,
                 mapper ->
                     mapper.softDeleteTagMetadataObjectRelsByMetadataObject(
-                        entityIds.entityId(), MetadataObject.Type.TABLE.name()));
+                        namespacedEntityId.entityId(), MetadataObject.Type.TABLE.name()));
             SessionUtils.doWithoutCommit(
                 TagMetadataObjectRelMapper.class,
-                mapper -> mapper.softDeleteTagMetadataObjectRelsByTableId(entityIds.entityId()));
+                mapper ->
+                    mapper.softDeleteTagMetadataObjectRelsByTableId(namespacedEntityId.entityId()));
 
             SessionUtils.doWithoutCommit(
                 StatisticMetaMapper.class,
-                mapper -> mapper.softDeleteStatisticsByEntityId(entityIds.entityId()));
+                mapper -> mapper.softDeleteStatisticsByEntityId(namespacedEntityId.entityId()));
             SessionUtils.doWithoutCommit(
                 PolicyMetadataObjectRelMapper.class,
-                mapper -> mapper.softDeletePolicyMetadataObjectRelsByTableId(entityIds.entityId()));
+                mapper ->
+                    mapper.softDeletePolicyMetadataObjectRelsByTableId(
+                        namespacedEntityId.entityId()));
             SessionUtils.doWithCommit(
                 TableVersionMapper.class,
                 mapper ->
                     mapper.softDeleteTableVersionByTableIdAndVersion(
-                        entityIds.entityId(), tablePOHolder[0].getCurrentVersion()));
+                        namespacedEntityId.entityId(), tablePOHolder[0].getCurrentVersion()));
           }
         });
 
@@ -316,12 +321,12 @@ public class TableMetaService {
 
   private void fillTablePOBuilderParentEntityId(TablePO.Builder builder, Namespace namespace) {
     NamespaceUtil.checkTable(namespace);
-    EntityIds entityIds =
+    NamespacedEntityId namespacedEntityId =
         EntityIdService.getEntityIds(
             NameIdentifier.of(namespace.levels()), Entity.EntityType.SCHEMA);
-    builder.withMetalakeId(entityIds.namespaceIds()[0]);
-    builder.withCatalogId(entityIds.namespaceIds()[1]);
-    builder.withSchemaId(entityIds.entityId());
+    builder.withMetalakeId(namespacedEntityId.namespaceIds()[0]);
+    builder.withCatalogId(namespacedEntityId.namespaceIds()[1]);
+    builder.withSchemaId(namespacedEntityId.entityId());
   }
 
   private TablePO getTablePOBySchemaIdAndName(Long schemaId, String tableName) {
