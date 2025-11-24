@@ -177,12 +177,16 @@ public class LanceTableOperations extends ManagedTableOperations {
       Table table = loadTable(ident);
       String location = table.properties().get(Table.PROPERTY_LOCATION);
 
-      // Delete the Lance dataset at the location
-      Dataset.drop(location, LancePropertiesUtils.getLanceStorageOptions(table.properties()));
-      LOG.info("Deleted Lance dataset at location {}", location);
+      boolean purged = super.purgeTable(ident);
+      // If the table metadata is purged successfully, we can delete the Lance dataset.
+      // Otherwise, we should not delete the dataset.
+      if (purged) {
+        // Delete the Lance dataset at the location
+        Dataset.drop(location, LancePropertiesUtils.getLanceStorageOptions(table.properties()));
+        LOG.info("Deleted Lance dataset at location {}", location);
+      }
 
-      // After deleting the dataset, we can delete the table metadata in Gravitino
-      return super.purgeTable(ident);
+      return purged;
 
     } catch (NoSuchTableException e) {
       return false;
@@ -200,18 +204,23 @@ public class LanceTableOperations extends ManagedTableOperations {
               .map(Boolean::parseBoolean)
               .orElse(false);
 
+      boolean dropped = super.dropTable(ident);
       if (external) {
-        // If the table is external, we only drop the table metadata in Gravitino
-        return super.dropTable(ident);
+        return dropped;
       }
 
-      String location = table.properties().get(Table.PROPERTY_LOCATION);
+      // If the table metadata is dropped successfully, and the table is not external, we can delete
+      // the
+      // Lance dataset. Otherwise, we should not delete the dataset.
+      if (dropped) {
+        String location = table.properties().get(Table.PROPERTY_LOCATION);
 
-      // Delete the Lance dataset at the location
-      Dataset.drop(location, LancePropertiesUtils.getLanceStorageOptions(table.properties()));
-      LOG.info("Deleted Lance dataset at location {}", location);
-      // After deleting the dataset, we can delete the table metadata in Gravitino
-      return super.dropTable(ident);
+        // Delete the Lance dataset at the location
+        Dataset.drop(location, LancePropertiesUtils.getLanceStorageOptions(table.properties()));
+        LOG.info("Deleted Lance dataset at location {}", location);
+      }
+
+      return dropped;
 
     } catch (NoSuchTableException e) {
       return false;
@@ -241,7 +250,7 @@ public class LanceTableOperations extends ManagedTableOperations {
 
         dataset.createIndex(
             Arrays.stream(index.fieldNames())
-                .map(fieldPath -> String.join(".", fieldPath))
+                .map(field -> String.join(".", field))
                 .collect(Collectors.toList()),
             indexType,
             Optional.of(index.name()),
