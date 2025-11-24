@@ -40,6 +40,7 @@ import org.apache.gravitino.storage.relational.mapper.PolicyMetadataObjectRelMap
 import org.apache.gravitino.storage.relational.mapper.SecurableObjectMapper;
 import org.apache.gravitino.storage.relational.mapper.StatisticMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.TableMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.TableVersionMapper;
 import org.apache.gravitino.storage.relational.mapper.TagMetadataObjectRelMapper;
 import org.apache.gravitino.storage.relational.po.ColumnPO;
 import org.apache.gravitino.storage.relational.po.TablePO;
@@ -118,17 +119,27 @@ public class TableMetaService {
       fillTablePOBuilderParentEntityId(builder, tableEntity.namespace());
 
       AtomicReference<TablePO> tablePORef = new AtomicReference<>();
+      TablePO po = POConverters.initializeTablePOWithVersion(tableEntity, builder);
       SessionUtils.doMultipleWithCommit(
           () ->
               SessionUtils.doWithoutCommit(
                   TableMetaMapper.class,
                   mapper -> {
-                    TablePO po = POConverters.initializeTablePOWithVersion(tableEntity, builder);
                     tablePORef.set(po);
                     if (overwrite) {
                       mapper.insertTableMetaOnDuplicateKeyUpdate(po);
                     } else {
                       mapper.insertTableMeta(po);
+                    }
+                  }),
+          () ->
+              SessionUtils.doWithCommit(
+                  TableVersionMapper.class,
+                  mapper -> {
+                    if (overwrite) {
+                      mapper.insertTableVersionOnDuplicateKeyUpdate(po);
+                    } else {
+                      mapper.insertTableVersion(po);
                     }
                   }),
           () -> {
@@ -183,11 +194,8 @@ public class TableMetaService {
                 .getParentEntityIdByNamespace(newTableEntity.namespace())
             : schemaId;
 
-    boolean isColumnChanged =
-        TableColumnMetaService.getInstance().isColumnUpdated(oldTableEntity, newTableEntity);
     TablePO newTablePO =
-        POConverters.updateTablePOWithVersionAndSchemaId(
-            oldTablePO, newTableEntity, isColumnChanged, newSchemaId);
+        POConverters.updateTablePOWithVersionAndSchemaId(oldTablePO, newTableEntity, newSchemaId);
 
     final AtomicInteger updateResult = new AtomicInteger(0);
     try {
@@ -197,8 +205,16 @@ public class TableMetaService {
                   SessionUtils.getWithoutCommit(
                       TableMetaMapper.class,
                       mapper -> mapper.updateTableMeta(newTablePO, oldTablePO, newSchemaId))),
+          () ->
+              SessionUtils.doWithCommit(
+                  TableVersionMapper.class,
+                  mapper -> {
+                    mapper.softDeleteTableVersionByTableIdAndVersion(
+                        oldTablePO.getTableId(), oldTablePO.getCurrentVersion());
+                    mapper.insertTableVersionOnDuplicateKeyUpdate(newTablePO);
+                  }),
           () -> {
-            if (updateResult.get() > 0 && (isColumnChanged || isSchemaChanged)) {
+            if (updateResult.get() > 0) {
               TableColumnMetaService.getInstance()
                   .updateColumnPOsFromTableDiff(oldTableEntity, newTableEntity, newTablePO);
             }
@@ -229,7 +245,11 @@ public class TableMetaService {
     Long tableId = getTableIdBySchemaIdAndName(schemaId, tableName);
 
     AtomicInteger deleteResult = new AtomicInteger(0);
+    TablePO[] tablePOHolder = new TablePO[1];
     SessionUtils.doMultipleWithCommit(
+        () -> {
+          tablePOHolder[0] = getTablePOBySchemaIdAndName(schemaId, tableName);
+        },
         () ->
             deleteResult.set(
                 SessionUtils.getWithoutCommit(
@@ -263,6 +283,11 @@ public class TableMetaService {
             SessionUtils.doWithoutCommit(
                 PolicyMetadataObjectRelMapper.class,
                 mapper -> mapper.softDeletePolicyMetadataObjectRelsByTableId(tableId));
+            SessionUtils.doWithCommit(
+                TableVersionMapper.class,
+                mapper ->
+                    mapper.softDeleteTableVersionByTableIdAndVersion(
+                        tableId, tablePOHolder[0].getCurrentVersion()));
           }
         });
 
@@ -274,8 +299,18 @@ public class TableMetaService {
       baseMetricName = "deleteTableMetasByLegacyTimeline")
   public int deleteTableMetasByLegacyTimeline(Long legacyTimeline, int limit) {
     return SessionUtils.doWithCommitAndFetchResult(
-        TableMetaMapper.class,
-        mapper -> mapper.deleteTableMetasByLegacyTimeline(legacyTimeline, limit));
+            TableMetaMapper.class,
+            mapper -> mapper.deleteTableMetasByLegacyTimeline(legacyTimeline, limit))
+        + deleteTableVersionByLegacyTimeline(legacyTimeline, limit);
+  }
+
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "deleteTableVersionByLegacyTimeline")
+  public int deleteTableVersionByLegacyTimeline(Long legacyTimeline, int limit) {
+    return SessionUtils.doWithCommitAndFetchResult(
+        TableVersionMapper.class,
+        mapper -> mapper.deleteTableVersionByLegacyTimeline(legacyTimeline, limit));
   }
 
   private void fillTablePOBuilderParentEntityId(TablePO.Builder builder, Namespace namespace) {
@@ -292,7 +327,6 @@ public class TableMetaService {
         SessionUtils.getWithoutCommit(
             TableMetaMapper.class,
             mapper -> mapper.selectTableMetaBySchemaIdAndName(schemaId, tableName));
-
     if (tablePO == null) {
       throw new NoSuchEntityException(
           NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,

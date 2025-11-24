@@ -92,10 +92,13 @@ public class TestSQLScripts extends BaseIT {
         Pattern.compile("schema-([\\d.]+)-" + jdbcBackend.toLowerCase() + "\\.sql");
     Pattern upgradePattern =
         Pattern.compile("upgrade-([\\d.]+)-to-([\\d.]+)-" + jdbcBackend.toLowerCase() + "\\.sql");
+    Pattern metricsPattern =
+        Pattern.compile("iceberg-metrics-schema-([\\d.]+)-" + jdbcBackend.toLowerCase() + "\\.sql");
 
     for (File scriptFile : scriptFiles) {
       Matcher schemaMatcher = schemaPattern.matcher(scriptFile.getName());
       Matcher upgradeMatcher = upgradePattern.matcher(scriptFile.getName());
+      Matcher metricsMatcher = metricsPattern.matcher(scriptFile.getName());
 
       if (schemaMatcher.matches()) {
         String version = schemaMatcher.group(1);
@@ -116,6 +119,8 @@ public class TestSQLScripts extends BaseIT {
         Assertions.assertDoesNotThrow(
             () -> executeSQLScript(conn, scriptFile),
             "Failed to execute upgrade script" + " in file " + scriptFile.getName());
+      } else if (metricsMatcher.matches()) {
+        // ignore iceberg metrics scripts for now
       } else {
         Assertions.fail("Unrecognized script file name: " + scriptFile.getName());
       }

@@ -115,7 +115,7 @@ If a securable object needs to be managed by more than one person at the same ti
 The metadata object that supports ownership is as follows:
 
 | Metadata Object Type |
-|----------------------|
+| -------------------- |
 | Metalake             |
 | Catalog              |
 | Schema               |
@@ -124,6 +124,7 @@ The metadata object that supports ownership is as follows:
 | Fileset              |
 | Role                 |
 | Model                |
+| Tag                  |
 
 ### User
 Users are generally granted one or multiple Roles, and users have different operating privileges depending on their Role.
@@ -263,6 +264,20 @@ DENY `WRITE_FILESET` won‘t deny the `READ_FILESET` operation if the user has t
 | CREATE_MODEL         | Metalake, Catalog, Schema        | Create a model                                                     |
 | CREATE_MODEL_VERSION | Metalake, Catalog, Schema, Model | Create a model version                                             |
 | USE_MODEL            | Metalake, Catalog, Schema, Model | View the metadata of the model and download all the model versions |
+
+### Tag privileges
+
+| Name       | Supports Securable Object | Operation                             |
+|------------|---------------------------|---------------------------------------|
+| CREATE_TAG | Metalake                  | Create a tag                          |
+| APPLY_TAG  | Metalake, Tag             | Associate tags with metadata objects. |
+
+### Policy privileges
+
+| Name          | Supports Securable Object | Operation                                 |
+|---------------|---------------------------|-------------------------------------------|
+| CREATE_POLICY | Metalake                  | Create a policy                           |
+| APPLY_POLICY  | Metalake, Policy          | Associate policies with metadata objects. |
 
 ## Inheritance Model
 
@@ -963,7 +978,7 @@ The following table lists the required privileges for each API.
 | create metalake                   | The user must be the service admins, configured in the server configurations.                                                                                                                                                                 |
 | load metalake                     | The user is in the metalake                                                                                                                                                                                                                   |
 | alter metalake                    | The owner of the metalake                                                                                                                                                                                                                     |
-| drop metalake                     | The owner of the metalake                                                                                                                                                                                                                     | 
+| drop metalake                     | The owner of the metalake                                                                                                                                                                                                                     |
 | create catalog                    | `CREATE_CATALOG` on the metalake or the owner of the metalake                                                                                                                                                                                 |
 | alter catalog                     | The owner of the catalog, metalake                                                                                                                                                                                                            |
 | drop catalog                      | The owner of the catalog, metalake                                                                                                                                                                                                            |
@@ -1018,11 +1033,30 @@ The following table lists the required privileges for each API.
 | list groups                       | `MANAGE_GROUPS` on the metalake or the owner of the metalake can see all the groups, others can see his group                                                                                                                                 |
 | create role                       | `CREATE_ROLE` on the metalake or the owner of the metalake                                                                                                                                                                                    |
 | delete role                       | The owner of the metalake or the role                                                                                                                                                                                                         |
-| get role                          | The owner of the metalake or the role. others can see his granted or owned roles.                                                                                                                                                             |
-| list roles                        | The owner of the metalake can see all the roles. Others can see his granted roles or owned roles.                                                                                                                                             |
+| get role                          | `MANAGE_GRANTS` on the metalake or the owner of the metalake or the role. others can see his granted or owned roles.                                                                                                                          |
+| list roles                        | `MANAGE_GRANTS` on the metalake or the owner of the metalake can see all the roles. Others can see his granted roles or owned roles.                                                                                                          |
 | grant role                        | `MANAGE_GRANTS` on the metalake                                                                                                                                                                                                               |
 | revoke role                       | `MANAGE_GRANTS` on the metalake                                                                                                                                                                                                               |
 | grant privilege                   | `MANAGE_GRANTS` on the metalake or the owner of the securable object                                                                                                                                                                          |
 | revoke privilege                  | `MANAGE_GRANTS` on the metalake or the owner of the securable object                                                                                                                                                                          |
 | set owner                         | The owner of the securable object                                                                                                                                                                                                             |
+| list tags                         | The owner of the metalake can see all the tags, others can see the tags which they can load.                                                                                                                                                  |
+| create tag                        | `CREATE_TAG` on the metalake or the owner of the metalake.                                                                                                                                                                                    |
+| get tag                           | `APPLY_TAG` on the metalake or tag, the owner of the metalake or the tag.                                                                                                                                                                     |
+| alter tag                         | Must be the owner of the metalake or the tag.                                                                                                                                                                                                 |
+| delete tag                        | Must be the owner of the metalake or the tag.                                                                                                                                                                                                 |
+| list objects for tag              | Requires both permission to **get the tag** and permission to **load metadata objects**.                                                                                                                                                      |
+| list tags for object              | Permission to both list tags Requires both permission to **list tags** and permission to **load metadata objects**. load metadata objects is required.                                                                                        |
+| get tag for object                | Requires both permission to **get the tag** and permission to **load metadata objects**.                                                                                                                                                      |
+| associate object tags             | Requires both `APPLY_TAG` permission and permission to **load metadata objects**.                                                                                                                                                             |
+| list policies for object          | The owner of the metalake can see all the policies, others can see the policies which they can load.                                                                                                                                          |
+| create policy                     | `CREATE_POLICY` on the metalake or the owner of the metalake.                                                                                                                                                                                 |
+| get policy                        | `APPLY_POLICY` on the metalake or policy, the owner of the metalake or the policy.                                                                                                                                                            |
+| alter policy                      | Must be the owner of the metalake or the policy.                                                                                                                                                                                              |
+| set policy                        | Must be the owner of the metalake or the policy.                                                                                                                                                                                              |
+| delete policy                     | Must be the owner of the metalake or the policy.                                                                                                                                                                                              |
+| list objects for policy           | Requires both permission to **get the policy** and permission to **load metadata objects**.                                                                                                                                                   |
+| associate-object-policies         | Requires both `APPLY_POLICY` permission and permission to **load metadata objects**.                                                                                                                                                          |
+| list policies for object          | Requires both permission to **get the policy** and permission to **load metadata objects**.                                                                                                                                                   |
+| get policy for object             | Requires both permission to **get the policy** and permission to **load metadata objects**.                                                                                                                                                   |
 

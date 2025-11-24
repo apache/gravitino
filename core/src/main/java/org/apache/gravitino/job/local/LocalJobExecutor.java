@@ -133,6 +133,7 @@ public class LocalJobExecutor implements JobExecutor {
         "Job status keep time must be greater than 0, but got: %s",
         jobStatusKeepTimeInMs);
 
+    this.jobStatusKeepTimeInMs = Math.max(jobStatusKeepTimeInMs, 10);
     long jobStatusCleanupIntervalInMs = jobStatusKeepTimeInMs / 10;
     this.jobStatusCleanupExecutor =
         Executors.newSingleThreadScheduledExecutor(

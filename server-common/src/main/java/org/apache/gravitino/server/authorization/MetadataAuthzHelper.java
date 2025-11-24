@@ -48,12 +48,12 @@ import org.slf4j.LoggerFactory;
  * on expressions or metadata types, and calls {@link GravitinoAuthorizer} for authorization,
  * returning only the metadata that the user has permission to access.
  */
-public class MetadataFilterHelper {
+public class MetadataAuthzHelper {
 
-  private static final Logger LOG = LoggerFactory.getLogger(MetadataFilterHelper.class);
+  private static final Logger LOG = LoggerFactory.getLogger(MetadataAuthzHelper.class);
   private static volatile Executor executor = null;
 
-  private MetadataFilterHelper() {}
+  private MetadataAuthzHelper() {}
 
   /**
    * Call {@link GravitinoAuthorizer} to filter the metadata list
@@ -137,6 +137,25 @@ public class MetadataFilterHelper {
         .map(CompletableFuture::join)
         .filter(Objects::nonNull)
         .toArray(NameIdentifier[]::new);
+  }
+
+  /**
+   * Call {@link AuthorizationExpressionEvaluator} to check access
+   *
+   * @param identifier
+   * @param entityType
+   * @param expression
+   * @return
+   */
+  public static boolean checkAccess(
+      NameIdentifier identifier, Entity.EntityType entityType, String expression) {
+    String metalake = NameIdentifierUtil.getMetalake(identifier);
+    Map<Entity.EntityType, NameIdentifier> nameIdentifierMap =
+        spiltMetadataNames(metalake, entityType, identifier);
+    AuthorizationExpressionEvaluator authorizationExpressionEvaluator =
+        new AuthorizationExpressionEvaluator(expression);
+    return authorizationExpressionEvaluator.evaluate(
+        nameIdentifierMap, new AuthorizationRequestContext());
   }
 
   /**
@@ -291,6 +310,9 @@ public class MetadataFilterHelper {
       case USER:
         nameIdentifierMap.put(entityType, nameIdentifier);
         break;
+      case TAG:
+        nameIdentifierMap.put(entityType, nameIdentifier);
+        break;
       default:
         throw new IllegalArgumentException("Unsupported entity type: " + entityType);
     }
@@ -304,7 +326,7 @@ public class MetadataFilterHelper {
 
   private static void checkExecutor() {
     if (executor == null) {
-      synchronized (MetadataFilterHelper.class) {
+      synchronized (MetadataAuthzHelper.class) {
         if (executor == null) {
           executor =
               Executors.newFixedThreadPool(
