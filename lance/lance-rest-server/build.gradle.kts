@@ -114,7 +114,7 @@ tasks {
   test {
     val testMode = project.properties["testMode"] as? String ?: "embedded"
     if (testMode == "embedded") {
-      dependsOn(":catalogs:catalog-generic-lakehouse:build")
+      dependsOn(":catalogs:catalog-lakehouse-generic:build")
     }
   }
 }
