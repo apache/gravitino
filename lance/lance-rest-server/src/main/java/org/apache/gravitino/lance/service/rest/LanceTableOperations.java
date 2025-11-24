@@ -34,6 +34,7 @@ import com.lancedb.lance.namespace.model.DeregisterTableRequest;
 import com.lancedb.lance.namespace.model.DeregisterTableResponse;
 import com.lancedb.lance.namespace.model.DescribeTableRequest;
 import com.lancedb.lance.namespace.model.DescribeTableResponse;
+import com.lancedb.lance.namespace.model.DropTableRequest;
 import com.lancedb.lance.namespace.model.DropTableResponse;
 import com.lancedb.lance.namespace.model.RegisterTableRequest;
 import com.lancedb.lance.namespace.model.RegisterTableRequest.ModeEnum;
@@ -204,7 +205,7 @@ public class LanceTableOperations {
       @Context HttpHeaders headers,
       TableExistsRequest tableExistsRequest) {
     try {
-      // True if exists, false if not found and other errors
+      // True if exists, false if not found and, otherwise throw exception
       boolean exists = lanceNamespace.asTableOps().tableExists(tableId, delimiter);
       if (exists) {
         return Response.status(Response.Status.OK).build();
@@ -223,7 +224,7 @@ public class LanceTableOperations {
       @PathParam("id") String tableId,
       @QueryParam("delimiter") @DefaultValue("$") String delimiter,
       @Context HttpHeaders headers,
-      DeregisterTableRequest deregisterTableRequest) {
+      DropTableRequest dropTableRequest) {
     try {
 
       DropTableResponse response = lanceNamespace.asTableOps().dropTable(tableId, delimiter);
