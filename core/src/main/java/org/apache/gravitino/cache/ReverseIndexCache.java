@@ -58,7 +58,7 @@ public class ReverseIndexCache {
    * <p>This map is used to quickly find all the related entity cache keys when we need to
    * invalidate in the reverse index if a role entity is updated. The following is an example: a
    * Role a has securable objects s1 and s2, so we have the following mapping: <br>
-   * cacheData: role1 -> role entity reserveIndex: s1 -> [role1], s2 -> [role1] </br>
+   * cacheData: role1 -> role entity reverseIndex: s1 -> [role1], s2 -> [role1] </br>
    *
    * <p>When we update role1, we need to invalidate s1 and s2 from the reverse index, or the data
    * will be in the memory forever. However, the current implementation of ReverseIndexCache does
