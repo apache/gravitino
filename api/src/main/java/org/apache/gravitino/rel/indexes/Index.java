@@ -110,11 +110,25 @@ public interface Index {
      * Currently, this type is only applicable to Lance.
      */
     VECTOR,
-    /** IVF_FLAT (Inverted File with Flat quantization) is an indexing method used for efficient */
+
+    /**
+     * IVF_FLAT (Inverted File with Flat Quantization) is an indexing method used for efficient
+     * approximate nearest neighbor search in high-dimensional vector spaces. It stores the original
+     * vectors without any quantization.
+     */
     IVF_FLAT,
-    /** IVF_SQ (Inverted File with Scalar Quantization) is an indexing method used for efficient */
+    /**
+     * IVF_SQ (Inverted File with Scalar Quantization) is an indexing method used for efficient
+     * approximate nearest neighbor search in high-dimensional vector spaces. It applies scalar
+     * quantization to reduce the storage size of the vectors.
+     */
     IVF_SQ,
-    /** IVF_PQ (Inverted File with Product Quantization) is an indexing method used for efficient */
+    /**
+     * IVF_PQ (Inverted File with Product Quantization) is an indexing method used for efficient
+     * approximate nearest neighbor search in high-dimensional vector spaces. It applies product
+     * quantization to compress the vectors into smaller codes for faster search and reduced
+     * storage.
+     */
     IVF_PQ,
 
     /**

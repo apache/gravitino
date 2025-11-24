@@ -554,11 +554,7 @@ public class POConverters {
                   : JsonUtils.anyFieldMapper()
                       .readValue(tablePO.getPartitions(), Partitioning[].class))
           .withComment(tablePO.getComment())
-          .withProperties(
-              StringUtils.isBlank(tablePO.getProperties())
-                  ? null
-                  : JsonUtils.anyFieldMapper().readValue(tablePO.getProperties(), Map.class))
-          .withColumns(fromColumnPOs(columnPOs))
+          .withProperties(properties)
           .build();
     } catch (JsonProcessingException e) {
       throw new RuntimeException("Failed to deserialize json object:", e);

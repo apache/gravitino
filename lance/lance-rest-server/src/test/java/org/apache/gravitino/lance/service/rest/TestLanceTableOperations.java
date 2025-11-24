@@ -474,7 +474,7 @@ public class TestLanceTableOperations extends JerseyTest {
     Assertions.assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), resp.getStatus());
     Assertions.assertEquals(MediaType.APPLICATION_JSON_TYPE, resp.getMediaType());
 
-    // Test
+    // Test not found exception
     Mockito.reset(tableOps);
     when(tableOps.listTableIndices(any(), any(), any()))
         .thenThrow(

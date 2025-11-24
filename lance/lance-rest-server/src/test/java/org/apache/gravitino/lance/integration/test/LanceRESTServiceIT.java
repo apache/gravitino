@@ -875,8 +875,6 @@ public class LanceRESTServiceIT extends BaseIT {
       } catch (Exception e) {
         throw new RuntimeException(e);
       }
-    } catch (JsonProcessingException e) {
-      throw new RuntimeException(e);
     } catch (Exception e) {
       throw new RuntimeException(e);
     }
