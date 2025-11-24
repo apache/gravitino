@@ -125,11 +125,9 @@ public class GravitinoCatalogStore extends AbstractCatalogStore {
   }
 
   private BaseCatalogFactory getCatalogFactory(Map<String, String> configuration) {
-    String catalogType =
-        Preconditions.checkNotNull(
-            configuration.get(CommonCatalogOptions.CATALOG_TYPE.key()),
-            "%s should not be null.",
-            CommonCatalogOptions.CATALOG_TYPE);
+    String catalogType = configuration.get(CommonCatalogOptions.CATALOG_TYPE.key());
+    Preconditions.checkArgument(
+        catalogType != null, "%s should not be null.", CommonCatalogOptions.CATALOG_TYPE.key());
 
     return discoverFactories(
         catalogFactory -> (catalogFactory.factoryIdentifier().equalsIgnoreCase(catalogType)),

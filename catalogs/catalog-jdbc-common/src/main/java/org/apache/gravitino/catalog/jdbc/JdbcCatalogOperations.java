@@ -230,9 +230,9 @@ public class JdbcCatalogOperations implements CatalogOperations, SupportsSchemas
   public JdbcSchema createSchema(
       NameIdentifier ident, String comment, Map<String, String> properties)
       throws NoSuchCatalogException, SchemaAlreadyExistsException {
-    StringIdentifier identifier =
-        Preconditions.checkNotNull(
-            StringIdentifier.fromProperties(properties), GRAVITINO_ATTRIBUTE_DOES_NOT_EXIST_MSG);
+
+    StringIdentifier identifier = StringIdentifier.fromProperties(properties);
+    Preconditions.checkArgument(identifier != null, GRAVITINO_ATTRIBUTE_DOES_NOT_EXIST_MSG);
     String notAllowedKey =
         properties.keySet().stream()
             .filter(s -> !StringUtils.equals(s, StringIdentifier.ID_KEY))
@@ -434,9 +434,8 @@ public class JdbcCatalogOperations implements CatalogOperations, SupportsSchemas
     Preconditions.checkArgument(
         null == sortOrders || sortOrders.length == 0, "jdbc-catalog does not support sort orders");
 
-    StringIdentifier identifier =
-        Preconditions.checkNotNull(
-            StringIdentifier.fromProperties(properties), GRAVITINO_ATTRIBUTE_DOES_NOT_EXIST_MSG);
+    StringIdentifier identifier = StringIdentifier.fromProperties(properties);
+    Preconditions.checkArgument(identifier != null, GRAVITINO_ATTRIBUTE_DOES_NOT_EXIST_MSG);
     // The properties we write to the database do not require the id field, so it needs to be
     // removed.
     HashMap<String, String> resultProperties =
