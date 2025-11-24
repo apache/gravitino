@@ -136,7 +136,7 @@ public class TestSerializer {
     actualJson = JsonUtils.anyFieldMapper().writeValueAsString(index);
     expectedJson =
         """
-            {"indexType":"unique_key","name":"index_2","fieldNames":[["col1"],["col2"]]}""";
+            {"indexType":"unique_key","name":"index_2","fieldNames":[["col1"],["col2"]],"properties":null}""";
     Assertions.assertEquals(expectedJson, actualJson);
   }
 
