@@ -238,7 +238,7 @@ For macOS users running Docker tests:
 
 - **Build JDK**: Java 17 (required to run Gradle)
 - **Runtime JDK**: Java 17 (for server and connectors)
-- **Target Compatibility**: Some modules (clients, connectors) target JDK 8 for compatibility
+- **Target Compatibility**: Client-side modules (clients, connectors) target JDK 8 for compatibility
 - **Scala**: Supports 2.12 and 2.13 (Flink only supports 2.12)
 - **Python**: 3.9, 3.10, 3.11, or 3.12
 
@@ -247,12 +247,12 @@ For macOS users running Docker tests:
 - Gradle 8.x with Kotlin DSL
 - Gradle Java Toolchain for automatic JDK management
 - Error Prone for additional compile-time checks
-- Jacoco for code coverage reporting
+- JaCoCo for code coverage reporting
 
 ### Testing Framework
 
-- JUnit 5 (JUnit Platform) for all tests
-- TestContainers for Docker-based integration tests
+- JUnit 5 (JUnit Platform) for Java tests, Python unittest for Python tests
+- Testcontainers for Docker-based integration tests
 - `@Tag("gravitino-docker-test")` marks tests requiring Docker
 - Separate test modes: embedded (MiniGravitino) and deploy (full distribution)
 
@@ -304,7 +304,8 @@ The project uses custom CI Docker images:
 ### Documentation Standards
 
 - **Javadoc**: Required for all public APIs
-- **Examples**: Include code examples in Javadoc for complex APIs
+- **Pythondoc**: Use docstrings for Python public APIs
+- **OpenAPI**: Document REST APIs with OpenAPI annotations
 - **Markdown**: Documentation in `docs/` directory
 - **Comments**: Explain "why" not "what" in code comments
 - **Changelog**: Document user-facing changes
@@ -381,7 +382,7 @@ Set breakpoints directly in IntelliJ IDEA or your IDE - tests run in the same pr
 ### Module Dependencies
 
 - API modules should have minimal dependencies
-- Client modules should not depend on server modules
+- Client modules should not depend on server-related modules
 - Keep catalog implementations independent
 - Use `catalog-common` for shared catalog code
 - Avoid circular dependencies
@@ -405,10 +406,10 @@ When reviewing contributions, check for:
 - Assertions have meaningful messages
 
 ### Documentation
-- Public APIs have complete Javadoc
+- Public APIs have complete Javadoc and Pythondoc
+- REST APIs documented with OpenAPI annotations
 - Complex logic has explanatory comments
 - User-facing changes documented in `docs/`
-- Examples provided for new features
 - README or docs updated if needed
 
 ### API Design
@@ -456,7 +457,6 @@ When reviewing contributions, check for:
 - `JAVA_HOME` - Java installation directory
 - `GRAVITINO_HOME` - Gravitino installation directory (deploy mode)
 - `GRAVITINO_TEST` - Enable test mode
-- `SKIP_DOCKER_TESTS` - Skip Docker tests
 - `HADOOP_USER_NAME` - Hadoop user for tests
 
 Remember: Gravitino follows Apache Software Foundation practices. Be respectful, collaborative, and follow the community guidelines in all interactions.
