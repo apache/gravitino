@@ -95,7 +95,7 @@ public class MetadataAuthzHelper {
     }
     checkExecutor();
     AuthorizationRequestContext authorizationRequestContext = new AuthorizationRequestContext();
-    List<CompletableFuture<NameIdentifier>> futures = new ArrayList<>();
+    List<CompletableFuture<Metalake>> futures = new ArrayList<>();
     for (Metalake metalake : metalakes) {
       Principal currentPrincipal = PrincipalUtils.getCurrentPrincipal();
       futures.add(
@@ -114,7 +114,7 @@ public class MetadataAuthzHelper {
                             new AuthorizationExpressionEvaluator(expression);
                         return authorizationExpressionEvaluator.evaluate(
                                 nameIdentifierMap, authorizationRequestContext)
-                            ? NameIdentifierUtil.ofMetalake(metalake.name())
+                            ? metalake
                             : null;
                       });
                 } catch (Exception e) {
