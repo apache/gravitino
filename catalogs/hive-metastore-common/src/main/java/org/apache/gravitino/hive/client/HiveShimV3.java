@@ -21,10 +21,10 @@ import static org.apache.gravitino.hive.client.HiveClient.HiveVersion.HIVE3;
 
 import java.lang.reflect.Method;
 import java.util.List;
-import org.apache.gravitino.Schema;
+import org.apache.gravitino.hive.HiveSchema;
+import org.apache.gravitino.hive.HiveTable;
 import org.apache.gravitino.hive.converter.HiveDatabaseConverter;
 import org.apache.gravitino.hive.converter.HiveTableConverter;
-import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.partitions.Partition;
 import org.apache.hadoop.hive.metastore.IMetaStoreClient;
 import org.apache.hadoop.hive.metastore.api.Database;
@@ -131,11 +131,10 @@ class HiveShimV3 extends HiveShimV2 {
   }
 
   @Override
-  public void createDatabase(String catalogName, Schema database) {
-    Database db = new Database();
-    db.setName(database.name());
-    db.setDescription(database.comment());
+  public void createDatabase(HiveSchema database) {
+    Database db = HiveDatabaseConverter.toHiveDb(database);
     // Hive3 requires a valid catalog name, use "hive" as default if empty
+    String catalogName = database.catalogName();
     String effectiveCatalogName =
         catalogName == null || catalogName.isEmpty() ? "hive" : catalogName;
     invoke(db, databaseSetCatalogNameMethod, effectiveCatalogName);
@@ -148,90 +147,95 @@ class HiveShimV3 extends HiveShimV2 {
   }
 
   @Override
-  public Schema getDatabase(String catalogName, String dbName) {
-    Database db = (Database) invoke(client, getDatabaseMethod, catalogName, dbName);
+  public HiveSchema getDatabase(String catalogName, String databaseName) {
+    Database db = (Database) invoke(client, getDatabaseMethod, catalogName, databaseName);
     return HiveDatabaseConverter.fromHiveDB(db);
   }
 
   @Override
-  public void alterDatabase(String catalogName, String dbName, Schema database) {
-    Database db = new Database();
-    db.setName(database.name());
-    db.setDescription(database.comment());
+  public void alterDatabase(String catalogName, String databaseName, HiveSchema database) {
+    Database db = HiveDatabaseConverter.toHiveDb(database);
     invoke(db, databaseSetCatalogNameMethod, catalogName);
-    invoke(client, alterDatabaseMethod, catalogName, dbName, db);
+    invoke(client, alterDatabaseMethod, catalogName, databaseName, db);
   }
 
   @Override
-  public void dropDatabase(String catalogName, String dbName, boolean cascade) {
-    invoke(client, dropDatabaseMethod, catalogName, dbName, cascade, false);
+  public void dropDatabase(String catalogName, String databaseName, boolean cascade) {
+    invoke(client, dropDatabaseMethod, catalogName, databaseName, cascade, false);
   }
 
   @Override
-  public List<String> getAllTables(String catalogName, String dbName) {
-    return (List<String>) invoke(client, getAllTablesMethod, catalogName, dbName);
+  public List<String> getAllTables(String catalogName, String databaseName) {
+    return (List<String>) invoke(client, getAllTablesMethod, catalogName, databaseName);
   }
 
   @Override
   public List<String> getAllDatabTables(
-      String catalogName, String dbName, String filter, short maxTables) {
-    return (List<String>) invoke(client, getTablesMethod, catalogName, dbName, filter);
+      String catalogName, String databaseName, String filter, short pageSize) {
+    return (List<String>) invoke(client, getTablesMethod, catalogName, databaseName, filter);
   }
 
   @Override
-  public Table getTable(String catalogName, String dbName, String tableName) {
+  public HiveTable getTable(String catalogName, String databaseName, String tableName) {
     var tb =
         (org.apache.hadoop.hive.metastore.api.Table)
-            invoke(client, getTableMethod, catalogName, dbName, tableName);
+            invoke(client, getTableMethod, catalogName, databaseName, tableName);
     return HiveTableConverter.fromHiveTable(tb);
   }
 
   @Override
   public void alterTable(
-      String catalogName, String dbName, String tableName, Table alteredHiveTable) {
-    var tb = HiveTableConverter.toHiveTable(dbName, alteredHiveTable);
+      String catalogName, String databaseName, String tableName, HiveTable alteredHiveTable) {
+    var tb = HiveTableConverter.toHiveTable(alteredHiveTable);
     invoke(tb, tableSetCatalogNameMethod, catalogName);
-    invoke(client, alterTableMethod, catalogName, dbName, tableName, tb);
+    invoke(client, alterTableMethod, catalogName, databaseName, tableName, tb);
   }
 
   @Override
   public void dropTable(
-      String catalogName, String dbName, String tableName, boolean deleteData, boolean ifPurge) {
-    invoke(client, dropTableMethod, catalogName, dbName, tableName, deleteData, ifPurge);
+      String catalogName,
+      String databaseName,
+      String tableName,
+      boolean deleteData,
+      boolean ifPurge) {
+    invoke(client, dropTableMethod, catalogName, databaseName, tableName, deleteData, ifPurge);
   }
 
   @Override
-  public void createTable(String catalogName, String dbName, Table hiveTable) {
-    var tb = HiveTableConverter.toHiveTable(dbName, hiveTable);
+  public void createTable(HiveTable hiveTable) {
+    String catalogName = hiveTable.catalogName();
+    var tb = HiveTableConverter.toHiveTable(hiveTable);
     invoke(tb, tableSetCatalogNameMethod, catalogName);
     invoke(client, createTableMethod, tb);
   }
 
   @Override
-  public List<String> listPartitionNames(
-      String catalogName, String dbName, String tableName, short pageSize) {
+  public List<String> listPartitionNames(HiveTable table, short pageSize) {
+    String catalogName = table.catalogName();
+    String databaseName = table.databaseName();
     Object pageSizeArg = convertPageSize(listPartitionNamesMethod, 3, pageSize);
     return (List<String>)
-        invoke(client, listPartitionNamesMethod, catalogName, dbName, tableName, pageSizeArg);
+        invoke(
+            client, listPartitionNamesMethod, catalogName, databaseName, table.name(), pageSizeArg);
   }
 
   @Override
-  public List<Partition> listPartitions(
-      String catalogName, String dbName, Table table, short pageSize) {
+  public List<Partition> listPartitions(HiveTable table, short pageSize) {
+    String catalogName = table.catalogName();
+    String databaseName = table.databaseName();
     Object pageSizeArg = convertPageSize(listPartitionsMethod, 3, pageSize);
     var partitions =
         (List<org.apache.hadoop.hive.metastore.api.Partition>)
-            invoke(client, listPartitionsMethod, catalogName, dbName, table.name(), pageSizeArg);
+            invoke(
+                client, listPartitionsMethod, catalogName, databaseName, table.name(), pageSizeArg);
     return partitions.stream().map(p -> HiveTableConverter.fromHivePartition(table, p)).toList();
   }
 
   @Override
   public List<Partition> listPartitions(
-      String catalogName,
-      String dbName,
-      Table table,
-      List<String> filterPartitionValueList,
-      short pageSize) {
+      HiveTable table, List<String> filterPartitionValueList, short pageSize) {
+    String catalogName = table.catalogName();
+    String databaseName = table.databaseName();
     Object pageSizeArg = convertPageSize(listPartitionsWithFilterMethod, 4, pageSize);
     var partitions =
         (List<org.apache.hadoop.hive.metastore.api.Partition>)
@@ -239,7 +243,7 @@ class HiveShimV3 extends HiveShimV2 {
                 client,
                 listPartitionsWithFilterMethod,
                 catalogName,
-                dbName,
+                databaseName,
                 table.name(),
                 filterPartitionValueList,
                 pageSizeArg);
@@ -247,19 +251,27 @@ class HiveShimV3 extends HiveShimV2 {
   }
 
   @Override
-  public Partition getPartition(
-      String catalogName, String dbName, Table table, String partitionName) {
+  public Partition getPartition(HiveTable table, String partitionName) {
+    String catalogName = table.catalogName();
+    String databaseName = table.databaseName();
     var partitionValues = HiveTableConverter.parsePartitionValues(partitionName);
     var partition =
         (org.apache.hadoop.hive.metastore.api.Partition)
-            invoke(client, getPartitionMethod, catalogName, dbName, table.name(), partitionValues);
+            invoke(
+                client,
+                getPartitionMethod,
+                catalogName,
+                databaseName,
+                table.name(),
+                partitionValues);
     return HiveTableConverter.fromHivePartition(table, partition);
   }
 
   @Override
-  public Partition addPartition(
-      String catalogName, String dbName, Table table, Partition partition) {
-    var hivePartition = HiveTableConverter.toHivePartition(dbName, table, partition);
+  public Partition addPartition(HiveTable table, Partition partition) {
+    String catalogName = table.catalogName();
+    String databaseName = table.databaseName();
+    var hivePartition = HiveTableConverter.toHivePartition(databaseName, table, partition);
     invoke(hivePartition, partitionSetCatalogNameMethod, catalogName);
     var addedPartition =
         (org.apache.hadoop.hive.metastore.api.Partition)
@@ -269,17 +281,17 @@ class HiveShimV3 extends HiveShimV2 {
 
   @Override
   public void dropPartition(
-      String catalogName, String dbName, String tableName, String partitionName, boolean b) {
+      String catalogName, String databaseName, String tableName, String partitionName, boolean b) {
     var partitionValues = HiveTableConverter.parsePartitionValues(partitionName);
-    invoke(client, dropPartitionMethod, catalogName, dbName, tableName, partitionValues, b);
+    invoke(client, dropPartitionMethod, catalogName, databaseName, tableName, partitionValues, b);
   }
 
   @Override
-  public List<Table> getTableObjectsByName(
-      String catalogName, String dbName, List<String> allTables) {
+  public List<HiveTable> getTableObjectsByName(
+      String catalogName, String databaseName, List<String> allTables) {
     var tables =
         (List<org.apache.hadoop.hive.metastore.api.Table>)
-            invoke(client, getTableObjectsByNameMethod, catalogName, dbName, allTables);
+            invoke(client, getTableObjectsByNameMethod, catalogName, databaseName, allTables);
     return tables.stream().map(HiveTableConverter::fromHiveTable).toList();
   }
 

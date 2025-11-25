@@ -30,8 +30,9 @@ import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.connector.TableOperations;
 import org.apache.gravitino.exceptions.NoSuchPartitionException;
 import org.apache.gravitino.exceptions.PartitionAlreadyExistsException;
+import org.apache.gravitino.hive.HiveTable;
+import org.apache.gravitino.hive.converter.HiveTableConverter;
 import org.apache.gravitino.rel.SupportsPartitions;
-import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.expressions.literals.Literal;
 import org.apache.gravitino.rel.expressions.literals.Literals;
 import org.apache.gravitino.rel.expressions.transforms.Transforms;
@@ -48,34 +49,32 @@ public class HiveTableOperations implements TableOperations, SupportsPartitions 
   private static final String PARTITION_NAME_DELIMITER = "/";
   private static final String PARTITION_VALUE_DELIMITER = "=";
 
-  private final HiveTable table;
+  private final HiveTableHandle tableHandle;
 
-  public HiveTableOperations(HiveTable table) {
-    Preconditions.checkArgument(table != null, "table must not be null");
-    this.table = table;
+  public HiveTableOperations(HiveTableHandle tableHandle) {
+    Preconditions.checkArgument(tableHandle != null, "table must not be null");
+    this.tableHandle = tableHandle;
   }
 
   @Override
   public String[] listPartitionNames() {
     try {
-      return table
+      return tableHandle
           .clientPool()
-          .run(
-              c ->
-                  c.listPartitionNames("", table.schemaName(), table.name(), (short) -1)
-                      .toArray(new String[0]));
+          .run(c -> c.listPartitionNames(tableHandle.table(), (short) -1).toArray(new String[0]));
     } catch (InterruptedException e) {
       throw new RuntimeException(
-          "Failed to list partition names of table " + table.name() + "from Hive Metastore", e);
+          "Failed to list partition names of table " + tableHandle.name() + "from Hive Metastore",
+          e);
     }
   }
 
   @Override
   public Partition[] listPartitions() {
     try {
-      return table
+      return tableHandle
           .clientPool()
-          .run(c -> c.listPartitions("", table.schemaName(), table, (short) -1))
+          .run(c -> c.listPartitions(tableHandle.table(), (short) -1))
           .toArray(new Partition[0]);
     } catch (InterruptedException e) {
       throw new RuntimeException(e);
@@ -85,16 +84,14 @@ public class HiveTableOperations implements TableOperations, SupportsPartitions 
   @Override
   public Partition getPartition(String partitionName) throws NoSuchPartitionException {
     try {
-      return table
-          .clientPool()
-          .run(c -> c.getPartition("", table.schemaName(), table, partitionName));
+      return tableHandle.clientPool().run(c -> c.getPartition(tableHandle.table(), partitionName));
 
     } catch (InterruptedException e) {
       throw new RuntimeException(
           "Failed to get partition "
               + partitionName
               + " of table "
-              + table.name()
+              + tableHandle.name()
               + "from Hive Metastore",
           e);
     }
@@ -128,7 +125,7 @@ public class HiveTableOperations implements TableOperations, SupportsPartitions 
     IdentityPartition identityPartition = (IdentityPartition) partition;
 
     Set<String> transformFields =
-        Arrays.stream(table.partitioning())
+        Arrays.stream(tableHandle.partitioning())
             .map(t -> ((Transforms.IdentityTransform) t).fieldName()[0])
             .collect(Collectors.toSet());
 
@@ -151,7 +148,9 @@ public class HiveTableOperations implements TableOperations, SupportsPartitions 
                     f[0]));
 
     try {
-      return table.clientPool().run(c -> c.addPartition("", "", table, identityPartition));
+      return tableHandle
+          .clientPool()
+          .run(c -> c.addPartition(tableHandle.table(), identityPartition));
     } catch (InterruptedException e) {
       throw new RuntimeException(e);
     }
@@ -178,20 +177,17 @@ public class HiveTableOperations implements TableOperations, SupportsPartitions 
   @Override
   public boolean dropPartition(String partitionName) {
     try {
-      Table tb = table.clientPool().run(c -> c.getTable("", table.schemaName(), table.name()));
-      HiveTable hiveTable = HiveTable.fromHiveTable(table.schemaName(), tb).build();
+      HiveTable hiveTable = tableHandle.table();
       // Get partitions that need to drop
       // If the partition has child partition, then drop all the child partitions
       // If the partition has no subpartitions, then just drop the partition
       List<Partition> partitions =
-          table
+          tableHandle
               .clientPool()
               .run(
                   c ->
                       c.listPartitions(
-                          "",
-                          table.schemaName(),
-                          table,
+                          hiveTable,
                           getFilterPartitionValueList(hiveTable, partitionName),
                           (short) -1));
       if (partitions.isEmpty()) {
@@ -200,11 +196,16 @@ public class HiveTableOperations implements TableOperations, SupportsPartitions 
       }
       // Delete partitions iteratively
       for (Partition partition : partitions) {
-        table
+        tableHandle
             .clientPool()
             .run(
                 cc -> {
-                  cc.dropPartition("", table.schemaName(), table.name(), partition.name(), true);
+                  cc.dropPartition(
+                      hiveTable.catalogName(),
+                      hiveTable.databaseName(),
+                      tableHandle.name(),
+                      partition.name(),
+                      true);
                   return null;
                 });
       }
@@ -217,7 +218,7 @@ public class HiveTableOperations implements TableOperations, SupportsPartitions 
           "Failed to get partition "
               + partitionName
               + " of table "
-              + table.name()
+              + tableHandle.name()
               + "from Hive Metastore",
           e);
     }
@@ -247,7 +248,7 @@ public class HiveTableOperations implements TableOperations, SupportsPartitions 
       throws NoSuchPartitionException, IllegalArgumentException {
     // Get all partition key names of the table
     List<String> partitionKeys =
-        dropTable.buildPartitionKeys().stream()
+        HiveTableConverter.buildPartitionKeys(dropTable).stream()
             .map(FieldSchema::getName)
             .collect(Collectors.toList());
 
@@ -280,6 +281,6 @@ public class HiveTableOperations implements TableOperations, SupportsPartitions 
 
   @Override
   public void close() throws IOException {
-    table.close();
+    tableHandle.close();
   }
 }

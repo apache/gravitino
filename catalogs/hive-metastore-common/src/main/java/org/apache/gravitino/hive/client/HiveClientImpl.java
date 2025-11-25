@@ -19,8 +19,8 @@
 package org.apache.gravitino.hive.client;
 
 import java.util.List;
-import org.apache.gravitino.Schema;
-import org.apache.gravitino.rel.Table;
+import org.apache.gravitino.hive.HiveSchema;
+import org.apache.gravitino.hive.HiveTable;
 import org.apache.gravitino.rel.partitions.Partition;
 import org.apache.hadoop.hive.metastore.IMetaStoreClient;
 
@@ -51,96 +51,92 @@ public class HiveClientImpl implements HiveClient {
   }
 
   @Override
-  public void createDatabase(String catalogName, Schema database) {
-    shim.createDatabase(catalogName, database);
+  public void createDatabase(HiveSchema database) {
+    shim.createDatabase(database);
   }
 
   @Override
-  public Schema getDatabase(String catalogName, String dbName) {
-    return shim.getDatabase(catalogName, dbName);
+  public HiveSchema getDatabase(String catalogName, String databaseName) {
+    return shim.getDatabase(catalogName, databaseName);
   }
 
   @Override
-  public void alterDatabase(String catalogName, String dbName, Schema database) {
-    shim.alterDatabase(catalogName, dbName, database);
+  public void alterDatabase(String catalogName, String databaseName, HiveSchema database) {
+    shim.alterDatabase(catalogName, databaseName, database);
   }
 
   @Override
-  public void dropDatabase(String catalogName, String dbName, boolean cascade) {
-    shim.dropDatabase(catalogName, dbName, cascade);
+  public void dropDatabase(String catalogName, String databaseName, boolean cascade) {
+    shim.dropDatabase(catalogName, databaseName, cascade);
   }
 
   @Override
-  public List<String> getAllTables(String catalogName, String dbName) {
-    return shim.getAllTables(catalogName, dbName);
+  public List<String> getAllTables(String catalogName, String databaseName) {
+    return shim.getAllTables(catalogName, databaseName);
   }
 
   @Override
   public List<String> listTableNamesByFilter(
-      String catalogName, String dbName, String filter, short maxTables) {
-    return shim.getAllDatabTables(catalogName, dbName, filter, maxTables);
+      String catalogName, String databaseName, String filter, short pageSize) {
+    return shim.getAllDatabTables(catalogName, databaseName, filter, pageSize);
   }
 
   @Override
-  public Table getTable(String catalogName, String dbName, String tableName) {
-    return shim.getTable(catalogName, dbName, tableName);
+  public HiveTable getTable(String catalogName, String databaseName, String tableName) {
+    return shim.getTable(catalogName, databaseName, tableName);
   }
 
   @Override
   public void alterTable(
-      String catalogName, String dbName, String tableName, Table alteredHiveTable) {
-    shim.alterTable(catalogName, dbName, tableName, alteredHiveTable);
+      String catalogName, String databaseName, String tableName, HiveTable alteredHiveTable) {
+    shim.alterTable(catalogName, databaseName, tableName, alteredHiveTable);
   }
 
   @Override
   public void dropTable(
-      String catalogName, String dbName, String tableName, boolean deleteData, boolean ifPurge) {
-    shim.dropTable(catalogName, dbName, tableName, deleteData, ifPurge);
-  }
-
-  @Override
-  public void createTable(String catalogName, String dbName, Table hiveTable) {
-    shim.createTable(catalogName, dbName, hiveTable);
-  }
-
-  @Override
-  public List<String> listPartitionNames(
-      String catalogName, String dbName, String tableName, short pageSize) {
-    return shim.listPartitionNames(catalogName, dbName, tableName, pageSize);
-  }
-
-  @Override
-  public List<Partition> listPartitions(
-      String catalogName, String dbName, Table table, short pageSize) {
-    return shim.listPartitions(catalogName, dbName, table, pageSize);
-  }
-
-  @Override
-  public List<Partition> listPartitions(
       String catalogName,
-      String dbName,
-      Table table,
-      List<String> filterPartitionValueList,
-      short pageSize) {
-    return shim.listPartitions(catalogName, dbName, table, filterPartitionValueList, pageSize);
+      String databaseName,
+      String tableName,
+      boolean deleteData,
+      boolean ifPurge) {
+    shim.dropTable(catalogName, databaseName, tableName, deleteData, ifPurge);
   }
 
   @Override
-  public Partition getPartition(
-      String catalogName, String dbName, Table table, String partitionName) {
-    return shim.getPartition(catalogName, dbName, table, partitionName);
+  public void createTable(HiveTable hiveTable) {
+    shim.createTable(hiveTable);
   }
 
   @Override
-  public Partition addPartition(
-      String catalogName, String dbName, Table table, Partition partition) {
-    return shim.addPartition(catalogName, dbName, table, partition);
+  public List<String> listPartitionNames(HiveTable table, short pageSize) {
+    return shim.listPartitionNames(table, pageSize);
+  }
+
+  @Override
+  public List<Partition> listPartitions(HiveTable table, short pageSize) {
+    return shim.listPartitions(table, pageSize);
+  }
+
+  @Override
+  public List<Partition> listPartitions(
+      HiveTable table, List<String> filterPartitionValueList, short pageSize) {
+    return shim.listPartitions(table, filterPartitionValueList, pageSize);
+  }
+
+  @Override
+  public Partition getPartition(HiveTable table, String partitionName) {
+    return shim.getPartition(table, partitionName);
+  }
+
+  @Override
+  public Partition addPartition(HiveTable table, Partition partition) {
+    return shim.addPartition(table, partition);
   }
 
   @Override
   public void dropPartition(
-      String catalogName, String dbName, String tableName, String partitionName, boolean b) {
-    shim.dropPartition(catalogName, dbName, tableName, partitionName, b);
+      String catalogName, String databaseName, String tableName, String partitionName, boolean b) {
+    shim.dropPartition(catalogName, databaseName, tableName, partitionName, b);
   }
 
   @Override
@@ -149,8 +145,8 @@ public class HiveClientImpl implements HiveClient {
   }
 
   @Override
-  public List<Table> getTableObjectsByName(
-      String catalogName, String dbName, List<String> allTables) {
-    return shim.getTableObjectsByName(catalogName, dbName, allTables);
+  public List<HiveTable> getTableObjectsByName(
+      String catalogName, String databaseName, List<String> allTables) {
+    return shim.getTableObjectsByName(catalogName, databaseName, allTables);
   }
 }

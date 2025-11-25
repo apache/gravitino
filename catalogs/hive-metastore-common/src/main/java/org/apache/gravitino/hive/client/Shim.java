@@ -19,8 +19,8 @@
 package org.apache.gravitino.hive.client;
 
 import java.util.List;
-import org.apache.gravitino.Schema;
-import org.apache.gravitino.rel.Table;
+import org.apache.gravitino.hive.HiveSchema;
+import org.apache.gravitino.hive.HiveTable;
 import org.apache.gravitino.rel.partitions.Partition;
 import org.apache.hadoop.hive.metastore.IMetaStoreClient;
 import org.apache.thrift.TException;
@@ -49,55 +49,51 @@ public abstract class Shim {
     }
   }
 
-  public void createDatabase(String catalogName, Schema schema) {}
+  public void createDatabase(HiveSchema database) {}
 
-  public Schema getDatabase(String catalogName, String dbName) {
+  public HiveSchema getDatabase(String catalogName, String databaseName) {
     return null;
   }
 
-  public abstract void alterDatabase(String catalogName, String dbName, Schema database);
+  public abstract void alterDatabase(String catalogName, String databaseName, HiveSchema database);
 
-  public abstract void dropDatabase(String catalogName, String dbName, boolean cascade);
+  public abstract void dropDatabase(String catalogName, String databaseName, boolean cascade);
 
-  public abstract List<String> getAllTables(String catalogName, String dbName);
+  public abstract List<String> getAllTables(String catalogName, String databaseName);
 
   public abstract List<String> getAllDatabTables(
-      String catalogName, String dbName, String filter, short maxTables);
+      String catalogName, String databaseName, String filter, short pageSize);
 
-  public abstract Table getTable(String catalogName, String dbName, String tableName);
+  public abstract HiveTable getTable(String catalogName, String databaseName, String tableName);
 
   public abstract void alterTable(
-      String catalogName, String dbName, String tableName, Table alteredHiveTable);
+      String catalogName, String databaseName, String tableName, HiveTable alteredHiveTable);
 
   public abstract void dropTable(
-      String catalogName, String dbName, String tableName, boolean deleteData, boolean ifPurge);
-
-  public abstract void createTable(String catalogName, String dbName, Table hiveTable);
-
-  public abstract List<String> listPartitionNames(
-      String catalogName, String dbName, String tableName, short pageSize);
-
-  public abstract List<Partition> listPartitions(
-      String catalogName, String dbName, Table table, short pageSize);
-
-  public abstract List<Partition> listPartitions(
       String catalogName,
-      String dbName,
-      Table table,
-      List<String> filterPartitionValueList,
-      short pageSize);
+      String databaseName,
+      String tableName,
+      boolean deleteData,
+      boolean ifPurge);
 
-  public abstract Partition getPartition(
-      String catalogName, String dbName, Table table, String partitionName);
+  public abstract void createTable(HiveTable hiveTable);
 
-  public abstract Partition addPartition(
-      String catalogName, String dbName, Table table, Partition partition);
+  public abstract List<String> listPartitionNames(HiveTable table, short pageSize);
+
+  public abstract List<Partition> listPartitions(HiveTable table, short pageSize);
+
+  public abstract List<Partition> listPartitions(
+      HiveTable table, List<String> filterPartitionValueList, short pageSize);
+
+  public abstract Partition getPartition(HiveTable table, String partitionName);
+
+  public abstract Partition addPartition(HiveTable table, Partition partition);
 
   public abstract void dropPartition(
-      String catalogName, String dbName, String tableName, String partitionName, boolean b);
+      String catalogName, String databaseName, String tableName, String partitionName, boolean b);
 
   public abstract String getDelegationToken(String finalPrincipalName, String userName);
 
-  public abstract List<Table> getTableObjectsByName(
-      String catalogName, String dbName, List<String> allTables);
+  public abstract List<HiveTable> getTableObjectsByName(
+      String catalogName, String databaseName, List<String> allTables);
 }

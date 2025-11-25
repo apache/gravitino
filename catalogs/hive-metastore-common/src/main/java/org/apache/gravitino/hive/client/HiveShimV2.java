@@ -20,10 +20,10 @@ package org.apache.gravitino.hive.client;
 import static org.apache.gravitino.hive.client.HiveClient.HiveVersion.HIVE2;
 
 import java.util.List;
-import org.apache.gravitino.Schema;
+import org.apache.gravitino.hive.HiveSchema;
+import org.apache.gravitino.hive.HiveTable;
 import org.apache.gravitino.hive.converter.HiveDatabaseConverter;
 import org.apache.gravitino.hive.converter.HiveTableConverter;
-import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.partitions.Partition;
 import org.apache.hadoop.hive.metastore.IMetaStoreClient;
 import org.apache.hadoop.hive.metastore.api.Database;
@@ -38,7 +38,8 @@ class HiveShimV2 extends Shim {
     super(client, version);
   }
 
-  public void createDatabase(String catalogName, Schema database) {
+  @Override
+  public void createDatabase(HiveSchema database) {
     try {
       Database db = HiveDatabaseConverter.toHiveDb(database);
       client.createDatabase(db);
@@ -48,9 +49,9 @@ class HiveShimV2 extends Shim {
   }
 
   @Override
-  public Schema getDatabase(String catalogName, String dbName) {
+  public HiveSchema getDatabase(String catalogName, String databaseName) {
     try {
-      Database db = client.getDatabase(dbName);
+      Database db = client.getDatabase(databaseName);
       return HiveDatabaseConverter.fromHiveDB(db);
     } catch (Exception e) {
       throw HiveExceptionConverter.toGravitinoException(e);
@@ -58,28 +59,28 @@ class HiveShimV2 extends Shim {
   }
 
   @Override
-  public void alterDatabase(String catalogName, String dbName, Schema database) {
+  public void alterDatabase(String catalogName, String databaseName, HiveSchema database) {
     try {
       Database db = HiveDatabaseConverter.toHiveDb(database);
-      client.alterDatabase(dbName, db);
+      client.alterDatabase(databaseName, db);
     } catch (Exception e) {
       throw HiveExceptionConverter.toGravitinoException(e);
     }
   }
 
   @Override
-  public void dropDatabase(String catalogName, String dbName, boolean cascade) {
+  public void dropDatabase(String catalogName, String databaseName, boolean cascade) {
     try {
-      client.dropDatabase(dbName, cascade, false);
+      client.dropDatabase(databaseName, cascade, false);
     } catch (Exception e) {
       throw HiveExceptionConverter.toGravitinoException(e);
     }
   }
 
   @Override
-  public List<String> getAllTables(String catalogName, String dbName) {
+  public List<String> getAllTables(String catalogName, String databaseName) {
     try {
-      return client.getAllTables(dbName);
+      return client.getAllTables(databaseName);
     } catch (Exception e) {
       throw HiveExceptionConverter.toGravitinoException(e);
     }
@@ -87,18 +88,18 @@ class HiveShimV2 extends Shim {
 
   @Override
   public List<String> getAllDatabTables(
-      String catalogName, String dbName, String filter, short maxTables) {
+      String catalogName, String databaseName, String filter, short pageSize) {
     try {
-      return client.getTables(dbName, filter);
+      return client.getTables(databaseName, filter);
     } catch (Exception e) {
       throw HiveExceptionConverter.toGravitinoException(e);
     }
   }
 
   @Override
-  public Table getTable(String catalogName, String dbName, String tableName) {
+  public HiveTable getTable(String catalogName, String databaseName, String tableName) {
     try {
-      var tb = client.getTable(dbName, tableName);
+      var tb = client.getTable(databaseName, tableName);
       return HiveTableConverter.fromHiveTable(tb);
     } catch (Exception e) {
       throw HiveExceptionConverter.toGravitinoException(e);
@@ -107,10 +108,10 @@ class HiveShimV2 extends Shim {
 
   @Override
   public void alterTable(
-      String catalogName, String dbName, String tableName, Table alteredHiveTable) {
+      String catalogName, String databaseName, String tableName, HiveTable alteredHiveTable) {
     try {
-      var tb = HiveTableConverter.toHiveTable(dbName, alteredHiveTable);
-      client.alter_table(dbName, tableName, tb);
+      var tb = HiveTableConverter.toHiveTable(alteredHiveTable);
+      client.alter_table(databaseName, tableName, tb);
     } catch (Exception e) {
       throw HiveExceptionConverter.toGravitinoException(e);
     }
@@ -118,18 +119,22 @@ class HiveShimV2 extends Shim {
 
   @Override
   public void dropTable(
-      String catalogName, String dbName, String tableName, boolean deleteData, boolean ifPurge) {
+      String catalogName,
+      String databaseName,
+      String tableName,
+      boolean deleteData,
+      boolean ifPurge) {
     try {
-      client.dropTable(dbName, tableName, deleteData, ifPurge);
+      client.dropTable(databaseName, tableName, deleteData, ifPurge);
     } catch (Exception e) {
       throw HiveExceptionConverter.toGravitinoException(e);
     }
   }
 
   @Override
-  public void createTable(String catalogName, String dbName, Table hiveTable) {
+  public void createTable(HiveTable hiveTable) {
     try {
-      var tb = HiveTableConverter.toHiveTable(dbName, hiveTable);
+      var tb = HiveTableConverter.toHiveTable(hiveTable);
       client.createTable(tb);
     } catch (Exception e) {
       throw HiveExceptionConverter.toGravitinoException(e);
@@ -137,20 +142,20 @@ class HiveShimV2 extends Shim {
   }
 
   @Override
-  public List<String> listPartitionNames(
-      String catalogName, String dbName, String tableName, short pageSize) {
+  public List<String> listPartitionNames(HiveTable table, short pageSize) {
     try {
-      return client.listPartitionNames(dbName, tableName, pageSize);
+      String databaseName = table.databaseName();
+      return client.listPartitionNames(databaseName, table.name(), pageSize);
     } catch (Exception e) {
       throw HiveExceptionConverter.toGravitinoException(e);
     }
   }
 
   @Override
-  public List<Partition> listPartitions(
-      String catalogName, String dbName, Table table, short pageSize) {
+  public List<Partition> listPartitions(HiveTable table, short pageSize) {
     try {
-      var partitions = client.listPartitions(dbName, table.name(), pageSize);
+      String databaseName = table.databaseName();
+      var partitions = client.listPartitions(databaseName, table.name(), pageSize);
       return partitions.stream().map(p -> HiveTableConverter.fromHivePartition(table, p)).toList();
     } catch (Exception e) {
       throw HiveExceptionConverter.toGravitinoException(e);
@@ -159,14 +164,11 @@ class HiveShimV2 extends Shim {
 
   @Override
   public List<Partition> listPartitions(
-      String catalogName,
-      String dbName,
-      Table table,
-      List<String> filterPartitionValueList,
-      short pageSize) {
+      HiveTable table, List<String> filterPartitionValueList, short pageSize) {
     try {
+      String databaseName = table.databaseName();
       var partitions =
-          client.listPartitions(dbName, table.name(), filterPartitionValueList, pageSize);
+          client.listPartitions(databaseName, table.name(), filterPartitionValueList, pageSize);
       return partitions.stream().map(p -> HiveTableConverter.fromHivePartition(table, p)).toList();
     } catch (Exception e) {
       throw HiveExceptionConverter.toGravitinoException(e);
@@ -174,11 +176,11 @@ class HiveShimV2 extends Shim {
   }
 
   @Override
-  public Partition getPartition(
-      String catalogName, String dbName, Table table, String partitionName) {
+  public Partition getPartition(HiveTable table, String partitionName) {
     try {
+      String databaseName = table.databaseName();
       var partitionValues = HiveTableConverter.parsePartitionValues(partitionName);
-      var partition = client.getPartition(dbName, table.name(), partitionValues);
+      var partition = client.getPartition(databaseName, table.name(), partitionValues);
       return HiveTableConverter.fromHivePartition(table, partition);
     } catch (Exception e) {
       throw HiveExceptionConverter.toGravitinoException(e);
@@ -186,10 +188,10 @@ class HiveShimV2 extends Shim {
   }
 
   @Override
-  public Partition addPartition(
-      String catalogName, String dbName, Table table, Partition partition) {
+  public Partition addPartition(HiveTable table, Partition partition) {
     try {
-      var hivePartition = HiveTableConverter.toHivePartition(dbName, table, partition);
+      String databaseName = table.databaseName();
+      var hivePartition = HiveTableConverter.toHivePartition(databaseName, table, partition);
       var addedPartition = client.add_partition(hivePartition);
       return HiveTableConverter.fromHivePartition(table, addedPartition);
     } catch (Exception e) {
@@ -199,10 +201,10 @@ class HiveShimV2 extends Shim {
 
   @Override
   public void dropPartition(
-      String catalogName, String dbName, String tableName, String partitionName, boolean b) {
+      String catalogName, String databaseName, String tableName, String partitionName, boolean b) {
     try {
       var partitionValues = HiveTableConverter.parsePartitionValues(partitionName);
-      client.dropPartition(dbName, tableName, partitionValues, b);
+      client.dropPartition(databaseName, tableName, partitionValues, b);
     } catch (Exception e) {
       throw HiveExceptionConverter.toGravitinoException(e);
     }
@@ -218,11 +220,11 @@ class HiveShimV2 extends Shim {
   }
 
   @Override
-  public List<Table> getTableObjectsByName(
-      String catalogName, String dbName, List<String> allTables) {
+  public List<HiveTable> getTableObjectsByName(
+      String catalogName, String databaseName, List<String> allTables) {
     try {
-      // Hive2 doesn't support catalog, so we ignore catalogName and use dbName
-      var tables = client.getTableObjectsByName(dbName, allTables);
+      // Hive2 doesn't support catalog, so we ignore catalogName and use databaseName
+      var tables = client.getTableObjectsByName(databaseName, allTables);
       return tables.stream().map(HiveTableConverter::fromHiveTable).toList();
     } catch (Exception e) {
       throw HiveExceptionConverter.toGravitinoException(e);

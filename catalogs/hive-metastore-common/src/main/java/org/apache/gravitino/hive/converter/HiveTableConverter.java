@@ -42,9 +42,8 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.apache.gravitino.catalog.hive.StorageFormat;
 import org.apache.gravitino.dto.rel.ColumnDTO;
-import org.apache.gravitino.dto.rel.TableDTO;
 import org.apache.gravitino.dto.rel.partitioning.Partitioning;
-import org.apache.gravitino.dto.util.DTOConverters;
+import org.apache.gravitino.hive.HiveTable;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Table;
@@ -73,7 +72,7 @@ public class HiveTableConverter {
   private static final String PARTITION_NAME_DELIMITER = "/";
   private static final String PARTITION_VALUE_DELIMITER = "=";
 
-  public static Table fromHiveTable(org.apache.hadoop.hive.metastore.api.Table table) {
+  public static HiveTable fromHiveTable(org.apache.hadoop.hive.metastore.api.Table table) {
     Preconditions.checkArgument(table != null, "Table cannot be null");
     AuditInfo auditInfo = HiveTableConverter.getAuditInfo(table);
 
@@ -85,16 +84,28 @@ public class HiveTableConverter {
 
     Transform[] partitioning = HiveTableConverter.getPartitioning(table);
 
-    return TableDTO.builder()
-        .withName(table.getTableName())
-        .withComment(table.getParameters().get(COMMENT))
-        .withProperties(buildTableProperties(table))
-        .withColumns(Arrays.stream(columns).map(DTOConverters::toDTO).toArray(ColumnDTO[]::new))
-        .withDistribution(DTOConverters.toDTO(distribution))
-        .withSortOrders(DTOConverters.toDTOs(sortOrders))
-        .withAudit(DTOConverters.toDTO(auditInfo))
-        .withPartitioning(DTOConverters.toDTOs(partitioning))
-        .build();
+    String catalogName = null;
+    try {
+      java.lang.reflect.Method getCatNameMethod = table.getClass().getMethod("getCatName");
+      catalogName = (String) getCatNameMethod.invoke(table);
+    } catch (Exception e) {
+      // Hive2 doesn't have getCatName method, catalogName will be null
+    }
+
+    HiveTable hiveTable =
+        HiveTable.builder()
+            .withName(table.getTableName())
+            .withComment(table.getParameters().get(COMMENT))
+            .withProperties(buildTableProperties(table))
+            .withColumns(columns)
+            .withDistribution(distribution)
+            .withSortOrders(sortOrders)
+            .withAuditInfo(auditInfo)
+            .withPartitioning(partitioning)
+            .withCatalogName(catalogName)
+            .withDatabaseName(table.getDbName())
+            .build();
+    return hiveTable;
   }
 
   private static Map<String, String> buildTableProperties(
@@ -118,29 +129,31 @@ public class HiveTableConverter {
     return properties;
   }
 
-  public static org.apache.hadoop.hive.metastore.api.Table toHiveTable(String dbName, Table table) {
+  public static org.apache.hadoop.hive.metastore.api.Table toHiveTable(HiveTable hiveTable) {
+    Preconditions.checkArgument(hiveTable != null, "HiveTable cannot be null");
+    String dbName = hiveTable.databaseName();
     Preconditions.checkArgument(dbName != null, "Database name cannot be null");
-    Preconditions.checkArgument(table != null, "Table cannot be null");
-    org.apache.hadoop.hive.metastore.api.Table hiveTable =
+
+    org.apache.hadoop.hive.metastore.api.Table table =
         new org.apache.hadoop.hive.metastore.api.Table();
 
-    hiveTable.setTableName(table.name());
-    hiveTable.setDbName(dbName);
+    table.setTableName(hiveTable.name());
+    table.setDbName(dbName);
     String tableType =
-        table.properties().getOrDefault(TABLE_TYPE, String.valueOf(TableType.MANAGED_TABLE));
-    hiveTable.setTableType(tableType);
+        hiveTable.properties().getOrDefault(TABLE_TYPE, String.valueOf(TableType.MANAGED_TABLE));
+    table.setTableType(tableType);
 
-    List<FieldSchema> partitionFields = buildPartitionKeys(table);
-    hiveTable.setSd(buildStorageDescriptor(table, partitionFields));
-    hiveTable.setParameters(buildTableParameters(table));
-    hiveTable.setPartitionKeys(partitionFields);
+    List<FieldSchema> partitionFields = buildPartitionKeys(hiveTable);
+    table.setSd(buildStorageDescriptor(hiveTable, partitionFields));
+    table.setParameters(buildTableParameters(hiveTable));
+    table.setPartitionKeys(partitionFields);
 
     // Set AuditInfo to Hive's Table object. Hive's Table doesn't support setting last modifier
     // and last modified time, so we only set creator and create time.
-    hiveTable.setOwner(table.auditInfo().creator());
-    hiveTable.setCreateTime(Math.toIntExact(table.auditInfo().createTime().getEpochSecond()));
+    table.setOwner(hiveTable.auditInfo().creator());
+    table.setCreateTime(Math.toIntExact(hiveTable.auditInfo().createTime().getEpochSecond()));
 
-    return hiveTable;
+    return table;
   }
 
   public static List<FieldSchema> buildPartitionKeys(Table table) {

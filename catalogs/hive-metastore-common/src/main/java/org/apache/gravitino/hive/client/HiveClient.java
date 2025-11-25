@@ -19,8 +19,8 @@
 package org.apache.gravitino.hive.client;
 
 import java.util.List;
-import org.apache.gravitino.Schema;
-import org.apache.gravitino.rel.Table;
+import org.apache.gravitino.hive.HiveSchema;
+import org.apache.gravitino.hive.HiveTable;
 import org.apache.gravitino.rel.partitions.Partition;
 
 /**
@@ -30,52 +30,53 @@ import org.apache.gravitino.rel.partitions.Partition;
  */
 public interface HiveClient {
 
-  void createDatabase(String catalogName, Schema schema);
+  void createDatabase(HiveSchema database);
 
-  Schema getDatabase(String catalogName, String name);
+  HiveSchema getDatabase(String catalogName, String databaseName);
 
   List<String> getAllDatabases(String catalogName);
 
-  void alterDatabase(String catalogName, String dbName, Schema database);
+  void alterDatabase(String catalogName, String databaseName, HiveSchema database);
 
-  void dropDatabase(String catalogName, String dbName, boolean cascade);
+  void dropDatabase(String catalogName, String databaseName, boolean cascade);
 
-  List<String> getAllTables(String catalogName, String dbName);
+  List<String> getAllTables(String catalogName, String databaseName);
 
   List<String> listTableNamesByFilter(
-      String catalogName, String dbName, String filter, short maxTables);
+      String catalogName, String databaseName, String filter, short pageSize);
 
-  Table getTable(String catalogName, String dbName, String tableName);
+  HiveTable getTable(String catalogName, String databaseName, String tableName);
 
-  void alterTable(String catalogName, String dbName, String tableName, Table alteredHiveTable);
+  void alterTable(
+      String catalogName, String databaseName, String tableName, HiveTable alteredHiveTable);
 
   void dropTable(
-      String catalogName, String dbName, String tableName, boolean deleteData, boolean ifPurge);
+      String catalogName,
+      String databaseName,
+      String tableName,
+      boolean deleteData,
+      boolean ifPurge);
 
-  void createTable(String catalogName, String dbName, Table hiveTable);
+  void createTable(HiveTable hiveTable);
 
-  List<String> listPartitionNames(
-      String catalogName, String dbName, String tableName, short pageSize);
+  List<String> listPartitionNames(HiveTable table, short pageSize);
 
-  List<Partition> listPartitions(String catalogName, String dbName, Table table, short pageSize);
+  List<Partition> listPartitions(HiveTable table, short pageSize);
 
   List<Partition> listPartitions(
-      String catalogName,
-      String dbName,
-      Table table,
-      List<String> filterPartitionValueList,
-      short pageSize);
+      HiveTable table, List<String> filterPartitionValueList, short pageSize);
 
-  Partition getPartition(String catalogName, String dbName, Table table, String partitionName);
+  Partition getPartition(HiveTable table, String partitionName);
 
-  Partition addPartition(String catalogName, String dbName, Table table, Partition partition);
+  Partition addPartition(HiveTable table, Partition partition);
 
   void dropPartition(
-      String catalogName, String dbName, String tableName, String partitionName, boolean b);
+      String catalogName, String databaseName, String tableName, String partitionName, boolean b);
 
   String getDelegationToken(String finalPrincipalName, String userName);
 
-  List<Table> getTableObjectsByName(String catalogName, String dbName, List<String> allTables);
+  List<HiveTable> getTableObjectsByName(
+      String catalogName, String databaseName, List<String> allTables);
 
   public enum HiveVersion {
     HIVE2,
