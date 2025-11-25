@@ -38,18 +38,47 @@ All operations are the same as relational catalog, please refer to [Manage Relat
 
 One thing need to be noted is that the provider will be `generic_lakehouse` when creating a generic lakehouse catalog.
 That is:
+
+<Tabs groupId='language' queryString>
+<TabItem value="shell" label="Shell">
+
 ```shell
 curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
 -H "Content-Type: application/json" -d '{
-  "name": "lance_catalog",
+  "name": "generic_lakehouse_catalog",
   "type": "RELATIONAL",
   "comment": "comment",
   "provider": "generic-lakehouse", 
   "properties": {
   }
-}' http://localhost:8090/api/metalakes/test/catalogs
+}' http://localhost:8090/api/metalakes/metalake/catalogs
 ```
 
+</TabItem>
+<TabItem value="java" label="Java">
+
+```java
+
+// Assuming you have just created a metalake named `metalake`
+GravitinoClient gravitinoClient = GravitinoClient
+    .builder("http://127.0.0.1:8090")
+    .withMetalake("metalake")
+    .build();
+
+Map<String, String> genericCatalogProperties = ImmutableMap.<String, String>builder()
+    .put("location", "hdfs://localhost:9000/user/lakehouse") // The root location of the lakehouse storage system
+    .build();
+
+Catalog catalog = gravitinoClient.createCatalog("generic_lakehouse_catalog",
+    Type.RELATIONAL,
+    "generic_lakehouse", 
+    "This is a generic lakehouse catalog",
+    genericCatalogProperties); // Please change the properties according to the value of the provider.
+// ...
+```
+
+</TabItem>
+</Tabs>
 
 
 ## Schema
@@ -60,7 +89,7 @@ All capabilities are the same as relational catalog, please refer to [Manage Rel
 
 ### Schema properties
 
-The same as catalog properties, please refer to [Catalog properties](#catalog-properties) section for more details.
+The same as catalog properties, please refer to [Catalog properties](#catalog-properties) section for more details. Schema `location` property can be used to specify the location to store all tables under this schema.
 
 ### Schema operations
 
@@ -156,24 +185,24 @@ Currently, the following properties are required for a table in a generic lakeho
 | `format`           | The format for a table, it can be `lance`, `iceberg`,..., currently, it only supports `lance` | (none)        | Yes                                                                         | 1.1.0         |
 | `location`         | The location to storage the table meta and data.                                              | (none)        | No, but if this is not set in catalog or schema, then it's a required value | 1.1.0         |
 
-Of course, apart from the above required properties, you can also set other table properties supported by the underlying lakehouse storage system or your custom properties.
+Of course, apart from the above-required properties, you can also set other table properties supported by the underlying lakehouse storage system or your custom properties.
 
 ### Table indexes
 
 This part is almost the same as relational catalog, please refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metadata-using-gravitino.md#table-partitioning-distribution-sort-ordering-and-indexes) for more details.
-However, different lakehouse storage systems may have different support for indexes, and the following tables show the support for indexes in Lance-based lakehouse storage system.
+However, different lakehouse storage systems may have different supports for indexes, and the following tables show the support for indexes in a Lance-based lakehouse storage system.
 
-| Index type  | Description                                                                                                                                                                                                                                                                                                                        | Lance    |
-|-------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|----------|         
-| SCALAR      | SCALAR index is used to optimize searches on scalar data types such as integers, floats, and so on.                                                                                                                                                                                                                                |  Y       |
-| VECTOR      | VECTOR index is used to optimize similarity searches in high-dimensional vector spaces..                                                                                                                                                                                                                                           |  Y       |
-| BTREE       | BTREE index is a balanced tree data structure that maintains sorted data and allows for logarithmic time complexity for search, insert, and delete operations.                                                                                                                                                                     |  Y       |
-| INVERTED    | INVERTED index is a data structure used to optimize full-text searches by mapping terms to  their locations within a dataset, allowing for quick retrieval of documents containing  specific words or phrases.                                                                                                                     |  Y       |
-| IVF_FLAT    | IVF_FLAT (Inverted File with Flat quantization) index is used for efficient similarity searches in high-dimensional vector spaces by partitioning the vector space into clusters and storing vectors in a flat structure within each cluster.                                                                                      |  Y       |
-| IVF_SQ      | IVF_SQ (Inverted File with Scalar Quantization) index is used for efficient similarity searches in high-dimensional vector spaces by partitioning the vector space into clusters and storing quantized representations of vectors within each cluster to reduce memory usage.                                                      |  Y       |
-| IVF_PQ      | IVF_PQ (Inverted File with Product Quantization) index is used for efficient similarity searches in high-dimensional vector spaces by partitioning the vector space into clusters and storing product-quantized representations of vectors within each cluster to achieve a balance between search accuracy and memory efficiency. |  Y       |
+| Index type | Description                                                                                                                                                                                                                                                                                                                        | Lance |
+|------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-------|         
+| SCALAR     | SCALAR index is used to optimize searches on scalar data types such as integers, floats, and so on.                                                                                                                                                                                                                                |  Y    |
+| VECTOR     | VECTOR index is used to optimize similarity searches in high-dimensional vector spaces.                                                                                                                                                                                                                                            |  Y    |
+| BTREE      | BTREE index is a balanced tree data structure that maintains sorted data and allows for logarithmic time complexity for search, insert, and delete operations.                                                                                                                                                                     |  Y    |
+| INVERTED   | INVERTED index is a data structure used to optimize full-text searches by mapping terms to  their locations within a dataset, allowing for quick retrieval of documents containing  specific words or phrases.                                                                                                                     |  Y    |
+| IVF_FLAT   | IVF_FLAT (Inverted File with Flat quantization) index is used for efficient similarity searches in high-dimensional vector spaces by partitioning the vector space into clusters and storing vectors in a flat structure within each cluster.                                                                                      |  Y    |
+| IVF_SQ     | IVF_SQ (Inverted File with Scalar Quantization) index is used for efficient similarity searches in high-dimensional vector spaces by partitioning the vector space into clusters and storing quantized representations of vectors within each cluster to reduce memory usage.                                                      |  Y    |
+| IVF_PQ     | IVF_PQ (Inverted File with Product Quantization) index is used for efficient similarity searches in high-dimensional vector spaces by partitioning the vector space into clusters and storing product-quantized representations of vectors within each cluster to achieve a balance between search accuracy and memory efficiency. |  Y    |
 
-Another point is that NOT all table format support creating index when creating table, and Lance is one of them. So when creating a lance table, you cannot specify indexes at the same time. You need to create the table first, then create indexes on the table.
+Another point is that **NOT all lakehouse table support creating index when creating table**, and Lance is one of them. So when creating a lance table, you cannot specify indexes at the same time. You need to create the table first, then create indexes on the table.
 
 ### Table operations
 
@@ -241,3 +270,12 @@ tableCatalog.createTable(
 
 </TabItem>
 </Tabs>
+
+About the properties `location`, if it's not set in table properties, Gravitino will use the following hierarchy to determine the location to store the table metadata and data:
+1. If `location` is set in table properties, use it.
+2. Else if `location` is set in schema properties, use it and the final location will be `schema_location/table_name`.
+3. Else if `location` is set in catalog properties, use it and the final location will be `catalog_location/schema_name/table_name`.
+4. If both catalog and schema have `location` set, schema `location` takes precedence over catalog `location`. 
+5. Else, throw an error indicating that the location is not specified.
+
+For other operations such as load, alter, drop, and truncate table, they are the same as relational catalog, please refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metadata-using-gravitino.md#table-operations) for more details.
