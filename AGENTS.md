@@ -305,7 +305,7 @@ The project uses custom CI Docker images:
 
 - **Javadoc**: Required for all public APIs
 - **Pythondoc**: Use docstrings for Python public APIs
-- **OpenAPI**: Document REST APIs with OpenAPI annotations
+- **OpenAPI**: Document REST APIs with OpenAPI annotations in `docs/open-api/`
 - **Markdown**: Documentation in `docs/` directory
 - **Comments**: Explain "why" not "what" in code comments
 - **Changelog**: Document user-facing changes
@@ -407,7 +407,7 @@ When reviewing contributions, check for:
 
 ### Documentation
 - Public APIs have complete Javadoc and Pythondoc
-- REST APIs documented with OpenAPI annotations
+- REST APIs documented with OpenAPI annotations in the `docs/open-api/` directory
 - Complex logic has explanatory comments
 - User-facing changes documented in `docs/`
 - README or docs updated if needed
