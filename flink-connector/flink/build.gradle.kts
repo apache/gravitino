@@ -103,6 +103,7 @@ dependencies {
   testImplementation("org.apache.flink:flink-connector-hive_$scalaVersion:$flinkVersion")
   testImplementation("org.apache.flink:flink-table-common:$flinkVersion")
   testImplementation("org.apache.flink:flink-table-api-java:$flinkVersion")
+  testImplementation("org.apache.flink:flink-sql-gateway:$flinkVersion")
   testImplementation("org.apache.paimon:paimon-flink-$flinkMajorVersion:$paimonVersion")
 
   testImplementation(libs.hive2.exec) {
