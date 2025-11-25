@@ -121,7 +121,13 @@ s3_catalog = gravitino_client.create_catalog(name="test_catalog",
 </Tabs>
 
 :::note
-When using S3, ensure that the location value starts with s3a:// (not s3://) for AWS S3. For example, use s3a://bucket/root, as the s3:// format is not supported by the hadoop-aws library.
+- When using S3, ensure that the location value starts with s3a:// (not s3://) for AWS S3. For example, use s3a://bucket/root, as the s3:// format is not supported by the hadoop-aws library.
+- When using MinIO or other S3-compatible storage services, make sure to set the `s3-endpoint` property to the appropriate endpoint URL. 
+- When using MinIO or other S3-compatible storage services, you may need to set additional properties such as `s3-path-style-access` to `true` depending on the storage service requirements. You can do this in Gravitino's `fileset.conf` file with the "gravitino.bypass." prefix: 
+```bash
+$ cat $GRAVITINO_HOME/catalogs/fileset/conf/fileset.conf
+gravitino.bypass.fs.s3a.path.style.access=true
+```
 :::
 
 ### Step2: Create a schema
@@ -215,7 +221,7 @@ filesetCatalog.createFileset(
     "This is an example fileset",
     Fileset.Type.MANAGED,
     "s3a://bucket/root/schema/example_fileset",
-    propertiesMap,
+    propertiesMap
 );
 ```
 
@@ -258,11 +264,11 @@ conf.set("fs.AbstractFileSystem.gvfs.impl", "org.apache.gravitino.filesystem.had
 conf.set("fs.gvfs.impl", "org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystem");
 conf.set("fs.gravitino.server.uri", "http://localhost:8090");
 conf.set("fs.gravitino.client.metalake", "test_metalake");
-conf.set("s3-endpoint", "http://localhost:8090");
+conf.set("s3-endpoint", "http://localhost:9000");
 conf.set("s3-access-key-id", "minio");
 conf.set("s3-secret-access-key", "minio123");
 
-Path filesetPath = new Path("gvfs://fileset/adls_catalog/adls_schema/adls_fileset/new_dir");
+Path filesetPath = new Path("gvfs://fileset/fileset_catalog/fileset_schema/my_fileset/new_dir");
 FileSystem fs = filesetPath.getFileSystem(conf);
 fs.mkdirs(filesetPath);
 ...
@@ -460,7 +466,7 @@ options = {
     "cache_size": 20,
     "cache_expired_time": 3600,
     "auth_type": "simple",
-    "s3_endpoint": "http://localhost:8090",
+    "s3_endpoint": "http://localhost:9000",
     "s3_access_key_id": "minio",
     "s3_secret_access_key": "minio123"
 }
