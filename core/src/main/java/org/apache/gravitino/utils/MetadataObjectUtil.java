@@ -36,6 +36,8 @@ import org.apache.gravitino.exceptions.NoSuchPolicyException;
 import org.apache.gravitino.exceptions.NoSuchRoleException;
 import org.apache.gravitino.exceptions.NoSuchTagException;
 
+import static com.google.common.base.Preconditions.checkNotNull;
+
 public class MetadataObjectUtil {
 
   private static final Joiner DOT = Joiner.on(".");
