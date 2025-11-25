@@ -258,10 +258,12 @@ public class TestJcasbinAuthorizer {
   }
 
   private Boolean doAuthorizeOwner(Principal currentPrincipal) {
+    AuthorizationRequestContext authorizationRequestContext = new AuthorizationRequestContext();
     return jcasbinAuthorizer.isOwner(
         currentPrincipal,
         "testMetalake",
-        MetadataObjects.of(null, "testCatalog", MetadataObject.Type.CATALOG));
+        MetadataObjects.of(null, "testCatalog", MetadataObject.Type.CATALOG),
+        authorizationRequestContext);
   }
 
   private static UserEntity getUserEntity() {
