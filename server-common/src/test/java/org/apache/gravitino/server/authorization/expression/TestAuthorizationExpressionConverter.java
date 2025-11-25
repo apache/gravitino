@@ -84,7 +84,7 @@ public class TestAuthorizationExpressionConverter {
     Assertions.assertEquals(
         "authorizer.authorize(principal,METALAKE_NAME,CATALOG,"
             + "@org.apache.gravitino.authorization.Privilege$Name@CREATE_SCHEMA,authorizationContext) "
-            + "|| authorizer.isOwner(principal,METALAKE_NAME,SCHEMA)",
+            + "|| authorizer.isOwner(principal,METALAKE_NAME,SCHEMA,authorizationContext)",
         createTableOgnlExpression);
 
     String expressionWithOwner2 = "(ANY(OWNER, METALAKE, CATALOG)) && CATALOG::USE_CATALOG)";
