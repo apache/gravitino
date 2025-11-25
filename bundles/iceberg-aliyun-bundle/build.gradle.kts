@@ -27,6 +27,9 @@ plugins {
 dependencies {
   implementation(libs.aliyun.credentials.sdk)
   implementation(libs.aliyun.sdk.oss)
+  // Aliyun oss SDK depends on this package, and JDK >= 9 requires manual add
+  // https://www.alibabacloud.com/help/en/oss/developer-reference/java-installation?spm=a2c63.p38356.0.i1
+  implementation(libs.sun.activation)
 }
 
 tasks.withType(ShadowJar::class.java) {
