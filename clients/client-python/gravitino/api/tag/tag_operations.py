@@ -24,6 +24,12 @@ from gravitino.api.tag.tag_change import TagChange
 
 
 class TagOperations(ABC):
+    """
+    Interface for supporting global tag operations. This interface will provide tag listing, getting,
+    creating, and other tag operations under a metalake. This interface will be mixed with
+    GravitinoMetalake or GravitinoClient to provide tag operations.
+    """
+
     @abstractmethod
     def list_tags(self) -> list[str]:
         """List all the tag names under a metalake.
