@@ -19,7 +19,6 @@
 
 package org.apache.gravitino.gcs.credential;
 
-import java.util.Map;
 import org.apache.gravitino.credential.CredentialProviderDelegator;
 import org.apache.gravitino.credential.GCSTokenCredential;
 
@@ -28,11 +27,6 @@ import org.apache.gravitino.credential.GCSTokenCredential;
  * {@link GCSTokenCredentialGenerator} which is loaded via reflection to avoid classpath issues.
  */
 public class GCSTokenProvider extends CredentialProviderDelegator<GCSTokenCredential> {
-
-  @Override
-  public void initialize(Map<String, String> properties) {
-    this.properties = properties;
-  }
 
   @Override
   public void close() {

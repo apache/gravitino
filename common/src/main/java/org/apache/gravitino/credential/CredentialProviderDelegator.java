@@ -31,27 +31,19 @@ import java.util.Map;
 public abstract class CredentialProviderDelegator<T extends Credential>
     implements CredentialProvider {
 
-  /**
-   * The properties used by the generator to generate the credential.
-   */
+  /** The properties used by the generator to generate the credential. */
   protected Map<String, String> properties;
+
   private volatile CredentialGenerator<T> generator;
 
   @Override
   public void initialize(Map<String, String> properties) {
     this.properties = properties;
+    this.generator = loadGenerator();
   }
 
   @Override
   public Credential getCredential(CredentialContext context) {
-    if (generator == null) {
-      synchronized (this) {
-        if (generator == null) {
-          this.generator = loadGenerator();
-        }
-      }
-    }
-
     try {
       return generator.generate(properties, context);
     } catch (Exception e) {
