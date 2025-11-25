@@ -184,8 +184,8 @@ public class TestSecurableObjects {
     Privilege applyTag = Privileges.ApplyTag.allow();
     Privilege createPolicy = Privileges.CreatePolicy.allow();
     Privilege applyPolicy = Privileges.ApplyPolicy.allow();
-    Privilege createJobTemplate = Privileges.RegisterJobTemplate.allow();
-    Privilege createJob = Privileges.RunJob.allow();
+    Privilege registerJobTemplate = Privileges.RegisterJobTemplate.allow();
+    Privilege runJob = Privileges.RunJob.allow();
     Privilege useJobTemplate = Privileges.UseJobTemplate.allow();
 
     // Test create catalog
@@ -424,27 +424,27 @@ public class TestSecurableObjects {
     Assertions.assertFalse(useModel.canBindTo(MetadataObject.Type.FILESET));
     Assertions.assertFalse(useModel.canBindTo(MetadataObject.Type.ROLE));
 
-    Assertions.assertTrue(createJobTemplate.canBindTo(MetadataObject.Type.METALAKE));
-    Assertions.assertFalse(createJobTemplate.canBindTo(MetadataObject.Type.CATALOG));
-    Assertions.assertFalse(createJobTemplate.canBindTo(MetadataObject.Type.SCHEMA));
-    Assertions.assertFalse(createJobTemplate.canBindTo(MetadataObject.Type.TABLE));
-    Assertions.assertFalse(createJobTemplate.canBindTo(MetadataObject.Type.TOPIC));
-    Assertions.assertFalse(createJobTemplate.canBindTo(MetadataObject.Type.FILESET));
-    Assertions.assertFalse(createJobTemplate.canBindTo(MetadataObject.Type.ROLE));
-    Assertions.assertFalse(createJobTemplate.canBindTo(MetadataObject.Type.COLUMN));
-    Assertions.assertFalse(createJobTemplate.canBindTo(MetadataObject.Type.JOB_TEMPLATE));
-    Assertions.assertFalse(createJobTemplate.canBindTo(MetadataObject.Type.JOB));
+    Assertions.assertTrue(registerJobTemplate.canBindTo(MetadataObject.Type.METALAKE));
+    Assertions.assertFalse(registerJobTemplate.canBindTo(MetadataObject.Type.CATALOG));
+    Assertions.assertFalse(registerJobTemplate.canBindTo(MetadataObject.Type.SCHEMA));
+    Assertions.assertFalse(registerJobTemplate.canBindTo(MetadataObject.Type.TABLE));
+    Assertions.assertFalse(registerJobTemplate.canBindTo(MetadataObject.Type.TOPIC));
+    Assertions.assertFalse(registerJobTemplate.canBindTo(MetadataObject.Type.FILESET));
+    Assertions.assertFalse(registerJobTemplate.canBindTo(MetadataObject.Type.ROLE));
+    Assertions.assertFalse(registerJobTemplate.canBindTo(MetadataObject.Type.COLUMN));
+    Assertions.assertFalse(registerJobTemplate.canBindTo(MetadataObject.Type.JOB_TEMPLATE));
+    Assertions.assertFalse(registerJobTemplate.canBindTo(MetadataObject.Type.JOB));
 
-    Assertions.assertTrue(createJob.canBindTo(MetadataObject.Type.METALAKE));
-    Assertions.assertFalse(createJob.canBindTo(MetadataObject.Type.CATALOG));
-    Assertions.assertFalse(createJob.canBindTo(MetadataObject.Type.SCHEMA));
-    Assertions.assertFalse(createJob.canBindTo(MetadataObject.Type.TABLE));
-    Assertions.assertFalse(createJob.canBindTo(MetadataObject.Type.TOPIC));
-    Assertions.assertFalse(createJob.canBindTo(MetadataObject.Type.FILESET));
-    Assertions.assertFalse(createJob.canBindTo(MetadataObject.Type.ROLE));
-    Assertions.assertFalse(createJob.canBindTo(MetadataObject.Type.COLUMN));
-    Assertions.assertFalse(createJob.canBindTo(MetadataObject.Type.JOB));
-    Assertions.assertFalse(createJob.canBindTo(MetadataObject.Type.JOB_TEMPLATE));
+    Assertions.assertTrue(runJob.canBindTo(MetadataObject.Type.METALAKE));
+    Assertions.assertFalse(runJob.canBindTo(MetadataObject.Type.CATALOG));
+    Assertions.assertFalse(runJob.canBindTo(MetadataObject.Type.SCHEMA));
+    Assertions.assertFalse(runJob.canBindTo(MetadataObject.Type.TABLE));
+    Assertions.assertFalse(runJob.canBindTo(MetadataObject.Type.TOPIC));
+    Assertions.assertFalse(runJob.canBindTo(MetadataObject.Type.FILESET));
+    Assertions.assertFalse(runJob.canBindTo(MetadataObject.Type.ROLE));
+    Assertions.assertFalse(runJob.canBindTo(MetadataObject.Type.COLUMN));
+    Assertions.assertFalse(runJob.canBindTo(MetadataObject.Type.JOB));
+    Assertions.assertFalse(runJob.canBindTo(MetadataObject.Type.JOB_TEMPLATE));
 
     Assertions.assertTrue(useJobTemplate.canBindTo(MetadataObject.Type.METALAKE));
     Assertions.assertFalse(useJobTemplate.canBindTo(MetadataObject.Type.CATALOG));
