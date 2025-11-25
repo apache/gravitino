@@ -58,6 +58,6 @@ All the catalog metrics start with the `gravitino-catalog` prefix in Prometheus 
 For example, you can get Prometheus metrics for a fileset catalog named `test_catalog` under a metalake named `test_metalake` in the Gravitino server as follows:
 
 ```text
-gravitino-catalog_filesystem-cache_hits{provider="fileset",metalake="test_metalake",catalog="test_catalog",} 0.0
-gravitino-catalog_filesystem-cache_misses{provider="fileset",metalake="test_metalake",catalog="test_catalog",} 0.0
+gravitino_catalog_filesystem_cache_hits{provider="fileset",metalake="test_metalake",catalog="test_catalog",} 0.0
+gravitino_catalog_filesystem_cache_misses{provider="fileset",metalake="test_metalake",catalog="test_catalog",} 0.0
 ```
