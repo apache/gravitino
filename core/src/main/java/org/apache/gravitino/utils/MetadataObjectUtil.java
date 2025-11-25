@@ -18,6 +18,8 @@
  */
 package org.apache.gravitino.utils;
 
+import static com.google.common.base.Preconditions.checkNotNull;
+
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.BiMap;
@@ -35,8 +37,6 @@ import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
 import org.apache.gravitino.exceptions.NoSuchPolicyException;
 import org.apache.gravitino.exceptions.NoSuchRoleException;
 import org.apache.gravitino.exceptions.NoSuchTagException;
-
-import static com.google.common.base.Preconditions.checkNotNull;
 
 public class MetadataObjectUtil {
 
