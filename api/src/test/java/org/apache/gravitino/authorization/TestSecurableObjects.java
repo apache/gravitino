@@ -108,7 +108,7 @@ public class TestSecurableObjects {
                     MetadataObject.Type.METALAKE,
                     Lists.newArrayList("metalake", "catalog"),
                     Lists.newArrayList(Privileges.UseCatalog.allow())));
-    Assertions.assertTrue(e.getMessage().contains("length of names is 2"));
+    Assertions.assertTrue(e.getMessage().contains("the length of names must be 1"));
     e =
         Assertions.assertThrows(
             IllegalArgumentException.class,
@@ -117,7 +117,7 @@ public class TestSecurableObjects {
                     MetadataObject.Type.CATALOG,
                     Lists.newArrayList("metalake", "catalog"),
                     Lists.newArrayList(Privileges.UseCatalog.allow())));
-    Assertions.assertTrue(e.getMessage().contains("length of names is 2"));
+    Assertions.assertTrue(e.getMessage().contains("the length of names must be 1"));
 
     e =
         Assertions.assertThrows(
@@ -127,7 +127,7 @@ public class TestSecurableObjects {
                     MetadataObject.Type.TABLE,
                     Lists.newArrayList("metalake"),
                     Lists.newArrayList(Privileges.SelectTable.allow())));
-    Assertions.assertTrue(e.getMessage().contains("the length of names is 1"));
+    Assertions.assertTrue(e.getMessage().contains("the length of names must be 3"));
     e =
         Assertions.assertThrows(
             IllegalArgumentException.class,
@@ -136,7 +136,7 @@ public class TestSecurableObjects {
                     MetadataObject.Type.TOPIC,
                     Lists.newArrayList("metalake"),
                     Lists.newArrayList(Privileges.ConsumeTopic.allow())));
-    Assertions.assertTrue(e.getMessage().contains("the length of names is 1"));
+    Assertions.assertTrue(e.getMessage().contains("the length of names must be 3"));
     e =
         Assertions.assertThrows(
             IllegalArgumentException.class,
@@ -145,7 +145,7 @@ public class TestSecurableObjects {
                     MetadataObject.Type.FILESET,
                     Lists.newArrayList("metalake"),
                     Lists.newArrayList(Privileges.ReadFileset.allow())));
-    Assertions.assertTrue(e.getMessage().contains("the length of names is 1"));
+    Assertions.assertTrue(e.getMessage().contains("the length of names must be 3"));
 
     e =
         Assertions.assertThrows(
@@ -155,7 +155,7 @@ public class TestSecurableObjects {
                     MetadataObject.Type.SCHEMA,
                     Lists.newArrayList("catalog", "schema", "table"),
                     Lists.newArrayList(Privileges.UseSchema.allow())));
-    Assertions.assertTrue(e.getMessage().contains("the length of names is 3"));
+    Assertions.assertTrue(e.getMessage().contains("the length of names must be 2"));
   }
 
   @Test
@@ -184,6 +184,9 @@ public class TestSecurableObjects {
     Privilege applyTag = Privileges.ApplyTag.allow();
     Privilege createPolicy = Privileges.CreatePolicy.allow();
     Privilege applyPolicy = Privileges.ApplyPolicy.allow();
+    Privilege registerJobTemplate = Privileges.RegisterJobTemplate.allow();
+    Privilege runJob = Privileges.RunJob.allow();
+    Privilege useJobTemplate = Privileges.UseJobTemplate.allow();
 
     // Test create catalog
     Assertions.assertTrue(createCatalog.canBindTo(MetadataObject.Type.METALAKE));
@@ -396,6 +399,7 @@ public class TestSecurableObjects {
     Assertions.assertFalse(applyTag.canBindTo(MetadataObject.Type.SCHEMA));
     Assertions.assertFalse(applyTag.canBindTo(MetadataObject.Type.TABLE));
     Assertions.assertFalse(applyTag.canBindTo(MetadataObject.Type.MODEL));
+
     Assertions.assertFalse(useModel.canBindTo(MetadataObject.Type.TOPIC));
     Assertions.assertFalse(useModel.canBindTo(MetadataObject.Type.FILESET));
     Assertions.assertFalse(useModel.canBindTo(MetadataObject.Type.ROLE));
@@ -419,5 +423,38 @@ public class TestSecurableObjects {
     Assertions.assertFalse(useModel.canBindTo(MetadataObject.Type.TOPIC));
     Assertions.assertFalse(useModel.canBindTo(MetadataObject.Type.FILESET));
     Assertions.assertFalse(useModel.canBindTo(MetadataObject.Type.ROLE));
+
+    Assertions.assertTrue(registerJobTemplate.canBindTo(MetadataObject.Type.METALAKE));
+    Assertions.assertFalse(registerJobTemplate.canBindTo(MetadataObject.Type.CATALOG));
+    Assertions.assertFalse(registerJobTemplate.canBindTo(MetadataObject.Type.SCHEMA));
+    Assertions.assertFalse(registerJobTemplate.canBindTo(MetadataObject.Type.TABLE));
+    Assertions.assertFalse(registerJobTemplate.canBindTo(MetadataObject.Type.TOPIC));
+    Assertions.assertFalse(registerJobTemplate.canBindTo(MetadataObject.Type.FILESET));
+    Assertions.assertFalse(registerJobTemplate.canBindTo(MetadataObject.Type.ROLE));
+    Assertions.assertFalse(registerJobTemplate.canBindTo(MetadataObject.Type.COLUMN));
+    Assertions.assertFalse(registerJobTemplate.canBindTo(MetadataObject.Type.JOB_TEMPLATE));
+    Assertions.assertFalse(registerJobTemplate.canBindTo(MetadataObject.Type.JOB));
+
+    Assertions.assertTrue(runJob.canBindTo(MetadataObject.Type.METALAKE));
+    Assertions.assertFalse(runJob.canBindTo(MetadataObject.Type.CATALOG));
+    Assertions.assertFalse(runJob.canBindTo(MetadataObject.Type.SCHEMA));
+    Assertions.assertFalse(runJob.canBindTo(MetadataObject.Type.TABLE));
+    Assertions.assertFalse(runJob.canBindTo(MetadataObject.Type.TOPIC));
+    Assertions.assertFalse(runJob.canBindTo(MetadataObject.Type.FILESET));
+    Assertions.assertFalse(runJob.canBindTo(MetadataObject.Type.ROLE));
+    Assertions.assertFalse(runJob.canBindTo(MetadataObject.Type.COLUMN));
+    Assertions.assertFalse(runJob.canBindTo(MetadataObject.Type.JOB));
+    Assertions.assertFalse(runJob.canBindTo(MetadataObject.Type.JOB_TEMPLATE));
+
+    Assertions.assertTrue(useJobTemplate.canBindTo(MetadataObject.Type.METALAKE));
+    Assertions.assertFalse(useJobTemplate.canBindTo(MetadataObject.Type.CATALOG));
+    Assertions.assertFalse(useJobTemplate.canBindTo(MetadataObject.Type.SCHEMA));
+    Assertions.assertFalse(useJobTemplate.canBindTo(MetadataObject.Type.TABLE));
+    Assertions.assertFalse(useJobTemplate.canBindTo(MetadataObject.Type.TOPIC));
+    Assertions.assertFalse(useJobTemplate.canBindTo(MetadataObject.Type.FILESET));
+    Assertions.assertFalse(useJobTemplate.canBindTo(MetadataObject.Type.ROLE));
+    Assertions.assertFalse(useJobTemplate.canBindTo(MetadataObject.Type.COLUMN));
+    Assertions.assertTrue(useJobTemplate.canBindTo(MetadataObject.Type.JOB_TEMPLATE));
+    Assertions.assertFalse(useJobTemplate.canBindTo(MetadataObject.Type.JOB));
   }
 }
