@@ -20,12 +20,14 @@ package org.apache.gravitino.cache;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
+import com.google.common.collect.Maps;
 import com.googlecode.concurrenttrees.radix.ConcurrentRadixTree;
 import com.googlecode.concurrenttrees.radix.RadixTree;
 import com.googlecode.concurrenttrees.radix.node.concrete.DefaultCharArrayNodeFactory;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import org.apache.commons.collections4.CollectionUtils;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.NameIdentifier;
@@ -45,6 +47,29 @@ public class ReverseIndexCache {
   /** Registers a reverse index processor for a specific entity class. */
   private final Map<Class<? extends Entity>, ReverseIndexRule> reverseIndexRules = new HashMap<>();
 
+  /**
+   * Map from data entity key to a list of entity cache relation keys. This is used for reverse
+   * indexing.
+   *
+   * <p>For example, a role entity may be related to multiple securable objects, so we need to
+   * maintain a mapping from the role entity key to the list of securable object keys. That is
+   * entityToReverseIndexMap: roleEntityKey -> [securableObjectKey1, securableObjectKey2, ...]
+   *
+   * <p>This map is used to quickly find all the related entity cache keys when we need to
+   * invalidate in the reverse index if a role entity is updated. The following is an example: a
+   * Role a has securable objects s1 and s2, so we have the following mapping: <br>
+   * cacheData: role1 -> role entity </br> <br>
+   * reverseIndex: s1 -> [role1], s2 -> [role1] </br>
+   *
+   * <p>This map will be: <br>
+   * role1 -> [s1, s2] </br>
+   *
+   * <p>When we update role1, we need to invalidate s1 and s2 from the reverse index via this map,
+   * or the data will be in the memory forever.
+   */
+  private final Map<EntityCacheKey, List<EntityCacheKey>> entityToReverseIndexMap =
+      Maps.newHashMap();
+
   public ReverseIndexCache() {
     this.reverseIndex = new ConcurrentRadixTree<>(new DefaultCharArrayNodeFactory());
 
@@ -57,20 +82,28 @@ public class ReverseIndexCache {
         GenericEntity.class, ReverseIndexRules.GENERIC_METADATA_OBJECT_REVERSE_RULE);
   }
 
-  public boolean remove(EntityCacheKey key) {
-    return reverseIndex.remove(key.toString());
-  }
-
   public Iterable<List<EntityCacheKey>> getValuesForKeysStartingWith(String keyPrefix) {
     return reverseIndex.getValuesForKeysStartingWith(keyPrefix);
   }
 
-  public Iterable<CharSequence> getKeysStartingWith(String keyPrefix) {
-    return reverseIndex.getKeysStartingWith(keyPrefix);
-  }
+  public boolean remove(EntityCacheKey key) {
+    List<EntityCacheKey> relatedKeys = entityToReverseIndexMap.remove(key);
+    if (CollectionUtils.isNotEmpty(relatedKeys)) {
+      for (EntityCacheKey relatedKey : relatedKeys) {
+        List<EntityCacheKey> existingKeys = reverseIndex.getValueForExactKey(relatedKey.toString());
+        if (existingKeys != null && existingKeys.contains(key)) {
+          List<EntityCacheKey> newValues = Lists.newArrayList(existingKeys);
+          newValues.remove(key);
+          if (newValues.isEmpty()) {
+            reverseIndex.remove(relatedKey.toString());
+          } else {
+            reverseIndex.put(relatedKey.toString(), newValues);
+          }
+        }
+      }
+    }
 
-  public boolean remove(String key) {
-    return reverseIndex.remove(key);
+    return reverseIndex.remove(key.toString());
   }
 
   public int size() {
@@ -80,6 +113,7 @@ public class ReverseIndexCache {
   public void put(
       NameIdentifier nameIdentifier, Entity.EntityType type, EntityCacheRelationKey key) {
     EntityCacheKey entityCacheKey = EntityCacheKey.of(nameIdentifier, type);
+    entityToReverseIndexMap.computeIfAbsent(key, k -> Lists.newArrayList()).add(entityCacheKey);
 
     List<EntityCacheKey> existingKeys = reverseIndex.getValueForExactKey(entityCacheKey.toString());
     if (existingKeys == null) {
