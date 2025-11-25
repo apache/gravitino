@@ -31,6 +31,7 @@ import java.nio.charset.StandardCharsets;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
+import java.util.Properties;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import org.apache.gravitino.hive.HiveClientPool;
@@ -189,8 +190,9 @@ public class MiniHiveMetastore {
           HiveConf.ConfVars.METASTOREURIS.varname,
           hiveConf.getVar(HiveConf.ConfVars.METASTOREURIS));
 
-      // todo yuhui
-      this.clientPool = new HiveClientPool(1, null);
+      Properties properties = new Properties();
+      properties.put("hive.metastore.uris", "thrift://localhost:" + port);
+      this.clientPool = new HiveClientPool(1, properties);
     } catch (Exception e) {
       throw new RuntimeException("Cannot start TestHiveMetastore", e);
     }

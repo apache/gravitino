@@ -27,6 +27,7 @@ import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
 import lombok.ToString;
+import org.apache.gravitino.Audit;
 import org.apache.gravitino.connector.BaseTable;
 import org.apache.gravitino.connector.TableOperations;
 import org.apache.gravitino.hive.CachedClientPool;
@@ -59,6 +60,17 @@ public class HiveTable extends BaseTable {
    * @return A new HiveTable instance Builder.
    */
   public static HiveTable.Builder fromHiveTable(String dbName, Table table) {
+    Audit audit = table.auditInfo();
+    AuditInfo auditInfo =
+        audit != null
+            ? AuditInfo.builder()
+                .withCreator(audit.creator())
+                .withCreateTime(audit.createTime())
+                .withLastModifier(audit.lastModifier())
+                .withLastModifiedTime(audit.lastModifiedTime())
+                .build()
+            : AuditInfo.EMPTY;
+
     return HiveTable.builder()
         .withName(table.name())
         .withComment(table.comment())
@@ -66,7 +78,7 @@ public class HiveTable extends BaseTable {
         .withColumns(table.columns())
         .withDistribution(table.distribution())
         .withSortOrders(table.sortOrder())
-        .withAuditInfo((AuditInfo) table.auditInfo())
+        .withAuditInfo(auditInfo)
         .withPartitioning(table.partitioning())
         .withSchemaName(dbName);
   }

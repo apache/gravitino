@@ -44,6 +44,7 @@ import java.time.Instant;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.Properties;
 import java.util.Set;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.ThreadFactory;
@@ -61,7 +62,6 @@ import org.apache.gravitino.connector.CatalogOperations;
 import org.apache.gravitino.connector.HasPropertyMetadata;
 import org.apache.gravitino.connector.ProxyPlugin;
 import org.apache.gravitino.connector.SupportsSchemas;
-import org.apache.gravitino.exceptions.ConnectionFailedException;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchTableException;
@@ -166,8 +166,9 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
 
     initKerberosIfNecessary(conf, hadoopConf);
 
-    // todo yuhui: handle hiveConfig
-    this.clientPool = new CachedClientPool(null, conf);
+    Properties prop = new Properties();
+    mergeConfig.forEach(prop::setProperty);
+    this.clientPool = new CachedClientPool(prop, conf);
 
     this.listAllTables = enableListAllTables(conf);
   }
@@ -327,12 +328,6 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
       return schemas;
     } catch (InterruptedException e) {
       throw new RuntimeException(e);
-    } catch (Exception e) {
-      throw new RuntimeException(
-          "Failed to list all schemas (database) under namespace : "
-              + namespace
-              + " in Hive Metastore",
-          e);
     }
   }
 
@@ -372,6 +367,8 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
       LOG.info("Created Hive schema (database) {} in Hive Metastore", ident.name());
       return hiveSchema;
 
+    } catch (NoSuchCatalogException | SchemaAlreadyExistsException ne) {
+      throw ne;
     } catch (Exception e) {
       throw new RuntimeException(e);
     }
@@ -442,7 +439,7 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
       LOG.info("Altered Hive schema (database) {} in Hive Metastore", ident.name());
       return hiveSchema;
 
-    } catch (Exception e) {
+    } catch (InterruptedException e) {
       throw new RuntimeException(e);
     }
   }
@@ -466,7 +463,9 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
       LOG.info("Dropped Hive schema (database) {}", ident.name());
       return true;
 
-    } catch (Exception e) {
+    } catch (NoSuchSchemaException e) {
+      return false;
+    } catch (InterruptedException e) {
       throw new RuntimeException(e);
     }
   }
@@ -838,9 +837,7 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
       LOG.info("Altered Hive table {} in Hive Metastore", tableIdent.name());
       return table;
 
-    } catch (IllegalArgumentException | NoSuchTableException e) {
-      throw e;
-    } catch (Exception e) {
+    } catch (InterruptedException e) {
       throw new RuntimeException(e);
     }
   }
@@ -1030,9 +1027,8 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
       Map<String, String> properties) {
     try {
       clientPool.run(c -> c.getAllDatabases(""));
-    } catch (Exception e) {
-      throw new ConnectionFailedException(
-          e, "Failed to run getAllDatabases in Hive Metastore: %s", e.getMessage());
+    } catch (InterruptedException e) {
+      throw new RuntimeException(e);
     }
   }
 
@@ -1057,7 +1053,7 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
       LOG.info("Dropped Hive table {}", tableIdent.name());
       return true;
 
-    } catch (Exception e) {
+    } catch (InterruptedException e) {
       throw new RuntimeException(e);
     }
   }

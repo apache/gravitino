@@ -93,11 +93,12 @@ public class HiveExceptionConverter {
     if (exceptionClassName.contains("AlreadyExistsException")) {
       // Try to determine type from message
       if (lowerMessage.contains("partition")) {
-        return new PartitionAlreadyExistsException(cause, "");
+        return new PartitionAlreadyExistsException(
+            cause, "Partition already exists in Hive Metastore");
       } else if (lowerMessage.contains("table")) {
-        return new TableAlreadyExistsException(cause, "");
+        return new TableAlreadyExistsException(cause, "Table already exists in Hive Metastore");
       } else {
-        return new SchemaAlreadyExistsException(cause, "");
+        return new SchemaAlreadyExistsException(cause, "Schema already exists in Hive Metastore");
       }
     }
 
