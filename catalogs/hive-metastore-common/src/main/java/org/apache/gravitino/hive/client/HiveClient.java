@@ -75,7 +75,7 @@ public interface HiveClient {
 
   String getDelegationToken(String finalPrincipalName, String userName);
 
-  List<Table> getTableObjectsByName(String name, List<String> allTables);
+  List<Table> getTableObjectsByName(String catalogName, String dbName, List<String> allTables);
 
   public enum HiveVersion {
     HIVE2,

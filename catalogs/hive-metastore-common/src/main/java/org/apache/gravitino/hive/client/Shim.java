@@ -98,5 +98,6 @@ public abstract class Shim {
 
   public abstract String getDelegationToken(String finalPrincipalName, String userName);
 
-  public abstract List<Table> getTableObjectsByName(String name, List<String> allTables);
+  public abstract List<Table> getTableObjectsByName(
+      String catalogName, String dbName, List<String> allTables);
 }

@@ -19,10 +19,7 @@
 
 package org.apache.gravitino.hive.client;
 
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.time.Instant;
-import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -40,128 +37,170 @@ import org.apache.gravitino.rel.expressions.literals.Literals;
 import org.apache.gravitino.rel.partitions.Partition;
 import org.apache.gravitino.rel.partitions.Partitions;
 import org.apache.gravitino.rel.types.Types;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 public class TestHiveClient {
 
+  private static final String HIVE2_HMS_URL = "thrift://172.17.0.2:9083";
+  private static final String HIVE2_HDFS_URL = "hdfs://172.17.0.2:9000";
+  private static final String HIVE3_HMS_URL = "thrift://172.17.0.3:9083";
+  private static final String HIVE3_HDFS_URL = "hdfs://172.17.0.3:9000";
+
   @Test
   void testHive2Client() throws Exception {
-    String catalogName = "sample_catalog";
-    String version = "HIVE3";
+    runHiveClientTest("HIVE2", "", "hive2", HIVE2_HMS_URL, HIVE2_HDFS_URL + "/tmp/gravitino_test");
+  }
+
+  @Test
+  void testHive3DefaultCatalog() throws Exception {
+    // Hive3 default catalog is "hive", not empty string
+    runHiveClientTest(
+        "HIVE3", "hive", "hive3_default", HIVE3_HMS_URL, HIVE3_HDFS_URL + "/tmp/gravitino_test");
+  }
+
+  @Test
+  void testHive3SampleCatalog() throws Exception {
+    runHiveClientTest(
+        "HIVE3",
+        "sample_catalog",
+        "hive3_sample",
+        HIVE3_HMS_URL,
+        HIVE3_HDFS_URL + "/tmp/gravitino_test");
+  }
+
+  private void runHiveClientTest(
+      String version,
+      String catalogName,
+      String testPrefix,
+      String metastoreUri,
+      String hdfsBasePath)
+      throws Exception {
     Properties properties = new Properties();
-    // properties.setProperty("hive.metastore.uris", "thrift://localhost:9083");
-    properties.setProperty("hive.metastore.uris", "thrift://172.17.0.3:9083");
+    properties.setProperty("hive.metastore.uris", metastoreUri);
     IsolatedClientLoader loader = IsolatedClientLoader.forVersion(version, Map.of());
     HiveClient client = loader.createClient(properties);
 
-    String dbName = "gt_hive2_db_" + UUID.randomUUID().toString().replace("-", "");
-    String tableName = "gt_hive2_tbl_" + UUID.randomUUID().toString().replace("-", "");
+    String dbName = "gt_" + testPrefix + "_db_" + UUID.randomUUID().toString().replace("-", "");
+    String tableName = "gt_" + testPrefix + "_tbl_" + UUID.randomUUID().toString().replace("-", "");
     String partitionValue = "p_" + UUID.randomUUID().toString().replace("-", "");
     String partitionName = "dt=" + partitionValue;
 
-    Path tempRoot = Files.createTempDirectory("hiveclient-hive2-");
-    Path dbLocation = tempRoot.resolve(dbName);
-    Path tableLocation = tempRoot.resolve(tableName);
+    String dbLocation = hdfsBasePath + "/" + dbName;
+    String tableLocation = hdfsBasePath + "/" + tableName;
 
     Schema schema = createTestSchema(dbName, dbLocation);
     Table table = createTestTable(tableName, tableLocation);
     Partition partition = createTestPartition(partitionName, partitionValue);
 
-    client.createDatabase(catalogName, schema);
-    System.out.println("Created database: " + dbName);
-
     try {
+      // Test database operations
+      client.createDatabase(catalogName, schema);
       List<String> allDatabases = client.getAllDatabases(catalogName);
-      System.out.println("All databases: " + allDatabases);
+      Assertions.assertTrue(allDatabases.contains(dbName), "Database should be in the list");
 
       Schema loadedDb = client.getDatabase(catalogName, dbName);
-      System.out.println("Loaded database: " + loadedDb.name());
+      Assertions.assertNotNull(loadedDb, "Loaded database should not be null");
+      Assertions.assertEquals(dbName, loadedDb.name(), "Database name should match");
+      Assertions.assertEquals(
+          schema.comment(), loadedDb.comment(), "Database comment should match");
 
       client.alterDatabase(catalogName, dbName, schema);
-      System.out.println("Altered database: " + dbName);
+      Schema alteredDb = client.getDatabase(catalogName, dbName);
+      Assertions.assertNotNull(alteredDb, "Altered database should not be null");
 
+      // Test table operations
       client.createTable(catalogName, dbName, table);
-      System.out.println("Created table: " + tableName);
+      List<String> allTables = client.getAllTables(catalogName, dbName);
+      Assertions.assertTrue(allTables.contains(tableName), "Table should be in the list");
 
       Table loadedTable = client.getTable(catalogName, dbName, tableName);
-      System.out.println("Loaded table: " + loadedTable.name());
+      Assertions.assertNotNull(loadedTable, "Loaded table should not be null");
+      Assertions.assertEquals(tableName, loadedTable.name(), "Table name should match");
+      Assertions.assertEquals(table.comment(), loadedTable.comment(), "Table comment should match");
+      Assertions.assertEquals(2, loadedTable.columns().length, "Table should have 2 columns");
+      Assertions.assertEquals(
+          1, loadedTable.partitioning().length, "Table should have 1 partition key");
 
       client.alterTable(catalogName, dbName, tableName, loadedTable);
-      System.out.println("Altered table: " + tableName);
-
-      List<String> allTables = client.getAllTables(catalogName, dbName);
-      System.out.println("All tables: " + allTables);
+      Table alteredTable = client.getTable(catalogName, dbName, tableName);
+      Assertions.assertNotNull(alteredTable, "Altered table should not be null");
 
       List<String> filteredTables =
           client.listTableNamesByFilter(catalogName, dbName, tableName, (short) 10);
-      System.out.println("Filtered tables: " + filteredTables);
+      Assertions.assertTrue(
+          filteredTables.contains(tableName), "Filtered tables should contain the table");
 
-      List<Table> tableObjects = client.getTableObjectsByName(dbName, List.of(tableName));
-      System.out.println("Table objects: " + tableObjects.size());
+      List<Table> tableObjects =
+          client.getTableObjectsByName(catalogName, dbName, List.of(tableName));
+      Assertions.assertEquals(1, tableObjects.size(), "Should get exactly one table object");
+      Assertions.assertEquals(
+          tableName, tableObjects.get(0).name(), "Table object name should match");
 
+      // Test partition operations
       Partition addedPartition = client.addPartition(catalogName, dbName, loadedTable, partition);
-      System.out.println("Added partition: " + addedPartition.name());
+      Assertions.assertNotNull(addedPartition, "Added partition should not be null");
+      Assertions.assertEquals(partitionName, addedPartition.name(), "Partition name should match");
 
       List<String> partitionNames =
           client.listPartitionNames(catalogName, dbName, tableName, (short) 10);
-      System.out.println("Partition names: " + partitionNames);
+      Assertions.assertTrue(
+          partitionNames.contains(partitionName), "Partition should be in the list");
 
       List<Partition> partitions =
           client.listPartitions(catalogName, dbName, loadedTable, (short) 10);
-      System.out.println("Partitions count: " + partitions.size());
+      Assertions.assertEquals(1, partitions.size(), "Should have exactly one partition");
+      Assertions.assertEquals(
+          partitionName, partitions.get(0).name(), "Partition name should match");
 
       List<Partition> filteredPartitions =
           client.listPartitions(
               catalogName, dbName, loadedTable, List.of(partitionValue), (short) 10);
-      System.out.println("Filtered partitions count: " + filteredPartitions.size());
+      Assertions.assertEquals(
+          1, filteredPartitions.size(), "Should have exactly one filtered partition");
 
       Partition fetchedPartition =
           client.getPartition(catalogName, dbName, loadedTable, addedPartition.name());
-      System.out.println("Fetched partition: " + fetchedPartition.name());
+      Assertions.assertNotNull(fetchedPartition, "Fetched partition should not be null");
+      Assertions.assertEquals(
+          partitionName, fetchedPartition.name(), "Fetched partition name should match");
 
       client.dropPartition(catalogName, dbName, tableName, addedPartition.name(), true);
-      System.out.println("Dropped partition: " + addedPartition.name());
+      List<String> partitionNamesAfterDrop =
+          client.listPartitionNames(catalogName, dbName, tableName, (short) 10);
+      Assertions.assertFalse(
+          partitionNamesAfterDrop.contains(partitionName),
+          "Partition should not be in the list after drop");
 
+      // Test delegation token (may not be available in all environments)
       try {
         String token =
             client.getDelegationToken(
                 System.getProperty("user.name"), System.getProperty("user.name"));
-        System.out.println("Delegation token: " + token);
+        Assertions.assertNotNull(token, "Delegation token should not be null");
       } catch (Exception e) {
-        System.out.println("Delegation token not available: " + e.getMessage());
+        // Delegation token may not be available, this is acceptable
       }
 
+      // Cleanup
       client.dropTable(catalogName, dbName, tableName, true, true);
-      System.out.println("Dropped table: " + tableName);
+      List<String> tablesAfterDrop = client.getAllTables(catalogName, dbName);
+      Assertions.assertFalse(
+          tablesAfterDrop.contains(tableName), "Table should not be in the list after drop");
 
       client.dropDatabase(catalogName, dbName, true);
-      System.out.println("Dropped database: " + dbName);
+      List<String> databasesAfterDrop = client.getAllDatabases(catalogName);
+      Assertions.assertFalse(
+          databasesAfterDrop.contains(dbName), "Database should not be in the list after drop");
     } finally {
       safelyDropTable(client, catalogName, dbName, tableName);
       safelyDropDatabase(client, catalogName, dbName);
-      deleteRecursively(tempRoot);
     }
   }
 
-  /*
-  void testHive3Client() throws Exception {
-    String catalogName = "";
-    String version = "HIVE3";
-    Properties properties = new Properties();
-    properties.setProperty("hive.metastore.uris", "thrift://172.17.0.3:9083");
-    IsolatedClientLoader loader = IsolatedClientLoader.forVersion(version, Map.of());
-    HiveClient client = loader.createClient(properties);
-    List<String> allDatabases = client.getAllDatabases(catalogName);
-    System.out.println("Databases: " + allDatabases);
-    Schema db = client.getDatabase(catalogName, "default");
-    System.out.println("Database s1: " + db.name());
-  }
-    */
-
-  private Schema createTestSchema(String dbName, Path location) throws Exception {
-    Files.createDirectories(location);
+  private Schema createTestSchema(String dbName, String location) {
     Map<String, String> properties = new HashMap<>();
-    properties.put(HiveConstants.LOCATION, location.toUri().toString());
+    properties.put(HiveConstants.LOCATION, location);
     return SchemaDTO.builder()
         .withName(dbName)
         .withComment("Test schema for HiveClient operations")
@@ -170,8 +209,7 @@ public class TestHiveClient {
         .build();
   }
 
-  private Table createTestTable(String tableName, Path location) throws Exception {
-    Files.createDirectories(location);
+  private Table createTestTable(String tableName, String location) {
     ColumnDTO idColumn =
         ColumnDTO.builder()
             .withName("id")
@@ -181,7 +219,7 @@ public class TestHiveClient {
     ColumnDTO dtColumn =
         ColumnDTO.builder().withName("dt").withDataType(Types.StringType.get()).build();
     Map<String, String> properties = new HashMap<>();
-    properties.put(HiveConstants.LOCATION, location.toUri().toString());
+    properties.put(HiveConstants.LOCATION, location);
     return TableDTO.builder()
         .withName(tableName)
         .withColumns(new ColumnDTO[] {idColumn, dtColumn})
@@ -221,25 +259,6 @@ public class TestHiveClient {
   private void safelyDropDatabase(HiveClient client, String catalogName, String dbName) {
     try {
       client.dropDatabase(catalogName, dbName, true);
-    } catch (Exception ignored) {
-      // ignore cleanup failures
-    }
-  }
-
-  private void deleteRecursively(Path root) {
-    try {
-      if (root == null || !Files.exists(root)) {
-        return;
-      }
-      Files.walk(root)
-          .sorted(Comparator.reverseOrder())
-          .forEach(
-              path -> {
-                try {
-                  Files.deleteIfExists(path);
-                } catch (Exception ignored) {
-                }
-              });
     } catch (Exception ignored) {
       // ignore cleanup failures
     }

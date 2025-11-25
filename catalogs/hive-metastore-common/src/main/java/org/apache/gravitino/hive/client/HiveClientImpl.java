@@ -149,7 +149,8 @@ public class HiveClientImpl implements HiveClient {
   }
 
   @Override
-  public List<Table> getTableObjectsByName(String name, List<String> allTables) {
-    return shim.getTableObjectsByName(name, allTables);
+  public List<Table> getTableObjectsByName(
+      String catalogName, String dbName, List<String> allTables) {
+    return shim.getTableObjectsByName(catalogName, dbName, allTables);
   }
 }

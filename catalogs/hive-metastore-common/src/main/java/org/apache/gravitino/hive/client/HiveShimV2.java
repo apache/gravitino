@@ -224,9 +224,11 @@ class HiveShimV2 extends Shim {
   }
 
   @Override
-  public List<Table> getTableObjectsByName(String name, List<String> allTables) {
+  public List<Table> getTableObjectsByName(
+      String catalogName, String dbName, List<String> allTables) {
     try {
-      var tables = client.getTableObjectsByName(name, allTables);
+      // Hive2 doesn't support catalog, so we ignore catalogName and use dbName
+      var tables = client.getTableObjectsByName(dbName, allTables);
       return tables.stream().map(HiveTableConverter::fromHiveTable).toList();
     } catch (Exception e) {
       throw new RuntimeException("Failed to get table objects by name", e);
