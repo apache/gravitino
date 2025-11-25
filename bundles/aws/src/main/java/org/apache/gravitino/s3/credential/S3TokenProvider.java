@@ -42,7 +42,7 @@ public class S3TokenProvider implements CredentialProvider {
 
   @Override
   public void close() {
-    // No-op, as the generator manages the client lifecycle per-call.
+    // No resources to close in this provider.
   }
 
   @Override

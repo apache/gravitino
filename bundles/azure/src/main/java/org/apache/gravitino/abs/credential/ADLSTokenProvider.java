@@ -50,7 +50,7 @@ public class ADLSTokenProvider implements CredentialProvider {
 
   @Override
   public String getGeneratorClassName() {
-    return "org.apache.gravitino.abs.credential.AzureTokenGenerator";
+    return "org.apache.gravitino.abs.credential.ADLSTokenProvider";
   }
 
   @Override
