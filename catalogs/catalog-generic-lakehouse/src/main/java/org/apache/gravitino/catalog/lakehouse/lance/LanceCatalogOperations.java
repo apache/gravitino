@@ -19,10 +19,8 @@
 
 package org.apache.gravitino.catalog.lakehouse.lance;
 
-import static org.apache.gravitino.catalog.lakehouse.GenericLakehouseTablePropertiesMetadata.LANCE_TABLE_STORAGE_OPTION_PREFIX;
-import static org.apache.gravitino.catalog.lakehouse.GenericLakehouseTablePropertiesMetadata.LOCATION;
+import static org.apache.gravitino.Entity.EntityType.TABLE;
 
-import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import com.lancedb.lance.Dataset;
 import com.lancedb.lance.WriteParams;
@@ -46,7 +44,10 @@ import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.catalog.lakehouse.GenericLakehouseTablePropertiesMetadata;
 import org.apache.gravitino.catalog.lakehouse.LakehouseCatalogOperations;
+import org.apache.gravitino.catalog.lakehouse.LakehouseTableFormat;
+import org.apache.gravitino.catalog.lakehouse.utils.EntityConverter;
 import org.apache.gravitino.connector.CatalogInfo;
 import org.apache.gravitino.connector.GenericLakehouseTable;
 import org.apache.gravitino.connector.HasPropertyMetadata;
@@ -55,10 +56,10 @@ import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.exceptions.TableAlreadyExistsException;
 import org.apache.gravitino.lance.common.ops.gravitino.LanceDataTypeConverter;
+import org.apache.gravitino.lance.common.utils.LancePropertiesUtils;
 import org.apache.gravitino.meta.AuditInfo;
-import org.apache.gravitino.meta.GenericTableEntity;
+import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.rel.Column;
-import org.apache.gravitino.rel.GenericTable;
 import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.TableChange;
 import org.apache.gravitino.rel.expressions.distributions.Distribution;
@@ -67,19 +68,16 @@ import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.indexes.Index;
 import org.apache.gravitino.rel.indexes.Indexes.IndexImpl;
 import org.apache.gravitino.utils.PrincipalUtils;
-import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.fs.Path;
 
 public class LanceCatalogOperations implements LakehouseCatalogOperations {
 
-  private Map<String, String> lancePropertiesMap;
+  private EntityStore store;
 
   @Override
   public void initialize(
       Map<String, String> config, CatalogInfo info, HasPropertyMetadata propertiesMetadata)
       throws RuntimeException {
-    lancePropertiesMap = ImmutableMap.copyOf(config);
+    store = GravitinoEnv.getInstance().entityStore();
   }
 
   @Override
@@ -96,13 +94,16 @@ public class LanceCatalogOperations implements LakehouseCatalogOperations {
 
   @Override
   public NameIdentifier[] listTables(Namespace namespace) throws NoSuchSchemaException {
-    return new NameIdentifier[0];
+    // No need to do nothing here as GenericLakehouseCatalogOperations will do the work.
+    throw new UnsupportedOperationException(
+        "We should not reach here as we could get table info" + "from metastore directly.");
   }
 
   @Override
   public Table loadTable(NameIdentifier ident) throws NoSuchTableException {
-    // Should not come here.
-    return null;
+    // No need to do nothing here as GenericLakehouseCatalogOperations will do the work.
+    throw new UnsupportedOperationException(
+        "We should not reach here as we could get table info" + "from metastore directly.");
   }
 
   @Override
@@ -117,15 +118,10 @@ public class LanceCatalogOperations implements LakehouseCatalogOperations {
       Index[] indexes)
       throws NoSuchSchemaException, TableAlreadyExistsException {
     // Ignore partitions, distributions, sortOrders, and indexes for Lance tables;
-    String location = properties.get(LOCATION);
-    Map<String, String> storageProps =
-        properties.entrySet().stream()
-            .filter(e -> e.getKey().startsWith(LANCE_TABLE_STORAGE_OPTION_PREFIX))
-            .collect(
-                Collectors.toMap(
-                    e -> e.getKey().substring(LANCE_TABLE_STORAGE_OPTION_PREFIX.length()),
-                    Map.Entry::getValue));
-    try (Dataset dataset =
+    String location = properties.get(GenericLakehouseTablePropertiesMetadata.LAKEHOUSE_LOCATION);
+    Map<String, String> storageProps = LancePropertiesUtils.getLanceStorageOptions(properties);
+
+    try (Dataset ignored =
         Dataset.create(
             new RootAllocator(),
             location,
@@ -146,7 +142,7 @@ public class LanceCatalogOperations implements LakehouseCatalogOperations {
                   .build())
           .withPartitioning(partitions)
           .withSortOrders(sortOrders)
-          .withFormat("lance")
+          .withFormat(LakehouseTableFormat.LANCE.lowerName())
           .build();
     }
   }
@@ -168,6 +164,7 @@ public class LanceCatalogOperations implements LakehouseCatalogOperations {
     // Lance only supports adding indexes for now.
     List<Index> addedIndexes = Lists.newArrayList();
 
+    // Only support for adding index for now.
     for (TableChange change : changes) {
       if (change instanceof TableChange.AddIndex addIndexChange) {
         Index index =
@@ -180,17 +177,61 @@ public class LanceCatalogOperations implements LakehouseCatalogOperations {
       }
     }
 
-    EntityStore entityStore = GravitinoEnv.getInstance().entityStore();
-    GenericTableEntity entity;
+    TableEntity updatedEntity;
     try {
-      entity = entityStore.get(ident, Entity.EntityType.TABLE, GenericTableEntity.class);
+      TableEntity entity = store.get(ident, Entity.EntityType.TABLE, TableEntity.class);
+      updatedEntity =
+          store.update(
+              ident,
+              TableEntity.class,
+              TABLE,
+              tableEntity ->
+                  TableEntity.builder()
+                      .withId(tableEntity.id())
+                      .withName(tableEntity.name())
+                      .withNamespace(tableEntity.namespace())
+                      .withAuditInfo(
+                          AuditInfo.builder()
+                              .withCreator(tableEntity.auditInfo().creator())
+                              .withCreateTime(tableEntity.auditInfo().createTime())
+                              .withLastModifier(PrincipalUtils.getCurrentPrincipal().getName())
+                              .withLastModifiedTime(Instant.now())
+                              .build())
+                      .withColumns(tableEntity.columns())
+                      .withIndexes(
+                          ArrayUtils.addAll(entity.indexes(), addedIndexes.toArray(new Index[0])))
+                      .withDistribution(tableEntity.distribution())
+                      .withPartitioning(tableEntity.partitioning())
+                      .withSortOrders(tableEntity.sortOrders())
+                      .withProperties(tableEntity.properties())
+                      .withComment(tableEntity.comment())
+                      .build());
+
+      // Add indexes to Lance dataset
+      addLanceIndex(updatedEntity, addedIndexes);
+
+      // return the updated table
+      return GenericLakehouseTable.builder()
+          .withProperties(updatedEntity.properties())
+          .withAuditInfo(updatedEntity.auditInfo())
+          .withSortOrders(updatedEntity.sortOrders())
+          .withPartitioning(updatedEntity.partitioning())
+          .withDistribution(updatedEntity.distribution())
+          .withColumns(EntityConverter.toColumns(updatedEntity.columns()))
+          .withIndexes(updatedEntity.indexes())
+          .withName(updatedEntity.name())
+          .withComment(updatedEntity.comment())
+          .build();
     } catch (NoSuchEntityException e) {
       throw new NoSuchTableException("No such table: %s", ident);
     } catch (IOException ioe) {
       throw new RuntimeException("Failed to load table entity for: " + ident, ioe);
     }
+  }
 
-    String location = entity.getProperties().get("location");
+  private void addLanceIndex(TableEntity updatedEntity, List<Index> addedIndexes) {
+    String location =
+        updatedEntity.properties().get(GenericLakehouseTablePropertiesMetadata.LAKEHOUSE_LOCATION);
     try (Dataset dataset = Dataset.open(location, new RootAllocator())) {
       // For Lance, we only support adding indexes, so in fact, we can't handle drop index here.
       for (Index index : addedIndexes) {
@@ -206,28 +247,7 @@ public class LanceCatalogOperations implements LakehouseCatalogOperations {
             indexParams,
             true);
       }
-    } catch (Exception e) {
-      throw new RuntimeException("Failed to alter Lance table: " + ident, e);
     }
-
-    GenericTable oldTable = entity.toGenericTable();
-    Index[] newIndexes = oldTable.index();
-    for (Index index : addedIndexes) {
-      newIndexes = ArrayUtils.add(newIndexes, index);
-    }
-
-    return GenericLakehouseTable.builder()
-        .withFormat(oldTable.format())
-        .withProperties(oldTable.properties())
-        .withAuditInfo((AuditInfo) oldTable.auditInfo())
-        .withSortOrders(oldTable.sortOrder())
-        .withPartitioning(oldTable.partitioning())
-        .withDistribution(oldTable.distribution())
-        .withColumns(oldTable.columns())
-        .withIndexes(newIndexes)
-        .withName(oldTable.name())
-        .withComment(oldTable.comment())
-        .build();
   }
 
   private IndexParams getIndexParamsByIndexType(IndexType indexType) {
@@ -248,14 +268,32 @@ public class LanceCatalogOperations implements LakehouseCatalogOperations {
   }
 
   @Override
-  public boolean dropTable(NameIdentifier ident) {
+  public boolean purgeTable(NameIdentifier ident) {
     try {
-      String location = lancePropertiesMap.get("location");
-      // Remove the directory on storage
-      FileSystem fs = FileSystem.get(new Configuration());
-      return fs.delete(new Path(location), true);
+      TableEntity tableEntity = store.get(ident, Entity.EntityType.TABLE, TableEntity.class);
+      Map<String, String> lancePropertiesMap = tableEntity.properties();
+      String location =
+          lancePropertiesMap.get(GenericLakehouseTablePropertiesMetadata.LAKEHOUSE_LOCATION);
+
+      if (!store.delete(ident, Entity.EntityType.TABLE)) {
+        throw new RuntimeException("Failed to purge Lance table: " + ident.name());
+      }
+
+      // Drop the Lance dataset from cloud storage.
+      Dataset.drop(location, LancePropertiesUtils.getLanceStorageOptions(lancePropertiesMap));
+      return true;
     } catch (IOException e) {
-      throw new RuntimeException("Failed to drop Lance table: " + ident.name(), e);
+      throw new RuntimeException("Failed to purge Lance table: " + ident.name(), e);
     }
+  }
+
+  @Override
+  public boolean dropTable(NameIdentifier ident) {
+    // TODO We will handle it in GenericLakehouseCatalogOperations. However, we need
+    //  to figure out it's a external table or not first. we will introduce a property
+    //  to indicate that. Currently, all Lance tables are external tables. `drop` will
+    //  just remove the metadata in metastore and will not delete data in storage.
+    throw new UnsupportedOperationException(
+        "LanceCatalogOperations does not support dropTable operation.");
   }
 }

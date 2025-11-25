@@ -23,6 +23,7 @@ import com.google.common.collect.ImmutableSet;
 import java.lang.reflect.Method;
 import java.util.List;
 import org.aopalliance.intercept.MethodInterceptor;
+import org.apache.gravitino.iceberg.service.rest.IcebergNamespaceOperations;
 import org.apache.gravitino.iceberg.service.rest.IcebergTableOperations;
 import org.apache.gravitino.iceberg.service.rest.IcebergTableRenameOperations;
 import org.glassfish.hk2.api.Filter;
@@ -38,7 +39,9 @@ public class IcebergRESTAuthInterceptionService extends BaseInterceptionService 
   public Filter getDescriptorFilter() {
     return new ClassListFilter(
         ImmutableSet.of(
-            IcebergTableOperations.class.getName(), IcebergTableRenameOperations.class.getName()));
+            IcebergTableOperations.class.getName(),
+            IcebergTableRenameOperations.class.getName(),
+            IcebergNamespaceOperations.class.getName()));
   }
 
   @Override

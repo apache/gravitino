@@ -19,31 +19,13 @@
 
 package org.apache.gravitino.connector;
 
-import org.apache.gravitino.rel.GenericTable;
+import com.google.common.collect.ImmutableMap;
+import org.apache.gravitino.rel.Table;
 
-public class GenericLakehouseTable extends BaseTable implements GenericTable {
-  @SuppressWarnings("unused")
-  private String schemaName;
-
-  private String format;
+public class GenericLakehouseTable extends BaseTable {
 
   public static Builder builder() {
     return new Builder();
-  }
-
-  @Override
-  public String format() {
-    return format;
-  }
-
-  @Override
-  public String location() {
-    return properties.get("location");
-  }
-
-  @Override
-  public boolean external() {
-    return properties.get("external") != null && Boolean.parseBoolean(properties.get("external"));
   }
 
   @Override
@@ -53,13 +35,7 @@ public class GenericLakehouseTable extends BaseTable implements GenericTable {
 
   public static class Builder extends BaseTableBuilder<Builder, GenericLakehouseTable> {
 
-    private String schemaName;
     private String format;
-
-    public Builder withSchemaName(String schemaName) {
-      this.schemaName = schemaName;
-      return this;
-    }
 
     public Builder withFormat(String format) {
       this.format = format;
@@ -69,11 +45,18 @@ public class GenericLakehouseTable extends BaseTable implements GenericTable {
     @Override
     protected GenericLakehouseTable internalBuild() {
       GenericLakehouseTable genericLakehouseTable = new GenericLakehouseTable();
-      genericLakehouseTable.schemaName = this.schemaName;
-      genericLakehouseTable.format = this.format;
       genericLakehouseTable.columns = this.columns;
       genericLakehouseTable.comment = this.comment;
-      genericLakehouseTable.properties = this.properties;
+
+      if (format != null) {
+        genericLakehouseTable.properties =
+            ImmutableMap.<String, String>builder()
+                .putAll(this.properties)
+                .put(Table.PROPERTY_TABLE_FORMAT, this.format)
+                .buildKeepingLast();
+      } else {
+        genericLakehouseTable.properties = this.properties;
+      }
       genericLakehouseTable.auditInfo = this.auditInfo;
       genericLakehouseTable.distribution = this.distribution;
       genericLakehouseTable.indexes = this.indexes;

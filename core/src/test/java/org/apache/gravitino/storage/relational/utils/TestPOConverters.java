@@ -65,7 +65,13 @@ import org.apache.gravitino.policy.Policy;
 import org.apache.gravitino.policy.PolicyContent;
 import org.apache.gravitino.policy.PolicyContents;
 import org.apache.gravitino.rel.expressions.Expression;
+import org.apache.gravitino.rel.expressions.NamedReference;
+import org.apache.gravitino.rel.expressions.distributions.Distributions;
+import org.apache.gravitino.rel.expressions.distributions.Strategy;
 import org.apache.gravitino.rel.expressions.literals.Literals;
+import org.apache.gravitino.rel.expressions.sorts.SortDirection;
+import org.apache.gravitino.rel.expressions.sorts.SortOrder;
+import org.apache.gravitino.rel.expressions.sorts.SortOrders;
 import org.apache.gravitino.rel.types.Type;
 import org.apache.gravitino.rel.types.Types;
 import org.apache.gravitino.stats.StatisticValues;
@@ -616,6 +622,15 @@ public class TestPOConverters {
     assertEquals(1, initPO.getCurrentVersion());
     assertEquals(1, initPO.getLastVersion());
     assertEquals(0, initPO.getDeletedAt());
+
+    TableEntity entity =
+        POConverters.fromTableAndColumnPOs(
+            initPO,
+            Lists.newArrayList(),
+            NamespaceUtil.ofTable("test_metalake", "test_catalog", "test_schema"));
+
+    Assertions.assertEquals(tableEntity.distribution(), entity.distribution());
+    Assertions.assertArrayEquals(tableEntity.partitioning(), entity.partitioning());
   }
 
   @Test
@@ -694,8 +709,7 @@ public class TestPOConverters {
     TablePO.Builder builder =
         TablePO.builder().withMetalakeId(1L).withCatalogId(1L).withSchemaId(1L);
     TablePO initPO = POConverters.initializeTablePOWithVersion(tableEntity, builder);
-    TablePO updatePO =
-        POConverters.updateTablePOWithVersionAndSchemaId(initPO, updatedTable, false, 1L);
+    TablePO updatePO = POConverters.updateTablePOWithVersionAndSchemaId(initPO, updatedTable, 1L);
     assertEquals(1, initPO.getCurrentVersion());
     assertEquals(1, initPO.getLastVersion());
     assertEquals(0, initPO.getDeletedAt());
@@ -1383,6 +1397,9 @@ public class TestPOConverters {
         .withName(name)
         .withNamespace(namespace)
         .withColumns(columns)
+        .withDistribution(Distributions.of(Strategy.EVEN, 10, NamedReference.field("key")))
+        .withSortOrders(
+            new SortOrder[] {SortOrders.of(NamedReference.field("col1"), SortDirection.ASCENDING)})
         .withAuditInfo(auditInfo)
         .build();
   }

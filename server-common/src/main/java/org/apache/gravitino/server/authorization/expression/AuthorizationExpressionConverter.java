@@ -29,7 +29,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.apache.gravitino.auth.AuthConstants;
-import org.apache.gravitino.server.authorization.MetadataFilterHelper;
+import org.apache.gravitino.server.authorization.MetadataAuthzHelper;
 
 /**
  * Convert the authorization expression into an executable expression, such as OGNL expression, etc.
@@ -73,14 +73,14 @@ public class AuthorizationExpressionConverter {
    * extras such as list projection and selection and lambda expressions. You use the same
    * expression for both getting and setting the value of a property.
    *
-   * @param authorizationExpression authorization expression from {@link MetadataFilterHelper}
+   * @param authorizationExpression authorization expression from {@link MetadataAuthzHelper}
    * @return an OGNL expression used to call GravitinoAuthorizer
    */
   public static String convertToOgnlExpression(String authorizationExpression) {
     return EXPRESSION_CACHE.computeIfAbsent(
         authorizationExpression,
         (expression) -> {
-          String replacedExpression = replaceGetOwnerPrivilege(expression);
+          String replacedExpression = replaceCanAccessMetadataPrivilege(expression);
           replacedExpression = replaceAnyPrivilege(replacedExpression);
           replacedExpression = replaceAnyExpressions(replacedExpression);
           Matcher matcher = PATTERN.matcher(replacedExpression);
@@ -156,9 +156,9 @@ public class AuthorizationExpressionConverter {
     return result.toString();
   }
 
-  public static String replaceGetOwnerPrivilege(String expression) {
+  public static String replaceCanAccessMetadataPrivilege(String expression) {
     return expression.replaceAll(
-        "CAN_GET_OWNER",
+        AuthorizationExpressionConstants.CAN_ACCESS_METADATA,
         """
               ( entityType == 'CATALOG' && (%s)) ||
               ( entityType == 'SCHEMA' && (%s)) ||
@@ -272,6 +272,10 @@ public class AuthorizationExpressionConverter {
             "ANY_WRITE_FILESET",
             "((ANY(WRITE_FILESET, METALAKE, CATALOG, SCHEMA, FILESET))"
                 + "&& !(ANY(DENY_WRITE_FILESET, METALAKE, CATALOG, SCHEMA, FILESET)))");
+    expression =
+        expression.replaceAll(
+            "ANY_APPLY_TAG",
+            "((ANY(APPLY_TAG, METALAKE, TAG))" + "&& !(ANY(DENY_APPLY_TAG, METALAKE, TAG)))");
     expression =
         expression.replaceAll(
             CAN_SET_OWNER,

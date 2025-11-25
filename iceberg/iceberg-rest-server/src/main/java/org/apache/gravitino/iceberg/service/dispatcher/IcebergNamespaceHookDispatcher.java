@@ -18,18 +18,19 @@
  */
 package org.apache.gravitino.iceberg.service.dispatcher;
 
+import java.io.IOException;
 import org.apache.gravitino.Entity;
+import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.GravitinoEnv;
-import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.authorization.AuthorizationUtils;
-import org.apache.gravitino.authorization.Owner;
-import org.apache.gravitino.authorization.OwnerDispatcher;
 import org.apache.gravitino.catalog.SchemaDispatcher;
+import org.apache.gravitino.catalog.TableDispatcher;
+import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.iceberg.common.utils.IcebergIdentifierUtils;
 import org.apache.gravitino.iceberg.service.authorization.IcebergRESTServerContext;
 import org.apache.gravitino.listener.api.event.IcebergRequestContext;
-import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.iceberg.catalog.Namespace;
+import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.rest.requests.CreateNamespaceRequest;
 import org.apache.iceberg.rest.requests.RegisterTableRequest;
 import org.apache.iceberg.rest.requests.UpdateNamespacePropertiesRequest;
@@ -62,7 +63,12 @@ public class IcebergNamespaceHookDispatcher implements IcebergNamespaceOperation
     CreateNamespaceResponse response = dispatcher.createNamespace(context, createRequest);
 
     importSchema(context.catalogName(), createRequest.namespace());
-    setSchemaOwner(context.catalogName(), createRequest.namespace(), context.userName());
+    IcebergOwnershipUtils.setSchemaOwner(
+        metalake,
+        context.catalogName(),
+        createRequest.namespace(),
+        context.userName(),
+        GravitinoEnv.getInstance().ownerDispatcher());
 
     return response;
   }
@@ -78,6 +84,22 @@ public class IcebergNamespaceHookDispatcher implements IcebergNamespaceOperation
   @Override
   public void dropNamespace(IcebergRequestContext context, Namespace namespace) {
     dispatcher.dropNamespace(context, namespace);
+
+    // Clean up the schema from Gravitino's entity store after successful drop
+    EntityStore store = GravitinoEnv.getInstance().entityStore();
+    try {
+      if (store != null) {
+        // Delete the entity for the dropped namespace (schema).
+        store.delete(
+            IcebergIdentifierUtils.toGravitinoSchemaIdentifier(
+                metalake, context.catalogName(), namespace),
+            Entity.EntityType.SCHEMA);
+      }
+    } catch (NoSuchEntityException ignore) {
+      // Ignore if the schema entity does not exist.
+    } catch (IOException ioe) {
+      throw new RuntimeException("io exception when deleting schema entity", ioe);
+    }
   }
 
   @Override
@@ -101,7 +123,30 @@ public class IcebergNamespaceHookDispatcher implements IcebergNamespaceOperation
       IcebergRequestContext context,
       Namespace namespace,
       RegisterTableRequest registerTableRequest) {
-    return dispatcher.registerTable(context, namespace, registerTableRequest);
+    LoadTableResponse response = dispatcher.registerTable(context, namespace, registerTableRequest);
+
+    // Import the registered table into Gravitino's catalog so it exists as a metadata object
+    importTable(context.catalogName(), namespace, registerTableRequest.name());
+
+    // Set the owner of the registered table to the current user
+    IcebergOwnershipUtils.setTableOwner(
+        metalake,
+        context.catalogName(),
+        namespace,
+        registerTableRequest.name(),
+        context.userName(),
+        GravitinoEnv.getInstance().ownerDispatcher());
+
+    return response;
+  }
+
+  private void importTable(String catalogName, Namespace namespace, String tableName) {
+    TableDispatcher tableDispatcher = GravitinoEnv.getInstance().tableDispatcher();
+    if (tableDispatcher != null) {
+      tableDispatcher.loadTable(
+          IcebergIdentifierUtils.toGravitinoTableIdentifier(
+              metalake, catalogName, TableIdentifier.of(namespace, tableName)));
+    }
   }
 
   private void importSchema(String catalogName, Namespace namespace) {
@@ -109,20 +154,6 @@ public class IcebergNamespaceHookDispatcher implements IcebergNamespaceOperation
     if (schemaDispatcher != null) {
       schemaDispatcher.loadSchema(
           IcebergIdentifierUtils.toGravitinoSchemaIdentifier(metalake, catalogName, namespace));
-    }
-  }
-
-  private void setSchemaOwner(String catalogName, Namespace namespace, String user) {
-    NameIdentifier schemaIdentifier =
-        IcebergIdentifierUtils.toGravitinoSchemaIdentifier(metalake, catalogName, namespace);
-    // Set the creator as the owner of the namespace
-    OwnerDispatcher ownerManager = GravitinoEnv.getInstance().ownerDispatcher();
-    if (ownerManager != null) {
-      ownerManager.setOwner(
-          metalake,
-          NameIdentifierUtil.toMetadataObject(schemaIdentifier, Entity.EntityType.SCHEMA),
-          user,
-          Owner.Type.USER);
     }
   }
 }

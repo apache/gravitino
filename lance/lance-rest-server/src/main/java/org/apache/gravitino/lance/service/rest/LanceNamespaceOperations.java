@@ -33,7 +33,6 @@ import java.util.regex.Pattern;
 import javax.inject.Inject;
 import javax.ws.rs.Consumes;
 import javax.ws.rs.DefaultValue;
-import javax.ws.rs.Encoded;
 import javax.ws.rs.GET;
 import javax.ws.rs.POST;
 import javax.ws.rs.Path;
@@ -63,7 +62,7 @@ public class LanceNamespaceOperations {
   @Timed(name = "list-namespaces." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "list-namespaces", absolute = true)
   public Response listNamespaces(
-      @Encoded @PathParam("id") String namespaceId,
+      @PathParam("id") String namespaceId,
       @DefaultValue(NAMESPACE_DELIMITER_DEFAULT) @QueryParam("delimiter") String delimiter,
       @QueryParam("page_token") String pageToken,
       @QueryParam("limit") Integer limit) {
@@ -83,7 +82,7 @@ public class LanceNamespaceOperations {
   @Timed(name = "describe-namespaces." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "describe-namespaces", absolute = true)
   public Response describeNamespace(
-      @Encoded @PathParam("id") String namespaceId,
+      @PathParam("id") String namespaceId,
       @DefaultValue(NAMESPACE_DELIMITER_DEFAULT) @QueryParam("delimiter") String delimiter) {
     try {
       DescribeNamespaceResponse response =
@@ -99,7 +98,7 @@ public class LanceNamespaceOperations {
   @Timed(name = "create-namespaces." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "create-namespaces", absolute = true)
   public Response createNamespace(
-      @Encoded @PathParam("id") String namespaceId,
+      @PathParam("id") String namespaceId,
       @DefaultValue(NAMESPACE_DELIMITER_DEFAULT) @QueryParam("delimiter") String delimiter,
       CreateNamespaceRequest request) {
     try {
@@ -124,7 +123,7 @@ public class LanceNamespaceOperations {
   @Timed(name = "drop-namespaces." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "drop-namespaces", absolute = true)
   public Response dropNamespace(
-      @Encoded @PathParam("id") String namespaceId,
+      @PathParam("id") String namespaceId,
       @DefaultValue(NAMESPACE_DELIMITER_DEFAULT) @QueryParam("delimiter") String delimiter,
       DropNamespaceRequest request) {
     try {
@@ -151,7 +150,7 @@ public class LanceNamespaceOperations {
   @Timed(name = "namespace-exists." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "namespace-exists", absolute = true)
   public Response namespaceExists(
-      @Encoded @PathParam("id") String namespaceId,
+      @PathParam("id") String namespaceId,
       @DefaultValue(NAMESPACE_DELIMITER_DEFAULT) @QueryParam("delimiter") String delimiter) {
     try {
       lanceNamespace.asNamespaceOps().namespaceExists(namespaceId, Pattern.quote(delimiter));
@@ -163,6 +162,8 @@ public class LanceNamespaceOperations {
 
   @GET
   @Path("{id}/table/list")
+  @Timed(name = "list-tables." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
+  @ResponseMetered(name = "list-tables", absolute = true)
   public Response listTables(
       @PathParam("id") String namespaceId,
       @DefaultValue(NAMESPACE_DELIMITER_DEFAULT) @QueryParam("delimiter") String delimiter,

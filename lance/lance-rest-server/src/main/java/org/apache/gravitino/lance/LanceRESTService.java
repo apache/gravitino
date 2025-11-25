@@ -127,6 +127,7 @@ public class LanceRESTService implements GravitinoAuxiliaryService {
     try {
       Constructor<? extends NamespaceWrapper> constructor =
           lanceNamespaceBackend.getWrapperClass().getConstructor(LanceConfig.class);
+
       return constructor.newInstance(lanceConfig);
     } catch (Exception e) {
       LOG.error("Error loading namespace implementation for backend type: {}", backendType, e);

@@ -74,6 +74,12 @@ public class AuthorizationExpressionConstants {
                   ANY_MODIFY_TABLE
                   """;
 
+  public static final String filterModifyTableAuthorizationExpression =
+      """
+                  ANY(OWNER, METALAKE, CATALOG, SCHEMA, TABLE) ||
+                  ANY_MODIFY_TABLE
+                  """;
+
   public static final String filterTopicsAuthorizationExpression =
       """
               ANY(OWNER, METALAKE, CATALOG, SCHEMA, TOPIC) ||
@@ -93,4 +99,18 @@ public class AuthorizationExpressionConstants {
           METALAKE::OWNER || METALAKE::MANAGE_GRANTS
           || ROLE::OWNER || ROLE::SELF
           """;
+
+  public static final String CAN_ACCESS_METADATA = "CAN_ACCESS_METADATA";
+
+  public static final String CAN_ACCESS_METADATA_AND_TAG =
+      """
+          METALAKE::OWNER ||
+          ((CAN_ACCESS_METADATA) && (TAG::OWNER || ANY_APPLY_TAG))
+          """;
+
+  public static final String loadTagAuthorizationExpression =
+      "METALAKE::OWNER || TAG::OWNER || ANY_APPLY_TAG";
+
+  public static final String applyTagAuthorizationExpression =
+      "METALAKE::OWNER || TAG::OWNER || ANY_APPLY_TAG";
 }

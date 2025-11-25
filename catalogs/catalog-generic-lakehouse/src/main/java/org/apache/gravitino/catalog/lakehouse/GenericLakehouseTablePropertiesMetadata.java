@@ -18,6 +18,8 @@
  */
 package org.apache.gravitino.catalog.lakehouse;
 
+import static org.apache.gravitino.connector.PropertyEntry.booleanPropertyEntry;
+import static org.apache.gravitino.connector.PropertyEntry.enumPropertyEntry;
 import static org.apache.gravitino.connector.PropertyEntry.stringOptionalPropertyEntry;
 
 import com.google.common.collect.ImmutableList;
@@ -28,8 +30,10 @@ import org.apache.gravitino.connector.BasePropertiesMetadata;
 import org.apache.gravitino.connector.PropertyEntry;
 
 public class GenericLakehouseTablePropertiesMetadata extends BasePropertiesMetadata {
-  public static final String LOCATION = "location";
+  public static final String LAKEHOUSE_LOCATION = "location";
+  public static final String LAKEHOUSE_FORMAT = "format";
   public static final String LANCE_TABLE_STORAGE_OPTION_PREFIX = "lance.storage.";
+  public static final String LAKEHOUSE_REGISTER = "register";
 
   private static final Map<String, PropertyEntry<?>> PROPERTIES_METADATA;
 
@@ -37,18 +41,35 @@ public class GenericLakehouseTablePropertiesMetadata extends BasePropertiesMetad
     List<PropertyEntry<?>> propertyEntries =
         ImmutableList.of(
             stringOptionalPropertyEntry(
-                LOCATION,
-                "The root directory of the lakehouse table.",
-                true /* immutable */,
+                LAKEHOUSE_LOCATION,
+                "The root directory of the lakehouse catalog.",
+                false /* immutable */,
                 null, /* defaultValue */
                 false /* hidden */),
+            enumPropertyEntry(
+                LAKEHOUSE_FORMAT,
+                "The table format of the lakehouse table (e.g., iceberg, delta, lance)",
+                true /* required */,
+                true /* immutable */,
+                LakehouseTableFormat.class /* enumClass */,
+                null /* defaultValue */,
+                false /* hidden */,
+                false /* reserved */),
             PropertyEntry.stringOptionalPropertyPrefixEntry(
                 LANCE_TABLE_STORAGE_OPTION_PREFIX,
                 "The storage options passed to Lance table.",
                 false /* immutable */,
                 null /* default value*/,
                 false /* hidden */,
-                false /* reserved */));
+                false /* reserved */),
+            booleanPropertyEntry(
+                LAKEHOUSE_REGISTER,
+                "Whether this is a table registration operation.",
+                false,
+                true /* immutable */,
+                false /* defaultValue */,
+                false /* hidden */,
+                false));
 
     PROPERTIES_METADATA = Maps.uniqueIndex(propertyEntries, PropertyEntry::getName);
   }

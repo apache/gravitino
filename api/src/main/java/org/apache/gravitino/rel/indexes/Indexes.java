@@ -18,21 +18,8 @@
  */
 package org.apache.gravitino.rel.indexes;
 
-import com.fasterxml.jackson.core.JsonGenerator;
-import com.fasterxml.jackson.core.JsonParser;
-import com.fasterxml.jackson.databind.DeserializationContext;
-import com.fasterxml.jackson.databind.JsonDeserializer;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.JsonSerializer;
-import com.fasterxml.jackson.databind.SerializerProvider;
-import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
-import com.fasterxml.jackson.databind.annotation.JsonSerialize;
-import com.fasterxml.jackson.databind.node.ArrayNode;
-import com.google.common.base.Preconditions;
-import com.google.common.collect.Lists;
-import java.io.IOException;
-import java.util.List;
-import java.util.Locale;
+import com.google.common.base.Objects;
+import java.util.Arrays;
 
 /** Helper methods to create index to pass into Apache Gravitino. */
 public class Indexes {
@@ -89,76 +76,7 @@ public class Indexes {
         .build();
   }
 
-  /** Custom JSON serializer for Index objects. */
-  public static class IndexSerializer extends JsonSerializer<Index> {
-    @Override
-    public void serialize(Index value, JsonGenerator gen, SerializerProvider serializers)
-        throws IOException {
-      gen.writeStartObject();
-      gen.writeStringField("indexType", value.type().name().toUpperCase(Locale.ROOT));
-      if (null != value.name()) {
-        gen.writeStringField("name", value.name());
-      }
-      gen.writeFieldName("fieldNames");
-      gen.writeObject(value.fieldNames());
-      gen.writeEndObject();
-    }
-  }
-
-  /** Custom JSON deserializer for Index objects. */
-  public static class IndexDeserializer extends JsonDeserializer<Index> {
-
-    @Override
-    public Index deserialize(JsonParser p, DeserializationContext ctxt) throws IOException {
-      JsonNode node = p.getCodec().readTree(p);
-      Preconditions.checkArgument(
-          node != null && !node.isNull() && node.isObject(),
-          "Index must be a valid JSON object, but found: %s",
-          node);
-
-      IndexImpl.Builder builder = IndexImpl.builder();
-      Preconditions.checkArgument(
-          node.has("indexType"), "Cannot parse index from missing type: %s", node);
-      String indexType = getString("indexType", node);
-      builder.withIndexType(Index.IndexType.valueOf(indexType.toUpperCase(Locale.ROOT)));
-      if (node.has("name")) {
-        builder.withName(getString("name", node));
-      }
-      Preconditions.checkArgument(
-          node.has("fieldNames"), "Cannot parse index from missing field names: %s", node);
-      List<String[]> fieldNames = Lists.newArrayList();
-      node.get("fieldNames").forEach(field -> fieldNames.add(getStringArray((ArrayNode) field)));
-      builder.withFieldNames(fieldNames.toArray(new String[0][0]));
-      return builder.build();
-    }
-
-    private static String[] getStringArray(ArrayNode node) {
-      String[] array = new String[node.size()];
-      for (int i = 0; i < node.size(); i++) {
-        array[i] = node.get(i).asText();
-      }
-      return array;
-    }
-
-    private static String getString(String property, JsonNode node) {
-      Preconditions.checkArgument(node.has(property), "Cannot parse missing string: %s", property);
-      JsonNode pNode = node.get(property);
-      return convertToString(property, pNode);
-    }
-
-    private static String convertToString(String property, JsonNode pNode) {
-      Preconditions.checkArgument(
-          pNode != null && !pNode.isNull() && pNode.isTextual(),
-          "Cannot parse to a string value %s: %s",
-          property,
-          pNode);
-      return pNode.asText();
-    }
-  }
-
   /** The user side implementation of the index. */
-  @JsonSerialize(using = IndexSerializer.class)
-  @JsonDeserialize(using = IndexDeserializer.class)
   public static final class IndexImpl implements Index {
     private final IndexType indexType;
 
@@ -201,6 +119,25 @@ public class Indexes {
     @Override
     public String[][] fieldNames() {
       return fieldNames;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+      if (this == o) {
+        return true;
+      }
+      if (o == null || getClass() != o.getClass()) {
+        return false;
+      }
+      IndexImpl index = (IndexImpl) o;
+      return indexType == index.indexType
+          && Objects.equal(name, index.name)
+          && Arrays.deepEquals(fieldNames, index.fieldNames);
+    }
+
+    @Override
+    public int hashCode() {
+      return Objects.hashCode(indexType, name, Arrays.hashCode(fieldNames));
     }
 
     /**

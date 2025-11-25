@@ -18,16 +18,21 @@
  */
 package org.apache.gravitino.iceberg.service.dispatcher;
 
+import java.io.IOException;
+import java.time.Instant;
 import org.apache.gravitino.Entity;
+import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.GravitinoEnv;
+import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.authorization.AuthorizationUtils;
-import org.apache.gravitino.authorization.Owner;
-import org.apache.gravitino.authorization.OwnerDispatcher;
 import org.apache.gravitino.catalog.TableDispatcher;
+import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.iceberg.common.utils.IcebergIdentifierUtils;
 import org.apache.gravitino.iceberg.service.authorization.IcebergRESTServerContext;
 import org.apache.gravitino.listener.api.event.IcebergRequestContext;
-import org.apache.gravitino.utils.NameIdentifierUtil;
+import org.apache.gravitino.meta.AuditInfo;
+import org.apache.gravitino.meta.TableEntity;
+import org.apache.gravitino.utils.PrincipalUtils;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.rest.requests.CreateTableRequest;
@@ -54,7 +59,13 @@ public class IcebergTableHookDispatcher implements IcebergTableOperationDispatch
 
     LoadTableResponse response = dispatcher.createTable(context, namespace, createTableRequest);
     importTable(context.catalogName(), namespace, createTableRequest.name());
-    setTableOwner(context.catalogName(), namespace, createTableRequest.name(), context.userName());
+    IcebergOwnershipUtils.setTableOwner(
+        metalake,
+        context.catalogName(),
+        namespace,
+        createTableRequest.name(),
+        context.userName(),
+        GravitinoEnv.getInstance().ownerDispatcher());
 
     return response;
   }
@@ -71,6 +82,20 @@ public class IcebergTableHookDispatcher implements IcebergTableOperationDispatch
   public void dropTable(
       IcebergRequestContext context, TableIdentifier tableIdentifier, boolean purgeRequested) {
     dispatcher.dropTable(context, tableIdentifier, purgeRequested);
+    EntityStore store = GravitinoEnv.getInstance().entityStore();
+    try {
+      if (store != null) {
+        // Delete the entity for the dropped table.
+        store.delete(
+            IcebergIdentifierUtils.toGravitinoTableIdentifier(
+                metalake, context.catalogName(), tableIdentifier),
+            Entity.EntityType.TABLE);
+      }
+    } catch (NoSuchEntityException ignore) {
+      // Ignore if the table entity does not exist.
+    } catch (IOException ioe) {
+      throw new RuntimeException("io exception when deleting table entity", ioe);
+    }
   }
 
   @Override
@@ -91,7 +116,43 @@ public class IcebergTableHookDispatcher implements IcebergTableOperationDispatch
 
   @Override
   public void renameTable(IcebergRequestContext context, RenameTableRequest renameTableRequest) {
+    AuthorizationUtils.checkCurrentUser(metalake, context.userName());
+
     dispatcher.renameTable(context, renameTableRequest);
+    NameIdentifier tableSource =
+        IcebergIdentifierUtils.toGravitinoTableIdentifier(
+            metalake, context.catalogName(), renameTableRequest.source());
+    NameIdentifier tableDest =
+        IcebergIdentifierUtils.toGravitinoTableIdentifier(
+            metalake, context.catalogName(), renameTableRequest.destination());
+    EntityStore store = GravitinoEnv.getInstance().entityStore();
+    try {
+      if (store != null) {
+        // Update the entity for the destination table.
+        store.update(
+            tableSource,
+            TableEntity.class,
+            Entity.EntityType.TABLE,
+            tableEntity ->
+                TableEntity.builder()
+                    .withId(tableEntity.id())
+                    .withName(tableDest.name())
+                    .withNamespace(tableDest.namespace())
+                    .withColumns(tableEntity.columns())
+                    .withAuditInfo(
+                        AuditInfo.builder()
+                            .withCreator(tableEntity.auditInfo().creator())
+                            .withCreateTime(tableEntity.auditInfo().createTime())
+                            .withLastModifier(PrincipalUtils.getCurrentPrincipal().getName())
+                            .withLastModifiedTime(Instant.now())
+                            .build())
+                    .build());
+      }
+    } catch (NoSuchEntityException ignore) {
+      // Ignore if the source table entity does not exist.
+    } catch (IOException ioe) {
+      throw new RuntimeException("io exception when renaming table entity", ioe);
+    }
   }
 
   @Override
@@ -106,22 +167,6 @@ public class IcebergTableHookDispatcher implements IcebergTableOperationDispatch
       tableDispatcher.loadTable(
           IcebergIdentifierUtils.toGravitinoTableIdentifier(
               metalake, catalogName, TableIdentifier.of(namespace, tableName)));
-    }
-  }
-
-  private void setTableOwner(
-      String catalogName, Namespace namespace, String tableName, String user) {
-    // Set the creator as the owner of the table.
-    OwnerDispatcher ownerManager = GravitinoEnv.getInstance().ownerDispatcher();
-    if (ownerManager != null) {
-      ownerManager.setOwner(
-          metalake,
-          NameIdentifierUtil.toMetadataObject(
-              IcebergIdentifierUtils.toGravitinoTableIdentifier(
-                  metalake, catalogName, TableIdentifier.of(namespace, tableName)),
-              Entity.EntityType.TABLE),
-          user,
-          Owner.Type.USER);
     }
   }
 }

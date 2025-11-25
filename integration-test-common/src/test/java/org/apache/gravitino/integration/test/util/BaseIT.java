@@ -21,6 +21,8 @@ package org.apache.gravitino.integration.test.util;
 import static org.apache.gravitino.Configs.ENTITY_RELATIONAL_JDBC_BACKEND_PATH;
 import static org.apache.gravitino.integration.test.util.TestDatabaseName.PG_CATALOG_POSTGRESQL_IT;
 import static org.apache.gravitino.integration.test.util.TestDatabaseName.PG_JDBC_BACKEND;
+import static org.apache.gravitino.lance.common.config.LanceConfig.LANCE_CONFIG_PREFIX;
+import static org.apache.gravitino.lance.common.config.LanceConfig.METALAKE_NAME;
 import static org.apache.gravitino.server.GravitinoServer.WEBSERVER_CONF_PREFIX;
 
 import com.google.common.base.Splitter;
@@ -103,7 +105,9 @@ public class BaseIT {
 
   protected Map<String, String> customConfigs = new HashMap<>();
 
-  protected boolean ignoreAuxRestService = true;
+  protected boolean ignoreIcebergAuxRestService = true;
+
+  protected boolean ignoreLanceAuxRestService = true;
 
   public String DOWNLOAD_MYSQL_JDBC_DRIVER_URL =
       "https://repo1.maven.org/maven2/mysql/mysql-connector-java/8.0.26/mysql-connector-java-8.0.26.jar";
@@ -132,6 +136,16 @@ public class BaseIT {
 
   public void registerCustomConfigs(Map<String, String> configs) {
     customConfigs.putAll(configs);
+  }
+
+  protected int getLanceRESTServerPort() {
+    JettyServerConfig lanceServerConfig =
+        JettyServerConfig.fromConfig(serverConfig, LANCE_CONFIG_PREFIX);
+    return lanceServerConfig.getHttpPort();
+  }
+
+  protected String getLanceRESTServerMetalakeName() {
+    return serverConfig.getRawString(LANCE_CONFIG_PREFIX + METALAKE_NAME.getKey());
   }
 
   private void rewriteGravitinoServerConfig() throws IOException {
@@ -330,14 +344,21 @@ public class BaseIT {
 
     serverConfig = new ServerConfig();
     customConfigs.put(ENTITY_RELATIONAL_JDBC_BACKEND_PATH.getKey(), file.getAbsolutePath());
-    if (ignoreAuxRestService) {
+    if (ignoreLanceAuxRestService && ignoreIcebergAuxRestService) {
       customConfigs.put(
           AuxiliaryServiceManager.GRAVITINO_AUX_SERVICE_PREFIX
               + AuxiliaryServiceManager.AUX_SERVICE_NAMES,
           "");
     }
+    if (!ignoreLanceAuxRestService) {
+      customConfigs.put(
+          LANCE_CONFIG_PREFIX + METALAKE_NAME.getKey(),
+          GravitinoITUtils.genRandomName("LanceRESTService_metalake"));
+    }
     if (testMode != null && testMode.equals(ITUtils.EMBEDDED_TEST_MODE)) {
-      MiniGravitinoContext context = new MiniGravitinoContext(customConfigs, ignoreAuxRestService);
+      MiniGravitinoContext context =
+          new MiniGravitinoContext(
+              customConfigs, ignoreIcebergAuxRestService, ignoreLanceAuxRestService);
       miniGravitino = new MiniGravitino(context);
       miniGravitino.start();
       serverConfig = miniGravitino.getServerConfig();
