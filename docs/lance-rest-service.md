@@ -184,7 +184,7 @@ You can also run Lance REST service with Docker. The following is an example com
 docker run -d --name lance-rest-service -p 9101:9101 \
   -e LANCE_REST_GRAVITINO_URI=http://gravitino-host:8090 \
   -e LANCE_REST_GRAVITINO_METALAKE_NAME=your_metalake_name \
-  gravitino/lance-rest-server:latest
+  apache/gravitino-lance-rest:latest
 ```       
 
 The following environment variables are used to configure Lance REST service in Docker:
