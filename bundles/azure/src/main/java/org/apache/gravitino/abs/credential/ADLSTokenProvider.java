@@ -29,9 +29,6 @@ import org.apache.gravitino.credential.CredentialProviderDelegator;
 public class ADLSTokenProvider extends CredentialProviderDelegator<ADLSTokenCredential> {
 
   @Override
-  public void close() {}
-
-  @Override
   public String credentialType() {
     return ADLSTokenCredential.ADLS_TOKEN_CREDENTIAL_TYPE;
   }

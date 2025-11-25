@@ -59,11 +59,6 @@ import org.apache.gravitino.credential.CredentialProviderDelegator;
 public class AwsIrsaCredentialProvider extends CredentialProviderDelegator<AwsIrsaCredential> {
 
   @Override
-  public void close() {
-    // No external resources to close
-  }
-
-  @Override
   public String credentialType() {
     return AwsIrsaCredential.AWS_IRSA_CREDENTIAL_TYPE;
   }

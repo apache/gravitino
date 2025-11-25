@@ -25,6 +25,7 @@ import com.aliyun.credentials.models.CredentialModel;
 import com.aliyun.credentials.utils.AuthConstant;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import java.io.IOException;
 import java.net.URI;
 import java.util.HashMap;
 import java.util.Map;
@@ -44,26 +45,38 @@ import org.apache.gravitino.oss.credential.policy.Statement;
 import org.apache.gravitino.oss.credential.policy.StringLike;
 
 /** Generates OSS token to access OSS data. */
-public class OSSTokenCredentialGenerator implements CredentialGenerator<OSSTokenCredential> {
+public class OSSTokenGenerator implements CredentialGenerator<OSSTokenCredential> {
 
   private final ObjectMapper objectMapper = new ObjectMapper();
+  private String accessKeyId;
+  private String secretAccessKey;
+  private String roleArn;
+  private String externalID;
+  private int tokenExpireSecs;
+  private String region;
 
   @Override
-  public OSSTokenCredential generate(Map<String, String> properties, CredentialContext context)
-      throws Exception {
+  public void initialize(Map<String, String> properties) {
+    OSSCredentialConfig credentialConfig = new OSSCredentialConfig(properties);
+    this.roleArn = credentialConfig.ossRoleArn();
+    this.externalID = credentialConfig.externalID();
+    this.tokenExpireSecs = credentialConfig.tokenExpireInSecs();
+    this.accessKeyId = credentialConfig.accessKeyID();
+    this.secretAccessKey = credentialConfig.secretAccessKey();
+    this.region = credentialConfig.region();
+  }
+
+  @Override
+  public OSSTokenCredential generate(CredentialContext context) throws Exception {
     if (!(context instanceof PathBasedCredentialContext)) {
       return null;
     }
 
-    OSSCredentialConfig config = new OSSCredentialConfig(properties);
     PathBasedCredentialContext pathContext = (PathBasedCredentialContext) context;
 
     CredentialModel credentialModel =
         createOSSCredentialModel(
-            config,
-            pathContext.getReadPaths(),
-            pathContext.getWritePaths(),
-            pathContext.getUserName());
+            pathContext.getReadPaths(), pathContext.getWritePaths(), pathContext.getUserName());
 
     return new OSSTokenCredential(
         credentialModel.accessKeyId,
@@ -73,21 +86,18 @@ public class OSSTokenCredentialGenerator implements CredentialGenerator<OSSToken
   }
 
   private CredentialModel createOSSCredentialModel(
-      OSSCredentialConfig credentialConfig,
-      Set<String> readLocations,
-      Set<String> writeLocations,
-      String userName) {
+      Set<String> readLocations, Set<String> writeLocations, String userName) {
     Config config = new Config();
-    config.setAccessKeyId(credentialConfig.accessKeyID());
-    config.setAccessKeySecret(credentialConfig.secretAccessKey());
+    config.setAccessKeyId(accessKeyId);
+    config.setAccessKeySecret(secretAccessKey);
     config.setType(AuthConstant.RAM_ROLE_ARN);
-    config.setRoleArn(credentialConfig.ossRoleArn());
+    config.setRoleArn(roleArn);
     config.setRoleSessionName(getRoleName(userName));
-    if (StringUtils.isNotBlank(credentialConfig.externalID())) {
-      config.setExternalId(credentialConfig.externalID());
+    if (StringUtils.isNotBlank(externalID)) {
+      config.setExternalId(externalID);
     }
-    config.setRoleSessionExpiration(credentialConfig.tokenExpireInSecs());
-    config.setPolicy(createPolicy(readLocations, writeLocations, credentialConfig.region()));
+    config.setRoleSessionExpiration(tokenExpireSecs);
+    config.setPolicy(createPolicy(readLocations, writeLocations, region));
     // Local object and client is a simple proxy that does not require manual release
     Client client = new Client(config);
     return client.getCredential();
@@ -214,4 +224,7 @@ public class OSSTokenCredentialGenerator implements CredentialGenerator<OSSToken
   private String getRoleName(String userName) {
     return "gravitino_" + userName;
   }
+
+  @Override
+  public void close() throws IOException {}
 }

@@ -24,14 +24,9 @@ import org.apache.gravitino.credential.GCSTokenCredential;
 
 /**
  * A lightweight credential provider for GCS. It delegates the actual credential generation to
- * {@link GCSTokenCredentialGenerator} which is loaded via reflection to avoid classpath issues.
+ * {@link GCSTokenGenerator} which is loaded via reflection to avoid classpath issues.
  */
 public class GCSTokenProvider extends CredentialProviderDelegator<GCSTokenCredential> {
-
-  @Override
-  public void close() {
-    // No external resources to close
-  }
 
   @Override
   public String credentialType() {
@@ -40,6 +35,6 @@ public class GCSTokenProvider extends CredentialProviderDelegator<GCSTokenCreden
 
   @Override
   public String getGeneratorClassName() {
-    return "org.apache.gravitino.gcs.credential.GCSTokenCredentialGenerator";
+    return "org.apache.gravitino.gcs.credential.GCSTokenGenerator";
   }
 }

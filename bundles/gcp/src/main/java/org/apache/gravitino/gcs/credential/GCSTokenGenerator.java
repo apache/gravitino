@@ -48,20 +48,27 @@ import org.apache.gravitino.credential.PathBasedCredentialContext;
 import org.apache.gravitino.credential.config.GCSCredentialConfig;
 
 /** Generate GCS access token according to the read and write paths. */
-public class GCSTokenCredentialGenerator implements CredentialGenerator<GCSTokenCredential> {
+public class GCSTokenGenerator implements CredentialGenerator<GCSTokenCredential> {
 
   private static final String INITIAL_SCOPE = "https://www.googleapis.com/auth/cloud-platform";
+  private GoogleCredentials sourceCredentials;
 
   @Override
-  public GCSTokenCredential generate(Map<String, String> properties, CredentialContext context)
-      throws IOException {
+  public void initialize(Map<String, String> properties) {
+    GCSCredentialConfig gcsCredentialConfig = new GCSCredentialConfig(properties);
+    try {
+      this.sourceCredentials =
+          getSourceCredentials(gcsCredentialConfig).createScoped(INITIAL_SCOPE);
+    } catch (IOException e) {
+      throw new RuntimeException(e);
+    }
+  }
+
+  @Override
+  public GCSTokenCredential generate(CredentialContext context) throws IOException {
     if (!(context instanceof PathBasedCredentialContext)) {
       return null;
     }
-
-    GCSCredentialConfig gcsCredentialConfig = new GCSCredentialConfig(properties);
-    GoogleCredentials sourceCredentials =
-        getSourceCredentials(gcsCredentialConfig).createScoped(INITIAL_SCOPE);
 
     PathBasedCredentialContext pathBasedCredentialContext = (PathBasedCredentialContext) context;
     AccessToken accessToken =
@@ -243,4 +250,7 @@ public class GCSTokenCredentialGenerator implements CredentialGenerator<GCSToken
       throw new IOException("GCS credential file does not exist." + gcsCredentialFilePath, e);
     }
   }
+
+  @Override
+  public void close() throws IOException {}
 }

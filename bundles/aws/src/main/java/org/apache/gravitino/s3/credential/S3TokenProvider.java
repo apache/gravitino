@@ -24,14 +24,9 @@ import org.apache.gravitino.credential.S3TokenCredential;
 
 /**
  * A lightweight credential provider for S3. It delegates the actual credential generation to {@link
- * S3TokenCredentialGenerator} which is loaded via reflection to avoid classpath issues.
+ * S3TokenGenerator} which is loaded via reflection to avoid classpath issues.
  */
 public class S3TokenProvider extends CredentialProviderDelegator<S3TokenCredential> {
-
-  @Override
-  public void close() {
-    // No resources to close in this provider.
-  }
 
   @Override
   public String credentialType() {
@@ -40,6 +35,6 @@ public class S3TokenProvider extends CredentialProviderDelegator<S3TokenCredenti
 
   @Override
   public String getGeneratorClassName() {
-    return "org.apache.gravitino.s3.credential.S3TokenCredentialGenerator";
+    return "org.apache.gravitino.s3.credential.S3TokenGenerator";
   }
 }

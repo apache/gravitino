@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.credential;
 
+import java.io.Closeable;
 import java.util.Map;
 
 /**
@@ -28,16 +29,22 @@ import java.util.Map;
  *
  * @param <T> The type of credential this generator produces.
  */
-@FunctionalInterface
-public interface CredentialGenerator<T extends Credential> {
+public interface CredentialGenerator<T extends Credential> extends Closeable {
+
+  /**
+   * Initializes the credential generator with catalog properties.
+   *
+   * @param properties catalog properties that can be used to configure the provider. The specific
+   *     properties required vary by implementation.
+   */
+  void initialize(Map<String, String> properties);
 
   /**
    * Generates a credential.
    *
-   * @param properties The configuration properties from the catalog.
    * @param context The context providing necessary information for credential retrieval.
    * @return The generated credential.
    * @throws Exception if an error occurs during credential generation.
    */
-  T generate(Map<String, String> properties, CredentialContext context) throws Exception;
+  T generate(CredentialContext context) throws Exception;
 }

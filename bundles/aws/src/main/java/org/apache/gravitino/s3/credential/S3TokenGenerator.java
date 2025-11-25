@@ -19,6 +19,7 @@
 
 package org.apache.gravitino.s3.credential;
 
+import java.io.IOException;
 import java.net.URI;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -48,33 +49,39 @@ import software.amazon.awssdk.services.sts.model.AssumeRoleResponse;
 import software.amazon.awssdk.services.sts.model.Credentials;
 
 /** Generate S3 token credentials according to the read and write paths. */
-public class S3TokenCredentialGenerator implements CredentialGenerator<S3TokenCredential> {
+public class S3TokenGenerator implements CredentialGenerator<S3TokenCredential> {
+
+  private StsClient stsClient;
+  private String roleArn;
+  private String externalID;
+  private int tokenExpireSecs;
 
   @Override
-  public S3TokenCredential generate(Map<String, String> properties, CredentialContext context)
-      throws Exception {
+  public void initialize(Map<String, String> properties) {
+    S3CredentialConfig s3CredentialConfig = new S3CredentialConfig(properties);
+    this.roleArn = s3CredentialConfig.s3RoleArn();
+    this.externalID = s3CredentialConfig.externalID();
+    this.tokenExpireSecs = s3CredentialConfig.tokenExpireInSecs();
+    this.stsClient = createStsClient(s3CredentialConfig);
+  }
+
+  @Override
+  public S3TokenCredential generate(CredentialContext context) {
     if (!(context instanceof PathBasedCredentialContext)) {
       return null;
     }
 
-    S3CredentialConfig config = new S3CredentialConfig(properties);
     PathBasedCredentialContext pathContext = (PathBasedCredentialContext) context;
 
-    try (StsClient stsClient = createStsClient(config)) {
-      Credentials s3Token =
-          createS3Token(
-              stsClient,
-              config,
-              pathContext.getReadPaths(),
-              pathContext.getWritePaths(),
-              pathContext.getUserName());
+    Credentials s3Token =
+        createS3Token(
+            pathContext.getReadPaths(), pathContext.getWritePaths(), pathContext.getUserName());
 
-      return new S3TokenCredential(
-          s3Token.accessKeyId(),
-          s3Token.secretAccessKey(),
-          s3Token.sessionToken(),
-          s3Token.expiration().toEpochMilli());
-    }
+    return new S3TokenCredential(
+        s3Token.accessKeyId(),
+        s3Token.secretAccessKey(),
+        s3Token.sessionToken(),
+        s3Token.expiration().toEpochMilli());
   }
 
   private StsClient createStsClient(S3CredentialConfig s3CredentialConfig) {
@@ -94,21 +101,17 @@ public class S3TokenCredentialGenerator implements CredentialGenerator<S3TokenCr
   }
 
   private Credentials createS3Token(
-      StsClient stsClient,
-      S3CredentialConfig config,
-      Set<String> readLocations,
-      Set<String> writeLocations,
-      String userName) {
-    IamPolicy policy = createPolicy(config.s3RoleArn(), readLocations, writeLocations);
+      Set<String> readLocations, Set<String> writeLocations, String userName) {
+    IamPolicy policy = createPolicy(roleArn, readLocations, writeLocations);
     AssumeRoleRequest.Builder builder =
         AssumeRoleRequest.builder()
-            .roleArn(config.s3RoleArn())
+            .roleArn(roleArn)
             .roleSessionName("gravitino_" + userName)
-            .durationSeconds(config.tokenExpireInSecs())
+            .durationSeconds(tokenExpireSecs)
             .policy(policy.toJson());
 
-    if (StringUtils.isNotBlank(config.externalID())) {
-      builder.externalId(config.externalID());
+    if (StringUtils.isNotBlank(externalID)) {
+      builder.externalId(externalID);
     }
     AssumeRoleResponse response = stsClient.assumeRole(builder.build());
     return response.credentials();
@@ -213,5 +216,12 @@ public class S3TokenCredentialGenerator implements CredentialGenerator<S3TokenCr
 
   private static String getBucketName(URI uri) {
     return uri.getHost();
+  }
+
+  @Override
+  public void close() throws IOException {
+    if (stsClient != null) {
+      stsClient.close();
+    }
   }
 }

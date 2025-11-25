@@ -19,13 +19,12 @@
 
 package org.apache.gravitino.oss.credential;
 
-import java.io.IOException;
 import org.apache.gravitino.credential.CredentialProviderDelegator;
 import org.apache.gravitino.credential.OSSTokenCredential;
 
 /**
  * A lightweight credential provider for OSS. It delegates the actual credential generation to
- * {@link OSSTokenCredentialGenerator} which is loaded via reflection to avoid classpath issues.
+ * {@link OSSTokenGenerator} which is loaded via reflection to avoid classpath issues.
  */
 public class OSSTokenProvider extends CredentialProviderDelegator<OSSTokenCredential> {
 
@@ -36,11 +35,6 @@ public class OSSTokenProvider extends CredentialProviderDelegator<OSSTokenCreden
 
   @Override
   public String getGeneratorClassName() {
-    return "org.apache.gravitino.oss.credential.OSSTokenCredentialGenerator";
-  }
-
-  @Override
-  public void close() throws IOException {
-    // No-op
+    return "org.apache.gravitino.oss.credential.OSSTokenGenerator";
   }
 }

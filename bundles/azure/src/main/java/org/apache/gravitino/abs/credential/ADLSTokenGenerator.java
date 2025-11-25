@@ -27,6 +27,7 @@ import com.azure.storage.file.datalake.implementation.util.DataLakeSasImplUtil;
 import com.azure.storage.file.datalake.models.UserDelegationKey;
 import com.azure.storage.file.datalake.sas.DataLakeServiceSasSignatureValues;
 import com.azure.storage.file.datalake.sas.PathSasPermission;
+import java.io.IOException;
 import java.time.OffsetDateTime;
 import java.util.HashSet;
 import java.util.Map;
@@ -40,14 +41,32 @@ import org.apache.gravitino.credential.config.AzureCredentialConfig;
 /** Generates ADLS token to access ADLS data. */
 public class ADLSTokenGenerator implements CredentialGenerator<ADLSTokenCredential> {
 
+  private String storageAccountName;
+  private String tenantId;
+  private String clientId;
+  private String clientSecret;
+  private String endpoint;
+  private Integer tokenExpireSecs;
+
   @Override
-  public ADLSTokenCredential generate(Map<String, String> properties, CredentialContext context) {
+  public void initialize(Map<String, String> properties) {
+    AzureCredentialConfig azureCredentialConfig = new AzureCredentialConfig(properties);
+    this.storageAccountName = azureCredentialConfig.storageAccountName();
+    this.tenantId = azureCredentialConfig.tenantId();
+    this.clientId = azureCredentialConfig.clientId();
+    this.clientSecret = azureCredentialConfig.clientSecret();
+    this.endpoint =
+        String.format("https://%s.%s", storageAccountName, ADLSTokenCredential.ADLS_DOMAIN);
+    this.tokenExpireSecs = azureCredentialConfig.adlsTokenExpireInSecs();
+  }
+
+  @Override
+  public ADLSTokenCredential generate(CredentialContext context) {
     if (!(context instanceof PathBasedCredentialContext)) {
       return null;
     }
 
     PathBasedCredentialContext pathContext = (PathBasedCredentialContext) context;
-    AzureCredentialConfig config = new AzureCredentialConfig(properties);
 
     Set<String> writePaths = pathContext.getWritePaths();
     Set<String> readPaths = pathContext.getReadPaths();
@@ -63,15 +82,11 @@ public class ADLSTokenGenerator implements CredentialGenerator<ADLSTokenCredenti
     }
     String uniquePath = combinedPaths.iterator().next();
 
-    String endpoint =
-        String.format(
-            "https://%s.%s", config.storageAccountName(), ADLSTokenCredential.ADLS_DOMAIN);
-
     ClientSecretCredential clientSecretCredential =
         new ClientSecretCredentialBuilder()
-            .tenantId(config.tenantId())
-            .clientId(config.clientId())
-            .clientSecret(config.clientSecret())
+            .tenantId(tenantId)
+            .clientId(clientId)
+            .clientSecret(clientSecret)
             .build();
 
     DataLakeServiceClient dataLakeServiceClient =
@@ -81,7 +96,7 @@ public class ADLSTokenGenerator implements CredentialGenerator<ADLSTokenCredenti
             .buildClient();
 
     OffsetDateTime start = OffsetDateTime.now();
-    OffsetDateTime expiry = OffsetDateTime.now().plusSeconds(config.adlsTokenExpireInSecs());
+    OffsetDateTime expiry = OffsetDateTime.now().plusSeconds(tokenExpireSecs);
     UserDelegationKey userDelegationKey = dataLakeServiceClient.getUserDelegationKey(start, expiry);
 
     PathSasPermission pathSasPermission =
@@ -109,4 +124,7 @@ public class ADLSTokenGenerator implements CredentialGenerator<ADLSTokenCredenti
     return new ADLSTokenCredential(
         locationParts.getAccountName(), sasToken, expiry.toInstant().toEpochMilli());
   }
+
+  @Override
+  public void close() throws IOException {}
 }

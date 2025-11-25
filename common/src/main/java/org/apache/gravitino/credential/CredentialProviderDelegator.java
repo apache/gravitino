@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.credential;
 
+import java.io.IOException;
 import java.lang.reflect.Constructor;
 import java.util.Map;
 
@@ -46,6 +47,7 @@ public abstract class CredentialProviderDelegator<T extends Credential>
   public void initialize(Map<String, String> properties) {
     this.properties = properties;
     this.generator = loadGenerator();
+    generator.initialize(properties);
   }
 
   /**
@@ -58,10 +60,17 @@ public abstract class CredentialProviderDelegator<T extends Credential>
   @Override
   public Credential getCredential(CredentialContext context) {
     try {
-      return generator.generate(properties, context);
+      return generator.generate(context);
     } catch (Exception e) {
       throw new RuntimeException(
           "Failed to generate credential using " + getGeneratorClassName(), e);
+    }
+  }
+
+  @Override
+  public void close() throws IOException {
+    if (generator != null) {
+      generator.close();
     }
   }
 
