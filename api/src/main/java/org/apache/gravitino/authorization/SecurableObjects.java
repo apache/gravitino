@@ -138,6 +138,40 @@ public class SecurableObjects {
     return of(MetadataObject.Type.MODEL, names, privileges);
   }
 
+  /**
+   * Create the tag {@link SecurableObject} with the given tag name and privileges.
+   *
+   * @param tag The tag name
+   * @param privileges The privileges of the tag
+   * @return The created tag {@link SecurableObject}
+   */
+  public static SecurableObject ofTag(String tag, List<Privilege> privileges) {
+    return of(MetadataObject.Type.TAG, Lists.newArrayList(tag), privileges);
+  }
+
+  /**
+   * Create the policy {@link SecurableObject} with the given policy name and privileges.
+   *
+   * @param policy The policy name
+   * @param privileges The privileges of the policy
+   * @return The created policy {@link SecurableObject}
+   */
+  public static SecurableObject ofPolicy(String policy, List<Privilege> privileges) {
+    return of(MetadataObject.Type.POLICY, Lists.newArrayList(policy), privileges);
+  }
+
+  /**
+   * Create the job template {@link SecurableObject} with the given job template name and
+   * privileges.
+   *
+   * @param jobTemplate The job template name
+   * @param privileges The privileges of the job template
+   * @return The created job template {@link SecurableObject}
+   */
+  public static SecurableObject ofJobTemplate(String jobTemplate, List<Privilege> privileges) {
+    return of(MetadataObject.Type.JOB_TEMPLATE, Lists.newArrayList(jobTemplate), privileges);
+  }
+
   private static class SecurableObjectImpl extends MetadataObjectImpl implements SecurableObject {
 
     private List<Privilege> privileges;
