@@ -20,7 +20,6 @@
 package org.apache.gravitino.credential;
 
 import java.io.Closeable;
-import java.lang.reflect.Constructor;
 import java.util.Map;
 import javax.annotation.Nullable;
 
@@ -50,7 +49,7 @@ public interface CredentialProvider extends Closeable {
   String credentialType();
 
   /**
-   * Obtains a credential based on the provided context information.
+   * Gets a credential based on the provided context information.
    *
    * @param context A context object providing necessary information for retrieving credentials.
    * @return A Credential object containing the authentication information needed to access a system
@@ -69,26 +68,5 @@ public interface CredentialProvider extends Closeable {
   default String getGeneratorClassName() {
     throw new UnsupportedOperationException(
         "This CredentialProvider does not use a CredentialGenerator.");
-  }
-
-  /**
-   * Lazily loads and returns an instance of the {@link CredentialGenerator}. This default
-   * implementation uses reflection and a no-argument constructor (public or non-public).
-   *
-   * @param <T> The type of the credential.
-   * @return An instance of the credential generator.
-   * @throws RuntimeException if the generator cannot be instantiated.
-   */
-  @SuppressWarnings("unchecked")
-  default <T extends Credential> CredentialGenerator<T> loadGenerator() {
-    try {
-      Class<?> generatorClass = Class.forName(getGeneratorClassName());
-      Constructor<?> constructor = generatorClass.getDeclaredConstructor();
-      constructor.setAccessible(true); // Allow instantiation of non-public classes/constructors
-      return (CredentialGenerator<T>) constructor.newInstance();
-    } catch (Exception e) {
-      throw new RuntimeException(
-          "Failed to load or instantiate CredentialGenerator: " + getGeneratorClassName(), e);
-    }
   }
 }

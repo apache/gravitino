@@ -19,26 +19,14 @@
 
 package org.apache.gravitino.s3.credential;
 
-import java.util.Map;
-import org.apache.gravitino.credential.Credential;
-import org.apache.gravitino.credential.CredentialContext;
-import org.apache.gravitino.credential.CredentialGenerator;
-import org.apache.gravitino.credential.CredentialProvider;
+import org.apache.gravitino.credential.CredentialProviderDelegator;
 import org.apache.gravitino.credential.S3TokenCredential;
 
 /**
  * A lightweight credential provider for S3. It delegates the actual credential generation to {@link
  * S3TokenCredentialGenerator} which is loaded via reflection to avoid classpath issues.
  */
-public class S3TokenProvider implements CredentialProvider {
-
-  private Map<String, String> properties;
-  private volatile CredentialGenerator<S3TokenCredential> generator;
-
-  @Override
-  public void initialize(Map<String, String> properties) {
-    this.properties = properties;
-  }
+public class S3TokenProvider extends CredentialProviderDelegator<S3TokenCredential> {
 
   @Override
   public void close() {
@@ -53,23 +41,5 @@ public class S3TokenProvider implements CredentialProvider {
   @Override
   public String getGeneratorClassName() {
     return "org.apache.gravitino.s3.credential.S3TokenCredentialGenerator";
-  }
-
-  @Override
-  public Credential getCredential(CredentialContext context) {
-    // Double-checked locking for lazy loading the generator
-    if (generator == null) {
-      synchronized (this) {
-        if (generator == null) {
-          this.generator = loadGenerator();
-        }
-      }
-    }
-
-    try {
-      return generator.generate(properties, context);
-    } catch (Exception e) {
-      throw new RuntimeException("Failed to generate S3 token credential", e);
-    }
   }
 }

@@ -19,12 +19,8 @@
 
 package org.apache.gravitino.s3.credential;
 
-import java.util.Map;
 import org.apache.gravitino.credential.AwsIrsaCredential;
-import org.apache.gravitino.credential.Credential;
-import org.apache.gravitino.credential.CredentialContext;
-import org.apache.gravitino.credential.CredentialGenerator;
-import org.apache.gravitino.credential.CredentialProvider;
+import org.apache.gravitino.credential.CredentialProviderDelegator;
 
 /**
  * AWS IRSA credential provider that supports both basic IRSA credentials and fine-grained
@@ -60,15 +56,7 @@ import org.apache.gravitino.credential.CredentialProvider;
  *       directly)
  * </ul>
  */
-public class AwsIrsaCredentialProvider implements CredentialProvider {
-
-  private Map<String, String> properties;
-  private volatile CredentialGenerator<AwsIrsaCredential> generator;
-
-  @Override
-  public void initialize(Map<String, String> properties) {
-    this.properties = properties;
-  }
+public class AwsIrsaCredentialProvider extends CredentialProviderDelegator<AwsIrsaCredential> {
 
   @Override
   public void close() {
@@ -83,23 +71,5 @@ public class AwsIrsaCredentialProvider implements CredentialProvider {
   @Override
   public String getGeneratorClassName() {
     return "org.apache.gravitino.s3.credential.AwsIrsaCredentialGenerator";
-  }
-
-  @Override
-  public Credential getCredential(CredentialContext context) {
-    // Double-checked locking for lazy loading the generator
-    if (generator == null) {
-      synchronized (this) {
-        if (generator == null) {
-          this.generator = loadGenerator();
-        }
-      }
-    }
-
-    try {
-      return generator.generate(properties, context);
-    } catch (Exception e) {
-      throw new RuntimeException("Failed to generate AWS IRSA credential", e);
-    }
   }
 }

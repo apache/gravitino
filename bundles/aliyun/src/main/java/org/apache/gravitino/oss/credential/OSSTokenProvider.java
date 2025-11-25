@@ -20,27 +20,14 @@
 package org.apache.gravitino.oss.credential;
 
 import java.io.IOException;
-import java.util.Map;
-import javax.annotation.Nullable;
-import org.apache.gravitino.credential.Credential;
-import org.apache.gravitino.credential.CredentialContext;
-import org.apache.gravitino.credential.CredentialGenerator;
-import org.apache.gravitino.credential.CredentialProvider;
+import org.apache.gravitino.credential.CredentialProviderDelegator;
 import org.apache.gravitino.credential.OSSTokenCredential;
 
 /**
  * A lightweight credential provider for OSS. It delegates the actual credential generation to
  * {@link OSSTokenCredentialGenerator} which is loaded via reflection to avoid classpath issues.
  */
-public class OSSTokenProvider implements CredentialProvider {
-
-  private Map<String, String> properties;
-  private volatile CredentialGenerator<OSSTokenCredential> generator;
-
-  @Override
-  public void initialize(Map<String, String> properties) {
-    this.properties = properties;
-  }
+public class OSSTokenProvider extends CredentialProviderDelegator<OSSTokenCredential> {
 
   @Override
   public String credentialType() {
@@ -50,25 +37,6 @@ public class OSSTokenProvider implements CredentialProvider {
   @Override
   public String getGeneratorClassName() {
     return "org.apache.gravitino.oss.credential.OSSTokenCredentialGenerator";
-  }
-
-  @Nullable
-  @Override
-  public Credential getCredential(CredentialContext context) {
-    // Double-checked locking for lazy loading the generator
-    if (generator == null) {
-      synchronized (this) {
-        if (generator == null) {
-          this.generator = loadGenerator();
-        }
-      }
-    }
-
-    try {
-      return generator.generate(properties, context);
-    } catch (Exception e) {
-      throw new RuntimeException("Failed to generate OSS token credential", e);
-    }
   }
 
   @Override

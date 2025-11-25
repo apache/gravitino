@@ -19,26 +19,14 @@
 
 package org.apache.gravitino.abs.credential;
 
-import java.util.Map;
 import org.apache.gravitino.credential.ADLSTokenCredential;
-import org.apache.gravitino.credential.Credential;
-import org.apache.gravitino.credential.CredentialContext;
-import org.apache.gravitino.credential.CredentialGenerator;
-import org.apache.gravitino.credential.CredentialProvider;
-import org.apache.gravitino.credential.PathBasedCredentialContext;
+import org.apache.gravitino.credential.CredentialProviderDelegator;
 
 /**
  * A lightweight credential provider for ADLS. It delegates the actual credential generation to
  * {@link ADLSTokenGenerator} which is loaded via reflection to avoid classpath issues.
  */
-public class ADLSTokenProvider implements CredentialProvider {
-  private Map<String, String> properties;
-  private volatile CredentialGenerator<ADLSTokenCredential> generator;
-
-  @Override
-  public void initialize(Map<String, String> properties) {
-    this.properties = properties;
-  }
+public class ADLSTokenProvider extends CredentialProviderDelegator<ADLSTokenCredential> {
 
   @Override
   public void close() {}
@@ -51,27 +39,5 @@ public class ADLSTokenProvider implements CredentialProvider {
   @Override
   public String getGeneratorClassName() {
     return "org.apache.gravitino.abs.credential.ADLSTokenProvider";
-  }
-
-  @Override
-  public Credential getCredential(CredentialContext context) {
-    if (!(context instanceof PathBasedCredentialContext)) {
-      return null;
-    }
-
-    // Double-checked locking for lazy loading the generator
-    if (generator == null) {
-      synchronized (this) {
-        if (generator == null) {
-          this.generator = loadGenerator();
-        }
-      }
-    }
-
-    try {
-      return generator.generate(properties, context);
-    } catch (Exception e) {
-      throw new RuntimeException("Failed to generate ADLS token", e);
-    }
   }
 }

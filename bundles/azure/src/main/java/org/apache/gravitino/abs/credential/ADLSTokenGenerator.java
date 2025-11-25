@@ -42,6 +42,10 @@ public class ADLSTokenGenerator implements CredentialGenerator<ADLSTokenCredenti
 
   @Override
   public ADLSTokenCredential generate(Map<String, String> properties, CredentialContext context) {
+    if (!(context instanceof PathBasedCredentialContext)) {
+      return null;
+    }
+
     PathBasedCredentialContext pathContext = (PathBasedCredentialContext) context;
     AzureCredentialConfig config = new AzureCredentialConfig(properties);
 
