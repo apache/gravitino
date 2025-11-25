@@ -31,6 +31,7 @@ import org.apache.gravitino.storage.relational.service.FilesetMetaService;
 import org.apache.gravitino.storage.relational.service.GroupMetaService;
 import org.apache.gravitino.storage.relational.service.MetalakeMetaService;
 import org.apache.gravitino.storage.relational.service.ModelMetaService;
+import org.apache.gravitino.storage.relational.service.PolicyMetaService;
 import org.apache.gravitino.storage.relational.service.RoleMetaService;
 import org.apache.gravitino.storage.relational.service.SchemaMetaService;
 import org.apache.gravitino.storage.relational.service.TableColumnMetaService;
@@ -133,6 +134,11 @@ public class RelationalEntityStoreIdResolver implements EntityIdResolver {
             TagMetaService.getInstance().getTagIdByTagName(metalakeId, nameIdentifier.name());
         return new NamespacedEntityId(tagId, metalakeId);
 
+      case POLICY:
+        long policyId =
+            PolicyMetaService.getInstance()
+                .getPolicyIdByPolicyName(metalakeId, nameIdentifier.name());
+        return new NamespacedEntityId(policyId, metalakeId);
       default:
         throw new IllegalArgumentException("Unsupported entity type: " + type);
     }
