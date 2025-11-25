@@ -91,7 +91,7 @@ The project is organized as a Gradle multi-module project with the following key
 ### Other Components
 - `web/` - Web UI frontend (Next.js/React)
 - `docs/` - Documentation source files
-- `integration-test/` - End-to-end integration tests
+- `integration-test-common/` - Common utilities for integration tests
 - `bundles/` - Cloud storage bundles (AWS, GCP, Azure, Aliyun)
 - `lineage/` - Data lineage tracking
 - `mcp-server/` - Model Context Protocol server for Gravitino
