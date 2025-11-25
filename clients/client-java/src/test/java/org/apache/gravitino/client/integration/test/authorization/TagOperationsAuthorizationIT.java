@@ -46,7 +46,6 @@ import org.apache.gravitino.rel.TableCatalog;
 import org.apache.gravitino.rel.types.Types;
 import org.apache.gravitino.tag.SupportsTags;
 import org.apache.gravitino.tag.TagChange;
-import org.junit.Assert;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
@@ -284,20 +283,19 @@ public class TagOperationsAuthorizationIT extends BaseRestApiAuthorizationIT {
 
   @Test
   @Order(8)
-  public void testListColumnTag(){
+  public void testListColumnTag() {
     GravitinoMetalake gravitinoMetalake = client.loadMetalake(METALAKE);
     SupportsTags columnSupportTag =
         gravitinoMetalake
             .loadCatalog(CATALOG)
             .asTableCatalog()
             .loadTable(NameIdentifier.of(SCHEMA, "table1"))
-                .columns()[0]
+            .columns()[0]
             .supportsTags();
     String[] tags = columnSupportTag.listTags();
     Arrays.sort(tags);
-    Assertions.assertArrayEquals(new String[]{"tag1","tag2","tag3"}, tags);
+    Assertions.assertArrayEquals(new String[] {"tag1", "tag2", "tag3"}, tags);
   }
-
 
   @Test
   @Order(9)

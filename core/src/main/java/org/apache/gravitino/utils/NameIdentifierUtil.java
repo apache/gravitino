@@ -379,23 +379,23 @@ public class NameIdentifierUtil {
    *     schema name
    */
   public static NameIdentifier getTableIdentifier(NameIdentifier ident)
-          throws IllegalNameIdentifierException {
+      throws IllegalNameIdentifierException {
     NameIdentifier.check(
-            ident.name() != null && !ident.name().isEmpty(),
-            "The name variable in the NameIdentifier must have value.");
+        ident.name() != null && !ident.name().isEmpty(),
+        "The name variable in the NameIdentifier must have value.");
     Namespace.check(
-            ident.namespace() != null && !ident.namespace().isEmpty() && ident.namespace().length() > 2,
-            "Table namespace must be non-null and at least 2 level, the input namespace is %s",
-            ident.namespace());
+        ident.namespace() != null && !ident.namespace().isEmpty() && ident.namespace().length() > 2,
+        "Table namespace must be non-null and at least 2 level, the input namespace is %s",
+        ident.namespace());
 
     List<String> allElems =
-            Stream.concat(Arrays.stream(ident.namespace().levels()), Stream.of(ident.name()))
-                    .collect(Collectors.toList());
+        Stream.concat(Arrays.stream(ident.namespace().levels()), Stream.of(ident.name()))
+            .collect(Collectors.toList());
     if (allElems.size() < 4) {
       throw new IllegalNameIdentifierException(
-              "Cannot create a schema NameIdentifier less than three elements.");
+          "Cannot create a schema NameIdentifier less than three elements.");
     }
-    return NameIdentifier.of(allElems.get(0), allElems.get(1), allElems.get(2),allElems.get(3));
+    return NameIdentifier.of(allElems.get(0), allElems.get(1), allElems.get(2), allElems.get(3));
   }
 
   /**

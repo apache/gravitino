@@ -314,12 +314,13 @@ public class MetadataAuthzHelper {
         nameIdentifierMap.put(entityType, nameIdentifier);
         break;
       case COLUMN:
-        nameIdentifierMap.put(entityType,nameIdentifier);
-        nameIdentifierMap.put(Entity.EntityType.TABLE, NameIdentifierUtil.getTableIdentifier(nameIdentifier));
+        nameIdentifierMap.put(entityType, nameIdentifier);
         nameIdentifierMap.put(
-                Entity.EntityType.SCHEMA, NameIdentifierUtil.getSchemaIdentifier(nameIdentifier));
+            Entity.EntityType.TABLE, NameIdentifierUtil.getTableIdentifier(nameIdentifier));
         nameIdentifierMap.put(
-                Entity.EntityType.CATALOG, NameIdentifierUtil.getCatalogIdentifier(nameIdentifier));
+            Entity.EntityType.SCHEMA, NameIdentifierUtil.getSchemaIdentifier(nameIdentifier));
+        nameIdentifierMap.put(
+            Entity.EntityType.CATALOG, NameIdentifierUtil.getCatalogIdentifier(nameIdentifier));
         break;
       default:
         throw new IllegalArgumentException("Unsupported entity type: " + entityType);
