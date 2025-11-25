@@ -33,6 +33,7 @@ import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.GravitinoEnv;
+import org.apache.gravitino.Metalake;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.authorization.AuthorizationRequestContext;
 import org.apache.gravitino.authorization.GravitinoAuthorizer;
@@ -88,6 +89,46 @@ public class MetadataAuthzHelper {
         .toArray(NameIdentifier[]::new);
   }
 
+  public static Metalake[] filterMetalakes(Metalake[] metalakes, String expression) {
+    if (!enableAuthorization()) {
+      return metalakes;
+    }
+    checkExecutor();
+    AuthorizationRequestContext authorizationRequestContext = new AuthorizationRequestContext();
+    List<CompletableFuture<NameIdentifier>> futures = new ArrayList<>();
+    for (Metalake metalake : metalakes) {
+      Principal currentPrincipal = PrincipalUtils.getCurrentPrincipal();
+      futures.add(
+          CompletableFuture.supplyAsync(
+              () -> {
+                try {
+                  return PrincipalUtils.doAs(
+                      currentPrincipal,
+                      () -> {
+                        Map<Entity.EntityType, NameIdentifier> nameIdentifierMap =
+                            spiltMetadataNames(
+                                metalake.name(),
+                                Entity.EntityType.METALAKE,
+                                NameIdentifierUtil.ofMetalake(metalake.name()));
+                        AuthorizationExpressionEvaluator authorizationExpressionEvaluator =
+                            new AuthorizationExpressionEvaluator(expression);
+                        return authorizationExpressionEvaluator.evaluate(
+                                nameIdentifierMap, authorizationRequestContext)
+                            ? NameIdentifierUtil.ofMetalake(metalake.name())
+                            : null;
+                      });
+                } catch (Exception e) {
+                  LOG.error("GravitinoAuthorize error:{}", e.getMessage(), e);
+                  return null;
+                }
+              },
+              executor));
+    }
+    return futures.stream()
+        .map(CompletableFuture::join)
+        .filter(Objects::nonNull)
+        .toArray(Metalake[]::new);
+  }
   /**
    * Call {@link AuthorizationExpressionEvaluator} to filter the metadata list
    *
