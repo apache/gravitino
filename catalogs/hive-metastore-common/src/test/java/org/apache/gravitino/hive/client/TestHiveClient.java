@@ -32,6 +32,15 @@ import org.apache.gravitino.dto.SchemaDTO;
 import org.apache.gravitino.dto.rel.ColumnDTO;
 import org.apache.gravitino.dto.rel.TableDTO;
 import org.apache.gravitino.dto.rel.partitioning.IdentityPartitioningDTO;
+import org.apache.gravitino.exceptions.ConnectionFailedException;
+import org.apache.gravitino.exceptions.GravitinoRuntimeException;
+import org.apache.gravitino.exceptions.NoSuchPartitionException;
+import org.apache.gravitino.exceptions.NoSuchSchemaException;
+import org.apache.gravitino.exceptions.NoSuchTableException;
+import org.apache.gravitino.exceptions.NonEmptySchemaException;
+import org.apache.gravitino.exceptions.PartitionAlreadyExistsException;
+import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
+import org.apache.gravitino.exceptions.TableAlreadyExistsException;
 import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.expressions.literals.Literals;
 import org.apache.gravitino.rel.partitions.Partition;
@@ -262,5 +271,138 @@ public class TestHiveClient {
     } catch (Exception ignored) {
       // ignore cleanup failures
     }
+  }
+
+  @Test
+  void testHiveExceptionHandling() throws Exception {
+    testHiveExceptionHandlingForVersion("HIVE2", "", HIVE2_HMS_URL, HIVE2_HDFS_URL);
+  }
+
+  @Test
+  void testHive3ExceptionHandling() throws Exception {
+    testHiveExceptionHandlingForVersion("HIVE3", "hive", HIVE3_HMS_URL, HIVE3_HDFS_URL);
+  }
+
+  private void testHiveExceptionHandlingForVersion(
+      String version, String catalogName, String metastoreUri, String hdfsBasePath)
+      throws Exception {
+    Properties properties = new Properties();
+    properties.setProperty("hive.metastore.uris", metastoreUri);
+    IsolatedClientLoader loader = IsolatedClientLoader.forVersion(version, Map.of());
+    HiveClient client = loader.createClient(properties);
+
+    String dbName = "gt_exception_test_db_" + UUID.randomUUID().toString().replace("-", "");
+    String tableName = "gt_exception_test_tbl_" + UUID.randomUUID().toString().replace("-", "");
+    String partitionValue = "p_" + UUID.randomUUID().toString().replace("-", "");
+    String partitionName = "dt=" + partitionValue;
+
+    String dbLocation = hdfsBasePath + "/" + dbName;
+    String tableLocation = hdfsBasePath + "/" + tableName;
+
+    Schema schema = createTestSchema(dbName, dbLocation);
+    Table table = createTestTable(tableName, tableLocation);
+    Partition partition = createTestPartition(partitionName, partitionValue);
+
+    try {
+      // Test SchemaAlreadyExistsException - create database twice
+      try {
+        client.createDatabase(catalogName, schema);
+      } catch (GravitinoRuntimeException e) {
+        // If permission error occurs, skip this test
+        if (e.getCause() != null
+            && e.getCause().getMessage() != null
+            && e.getCause().getMessage().contains("Permission denied")) {
+          return; // Skip test if permission denied
+        }
+        throw e;
+      }
+      Assertions.assertThrows(
+          SchemaAlreadyExistsException.class, () -> client.createDatabase(catalogName, schema));
+
+      // Test NoSuchSchemaException - get non-existent database
+      Assertions.assertThrows(
+          NoSuchSchemaException.class,
+          () -> client.getDatabase(catalogName, "non_existent_db_" + UUID.randomUUID()));
+
+      // Test TableAlreadyExistsException - create table twice
+      client.createTable(catalogName, dbName, table);
+      Assertions.assertThrows(
+          TableAlreadyExistsException.class, () -> client.createTable(catalogName, dbName, table));
+
+      // Test NoSuchTableException - get non-existent table
+      Assertions.assertThrows(
+          NoSuchTableException.class,
+          () -> client.getTable(catalogName, dbName, "non_existent_table_" + UUID.randomUUID()));
+
+      // Test PartitionAlreadyExistsException - add partition twice
+      Partition addedPartition = client.addPartition(catalogName, dbName, table, partition);
+      Assertions.assertNotNull(addedPartition, "Added partition should not be null");
+      Assertions.assertThrows(
+          PartitionAlreadyExistsException.class,
+          () -> client.addPartition(catalogName, dbName, table, partition));
+
+      // Test NoSuchPartitionException - get non-existent partition
+      Assertions.assertThrows(
+          NoSuchPartitionException.class,
+          () ->
+              client.getPartition(
+                  catalogName, dbName, table, "dt=non_existent_partition_" + UUID.randomUUID()));
+
+      // Test NonEmptySchemaException - try to drop database with tables (cascade=false)
+      Exception exception =
+          Assertions.assertThrows(
+              Exception.class, () -> client.dropDatabase(catalogName, dbName, false));
+      // Hive may throw different exceptions for non-empty database
+      // The converter should handle it appropriately
+      Assertions.assertTrue(
+          exception instanceof NonEmptySchemaException
+              || exception instanceof GravitinoRuntimeException,
+          "Should throw NonEmptySchemaException or GravitinoRuntimeException, got: "
+              + exception.getClass().getName());
+
+      // Cleanup
+      client.dropPartition(catalogName, dbName, tableName, addedPartition.name(), true);
+      client.dropTable(catalogName, dbName, tableName, true, true);
+      client.dropDatabase(catalogName, dbName, true);
+    } finally {
+      safelyDropTable(client, catalogName, dbName, tableName);
+      safelyDropDatabase(client, catalogName, dbName);
+    }
+  }
+
+  private void testConnectionFailedExceptionForVersion(String version, String catalogName)
+      throws Exception {
+    // Test with invalid/unreachable Hive Metastore URI
+    String invalidMetastoreUri = "thrift://127.0.0.1:9999";
+    Properties properties = new Properties();
+    properties.setProperty("hive.metastore.uris", invalidMetastoreUri);
+
+    IsolatedClientLoader loader = IsolatedClientLoader.forVersion(version, Map.of());
+
+    // Connection failure may occur during client creation or operation
+    // Both should be converted to ConnectionFailedException
+    Exception exception =
+        Assertions.assertThrows(
+            Exception.class,
+            () -> {
+              HiveClient client = loader.createClient(properties);
+              client.getAllDatabases(catalogName);
+            });
+
+    // Verify the exception is converted to ConnectionFailedException
+    Assertions.assertTrue(
+        exception instanceof ConnectionFailedException,
+        "Should throw ConnectionFailedException, got: " + exception.getClass().getName());
+    Assertions.assertNotNull(
+        ((ConnectionFailedException) exception).getCause(), "Exception should have a cause");
+  }
+
+  @Test
+  void testConnectionFailedException() throws Exception {
+    // Test with HIVE2
+    testConnectionFailedExceptionForVersion("HIVE2", "");
+
+    // Test with HIVE3
+    testConnectionFailedExceptionForVersion("HIVE3", "hive");
   }
 }

@@ -30,6 +30,7 @@ import static org.apache.gravitino.catalog.hive.HiveConstants.SERDE_PARAMETER_PR
 import static org.apache.gravitino.catalog.hive.HiveConstants.TABLE_TYPE;
 import static org.apache.gravitino.rel.expressions.transforms.Transforms.identity;
 
+import com.google.common.base.Preconditions;
 import com.google.common.collect.Maps;
 import java.time.Instant;
 import java.util.Arrays;
@@ -73,6 +74,7 @@ public class HiveTableConverter {
   private static final String PARTITION_VALUE_DELIMITER = "=";
 
   public static Table fromHiveTable(org.apache.hadoop.hive.metastore.api.Table table) {
+    Preconditions.checkArgument(table != null, "Table cannot be null");
     AuditInfo auditInfo = HiveTableConverter.getAuditInfo(table);
 
     Distribution distribution = HiveTableConverter.getDistribution(table);
@@ -117,6 +119,8 @@ public class HiveTableConverter {
   }
 
   public static org.apache.hadoop.hive.metastore.api.Table toHiveTable(String dbName, Table table) {
+    Preconditions.checkArgument(dbName != null, "Database name cannot be null");
+    Preconditions.checkArgument(table != null, "Table cannot be null");
     org.apache.hadoop.hive.metastore.api.Table hiveTable =
         new org.apache.hadoop.hive.metastore.api.Table();
 
@@ -351,6 +355,8 @@ public class HiveTableConverter {
 
   public static Partition fromHivePartition(
       Table table, org.apache.hadoop.hive.metastore.api.Partition partition) {
+    Preconditions.checkArgument(table != null, "Table cannot be null");
+    Preconditions.checkArgument(partition != null, "Partition cannot be null");
     List<String> partCols =
         buildPartitionKeys(table).stream().map(FieldSchema::getName).collect(Collectors.toList());
     String partitionName = FileUtils.makePartName(partCols, partition.getValues());
@@ -384,6 +390,9 @@ public class HiveTableConverter {
 
   public static org.apache.hadoop.hive.metastore.api.Partition toHivePartition(
       String dbName, Table table, Partition partition) {
+    Preconditions.checkArgument(dbName != null, "Database name cannot be null");
+    Preconditions.checkArgument(table != null, "Table cannot be null");
+    Preconditions.checkArgument(partition != null, "Partition cannot be null");
     org.apache.hadoop.hive.metastore.api.Partition hivePartition =
         new org.apache.hadoop.hive.metastore.api.Partition();
     hivePartition.setDbName(dbName);

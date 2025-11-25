@@ -21,6 +21,7 @@ package org.apache.gravitino.hive.converter;
 import static org.apache.gravitino.catalog.hive.HiveConstants.LOCATION;
 
 import avro.shaded.com.google.common.collect.Maps;
+import com.google.common.base.Preconditions;
 import java.util.Map;
 import java.util.Optional;
 import org.apache.gravitino.Schema;
@@ -31,6 +32,8 @@ import org.apache.hadoop.hive.metastore.api.PrincipalType;
 
 public class HiveDatabaseConverter {
   public static Schema fromHiveDB(Database db) {
+    Preconditions.checkArgument(db != null, "Database cannot be null");
+
     Map<String, String> properties = buildSchemaProperties(db);
 
     // Get audit info from Hive's Database object. Because Hive's database doesn't store create
@@ -61,6 +64,7 @@ public class HiveDatabaseConverter {
   }
 
   public static Database toHiveDb(Schema db) {
+    Preconditions.checkArgument(db != null, "Schema cannot be null");
     Database hiveDb = new Database();
 
     hiveDb.setName(db.name());

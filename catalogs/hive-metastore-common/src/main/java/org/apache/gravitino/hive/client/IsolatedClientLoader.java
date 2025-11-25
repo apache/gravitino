@@ -19,7 +19,6 @@ package org.apache.gravitino.hive.client;
 import java.io.IOException;
 import java.io.InputStream;
 import java.lang.reflect.Constructor;
-import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.net.URL;
 import java.net.URLClassLoader;
@@ -196,8 +195,8 @@ public final class IsolatedClientLoader {
                 .loadClass(HiveClientImpl.class.getName())
                 .getConstructors()[0]
                 .newInstance(version, client);
-      } catch (InvocationTargetException e) {
-        throw e;
+      } catch (Exception e) {
+        throw HiveExceptionConverter.toGravitinoException(e);
       } finally {
         Thread.currentThread().setContextClassLoader(origLoader);
       }

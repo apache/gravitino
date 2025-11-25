@@ -128,7 +128,7 @@ public class HudiHMSBackendOps implements HudiCatalogBackendOps {
       return clientPool.run(
           c -> {
             List<String> allTables = c.getAllTables("", schemaIdent.name());
-            return c.getTableObjectsByName(schemaIdent.name(), allTables).stream()
+            return c.getTableObjectsByName("", schemaIdent.name(), allTables).stream()
                 .filter(this::checkHudiTable)
                 .map(t -> NameIdentifier.of(namespace, t.name()))
                 .toArray(NameIdentifier[]::new);
