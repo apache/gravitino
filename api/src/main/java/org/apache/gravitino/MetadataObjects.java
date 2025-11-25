@@ -38,7 +38,7 @@ public class MetadataObjects {
 
   private static final Joiner DOT_JOINER = Joiner.on('.');
 
-  private static final Set<MetadataObject.Type> validSingleNameTypes =
+  private static final Set<MetadataObject.Type> validSingleLevelNameTypes =
       Sets.newHashSet(
           MetadataObject.Type.CATALOG,
           MetadataObject.Type.METALAKE,
@@ -48,17 +48,17 @@ public class MetadataObjects {
           MetadataObject.Type.JOB_TEMPLATE,
           MetadataObject.Type.POLICY);
 
-  private static final Set<MetadataObject.Type> validTwoNameTypes =
+  private static final Set<MetadataObject.Type> validTwoLevelNameTypes =
       Sets.newHashSet(MetadataObject.Type.SCHEMA);
 
-  private static final Set<MetadataObject.Type> validThreeNameTypes =
+  private static final Set<MetadataObject.Type> validThreeLevelNameTypes =
       Sets.newHashSet(
           MetadataObject.Type.FILESET,
           MetadataObject.Type.TABLE,
           MetadataObject.Type.TOPIC,
           MetadataObject.Type.MODEL);
 
-  private static final Set<MetadataObject.Type> validFourNameTypes =
+  private static final Set<MetadataObject.Type> validFourLevelNameTypes =
       Sets.newHashSet(MetadataObject.Type.COLUMN);
 
   private MetadataObjects() {}
@@ -74,7 +74,7 @@ public class MetadataObjects {
   public static MetadataObject of(String parent, String name, MetadataObject.Type type) {
     Preconditions.checkArgument(name != null, "Cannot create a metadata object with null name");
     Preconditions.checkArgument(type != null, "Cannot create a metadata object with no type");
-    if (validSingleNameTypes.contains(type)) {
+    if (validSingleLevelNameTypes.contains(type)) {
       Preconditions.checkArgument(
           parent == null, "If the type is " + type + ", parent must be null");
     }
@@ -98,16 +98,16 @@ public class MetadataObjects {
         "Cannot create a metadata object with the name length which is greater than 4");
     Preconditions.checkArgument(type != null, "Cannot create a metadata object with no type");
 
-    if (validSingleNameTypes.contains(type)) {
+    if (validSingleLevelNameTypes.contains(type)) {
       Preconditions.checkArgument(
           names.size() == 1, "If the type is " + type + ", the length of names must be 1");
-    } else if (validTwoNameTypes.contains(type)) {
+    } else if (validTwoLevelNameTypes.contains(type)) {
       Preconditions.checkArgument(
           names.size() == 2, "If the type is " + type + ", the length of names must be 2");
-    } else if (validThreeNameTypes.contains(type)) {
+    } else if (validThreeLevelNameTypes.contains(type)) {
       Preconditions.checkArgument(
           names.size() == 3, "If the type is " + type + ", the length of names must be 3");
-    } else if (validFourNameTypes.contains(type)) {
+    } else if (validFourLevelNameTypes.contains(type)) {
       Preconditions.checkArgument(
           names.size() == 4, "If the type is COLUMN, the length of names must be 4");
     } else {
@@ -134,7 +134,7 @@ public class MetadataObjects {
     }
 
     // Return null if the object is the root object
-    if (validSingleNameTypes.contains(object.type())) {
+    if (validSingleLevelNameTypes.contains(object.type())) {
       return null;
     }
 
@@ -173,7 +173,7 @@ public class MetadataObjects {
         StringUtils.isNotBlank(fullName), "Metadata object full name cannot be blank");
 
     List<String> parts = DOT_SPLITTER.splitToList(fullName);
-    if (validSingleNameTypes.contains(type)) {
+    if (validSingleLevelNameTypes.contains(type)) {
       return of(Collections.singletonList(fullName), type);
     }
 

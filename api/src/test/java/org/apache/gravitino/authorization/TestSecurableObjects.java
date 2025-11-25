@@ -184,7 +184,7 @@ public class TestSecurableObjects {
     Privilege applyTag = Privileges.ApplyTag.allow();
     Privilege createPolicy = Privileges.CreatePolicy.allow();
     Privilege applyPolicy = Privileges.ApplyPolicy.allow();
-    Privilege createJobTemplate = Privileges.CreateJobTemplate.allow();
+    Privilege createJobTemplate = Privileges.RegisterJobTemplate.allow();
     Privilege createJob = Privileges.RunJob.allow();
     Privilege useJobTemplate = Privileges.UseJobTemplate.allow();
 

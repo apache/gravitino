@@ -147,8 +147,8 @@ public class Privileges {
         return CreatePolicy.allow();
 
         // Job template
-      case CREATE_JOB_TEMPLATE:
-        return CreateJobTemplate.allow();
+      case REGISTER_JOB_TEMPLATE:
+        return RegisterJobTemplate.allow();
       case USE_JOB_TEMPLATE:
         return UseJobTemplate.allow();
 
@@ -251,8 +251,8 @@ public class Privileges {
         return CreatePolicy.deny();
 
         // Job template
-      case CREATE_JOB_TEMPLATE:
-        return CreateJobTemplate.deny();
+      case REGISTER_JOB_TEMPLATE:
+        return RegisterJobTemplate.deny();
       case USE_JOB_TEMPLATE:
         return UseJobTemplate.deny();
 
@@ -1104,28 +1104,28 @@ public class Privileges {
     }
   }
 
-  /** The privilege to create a job template. */
-  public static class CreateJobTemplate extends GenericPrivilege<CreateJobTemplate> {
-    private static final CreateJobTemplate ALLOW_INSTANCE =
-        new CreateJobTemplate(Condition.ALLOW, Name.CREATE_JOB_TEMPLATE);
-    private static final CreateJobTemplate DENY_INSTANCE =
-        new CreateJobTemplate(Condition.DENY, Name.CREATE_JOB_TEMPLATE);
+  /** The privilege to register a job template. */
+  public static class RegisterJobTemplate extends GenericPrivilege<RegisterJobTemplate> {
+    private static final RegisterJobTemplate ALLOW_INSTANCE =
+        new RegisterJobTemplate(Condition.ALLOW, Name.REGISTER_JOB_TEMPLATE);
+    private static final RegisterJobTemplate DENY_INSTANCE =
+        new RegisterJobTemplate(Condition.DENY, Name.REGISTER_JOB_TEMPLATE);
 
-    private CreateJobTemplate(Condition condition, Name name) {
+    private RegisterJobTemplate(Condition condition, Name name) {
       super(condition, name);
     }
 
     /**
      * @return The instance with allow condition of the privilege.
      */
-    public static CreateJobTemplate allow() {
+    public static RegisterJobTemplate allow() {
       return ALLOW_INSTANCE;
     }
 
     /**
      * @return The instance with deny condition of the privilege.
      */
-    public static CreateJobTemplate deny() {
+    public static RegisterJobTemplate deny() {
       return DENY_INSTANCE;
     }
 

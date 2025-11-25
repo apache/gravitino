@@ -283,10 +283,10 @@ DENY `WRITE_FILESET` won‘t deny the `READ_FILESET` operation if the user has t
 
 ### Job template privileges
 
-| Name                | Supports Securable Object | Operation                                |
-|---------------------|---------------------------|------------------------------------------|
-| CREATE_JOB_TEMPLATE | Metalake                  | Create a job template                    |
-| USE_JOB_TEMPLATE    | Metalake, JobTemplate     | Use a job template when creating the job |
+| Name                  | Supports Securable Object | Operation                               |
+|-----------------------|---------------------------|-----------------------------------------|
+| REGISTER_JOB_TEMPLATE | Metalake                  | Register a job template                 |
+| USE_JOB_TEMPLATE      | Metalake, JobTemplate     | Use a job template when running the job |
 
 ### Job privileges
 | Name    | Supports Securable Object | Operation |
@@ -1075,11 +1075,11 @@ The following table lists the required privileges for each API.
 | list policies for object          | Requires both permission to **get the policy** and permission to **load metadata objects**.                                                                                                                                                   |
 | get policy for object             | Requires both permission to **get the policy** and permission to **load metadata objects**.                                                                                                                                                   |
 | list job templates                | The owner of the metalake can see all the job templates, others can see the job templates which they can get.                                                                                                                                 |
-| register a job template           | `CREATE_JOB_TEMPLATE` on the metalake or the owner of the metalake.                                                                                                                                                                           |
+| register a job template           | `REGISTER_JOB_TEMPLATE` on the metalake or the owner of the metalake.                                                                                                                                                                         |
 | get a job template                | `USE_JOB_TEMPLATE` on the metalake or job template, the owner of the metalake or the job template.                                                                                                                                            |
 | delete a job template             | The owner of the metalake or the job template.                                                                                                                                                                                                |
 | alter a job template              | The owner of the metalake or the job template.                                                                                                                                                                                                |
 | list jobs                         | The owner of the metalake can see all the jobs, others can see the jobs which they can get.                                                                                                                                                   |                                                                                                                                                                                                                            
-| run a job                         | The owner of the metalake , or have both `RUN_JOB` on the metalake and `USE_JOB_TEMPLATE` on the job template                                                                                                                                |
+| run a job                         | The owner of the metalake , or have both `RUN_JOB` on the metalake and `USE_JOB_TEMPLATE` on the job template                                                                                                                                 |
 | get a job                         | The owner of the metalake or the job.                                                                                                                                                                                                         |
 | cancel a job                      | The owner of the metalake or the job.                                                                                                                                                                                                         |
