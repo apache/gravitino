@@ -765,7 +765,7 @@ public class HTTPClient implements RESTClient {
      * @return This Builder instance for method chaining.
      */
     public Builder uri(String baseUri) {
-      Preconditions.checkNotNull(baseUri, "Invalid uri for http client: null");
+      Preconditions.checkArgument(baseUri != null, "Invalid uri for http client: null");
       this.uri = RESTUtils.stripTrailingSlash(baseUri);
       return this;
     }
