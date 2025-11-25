@@ -74,11 +74,10 @@ dependencies {
   annotationProcessor(libs.lombok)
   compileOnly(libs.lombok)
 
-  // Iceberg doesn't provide Aliyun bundle jar, use Gravitino Aliyun bundle to provide OSS packages
-  testImplementation(project(":bundles:aliyun-bundle"))
-  testImplementation(project(":bundles:aws-bundle"))
-  testImplementation(project(":bundles:gcp-bundle"))
-  testImplementation(project(":bundles:azure-bundle"))
+  testImplementation(project(":bundles:iceberg-aliyun-bundle"))
+  testImplementation(project(":bundles:iceberg-aws-bundle"))
+  testImplementation(project(":bundles:iceberg-gcp-bundle"))
+  testImplementation(project(":bundles:iceberg-azure-bundle"))
   testImplementation(project(":integration-test-common", "testArtifacts"))
   testImplementation(project(":server"))
 
@@ -95,11 +94,6 @@ dependencies {
   testImplementation(libs.h2db)
   testImplementation(libs.mysql.driver)
   testImplementation(libs.postgresql.driver)
-  testImplementation(libs.iceberg.aws.bundle)
-  testImplementation(libs.iceberg.gcp.bundle)
-  testImplementation(libs.iceberg.azure.bundle) {
-    exclude("com.google.guava", "guava")
-  }
   testImplementation(libs.jersey.test.framework.core) {
     exclude(group = "org.junit.jupiter")
   }
