@@ -14,3 +14,13 @@
 # KIND, either express or implied.  See the License for the
 # specific language governing permissions and limitations
 # under the License.
+
+from __future__ import annotations
+
+from gravitino.api.tag.tag import Tag
+from gravitino.api.tag.tag_change import TagChange
+
+__all__ = [
+    "Tag",
+    "TagChange",
+]
