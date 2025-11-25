@@ -20,7 +20,6 @@ package org.apache.gravitino.catalog.lakehouse.generic;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
-import java.util.Locale;
 import java.util.Optional;
 import java.util.ServiceLoader;
 import java.util.stream.Collectors;
@@ -62,15 +61,5 @@ public class LakehouseTableDelegatorFactory {
     // Initialize delegators if not yet done
     createTableDelegators();
     return delegators;
-  }
-
-  public static LakehouseTableDelegator tableDelegator(String format) {
-    // Initialize delegators if not yet done
-    createTableDelegators();
-
-    LakehouseTableDelegator delegator = delegators.get(format.toLowerCase(Locale.ROOT));
-    Preconditions.checkArgument(
-        delegator != null, "The lakehouse table format %s is not supported.", format);
-    return delegator;
   }
 }
