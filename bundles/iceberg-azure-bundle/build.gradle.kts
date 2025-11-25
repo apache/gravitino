@@ -24,6 +24,11 @@ plugins {
   alias(libs.plugins.shadow)
 }
 
+configurations.shadow {
+  // Force a newer version of ASM to support class files compiled with higher JDK versions.
+  resolutionStrategy.force("org.ow2.asm:asm:9.6", "org.ow2.asm:asm-commons:9.6")
+}
+
 dependencies {
   // The iceberg-azure-bundle already includes the dependencies
   // required by Gravitino for credential vending.
@@ -38,25 +43,6 @@ tasks.withType(ShadowJar::class.java) {
   dependencies {
     exclude(dependency("org.slf4j:slf4j-api"))
   }
-
-  // Relocate dependencies to avoid conflicts
-  relocate("com.ctc.wstx", "org.apache.gravitino.azure.shaded.com.ctc.wstx")
-  relocate("com.fasterxml", "org.apache.gravitino.azure.shaded.com.fasterxml")
-  relocate("com.google", "org.apache.gravitino.azure.shaded.com.google")
-  relocate("com.microsoft.aad", "org.apache.gravitino.azure.shaded.com.microsoft.aad")
-  relocate("com.nimbusds", "org.apache.gravitino.azure.shaded.com.nimbusds")
-  relocate("com.sun.jna", "org.apache.gravitino.azure.shaded.com.sun.jna")
-  relocate("io.netty", "org.apache.gravitino.azure.shaded.io.netty")
-  relocate("net.minidev", "org.apache.gravitino.azure.shaded.net.minidev")
-  relocate("net.jcip.annotations", "org.apache.gravitino.azure.shaded.net.jcip.annotations")
-  relocate("org.apache.commons", "org.apache.gravitino.azure.shaded.org.apache.commons")
-  relocate("org.apache.httpcomponents", "org.apache.gravitino.azure.shaded.org.apache.httpcomponents")
-  relocate("org.checkerframework", "org.apache.gravitino.azure.shaded.org.checkerframework")
-  relocate("org.codehaus.stax2", "org.apache.gravitino.azure.shaded.org.codehaus.stax2")
-  relocate("org.eclipse.jetty", "org.apache.gravitino.azure.shaded.org.eclipse.jetty")
-  relocate("org.objectweb.asm", "org.apache.gravitino.azure.shaded.org.objectweb.asm")
-  relocate("org.reactivestreams", "org.apache.gravitino.azure.shaded.org.reactivestreams")
-  relocate("reactor", "org.apache.gravitino.azure.shaded.reactor")
 
   mergeServiceFiles()
 }
