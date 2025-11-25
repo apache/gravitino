@@ -31,6 +31,9 @@ import java.util.Map;
 public abstract class CredentialProviderDelegator<T extends Credential>
     implements CredentialProvider {
 
+  /**
+   * The properties used by the generator to generate the credential.
+   */
   protected Map<String, String> properties;
   private volatile CredentialGenerator<T> generator;
 
