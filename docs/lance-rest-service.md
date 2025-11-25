@@ -191,13 +191,13 @@ Then you can access Lance REST service at `http://localhost:9101`.
 
 The following environment variables are used to configure Lance REST service in Docker:
 
-| Environment variables                | Configuration items                      | Required | Default                 | Since version |
-|--------------------------------------|------------------------------------------|----------|-------------------------|---------------|
-| `LANCE_REST_GRAVITINO_METALAKE_NAME` | `gravitino.lance-rest.namespace-backend` | Y        | (none)                  | 1.1.0         |
-| `LANCE_REST_NAMESPACE_BACKEND`       | `gravitino.lance-rest.uri`               | N        | `gravitino`             | 1.1.0         |
-| `LANCE_REST_GRAVITINO_URI`           | `gravitino.lance-rest.gravitino-uri`     | N        | `http://localhost:8090` | 1.1.0         |
-| `LANCE_REST_HOST`                    | `gravitino.lance-rest.host`              | N        | `0.0.0.0`               | 1.1.0         |
-| `LANCE_REST_PORT`                    | `gravitino.lance-rest.httpPort`          | N        | `9101`                  | 1.1.0         |
+| Environment variables                | Configuration items                                           | Required | Default                 | Since version |
+|--------------------------------------|---------------------------------------------------------------|----------|-------------------------|---------------|
+| `LANCE_REST_GRAVITINO_METALAKE_NAME` | `gravitino.lance-rest.gravitino.metalake-name`                | Y        | (none)                  | 1.1.0         |
+| `LANCE_REST_NAMESPACE_BACKEND`       | `gravitino.lance-rest.gravitino.lance-rest.namespace-backend` | N        | `gravitino`             | 1.1.0         |
+| `LANCE_REST_GRAVITINO_URI`           | `gravitino.lance-rest.gravitino-uri`                          | N        | `http://localhost:8090` | 1.1.0         |
+| `LANCE_REST_HOST`                    | `gravitino.lance-rest.host`                                   | N        | `0.0.0.0`               | 1.1.0         |
+| `LANCE_REST_PORT`                    | `gravitino.lance-rest.httpPort`                               | N        | `9101`                  | 1.1.0         |
 
 - In most cases, you only need to set `LANCE_REST_GRAVITINO_METALAKE_NAME` to your Gravitino metalake name.
 - If your Gravitino server is not running on `localhost`, you need to set `LANCE_REST_GRAVITINO_URI` to the correct Gravitino server URI.
