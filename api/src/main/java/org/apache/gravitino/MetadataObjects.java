@@ -21,9 +21,11 @@ package org.apache.gravitino;
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Splitter;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Sets;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
@@ -38,7 +40,7 @@ public class MetadataObjects {
 
   private static final Joiner DOT_JOINER = Joiner.on('.');
 
-  private static final Set<MetadataObject.Type> validSingleLevelNameTypes =
+  private static final Set<MetadataObject.Type> VALID_SINGLE_LEVEL_NAME_TYPES =
       Sets.newHashSet(
           MetadataObject.Type.CATALOG,
           MetadataObject.Type.METALAKE,
@@ -48,18 +50,25 @@ public class MetadataObjects {
           MetadataObject.Type.JOB_TEMPLATE,
           MetadataObject.Type.POLICY);
 
-  private static final Set<MetadataObject.Type> validTwoLevelNameTypes =
+  private static final Set<MetadataObject.Type> VALID_TWO_LEVEL_NAME_TYPES =
       Sets.newHashSet(MetadataObject.Type.SCHEMA);
 
-  private static final Set<MetadataObject.Type> validThreeLevelNameTypes =
+  private static final Set<MetadataObject.Type> VALID_THREE_LEVEL_NAME_TYPES =
       Sets.newHashSet(
           MetadataObject.Type.FILESET,
           MetadataObject.Type.TABLE,
           MetadataObject.Type.TOPIC,
           MetadataObject.Type.MODEL);
 
-  private static final Set<MetadataObject.Type> validFourLevelNameTypes =
+  private static final Set<MetadataObject.Type> VALID_FOUR_LEVEL_NAME_TYPES =
       Sets.newHashSet(MetadataObject.Type.COLUMN);
+
+  private static final Map<Set<MetadataObject.Type>, Integer> TYPE_TO_EXPECT_LENGTH =
+      ImmutableMap.of(
+          VALID_SINGLE_LEVEL_NAME_TYPES, 1,
+          VALID_TWO_LEVEL_NAME_TYPES, 2,
+          VALID_THREE_LEVEL_NAME_TYPES, 3,
+          VALID_FOUR_LEVEL_NAME_TYPES, 4);
 
   private MetadataObjects() {}
 
@@ -74,7 +83,7 @@ public class MetadataObjects {
   public static MetadataObject of(String parent, String name, MetadataObject.Type type) {
     Preconditions.checkArgument(name != null, "Cannot create a metadata object with null name");
     Preconditions.checkArgument(type != null, "Cannot create a metadata object with no type");
-    if (validSingleLevelNameTypes.contains(type)) {
+    if (VALID_SINGLE_LEVEL_NAME_TYPES.contains(type)) {
       Preconditions.checkArgument(
           parent == null, "If the type is " + type + ", parent must be null");
     }
@@ -93,26 +102,19 @@ public class MetadataObjects {
   public static MetadataObject of(List<String> names, MetadataObject.Type type) {
     Preconditions.checkArgument(names != null, "Cannot create a metadata object with null names");
     Preconditions.checkArgument(!names.isEmpty(), "Cannot create a metadata object with no names");
-    Preconditions.checkArgument(
-        names.size() <= 4,
-        "Cannot create a metadata object with the name length which is greater than 4");
     Preconditions.checkArgument(type != null, "Cannot create a metadata object with no type");
 
-    if (validSingleLevelNameTypes.contains(type)) {
-      Preconditions.checkArgument(
-          names.size() == 1, "If the type is " + type + ", the length of names must be 1");
-    } else if (validTwoLevelNameTypes.contains(type)) {
-      Preconditions.checkArgument(
-          names.size() == 2, "If the type is " + type + ", the length of names must be 2");
-    } else if (validThreeLevelNameTypes.contains(type)) {
-      Preconditions.checkArgument(
-          names.size() == 3, "If the type is " + type + ", the length of names must be 3");
-    } else if (validFourLevelNameTypes.contains(type)) {
-      Preconditions.checkArgument(
-          names.size() == 4, "If the type is COLUMN, the length of names must be 4");
-    } else {
-      throw new IllegalArgumentException("Unsupported metadata object type: " + type);
-    }
+    Integer expectedLength =
+        TYPE_TO_EXPECT_LENGTH.entrySet().stream()
+            .filter(entry -> entry.getKey().contains(type))
+            .map(Map.Entry::getValue)
+            .findFirst()
+            .orElseThrow(
+                () -> new IllegalArgumentException("Unsupported metadata object type: " + type));
+
+    Preconditions.checkArgument(
+        names.size() == expectedLength,
+        "If the type is " + type + ", the length of names must be " + expectedLength);
 
     for (String name : names) {
       checkName(name);
@@ -134,7 +136,7 @@ public class MetadataObjects {
     }
 
     // Return null if the object is the root object
-    if (validSingleLevelNameTypes.contains(object.type())) {
+    if (VALID_SINGLE_LEVEL_NAME_TYPES.contains(object.type())) {
       return null;
     }
 
@@ -173,7 +175,7 @@ public class MetadataObjects {
         StringUtils.isNotBlank(fullName), "Metadata object full name cannot be blank");
 
     List<String> parts = DOT_SPLITTER.splitToList(fullName);
-    if (validSingleLevelNameTypes.contains(type)) {
+    if (VALID_SINGLE_LEVEL_NAME_TYPES.contains(type)) {
       return of(Collections.singletonList(fullName), type);
     }
 
