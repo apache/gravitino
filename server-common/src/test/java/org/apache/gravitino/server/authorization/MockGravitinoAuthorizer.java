@@ -70,7 +70,11 @@ public class MockGravitinoAuthorizer implements GravitinoAuthorizer {
   }
 
   @Override
-  public boolean isOwner(Principal principal, String metalake, MetadataObject metadataObject) {
+  public boolean isOwner(
+      Principal principal,
+      String metalake,
+      MetadataObject metadataObject,
+      AuthorizationRequestContext requestContext) {
     if (!("tester".equals(principal.getName()) && "metalakeWithOwner".equals(metalake))) {
       return false;
     }

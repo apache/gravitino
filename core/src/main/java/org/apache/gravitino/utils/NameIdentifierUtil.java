@@ -539,7 +539,7 @@ public class NameIdentifierUtil {
         return MetadataObjects.of(null, ident.name(), MetadataObject.Type.TAG);
       case POLICY:
         checkPolicy(ident);
-        return MetadataObjects.of(null, ident.name(), MetadataObject.Type.TAG);
+        return MetadataObjects.of(null, ident.name(), MetadataObject.Type.POLICY);
       default:
         throw new IllegalArgumentException(
             "Entity type " + entityType + " is not supported to convert to MetadataObject");

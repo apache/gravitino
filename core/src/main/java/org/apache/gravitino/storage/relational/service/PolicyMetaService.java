@@ -470,10 +470,17 @@ public class PolicyMetaService {
         mapper -> mapper.listPolicyPOsByMetalakeAndPolicyNames(metalakeName, policyNames));
   }
 
-  public long getPolicyIdByTagName(long metalakeId, String policyName) {
-    return SessionUtils.getWithoutCommit(
+  public long getPolicyIdByPolicyName(long metalakeId, String policyName) {
+    PolicyPO policyPO =
+        SessionUtils.getWithoutCommit(
             PolicyMetaMapper.class,
-            mapper -> mapper.selectPolicyMetaByMetalakeIdAndName(metalakeId, policyName))
-        .getPolicyId();
+            mapper -> mapper.selectPolicyMetaByMetalakeIdAndName(metalakeId, policyName));
+    if (policyPO == null) {
+      throw new NoSuchEntityException(
+          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
+          Entity.EntityType.POLICY.name().toLowerCase(),
+          policyName);
+    }
+    return policyPO.getPolicyId();
   }
 }

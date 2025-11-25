@@ -172,7 +172,7 @@ public class PolicyMetaBaseSQLProvider {
         + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0";
   }
 
-  public String selectPolicyByPolicyId(Long policyId) {
+  public String selectPolicyByPolicyId(@Param("policyId") Long policyId) {
     return "SELECT pm.policy_id, pm.policy_name, pm.policy_type, pm.metalake_id,"
         + " pm.audit_info, pm.current_version, pm.last_version,"
         + " pm.deleted_at"
@@ -184,7 +184,8 @@ public class PolicyMetaBaseSQLProvider {
         + " AND pm.deleted_at = 0 ";
   }
 
-  public String selectPolicyMetaByMetalakeIdAndName(Long metalakeId, String policyName) {
+  public String selectPolicyMetaByMetalakeIdAndName(
+      @Param("metalakeId") Long metalakeId, @Param("policyName") String policyName) {
     return "SELECT pm.policy_id, pm.policy_name, pm.policy_type, pm.metalake_id,"
         + " pm.audit_info, pm.current_version, pm.last_version,"
         + " pm.deleted_at"

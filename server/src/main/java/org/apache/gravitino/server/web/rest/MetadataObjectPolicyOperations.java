@@ -84,7 +84,7 @@ public class MetadataObjectPolicyOperations {
   @ResponseMetered(name = "get-object-policy", absolute = true)
   @AuthorizationExpression(
       expression =
-          "METALAKE::OWNER || ((POLICY::OWNER || ANY_APPLY_POLICY) && CAN_ACCESS_METADATA)")
+          "METALAKE::OWNER || ((POLICY::OWNER || ANY_APPLY_POLICY) && (CAN_ACCESS_METADATA))")
   public Response getPolicyForObject(
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
           String metalake,
@@ -241,7 +241,7 @@ public class MetadataObjectPolicyOperations {
   @ResponseMetered(name = "associate-object-policies", absolute = true)
   @AuthorizationExpression(
       expression =
-          "METALAKE::OWNER || ((POLICY::OWNER || ANY_APPLY_POLICY) && CAN_ACCESS_METADATA)")
+          "METALAKE::OWNER || ((POLICY::OWNER || ANY_APPLY_POLICY) && (CAN_ACCESS_METADATA))")
   public Response associatePoliciesForObject(
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
           String metalake,

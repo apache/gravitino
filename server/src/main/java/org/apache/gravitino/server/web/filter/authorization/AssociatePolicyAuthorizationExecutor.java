@@ -28,21 +28,21 @@ import java.util.Optional;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.authorization.AuthorizationRequestContext;
-import org.apache.gravitino.dto.requests.TagsAssociateRequest;
+import org.apache.gravitino.dto.requests.PoliciesAssociateRequest;
 import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionEvaluator;
-import org.apache.gravitino.server.web.rest.MetadataObjectTagOperations;
 
 /**
  * Metadata object authorization for {@link
- * MetadataObjectTagOperations#associateTagsForObject(String, String, String, TagsAssociateRequest)}
+ * org.apache.gravitino.server.web.rest.MetadataObjectPolicyOperations#associatePoliciesForObject(String,
+ * String, String, PoliciesAssociateRequest)}
  */
-public class AssociateTagAuthorizationExecutor extends CommonAuthorizerExecutor
+public class AssociatePolicyAuthorizationExecutor extends CommonAuthorizerExecutor
     implements AuthorizationExecutor {
 
   private final Parameter[] parameters;
   private final Object[] args;
 
-  public AssociateTagAuthorizationExecutor(
+  public AssociatePolicyAuthorizationExecutor(
       String expression,
       Parameter[] parameters,
       Object[] args,
@@ -65,38 +65,38 @@ public class AssociateTagAuthorizationExecutor extends CommonAuthorizerExecutor
     AuthorizationRequestContext context = new AuthorizationRequestContext();
     context.setOriginalAuthorizationExpression(expression);
     Entity.EntityType targetType =
-        Entity.EntityType.TAG; // Tags are the only supported batch target here
+        Entity.EntityType.POLICY; // policies are the only supported batch target here
     Preconditions.checkArgument(
-        request instanceof TagsAssociateRequest,
-        "Only tag can use AssociateTagAuthorizationExecutor, please contact the administrator.");
-    TagsAssociateRequest tagsAssociateRequest = (TagsAssociateRequest) request;
-    tagsAssociateRequest.validate();
-    // Authorize both 'tagsToAdd' and 'tagsToRemove' fields.
-    return authorizeTag(tagsAssociateRequest.getTagsToAdd(), context, targetType)
-        && authorizeTag(tagsAssociateRequest.getTagsToRemove(), context, targetType);
+        request instanceof PoliciesAssociateRequest,
+        "Only tag can use AssociatePolicyAuthorizationExecutor, please contact the administrator.");
+    PoliciesAssociateRequest policiesAssociateRequest = (PoliciesAssociateRequest) request;
+    policiesAssociateRequest.validate();
+    // Authorize both 'policiesToAdd' and 'policiesToRemove' fields.
+    return authorizePolicy(policiesAssociateRequest.getPoliciesToAdd(), context, targetType)
+        && authorizePolicy(policiesAssociateRequest.getPoliciesToRemove(), context, targetType);
   }
 
   /**
-   * Performs batch authorization for a given field (e.g., "tagsToAdd" or "tagsToRemove") containing
-   * an array of tag names.
+   * Performs batch authorization for a given field (e.g., "policiesToAdd" or "policiesToRemove")
+   * containing an array of tag names.
    *
-   * @param tagNames tagNames
+   * @param policies policies
    * @param context The shared authorization request context.
    * @param targetType The entity type being authorized (expected to be TAG).
-   * @return {@code true} if all tags in the field pass authorization; {@code false} otherwise.
+   * @return {@code true} if all policies in the field pass authorization; {@code false} otherwise.
    */
-  private boolean authorizeTag(
-      String[] tagNames, AuthorizationRequestContext context, Entity.EntityType targetType) {
+  private boolean authorizePolicy(
+      String[] policies, AuthorizationRequestContext context, Entity.EntityType targetType) {
 
     // Treat null or empty arrays as no-op (implicitly authorized)
-    if (tagNames == null) {
+    if (policies == null) {
       return true;
     }
 
-    for (String tagName : tagNames) {
+    for (String policy : policies) {
       // Use a fresh context copy for each tag to avoid cross-contamination
       Map<Entity.EntityType, NameIdentifier> currentContext = new HashMap<>(this.metadataContext);
-      buildNameIdentifierForBatchAuthorization(currentContext, tagName, targetType);
+      buildNameIdentifierForBatchAuthorization(currentContext, policy, targetType);
 
       boolean authorized =
           authorizationExpressionEvaluator.evaluate(

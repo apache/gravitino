@@ -107,6 +107,7 @@ public class MetadataAuthzHelper {
     }
     checkExecutor();
     AuthorizationRequestContext authorizationRequestContext = new AuthorizationRequestContext();
+    authorizationRequestContext.setOriginalAuthorizationExpression(expression);
     List<CompletableFuture<NameIdentifier>> futures = new ArrayList<>();
     for (NameIdentifier nameIdentifier : nameIdentifiers) {
       Principal currentPrincipal = PrincipalUtils.getCurrentPrincipal();
@@ -209,6 +210,7 @@ public class MetadataAuthzHelper {
     }
     checkExecutor();
     AuthorizationRequestContext authorizationRequestContext = new AuthorizationRequestContext();
+    authorizationRequestContext.setOriginalAuthorizationExpression(expression);
     List<CompletableFuture<E>> futures = new ArrayList<>();
     for (E entity : entities) {
       futures.add(

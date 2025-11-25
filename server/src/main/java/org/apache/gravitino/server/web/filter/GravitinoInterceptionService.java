@@ -48,12 +48,14 @@ import org.apache.gravitino.server.web.filter.authorization.AuthorizeExecutorFac
 import org.apache.gravitino.server.web.rest.CatalogOperations;
 import org.apache.gravitino.server.web.rest.FilesetOperations;
 import org.apache.gravitino.server.web.rest.GroupOperations;
+import org.apache.gravitino.server.web.rest.MetadataObjectPolicyOperations;
 import org.apache.gravitino.server.web.rest.MetadataObjectTagOperations;
 import org.apache.gravitino.server.web.rest.MetalakeOperations;
 import org.apache.gravitino.server.web.rest.ModelOperations;
 import org.apache.gravitino.server.web.rest.OwnerOperations;
 import org.apache.gravitino.server.web.rest.PartitionOperations;
 import org.apache.gravitino.server.web.rest.PermissionOperations;
+import org.apache.gravitino.server.web.rest.PolicyOperations;
 import org.apache.gravitino.server.web.rest.RoleOperations;
 import org.apache.gravitino.server.web.rest.SchemaOperations;
 import org.apache.gravitino.server.web.rest.StatisticOperations;
@@ -94,7 +96,10 @@ public class GravitinoInterceptionService implements InterceptionService {
             StatisticOperations.class.getName(),
             PartitionOperations.class.getName(),
             MetadataObjectTagOperations.class.getName(),
-            TagOperations.class.getName()));
+            TagOperations.class.getName(),
+            MetadataObjectTagOperations.class.getName(),
+            PolicyOperations.class.getName(),
+            MetadataObjectPolicyOperations.class.getName()));
   }
 
   @Override
@@ -144,6 +149,7 @@ public class GravitinoInterceptionService implements InterceptionService {
               extractAuthorizationRequestTypeFromParameters(parameters);
           executor =
               AuthorizeExecutorFactory.create(
+                  expression,
                   requestType,
                   metadataContext,
                   authorizationExpressionEvaluator,

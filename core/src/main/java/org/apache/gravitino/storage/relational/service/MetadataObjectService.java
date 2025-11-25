@@ -175,7 +175,7 @@ public class MetadataObjectService {
       return TagMetaService.getInstance().getTagIdByTagName(metalakeId, fullName);
     }
     if (type == MetadataObject.Type.POLICY) {
-      return PolicyMetaService.getInstance().getPolicyIdByTagName(metalakeId, fullName);
+      return PolicyMetaService.getInstance().getPolicyIdByPolicyName(metalakeId, fullName);
     }
     long catalogId =
         CatalogMetaService.getInstance().getCatalogIdByMetalakeIdAndName(metalakeId, names.get(0));

@@ -91,7 +91,9 @@ public class AuthorizationExpressionConverter {
             String privilegeOrExpression = matcher.group(2);
             String replacement;
             if (AuthConstants.OWNER.equals(privilegeOrExpression)) {
-              replacement = String.format("authorizer.isOwner(principal,METALAKE_NAME,%s)", type);
+              replacement =
+                  String.format(
+                      "authorizer.isOwner(principal,METALAKE_NAME,%s,authorizationContext)", type);
             } else if (privilegeOrExpression.startsWith(DENY_PREFIX)) {
               String privilege = privilegeOrExpression.substring(5);
               replacement =
@@ -162,7 +164,7 @@ public class AuthorizationExpressionConverter {
         """
               ( entityType == 'CATALOG' && (%s)) ||
               ( entityType == 'SCHEMA' && (%s)) ||
-              ( entityType == 'TABLE' && (%s)) ||
+               ( entityType == 'TABLE' && (%s)) ||
               ( entityType == 'MODEL' && (%s)) ||
               ( entityType == 'FILESET' && (%s)) ||
               ( entityType == 'TOPIC' && (%s)) ||
@@ -279,7 +281,7 @@ public class AuthorizationExpressionConverter {
     expression =
         expression.replaceAll(
             "ANY_APPLY_POLICY",
-            "((ANY(APPLY_POLICY, METALAKE, TAG))"
+            "((ANY(APPLY_POLICY, METALAKE, POLICY))"
                 + "&& !(ANY(DENY_APPLY_POLICY, METALAKE, POLICY)))");
     expression =
         expression.replaceAll(

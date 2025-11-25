@@ -26,16 +26,19 @@ import org.apache.gravitino.server.authorization.expression.AuthorizationExpress
 
 public class CommonAuthorizerExecutor implements AuthorizationExecutor {
 
-  private Map<Entity.EntityType, NameIdentifier> metadataContext;
-  private AuthorizationExpressionEvaluator authorizationExpressionEvaluator;
-  private Map<String, Object> pathParams;
-  private String entityType;
+  protected Map<Entity.EntityType, NameIdentifier> metadataContext;
+  protected AuthorizationExpressionEvaluator authorizationExpressionEvaluator;
+  protected Map<String, Object> pathParams;
+  protected String entityType;
+  protected String expression;
 
   public CommonAuthorizerExecutor(
+      String expression,
       Map<Entity.EntityType, NameIdentifier> metadataContext,
       AuthorizationExpressionEvaluator authorizationExpressionEvaluator,
       Map<String, Object> pathParams,
       String entityType) {
+    this.expression = expression;
     this.metadataContext = metadataContext;
     this.authorizationExpressionEvaluator = authorizationExpressionEvaluator;
     this.pathParams = pathParams;
@@ -43,7 +46,7 @@ public class CommonAuthorizerExecutor implements AuthorizationExecutor {
   }
 
   @Override
-  public boolean execute() {
+  public boolean execute() throws Exception {
     return authorizationExpressionEvaluator.evaluate(
         metadataContext,
         pathParams,

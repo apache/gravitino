@@ -133,11 +133,32 @@ public interface PolicyMetaMapper {
   Integer deletePolicyMetasByLegacyTimeline(
       @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit);
 
+  @Results({
+    @Result(property = "policyId", column = "policy_id"),
+    @Result(property = "policyName", column = "policy_name"),
+    @Result(property = "policyType", column = "policy_type"),
+    @Result(property = "metalakeId", column = "metalake_id"),
+    @Result(property = "auditInfo", column = "audit_info"),
+    @Result(property = "currentVersion", column = "current_version"),
+    @Result(property = "lastVersion", column = "last_version"),
+    @Result(property = "deletedAt", column = "deleted_at")
+  })
   @SelectProvider(
       type = PolicyMetaSQLProviderFactory.class,
       method = "selectPolicyMetaByMetalakeIdAndName")
-  PolicyPO selectPolicyMetaByMetalakeIdAndName(long metalakeId, String policyName);
+  PolicyPO selectPolicyMetaByMetalakeIdAndName(
+      @Param("metalakeId") long metalakeId, @Param("policyName") String policyName);
 
+  @Results({
+    @Result(property = "policyId", column = "policy_id"),
+    @Result(property = "policyName", column = "policy_name"),
+    @Result(property = "policyType", column = "policy_type"),
+    @Result(property = "metalakeId", column = "metalake_id"),
+    @Result(property = "auditInfo", column = "audit_info"),
+    @Result(property = "currentVersion", column = "current_version"),
+    @Result(property = "lastVersion", column = "last_version"),
+    @Result(property = "deletedAt", column = "deleted_at")
+  })
   @SelectProvider(type = PolicyMetaSQLProviderFactory.class, method = "selectPolicyByPolicyId")
-  PolicyPO selectPolicyByPolicyId(Long policyId);
+  PolicyPO selectPolicyByPolicyId(@Param("policyId") Long policyId);
 }

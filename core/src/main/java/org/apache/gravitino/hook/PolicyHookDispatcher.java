@@ -74,7 +74,7 @@ public class PolicyHookDispatcher implements PolicyDispatcher {
       ownerDispatcher.setOwner(
           metalake,
           NameIdentifierUtil.toMetadataObject(
-              NameIdentifierUtil.ofPolicy(metalake, name), Entity.EntityType.TAG),
+              NameIdentifierUtil.ofPolicy(metalake, name), Entity.EntityType.POLICY),
           PrincipalUtils.getCurrentUserName(),
           Owner.Type.USER);
     }

@@ -27,6 +27,7 @@ import org.apache.gravitino.server.authorization.expression.AuthorizationExpress
 public class AuthorizeExecutorFactory {
 
   public static AuthorizationExecutor create(
+      String expression,
       AuthorizationRequest.RequestType requestType,
       Map<Entity.EntityType, NameIdentifier> metadataContext,
       AuthorizationExpressionEvaluator authorizationExpressionEvaluator,
@@ -36,15 +37,23 @@ public class AuthorizeExecutorFactory {
       Object[] args) {
     return switch (requestType) {
       case COMMON -> new CommonAuthorizerExecutor(
-          metadataContext, authorizationExpressionEvaluator, pathParams, entityType);
+          expression, metadataContext, authorizationExpressionEvaluator, pathParams, entityType);
       case ASSOCIATE_TAG -> new AssociateTagAuthorizationExecutor(
+          expression,
           parameters,
           args,
           metadataContext,
           authorizationExpressionEvaluator,
           pathParams,
           entityType);
-      case ASSOCIATE_POLICY -> null;
+      case ASSOCIATE_POLICY -> new AssociatePolicyAuthorizationExecutor(
+          expression,
+          parameters,
+          args,
+          metadataContext,
+          authorizationExpressionEvaluator,
+          pathParams,
+          entityType);
     };
   }
 }

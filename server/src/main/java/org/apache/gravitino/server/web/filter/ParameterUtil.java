@@ -203,6 +203,11 @@ public class ParameterUtil {
           Entity.EntityType.TAG,
           NameIdentifierUtil.ofTag(NameIdentifierUtil.getMetalake(metalake), name));
       return;
+    } else if (type == Entity.EntityType.POLICY) {
+      metadataNames.put(
+          Entity.EntityType.POLICY,
+          NameIdentifierUtil.ofPolicy(NameIdentifierUtil.getMetalake(metalake), name));
+      return;
     }
     throw new UnsupportedOperationException(
         "Unsupported to build NameIdentifier for batch authorization target");
