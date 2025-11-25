@@ -38,6 +38,6 @@ public class ADLSTokenProvider extends CredentialProviderDelegator<ADLSTokenCred
 
   @Override
   public String getGeneratorClassName() {
-    return "org.apache.gravitino.abs.credential.ADLSTokenProvider";
+    return "org.apache.gravitino.abs.credential.ADLSTokenGenerator";
   }
 }
