@@ -73,7 +73,7 @@ public interface CredentialProvider extends Closeable {
 
   /**
    * Lazily loads and returns an instance of the {@link CredentialGenerator}. This default
-   * implementation uses reflection and a no-argument constructor.
+   * implementation uses reflection and a no-argument constructor (public or non-public).
    *
    * @param <T> The type of the credential.
    * @return An instance of the credential generator.
