@@ -36,12 +36,25 @@ public abstract class CredentialProviderDelegator<T extends Credential>
 
   private volatile CredentialGenerator<T> generator;
 
+  /**
+   * Initializes the provider by storing properties and loading the associated {@link
+   * CredentialGenerator}.
+   *
+   * @param properties A map of configuration properties for the provider.
+   */
   @Override
   public void initialize(Map<String, String> properties) {
     this.properties = properties;
     this.generator = loadGenerator();
   }
 
+  /**
+   * Delegates the credential generation to the loaded {@link CredentialGenerator}.
+   *
+   * @param context The context containing information required for credential retrieval.
+   * @return A {@link Credential} object.
+   * @throws RuntimeException if credential generation fails.
+   */
   @Override
   public Credential getCredential(CredentialContext context) {
     try {
@@ -53,11 +66,20 @@ public abstract class CredentialProviderDelegator<T extends Credential>
   }
 
   /**
-   * Lazily loads and returns an instance of the {@link CredentialGenerator}. This default
-   * implementation uses reflection and a no-argument constructor (public or non-public).
+   * Returns the fully qualified class name of the {@link CredentialGenerator} implementation. This
+   * generator will be loaded via reflection to perform the actual credential creation.
+   *
+   * @return The class name of the credential generator.
+   */
+  protected abstract String getGeneratorClassName();
+
+  /**
+   * Loads and instantiates the {@link CredentialGenerator} using reflection.
+   *
+   * <p>This implementation uses a no-argument constructor. The constructor can be non-public.
    *
    * @return An instance of the credential generator.
-   * @throws RuntimeException if the generator cannot be instantiated.
+   * @throws RuntimeException if the generator cannot be loaded or instantiated.
    */
   @SuppressWarnings("unchecked")
   private CredentialGenerator<T> loadGenerator() {

@@ -24,12 +24,13 @@ import java.util.Map;
 import javax.annotation.Nullable;
 
 /**
- * Interface for credential providers.
+ * An interface for providing credentials to access external systems.
  *
- * <p>A credential provider is responsible for managing and retrieving credentials. To avoid
- * classloading issues with {@link java.util.ServiceLoader}, implementations should be lightweight.
- * Any heavy dependencies should be isolated in a {@link CredentialGenerator} class, which is loaded
- * via reflection.
+ * <p>Implementations of this interface are discovered using Java's {@link java.util.ServiceLoader}.
+ * To prevent class loading issues and unnecessary dependency bloat, all implementations must be
+ * lightweight. Any logic that requires heavy external dependencies (e.g., cloud SDKs) should be
+ * isolated in a separate {@link CredentialGenerator} class and loaded reflectively at runtime. The
+ * {@link CredentialProviderDelegator} provides a convenient base class for this pattern.
  */
 public interface CredentialProvider extends Closeable {
 
@@ -57,16 +58,4 @@ public interface CredentialProvider extends Closeable {
    */
   @Nullable
   Credential getCredential(CredentialContext context);
-
-  /**
-   * Returns the fully qualified class name of the {@link CredentialGenerator} implementation. This
-   * generator will be loaded via reflection to perform the actual credential creation.
-   *
-   * @return The class name of the credential generator.
-   * @throws UnsupportedOperationException if the provider does not use a generator.
-   */
-  default String getGeneratorClassName() {
-    throw new UnsupportedOperationException(
-        "This CredentialProvider does not use a CredentialGenerator.");
-  }
 }
