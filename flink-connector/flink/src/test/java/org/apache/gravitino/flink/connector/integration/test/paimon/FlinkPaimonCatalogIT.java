@@ -74,7 +74,7 @@ public abstract class FlinkPaimonCatalogIT extends FlinkCommonIT {
 
   @AfterAll
   void paimonStop() {
-    Preconditions.checkArgument(metalake != null);
+    Preconditions.checkArgument(metalake != null, "metalake should not be null");
     metalake.dropCatalog(getPaimonCatalogName(), true);
   }
 
