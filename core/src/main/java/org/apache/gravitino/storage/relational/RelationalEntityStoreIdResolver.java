@@ -62,7 +62,7 @@ public class RelationalEntityStoreIdResolver implements EntityIdResolver {
   @Override
   public NamespacedEntityId getEntityIds(NameIdentifier nameIdentifier, Entity.EntityType type) {
     if (ENTITY_TYPES_REQUIRING_METALAKE_ID.contains(type)) {
-      return getEntityIdsAboutMetalake(nameIdentifier, type);
+      return getEntityIdsRequiringMetalakeId(nameIdentifier, type);
 
     } else if (ENTITY_TYPES_REQURING_CATALOG_IDS.contains(type)) {
       CatalogIds catalogIds =
@@ -73,7 +73,7 @@ public class RelationalEntityStoreIdResolver implements EntityIdResolver {
       return new NamespacedEntityId(catalogIds.getCatalogId(), catalogIds.getMetalakeId());
 
     } else if (ENTITY_TYPES_REQURING_SCHEMA_IDS.contains(type)) {
-      return getEntityIdsAboutSchema(nameIdentifier, type);
+      return getEntityIdsRequiringSchemaIds(nameIdentifier, type);
 
     } else {
       throw new IllegalArgumentException("Unsupported entity type: " + type);
@@ -83,7 +83,7 @@ public class RelationalEntityStoreIdResolver implements EntityIdResolver {
   @Override
   public Long getEntityId(NameIdentifier nameIdentifier, Entity.EntityType type) {
     if (ENTITY_TYPES_REQUIRING_METALAKE_ID.contains(type)) {
-      return getEntityIdsAboutMetalake(nameIdentifier, type).entityId();
+      return getEntityIdsRequiringMetalakeId(nameIdentifier, type).entityId();
 
     } else if (ENTITY_TYPES_REQURING_CATALOG_IDS.contains(type)) {
       return CatalogMetaService.getInstance()
@@ -93,14 +93,14 @@ public class RelationalEntityStoreIdResolver implements EntityIdResolver {
           .getCatalogId();
 
     } else if (ENTITY_TYPES_REQURING_SCHEMA_IDS.contains(type)) {
-      return getEntityIdsAboutSchema(nameIdentifier, type).entityId();
+      return getEntityIdsRequiringSchemaIds(nameIdentifier, type).entityId();
 
     } else {
       throw new IllegalArgumentException("Unsupported entity type: " + type);
     }
   }
 
-  private NamespacedEntityId getEntityIdsAboutMetalake(
+  private NamespacedEntityId getEntityIdsRequiringMetalakeId(
       NameIdentifier nameIdentifier, Entity.EntityType type) {
     long metalakeId =
         MetalakeMetaService.getInstance()
@@ -138,7 +138,7 @@ public class RelationalEntityStoreIdResolver implements EntityIdResolver {
     }
   }
 
-  private NamespacedEntityId getEntityIdsAboutSchema(
+  private NamespacedEntityId getEntityIdsRequiringSchemaIds(
       NameIdentifier nameIdentifier, Entity.EntityType type) {
     SchemaIds schemaIds =
         SchemaMetaService.getInstance()
