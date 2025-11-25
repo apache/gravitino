@@ -212,7 +212,7 @@ public class GravitinoEnv {
    * @return The EntityStore instance.
    */
   public EntityStore entityStore() {
-    Preconditions.checkNotNull(entityStore, "GravitinoEnv is not initialized.");
+    Preconditions.checkArgument(entityStore != null, "GravitinoEnv is not initialized.");
     return entityStore;
   }
 

@@ -66,6 +66,6 @@ public class TestCommandContext {
 
   @Test
   public void testCreateCommandContextWithNull() {
-    Assertions.assertThrows(NullPointerException.class, () -> new CommandContext(null));
+    Assertions.assertThrows(IllegalArgumentException.class, () -> new CommandContext(null));
   }
 }

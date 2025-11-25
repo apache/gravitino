@@ -24,6 +24,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
+import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
@@ -110,7 +111,8 @@ public class TestModelMetaService extends TestJDBCBackend {
         NoSuchEntityException.class, () -> ModelMetaService.getInstance().getModelPOById(111L));
 
     // Test get model id by name
-    Long schemaId = CommonMetaService.getInstance().getParentEntityIdByNamespace(MODEL_NS);
+    Long schemaId =
+        EntityIdService.getEntityId(NameIdentifier.of(MODEL_NS.levels()), Entity.EntityType.SCHEMA);
     Long modelId =
         ModelMetaService.getInstance().getModelIdBySchemaIdAndModelName(schemaId, "model2");
     Assertions.assertEquals(modelEntity2.id(), modelId);

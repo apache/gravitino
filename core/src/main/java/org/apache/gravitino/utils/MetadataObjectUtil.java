@@ -18,8 +18,6 @@
  */
 package org.apache.gravitino.utils;
 
-import static com.google.common.base.Preconditions.checkNotNull;
-
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.BiMap;
@@ -196,7 +194,9 @@ public class MetadataObjectUtil {
         try {
           env.accessControlDispatcher().getRole(metalake, object.fullName());
         } catch (NoSuchRoleException nsr) {
-          throw checkNotNull(exceptionToThrowSupplier).get();
+          Preconditions.checkArgument(
+              exceptionToThrowSupplier != null, "exceptionToThrowSupplier should not be null");
+          throw exceptionToThrowSupplier.get();
         }
         break;
       case TAG:
@@ -204,7 +204,9 @@ public class MetadataObjectUtil {
         try {
           env.tagDispatcher().getTag(metalake, object.fullName());
         } catch (NoSuchTagException nsr) {
-          throw checkNotNull(exceptionToThrowSupplier).get();
+          Preconditions.checkArgument(
+              exceptionToThrowSupplier != null, "exceptionToThrowSupplier should not be null");
+          throw exceptionToThrowSupplier.get();
         }
         break;
       case POLICY:
@@ -224,7 +226,9 @@ public class MetadataObjectUtil {
   private static void check(
       final boolean expression, Supplier<? extends RuntimeException> exceptionToThrowSupplier) {
     if (!expression) {
-      throw checkNotNull(exceptionToThrowSupplier).get();
+      Preconditions.checkArgument(
+          exceptionToThrowSupplier != null, "exceptionToThrowSupplier should not be null");
+      throw exceptionToThrowSupplier.get();
     }
   }
 }

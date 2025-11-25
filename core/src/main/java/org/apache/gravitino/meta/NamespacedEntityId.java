@@ -16,45 +16,35 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-
-package org.apache.gravitino;
+package org.apache.gravitino.meta;
 
 import com.google.common.base.Preconditions;
-import java.security.Principal;
+import org.apache.commons.lang3.ArrayUtils;
 
-public class UserPrincipal implements Principal {
+public class NamespacedEntityId {
 
-  private final String username;
+  private final long entityId;
+  private final long[] namespaceIds;
 
-  public UserPrincipal(final String username) {
-    Preconditions.checkArgument(username != null, "UserPrincipal must have the username");
-    this.username = username;
+  public NamespacedEntityId(long entityId, long... namespaceIds) {
+    Preconditions.checkArgument(namespaceIds != null, "namespaceIds cannot be null");
+    this.entityId = entityId;
+    this.namespaceIds = namespaceIds;
   }
 
-  @Override
-  public String getName() {
-    return username;
+  public NamespacedEntityId(long entityId) {
+    this(entityId, new long[0]);
   }
 
-  @Override
-  public int hashCode() {
-    return username.hashCode();
+  public long entityId() {
+    return entityId;
   }
 
-  @Override
-  public boolean equals(final Object o) {
-    if (this == o) {
-      return true;
-    }
-    if (o instanceof UserPrincipal) {
-      UserPrincipal that = (UserPrincipal) o;
-      return this.username.equals(that.username);
-    }
-    return false;
+  public long[] namespaceIds() {
+    return namespaceIds;
   }
 
-  @Override
-  public String toString() {
-    return "[principal: " + this.username + "]";
+  public long[] fullIds() {
+    return ArrayUtils.add(namespaceIds, entityId);
   }
 }
