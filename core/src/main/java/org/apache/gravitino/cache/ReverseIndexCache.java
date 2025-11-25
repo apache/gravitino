@@ -58,13 +58,17 @@ public class ReverseIndexCache {
    * <p>This map is used to quickly find all the related entity cache keys when we need to
    * invalidate in the reverse index if a role entity is updated. The following is an example: a
    * Role a has securable objects s1 and s2, so we have the following mapping: <br>
-   * cacheData: role1 -> role entity reverseIndex: s1 -> [role1], s2 -> [role1] </br>
+   * cacheData: role1 -> role entity </br> <br>
+   * reverseIndex: s1 -> [role1], s2 -> [role1] </br>
+   *
+   * <p>This map will be: <br>
+   * role1 -> [s1, s2] </br>
    *
    * <p>When we update role1, we need to invalidate s1 and s2 from the reverse index, or the data
-   * will be in the memory forever. However, the current implementation of ReverseIndexCache does
-   * not support this operation directly as we do not maintain such a map.
+   * will be in the memory forever. However, the main branch before this PR does not support this
+   * operation directly as we do not maintain such a map.
    */
-  private Map<EntityCacheKey, List<EntityCacheKey>> dataToReverseIndexMap = Maps.newHashMap();
+  private Map<EntityCacheKey, List<EntityCacheKey>> entityToReverseIndexMap = Maps.newHashMap();
 
   public ReverseIndexCache() {
     this.reverseIndex = new ConcurrentRadixTree<>(new DefaultCharArrayNodeFactory());
@@ -83,7 +87,7 @@ public class ReverseIndexCache {
   }
 
   public boolean remove(EntityCacheKey key) {
-    List<EntityCacheKey> relatedKeys = dataToReverseIndexMap.remove(key);
+    List<EntityCacheKey> relatedKeys = entityToReverseIndexMap.remove(key);
     if (CollectionUtils.isNotEmpty(relatedKeys)) {
       for (EntityCacheKey relatedKey : relatedKeys) {
         List<EntityCacheKey> existingKeys = reverseIndex.getValueForExactKey(relatedKey.toString());
@@ -109,7 +113,7 @@ public class ReverseIndexCache {
   public void put(
       NameIdentifier nameIdentifier, Entity.EntityType type, EntityCacheRelationKey key) {
     EntityCacheRelationKey entityCacheKey = EntityCacheRelationKey.of(nameIdentifier, type);
-    dataToReverseIndexMap.computeIfAbsent(key, k -> Lists.newArrayList()).add(entityCacheKey);
+    entityToReverseIndexMap.computeIfAbsent(key, k -> Lists.newArrayList()).add(entityCacheKey);
 
     List<EntityCacheKey> existingKeys = reverseIndex.getValueForExactKey(entityCacheKey.toString());
     if (existingKeys == null) {
