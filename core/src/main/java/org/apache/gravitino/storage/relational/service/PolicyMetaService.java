@@ -93,7 +93,8 @@ public class PolicyMetaService {
     String metalakeName = ns.level(0);
 
     try {
-      Long metalakeId = MetalakeMetaService.getInstance().getMetalakeIdByName(metalakeName);
+      Long metalakeId =
+          EntityIdService.getEntityId(NameIdentifier.of(metalakeName), Entity.EntityType.METALAKE);
 
       PolicyPO.Builder builder = PolicyPO.builder().withMetalakeId(metalakeId);
       PolicyPO policyPO = POConverters.initializePolicyPOWithVersion(policyEntity, builder);
@@ -218,10 +219,7 @@ public class PolicyMetaService {
 
     List<PolicyPO> PolicyPOs;
     try {
-      Long metalakeId = MetalakeMetaService.getInstance().getMetalakeIdByName(metalake);
-      Long metadataObjectId =
-          MetadataObjectService.getMetadataObjectId(
-              metalakeId, metadataObject.fullName(), metadataObject.type());
+      Long metadataObjectId = EntityIdService.getEntityId(objectIdent, objectType);
 
       PolicyPOs =
           SessionUtils.getWithoutCommit(
@@ -250,10 +248,7 @@ public class PolicyMetaService {
 
     PolicyPO policyPO;
     try {
-      Long metalakeId = MetalakeMetaService.getInstance().getMetalakeIdByName(metalake);
-      Long metadataObjectId =
-          MetadataObjectService.getMetadataObjectId(
-              metalakeId, metadataObject.fullName(), metadataObject.type());
+      Long metadataObjectId = EntityIdService.getEntityId(objectIdent, objectType);
 
       policyPO =
           SessionUtils.getWithoutCommit(
@@ -322,10 +317,7 @@ public class PolicyMetaService {
     String metalake = objectIdent.namespace().level(0);
 
     try {
-      Long metalakeId = MetalakeMetaService.getInstance().getMetalakeIdByName(metalake);
-      Long metadataObjectId =
-          MetadataObjectService.getMetadataObjectId(
-              metalakeId, metadataObject.fullName(), metadataObject.type());
+      Long metadataObjectId = EntityIdService.getEntityId(objectIdent, objectType);
 
       // Fetch all the policies need to associate with the metadata object.
       List<String> policyNamesToAdd =

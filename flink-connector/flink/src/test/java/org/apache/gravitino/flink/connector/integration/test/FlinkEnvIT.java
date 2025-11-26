@@ -117,7 +117,7 @@ public abstract class FlinkEnvIT extends BaseIT {
   protected abstract String getProvider();
 
   private void initIcebergRestServiceEnv() {
-    super.ignoreAuxRestService = false;
+    super.ignoreIcebergAuxRestService = false;
     Map<String, String> icebergRestServiceConfigs = new HashMap<>();
     icebergRestServiceConfigs.put(
         "gravitino."
@@ -231,8 +231,8 @@ public abstract class FlinkEnvIT extends BaseIT {
       Consumer<Catalog> action,
       boolean dropSchema,
       boolean cascade) {
-    Preconditions.checkNotNull(catalog);
-    Preconditions.checkNotNull(schemaName);
+    Preconditions.checkArgument(catalog != null, "Catalog cannot be null");
+    Preconditions.checkArgument(schemaName != null, "Schema name cannot be null");
     try {
       tableEnv.useCatalog(catalog.name());
       if (!catalog.asSchemas().schemaExists(schemaName)) {
@@ -253,7 +253,7 @@ public abstract class FlinkEnvIT extends BaseIT {
   }
 
   protected static void doWithCatalog(Catalog catalog, Consumer<Catalog> action) {
-    Preconditions.checkNotNull(catalog);
+    Preconditions.checkArgument(catalog != null, "Catalog cannot be null");
     tableEnv.useCatalog(catalog.name());
     action.accept(catalog);
   }

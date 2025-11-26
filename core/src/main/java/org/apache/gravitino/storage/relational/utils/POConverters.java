@@ -21,6 +21,7 @@ package org.apache.gravitino.storage.relational.utils;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.google.common.collect.Lists;
+import com.google.common.collect.Maps;
 import java.time.Instant;
 import java.util.Collections;
 import java.util.List;
@@ -63,6 +64,7 @@ import org.apache.gravitino.meta.UserEntity;
 import org.apache.gravitino.policy.Policy;
 import org.apache.gravitino.policy.PolicyContent;
 import org.apache.gravitino.rel.Column;
+import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.expressions.Expression;
 import org.apache.gravitino.rel.types.Type;
 import org.apache.gravitino.storage.relational.po.CatalogPO;
@@ -401,33 +403,35 @@ public class POConverters {
           .withCurrentVersion(INIT_VERSION)
           .withLastVersion(INIT_VERSION)
           .withDeletedAt(DEFAULT_DELETED_AT)
-          .withFormat(tableEntity.getFormat())
-          .withComment(tableEntity.getComment())
+          .withFormat(
+              tableEntity.properties() == null
+                  ? null
+                  : tableEntity.properties().getOrDefault(Table.PROPERTY_TABLE_FORMAT, null))
+          .withComment(tableEntity.comment())
           .withProperties(
-              tableEntity.getProperties() == null
+              tableEntity.properties() == null
                   ? null
-                  : JsonUtils.anyFieldMapper().writeValueAsString(tableEntity.getProperties()))
+                  : JsonUtils.anyFieldMapper().writeValueAsString(tableEntity.properties()))
           .withIndexes(
-              tableEntity.getIndexes() == null
+              tableEntity.indexes() == null
                   ? null
                   : JsonUtils.anyFieldMapper()
-                      .writeValueAsString(DTOConverters.toDTOs(tableEntity.getIndexes())))
+                      .writeValueAsString(DTOConverters.toDTOs(tableEntity.indexes())))
           .withDistribution(
-              tableEntity.getDistribution() == null
+              tableEntity.distribution() == null
                   ? null
                   : JsonUtils.anyFieldMapper()
-                      .writeValueAsString(DTOConverters.toDTO(tableEntity.getDistribution())))
+                      .writeValueAsString(DTOConverters.toDTO(tableEntity.distribution())))
           .withSortOrders(
-              tableEntity.getSortOrder() == null
+              tableEntity.sortOrders() == null
                   ? null
                   : JsonUtils.anyFieldMapper()
-                      .writeValueAsString(DTOConverters.toDTOs(tableEntity.getSortOrder())))
+                      .writeValueAsString(DTOConverters.toDTOs(tableEntity.sortOrders())))
           .withPartitions(
-              tableEntity.getPartitions() == null
+              tableEntity.partitioning() == null
                   ? null
                   : JsonUtils.anyFieldMapper()
-                      .writeValueAsString(DTOConverters.toDTOs(tableEntity.getPartitions())));
-      // TODO support partitions later
+                      .writeValueAsString(DTOConverters.toDTOs(tableEntity.partitioning())));
       return builder.build();
     } catch (JsonProcessingException e) {
       throw new RuntimeException("Failed to serialize json object:", e);
@@ -461,33 +465,35 @@ public class POConverters {
               .withCurrentVersion(currentVersion)
               .withLastVersion(lastVersion)
               .withDeletedAt(DEFAULT_DELETED_AT)
-              .withComment(newTable.getComment())
+              .withComment(newTable.comment())
               .withProperties(
-                  newTable.getProperties() == null
+                  newTable.properties() == null
                       ? null
-                      : JsonUtils.anyFieldMapper().writeValueAsString(newTable.getProperties()))
+                      : JsonUtils.anyFieldMapper().writeValueAsString(newTable.properties()))
               .withIndexes(
-                  newTable.getIndexes() == null
+                  newTable.indexes() == null
                       ? null
                       : JsonUtils.anyFieldMapper()
-                          .writeValueAsString(DTOConverters.toDTOs(newTable.getIndexes())))
+                          .writeValueAsString(DTOConverters.toDTOs(newTable.indexes())))
               .withDistribution(
-                  newTable.getDistribution() == null
+                  newTable.distribution() == null
                       ? null
                       : JsonUtils.anyFieldMapper()
-                          .writeValueAsString(DTOConverters.toDTO(newTable.getDistribution())))
+                          .writeValueAsString(DTOConverters.toDTO(newTable.distribution())))
               .withSortOrders(
-                  newTable.getSortOrder() == null
+                  newTable.sortOrders() == null
                       ? null
                       : JsonUtils.anyFieldMapper()
-                          .writeValueAsString(DTOConverters.toDTOs(newTable.getSortOrder())))
+                          .writeValueAsString(DTOConverters.toDTOs(newTable.sortOrders())))
               .withPartitions(
-                  newTable.getPartitions() == null
+                  newTable.partitioning() == null
                       ? null
                       : JsonUtils.anyFieldMapper()
-                          .writeValueAsString(DTOConverters.toDTOs(newTable.getPartitions())))
-              // TODO support partitions later
-              .withFormat(newTable.getFormat());
+                          .writeValueAsString(DTOConverters.toDTOs(newTable.partitioning())))
+              .withFormat(
+                  newTable.properties() == null
+                      ? null
+                      : newTable.properties().getOrDefault(Table.PROPERTY_TABLE_FORMAT, null));
 
       return builder.build();
     } catch (JsonProcessingException e) {
@@ -509,6 +515,14 @@ public class POConverters {
   public static TableEntity fromTableAndColumnPOs(
       TablePO tablePO, List<ColumnPO> columnPOs, Namespace namespace) {
     try {
+      Map<String, String> properties =
+          StringUtils.isBlank(tablePO.getProperties())
+              ? Maps.newHashMap()
+              : JsonUtils.anyFieldMapper().readValue(tablePO.getProperties(), Map.class);
+      if (StringUtils.isNotBlank(tablePO.getFormat())) {
+        properties.put(Table.PROPERTY_TABLE_FORMAT, tablePO.getFormat());
+      }
+
       return TableEntity.builder()
           .withId(tablePO.getTableId())
           .withName(tablePO.getTableName())
@@ -522,7 +536,7 @@ public class POConverters {
                   : DTOConverters.fromDTO(
                       JsonUtils.anyFieldMapper()
                           .readValue(tablePO.getDistribution(), DistributionDTO.class)))
-          .withSortOrder(
+          .withSortOrders(
               StringUtils.isBlank(tablePO.getSortOrders())
                   ? null
                   : DTOConverters.fromDTOs(
@@ -534,17 +548,13 @@ public class POConverters {
                   : DTOConverters.fromDTOs(
                       JsonUtils.anyFieldMapper().readValue(tablePO.getIndexes(), IndexDTO[].class)))
           // TODO add field partition, distribution and sort order;
-          .withPartitions(
+          .withPartitioning(
               StringUtils.isBlank(tablePO.getPartitions())
                   ? null
                   : JsonUtils.anyFieldMapper()
                       .readValue(tablePO.getPartitions(), Partitioning[].class))
-          .withFormat(tablePO.getFormat())
           .withComment(tablePO.getComment())
-          .withProperties(
-              StringUtils.isBlank(tablePO.getProperties())
-                  ? null
-                  : JsonUtils.anyFieldMapper().readValue(tablePO.getProperties(), Map.class))
+          .withProperties(properties)
           .withColumns(fromColumnPOs(columnPOs))
           .build();
     } catch (JsonProcessingException e) {

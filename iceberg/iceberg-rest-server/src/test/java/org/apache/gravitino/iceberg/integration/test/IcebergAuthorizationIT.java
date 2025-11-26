@@ -20,6 +20,7 @@
 package org.apache.gravitino.iceberg.integration.test;
 
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.Maps;
 import com.google.errorprone.annotations.FormatMethod;
 import java.io.IOException;
 import java.util.Arrays;
@@ -117,33 +118,41 @@ public class IcebergAuthorizationIT extends BaseIT {
       metalakeClientWithAllPrivilege.addUser(NORMAL_USER);
     }
 
+    Map<String, String> basicProps =
+        ImmutableMap.of(
+            IcebergConstants.URI,
+            getPGUri(),
+            IcebergConstants.CATALOG_BACKEND,
+            "jdbc",
+            IcebergConstants.GRAVITINO_JDBC_DRIVER,
+            "org.postgresql.Driver",
+            IcebergConstants.GRAVITINO_JDBC_USER,
+            getPGUser(),
+            IcebergConstants.GRAVITINO_JDBC_PASSWORD,
+            getPGPassword(),
+            "gravitino.bypass.jdbc.schema-version",
+            "v1",
+            IcebergConstants.ICEBERG_JDBC_INITIALIZE,
+            "true",
+            IcebergConstants.WAREHOUSE,
+            "file:///tmp/");
+
+    Map<String, String> customProps = getCustomProperties();
+    Map<String, String> catalogProps = Maps.newHashMap();
+    catalogProps.putAll(basicProps);
+    catalogProps.putAll(customProps);
+
     catalogClientWithAllPrivilege =
         metalakeClientWithAllPrivilege.createCatalog(
             GRAVITINO_CATALOG_NAME,
             Catalog.Type.RELATIONAL,
             "lakehouse-iceberg",
             "comment",
-            ImmutableMap.of(
-                IcebergConstants.URI,
-                getPGUri(),
-                IcebergConstants.CATALOG_BACKEND,
-                "jdbc",
-                IcebergConstants.GRAVITINO_JDBC_DRIVER,
-                "org.postgresql.Driver",
-                IcebergConstants.GRAVITINO_JDBC_USER,
-                getPGUser(),
-                IcebergConstants.GRAVITINO_JDBC_PASSWORD,
-                getPGPassword(),
-                "gravitino.bypass.jdbc.schema-version",
-                "v1",
-                IcebergConstants.ICEBERG_JDBC_INITIALIZE,
-                "true",
-                IcebergConstants.WAREHOUSE,
-                "file:///tmp/"));
+            catalogProps);
   }
 
   private void startGravitinoServerWithIcebergREST() throws Exception {
-    ignoreAuxRestService = false;
+    ignoreIcebergAuxRestService = false;
     // Enable authorization
     customConfigs.putAll(
         ImmutableMap.of(
@@ -175,6 +184,14 @@ public class IcebergAuthorizationIT extends BaseIT {
     super.startIntegrationTest();
   }
 
+  protected Map<String, String> getCustomProperties() {
+    return Maps.newHashMap();
+  }
+
+  protected boolean supportsCredentialVending() {
+    return false;
+  }
+
   void revokeUserRoles() {
     List<String> roles = metalakeClientWithAllPrivilege.getUser(NORMAL_USER).roles();
     if (roles.size() > 0) {
@@ -196,11 +213,12 @@ public class IcebergAuthorizationIT extends BaseIT {
 
   void createTable(String schemaName, String tableName) {
     Column col1 = Column.of("col_1", Types.IntegerType.get(), "col_1_comment");
+    Column col2 = Column.of("col_2", Types.IntegerType.get(), "col_2_comment");
     catalogClientWithAllPrivilege
         .asTableCatalog()
         .createTable(
             NameIdentifier.of(schemaName, tableName),
-            new Column[] {col1},
+            new Column[] {col1, col2},
             "table_comment",
             new HashMap<>());
     boolean exists =
@@ -228,6 +246,10 @@ public class IcebergAuthorizationIT extends BaseIT {
             .set("spark.sql.catalog.rest.rest.auth.basic.password", "mock")
             // drop Iceberg table purge may hang in spark local mode
             .set("spark.locality.wait.node", "0");
+    if (supportsCredentialVending()) {
+      sparkConf.set(
+          "spark.sql.catalog.rest.header.X-Iceberg-Access-Delegation", "vended-credentials");
+    }
 
     sparkSession = SparkSession.builder().master("local[1]").config(sparkConf).getOrCreate();
   }

@@ -22,6 +22,7 @@ package org.apache.gravitino.server.web.filter;
 import java.lang.reflect.Method;
 import java.lang.reflect.Parameter;
 import java.util.Map;
+import java.util.Optional;
 import org.aopalliance.intercept.MethodInterceptor;
 import org.aopalliance.intercept.MethodInvocation;
 import org.apache.gravitino.Entity;
@@ -31,6 +32,7 @@ import org.apache.gravitino.authorization.AuthorizationRequestContext;
 import org.apache.gravitino.iceberg.service.IcebergExceptionMapper;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationExpression;
 import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionEvaluator;
+import org.apache.gravitino.server.web.Utils;
 import org.apache.gravitino.utils.PrincipalUtils;
 import org.apache.iceberg.exceptions.ForbiddenException;
 import org.slf4j.Logger;
@@ -45,8 +47,56 @@ public abstract class BaseMetadataAuthorizationMethodInterceptor implements Meth
   private static final Logger LOG =
       LoggerFactory.getLogger(BaseMetadataAuthorizationMethodInterceptor.class);
 
+  /**
+   * Handler for request-specific authorization processing that cannot be handled by standard
+   * annotation-based expressions. Implementations can enrich identifiers, validate requests, and/or
+   * perform custom authorization.
+   */
+  protected interface AuthorizationHandler {
+    /**
+     * Process the request for authorization purposes. This may include:
+     *
+     * <ul>
+     *   <li>Extracting additional identifiers from request bodies
+     *   <li>Validating request parameters
+     *   <li>Performing custom authorization logic
+     * </ul>
+     *
+     * @param nameIdentifierMap Name identifier map (can be modified to add identifiers)
+     * @throws ForbiddenException if authorization or validation fails
+     */
+    void process(Map<Entity.EntityType, NameIdentifier> nameIdentifierMap)
+        throws ForbiddenException;
+
+    /**
+     * Whether this handler has completed full authorization. Called after {@link #process} to
+     * determine if standard expression-based authorization should be skipped.
+     *
+     * @return true if authorization is complete (skip standard check), false to continue with
+     *     standard expression-based authorization
+     */
+    boolean authorizationCompleted();
+  }
+
   protected abstract Map<Entity.EntityType, NameIdentifier> extractNameIdentifierFromParameters(
       Parameter[] parameters, Object[] args);
+
+  /**
+   * Create an authorization handler for this request, if special handling is needed beyond standard
+   * annotation-based authorization.
+   *
+   * <p>Override this method to provide custom handlers based on request characteristics (e.g.,
+   * annotations, request types, parameters).
+   *
+   * @param parameters Method parameters
+   * @param args Method arguments
+   * @return Optional handler for custom authorization processing, or empty if standard
+   *     authorization is sufficient
+   */
+  protected Optional<AuthorizationHandler> createAuthorizationHandler(
+      Parameter[] parameters, Object[] args) {
+    return Optional.empty();
+  }
 
   protected boolean isExceptionPropagate(Exception e) {
     return false;
@@ -70,25 +120,43 @@ public abstract class BaseMetadataAuthorizationMethodInterceptor implements Meth
       if (expressionAnnotation != null) {
         String expression = expressionAnnotation.expression();
         Object[] args = methodInvocation.getArguments();
-        Map<Entity.EntityType, NameIdentifier> metadataContext =
+        Map<Entity.EntityType, NameIdentifier> nameIdentifierMap =
             extractNameIdentifierFromParameters(parameters, args);
-        AuthorizationExpressionEvaluator authorizationExpressionEvaluator =
-            new AuthorizationExpressionEvaluator(expression);
-        boolean authorizeResult =
-            authorizationExpressionEvaluator.evaluate(
-                metadataContext, new AuthorizationRequestContext());
-        if (!authorizeResult) {
-          MetadataObject.Type type = expressionAnnotation.accessMetadataType();
-          NameIdentifier accessMetadataName =
-              metadataContext.get(Entity.EntityType.valueOf(type.name()));
-          String currentUser = PrincipalUtils.getCurrentUserName();
-          String methodName = method.getName();
-          String notAuthzMessage =
-              String.format(
-                  "User '%s' is not authorized to perform operation '%s' on metadata '%s' with expression '%s'",
-                  currentUser, methodName, accessMetadataName, expression);
-          LOG.info(notAuthzMessage);
-          return IcebergExceptionMapper.toRESTResponse(new ForbiddenException(notAuthzMessage));
+
+        // Process custom authorization if handler exists
+        Optional<AuthorizationHandler> handler = createAuthorizationHandler(parameters, args);
+        boolean skipStandardCheck = false;
+
+        if (handler.isPresent()) {
+          AuthorizationHandler authzHandler = handler.get();
+          authzHandler.process(nameIdentifierMap);
+          skipStandardCheck = authzHandler.authorizationCompleted();
+        }
+
+        // Perform standard authorization check if custom handler didn't complete it
+        if (!skipStandardCheck) {
+          Map<String, Object> pathParams = Utils.extractPathParamsFromParameters(parameters, args);
+          AuthorizationExpressionEvaluator authorizationExpressionEvaluator =
+              new AuthorizationExpressionEvaluator(expression);
+          boolean authorizeResult =
+              authorizationExpressionEvaluator.evaluate(
+                  nameIdentifierMap,
+                  pathParams,
+                  new AuthorizationRequestContext(),
+                  Optional.empty());
+          if (!authorizeResult) {
+            MetadataObject.Type type = expressionAnnotation.accessMetadataType();
+            NameIdentifier accessMetadataName =
+                nameIdentifierMap.get(Entity.EntityType.valueOf(type.name()));
+            String currentUser = PrincipalUtils.getCurrentUserName();
+            String methodName = method.getName();
+            String notAuthzMessage =
+                String.format(
+                    "User '%s' is not authorized to perform operation '%s' on metadata '%s' with expression '%s'",
+                    currentUser, methodName, accessMetadataName, expression);
+            LOG.info(notAuthzMessage);
+            return IcebergExceptionMapper.toRESTResponse(new ForbiddenException(notAuthzMessage));
+          }
         }
       }
     } catch (Exception ex) {

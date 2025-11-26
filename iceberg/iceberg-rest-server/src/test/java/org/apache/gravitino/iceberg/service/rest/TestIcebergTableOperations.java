@@ -54,6 +54,8 @@ import org.apache.gravitino.listener.api.event.IcebergTableExistsPreEvent;
 import org.apache.gravitino.listener.api.event.IcebergUpdateTableEvent;
 import org.apache.gravitino.listener.api.event.IcebergUpdateTableFailureEvent;
 import org.apache.gravitino.listener.api.event.IcebergUpdateTablePreEvent;
+import org.apache.gravitino.server.ServerConfig;
+import org.apache.gravitino.server.authorization.GravitinoAuthorizerProvider;
 import org.apache.iceberg.MetadataUpdate;
 import org.apache.iceberg.Schema;
 import org.apache.iceberg.TableMetadata;
@@ -110,6 +112,9 @@ public class TestIcebergTableOperations extends IcebergNamespaceTestBase {
             bind(mockRequest).to(HttpServletRequest.class);
           }
         });
+
+    GravitinoAuthorizerProvider provider = GravitinoAuthorizerProvider.getInstance();
+    provider.initialize(new ServerConfig());
 
     return resourceConfig;
   }

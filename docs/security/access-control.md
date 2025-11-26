@@ -115,7 +115,7 @@ If a securable object needs to be managed by more than one person at the same ti
 The metadata object that supports ownership is as follows:
 
 | Metadata Object Type |
-| -------------------- |
+|----------------------|
 | Metalake             |
 | Catalog              |
 | Schema               |
@@ -125,6 +125,8 @@ The metadata object that supports ownership is as follows:
 | Role                 |
 | Model                |
 | Tag                  |
+| JobTemplate          |
+| Job                  |
 
 ### User
 Users are generally granted one or multiple Roles, and users have different operating privileges depending on their Role.
@@ -278,6 +280,19 @@ DENY `WRITE_FILESET` won‘t deny the `READ_FILESET` operation if the user has t
 |---------------|---------------------------|-------------------------------------------|
 | CREATE_POLICY | Metalake                  | Create a policy                           |
 | APPLY_POLICY  | Metalake, Policy          | Associate policies with metadata objects. |
+
+### Job template privileges
+
+| Name                  | Supports Securable Object | Operation                               |
+|-----------------------|---------------------------|-----------------------------------------|
+| REGISTER_JOB_TEMPLATE | Metalake                  | Register a job template                 |
+| USE_JOB_TEMPLATE      | Metalake, JobTemplate     | Use a job template when running the job |
+
+### Job privileges
+| Name    | Supports Securable Object | Operation |
+|---------|---------------------------|-----------|
+| RUN_JOB | Metalake                  | Run a job |
+
 
 ## Inheritance Model
 
@@ -1059,4 +1074,12 @@ The following table lists the required privileges for each API.
 | associate-object-policies         | Requires both `APPLY_POLICY` permission and permission to **load metadata objects**.                                                                                                                                                          |
 | list policies for object          | Requires both permission to **get the policy** and permission to **load metadata objects**.                                                                                                                                                   |
 | get policy for object             | Requires both permission to **get the policy** and permission to **load metadata objects**.                                                                                                                                                   |
-
+| list job templates                | The owner of the metalake can see all the job templates, others can see the job templates which they can get.                                                                                                                                 |
+| register a job template           | `REGISTER_JOB_TEMPLATE` on the metalake or the owner of the metalake.                                                                                                                                                                         |
+| get a job template                | `USE_JOB_TEMPLATE` on the metalake or job template, the owner of the metalake or the job template.                                                                                                                                            |
+| delete a job template             | The owner of the metalake or the job template.                                                                                                                                                                                                |
+| alter a job template              | The owner of the metalake or the job template.                                                                                                                                                                                                |
+| list jobs                         | The owner of the metalake can see all the jobs, others can see the jobs which they can get.                                                                                                                                                   |                                                                                                                                                                                                                            
+| run a job                         | The owner of the metalake , or have both `RUN_JOB` on the metalake and `USE_JOB_TEMPLATE` on the job template                                                                                                                                 |
+| get a job                         | The owner of the metalake or the job.                                                                                                                                                                                                         |
+| cancel a job                      | The owner of the metalake or the job.                                                                                                                                                                                                         |

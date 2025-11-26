@@ -629,8 +629,8 @@ public class TestPOConverters {
             Lists.newArrayList(),
             NamespaceUtil.ofTable("test_metalake", "test_catalog", "test_schema"));
 
-    Assertions.assertEquals(tableEntity.getDistribution(), entity.getDistribution());
-    Assertions.assertArrayEquals(tableEntity.getPartitions(), entity.getPartitions());
+    Assertions.assertEquals(tableEntity.distribution(), entity.distribution());
+    Assertions.assertArrayEquals(tableEntity.partitioning(), entity.partitioning());
   }
 
   @Test
@@ -1398,7 +1398,7 @@ public class TestPOConverters {
         .withNamespace(namespace)
         .withColumns(columns)
         .withDistribution(Distributions.of(Strategy.EVEN, 10, NamedReference.field("key")))
-        .withSortOrder(
+        .withSortOrders(
             new SortOrder[] {SortOrders.of(NamedReference.field("col1"), SortDirection.ASCENDING)})
         .withAuditInfo(auditInfo)
         .build();

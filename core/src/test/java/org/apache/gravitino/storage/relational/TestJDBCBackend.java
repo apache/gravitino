@@ -93,6 +93,7 @@ import org.apache.gravitino.storage.relational.mapper.CatalogMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.GroupMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.UserMetaMapper;
 import org.apache.gravitino.storage.relational.service.CatalogMetaService;
+import org.apache.gravitino.storage.relational.service.EntityIdService;
 import org.apache.gravitino.storage.relational.service.MetalakeMetaService;
 import org.apache.gravitino.storage.relational.service.RoleMetaService;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
@@ -160,6 +161,7 @@ public class TestJDBCBackend {
     try {
       backend = (RelationalBackend) Class.forName(className).getDeclaredConstructor().newInstance();
       backend.initialize(config);
+      EntityIdService.initialize(new RelationalEntityStoreIdResolver());
     } catch (Exception e) {
       throw new RuntimeException(
           "Failed to create and initialize RelationalBackend by name: " + backendName, e);
@@ -1245,15 +1247,14 @@ public class TestJDBCBackend {
             .withNamespace(NamespaceUtil.ofTable(metalakeName, catalog.name(), schema.name()))
             .withName("table")
             .withAuditInfo(auditInfo)
-            .withFormat("lance")
             .withComment(null)
-            .withProperties(ImmutableMap.of("format", "LANCE", "location", "/tmp/test/lance"))
+            .withProperties(ImmutableMap.of("format", "lance", "location", "/tmp/test/lance"))
             .build();
 
     backend.insert(table, false);
 
     TableEntity fetchedTable = backend.get(table.nameIdentifier(), Entity.EntityType.TABLE);
-    Assertions.assertEquals("LANCE", fetchedTable.getProperties().get("format"));
+    Assertions.assertEquals("lance", fetchedTable.properties().get("format"));
 
     TableEntity updatedTable =
         TableEntity.builder()
