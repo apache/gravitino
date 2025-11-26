@@ -19,6 +19,7 @@
 package org.apache.gravitino.flink.connector.catalog;
 
 import com.google.common.base.Preconditions;
+import com.google.common.base.Strings;
 import com.google.common.collect.Sets;
 import java.util.Arrays;
 import java.util.Map;
@@ -31,6 +32,7 @@ import org.slf4j.LoggerFactory;
 
 /** GravitinoCatalogManager is used to retrieve catalogs from Apache Gravitino server. */
 public class GravitinoCatalogManager {
+
   private static final Logger LOG = LoggerFactory.getLogger(GravitinoCatalogManager.class);
   private static GravitinoCatalogManager gravitinoCatalogManager;
 
@@ -38,8 +40,20 @@ public class GravitinoCatalogManager {
   private final GravitinoMetalake metalake;
   private final GravitinoAdminClient gravitinoClient;
 
+  private final String gravitinoUri;
+  private final String metalakeName;
+  private final Map<String, String> gravitinoClientConfig;
+
   private GravitinoCatalogManager(
       String gravitinoUri, String metalakeName, Map<String, String> gravitinoClientConfig) {
+    Preconditions.checkArgument(
+        !Strings.isNullOrEmpty(gravitinoUri), "Gravitino uri cannot be null or empty");
+    Preconditions.checkArgument(
+        !Strings.isNullOrEmpty(metalakeName), "MetalakeName cannot be null or empty");
+    Preconditions.checkNotNull(gravitinoClientConfig, "GravitinoClientConfig cannot be null");
+    this.gravitinoUri = gravitinoUri;
+    this.metalakeName = metalakeName;
+    this.gravitinoClientConfig = gravitinoClientConfig;
     this.gravitinoClient =
         GravitinoAdminClient.builder(gravitinoUri).withClientConfig(gravitinoClientConfig).build();
     this.metalake = gravitinoClient.loadMetalake(metalakeName);
@@ -56,10 +70,18 @@ public class GravitinoCatalogManager {
    */
   public static GravitinoCatalogManager create(
       String gravitinoUri, String metalakeName, Map<String, String> gravitinoClientConfig) {
-    Preconditions.checkState(
-        gravitinoCatalogManager == null, "Should not create duplicate GravitinoCatalogManager");
-    gravitinoCatalogManager =
-        new GravitinoCatalogManager(gravitinoUri, metalakeName, gravitinoClientConfig);
+    if (gravitinoCatalogManager == null) {
+      gravitinoCatalogManager =
+          new GravitinoCatalogManager(gravitinoUri, metalakeName, gravitinoClientConfig);
+    } else {
+      Preconditions.checkState(
+          checkEqual(gravitinoUri, metalakeName, gravitinoClientConfig),
+          String.format(
+              "Creating GravitinoCatalogManager with different configuration is not supported. "
+                  + "Current singleton %s. "
+                  + "Creating with gravitinoUri=%s, metalakeName=%s, gravitinoClientConfig=%s",
+              gravitinoCatalogManager, gravitinoUri, metalakeName, gravitinoClientConfig));
+    }
     return gravitinoCatalogManager;
   }
 
@@ -154,5 +176,34 @@ public class GravitinoCatalogManager {
    */
   public boolean contains(String catalogName) {
     return metalake.catalogExists(catalogName);
+  }
+
+  @Override
+  public String toString() {
+    return "GravitinoCatalogManager{"
+        + "gravitinoUri='"
+        + gravitinoUri
+        + '\''
+        + ", metalakeName='"
+        + metalakeName
+        + '\''
+        + ", gravitinoClientConfig="
+        + gravitinoClientConfig
+        + '}';
+  }
+
+  /**
+   * Check whether the parameters are the same as the configuration of the GravitinoCatalogManager
+   * static variable.
+   *
+   * @param gravitinoUri Gravitino server uri
+   * @param metalakeName Metalake name
+   * @param gravitinoClientConfig Gravitino client properties map
+   */
+  private static boolean checkEqual(
+      String gravitinoUri, String metalakeName, Map<String, String> gravitinoClientConfig) {
+    return gravitinoCatalogManager.gravitinoUri.equals(gravitinoUri)
+        && gravitinoCatalogManager.metalakeName.equals(metalakeName)
+        && gravitinoCatalogManager.gravitinoClientConfig.equals(gravitinoClientConfig);
   }
 }

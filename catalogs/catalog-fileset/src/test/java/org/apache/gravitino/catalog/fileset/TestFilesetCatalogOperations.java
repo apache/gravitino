@@ -2887,7 +2887,7 @@ public class TestFilesetCatalogOperations {
 
       NameIdentifier schemaIdent = NameIdentifierUtil.ofSchema("m1", "c1", name);
       Map<String, String> schemaProps = Maps.newHashMap();
-      StringIdentifier stringId = StringIdentifier.fromId(idGenerator.nextId());
+      StringIdentifier stringId = StringIdentifier.fromId(testId);
       schemaProps = Maps.newHashMap(StringIdentifier.newPropertiesWithId(stringId, schemaProps));
 
       if (schemaPath != null) {

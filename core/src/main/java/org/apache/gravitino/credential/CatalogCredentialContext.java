@@ -28,7 +28,7 @@ public class CatalogCredentialContext implements CredentialContext {
   @NotNull private final String userName;
 
   public CatalogCredentialContext(String userName) {
-    Preconditions.checkNotNull(userName, "User name should not be null");
+    Preconditions.checkArgument(userName != null, "User name should not be null");
     this.userName = userName;
   }
 

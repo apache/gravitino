@@ -52,18 +52,23 @@ public class TestSecurableObjects extends TestJDBCBackend {
     String metalakeName = "metalake";
     AuditInfo auditInfo =
         AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
-    BaseMetalake metalake =
-        createBaseMakeLake(RandomIdGenerator.INSTANCE.nextId(), metalakeName + "2", auditInfo);
-    backend.insert(metalake, false);
 
-    BaseMetalake metalake2 =
+    BaseMetalake metalake =
         createBaseMakeLake(RandomIdGenerator.INSTANCE.nextId(), metalakeName, auditInfo);
-    backend.insert(metalake2, false);
+    backend.insert(metalake, false);
 
     CatalogEntity catalog =
         createCatalog(
             RandomIdGenerator.INSTANCE.nextId(), Namespace.of("metalake"), "catalog", auditInfo);
     backend.insert(catalog, false);
+
+    CatalogEntity catalog2 =
+        createCatalog(
+            RandomIdGenerator.INSTANCE.nextId(),
+            Namespace.of("metalake"),
+            metalake.name(),
+            auditInfo);
+    backend.insert(catalog2, false);
 
     SchemaEntity schema =
         createSchemaEntity(
@@ -101,14 +106,14 @@ public class TestSecurableObjects extends TestJDBCBackend {
         SecurableObjects.ofMetalake(
             metalake.name(), Lists.newArrayList(Privileges.UseCatalog.allow()));
 
-    SecurableObject metalakeObject2 =
-        SecurableObjects.ofMetalake(
-            metalake2.name(), Lists.newArrayList(Privileges.UseCatalog.allow()));
-
     SecurableObject catalogObject =
         SecurableObjects.ofCatalog(
             "catalog",
             Lists.newArrayList(Privileges.UseCatalog.allow(), Privileges.CreateSchema.deny()));
+
+    SecurableObject catalogObject2 =
+        SecurableObjects.ofCatalog(
+            metalake.name(), Lists.newArrayList(Privileges.UseCatalog.allow()));
 
     SecurableObject schemaObject =
         SecurableObjects.ofSchema(
@@ -129,7 +134,7 @@ public class TestSecurableObjects extends TestJDBCBackend {
     ArrayList<SecurableObject> securableObjects =
         Lists.newArrayList(
             metalakeObject,
-            metalakeObject2,
+            catalogObject2,
             catalogObject,
             schemaObject,
             tableObject,
