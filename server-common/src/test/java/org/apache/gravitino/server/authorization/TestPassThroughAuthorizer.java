@@ -17,8 +17,16 @@
 
 package org.apache.gravitino.server.authorization;
 
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
+
 import java.io.IOException;
+import java.security.Principal;
+import org.apache.gravitino.Entity;
+import org.apache.gravitino.MetadataObject;
+import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.authorization.AuthorizationRequestContext;
+import org.apache.gravitino.authorization.Privilege;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -26,12 +34,38 @@ import org.junit.jupiter.api.Test;
 public class TestPassThroughAuthorizer {
 
   @Test
-  public void testAuthorize() throws IOException {
+  public void testPassThroughAuthorizerDefaults() throws IOException {
     try (PassThroughAuthorizer passThroughAuthorizer = new PassThroughAuthorizer()) {
-      boolean result =
+      Principal principal = mock(Principal.class);
+      when(principal.getName()).thenReturn("testUser");
+      MetadataObject metadataObject =
+          MetadataObjects.of("catalog", "schema", MetadataObject.Type.SCHEMA);
+      Assertions.assertTrue(
           passThroughAuthorizer.authorize(
-              null, null, null, null, new AuthorizationRequestContext());
-      Assertions.assertTrue(result, "Logic error in PassThroughAuthorizer");
+              principal,
+              "metalake",
+              metadataObject,
+              Privilege.Name.CREATE_SCHEMA,
+              new AuthorizationRequestContext()));
+
+      Assertions.assertFalse(
+          passThroughAuthorizer.deny(
+              principal,
+              "metalake",
+              metadataObject,
+              Privilege.Name.CREATE_SCHEMA,
+              new AuthorizationRequestContext()));
+
+      Assertions.assertTrue(passThroughAuthorizer.isOwner(principal, "metalake", metadataObject));
+      Assertions.assertTrue(passThroughAuthorizer.isServiceAdmin());
+      Assertions.assertTrue(passThroughAuthorizer.isMetalakeUser("metalake"));
+      Assertions.assertTrue(passThroughAuthorizer.isSelf(Entity.EntityType.USER, null));
+      Assertions.assertTrue(
+          passThroughAuthorizer.hasSetOwnerPermission(
+              "metalake", "type", "fullName", new AuthorizationRequestContext()));
+      Assertions.assertTrue(
+          passThroughAuthorizer.hasMetadataPrivilegePermission(
+              "metalake", "type", "fullName", new AuthorizationRequestContext()));
     }
   }
 }

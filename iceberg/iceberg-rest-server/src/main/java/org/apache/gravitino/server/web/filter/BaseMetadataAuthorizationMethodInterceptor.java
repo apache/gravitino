@@ -29,6 +29,7 @@ import org.apache.gravitino.Entity;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.authorization.AuthorizationRequestContext;
+import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.iceberg.service.IcebergExceptionMapper;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationExpression;
 import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionEvaluator;
@@ -122,6 +123,31 @@ public abstract class BaseMetadataAuthorizationMethodInterceptor implements Meth
         Object[] args = methodInvocation.getArguments();
         Map<Entity.EntityType, NameIdentifier> nameIdentifierMap =
             extractNameIdentifierFromParameters(parameters, args);
+
+        // Check if current user exists in the metalake.
+        NameIdentifier metalakeIdent = nameIdentifierMap.get(Entity.EntityType.METALAKE);
+
+        if (metalakeIdent != null) {
+          String currentUser = PrincipalUtils.getCurrentUserName();
+          try {
+            AuthorizationUtils.checkCurrentUser(metalakeIdent.name(), currentUser);
+          } catch (org.apache.gravitino.exceptions.ForbiddenException ex) {
+            LOG.info(
+                "User validation failed - User: '{}', Metalake: '{}', Reason: {}",
+                currentUser,
+                metalakeIdent.name(),
+                ex.getMessage());
+            return IcebergExceptionMapper.toRESTResponse(ex);
+          } catch (Exception ex) {
+            LOG.error(
+                "Unexpected error during user validation - User: '{}', Metalake: '{}'",
+                currentUser,
+                metalakeIdent.name(),
+                ex);
+            return IcebergExceptionMapper.toRESTResponse(
+                new RuntimeException("Failed to validate user", ex));
+          }
+        }
 
         // Process custom authorization if handler exists
         Optional<AuthorizationHandler> handler = createAuthorizationHandler(parameters, args);
