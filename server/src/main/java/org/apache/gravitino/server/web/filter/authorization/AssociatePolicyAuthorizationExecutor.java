@@ -68,7 +68,7 @@ public class AssociatePolicyAuthorizationExecutor extends CommonAuthorizerExecut
         Entity.EntityType.POLICY; // policies are the only supported batch target here
     Preconditions.checkArgument(
         request instanceof PoliciesAssociateRequest,
-        "Only tag can use AssociatePolicyAuthorizationExecutor, please contact the administrator.");
+        "Only policy can use AssociatePolicyAuthorizationExecutor, please contact the administrator.");
     PoliciesAssociateRequest policiesAssociateRequest = (PoliciesAssociateRequest) request;
     policiesAssociateRequest.validate();
     // Authorize both 'policiesToAdd' and 'policiesToRemove' fields.
