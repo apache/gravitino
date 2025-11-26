@@ -115,22 +115,26 @@ public class TestSQLScripts extends TestJDBCBackend {
     try (SqlSession sqlSession =
         SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true)) {
       try (Connection connection = sqlSession.getConnection()) {
-        try (Statement statement = connection.createStatement()) {
-          if ("postgresql".equals(backendType)) {
-            dropAllTablesForPostgreSQL(connection);
-          } else {
-            String query = "SHOW TABLES";
-            List<String> tableList = new ArrayList<>();
-            try (ResultSet rs = statement.executeQuery(query)) {
-              while (rs.next()) {
-                tableList.add(rs.getString(1));
-              }
-            }
-            for (String table : tableList) {
-              statement.execute("DROP TABLE " + table);
-            }
-          }
+        if ("postgresql".equals(backendType)) {
+          dropAllTablesForPostgreSQL(connection);
+        } else {
+          dropAllTablesForMySQLCompatible(connection);
         }
+      }
+    }
+  }
+
+  private void dropAllTablesForMySQLCompatible(Connection connection) throws SQLException {
+    try (Statement statement = connection.createStatement()) {
+      String query = "SHOW TABLES";
+      List<String> tableList = new ArrayList<>();
+      try (ResultSet rs = statement.executeQuery(query)) {
+        while (rs.next()) {
+          tableList.add(rs.getString(1));
+        }
+      }
+      for (String table : tableList) {
+        statement.execute("DROP TABLE " + table);
       }
     }
   }
