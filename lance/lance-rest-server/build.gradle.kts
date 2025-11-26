@@ -114,7 +114,17 @@ tasks {
   test {
     val testMode = project.properties["testMode"] as? String ?: "embedded"
     if (testMode == "embedded") {
-      dependsOn(":catalogs:catalog-generic-lakehouse:build")
+      dependsOn(":catalogs:catalog-lakehouse-generic:build")
     }
+  }
+}
+
+tasks.test {
+  val skipITs = project.hasProperty("skipITs")
+  if (skipITs) {
+    // Exclude integration tests
+    exclude("**/integration/test/**")
+  } else {
+    dependsOn(tasks.jar)
   }
 }

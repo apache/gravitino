@@ -222,7 +222,7 @@ public class GravitinoLanceNameSpaceOperations implements LanceNamespaceOperatio
           client.createCatalog(
               catalogName,
               Catalog.Type.RELATIONAL,
-              "generic-lakehouse",
+              "lakehouse-generic",
               "created by Lance REST server",
               properties);
       response.setProperties(
