@@ -78,7 +78,7 @@ public class AssociatePolicyAuthorizationExecutor extends CommonAuthorizerExecut
 
   /**
    * Performs batch authorization for a given field (e.g., "policiesToAdd" or "policiesToRemove")
-   * containing an array of tag names.
+   * containing an array of policy names.
    *
    * @param policies policies
    * @param context The shared authorization request context.
