@@ -87,8 +87,10 @@ public class TagOperations {
   @Produces("application/vnd.gravitino.v1+json")
   @Timed(name = "list-tags." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "list-tags", absolute = true)
+  @AuthorizationExpression(expression = "", accessMetadataType = MetadataObject.Type.METALAKE)
   public Response listTags(
-      @PathParam("metalake") String metalake,
+      @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
+          String metalake,
       @QueryParam("details") @DefaultValue("false") boolean verbose) {
     LOG.info(
         "Received list tag {} request for metalake: {}", verbose ? "infos" : "names", metalake);
@@ -261,8 +263,11 @@ public class TagOperations {
   @Produces("application/vnd.gravitino.v1+json")
   @Timed(name = "list-objects-for-tag." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "list-objects-for-tag", absolute = true)
+  @AuthorizationExpression(expression = "", accessMetadataType = MetadataObject.Type.TAG)
   public Response listMetadataObjectsForTag(
-      @PathParam("metalake") String metalake, @PathParam("tag") String tagName) {
+      @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
+          String metalake,
+      @PathParam("tag") @AuthorizationMetadata(type = Entity.EntityType.TAG) String tagName) {
     LOG.info("Received list objects for tag: {} under metalake: {}", tagName, metalake);
 
     try {
