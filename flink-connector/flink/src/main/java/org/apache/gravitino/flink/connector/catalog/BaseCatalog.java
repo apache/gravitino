@@ -668,7 +668,8 @@ public abstract class BaseCatalog extends AbstractCatalog {
   @VisibleForTesting
   static TableChange[] getGravitinoTableChanges(
       CatalogBaseTable existingTable, CatalogBaseTable newTable) {
-    Preconditions.checkNotNull(newTable.getComment(), "The new comment should not be null");
+    Preconditions.checkArgument(
+        newTable.getComment() != null, "The new comment should not be null");
     List<TableChange> changes = Lists.newArrayList();
     if (!Objects.equals(newTable.getComment(), existingTable.getComment())) {
       changes.add(TableChange.updateComment(newTable.getComment()));

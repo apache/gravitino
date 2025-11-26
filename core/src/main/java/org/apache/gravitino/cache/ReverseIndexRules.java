@@ -23,6 +23,7 @@ import org.apache.gravitino.Entity;
 import org.apache.gravitino.Entity.EntityType;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.SupportsRelationOperations;
 import org.apache.gravitino.meta.GenericEntity;
 import org.apache.gravitino.meta.GroupEntity;
 import org.apache.gravitino.meta.PolicyEntity;
@@ -42,7 +43,7 @@ import org.apache.gravitino.utils.NamespaceUtil;
 public class ReverseIndexRules {
 
   /** UserEntity reverse index processor */
-  public static final ReverseIndexCache.ReverseIndexRule USER_REVERSE_RULE =
+  public static final ReverseIndexCache.ReverseIndexRule USER_ROLE_REVERSE_RULE =
       (entity, key, reverseIndexCache) -> {
         UserEntity userEntity = (UserEntity) entity;
         if (userEntity.roleNames() != null) {
@@ -57,8 +58,18 @@ public class ReverseIndexRules {
         }
       };
 
+  public static final ReverseIndexCache.ReverseIndexRule USER_OWNERSHIP_REVERSE_RULE =
+      (entity, key, reverseIndexCache) -> {
+        UserEntity userEntity = (UserEntity) entity;
+        // Handle Securable Objects -> User reverse index, so the key type is User and the value
+        // type is securable Object.
+        if (key.relationType() == SupportsRelationOperations.Type.OWNER_REL) {
+          reverseIndexCache.put(userEntity.nameIdentifier(), EntityType.USER, key);
+        }
+      };
+
   /** GroupEntity reverse index processor */
-  public static final ReverseIndexCache.ReverseIndexRule GROUP_REVERSE_RULE =
+  public static final ReverseIndexCache.ReverseIndexRule GROUP_ROLE_REVERSE_RULE =
       (entity, key, reverseIndexCache) -> {
         GroupEntity groupEntity = (GroupEntity) entity;
         if (groupEntity.roleNames() != null) {
@@ -73,8 +84,18 @@ public class ReverseIndexRules {
         }
       };
 
-  /** * RoleEntity reverse index processor */
-  public static final ReverseIndexCache.ReverseIndexRule ROLE_REVERSE_RULE =
+  public static final ReverseIndexCache.ReverseIndexRule GROUP_OWNERSHIP_REVERSE_RULE =
+      (entity, key, reverseIndexCache) -> {
+        GroupEntity groupEntity = (GroupEntity) entity;
+        // Handle Securable Objects -> Group reverse index, so the key type is group and the value
+        // type is securable Object.
+        if (key.relationType() == SupportsRelationOperations.Type.OWNER_REL) {
+          reverseIndexCache.put(groupEntity.nameIdentifier(), EntityType.GROUP, key);
+        }
+      };
+
+  /** RoleEntity reverse index processor */
+  public static final ReverseIndexCache.ReverseIndexRule ROLE_SECURABLE_OBJECT_REVERSE_RULE =
       (entity, key, reverseIndexCache) -> {
         RoleEntity roleEntity = (RoleEntity) entity;
         if (roleEntity.securableObjects() != null) {
@@ -166,7 +187,7 @@ public class ReverseIndexRules {
 
   // Keep objects to policies reverse index for policy objects, so the key are policies and the
   // values are objects.
-  public static final ReverseIndexCache.ReverseIndexRule POLICY_REVERSE_RULE =
+  public static final ReverseIndexCache.ReverseIndexRule POLICY_SECURABLE_OBJECT_REVERSE_RULE =
       (entity, key, reverseIndexCache) -> {
         PolicyEntity policyEntity = (PolicyEntity) entity;
         NameIdentifier nameIdentifier =
@@ -176,7 +197,7 @@ public class ReverseIndexRules {
 
   // Keep objects to tags reverse index for tag objects, so the key are tags and the
   // values are objects.
-  public static final ReverseIndexCache.ReverseIndexRule TAG_REVERSE_RULE =
+  public static final ReverseIndexCache.ReverseIndexRule TAG_SECURABLE_OBJECT_REVERSE_RULE =
       (entity, key, reverseIndexCache) -> {
         TagEntity tagEntity = (TagEntity) entity;
         NameIdentifier nameIdentifier = NameIdentifier.of(tagEntity.namespace(), tagEntity.name());

@@ -32,6 +32,7 @@ include("catalogs:hive-metastore-common")
 include("catalogs:catalog-lakehouse-iceberg")
 include("catalogs:catalog-lakehouse-paimon")
 include("catalogs:catalog-lakehouse-hudi")
+include("catalogs:catalog-lakehouse-generic")
 include(
   "catalogs:catalog-jdbc-common",
   "catalogs:catalog-jdbc-doris",
@@ -51,7 +52,6 @@ include(
   "clients:client-python",
   "clients:cli"
 )
-include("catalogs:catalog-generic-lakehouse")
 if (gradle.startParameter.projectProperties["enableFuse"]?.toBoolean() == true) {
   include("clients:filesystem-fuse")
 } else {

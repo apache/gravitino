@@ -1030,7 +1030,7 @@ tasks {
       ":catalogs:catalog-lakehouse-iceberg:copyLibAndConfig",
       ":catalogs:catalog-lakehouse-paimon:copyLibAndConfig",
       ":catalogs:catalog-model:copyLibAndConfig",
-      ":catalogs:catalog-generic-lakehouse:copyLibAndConfig"
+      ":catalogs:catalog-lakehouse-generic:copyLibAndConfig"
     )
   }
 

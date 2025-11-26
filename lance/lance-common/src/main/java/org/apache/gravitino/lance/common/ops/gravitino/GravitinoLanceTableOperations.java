@@ -140,7 +140,8 @@ public class GravitinoLanceTableOperations implements LanceTableOperations {
       createTableProperties.put(LANCE_LOCATION, tableLocation);
     }
     // The format is defined in GenericLakehouseCatalog
-    createTableProperties.put("format", "lance");
+    createTableProperties.put(Table.PROPERTY_TABLE_FORMAT, "lance");
+    createTableProperties.put(Table.PROPERTY_EXTERNAL, "true");
 
     Table t;
     try {

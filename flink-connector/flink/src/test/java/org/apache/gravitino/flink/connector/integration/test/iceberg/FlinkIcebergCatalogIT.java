@@ -69,7 +69,7 @@ public abstract class FlinkIcebergCatalogIT extends FlinkCommonIT {
 
   @BeforeAll
   public void before() {
-    Preconditions.checkNotNull(metalake);
+    Preconditions.checkArgument(metalake != null, "metalake should not be null");
     icebergCatalog =
         metalake.createCatalog(
             DEFAULT_ICEBERG_CATALOG,

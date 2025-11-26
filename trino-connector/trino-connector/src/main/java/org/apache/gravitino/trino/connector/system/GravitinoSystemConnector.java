@@ -205,6 +205,9 @@ public class GravitinoSystemConnector implements Connector {
 
     @Override
     public Page getNextPage() {
+      if (isFinished) {
+        return null;
+      }
       isFinished = true;
       return page;
     }
