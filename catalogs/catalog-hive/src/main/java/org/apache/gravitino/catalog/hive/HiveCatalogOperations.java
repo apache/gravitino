@@ -21,11 +21,9 @@ package org.apache.gravitino.catalog.hive;
 import static org.apache.gravitino.catalog.hive.HiveCatalogPropertiesMetadata.LIST_ALL_TABLES;
 import static org.apache.gravitino.catalog.hive.HiveCatalogPropertiesMetadata.METASTORE_URIS;
 import static org.apache.gravitino.catalog.hive.HiveCatalogPropertiesMetadata.PRINCIPAL;
-import static org.apache.gravitino.catalog.hive.HiveConstants.COMMENT;
 import static org.apache.gravitino.catalog.hive.HiveConstants.TABLE_TYPE;
 import static org.apache.gravitino.connector.BaseCatalog.CATALOG_BYPASS_PREFIX;
 import static org.apache.gravitino.hive.HiveTable.SUPPORT_TABLE_TYPES;
-import static org.apache.gravitino.hive.converter.HiveDataTypeConverter.CONVERTER;
 import static org.apache.hadoop.hive.metastore.TableType.EXTERNAL_TABLE;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -41,7 +39,10 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
@@ -75,6 +76,7 @@ import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.TableCatalog;
 import org.apache.gravitino.rel.TableChange;
+import org.apache.gravitino.rel.expressions.Expression;
 import org.apache.gravitino.rel.expressions.NamedReference;
 import org.apache.gravitino.rel.expressions.distributions.Distribution;
 import org.apache.gravitino.rel.expressions.distributions.Distributions;
@@ -82,10 +84,10 @@ import org.apache.gravitino.rel.expressions.sorts.SortOrder;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.expressions.transforms.Transforms;
 import org.apache.gravitino.rel.indexes.Index;
+import org.apache.gravitino.rel.types.Type;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.conf.HiveConf.ConfVars;
-import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.metastore.api.hive_metastoreConstants;
 import org.apache.hadoop.security.SecurityUtil;
 import org.apache.hadoop.security.UserGroupInformation;
@@ -568,6 +570,7 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
 
     try {
       HiveTable table = clientPool.run(c -> c.getTable("", schemaIdent.name(), tableIdent.name()));
+      table.setProxyPlugin(proxyPlugin);
       return new HiveTableHandle(table, clientPool);
 
     } catch (InterruptedException e) {
@@ -597,12 +600,10 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
     }
   }
 
-  private void validateColumnChangeForAlter(
-      TableChange[] changes, org.apache.hadoop.hive.metastore.api.Table hiveTable) {
-    Set<String> partitionFields =
-        hiveTable.getPartitionKeys().stream().map(FieldSchema::getName).collect(Collectors.toSet());
+  private void validateColumnChangeForAlter(TableChange[] changes, HiveTable hiveTable) {
+    Set<String> partitionFields = new HashSet<>(hiveTable.partitionFieldNames());
     Set<String> existingFields =
-        hiveTable.getSd().getCols().stream().map(FieldSchema::getName).collect(Collectors.toSet());
+        Arrays.stream(hiveTable.columns()).map(Column::name).collect(Collectors.toSet());
     existingFields.addAll(partitionFields);
 
     Arrays.stream(changes)
@@ -721,7 +722,7 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
       HiveTable hiveTable =
           HiveTable.builder()
               .withName(tableIdent.name())
-              .withSchemaName(schemaIdent.name())
+              .withDatabaseName(schemaIdent.name())
               .withComment(comment)
               .withColumns(columns)
               .withProperties(properties)
@@ -744,7 +745,7 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
       LOG.info("Created Hive table {} in Hive Metastore", tableIdent.name());
       return new HiveTableHandle(hiveTable, clientPool);
 
-    } catch (Exception e) {
+    } catch (IOException | InterruptedException e) {
       throw new RuntimeException(e);
     }
   }
@@ -771,79 +772,109 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
     try {
       // TODO(@Minghuang): require a table lock to avoid race condition
       HiveTableHandle tableHandle = (HiveTableHandle) loadTable(tableIdent);
-      /*
-      validateColumnChangeForAlter(changes, table);
+      HiveTable currentTable = tableHandle.table();
+      validateColumnChangeForAlter(changes, currentTable);
+
+      String newTableName = currentTable.name();
+      String newComment = currentTable.comment();
+      Map<String, String> updatedProperties = new HashMap<>(currentTable.properties());
+      List<Column> updatedColumns = new ArrayList<>(Arrays.asList(currentTable.columns()));
 
       for (TableChange change : changes) {
-        // Table change
         if (change instanceof TableChange.RenameTable) {
-          doRenameTable(alteredHiveTable, (TableChange.RenameTable) change);
-
+          TableChange.RenameTable rename = (TableChange.RenameTable) change;
+          Preconditions.checkArgument(
+              rename.getNewSchemaName().isEmpty(), "Does not support rename schema yet");
+          newTableName = rename.getNewName();
         } else if (change instanceof TableChange.UpdateComment) {
-          doUpdateComment(alteredHiveTable, (TableChange.UpdateComment) change);
-
+          newComment = ((TableChange.UpdateComment) change).getNewComment();
         } else if (change instanceof TableChange.SetProperty) {
-          doSetProperty(alteredHiveTable, (TableChange.SetProperty) change);
-
+          TableChange.SetProperty setProperty = (TableChange.SetProperty) change;
+          updatedProperties.put(setProperty.getProperty(), setProperty.getValue());
         } else if (change instanceof TableChange.RemoveProperty) {
-          doRemoveProperty(alteredHiveTable, (TableChange.RemoveProperty) change);
-
+          TableChange.RemoveProperty removeProperty = (TableChange.RemoveProperty) change;
+          updatedProperties.remove(removeProperty.getProperty());
         } else if (change instanceof TableChange.ColumnChange) {
-          // Column change
-          StorageDescriptor sd = alteredHiveTable.getSd();
-          List<FieldSchema> cols = sd.getCols();
-
-          if (change instanceof TableChange.AddColumn) {
-            TableChange.AddColumn addColumn = (TableChange.AddColumn) change;
-            doAddColumn(cols, addColumn);
-
-          } else if (change instanceof TableChange.DeleteColumn) {
-            doDeleteColumn(cols, (TableChange.DeleteColumn) change);
-
-          } else if (change instanceof TableChange.RenameColumn) {
-            doRenameColumn(cols, (TableChange.RenameColumn) change);
-
-          } else if (change instanceof TableChange.UpdateColumnComment) {
-            doUpdateColumnComment(cols, (TableChange.UpdateColumnComment) change);
-
-          } else if (change instanceof TableChange.UpdateColumnPosition) {
-            doUpdateColumnPosition(cols, (TableChange.UpdateColumnPosition) change);
-
-          } else if (change instanceof TableChange.UpdateColumnType) {
-            doUpdateColumnType(cols, (TableChange.UpdateColumnType) change);
-
-          } else if (change instanceof TableChange.UpdateColumnAutoIncrement) {
-            throw new IllegalArgumentException(
-                "Hive does not support altering column auto increment");
-          } else {
-            throw new IllegalArgumentException(
-                "Unsupported column change type: " + change.getClass().getSimpleName());
-          }
+          applyColumnChange(updatedColumns, (TableChange.ColumnChange) change);
         } else {
           throw new IllegalArgumentException(
               "Unsupported table change type: "
                   + (change == null ? "null" : change.getClass().getSimpleName()));
         }
       }
-       */
 
+      HiveTable updatedTable =
+          buildAlteredHiveTable(
+              currentTable, newTableName, newComment, updatedProperties, updatedColumns);
+
+      HiveTable finalUpdatedTable = updatedTable;
       clientPool.run(
           c -> {
-            c.alterTable("", schemaIdent.name(), tableIdent.name(), tableHandle.table());
+            c.alterTable("", schemaIdent.name(), tableIdent.name(), finalUpdatedTable);
             return null;
           });
 
       LOG.info("Altered Hive table {} in Hive Metastore", tableIdent.name());
-      return tableHandle;
+      return new HiveTableHandle(updatedTable, clientPool);
 
     } catch (InterruptedException e) {
       throw new RuntimeException(e);
     }
   }
 
-  private int columnPosition(List<FieldSchema> columns, TableChange.ColumnPosition position) {
-    Preconditions.checkArgument(position != null, "Column position cannot be null");
-    if (position instanceof TableChange.After) {
+  private HiveTable buildAlteredHiveTable(
+      HiveTable original,
+      String tableName,
+      String comment,
+      Map<String, String> properties,
+      List<Column> columns) {
+    HiveTable.Builder builder =
+        HiveTable.builder()
+            .withName(tableName)
+            .withColumns(columns.toArray(new Column[0]))
+            .withProperties(properties)
+            .withAuditInfo(original.auditInfo())
+            .withDistribution(original.distribution())
+            .withSortOrders(original.sortOrder())
+            .withPartitioning(original.partitioning())
+            .withCatalogName(original.catalogName())
+            .withDatabaseName(original.databaseName());
+
+    if (comment != null) {
+      builder.withComment(comment);
+    }
+    return builder.build();
+  }
+
+  private void applyColumnChange(List<Column> columns, TableChange.ColumnChange change) {
+    if (change instanceof TableChange.AddColumn) {
+      doAddColumn(columns, (TableChange.AddColumn) change);
+    } else if (change instanceof TableChange.DeleteColumn) {
+      doDeleteColumn(columns, (TableChange.DeleteColumn) change);
+    } else if (change instanceof TableChange.RenameColumn) {
+      doRenameColumn(columns, (TableChange.RenameColumn) change);
+    } else if (change instanceof TableChange.UpdateColumnComment) {
+      doUpdateColumnComment(columns, (TableChange.UpdateColumnComment) change);
+    } else if (change instanceof TableChange.UpdateColumnPosition) {
+      doUpdateColumnPosition(columns, (TableChange.UpdateColumnPosition) change);
+    } else if (change instanceof TableChange.UpdateColumnType) {
+      doUpdateColumnType(columns, (TableChange.UpdateColumnType) change);
+    } else if (change instanceof TableChange.UpdateColumnDefaultValue) {
+      doUpdateColumnDefaultValue(columns, (TableChange.UpdateColumnDefaultValue) change);
+    } else if (change instanceof TableChange.UpdateColumnNullability) {
+      doUpdateColumnNullability(columns, (TableChange.UpdateColumnNullability) change);
+    } else if (change instanceof TableChange.UpdateColumnAutoIncrement) {
+      throw new IllegalArgumentException("Hive does not support altering column auto increment");
+    } else {
+      throw new IllegalArgumentException(
+          "Unsupported column change type: " + change.getClass().getSimpleName());
+    }
+  }
+
+  private int columnPosition(List<Column> columns, TableChange.ColumnPosition position) {
+    if (position == null || position instanceof TableChange.Default) {
+      return columns.size();
+    } else if (position instanceof TableChange.After) {
       String afterColumn = ((TableChange.After) position).getColumn();
       int indexOfColumn = indexOfColumn(columns, afterColumn);
       Preconditions.checkArgument(indexOfColumn != -1, "Column does not exist: " + afterColumn);
@@ -856,114 +887,141 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
     }
   }
 
-  /**
-   * Returns the index of a column in the given list of FieldSchema objects, based on the field
-   * name.
-   *
-   * @param columns The list of Hive columns.
-   * @param fieldName The name of the field to be searched.
-   * @return The index of the column if found, otherwise -1.
-   */
-  private int indexOfColumn(List<FieldSchema> columns, String fieldName) {
-    return columns.stream()
-        .map(FieldSchema::getName)
-        .collect(Collectors.toList())
-        .indexOf(fieldName);
+  private int indexOfColumn(List<Column> columns, String fieldName) {
+    for (int i = 0; i < columns.size(); i++) {
+      if (columns.get(i).name().equals(fieldName)) {
+        return i;
+      }
+    }
+    return -1;
   }
 
-  private void doRenameTable(
-      org.apache.hadoop.hive.metastore.api.Table hiveTable, TableChange.RenameTable change) {
-    Preconditions.checkArgument(
-        !change.getNewSchemaName().isPresent(), "Does not support rename schema yet");
-    hiveTable.setTableName(change.getNewName());
-  }
-
-  private void doUpdateComment(
-      org.apache.hadoop.hive.metastore.api.Table hiveTable, TableChange.UpdateComment change) {
-    Map<String, String> parameters = hiveTable.getParameters();
-    parameters.put(COMMENT, change.getNewComment());
-  }
-
-  private void doSetProperty(
-      org.apache.hadoop.hive.metastore.api.Table hiveTable, TableChange.SetProperty change) {
-    Map<String, String> parameters = hiveTable.getParameters();
-    parameters.put(change.getProperty(), change.getValue());
-  }
-
-  private void doRemoveProperty(
-      org.apache.hadoop.hive.metastore.api.Table hiveTable, TableChange.RemoveProperty change) {
-    Map<String, String> parameters = hiveTable.getParameters();
-    parameters.remove(change.getProperty());
-  }
-
-  private void doAddColumn(List<FieldSchema> cols, TableChange.AddColumn change) {
-    int targetPosition;
+  private void doAddColumn(List<Column> columns, TableChange.AddColumn change) {
+    String columnName = topLevelFieldName(change.getFieldName());
     if (change.isAutoIncrement()) {
       throw new IllegalArgumentException("Hive catalog does not support auto-increment column");
     }
-    if (change.getPosition() instanceof TableChange.Default) {
-      // add to the end by default
-      targetPosition = cols.size();
-      LOG.info(
-          "Hive catalog add column {} to the end of non-partition columns by default",
-          change.fieldName()[0]);
-    } else {
-      targetPosition = columnPosition(cols, change.getPosition());
-    }
-    cols.add(
+    Preconditions.checkArgument(
+        indexOfColumn(columns, columnName) == -1, "Column already exists: " + columnName);
+    int targetPosition = columnPosition(columns, change.getPosition());
+    columns.add(
         targetPosition,
-        new FieldSchema(
-            change.fieldName()[0],
-            CONVERTER.fromGravitino(change.getDataType()).getQualifiedName(),
-            change.getComment()));
+        Column.of(
+            columnName,
+            change.getDataType(),
+            change.getComment(),
+            change.isNullable(),
+            change.isAutoIncrement(),
+            defaultValueOrUnset(change.getDefaultValue())));
   }
 
-  private void doDeleteColumn(List<FieldSchema> cols, TableChange.DeleteColumn change) {
-    String columnName = change.fieldName()[0];
-    if (!cols.removeIf(c -> c.getName().equals(columnName)) && !change.getIfExists()) {
-      throw new IllegalArgumentException("DeleteColumn does not exist: " + columnName);
+  private void doDeleteColumn(List<Column> columns, TableChange.DeleteColumn change) {
+    String columnName = topLevelFieldName(change.fieldName());
+    int index = indexOfColumn(columns, columnName);
+    if (index == -1) {
+      if (!change.getIfExists()) {
+        throw new IllegalArgumentException("DeleteColumn does not exist: " + columnName);
+      }
+      return;
     }
+    columns.remove(index);
   }
 
-  private void doRenameColumn(List<FieldSchema> cols, TableChange.RenameColumn change) {
-    String columnName = change.fieldName()[0];
-    if (indexOfColumn(cols, columnName) == -1) {
+  private void doRenameColumn(List<Column> columns, TableChange.RenameColumn change) {
+    String columnName = topLevelFieldName(change.fieldName());
+    int index = indexOfColumn(columns, columnName);
+    if (index == -1) {
       throw new IllegalArgumentException("RenameColumn does not exist: " + columnName);
     }
-
     String newName = change.getNewName();
-    if (indexOfColumn(cols, newName) != -1) {
-      throw new IllegalArgumentException("Column already exists: " + newName);
-    }
-    cols.get(indexOfColumn(cols, columnName)).setName(newName);
+    Preconditions.checkArgument(
+        indexOfColumn(columns, newName) == -1, "Column already exists: " + newName);
+    Column existing = columns.get(index);
+    columns.set(index, rebuildColumn(existing, newName, null, null, null, null, null));
   }
 
-  private void doUpdateColumnComment(
-      List<FieldSchema> cols, TableChange.UpdateColumnComment change) {
-    cols.get(indexOfColumn(cols, change.fieldName()[0])).setComment(change.getNewComment());
+  private void doUpdateColumnComment(List<Column> columns, TableChange.UpdateColumnComment change) {
+    int index = indexOfColumn(columns, topLevelFieldName(change.fieldName()));
+    if (index == -1) {
+      throw new IllegalArgumentException(
+          "UpdateColumnComment does not exist: " + change.fieldName()[0]);
+    }
+    Column existing = columns.get(index);
+    columns.set(
+        index, rebuildColumn(existing, null, null, change.getNewComment(), null, null, null));
   }
 
   private void doUpdateColumnPosition(
-      List<FieldSchema> cols, TableChange.UpdateColumnPosition change) {
-    String columnName = change.fieldName()[0];
-    int sourceIndex = indexOfColumn(cols, columnName);
+      List<Column> columns, TableChange.UpdateColumnPosition change) {
+    String columnName = topLevelFieldName(change.fieldName());
+    int sourceIndex = indexOfColumn(columns, columnName);
     if (sourceIndex == -1) {
       throw new IllegalArgumentException("UpdateColumnPosition does not exist: " + columnName);
     }
-
-    // update column position: remove then add to given position
-    FieldSchema hiveColumn = cols.remove(sourceIndex);
-    cols.add(columnPosition(cols, change.getPosition()), hiveColumn);
+    Column column = columns.remove(sourceIndex);
+    int targetIndex = columnPosition(columns, change.getPosition());
+    columns.add(targetIndex, column);
   }
 
-  private void doUpdateColumnType(List<FieldSchema> cols, TableChange.UpdateColumnType change) {
-    String columnName = change.fieldName()[0];
-    int indexOfColumn = indexOfColumn(cols, columnName);
-    if (indexOfColumn == -1) {
+  private void doUpdateColumnType(List<Column> columns, TableChange.UpdateColumnType change) {
+    String columnName = topLevelFieldName(change.getFieldName());
+    int index = indexOfColumn(columns, columnName);
+    if (index == -1) {
       throw new IllegalArgumentException("UpdateColumnType does not exist: " + columnName);
     }
-    cols.get(indexOfColumn)
-        .setType(CONVERTER.fromGravitino(change.getNewDataType()).getQualifiedName());
+    Column existing = columns.get(index);
+    columns.set(
+        index, rebuildColumn(existing, null, change.getNewDataType(), null, null, null, null));
+  }
+
+  private void doUpdateColumnDefaultValue(
+      List<Column> columns, TableChange.UpdateColumnDefaultValue change) {
+    String columnName = topLevelFieldName(change.fieldName());
+    int index = indexOfColumn(columns, columnName);
+    if (index == -1) {
+      throw new IllegalArgumentException("UpdateColumnDefaultValue does not exist: " + columnName);
+    }
+    Column existing = columns.get(index);
+    columns.set(
+        index, rebuildColumn(existing, null, null, null, null, null, change.getNewDefaultValue()));
+  }
+
+  private void doUpdateColumnNullability(
+      List<Column> columns, TableChange.UpdateColumnNullability change) {
+    String columnName = topLevelFieldName(change.fieldName());
+    int index = indexOfColumn(columns, columnName);
+    if (index == -1) {
+      throw new IllegalArgumentException("UpdateColumnNullability does not exist: " + columnName);
+    }
+    Column existing = columns.get(index);
+    columns.set(index, rebuildColumn(existing, null, null, null, change.nullable(), null, null));
+  }
+
+  private Column rebuildColumn(
+      Column existing,
+      String name,
+      Type dataType,
+      String comment,
+      Boolean nullable,
+      Boolean autoIncrement,
+      Expression defaultValue) {
+    return Column.of(
+        name != null ? name : existing.name(),
+        dataType != null ? dataType : existing.dataType(),
+        comment != null ? comment : existing.comment(),
+        nullable != null ? nullable : existing.nullable(),
+        autoIncrement != null ? autoIncrement : existing.autoIncrement(),
+        defaultValue != null ? defaultValue : existing.defaultValue());
+  }
+
+  private Expression defaultValueOrUnset(Expression defaultValue) {
+    return defaultValue == null ? Column.DEFAULT_VALUE_NOT_SET : defaultValue;
+  }
+
+  private String topLevelFieldName(String[] fieldName) {
+    Preconditions.checkArgument(
+        fieldName.length == 1, "Hive catalog only supports top-level column operations");
+    return fieldName[0];
   }
 
   /**
@@ -1067,7 +1125,7 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
 
   private boolean isExternalTable(NameIdentifier tableIdent) {
     HiveTableHandle hiveTable = loadHiveTable(tableIdent);
-    return EXTERNAL_TABLE.name().equalsIgnoreCase(hiveTable.properties().getOrDefault("type", ""));
+    return EXTERNAL_TABLE.name().equalsIgnoreCase(hiveTable.getTableType());
   }
 
   private static ThreadFactory getThreadFactory(String factoryName) {

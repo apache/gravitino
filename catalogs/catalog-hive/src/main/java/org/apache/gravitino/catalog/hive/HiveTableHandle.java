@@ -18,6 +18,8 @@
  */
 package org.apache.gravitino.catalog.hive;
 
+import static org.apache.gravitino.catalog.hive.HiveConstants.TABLE_TYPE;
+
 import lombok.ToString;
 import org.apache.gravitino.connector.BaseTable;
 import org.apache.gravitino.connector.TableOperations;
@@ -31,9 +33,19 @@ public class HiveTableHandle extends BaseTable {
   private final HiveTable table;
   private final CachedClientPool clientPool;
 
-  protected HiveTableHandle(HiveTable hiveTable, CachedClientPool clientPool) {
+  public HiveTableHandle(HiveTable hiveTable, CachedClientPool clientPool) {
     this.table = hiveTable;
     this.clientPool = clientPool;
+    this.name = hiveTable.name();
+    this.comment = hiveTable.comment();
+    this.properties = hiveTable.properties();
+    this.auditInfo = hiveTable.auditInfo();
+    this.columns = hiveTable.columns();
+    this.partitioning = hiveTable.partitioning();
+    this.sortOrders = hiveTable.sortOrder();
+    this.distribution = hiveTable.distribution();
+    this.indexes = hiveTable.index();
+    this.proxyPlugin = hiveTable.proxyPlugin();
   }
 
   public HiveTable table() {
@@ -56,5 +68,9 @@ public class HiveTableHandle extends BaseTable {
 
   public void close() {
     clientPool.close();
+  }
+
+  public String getTableType() {
+    return properties.getOrDefault(TABLE_TYPE, "MANAGED_TABLE");
   }
 }

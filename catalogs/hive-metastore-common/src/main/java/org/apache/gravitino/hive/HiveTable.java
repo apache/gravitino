@@ -22,11 +22,20 @@ import static org.apache.gravitino.catalog.hive.HiveConstants.COMMENT;
 
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
+import java.util.Optional;
 import java.util.Set;
+import java.util.stream.Collectors;
 import lombok.ToString;
 import org.apache.gravitino.catalog.hive.TableType;
 import org.apache.gravitino.connector.BaseTable;
+import org.apache.gravitino.connector.ProxyPlugin;
 import org.apache.gravitino.connector.TableOperations;
+import org.apache.gravitino.rel.expressions.NamedReference;
+import org.apache.gravitino.rel.expressions.transforms.Transform;
+import org.apache.gravitino.rel.expressions.transforms.Transforms;
 
 /** Represents an Apache Hive Table entity in the Hive Metastore catalog. */
 @ToString
@@ -48,6 +57,10 @@ public class HiveTable extends BaseTable {
 
   public String databaseName() {
     return databaseName;
+  }
+
+  public void setProxyPlugin(ProxyPlugin plugin) {
+    this.proxyPlugin = Optional.ofNullable(plugin);
   }
 
   @Override
@@ -87,20 +100,6 @@ public class HiveTable extends BaseTable {
     }
 
     /**
-     * Sets the Hive schema (database) name to be used for building the HiveTable. This is a
-     * deprecated alias for {@link #withDatabaseName(String)}.
-     *
-     * @param schemaName The string schema name of the HiveTable.
-     * @return This Builder instance.
-     * @deprecated Use {@link #withDatabaseName(String)} instead.
-     */
-    @Deprecated
-    public Builder withSchemaName(String schemaName) {
-      this.databaseName = schemaName;
-      return this;
-    }
-
-    /**
      * Internal method to build a HiveTable instance using the provided values.
      *
      * @return A new HiveTable instance with the configured values.
@@ -118,6 +117,7 @@ public class HiveTable extends BaseTable {
       hiveTable.partitioning = partitioning;
       hiveTable.catalogName = catalogName;
       hiveTable.databaseName = databaseName;
+      hiveTable.proxyPlugin = proxyPlugin;
 
       // HMS put table comment in parameters
       if (comment != null) {
@@ -135,5 +135,33 @@ public class HiveTable extends BaseTable {
    */
   public static Builder builder() {
     return new Builder();
+  }
+
+  /**
+   * Returns all partition field names defined on this table in declaration order. Callers that need
+   * uniqueness can convert the returned list to a {@link java.util.Set}.
+   */
+  public List<String> partitionFieldNames() {
+    if (partitioning() == null) {
+      return Collections.emptyList();
+    }
+
+    return Arrays.stream(partitioning())
+        .flatMap(transform -> extractPartitionFieldNames(transform).stream())
+        .collect(Collectors.toList());
+  }
+
+  private static List<String> extractPartitionFieldNames(Transform partitioning) {
+    if (partitioning instanceof Transforms.IdentityTransform) {
+      return Arrays.asList(((Transforms.IdentityTransform) partitioning).fieldName());
+    }
+
+    if (partitioning.arguments().length > 0
+        && partitioning.arguments()[0] instanceof NamedReference.FieldReference fieldReference) {
+      return Arrays.asList(fieldReference.fieldName());
+    }
+
+    throw new IllegalArgumentException(
+        String.format("Unsupported partition transform type: %s", partitioning.getClass()));
   }
 }

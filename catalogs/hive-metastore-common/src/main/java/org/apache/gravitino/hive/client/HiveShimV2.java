@@ -71,7 +71,7 @@ class HiveShimV2 extends Shim {
   @Override
   public void dropDatabase(String catalogName, String databaseName, boolean cascade) {
     try {
-      client.dropDatabase(databaseName, cascade, false);
+      client.dropDatabase(databaseName, false, false, cascade);
     } catch (Exception e) {
       throw HiveExceptionConverter.toGravitinoException(e);
     }
@@ -87,10 +87,10 @@ class HiveShimV2 extends Shim {
   }
 
   @Override
-  public List<String> getAllDatabTables(
+  public List<String> listTableNamesByFilter(
       String catalogName, String databaseName, String filter, short pageSize) {
     try {
-      return client.getTables(databaseName, filter);
+      return client.listTableNamesByFilter(databaseName, filter, pageSize);
     } catch (Exception e) {
       throw HiveExceptionConverter.toGravitinoException(e);
     }

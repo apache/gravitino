@@ -34,6 +34,7 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.Maps;
 import java.time.Instant;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -41,8 +42,7 @@ import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.apache.gravitino.catalog.hive.StorageFormat;
-import org.apache.gravitino.dto.rel.ColumnDTO;
-import org.apache.gravitino.dto.rel.partitioning.Partitioning;
+import org.apache.gravitino.hive.HiveColumn;
 import org.apache.gravitino.hive.HiveTable;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.rel.Column;
@@ -60,6 +60,7 @@ import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.expressions.transforms.Transforms;
 import org.apache.gravitino.rel.partitions.Partition;
 import org.apache.gravitino.rel.partitions.Partitions;
+import org.apache.gravitino.rel.types.Type;
 import org.apache.hadoop.hive.common.FileUtils;
 import org.apache.hadoop.hive.metastore.TableType;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
@@ -80,7 +81,7 @@ public class HiveTableConverter {
 
     SortOrder[] sortOrders = HiveTableConverter.getSortOrders(table);
 
-    Column[] columns = HiveTableConverter.getColumns(table, ColumnDTO.builder());
+    Column[] columns = HiveTableConverter.getColumns(table);
 
     Transform[] partitioning = HiveTableConverter.getPartitioning(table);
 
@@ -157,43 +158,54 @@ public class HiveTableConverter {
   }
 
   public static List<FieldSchema> buildPartitionKeys(Table table) {
-    return Arrays.stream(table.partitioning())
-        .map(HiveTableConverter::getPartitionFieldNames)
+    return getPartitionFieldNames(table).stream()
         .map(fieldName -> getPartitionKey(fieldName, table))
         .collect(Collectors.toList());
   }
 
-  private static String[] getPartitionFieldNames(Transform partitioning) {
-    if (partitioning instanceof Transforms.IdentityTransform) {
-      return ((Transforms.IdentityTransform) partitioning).fieldName();
+  private static List<String> getPartitionFieldNames(Table table) {
+    if (table instanceof HiveTable) {
+      return ((HiveTable) table).partitionFieldNames();
     }
 
-    if (partitioning instanceof Partitioning partitioningDTO) {
-      if (partitioningDTO instanceof Partitioning.SingleFieldPartitioning singleFieldPartitioning) {
-        return singleFieldPartitioning.fieldName();
-      }
+    if (table.partitioning() == null) {
+      return Collections.emptyList();
+    }
+
+    return Arrays.stream(table.partitioning())
+        .flatMap(transform -> partitionFieldNames(transform).stream())
+        .collect(Collectors.toList());
+  }
+
+  private static List<String> partitionFieldNames(Transform partitioning) {
+    if (partitioning instanceof Transforms.IdentityTransform) {
+      return Arrays.asList(((Transforms.IdentityTransform) partitioning).fieldName());
     }
 
     if (partitioning.arguments().length > 0
         && partitioning.arguments()[0] instanceof NamedReference.FieldReference fieldReference) {
-      return fieldReference.fieldName();
+      return Arrays.asList(fieldReference.fieldName());
     }
 
     throw new IllegalArgumentException(
         String.format("Unsupported partition transform type: %s", partitioning.getClass()));
   }
 
-  private static FieldSchema getPartitionKey(String[] fieldName, Table table) {
-    List<Column> partitionColumns =
+  private static FieldSchema getPartitionKey(String fieldName, Table table) {
+    Column partitionColumn =
         Arrays.stream(table.columns())
-            .filter(c -> c.name().equals(fieldName[0]))
-            .collect(Collectors.toList());
+            .filter(c -> c.name().equals(fieldName))
+            .findFirst()
+            .orElseThrow(
+                () ->
+                    new IllegalArgumentException(
+                        String.format("Partition column %s does not exist", fieldName)));
     return new FieldSchema(
-        partitionColumns.get(0).name(),
+        partitionColumn.name(),
         HiveDataTypeConverter.CONVERTER
-            .fromGravitino(partitionColumns.get(0).dataType())
+            .fromGravitino(partitionColumn.dataType())
             .getQualifiedName(),
-        partitionColumns.get(0).comment());
+        partitionColumn.comment());
   }
 
   private static StorageDescriptor buildStorageDescriptor(
@@ -337,8 +349,7 @@ public class HiveTableConverter {
         .toArray(Transform[]::new);
   }
 
-  public static ColumnDTO[] getColumns(
-      org.apache.hadoop.hive.metastore.api.Table table, ColumnDTO.Builder columnBuilder) {
+  public static Column[] getColumns(org.apache.hadoop.hive.metastore.api.Table table) {
     StorageDescriptor sd = table.getSd();
     // Collect column names from sd.getCols() to check for duplicates
     Set<String> columnNames =
@@ -348,22 +359,29 @@ public class HiveTableConverter {
             sd.getCols().stream()
                 .map(
                     f ->
-                        columnBuilder
-                            .withName(f.getName())
-                            .withDataType(HiveDataTypeConverter.CONVERTER.toGravitino(f.getType()))
-                            .withComment(f.getComment())
-                            .build()),
+                        buildColumn(
+                            f.getName(),
+                            HiveDataTypeConverter.CONVERTER.toGravitino(f.getType()),
+                            f.getComment())),
             table.getPartitionKeys().stream()
                 // Filter out partition keys that already exist in sd.getCols()
                 .filter(p -> !columnNames.contains(p.getName()))
                 .map(
                     p ->
-                        columnBuilder
-                            .withName(p.getName())
-                            .withDataType(HiveDataTypeConverter.CONVERTER.toGravitino(p.getType()))
-                            .withComment(p.getComment())
-                            .build()))
-        .toArray(ColumnDTO[]::new);
+                        buildColumn(
+                            p.getName(),
+                            HiveDataTypeConverter.CONVERTER.toGravitino(p.getType()),
+                            p.getComment())))
+        .toArray(Column[]::new);
+  }
+
+  private static Column buildColumn(String name, Type type, String comment) {
+    HiveColumn.Builder builder =
+        HiveColumn.builder().withName(name).withType(type).withNullable(true);
+    if (comment != null) {
+      builder.withComment(comment);
+    }
+    return builder.build();
   }
 
   public static Partition fromHivePartition(
@@ -388,7 +406,7 @@ public class HiveTableConverter {
         .toArray(String[][]::new);
   }
 
-  public static java.util.List<String> parsePartitionValues(String partitionName) {
+  public static List<String> parsePartitionValues(String partitionName) {
     if (partitionName == null || partitionName.isEmpty()) {
       return java.util.List.of();
     }

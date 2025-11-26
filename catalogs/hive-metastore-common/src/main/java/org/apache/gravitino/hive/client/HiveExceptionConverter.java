@@ -52,7 +52,7 @@ public class HiveExceptionConverter {
    * @param e The exception to convert
    * @return A Gravitino exception
    */
-  public static GravitinoRuntimeException toGravitinoException(Exception e) {
+  public static RuntimeException toGravitinoException(Exception e) {
     Throwable cause = unwrapException(e);
     return convertException(cause);
   }
@@ -82,7 +82,7 @@ public class HiveExceptionConverter {
    * @param cause The exception cause
    * @return A Gravitino exception
    */
-  private static GravitinoRuntimeException convertException(Throwable cause) {
+  private static RuntimeException convertException(Throwable cause) {
     String message = cause.getMessage();
     String lowerMessage = message != null ? message.toLowerCase() : "";
 
@@ -174,10 +174,14 @@ public class HiveExceptionConverter {
     }
 
     if (cause instanceof RuntimeException) {
-      return toGravitinoException((Exception) cause.getCause());
+      if (cause.getCause() != null && cause.getCause() instanceof Exception) {
+        return toGravitinoException((Exception) cause.getCause());
+      } else {
+        return (RuntimeException) cause;
+      }
     }
 
     // Default: wrap in GravitinoRuntimeException
-    return new GravitinoRuntimeException(cause, "");
+    return new GravitinoRuntimeException(cause, message);
   }
 }

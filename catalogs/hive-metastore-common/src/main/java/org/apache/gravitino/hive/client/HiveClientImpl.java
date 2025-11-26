@@ -78,7 +78,7 @@ public class HiveClientImpl implements HiveClient {
   @Override
   public List<String> listTableNamesByFilter(
       String catalogName, String databaseName, String filter, short pageSize) {
-    return shim.getAllDatabTables(catalogName, databaseName, filter, pageSize);
+    return shim.listTableNamesByFilter(catalogName, databaseName, filter, pageSize);
   }
 
   @Override

@@ -46,9 +46,10 @@ import org.apache.gravitino.rel.partitions.Partition;
 import org.apache.gravitino.rel.partitions.Partitions;
 import org.apache.gravitino.rel.types.Types;
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 
-// @Disabled
+@Disabled
 public class TestHiveClient {
 
   private static final String HIVE2_HMS_URL = "thrift://172.17.0.2:9083";

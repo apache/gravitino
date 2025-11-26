@@ -41,7 +41,7 @@ class HiveShimV3 extends HiveShimV2 {
   private final Method alterTableMethod;
   private final Method dropTableMethod;
   private final Method getAllTablesMethod;
-  private final Method getTablesMethod;
+  private final Method listTableNamesByFilterMethod;
   private final Method listPartitionNamesMethod;
   private final Method listPartitionsMethod;
   private final Method listPartitionsWithFilterMethod;
@@ -88,8 +88,9 @@ class HiveShimV3 extends HiveShimV2 {
               "dropTable", String.class, String.class, String.class, boolean.class, boolean.class);
       this.getAllTablesMethod =
           IMetaStoreClient.class.getMethod("getAllTables", String.class, String.class);
-      this.getTablesMethod =
-          IMetaStoreClient.class.getMethod("getTables", String.class, String.class, String.class);
+      this.listTableNamesByFilterMethod =
+          IMetaStoreClient.class.getMethod(
+              "listTableNamesByFilter", String.class, String.class, String.class, short.class);
 
       // Hive3 partition methods with catalog support (using int for pageSize)
       this.listPartitionNamesMethod =
@@ -170,9 +171,12 @@ class HiveShimV3 extends HiveShimV2 {
   }
 
   @Override
-  public List<String> getAllDatabTables(
+  public List<String> listTableNamesByFilter(
       String catalogName, String databaseName, String filter, short pageSize) {
-    return (List<String>) invoke(client, getTablesMethod, catalogName, databaseName, filter);
+    Object pageSizeArg = convertPageSize(listTableNamesByFilterMethod, 3, pageSize);
+    return (List<String>)
+        invoke(
+            client, listTableNamesByFilterMethod, catalogName, databaseName, filter, pageSizeArg);
   }
 
   @Override

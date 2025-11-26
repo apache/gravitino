@@ -61,7 +61,7 @@ public abstract class Shim {
 
   public abstract List<String> getAllTables(String catalogName, String databaseName);
 
-  public abstract List<String> getAllDatabTables(
+  public abstract List<String> listTableNamesByFilter(
       String catalogName, String databaseName, String filter, short pageSize);
 
   public abstract HiveTable getTable(String catalogName, String databaseName, String tableName);
