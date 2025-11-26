@@ -24,8 +24,6 @@ import static org.apache.gravitino.file.Fileset.PROPERTY_DEFAULT_LOCATION_NAME;
 import static org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_CURRENT_LOCATION_NAME;
 import static org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_FILESET_METADATA_CACHE_ENABLE;
 import static org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_FILESET_METADATA_CACHE_ENABLE_DEFAULT;
-import static org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_FILESET_PROPERTY_KEYNAME_PREFIX;
-import static org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_FILESET_PROPERTY_PREFIX;
 import static org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystemUtils.extractIdentifier;
 import static org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystemUtils.extractNonDefaultConfig;
 import static org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystemUtils.getSubPathFromGvfsPath;
@@ -755,12 +753,14 @@ public abstract class BaseGVFSOperations implements Closeable {
 
       Path targetLocation = new Path(fileset.storageLocations().get(targetLocationName));
       Map<String, String> allProperties =
-          getAllProperties(filesetIdent, targetLocation.toUri().getScheme(), targetLocationName);
-      Schema schema = getSchema(NameIdentifier.parse(filesetIdent.namespace().toString()));
-      allProperties.putAll(schema.properties());
+          getAllProperties(filesetIdent, fileset.properties());
+      allProperties.putAll(getUserDefinedConfigs(getBaseLocation(targetLocation)));
 
-      allProperties.putAll(fileset.properties());
-      allProperties.putAll(getUserDefinedFilesetConfigs(filesetIdent));
+      if (enableCredentialVending()) {
+          allProperties.putAll(
+                  getCredentialProperties(
+                          getFileSystemProviderByScheme(targetLocation.toUri().getScheme()), filesetIdent, locationName));
+      }
 
       FileSystem actualFileSystem = getActualFileSystemByPath(targetLocation, allProperties);
       createFilesetLocationIfNeed(filesetIdent, actualFileSystem, targetLocation);
@@ -794,72 +794,54 @@ public abstract class BaseGVFSOperations implements Closeable {
     }
   }
 
-  private Map<String, String> getUserDefinedFilesetConfigs(NameIdentifier ident) {
-    // retrieve the special fileset properties from the configuration
-    // the configuration key pattern is
-    // fs.gravitino.fileset.properties.catalog.schema.fileset.keyname.property_key
-    // e.g.,
-    // fs.gravitino.fileset.properties.my_catalog.my_schema.my_fileset.some_property_key=some_value
-    // or fs.gravitino.fileset.properties.my_catalog.my_schema.some_property_key=some_value
-    // the fileset level properties will override the schema level properties, which will override
-    // the catalog level properties
+  /**
+   * Get user defined configurations for a specific location. Configuration format:
+   *
+   * <pre>
+   *
+   * </pre>
+   *
+   * @param baseLocation the base location of fileset
+   * @return a map of configuration properties for the specified location
+   */
+  private Map<String, String> getUserDefinedConfigs(String baseLocation) {
+    // Prepare a map to hold the properties for the specified location
+    // fs.path.config.<location_name> = location
+    // fs.path.config.<location_name>.<property_name> = <property_value>
+    // eg:
+    //   fs.path.config.cluster1 = s3://bucket/path/
+    //   fs.path.config.cluster1.aws-access-key = XXX
+    //   fs.path.config.cluster1.aws-secret-key = XXX
     Map<String, String> properties = new HashMap<>();
-    Map<String, String> schemaProperties = new HashMap<>();
-    Map<String, String> filesetProperties = new HashMap<>();
+    if (StringUtils.isBlank(baseLocation)) {
+      return properties;
+    }
+    String locationPrefix =
+        GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_PATH_CONFIG_PREFIX
+            + baseLocation
+            + ".";
 
-    int levelCount = ident.namespace().levels().length;
-    Preconditions.checkArgument(levelCount >= 2, "identifier %s is invalid.", ident);
+    // Iterate through all configuration entries
+    for (Map.Entry<String, String> entry : conf) {
+      String key = entry.getKey();
 
-    String catalog = ident.namespace().level(1);
-    String schema = levelCount == 3 ? ident.namespace().level(2) : null;
-    String fileset = levelCount == 4 ? ident.namespace().level(3) : null;
+      // Check if this key is a property for the specified location
+      // e.g., "fs.path.config.cluster1.aws-ak" matches prefix "fs.path.config.cluster1."
+      if (key.startsWith(locationPrefix)) {
+        // Extract the property name after the location prefix
+        // e.g., "fs.path.config.cluster1.aws-ak" -> "aws-ak"
+        String propertyName = key.substring(locationPrefix.length());
+        if (!propertyName.isEmpty()) {
+          properties.put(propertyName, entry.getValue());
+        }
+      }
+    }
 
-    conf.forEach(
-        entry -> {
-          String key = entry.getKey();
-          String value = entry.getValue();
-
-          String catalogPrefix =
-              String.format(
-                  "%s.%s.%s.",
-                  FS_GRAVITINO_FILESET_PROPERTY_PREFIX,
-                  catalog,
-                  FS_GRAVITINO_FILESET_PROPERTY_KEYNAME_PREFIX);
-          String schemaPrefix =
-              schema != null
-                  ? String.format(
-                      "%s.%s.%s.%s.",
-                      FS_GRAVITINO_FILESET_PROPERTY_PREFIX,
-                      catalog,
-                      schema,
-                      FS_GRAVITINO_FILESET_PROPERTY_KEYNAME_PREFIX)
-                  : null;
-          String filesetPrefix =
-              fileset != null
-                  ? String.format(
-                      "%s.%s.%s.%s.%s.",
-                      FS_GRAVITINO_FILESET_PROPERTY_PREFIX,
-                      catalog,
-                      schema,
-                      fileset,
-                      FS_GRAVITINO_FILESET_PROPERTY_KEYNAME_PREFIX)
-                  : null;
-
-          if (filesetPrefix != null && key.startsWith(filesetPrefix)) {
-            String configKey = key.substring(filesetPrefix.length());
-            filesetProperties.put(configKey, value);
-          } else if (schemaPrefix != null && key.startsWith(schemaPrefix)) {
-            String configKey = key.substring(schemaPrefix.length());
-            schemaProperties.put(configKey, value);
-          } else if (key.startsWith(catalogPrefix)) {
-            String configKey = key.substring(catalogPrefix.length());
-            properties.put(configKey, value);
-          }
-        });
-
-    properties.putAll(schemaProperties);
-    properties.putAll(filesetProperties);
     return properties;
+  }
+
+  private String getBaseLocation(Path targetLocation) {
+    return targetLocation.toUri().getScheme() + "://" + targetLocation.toUri().getAuthority();
   }
 
   /**
@@ -976,21 +958,20 @@ public abstract class BaseGVFSOperations implements Closeable {
   }
 
   private Map<String, String> getAllProperties(
-      NameIdentifier filesetIdent, String scheme, String locationName) {
+      NameIdentifier filesetIdent, Map<String, String> filesetProperties) {
+   Map<String, String> allProperties = new HashMap<>();
     Catalog catalog =
         (Catalog)
             getFilesetCatalog(
                 NameIdentifier.of(
                     filesetIdent.namespace().level(0), filesetIdent.namespace().level(1)));
+   allProperties.putAll(getNecessaryProperties(catalog.properties()));
 
-    Map<String, String> allProperties = getNecessaryProperties(catalog.properties());
-    allProperties.putAll(extractNonDefaultConfig(conf));
-    if (enableCredentialVending()) {
-      allProperties.putAll(
-          getCredentialProperties(
-              getFileSystemProviderByScheme(scheme), filesetIdent, locationName));
-    }
-    return allProperties;
+   Schema schema = getSchema(NameIdentifier.parse(filesetIdent.namespace().toString()));
+   allProperties.putAll(getNecessaryProperties(schema.properties()));
+   allProperties.putAll(getNecessaryProperties(filesetProperties));
+   allProperties.putAll(extractNonDefaultConfig(conf));
+   return allProperties;
   }
 
   private Map<String, String> getNecessaryProperties(Map<String, String> properties) {
