@@ -382,6 +382,5 @@ public class PolicyAuthorizationIT extends BaseRestApiAuthorizationIT {
         });
     gravitinoMetalake.deletePolicy("policy1");
     metalakeLoadByNormalUser.deletePolicy("policy2");
-    gravitinoMetalake.deletePolicy("policy3");
   }
 }
