@@ -21,7 +21,7 @@ package org.apache.gravitino.catalog.hadoop.fs;
 import static org.apache.gravitino.catalog.hadoop.fs.Constants.BUILTIN_HDFS_FS_PROVIDER;
 import static org.apache.gravitino.catalog.hadoop.fs.Constants.BUILTIN_LOCAL_FS_PROVIDER;
 import static org.apache.gravitino.catalog.hadoop.fs.Constants.FS_DISABLE_CACHE;
-import static org.apache.gravitino.catalog.hadoop.fs.Constants.HDFS_CONFIG_RESOURCES;
+import static org.apache.gravitino.catalog.hadoop.fs.Constants.CONFIG_RESOURCES;
 import static org.apache.gravitino.catalog.hadoop.fs.FileSystemProvider.GRAVITINO_BYPASS;
 import static org.apache.gravitino.catalog.hadoop.fs.HDFSFileSystemProvider.IPC_FALLBACK_TO_SIMPLE_AUTH_ALLOWED;
 
@@ -221,7 +221,7 @@ public class FileSystemUtils {
     try (ByteArrayOutputStream out = new ByteArrayOutputStream()) {
       Configuration configuration = new Configuration();
 
-      String hdfsConfigResources = config.get(HDFS_CONFIG_RESOURCES);
+      String hdfsConfigResources = config.get(CONFIG_RESOURCES);
       if (StringUtils.isNotBlank(hdfsConfigResources)) {
         for (String resource : hdfsConfigResources.split(",")) {
           resource = resource.trim();

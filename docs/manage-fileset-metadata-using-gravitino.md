@@ -916,7 +916,7 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
   "type": "MANAGED",
   "storageLocation": "hdfs://172.17.0.3:9000/tmp/fs2",
   "properties": {
-    "hdfs.config.resources": "/etc/conf/cluster1/core-site.xml,/etc/conf/cluster1/hdfs-site.xml"
+    "config.resources": "/etc/conf/cluster1/core-site.xml,/etc/conf/cluster1/hdfs-site.xml"
   }
 }' http://localhost:8090/api/metalakes/test/catalogs/fileset_catalog/schemas/test_schema/filesets
 ```

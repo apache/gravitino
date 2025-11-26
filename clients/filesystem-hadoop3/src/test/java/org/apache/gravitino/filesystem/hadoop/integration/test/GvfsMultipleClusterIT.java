@@ -233,7 +233,7 @@ public class GvfsMultipleClusterIT extends BaseIT {
                 LOCATION_NAME_UNKNOWN,
                 "gravitino.bypass.dfs.namenode.kerberos.principal.pattern",
                 "*",
-                "hdfs.config.resources",
+                "config.resources",
                 configResources));
     Assertions.assertTrue(catalog.asFilesetCatalog().filesetExists(kerberosFilesetIdent));
 
