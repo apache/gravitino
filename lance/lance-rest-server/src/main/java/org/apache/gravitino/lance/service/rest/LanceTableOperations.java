@@ -205,7 +205,8 @@ public class LanceTableOperations {
       @Context HttpHeaders headers,
       TableExistsRequest tableExistsRequest) {
     try {
-      // True if exists, false if not found and, otherwise throw exception
+      validateTableExists(tableExistsRequest);
+      // True if exists, false if not found and, otherwise throws exception
       boolean exists = lanceNamespace.asTableOps().tableExists(tableId, delimiter);
       if (exists) {
         return Response.status(Response.Status.OK).build();
@@ -226,7 +227,7 @@ public class LanceTableOperations {
       @Context HttpHeaders headers,
       DropTableRequest dropTableRequest) {
     try {
-
+      validateDropTableRequest(dropTableRequest);
       DropTableResponse response = lanceNamespace.asTableOps().dropTable(tableId, delimiter);
       return Response.ok(response).build();
     } catch (Exception e) {
@@ -252,6 +253,16 @@ public class LanceTableOperations {
 
   private void validateDescribeTableRequest(
       @SuppressWarnings("unused") DescribeTableRequest request) {
+    // We will ignore the id in the request body since it's already provided in the path param
+    // No specific fields to validate for now
+  }
+
+  private void validateTableExists(@SuppressWarnings("unused") TableExistsRequest request) {
+    // We will ignore the id in the request body since it's already provided in the path param
+    // No specific fields to validate for now
+  }
+
+  private void validateDropTableRequest(@SuppressWarnings("unused") DropTableRequest request) {
     // We will ignore the id in the request body since it's already provided in the path param
     // No specific fields to validate for now
   }

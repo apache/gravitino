@@ -304,7 +304,14 @@ public class GravitinoLanceTableOperations implements LanceTableOperations {
           CommonUtil.formatCurrentStackTrace());
     }
 
-    catalog.asTableCatalog().purgeTable(tableIdentifier);
+    boolean deleted = catalog.asTableCatalog().purgeTable(tableIdentifier);
+    if (!deleted) {
+      throw LanceNamespaceException.notFound(
+          "Table not found: " + tableId,
+          NoSuchTableException.class.getSimpleName(),
+          tableId,
+          CommonUtil.formatCurrentStackTrace());
+    }
 
     DropTableResponse response = new DropTableResponse();
     response.setId(nsId.listStyleId());
