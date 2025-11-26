@@ -40,6 +40,7 @@ import org.apache.gravitino.Entity;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.authorization.AuthorizationUtils;
+import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationExpression;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationRequest;
 import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionEvaluator;
@@ -144,7 +145,7 @@ public class GravitinoInterceptionService implements InterceptionService {
           String currentUser = PrincipalUtils.getCurrentUserName();
           try {
             AuthorizationUtils.checkCurrentUser(metalakeIdent.name(), currentUser);
-          } catch (org.apache.gravitino.exceptions.ForbiddenException ex) {
+          } catch (ForbiddenException ex) {
             LOG.warn(
                 "User validation failed - User: {}, Metalake: {}, Reason: {}",
                 currentUser,
