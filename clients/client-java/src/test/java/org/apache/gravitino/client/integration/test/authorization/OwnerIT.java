@@ -434,26 +434,27 @@ public class OwnerIT extends BaseIT {
     Owner owner = metalake.getOwner(catalogObject).get();
     Assertions.assertEquals(userName, owner.name());
 
-    GravitinoClient ordinaryClient =
-        GravitinoClient.builder(serverUri).withMetalake(metalakeNameE).build();
-    // Drop the user
-    ordinaryClient.removeUser(userName);
-    // The owner should be removed as well
-    Owner ownerAfterDrop = metalake.getOwner(catalogObject).orElse(null);
-    Assertions.assertEquals(null, ownerAfterDrop);
+    try (GravitinoClient ordinaryClient =
+        GravitinoClient.builder(serverUri).withMetalake(metalakeNameE).build()) {
+      // Drop the user
+      ordinaryClient.removeUser(userName);
+      // The owner should be removed as well
+      Owner ownerAfterDrop = metalake.getOwner(catalogObject).orElse(null);
+      Assertions.assertNull(ownerAfterDrop);
 
-    // create a Group
-    String groupName = "ownerGroup";
-    metalake.addGroup(groupName);
-    // Now set the owner of catalog to the group
-    metalake.setOwner(catalogObject, groupName, Owner.Type.GROUP);
-    owner = metalake.getOwner(catalogObject).get();
-    Assertions.assertEquals(groupName, owner.name());
+      // create a Group
+      String groupName = "ownerGroup";
+      metalake.addGroup(groupName);
+      // Now set the owner of catalog to the group
+      metalake.setOwner(catalogObject, groupName, Owner.Type.GROUP);
+      owner = metalake.getOwner(catalogObject).get();
+      Assertions.assertEquals(groupName, owner.name());
 
-    // Drop the group
-    ordinaryClient.removeGroup(groupName);
-    // The owner should be removed as well
-    ownerAfterDrop = metalake.getOwner(catalogObject).orElse(null);
-    Assertions.assertEquals(null, ownerAfterDrop);
+      // Drop the group
+      ordinaryClient.removeGroup(groupName);
+      // The owner should be removed as well
+      ownerAfterDrop = metalake.getOwner(catalogObject).orElse(null);
+      Assertions.assertNull(ownerAfterDrop);
+    }
   }
 }

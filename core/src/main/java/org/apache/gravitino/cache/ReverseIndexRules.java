@@ -94,7 +94,7 @@ public class ReverseIndexRules {
         }
       };
 
-  /** * RoleEntity reverse index processor */
+  /** RoleEntity reverse index processor */
   public static final ReverseIndexCache.ReverseIndexRule ROLE_SECURABLE_OBJECT_REVERSE_RULE =
       (entity, key, reverseIndexCache) -> {
         RoleEntity roleEntity = (RoleEntity) entity;

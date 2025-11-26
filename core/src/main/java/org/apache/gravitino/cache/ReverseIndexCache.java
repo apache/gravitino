@@ -19,13 +19,14 @@
 package org.apache.gravitino.cache;
 
 import com.google.common.base.Preconditions;
+import com.google.common.collect.HashMultimap;
 import com.google.common.collect.Lists;
+import com.google.common.collect.Multimap;
 import com.googlecode.concurrenttrees.radix.ConcurrentRadixTree;
 import com.googlecode.concurrenttrees.radix.RadixTree;
 import com.googlecode.concurrenttrees.radix.node.concrete.DefaultCharArrayNodeFactory;
-import java.util.HashMap;
+import java.util.Collection;
 import java.util.List;
-import java.util.Map;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.NameIdentifier;
@@ -42,9 +43,10 @@ import org.apache.gravitino.meta.UserEntity;
  */
 public class ReverseIndexCache {
   private final RadixTree<List<EntityCacheKey>> reverseIndex;
+
   /** Registers a reverse index processor for a specific entity class. */
-  private final Map<Class<? extends Entity>, List<ReverseIndexRule>> reverseIndexRules =
-      new HashMap<>();
+  private final Multimap<Class<? extends Entity>, ReverseIndexRule> reverseIndexRules =
+      HashMultimap.create();
 
   public ReverseIndexCache() {
     this.reverseIndex = new ConcurrentRadixTree<>(new DefaultCharArrayNodeFactory());
@@ -66,10 +68,6 @@ public class ReverseIndexCache {
 
   public Iterable<List<EntityCacheKey>> getValuesForKeysStartingWith(String keyPrefix) {
     return reverseIndex.getValuesForKeysStartingWith(keyPrefix);
-  }
-
-  public Iterable<CharSequence> getKeysStartingWith(String keyPrefix) {
-    return reverseIndex.getKeysStartingWith(keyPrefix);
   }
 
   public boolean remove(String key) {
@@ -113,23 +111,15 @@ public class ReverseIndexCache {
   }
 
   public void registerReverseRule(Class<? extends Entity> entityClass, ReverseIndexRule rule) {
-    reverseIndexRules.compute(
-        entityClass,
-        (k, v) -> {
-          if (v == null) {
-            v = Lists.newArrayList();
-          }
-          v.add(rule);
-          return v;
-        });
+    reverseIndexRules.put(entityClass, rule);
   }
 
   /** Processes an entity and updates the reverse index accordingly. */
   public void indexEntity(Entity entity, EntityCacheRelationKey key) {
-    List<ReverseIndexRule> rule = reverseIndexRules.get(entity.getClass());
-    if (rule != null && !rule.isEmpty()) {
-      for (ReverseIndexRule r : rule) {
-        r.indexEntity(entity, key, this);
+    Collection<ReverseIndexRule> rules = reverseIndexRules.get(entity.getClass());
+    if (!rules.isEmpty()) {
+      for (ReverseIndexRule rule : rules) {
+        rule.indexEntity(entity, key, this);
       }
     }
   }
