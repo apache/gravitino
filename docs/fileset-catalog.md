@@ -164,7 +164,7 @@ This behavior is skipped in either of these cases:
 
 1. When the catalog property `disable-filesystem-ops` is set to `true`
 2. When the location contains [placeholders](./manage-fileset-metadata-using-gravitino.md#placeholder)
-   :::
+:::
 
 ## Fileset
 
