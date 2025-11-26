@@ -37,14 +37,11 @@ import org.aopalliance.intercept.MethodInterceptor;
 import org.aopalliance.intercept.MethodInvocation;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Entity;
-import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.exceptions.ForbiddenException;
-import org.apache.gravitino.exceptions.MetalakeNotInUseException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
-import org.apache.gravitino.metalake.MetalakeManager;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationExpression;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationRequest;
 import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionEvaluator;
@@ -150,17 +147,13 @@ public class GravitinoInterceptionService implements InterceptionService {
           // Check metalake and user existence before authorization
           NameIdentifier metalakeIdent = metadataContext.get(Entity.EntityType.METALAKE);
           if (metalakeIdent != null) {
-            try {
-              MetalakeManager.checkMetalake(
-                  metalakeIdent, GravitinoEnv.getInstance().entityStore());
-            } catch (NoSuchMetalakeException | MetalakeNotInUseException ex) {
-              // If metalake doesn't exist or is not in use, return no auth response
-              return buildNoAuthResponse(expressionAnnotation, metadataContext, method, expression);
-            }
-
             String currentUser = PrincipalUtils.getCurrentUserName();
             try {
               AuthorizationUtils.checkCurrentUser(metalakeIdent.name(), currentUser);
+            } catch (NoSuchMetalakeException e) {
+              LOG.warn(
+                  "Metalake {} does not exist when validating user {}", metalakeIdent, currentUser);
+              return buildNoAuthResponse(expressionAnnotation, metadataContext, method, expression);
             } catch (ForbiddenException ex) {
               LOG.warn(
                   "User validation failed - User: {}, Metalake: {}, Reason: {}",

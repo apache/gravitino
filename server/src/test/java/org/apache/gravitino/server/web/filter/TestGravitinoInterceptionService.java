@@ -36,6 +36,7 @@ import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.UserPrincipal;
 import org.apache.gravitino.authorization.AuthorizationRequestContext;
+import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.authorization.GravitinoAuthorizer;
 import org.apache.gravitino.authorization.Privilege;
 import org.apache.gravitino.dto.responses.ErrorResponse;
@@ -147,14 +148,12 @@ public class TestGravitinoInterceptionService {
   }
 
   @Test
-  public void testMetalakeNotExistOrNotInUse() throws Throwable {
+  public void testMetalakeNotExist() throws Throwable {
     try (MockedStatic<PrincipalUtils> principalUtilsMocked = mockStatic(PrincipalUtils.class);
         MockedStatic<GravitinoAuthorizerProvider> authorizerMocked =
             mockStatic(GravitinoAuthorizerProvider.class);
-        MockedStatic<org.apache.gravitino.GravitinoEnv> envMocked =
-            mockStatic(org.apache.gravitino.GravitinoEnv.class);
-        MockedStatic<org.apache.gravitino.metalake.MetalakeManager> metalakeManagerMocked =
-            mockStatic(org.apache.gravitino.metalake.MetalakeManager.class)) {
+        MockedStatic<AuthorizationUtils> authorizationUtilsMocked =
+            mockStatic(AuthorizationUtils.class)) {
 
       principalUtilsMocked
           .when(PrincipalUtils::getCurrentPrincipal)
@@ -166,14 +165,12 @@ public class TestGravitinoInterceptionService {
       authorizerMocked.when(GravitinoAuthorizerProvider::getInstance).thenReturn(mockedProvider);
       when(mockedProvider.getGravitinoAuthorizer()).thenReturn(new MockGravitinoAuthorizer());
 
-      GravitinoEnv mockEnv = mock(GravitinoEnv.class);
-      EntityStore mockStore = mock(EntityStore.class);
-      envMocked.when(GravitinoEnv::getInstance).thenReturn(mockEnv);
-      when(mockEnv.entityStore()).thenReturn(mockStore);
-
-      // Mock MetalakeManager.checkMetalake to throw NoSuchMetalakeException
-      metalakeManagerMocked
-          .when(() -> MetalakeManager.checkMetalake(ArgumentMatchers.any(), ArgumentMatchers.any()))
+      // Mock AuthorizationUtils.checkCurrentUser to throw NoSuchMetalakeException
+      authorizationUtilsMocked
+          .when(
+              () ->
+                  AuthorizationUtils.checkCurrentUser(
+                      ArgumentMatchers.any(), ArgumentMatchers.any()))
           .thenThrow(new NoSuchMetalakeException("Metalake nonExistentMetalake does not exist"));
 
       GravitinoInterceptionService gravitinoInterceptionService =
