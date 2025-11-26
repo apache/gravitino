@@ -380,7 +380,13 @@ public class PolicyAuthorizationIT extends BaseRestApiAuthorizationIT {
         () -> {
           metalakeLoadByNormalUser.deletePolicy("policy1");
         });
+    assertThrows(
+        "Can not access metadata.",
+        ForbiddenException.class,
+        () -> {
+          metalakeLoadByNormalUser.deletePolicy("policy2");
+        });
     gravitinoMetalake.deletePolicy("policy1");
-    metalakeLoadByNormalUser.deletePolicy("policy2");
+    gravitinoMetalake.deletePolicy("policy2");
   }
 }
