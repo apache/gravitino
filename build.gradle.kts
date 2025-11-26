@@ -781,9 +781,9 @@ tasks {
       copy {
         from(projectDir.dir("conf")) {
           include(
-                  "${rootProject.name}-lance-rest-server.conf.template",
-                  "${rootProject.name}-env.sh.template",
-                  "log4j2.properties.template"
+            "${rootProject.name}-lance-rest-server.conf.template",
+            "${rootProject.name}-env.sh.template",
+            "log4j2.properties.template"
           )
           into("${rootProject.name}-lance-rest-server/conf")
         }
@@ -896,7 +896,6 @@ tasks {
     }
   }
 
-
   register("checksumLanceRESTServerDistribution") {
     group = "gravitino distribution"
     dependsOn(assembleLanceRESTServer)
@@ -908,7 +907,7 @@ tasks {
     outputs.file(checksumFile)
     doLast {
       checksumFile.get().writeText(
-              serviceOf<ChecksumService>().sha256(archiveFile.get().asFile).toString()
+        serviceOf<ChecksumService>().sha256(archiveFile.get().asFile).toString()
       )
     }
   }
