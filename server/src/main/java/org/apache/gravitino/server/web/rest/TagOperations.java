@@ -87,7 +87,7 @@ public class TagOperations {
   @Produces("application/vnd.gravitino.v1+json")
   @Timed(name = "list-tags." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "list-tags", absolute = true)
-  @AuthorizationExpression(expression = "", accessMetadataType = MetadataObject.Type.METALAKE)
+  @AuthorizationExpression(expression = "")
   public Response listTags(
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
           String metalake,
@@ -263,7 +263,7 @@ public class TagOperations {
   @Produces("application/vnd.gravitino.v1+json")
   @Timed(name = "list-objects-for-tag." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "list-objects-for-tag", absolute = true)
-  @AuthorizationExpression(expression = "", accessMetadataType = MetadataObject.Type.TAG)
+  @AuthorizationExpression(expression = "")
   public Response listMetadataObjectsForTag(
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
           String metalake,
