@@ -36,7 +36,7 @@ specified otherwise in schema or table properties.
 
 All operations are the same as relational catalog, please refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metadata-using-gravitino.md) for more details.
 
-One thing need to be noted is that the provider will be `generic_lakehouse` when creating a generic lakehouse catalog.
+One thing needs to be noted is that the provider will be `generic_lakehouse` when creating a generic lakehouse catalog.
 That is:
 
 <Tabs groupId='language' queryString>
@@ -202,7 +202,7 @@ However, different lakehouse storage systems may have different supports for ind
 | IVF_SQ     | IVF_SQ (Inverted File with Scalar Quantization) index is used for efficient similarity searches in high-dimensional vector spaces by partitioning the vector space into clusters and storing quantized representations of vectors within each cluster to reduce memory usage.                                                      |  Y    |
 | IVF_PQ     | IVF_PQ (Inverted File with Product Quantization) index is used for efficient similarity searches in high-dimensional vector spaces by partitioning the vector space into clusters and storing product-quantized representations of vectors within each cluster to achieve a balance between search accuracy and memory efficiency. |  Y    |
 
-Another point is that **NOT all lakehouse table support creating index when creating table**, and Lance is one of them. So when creating a lance table, you cannot specify indexes at the same time. You need to create the table first, then create indexes on the table.
+Another point is that **NOT all lakehouse tables support creating indexes when creating a table**, and Lance is one of them. So when creating a lance table, you cannot specify indexes at the same time. You need to create the table first, then create indexes on the table.
 
 ### Table operations
 
