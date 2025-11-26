@@ -393,7 +393,7 @@ public class NameIdentifierUtil {
             .collect(Collectors.toList());
     if (allElems.size() < 4) {
       throw new IllegalNameIdentifierException(
-          "Cannot create a schema NameIdentifier less than three elements.");
+          "Cannot create a table NameIdentifier less than four elements.");
     }
     return NameIdentifier.of(allElems.get(0), allElems.get(1), allElems.get(2), allElems.get(3));
   }
