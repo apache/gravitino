@@ -27,7 +27,9 @@ plugins {
 
 dependencies {
   // used by Gravitino credential vending
-  implementation(libs.aws.policy)
+  implementation(libs.aws.policy) {
+    exclude("*")
+  }
   implementation(libs.iceberg.aws.bundle)
 }
 
