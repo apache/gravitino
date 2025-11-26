@@ -397,7 +397,7 @@ public class NameIdentifierUtil {
     Namespace namespace = ident.namespace();
     Namespace.check(
         namespace != null && !namespace.isEmpty() && namespace.length() == 3,
-        "Tag namespace must be 3 level, the input namespace is %s",
+        "Policy namespace must be 3 level, the input namespace is %s",
         namespace);
   }
 
