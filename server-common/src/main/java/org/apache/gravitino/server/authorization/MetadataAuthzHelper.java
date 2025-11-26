@@ -105,11 +105,12 @@ public class MetadataAuthzHelper {
                   return PrincipalUtils.doAs(
                       currentPrincipal,
                       () -> {
+                        String metalakeName = metalake.name();
                         Map<Entity.EntityType, NameIdentifier> nameIdentifierMap =
                             spiltMetadataNames(
-                                metalake.name(),
+                                metalakeName,
                                 Entity.EntityType.METALAKE,
-                                NameIdentifierUtil.ofMetalake(metalake.name()));
+                                NameIdentifierUtil.ofMetalake(metalakeName));
                         AuthorizationExpressionEvaluator authorizationExpressionEvaluator =
                             new AuthorizationExpressionEvaluator(expression);
                         return authorizationExpressionEvaluator.evaluate(
