@@ -402,6 +402,7 @@ public class TestLanceTableOperations extends JerseyTest {
     Assertions.assertEquals(MediaType.APPLICATION_JSON_TYPE, resp.getMediaType());
     response = resp.readEntity(CreateTableIndexResponse.class);
     Assertions.assertEquals(response.getProperties(), response.getProperties());
+    Assertions.assertEquals("value", response.getProperties().get("key"));
 
     Mockito.reset(tableOps);
     // Test illegal argument

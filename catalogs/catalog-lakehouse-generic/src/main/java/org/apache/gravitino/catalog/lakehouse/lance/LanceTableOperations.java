@@ -271,27 +271,13 @@ public class LanceTableOperations extends ManagedTableOperations {
       }
     }
 
-    return Arrays.stream(tableChanges)
-        .map(
-            change -> {
-              if (change instanceof TableChange.AddIndex) {
-                TableChange.AddIndex addIndexChange = (TableChange.AddIndex) change;
-                // Here we can modify the index properties if needed.
-                return new TableChange.AddIndex(
-                    addIndexChange.getType(),
-                    addIndexChange.getName(),
-                    addIndexChange.getFieldNames(),
-                    addIndexChange.getProperties());
-              } else {
-                return change;
-              }
-            })
-        .toArray(TableChange[]::new);
+    return tableChanges;
   }
 
   private List<Index> addLanceIndex(String location, List<Index> addedIndexes) {
     List<Index> newIndexes = Lists.newArrayList();
-    try (Dataset dataset = Dataset.open(location, new RootAllocator())) {
+    try (RootAllocator rootAllocator = new RootAllocator();
+        Dataset dataset = Dataset.open(location, rootAllocator)) {
       for (Index index : addedIndexes) {
         IndexType indexType = getIndexType(index);
         IndexParams indexParams = generateIndexParams(index);
@@ -334,6 +320,10 @@ public class LanceTableOperations extends ManagedTableOperations {
     IndexType indexType = IndexType.valueOf(index.type().name());
 
     String configJson = index.properties().get(LANCE_INDEX_CONFIG_KEY);
+    Preconditions.checkArgument(
+        StringUtils.isNotBlank(configJson),
+        "Lance index config must be provided in index properties with key %s",
+        LANCE_INDEX_CONFIG_KEY);
     CreateTableIndexRequest request;
     try {
       request = JsonUtil.mapper().readValue(configJson, CreateTableIndexRequest.class);
@@ -369,6 +359,16 @@ public class LanceTableOperations extends ManagedTableOperations {
           new VectorIndexParams.Builder(new IvfBuildParams.Builder().build())
               .setDistanceType(toLanceDistanceType(request.getMetricType()))
               .setHnswParams(new HnswBuildParams.Builder().build())
+              .build());
+
+      case IVF_HNSW_PQ -> builder.setVectorIndexParams(
+          new VectorIndexParams.Builder(new IvfBuildParams.Builder().build())
+              .setDistanceType(toLanceDistanceType(request.getMetricType()))
+              .setHnswParams(new HnswBuildParams.Builder().build())
+              .setPqParams(
+                  new PQBuildParams.Builder()
+                      .setNumSubVectors(1) // others use default value.
+                      .build())
               .build());
       default -> throw new IllegalArgumentException("Unsupported index type: " + indexType);
     }

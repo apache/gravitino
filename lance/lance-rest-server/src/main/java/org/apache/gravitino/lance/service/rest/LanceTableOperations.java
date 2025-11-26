@@ -58,6 +58,7 @@ import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.MultivaluedMap;
 import javax.ws.rs.core.Response;
+import org.apache.arrow.util.Preconditions;
 import org.apache.gravitino.lance.common.ops.NamespaceWrapper;
 import org.apache.gravitino.lance.common.utils.SerializationUtils;
 import org.apache.gravitino.lance.service.LanceExceptionMapper;
@@ -285,8 +286,7 @@ public class LanceTableOperations {
 
   private void validateCreateTableIndexRequest(
       @SuppressWarnings("unused") CreateTableIndexRequest request) {
-    // We will ignore the id in the request body since it's already provided in the path param
-    // No specific fields to validate for now
+    Preconditions.checkArgument(request != null, "CreateTableIndexRequest must not be null");
   }
 
   private void validateListTableIndicesRequest(
