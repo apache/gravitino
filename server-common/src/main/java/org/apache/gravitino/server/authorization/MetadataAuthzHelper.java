@@ -119,7 +119,7 @@ public class MetadataAuthzHelper {
                             : null;
                       });
                 } catch (Exception e) {
-                  LOG.error("GravitinoAuthorize error:{}", e.getMessage(), e);
+                  LOG.error("GravitinoAuthorization error:{}", e.getMessage(), e);
                   return null;
                 }
               },
