@@ -456,5 +456,7 @@ public class OwnerIT extends BaseIT {
       ownerAfterDrop = metalake.getOwner(catalogObject).orElse(null);
       Assertions.assertNull(ownerAfterDrop);
     }
+    // Cleanup
+    client.dropMetalake(metalakeNameE, true);
   }
 }
