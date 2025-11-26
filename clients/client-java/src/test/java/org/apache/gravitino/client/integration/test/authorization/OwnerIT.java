@@ -457,6 +457,7 @@ public class OwnerIT extends BaseIT {
       Assertions.assertNull(ownerAfterDrop);
     }
     // Cleanup
+    client.disableMetalake(metalakeNameE);
     client.dropMetalake(metalakeNameE, true);
   }
 }
