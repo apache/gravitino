@@ -91,8 +91,8 @@ public class TestAuthorizationExpressionConverter {
     String useCatalogOgnExpression =
         AuthorizationExpressionConverter.convertToOgnlExpression(expressionWithOwner2);
     Assertions.assertEquals(
-        "(authorizer.isOwner(principal,METALAKE_NAME,METALAKE) "
-            + "|| authorizer.isOwner(principal,METALAKE_NAME,CATALOG))"
+        "(authorizer.isOwner(principal,METALAKE_NAME,METALAKE,authorizationContext) "
+            + "|| authorizer.isOwner(principal,METALAKE_NAME,CATALOG,authorizationContext))"
             + " && authorizer.authorize(principal,METALAKE_NAME,CATALOG"
             + ",@org.apache.gravitino.authorization.Privilege$Name@USE_CATALOG,authorizationContext))",
         useCatalogOgnExpression);
