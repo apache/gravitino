@@ -255,14 +255,13 @@ public class PolicyAuthorizationIT extends BaseRestApiAuthorizationIT {
         .loadTable(NameIdentifier.of(SCHEMA, "table2"))
         .supportsPolicies()
         .associatePolicies(new String[] {"policy2"}, new String[] {});
-    ;
+
     metalakeLoadByNormalUser
         .loadCatalog(CATALOG)
         .asTableCatalog()
         .loadTable(NameIdentifier.of(SCHEMA, "table3"))
         .supportsPolicies()
         .associatePolicies(new String[] {"policy2"}, new String[] {});
-    ;
   }
 
   @Test
