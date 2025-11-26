@@ -24,7 +24,6 @@ import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
-import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.catalog.TableDispatcher;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.iceberg.common.utils.IcebergIdentifierUtils;
@@ -55,8 +54,6 @@ public class IcebergTableHookDispatcher implements IcebergTableOperationDispatch
   @Override
   public LoadTableResponse createTable(
       IcebergRequestContext context, Namespace namespace, CreateTableRequest createTableRequest) {
-    AuthorizationUtils.checkCurrentUser(metalake, context.userName());
-
     LoadTableResponse response = dispatcher.createTable(context, namespace, createTableRequest);
     importTable(context.catalogName(), namespace, createTableRequest.name());
     IcebergOwnershipUtils.setTableOwner(
@@ -116,8 +113,6 @@ public class IcebergTableHookDispatcher implements IcebergTableOperationDispatch
 
   @Override
   public void renameTable(IcebergRequestContext context, RenameTableRequest renameTableRequest) {
-    AuthorizationUtils.checkCurrentUser(metalake, context.userName());
-
     dispatcher.renameTable(context, renameTableRequest);
     NameIdentifier tableSource =
         IcebergIdentifierUtils.toGravitinoTableIdentifier(

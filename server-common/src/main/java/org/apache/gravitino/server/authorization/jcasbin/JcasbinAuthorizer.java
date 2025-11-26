@@ -216,6 +216,12 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
     if (StringUtils.isBlank(currentUserName)) {
       return false;
     }
+
+    // Service admins are considered users of all metalakes
+    if (isServiceAdmin()) {
+      return true;
+    }
+
     try {
       return GravitinoEnv.getInstance()
               .entityStore()
