@@ -20,8 +20,8 @@ package org.apache.gravitino.catalog.hadoop.fs;
 
 import static org.apache.gravitino.catalog.hadoop.fs.Constants.BUILTIN_HDFS_FS_PROVIDER;
 import static org.apache.gravitino.catalog.hadoop.fs.Constants.BUILTIN_LOCAL_FS_PROVIDER;
-import static org.apache.gravitino.catalog.hadoop.fs.Constants.FS_DISABLE_CACHE;
 import static org.apache.gravitino.catalog.hadoop.fs.Constants.CONFIG_RESOURCES;
+import static org.apache.gravitino.catalog.hadoop.fs.Constants.FS_DISABLE_CACHE;
 import static org.apache.gravitino.catalog.hadoop.fs.FileSystemProvider.GRAVITINO_BYPASS;
 import static org.apache.gravitino.catalog.hadoop.fs.HDFSFileSystemProvider.IPC_FALLBACK_TO_SIMPLE_AUTH_ALLOWED;
 
