@@ -107,7 +107,6 @@ fs.path.config.cluster3.config.resource=/etc/fs3/core-site.xml,/etc/fs3/hdfs-sit
 ```
 
 The plain `fs.path.config.<name>` entry specifies the base path of the filesystem. Any additional key under the same prefix (`fs.path.config.<name>.<config_key>`) is treated as a location-scoped configuration (for example, `config.resource` for HDFS) and is forwarded directly to the underlying filesystem client.
-
 :::
 
 **Example:** Setting `fs.gravitino.client.socketTimeoutMs` is equivalent to setting `gravitino.client.socketTimeoutMs` for the Gravitino client.
