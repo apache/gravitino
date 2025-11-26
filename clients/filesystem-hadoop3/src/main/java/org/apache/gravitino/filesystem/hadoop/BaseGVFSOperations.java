@@ -969,8 +969,8 @@ public abstract class BaseGVFSOperations implements Closeable {
     allProperties.putAll(getNecessaryProperties(catalog.properties()));
 
     Schema schema = getSchema(NameIdentifier.parse(filesetIdent.namespace().toString()));
-    allProperties.putAll(getNecessaryProperties(schema.properties()));
-    allProperties.putAll(getNecessaryProperties(filesetProperties));
+    allProperties.putAll(schema.properties());
+    allProperties.putAll(filesetProperties);
     allProperties.putAll(extractNonDefaultConfig(conf));
     return allProperties;
   }
