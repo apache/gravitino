@@ -752,14 +752,15 @@ public abstract class BaseGVFSOperations implements Closeable {
           filesetIdent);
 
       Path targetLocation = new Path(fileset.storageLocations().get(targetLocationName));
-      Map<String, String> allProperties =
-          getAllProperties(filesetIdent, fileset.properties());
+      Map<String, String> allProperties = getAllProperties(filesetIdent, fileset.properties());
       allProperties.putAll(getUserDefinedConfigs(getBaseLocation(targetLocation)));
 
       if (enableCredentialVending()) {
-          allProperties.putAll(
-                  getCredentialProperties(
-                          getFileSystemProviderByScheme(targetLocation.toUri().getScheme()), filesetIdent, locationName));
+        allProperties.putAll(
+            getCredentialProperties(
+                getFileSystemProviderByScheme(targetLocation.toUri().getScheme()),
+                filesetIdent,
+                locationName));
       }
 
       FileSystem actualFileSystem = getActualFileSystemByPath(targetLocation, allProperties);
@@ -959,19 +960,19 @@ public abstract class BaseGVFSOperations implements Closeable {
 
   private Map<String, String> getAllProperties(
       NameIdentifier filesetIdent, Map<String, String> filesetProperties) {
-   Map<String, String> allProperties = new HashMap<>();
+    Map<String, String> allProperties = new HashMap<>();
     Catalog catalog =
         (Catalog)
             getFilesetCatalog(
                 NameIdentifier.of(
                     filesetIdent.namespace().level(0), filesetIdent.namespace().level(1)));
-   allProperties.putAll(getNecessaryProperties(catalog.properties()));
+    allProperties.putAll(getNecessaryProperties(catalog.properties()));
 
-   Schema schema = getSchema(NameIdentifier.parse(filesetIdent.namespace().toString()));
-   allProperties.putAll(getNecessaryProperties(schema.properties()));
-   allProperties.putAll(getNecessaryProperties(filesetProperties));
-   allProperties.putAll(extractNonDefaultConfig(conf));
-   return allProperties;
+    Schema schema = getSchema(NameIdentifier.parse(filesetIdent.namespace().toString()));
+    allProperties.putAll(getNecessaryProperties(schema.properties()));
+    allProperties.putAll(getNecessaryProperties(filesetProperties));
+    allProperties.putAll(extractNonDefaultConfig(conf));
+    return allProperties;
   }
 
   private Map<String, String> getNecessaryProperties(Map<String, String> properties) {
