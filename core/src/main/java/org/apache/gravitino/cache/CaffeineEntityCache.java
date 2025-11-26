@@ -94,6 +94,11 @@ public class CaffeineEntityCache extends BaseEntityCache {
 
   private ScheduledExecutorService scheduler;
 
+  @VisibleForTesting
+  public ReverseIndexCache getReverseIndex() {
+    return reverseIndex;
+  }
+
   private static final Set<SupportsRelationOperations.Type> RELATION_TYPES =
       Sets.newHashSet(
           SupportsRelationOperations.Type.METADATA_OBJECT_ROLE_REL,
@@ -476,7 +481,7 @@ public class CaffeineEntityCache extends BaseEntityCache {
                     k ->
                         reverseIndex
                             .getValuesForKeysStartingWith(k.toString())
-                            .forEach(rsk -> reverseIndex.remove(rsk.toString())));
+                            .forEach(rsk -> rsk.forEach(v -> reverseIndex.remove(v))));
           });
 
       reverseIndex.remove(currentKeyToRemove);

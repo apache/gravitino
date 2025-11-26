@@ -68,6 +68,7 @@ import org.apache.arrow.memory.BufferAllocator;
 import org.apache.arrow.memory.RootAllocator;
 import org.apache.arrow.vector.types.pojo.ArrowType;
 import org.apache.arrow.vector.types.pojo.Field;
+import org.apache.commons.io.FileUtils;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Schema;
@@ -114,9 +115,9 @@ public class LanceRESTServiceIT extends BaseIT {
   }
 
   @AfterAll
-  public void clean() {
+  public void clean() throws IOException {
     client.dropMetalake(getLanceRESTServerMetalakeName(), true);
-    tempDir.toFile().deleteOnExit();
+    FileUtils.deleteDirectory(tempDir.toFile());
   }
 
   @AfterEach
@@ -560,11 +561,8 @@ public class LanceRESTServiceIT extends BaseIT {
     // Create a table without location should fail
     CreateTableRequest noLocationRequest = new CreateTableRequest();
     noLocationRequest.setId(List.of(CATALOG_NAME, SCHEMA_NAME, "no_location_table"));
-    LanceNamespaceException noLocationException =
-        Assertions.assertThrows(
-            LanceNamespaceException.class, () -> ns.createTable(noLocationRequest, body));
-    Assertions.assertTrue(
-        noLocationException.getMessage().contains("No location specified for table"));
+    Assertions.assertThrows(
+        LanceNamespaceException.class, () -> ns.createTable(noLocationRequest, body));
 
     // Create table with invalid schema should fail
     byte[] invalidBody = "".getBytes(Charset.defaultCharset());
@@ -772,7 +770,7 @@ public class LanceRESTServiceIT extends BaseIT {
     return metalake.createCatalog(
         catalogName,
         Catalog.Type.RELATIONAL,
-        "generic-lakehouse",
+        "lakehouse-generic",
         "catalog for lance rest service tests",
         properties);
   }

@@ -146,7 +146,7 @@ public class SortOrderDTO implements SortOrder {
       // Default is by direction
       this.nullOrdering = nullOrdering == null ? direction.defaultNullOrdering() : nullOrdering;
 
-      Preconditions.checkNotNull(this.sortTerm, "expression cannot be null");
+      Preconditions.checkArgument(this.sortTerm != null, "expression cannot be null");
       return new SortOrderDTO(sortTerm, direction, nullOrdering);
     }
   }

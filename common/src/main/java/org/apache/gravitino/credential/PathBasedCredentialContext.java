@@ -43,9 +43,9 @@ public class PathBasedCredentialContext implements CredentialContext {
    */
   public PathBasedCredentialContext(
       String userName, Set<String> writePaths, Set<String> readPaths) {
-    Preconditions.checkNotNull(userName, "User name should not be null");
-    Preconditions.checkNotNull(writePaths, "Write paths should not be null");
-    Preconditions.checkNotNull(readPaths, "Read paths should not be null");
+    Preconditions.checkArgument(userName != null, "User name should not be null");
+    Preconditions.checkArgument(writePaths != null, "Write paths should not be null");
+    Preconditions.checkArgument(readPaths != null, "Read paths should not be null");
     this.userName = userName;
     this.writePaths = writePaths;
     this.readPaths = readPaths;
