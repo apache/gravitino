@@ -102,7 +102,7 @@ public class MetadataAuthzHelper {
         authorizationRequestContext,
         metalake -> {
           String metalakeName = metalake.name();
-          return spiltMetadataNames(
+          return splitMetadataNames(
               metalakeName,
               Entity.EntityType.METALAKE,
               NameIdentifierUtil.ofMetalake(metalakeName));
@@ -137,7 +137,7 @@ public class MetadataAuthzHelper {
       NameIdentifier identifier, Entity.EntityType entityType, String expression) {
     String metalake = NameIdentifierUtil.getMetalake(identifier);
     Map<Entity.EntityType, NameIdentifier> nameIdentifierMap =
-        spiltMetadataNames(metalake, entityType, identifier);
+        splitMetadataNames(metalake, entityType, identifier);
     AuthorizationExpressionEvaluator authorizationExpressionEvaluator =
         new AuthorizationExpressionEvaluator(expression);
     return authorizationExpressionEvaluator.evaluate(
@@ -199,7 +199,7 @@ public class MetadataAuthzHelper {
         authorizationRequestContext,
         (entity) -> {
           NameIdentifier nameIdentifier = toNameIdentifier.apply(entity);
-          return spiltMetadataNames(metalake, entityType, nameIdentifier);
+          return splitMetadataNames(metalake, entityType, nameIdentifier);
         });
   }
 
@@ -249,7 +249,7 @@ public class MetadataAuthzHelper {
    * @param nameIdentifier metadata name
    * @return A map containing the metadata object and all its parent objects, keyed by their types
    */
-  public static Map<Entity.EntityType, NameIdentifier> spiltMetadataNames(
+  public static Map<Entity.EntityType, NameIdentifier> splitMetadataNames(
       String metalake, Entity.EntityType entityType, NameIdentifier nameIdentifier) {
     Map<Entity.EntityType, NameIdentifier> nameIdentifierMap = new HashMap<>();
     nameIdentifierMap.put(Entity.EntityType.METALAKE, NameIdentifierUtil.ofMetalake(metalake));
