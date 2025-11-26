@@ -142,13 +142,17 @@ public class MetadataAuthzHelper {
   /**
    * Call {@link AuthorizationExpressionEvaluator} to check access
    *
-   * @param identifier
-   * @param entityType
-   * @param expression
-   * @return
+   * @param identifier metadata identifier
+   * @param entityType for example, CATALOG, SCHEMA,TABLE, etc.
+   * @param expression authorization expression
+   * @return whether it has access to the metadata
    */
   public static boolean checkAccess(
       NameIdentifier identifier, Entity.EntityType entityType, String expression) {
+    if (!enableAuthorization()) {
+      return true;
+    }
+
     String metalake = NameIdentifierUtil.getMetalake(identifier);
     Map<Entity.EntityType, NameIdentifier> nameIdentifierMap =
         spiltMetadataNames(metalake, entityType, identifier);
