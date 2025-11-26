@@ -39,6 +39,7 @@ import java.util.stream.Stream;
 import javax.sql.DataSource;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Catalog;
+import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.SchemaChange;
@@ -64,6 +65,8 @@ import org.apache.gravitino.exceptions.NonEmptySchemaException;
 import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
 import org.apache.gravitino.exceptions.TableAlreadyExistsException;
 import org.apache.gravitino.meta.AuditInfo;
+import org.apache.gravitino.metrics.MetricsSystem;
+import org.apache.gravitino.metrics.source.JdbcCatalogMetricsSource;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.TableCatalog;
@@ -101,6 +104,8 @@ public class JdbcCatalogOperations implements CatalogOperations, SupportsSchemas
   private DataSource dataSource;
 
   private final JdbcColumnDefaultValueConverter columnDefaultValueConverter;
+
+  private JdbcCatalogMetricsSource catalogMetricsSource;
 
   public static class JDBCDriverInfo {
     public String name;
@@ -174,11 +179,25 @@ public class JdbcCatalogOperations implements CatalogOperations, SupportsSchemas
     if (tableOperation instanceof RequireDatabaseOperation) {
       ((RequireDatabaseOperation) tableOperation).setDatabaseOperation(databaseOperation);
     }
+
+    MetricsSystem metricsSystem = GravitinoEnv.getInstance().metricsSystem();
+    // Metrics System could be null in UT.
+    if (metricsSystem != null) {
+      this.catalogMetricsSource =
+          new JdbcCatalogMetricsSource(info.namespace().toString(), info.name());
+      catalogMetricsSource.registerDatasourceMetrics(dataSource);
+      metricsSystem.register(catalogMetricsSource);
+    }
   }
 
   /** Closes the Jdbc catalog and releases the associated client pool. */
   @Override
   public void close() {
+    // Metrics System could be null in UT.
+    MetricsSystem metricsSystem = GravitinoEnv.getInstance().metricsSystem();
+    if (metricsSystem != null) {
+      metricsSystem.unregister(catalogMetricsSource);
+    }
     DataSourceUtils.closeDataSource(dataSource);
   }
 

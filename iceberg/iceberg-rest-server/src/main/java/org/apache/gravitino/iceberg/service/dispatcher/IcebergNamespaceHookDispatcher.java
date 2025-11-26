@@ -22,7 +22,6 @@ import java.io.IOException;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.GravitinoEnv;
-import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.catalog.SchemaDispatcher;
 import org.apache.gravitino.catalog.TableDispatcher;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
@@ -58,8 +57,6 @@ public class IcebergNamespaceHookDispatcher implements IcebergNamespaceOperation
   @Override
   public CreateNamespaceResponse createNamespace(
       IcebergRequestContext context, CreateNamespaceRequest createRequest) {
-    AuthorizationUtils.checkCurrentUser(metalake, context.userName());
-
     CreateNamespaceResponse response = dispatcher.createNamespace(context, createRequest);
 
     importSchema(context.catalogName(), createRequest.namespace());

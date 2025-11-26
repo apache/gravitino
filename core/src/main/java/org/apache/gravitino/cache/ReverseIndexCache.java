@@ -19,12 +19,14 @@
 package org.apache.gravitino.cache;
 
 import com.google.common.base.Preconditions;
+import com.google.common.collect.HashMultimap;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
+import com.google.common.collect.Multimap;
 import com.googlecode.concurrenttrees.radix.ConcurrentRadixTree;
 import com.googlecode.concurrenttrees.radix.RadixTree;
 import com.googlecode.concurrenttrees.radix.node.concrete.DefaultCharArrayNodeFactory;
-import java.util.HashMap;
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import org.apache.commons.collections4.CollectionUtils;
@@ -43,9 +45,11 @@ import org.apache.gravitino.meta.UserEntity;
  * efficiently store and retrieve relationships between entities based on their keys.
  */
 public class ReverseIndexCache {
-  private RadixTree<List<EntityCacheKey>> reverseIndex;
+  private final RadixTree<List<EntityCacheKey>> reverseIndex;
+
   /** Registers a reverse index processor for a specific entity class. */
-  private final Map<Class<? extends Entity>, ReverseIndexRule> reverseIndexRules = new HashMap<>();
+  private final Multimap<Class<? extends Entity>, ReverseIndexRule> reverseIndexRules =
+      HashMultimap.create();
 
   /**
    * Map from data entity key to a list of entity cache relation keys. This is used for reverse
@@ -73,11 +77,13 @@ public class ReverseIndexCache {
   public ReverseIndexCache() {
     this.reverseIndex = new ConcurrentRadixTree<>(new DefaultCharArrayNodeFactory());
 
-    registerReverseRule(UserEntity.class, ReverseIndexRules.USER_REVERSE_RULE);
-    registerReverseRule(GroupEntity.class, ReverseIndexRules.GROUP_REVERSE_RULE);
-    registerReverseRule(RoleEntity.class, ReverseIndexRules.ROLE_REVERSE_RULE);
-    registerReverseRule(PolicyEntity.class, ReverseIndexRules.POLICY_REVERSE_RULE);
-    registerReverseRule(TagEntity.class, ReverseIndexRules.TAG_REVERSE_RULE);
+    registerReverseRule(UserEntity.class, ReverseIndexRules.USER_ROLE_REVERSE_RULE);
+    registerReverseRule(UserEntity.class, ReverseIndexRules.USER_OWNERSHIP_REVERSE_RULE);
+    registerReverseRule(GroupEntity.class, ReverseIndexRules.GROUP_ROLE_REVERSE_RULE);
+    registerReverseRule(GroupEntity.class, ReverseIndexRules.GROUP_OWNERSHIP_REVERSE_RULE);
+    registerReverseRule(RoleEntity.class, ReverseIndexRules.ROLE_SECURABLE_OBJECT_REVERSE_RULE);
+    registerReverseRule(PolicyEntity.class, ReverseIndexRules.POLICY_SECURABLE_OBJECT_REVERSE_RULE);
+    registerReverseRule(TagEntity.class, ReverseIndexRules.TAG_SECURABLE_OBJECT_REVERSE_RULE);
     registerReverseRule(
         GenericEntity.class, ReverseIndexRules.GENERIC_METADATA_OBJECT_REVERSE_RULE);
   }
@@ -149,9 +155,11 @@ public class ReverseIndexCache {
 
   /** Processes an entity and updates the reverse index accordingly. */
   public void indexEntity(Entity entity, EntityCacheRelationKey key) {
-    ReverseIndexRule rule = reverseIndexRules.get(entity.getClass());
-    if (rule != null) {
-      rule.indexEntity(entity, key, this);
+    Collection<ReverseIndexRule> rules = reverseIndexRules.get(entity.getClass());
+    if (!rules.isEmpty()) {
+      for (ReverseIndexRule rule : rules) {
+        rule.indexEntity(entity, key, this);
+      }
     }
   }
 

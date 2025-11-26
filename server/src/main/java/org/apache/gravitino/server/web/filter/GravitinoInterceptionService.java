@@ -39,6 +39,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationExpression;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationRequest;
 import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionEvaluator;
@@ -130,11 +131,43 @@ public class GravitinoInterceptionService implements InterceptionService {
      */
     @Override
     public Object invoke(MethodInvocation methodInvocation) throws Throwable {
+      Method method = methodInvocation.getMethod();
+      Parameter[] parameters = method.getParameters();
+      AuthorizationExpression expressionAnnotation =
+          method.getAnnotation(AuthorizationExpression.class);
+
+      // Check current user exists in metalake before authorization
+      if (expressionAnnotation != null) {
+        Object[] args = methodInvocation.getArguments();
+        Map<Entity.EntityType, NameIdentifier> metadataContext =
+            extractNameIdentifierFromParameters(parameters, args);
+
+        // Check if current user exists in the metalake.
+        NameIdentifier metalakeIdent = metadataContext.get(Entity.EntityType.METALAKE);
+
+        if (metalakeIdent != null) {
+          String currentUser = PrincipalUtils.getCurrentUserName();
+          try {
+            AuthorizationUtils.checkCurrentUser(metalakeIdent.name(), currentUser);
+          } catch (org.apache.gravitino.exceptions.ForbiddenException ex) {
+            LOG.warn(
+                "User validation failed - User: {}, Metalake: {}, Reason: {}",
+                currentUser,
+                metalakeIdent.name(),
+                ex.getMessage());
+            return Utils.forbidden(ex.getMessage(), ex);
+          } catch (Exception ex) {
+            LOG.error(
+                "Unexpected error during user validation - User: {}, Metalake: {}",
+                currentUser,
+                metalakeIdent.name(),
+                ex);
+            return Utils.internalError("Failed to validate user", ex);
+          }
+        }
+      }
+
       try {
-        Method method = methodInvocation.getMethod();
-        Parameter[] parameters = method.getParameters();
-        AuthorizationExpression expressionAnnotation =
-            method.getAnnotation(AuthorizationExpression.class);
         AuthorizationExecutor executor;
         if (expressionAnnotation != null) {
           String expression = expressionAnnotation.expression();
@@ -142,6 +175,7 @@ public class GravitinoInterceptionService implements InterceptionService {
           String entityType = extractMetadataObjectTypeFromParameters(parameters, args);
           Map<Entity.EntityType, NameIdentifier> metadataContext =
               extractNameIdentifierFromParameters(parameters, args);
+
           Map<String, Object> pathParams = Utils.extractPathParamsFromParameters(parameters, args);
           AuthorizationExpressionEvaluator authorizationExpressionEvaluator =
               new AuthorizationExpressionEvaluator(expression);

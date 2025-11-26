@@ -159,9 +159,6 @@ public class AccessControlHookDispatcher implements AccessControlDispatcher {
       Map<String, String> properties,
       List<SecurableObject> securableObjects)
       throws RoleAlreadyExistsException, NoSuchMetalakeException {
-    // Check whether the current user exists or not
-    AuthorizationUtils.checkCurrentUser(metalake, PrincipalUtils.getCurrentUserName());
-
     Role createdRole = dispatcher.createRole(metalake, role, properties, securableObjects);
 
     // Set the creator as the owner of role.

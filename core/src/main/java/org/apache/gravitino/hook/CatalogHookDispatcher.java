@@ -79,10 +79,6 @@ public class CatalogHookDispatcher implements CatalogDispatcher {
       String comment,
       Map<String, String> properties)
       throws NoSuchMetalakeException, CatalogAlreadyExistsException {
-    // Check whether the current user exists or not
-    AuthorizationUtils.checkCurrentUser(
-        ident.namespace().level(0), PrincipalUtils.getCurrentUserName());
-
     Catalog catalog = dispatcher.createCatalog(ident, type, provider, comment, properties);
 
     try {
