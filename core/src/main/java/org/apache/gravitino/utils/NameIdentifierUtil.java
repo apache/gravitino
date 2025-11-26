@@ -376,7 +376,7 @@ public class NameIdentifierUtil {
    * @param ident The {@link NameIdentifier} to check.
    * @return The table {@link NameIdentifier}
    * @throws IllegalNameIdentifierException If the given {@link NameIdentifier} does not include
-   *     schema name
+   *     table name
    */
   public static NameIdentifier getTableIdentifier(NameIdentifier ident)
       throws IllegalNameIdentifierException {
