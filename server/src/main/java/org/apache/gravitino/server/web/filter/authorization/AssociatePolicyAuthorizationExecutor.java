@@ -103,7 +103,7 @@ public class AssociatePolicyAuthorizationExecutor extends CommonAuthorizerExecut
               currentContext, pathParams, context, Optional.ofNullable(entityType));
 
       if (!authorized) {
-        return false; // Fail fast on first unauthorized tag
+        return false; // Fail fast on first unauthorized policy
       }
     }
     return true;
