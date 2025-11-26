@@ -94,7 +94,7 @@ public class AssociatePolicyAuthorizationExecutor extends CommonAuthorizerExecut
     }
 
     for (String policy : policies) {
-      // Use a fresh context copy for each tag to avoid cross-contamination
+      // Use a fresh context copy for each policy to avoid cross-contamination
       Map<Entity.EntityType, NameIdentifier> currentContext = new HashMap<>(this.metadataContext);
       buildNameIdentifierForBatchAuthorization(currentContext, policy, targetType);
 
