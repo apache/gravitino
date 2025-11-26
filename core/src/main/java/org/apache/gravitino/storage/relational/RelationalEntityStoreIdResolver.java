@@ -48,7 +48,8 @@ public class RelationalEntityStoreIdResolver implements EntityIdResolver {
           Entity.EntityType.ROLE,
           Entity.EntityType.USER,
           Entity.EntityType.GROUP,
-          Entity.EntityType.TAG);
+          Entity.EntityType.TAG,
+          Entity.EntityType.POLICY);
   private static final Set<Entity.EntityType> ENTITY_TYPES_REQURING_CATALOG_IDS =
       ImmutableSet.of(Entity.EntityType.CATALOG);
   private static final Set<Entity.EntityType> ENTITY_TYPES_REQURING_SCHEMA_IDS =
