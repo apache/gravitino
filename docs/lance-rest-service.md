@@ -47,15 +47,15 @@ Full capabilities are listed in the following table:
 
 To use the Lance REST service, you need to have Gravitino server running with Lance REST service enabled. The following are configurations to enable Lance REST service in Gravitino server.
 
-| Configuration item                             | Description                                                                                                                                                                                                                        | Default value           | Required                                   | Since Version |
-|------------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-------------------------|--------------------------------------------|---------------|
-| `gravitino.auxService.names`                   | Auxiliary service that runs Lance REST service, currently it supports `iceberg-rest` and `lance-rest`. It should include `lance-rest` if you want to start the Lance REST service like `lance-rest`, or `lance-rest, iceberg-rest` | iceberg-rest,lance-rest | Yes if Lance REST service is going to run  | 0.2.0         |
-| `gravitino.lance-rest.classpath`               | The classpath of Lance REST service, relative to the Gravitino home directory.                                                                                                                                                     | lance-rest-server/libs  | Yes if Lance REST service is going to run  | 1.1.0         |
-| `gravitino.lance-rest.port`                    | The port number that Lance REST service listens on.                                                                                                                                                                                | 9101                    | Yes if Lance REST service is going to run  | 1.1.0         |
-| `gravitino.lance-rest.host`                    | The hostname that the Lance REST service run on.                                                                                                                                                                                   | 0.0.0.0                 | Yes if Lance REST service is going to run  | 1.1.0         | 
-| `gravitino.lance-rest.namespace-backend`       | backend to store namespace metadata, currently it only supports `gravitino`                                                                                                                                                        | gravitino               | Yes if Lance REST service is going to run  | 1.1.0         |
-| `gravitino.lance-rest.gravitino.uri`           | Gravitino server URI, it should be set when `namespace-backend` is `gravitino`                                                                                                                                                     | http://localhost:8090   | Yes if Lance REST service is going to run  | 1.1.0         |
-| `gravitino.lance-rest.gravitino.metalake-name` | Gravitino metalake name, it should be set when `namespace-backend` is `gravitino`                                                                                                                                                  | (none)                  | Yes if Lance REST service is going to run  | 1.1.0         |
+| Configuration item                             | Description                                                                                                                                                                                                                           | Default value           | Required                                   | Since Version |
+|------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-------------------------|--------------------------------------------|---------------|
+| `gravitino.auxService.names`                   | Auxiliary service that runs Lance REST service, currently it supports `iceberg-rest` and `lance-rest`. It should include `lance-rest` if you want to start the Lance REST service such as `lance-rest`, or `lance-rest, iceberg-rest` | iceberg-rest,lance-rest | Yes if Lance REST service is going to run  | 0.2.0         |
+| `gravitino.lance-rest.classpath`               | The classpath of Lance REST service, relative to the Gravitino home directory.                                                                                                                                                        | lance-rest-server/libs  | Yes if Lance REST service is going to run  | 1.1.0         |
+| `gravitino.lance-rest.port`                    | The port number that Lance REST service listens on.                                                                                                                                                                                   | 9101                    | Yes if Lance REST service is going to run  | 1.1.0         |
+| `gravitino.lance-rest.host`                    | The hostname that the Lance REST service run on.                                                                                                                                                                                      | 0.0.0.0                 | Yes if Lance REST service is going to run  | 1.1.0         | 
+| `gravitino.lance-rest.namespace-backend`       | backend to store namespace metadata, currently it only supports `gravitino`                                                                                                                                                           | gravitino               | Yes if Lance REST service is going to run  | 1.1.0         |
+| `gravitino.lance-rest.gravitino.uri`           | Gravitino server URI, it should be set when `namespace-backend` is `gravitino`                                                                                                                                                        | http://localhost:8090   | Yes if Lance REST service is going to run  | 1.1.0         |
+| `gravitino.lance-rest.gravitino.metalake-name` | Gravitino metalake name, it should be set when `namespace-backend` is `gravitino`                                                                                                                                                     | (none)                  | Yes if Lance REST service is going to run  | 1.1.0         |
 
 ### Running Lance REST service standalone
 
@@ -74,7 +74,7 @@ Typically, you only need to change the following configurations:
 | `gravitino.lance-rest.gravitino.uri`           | Gravitino server URI, it should be set when `namespace-backend` is `gravitino`    | http://localhost:8090    | Yes if Lance REST service is going to run  | 1.1.0         |
 | `gravitino.lance-rest.gravitino.metalake-name` | Gravitino metalake name, it should be set when `namespace-backend` is `gravitino` | (none)                   | Yes if Lance REST service is going to run  | 1.1.0         |
 | `gravitino.lance-rest.port`                    | The port number that Lance REST service listens on.                               | 9101                     | Yes if Lance REST service is going to run  | 1.1.0         |
-| `gravitino.lance-rest.host`                    | The host name that Lance REST service run in                                      | 0.0.0.0                  | Yes if Lance REST service is going to run  | 1.1.0         |
+| `gravitino.lance-rest.host`                    | The host name that Lance REST service run on                                      | 0.0.0.0                  | Yes if Lance REST service is going to run  | 1.1.0         |
 
 `namespace-backend`, `uri`, `port` and `host` have the same meaning as described in the previous section, and they have the default values. In most cases you only need to change `metalake-name` to your Gravitino metalake name. 
 For other configurations listed in the file, just keep their default values.
@@ -111,7 +111,7 @@ curl -X POST http://localhost:9101/lance/v1/namespace/lance_catalog%24schema/cre
 }'
 
 # register a table
-curl -X POST http://localhost:9101/lance/v1/table/lance_catalog2%24schema%24table01/register -H 'Content-Type: application/json' -d '{
+curl -X POST http://localhost:9101/lance/v1/table/lance_catalog%24schema%24table01/register -H 'Content-Type: application/json' -d '{
     "id": ["lance_catalog","schema","table01"],
     "location": "/tmp/lance_catalog/schema/table01"
 }'
@@ -122,7 +122,7 @@ curl -X POST http://localhost:9101/lance/v1/table/lance_catalog2%24schema%24tabl
 <TabItem value="java" label="Java">
 
 ```java
-// implementation("com.lancedb:lance-namespace-core:0.0.19")
+// implementation("com.lancedb:lance-namespace-core:0.0.20")
 
 private final BufferAllocator allocator = new RootAllocator(Long.MAX_VALUE);
 LanceNamespace ns = LanceNamespace.connect("rest", Map.of("uri", "http://localhost:9101/lance"));
@@ -167,7 +167,6 @@ schema = ns.create_namespace(create_schema_ns_request)
 # register a table
 register_table_request=ln.RegisterTableRequest(id=['lance_catalog','schema','table01'], location='/tmp/lance_catalog/schema/table01')
 ns.register_table(register_table_request)
-...
 ```
 
 </TabItem>

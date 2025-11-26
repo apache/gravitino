@@ -108,15 +108,15 @@ Currently, for a lance table, Gravitino supports the following capabilities:
 
 ### Table partitions
 
-Not support now
+Not supported now
 
 ### Table sort orders
 
-Not support now.
+Not supported now.
 
 ### Table distributions
 
-Not support now.
+Not supported now.
 
 ### Table column types
 
@@ -173,7 +173,7 @@ Here are some examples of how to use `External` type for various Arrow types tha
 | `Fixed-Size List` | `External("{\"name\":\"col_name\",\"nullable\":true,\"type\":{\"name\":\"fixedsizelist\", \"listSize\":10},\"children\":[{\"name\":\"element\",\"nullable\":true,\"type\":{\"name\":\"int\", \"bitWidth\":32, \"isSigned\": true},\"children\":[]}]}")` |
 
 **Important considerations:**
-- The `name` attribute and `nullable` attribute in the JSON string must exactly match the corresponding column name and nullable in the Gravitino table.
+- The `name` attribute and `nullable` attribute in the JSON string must exactly match the corresponding column name and nullability in the Gravitino table.
 - The `children` array should be empty for primitive types. For complex types like `Struct` or `List`, it must contain the definitions of the child fields.
 
 ### Table properties
@@ -183,7 +183,7 @@ Currently, the following properties are required for a table in a generic lakeho
 | Configuration item | Description                                                                                   | Default value | Required                                                                    | Since version |
 |--------------------|-----------------------------------------------------------------------------------------------|---------------|-----------------------------------------------------------------------------|---------------|
 | `format`           | The format for a table, it can be `lance`, `iceberg`,..., currently, it only supports `lance` | (none)        | Yes                                                                         | 1.1.0         |
-| `location`         | The location to storage the table meta and data.                                              | (none)        | No, but if this is not set in catalog or schema, then it's a required value | 1.1.0         |
+| `location`         | The location to store the table meta and data.                                                | (none)        | No, but if this is not set in catalog or schema, then it's a required value | 1.1.0         |
 
 Of course, apart from the above-required properties, you can also set other table properties supported by the underlying lakehouse storage system or your custom properties.
 
