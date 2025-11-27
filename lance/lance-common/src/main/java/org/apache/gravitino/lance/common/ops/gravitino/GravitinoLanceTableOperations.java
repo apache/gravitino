@@ -40,6 +40,7 @@ import com.lancedb.lance.namespace.model.DeregisterTableResponse;
 import com.lancedb.lance.namespace.model.DescribeTableIndexStatsRequest;
 import com.lancedb.lance.namespace.model.DescribeTableIndexStatsResponse;
 import com.lancedb.lance.namespace.model.DescribeTableResponse;
+import com.lancedb.lance.namespace.model.DropTableResponse;
 import com.lancedb.lance.namespace.model.IndexContent;
 import com.lancedb.lance.namespace.model.JsonArrowSchema;
 import com.lancedb.lance.namespace.model.ListTableIndicesRequest;
@@ -276,6 +277,63 @@ public class GravitinoLanceTableOperations implements LanceTableOperations {
     response.setProperties(properties);
     response.setLocation(properties.get(LANCE_LOCATION));
     response.setId(nsId.listStyleId());
+    return response;
+  }
+
+  @Override
+  public boolean tableExists(String tableId, String delimiter) {
+    ObjectIdentifier nsId = ObjectIdentifier.of(tableId, Pattern.quote(delimiter));
+    Preconditions.checkArgument(
+        nsId.levels() == 3, "Expected at 3-level namespace but got: %s", nsId.levels());
+
+    String catalogName = nsId.levelAtListPos(0);
+    Catalog catalog = namespaceWrapper.loadAndValidateLakehouseCatalog(catalogName);
+
+    NameIdentifier tableIdentifier =
+        NameIdentifier.of(nsId.levelAtListPos(1), nsId.levelAtListPos(2));
+
+    return catalog.asTableCatalog().tableExists(tableIdentifier);
+  }
+
+  @Override
+  public DropTableResponse dropTable(String tableId, String delimiter) {
+    ObjectIdentifier nsId = ObjectIdentifier.of(tableId, Pattern.quote(delimiter));
+    Preconditions.checkArgument(
+        nsId.levels() == 3, "Expected at 3-level namespace but got: %s", nsId.levels());
+
+    String catalogName = nsId.levelAtListPos(0);
+    Catalog catalog = namespaceWrapper.loadAndValidateLakehouseCatalog(catalogName);
+
+    NameIdentifier tableIdentifier =
+        NameIdentifier.of(nsId.levelAtListPos(1), nsId.levelAtListPos(2));
+
+    Table table;
+    try {
+      table = catalog.asTableCatalog().loadTable(tableIdentifier);
+    } catch (NoSuchTableException e) {
+      throw LanceNamespaceException.notFound(
+          "Table not found: " + tableId,
+          NoSuchTableException.class.getSimpleName(),
+          tableId,
+          CommonUtil.formatCurrentStackTrace());
+    }
+
+    boolean deleted = catalog.asTableCatalog().purgeTable(tableIdentifier);
+    if (!deleted) {
+      throw LanceNamespaceException.notFound(
+          "Table not found: " + tableId,
+          NoSuchTableException.class.getSimpleName(),
+          tableId,
+          CommonUtil.formatCurrentStackTrace());
+    }
+
+    DropTableResponse response = new DropTableResponse();
+    response.setId(nsId.listStyleId());
+    response.setLocation(table.properties().get(LANCE_LOCATION));
+    response.setProperties(table.properties());
+    // TODO Support transaction ids later
+    response.setTransactionId(List.of());
+
     return response;
   }
 

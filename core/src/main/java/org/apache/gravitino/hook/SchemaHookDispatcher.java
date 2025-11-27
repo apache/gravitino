@@ -57,10 +57,6 @@ public class SchemaHookDispatcher implements SchemaDispatcher {
   @Override
   public Schema createSchema(NameIdentifier ident, String comment, Map<String, String> properties)
       throws NoSuchCatalogException, SchemaAlreadyExistsException {
-    // Check whether the current user exists or not
-    AuthorizationUtils.checkCurrentUser(
-        ident.namespace().level(0), PrincipalUtils.getCurrentUserName());
-
     Schema schema = dispatcher.createSchema(ident, comment, properties);
 
     // Set the creator as the owner of the schema.
