@@ -372,9 +372,10 @@ os.environ["PYSPARK_SUBMIT_ARGS"] = (
 )
 ```
 
-- [`gravitino-azure-bundle-${gravitino-version}.jar`](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-azure-bundle) is the Gravitino ADLS jar with Hadoop environment(3.3.1), `hadoop-azure.jar` and all packages needed to access ADLS.
-- [`gravitino-azure-${gravitino-version}.jar`](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-azure) is bundled with the `gravitino-filesystem-hadoop3-runtime-${gravitino-version}.jar` and `gravitino-azure-bundle-${gravitino-version}.jar` since version 1.1.0.
-- `hadoop-azure-3.3.4.jar` and `azure-storage-7.0.1.jar` can be found in the Hadoop distribution in the `${HADOOP_HOME}/share/hadoop/tools/lib` directory.
+- [`gravitino-azure-bundle-${gravitino-version}.jar`](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-azure-bundle): A "fat" JAR that includes `gravitino-azure` functionality and all necessary dependencies like `hadoop-azure` (3.3.1) and other packages needed to access ADLS. Use this if your Spark environment doesn't have a pre-existing Hadoop setup.
+- [`gravitino-filesystem-hadoop3-runtime-${gravitino-version}.jar`](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-filesystem-hadoop3-runtime): A "fat" JAR that bundles Gravitino's virtual filesystem client and includes the functionality of `gravitino-azure`. It is required for accessing Gravitino filesets.
+- `hadoop-azure-3.3.4.jar`, `azure-storage-7.0.1.jar`, and `wildfly-openssl-1.0.7.Final.jar`: Standard Hadoop dependencies for ADLS access. If you are running in an existing Hadoop environment, you need to provide these JARs. They are typically located in the `${HADOOP_HOME}/share/hadoop/tools/lib` directory.
+- [`gravitino-azure-${gravitino-version}.jar`](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-azure): A "thin" JAR that only provides the Azure integration code. Its functionality is already included in the `gravitino-azure-bundle` and `gravitino-filesystem-hadoop3-runtime` JARs, so you do not need to add it as a direct dependency unless you want to manage all Hadoop and Azure dependencies manually.
 
 Please choose the correct jar according to your environment.
 

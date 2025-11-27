@@ -363,8 +363,10 @@ os.environ["PYSPARK_SUBMIT_ARGS"] = (
 )
 ```
 
-- [`gravitino-gcp-bundle-${gravitino-version}.jar`](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-gcp-bundle) is the Gravitino GCP jar with Hadoop environment(3.3.1) and `gcs-connector`.
-- [`gravitino-gcp-${gravitino-version}.jar`](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-gcp) is bundled with the `gravitino-filesystem-hadoop3-runtime-${gravitino-version}.jar` and `gravitino-gcp-bundle-${gravitino-version}.jar` since version 1.1.0.
+- [`gravitino-gcp-bundle-${gravitino-version}.jar`](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-gcp-bundle): A "fat" JAR that includes `gravitino-gcp` functionality and all necessary dependencies like `gcs-connector` (hadoop3-2.2.22). Use this if your Spark environment doesn't have a pre-existing Hadoop setup.
+- [`gravitino-filesystem-hadoop3-runtime-${gravitino-version}.jar`](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-filesystem-hadoop3-runtime): A "fat" JAR that bundles Gravitino's virtual filesystem client and includes the functionality of `gravitino-gcp`. It is required for accessing Gravitino filesets.
+- [`gcs-connector-hadoop3-2.2.22-shaded.jar`](https://github.com/GoogleCloudDataproc/hadoop-connectors/releases/download/v2.2.22/gcs-connector-hadoop3-2.2.22-shaded.jar): Standard Hadoop dependency for GCS access. If you are running in an existing Hadoop environment, you need to provide this JAR.
+- [`gravitino-gcp-${gravitino-version}.jar`](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-gcp): A "thin" JAR that only provides the GCP integration code. Its functionality is already included in the `gravitino-gcp-bundle` and `gravitino-filesystem-hadoop3-runtime` JARs, so you do not need to add it as a direct dependency unless you want to manage all Hadoop and GCP dependencies manually.
 
 Please choose the correct jar according to your environment.
 

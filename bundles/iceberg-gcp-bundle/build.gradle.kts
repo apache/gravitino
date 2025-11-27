@@ -46,7 +46,3 @@ tasks.jar {
   dependsOn(tasks.named("shadowJar"))
   archiveClassifier.set("empty")
 }
-
-tasks.compileJava {
-  dependsOn(":catalogs:catalog-fileset:runtimeJars")
-}

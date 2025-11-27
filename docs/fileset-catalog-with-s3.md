@@ -367,9 +367,10 @@ If your Spark **without Hadoop environment**, you can use the following code sni
 os.environ["PYSPARK_SUBMIT_ARGS"] = "--jars /path/to/gravitino-aws-bundle-${gravitino-version}.jar,/path/to/gravitino-filesystem-hadoop3-runtime-${gravitino-version}-SNAPSHOT.jar --master local[1] pyspark-shell"
 ```
 
-- [`gravitino-aws-bundle-${gravitino-version}.jar`](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-aws-bundle) is the Gravitino AWS jar with Hadoop environment(3.3.1) and `hadoop-aws` jar.
-- [`gravitino-aws-${gravitino-version}.jar`](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-aws) is bundled with the `gravitino-filesystem-hadoop3-runtime-${gravitino-version}.jar` and `gravitino-aws-bundle-${gravitino-version}.jar` since version 1.1.0.
-- `hadoop-aws-3.3.4.jar` and `aws-java-sdk-bundle-1.12.262.jar` can be found in the Hadoop distribution in the `${HADOOP_HOME}/share/hadoop/tools/lib` directory.
+- [`gravitino-aws-bundle-${gravitino-version}.jar`](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-aws-bundle): A "fat" JAR that includes `gravitino-aws` functionality and all necessary dependencies like `hadoop-aws` (3.3.1) and the `AWS SDK`. Use this if your Spark environment doesn't have a pre-existing Hadoop setup.
+- [`gravitino-filesystem-hadoop3-runtime-${gravitino-version}.jar`] (https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-filesystem-hadoop3-runtime): A "fat" JAR that bundles Gravitino's virtual filesystem client and includes the functionality of `gravitino-aws`. It is required for accessing Gravitino filesets.
+- `hadoop-aws-3.3.4.jar` and `aws-java-sdk-bundle-1.12.262.jar`: Standard Hadoop dependencies for S3 access. If you are running in an existing Hadoop environment, you need to provide these JARs. They are typically located in the `${HADOOP_HOME}/share/hadoop/tools/lib` directory.
+- [`gravitino-aws-${gravitino-version}.jar`](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-aws): A "thin" JAR that only provides the AWS integration code. Its functionality is already included in the `gravitino-aws-bundle` and `gravitino-filesystem-hadoop3-runtime` JARs, so you do not need to add it as a direct dependency unless you want to manage all Hadoop and AWS dependencies manually.
 
 Please choose the correct jar according to your environment.
 

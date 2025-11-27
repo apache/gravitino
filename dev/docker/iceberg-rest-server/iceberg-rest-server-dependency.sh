@@ -50,35 +50,18 @@ tar xfz gravitino-iceberg-rest-server-*.tar.gz
 cp -r gravitino-iceberg-rest-server*-bin ${iceberg_rest_server_dir}/packages/gravitino-iceberg-rest-server
 
 cd ${gravitino_home}
-./gradlew :bundles:gcp:jar
-./gradlew :bundles:aws:jar
-./gradlew :bundles:azure:jar
-./gradlew :bundles:aliyun:jar
+./gradlew :bundles:iceberg-gcp-bundle:shadowJar
+./gradlew :bundles:iceberg-aws-bundle:shadowJar
+./gradlew :bundles:iceberg-azure-bundle:shadowJar
+./gradlew :bundles:iceberg-aliyun-bundle:shadowJar
 
 # prepare bundle jar
 cd ${iceberg_rest_server_dir}
 mkdir -p bundles
-find ${gravitino_home}/bundles/gcp/build/libs/ -name 'gravitino-gcp-*.jar' ! -name '*-empty.jar' -exec cp -v {} bundles/ \;
-find ${gravitino_home}/bundles/aws/build/libs/ -name 'gravitino-aws-*.jar' ! -name '*-empty.jar' -exec cp -v {} bundles/ \;
-find ${gravitino_home}/bundles/azure/build/libs/ -name 'gravitino-azure-*.jar' ! -name '*-empty.jar' -exec cp -v {} bundles/ \;
-find ${gravitino_home}/bundles/aliyun/build/libs/ -name 'gravitino-aliyun-*.jar' ! -name '*-empty.jar' -exec cp -v {} bundles/ \;
-
-iceberg_version="1.10.0"
-
-iceberg_gcp_bundle="iceberg-gcp-bundle-${iceberg_version}.jar"
-if [ ! -f "bundles/${iceberg_gcp_bundle}" ]; then
-  curl -L -s -o bundles/${iceberg_gcp_bundle} https://repo1.maven.org/maven2/org/apache/iceberg/iceberg-gcp-bundle/${iceberg_version}/${iceberg_gcp_bundle}
-fi
-
-iceberg_aws_bundle="iceberg-aws-bundle-${iceberg_version}.jar"
-if [ ! -f "bundles/${iceberg_aws_bundle}" ]; then
-  curl -L -s -o bundles/${iceberg_aws_bundle} https://repo1.maven.org/maven2/org/apache/iceberg/iceberg-aws-bundle/${iceberg_version}/${iceberg_aws_bundle}
-fi
-
-iceberg_azure_bundle="iceberg-azure-bundle-${iceberg_version}.jar"
-if [ ! -f "bundles/${iceberg_azure_bundle}" ]; then
-  curl -L -s -o bundles/${iceberg_azure_bundle} https://repo1.maven.org/maven2/org/apache/iceberg/iceberg-azure-bundle/${iceberg_version}/${iceberg_azure_bundle}
-fi
+find ${gravitino_home}/bundles/iceberg-gcp/build/libs/ -name 'gravitino-iceberg-gcp-bundle-*.jar' ! -name '*-empty.jar' -exec cp -v {} bundles/ \;
+find ${gravitino_home}/bundles/iceberg-aws/build/libs/ -name 'gravitino-iceberg-aws-bundle-*.jar' ! -name '*-empty.jar' -exec cp -v {} bundles/ \;
+find ${gravitino_home}/bundles/iceberg-azure/build/libs/ -name 'gravitino-iceberg-azure-bundle-*.jar' ! -name '*-empty.jar' -exec cp -v {} bundles/ \;
+find ${gravitino_home}/bundles/iceberg-aliyun/build/libs/ -name 'gravitino-iceberg-aliyun-bundle-*.jar' ! -name '*-empty.jar' -exec cp -v {} bundles/ \;
 
 download_aliyun_jars "bundles" "${iceberg_rest_server_dir}/packages/gravitino-iceberg-rest-server/libs/"
 
