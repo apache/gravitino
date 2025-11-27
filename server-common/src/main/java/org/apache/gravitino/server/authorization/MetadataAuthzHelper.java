@@ -196,9 +196,7 @@ public class MetadataAuthzHelper {
     }
     checkExecutor();
     AuthorizationRequestContext authorizationRequestContext = new AuthorizationRequestContext();
-      authorizationRequestContext.setOriginalAuthorizationExpression(expression);
-
-      return doFilter(
+    return doFilter(
         expression,
         entities,
         authorizer,
