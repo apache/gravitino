@@ -38,7 +38,6 @@ import org.apache.gravitino.Entity;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
-import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.authorization.AccessControlDispatcher;
 import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.authorization.Privilege;
@@ -92,22 +91,12 @@ public class RoleOperations {
           () -> {
             String[] names = accessControlManager.listRoleNames(metalake);
             names =
-                Arrays.stream(names)
-                    .filter(
-                        role -> {
-                          NameIdentifier[] nameIdentifiers =
-                              new NameIdentifier[] {NameIdentifierUtil.ofRole(metalake, role)};
-                          return MetadataAuthzHelper.filterByExpression(
-                                      metalake,
-                                      AuthorizationExpressionConstants
-                                          .loadRoleAuthorizationExpression,
-                                      Entity.EntityType.ROLE,
-                                      nameIdentifiers)
-                                  .length
-                              > 0;
-                        })
-                    .collect(Collectors.toList())
-                    .toArray(new String[0]);
+                MetadataAuthzHelper.filterByExpression(
+                    metalake,
+                    AuthorizationExpressionConstants.loadRoleAuthorizationExpression,
+                    Entity.EntityType.ROLE,
+                    names,
+                    roleName -> NameIdentifierUtil.ofRole(metalake, roleName));
             return Utils.ok(new NameListResponse(names));
           });
     } catch (Exception e) {

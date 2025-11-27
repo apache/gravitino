@@ -33,6 +33,7 @@ import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.GravitinoEnv;
+import org.apache.gravitino.Metalake;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.authorization.AuthorizationRequestContext;
 import org.apache.gravitino.authorization.GravitinoAuthorizer;
@@ -88,6 +89,25 @@ public class MetadataAuthzHelper {
         .toArray(NameIdentifier[]::new);
   }
 
+  public static Metalake[] filterMetalakes(Metalake[] metalakes, String expression) {
+    if (!enableAuthorization()) {
+      return metalakes;
+    }
+    checkExecutor();
+    AuthorizationRequestContext authorizationRequestContext = new AuthorizationRequestContext();
+    return doFilter(
+        expression,
+        metalakes,
+        GravitinoAuthorizerProvider.getInstance().getGravitinoAuthorizer(),
+        authorizationRequestContext,
+        metalake -> {
+          String metalakeName = metalake.name();
+          return splitMetadataNames(
+              metalakeName,
+              Entity.EntityType.METALAKE,
+              NameIdentifierUtil.ofMetalake(metalakeName));
+        });
+  }
   /**
    * Call {@link AuthorizationExpressionEvaluator} to filter the metadata list
    *
@@ -102,41 +122,7 @@ public class MetadataAuthzHelper {
       String expression,
       Entity.EntityType entityType,
       NameIdentifier[] nameIdentifiers) {
-    if (!enableAuthorization()) {
-      return nameIdentifiers;
-    }
-    checkExecutor();
-    AuthorizationRequestContext authorizationRequestContext = new AuthorizationRequestContext();
-    List<CompletableFuture<NameIdentifier>> futures = new ArrayList<>();
-    for (NameIdentifier nameIdentifier : nameIdentifiers) {
-      Principal currentPrincipal = PrincipalUtils.getCurrentPrincipal();
-      futures.add(
-          CompletableFuture.supplyAsync(
-              () -> {
-                try {
-                  return PrincipalUtils.doAs(
-                      currentPrincipal,
-                      () -> {
-                        Map<Entity.EntityType, NameIdentifier> nameIdentifierMap =
-                            spiltMetadataNames(metalake, entityType, nameIdentifier);
-                        AuthorizationExpressionEvaluator authorizationExpressionEvaluator =
-                            new AuthorizationExpressionEvaluator(expression);
-                        return authorizationExpressionEvaluator.evaluate(
-                                nameIdentifierMap, authorizationRequestContext)
-                            ? nameIdentifier
-                            : null;
-                      });
-                } catch (Exception e) {
-                  LOG.error("GravitinoAuthorize error:{}", e.getMessage(), e);
-                  return null;
-                }
-              },
-              executor));
-    }
-    return futures.stream()
-        .map(CompletableFuture::join)
-        .filter(Objects::nonNull)
-        .toArray(NameIdentifier[]::new);
+    return filterByExpression(metalake, expression, entityType, nameIdentifiers, e -> e);
   }
 
   /**
@@ -155,7 +141,7 @@ public class MetadataAuthzHelper {
 
     String metalake = NameIdentifierUtil.getMetalake(identifier);
     Map<Entity.EntityType, NameIdentifier> nameIdentifierMap =
-        spiltMetadataNames(metalake, entityType, identifier);
+        splitMetadataNames(metalake, entityType, identifier);
     AuthorizationExpressionEvaluator authorizationExpressionEvaluator =
         new AuthorizationExpressionEvaluator(expression);
     return authorizationExpressionEvaluator.evaluate(
@@ -181,9 +167,8 @@ public class MetadataAuthzHelper {
       Function<E, NameIdentifier> toNameIdentifier) {
     GravitinoAuthorizer authorizer =
         GravitinoAuthorizerProvider.getInstance().getGravitinoAuthorizer();
-    Principal currentPrincipal = PrincipalUtils.getCurrentPrincipal();
     return filterByExpression(
-        metalake, expression, entityType, entities, toNameIdentifier, currentPrincipal, authorizer);
+        metalake, expression, entityType, entities, toNameIdentifier, authorizer);
   }
 
   /**
@@ -195,7 +180,6 @@ public class MetadataAuthzHelper {
    * @param entityType entity type
    * @param entities metadata entities
    * @param toNameIdentifier function to convert entity to NameIdentifier
-   * @param currentPrincipal current principal
    * @param authorizer authorizer to filter metadata
    * @return Filtered Metadata Entity
    * @param <E> Entity class
@@ -206,13 +190,30 @@ public class MetadataAuthzHelper {
       Entity.EntityType entityType,
       E[] entities,
       Function<E, NameIdentifier> toNameIdentifier,
-      Principal currentPrincipal,
       GravitinoAuthorizer authorizer) {
     if (!enableAuthorization()) {
       return entities;
     }
     checkExecutor();
     AuthorizationRequestContext authorizationRequestContext = new AuthorizationRequestContext();
+    return doFilter(
+        expression,
+        entities,
+        authorizer,
+        authorizationRequestContext,
+        (entity) -> {
+          NameIdentifier nameIdentifier = toNameIdentifier.apply(entity);
+          return splitMetadataNames(metalake, entityType, nameIdentifier);
+        });
+  }
+
+  private static <E> E[] doFilter(
+      String expression,
+      E[] entities,
+      GravitinoAuthorizer authorizer,
+      AuthorizationRequestContext authorizationRequestContext,
+      Function<E, Map<Entity.EntityType, NameIdentifier>> extractMetadataNamesMap) {
+    Principal currentPrincipal = PrincipalUtils.getCurrentPrincipal();
     List<CompletableFuture<E>> futures = new ArrayList<>();
     for (E entity : entities) {
       futures.add(
@@ -224,11 +225,8 @@ public class MetadataAuthzHelper {
                       () -> {
                         AuthorizationExpressionEvaluator authorizationExpressionEvaluator =
                             new AuthorizationExpressionEvaluator(expression, authorizer);
-                        NameIdentifier nameIdentifier = toNameIdentifier.apply(entity);
-                        Map<Entity.EntityType, NameIdentifier> nameIdentifierMap =
-                            spiltMetadataNames(metalake, entityType, nameIdentifier);
                         return authorizationExpressionEvaluator.evaluate(
-                                nameIdentifierMap, authorizationRequestContext)
+                                extractMetadataNamesMap.apply(entity), authorizationRequestContext)
                             ? entity
                             : null;
                       });
@@ -255,7 +253,7 @@ public class MetadataAuthzHelper {
    * @param nameIdentifier metadata name
    * @return A map containing the metadata object and all its parent objects, keyed by their types
    */
-  public static Map<Entity.EntityType, NameIdentifier> spiltMetadataNames(
+  public static Map<Entity.EntityType, NameIdentifier> splitMetadataNames(
       String metalake, Entity.EntityType entityType, NameIdentifier nameIdentifier) {
     Map<Entity.EntityType, NameIdentifier> nameIdentifierMap = new HashMap<>();
     nameIdentifierMap.put(Entity.EntityType.METALAKE, NameIdentifierUtil.ofMetalake(metalake));
