@@ -176,7 +176,7 @@ public class ParameterUtil {
       NameIdentifier nameIdentifier =
           MetadataObjectUtil.toEntityIdent(metalake, MetadataObjects.parse(fullName, type));
       nameIdentifierMap.putAll(
-          MetadataAuthzHelper.spiltMetadataNames(
+          MetadataAuthzHelper.splitMetadataNames(
               metalake, MetadataObjectUtil.toEntityType(type), nameIdentifier));
     }
 
