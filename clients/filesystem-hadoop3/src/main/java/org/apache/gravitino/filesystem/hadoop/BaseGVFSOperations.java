@@ -966,7 +966,7 @@ public abstract class BaseGVFSOperations implements Closeable {
             getFilesetCatalog(
                 NameIdentifier.of(
                     filesetIdent.namespace().level(0), filesetIdent.namespace().level(1)));
-    allProperties.putAll(getNecessaryProperties(catalog.properties()));
+    allProperties.putAll(catalog.properties());
 
     Schema schema = getSchema(NameIdentifier.parse(filesetIdent.namespace().toString()));
     allProperties.putAll(schema.properties());
