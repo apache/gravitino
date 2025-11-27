@@ -37,12 +37,12 @@ class TagChange(ABC):
             new_name (str): The new name of the tag.
 
         Returns:
-            TagChange: A tag change instance to rename the tag.
+            RenameTag: A tag change instance to rename the tag.
         """
         return TagChange.RenameTag(new_name)
 
     @staticmethod
-    def update_comment(new_comment: str) -> UpdateComment:
+    def update_comment(new_comment: str) -> UpdateTagComment:
         """
         Create a tag change instance to update the tag comment.
 
@@ -50,9 +50,9 @@ class TagChange(ABC):
             new_comment (str): The new comment of the tag.
 
         Returns:
-            TagChange: A tag change instance to update the tag comment.
+            UpdateTagComment: A tag change instance to update the tag comment.
         """
-        return TagChange.UpdateComment(new_comment)
+        return TagChange.UpdateTagComment(new_comment)
 
     @staticmethod
     def set_property(tag_property: str, tag_value: str) -> SetProperty:
@@ -64,7 +64,7 @@ class TagChange(ABC):
             tag_value (str): The value to set.
 
         Returns:
-            TagChange: The tag change instance to set the property and value for the tag.
+            SetProperty: The tag change instance to set the property and value for the tag.
         """
         return TagChange.SetProperty(tag_property, tag_value)
 
@@ -77,7 +77,7 @@ class TagChange(ABC):
             tag_property (str): The property to remove.
 
         Returns:
-            TagChange: The tag change instance to remove a property from the tag.
+            RemoveProperty: The tag change instance to remove a property from the tag.
         """
         return TagChange.RemoveProperty(tag_property)
 
@@ -93,10 +93,10 @@ class TagChange(ABC):
             return self._new_name
 
         def __str__(self) -> str:
-            return f"RenameTag {self._new_name}"
+            return f"RENAMETAG {self._new_name}"
 
     @dataclass(frozen=True, eq=True)
-    class UpdateComment:
+    class UpdateTagComment:
         """A tag change to update the tag comment."""
 
         _new_comment: str = field(metadata=config(field_name="newComment"))
@@ -107,7 +107,7 @@ class TagChange(ABC):
             return self._new_comment
 
         def __str__(self) -> str:
-            return f"UpdateComment {self._new_comment}"
+            return f"UPDATETAGCOMMENT {self._new_comment}"
 
     @dataclass(frozen=True, eq=True)
     class SetProperty:
@@ -127,7 +127,7 @@ class TagChange(ABC):
             return self._value
 
         def __str__(self) -> str:
-            return f"SetProperty {self._property}={self._value}"
+            return f"SETTAGPROPERTY {self._property} = {self._value}"
 
     @dataclass(frozen=True, eq=True)
     class RemoveProperty:

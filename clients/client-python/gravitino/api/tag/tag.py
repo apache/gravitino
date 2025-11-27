@@ -18,7 +18,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import ClassVar, Dict, List, Optional
+from typing import ClassVar, Optional
 
 from gravitino.api.auditable import Auditable
 from gravitino.api.metadata_object import MetadataObject
@@ -39,11 +39,11 @@ class AssociatedObjects(ABC):
         return 0 if objects is None else len(objects)
 
     @abstractmethod
-    def objects(self) -> Optional[List[MetadataObject]]:
+    def objects(self) -> Optional[list[MetadataObject]]:
         """Get the associated objects.
 
         Returns:
-            Optional[List[MetadataObject]]: The list of objects that are associated with this tag..
+            Optional[list[MetadataObject]]: The list of objects that are associated with this tag..
         """
         pass
 
@@ -81,7 +81,7 @@ class Tag(Auditable):
         pass
 
     @abstractmethod
-    def properties(self) -> Dict[str, str]:
+    def properties(self) -> dict[str, str]:
         """Get the properties of the tag.
 
         Returns:

@@ -25,13 +25,13 @@ class TestTagChange(unittest.TestCase):
         expected_new_name = "new_name"
         tag_change = TagChange.rename(expected_new_name)
         self.assertEqual(expected_new_name, tag_change.new_name)
-        self.assertEqual(f"RenameTag {expected_new_name}", str(tag_change))
+        self.assertEqual(f"RENAMETAG {expected_new_name}", str(tag_change))
 
     def test_update_comment(self) -> None:
         expected_new_comment = "new_comment"
         tag_change = TagChange.update_comment(expected_new_comment)
         self.assertEqual(expected_new_comment, tag_change.new_comment)
-        self.assertEqual(f"UpdateComment {expected_new_comment}", str(tag_change))
+        self.assertEqual(f"UPDATETAGCOMMENT {expected_new_comment}", str(tag_change))
 
     def test_set_property(self) -> None:
         expected_property = "property"
@@ -40,7 +40,7 @@ class TestTagChange(unittest.TestCase):
         self.assertEqual(expected_property, tag_change.name)
         self.assertEqual(expected_value, tag_change.value)
         self.assertEqual(
-            f"SetProperty {expected_property}={expected_value}", str(tag_change)
+            f"SETTAGPROPERTY {expected_property} = {expected_value}", str(tag_change)
         )
 
     def test_remove_property(self) -> None:
