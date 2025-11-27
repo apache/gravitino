@@ -98,7 +98,6 @@ public class GravitinoInterceptionService implements InterceptionService {
             PartitionOperations.class.getName(),
             MetadataObjectTagOperations.class.getName(),
             TagOperations.class.getName(),
-            MetadataObjectTagOperations.class.getName(),
             PolicyOperations.class.getName(),
             MetadataObjectPolicyOperations.class.getName()));
   }
