@@ -255,75 +255,10 @@ public class MetadataAuthzHelper {
       String metalake, Entity.EntityType entityType, NameIdentifier nameIdentifier) {
     Map<Entity.EntityType, NameIdentifier> nameIdentifierMap = new HashMap<>();
     nameIdentifierMap.put(Entity.EntityType.METALAKE, NameIdentifierUtil.ofMetalake(metalake));
-    switch (entityType) {
-      case CATALOG:
-        nameIdentifierMap.put(Entity.EntityType.CATALOG, nameIdentifier);
-        break;
-      case SCHEMA:
-        nameIdentifierMap.put(Entity.EntityType.SCHEMA, nameIdentifier);
-        nameIdentifierMap.put(
-            Entity.EntityType.CATALOG, NameIdentifierUtil.getCatalogIdentifier(nameIdentifier));
-        break;
-      case TABLE:
-        nameIdentifierMap.put(Entity.EntityType.TABLE, nameIdentifier);
-        nameIdentifierMap.put(
-            Entity.EntityType.SCHEMA, NameIdentifierUtil.getSchemaIdentifier(nameIdentifier));
-        nameIdentifierMap.put(
-            Entity.EntityType.CATALOG, NameIdentifierUtil.getCatalogIdentifier(nameIdentifier));
-        break;
-      case MODEL:
-        nameIdentifierMap.put(Entity.EntityType.MODEL, nameIdentifier);
-        nameIdentifierMap.put(
-            Entity.EntityType.SCHEMA, NameIdentifierUtil.getSchemaIdentifier(nameIdentifier));
-        nameIdentifierMap.put(
-            Entity.EntityType.CATALOG, NameIdentifierUtil.getCatalogIdentifier(nameIdentifier));
-        break;
-      case MODEL_VERSION:
-        nameIdentifierMap.put(Entity.EntityType.MODEL_VERSION, nameIdentifier);
-        nameIdentifierMap.put(
-            Entity.EntityType.MODEL, NameIdentifierUtil.getModelIdentifier(nameIdentifier));
-        nameIdentifierMap.put(
-            Entity.EntityType.SCHEMA, NameIdentifierUtil.getSchemaIdentifier(nameIdentifier));
-        nameIdentifierMap.put(
-            Entity.EntityType.CATALOG, NameIdentifierUtil.getCatalogIdentifier(nameIdentifier));
-        break;
-      case TOPIC:
-        nameIdentifierMap.put(Entity.EntityType.TOPIC, nameIdentifier);
-        nameIdentifierMap.put(
-            Entity.EntityType.SCHEMA, NameIdentifierUtil.getSchemaIdentifier(nameIdentifier));
-        nameIdentifierMap.put(
-            Entity.EntityType.CATALOG, NameIdentifierUtil.getCatalogIdentifier(nameIdentifier));
-        break;
-      case FILESET:
-        nameIdentifierMap.put(Entity.EntityType.FILESET, nameIdentifier);
-        nameIdentifierMap.put(
-            Entity.EntityType.SCHEMA, NameIdentifierUtil.getSchemaIdentifier(nameIdentifier));
-        nameIdentifierMap.put(
-            Entity.EntityType.CATALOG, NameIdentifierUtil.getCatalogIdentifier(nameIdentifier));
-        break;
-      case METALAKE:
-        nameIdentifierMap.put(entityType, nameIdentifier);
-        break;
-      case ROLE:
-        nameIdentifierMap.put(entityType, nameIdentifier);
-        break;
-      case USER:
-        nameIdentifierMap.put(entityType, nameIdentifier);
-        break;
-      case TAG:
-        nameIdentifierMap.put(entityType, nameIdentifier);
-        break;
-      case COLUMN:
-        nameIdentifierMap.put(entityType, nameIdentifier);
-        nameIdentifierMap.put(
-            Entity.EntityType.TABLE, NameIdentifierUtil.getTableIdentifier(nameIdentifier));
-        nameIdentifierMap.put(
-            Entity.EntityType.SCHEMA, NameIdentifierUtil.getSchemaIdentifier(nameIdentifier));
-        nameIdentifierMap.put(
-            Entity.EntityType.CATALOG, NameIdentifierUtil.getCatalogIdentifier(nameIdentifier));
-        break;
-      default:
-        throw new IllegalArgumentException("Unsupported entity type: " + entityType);
+    while (entityType != Entity.EntityType.METALAKE) {
+      nameIdentifierMap.put(entityType, nameIdentifier);
+      entityType = NameIdentifierUtil.parentEntityType(entityType);
+      nameIdentifier = NameIdentifierUtil.parentNameIdentifier(nameIdentifier, entityType);
     }
     return nameIdentifierMap;
   }
