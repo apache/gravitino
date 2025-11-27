@@ -21,7 +21,6 @@ import java.util.Map;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
-import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.authorization.Owner;
 import org.apache.gravitino.authorization.OwnerDispatcher;
 import org.apache.gravitino.exceptions.NoSuchTagException;
@@ -57,7 +56,6 @@ public class TagHookDispatcher implements TagDispatcher {
   @Override
   public Tag createTag(
       String metalake, String name, String comment, Map<String, String> properties) {
-    AuthorizationUtils.checkCurrentUser(metalake, PrincipalUtils.getCurrentUserName());
     Tag tag = dispatcher.createTag(metalake, name, comment, properties);
 
     // Set the creator as the owner of the catalog.
