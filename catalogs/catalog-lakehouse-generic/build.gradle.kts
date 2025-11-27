@@ -43,7 +43,11 @@ dependencies {
   implementation(libs.commons.io)
   implementation(libs.commons.lang3)
   implementation(libs.guava)
-  implementation(libs.lance)
+  implementation(libs.hadoop3.client.api)
+  implementation(libs.lance) {
+    exclude(group = "com.google.guava", module = "guava") // provided by gravitino
+    exclude(group = "org.apache.commons", module = "commons-lang3") // provided by gravitino
+  }
 
   annotationProcessor(libs.lombok)
 

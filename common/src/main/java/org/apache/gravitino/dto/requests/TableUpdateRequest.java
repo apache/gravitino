@@ -29,6 +29,7 @@ import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import com.google.common.base.Preconditions;
 import java.util.Arrays;
+import java.util.Map;
 import javax.annotation.Nullable;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
@@ -825,6 +826,19 @@ public interface TableUpdateRequest extends RESTRequest {
     }
 
     /**
+     * The constructor of the add table index request.
+     *
+     * @param type Index type of the index to be added
+     * @param name Name of the index to be added
+     * @param fieldNames Field names of the index to be added
+     * @param properties Properties of the index to be added
+     */
+    public AddTableIndexRequest(
+        Index.IndexType type, String name, String[][] fieldNames, Map<String, String> properties) {
+      this.index = Indexes.of(type, name, fieldNames, properties);
+    }
+
+    /**
      * Validates the request.
      *
      * @throws IllegalArgumentException If the request is invalid, this exception is thrown.
@@ -843,7 +857,8 @@ public interface TableUpdateRequest extends RESTRequest {
      */
     @Override
     public TableChange tableChange() {
-      return TableChange.addIndex(index.type(), index.name(), index.fieldNames());
+      return TableChange.addIndex(
+          index.type(), index.name(), index.fieldNames(), index.properties());
     }
   }
 

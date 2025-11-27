@@ -18,13 +18,24 @@
  */
 package org.apache.gravitino.catalog.lakehouse.lance;
 
+import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_INDEX_CONFIG_KEY;
+
 import com.google.common.base.Preconditions;
+import com.google.common.collect.Lists;
 import com.lancedb.lance.Dataset;
 import com.lancedb.lance.WriteParams;
 import com.lancedb.lance.index.DistanceType;
 import com.lancedb.lance.index.IndexParams;
 import com.lancedb.lance.index.IndexType;
+import com.lancedb.lance.index.scalar.ScalarIndexParams;
+import com.lancedb.lance.index.vector.HnswBuildParams;
+import com.lancedb.lance.index.vector.IvfBuildParams;
+import com.lancedb.lance.index.vector.PQBuildParams;
+import com.lancedb.lance.index.vector.SQBuildParams;
 import com.lancedb.lance.index.vector.VectorIndexParams;
+import com.lancedb.lance.namespace.model.CreateTableIndexRequest;
+import com.lancedb.lance.namespace.model.CreateTableIndexRequest.MetricTypeEnum;
+import com.lancedb.lance.namespace.util.JsonUtil;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
@@ -159,12 +170,20 @@ public class LanceTableOperations extends ManagedTableOperations {
                       .withIndexType(addIndexChange.getType())
                       .withName(addIndexChange.getName())
                       .withFieldNames(addIndexChange.getFieldNames())
+                      .withProperties(addIndexChange.getProperties())
                       .build();
                 })
             .collect(Collectors.toList());
 
     Table loadedTable = super.loadTable(ident);
-    addLanceIndex(loadedTable, addedIndexes);
+
+    String location = loadedTable.properties().get(Table.PROPERTY_LOCATION);
+    List<Index> addedIndex = addLanceIndex(location, addedIndexes);
+
+    // Since Lance supports adding indexes without an index name, and it will generate index name
+    // automatically, we need to modify the TableChange to include the index name after adding the
+    // index to Lance dataset.
+    changes = modifyAddIndex(changes, addedIndex);
     // After adding the index to the Lance dataset, we need to update the table metadata in
     // Gravitino. If there's any failure during this process, the code will throw an exception
     // and the update won't be applied in Gravitino.
@@ -240,43 +259,135 @@ public class LanceTableOperations extends ManagedTableOperations {
     return new org.apache.arrow.vector.types.pojo.Schema(fields);
   }
 
-  private void addLanceIndex(Table table, List<Index> addedIndexes) {
-    String location = table.properties().get(Table.PROPERTY_LOCATION);
-    try (Dataset dataset = Dataset.open(location, new RootAllocator())) {
-      // For Lance, we only support adding indexes, so in fact, we can't handle drop index here.
-      for (Index index : addedIndexes) {
-        IndexType indexType = IndexType.valueOf(index.type().name());
-        IndexParams indexParams = getIndexParamsByIndexType(indexType);
+  private TableChange[] modifyAddIndex(TableChange[] tableChanges, List<Index> addIndex) {
+    int indexCount = 0;
+    for (int i = 0; i < tableChanges.length; i++) {
+      TableChange change = tableChanges[i];
+      if (change instanceof TableChange.AddIndex) {
+        Index index = addIndex.get(indexCount++);
+        tableChanges[i] =
+            new TableChange.AddIndex(
+                index.type(), index.name(), index.fieldNames(), index.properties());
+      }
+    }
 
+    return tableChanges;
+  }
+
+  private List<Index> addLanceIndex(String location, List<Index> addedIndexes) {
+    List<Index> newIndexes = Lists.newArrayList();
+    try (RootAllocator rootAllocator = new RootAllocator();
+        Dataset dataset = Dataset.open(location, rootAllocator)) {
+      for (Index index : addedIndexes) {
+        IndexType indexType = getIndexType(index);
+        IndexParams indexParams = generateIndexParams(index);
         dataset.createIndex(
             Arrays.stream(index.fieldNames())
-                .map(field -> String.join(".", field))
+                .map(fieldPath -> String.join(".", fieldPath))
                 .collect(Collectors.toList()),
             indexType,
-            Optional.of(index.name()),
+            Optional.ofNullable(index.name()),
             indexParams,
-            true);
+            false);
+
+        // Currently lance only supports single-field indexes, so we can use the first field name.
+        // Another point is that we need to ensure the index name is not null in Gravitino, so we
+        // generate a name if it's null as Lance will generate a name automatically.
+        String lanceIndexName =
+            index.name() == null ? index.fieldNames()[0][0] + "_idx" : index.name();
+        newIndexes.add(
+            Indexes.of(index.type(), lanceIndexName, index.fieldNames(), index.properties()));
       }
-    } catch (Exception e) {
-      throw new RuntimeException(
-          "Failed to add indexes to Lance dataset at location " + location, e);
+
+      return newIndexes;
     }
   }
 
-  private IndexParams getIndexParamsByIndexType(IndexType indexType) {
-    switch (indexType) {
-      case SCALAR:
-        return IndexParams.builder().build();
-      case VECTOR:
-        // TODO make these parameters configurable
-        int numberOfDimensions = 3; // this value should be determined dynamically based on the data
-        // Add properties to Index to set this value.
-        return IndexParams.builder()
-            .setVectorIndexParams(
-                VectorIndexParams.ivfPq(2, 8, numberOfDimensions, DistanceType.L2, 2))
-            .build();
-      default:
-        throw new IllegalArgumentException("Unsupported index type: " + indexType);
+  private IndexType getIndexType(Index index) {
+    IndexType indexType = IndexType.valueOf(index.type().name());
+    return switch (indexType) {
+        // API only supports these index types for now, but there are more index types in Lance.
+      case SCALAR, BTREE, INVERTED, BITMAP -> indexType;
+        // According to real test, we need to map IVF_SQ/IVF_PQ/IVF_HNSW_SQ to VECTOR type in Lance,
+        // or it will throw exception. For more, please refer to
+        // https://github.com/lancedb/lance/issues/5182#issuecomment-3524372490
+      case IVF_FLAT, IVF_PQ, IVF_HNSW_SQ -> IndexType.VECTOR;
+      default -> throw new IllegalArgumentException("Unsupported index type: " + indexType);
+    };
+  }
+
+  private IndexParams generateIndexParams(Index index) {
+    IndexType indexType = IndexType.valueOf(index.type().name());
+
+    String configJson = index.properties().get(LANCE_INDEX_CONFIG_KEY);
+    Preconditions.checkArgument(
+        StringUtils.isNotBlank(configJson),
+        "Lance index config must be provided in index properties with key %s",
+        LANCE_INDEX_CONFIG_KEY);
+    CreateTableIndexRequest request;
+    try {
+      request = JsonUtil.mapper().readValue(configJson, CreateTableIndexRequest.class);
+    } catch (Exception e) {
+      throw new IllegalArgumentException("Lance index config is invalid", e);
     }
+
+    IndexParams.Builder builder = IndexParams.builder();
+    switch (indexType) {
+      case SCALAR, BTREE, INVERTED, BITMAP -> builder.setScalarIndexParams(
+          ScalarIndexParams.create(indexType.name()));
+
+      case IVF_FLAT -> builder.setVectorIndexParams(
+          new VectorIndexParams.Builder(new IvfBuildParams.Builder().build())
+              .setDistanceType(toLanceDistanceType(request.getMetricType()))
+              .build());
+      case IVF_PQ -> builder.setVectorIndexParams(
+          new VectorIndexParams.Builder(new IvfBuildParams.Builder().build())
+              .setDistanceType(toLanceDistanceType(request.getMetricType()))
+              .setPqParams(
+                  new PQBuildParams.Builder()
+                      .setNumSubVectors(1) // others use default value.
+                      .build())
+              .build());
+
+      case IVF_SQ -> builder.setVectorIndexParams(
+          new VectorIndexParams.Builder(new IvfBuildParams.Builder().build())
+              .setDistanceType(toLanceDistanceType(request.getMetricType()))
+              .setSqParams(new SQBuildParams.Builder().build())
+              .build());
+
+      case IVF_HNSW_SQ -> builder.setVectorIndexParams(
+          new VectorIndexParams.Builder(new IvfBuildParams.Builder().build())
+              .setDistanceType(toLanceDistanceType(request.getMetricType()))
+              .setHnswParams(new HnswBuildParams.Builder().build())
+              .build());
+
+      case IVF_HNSW_PQ -> builder.setVectorIndexParams(
+          new VectorIndexParams.Builder(new IvfBuildParams.Builder().build())
+              .setDistanceType(toLanceDistanceType(request.getMetricType()))
+              .setHnswParams(new HnswBuildParams.Builder().build())
+              .setPqParams(
+                  new PQBuildParams.Builder()
+                      .setNumSubVectors(1) // others use default value.
+                      .build())
+              .build());
+      default -> throw new IllegalArgumentException("Unsupported index type: " + indexType);
+    }
+
+    return builder.build();
+  }
+
+  private DistanceType toLanceDistanceType(MetricTypeEnum metricTypeEnum) {
+    if (metricTypeEnum == null) {
+      // Default to L2
+      return DistanceType.L2;
+    }
+    String metricName = metricTypeEnum.name();
+    for (DistanceType distanceType : DistanceType.values()) {
+      if (distanceType.name().equalsIgnoreCase(metricName)) {
+        return distanceType;
+      }
+    }
+
+    throw new IllegalArgumentException("Unsupported metric type: " + metricTypeEnum);
   }
 }

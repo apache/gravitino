@@ -19,6 +19,7 @@
 
 package org.apache.gravitino.rel.indexes;
 
+import java.util.Map;
 import org.apache.gravitino.annotation.Evolving;
 
 /**
@@ -43,6 +44,13 @@ public interface Index {
    *     "a.b.c" for nested column, but normally it could only be "a".
    */
   String[][] fieldNames();
+
+  /**
+   * @return The properties of the index.
+   */
+  default Map<String, String> properties() {
+    return Map.of();
+  }
 
   /**
    * The enum IndexType defines the type of the index. Currently, PRIMARY_KEY and UNIQUE_KEY are
@@ -102,15 +110,44 @@ public interface Index {
      * Currently, this type is only applicable to Lance.
      */
     VECTOR,
-    /** IVF_FLAT (Inverted File with Flat quantization) is an indexing method used for efficient */
+
+    /**
+     * IVF_FLAT (Inverted File with Flat Quantization) is an indexing method used for efficient
+     * approximate nearest neighbor search in high-dimensional vector spaces. It stores the original
+     * vectors without any quantization.
+     */
     IVF_FLAT,
-    /** IVF_SQ (Inverted File with Scalar Quantization) is an indexing method used for efficient */
+    /**
+     * IVF_SQ (Inverted File with Scalar Quantization) is an indexing method used for efficient
+     * approximate nearest neighbor search in high-dimensional vector spaces. It applies scalar
+     * quantization to reduce the storage size of the vectors.
+     */
     IVF_SQ,
-    /** IVF_PQ (Inverted File with Product Quantization) is an indexing method used for efficient */
+    /**
+     * IVF_PQ (Inverted File with Product Quantization) is an indexing method used for efficient
+     * approximate nearest neighbor search in high-dimensional vector spaces. It applies product
+     * quantization to compress the vectors into smaller codes for faster search and reduced
+     * storage.
+     */
     IVF_PQ,
-    /** IVF_HNSW_FLAT */
+
+    /**
+     * IVF_HNSW_SQ is an indexing method that combines Inverted File (IVF) with Hierarchical
+     * Navigable Small World (HNSW) graphs and Scalar Quantization (SQ) for efficient approximate
+     * nearest neighbor search in high-dimensional vector spaces.
+     */
     IVF_HNSW_SQ,
-    /** IVF_HNSW_PQ */
-    IVF_HNSW_PQ;
+    /**
+     * IVF_HNSW_PQ is an indexing method that combines Inverted File (IVF) with Hierarchical
+     * Navigable Small World (HNSW) graphs and Product Quantization (PQ) for efficient approximate
+     * nearest neighbor search in high-dimensional vector spaces.
+     */
+    IVF_HNSW_PQ,
+    /**
+     * FTS index is a data structure used for efficient storage and retrieval of strings, enabling
+     * fast prefix-based searches and pattern matching. Currently, this type is only applicable to
+     * Lance.
+     */
+    FTS;
   }
 }

@@ -248,6 +248,7 @@ public abstract class ManagedTableOperations implements TableCatalog {
                 .withName(addIndex.getName())
                 .withFieldNames(addIndex.getFieldNames())
                 .withIndexType(addIndex.getType())
+                .withProperties(addIndex.getProperties())
                 .build();
         newIndexes.add(newIndex);
 

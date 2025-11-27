@@ -555,7 +555,6 @@ public class POConverters {
                       .readValue(tablePO.getPartitions(), Partitioning[].class))
           .withComment(tablePO.getComment())
           .withProperties(properties)
-          .withColumns(fromColumnPOs(columnPOs))
           .build();
     } catch (JsonProcessingException e) {
       throw new RuntimeException("Failed to deserialize json object:", e);

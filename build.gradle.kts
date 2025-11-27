@@ -858,17 +858,6 @@ tasks {
     destinationDirectory.set(projectDir.dir("distribution"))
   }
 
-  val assembleLanceRESTServer by registering(Tar::class) {
-    dependsOn("compileLanceRESTServer")
-    group = "gravitino distribution"
-    finalizedBy("checksumLanceRESTServerDistribution")
-    into("${rootProject.name}-lance-rest-server-$version-bin")
-    from(compileLanceRESTServer.map { it.outputs.files.single() })
-    compression = Compression.GZIP
-    archiveFileName.set("${rootProject.name}-lance-rest-server-$version-bin.tar.gz")
-    destinationDirectory.set(projectDir.dir("distribution"))
-  }
-
   val assembleIcebergRESTServer by registering(Tar::class) {
     dependsOn("compileIcebergRESTServer")
     group = "gravitino distribution"
@@ -877,6 +866,17 @@ tasks {
     from(compileIcebergRESTServer.map { it.outputs.files.single() })
     compression = Compression.GZIP
     archiveFileName.set("${rootProject.name}-iceberg-rest-server-$version-bin.tar.gz")
+    destinationDirectory.set(projectDir.dir("distribution"))
+  }
+
+  val assembleLanceRESTServer by registering(Tar::class) {
+    dependsOn("compileLanceRESTServer")
+    group = "gravitino distribution"
+    finalizedBy("checksumLanceRESTServerDistribution")
+    into("${rootProject.name}-lance-rest-server-$version-bin")
+    from(compileLanceRESTServer.map { it.outputs.files.single() })
+    compression = Compression.GZIP
+    archiveFileName.set("${rootProject.name}-lance-rest-server-$version-bin.tar.gz")
     destinationDirectory.set(projectDir.dir("distribution"))
   }
 
@@ -914,7 +914,12 @@ tasks {
 
   register("checksumDistribution") {
     group = "gravitino distribution"
-    dependsOn(assembleDistribution, "checksumTrinoConnector", "checksumIcebergRESTServerDistribution", "checksumLanceRESTServerDistribution")
+    dependsOn(
+      assembleDistribution,
+      "checksumTrinoConnector",
+      "checksumIcebergRESTServerDistribution",
+      "checksumLanceRESTServerDistribution"
+    )
     val archiveFile = assembleDistribution.flatMap { it.archiveFile }
     val checksumFile = archiveFile.map { archive ->
       archive.asFile.let { it.resolveSibling("${it.name}.sha256") }

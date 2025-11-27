@@ -226,7 +226,8 @@ class DTOConverters {
       return new TableUpdateRequest.AddTableIndexRequest(
           ((TableChange.AddIndex) change).getType(),
           ((TableChange.AddIndex) change).getName(),
-          ((TableChange.AddIndex) change).getFieldNames());
+          ((TableChange.AddIndex) change).getFieldNames(),
+          ((TableChange.AddIndex) change).getProperties());
     } else if (change instanceof TableChange.DeleteIndex) {
       return new TableUpdateRequest.DeleteTableIndexRequest(
           ((TableChange.DeleteIndex) change).getName(),

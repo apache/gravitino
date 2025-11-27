@@ -22,6 +22,7 @@ package org.apache.gravitino.rel;
 
 import com.google.common.base.Preconditions;
 import java.util.Arrays;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import org.apache.gravitino.annotation.Evolving;
@@ -454,6 +455,20 @@ public interface TableChange {
   }
 
   /**
+   * Create a TableChange for adding an index.
+   *
+   * @param type The type of the index.
+   * @param name The name of the index.
+   * @param fieldNames The field names of the index.
+   * @param properties The properties of the index.
+   * @return A TableChange for the add index.
+   */
+  static TableChange addIndex(
+      IndexType type, String name, String[][] fieldNames, Map<String, String> properties) {
+    return new AddIndex(type, name, fieldNames, properties);
+  }
+
+  /**
    * Create a TableChange for deleting an index.
    *
    * @param name The name of the index to be dropped.
@@ -747,15 +762,29 @@ public interface TableChange {
 
     private final String[][] fieldNames;
 
+    private final Map<String, String> properties;
+
     /**
      * @param type The type of the index.
      * @param name The name of the index.
      * @param fieldNames The field names of the index.
      */
     public AddIndex(IndexType type, String name, String[][] fieldNames) {
+      this(type, name, fieldNames, Map.of());
+    }
+
+    /**
+     * @param type The type of the index.
+     * @param name The name of the index.
+     * @param fieldNames The field names of the index.
+     * @param properties The properties of the index.
+     */
+    public AddIndex(
+        IndexType type, String name, String[][] fieldNames, Map<String, String> properties) {
       this.type = type;
       this.name = name;
       this.fieldNames = fieldNames;
+      this.properties = properties;
     }
 
     /**
@@ -779,6 +808,13 @@ public interface TableChange {
       return fieldNames;
     }
 
+    /**
+     * @return The properties of the index.
+     */
+    public Map<String, String> getProperties() {
+      return properties;
+    }
+
     @Override
     public boolean equals(Object o) {
       if (this == o) return true;
@@ -786,13 +822,15 @@ public interface TableChange {
       AddIndex addIndex = (AddIndex) o;
       return type == addIndex.type
           && Objects.equals(name, addIndex.name)
-          && Arrays.deepEquals(fieldNames, addIndex.fieldNames);
+          && Arrays.deepEquals(fieldNames, addIndex.fieldNames)
+          && Objects.equals(properties, addIndex.properties);
     }
 
     @Override
     public int hashCode() {
       int result = Objects.hash(type, name);
       result = 31 * result + Arrays.hashCode(fieldNames);
+      result = 31 * result + Objects.hashCode(properties);
       return result;
     }
   }
