@@ -47,8 +47,15 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
+import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -137,6 +144,24 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
 
   @VisibleForTesting ScheduledThreadPoolExecutor scheduler;
   @VisibleForTesting Cache<FileSystemCacheKey, FileSystem> fileSystemCache;
+
+  private static final ThreadPoolExecutor GET_FILESYSTEM_EXECUTOR =
+      new ThreadPoolExecutor(
+          Math.max(2, Runtime.getRuntime().availableProcessors() * 2),
+          Math.max(2, Runtime.getRuntime().availableProcessors() * 2),
+          0L,
+          TimeUnit.MILLISECONDS,
+          new ArrayBlockingQueue<>(1000),
+          r -> {
+            Thread t = new Thread(r, "fileset-filesystem-getter-pool");
+            t.setDaemon(true);
+            return t;
+          },
+          new ThreadPoolExecutor.CallerRunsPolicy()) {
+        {
+          allowCoreThreadTimeOut(true);
+        }
+      };
 
   FilesetCatalogOperations(EntityStore store) {
     this.store = store;
@@ -1397,30 +1422,40 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
                 .catalogPropertiesMetadata()
                 .getOrDefault(
                     config, FilesetCatalogPropertiesMetadata.FILESYSTEM_CONNECTION_TIMEOUT_SECONDS);
+
+    CompletableFuture<FileSystem> future = CompletableFuture.supplyAsync(() -> {
+      try {
+        return provider.getFileSystem(path, config);
+      } catch (Exception e) {
+        throw new CompletionException(e);
+      }
+    }, GET_FILESYSTEM_EXECUTOR);
+
     try {
-      AtomicReference<FileSystem> fileSystem = new AtomicReference<>();
-      Awaitility.await()
-          .atMost(timeoutSeconds, TimeUnit.SECONDS)
-          .pollInterval(1, TimeUnit.MILLISECONDS)
-          .until(
-              () -> {
-                fileSystem.set(provider.getFileSystem(path, config));
-                return true;
-              });
-      return fileSystem.get();
-    } catch (ConditionTimeoutException e) {
+      return future.get(timeoutSeconds, TimeUnit.SECONDS);
+    } catch (TimeoutException e) {
+      future.cancel(true);
+
       throw new IOException(
           String.format(
-              "Failed to get FileSystem for path: %s, scheme: %s, provider: %s, config: %s within %s "
+              "Failed to get FileSystem for path: %s, scheme: %s, provider: %s, within %s "
                   + "seconds, please check the configuration or increase the "
                   + "file system connection timeout time by setting catalog property: %s",
               path,
               scheme,
               provider,
-              config,
               timeoutSeconds,
               FilesetCatalogPropertiesMetadata.FILESYSTEM_CONNECTION_TIMEOUT_SECONDS),
           e);
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+      throw new IOException("Interrupted while waiting for FileSystem", e);
+    } catch (ExecutionException e) {
+      Throwable cause = e.getCause();
+      if (cause instanceof IOException) {
+        throw (IOException) cause;
+      }
+      throw new IOException("Failed to create FileSystem", cause);
     }
   }
 }
