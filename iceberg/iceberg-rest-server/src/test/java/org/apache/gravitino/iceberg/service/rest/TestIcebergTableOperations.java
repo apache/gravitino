@@ -19,6 +19,8 @@
 
 package org.apache.gravitino.iceberg.service.rest;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import java.util.Arrays;
 import java.util.List;
@@ -27,6 +29,7 @@ import java.util.Set;
 import java.util.stream.Collectors;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.client.Entity;
+import javax.ws.rs.client.Invocation;
 import javax.ws.rs.core.Application;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
@@ -46,6 +49,9 @@ import org.apache.gravitino.listener.api.event.IcebergListTablePreEvent;
 import org.apache.gravitino.listener.api.event.IcebergLoadTableEvent;
 import org.apache.gravitino.listener.api.event.IcebergLoadTableFailureEvent;
 import org.apache.gravitino.listener.api.event.IcebergLoadTablePreEvent;
+import org.apache.gravitino.listener.api.event.IcebergPlanTableScanEvent;
+import org.apache.gravitino.listener.api.event.IcebergPlanTableScanFailureEvent;
+import org.apache.gravitino.listener.api.event.IcebergPlanTableScanPreEvent;
 import org.apache.gravitino.listener.api.event.IcebergRenameTableEvent;
 import org.apache.gravitino.listener.api.event.IcebergRenameTableFailureEvent;
 import org.apache.gravitino.listener.api.event.IcebergRenameTablePreEvent;
@@ -58,6 +64,7 @@ import org.apache.gravitino.server.ServerConfig;
 import org.apache.gravitino.server.authorization.GravitinoAuthorizerProvider;
 import org.apache.iceberg.MetadataUpdate;
 import org.apache.iceberg.Schema;
+import org.apache.iceberg.Snapshot;
 import org.apache.iceberg.TableMetadata;
 import org.apache.iceberg.UpdateRequirement;
 import org.apache.iceberg.UpdateRequirements;
@@ -66,7 +73,9 @@ import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.metrics.CommitReport;
 import org.apache.iceberg.metrics.ImmutableCommitMetricsResult;
 import org.apache.iceberg.metrics.ImmutableCommitReport;
+import org.apache.iceberg.rest.PlanStatus;
 import org.apache.iceberg.rest.requests.CreateTableRequest;
+import org.apache.iceberg.rest.requests.PlanTableScanRequest;
 import org.apache.iceberg.rest.requests.RenameTableRequest;
 import org.apache.iceberg.rest.requests.ReportMetricsRequest;
 import org.apache.iceberg.rest.requests.UpdateTableRequest;
@@ -74,6 +83,7 @@ import org.apache.iceberg.rest.responses.ListTablesResponse;
 import org.apache.iceberg.rest.responses.LoadTableResponse;
 import org.apache.iceberg.types.Types.NestedField;
 import org.apache.iceberg.types.Types.StringType;
+import org.apache.iceberg.util.JsonUtil;
 import org.glassfish.jersey.internal.inject.AbstractBinder;
 import org.glassfish.jersey.server.ResourceConfig;
 import org.junit.jupiter.api.Assertions;
@@ -152,6 +162,106 @@ public class TestIcebergTableOperations extends IcebergNamespaceTestBase {
     verifyLoadTableSucc(namespace, "load_foo1");
     Assertions.assertTrue(dummyEventListener.popPreEvent() instanceof IcebergLoadTablePreEvent);
     Assertions.assertTrue(dummyEventListener.popPostEvent() instanceof IcebergLoadTableEvent);
+  }
+
+  @ParameterizedTest
+  @MethodSource("org.apache.gravitino.iceberg.service.rest.IcebergRestTestUtil#testNamespaces")
+  void testPlanTableScan(Namespace namespace) {
+    verifyCreateNamespaceSucc(namespace);
+    verifyCreateTableSucc(namespace, "plan_scan_table", true);
+
+    dummyEventListener.clearEvent();
+    TableMetadata metadata = getTableMeta(namespace, "plan_scan_table");
+    Long snapshotId =
+        metadata.currentSnapshot() == null ? null : metadata.currentSnapshot().snapshotId();
+    JsonNode planResponse = verifyPlanTableScanSucc(namespace, "plan_scan_table", snapshotId);
+
+    Assertions.assertEquals(
+        PlanStatus.COMPLETED.status(), planResponse.get("plan-status").asText());
+    Assertions.assertTrue(planResponse.has("plan-tasks"));
+    Assertions.assertTrue(planResponse.get("plan-tasks").isArray());
+    Assertions.assertTrue(planResponse.get("plan-tasks").size() > 0);
+
+    Assertions.assertTrue(dummyEventListener.popPreEvent() instanceof IcebergPlanTableScanPreEvent);
+    Assertions.assertTrue(dummyEventListener.popPostEvent() instanceof IcebergPlanTableScanEvent);
+  }
+
+  @ParameterizedTest
+  @MethodSource("org.apache.gravitino.iceberg.service.rest.IcebergRestTestUtil#testNamespaces")
+  void testPlanTableScanTableNotFound(Namespace namespace) {
+    verifyCreateNamespaceSucc(namespace);
+    dummyEventListener.clearEvent();
+
+    verifyPlanTableScanFail(namespace, "missing_table", 404);
+
+    Assertions.assertTrue(dummyEventListener.popPreEvent() instanceof IcebergPlanTableScanPreEvent);
+    Assertions.assertTrue(
+        dummyEventListener.popPostEvent() instanceof IcebergPlanTableScanFailureEvent);
+  }
+
+  @ParameterizedTest
+  @MethodSource("org.apache.gravitino.iceberg.service.rest.IcebergRestTestUtil#testNamespaces")
+  void testPlanTableScanWithIncrementalAppendScan(Namespace namespace) {
+    verifyCreateNamespaceSucc(namespace);
+    verifyCreateTableSucc(namespace, "incremental_scan_table", true);
+
+    dummyEventListener.clearEvent();
+    TableMetadata metadata = getTableMeta(namespace, "incremental_scan_table");
+    Long currentSnapshotId = metadata.currentSnapshot().snapshotId();
+
+    PlanTableScanRequest invalidRequest =
+        buildPlanTableScanRequestWithRange(currentSnapshotId, currentSnapshotId);
+    Response response = doPlanTableScan(namespace, "incremental_scan_table", invalidRequest);
+    Assertions.assertEquals(
+        Status.BAD_REQUEST.getStatusCode(),
+        response.getStatus(),
+        "Expected BAD_REQUEST for start == end snapshot IDs");
+  }
+
+  @ParameterizedTest
+  @MethodSource("org.apache.gravitino.iceberg.service.rest.IcebergRestTestUtil#testNamespaces")
+  void testPlanTableScanWithIncrementalAppendScanValidRange(Namespace namespace) {
+    verifyCreateNamespaceSucc(namespace);
+    verifyCreateTableSucc(namespace, "incremental_scan_valid_table", true);
+
+    dummyEventListener.clearEvent();
+    TableMetadata metadata = getTableMeta(namespace, "incremental_scan_valid_table");
+
+    // generatePlanData=true creates two snapshots: one from table creation, one from
+    // appendSampleData
+    List<Snapshot> snapshots = metadata.snapshots();
+    Assertions.assertNotNull(snapshots, "Snapshots should not be null");
+    Assertions.assertTrue(snapshots.size() >= 2, "Should have at least 2 snapshots");
+
+    // Sort by sequence number to get ordered snapshots
+    List<Snapshot> sortedSnapshots =
+        snapshots.stream()
+            .sorted((s1, s2) -> Long.compare(s1.snapshotId(), s2.snapshotId()))
+            .collect(java.util.stream.Collectors.toList());
+
+    Assertions.assertTrue(
+        sortedSnapshots.size() >= 2,
+        "Should have at least 2 snapshots for incremental scan test, but got: "
+            + sortedSnapshots.size());
+
+    // For IncrementalAppendScan, start snapshot must be an ancestor of end snapshot
+    // Use the last snapshot as end, and find its parent from the sorted list
+    Snapshot endSnapshot = sortedSnapshots.get(sortedSnapshots.size() - 1);
+    Long endSnapshotId = endSnapshot.snapshotId();
+    Long startSnapshotId = endSnapshot.parentId();
+
+    Assertions.assertNotNull(
+        startSnapshotId, "Could not find a valid startSnapshotId from snapshots");
+    JsonNode planResponse =
+        verifyPlanTableScanSuccWithRange(
+            namespace, "incremental_scan_valid_table", startSnapshotId, endSnapshotId);
+    Assertions.assertEquals(
+        PlanStatus.COMPLETED.status(), planResponse.get("plan-status").asText());
+    Assertions.assertTrue(planResponse.has("plan-tasks"));
+    Assertions.assertTrue(planResponse.get("plan-tasks").isArray());
+
+    Assertions.assertTrue(dummyEventListener.popPreEvent() instanceof IcebergPlanTableScanPreEvent);
+    Assertions.assertTrue(dummyEventListener.popPostEvent() instanceof IcebergPlanTableScanEvent);
   }
 
   @ParameterizedTest
@@ -341,8 +451,19 @@ public class TestIcebergTableOperations extends IcebergNamespaceTestBase {
   }
 
   private Response doCreateTable(Namespace ns, String name) {
-    CreateTableRequest createTableRequest =
-        CreateTableRequest.builder().withName(name).withSchema(tableSchema).build();
+    return doCreateTable(ns, name, false);
+  }
+
+  private Response doCreateTable(Namespace ns, String name, boolean generatePlanData) {
+    CreateTableRequest.Builder builder =
+        CreateTableRequest.builder().withName(name).withSchema(tableSchema);
+    if (generatePlanData) {
+      builder =
+          builder.setProperties(
+              ImmutableMap.of(
+                  CatalogWrapperForTest.GENERATE_PLAN_TASKS_DATA_PROP, Boolean.TRUE.toString()));
+    }
+    CreateTableRequest createTableRequest = builder.build();
     return getTableClientBuilder(ns, Optional.empty())
         .post(Entity.entity(createTableRequest, MediaType.APPLICATION_JSON_TYPE));
   }
@@ -377,6 +498,11 @@ public class TestIcebergTableOperations extends IcebergNamespaceTestBase {
 
   private Response doLoadTable(Namespace ns, String name) {
     return getTableClientBuilder(ns, Optional.of(name)).get();
+  }
+
+  private Response doPlanTableScan(Namespace ns, String tableName, PlanTableScanRequest request) {
+    Invocation.Builder builder = getTableClientBuilder(ns, Optional.of(tableName + "/scan"));
+    return builder.post(Entity.entity(request, MediaType.APPLICATION_JSON_TYPE));
   }
 
   private Response doUpdateTable(Namespace ns, String name, TableMetadata base) {
@@ -431,13 +557,69 @@ public class TestIcebergTableOperations extends IcebergNamespaceTestBase {
     Assertions.assertEquals(status, response.getStatus());
   }
 
+  private void verifyPlanTableScanFail(Namespace ns, String tableName, int status) {
+    Response response = doPlanTableScan(ns, tableName, buildPlanTableScanRequest(null));
+    Assertions.assertEquals(status, response.getStatus());
+  }
+
+  private JsonNode verifyPlanTableScanSucc(Namespace ns, String tableName, Long snapshotId) {
+    Response response = doPlanTableScan(ns, tableName, buildPlanTableScanRequest(snapshotId));
+    Assertions.assertEquals(Status.OK.getStatusCode(), response.getStatus());
+    String responseBody = response.readEntity(String.class);
+    try {
+      return JsonUtil.mapper().readTree(responseBody);
+    } catch (Exception e) {
+      throw new RuntimeException("Failed to parse plan table scan response", e);
+    }
+  }
+
+  private JsonNode verifyPlanTableScanSuccWithRange(
+      Namespace ns, String tableName, Long startSnapshotId, Long endSnapshotId) {
+    Response response =
+        doPlanTableScan(
+            ns, tableName, buildPlanTableScanRequestWithRange(startSnapshotId, endSnapshotId));
+    Assertions.assertEquals(Status.OK.getStatusCode(), response.getStatus());
+    String responseBody = response.readEntity(String.class);
+    try {
+      return JsonUtil.mapper().readTree(responseBody);
+    } catch (Exception e) {
+      throw new RuntimeException("Failed to parse plan table scan response", e);
+    }
+  }
+
+  private PlanTableScanRequest buildPlanTableScanRequest(Long snapshotId) {
+    PlanTableScanRequest.Builder builder = new PlanTableScanRequest.Builder();
+    if (snapshotId != null) {
+      builder = builder.withSnapshotId(snapshotId);
+    } else {
+      builder = builder.withSnapshotId(0L);
+    }
+    return builder.build();
+  }
+
+  private PlanTableScanRequest buildPlanTableScanRequestWithRange(
+      Long startSnapshotId, Long endSnapshotId) {
+    PlanTableScanRequest.Builder builder = new PlanTableScanRequest.Builder();
+    if (startSnapshotId != null) {
+      builder = builder.withStartSnapshotId(startSnapshotId);
+    }
+    if (endSnapshotId != null) {
+      builder = builder.withEndSnapshotId(endSnapshotId);
+    }
+    return builder.build();
+  }
+
   private void verifyDropTableFail(Namespace ns, String name, int status) {
     Response response = doDropTable(ns, name);
     Assertions.assertEquals(status, response.getStatus());
   }
 
   private void verifyCreateTableSucc(Namespace ns, String name) {
-    Response response = doCreateTable(ns, name);
+    verifyCreateTableSucc(ns, name, false);
+  }
+
+  private void verifyCreateTableSucc(Namespace ns, String name, boolean generatePlanData) {
+    Response response = doCreateTable(ns, name, generatePlanData);
     Assertions.assertEquals(Status.OK.getStatusCode(), response.getStatus());
     LoadTableResponse loadTableResponse = response.readEntity(LoadTableResponse.class);
     Schema schema = loadTableResponse.tableMetadata().schema();
