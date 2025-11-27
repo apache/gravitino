@@ -462,6 +462,13 @@ public class PolicyMetaService {
         mapper -> mapper.listPolicyPOsByMetalakeAndPolicyNames(metalakeName, policyNames));
   }
 
+  /**
+   * Get policy id by policy name
+   *
+   * @param metalakeId metalake id
+   * @param policyName policy name
+   * @return policy id
+   */
   public long getPolicyIdByPolicyName(long metalakeId, String policyName) {
     PolicyPO policyPO =
         SessionUtils.getWithoutCommit(
