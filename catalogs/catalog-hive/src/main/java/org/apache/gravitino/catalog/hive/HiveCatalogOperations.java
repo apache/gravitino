@@ -62,6 +62,7 @@ import org.apache.gravitino.connector.CatalogOperations;
 import org.apache.gravitino.connector.HasPropertyMetadata;
 import org.apache.gravitino.connector.ProxyPlugin;
 import org.apache.gravitino.connector.SupportsSchemas;
+import org.apache.gravitino.exceptions.ConnectionFailedException;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchTableException;
@@ -1084,8 +1085,11 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
       Map<String, String> properties) {
     try {
       clientPool.run(c -> c.getAllDatabases(""));
-    } catch (InterruptedException e) {
-      throw new RuntimeException(e);
+    } catch (ConnectionFailedException e) {
+      throw e;
+    } catch (Exception e) {
+      throw new ConnectionFailedException(
+          e, "Failed to run getAllDatabases in Hive Metastore: %s", e.getMessage());
     }
   }
 

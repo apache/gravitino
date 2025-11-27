@@ -139,7 +139,7 @@ class TestHiveCatalogOperations {
   }
 
   @Test
-  void testTestConnection() throws TException, InterruptedException {
+  void testTestConnection() throws InterruptedException {
     HiveCatalogOperations op = new HiveCatalogOperations();
     op.clientPool = mock(CachedClientPool.class);
     when(op.clientPool.run(any())).thenThrow(new TException("mock connection exception"));

@@ -21,11 +21,11 @@ package org.apache.gravitino.catalog.hive;
 import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.util.Arrays;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
-import java.util.stream.IntStream;
 import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.connector.TableOperations;
 import org.apache.gravitino.exceptions.NoSuchPartitionException;
@@ -33,12 +33,8 @@ import org.apache.gravitino.exceptions.PartitionAlreadyExistsException;
 import org.apache.gravitino.hive.HiveTable;
 import org.apache.gravitino.hive.converter.HiveTableConverter;
 import org.apache.gravitino.rel.SupportsPartitions;
-import org.apache.gravitino.rel.expressions.literals.Literal;
-import org.apache.gravitino.rel.expressions.literals.Literals;
-import org.apache.gravitino.rel.expressions.transforms.Transforms;
 import org.apache.gravitino.rel.partitions.IdentityPartition;
 import org.apache.gravitino.rel.partitions.Partition;
-import org.apache.gravitino.rel.partitions.Partitions;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -77,7 +73,8 @@ public class HiveTableOperations implements TableOperations, SupportsPartitions 
           .run(c -> c.listPartitions(tableHandle.table(), (short) -1))
           .toArray(new Partition[0]);
     } catch (InterruptedException e) {
-      throw new RuntimeException(e);
+      throw new RuntimeException(
+          "Failed to list partitions of table " + tableHandle.name() + "from Hive Metastore", e);
     }
   }
 
@@ -97,23 +94,6 @@ public class HiveTableOperations implements TableOperations, SupportsPartitions 
     }
   }
 
-  private Partition fromHivePartition(
-      String partitionName, org.apache.hadoop.hive.metastore.api.Partition partition) {
-    String[][] fieldNames = getFieldNames(partitionName);
-    Literal[] values =
-        partition.getValues().stream().map(Literals::stringLiteral).toArray(Literal[]::new);
-    // todo: support partition properties metadata to get more necessary information
-    return Partitions.identity(partitionName, fieldNames, values, partition.getParameters());
-  }
-
-  private String[][] getFieldNames(String partitionName) {
-    // Hive partition name is in the format of "field1=value1/field2=value2/..."
-    String[] fields = partitionName.split(PARTITION_NAME_DELIMITER);
-    return Arrays.stream(fields)
-        .map(field -> new String[] {field.split(PARTITION_VALUE_DELIMITER)[0]})
-        .toArray(String[][]::new);
-  }
-
   @Override
   public Partition addPartition(Partition partition) throws PartitionAlreadyExistsException {
     if (MetadataObjects.METADATA_OBJECT_RESERVED_NAME.equals(partition.name())) {
@@ -124,15 +104,11 @@ public class HiveTableOperations implements TableOperations, SupportsPartitions 
         partition instanceof IdentityPartition, "Hive only supports identity partition");
     IdentityPartition identityPartition = (IdentityPartition) partition;
 
-    Set<String> transformFields =
-        Arrays.stream(tableHandle.partitioning())
-            .map(t -> ((Transforms.IdentityTransform) t).fieldName()[0])
-            .collect(Collectors.toSet());
-
+    Set<String> partitionFieldNames = new HashSet<>(tableHandle.table().partitionFieldNames());
     Preconditions.checkArgument(
-        transformFields.size() == identityPartition.fieldNames().length,
+        partitionFieldNames.size() == identityPartition.fieldNames().length,
         "Hive partition field names must be the same as table partitioning field names: %s, but got %s",
-        String.join(",", transformFields),
+        String.join(",", partitionFieldNames),
         String.join(
             ",",
             Arrays.stream(identityPartition.fieldNames())
@@ -142,9 +118,9 @@ public class HiveTableOperations implements TableOperations, SupportsPartitions 
         .forEach(
             f ->
                 Preconditions.checkArgument(
-                    transformFields.contains(f[0]),
+                    partitionFieldNames.contains(f[0]),
                     "Hive partition field name must be in table partitioning field names: %s, but got %s",
-                    String.join(",", transformFields),
+                    String.join(",", partitionFieldNames),
                     f[0]));
 
     try {
@@ -154,24 +130,6 @@ public class HiveTableOperations implements TableOperations, SupportsPartitions 
     } catch (InterruptedException e) {
       throw new RuntimeException(e);
     }
-  }
-
-  private String generatePartitionName(IdentityPartition partition) {
-    Arrays.stream(partition.fieldNames())
-        .forEach(
-            fieldName ->
-                Preconditions.checkArgument(
-                    fieldName.length == 1,
-                    "Hive catalog does not support nested partition field names"));
-
-    // Hive partition name is in the format of "field1=value1/field2=value2/..."
-    return IntStream.range(0, partition.fieldNames().length)
-        .mapToObj(
-            i ->
-                partition.fieldNames()[i][0]
-                    + PARTITION_VALUE_DELIMITER
-                    + partition.values()[i].value().toString())
-        .collect(Collectors.joining(PARTITION_NAME_DELIMITER));
   }
 
   @Override
