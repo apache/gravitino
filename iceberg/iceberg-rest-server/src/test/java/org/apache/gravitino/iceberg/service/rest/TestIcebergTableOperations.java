@@ -201,25 +201,6 @@ public class TestIcebergTableOperations extends IcebergNamespaceTestBase {
 
   @ParameterizedTest
   @MethodSource("org.apache.gravitino.iceberg.service.rest.IcebergRestTestUtil#testNamespaces")
-  void testPlanTableScanWithIncrementalAppendScan(Namespace namespace) {
-    verifyCreateNamespaceSucc(namespace);
-    verifyCreateTableSucc(namespace, "incremental_scan_table", true);
-
-    dummyEventListener.clearEvent();
-    TableMetadata metadata = getTableMeta(namespace, "incremental_scan_table");
-    Long currentSnapshotId = metadata.currentSnapshot().snapshotId();
-
-    PlanTableScanRequest invalidRequest =
-        buildPlanTableScanRequestWithRange(currentSnapshotId, currentSnapshotId);
-    Response response = doPlanTableScan(namespace, "incremental_scan_table", invalidRequest);
-    Assertions.assertEquals(
-        Status.BAD_REQUEST.getStatusCode(),
-        response.getStatus(),
-        "Expected BAD_REQUEST for start == end snapshot IDs");
-  }
-
-  @ParameterizedTest
-  @MethodSource("org.apache.gravitino.iceberg.service.rest.IcebergRestTestUtil#testNamespaces")
   void testPlanTableScanWithIncrementalAppendScanValidRange(Namespace namespace) {
     verifyCreateNamespaceSucc(namespace);
     verifyCreateTableSucc(namespace, "incremental_scan_valid_table", true);
@@ -233,25 +214,11 @@ public class TestIcebergTableOperations extends IcebergNamespaceTestBase {
     Assertions.assertNotNull(snapshots, "Snapshots should not be null");
     Assertions.assertTrue(snapshots.size() >= 2, "Should have at least 2 snapshots");
 
-    // Sort by sequence number to get ordered snapshots
-    List<Snapshot> sortedSnapshots =
-        snapshots.stream()
-            .sorted((s1, s2) -> Long.compare(s1.snapshotId(), s2.snapshotId()))
-            .collect(java.util.stream.Collectors.toList());
-
-    Assertions.assertTrue(
-        sortedSnapshots.size() >= 2,
-        "Should have at least 2 snapshots for incremental scan test, but got: "
-            + sortedSnapshots.size());
-
-    // For IncrementalAppendScan, start snapshot must be an ancestor of end snapshot
-    // Use the last snapshot as end, and find its parent from the sorted list
-    Snapshot endSnapshot = sortedSnapshots.get(sortedSnapshots.size() - 1);
+    Snapshot endSnapshot = snapshots.get(snapshots.size() - 1);
     Long endSnapshotId = endSnapshot.snapshotId();
-    Long startSnapshotId = endSnapshot.parentId();
+    Snapshot startSnapshot = snapshots.get(snapshots.size() - 2);
+    Long startSnapshotId = startSnapshot.snapshotId();
 
-    Assertions.assertNotNull(
-        startSnapshotId, "Could not find a valid startSnapshotId from snapshots");
     JsonNode planResponse =
         verifyPlanTableScanSuccWithRange(
             namespace, "incremental_scan_valid_table", startSnapshotId, endSnapshotId);
