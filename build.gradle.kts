@@ -209,8 +209,9 @@ allprojects {
         param.include("**/integration/test/**")
       }
 
+      val dockerTest = project.rootProject.extra["dockerTest"] as? Boolean ?: false
+      param.environment("dockerTest", dockerTest.toString())
       param.useJUnitPlatform {
-        val dockerTest = project.rootProject.extra["dockerTest"] as? Boolean ?: false
         if (!dockerTest) {
           excludeTags("gravitino-docker-test")
         }
