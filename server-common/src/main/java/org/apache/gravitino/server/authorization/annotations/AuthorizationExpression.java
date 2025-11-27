@@ -32,7 +32,7 @@ import org.apache.gravitino.MetadataObject;
 @Retention(RetentionPolicy.RUNTIME)
 public @interface AuthorizationExpression {
   /**
-   * The expression to evaluate for authorization, which represents multiple privileges. g
+   * The expression to evaluate for authorization, which represents multiple privileges.
    *
    * @return the expression to evaluate for authorization.
    */
