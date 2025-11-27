@@ -103,8 +103,10 @@ public class UserOperations {
   @Produces("application/vnd.gravitino.v1+json")
   @Timed(name = "list-user." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "list-user", absolute = true)
+  @AuthorizationExpression(expression = "")
   public Response listUsers(
-      @PathParam("metalake") String metalake,
+      @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
+          String metalake,
       @QueryParam("details") @DefaultValue("false") boolean verbose) {
     try {
       return Utils.doAs(

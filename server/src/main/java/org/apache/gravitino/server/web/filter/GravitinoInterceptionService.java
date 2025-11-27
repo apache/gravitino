@@ -40,6 +40,8 @@ import org.apache.gravitino.Entity;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.authorization.AuthorizationUtils;
+import org.apache.gravitino.exceptions.ForbiddenException;
+import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationExpression;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationRequest;
 import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionEvaluator;
@@ -95,9 +97,7 @@ public class GravitinoInterceptionService implements InterceptionService {
             RoleOperations.class.getName(),
             OwnerOperations.class.getName(),
             StatisticOperations.class.getName(),
-            PartitionOperations.class.getName(),
-            MetadataObjectTagOperations.class.getName(),
-            TagOperations.class.getName(),
+            PartitionOperations.class.getName(), TagOperations.class.getName(),
             MetadataObjectTagOperations.class.getName(),
             PolicyOperations.class.getName(),
             MetadataObjectPolicyOperations.class.getName()));
@@ -136,37 +136,6 @@ public class GravitinoInterceptionService implements InterceptionService {
       AuthorizationExpression expressionAnnotation =
           method.getAnnotation(AuthorizationExpression.class);
 
-      // Check current user exists in metalake before authorization
-      if (expressionAnnotation != null) {
-        Object[] args = methodInvocation.getArguments();
-        Map<Entity.EntityType, NameIdentifier> metadataContext =
-            extractNameIdentifierFromParameters(parameters, args);
-
-        // Check if current user exists in the metalake.
-        NameIdentifier metalakeIdent = metadataContext.get(Entity.EntityType.METALAKE);
-
-        if (metalakeIdent != null) {
-          String currentUser = PrincipalUtils.getCurrentUserName();
-          try {
-            AuthorizationUtils.checkCurrentUser(metalakeIdent.name(), currentUser);
-          } catch (org.apache.gravitino.exceptions.ForbiddenException ex) {
-            LOG.warn(
-                "User validation failed - User: {}, Metalake: {}, Reason: {}",
-                currentUser,
-                metalakeIdent.name(),
-                ex.getMessage());
-            return Utils.forbidden(ex.getMessage(), ex);
-          } catch (Exception ex) {
-            LOG.error(
-                "Unexpected error during user validation - User: {}, Metalake: {}",
-                currentUser,
-                metalakeIdent.name(),
-                ex);
-            return Utils.internalError("Failed to validate user", ex);
-          }
-        }
-      }
-
       try {
         AuthorizationExecutor executor;
         if (expressionAnnotation != null) {
@@ -177,25 +146,55 @@ public class GravitinoInterceptionService implements InterceptionService {
               extractNameIdentifierFromParameters(parameters, args);
 
           Map<String, Object> pathParams = Utils.extractPathParamsFromParameters(parameters, args);
-          AuthorizationExpressionEvaluator authorizationExpressionEvaluator =
-              new AuthorizationExpressionEvaluator(expression);
-          AuthorizationRequest.RequestType requestType =
-              extractAuthorizationRequestTypeFromParameters(parameters);
-          executor =
-              AuthorizeExecutorFactory.create(
-                  expression,
-                  requestType,
-                  metadataContext,
-                  authorizationExpressionEvaluator,
-                  pathParams,
-                  entityType,
-                  parameters,
-                  args);
-          boolean authorizeResult = executor.execute();
-          if (!authorizeResult) {
-            return buildNoAuthResponse(expressionAnnotation, metadataContext, method, expression);
+
+          // Check metalake and user existence before authorization
+          NameIdentifier metalakeIdent = metadataContext.get(Entity.EntityType.METALAKE);
+          if (metalakeIdent != null) {
+            String currentUser = PrincipalUtils.getCurrentUserName();
+            try {
+              AuthorizationUtils.checkCurrentUser(metalakeIdent.name(), currentUser);
+            } catch (NoSuchMetalakeException e) {
+              LOG.warn(
+                  "Metalake {} does not exist when validating user {}", metalakeIdent, currentUser);
+              return buildNoAuthResponse(expressionAnnotation, metadataContext, method, expression);
+            } catch (ForbiddenException ex) {
+              LOG.warn(
+                  "User validation failed - User: {}, Metalake: {}, Reason: {}",
+                  currentUser,
+                  metalakeIdent.name(),
+                  ex.getMessage());
+              return Utils.forbidden(ex.getMessage(), ex);
+            } catch (Exception ex) {
+              LOG.error(
+                  "Unexpected error during user validation - User: {}, Metalake: {}",
+                  currentUser,
+                  metalakeIdent.name(),
+                  ex);
+              return Utils.internalError("Failed to validate user", ex);
+            }
           }
-        }
+
+            // If expression is empty, skip authorization check (method handles its own filtering)
+            if (StringUtils.isNotBlank(expression)) {
+                AuthorizationExpressionEvaluator authorizationExpressionEvaluator =
+                        new AuthorizationExpressionEvaluator(expression);
+                AuthorizationRequest.RequestType requestType =
+                        extractAuthorizationRequestTypeFromParameters(parameters);
+                executor =
+                        AuthorizeExecutorFactory.create(
+                                requestType,
+                                metadataContext,
+                                authorizationExpressionEvaluator,
+                                pathParams,
+                                entityType,
+                                parameters,
+                                args);
+                boolean authorizeResult = executor.execute();
+                if (!authorizeResult) {
+                    return buildNoAuthResponse(expressionAnnotation, metadataContext, method, expression);
+                }
+            }
+            }
         return methodInvocation.proceed();
       } catch (Exception ex) {
         String currentUser = PrincipalUtils.getCurrentUserName();

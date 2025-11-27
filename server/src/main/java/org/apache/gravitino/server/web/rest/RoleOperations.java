@@ -82,7 +82,10 @@ public class RoleOperations {
   @Produces("application/vnd.gravitino.v1+json")
   @Timed(name = "list-role." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "list-role", absolute = true)
-  public Response listRoles(@PathParam("metalake") String metalake) {
+  @AuthorizationExpression(expression = "")
+  public Response listRoles(
+      @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
+          String metalake) {
     try {
       return Utils.doAs(
           httpRequest,
