@@ -113,7 +113,15 @@ public class LanceTableOperations extends ManagedTableOperations {
     // Extract creation mode from properties
     CreationMode mode =
         Optional.ofNullable(properties.get(LANCE_CREATION_MODE))
-            .map(CreationMode::valueOf)
+            .map(modeStr -> {
+              try {
+                return CreationMode.valueOf(modeStr);
+              } catch (IllegalArgumentException e) {
+                throw new IllegalArgumentException(
+                    "Invalid creation mode: " + modeStr + ". Supported modes are CREATE, EXIST_OK, "
+                        + "OVERWRITE.");
+              }
+            })
             .orElse(CreationMode.CREATE);
 
     boolean register =
