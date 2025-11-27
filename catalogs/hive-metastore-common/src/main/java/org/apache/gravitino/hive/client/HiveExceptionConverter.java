@@ -37,6 +37,8 @@ import org.apache.thrift.TException;
  *
  * <ul>
  *   <li>Reflection exceptions (InvocationTargetException)
+ *   <Li>Hive Metastore exceptions (e.g., AlreadyExistsException, NoSuchObjectException,
+ *       InvalidOperationException, MetaException)
  *   <li>Hive Thrift exceptions (TException)
  *   <li>Other runtime exceptions
  * </ul>
@@ -103,8 +105,7 @@ public class HiveExceptionConverter {
         || exceptionClassName.contains("InvalidPartitionException")) {
       return toNoSuchObjectException(cause, lowerMessage, targetName, message);
     }
-    if (exceptionClassName.contains("InvalidOperationException")
-        || exceptionClassName.contains("MetaException")) {
+    if (exceptionClassName.contains("InvalidOperationException")) {
       if (isNonEmptySchemaMessage(lowerMessage)) {
         return new NonEmptySchemaException(
             cause, "Hive schema %s is not empty in Hive Metastore", targetName);
@@ -206,17 +207,6 @@ public class HiveExceptionConverter {
       return HiveObjectType.SCHEMA;
     }
     return HiveObjectType.UNKNOWN;
-  }
-
-  private static boolean hasCause(Throwable throwable, Class<? extends Throwable> targetClass) {
-    Throwable current = throwable;
-    while (current != null) {
-      if (targetClass.isInstance(current)) {
-        return true;
-      }
-      current = current.getCause();
-    }
-    return false;
   }
 
   private enum HiveObjectType {
