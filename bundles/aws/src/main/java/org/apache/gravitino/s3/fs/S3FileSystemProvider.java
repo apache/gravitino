@@ -73,6 +73,8 @@ public class S3FileSystemProvider implements FileSystemProvider, SupportsCredent
     // Hadoop-aws 2 does not support IAMInstanceCredentialsProvider
     checkAndSetCredentialProvider(hadoopConfMap);
 
+    hadoopConfMap = additionalS3Config(hadoopConfMap);
+
     Configuration configuration = FileSystemUtils.createConfiguration(hadoopConfMap);
     return S3AFileSystem.newInstance(path.toUri(), configuration);
   }
@@ -127,6 +129,33 @@ public class S3FileSystemProvider implements FileSystemProvider, SupportsCredent
     } else {
       configs.put(S3_CREDENTIAL_KEY, joiner.join(validProviders));
     }
+  }
+
+  private Map<String, String> additionalS3Config(Map<String, String> configs) {
+    Map<String, String> additionalConfigs = Maps.newHashMap(configs);
+
+    // Avoid multiple retries to speed up failure in test cases.
+    // Use hard code instead of Constants.MAX_ERROR_RETRIES to avoid dependency on a specific Hadoop
+    // version
+    if (!configs.containsKey("fs.s3a.attempts.maximum")) {
+      additionalConfigs.put("fs.s3a.attempts.maximum", "2");
+    }
+
+    if (!configs.containsKey("fs.s3a.connection.establish.timeout")) {
+      additionalConfigs.put("fs.s3a.connection.establish.timeout", "5000");
+    }
+
+    if (!configs.containsKey("fs.s3a.retry.limit")) {
+      additionalConfigs.put("fs.s3a.retry.limit", "2");
+    }
+
+    if (!configs.containsKey("fs.s3a.retry.throttle.limit")) {
+      additionalConfigs.put("fs.s3a.retry.throttle.limit", "2");
+    }
+
+    // More tuning can be added here.
+
+    return ImmutableMap.copyOf(additionalConfigs);
   }
 
   /**

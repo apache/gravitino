@@ -20,6 +20,8 @@ package org.apache.gravitino.catalog.hadoop.fs;
 
 import static org.apache.gravitino.catalog.hadoop.fs.Constants.BUILTIN_HDFS_FS_PROVIDER;
 
+import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.Maps;
 import java.io.IOException;
 import java.util.Map;
 import javax.annotation.Nonnull;
@@ -32,13 +34,34 @@ public class HDFSFileSystemProvider implements FileSystemProvider {
   @Override
   public FileSystem getFileSystem(@Nonnull Path path, @Nonnull Map<String, String> config)
       throws IOException {
-    Configuration configuration = FileSystemUtils.createConfiguration(GRAVITINO_BYPASS, config);
+    Map<String, String> hadoopConfMap = additionalHDFSConfig(config);
+    Configuration configuration =
+        FileSystemUtils.createConfiguration(GRAVITINO_BYPASS, hadoopConfMap);
     return FileSystem.newInstance(path.toUri(), configuration);
   }
 
   @Override
   public String scheme() {
     return "hdfs";
+  }
+
+  private Map<String, String> additionalHDFSConfig(Map<String, String> configs) {
+    Map<String, String> additionalConfigs = Maps.newHashMap(configs);
+
+    // Avoid multiple retries to speed up failure in test cases.
+    // Use hard code instead of CommonConfigurationKeysPublic.IPC_CLIENT_CONNECT_TIMEOUT_KEY to
+    // avoid dependency on a specific Hadoop version.
+    if (!configs.containsKey("ipc.client.connect.timeout")) {
+      additionalConfigs.put("ipc.client.connect.timeout", "5000");
+    }
+
+    if (!configs.containsKey("ipc.client.ping")) {
+      additionalConfigs.put("ipc.client.ping", "true");
+    }
+
+    // More tuning can be added here.
+
+    return ImmutableMap.copyOf(additionalConfigs);
   }
 
   @Override

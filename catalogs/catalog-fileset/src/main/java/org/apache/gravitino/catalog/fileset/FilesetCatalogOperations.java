@@ -48,9 +48,8 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ArrayBlockingQueue;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CompletionException;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
@@ -154,7 +153,7 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
             t.setDaemon(true);
             return t;
           },
-          new ThreadPoolExecutor.CallerRunsPolicy()) {
+          new ThreadPoolExecutor.AbortPolicy()) {
         {
           allowCoreThreadTimeOut(true);
         }
@@ -1420,21 +1419,13 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
                 .getOrDefault(
                     config, FilesetCatalogPropertiesMetadata.FILESYSTEM_CONNECTION_TIMEOUT_SECONDS);
 
-    CompletableFuture<FileSystem> future =
-        CompletableFuture.supplyAsync(
-            () -> {
-              try {
-                return provider.getFileSystem(path, config);
-              } catch (Exception e) {
-                throw new CompletionException(e);
-              }
-            },
-            GET_FILESYSTEM_EXECUTOR);
+    Future<FileSystem> fileSystemFuture =
+        GET_FILESYSTEM_EXECUTOR.submit(() -> provider.getFileSystem(path, config));
 
     try {
-      return future.get(timeoutSeconds, TimeUnit.SECONDS);
+      return fileSystemFuture.get(timeoutSeconds, TimeUnit.SECONDS);
     } catch (TimeoutException e) {
-      future.cancel(true);
+      fileSystemFuture.cancel(true);
 
       throw new IOException(
           String.format(

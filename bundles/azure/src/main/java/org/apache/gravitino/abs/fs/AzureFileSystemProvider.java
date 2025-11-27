@@ -71,6 +71,8 @@ public class AzureFileSystemProvider implements FileSystemProvider, SupportsCred
       hadoopConfMap.put(ABFS_IMPL_KEY, ABFS_IMPL);
     }
 
+    hadoopConfMap = additionalAzureConfig(hadoopConfMap);
+
     Configuration configuration = FileSystemUtils.createConfiguration(hadoopConfMap);
     return FileSystem.newInstance(path.toUri(), configuration);
   }
@@ -99,6 +101,19 @@ public class AzureFileSystemProvider implements FileSystemProvider, SupportsCred
     }
 
     return result;
+  }
+
+  private Map<String, String> additionalAzureConfig(Map<String, String> configs) {
+    Map<String, String> additionalConfigs = Maps.newHashMap(configs);
+
+    // Avoid multiple retries to speed up failure in test cases.
+    if (!configs.containsKey("fs.azure.io.retry.max.retries")) {
+      additionalConfigs.put("fs.azure.io.retry.max.retries", "2");
+    }
+
+    // More tuning can be added here.
+
+    return ImmutableMap.copyOf(additionalConfigs);
   }
 
   @Override

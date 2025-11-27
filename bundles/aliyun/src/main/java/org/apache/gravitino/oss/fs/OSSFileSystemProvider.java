@@ -63,6 +63,8 @@ public class OSSFileSystemProvider implements FileSystemProvider, SupportsCreden
       hadoopConfMap.put(OSS_FILESYSTEM_IMPL, AliyunOSSFileSystem.class.getCanonicalName());
     }
 
+    hadoopConfMap = additionalOSSConfig(hadoopConfMap);
+
     Configuration configuration = FileSystemUtils.createConfiguration(hadoopConfMap);
 
     return AliyunOSSFileSystem.newInstance(path.toUri(), configuration);
@@ -78,6 +80,25 @@ public class OSSFileSystemProvider implements FileSystemProvider, SupportsCreden
     }
 
     return result;
+  }
+
+  private Map<String, String> additionalOSSConfig(Map<String, String> configs) {
+    Map<String, String> additionalConfigs = Maps.newHashMap(configs);
+
+    // Avoid multiple retries to speed up failure in test cases.
+    // Use hard code instead of Constants.ESTABLISH_TIMEOUT_KEY to avoid dependency on a specific
+    // Hadoop version.
+    if (!configs.containsKey("fs.oss.connection.establish.timeout")) {
+      additionalConfigs.put("fs.oss.connection.establish.timeout", "5000");
+    }
+
+    if (!configs.containsKey("fs.oss.attempts.maximum")) {
+      additionalConfigs.put("fs.oss.attempts.maximum", "2");
+    }
+
+    // More tuning can be added here.
+
+    return ImmutableMap.copyOf(additionalConfigs);
   }
 
   @Override
