@@ -187,27 +187,6 @@ public class HiveTableOperations implements TableOperations, SupportsPartitions 
     return true;
   }
 
-  private boolean validPartitionName(String partitionName) {
-    if (StringUtils.isEmpty(partitionName)) {
-      return false;
-    }
-
-    List<String> partitionFields = tableHandle.table().partitionFieldNames();
-    String[] parts = partitionName.split(PARTITION_NAME_DELIMITER);
-    if (parts.length != partitionFields.size()) {
-      return false;
-    }
-
-    for (int i = 0; i < parts.length; i++) {
-      String[] keyValue = parts[i].split(PARTITION_VALUE_DELIMITER, 2);
-      if (keyValue.length != 2 || !partitionFields.get(i).equals(keyValue[0])) {
-        return false;
-      }
-    }
-
-    return true;
-  }
-
   @Override
   public void close() throws IOException {
     tableHandle.close();
