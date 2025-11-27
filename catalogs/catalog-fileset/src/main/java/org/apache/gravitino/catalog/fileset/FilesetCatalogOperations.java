@@ -146,7 +146,7 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
       new ThreadPoolExecutor(
           Math.max(2, Runtime.getRuntime().availableProcessors() * 2),
           Math.max(2, Runtime.getRuntime().availableProcessors() * 2),
-          0L,
+          50L,
           TimeUnit.MILLISECONDS,
           new ArrayBlockingQueue<>(1000),
           r -> {
