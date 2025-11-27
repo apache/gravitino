@@ -295,7 +295,8 @@ public final class IsolatedClientLoader implements Closeable {
       Object metastoreClient = createMetastoreClient(properties);
       return createHiveClientImpl(metastoreClient);
     } catch (Exception e) {
-      throw HiveExceptionConverter.toGravitinoException(e);
+      throw HiveExceptionConverter.toGravitinoException(
+          e, properties.getProperty("hive.metastore.uris"));
     } finally {
       Thread.currentThread().setContextClassLoader(origLoader);
     }

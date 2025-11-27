@@ -19,9 +19,9 @@
 package org.apache.gravitino.hive.client;
 
 import java.util.List;
+import org.apache.gravitino.hive.HivePartition;
 import org.apache.gravitino.hive.HiveSchema;
 import org.apache.gravitino.hive.HiveTable;
-import org.apache.gravitino.rel.partitions.Partition;
 
 /**
  * An externally visible interface to the Hive client. This interface is shared across both the
@@ -61,14 +61,14 @@ public interface HiveClient {
 
   List<String> listPartitionNames(HiveTable table, short pageSize);
 
-  List<Partition> listPartitions(HiveTable table, short pageSize);
+  List<HivePartition> listPartitions(HiveTable table, short pageSize);
 
-  List<Partition> listPartitions(
+  List<HivePartition> listPartitions(
       HiveTable table, List<String> filterPartitionValueList, short pageSize);
 
-  Partition getPartition(HiveTable table, String partitionName);
+  HivePartition getPartition(HiveTable table, String partitionName);
 
-  Partition addPartition(HiveTable table, Partition partition);
+  HivePartition addPartition(HiveTable table, HivePartition partition);
 
   void dropPartition(
       String catalogName, String databaseName, String tableName, String partitionName, boolean b);

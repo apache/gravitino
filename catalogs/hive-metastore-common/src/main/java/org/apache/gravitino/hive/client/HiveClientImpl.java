@@ -19,9 +19,9 @@
 package org.apache.gravitino.hive.client;
 
 import java.util.List;
+import org.apache.gravitino.hive.HivePartition;
 import org.apache.gravitino.hive.HiveSchema;
 import org.apache.gravitino.hive.HiveTable;
-import org.apache.gravitino.rel.partitions.Partition;
 import org.apache.hadoop.hive.metastore.IMetaStoreClient;
 
 /**
@@ -113,23 +113,23 @@ public class HiveClientImpl implements HiveClient {
   }
 
   @Override
-  public List<Partition> listPartitions(HiveTable table, short pageSize) {
+  public List<HivePartition> listPartitions(HiveTable table, short pageSize) {
     return shim.listPartitions(table, pageSize);
   }
 
   @Override
-  public List<Partition> listPartitions(
+  public List<HivePartition> listPartitions(
       HiveTable table, List<String> filterPartitionValueList, short pageSize) {
     return shim.listPartitions(table, filterPartitionValueList, pageSize);
   }
 
   @Override
-  public Partition getPartition(HiveTable table, String partitionName) {
+  public HivePartition getPartition(HiveTable table, String partitionName) {
     return shim.getPartition(table, partitionName);
   }
 
   @Override
-  public Partition addPartition(HiveTable table, Partition partition) {
+  public HivePartition addPartition(HiveTable table, HivePartition partition) {
     return shim.addPartition(table, partition);
   }
 

@@ -34,7 +34,6 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.Maps;
 import java.time.Instant;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -43,23 +42,18 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.apache.gravitino.catalog.hive.StorageFormat;
 import org.apache.gravitino.hive.HiveColumn;
+import org.apache.gravitino.hive.HivePartition;
 import org.apache.gravitino.hive.HiveTable;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.rel.Column;
-import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.expressions.Expression;
 import org.apache.gravitino.rel.expressions.NamedReference;
 import org.apache.gravitino.rel.expressions.distributions.Distribution;
 import org.apache.gravitino.rel.expressions.distributions.Distributions;
-import org.apache.gravitino.rel.expressions.literals.Literal;
-import org.apache.gravitino.rel.expressions.literals.Literals;
 import org.apache.gravitino.rel.expressions.sorts.SortDirection;
 import org.apache.gravitino.rel.expressions.sorts.SortOrder;
 import org.apache.gravitino.rel.expressions.sorts.SortOrders;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
-import org.apache.gravitino.rel.expressions.transforms.Transforms;
-import org.apache.gravitino.rel.partitions.Partition;
-import org.apache.gravitino.rel.partitions.Partitions;
 import org.apache.gravitino.rel.types.Type;
 import org.apache.hadoop.hive.common.FileUtils;
 import org.apache.hadoop.hive.metastore.TableType;
@@ -69,9 +63,6 @@ import org.apache.hadoop.hive.metastore.api.SerDeInfo;
 import org.apache.hadoop.hive.metastore.api.StorageDescriptor;
 
 public class HiveTableConverter {
-
-  private static final String PARTITION_NAME_DELIMITER = "/";
-  private static final String PARTITION_VALUE_DELIMITER = "=";
 
   public static HiveTable fromHiveTable(org.apache.hadoop.hive.metastore.api.Table table) {
     Preconditions.checkArgument(table != null, "Table cannot be null");
@@ -144,7 +135,10 @@ public class HiveTableConverter {
         hiveTable.properties().getOrDefault(TABLE_TYPE, String.valueOf(TableType.MANAGED_TABLE));
     table.setTableType(tableType);
 
-    List<FieldSchema> partitionFields = buildPartitionKeys(hiveTable);
+    List<FieldSchema> partitionFields =
+        hiveTable.partitionFieldNames().stream()
+            .map(fieldName -> buildPartitionKeyField(fieldName, hiveTable))
+            .collect(Collectors.toList());
     table.setSd(buildStorageDescriptor(hiveTable, partitionFields));
     table.setParameters(buildTableParameters(hiveTable));
     table.setPartitionKeys(partitionFields);
@@ -157,41 +151,7 @@ public class HiveTableConverter {
     return table;
   }
 
-  public static List<FieldSchema> buildPartitionKeys(Table table) {
-    return getPartitionFieldNames(table).stream()
-        .map(fieldName -> getPartitionKey(fieldName, table))
-        .collect(Collectors.toList());
-  }
-
-  private static List<String> getPartitionFieldNames(Table table) {
-    if (table instanceof HiveTable) {
-      return ((HiveTable) table).partitionFieldNames();
-    }
-
-    if (table.partitioning() == null) {
-      return Collections.emptyList();
-    }
-
-    return Arrays.stream(table.partitioning())
-        .flatMap(transform -> partitionFieldNames(transform).stream())
-        .collect(Collectors.toList());
-  }
-
-  private static List<String> partitionFieldNames(Transform partitioning) {
-    if (partitioning instanceof Transforms.IdentityTransform) {
-      return Arrays.asList(((Transforms.IdentityTransform) partitioning).fieldName());
-    }
-
-    if (partitioning.arguments().length > 0
-        && partitioning.arguments()[0] instanceof NamedReference.FieldReference fieldReference) {
-      return Arrays.asList(fieldReference.fieldName());
-    }
-
-    throw new IllegalArgumentException(
-        String.format("Unsupported partition transform type: %s", partitioning.getClass()));
-  }
-
-  private static FieldSchema getPartitionKey(String fieldName, Table table) {
+  private static FieldSchema buildPartitionKeyField(String fieldName, HiveTable table) {
     Column partitionColumn =
         Arrays.stream(table.columns())
             .filter(c -> c.name().equals(fieldName))
@@ -209,7 +169,7 @@ public class HiveTableConverter {
   }
 
   private static StorageDescriptor buildStorageDescriptor(
-      Table table, List<FieldSchema> partitionFields) {
+      HiveTable table, List<FieldSchema> partitionFields) {
     StorageDescriptor strgDesc = new StorageDescriptor();
     List<String> partitionKeys =
         partitionFields.stream().map(FieldSchema::getName).collect(Collectors.toList());
@@ -261,7 +221,7 @@ public class HiveTableConverter {
     return strgDesc;
   }
 
-  private static SerDeInfo buildSerDeInfo(Table table) {
+  private static SerDeInfo buildSerDeInfo(HiveTable table) {
     SerDeInfo serDeInfo = new SerDeInfo();
     serDeInfo.setName(table.properties().getOrDefault(SERDE_NAME, table.name()));
 
@@ -282,7 +242,7 @@ public class HiveTableConverter {
     return serDeInfo;
   }
 
-  private static Map<String, String> buildTableParameters(Table table) {
+  private static Map<String, String> buildTableParameters(HiveTable table) {
     Map<String, String> parameters = Maps.newHashMap(table.properties());
     Optional.ofNullable(table.comment()).ifPresent(c -> parameters.put(COMMENT, c));
 
@@ -384,43 +344,18 @@ public class HiveTableConverter {
     return builder.build();
   }
 
-  public static Partition fromHivePartition(
-      Table table, org.apache.hadoop.hive.metastore.api.Partition partition) {
+  public static HivePartition fromHivePartition(
+      HiveTable table, org.apache.hadoop.hive.metastore.api.Partition partition) {
     Preconditions.checkArgument(table != null, "Table cannot be null");
     Preconditions.checkArgument(partition != null, "Partition cannot be null");
-    List<String> partCols =
-        buildPartitionKeys(table).stream().map(FieldSchema::getName).collect(Collectors.toList());
-    String partitionName = FileUtils.makePartName(partCols, partition.getValues());
-    String[][] fieldNames = getFieldNames(partitionName);
-    Literal[] values =
-        partition.getValues().stream().map(Literals::stringLiteral).toArray(Literal[]::new);
+    List<String> partitionColumns = table.partitionFieldNames();
+    String partitionName = FileUtils.makePartName(partitionColumns, partition.getValues());
     // todo: support partition properties metadata to get more necessary information
-    return Partitions.identity(partitionName, fieldNames, values, partition.getParameters());
-  }
-
-  private static String[][] getFieldNames(String partitionName) {
-    // Hive partition name is in the format of "field1=value1/field2=value2/..."
-    String[] fields = partitionName.split(PARTITION_NAME_DELIMITER);
-    return Arrays.stream(fields)
-        .map(field -> new String[] {field.split(PARTITION_VALUE_DELIMITER)[0]})
-        .toArray(String[][]::new);
-  }
-
-  public static List<String> parsePartitionValues(String partitionName) {
-    if (partitionName == null || partitionName.isEmpty()) {
-      return java.util.List.of();
-    }
-    return Arrays.stream(partitionName.split(PARTITION_NAME_DELIMITER))
-        .map(
-            field -> {
-              String[] kv = field.split(PARTITION_VALUE_DELIMITER, 2);
-              return kv.length > 1 ? kv[1] : "";
-            })
-        .collect(Collectors.toList());
+    return HivePartition.identity(partitionName, partition.getParameters());
   }
 
   public static org.apache.hadoop.hive.metastore.api.Partition toHivePartition(
-      String dbName, Table table, Partition partition) {
+      String dbName, HiveTable table, HivePartition partition) {
     Preconditions.checkArgument(dbName != null, "Database name cannot be null");
     Preconditions.checkArgument(table != null, "Table cannot be null");
     Preconditions.checkArgument(partition != null, "Partition cannot be null");
@@ -429,12 +364,16 @@ public class HiveTableConverter {
     hivePartition.setDbName(dbName);
     hivePartition.setTableName(table.name());
 
+    List<FieldSchema> partitionFields =
+        table.partitionFieldNames().stream()
+            .map(fieldName -> buildPartitionKeyField(fieldName, table))
+            .collect(Collectors.toList());
     // todo: support custom serde and location if necessary
-    StorageDescriptor sd = buildStorageDescriptor(table, buildPartitionKeys(table));
+    StorageDescriptor sd = buildStorageDescriptor(table, partitionFields);
     hivePartition.setSd(sd);
     hivePartition.setParameters(partition.properties());
 
-    List<String> values = parsePartitionValues(partition.name());
+    List<String> values = HivePartition.extractPartitionValues(partition.name());
     hivePartition.setValues(values);
     return hivePartition;
   }

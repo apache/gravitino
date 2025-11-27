@@ -35,15 +35,15 @@ import org.apache.gravitino.exceptions.NonEmptySchemaException;
 import org.apache.gravitino.exceptions.PartitionAlreadyExistsException;
 import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
 import org.apache.gravitino.exceptions.TableAlreadyExistsException;
+import org.apache.gravitino.hive.HivePartition;
 import org.apache.gravitino.hive.HiveSchema;
 import org.apache.gravitino.hive.HiveTable;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.rel.Column;
+import org.apache.gravitino.rel.expressions.literals.Literal;
 import org.apache.gravitino.rel.expressions.literals.Literals;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.expressions.transforms.Transforms;
-import org.apache.gravitino.rel.partitions.Partition;
-import org.apache.gravitino.rel.partitions.Partitions;
 import org.apache.gravitino.rel.types.Types;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Disabled;
@@ -101,7 +101,7 @@ public class TestHiveClient {
 
     HiveSchema schema = createTestSchema(catalogName, dbName, dbLocation);
     HiveTable table = createTestTable(catalogName, dbName, tableName, tableLocation);
-    Partition partition = createTestPartition(partitionName, partitionValue);
+    HivePartition partition = createTestPartition(partitionName, partitionValue);
 
     try {
       // Test database operations
@@ -148,7 +148,7 @@ public class TestHiveClient {
           tableName, tableObjects.get(0).name(), "Table object name should match");
 
       // Test partition operations
-      Partition addedPartition = client.addPartition(loadedTable, partition);
+      HivePartition addedPartition = client.addPartition(loadedTable, partition);
       Assertions.assertNotNull(addedPartition, "Added partition should not be null");
       Assertions.assertEquals(partitionName, addedPartition.name(), "Partition name should match");
 
@@ -156,17 +156,17 @@ public class TestHiveClient {
       Assertions.assertTrue(
           partitionNames.contains(partitionName), "Partition should be in the list");
 
-      List<Partition> partitions = client.listPartitions(loadedTable, (short) 10);
+      List<HivePartition> partitions = client.listPartitions(loadedTable, (short) 10);
       Assertions.assertEquals(1, partitions.size(), "Should have exactly one partition");
       Assertions.assertEquals(
           partitionName, partitions.get(0).name(), "Partition name should match");
 
-      List<Partition> filteredPartitions =
+      List<HivePartition> filteredPartitions =
           client.listPartitions(loadedTable, List.of(partitionValue), (short) 10);
       Assertions.assertEquals(
           1, filteredPartitions.size(), "Should have exactly one filtered partition");
 
-      Partition fetchedPartition = client.getPartition(loadedTable, addedPartition.name());
+      HivePartition fetchedPartition = client.getPartition(loadedTable, addedPartition.name());
       Assertions.assertNotNull(fetchedPartition, "Fetched partition should not be null");
       Assertions.assertEquals(
           partitionName, fetchedPartition.name(), "Fetched partition name should match");
@@ -233,14 +233,14 @@ public class TestHiveClient {
         .build();
   }
 
-  private Partition createTestPartition(String partitionName, String value) {
-    return Partitions.identity(
-        partitionName,
-        new String[][] {new String[] {"dt"}},
-        new org.apache.gravitino.rel.expressions.literals.Literal<?>[] {
-          Literals.stringLiteral(value)
-        },
-        Map.of());
+  private HivePartition createTestPartition(String partitionName, String value) {
+    HivePartition partition =
+        HivePartition.identity(
+            new String[][] {new String[] {"dt"}},
+            new Literal<?>[] {Literals.stringLiteral(value)},
+            Map.of());
+    Assertions.assertEquals(partitionName, partition.name());
+    return partition;
   }
 
   private AuditInfo defaultAudit() {
@@ -295,7 +295,7 @@ public class TestHiveClient {
 
     HiveSchema schema = createTestSchema(catalogName, dbName, dbLocation);
     HiveTable table = createTestTable(catalogName, dbName, tableName, tableLocation);
-    Partition partition = createTestPartition(partitionName, partitionValue);
+    HivePartition partition = createTestPartition(partitionName, partitionValue);
 
     try {
       // Test SchemaAlreadyExistsException - create database twice
@@ -329,7 +329,7 @@ public class TestHiveClient {
 
       // Test PartitionAlreadyExistsException - add partition twice
       HiveTable loadedTable = client.getTable(catalogName, dbName, tableName);
-      Partition addedPartition = client.addPartition(loadedTable, partition);
+      HivePartition addedPartition = client.addPartition(loadedTable, partition);
       Assertions.assertNotNull(addedPartition, "Added partition should not be null");
       Assertions.assertThrows(
           PartitionAlreadyExistsException.class, () -> client.addPartition(loadedTable, partition));

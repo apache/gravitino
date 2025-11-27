@@ -219,7 +219,10 @@ public class TestHiveTable extends MiniHiveMetastoreService {
                     new Transform[0],
                     distribution,
                     sortOrders));
-    Assertions.assertTrue(exception.getMessage().contains("Table already exists"));
+    Assertions.assertTrue(
+        exception
+            .getMessage()
+            .contains(String.format("Hive table %s already exists", hiveTableName)));
 
     // Test struct field with comment
     HiveColumn structCol =
