@@ -58,10 +58,10 @@ cd ${gravitino_home}
 # prepare bundle jar
 cd ${iceberg_rest_server_dir}
 mkdir -p bundles
-find ${gravitino_home}/bundles/iceberg-gcp/build/libs/ -name 'gravitino-iceberg-gcp-bundle-*.jar' ! -name '*-empty.jar' -exec cp -v {} bundles/ \;
-find ${gravitino_home}/bundles/iceberg-aws/build/libs/ -name 'gravitino-iceberg-aws-bundle-*.jar' ! -name '*-empty.jar' -exec cp -v {} bundles/ \;
-find ${gravitino_home}/bundles/iceberg-azure/build/libs/ -name 'gravitino-iceberg-azure-bundle-*.jar' ! -name '*-empty.jar' -exec cp -v {} bundles/ \;
-find ${gravitino_home}/bundles/iceberg-aliyun/build/libs/ -name 'gravitino-iceberg-aliyun-bundle-*.jar' ! -name '*-empty.jar' -exec cp -v {} bundles/ \;
+find ${gravitino_home}/bundles/iceberg-gcp-bundle/build/libs/ -name 'gravitino-iceberg-gcp-bundle-*.jar' ! -name '*-empty.jar' -exec cp -v {} bundles/ \;
+find ${gravitino_home}/bundles/iceberg-aws-bundle/build/libs/ -name 'gravitino-iceberg-aws-bundle-*.jar' ! -name '*-empty.jar' -exec cp -v {} bundles/ \;
+find ${gravitino_home}/bundles/iceberg-azure-bundle/build/libs/ -name 'gravitino-iceberg-azure-bundle-*.jar' ! -name '*-empty.jar' -exec cp -v {} bundles/ \;
+find ${gravitino_home}/bundles/iceberg-aliyun-bundle/build/libs/ -name 'gravitino-iceberg-aliyun-bundle-*.jar' ! -name '*-empty.jar' -exec cp -v {} bundles/ \;
 
 download_aliyun_jars "bundles" "${iceberg_rest_server_dir}/packages/gravitino-iceberg-rest-server/libs/"
 
