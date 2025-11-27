@@ -28,4 +28,9 @@ dependencies {
   implementation(libs.hadoop3.client.api)
   implementation(libs.hadoop3.client.runtime)
   implementation(libs.guava)
+
+  testImplementation(libs.junit.jupiter.api)
+  testImplementation(libs.junit.jupiter.params)
+
+  testRuntimeOnly(libs.junit.jupiter.engine)
 }

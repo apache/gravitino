@@ -15,32 +15,37 @@
  *  KIND, either express or implied.  See the License for the
  *  specific language governing permissions and limitations
  *  under the License.
+ *
  */
 package org.apache.gravitino.catalog.hadoop.fs;
 
-import static org.apache.gravitino.catalog.hadoop.fs.Constants.BUILTIN_LOCAL_FS_PROVIDER;
-
+import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
 import java.util.Map;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
 
-public class LocalFileSystemProvider implements FileSystemProvider {
+public class TestLocalFileSystemProvider {
 
-  @Override
-  public FileSystem getFileSystem(Path path, Map<String, String> config) throws IOException {
-    Configuration configuration = FileSystemUtils.createConfiguration(GRAVITINO_BYPASS, config);
-    return FileSystem.newInstance(path.toUri(), configuration);
-  }
+  @Test
+  public void testGetFileSystem() throws IOException {
+    LocalFileSystemProvider provider = new LocalFileSystemProvider();
 
-  @Override
-  public String scheme() {
-    return "file";
-  }
+    Map<String, String> fileSystemProviders =
+        ImmutableMap.of(
+            "key1", "value1",
+            "gravitino.bypass.key2", "value2");
 
-  @Override
-  public String name() {
-    return BUILTIN_LOCAL_FS_PROVIDER;
+    Path path = new Path("file:///tmp/test");
+
+    FileSystem fs = provider.getFileSystem(path, fileSystemProviders);
+    Configuration configuration = fs.getConf();
+    // Verify that the configuration contains the expected entries
+    Assertions.assertEquals("value1", configuration.get("key1"));
+    Assertions.assertEquals("value2", configuration.get("key2"));
+    Assertions.assertNull(configuration.get("gravitino.bypass.key2"));
   }
 }
