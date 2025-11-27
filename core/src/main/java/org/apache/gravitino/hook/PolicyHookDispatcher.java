@@ -20,7 +20,6 @@ package org.apache.gravitino.hook;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
-import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.authorization.Owner;
 import org.apache.gravitino.authorization.OwnerDispatcher;
 import org.apache.gravitino.exceptions.NoSuchPolicyException;
@@ -65,10 +64,9 @@ public class PolicyHookDispatcher implements PolicyDispatcher {
       boolean enabled,
       PolicyContent content)
       throws PolicyAlreadyExistsException {
-    AuthorizationUtils.checkCurrentUser(metalake, PrincipalUtils.getCurrentUserName());
     PolicyEntity policy = dispatcher.createPolicy(metalake, name, type, comment, enabled, content);
 
-    // Set the creator as the owner of the catalog.
+    // Set the creator as the owner of the policy.
     OwnerDispatcher ownerDispatcher = GravitinoEnv.getInstance().ownerDispatcher();
     if (ownerDispatcher != null) {
       ownerDispatcher.setOwner(
