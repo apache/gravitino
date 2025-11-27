@@ -36,7 +36,6 @@ tasks.withType(ShadowJar::class.java) {
   isZip64 = true
   configurations = listOf(project.configurations.runtimeClasspath.get())
   archiveClassifier.set("")
-  mergeServiceFiles()
 
   dependencies {
     exclude(dependency("org.slf4j:slf4j-api"))

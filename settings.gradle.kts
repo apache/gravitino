@@ -80,7 +80,7 @@ project(":spark-connector:spark-runtime-3.5").projectDir = file("spark-connector
 include("web:web", "web:integration-test")
 include("docs")
 include("integration-test-common")
-include(":bundles:aws", ":bundles:aws-bundle", "bundles:iceberg-aws-bundle")
+include(":bundles:aws", ":bundles:aws-bundle", ":bundles:iceberg-aws-bundle")
 include(":bundles:gcp", ":bundles:gcp-bundle", ":bundles:iceberg-gcp-bundle")
 include(":bundles:aliyun", ":bundles:aliyun-bundle", ":bundles:iceberg-aliyun-bundle")
 include(":bundles:azure", ":bundles:azure-bundle", ":bundles:iceberg-azure-bundle")

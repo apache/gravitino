@@ -170,10 +170,10 @@ For Fileset catalog, please use Gravitino cloud bundle jar with Hadoop and cloud
 
 For Iceberg REST catalog server, please download the corresponding Gravitino cloud packages.
 
-- [Gravitino Iceberg AWS bundle JAR](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-aws-bundle)
-- [Gravitino Iceberg GCP bundle JAR](https://mvnrepository.com/artifact/com.github.apache.incubator-gravitino/gravitino-gcp-bundle)
-- [Gravitino Iceberg Aliyun bundle JAR](https://mvnrepository.com/artifact/com.github.apache.gravitino/gravitino-aliyun-bundle)
-- [Gravitino Iceberg Azure bundle JAR](https://mvnrepository.com/artifact/com.github.apache.gravitino/gravitino-azure-bundle)
+- [Gravitino Iceberg AWS bundle JAR](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-iceberg-aws-bundle)
+- [Gravitino Iceberg GCP bundle JAR](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-iceberg-aliyun-bundle)
+- [Gravitino Iceberg Aliyun bundle JAR](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-iceberg-gcp-bundle)
+- [Gravitino Iceberg Azure bundle JAR](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-iceberg-azure-bundle)
 
 The classpath of the server:
 
@@ -186,7 +186,7 @@ The classpath of the server:
 
 Suppose the Iceberg table data is stored in S3, follow the steps below:
 
-1. Download the [Iceberg AWS bundle JAR](https://mvnrepository.com/artifact/org.apache.iceberg/iceberg-aws-bundle), and place it in the classpath of Iceberg REST server.
+1. Download the [Gravitino Iceberg AWS bundle JAR](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-iceberg-aws-bundle), and place it in the classpath of Iceberg REST server.
 
 2. Add s3 token credential configurations.
 
