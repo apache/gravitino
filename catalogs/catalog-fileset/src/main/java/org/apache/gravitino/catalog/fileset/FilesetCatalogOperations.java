@@ -51,7 +51,6 @@ import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
@@ -107,8 +106,6 @@ import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.security.UserGroupInformation;
-import org.awaitility.Awaitility;
-import org.awaitility.core.ConditionTimeoutException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -1423,13 +1420,16 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
                 .getOrDefault(
                     config, FilesetCatalogPropertiesMetadata.FILESYSTEM_CONNECTION_TIMEOUT_SECONDS);
 
-    CompletableFuture<FileSystem> future = CompletableFuture.supplyAsync(() -> {
-      try {
-        return provider.getFileSystem(path, config);
-      } catch (Exception e) {
-        throw new CompletionException(e);
-      }
-    }, GET_FILESYSTEM_EXECUTOR);
+    CompletableFuture<FileSystem> future =
+        CompletableFuture.supplyAsync(
+            () -> {
+              try {
+                return provider.getFileSystem(path, config);
+              } catch (Exception e) {
+                throw new CompletionException(e);
+              }
+            },
+            GET_FILESYSTEM_EXECUTOR);
 
     try {
       return future.get(timeoutSeconds, TimeUnit.SECONDS);
