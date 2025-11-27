@@ -68,7 +68,7 @@ public class AssociatePolicyAuthorizationExecutor extends CommonAuthorizerExecut
         Entity.EntityType.POLICY; // policies are the only supported batch target here
     Preconditions.checkArgument(
         request instanceof PoliciesAssociateRequest,
-        "Only tag can use AssociatePolicyAuthorizationExecutor, please contact the administrator.");
+        "Only policy can use AssociatePolicyAuthorizationExecutor, please contact the administrator.");
     PoliciesAssociateRequest policiesAssociateRequest = (PoliciesAssociateRequest) request;
     policiesAssociateRequest.validate();
     // Authorize both 'policiesToAdd' and 'policiesToRemove' fields.
@@ -78,7 +78,7 @@ public class AssociatePolicyAuthorizationExecutor extends CommonAuthorizerExecut
 
   /**
    * Performs batch authorization for a given field (e.g., "policiesToAdd" or "policiesToRemove")
-   * containing an array of tag names.
+   * containing an array of policy names.
    *
    * @param policies policies
    * @param context The shared authorization request context.
@@ -94,7 +94,7 @@ public class AssociatePolicyAuthorizationExecutor extends CommonAuthorizerExecut
     }
 
     for (String policy : policies) {
-      // Use a fresh context copy for each tag to avoid cross-contamination
+      // Use a fresh context copy for each policy to avoid cross-contamination
       Map<Entity.EntityType, NameIdentifier> currentContext = new HashMap<>(this.metadataContext);
       buildNameIdentifierForBatchAuthorization(currentContext, policy, targetType);
 
@@ -103,7 +103,7 @@ public class AssociatePolicyAuthorizationExecutor extends CommonAuthorizerExecut
               currentContext, pathParams, context, Optional.ofNullable(entityType));
 
       if (!authorized) {
-        return false; // Fail fast on first unauthorized tag
+        return false; // Fail fast on first unauthorized policy
       }
     }
     return true;
