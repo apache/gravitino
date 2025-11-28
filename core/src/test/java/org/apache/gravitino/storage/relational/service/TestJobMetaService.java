@@ -35,7 +35,7 @@ import org.apache.gravitino.storage.relational.TestJDBCBackend;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
 import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestTemplate;
 
 public class TestJobMetaService extends TestJDBCBackend {
 
@@ -44,7 +44,7 @@ public class TestJobMetaService extends TestJDBCBackend {
   private static final AuditInfo AUDIT_INFO =
       AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build();
 
-  @Test
+  @TestTemplate
   public void testInsertAndListJobs() throws IOException {
     BaseMetalake metalake =
         createBaseMakeLake(RandomIdGenerator.INSTANCE.nextId(), METALAKE_NAME, AUDIT_INFO);
@@ -87,7 +87,7 @@ public class TestJobMetaService extends TestJDBCBackend {
     Assertions.assertTrue(emptyJobs.isEmpty());
   }
 
-  @Test
+  @TestTemplate
   public void testInsertAndGetJob() throws IOException {
     BaseMetalake metalake =
         createBaseMakeLake(RandomIdGenerator.INSTANCE.nextId(), METALAKE_NAME, AUDIT_INFO);
@@ -148,7 +148,7 @@ public class TestJobMetaService extends TestJDBCBackend {
     Assertions.assertTrue(retrievedFinishedJob.finishedAt() > 0);
   }
 
-  @Test
+  @TestTemplate
   public void testDeleteJobsByLegacyTimeline() throws IOException {
     BaseMetalake metalake =
         createBaseMakeLake(RandomIdGenerator.INSTANCE.nextId(), METALAKE_NAME, AUDIT_INFO);
@@ -195,7 +195,7 @@ public class TestJobMetaService extends TestJDBCBackend {
     Assertions.assertTrue(jobs.isEmpty(), "Jobs should be deleted by legacy timeline");
   }
 
-  @Test
+  @TestTemplate
   public void testDeleteJobByIdentifier() throws IOException {
     BaseMetalake metalake =
         createBaseMakeLake(RandomIdGenerator.INSTANCE.nextId(), METALAKE_NAME, AUDIT_INFO);
@@ -224,5 +224,36 @@ public class TestJobMetaService extends TestJDBCBackend {
     Assertions.assertFalse(
         JobMetaService.getInstance()
             .deleteJob(NameIdentifierUtil.ofJob(METALAKE_NAME, job.name())));
+  }
+
+  @Test
+  public void testGetJobWithMalformedIdentifierThrowsNoSuchEntityException() {
+    Assertions.assertThrows(
+        NoSuchEntityException.class,
+        () ->
+            JobMetaService.getInstance()
+                .getJobByIdentifier(NameIdentifierUtil.ofJob(METALAKE_NAME, "invalid")));
+
+    Assertions.assertThrows(
+        NoSuchEntityException.class,
+        () ->
+            JobMetaService.getInstance()
+                .getJobByIdentifier(
+                    NameIdentifierUtil.ofJob(METALAKE_NAME, JobHandle.JOB_ID_PREFIX)));
+  }
+
+  @Test
+  public void testDeleteJobWithMalformedIdentifierThrowsNoSuchEntityException() {
+    Assertions.assertThrows(
+        NoSuchEntityException.class,
+        () ->
+            JobMetaService.getInstance()
+                .deleteJob(NameIdentifierUtil.ofJob(METALAKE_NAME, "invalid")));
+
+    Assertions.assertThrows(
+        NoSuchEntityException.class,
+        () ->
+            JobMetaService.getInstance()
+                .deleteJob(NameIdentifierUtil.ofJob(METALAKE_NAME, JobHandle.JOB_ID_PREFIX)));
   }
 }
