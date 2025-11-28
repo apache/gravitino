@@ -133,6 +133,10 @@ public class MetadataAuthzHelper {
 
   public static MetadataObject[] filterMetadataObject(
       String metalake, MetadataObject[] metadataObjects) {
+    if (!enableAuthorization()) {
+      return metadataObjects;
+    }
+    checkExecutor();
     return doFilter(
         AuthorizationExpressionConstants.CAN_ACCESS_METADATA,
         metadataObjects,
