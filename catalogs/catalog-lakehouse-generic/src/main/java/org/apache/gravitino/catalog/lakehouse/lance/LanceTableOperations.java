@@ -42,6 +42,7 @@ import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.exceptions.TableAlreadyExistsException;
 import org.apache.gravitino.lance.common.ops.gravitino.LanceDataTypeConverter;
+import org.apache.gravitino.lance.common.utils.LanceConstants;
 import org.apache.gravitino.lance.common.utils.LancePropertiesUtils;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Table;
@@ -103,7 +104,7 @@ public class LanceTableOperations extends ManagedTableOperations {
     Map<String, String> storageProps = LancePropertiesUtils.getLanceStorageOptions(properties);
 
     boolean register =
-        Optional.ofNullable(properties.get(LanceTableDelegator.PROPERTY_LANCE_TABLE_REGISTER))
+        Optional.ofNullable(properties.get(LanceConstants.LANCE_TABLE_REGISTER))
             .map(Boolean::parseBoolean)
             .orElse(false);
     if (register) {

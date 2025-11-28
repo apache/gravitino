@@ -18,6 +18,9 @@
  */
 package org.apache.gravitino.catalog.lakehouse.lance;
 
+import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_STORAGE_OPTIONS_PREFIX;
+import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_TABLE_REGISTER;
+
 import com.google.common.collect.ImmutableList;
 import java.util.List;
 import org.apache.gravitino.EntityStore;
@@ -25,33 +28,28 @@ import org.apache.gravitino.catalog.ManagedSchemaOperations;
 import org.apache.gravitino.catalog.ManagedTableOperations;
 import org.apache.gravitino.catalog.lakehouse.generic.LakehouseTableDelegator;
 import org.apache.gravitino.connector.PropertyEntry;
+import org.apache.gravitino.lance.common.utils.LanceConstants;
 import org.apache.gravitino.storage.IdGenerator;
 
 public class LanceTableDelegator implements LakehouseTableDelegator {
 
-  public static final String LANCE_TABLE_FORMAT = "lance";
-
-  public static final String PROPERTY_LANCE_TABLE_REGISTER = "lance.register";
-
-  public static final String PROPERTY_LANCE_STORAGE_OPTIONS_PREFIX = "lance.storage.";
-
   @Override
   public String tableFormat() {
-    return LANCE_TABLE_FORMAT;
+    return LanceConstants.LANCE_TABLE_FORMAT;
   }
 
   @Override
   public List<PropertyEntry<?>> tablePropertyEntries() {
     return ImmutableList.of(
         PropertyEntry.stringOptionalPropertyPrefixEntry(
-            PROPERTY_LANCE_STORAGE_OPTIONS_PREFIX,
+            LANCE_STORAGE_OPTIONS_PREFIX,
             "The storage options passed to Lance table.",
             false /* immutable */,
             null /* default value*/,
             false /* hidden */,
             false /* reserved */),
         PropertyEntry.booleanPropertyEntry(
-            PROPERTY_LANCE_TABLE_REGISTER,
+            LANCE_TABLE_REGISTER,
             "Whether this is a table registration operation.",
             false,
             true /* immutable */,

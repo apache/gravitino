@@ -22,6 +22,7 @@ import static org.apache.gravitino.lance.common.ops.NamespaceWrapper.NAMESPACE_D
 import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_LOCATION;
 import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_TABLE_LOCATION_HEADER;
 import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_TABLE_PROPERTIES_PREFIX_HEADER;
+import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_TABLE_REGISTER;
 
 import com.codahale.metrics.annotation.ResponseMetered;
 import com.codahale.metrics.annotation.Timed;
@@ -165,7 +166,7 @@ public class LanceTableOperations {
               ? Maps.newHashMap()
               : Maps.newHashMap(registerTableRequest.getProperties());
       props.put(LANCE_LOCATION, registerTableRequest.getLocation());
-      props.put("register", "true");
+      props.put(LANCE_TABLE_REGISTER, "true");
       ModeEnum mode = registerTableRequest.getMode();
 
       RegisterTableResponse response =

@@ -20,6 +20,11 @@
 package org.apache.gravitino.lance.common.utils;
 
 public class LanceConstants {
+
+  public static final String LANCE_TABLE_FORMAT = "lance";
+
+  public static final String LANCE_TABLE_REGISTER = "lance.register";
+
   public static final String LANCE_HTTP_HEADER_PREFIX = "x-lance-";
 
   public static final String LANCE_TABLE_LOCATION_HEADER =
