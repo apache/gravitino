@@ -347,3 +347,67 @@ nodeSelector: {}
 tolerations: []
 
 affinity: {}
+
+## PodDisruptionBudget configuration
+## PodDisruptionBudgets limit the number of pods that can be down simultaneously during voluntary disruptions
+## (such as node drains, cluster upgrades, or pod evictions), ensuring high availability and service continuity.
+## ref: https://kubernetes.io/docs/tasks/run-application/configure-pdb/
+##
+podDisruptionBudget:
+  ## @param podDisruptionBudget.enabled Enable PodDisruptionBudget creation
+  ## Set to true to create a PodDisruptionBudget resource for the Iceberg REST Server deployment
+  ##
+  enabled: false
+
+  ## @param podDisruptionBudget.minAvailable Minimum number/percentage of pods that must remain available
+  ## Specify either an integer (e.g., 1, 2) or a percentage string (e.g., "50%")
+  ## This ensures at least this many pods stay running during voluntary disruptions
+  ##
+  ## Examples:
+  ##   minAvailable: 1           # At least 1 pod must remain available
+  ##   minAvailable: 2           # At least 2 pods must remain available
+  ##   minAvailable: "50%"       # At least 50% of pods must remain available
+  ##
+  ## When to use minAvailable:
+  ## - Use when you want to guarantee a minimum number of pods stay running
+  ## - Recommended for production deployments to ensure service availability
+  ## - With single replica (replicas: 1), minAvailable: 1 prevents all voluntary disruptions
+  ## - With multiple replicas, allows disruptions while maintaining minimum availability
+  ##
+  minAvailable: 1
+
+  ## @param podDisruptionBudget.maxUnavailable Maximum number/percentage of pods that can be unavailable
+  ## Specify either an integer (e.g., 1, 2) or a percentage string (e.g., "50%")
+  ## This limits how many pods can be down simultaneously during voluntary disruptions
+  ##
+  ## Examples:
+  ##   maxUnavailable: 1         # At most 1 pod can be unavailable
+  ##   maxUnavailable: 2         # At most 2 pods can be unavailable
+  ##   maxUnavailable: "25%"     # At most 25% of pods can be unavailable
+  ##
+  ## When to use maxUnavailable:
+  ## - Use when you want to control the rate of disruptions
+  ## - Useful for rolling updates and gradual scaling operations
+  ## - More flexible than minAvailable when scaling up/down
+  ##
+  ## IMPORTANT: Specify either minAvailable OR maxUnavailable, not both
+  ## If both are specified, Kubernetes will use both constraints, which may be overly restrictive
+  ##
+  maxUnavailable: ""
+
+  ## @param podDisruptionBudget.labels Additional labels to apply to the PodDisruptionBudget resource
+  ## These labels are merged with the default Helm labels
+  ##
+  labels: {}
+  #   custom-label: value
+
+  ## @param podDisruptionBudget.annotations Additional annotations to apply to the PodDisruptionBudget resource
+  ## Useful for adding metadata or integration with other tools
+  ##
+  annotations: {}
+  #   custom-annotation: value
+
+## Relationship between PDB and replica count:
+## - Single replica (replicas: 1) + minAvailable: 1 = No voluntary disruptions allowed
+## - Multiple replicas (replicas: 2+) + minAvailable: 1 = Allows disruptions while keeping at least 1 pod running
+## - Multiple replicas (replicas: 3+) + maxUnavailable: 1 = Allows 1 pod to be disrupted at a time
