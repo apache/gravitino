@@ -43,6 +43,9 @@ import java.util.Objects;
  * These resources must be accessible to the Gravitino server, and can be located in the local file
  * system, on a web server (e.g., HTTP, HTTPS, FTP). Distributed file systems like HDFS or S3 will
  * be supported in the future.
+ *
+ * <p>Note: The {@code className} field is required for Java/Scala Spark applications but is
+ * optional for PySpark applications. For PySpark jobs, you can set this field to {@code null}.
  */
 public class SparkJobTemplate extends JobTemplate {
 
@@ -73,7 +76,10 @@ public class SparkJobTemplate extends JobTemplate {
   /**
    * Returns the class name of the Spark application to be executed.
    *
-   * @return the class name
+   * <p>This field is required for Java/Scala Spark applications but optional for PySpark
+   * applications. For PySpark jobs, this may return {@code null}.
+   *
+   * @return the class name, or {@code null} for PySpark applications
    */
   public String className() {
     return className;
@@ -208,7 +214,10 @@ public class SparkJobTemplate extends JobTemplate {
     /**
      * Sets the class name of the Spark application to be executed.
      *
-     * @param className the class name
+     * <p>This field is required for Java/Scala Spark applications but optional for PySpark
+     * applications. For PySpark jobs, you can set this to {@code null} or omit this call.
+     *
+     * @param className the class name, or {@code null} for PySpark applications
      * @return the builder instance for method chaining
      */
     public Builder withClassName(String className) {

@@ -27,7 +27,12 @@ import lombok.ToString;
 import lombok.experimental.Accessors;
 import lombok.experimental.SuperBuilder;
 
-/** Represents a Spark Job Template Data Transfer Object (DTO). */
+/**
+ * Represents a Spark Job Template Data Transfer Object (DTO).
+ *
+ * <p>Note: The {@code className} field is required for Java/Scala Spark applications but is
+ * optional for PySpark applications. For PySpark jobs, this field can be {@code null}.
+ */
 @Getter
 @Accessors(fluent = true)
 @EqualsAndHashCode(callSuper = true)
