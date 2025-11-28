@@ -157,6 +157,14 @@ public class ReverseIndexRules {
                                 nsFileset.level(0),
                                 nsFileset.level(1));
                         break;
+                      case TAG:
+                        entityType = Entity.EntityType.TAG;
+                        namespace = NamespaceUtil.ofTag(roleEntity.namespace().level(0));
+                        break;
+                      case POLICY:
+                        entityType = Entity.EntityType.POLICY;
+                        namespace = NamespaceUtil.ofPolicy(roleEntity.namespace().level(0));
+                        break;
                       default:
                         throw new UnsupportedOperationException(
                             "Don't support securable object type: " + securableObject.type());

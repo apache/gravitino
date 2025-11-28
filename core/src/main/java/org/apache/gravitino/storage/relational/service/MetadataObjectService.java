@@ -37,6 +37,7 @@ import org.apache.gravitino.storage.relational.mapper.CatalogMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.FilesetMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.MetalakeMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.ModelMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.PolicyMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.SchemaMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.TableColumnMapper;
 import org.apache.gravitino.storage.relational.mapper.TableMetaMapper;
@@ -84,7 +85,24 @@ public class MetadataObjectService {
               MetadataObject.Type.COLUMN,
               MetadataObjectService::getColumnObjectsFullName,
               MetadataObject.Type.TAG,
-              MetadataObjectService::getTagObjectsFullName);
+              MetadataObjectService::getTagObjectsFullName,
+              MetadataObject.Type.POLICY,
+              MetadataObjectService::getPolicyObjectsFullName);
+
+  private static Map<Long, String> getPolicyObjectsFullName(List<Long> policyIds) {
+    if (policyIds == null || policyIds.isEmpty()) {
+      return Map.of();
+    }
+    return policyIds.stream()
+        .collect(
+            Collectors.toMap(
+                policyId -> policyId,
+                policyId ->
+                    SessionUtils.getWithoutCommit(
+                        PolicyMetaMapper.class,
+                        policyMetaMapper ->
+                            policyMetaMapper.selectPolicyByPolicyId(policyId).getPolicyName())));
+  }
 
   private static Map<Long, String> getTagObjectsFullName(List<Long> tagIds) {
     if (tagIds == null || tagIds.isEmpty()) {
