@@ -1,0 +1,6 @@
+Remove a property of a schema in a Metalake catalog, use --property to specify the property to remove.
+
+Example commands
+
+# Remove a property of a schema in a Metalake.catalog
+gcli schema remove --metalake demo_metalake --name catalog_postgres.old_db --property key1;
