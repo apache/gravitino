@@ -45,5 +45,5 @@ public class Constants {
   // Supported authentication types
   public static final String AUTH_KERBEROS = "kerberos";
   // Simple authentication type
-  public static final String AUTH_SIMPlE = "simple";
+  public static final String AUTH_SIMPLE = "simple";
 }

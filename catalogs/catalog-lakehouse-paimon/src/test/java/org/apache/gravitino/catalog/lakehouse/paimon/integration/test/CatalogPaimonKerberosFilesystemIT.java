@@ -185,8 +185,8 @@ public class CatalogPaimonKerberosFilesystemIT extends BaseIT {
         classRef = Class.forName("sun.security.krb5.Config");
       }
 
-      Method refershMethod = classRef.getMethod("refresh");
-      refershMethod.invoke(null);
+      Method refreshMethod = classRef.getMethod("refresh");
+      refreshMethod.invoke(null);
     } catch (Exception e) {
       throw new RuntimeException(e);
     }

@@ -1,4 +1,3 @@
-package org.apache.gravitino.filesystem.hadoop;
 /*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -17,9 +16,10 @@ package org.apache.gravitino.filesystem.hadoop;
  * specific language governing permissions and limitations
  * under the License.
  */
+package org.apache.gravitino.filesystem.hadoop;
 
 import static org.apache.gravitino.catalog.hadoop.fs.Constants.AUTH_KERBEROS;
-import static org.apache.gravitino.catalog.hadoop.fs.Constants.AUTH_SIMPlE;
+import static org.apache.gravitino.catalog.hadoop.fs.Constants.AUTH_SIMPLE;
 import static org.apache.gravitino.catalog.hadoop.fs.Constants.FS_DISABLE_CACHE;
 import static org.apache.gravitino.catalog.hadoop.fs.Constants.HADOOP_KRB5_CONF;
 import static org.apache.gravitino.catalog.hadoop.fs.Constants.HADOOP_SECURITY_KEYTAB;
@@ -76,7 +76,7 @@ public class HDFSFileSystemProxy implements MethodInterceptor {
       conf.setBoolean(IPC_FALLBACK_TO_SIMPLE_AUTH_ALLOWED, true);
       this.configuration = conf;
 
-      String authType = conf.get(HADOOP_SECURITY_AUTHENTICATION, AUTH_SIMPlE);
+      String authType = conf.get(HADOOP_SECURITY_AUTHENTICATION, AUTH_SIMPLE);
       if (AUTH_KERBEROS.equalsIgnoreCase(authType)) {
         String krb5Config = conf.get(HADOOP_KRB5_CONF);
 
@@ -157,9 +157,16 @@ public class HDFSFileSystemProxy implements MethodInterceptor {
         TimeUnit.MILLISECONDS);
   }
 
-  @Override
-  public Object intercept(Object o, Method method, Object[] objects, MethodProxy methodProxy)
-      throws Throwable {
+  /** Close the Kerberos renewal executor service to prevent resource leaks. */
+  private void close() {
+    if (kerberosRenewExecutor != null) {
+      kerberosRenewExecutor.shutdownNow();
+      kerberosRenewExecutor = null;
+    }
+  }
+
+  /** Invoke the method on the underlying FileSystem using ugi.doAs. */
+  private Object invokeWithUgi(MethodProxy methodProxy, Object[] objects) throws Throwable {
     return ugi.doAs(
         (PrivilegedExceptionAction<Object>)
             () -> {
@@ -174,5 +181,25 @@ public class HDFSFileSystemProxy implements MethodInterceptor {
                 throw new RuntimeException("Failed to invoke method", e);
               }
             });
+  }
+
+  @Override
+  public Object intercept(Object o, Method method, Object[] objects, MethodProxy methodProxy)
+      throws Throwable {
+    // Intercept close() method to clean up the Kerberos renewal executor
+    boolean isCloseMethod = "close".equals(method.getName());
+    try {
+      Object result = invokeWithUgi(methodProxy, objects);
+      // Close the Kerberos renewal executor after FileSystem.close()
+      if (isCloseMethod) {
+        close();
+      }
+      return result;
+    } catch (Throwable e) {
+      if (isCloseMethod) {
+        close();
+      }
+      throw e;
+    }
   }
 }
