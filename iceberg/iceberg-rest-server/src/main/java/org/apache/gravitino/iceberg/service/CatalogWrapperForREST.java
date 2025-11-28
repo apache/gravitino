@@ -359,7 +359,7 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
       return incrementalScan.planFiles();
     } else {
       TableScan tableScan = table.newScan();
-      if (scanRequest.snapshotId() != null && scanRequest.snapshotId() != 0L) {
+      if (scanRequest.snapshotId() != null) {
         tableScan = tableScan.useSnapshot(scanRequest.snapshotId());
         LOG.debug("Applied snapshot filter: snapshot-id={}", scanRequest.snapshotId());
       }
