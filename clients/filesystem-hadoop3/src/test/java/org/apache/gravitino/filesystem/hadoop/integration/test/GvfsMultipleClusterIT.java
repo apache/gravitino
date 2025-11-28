@@ -252,8 +252,5 @@ public class GvfsMultipleClusterIT extends BaseIT {
       gvfs.create(new Path(normalGvfsPath + "/file2.txt")).close();
       gvfs.create(new Path(kerberosGvfsPath + "/file2.txt")).close();
     }
-
-    catalog.asFilesetCatalog().dropFileset(normalFilesetIdent);
-    catalog.asFilesetCatalog().dropFileset(kerberosFilesetIdent);
   }
 }
