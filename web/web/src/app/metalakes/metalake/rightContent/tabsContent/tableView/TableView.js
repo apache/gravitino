@@ -256,35 +256,33 @@ const TableView = () => {
                 </Box>
 
                 <Box sx={{ p: type === 'indexes' ? 1 : 1.5, px: type === 'indexes' ? 1 : 4 }}>
-                  {type === 'indexes' ? (
-                    renderIndexesTable()
-                  ) : (
-                    items.map((it, idx) => {
-                      return (
-                        <Fragment key={idx}>
-                          <Typography
-                            variant='caption'
-                            color='white'
-                            className={fonts.className}
-                            sx={{ display: 'flex', flexDirection: 'column' }}
-                            data-refer={`tip-${type}-item-${name}`}
-                          >
-                            {it.text || it.fields}
-                          </Typography>
-                          {idx < items.length - 1 && (
-                            <Box
-                              component={'span'}
-                              sx={{
-                                display: 'block',
-                                my: 1,
-                                borderTop: theme => `1px solid ${theme.palette.grey[800]}`
-                              }}
-                            ></Box>
-                          )}
-                        </Fragment>
-                      )
-                    })
-                  )}
+                  {type === 'indexes'
+                    ? renderIndexesTable()
+                    : items.map((it, idx) => {
+                        return (
+                          <Fragment key={idx}>
+                            <Typography
+                              variant='caption'
+                              color='white'
+                              className={fonts.className}
+                              sx={{ display: 'flex', flexDirection: 'column' }}
+                              data-refer={`tip-${type}-item-${name}`}
+                            >
+                              {it.text || it.fields}
+                            </Typography>
+                            {idx < items.length - 1 && (
+                              <Box
+                                component={'span'}
+                                sx={{
+                                  display: 'block',
+                                  my: 1,
+                                  borderTop: theme => `1px solid ${theme.palette.grey[800]}`
+                                }}
+                              ></Box>
+                            )}
+                          </Fragment>
+                        )
+                      })}
                 </Box>
               </>
             }
