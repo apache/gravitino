@@ -83,7 +83,8 @@ const CustomTooltip = styled(({ className, ...props }) => <Tooltip {...props} cl
     [`& .${tooltipClasses.tooltip}`]: {
       backgroundColor: '#23282a',
       padding: 0,
-      border: '1px solid #dadde9'
+      border: '1px solid #dadde9',
+      maxWidth: 'none'
     }
   })
 )
@@ -155,6 +156,84 @@ const TableView = () => {
 
     const icon = propsItem?.icon
 
+    const renderIndexesTable = () => (
+      <Box component='table' sx={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed', maxWidth: 400 }}>
+        <Box component='thead'>
+          <Box component='tr' sx={{ borderBottom: '1px solid #3a4245' }}>
+            <Box component='th' sx={{ width: '45%', py: 1, px: 1.5, textAlign: 'left', color: 'white', fontSize: 12 }}>
+              Name
+            </Box>
+            <Box component='th' sx={{ width: '30%', py: 1, px: 1.5, textAlign: 'left', color: 'white', fontSize: 12 }}>
+              Type
+            </Box>
+            <Box component='th' sx={{ width: '25%', py: 1, px: 1.5, textAlign: 'left', color: 'white', fontSize: 12 }}>
+              Fields
+            </Box>
+          </Box>
+        </Box>
+        <Box component='tbody'>
+          {items.map((it, idx) => {
+            const fieldsText = it.fields?.map(v => (Array.isArray(v) ? v.join('.') : v)).join(', ')
+
+            return (
+              <Box
+                key={idx}
+                component='tr'
+                sx={{ borderBottom: idx < items.length - 1 ? '1px solid #3a4245' : 'none' }}
+              >
+                <Tooltip title={it.name} placement='top'>
+                  <Box
+                    component='td'
+                    sx={{
+                      py: 1,
+                      px: 1.5,
+                      color: 'white',
+                      fontSize: 12,
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap'
+                    }}
+                  >
+                    {it.name}
+                  </Box>
+                </Tooltip>
+                <Box
+                  component='td'
+                  sx={{
+                    py: 1,
+                    px: 1.5,
+                    color: '#8fd4f5',
+                    fontSize: 12,
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap'
+                  }}
+                >
+                  {it.indexType}
+                </Box>
+                <Tooltip title={fieldsText} placement='top'>
+                  <Box
+                    component='td'
+                    sx={{
+                      py: 1,
+                      px: 1.5,
+                      color: 'white',
+                      fontSize: 12,
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap'
+                    }}
+                  >
+                    {fieldsText}
+                  </Box>
+                </Tooltip>
+              </Box>
+            )
+          })}
+        </Box>
+      </Box>
+    )
+
     return (
       <>
         {isCond && (
@@ -176,32 +255,36 @@ const TableView = () => {
                   </Typography>
                 </Box>
 
-                <Box sx={{ p: 1.5, px: 4 }}>
-                  {items.map((it, idx) => {
-                    return (
-                      <Fragment key={idx}>
-                        <Typography
-                          variant='caption'
-                          color='white'
-                          className={fonts.className}
-                          sx={{ display: 'flex', flexDirection: 'column' }}
-                          data-refer={`tip-${type}-item-${name}`}
-                        >
-                          {it.text || it.fields}
-                        </Typography>
-                        {idx < items.length - 1 && (
-                          <Box
-                            component={'span'}
-                            sx={{
-                              display: 'block',
-                              my: 1,
-                              borderTop: theme => `1px solid ${theme.palette.grey[800]}`
-                            }}
-                          ></Box>
-                        )}
-                      </Fragment>
-                    )
-                  })}
+                <Box sx={{ p: type === 'indexes' ? 1 : 1.5, px: type === 'indexes' ? 1 : 4 }}>
+                  {type === 'indexes' ? (
+                    renderIndexesTable()
+                  ) : (
+                    items.map((it, idx) => {
+                      return (
+                        <Fragment key={idx}>
+                          <Typography
+                            variant='caption'
+                            color='white'
+                            className={fonts.className}
+                            sx={{ display: 'flex', flexDirection: 'column' }}
+                            data-refer={`tip-${type}-item-${name}`}
+                          >
+                            {it.text || it.fields}
+                          </Typography>
+                          {idx < items.length - 1 && (
+                            <Box
+                              component={'span'}
+                              sx={{
+                                display: 'block',
+                                my: 1,
+                                borderTop: theme => `1px solid ${theme.palette.grey[800]}`
+                              }}
+                            ></Box>
+                          )}
+                        </Fragment>
+                      )
+                    })
+                  )}
                 </Box>
               </>
             }
