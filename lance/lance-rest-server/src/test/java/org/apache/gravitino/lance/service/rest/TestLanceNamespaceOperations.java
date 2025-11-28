@@ -516,7 +516,7 @@ public class TestLanceNamespaceOperations extends JerseyTest {
     // Test that the "register" property is set to "true"
     RegisterTableResponse registerTableResponse = new RegisterTableResponse();
     registerTableResponse.setLocation("/path/to/registered_table");
-    registerTableResponse.setProperties(ImmutableMap.of("key", "value", "register", "true"));
+    registerTableResponse.setProperties(ImmutableMap.of("key", "value", "lance.register", "true"));
     when(tableOps.registerTable(any(), any(), any(), any())).thenReturn(registerTableResponse);
 
     RegisterTableRequest tableRequest = new RegisterTableRequest();
@@ -541,7 +541,7 @@ public class TestLanceNamespaceOperations extends JerseyTest {
             Mockito.argThat(
                 props ->
                     props != null
-                        && "true".equals(props.get("register"))
+                        && "true".equals(props.get("lance.register"))
                         && "/path/to/registered_table".equals(props.get("location"))
                         && "custom-value".equals(props.get("custom-key"))));
   }
