@@ -279,3 +279,51 @@ About the properties `location`, if it's not set in table properties, Gravitino 
 5. Else, throw an error indicating that the location is not specified.
 
 For other operations such as load, alter, drop, and truncate table, they are the same as relational catalog, please refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metadata-using-gravitino.md#table-operations) for more details.
+
+One thing to address is that lakehouse generic catalog supports registering and deregistering external tables. This is useful when you have existing tables in the lakehouse storage system and want to manage them using Gravitino without moving or copying the data.
+The following is an example of registering an existing lance table in a generic lakehouse catalog:
+
+<Tabs groupId='language' queryString>
+<TabItem value="shell" label="Shell">
+
+```shell
+curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
+-H "Content-Type: application/json" -d '{
+  "name": "register_lance_table",
+  "comment": "This is an example to register lance table",
+  "columns": [
+  ],
+  "properties": {
+    "format": "lance",
+    "lance.register": "true",
+    "location": "/tmp/lance_catalog/schema/lance_table1"
+  }
+}' http://localhost:8090/api/metalakes/test/catalogs/generic_lakehouse_lance_catalog/schemas/schema/tables
+```
+
+</TabItem>
+<TabItem value="java" label="Java">
+
+```java
+Catalog catalog = gravitinoClient.loadCatalog("generic_lakehouse_lance_catalog");
+
+TableCatalog tableCatalog = catalog.asTableCatalog();
+
+Map<String, String> tablePropertiesMap = ImmutableMap.<String, String>builder()
+        .put("format", "lance")
+        .put("lance.register", "true")
+        .put("location", "/tmp/lance_catalog/schema/example_table") 
+        .build();
+
+tableCatalog.createTable(
+  NameIdentifier.of("schema", "lance_table"),
+  new Column[] {
+  },
+  "This is an example to register lance table",
+  tablePropertiesMap,
+  null,
+  null,
+  null,
+  null
+);
+```
