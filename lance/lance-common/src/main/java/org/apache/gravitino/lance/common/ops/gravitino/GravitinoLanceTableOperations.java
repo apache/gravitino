@@ -28,6 +28,10 @@ import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.lancedb.lance.namespace.LanceNamespaceException;
 import com.lancedb.lance.namespace.ObjectIdentifier;
+import com.lancedb.lance.namespace.model.AlterTableAddColumnsRequest;
+import com.lancedb.lance.namespace.model.AlterTableAddColumnsResponse;
+import com.lancedb.lance.namespace.model.AlterTableDropColumnsRequest;
+import com.lancedb.lance.namespace.model.AlterTableDropColumnsResponse;
 import com.lancedb.lance.namespace.model.CreateEmptyTableResponse;
 import com.lancedb.lance.namespace.model.CreateTableRequest;
 import com.lancedb.lance.namespace.model.CreateTableRequest.ModeEnum;
@@ -57,6 +61,7 @@ import org.apache.gravitino.lance.common.utils.ArrowUtils;
 import org.apache.gravitino.lance.common.utils.LancePropertiesUtils;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Table;
+import org.apache.gravitino.rel.TableChange;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -322,6 +327,38 @@ public class GravitinoLanceTableOperations implements LanceTableOperations {
     response.setTransactionId(List.of());
 
     return response;
+  }
+
+  @Override
+  public AlterTableDropColumnsResponse alterTableDropColumns(
+      String tableId, String delimiter, AlterTableDropColumnsRequest request) {
+    ObjectIdentifier nsId = ObjectIdentifier.of(tableId, Pattern.quote(delimiter));
+    Preconditions.checkArgument(
+        nsId.levels() == 3, "Expected at 3-level namespace but got: %s", nsId.levels());
+
+    String catalogName = nsId.levelAtListPos(0);
+    Catalog catalog = namespaceWrapper.loadAndValidateLakehouseCatalog(catalogName);
+
+    NameIdentifier tableIdentifier =
+        NameIdentifier.of(nsId.levelAtListPos(1), nsId.levelAtListPos(2));
+
+    TableChange[] changes =
+        request.getColumns().stream()
+            .map(colName -> TableChange.deleteColumn(new String[] {colName}, false))
+            .toArray(TableChange[]::new);
+
+    catalog.asTableCatalog().alterTable(tableIdentifier, changes);
+
+    return new AlterTableDropColumnsResponse();
+  }
+
+  @Override
+  public AlterTableAddColumnsResponse alterTableAddColumns(
+      String tableId, String delimiter, AlterTableAddColumnsRequest request) {
+    // We need to parse NewColumnTransform to Column, however, NewColumnTransform only contains
+    // the name and a string expression.
+    // More please see: https://docs.lancedb.com/api-reference/data/add-columns
+    throw new UnsupportedOperationException("Adding columns is not supported yet.");
   }
 
   private List<Column> extractColumns(org.apache.arrow.vector.types.pojo.Schema arrowSchema) {

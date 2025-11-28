@@ -25,6 +25,8 @@ import com.lancedb.lance.namespace.LanceNamespace;
 import com.lancedb.lance.namespace.LanceNamespaceException;
 import com.lancedb.lance.namespace.LanceNamespaces;
 import com.lancedb.lance.namespace.client.apache.ApiException;
+import com.lancedb.lance.namespace.client.apache.api.TableApi;
+import com.lancedb.lance.namespace.model.AlterTableDropColumnsRequest;
 import com.lancedb.lance.namespace.model.CreateEmptyTableRequest;
 import com.lancedb.lance.namespace.model.CreateEmptyTableResponse;
 import com.lancedb.lance.namespace.model.CreateNamespaceRequest;
@@ -51,6 +53,7 @@ import com.lancedb.lance.namespace.model.RegisterTableRequest;
 import com.lancedb.lance.namespace.model.RegisterTableRequest.ModeEnum;
 import com.lancedb.lance.namespace.model.RegisterTableResponse;
 import com.lancedb.lance.namespace.model.TableExistsRequest;
+import com.lancedb.lance.namespace.rest.RestNamespace;
 import com.lancedb.lance.namespace.rest.RestNamespaceConfig;
 import java.io.File;
 import java.io.IOException;
@@ -69,6 +72,7 @@ import org.apache.arrow.memory.RootAllocator;
 import org.apache.arrow.vector.types.pojo.ArrowType;
 import org.apache.arrow.vector.types.pojo.Field;
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Schema;
@@ -467,7 +471,7 @@ public class LanceRESTServiceIT extends BaseIT {
   }
 
   @Test
-  void testCreateTable() throws IOException, ApiException {
+  void testCreateTable() throws IOException, ApiException, IllegalAccessException {
     catalog = createCatalog(CATALOG_NAME);
     createSchema();
 
@@ -592,6 +596,56 @@ public class LanceRESTServiceIT extends BaseIT {
     Set<String> stringSet = listResponse.getTables();
     Assertions.assertEquals(1, stringSet.size());
     Assertions.assertTrue(stringSet.contains(Joiner.on(".").join(ids)));
+
+    // Now try to drop columns in the table
+    AlterTableDropColumnsRequest dropColumnsRequest = new AlterTableDropColumnsRequest();
+    List.of(ids);
+    dropColumnsRequest.setId(List.of(CATALOG_NAME, SCHEMA_NAME, "table"));
+    dropColumnsRequest.setColumns(List.of("value"));
+
+    // No alterTableDropColumns in Namespace interface, so we need to get TableApi via reflection
+    RestNamespace restNamespace = (RestNamespace) ns;
+    TableApi tableApi = (TableApi) FieldUtils.readField(restNamespace, "tableApi", true);
+    String delimiter = RestNamespaceConfig.DELIMITER_DEFAULT;
+
+    Assertions.assertDoesNotThrow(
+        () ->
+            tableApi.alterTableDropColumns(
+                String.join(delimiter, ids), dropColumnsRequest, delimiter));
+
+    describeTableRequest.setId(ids);
+    loadTable = ns.describeTable(describeTableRequest);
+    Assertions.assertNotNull(loadTable);
+    Assertions.assertEquals(newLocation, loadTable.getLocation());
+
+    jsonArrowFields = loadTable.getSchema().getFields();
+    Assertions.assertEquals(1, jsonArrowFields.size());
+    for (int i = 0; i < jsonArrowFields.size(); i++) {
+      JsonArrowField jsonArrowField = jsonArrowFields.get(i);
+      Field originalField = schema.getFields().get(i);
+      Assertions.assertEquals(originalField.getName(), jsonArrowField.getName());
+
+      if (i == 0) {
+        Assertions.assertEquals("int32", jsonArrowField.getType().getType());
+      } else if (i == 1) {
+        Assertions.assertEquals("utf8", jsonArrowField.getType().getType());
+      }
+    }
+
+    // Drop a non-existing column should fail
+    AlterTableDropColumnsRequest dropNonExistingColumnsRequest = new AlterTableDropColumnsRequest();
+    dropNonExistingColumnsRequest.setId(ids);
+    dropNonExistingColumnsRequest.setColumns(List.of("non_existing_column"));
+    Exception dropColumnException =
+        Assertions.assertThrows(
+            Exception.class,
+            () ->
+                tableApi.alterTableDropColumns(
+                    String.join(delimiter, ids), dropNonExistingColumnsRequest, delimiter));
+    Assertions.assertTrue(
+        dropColumnException
+            .getMessage()
+            .contains("Column non_existing_column not found for deletion "));
   }
 
   @Test
