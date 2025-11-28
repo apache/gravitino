@@ -58,7 +58,7 @@
     "@types/react": "^18.3.3",
     "@vitest/coverage-v8": "^1.6.0",
     "autoprefixer": "^10.4.21",
-    "env-cmd": "^10.1.0",
+    "env-cmd": "^11.0.0",
     "eslint": "^8.57.0",
     "eslint-config-next": "14.0.3",
     "eslint-config-prettier": "^9.1.0",
