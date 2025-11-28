@@ -41,6 +41,14 @@ tasks.withType(ShadowJar::class.java) {
     exclude(dependency("org.slf4j:slf4j-api"))
   }
 
+  // Iceberg AWS bundle includes Log4j (before 1.10.1), so exclude to avoid conflicts
+  // see https://github.com/apache/iceberg/pull/14225
+  exclude("org/apache/log4j/**")
+  exclude("org/apache/logging/log4j/**")
+  exclude("log4j.properties")
+  exclude("log4j2.xml")
+  exclude("log4j2.component.properties")
+
   mergeServiceFiles()
 }
 

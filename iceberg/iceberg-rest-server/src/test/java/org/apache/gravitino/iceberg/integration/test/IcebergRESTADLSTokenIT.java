@@ -67,12 +67,6 @@ public class IcebergRESTADLSTokenIT extends IcebergRESTJdbcCatalogIT {
     if (ITUtils.isEmbedded()) {
       return;
     }
-    try {
-      downloadIcebergAzureBundleJar();
-    } catch (IOException e) {
-      LOG.warn("Download Iceberg Azure bundle jar failed,", e);
-      throw new RuntimeException(e);
-    }
     copyAzureBundleJar();
   }
 
@@ -130,7 +124,7 @@ public class IcebergRESTADLSTokenIT extends IcebergRESTJdbcCatalogIT {
   private void copyAzureBundleJar() {
     String gravitinoHome = System.getenv("GRAVITINO_HOME");
     String targetDir = String.format("%s/iceberg-rest-server/libs/", gravitinoHome);
-    BaseIT.copyBundleJarsToDirectory("azure", targetDir);
+    BaseIT.copyBundleJarsToDirectory("iceberg-azure-bundle", targetDir);
   }
 
   @Test

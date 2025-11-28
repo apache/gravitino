@@ -175,6 +175,10 @@ For Iceberg REST catalog server, please download the corresponding Gravitino clo
 - [Gravitino Iceberg Aliyun bundle JAR](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-iceberg-gcp-bundle)
 - [Gravitino Iceberg Azure bundle JAR](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-iceberg-azure-bundle)
 
+:::note
+Since Gravitino 1.1.0, the above Gravitino Iceberg cloud bundle jars have already included the Iceberg cloud bundle jars, no need to download and include them separately.
+:::
+
 The classpath of the server:
 
 - Iceberg REST server: the classpath differs in different deploy mode, please refer to [Server management](../iceberg-rest-service.md#server-management) part.
