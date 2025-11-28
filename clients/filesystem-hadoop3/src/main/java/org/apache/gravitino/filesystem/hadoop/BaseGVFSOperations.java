@@ -798,10 +798,6 @@ public abstract class BaseGVFSOperations implements Closeable {
   /**
    * Get user defined configurations for a specific location. Configuration format:
    *
-   * <pre>
-   *
-   * </pre>
-   *
    * @param baseLocation the base location of fileset
    * @return a map of configuration properties for the specified location
    */
