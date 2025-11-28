@@ -33,12 +33,16 @@ import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.GravitinoEnv;
+import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.Metalake;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.authorization.AuthorizationRequestContext;
 import org.apache.gravitino.authorization.GravitinoAuthorizer;
 import org.apache.gravitino.authorization.Privilege;
+import org.apache.gravitino.dto.tag.MetadataObjectDTO;
+import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants;
 import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionEvaluator;
+import org.apache.gravitino.utils.MetadataObjectUtil;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.PrincipalUtils;
 import org.slf4j.Logger;
@@ -108,6 +112,39 @@ public class MetadataAuthzHelper {
               NameIdentifierUtil.ofMetalake(metalakeName));
         });
   }
+
+  public static MetadataObjectDTO[] filterMetadataObject(
+      String metalake, MetadataObjectDTO[] metadataObjects) {
+    if (!enableAuthorization()) {
+      return metadataObjects;
+    }
+    checkExecutor();
+    return doFilter(
+        AuthorizationExpressionConstants.CAN_ACCESS_METADATA,
+        metadataObjects,
+        GravitinoAuthorizerProvider.getInstance().getGravitinoAuthorizer(),
+        new AuthorizationRequestContext(),
+        metadataObject ->
+            splitMetadataNames(
+                metalake,
+                MetadataObjectUtil.toEntityType(metadataObject.type()),
+                MetadataObjectUtil.toEntityIdent(metalake, metadataObject)));
+  }
+
+  public static MetadataObject[] filterMetadataObject(
+      String metalake, MetadataObject[] metadataObjects) {
+    return doFilter(
+        AuthorizationExpressionConstants.CAN_ACCESS_METADATA,
+        metadataObjects,
+        GravitinoAuthorizerProvider.getInstance().getGravitinoAuthorizer(),
+        new AuthorizationRequestContext(),
+        metadataObject ->
+            splitMetadataNames(
+                metalake,
+                MetadataObjectUtil.toEntityType(metadataObject.type()),
+                MetadataObjectUtil.toEntityIdent(metalake, metadataObject)));
+  }
+
   /**
    * Call {@link AuthorizationExpressionEvaluator} to filter the metadata list
    *
