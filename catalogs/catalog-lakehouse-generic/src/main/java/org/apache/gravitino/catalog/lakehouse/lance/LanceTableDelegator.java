@@ -18,6 +18,11 @@
  */
 package org.apache.gravitino.catalog.lakehouse.lance;
 
+import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_CREATION_MODE;
+import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_STORAGE_OPTIONS_PREFIX;
+import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_TABLE_FORMAT;
+import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_TABLE_REGISTER;
+
 import com.google.common.collect.ImmutableList;
 import java.util.List;
 import org.apache.gravitino.EntityStore;
@@ -29,12 +34,6 @@ import org.apache.gravitino.storage.IdGenerator;
 
 public class LanceTableDelegator implements LakehouseTableDelegator {
 
-  public static final String LANCE_TABLE_FORMAT = "lance";
-
-  public static final String PROPERTY_LANCE_TABLE_REGISTER = "lance.register";
-
-  public static final String PROPERTY_LANCE_STORAGE_OPTIONS_PREFIX = "lance.storage.";
-
   @Override
   public String tableFormat() {
     return LANCE_TABLE_FORMAT;
@@ -44,20 +43,29 @@ public class LanceTableDelegator implements LakehouseTableDelegator {
   public List<PropertyEntry<?>> tablePropertyEntries() {
     return ImmutableList.of(
         PropertyEntry.stringOptionalPropertyPrefixEntry(
-            PROPERTY_LANCE_STORAGE_OPTIONS_PREFIX,
+            LANCE_STORAGE_OPTIONS_PREFIX,
             "The storage options passed to Lance table.",
             false /* immutable */,
             null /* default value*/,
             false /* hidden */,
             false /* reserved */),
         PropertyEntry.booleanPropertyEntry(
-            PROPERTY_LANCE_TABLE_REGISTER,
+            LANCE_TABLE_REGISTER,
             "Whether this is a table registration operation.",
             false,
             true /* immutable */,
             false /* defaultValue */,
             false /* hidden */,
-            false));
+            false),
+        PropertyEntry.enumPropertyEntry(
+            LANCE_CREATION_MODE,
+            "Creation mode for Lance table: CREATE, EXIST_OK, or OVERWRITE",
+            false /* required */,
+            true /* immutable */,
+            LanceTableOperations.CreationMode.class,
+            LanceTableOperations.CreationMode.CREATE,
+            false /* hidden */,
+            false /* reserved */));
   }
 
   @Override

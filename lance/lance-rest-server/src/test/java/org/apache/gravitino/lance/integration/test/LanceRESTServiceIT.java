@@ -442,7 +442,6 @@ public class LanceRESTServiceIT extends BaseIT {
             () -> {
               ns.createEmptyTable(request);
             });
-    Assertions.assertTrue(exception.getMessage().contains("Table already exists"));
     Assertions.assertEquals(409, exception.getCode());
 
     // Try to create a table with wrong location should fail

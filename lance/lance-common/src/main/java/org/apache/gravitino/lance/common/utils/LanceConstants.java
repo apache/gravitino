@@ -29,6 +29,13 @@ public class LanceConstants {
   // Key for table location in table properties map
   public static final String LANCE_LOCATION = "location";
 
+  // Key for creation mode in table properties
+  public static final String LANCE_CREATION_MODE = "lance.creation-mode";
+
   // Prefix for storage options in LanceConfig
   public static final String LANCE_STORAGE_OPTIONS_PREFIX = "lance.storage.";
+
+  public static final String LANCE_TABLE_REGISTER = "lance.register";
+
+  public static final String LANCE_TABLE_FORMAT = "lance";
 }

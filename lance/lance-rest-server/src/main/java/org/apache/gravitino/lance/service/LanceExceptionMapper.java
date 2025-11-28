@@ -27,6 +27,7 @@ import javax.ws.rs.core.Response;
 import javax.ws.rs.ext.ExceptionMapper;
 import javax.ws.rs.ext.Provider;
 import org.apache.gravitino.exceptions.NotFoundException;
+import org.apache.gravitino.exceptions.TableAlreadyExistsException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -56,6 +57,10 @@ public class LanceExceptionMapper implements ExceptionMapper<Exception> {
 
     } else if (ex instanceof IllegalArgumentException) {
       return LanceNamespaceException.badRequest(
+          ex.getMessage(), ex.getClass().getSimpleName(), instance, getStackTrace(ex));
+
+    } else if (ex instanceof TableAlreadyExistsException) {
+      return LanceNamespaceException.conflict(
           ex.getMessage(), ex.getClass().getSimpleName(), instance, getStackTrace(ex));
 
     } else if (ex instanceof UnsupportedOperationException) {

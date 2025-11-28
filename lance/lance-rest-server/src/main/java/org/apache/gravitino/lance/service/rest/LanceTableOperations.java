@@ -56,6 +56,7 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.MultivaluedMap;
 import javax.ws.rs.core.Response;
 import org.apache.gravitino.lance.common.ops.NamespaceWrapper;
+import org.apache.gravitino.lance.common.utils.LanceConstants;
 import org.apache.gravitino.lance.common.utils.SerializationUtils;
 import org.apache.gravitino.lance.service.LanceExceptionMapper;
 import org.apache.gravitino.metrics.MetricNames;
@@ -165,7 +166,7 @@ public class LanceTableOperations {
               ? Maps.newHashMap()
               : Maps.newHashMap(registerTableRequest.getProperties());
       props.put(LANCE_LOCATION, registerTableRequest.getLocation());
-      props.put("register", "true");
+      props.put(LanceConstants.LANCE_TABLE_REGISTER, "true");
       ModeEnum mode = registerTableRequest.getMode();
 
       RegisterTableResponse response =
