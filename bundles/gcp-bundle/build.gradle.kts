@@ -29,6 +29,8 @@ dependencies {
     // There is already a dependency on commons-logging v1.2 in hadoop-gcs, so exclude the one.
     exclude(group = "commons-logging", module = "commons-logging")
   }
+  implementation(libs.google.auth.credentials)
+  implementation(libs.google.auth.http)
   implementation(libs.hadoop3.client.api)
   implementation(libs.hadoop3.client.runtime)
   implementation(libs.hadoop3.gcs)
@@ -41,6 +43,16 @@ tasks.withType(ShadowJar::class.java) {
 
   dependencies {
     exclude(dependency("org.slf4j:slf4j-api"))
+
+    // Exclude Gravitino modules to prevent class duplication and "Split Packages" issues.
+    // These modules (api, common, catalogs) are already provided by the Gravitino server and gravitino-filesystem-hadoop3-runtime.
+    // Including them here would cause the Relocation rules below to incorrectly modify
+    // method signatures (e.g., JsonUtils.anyFieldMapper returning a shaded ObjectMapper),
+    // leading to java.lang.NoSuchMethodError at runtime.
+    exclude(project(":api"))
+    exclude(project(":common"))
+    exclude(project(":catalogs:catalog-common"))
+    exclude(project(":catalogs:hadoop-common"))
   }
 
   // Relocate dependencies to avoid conflicts

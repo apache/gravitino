@@ -120,6 +120,7 @@ datanucleus-jdo = "3.2.0-m3"
 hudi = "0.15.0"
 google-auth = "1.28.0"
 aliyun-credentials = "0.3.12"
+aliyun-sdk-oss = "3.10.2"
 openlineage = "1.29.0"
 jcstress = "0.8.15"
 jmh-plugin = "0.7.3"
@@ -299,6 +300,7 @@ google-auth-http = { group = "com.google.auth", name = "google-auth-library-oaut
 google-auth-credentials = { group = "com.google.auth", name = "google-auth-library-credentials", version.ref = "google-auth" }
 
 aliyun-credentials-sdk = { group='com.aliyun', name='credentials-java', version.ref='aliyun-credentials' }
+aliyun-sdk-oss = { module = "com.aliyun.oss:aliyun-sdk-oss", version.ref = "aliyun-sdk-oss" }
 flinkjdbc = {group='org.apache.flink',name='flink-connector-jdbc', version.ref='flinkjdbc'}
 concurrent-trees = { group = "com.googlecode.concurrent-trees", name = "concurrent-trees", version.ref = "concurrent-trees" }
 jcasbin = { group='org.casbin', name='jcasbin', version.ref="jcasbin" }

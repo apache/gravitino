@@ -32,6 +32,10 @@ val scalaCollectionCompatVersion: String = libs.versions.scala.collection.compat
 
 dependencies {
   implementation(project(":api"))
+  implementation(project(":bundles:aliyun"))
+  implementation(project(":bundles:aws"))
+  implementation(project(":bundles:azure"))
+  implementation(project(":bundles:gcp"))
   implementation(project(":catalogs:catalog-common"))
   implementation(project(":clients:client-java"))
   implementation(project(":core")) {
@@ -70,11 +74,10 @@ dependencies {
   annotationProcessor(libs.lombok)
   compileOnly(libs.lombok)
 
-  // Iceberg doesn't provide Aliyun bundle jar, use Gravitino Aliyun bundle to provide OSS packages
-  testImplementation(project(":bundles:aliyun-bundle"))
-  testImplementation(project(":bundles:aws", configuration = "shadow"))
-  testImplementation(project(":bundles:gcp", configuration = "shadow"))
-  testImplementation(project(":bundles:azure", configuration = "shadow"))
+  testImplementation(project(":bundles:iceberg-aliyun-bundle"))
+  testImplementation(project(":bundles:iceberg-aws-bundle"))
+  testImplementation(project(":bundles:iceberg-gcp-bundle"))
+  testImplementation(project(":bundles:iceberg-azure-bundle"))
   testImplementation(project(":integration-test-common", "testArtifacts"))
   testImplementation(project(":server"))
 
@@ -91,11 +94,6 @@ dependencies {
   testImplementation(libs.h2db)
   testImplementation(libs.mysql.driver)
   testImplementation(libs.postgresql.driver)
-  testImplementation(libs.iceberg.aws.bundle)
-  testImplementation(libs.iceberg.gcp.bundle)
-  testImplementation(libs.iceberg.azure.bundle) {
-    exclude("com.google.guava", "guava")
-  }
   testImplementation(libs.jersey.test.framework.core) {
     exclude(group = "org.junit.jupiter")
   }

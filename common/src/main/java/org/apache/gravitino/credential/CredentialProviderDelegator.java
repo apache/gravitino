@@ -93,7 +93,8 @@ public abstract class CredentialProviderDelegator<T extends Credential>
   @SuppressWarnings("unchecked")
   private CredentialGenerator<T> loadGenerator() {
     try {
-      Class<?> generatorClass = Class.forName(getGeneratorClassName());
+      ClassLoader classLoader = Thread.currentThread().getContextClassLoader();
+      Class<?> generatorClass = Class.forName(getGeneratorClassName(), true, classLoader);
       Constructor<?> constructor = generatorClass.getDeclaredConstructor();
       constructor.setAccessible(true);
       return (CredentialGenerator<T>) constructor.newInstance();

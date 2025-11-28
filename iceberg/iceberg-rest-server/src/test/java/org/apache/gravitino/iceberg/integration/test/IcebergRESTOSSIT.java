@@ -19,7 +19,6 @@
 
 package org.apache.gravitino.iceberg.integration.test;
 
-import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
@@ -27,7 +26,6 @@ import org.apache.gravitino.credential.CredentialConstants;
 import org.apache.gravitino.credential.OSSTokenCredential;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
 import org.apache.gravitino.integration.test.util.BaseIT;
-import org.apache.gravitino.integration.test.util.DownloaderUtils;
 import org.apache.gravitino.integration.test.util.ITUtils;
 import org.apache.gravitino.storage.OSSProperties;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
@@ -60,12 +58,6 @@ public class IcebergRESTOSSIT extends IcebergRESTJdbcCatalogIT {
 
     if (ITUtils.isEmbedded()) {
       return;
-    }
-    try {
-      downloadIcebergForAliyunJar();
-    } catch (IOException e) {
-      LOG.warn("Download Iceberg Aliyun bundle jar failed,", e);
-      throw new RuntimeException(e);
     }
     copyAliyunOSSJar();
   }
@@ -112,22 +104,9 @@ public class IcebergRESTOSSIT extends IcebergRESTJdbcCatalogIT {
     return configMap;
   }
 
-  private void downloadIcebergForAliyunJar() throws IOException {
-    String icebergBundleJarUri =
-        String.format(
-            "https://repo1.maven.org/maven2/org/apache/iceberg/"
-                + "iceberg-aliyun/%s/iceberg-aliyun-%s.jar",
-            ITUtils.icebergVersion(), ITUtils.icebergVersion());
-    String gravitinoHome = System.getenv("GRAVITINO_HOME");
-    String targetDir = String.format("%s/iceberg-rest-server/libs/", gravitinoHome);
-    DownloaderUtils.downloadFile(icebergBundleJarUri, targetDir);
-  }
-
   private void copyAliyunOSSJar() {
     String gravitinoHome = System.getenv("GRAVITINO_HOME");
     String targetDir = String.format("%s/iceberg-rest-server/libs/", gravitinoHome);
-    // Iceberg doesn't provide Iceberg Aliyun bundle jar, so use Gravitino aliyun bundle to provide
-    // OSS packages.
-    BaseIT.copyBundleJarsToDirectory("aliyun-bundle", targetDir);
+    BaseIT.copyBundleJarsToDirectory("iceberg-aliyun-bundle", targetDir);
   }
 }

@@ -299,12 +299,10 @@ For other Iceberg s3 properties not managed by Gravitino like `s3.sse.type`, you
 
 Please refer to [S3 credentials](./security/credential-vending.md#s3-credentials) for credential related configurations.
 
-:::caution
-To resolve Log4j class conflict issues that may arise when using Iceberg AWS 1.10 bundle jars alongside the Gravitino Iceberg REST server, it is recommended to remove the Log4j JAR files (specifically log4j-core and log4j-api) from the `iceberg-rest-server/libs` directory.
-:::
-
 :::info
-To configure the JDBC catalog backend, set the `gravitino.iceberg-rest.warehouse` parameter to `s3://{bucket_name}/${prefix_name}`. For the Hive catalog backend, set `gravitino.iceberg-rest.warehouse` to `s3a://{bucket_name}/${prefix_name}`. Additionally, download the [Iceberg AWS bundle](https://mvnrepository.com/artifact/org.apache.iceberg/iceberg-aws-bundle) and place it in the classpath of Iceberg REST server.
+ - For the JDBC catalog backend, set the `gravitino.iceberg-rest.warehouse` parameter to `s3://{bucket_name}/${prefix_name}`. 
+ - For the Hive catalog backend, set `gravitino.iceberg-rest.warehouse` to `s3a://{bucket_name}/${prefix_name}`. 
+ - Additionally, download the [Gravitino Iceberg AWS bundle](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-iceberg-aws-bundle) and place it in the classpath of Iceberg REST server.
 :::
 
 #### OSS configuration
@@ -319,11 +317,7 @@ For other Iceberg OSS properties not managed by Gravitino like `client.security-
 
 Please refer to [OSS credentials](./security/credential-vending.md#oss-credentials) for credential related configurations.
 
-Additionally, Iceberg doesn't provide Iceberg Aliyun bundle jar which contains OSS packages, there are two alternatives to use OSS packages:
-1. Use [Gravitino Aliyun bundle jar with hadoop packages](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-aliyun-bundle).
-2. Use [Aliyun JAVA SDK](https://gosspublic.alicdn.com/sdks/java/aliyun_java_sdk_3.10.2.zip) and extract `aliyun-sdk-oss-3.10.2.jar`, `hamcrest-core-1.1.jar`, `jdom2-2.0.6.jar` jars.
-
-Please place the above jars in the classpath of Iceberg REST server, please refer to [server management](#server-management) for classpath details.
+Additionally, please download the [Gravitino Iceberg Aliyun bundle jar](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-iceberg-aliyun-bundle) and place it in the classpath of Iceberg REST server, you can refer to [server management](#server-management) for classpath details.
 
 :::info
 Please set the `gravitino.iceberg-rest.warehouse` parameter to `oss://{bucket_name}/${prefix_name}`.
@@ -346,7 +340,7 @@ Please ensure that the credential file can be accessed by the Gravitino server. 
 :::
 
 :::info
-Please set `gravitino.iceberg-rest.warehouse` to `gs://{bucket_name}/${prefix_name}`, and download [Iceberg gcp bundle](https://mvnrepository.com/artifact/org.apache.iceberg/iceberg-gcp-bundle) and place it to the classpath of Gravitino Iceberg REST server, `iceberg-rest-server/libs` for the auxiliary server, `libs` for the standalone server.
+Please set `gravitino.iceberg-rest.warehouse` to `gs://{bucket_name}/${prefix_name}`, and download [Gravitino Iceberg gcp bundle](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-iceberg-gcp-bundle) and place it to the classpath of Gravitino Iceberg REST server, `iceberg-rest-server/libs` for the auxiliary server, `libs` for the standalone server.
 :::
 
 #### ADLS
@@ -360,7 +354,7 @@ For other Iceberg ADLS properties not managed by Gravitino like `adls.read.block
 Please refer to [ADLS credentials](./security/credential-vending.md#adls-credentials) for credential related configurations.
 
 :::info
-Please set `gravitino.iceberg-rest.warehouse` to `abfs[s]://{container-name}@{storage-account-name}.dfs.core.windows.net/{path}`, and download the [Iceberg Azure bundle](https://mvnrepository.com/artifact/org.apache.iceberg/iceberg-azure-bundle) and place it in the classpath of Iceberg REST server.
+Please set `gravitino.iceberg-rest.warehouse` to `abfs[s]://{container-name}@{storage-account-name}.dfs.core.windows.net/{path}`, and download the [Gravitino Iceberg Azure bundle](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-iceberg-azure-bundle) and place it in the classpath of Iceberg REST server.
 :::
 
 #### HDFS configuration
