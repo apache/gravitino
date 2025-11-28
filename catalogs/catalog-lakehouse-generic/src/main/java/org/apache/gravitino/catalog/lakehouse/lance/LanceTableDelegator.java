@@ -57,12 +57,13 @@ public class LanceTableDelegator implements LakehouseTableDelegator {
             false /* defaultValue */,
             false /* hidden */,
             false),
-        PropertyEntry.stringPropertyEntry(
+        PropertyEntry.enumPropertyEntry(
             LANCE_CREATION_MODE,
             "Creation mode for Lance table: CREATE, EXIST_OK, or OVERWRITE",
             false /* required */,
             true /* immutable */,
-            "CREATE" /* default value */,
+            LanceTableOperations.CreationMode.class,
+            LanceTableOperations.CreationMode.CREATE,
             false /* hidden */,
             false /* reserved */));
   }
