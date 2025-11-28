@@ -225,4 +225,35 @@ public class TestJobMetaService extends TestJDBCBackend {
         JobMetaService.getInstance()
             .deleteJob(NameIdentifierUtil.ofJob(METALAKE_NAME, job.name())));
   }
+
+  @Test
+  public void testGetJobWithMalformedIdentifierThrowsNoSuchEntityException() {
+    Assertions.assertThrows(
+        NoSuchEntityException.class,
+        () ->
+            JobMetaService.getInstance()
+                .getJobByIdentifier(NameIdentifierUtil.ofJob(METALAKE_NAME, "invalid")));
+
+    Assertions.assertThrows(
+        NoSuchEntityException.class,
+        () ->
+            JobMetaService.getInstance()
+                .getJobByIdentifier(
+                    NameIdentifierUtil.ofJob(METALAKE_NAME, JobHandle.JOB_ID_PREFIX)));
+  }
+
+  @Test
+  public void testDeleteJobWithMalformedIdentifierThrowsNoSuchEntityException() {
+    Assertions.assertThrows(
+        NoSuchEntityException.class,
+        () ->
+            JobMetaService.getInstance()
+                .deleteJob(NameIdentifierUtil.ofJob(METALAKE_NAME, "invalid")));
+
+    Assertions.assertThrows(
+        NoSuchEntityException.class,
+        () ->
+            JobMetaService.getInstance()
+                .deleteJob(NameIdentifierUtil.ofJob(METALAKE_NAME, JobHandle.JOB_ID_PREFIX)));
+  }
 }
