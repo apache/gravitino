@@ -34,12 +34,17 @@ import org.apache.gravitino.authorization.GravitinoAuthorizer;
 import org.apache.gravitino.server.authorization.GravitinoAuthorizerProvider;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.PrincipalUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /** Evaluate the runtime result of the AuthorizationExpression. */
 public class AuthorizationExpressionEvaluator {
 
   private final String ognlAuthorizationExpression;
   private final GravitinoAuthorizer authorizer;
+
+  private static final Logger LOGGER =
+      LoggerFactory.getLogger(AuthorizationExpressionEvaluator.class);
 
   /**
    * Use {@link AuthorizationExpressionConverter} to convert the authorization expression into an
@@ -49,6 +54,7 @@ public class AuthorizationExpressionEvaluator {
    */
   public AuthorizationExpressionEvaluator(String expression) {
     this(expression, GravitinoAuthorizerProvider.getInstance().getGravitinoAuthorizer());
+    LOGGER.debug("Authorization expression: {}", expression);
   }
 
   /**

@@ -158,8 +158,10 @@ public class GroupOperations {
   @Produces("application/vnd.gravitino.v1+json")
   @Timed(name = "list-group." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "list-group", absolute = true)
+  @AuthorizationExpression(expression = "")
   public Response listGroups(
-      @PathParam("metalake") String metalake,
+      @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
+          String metalake,
       @QueryParam("details") @DefaultValue("false") boolean verbose) {
     LOG.info("Received list groups request.");
     try {
