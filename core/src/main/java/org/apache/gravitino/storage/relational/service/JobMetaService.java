@@ -147,6 +147,8 @@ public class JobMetaService {
         mapper -> mapper.deleteJobMetasByLegacyTimeline(legacyTimeline, limit));
   }
 
+  // Validate and parse a job run identifier of the form "job-<number>"; throws NoSuchEntityException
+  // for any malformed input instead of leaking parsing errors.
   private long parseJobRunId(String jobRunId) {
     if (jobRunId == null
         || !jobRunId.startsWith(JobHandle.JOB_ID_PREFIX)
