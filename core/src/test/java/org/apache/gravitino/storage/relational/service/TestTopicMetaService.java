@@ -32,6 +32,7 @@ import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.storage.relational.TestJDBCBackend;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.TestTemplate;
 
@@ -93,7 +94,34 @@ public class TestTopicMetaService extends TestJDBCBackend {
   }
 
   @TestTemplate
-  public void testUpdateAlreadyExistsException() throws IOException {
+  public void testUpdateTopic() throws IOException {
+    TopicEntity topicWithNullComment =
+        TopicEntity.builder()
+            .withId(RandomIdGenerator.INSTANCE.nextId())
+            .withName("test_null")
+            .withNamespace(NamespaceUtil.ofFileset(metalakeName, catalogName, schemaName))
+            .withComment(null)
+            .withProperties(null)
+            .withAuditInfo(AUDIT_INFO)
+            .build();
+    backend.insert(topicWithNullComment, false);
+    backend.update(
+        topicWithNullComment.nameIdentifier(),
+        Entity.EntityType.TOPIC,
+        e ->
+            TopicEntity.builder()
+                .withId(topicWithNullComment.id())
+                .withName(topicWithNullComment.name())
+                .withNamespace(topicWithNullComment.namespace())
+                .withComment("now has comment")
+                .withProperties(topicWithNullComment.properties())
+                .withAuditInfo(AUDIT_INFO)
+                .build());
+    TopicEntity updatedTopic =
+        backend.get(topicWithNullComment.nameIdentifier(), Entity.EntityType.TOPIC);
+    Assertions.assertEquals("now has comment", updatedTopic.comment());
+
+    // test topic already exists exception
     TopicEntity topic =
         createTopicEntity(
             RandomIdGenerator.INSTANCE.nextId(),

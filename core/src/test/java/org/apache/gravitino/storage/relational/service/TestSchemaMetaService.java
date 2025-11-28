@@ -32,6 +32,7 @@ import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.storage.relational.TestJDBCBackend;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.TestTemplate;
 
 public class TestSchemaMetaService extends TestJDBCBackend {
@@ -87,6 +88,40 @@ public class TestSchemaMetaService extends TestJDBCBackend {
                 e ->
                     createSchemaEntity(
                         schemaCopy.id(), schemaCopy.namespace(), "schema", AUDIT_INFO)));
+  }
+
+  @TestTemplate
+  public void testUpdateSchemaCommentFromNull() throws IOException {
+    createAndInsertMakeLake(metalakeName);
+    createAndInsertCatalog(metalakeName, catalogName);
+
+    SchemaMetaService schemaMetaService = SchemaMetaService.getInstance();
+    SchemaEntity schemaEntity =
+        SchemaEntity.builder()
+            .withId(RandomIdGenerator.INSTANCE.nextId())
+            .withName("schema_null_comment")
+            .withNamespace(NamespaceUtil.ofSchema(metalakeName, catalogName))
+            .withAuditInfo(AUDIT_INFO)
+            .build();
+    schemaMetaService.insertSchema(schemaEntity, false);
+
+    schemaMetaService.updateSchema(
+        schemaEntity.nameIdentifier(),
+        entity -> {
+          SchemaEntity schema = (SchemaEntity) entity;
+          return SchemaEntity.builder()
+              .withId(schema.id())
+              .withName(schema.name())
+              .withNamespace(schema.namespace())
+              .withComment("schema comment updated")
+              .withProperties(schema.properties())
+              .withAuditInfo(schema.auditInfo())
+              .build();
+        });
+
+    SchemaEntity updatedSchema =
+        schemaMetaService.getSchemaByIdentifier(schemaEntity.nameIdentifier());
+    Assertions.assertEquals("schema comment updated", updatedSchema.comment());
   }
 
   @TestTemplate
