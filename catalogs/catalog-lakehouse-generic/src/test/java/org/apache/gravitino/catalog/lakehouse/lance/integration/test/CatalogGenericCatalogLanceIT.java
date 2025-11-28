@@ -721,7 +721,6 @@ public class CatalogGenericCatalogLanceIT extends BaseIT {
     Assertions.assertNotNull(registeredTable);
     Assertions.assertEquals(tableIdentifier.name(), registeredTable.name());
 
-    // Try to register again with EXIST_OK mode - should return existing
     Map<String, String> existOkProperties = createProperties();
     existOkProperties.put(Table.PROPERTY_LOCATION, location);
     existOkProperties.put(Table.PROPERTY_TABLE_FORMAT, LANCE_TABLE_FORMAT);
@@ -729,20 +728,21 @@ public class CatalogGenericCatalogLanceIT extends BaseIT {
     existOkProperties.put(Table.PROPERTY_EXTERNAL, "true");
     existOkProperties.put(LANCE_CREATION_MODE, "EXIST_OK");
 
-    Table existingTable =
-        catalog
-            .asTableCatalog()
-            .createTable(
-                tableIdentifier,
-                columns,
-                TABLE_COMMENT,
-                existOkProperties,
-                Transforms.EMPTY_TRANSFORM,
-                Distributions.NONE,
-                new SortOrder[0]);
-
-    Assertions.assertNotNull(existingTable);
-    Assertions.assertEquals(registeredTable.name(), existingTable.name());
+    // Throw an exception for registering the table with EXIST_OK mode, since register operation
+    // doesn't support EXIST_OK mode currently.
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            catalog
+                .asTableCatalog()
+                .createTable(
+                    tableIdentifier,
+                    columns,
+                    TABLE_COMMENT,
+                    existOkProperties,
+                    Transforms.EMPTY_TRANSFORM,
+                    Distributions.NONE,
+                    new SortOrder[0]));
   }
 
   @Test
