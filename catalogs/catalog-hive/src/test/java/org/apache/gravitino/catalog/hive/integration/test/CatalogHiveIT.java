@@ -826,7 +826,7 @@ public class CatalogHiveIT extends BaseIT {
     // Directly get partition from Hive metastore
     org.apache.hadoop.hive.metastore.api.Partition hivePartition =
         hiveClientPool.run(
-            client -> client.getPartition(schemaName, createdTable, partition.name()));
+            client -> client.getPartition(schemaName, createdTable.name(), partition.name()));
     Assertions.assertEquals(
         partition.values()[0].value().toString(), hivePartition.getValues().get(0));
     Assertions.assertEquals(
@@ -853,7 +853,7 @@ public class CatalogHiveIT extends BaseIT {
     // Directly get partition from hive metastore to check if the partition is created successfully.
     org.apache.hadoop.hive.metastore.api.Partition partitionGot =
         hiveClientPool.run(
-            client -> client.getPartition(schemaName, createdTable, partitionAdded.name()));
+            client -> client.getPartition(schemaName, createdTable.name(), partitionAdded.name()));
     Assertions.assertEquals(
         partitionAdded.values()[0].value().toString(), partitionGot.getValues().get(0));
     Assertions.assertEquals(
@@ -901,7 +901,7 @@ public class CatalogHiveIT extends BaseIT {
     // Directly get partition from hive metastore to check if the partition is created successfully.
     org.apache.hadoop.hive.metastore.api.Partition partitionGot =
         hiveClientPool.run(
-            client -> client.getPartition(schemaName, createdTable, partitionAdded.name()));
+            client -> client.getPartition(schemaName, createdTable.name(), partitionAdded.name()));
     Assertions.assertEquals(
         partitionAdded.values()[0].value().toString(), partitionGot.getValues().get(0));
     Assertions.assertEquals(
@@ -936,7 +936,7 @@ public class CatalogHiveIT extends BaseIT {
     // Directly get partition from Hive metastore to check if the partition is created successfully.
     org.apache.hadoop.hive.metastore.api.Partition partitionGot1 =
         hiveClientPool.run(
-            client -> client.getPartition(schemaName, createdTable, partitionAdded1.name()));
+            client -> client.getPartition(schemaName, createdTable.name(), partitionAdded1.name()));
     Assertions.assertEquals(
         partitionAdded1.values()[0].value().toString(), partitionGot1.getValues().get(0));
     Assertions.assertEquals(
@@ -955,7 +955,7 @@ public class CatalogHiveIT extends BaseIT {
     // Directly get partition from Hive metastore to check if the partition is created successfully.
     org.apache.hadoop.hive.metastore.api.Partition partitionGot2 =
         hiveClientPool.run(
-            client -> client.getPartition(schemaName, createdTable, partitionAdded2.name()));
+            client -> client.getPartition(schemaName, createdTable.name(), partitionAdded2.name()));
     Assertions.assertEquals(
         partitionAdded2.values()[0].value().toString(), partitionGot2.getValues().get(0));
     Assertions.assertEquals(
