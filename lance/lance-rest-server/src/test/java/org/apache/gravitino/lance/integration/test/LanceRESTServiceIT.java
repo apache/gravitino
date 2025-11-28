@@ -609,6 +609,9 @@ public class LanceRESTServiceIT extends BaseIT {
 
     RegisterTableResponse response = ns.registerTable(registerTableRequest);
     Assertions.assertNotNull(response);
+    // The location should not exist yet as we do not create it in advanced.
+    Assertions.assertEquals(location, response.getLocation());
+    Assertions.assertFalse(new File(location).exists());
 
     DescribeTableRequest describeTableRequest = new DescribeTableRequest();
     describeTableRequest.setId(ids);
@@ -624,6 +627,7 @@ public class LanceRESTServiceIT extends BaseIT {
     response = Assertions.assertDoesNotThrow(() -> ns.registerTable(registerTableRequest));
     Assertions.assertNotNull(response);
     Assertions.assertEquals(newLocation, response.getLocation());
+    Assertions.assertFalse(new File(newLocation).exists());
 
     // Test deregister table
     DeregisterTableRequest deregisterTableRequest = new DeregisterTableRequest();

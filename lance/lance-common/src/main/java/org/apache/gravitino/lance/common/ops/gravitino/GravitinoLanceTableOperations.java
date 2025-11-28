@@ -21,7 +21,10 @@ package org.apache.gravitino.lance.common.ops.gravitino;
 
 import static org.apache.gravitino.lance.common.ops.gravitino.LanceDataTypeConverter.CONVERTER;
 import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_LOCATION;
+import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_TABLE_FORMAT;
 import static org.apache.gravitino.rel.Column.DEFAULT_VALUE_NOT_SET;
+import static org.apache.gravitino.rel.Table.PROPERTY_EXTERNAL;
+import static org.apache.gravitino.rel.Table.PROPERTY_TABLE_FORMAT;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
@@ -128,8 +131,8 @@ public class GravitinoLanceTableOperations implements LanceTableOperations {
       createTableProperties.put(LANCE_LOCATION, tableLocation);
     }
     // The format is defined in GenericLakehouseCatalog
-    createTableProperties.put(Table.PROPERTY_TABLE_FORMAT, "lance");
-    createTableProperties.put(Table.PROPERTY_EXTERNAL, "true");
+    createTableProperties.put(PROPERTY_TABLE_FORMAT, "lance");
+    createTableProperties.put(PROPERTY_EXTERNAL, "true");
 
     Table t;
     try {
@@ -206,7 +209,8 @@ public class GravitinoLanceTableOperations implements LanceTableOperations {
         NameIdentifier.of(nsId.levelAtListPos(1), nsId.levelAtListPos(2));
 
     Map<String, String> copiedTableProperties = Maps.newHashMap(tableProperties);
-    copiedTableProperties.put("format", "lance");
+    copiedTableProperties.put(PROPERTY_TABLE_FORMAT, LANCE_TABLE_FORMAT);
+    copiedTableProperties.put(PROPERTY_EXTERNAL, "true");
     Table t = null;
     try {
       t =
