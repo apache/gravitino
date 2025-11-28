@@ -304,27 +304,27 @@ public class TagOperationsAuthorizationIT extends BaseRestApiAuthorizationIT {
   public void testListObjForTag() {
     GravitinoMetalake gravitinoMetalake = client.loadMetalake(METALAKE);
     GravitinoMetalake gravitinoMetalakeLoadByNormalUser = normalUserClient.loadMetalake(METALAKE);
-    String[] tables =
+    String[] objs =
         Arrays.stream(gravitinoMetalake.getTag("tag1").associatedObjects().objects())
             .map(MetadataObject::name)
             .toList()
             .toArray(new String[0]);
-    Arrays.sort(tables);
-    Assertions.assertArrayEquals(new String[] {"table1"}, tables);
-    tables =
+    Arrays.sort(objs);
+    Assertions.assertArrayEquals(new String[] {"catalog", "table1"}, objs);
+    objs =
         Arrays.stream(gravitinoMetalake.getTag("tag2").associatedObjects().objects())
             .map(MetadataObject::name)
             .toList()
             .toArray(new String[0]);
-    Arrays.sort(tables);
-    Assertions.assertArrayEquals(new String[] {"table1"}, tables);
-    tables =
+    Arrays.sort(objs);
+    Assertions.assertArrayEquals(new String[] {"table1"}, objs);
+    objs =
         Arrays.stream(gravitinoMetalake.getTag("tag3").associatedObjects().objects())
             .map(MetadataObject::name)
             .toList()
             .toArray(new String[0]);
-    Arrays.sort(tables);
-    Assertions.assertArrayEquals(new String[] {"table1"}, tables);
+    Arrays.sort(objs);
+    Assertions.assertArrayEquals(new String[] {"table1"}, objs);
     assertThrows(
         "Can not access metadata.",
         ForbiddenException.class,
@@ -335,22 +335,22 @@ public class TagOperationsAuthorizationIT extends BaseRestApiAuthorizationIT {
               .toList()
               .toArray(new String[0]);
         });
-    tables =
+    objs =
         Arrays.stream(
                 gravitinoMetalakeLoadByNormalUser.getTag("tag2").associatedObjects().objects())
             .map(MetadataObject::name)
             .toList()
             .toArray(new String[0]);
-    Arrays.sort(tables);
-    Assertions.assertArrayEquals(new String[] {"table1"}, tables);
-    tables =
+    Arrays.sort(objs);
+    Assertions.assertArrayEquals(new String[] {"table1"}, objs);
+    objs =
         Arrays.stream(
                 gravitinoMetalakeLoadByNormalUser.getTag("tag3").associatedObjects().objects())
             .map(MetadataObject::name)
             .toList()
             .toArray(new String[0]);
-    Arrays.sort(tables);
-    Assertions.assertArrayEquals(new String[] {"table1"}, tables);
+    Arrays.sort(objs);
+    Assertions.assertArrayEquals(new String[] {"table1"}, objs);
     TableCatalog tableCatalog = gravitinoMetalake.loadCatalog(CATALOG).asTableCatalog();
     tableCatalog.createTable(
         NameIdentifier.of(SCHEMA, "table2"), createColumns(), "test", new HashMap<>());
@@ -371,21 +371,21 @@ public class TagOperationsAuthorizationIT extends BaseRestApiAuthorizationIT {
             .supportsTags();
     supportsTags.associateTags(new String[] {"tag2"}, null);
 
-    tables =
+    objs =
         Arrays.stream(
                 gravitinoMetalakeLoadByNormalUser.getTag("tag2").associatedObjects().objects())
             .map(MetadataObject::name)
             .toList()
             .toArray(new String[0]);
-    Arrays.sort(tables);
-    Assertions.assertArrayEquals(new String[] {"table1"}, tables);
-    tables =
+    Arrays.sort(objs);
+    Assertions.assertArrayEquals(new String[] {"table1"}, objs);
+    objs =
         Arrays.stream(gravitinoMetalake.getTag("tag2").associatedObjects().objects())
             .map(MetadataObject::name)
             .toList()
             .toArray(new String[0]);
-    Arrays.sort(tables);
-    Assertions.assertArrayEquals(new String[] {"table1", "table2", "table3"}, tables);
+    Arrays.sort(objs);
+    Assertions.assertArrayEquals(new String[] {"table1", "table2", "table3"}, objs);
   }
 
   @Test
