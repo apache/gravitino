@@ -36,7 +36,7 @@ public class AuthorizationRequestContext {
   /** Used to determine whether the role has already been loaded. */
   private final AtomicBoolean hasLoadRole = new AtomicBoolean();
 
-  private String originalAuthorizationExpression;
+  private volatile String originalAuthorizationExpression;
 
   /**
    * check allow

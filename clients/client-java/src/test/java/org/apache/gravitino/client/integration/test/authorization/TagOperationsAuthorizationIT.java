@@ -301,21 +301,80 @@ public class TagOperationsAuthorizationIT extends BaseRestApiAuthorizationIT {
 
   @Test
   @Order(9)
-  public void testDropTag() {
+  public void testListObjForTag() {
+    GravitinoMetalake gravitinoMetalake = client.loadMetalake(METALAKE);
     GravitinoMetalake gravitinoMetalakeLoadByNormalUser = normalUserClient.loadMetalake(METALAKE);
+    String[] objs =
+        Arrays.stream(gravitinoMetalake.getTag("tag1").associatedObjects().objects())
+            .map(MetadataObject::name)
+            .toList()
+            .toArray(new String[0]);
+    Arrays.sort(objs);
+    Assertions.assertArrayEquals(new String[] {"catalog", "table1"}, objs);
+    objs =
+        Arrays.stream(gravitinoMetalake.getTag("tag2").associatedObjects().objects())
+            .map(MetadataObject::name)
+            .toList()
+            .toArray(new String[0]);
+    Arrays.sort(objs);
+    Assertions.assertArrayEquals(new String[] {"table1"}, objs);
+    objs =
+        Arrays.stream(gravitinoMetalake.getTag("tag3").associatedObjects().objects())
+            .map(MetadataObject::name)
+            .toList()
+            .toArray(new String[0]);
+    Arrays.sort(objs);
+    Assertions.assertArrayEquals(new String[] {"table1"}, objs);
     assertThrows(
         "Can not access metadata.",
         ForbiddenException.class,
         () -> {
-          gravitinoMetalakeLoadByNormalUser.deleteTag("tag1");
+          Arrays.stream(
+                  gravitinoMetalakeLoadByNormalUser.getTag("tag1").associatedObjects().objects())
+              .map(MetadataObject::name)
+              .toList()
+              .toArray(new String[0]);
         });
-    gravitinoMetalakeLoadByNormalUser.deleteTag("tag2");
-    GravitinoMetalake gravitinoMetalake = client.loadMetalake(METALAKE);
-    gravitinoMetalake.deleteTag("tag1");
+    objs =
+        Arrays.stream(
+                gravitinoMetalakeLoadByNormalUser.getTag("tag2").associatedObjects().objects())
+            .map(MetadataObject::name)
+            .toList()
+            .toArray(new String[0]);
+    Arrays.sort(objs);
+    Assertions.assertArrayEquals(new String[] {"table1"}, objs);
+    objs =
+        Arrays.stream(
+                gravitinoMetalakeLoadByNormalUser.getTag("tag3").associatedObjects().objects())
+            .map(MetadataObject::name)
+            .toList()
+            .toArray(new String[0]);
+    Arrays.sort(objs);
+    Assertions.assertArrayEquals(new String[] {"table1"}, objs);
+
+    objs =
+        Arrays.stream(gravitinoMetalake.getTag("tag3").associatedObjects().objects())
+            .map(MetadataObject::name)
+            .toList()
+            .toArray(new String[0]);
+    Arrays.sort(objs);
+    Assertions.assertArrayEquals(new String[] {"table1"}, objs);
+    gravitinoMetalake.revokePrivilegesFromRole(
+        role,
+        MetadataObjects.of(ImmutableList.of(CATALOG, SCHEMA), MetadataObject.Type.SCHEMA),
+        ImmutableSet.of(Privileges.SelectTable.allow(), Privileges.UseSchema.allow()));
+    objs =
+        Arrays.stream(
+                gravitinoMetalakeLoadByNormalUser.getTag("tag3").associatedObjects().objects())
+            .map(MetadataObject::name)
+            .toList()
+            .toArray(new String[0]);
+    Arrays.sort(objs);
+    Assertions.assertArrayEquals(new String[] {}, objs);
   }
 
   @Test
-  @Order(9)
+  @Order(10)
   public void testTagOperationsWithNonExistentMetalake() throws Exception {
     // Test that all tag operations with @AuthorizationExpression return 403 Forbidden
     // when the metalake doesn't exist, instead of inconsistent 404 responses
@@ -388,6 +447,21 @@ public class TagOperationsAuthorizationIT extends BaseRestApiAuthorizationIT {
                 .loadCatalog(CATALOG)
                 .supportsTags()
                 .associateTags(new String[] {"testTag"}, null));
+  }
+
+  @Test
+  @Order(11)
+  public void testDropTag() {
+    GravitinoMetalake gravitinoMetalakeLoadByNormalUser = normalUserClient.loadMetalake(METALAKE);
+    assertThrows(
+        "Can not access metadata.",
+        ForbiddenException.class,
+        () -> {
+          gravitinoMetalakeLoadByNormalUser.deleteTag("tag1");
+        });
+    gravitinoMetalakeLoadByNormalUser.deleteTag("tag2");
+    GravitinoMetalake gravitinoMetalake = client.loadMetalake(METALAKE);
+    gravitinoMetalake.deleteTag("tag1");
   }
 
   private Column[] createColumns() {

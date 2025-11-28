@@ -314,9 +314,8 @@ public class PolicyOperations {
           () -> {
             MetadataObject[] objects =
                 policyDispatcher.listMetadataObjectsForPolicy(metalake, policyName);
-            // TODO filter by can-access-metadata, MetadataFilterHelper can not support now
             objects = objects == null ? new MetadataObject[0] : objects;
-
+            objects = MetadataAuthzHelper.filterMetadataObject(metalake, objects);
             LOG.info(
                 "List {} objects for policy: {} under metalake: {}",
                 objects.length,
@@ -325,6 +324,7 @@ public class PolicyOperations {
 
             MetadataObjectDTO[] objectDTOs =
                 Arrays.stream(objects).map(DTOConverters::toDTO).toArray(MetadataObjectDTO[]::new);
+
             return Utils.ok(new MetadataObjectListResponse(objectDTOs));
           });
 
