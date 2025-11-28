@@ -95,6 +95,7 @@ public class JobOperations {
   @Produces("application/vnd.gravitino.v1+json")
   @Timed(name = "list-job-templates." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "list-job-templates", absolute = true)
+  @AuthorizationExpression(expression = "")
   public Response listJobTemplates(
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
           String metalake,
@@ -279,6 +280,7 @@ public class JobOperations {
   @Produces("application/vnd.gravitino.v1+json")
   @Timed(name = "list-jobs." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "list-jobs", absolute = true)
+  @AuthorizationExpression(expression = "")
   public Response listJobs(
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
           String metalake,
@@ -345,7 +347,8 @@ public class JobOperations {
   @Timed(name = "run-job." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "run-job", absolute = true)
   @AuthorizationExpression(
-      expression = "METALAKE::OWNER || (METALAKE::RUN_JOB && ANY_USE_JOB_TEMPLATE)")
+      expression =
+          "METALAKE::OWNER || (METALAKE::RUN_JOB && (ANY_USE_JOB_TEMPLATE || JOB_TEMPLATE::OWNER))")
   public Response runJob(
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
           String metalake,
