@@ -47,6 +47,8 @@ public class GCSFileSystemProvider implements FileSystemProvider, SupportsCreden
   public FileSystem getFileSystem(Path path, Map<String, String> config) throws IOException {
     Map<String, String> hadoopConfMap =
         FileSystemUtils.toHadoopConfigMap(config, GRAVITINO_KEY_TO_GCS_HADOOP_KEY);
+    hadoopConfMap = additionalGCSConfig(hadoopConfMap);
+
     Configuration configuration = FileSystemUtils.createConfiguration(hadoopConfMap);
     return FileSystem.newInstance(path.toUri(), configuration);
   }
@@ -60,6 +62,25 @@ public class GCSFileSystemProvider implements FileSystemProvider, SupportsCreden
     }
 
     return result;
+  }
+
+  private Map<String, String> additionalGCSConfig(Map<String, String> configs) {
+    Map<String, String> additionalConfigs = Maps.newHashMap(configs);
+
+    // Avoid multiple retries to speed up failure in test cases.
+    // Use hard code instead of GoogleHadoopFileSystemBase.GCS_HTTP_CONNECT_TIMEOUT_KEY to avoid
+    // dependency on a specific Hadoop version
+    if (!configs.containsKey("fs.gs.http.connect-timeout")) {
+      additionalConfigs.put("fs.gs.http.connect-timeout", "5000");
+    }
+
+    if (!configs.containsKey("fs.gs.http.max.retry")) {
+      additionalConfigs.put("fs.gs.http.max.retry", "2");
+    }
+
+    // More tuning can be added here.
+
+    return ImmutableMap.copyOf(additionalConfigs);
   }
 
   @Override
