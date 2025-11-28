@@ -134,7 +134,7 @@ public class MetadataObjectService {
 
   private static Map<Long, String> getTagObjectsFullName(List<Long> tagIds) {
     if (tagIds == null || tagIds.isEmpty()) {
-      return Maps.newHashMap();
+      return Map.of();
     }
     return tagIds.stream()
         .collect(

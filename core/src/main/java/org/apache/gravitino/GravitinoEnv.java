@@ -604,9 +604,9 @@ public class GravitinoEnv {
     this.auxServiceManager.serviceInit(config);
 
     // Create and initialize Tag related modules
-    this.tagDispatcher =
-        new TagEventDispatcher(
-            eventBus, new TagHookDispatcher(new TagManager(idGenerator, entityStore)));
+    TagManager tagManager = new TagManager(idGenerator, entityStore);
+    TagHookDispatcher tagHookDispatcher = new TagHookDispatcher(tagManager);
+    this.tagDispatcher = new TagEventDispatcher(eventBus, tagHookDispatcher);
 
     PolicyEventDispatcher policyEventDispatcher =
         new PolicyEventDispatcher(eventBus, new PolicyManager(idGenerator, entityStore));
