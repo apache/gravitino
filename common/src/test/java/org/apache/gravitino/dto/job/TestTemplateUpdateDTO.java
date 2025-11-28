@@ -317,4 +317,157 @@ public class TestTemplateUpdateDTO {
     Assertions.assertNull(sparkDto.getNewEnvironments());
     Assertions.assertNull(sparkDto.getNewCustomFields());
   }
+
+  @Test
+  public void testHttpTemplateUpdateDTO() throws JsonProcessingException {
+    HttpTemplateUpdateDTO httpTemplateUpdateDTO =
+        HttpTemplateUpdateDTO.builder()
+            .withNewExecutable("POST")
+            .withNewArguments(ImmutableList.of("arg1", "arg2"))
+            .withNewEnvironments(ImmutableMap.of("ENV_VAR", "value"))
+            .withNewCustomFields(ImmutableMap.of("customKey", "customValue"))
+            .withNewUrl("http://example.com/api")
+            .withNewHeaders(ImmutableMap.of("Content-Type", "application/json"))
+            .withNewBody("{\"key\": \"value\"}")
+            .withNewQueryParams(ImmutableList.of("param1=value1", "param2=value2"))
+            .build();
+
+    String serJson = JsonUtils.objectMapper().writeValueAsString(httpTemplateUpdateDTO);
+    HttpTemplateUpdateDTO deserDTO =
+        JsonUtils.objectMapper().readValue(serJson, HttpTemplateUpdateDTO.class);
+    Assertions.assertEquals(httpTemplateUpdateDTO, deserDTO);
+
+    httpTemplateUpdateDTO =
+        HttpTemplateUpdateDTO.builder()
+            .withNewEnvironments(ImmutableMap.of("ENV_VAR", "value"))
+            .withNewCustomFields(ImmutableMap.of("customKey", "customValue"))
+            .withNewUrl("http://example.com/api")
+            .withNewHeaders(ImmutableMap.of("Content-Type", "application/json"))
+            .withNewBody("{\"key\": \"value\"}")
+            .withNewQueryParams(ImmutableList.of("param1=value1", "param2=value2"))
+            .build();
+
+    serJson = JsonUtils.objectMapper().writeValueAsString(httpTemplateUpdateDTO);
+    deserDTO = JsonUtils.objectMapper().readValue(serJson, HttpTemplateUpdateDTO.class);
+    Assertions.assertNull(deserDTO.getNewExecutable());
+    Assertions.assertNull(deserDTO.getNewArguments());
+    Assertions.assertEquals(httpTemplateUpdateDTO, deserDTO);
+
+    httpTemplateUpdateDTO =
+        HttpTemplateUpdateDTO.builder()
+            .withNewUrl("http://example.com/api")
+            .withNewHeaders(ImmutableMap.of("Content-Type", "application/json"))
+            .withNewBody("{\"key\": \"value\"}")
+            .withNewQueryParams(ImmutableList.of("param1=value1", "param2=value2"))
+            .build();
+
+    serJson = JsonUtils.objectMapper().writeValueAsString(httpTemplateUpdateDTO);
+    deserDTO = JsonUtils.objectMapper().readValue(serJson, HttpTemplateUpdateDTO.class);
+    Assertions.assertNull(deserDTO.getNewEnvironments());
+    Assertions.assertNull(deserDTO.getNewCustomFields());
+    Assertions.assertEquals(httpTemplateUpdateDTO, deserDTO);
+
+    httpTemplateUpdateDTO =
+        HttpTemplateUpdateDTO.builder()
+            .withNewBody("{\"key\": \"value\"}")
+            .withNewQueryParams(ImmutableList.of("param1=value1", "param2=value2"))
+            .build();
+
+    serJson = JsonUtils.objectMapper().writeValueAsString(httpTemplateUpdateDTO);
+    deserDTO = JsonUtils.objectMapper().readValue(serJson, HttpTemplateUpdateDTO.class);
+    Assertions.assertNull(deserDTO.getNewUrl());
+    Assertions.assertNull(deserDTO.getNewHeaders());
+    Assertions.assertEquals(httpTemplateUpdateDTO, deserDTO);
+
+    httpTemplateUpdateDTO = HttpTemplateUpdateDTO.builder().build();
+    serJson = JsonUtils.objectMapper().writeValueAsString(httpTemplateUpdateDTO);
+    deserDTO = JsonUtils.objectMapper().readValue(serJson, HttpTemplateUpdateDTO.class);
+    Assertions.assertNull(deserDTO.getNewBody());
+    Assertions.assertNull(deserDTO.getNewQueryParams());
+    Assertions.assertEquals(httpTemplateUpdateDTO, deserDTO);
+  }
+
+  @Test
+  public void testDeserializeHttpTemplateUpdate() throws JsonProcessingException {
+    String json =
+        "{"
+            + "\"@type\":\"http\","
+            + "\"newExecutable\":\"POST\","
+            + "\"newArguments\":[\"arg1\",\"arg2\"],"
+            + "\"newEnvironments\":{\"ENV_VAR\":\"value\"},"
+            + "\"newCustomFields\":{\"customKey\":\"customValue\"},"
+            + "\"newUrl\":\"http://example.com/api\","
+            + "\"newHeaders\":{\"Content-Type\":\"application/json\"},"
+            + "\"newBody\":\"{\\\"key\\\": \\\"value\\\"}\","
+            + "\"newQueryParams\":[\"param1=value1\",\"param2=value2\"]"
+            + "}";
+
+    TemplateUpdateDTO dto = JsonUtils.objectMapper().readValue(json, TemplateUpdateDTO.class);
+    Assertions.assertInstanceOf(HttpTemplateUpdateDTO.class, dto);
+    HttpTemplateUpdateDTO httpDto = (HttpTemplateUpdateDTO) dto;
+    Assertions.assertEquals("POST", httpDto.getNewExecutable());
+    Assertions.assertEquals(ImmutableList.of("arg1", "arg2"), httpDto.getNewArguments());
+    Assertions.assertEquals(ImmutableMap.of("ENV_VAR", "value"), httpDto.getNewEnvironments());
+    Assertions.assertEquals(
+        ImmutableMap.of("customKey", "customValue"), httpDto.getNewCustomFields());
+    Assertions.assertEquals("http://example.com/api", httpDto.getNewUrl());
+    Assertions.assertEquals(
+        ImmutableMap.of("Content-Type", "application/json"), httpDto.getNewHeaders());
+    Assertions.assertEquals("{\"key\": \"value\"}", httpDto.getNewBody());
+    Assertions.assertEquals(
+        ImmutableList.of("param1=value1", "param2=value2"), httpDto.getNewQueryParams());
+
+    json =
+        "{"
+            + "\"@type\":\"http\","
+            + "\"newEnvironments\":{\"ENV_VAR\":\"value\"},"
+            + "\"newCustomFields\":{\"customKey\":\"customValue\"},"
+            + "\"newUrl\":\"http://example.com/api\","
+            + "\"newHeaders\":{\"Content-Type\":\"application/json\"},"
+            + "\"newBody\":\"{\\\"key\\\": \\\"value\\\"}\","
+            + "\"newQueryParams\":[\"param1=value1\",\"param2=value2\"]"
+            + "}";
+
+    dto = JsonUtils.objectMapper().readValue(json, TemplateUpdateDTO.class);
+    Assertions.assertInstanceOf(HttpTemplateUpdateDTO.class, dto);
+    httpDto = (HttpTemplateUpdateDTO) dto;
+    Assertions.assertNull(httpDto.getNewExecutable());
+    Assertions.assertNull(httpDto.getNewArguments());
+
+    json =
+        "{"
+            + "\"@type\":\"http\","
+            + "\"newUrl\":\"http://example.com/api\","
+            + "\"newHeaders\":{\"Content-Type\":\"application/json\"},"
+            + "\"newBody\":\"{\\\"key\\\": \\\"value\\\"}\","
+            + "\"newQueryParams\":[\"param1=value1\",\"param2=value2\"]"
+            + "}";
+
+    dto = JsonUtils.objectMapper().readValue(json, TemplateUpdateDTO.class);
+    Assertions.assertInstanceOf(HttpTemplateUpdateDTO.class, dto);
+    httpDto = (HttpTemplateUpdateDTO) dto;
+    Assertions.assertNull(httpDto.getNewEnvironments());
+    Assertions.assertNull(httpDto.getNewCustomFields());
+
+    json =
+        "{"
+            + "\"@type\":\"http\","
+            + "\"newBody\":\"{\\\"key\\\": \\\"value\\\"}\","
+            + "\"newQueryParams\":[\"param1=value1\",\"param2=value2\"]"
+            + "}";
+
+    dto = JsonUtils.objectMapper().readValue(json, TemplateUpdateDTO.class);
+    Assertions.assertInstanceOf(HttpTemplateUpdateDTO.class, dto);
+    httpDto = (HttpTemplateUpdateDTO) dto;
+    Assertions.assertNull(httpDto.getNewUrl());
+    Assertions.assertNull(httpDto.getNewHeaders());
+
+    json = "{" + "\"@type\":\"http\"" + "}";
+
+    dto = JsonUtils.objectMapper().readValue(json, TemplateUpdateDTO.class);
+    Assertions.assertInstanceOf(HttpTemplateUpdateDTO.class, dto);
+    httpDto = (HttpTemplateUpdateDTO) dto;
+    Assertions.assertNull(httpDto.getNewBody());
+    Assertions.assertNull(httpDto.getNewQueryParams());
+  }
 }

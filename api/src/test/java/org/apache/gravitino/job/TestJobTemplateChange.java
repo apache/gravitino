@@ -122,4 +122,45 @@ public class TestJobTemplateChange {
         update.getNewConfigs(),
         ((JobTemplateChange.SparkTemplateUpdate) updateChange.getTemplateUpdate()).getNewConfigs());
   }
+
+  @Test
+  public void testUpdateHttpJobTemplate() {
+    JobTemplateChange.HttpTemplateUpdate update =
+        JobTemplateChange.HttpTemplateUpdate.builder()
+            .withNewExecutable("POST")
+            .withNewArguments(Lists.newArrayList("arg1", "arg2"))
+            .withNewEnvironments(ImmutableMap.of("ENV1", "value1", "ENV2", "value2"))
+            .withNewCustomFields(Collections.emptyMap())
+            .withNewUrl("http://example.com/api")
+            .withNewHeaders(ImmutableMap.of("Content-Type", "application/json"))
+            .withNewBody("{\"key\": \"value\"}")
+            .withNewQueryParams(Lists.newArrayList("param1=value1", "param2=value2"))
+            .build();
+
+    JobTemplateChange change = JobTemplateChange.updateTemplate(update);
+
+    Assertions.assertInstanceOf(JobTemplateChange.UpdateJobTemplate.class, change);
+    JobTemplateChange.UpdateJobTemplate updateChange = (JobTemplateChange.UpdateJobTemplate) change;
+    Assertions.assertEquals(
+        update.getNewExecutable(), updateChange.getTemplateUpdate().getNewExecutable());
+    Assertions.assertEquals(
+        update.getNewArguments(), updateChange.getTemplateUpdate().getNewArguments());
+    Assertions.assertEquals(
+        update.getNewEnvironments(), updateChange.getTemplateUpdate().getNewEnvironments());
+    Assertions.assertEquals(
+        update.getNewCustomFields(), updateChange.getTemplateUpdate().getNewCustomFields());
+    Assertions.assertEquals(
+        update.getNewUrl(),
+        ((JobTemplateChange.HttpTemplateUpdate) updateChange.getTemplateUpdate()).getNewUrl());
+    Assertions.assertEquals(
+        update.getNewHeaders(),
+        ((JobTemplateChange.HttpTemplateUpdate) updateChange.getTemplateUpdate()).getNewHeaders());
+    Assertions.assertEquals(
+        update.getNewBody(),
+        ((JobTemplateChange.HttpTemplateUpdate) updateChange.getTemplateUpdate()).getNewBody());
+    Assertions.assertEquals(
+        update.getNewQueryParams(),
+        ((JobTemplateChange.HttpTemplateUpdate) updateChange.getTemplateUpdate())
+            .getNewQueryParams());
+  }
 }

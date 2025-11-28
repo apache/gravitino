@@ -59,6 +59,7 @@ import org.apache.gravitino.exceptions.MetalakeNotInUseException;
 import org.apache.gravitino.exceptions.NoSuchJobException;
 import org.apache.gravitino.exceptions.NoSuchJobTemplateException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
+import org.apache.gravitino.job.HttpJobTemplate;
 import org.apache.gravitino.job.JobHandle;
 import org.apache.gravitino.job.JobOperationDispatcher;
 import org.apache.gravitino.job.JobTemplateChange;
@@ -136,9 +137,11 @@ public class TestJobOperations extends JerseyTest {
         newShellJobTemplateEntity("shell_template_1", "Test Shell Template 1");
     JobTemplateEntity template2 =
         newSparkJobTemplateEntity("spark_template_1", "Test Spark Template 1");
+    JobTemplateEntity template3 =
+        newHttpJobTemplateEntity("http_template_1", "Test HTTP Template 1");
 
     when(jobOperationDispatcher.listJobTemplates(metalake))
-        .thenReturn(Lists.newArrayList(template1, template2));
+        .thenReturn(Lists.newArrayList(template1, template2, template3));
 
     Response resp =
         target(jobTemplatePath())
@@ -151,7 +154,7 @@ public class TestJobOperations extends JerseyTest {
 
     NameListResponse nameListResponse = resp.readEntity(NameListResponse.class);
     Assertions.assertEquals(0, nameListResponse.getCode());
-    String[] expectedNames = {template1.name(), template2.name()};
+    String[] expectedNames = {template1.name(), template2.name(), template3.name()};
     Assertions.assertArrayEquals(expectedNames, nameListResponse.getNames());
 
     // Test list details
@@ -169,11 +172,13 @@ public class TestJobOperations extends JerseyTest {
         resp1.readEntity(JobTemplateListResponse.class);
     Assertions.assertEquals(0, jobTemplateListResponse.getCode());
 
-    Assertions.assertEquals(2, jobTemplateListResponse.getJobTemplates().size());
+    Assertions.assertEquals(3, jobTemplateListResponse.getJobTemplates().size());
     Assertions.assertEquals(
         JobOperations.toDTO(template1), jobTemplateListResponse.getJobTemplates().get(0));
     Assertions.assertEquals(
         JobOperations.toDTO(template2), jobTemplateListResponse.getJobTemplates().get(1));
+    Assertions.assertEquals(
+        JobOperations.toDTO(template3), jobTemplateListResponse.getJobTemplates().get(2));
 
     // Test throw NoSuchMetalakeException
     doThrow(new NoSuchMetalakeException("mock error"))
@@ -862,6 +867,26 @@ public class TestJobOperations extends JerseyTest {
         .withName(name)
         .withNamespace(NamespaceUtil.ofJobTemplate(metalake))
         .withTemplateContent(JobTemplateEntity.TemplateContent.fromJobTemplate(sparkJobTemplate))
+        .withAuditInfo(auditInfo)
+        .build();
+  }
+
+  private JobTemplateEntity newHttpJobTemplateEntity(String name, String comment) {
+    HttpJobTemplate httpJobTemplate =
+        HttpJobTemplate.builder()
+            .withName(name)
+            .withComment(comment)
+            .withExecutable("GET")
+            .withUrl("http://example.com/api")
+            .withHeaders(ImmutableMap.of("Content-Type", "application/json"))
+            .build();
+
+    Random rand = new Random();
+    return JobTemplateEntity.builder()
+        .withId(rand.nextLong())
+        .withName(name)
+        .withNamespace(NamespaceUtil.ofJobTemplate(metalake))
+        .withTemplateContent(JobTemplateEntity.TemplateContent.fromJobTemplate(httpJobTemplate))
         .withAuditInfo(auditInfo)
         .build();
   }

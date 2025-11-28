@@ -36,6 +36,8 @@ import org.apache.gravitino.dto.CatalogDTO;
 import org.apache.gravitino.dto.MetalakeDTO;
 import org.apache.gravitino.dto.authorization.PrivilegeDTO;
 import org.apache.gravitino.dto.authorization.SecurableObjectDTO;
+import org.apache.gravitino.dto.job.HttpJobTemplateDTO;
+import org.apache.gravitino.dto.job.HttpTemplateUpdateDTO;
 import org.apache.gravitino.dto.job.JobTemplateDTO;
 import org.apache.gravitino.dto.job.ShellJobTemplateDTO;
 import org.apache.gravitino.dto.job.ShellTemplateUpdateDTO;
@@ -54,6 +56,7 @@ import org.apache.gravitino.dto.requests.TableUpdateRequest;
 import org.apache.gravitino.dto.requests.TagUpdateRequest;
 import org.apache.gravitino.dto.requests.TopicUpdateRequest;
 import org.apache.gravitino.file.FilesetChange;
+import org.apache.gravitino.job.HttpJobTemplate;
 import org.apache.gravitino.job.JobTemplate;
 import org.apache.gravitino.job.JobTemplateChange;
 import org.apache.gravitino.job.ShellJobTemplate;
@@ -496,6 +499,21 @@ class DTOConverters {
             .withConfigs(((SparkJobTemplate) jobTemplate).configs())
             .build();
 
+      case HTTP:
+        return HttpJobTemplateDTO.builder()
+            .withJobType(jobTemplate.jobType())
+            .withName(jobTemplate.name())
+            .withComment(jobTemplate.comment())
+            .withExecutable(jobTemplate.executable())
+            .withArguments(jobTemplate.arguments())
+            .withEnvironments(jobTemplate.environments())
+            .withCustomFields(jobTemplate.customFields())
+            .withUrl(((HttpJobTemplate) jobTemplate).url())
+            .withHeaders(((HttpJobTemplate) jobTemplate).headers())
+            .withBody(((HttpJobTemplate) jobTemplate).body())
+            .withQueryParams(((HttpJobTemplate) jobTemplate).queryParams())
+            .build();
+
       default:
         throw new IllegalArgumentException("Unsupported job type: " + jobTemplate.jobType());
     }
@@ -547,6 +565,19 @@ class DTOConverters {
           .withNewConfigs(sparkUpdate.getNewConfigs())
           .build();
 
+    } else if (change instanceof JobTemplateChange.HttpTemplateUpdate) {
+      JobTemplateChange.HttpTemplateUpdate httpUpdate =
+          (JobTemplateChange.HttpTemplateUpdate) change;
+      return HttpTemplateUpdateDTO.builder()
+          .withNewExecutable(httpUpdate.getNewExecutable())
+          .withNewArguments(httpUpdate.getNewArguments())
+          .withNewEnvironments(httpUpdate.getNewEnvironments())
+          .withNewCustomFields(httpUpdate.getNewCustomFields())
+          .withNewUrl(httpUpdate.getNewUrl())
+          .withNewHeaders(httpUpdate.getNewHeaders())
+          .withNewBody(httpUpdate.getNewBody())
+          .withNewQueryParams(httpUpdate.getNewQueryParams())
+          .build();
     } else {
       throw new IllegalArgumentException(
           "Unknown template update type: " + change.getClass().getSimpleName());

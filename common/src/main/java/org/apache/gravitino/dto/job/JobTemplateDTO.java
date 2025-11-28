@@ -51,6 +51,7 @@ import org.apache.gravitino.job.JobTemplate;
 @JsonSubTypes({
   @JsonSubTypes.Type(value = SparkJobTemplateDTO.class, name = "spark"),
   @JsonSubTypes.Type(value = ShellJobTemplateDTO.class, name = "shell"),
+  @JsonSubTypes.Type(value = HttpJobTemplateDTO.class, name = "http"),
 })
 @Getter
 @Accessors(fluent = true)
