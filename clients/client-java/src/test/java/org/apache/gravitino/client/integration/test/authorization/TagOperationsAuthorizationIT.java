@@ -351,41 +351,26 @@ public class TagOperationsAuthorizationIT extends BaseRestApiAuthorizationIT {
             .toArray(new String[0]);
     Arrays.sort(objs);
     Assertions.assertArrayEquals(new String[] {"table1"}, objs);
-    TableCatalog tableCatalog = gravitinoMetalake.loadCatalog(CATALOG).asTableCatalog();
-    tableCatalog.createTable(
-        NameIdentifier.of(SCHEMA, "table2"), createColumns(), "test", new HashMap<>());
-    tableCatalog.createTable(
-        NameIdentifier.of(SCHEMA, "table3"), createColumns(), "test", new HashMap<>());
-    SupportsTags supportsTags =
-        gravitinoMetalake
-            .loadCatalog(CATALOG)
-            .asTableCatalog()
-            .loadTable(NameIdentifier.of(SCHEMA, "table2"))
-            .supportsTags();
-    supportsTags.associateTags(new String[] {"tag2"}, null);
-    supportsTags =
-        gravitinoMetalake
-            .loadCatalog(CATALOG)
-            .asTableCatalog()
-            .loadTable(NameIdentifier.of(SCHEMA, "table3"))
-            .supportsTags();
-    supportsTags.associateTags(new String[] {"tag2"}, null);
 
     objs =
-        Arrays.stream(
-                gravitinoMetalakeLoadByNormalUser.getTag("tag2").associatedObjects().objects())
+        Arrays.stream(gravitinoMetalake.getTag("tag3").associatedObjects().objects())
             .map(MetadataObject::name)
             .toList()
             .toArray(new String[0]);
     Arrays.sort(objs);
     Assertions.assertArrayEquals(new String[] {"table1"}, objs);
+    gravitinoMetalake.revokePrivilegesFromRole(
+        role,
+        MetadataObjects.of(ImmutableList.of(CATALOG, SCHEMA), MetadataObject.Type.SCHEMA),
+        ImmutableSet.of(Privileges.SelectTable.allow(), Privileges.UseSchema.allow()));
     objs =
-        Arrays.stream(gravitinoMetalake.getTag("tag2").associatedObjects().objects())
+        Arrays.stream(
+                gravitinoMetalakeLoadByNormalUser.getTag("tag3").associatedObjects().objects())
             .map(MetadataObject::name)
             .toList()
             .toArray(new String[0]);
     Arrays.sort(objs);
-    Assertions.assertArrayEquals(new String[] {"table1", "table2", "table3"}, objs);
+    Assertions.assertArrayEquals(new String[] {}, objs);
   }
 
   @Test

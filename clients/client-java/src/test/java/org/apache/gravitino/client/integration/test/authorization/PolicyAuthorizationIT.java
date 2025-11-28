@@ -34,6 +34,7 @@ import org.apache.gravitino.Catalog;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.authorization.Owner;
 import org.apache.gravitino.authorization.Privileges;
 import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.authorization.SecurableObjects;
@@ -387,10 +388,11 @@ public class PolicyAuthorizationIT extends BaseRestApiAuthorizationIT {
             .toArray(new String[0]);
     Arrays.sort(tables);
     Assertions.assertArrayEquals(new String[] {"table2", "table3"}, tables);
+    MetadataObject metadataObject =
+        MetadataObjects.of(ImmutableList.of(CATALOG, SCHEMA, "table2"), MetadataObject.Type.TABLE);
+    gravitinoMetalake.setOwner(metadataObject, USER, Owner.Type.USER);
     gravitinoMetalake.grantPrivilegesToRole(
-        role,
-        MetadataObjects.of(ImmutableList.of(CATALOG, SCHEMA, "table2"), MetadataObject.Type.TABLE),
-        ImmutableSet.of(Privileges.SelectTable.deny()));
+        role, metadataObject, ImmutableSet.of(Privileges.SelectTable.deny()));
     tables =
         Arrays.stream(
                 gravitinoMetalakeLoadByNormalUser
