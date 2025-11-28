@@ -359,6 +359,7 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
       return incrementalScan.planFiles();
     } else {
       TableScan tableScan = table.newScan();
+      // Snapshot ID 0 has no special meaning in Iceberg, so we only apply if not null
       if (scanRequest.snapshotId() != null) {
         tableScan = tableScan.useSnapshot(scanRequest.snapshotId());
         LOG.debug("Applied snapshot filter: snapshot-id={}", scanRequest.snapshotId());
