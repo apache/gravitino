@@ -111,7 +111,7 @@ Please set the `warehouse` parameter to `oss://{bucket_name}/${prefix_name}`. Ad
 :::
 
 :::note
-Since Gravitino 1.1.0, the Gravitino Iceberg aliyun bundle jar have already included the Iceberg aliyun necessary dependency jars, no need to download and include them separately.
+Since Gravitino 1.1.0, the Gravitino Iceberg aliyun bundle jar has already included the Iceberg aliyun necessary dependency jars, no need to download and include them separately.
 :::
 
 #### GCS
