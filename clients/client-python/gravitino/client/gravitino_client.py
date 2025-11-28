@@ -15,7 +15,9 @@
 # specific language governing permissions and limitations
 # under the License.
 
-from typing import List, Dict
+from __future__ import annotations
+
+from typing import Dict, List, Optional
 
 from gravitino.api.catalog import Catalog
 from gravitino.api.catalog_change import CatalogChange
@@ -23,12 +25,15 @@ from gravitino.api.job.job_handle import JobHandle
 from gravitino.api.job.job_template import JobTemplate
 from gravitino.api.job.job_template_change import JobTemplateChange
 from gravitino.api.job.supports_jobs import SupportsJobs
+from gravitino.api.tag.tag_operations import TagOperations
 from gravitino.auth.auth_data_provider import AuthDataProvider
 from gravitino.client.gravitino_client_base import GravitinoClientBase
 from gravitino.client.gravitino_metalake import GravitinoMetalake
 
+from ..api.tag.tag import Tag
 
-class GravitinoClient(GravitinoClientBase, SupportsJobs):
+
+class GravitinoClient(GravitinoClientBase, SupportsJobs, TagOperations):
     """Gravitino Client for a user to interact with the Gravitino API, allowing the client to list,
     load, create, and alter Catalog.
 
@@ -43,8 +48,8 @@ class GravitinoClient(GravitinoClientBase, SupportsJobs):
         metalake_name: str,
         check_version: bool = True,
         auth_data_provider: AuthDataProvider = None,
-        request_headers: dict = None,
-        client_config: dict = None,
+        request_headers: Optional[dict] = None,
+        client_config: Optional[dict] = None,
     ):
         """Constructs a new GravitinoClient with the given URI, authenticator and AuthDataProvider.
 
@@ -235,3 +240,93 @@ class GravitinoClient(GravitinoClientBase, SupportsJobs):
             NoSuchJobException: If no job with the specified ID exists.
         """
         return self.get_metalake().cancel_job(job_id)
+
+    # Tag operations
+    def list_tags(self) -> list[str]:
+        """List all the tag names under a metalake.
+
+        Returns:
+            list[str]: The list of tag names.
+
+        Raises:
+            NoSuchMetalakeException: If the metalake does not exist.
+        """
+        return self.get_metalake().list_tags()
+
+    def list_tags_info(self) -> list[Tag]:
+        """
+        List tags information under a metalake.
+
+        Returns:
+            list[Tag]: The list of tag information.
+
+        Raises:
+            NoSuchMetalakeException: If the metalake does not exist.
+        """
+        return self.get_metalake().list_tags_info()
+
+    def get_tag(self, tag_name) -> Tag:
+        """
+        Get a tag by its name under a metalake.
+
+        Args:
+            tag_name (str): The name of the tag.
+
+        Returns:
+            Tag: The tag information.
+
+        Raises:
+            NoSuchTagException: If the tag does not exist.
+        """
+        return self.get_metalake().get_tag(tag_name)
+
+    def create_tag(self, tag_name, comment, properties) -> Tag:
+        """
+        Create a new tag under a metalake.
+
+        Raises:
+            NoSuchMetalakeException: If the metalake does not exist.
+            TagAlreadyExistsException: If the tag already exists.
+
+        Args:
+            tag_name (str): The name of the tag.
+            comment (str): The comment of the tag.
+            properties (dict[str, str]): The properties of the tag.
+
+        Returns:
+            Tag: The tag information.
+        """
+        return self.get_metalake().create_tag(tag_name, comment, properties)
+
+    def alter_tag(self, tag_name, *changes) -> Tag:
+        """
+        Alter a tag under a metalake.
+
+        Args:
+            tag_name (str): The name of the tag.
+            changes (TagChange): The changes to apply to the tag.
+
+        Returns:
+            Tag: The altered tag.
+
+        Raises:
+            NoSuchTagException: If the tag does not exist.
+            NoSuchMetalakeException: If the metalake does not exist.
+        """
+        return self.get_metalake().alter_tag(tag_name, *changes)
+
+    def delete_tag(self, tag_name) -> bool:
+        """
+        Delete a tag under a metalake.
+
+        Args:
+            tag_name (str): The name of the tag.
+
+        Returns:
+            bool: True if the tag was deleted, False otherwise.
+
+        Raises:
+            NoSuchTagException: If the tag does not exist.
+            NoSuchMetalakeException: If the metalake does not exist.
+        """
+        return self.get_metalake().delete_tag(tag_name)
