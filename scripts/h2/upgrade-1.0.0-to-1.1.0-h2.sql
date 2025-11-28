@@ -19,7 +19,7 @@
 
 CREATE TABLE IF NOT EXISTS `table_version_info` (
     `table_id`        BIGINT(20) UNSIGNED NOT NULL COMMENT 'table id',
-    `format`          VARCHAR(64) NOT NULL COMMENT 'table format, such as Lance, Iceberg and so on',
+    `format`          VARCHAR(64) COMMENT 'table format, such as Lance, Iceberg and so on, it will be null if it is not a lakehouse table',
     `properties`      CLOB DEFAULT NULL COMMENT 'table properties',
     `partitioning`  MEDIUMTEXT DEFAULT NULL COMMENT 'table partition info',
     `distribution` MEDIUMTEXT DEFAULT NULL COMMENT 'table distribution info',
@@ -28,6 +28,5 @@ CREATE TABLE IF NOT EXISTS `table_version_info` (
     `comment`   MEDIUMTEXT DEFAULT NULL COMMENT 'table comment',
     `version` BIGINT(20) UNSIGNED COMMENT 'table current version',
     `deleted_at`      BIGINT(20) UNSIGNED DEFAULT 0 COMMENT 'table deletion timestamp, 0 means not deleted',
-    PRIMARY KEY (table_id),
-    UNIQUE KEY `uk_table_id_deleted_at` (`table_id`, `deleted_at`)
+    UNIQUE KEY `uk_table_id_version_deleted_at` (`table_id`, `version`, `deleted_at`)
 ) ENGINE=InnoDB COMMENT 'table detail information including format, location, properties, partition, distribution, sort order, index and so on';

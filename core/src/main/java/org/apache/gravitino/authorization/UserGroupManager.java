@@ -38,6 +38,7 @@ import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.NoSuchUserException;
 import org.apache.gravitino.exceptions.UserAlreadyExistsException;
 import org.apache.gravitino.meta.AuditInfo;
+import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.GroupEntity;
 import org.apache.gravitino.meta.UserEntity;
 import org.apache.gravitino.storage.IdGenerator;
@@ -104,7 +105,15 @@ class UserGroupManager {
 
   User getUser(String metalake, String user) throws NoSuchUserException {
     try {
-      checkMetalake(NameIdentifier.of(metalake), store);
+      // Only check metalake existence, not enabled status, to allow reading user info
+      // on disabled metalakes for internal operations like checkCurrentUser().
+      try {
+        store.get(NameIdentifier.of(metalake), Entity.EntityType.METALAKE, BaseMetalake.class);
+      } catch (NoSuchEntityException e) {
+        LOG.error("Metalake {} does not exist", metalake, e);
+        throw new NoSuchMetalakeException(METALAKE_DOES_NOT_EXIST_MSG, metalake);
+      }
+
       return store.get(
           AuthorizationUtils.ofUser(metalake, user), Entity.EntityType.USER, UserEntity.class);
 

@@ -223,10 +223,10 @@ public final class DorisUtils {
   private static int extractBucketNum(Matcher matcher) {
     int bucketNum = 1;
     if (matcher.group(4) != null) {
-      String bucketValue = matcher.group(4);
+      String bucketValue = matcher.group(4).trim();
       // Use -1 to indicate auto bucket.
       bucketNum =
-          bucketValue.trim().toUpperCase().equals("AUTO")
+          bucketValue.toUpperCase().equals("AUTO")
               ? Distributions.AUTO
               : Integer.valueOf(bucketValue);
     }

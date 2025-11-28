@@ -46,7 +46,7 @@ import org.apache.gravitino.dto.util.DTOConverters;
 import org.apache.gravitino.messaging.Topic;
 import org.apache.gravitino.messaging.TopicChange;
 import org.apache.gravitino.metrics.MetricNames;
-import org.apache.gravitino.server.authorization.MetadataFilterHelper;
+import org.apache.gravitino.server.authorization.MetadataAuthzHelper;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationExpression;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationMetadata;
 import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants;
@@ -91,7 +91,7 @@ public class TopicOperations {
             NameIdentifier[] topics = dispatcher.listTopics(topicNS);
             topics = topics == null ? new NameIdentifier[0] : topics;
             topics =
-                MetadataFilterHelper.filterByExpression(
+                MetadataAuthzHelper.filterByExpression(
                     metalake,
                     AuthorizationExpressionConstants.filterTopicsAuthorizationExpression,
                     Entity.EntityType.TOPIC,

@@ -269,6 +269,50 @@ public abstract class SparkAuthorizationIT extends BaseIT {
     normalUserSparkSession.sql("DROP TABLE table_a");
   }
 
+  @Test
+  @Order(5)
+  public void testCreateTableIfNotExistsWithoutLoadTablePrivilege() {
+    GravitinoMetalake gravitinoMetalake = client.loadMetalake(METALAKE);
+    String testTable = "test_if_not_exists";
+    String testRole = "role_no_select";
+
+    // Temporarily revoke ROLE from user to avoid interference from test 2's CreateTable.deny()
+    // ROLE has deny from test 2, which would override any allow privileges in testRole
+    gravitinoMetalake.revokeRolesFromUser(ImmutableList.of(ROLE), NORMAL_USER);
+
+    // Create role with CREATE_TABLE but without SELECT_TABLE privilege
+    SecurableObject catalogObject =
+        SecurableObjects.ofCatalog(JDBC_CATALOG, ImmutableList.of(Privileges.UseCatalog.allow()));
+    SecurableObject schemaObject =
+        SecurableObjects.ofSchema(
+            catalogObject,
+            JDBC_DATABASE,
+            ImmutableList.of(Privileges.UseSchema.allow(), Privileges.CreateTable.allow()));
+    gravitinoMetalake.createRole(
+        testRole, new HashMap<>(), ImmutableList.of(catalogObject, schemaObject));
+    gravitinoMetalake.grantRolesToUser(ImmutableList.of(testRole), NORMAL_USER);
+
+    try {
+      normalUserSparkSession.sql(
+          String.format("CREATE TABLE IF NOT EXISTS %s (id INT, name STRING)", testTable));
+
+      TableCatalog tableCatalog = gravitinoMetalake.loadCatalog(JDBC_CATALOG).asTableCatalog();
+      boolean tableExists = tableCatalog.tableExists(NameIdentifier.of(JDBC_DATABASE, testTable));
+      Assertions.assertTrue(tableExists, "Table should have been created");
+
+      normalUserSparkSession.sql(
+          String.format("CREATE TABLE IF NOT EXISTS %s (id INT, name STRING)", testTable));
+
+      // Clean up
+      tableCatalog.dropTable(NameIdentifier.of(JDBC_DATABASE, testTable));
+    } finally {
+      // Clean up test role and restore ROLE to user for subsequent tests
+      gravitinoMetalake.revokeRolesFromUser(ImmutableList.of(testRole), NORMAL_USER);
+      gravitinoMetalake.deleteRole(testRole);
+      gravitinoMetalake.grantRolesToUser(ImmutableList.of(ROLE), NORMAL_USER);
+    }
+  }
+
   private void assertEqualsRows(List<Row> exceptRows, List<Row> actualRows) {
     Assertions.assertEquals(exceptRows.size(), actualRows.size());
     for (int i = 0; i < exceptRows.size(); i++) {

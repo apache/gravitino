@@ -1,0 +1,49 @@
+#
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#  http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+#
+
+# THE CONFIGURATION FOR Lance REST SERVER
+gravitino.lance-rest.shutdown.timeout = 3000
+
+# THE CONFIGURATION FOR Lance REST WEB SERVER
+# The host name of the built-in web server
+gravitino.lance-rest.host = 0.0.0.0
+# The http port number of the built-in web server
+gravitino.lance-rest.httpPort = 9101
+# The min thread size of the built-in web server
+gravitino.lance-rest.minThreads = 24
+# The max thread size of the built-in web server
+gravitino.lance-rest.maxThreads = 200
+# The stop timeout of the built-in web server
+gravitino.lance-rest.stopTimeout = 30000
+# The timeout of idle connections
+gravitino.lance-rest.idleTimeout = 30000
+# The executor thread pool work queue size of the built-in web server
+gravitino.lance-rest.threadPoolWorkQueueSize = 100
+# The request header size of the built-in web server
+gravitino.lance-rest.requestHeaderSize = 131072
+# The response header size of the built-in web server
+gravitino.lance-rest.responseHeaderSize = 131072
+
+# THE CONFIGURATION FOR Lance namespace backend
+# The backend Lance namespace for Lance REST service, it's recommended to use Gravitino
+gravitino.lance-rest.namespace-backend = gravitino
+# The uri of the Lance REST service gravitino namespace backend
+gravitino.lance-rest.gravitino.uri = http://localhost:8090
+# The metalake name used for Lance REST service gravitino namespace backend, please create the metalake before using it, and configure the metalake name here.
+# gravitino.lance-rest.gravitino.metalake-name = metalake
