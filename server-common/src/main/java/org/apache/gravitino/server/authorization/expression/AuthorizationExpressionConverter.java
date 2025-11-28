@@ -285,6 +285,11 @@ public class AuthorizationExpressionConverter {
                 + "&& !(ANY(DENY_APPLY_POLICY, METALAKE, POLICY)))");
     expression =
         expression.replaceAll(
+            "ANY_USE_JOB_TEMPLATE",
+            "((ANY(USE_JOB_TEMPLATE,  METALAKE, JOB_TEMPLATE))"
+                + "&& !(ANY(DENY_USE_JOB_TEMPLATE, METALAKE, JOB_TEMPLATE))");
+    expression =
+        expression.replaceAll(
             CAN_SET_OWNER,
             "authorizer.hasSetOwnerPermission(p_metalake,p_metadataObjectType,p_fullName,authorizationContext)");
     expression =

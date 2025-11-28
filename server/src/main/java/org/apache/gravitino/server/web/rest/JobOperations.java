@@ -110,7 +110,7 @@ public class JobOperations {
                 Lists.newArrayList(
                     MetadataAuthzHelper.filterByExpression(
                         metalake,
-                        "METALAKE::OWNER || JOB_TEMPLATE::OWNER || METALAKE::USE_JOB_TEMPLATE || JOB_TEMPLATE::USE_JOB_TEMPLATE",
+                        "METALAKE::OWNER || JOB_TEMPLATE::OWNER || ANY_USE_JOB_TEMPLATE",
                         Entity.EntityType.JOB_TEMPLATE,
                         jobOperationDispatcher
                             .listJobTemplates(metalake)
@@ -181,8 +181,7 @@ public class JobOperations {
   @Timed(name = "get-job-template." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "get-job-template", absolute = true)
   @AuthorizationExpression(
-      expression =
-          "METALAKE::OWNER || JOB_TEMPLATE::OWNER || METALAKE::USE_JOB_TEMPLATE || JOB_TEMPLATE::USE_JOB_TEMPLATE")
+      expression = "METALAKE::OWNER || JOB_TEMPLATE::OWNER || ANY_USE_JOB_TEMPLATE")
   public Response getJobTemplate(
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
           String metalake,
@@ -346,8 +345,7 @@ public class JobOperations {
   @Timed(name = "run-job." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "run-job", absolute = true)
   @AuthorizationExpression(
-      expression =
-          "METALAKE::OWNER || (METALAKE::RUN_JOB || (METALAKE::USE_JOB_TEMPLATE || JOB_TEMPLATE::USE_JOB_TEMPLATE))")
+      expression = "METALAKE::OWNER || (METALAKE::RUN_JOB && ANY_USE_JOB_TEMPLATE)")
   public Response runJob(
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
           String metalake,
