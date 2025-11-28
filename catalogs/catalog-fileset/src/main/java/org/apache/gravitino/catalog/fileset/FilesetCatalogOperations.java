@@ -148,11 +148,10 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
           5L,
           TimeUnit.SECONDS,
           new ArrayBlockingQueue<>(1000),
-          r -> {
-            Thread t = new Thread(r, "fileset-filesystem-getter-pool");
-            t.setDaemon(true);
-            return t;
-          },
+          new ThreadFactoryBuilder()
+              .setDaemon(true)
+              .setNameFormat("fileset-filesystem-getter-pool-%d")
+              .build(),
           new ThreadPoolExecutor.AbortPolicy()) {
         {
           allowCoreThreadTimeOut(true);
