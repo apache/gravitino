@@ -93,4 +93,13 @@ public class JobTemplateMetaSQLProviderFactory {
       @Param("oldJobTemplateMeta") JobTemplatePO oldJobTemplatePO) {
     return getProvider().updateJobTemplateMeta(newJobTemplatePO, oldJobTemplatePO);
   }
+
+  public static String selectJobTemplateIdByMetalakeAndName(
+      @Param("metalakeId") Long metalakeId, @Param("jobTemplateName") String jobTemplateName) {
+    return getProvider().selectJobTemplateIdByMetalakeAndName(metalakeId, jobTemplateName);
+  }
+
+  public static String selectJobTemplateById(@Param("jobTemplateId") Long jobTemplateId) {
+    return getProvider().selectJobTemplateById(jobTemplateId);
+  }
 }

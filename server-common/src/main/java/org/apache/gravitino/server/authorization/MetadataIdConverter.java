@@ -38,6 +38,8 @@ import org.apache.gravitino.meta.CatalogEntity;
 import org.apache.gravitino.meta.ColumnEntity;
 import org.apache.gravitino.meta.FilesetEntity;
 import org.apache.gravitino.meta.GroupEntity;
+import org.apache.gravitino.meta.JobEntity;
+import org.apache.gravitino.meta.JobTemplateEntity;
 import org.apache.gravitino.meta.ModelEntity;
 import org.apache.gravitino.meta.ModelVersionEntity;
 import org.apache.gravitino.meta.RoleEntity;
@@ -76,6 +78,8 @@ public class MetadataIdConverter {
           .put(Entity.EntityType.USER, UserEntity.class)
           .put(Entity.EntityType.GROUP, GroupEntity.class)
           .put(Entity.EntityType.ROLE, RoleEntity.class)
+          .put(Entity.EntityType.JOB_TEMPLATE, JobTemplateEntity.class)
+          .put(Entity.EntityType.JOB, JobEntity.class)
           .build();
 
   private MetadataIdConverter() {}

@@ -54,6 +54,13 @@ public class AuthorizeExecutorFactory {
           authorizationExpressionEvaluator,
           pathParams,
           entityType);
+      case RUN_JOB -> new RunJobAuthorizationExecutor(
+          parameters,
+          args,
+          metadataContext,
+          authorizationExpressionEvaluator,
+          pathParams,
+          entityType);
     };
   }
 }
