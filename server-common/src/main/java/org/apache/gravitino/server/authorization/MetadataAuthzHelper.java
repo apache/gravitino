@@ -214,6 +214,7 @@ public class MetadataAuthzHelper {
       AuthorizationRequestContext authorizationRequestContext,
       Function<E, Map<Entity.EntityType, NameIdentifier>> extractMetadataNamesMap) {
     Principal currentPrincipal = PrincipalUtils.getCurrentPrincipal();
+    authorizationRequestContext.setOriginalAuthorizationExpression(expression);
     List<CompletableFuture<E>> futures = new ArrayList<>();
     for (E entity : entities) {
       futures.add(

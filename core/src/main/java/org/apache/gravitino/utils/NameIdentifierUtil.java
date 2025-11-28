@@ -420,6 +420,15 @@ public class NameIdentifierUtil {
         namespace);
   }
 
+  public static void checkPolicy(NameIdentifier ident) {
+    NameIdentifier.check(ident != null, "Policy identifier must not be null");
+    Namespace namespace = ident.namespace();
+    Namespace.check(
+        namespace != null && !namespace.isEmpty() && namespace.length() == 3,
+        "Policy namespace must be 3 level, the input namespace is %s",
+        namespace);
+  }
+
   /**
    * Check the given {@link NameIdentifier} is a catalog identifier. Throw an {@link
    * IllegalNameIdentifierException} if it's not.
@@ -569,6 +578,9 @@ public class NameIdentifierUtil {
       case TAG:
         checkTag(ident);
         return MetadataObjects.of(null, ident.name(), MetadataObject.Type.TAG);
+      case POLICY:
+        checkPolicy(ident);
+        return MetadataObjects.of(null, ident.name(), MetadataObject.Type.POLICY);
       default:
         throw new IllegalArgumentException(
             "Entity type " + entityType + " is not supported to convert to MetadataObject");

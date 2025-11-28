@@ -159,6 +159,11 @@ public class ParameterUtil {
                   Entity.EntityType.TAG,
                   NameIdentifierUtil.ofTag(metalake, entities.get(Entity.EntityType.TAG)));
               break;
+            case POLICY:
+              nameIdentifierMap.put(
+                  Entity.EntityType.POLICY,
+                  NameIdentifierUtil.ofPolicy(metalake, entities.get(Entity.EntityType.POLICY)));
+              break;
             default:
               break;
           }
@@ -197,6 +202,11 @@ public class ParameterUtil {
       metadataNames.put(
           Entity.EntityType.TAG,
           NameIdentifierUtil.ofTag(NameIdentifierUtil.getMetalake(metalake), name));
+      return;
+    } else if (type == Entity.EntityType.POLICY) {
+      metadataNames.put(
+          Entity.EntityType.POLICY,
+          NameIdentifierUtil.ofPolicy(NameIdentifierUtil.getMetalake(metalake), name));
       return;
     }
     throw new UnsupportedOperationException(
