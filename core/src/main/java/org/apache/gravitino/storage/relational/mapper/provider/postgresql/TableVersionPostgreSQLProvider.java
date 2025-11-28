@@ -65,4 +65,14 @@ public class TableVersionPostgreSQLProvider extends TableVersionBaseSQLProvider 
         + " timestamp '1970-01-01 00:00:00')) * 1000)"
         + " WHERE table_id = #{tableId} AND version = #{version}";
   }
+
+  @Override
+  public String deleteTableVersionByLegacyTimeline(
+      @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit) {
+    return "DELETE FROM "
+        + TABLE_NAME
+        + " WHERE table_id IN (SELECT table_id FROM "
+        + TABLE_NAME
+        + " WHERE deleted_at > 0 AND deleted_at < #{legacyTimeline} LIMIT #{limit})";
+  }
 }
