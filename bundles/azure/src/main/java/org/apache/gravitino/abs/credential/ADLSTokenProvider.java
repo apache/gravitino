@@ -19,49 +19,14 @@
 
 package org.apache.gravitino.abs.credential;
 
-import com.azure.core.util.Context;
-import com.azure.identity.ClientSecretCredential;
-import com.azure.identity.ClientSecretCredentialBuilder;
-import com.azure.storage.file.datalake.DataLakeServiceClient;
-import com.azure.storage.file.datalake.DataLakeServiceClientBuilder;
-import com.azure.storage.file.datalake.implementation.util.DataLakeSasImplUtil;
-import com.azure.storage.file.datalake.models.UserDelegationKey;
-import com.azure.storage.file.datalake.sas.DataLakeServiceSasSignatureValues;
-import com.azure.storage.file.datalake.sas.PathSasPermission;
-import java.time.OffsetDateTime;
-import java.util.HashSet;
-import java.util.Map;
-import java.util.Set;
 import org.apache.gravitino.credential.ADLSTokenCredential;
-import org.apache.gravitino.credential.Credential;
-import org.apache.gravitino.credential.CredentialContext;
-import org.apache.gravitino.credential.CredentialProvider;
-import org.apache.gravitino.credential.PathBasedCredentialContext;
-import org.apache.gravitino.credential.config.AzureCredentialConfig;
+import org.apache.gravitino.credential.CredentialProviderDelegator;
 
-/** Generates ADLS token to access ADLS data. */
-public class ADLSTokenProvider implements CredentialProvider {
-  private String storageAccountName;
-  private String tenantId;
-  private String clientId;
-  private String clientSecret;
-  private String endpoint;
-  private Integer tokenExpireSecs;
-
-  @Override
-  public void initialize(Map<String, String> properties) {
-    AzureCredentialConfig azureCredentialConfig = new AzureCredentialConfig(properties);
-    this.storageAccountName = azureCredentialConfig.storageAccountName();
-    this.tenantId = azureCredentialConfig.tenantId();
-    this.clientId = azureCredentialConfig.clientId();
-    this.clientSecret = azureCredentialConfig.clientSecret();
-    this.endpoint =
-        String.format("https://%s.%s", storageAccountName, ADLSTokenCredential.ADLS_DOMAIN);
-    this.tokenExpireSecs = azureCredentialConfig.adlsTokenExpireInSecs();
-  }
-
-  @Override
-  public void close() {}
+/**
+ * A lightweight credential provider for ADLS. It delegates the actual credential generation to
+ * {@link ADLSTokenGenerator} which is loaded via reflection to avoid classpath issues.
+ */
+public class ADLSTokenProvider extends CredentialProviderDelegator<ADLSTokenCredential> {
 
   @Override
   public String credentialType() {
@@ -69,69 +34,7 @@ public class ADLSTokenProvider implements CredentialProvider {
   }
 
   @Override
-  public Credential getCredential(CredentialContext context) {
-    if (!(context instanceof PathBasedCredentialContext)) {
-      return null;
-    }
-    PathBasedCredentialContext pathBasedCredentialContext = (PathBasedCredentialContext) context;
-
-    Set<String> writePaths = pathBasedCredentialContext.getWritePaths();
-    Set<String> readPaths = pathBasedCredentialContext.getReadPaths();
-
-    Set<String> combinedPaths = new HashSet<>(writePaths);
-    combinedPaths.addAll(readPaths);
-
-    if (combinedPaths.size() != 1) {
-      throw new IllegalArgumentException(
-          "ADLS should contain exactly one unique path, but found: "
-              + combinedPaths.size()
-              + " paths: "
-              + combinedPaths);
-    }
-    String uniquePath = combinedPaths.iterator().next();
-
-    ClientSecretCredential clientSecretCredential =
-        new ClientSecretCredentialBuilder()
-            .tenantId(tenantId)
-            .clientId(clientId)
-            .clientSecret(clientSecret)
-            .build();
-
-    DataLakeServiceClient dataLakeServiceClient =
-        new DataLakeServiceClientBuilder()
-            .endpoint(endpoint)
-            .credential(clientSecretCredential)
-            .buildClient();
-
-    OffsetDateTime start = OffsetDateTime.now();
-    OffsetDateTime expiry = OffsetDateTime.now().plusSeconds(tokenExpireSecs);
-    UserDelegationKey userDelegationKey = dataLakeServiceClient.getUserDelegationKey(start, expiry);
-
-    PathSasPermission pathSasPermission =
-        new PathSasPermission().setReadPermission(true).setListPermission(true);
-
-    if (!writePaths.isEmpty()) {
-      pathSasPermission
-          .setWritePermission(true)
-          .setDeletePermission(true)
-          .setCreatePermission(true)
-          .setAddPermission(true);
-    }
-
-    DataLakeServiceSasSignatureValues signatureValues =
-        new DataLakeServiceSasSignatureValues(expiry, pathSasPermission);
-
-    ADLSLocationUtils.ADLSLocationParts locationParts = ADLSLocationUtils.parseLocation(uniquePath);
-    String sasToken =
-        new DataLakeSasImplUtil(
-                signatureValues,
-                locationParts.getContainer(),
-                ADLSLocationUtils.trimSlashes(locationParts.getPath()),
-                true)
-            .generateUserDelegationSas(
-                userDelegationKey, locationParts.getAccountName(), Context.NONE);
-
-    return new ADLSTokenCredential(
-        locationParts.getAccountName(), sasToken, expiry.toInstant().toEpochMilli());
+  public String getGeneratorClassName() {
+    return "org.apache.gravitino.abs.credential.ADLSTokenGenerator";
   }
 }
