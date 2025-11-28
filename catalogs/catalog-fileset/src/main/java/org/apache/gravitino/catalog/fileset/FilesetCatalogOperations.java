@@ -141,7 +141,7 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
   @VisibleForTesting ScheduledThreadPoolExecutor scheduler;
   @VisibleForTesting Cache<FileSystemCacheKey, FileSystem> fileSystemCache;
 
-  private static final ThreadPoolExecutor GET_FILESYSTEM_EXECUTOR =
+  private final ThreadPoolExecutor fileSystemExecutor =
       new ThreadPoolExecutor(
           Math.max(2, Runtime.getRuntime().availableProcessors() * 2),
           Math.max(2, Runtime.getRuntime().availableProcessors() * 2),
@@ -1016,7 +1016,7 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
       scheduler.shutdownNow();
     }
 
-    GET_FILESYSTEM_EXECUTOR.shutdownNow();
+    fileSystemExecutor.shutdownNow();
 
     if (fileSystemCache != null) {
       fileSystemCache
@@ -1421,7 +1421,7 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
                     config, FilesetCatalogPropertiesMetadata.FILESYSTEM_CONNECTION_TIMEOUT_SECONDS);
 
     Future<FileSystem> fileSystemFuture =
-        GET_FILESYSTEM_EXECUTOR.submit(() -> provider.getFileSystem(path, config));
+        fileSystemExecutor.submit(() -> provider.getFileSystem(path, config));
 
     try {
       return fileSystemFuture.get(timeoutSeconds, TimeUnit.SECONDS);
