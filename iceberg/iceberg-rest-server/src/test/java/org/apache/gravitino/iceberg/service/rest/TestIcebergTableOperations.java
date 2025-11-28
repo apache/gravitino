@@ -216,8 +216,9 @@ public class TestIcebergTableOperations extends IcebergNamespaceTestBase {
 
     Snapshot endSnapshot = snapshots.get(snapshots.size() - 1);
     Long endSnapshotId = endSnapshot.snapshotId();
-    Snapshot startSnapshot = snapshots.get(snapshots.size() - 2);
-    Long startSnapshotId = startSnapshot.snapshotId();
+    Long startSnapshotId = endSnapshot.parentId();
+    Assertions.assertNotNull(
+        startSnapshotId, "End snapshot should have a parent snapshot for incremental scan");
 
     JsonNode planResponse =
         verifyPlanTableScanSuccWithRange(
