@@ -145,8 +145,8 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
       new ThreadPoolExecutor(
           Math.max(2, Runtime.getRuntime().availableProcessors() * 2),
           Math.max(2, Runtime.getRuntime().availableProcessors() * 2),
-          50L,
-          TimeUnit.MILLISECONDS,
+          5L,
+          TimeUnit.SECONDS,
           new ArrayBlockingQueue<>(1000),
           r -> {
             Thread t = new Thread(r, "fileset-filesystem-getter-pool");
@@ -1017,6 +1017,8 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
       scheduler.shutdownNow();
     }
 
+    GET_FILESYSTEM_EXECUTOR.shutdownNow();
+
     if (fileSystemCache != null) {
       fileSystemCache
           .asMap()
@@ -1426,6 +1428,14 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
       return fileSystemFuture.get(timeoutSeconds, TimeUnit.SECONDS);
     } catch (TimeoutException e) {
       fileSystemFuture.cancel(true);
+
+      LOG.warn(
+          "Timeout when getting FileSystem for path: {}, scheme: {}, provider: {} within {} seconds",
+          path,
+          scheme,
+          provider,
+          timeoutSeconds,
+          e);
 
       throw new IOException(
           String.format(
