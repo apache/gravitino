@@ -21,7 +21,9 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
+import com.google.common.collect.Maps;
 import java.io.File;
+import java.lang.reflect.Method;
 import java.nio.file.Files;
 import java.util.Collections;
 import java.util.HashMap;
@@ -32,6 +34,7 @@ import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.authorization.Privileges;
 import org.apache.gravitino.client.GravitinoMetalake;
+import org.apache.gravitino.dto.MetalakeDTO;
 import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.job.JobHandle;
 import org.apache.gravitino.job.JobTemplate;
@@ -160,7 +163,7 @@ public class JobAuthorizationIT extends BaseRestApiAuthorizationIT {
 
   @Test
   @Order(5)
-  public void testCreateJob() {
+  public void testRunJob() {
     // Normal user without RunJob privilege cannot run jobs
     assertThrows(
         ForbiddenException.class,
@@ -171,14 +174,33 @@ public class JobAuthorizationIT extends BaseRestApiAuthorizationIT {
                     "test_2",
                     ImmutableMap.of("arg1", "value1", "arg2", "success", "env_var", "value2")));
 
-    // Grant RunJob privilege to normal user
+    // Grant RunJob privilege to normal user but not UseJobTemplate privilege
     GravitinoMetalake metalake = client.loadMetalake(METALAKE);
     metalake.grantPrivilegesToRole(
         ROLE,
         MetadataObjects.of(null, METALAKE, MetadataObject.Type.METALAKE),
         ImmutableList.of(Privileges.RunJob.allow()));
 
-    // Now normal user can run jobs on their own template
+    // User with RunJob privilege but without UseJobTemplate privilege cannot run jobs
+    // The authorization expression is: METALAKE::OWNER || (METALAKE::RUN_JOB &&
+    // ANY_USE_JOB_TEMPLATE)
+    client.loadMetalake(METALAKE).registerJobTemplate(builder.withName("test_4").build());
+    assertThrows(
+        ForbiddenException.class,
+        () ->
+            normalUserClient
+                .loadMetalake(METALAKE)
+                .runJob(
+                    "test_4",
+                    ImmutableMap.of("arg1", "value1", "arg2", "success", "env_var", "value2")));
+
+    // Grant UseJobTemplate privilege on the metalake to normal user
+    metalake.grantPrivilegesToRole(
+        ROLE,
+        MetadataObjects.of(null, METALAKE, MetadataObject.Type.METALAKE),
+        ImmutableList.of(Privileges.UseJobTemplate.allow()));
+
+    // Now normal user can run jobs on their own template (has both RunJob and UseJobTemplate)
     JobHandle normalUserJobHandle =
         normalUserClient
             .loadMetalake(METALAKE)
@@ -276,6 +298,77 @@ public class JobAuthorizationIT extends BaseRestApiAuthorizationIT {
     // Admin can cancel any job
     JobHandle adminCanceledJob = client.loadMetalake(METALAKE).cancelJob(adminJobId);
     Assertions.assertNotNull(adminCanceledJob);
+  }
+
+  @Test
+  @Order(9)
+  public void testJobOperationsWithNonExistentMetalake() throws Exception {
+    // Test that all job operations with @AuthorizationExpression return 403 Forbidden
+    // when the metalake doesn't exist, instead of inconsistent 404 responses
+    String nonExistentMetalake = "nonExistentMetalake";
+
+    // Access the restClient from normalUserClient using reflection
+    Method restClientMethod =
+        normalUserClient.getClass().getSuperclass().getDeclaredMethod("restClient");
+    restClientMethod.setAccessible(true);
+    Object restClient = restClientMethod.invoke(normalUserClient);
+
+    // Create a MetalakeDTO for the non-existent metalake
+    MetalakeDTO metalakeDTO =
+        MetalakeDTO.builder()
+            .withName(nonExistentMetalake)
+            .withComment("test")
+            .withProperties(Maps.newHashMap())
+            .withAudit(
+                org.apache.gravitino.dto.AuditDTO.builder()
+                    .withCreator("test")
+                    .withCreateTime(java.time.Instant.now())
+                    .build())
+            .build();
+
+    // Use DTOConverters.toMetaLake() via reflection to create GravitinoMetalake
+    Class<?> dtoConvertersClass = Class.forName("org.apache.gravitino.client.DTOConverters");
+    Method toMetaLakeMethod =
+        dtoConvertersClass.getDeclaredMethod(
+            "toMetaLake",
+            MetalakeDTO.class,
+            Class.forName("org.apache.gravitino.client.RESTClient"));
+    toMetaLakeMethod.setAccessible(true);
+    GravitinoMetalake nonExistentMetalakeObj =
+        (GravitinoMetalake) toMetaLakeMethod.invoke(null, metalakeDTO, restClient);
+
+    // Test registerJobTemplate - should return 403 ForbiddenException
+    assertThrows(
+        ForbiddenException.class,
+        () -> nonExistentMetalakeObj.registerJobTemplate(builder.withName("testTemplate").build()));
+
+    // Test listJobTemplates - should return 403 ForbiddenException
+    assertThrows(ForbiddenException.class, nonExistentMetalakeObj::listJobTemplates);
+
+    // Test getJobTemplate - should return 403 ForbiddenException
+    assertThrows(
+        ForbiddenException.class, () -> nonExistentMetalakeObj.getJobTemplate("testTemplate"));
+
+    // Test deleteJobTemplate - should return 403 ForbiddenException
+    assertThrows(
+        ForbiddenException.class, () -> nonExistentMetalakeObj.deleteJobTemplate("testTemplate"));
+
+    // Test runJob - should return 403 ForbiddenException
+    assertThrows(
+        ForbiddenException.class,
+        () -> nonExistentMetalakeObj.runJob("testTemplate", Maps.newHashMap()));
+
+    // Test listJobs - should return 403 ForbiddenException
+    assertThrows(ForbiddenException.class, nonExistentMetalakeObj::listJobs);
+
+    // Test listJobs with template name - should return 403 ForbiddenException
+    assertThrows(ForbiddenException.class, () -> nonExistentMetalakeObj.listJobs("testTemplate"));
+
+    // Test getJob - should return 403 ForbiddenException
+    assertThrows(ForbiddenException.class, () -> nonExistentMetalakeObj.getJob("testJobId"));
+
+    // Test cancelJob - should return 403 ForbiddenException
+    assertThrows(ForbiddenException.class, () -> nonExistentMetalakeObj.cancelJob("testJobId"));
   }
 
   @AfterAll
