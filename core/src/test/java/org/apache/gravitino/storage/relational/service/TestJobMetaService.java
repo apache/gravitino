@@ -35,6 +35,7 @@ import org.apache.gravitino.storage.relational.TestJDBCBackend;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestTemplate;
 
 public class TestJobMetaService extends TestJDBCBackend {
