@@ -82,8 +82,17 @@ public class AuthorizationRequestContext {
     if (hasLoadRole.get()) {
       return;
     }
-    runnable.run();
-    hasLoadRole.set(true);
+    synchronized (this) {
+      if (hasLoadRole.get()) {
+        return;
+      }
+      try {
+        runnable.run();
+        hasLoadRole.set(true);
+      } catch (Exception e) {
+        throw new RuntimeException("Failed to load role: ", e);
+      }
+    }
   }
 
   public String getOriginalAuthorizationExpression() {
