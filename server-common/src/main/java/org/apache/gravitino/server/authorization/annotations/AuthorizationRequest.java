@@ -30,6 +30,7 @@ public @interface AuthorizationRequest {
 
   enum RequestType {
     COMMON,
-    ASSOCIATE_TAG
+    ASSOCIATE_TAG,
+    ASSOCIATE_POLICY
   }
 }

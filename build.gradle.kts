@@ -209,8 +209,9 @@ allprojects {
         param.include("**/integration/test/**")
       }
 
+      val dockerTest = project.rootProject.extra["dockerTest"] as? Boolean ?: false
+      param.environment("dockerTest", dockerTest.toString())
       param.useJUnitPlatform {
-        val dockerTest = project.rootProject.extra["dockerTest"] as? Boolean ?: false
         if (!dockerTest) {
           excludeTags("gravitino-docker-test")
         }
@@ -773,6 +774,51 @@ tasks {
     }
   }
 
+  val compileLanceRESTServer by registering {
+    dependsOn("lance:lance-rest-server:copyLibAndConfigsToStandalonePackage")
+    group = "gravitino distribution"
+    outputs.dir(projectDir.dir("distribution/${rootProject.name}-lance-rest-server"))
+    doLast {
+      copy {
+        from(projectDir.dir("conf")) {
+          include(
+            "${rootProject.name}-lance-rest-server.conf.template",
+            "${rootProject.name}-env.sh.template",
+            "log4j2.properties.template"
+          )
+          into("${rootProject.name}-lance-rest-server/conf")
+        }
+        from(projectDir.dir("bin")) {
+          include("common.sh.template", "${rootProject.name}-lance-rest-server.sh.template")
+          into("${rootProject.name}-lance-rest-server/bin")
+        }
+        into(outputDir)
+        rename { fileName ->
+          fileName.replace(".template", "")
+        }
+        eachFile {
+          if (name == "gravitino-env.sh") {
+            filter { line ->
+              line.replace("GRAVITINO_VERSION_PLACEHOLDER", "$version")
+            }
+          }
+        }
+        fileMode = 0b111101101
+      }
+
+      copy {
+        from(projectDir.dir("licenses")) { into("${rootProject.name}-lance-rest-server/licenses") }
+        from(projectDir.file("LICENSE.rest")) { into("${rootProject.name}-lance-rest-server") }
+        from(projectDir.file("NOTICE.rest")) { into("${rootProject.name}-lance-rest-server") }
+        from(projectDir.file("README.md")) { into("${rootProject.name}-lance-rest-server") }
+        into(outputDir)
+        rename { fileName ->
+          fileName.replace(".rest", "")
+        }
+      }
+    }
+  }
+
   val compileTrinoConnector by registering {
     dependsOn("trino-connector:trino-connector:copyLibs")
     group = "gravitino distribution"
@@ -792,7 +838,7 @@ tasks {
   }
 
   val assembleDistribution by registering(Tar::class) {
-    dependsOn("assembleTrinoConnector", "assembleIcebergRESTServer")
+    dependsOn("assembleTrinoConnector", "assembleIcebergRESTServer", "assembleLanceRESTServer")
     group = "gravitino distribution"
     finalizedBy("checksumDistribution")
     into("${rootProject.name}-$version-bin")
@@ -810,6 +856,17 @@ tasks {
     from(compileTrinoConnector.map { it.outputs.files.single() })
     compression = Compression.GZIP
     archiveFileName.set("${rootProject.name}-trino-connector-$version.tar.gz")
+    destinationDirectory.set(projectDir.dir("distribution"))
+  }
+
+  val assembleLanceRESTServer by registering(Tar::class) {
+    dependsOn("compileLanceRESTServer")
+    group = "gravitino distribution"
+    finalizedBy("checksumLanceRESTServerDistribution")
+    into("${rootProject.name}-lance-rest-server-$version-bin")
+    from(compileLanceRESTServer.map { it.outputs.files.single() })
+    compression = Compression.GZIP
+    archiveFileName.set("${rootProject.name}-lance-rest-server-$version-bin.tar.gz")
     destinationDirectory.set(projectDir.dir("distribution"))
   }
 
@@ -840,9 +897,25 @@ tasks {
     }
   }
 
+  register("checksumLanceRESTServerDistribution") {
+    group = "gravitino distribution"
+    dependsOn(assembleLanceRESTServer)
+    val archiveFile = assembleLanceRESTServer.flatMap { it.archiveFile }
+    val checksumFile = archiveFile.map { archive ->
+      archive.asFile.let { it.resolveSibling("${it.name}.sha256") }
+    }
+    inputs.file(archiveFile)
+    outputs.file(checksumFile)
+    doLast {
+      checksumFile.get().writeText(
+        serviceOf<ChecksumService>().sha256(archiveFile.get().asFile).toString()
+      )
+    }
+  }
+
   register("checksumDistribution") {
     group = "gravitino distribution"
-    dependsOn(assembleDistribution, "checksumTrinoConnector", "checksumIcebergRESTServerDistribution")
+    dependsOn(assembleDistribution, "checksumTrinoConnector", "checksumIcebergRESTServerDistribution", "checksumLanceRESTServerDistribution")
     val archiveFile = assembleDistribution.flatMap { it.archiveFile }
     val checksumFile = archiveFile.map { archive ->
       archive.asFile.let { it.resolveSibling("${it.name}.sha256") }
@@ -886,6 +959,7 @@ tasks {
         !it.name.startsWith("filesystem") &&
         !it.name.startsWith("flink") &&
         !it.name.startsWith("iceberg") &&
+        !it.name.startsWith("lance") &&
         !it.name.startsWith("spark") &&
         it.name != "hadoop-common" &&
         it.name != "hive-metastore-common" &&

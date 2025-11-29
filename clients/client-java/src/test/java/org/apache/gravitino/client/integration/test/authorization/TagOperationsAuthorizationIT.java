@@ -25,6 +25,7 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Maps;
 import java.io.IOException;
+import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -38,6 +39,7 @@ import org.apache.gravitino.authorization.Privileges;
 import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.authorization.SecurableObjects;
 import org.apache.gravitino.client.GravitinoMetalake;
+import org.apache.gravitino.dto.MetalakeDTO;
 import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.integration.test.container.ContainerSuite;
 import org.apache.gravitino.integration.test.container.HiveContainer;
@@ -47,6 +49,7 @@ import org.apache.gravitino.rel.types.Types;
 import org.apache.gravitino.tag.SupportsTags;
 import org.apache.gravitino.tag.TagChange;
 import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.MethodOrderer;
 import org.junit.jupiter.api.Order;
@@ -94,6 +97,7 @@ public class TagOperationsAuthorizationIT extends BaseRestApiAuthorizationIT {
     // grant tester privilege
     List<SecurableObject> securableObjects = new ArrayList<>();
     GravitinoMetalake gravitinoMetalake = client.loadMetalake(METALAKE);
+
     SecurableObject catalogObject =
         SecurableObjects.ofCatalog(CATALOG, ImmutableList.of(Privileges.UseCatalog.allow()));
     securableObjects.add(catalogObject);
@@ -281,6 +285,22 @@ public class TagOperationsAuthorizationIT extends BaseRestApiAuthorizationIT {
 
   @Test
   @Order(8)
+  public void testListColumnTag() {
+    GravitinoMetalake gravitinoMetalake = client.loadMetalake(METALAKE);
+    SupportsTags columnSupportTag =
+        gravitinoMetalake
+            .loadCatalog(CATALOG)
+            .asTableCatalog()
+            .loadTable(NameIdentifier.of(SCHEMA, "table1"))
+            .columns()[0]
+            .supportsTags();
+    String[] tags = columnSupportTag.listTags();
+    Arrays.sort(tags);
+    Assertions.assertArrayEquals(new String[] {"tag1", "tag2", "tag3"}, tags);
+  }
+
+  @Test
+  @Order(9)
   public void testDropTag() {
     GravitinoMetalake gravitinoMetalakeLoadByNormalUser = normalUserClient.loadMetalake(METALAKE);
     assertThrows(
@@ -292,6 +312,82 @@ public class TagOperationsAuthorizationIT extends BaseRestApiAuthorizationIT {
     gravitinoMetalakeLoadByNormalUser.deleteTag("tag2");
     GravitinoMetalake gravitinoMetalake = client.loadMetalake(METALAKE);
     gravitinoMetalake.deleteTag("tag1");
+  }
+
+  @Test
+  @Order(9)
+  public void testTagOperationsWithNonExistentMetalake() throws Exception {
+    // Test that all tag operations with @AuthorizationExpression return 403 Forbidden
+    // when the metalake doesn't exist, instead of inconsistent 404 responses
+    String nonExistentMetalake = "nonExistentMetalake";
+
+    // Access the restClient from normalUserClient using reflection
+    Method restClientMethod =
+        normalUserClient.getClass().getSuperclass().getDeclaredMethod("restClient");
+    restClientMethod.setAccessible(true);
+    Object restClient = restClientMethod.invoke(normalUserClient);
+
+    // Create a MetalakeDTO for the non-existent metalake
+    MetalakeDTO metalakeDTO =
+        MetalakeDTO.builder()
+            .withName(nonExistentMetalake)
+            .withComment("test")
+            .withProperties(Maps.newHashMap())
+            .withAudit(
+                org.apache.gravitino.dto.AuditDTO.builder()
+                    .withCreator("test")
+                    .withCreateTime(java.time.Instant.now())
+                    .build())
+            .build();
+
+    // Use DTOConverters.toMetaLake() via reflection to create GravitinoMetalake
+    Class<?> dtoConvertersClass = Class.forName("org.apache.gravitino.client.DTOConverters");
+    Method toMetaLakeMethod =
+        dtoConvertersClass.getDeclaredMethod(
+            "toMetaLake",
+            MetalakeDTO.class,
+            Class.forName("org.apache.gravitino.client.RESTClient"));
+    toMetaLakeMethod.setAccessible(true);
+    GravitinoMetalake nonExistentMetalakeObj =
+        (GravitinoMetalake) toMetaLakeMethod.invoke(null, metalakeDTO, restClient);
+
+    // Test createTag - should return 403 ForbiddenException
+    assertThrows(
+        ForbiddenException.class,
+        () -> nonExistentMetalakeObj.createTag("testTag", "comment", Maps.newHashMap()));
+
+    // Test getTag - should return 403 ForbiddenException
+    assertThrows(ForbiddenException.class, () -> nonExistentMetalakeObj.getTag("testTag"));
+
+    // Test alterTag - should return 403 ForbiddenException
+    assertThrows(
+        ForbiddenException.class,
+        () -> nonExistentMetalakeObj.alterTag("testTag", TagChange.rename("newName")));
+
+    // Test deleteTag - should return 403 ForbiddenException
+    assertThrows(
+        ForbiddenException.class,
+        () -> {
+          nonExistentMetalakeObj.deleteTag("testTag");
+        });
+
+    // Test listTags - now has @AuthorizationExpression with empty expression,
+    // should return 403 ForbiddenException
+    assertThrows(ForbiddenException.class, nonExistentMetalakeObj::listTags);
+
+    // Test listTagsInfo - now has @AuthorizationExpression with empty expression,
+    // should return 403 ForbiddenException
+    assertThrows(ForbiddenException.class, nonExistentMetalakeObj::listTagsInfo);
+
+    // Test associateTags for metadata object - should return 403 ForbiddenException
+    // when trying to associate tags to a catalog in a non-existent metalake
+    assertThrows(
+        ForbiddenException.class,
+        () ->
+            nonExistentMetalakeObj
+                .loadCatalog(CATALOG)
+                .supportsTags()
+                .associateTags(new String[] {"testTag"}, null));
   }
 
   private Column[] createColumns() {

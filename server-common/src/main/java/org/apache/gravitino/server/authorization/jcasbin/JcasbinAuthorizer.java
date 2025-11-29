@@ -139,12 +139,13 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
                     authorizationKey.getPrivilege().name(),
                     requestContext));
     LOG.debug(
-        "principal {},metalake {},metadata object {},privilege {}, result {}",
+        "Authorization expression: {},privilege {}, result {}\n, principal {},metalake {},metadata object {}",
+        requestContext.getOriginalAuthorizationExpression(),
+        privilege,
+        result,
         principal,
         metalake,
-        metadataObject,
-        privilege,
-        result);
+        metadataObject);
     return result;
   }
 
@@ -169,17 +170,22 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
                     authorizationKey.getPrivilege().name(),
                     requestContext));
     LOG.debug(
-        "principal {},metalake {},metadata object {},privilege {},deny result {}",
+        "Authorization expression: {},privilege {},deny result {}\n, principal {},metalake {},metadata object {}",
+        requestContext.getOriginalAuthorizationExpression(),
+        privilege,
+        result,
         principal,
         metalake,
-        metadataObject,
-        privilege,
-        result);
+        metadataObject);
     return result;
   }
 
   @Override
-  public boolean isOwner(Principal principal, String metalake, MetadataObject metadataObject) {
+  public boolean isOwner(
+      Principal principal,
+      String metalake,
+      MetadataObject metadataObject,
+      AuthorizationRequestContext requestContext) {
     Long userId;
     boolean result;
     try {
@@ -194,12 +200,13 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
       result = false;
     }
     LOG.debug(
-        "principal {},metalake {},metadata object {},privilege {},owner result {}",
+        "Authorization expression: {},privilege {},owner result {}\n,principal {},metalake {},metadata object {}",
+        requestContext.getOriginalAuthorizationExpression(),
+        "OWNER",
+        result,
         principal,
         metalake,
-        metadataObject,
-        "OWNER",
-        result);
+        metadataObject);
     return result;
   }
 
@@ -215,11 +222,6 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
     String currentUserName = PrincipalUtils.getCurrentUserName();
     if (StringUtils.isBlank(currentUserName)) {
       return false;
-    }
-
-    // Service admins are considered users of all metalakes
-    if (isServiceAdmin()) {
-      return true;
     }
 
     try {
@@ -274,14 +276,14 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
     MetadataObject metalakeObject =
         MetadataObjects.of(ImmutableList.of(metalake), MetadataObject.Type.METALAKE);
     // metalake owner can set owner in metalake.
-    if (isOwner(currentPrincipal, metalake, metalakeObject)) {
+    if (isOwner(currentPrincipal, metalake, metalakeObject, requestContext)) {
       return true;
     }
     MetadataObject.Type metadataType = MetadataObject.Type.valueOf(type.toUpperCase());
     MetadataObject metadataObject =
         MetadataObjects.of(Arrays.asList(fullName.split("\\.")), metadataType);
     do {
-      if (isOwner(currentPrincipal, metalake, metadataObject)) {
+      if (isOwner(currentPrincipal, metalake, metadataObject, requestContext)) {
         MetadataObject.Type tempType = metadataObject.type();
         if (tempType == MetadataObject.Type.SCHEMA) {
           // schema owner need use catalog privilege
