@@ -35,6 +35,7 @@ import org.apache.gravitino.storage.relational.TestJDBCBackend;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestTemplate;
 
 public class TestJobMetaService extends TestJDBCBackend {
@@ -224,5 +225,36 @@ public class TestJobMetaService extends TestJDBCBackend {
     Assertions.assertFalse(
         JobMetaService.getInstance()
             .deleteJob(NameIdentifierUtil.ofJob(METALAKE_NAME, job.name())));
+  }
+
+  @Test
+  public void testGetJobWithMalformedIdentifierThrowsNoSuchEntityException() {
+    Assertions.assertThrows(
+        NoSuchEntityException.class,
+        () ->
+            JobMetaService.getInstance()
+                .getJobByIdentifier(NameIdentifierUtil.ofJob(METALAKE_NAME, "invalid")));
+
+    Assertions.assertThrows(
+        NoSuchEntityException.class,
+        () ->
+            JobMetaService.getInstance()
+                .getJobByIdentifier(
+                    NameIdentifierUtil.ofJob(METALAKE_NAME, JobHandle.JOB_ID_PREFIX)));
+  }
+
+  @Test
+  public void testDeleteJobWithMalformedIdentifierThrowsNoSuchEntityException() {
+    Assertions.assertThrows(
+        NoSuchEntityException.class,
+        () ->
+            JobMetaService.getInstance()
+                .deleteJob(NameIdentifierUtil.ofJob(METALAKE_NAME, "invalid")));
+
+    Assertions.assertThrows(
+        NoSuchEntityException.class,
+        () ->
+            JobMetaService.getInstance()
+                .deleteJob(NameIdentifierUtil.ofJob(METALAKE_NAME, JobHandle.JOB_ID_PREFIX)));
   }
 }
