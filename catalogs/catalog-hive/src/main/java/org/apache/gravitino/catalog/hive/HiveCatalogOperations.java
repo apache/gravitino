@@ -64,6 +64,7 @@ import org.apache.gravitino.connector.ProxyPlugin;
 import org.apache.gravitino.connector.SupportsSchemas;
 import org.apache.gravitino.exceptions.ConnectionFailedException;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
+import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.exceptions.NonEmptySchemaException;
@@ -393,6 +394,8 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
 
       LOG.info("Loaded Hive schema (database) {} from Hive Metastore ", ident.name());
       return database;
+    } catch (NoSuchEntityException e) {
+      throw new NoSuchSchemaException("Schema %s does not exist", ident.name());
     } catch (InterruptedException e) {
       throw new RuntimeException(e);
     }
@@ -818,6 +821,18 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
       LOG.info("Altered Hive table {} in Hive Metastore", tableIdent.name());
       return new HiveTableHandle(updatedTable, clientPool);
 
+    } catch (IllegalArgumentException e) {
+      if (e.getMessage().contains("types incompatible with the existing columns")) {
+        throw new IllegalArgumentException(
+            "Failed to alter Hive table ["
+                + tableIdent.name()
+                + "] in Hive metastore, "
+                + "since Hive metastore will check the compatibility of column type between the old and new column positions, "
+                + "please ensure that the type of the new column position is compatible with the old one, "
+                + "otherwise the alter operation will fail in Hive metastore.",
+            e);
+      }
+      throw e;
     } catch (InterruptedException e) {
       throw new RuntimeException(e);
     }

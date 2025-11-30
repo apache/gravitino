@@ -22,6 +22,7 @@ import java.lang.reflect.InvocationTargetException;
 import java.util.Locale;
 import org.apache.gravitino.exceptions.ConnectionFailedException;
 import org.apache.gravitino.exceptions.GravitinoRuntimeException;
+import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchPartitionException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchTableException;
@@ -110,6 +111,7 @@ public class HiveExceptionConverter {
         return new NonEmptySchemaException(
             cause, "Hive schema %s is not empty in Hive Metastore", targetName);
       }
+      return new IllegalArgumentException(cause.getMessage(), cause);
     }
 
     if (exceptionClassName.contains("MetaException") && message != null) {
@@ -189,7 +191,7 @@ public class HiveExceptionConverter {
           cause, "Hive table %s does not exist in Hive Metastore", target);
       case SCHEMA -> new NoSuchSchemaException(
           cause, "Hive schema %s does not exist in Hive Metastore", target);
-      default -> new GravitinoRuntimeException(cause, rawMessage);
+      default -> new NoSuchEntityException(cause, "%s", rawMessage);
     };
   }
 

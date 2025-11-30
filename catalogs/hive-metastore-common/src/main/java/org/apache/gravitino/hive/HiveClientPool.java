@@ -53,8 +53,8 @@ public class HiveClientPool extends ClientPoolImpl<HiveClient, GravitinoRuntimeE
       IsolatedClientLoader loader = IsolatedClientLoader.forVersion("HIVE2", Map.of());
       return loader.createClient(properties);
     } catch (Exception e) {
-      LOG.error("Failed to create Hive Metastore client", e);
-      throw new GravitinoRuntimeException(e, "Failed to create Hive Metastore client");
+      LOG.error("Failed to connect to Hive Metastore", e);
+      throw new GravitinoRuntimeException(e, "Failed to connect to Hive Metastore");
     }
   }
 

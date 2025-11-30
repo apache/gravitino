@@ -491,10 +491,7 @@ public class CatalogHiveIT extends BaseIT {
 
     final SortOrder[] sortOrders =
         new SortOrder[] {
-          SortOrders.of(
-              NamedReference.field(HIVE_COL_NAME2),
-              SortDirection.DESCENDING,
-              NullOrdering.NULLS_FIRST)
+          SortOrders.of(NamedReference.field(HIVE_COL_NAME2), SortDirection.DESCENDING)
         };
 
     Map<String, String> properties = createProperties();
@@ -973,8 +970,15 @@ public class CatalogHiveIT extends BaseIT {
     // test the new partition can be read and write successfully by dynamic partition
     String selectTemplate =
         "SELECT * FROM %s.%s WHERE hive_col_name2 = '2023-01-02' AND hive_col_name3 = 'gravitino_it_test2'";
-    long count =
-        sparkSession.sql(String.format(selectTemplate, schemaName, createdTable.name())).count();
+    String sql = String.format(selectTemplate, schemaName, createdTable.name());
+
+    String a = sparkSession.table(schemaName + "." + createdTable.name()).schema().toString();
+    String s =
+        sparkSession
+            .sql(String.format("SHOW PARTITIONS %s.%s", schemaName, createdTable.name()))
+            .collectAsList()
+            .toString();
+    long count = sparkSession.sql(sql).count();
     Assertions.assertEquals(0, count);
 
     String insertTemplate =
@@ -1025,7 +1029,7 @@ public class CatalogHiveIT extends BaseIT {
     HiveTable hiveTable = loadHiveTable(schemaName, createdTable.name());
     String tableLocation = hiveTable.properties().get(LOCATION);
     Assertions.assertNotNull(tableLocation, "Table location should not be null");
-    Path partitionDirectory = new Path(tableLocation, identity.name());
+    Path partitionDirectory = new Path(tableLocation + identity.name());
     Assertions.assertFalse(
         fileSystem.exists(partitionDirectory), "The partition directory should not exist");
 
@@ -1074,13 +1078,13 @@ public class CatalogHiveIT extends BaseIT {
     Assertions.assertThrows(
         NoSuchPartitionException.class,
         () -> loadHivePartition(schemaName, createdTable.name(), partitionAdded1.name()));
-    Path partitionDirectory1 = new Path(tableLocation, identity1.name());
+    Path partitionDirectory1 = new Path(tableLocation + identity1.name());
     Assertions.assertFalse(
         fileSystem.exists(partitionDirectory1), "The partition directory should not exist");
     Assertions.assertThrows(
         NoSuchPartitionException.class,
         () -> loadHivePartition(schemaName, createdTable.name(), partitionAdded2.name()));
-    Path partitionDirectory2 = new Path(tableLocation, identity2.name());
+    Path partitionDirectory2 = new Path(tableLocation + identity2.name());
     Assertions.assertFalse(
         fileSystem.exists(partitionDirectory2), "The partition directory should not exist");
 
