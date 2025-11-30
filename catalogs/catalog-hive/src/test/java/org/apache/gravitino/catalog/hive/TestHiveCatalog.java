@@ -34,7 +34,6 @@ import org.apache.gravitino.connector.PropertiesMetadata;
 import org.apache.gravitino.hive.hms.MiniHiveMetastoreService;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.CatalogEntity;
-import org.apache.hadoop.hive.metastore.IMetaStoreClient;
 import org.apache.thrift.TException;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -99,7 +98,7 @@ public class TestHiveCatalog extends MiniHiveMetastoreService {
 
     try (HiveCatalogOperations ops = new HiveCatalogOperations()) {
       ops.initialize(conf, entity.toCatalogInfo(), HIVE_PROPERTIES_METADATA);
-      List<String> dbs = ops.clientPool.run(IMetaStoreClient::getAllDatabases);
+      List<String> dbs = ops.clientPool.run(c -> c.getAllDatabases(""));
       Assertions.assertEquals(2, dbs.size());
       Assertions.assertTrue(dbs.contains("default"));
       Assertions.assertTrue(dbs.contains(DB_NAME));

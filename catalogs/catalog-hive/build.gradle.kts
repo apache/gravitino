@@ -50,7 +50,43 @@ dependencies {
     exclude("*")
   }
   implementation(libs.woodstox.core)
-  implementation(libs.hive2.metastore) {
+  implementation(libs.hadoop2.mapreduce.client.core) {
+    exclude("*")
+  }
+  implementation(libs.slf4j.api)
+
+  compileOnly(libs.hive2.metastore)
+  compileOnly(libs.immutables.value)
+  compileOnly(libs.lombok)
+
+  annotationProcessor(libs.immutables.value)
+  annotationProcessor(libs.lombok)
+
+  testImplementation(project(":catalogs:hive-metastore-common", "testArtifacts"))
+  testImplementation(project(":common"))
+  testImplementation(project(":clients:client-java"))
+  testImplementation(project(":integration-test-common", "testArtifacts"))
+  testImplementation(project(":server"))
+  testImplementation(project(":server-common"))
+  testImplementation(project(":catalogs:hadoop-common")) {
+    exclude("*")
+  }
+
+  testImplementation(libs.bundles.jetty)
+  testImplementation(libs.bundles.jersey)
+  testImplementation(libs.bundles.log4j)
+  testImplementation(libs.hadoop2.common) {
+    exclude("*")
+  }
+  testImplementation(libs.hadoop2.hdfs)
+  testImplementation(libs.hadoop2.mapreduce.client.core) {
+    exclude("*")
+  }
+  testImplementation(libs.hive2.common) {
+    exclude("org.eclipse.jetty.aggregate", "jetty-all")
+    exclude("org.eclipse.jetty.orbit", "javax.servlet")
+  }
+  testImplementation(libs.hive2.metastore) {
     exclude("ant")
     exclude("co.cask.tephra")
     exclude("com.github.joshelser")
@@ -74,42 +110,6 @@ dependencies {
     exclude("org.eclipse.jetty.orbit", "javax.servlet")
     exclude("org.openjdk.jol")
     exclude("org.slf4j")
-  }
-
-  implementation(libs.hadoop2.common) {
-    exclude("*")
-  }
-  implementation(libs.hadoop2.mapreduce.client.core) {
-    exclude("*")
-  }
-  implementation(libs.slf4j.api)
-
-  compileOnly(libs.immutables.value)
-  compileOnly(libs.lombok)
-
-  annotationProcessor(libs.immutables.value)
-  annotationProcessor(libs.lombok)
-
-  testImplementation(project(":catalogs:hive-metastore-common", "testArtifacts"))
-  testImplementation(project(":common"))
-  testImplementation(project(":clients:client-java"))
-  testImplementation(project(":integration-test-common", "testArtifacts"))
-  testImplementation(project(":server"))
-  testImplementation(project(":server-common"))
-  testImplementation(project(":catalogs:hadoop-common")) {
-    exclude("*")
-  }
-
-  testImplementation(libs.bundles.jetty)
-  testImplementation(libs.bundles.jersey)
-  testImplementation(libs.bundles.log4j)
-  testImplementation(libs.hadoop2.hdfs)
-  testImplementation(libs.hadoop2.mapreduce.client.core) {
-    exclude("*")
-  }
-  testImplementation(libs.hive2.common) {
-    exclude("org.eclipse.jetty.aggregate", "jetty-all")
-    exclude("org.eclipse.jetty.orbit", "javax.servlet")
   }
   testImplementation(libs.junit.jupiter.api)
   testImplementation(libs.mockito.core)
