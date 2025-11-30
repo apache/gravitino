@@ -153,6 +153,7 @@ public class HiveContainer extends BaseContainer {
             });
 
     final String showDatabaseSQL = "show databases";
+    // Starting both the regular Hive cluster and the Kerberos-enabled Hive cluster at the same time takes a long time.
     await()
         .atMost(120, TimeUnit.SECONDS)
         .pollInterval(120 / retryLimit, TimeUnit.SECONDS)
