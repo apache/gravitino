@@ -71,10 +71,43 @@ the path mapping and convert automatically.
 | `fs.gravitino.client.request.header.`                 | The configuration key prefix for the Gravitino client request header. You can set the request header for the Gravitino client.                                                                                                                                                                                       | (none)                                                         | No                                  | 0.9.0-incubating |
 | `fs.gravitino.enableCredentialVending`                | Whether to enable credential vending for the Gravitino Virtual File System.                                                                                                                                                                                                                                          | `false`                                                        | No                                  | 0.9.0-incubating |
 | `fs.gravitino.client.`                                | The configuration key prefix for the Gravitino client config.                                                                                                                                                                                                                                                        | (none)                                                         | No                                  | 1.0.0            |
-| `fs.gravitino.filesetMetadataCache.enable`            | Whether to cache the fileset or fileset catalog metadata in the Gravitino Virtual File System. Note that this cache causes a side effect: if you modify the fileset or fileset catalog metadata, the client can not see the latest changes.                                                                          | `false`                                                        | No                                  | 1.0.0            |
-| `fs.gravitino.autoCreateLocation`                     | The configuration key for whether to enable auto-creation of fileset location when the server-side filesystem ops are disabled and the location does not exist.                                                                                                                                                      | `true`                                                         | No                                  | 1.1.0           |
+| `fs.gravitino.filesetMetadataCache.enable`            | Whether to cache the fileset, fileset schema or fileset catalog metadata in the Gravitino Virtual File System. Note that this cache causes a side effect: if you modify the fileset or fileset catalog metadata, the client can not see the latest changes.                                                          | `false`                                                        | No                                  | 1.0.0            |
+| `fs.gravitino.autoCreateLocation`                     | The configuration key for whether to enable auto-creation of fileset location when the server-side filesystem ops are disabled and the location does not exist.                                                                                                                                                      | `true`                                                         | No                                  | 1.1.0            |
+| `fs.path.config.<name>`                               | Defines a logical location entry. Set `fs.path.config.<name>` to the real base URI (for example, `hdfs://cluster1/`). Any key that starts with the same prefix (such as `fs.path.config.<name>.config.resource`) is treated as a location-scoped property and will be forwarded to the underlying filesystem client. | (none)                                                         | No                                  | 1.1.0            |
 
 To configure the Gravitino client, use properties prefixed with `fs.gravitino.client.`. These properties will be passed to the Gravitino client after removing the `fs.` prefix.
+
+:::note
+When users work with a multi-cluster fileset catalog, they can configure separate sets of properties for the base paths
+of the different clusters. [Manage fileset with multiple clusters](./manage-fileset-metadata-using-gravitino.md#manage-fileset-with-multiple-clusters)
+
+For example, a complex catalog structure might look like this:
+
+```text
+catalog1 -> hdfs://cluster1/catalog1
+    schema1 -> hdfs://cluster1/catalog1/schema1
+        fileset1 -> hdfs://cluster1/catalog1/schema1/fileset1
+        fileset2 -> hdfs://cluster1/catalog1/schema1/fileset2
+    schema2 -> hdfs://cluster2/tmp/schema2
+        fileset3 -> hdfs://cluster2/tmp/schema2/fsd
+        fileset4 -> hdfs://cluster3/customers
+```
+
+In this case, users can configure different client properties for each base path:
+
+```text
+fs.path.config.cluster1 = hdfs://cluster1/
+fs.path.config.cluster1.config.resource= /etc/core-site.xml,/etc/hdfs-site.xml
+
+fs.path.config.cluster2 = hdfs://cluster2/
+fs.path.config.cluster2.config.resource= /etc/fs2/core-site.xml,/etc/fs2/hdfs-site.xml
+
+fs.path.config.cluster3 = hdfs://cluster3/
+fs.path.config.cluster3.config.resource=/etc/fs3/core-site.xml,/etc/fs3/hdfs-site.xml
+```
+
+The plain `fs.path.config.<name>` entry specifies the base path of the filesystem. Any additional key under the same prefix (`fs.path.config.<name>.<config_key>`) is treated as a location-scoped configuration (for example, `config.resource` for HDFS) and is forwarded directly to the underlying filesystem client.
+:::
 
 **Example:** Setting `fs.gravitino.client.socketTimeoutMs` is equivalent to setting `gravitino.client.socketTimeoutMs` for the Gravitino client.
 

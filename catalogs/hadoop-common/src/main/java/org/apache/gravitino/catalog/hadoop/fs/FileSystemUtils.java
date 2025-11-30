@@ -20,7 +20,10 @@ package org.apache.gravitino.catalog.hadoop.fs;
 
 import static org.apache.gravitino.catalog.hadoop.fs.Constants.BUILTIN_HDFS_FS_PROVIDER;
 import static org.apache.gravitino.catalog.hadoop.fs.Constants.BUILTIN_LOCAL_FS_PROVIDER;
+import static org.apache.gravitino.catalog.hadoop.fs.Constants.CONFIG_RESOURCES;
+import static org.apache.gravitino.catalog.hadoop.fs.Constants.FS_DISABLE_CACHE;
 import static org.apache.gravitino.catalog.hadoop.fs.FileSystemProvider.GRAVITINO_BYPASS;
+import static org.apache.gravitino.catalog.hadoop.fs.HDFSFileSystemProvider.IPC_FALLBACK_TO_SIMPLE_AUTH_ALLOWED;
 
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
@@ -37,6 +40,7 @@ import javax.xml.stream.XMLOutputFactory;
 import javax.xml.stream.XMLStreamWriter;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.Path;
 
 public class FileSystemUtils {
 
@@ -215,6 +219,18 @@ public class FileSystemUtils {
    */
   public static Configuration createConfiguration(String bypass, Map<String, String> config) {
     try (ByteArrayOutputStream out = new ByteArrayOutputStream()) {
+      Configuration configuration = new Configuration();
+
+      String hdfsConfigResources = config.get(CONFIG_RESOURCES);
+      if (StringUtils.isNotBlank(hdfsConfigResources)) {
+        for (String resource : hdfsConfigResources.split(",")) {
+          resource = resource.trim();
+          if (StringUtils.isNotBlank(resource)) {
+            configuration.addResource(new Path(resource));
+          }
+        }
+      }
+
       XMLStreamWriter writer = XMLOutputFactory.newInstance().createXMLStreamWriter(out);
       writer.writeStartDocument();
       writer.writeStartElement(CONFIG_ROOT);
@@ -225,12 +241,12 @@ public class FileSystemUtils {
       writer.writeEndElement();
       writer.writeEndDocument();
       writer.close();
+      configuration.addResource(new ByteArrayInputStream(out.toByteArray()));
 
-      return new Configuration() {
-        {
-          addResource(new ByteArrayInputStream(out.toByteArray()));
-        }
-      };
+      configuration.setBoolean(FS_DISABLE_CACHE, true);
+      configuration.setBoolean(IPC_FALLBACK_TO_SIMPLE_AUTH_ALLOWED, true);
+
+      return configuration;
     } catch (Exception e) {
       throw new RuntimeException("Failed to create configuration", e);
     }
