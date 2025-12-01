@@ -102,7 +102,6 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
   public static final Logger LOG = LoggerFactory.getLogger(HiveCatalogOperations.class);
   public static final String GRAVITINO_KEYTAB_FORMAT = "keytabs/gravitino-hive-%s-keytab";
 
-
   @VisibleForTesting CachedClientPool clientPool;
 
   @VisibleForTesting HiveConf hiveConf;
@@ -182,9 +181,10 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
 
     // Initialize the HMS catalog name from catalog properties (default to DEFAULT_HMS_CATALOG)
     String defaultCatalog =
-      (String) propertiesMetadata
-            .catalogPropertiesMetadata()
-            .getOrDefault(conf, HiveCatalogPropertiesMetadata.DEFAULT_CATALOG);
+        (String)
+            propertiesMetadata
+                .catalogPropertiesMetadata()
+                .getOrDefault(conf, HiveCatalogPropertiesMetadata.DEFAULT_CATALOG);
     if (defaultCatalog.isEmpty()) {
       this.catalogName = defaultCatalog;
     }
