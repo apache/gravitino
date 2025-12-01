@@ -16,40 +16,38 @@
  * specific language governing permissions and limitations
  * under the License.
  */
+import com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar
 
 plugins {
   `maven-publish`
   id("java")
+  alias(libs.plugins.shadow)
+}
+
+configurations.shadow {
+  // Force a newer version of ASM to support class files compiled with higher JDK versions.
+  resolutionStrategy.force("org.ow2.asm:asm:9.6", "org.ow2.asm:asm-commons:9.6")
 }
 
 dependencies {
-  implementation(project(":api")) {
-    exclude("*")
-  }
-  implementation(project(":catalogs:catalog-common")) {
-    exclude("*")
-  }
-  implementation(project(":catalogs:hadoop-common")) {
-    exclude("*")
-  }
-  implementation(project(":common")) {
-    exclude("*")
-  }
-
-  implementation(libs.commons.lang3)
-  implementation(libs.guava)
-
-  compileOnly(libs.azure.identity)
-  compileOnly(libs.azure.storage.file.datalake)
-  compileOnly(libs.hadoop3.abs)
-  compileOnly(libs.hadoop3.client.api)
-
-  testImplementation(libs.azure.identity)
-  testImplementation(libs.junit.jupiter.api)
-  testImplementation(libs.junit.jupiter.params)
-  testRuntimeOnly(libs.junit.jupiter.engine)
+  // The iceberg-azure-bundle already includes the dependencies
+  // required by Gravitino for credential vending.
+  implementation(libs.iceberg.azure.bundle)
 }
 
-tasks.compileJava {
-  dependsOn(":catalogs:catalog-fileset:runtimeJars")
+tasks.withType(ShadowJar::class.java) {
+  isZip64 = true
+  configurations = listOf(project.configurations.runtimeClasspath.get())
+  archiveClassifier.set("")
+
+  dependencies {
+    exclude(dependency("org.slf4j:slf4j-api"))
+  }
+
+  mergeServiceFiles()
+}
+
+tasks.jar {
+  dependsOn(tasks.named("shadowJar"))
+  archiveClassifier.set("empty")
 }
