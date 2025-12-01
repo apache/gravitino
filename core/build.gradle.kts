@@ -50,8 +50,10 @@ dependencies {
     exclude(group = "com.google.guava", module = "guava") // provided by gravitino
     exclude(group = "org.apache.commons", module = "commons-lang3") // provided by gravitino
     exclude(group = "org.junit.jupiter", module = "*") // provided by test scope
+    exclude(group = "com.fasterxml.jackson.jaxrs", module = "jackson-jaxrs-json-provider") // using gravitino's version
   }
   implementation(libs.mybatis)
+  implementation(libs.jackson.jaxrs.json.provider) // This is required by lance
 
   annotationProcessor(libs.lombok)
 
