@@ -224,7 +224,7 @@ class TestRelationalTable(unittest.TestCase):
             f"/tables/{encode_string(self.relational_table.name())}"
             "/partitions"
         )
-        self.assertEqual(self.relational_table.get_partition_request_path(), expected)
+        self.assertEqual(self.relational_table._get_partition_request_path(), expected)
 
     def test_list_partition_names(self):
         resp_body = PartitionNameListResponse(0, ["partition_1", "partition_2"])
