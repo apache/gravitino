@@ -123,27 +123,25 @@ public class TestBaseCatalog {
   }
 
   @Test
-  public void testListViewsDelegatesToWrappedCatalog() throws Exception {
+  public void testListViewsReturnsEmptyWithoutDelegation() throws Exception {
     AbstractCatalog delegate = Mockito.mock(AbstractCatalog.class);
-    Mockito.when(delegate.listViews("db")).thenReturn(ImmutableList.of("v1", "v2"));
-    BaseCatalog catalog = new TestableBaseCatalog(delegate);
-
-    List<String> views = catalog.listViews("db");
-
-    Assertions.assertEquals(ImmutableList.of("v1", "v2"), views);
-    Mockito.verify(delegate).listViews("db");
-  }
-
-  @Test
-  public void testListViewsReturnsEmptyWhenUnsupported() throws Exception {
-    AbstractCatalog delegate = Mockito.mock(AbstractCatalog.class);
-    Mockito.when(delegate.listViews("db")).thenThrow(new UnsupportedOperationException("no view"));
     BaseCatalog catalog = new TestableBaseCatalog(delegate);
 
     List<String> views = catalog.listViews("db");
 
     Assertions.assertTrue(views.isEmpty());
-    Mockito.verify(delegate).listViews("db");
+    Mockito.verifyNoInteractions(delegate);
+  }
+
+  @Test
+  public void testListViewsReturnsEmptyWithoutDelegationWhenUnsupported() throws Exception {
+    AbstractCatalog delegate = Mockito.mock(AbstractCatalog.class);
+    BaseCatalog catalog = new TestableBaseCatalog(delegate);
+
+    List<String> views = catalog.listViews("db");
+
+    Assertions.assertTrue(views.isEmpty());
+    Mockito.verifyNoInteractions(delegate);
   }
 
   private static class TestableBaseCatalog extends BaseCatalog {
