@@ -243,7 +243,7 @@ public class MetadataAuthzHelper {
         authorizer,
         authorizationRequestContext,
         extractMetadataNamesMap,
-        (any) -> null);
+        (unused) -> null);
   }
 
   private static <E> E[] doFilter(
