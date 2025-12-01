@@ -919,6 +919,8 @@ tasks {
         !it.name.startsWith("integration-test") &&
         !it.name.startsWith("spark") &&
         !it.name.startsWith("trino-connector") &&
+        it.name != "hive-metastore2-libs" &&
+        it.name != "hive-metastore3-libs" &&
         it.name != "hive-metastore-common" &&
         it.name != "docs" &&
         it.name != "hadoop-common" &&
@@ -949,7 +951,9 @@ tasks {
       ":catalogs:catalog-lakehouse-hudi:copyLibAndConfig",
       ":catalogs:catalog-lakehouse-iceberg:copyLibAndConfig",
       ":catalogs:catalog-lakehouse-paimon:copyLibAndConfig",
-      ":catalogs:catalog-model:copyLibAndConfig"
+      ":catalogs:catalog-model:copyLibAndConfig",
+      ":catalogs:hive-metastore2-libs:copyLibs",
+      ":catalogs:hive-metastore3-libs:copyLibs"
     )
   }
 

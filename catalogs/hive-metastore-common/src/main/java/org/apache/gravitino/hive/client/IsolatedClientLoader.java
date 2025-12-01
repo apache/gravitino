@@ -112,21 +112,27 @@ public final class IsolatedClientLoader {
    */
   private static Path getJarDirectory(HiveClient.HiveVersion version) {
     String gravitinoHome = System.getenv("GRAVITINO_HOME");
-    boolean testEnv = System.getenv("GRAVITINO_TEST") != null;
-
-    String jarPath;
-    if (testEnv && gravitinoHome != null) {
-      // In test environment, use GRAVITINO_HOME
-      String libsDir =
-          version == HiveClient.HiveVersion.HIVE2 ? "hive-metastore2-libs" : "hive-metastore3-libs";
-      jarPath = Paths.get(gravitinoHome, "catalogs", libsDir, "build", "libs").toString();
-    } else {
-      // Try to use relative path from current working directory
-      String libsDir =
-          version == HiveClient.HiveVersion.HIVE2 ? "hive-metastore2-libs" : "hive-metastore3-libs";
-      jarPath = Paths.get("catalogs", libsDir, "build", "libs").toString();
+    String jarPath = "";
+    if (gravitinoHome != null) {
+      String libsDir = version == HiveClient.HiveVersion.HIVE2 ? "hive2" : "hive3";
+      jarPath = Paths.get(gravitinoHome, "catalogs", "hive", "libs", libsDir).toString();
+      if (Files.exists(Paths.get(jarPath))) {
+        return Paths.get(jarPath).toAbsolutePath();
+      }
+      LOG.info(
+          "Can not find Hive jar directory for version {} in directory : {}", version, jarPath);
     }
 
+    // Try to get project root directory from working directory
+    String workingDir = System.getProperty("user.dir");
+    String projectRoot = workingDir.substring(0, workingDir.indexOf("gravitino"));
+    String libsDir =
+        version == HiveClient.HiveVersion.HIVE2 ? "hive-metastore2-libs" : "hive-metastore3-libs";
+    jarPath = Paths.get(projectRoot, "catalogs", libsDir, "build", "libs").toString();
+    if (!Files.exists(Paths.get(jarPath))) {
+      throw new GravitinoRuntimeException(
+          "Cannot find Hive jar directory for version %s in directory: %s", version, jarPath);
+    }
     return Paths.get(jarPath).toAbsolutePath();
   }
 

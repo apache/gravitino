@@ -46,8 +46,6 @@ import org.apache.thrift.TException;
  */
 public class HiveExceptionConverter {
 
-  private static final String UNKNOWN_TARGET = "[unknown]";
-
   private HiveExceptionConverter() {}
 
   /**

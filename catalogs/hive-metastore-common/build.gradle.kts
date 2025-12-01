@@ -17,6 +17,8 @@
  * under the License.
  */
 
+import org.gradle.api.tasks.compile.JavaCompile
+
 plugins {
   id("java")
   id("idea")
@@ -136,4 +138,14 @@ configurations {
 
 artifacts {
   add("testArtifacts", testJar)
+}
+
+// Ensure the shaded Hive metastore lib jars exist before compiling this module,
+// since compileOnly(project(":catalogs:hive-metastore{2,3}-libs")) puts those
+// jars on the compile classpath and they are produced by the copyDepends tasks.
+tasks.named<JavaCompile>("compileJava") {
+  dependsOn(
+    ":catalogs:hive-metastore2-libs:copyDepends",
+    ":catalogs:hive-metastore3-libs:copyDepends"
+  )
 }

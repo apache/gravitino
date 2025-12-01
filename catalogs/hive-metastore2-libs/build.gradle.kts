@@ -17,9 +17,6 @@
  * under the License.
  */
 
-import org.gradle.api.publish.maven.tasks.PublishToMavenLocal
-import org.gradle.api.publish.maven.tasks.PublishToMavenRepository
-
 plugins {
   id("java")
   id("idea")
@@ -44,11 +41,6 @@ tasks {
   register("copyLibs", Copy::class) {
     dependsOn(copyDepends, "build")
     from("build/libs")
-    into("$rootDir/distribution/${rootProject.name}/catalogs/lib/hive2")
+    into("$rootDir/distribution/package/catalogs/hive/libs/hive2")
   }
-
-  named("generateMetadataFileForMavenJavaPublication") { dependsOn(copyDepends) }
 }
-
-tasks.withType<PublishToMavenLocal>().configureEach { enabled = false }
-tasks.withType<PublishToMavenRepository>().configureEach { enabled = false }
