@@ -326,4 +326,24 @@ public class TestPartitionOperations extends JerseyTest {
     Assertions.assertEquals(0, noExistDropResponse.getCode());
     Assertions.assertFalse(noExistDropResponse.dropped());
   }
+
+  @Test
+  public void testAddPartitionWithNullPartitions() {
+    AddPartitionsRequest invalidReq = new AddPartitionsRequest();
+
+    try (Response resp =
+        target(partitionPath(metalake, catalog, schema, table))
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .post(Entity.entity(invalidReq, MediaType.APPLICATION_JSON_TYPE))) {
+
+      Assertions.assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), resp.getStatus());
+
+      ErrorResponse errorResponse = resp.readEntity(ErrorResponse.class);
+      Assertions.assertEquals(ErrorConstants.ILLEGAL_ARGUMENTS_CODE, errorResponse.getCode());
+      Assertions.assertEquals(
+          IllegalArgumentException.class.getSimpleName(), errorResponse.getType());
+      Assertions.assertTrue(errorResponse.getMessage().contains("partitions must not be null"));
+    }
+  }
 }
