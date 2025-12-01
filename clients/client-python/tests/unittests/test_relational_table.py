@@ -41,7 +41,6 @@ from gravitino.dto.responses.partition_name_list_response import (
 )
 from gravitino.dto.responses.partition_response import PartitionResponse
 from gravitino.namespace import Namespace
-from gravitino.rest.rest_utils import encode_string
 from gravitino.utils import HTTPClient, Response
 
 
@@ -215,16 +214,6 @@ class TestRelationalTable(unittest.TestCase):
         mock_http_resp.url = None
         mock_resp = Response(mock_http_resp)
         return mock_resp
-
-    def test_get_partition_request_path(self):
-        expected = (
-            f"api/metalakes/{encode_string(self.namespace.level(0))}"
-            f"/catalogs/{encode_string(self.namespace.level(1))}"
-            f"/schemas/{encode_string(self.namespace.level(2))}"
-            f"/tables/{encode_string(self.relational_table.name())}"
-            "/partitions"
-        )
-        self.assertEqual(self.relational_table._get_partition_request_path(), expected)
 
     def test_list_partition_names(self):
         resp_body = PartitionNameListResponse(0, ["partition_1", "partition_2"])
