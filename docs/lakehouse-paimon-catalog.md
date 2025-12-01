@@ -192,16 +192,16 @@ You can pass [Paimon table properties](https://paimon.apache.org/docs/0.8/mainte
 **Immutable**: Fields that cannot be modified once set.
 :::
 
-| Configuration item                 | Description                                                  | Default Value | Required  | Reserved | Immutable | Since version     |
-|------------------------------------|--------------------------------------------------------------|---------------|-----------|----------|-----------|-------------------|
-| `merge-engine`                     | The table merge-engine.                                      | (none)        | No        | No       | Yes       | 0.6.0-incubating  |
-| `sequence.field`                   | The table sequence.field.                                    | (none)        | No        | No       | Yes       | 0.6.0-incubating  |
-| `rowkind.field`                    | The table rowkind.field.                                     | (none)        | No        | No       | Yes       | 0.6.0-incubating  |
-| `comment`                          | The table comment.                                           | (none)        | No        | Yes      | No        | 0.6.0-incubating  |
-| `owner`                            | The table owner.                                             | (none)        | No        | Yes      | No        | 0.6.0-incubating  |
-| `bucket-key`                       | The table bucket-key.                                        | (none)        | No        | Yes      | No        | 0.6.0-incubating  |
-| `primary-key`                      | The table primary-key.                                       | (none)        | No        | Yes      | No        | 0.6.0-incubating  |
-| `partition`                        | The table partition.                                         | (none)        | No        | Yes      | No        | 0.6.0-incubating  |
+| Configuration item | Description               | Default Value | Required  | Reserved | Immutable | Since version     |
+|--------------------|---------------------------|---------------|-----------|----------|-----------|-------------------|
+| `merge-engine`     | The table merge-engine.   | (none)        | No        | No       | Yes       | 0.6.0-incubating  |
+| `sequence.field`   | The table sequence.field. | (none)        | No        | No       | Yes       | 0.6.0-incubating  |
+| `rowkind.field`    | The table rowkind.field.  | (none)        | No        | No       | Yes       | 0.6.0-incubating  |
+| `comment`          | The table comment.        | (none)        | No        | Yes      | No        | 0.6.0-incubating  |
+| `owner`            | The table owner.          | (none)        | No        | Yes      | No        | 0.6.0-incubating  |
+| `bucket-key`       | The table bucket-key.     | (none)        | No        | Yes      | No        | 0.6.0-incubating  |
+| `primary-key`      | The table primary-key.    | (none)        | No        | Yes      | No        | 0.6.0-incubating  |
+| `partition`        | The table partition.      | (none)        | No        | Yes      | No        | 0.6.0-incubating  |
 
 ### Table operations
 

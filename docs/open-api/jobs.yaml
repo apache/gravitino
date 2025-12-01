@@ -137,6 +137,54 @@ paths:
         "5xx":
           $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
 
+    put:
+      tags:
+        - job
+      summary: Update job template
+      operationId: updateJobTemplate
+      description: Updates a job template in the specified metalake
+      requestBody:
+        content:
+          application/vnd.gravitino.v1+json:
+            schema:
+              $ref: "#/components/requests/JobTemplateUpdatesRequest"
+            examples:
+              JobTemplateRegisterRequest:
+                $ref: "#/components/examples/JobTemplateUpdatesRequest"
+
+      responses:
+        "200":
+          description: Returns the updated job template object
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "#/components/responses/JobTemplateResponse"
+              examples:
+                JobTemplateResponse:
+                  $ref: "#/components/examples/JobTemplateResponse"
+        "404":
+          description: Not Found - The specified job template does not exist in the specified metalake
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+              examples:
+                NoSuchMetalakeException:
+                  $ref: "./metalakes.yaml#/components/examples/NoSuchMetalakeException"
+                NoSuchJobTemplateException:
+                  $ref: "#/components/examples/NoSuchJobTemplateException"
+        "400":
+          description: Bad Request - The changes in the request cannot be applied to the job template
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+              examples:
+                IllegalArgumentException:
+                  $ref: "#/components/examples/IllegalArgumentException"
+        "5xx":
+          $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
+
   /metalakes/{metalake}/jobs/runs:
     parameters:
       - $ref: "./openapi.yaml#/components/parameters/metalake"
@@ -368,103 +416,216 @@ components:
           $ref: "./openapi.yaml#/components/schemas/Audit"
 
     SparkJobTemplate:
-        type: object
-        description: A job template object for Spark jobs
-        required:
-          - name
-          - jobType
-          - mainClass
-        properties:
-          name:
+      type: object
+      description: A job template object for Spark jobs
+      required:
+        - name
+        - jobType
+        - mainClass
+      properties:
+        name:
+          type: string
+          description: The name of the job template
+        jobType:
+          type: string
+          description: The type of the job template
+          enum:
+            - "spark"
+        comment:
+          type: string
+          description: A comment about the job template
+          nullable: true
+        executable:
+          type: string
+          description: The executable command of the job template
+        arguments:
+          type: array
+          description: The arguments of the job template
+          items:
             type: string
-            description: The name of the job template
-          jobType:
+          nullable: true
+        environments:
+          type: object
+          description: Configured string to string map of environment variables for the job template
+          default: { }
+          additionalProperties:
             type: string
-            description: The type of the job template
-            enum:
-              - "spark"
-          comment:
+        customFields:
+          type: object
+          description: Configured string to string map of custom fields for the job template
+          default: { }
+          additionalProperties:
             type: string
-            description: A comment about the job template
-            nullable: true
-          executable:
+        mainClass:
+          type: string
+          description: The main class of the Spark job template
+        jars:
+          type: array
+          description: The JAR files of the Spark job template
+          items:
             type: string
-            description: The executable command of the job template
-          arguments:
-            type: array
-            description: The arguments of the job template
-            items:
-              type: string
-            nullable: true
-          environments:
-            type: object
-            description: Configured string to string map of environment variables for the job template
-            default: { }
-            additionalProperties:
-              type: string
-          customFields:
-            type: object
-            description: Configured string to string map of custom fields for the job template
-            default: { }
-            additionalProperties:
-              type: string
-          mainClass:
+          nullable: true
+        files:
+          type: array
+          description: The files of the Spark job template
+          items:
             type: string
-            description: The main class of the Spark job template
-          jars:
-            type: array
-            description: The JAR files of the Spark job template
-            items:
-              type: string
-            nullable: true
-          files:
-            type: array
-            description: The files of the Spark job template
-            items:
-              type: string
-            nullable: true
-          archives:
-            type: array
-            description: The archives of the Spark job template
-            items:
-              type: string
-            nullable: true
-          configs:
-            type: object
-            description: Configured string to string map of Spark configurations for the job template
-            default: { }
-            additionalProperties:
-              type: string
-          audit:
-            $ref: "./openapi.yaml#/components/schemas/Audit"
+          nullable: true
+        archives:
+          type: array
+          description: The archives of the Spark job template
+          items:
+            type: string
+          nullable: true
+        configs:
+          type: object
+          description: Configured string to string map of Spark configurations for the job template
+          default: { }
+          additionalProperties:
+            type: string
+        audit:
+          $ref: "./openapi.yaml#/components/schemas/Audit"
 
     Job:
-        type: object
-        description: A job object
-        required:
-          - jobId
-          - jobTemplateName
-          - status
-          - audit
-        properties:
-          jobId:
+      type: object
+      description: A job object
+      required:
+        - jobId
+        - jobTemplateName
+        - status
+        - audit
+      properties:
+        jobId:
+          type: string
+          description: The unique identifier of the job
+        jobTemplateName:
+          type: string
+          description: The name of the job template used to create the job
+        status:
+          type: string
+          description: The status of the job
+          enum:
+            - "queued"
+            - "started"
+            - "failed"
+            - "succeeded"
+            - "cancelling"
+            - "canceled"
+        audit:
+          $ref: "./openapi.yaml#/components/schemas/Audit"
+
+
+    TemplateUpdate:
+      oneOf:
+        - $ref: "#/components/schemas/ShellTemplateUpdate"
+        - $ref: "#/components/schemas/SparkTemplateUpdate"
+      discriminator:
+        propertyName: "@type"
+        mapping:
+          shell: "#/components/schemas/ShellTemplateUpdate"
+          spark: "#/components/schemas/SparkTemplateUpdate"
+
+    ShellTemplateUpdate:
+      type: object
+      description: A job template update object for shell jobs
+      required:
+        - "@type"
+      properties:
+        "@type":
+          type: string
+          description: The type of the job template
+          enum:
+            - "shell"
+        newExecutable:
+          type: string
+          description: The new executable command of the job template
+          nullable: true
+        newArguments:
+          type: array
+          description: The new arguments of the job template
+          items:
             type: string
-            description: The unique identifier of the job
-          jobTemplateName:
+          nullable: true
+        newEnvironments:
+          type: object
+          description: The new configured string to string map of environment variables for the job template
+          additionalProperties:
             type: string
-            description: The name of the job template used to create the job
-          status:
+          nullable: true
+        newCustomFields:
+          type: object
+          description: The new configured string to string map of custom fields for the job template
+          additionalProperties:
             type: string
-            description: The status of the job
-            enum:
-              - "queued"
-              - "started"
-              - "failed"
-              - "succeeded"
-              - "cancelling"
-              - "canceled"
-          audit:
-            $ref: "./openapi.yaml#/components/schemas/Audit"
+          nullable: true
+        newScripts:
+          type: array
+          description: The new scripts of the job template
+          items:
+            type: string
+          nullable: true
+
+    SparkTemplateUpdate:
+      type: object
+      description: A job template update object for Spark jobs
+      required:
+        - "@type"
+      properties:
+        "@type":
+          type: string
+          description: The type of the job template
+          enum:
+            - "spark"
+        newExecutable:
+          type: string
+          description: The new executable command of the job template
+          nullable: true
+        newArguments:
+          type: array
+          description: The new arguments of the job template
+          items:
+            type: string
+          nullable: true
+        newEnvironments:
+          type: object
+          description: The new configured string to string map of environment variables for the job template
+          additionalProperties:
+            type: string
+          nullable: true
+        newCustomFields:
+          type: object
+          description: The new configured string to string map of custom fields for the job template
+          additionalProperties:
+            type: string
+          nullable: true
+        newClassName:
+          type: string
+          description: The new class name of the Spark job template
+          nullable: true
+        newJars:
+          type: array
+          description: The new JAR files of the Spark job template
+          items:
+            type: string
+          nullable: true
+        newFiles:
+          type: array
+          description: The new files of the Spark job template
+          items:
+            type: string
+          nullable: true
+        newArchives:
+          type: array
+          description: The new archives of the Spark job template
+          items:
+            type: string
+          nullable: true
+        newConfigs:
+          type: object
+          description: The new configured string to string map of Spark configurations for the job template
+          additionalProperties:
+            type: string
+          nullable: true
 
   requests:
 
@@ -475,6 +636,69 @@ components:
       properties:
         jobTemplate:
           $ref: "#/components/schemas/JobTemplate"
+
+    JobTemplateUpdatesRequest:
+      type: object
+      required:
+        - updates
+      properties:
+        updates:
+          type: array
+          items:
+            $ref: "#/components/requests/JobTemplateUpdateRequest"
+
+    JobTemplateUpdateRequest:
+      oneOf:
+        - $ref: "#/components/requests/RenameJobTemplateRequest"
+        - $ref: "#/components/requests/UpdateJobTemplateCommentRequest"
+        - $ref: "#/components/requests/UpdateJobTemplateContentRequest"
+      discriminator:
+        propertyName: "@type"
+        mapping:
+          rename: "#/components/requests/RenameJobTemplateRequest"
+          updateComment: "#/components/requests/UpdateJobTemplateCommentRequest"
+          updateTemplate: "#/components/requests/UpdateJobTemplateContentRequest"
+
+    RenameJobTemplateRequest:
+      type: object
+      required:
+        - "@type"
+        - newName
+      properties:
+        "@type":
+          type: string
+          enum:
+            - "rename"
+        newName:
+          type: string
+          description: The new name of the job template
+
+    UpdateJobTemplateCommentRequest:
+      type: object
+      required:
+        - "@type"
+        - newComment
+      properties:
+        "@type":
+          type: string
+          enum:
+            - "updateComment"
+        newComment:
+          type: string
+          description: The new comment of the job template
+
+    UpdateJobTemplateContentRequest:
+      type: object
+      required:
+        - "@type"
+        - newTemplate
+      properties:
+        "@type":
+          type: string
+          enum:
+            - "updateTemplate"
+        newTemplate:
+          $ref: "#/components/schemas/TemplateUpdate"
 
     JobRunRequest:
       type: object
@@ -621,6 +845,37 @@ components:
         }
       }
 
+    JobTemplateUpdatesRequest:
+      value: {
+        "updates": [
+          {
+            "@type": "rename",
+            "newName": "new_test_run_get"
+          },
+          {
+            "@type": "updateComment",
+            "newComment": "Updated comment for the job template"
+          },
+          {
+            "@type": "updateTemplate",
+            "newTemplate": {
+              "@type": "shell",
+              "newExecutable": "/var/folders/90/v1d9hxsd6pj8m0jnn6f22tkr0000gn/T/tmpy65fiugc/updated-test-job.sh",
+              "newArguments": ["{{new_arg1}}", "{{new_arg2}}"],
+              "newEnvironments": {
+                "NEW_ENV_VAR": "{{new_env_var}}"
+              },
+              "newCustomFields": {
+                "field1": "value1"
+              },
+              "newScripts": [
+                "/var/folders/90/v1d9hxsd6pj8m0jnn6f22tkr0000gn/T/tmpy65fiugc/updated-common.sh"
+              ]
+            }
+          }
+        ]
+      }
+
     JobRunRequest:
       value: {
         "jobTemplateName": "test_run_get",
@@ -721,6 +976,17 @@ components:
         "message": "Failed to operate job(s) [my_job] operation [GET] under metalake [my_test_metalake], reason [NoSuchJobException]",
         "stack": [
           "org.apache.gravitino.exceptions.NoSuchJobException: Job xxx does not exist",
+          "..."
+        ]
+      }
+
+    IllegalArgumentException:
+      value: {
+        "code": 1001,
+        "type": "IllegalArgumentException",
+        "message": "Failed to operate job template(s) [my_job] operation [UPDATE], reason [IllegalArgumentException]",
+        "stack": [
+          "java.lang.IllegalArgumentException: Invalid argument xxx",
           "..."
         ]
       }

@@ -46,7 +46,7 @@ import org.apache.gravitino.dto.util.DTOConverters;
 import org.apache.gravitino.messaging.Topic;
 import org.apache.gravitino.messaging.TopicChange;
 import org.apache.gravitino.metrics.MetricNames;
-import org.apache.gravitino.server.authorization.MetadataFilterHelper;
+import org.apache.gravitino.server.authorization.MetadataAuthzHelper;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationExpression;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationMetadata;
 import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants;
@@ -91,7 +91,7 @@ public class TopicOperations {
             NameIdentifier[] topics = dispatcher.listTopics(topicNS);
             topics = topics == null ? new NameIdentifier[0] : topics;
             topics =
-                MetadataFilterHelper.filterByExpression(
+                MetadataAuthzHelper.filterByExpression(
                     metalake,
                     AuthorizationExpressionConstants.filterTopicsAuthorizationExpression,
                     Entity.EntityType.TOPIC,
@@ -112,9 +112,11 @@ public class TopicOperations {
   @ResponseMetered(name = "create-topic", absolute = true)
   @AuthorizationExpression(
       expression =
-          "ANY(OWNER,METALAKE,CATALOG) || "
-              + "SCHEMA_OWNER_WITH_USE_CATALOG || "
-              + "ANY_USE_CATALOG && ANY_USE_SCHEMA && ANY_CREATE_TOPIC",
+          """
+                      ANY(OWNER,METALAKE,CATALOG) ||
+                      SCHEMA_OWNER_WITH_USE_CATALOG ||
+                      ANY_USE_CATALOG && ANY_USE_SCHEMA && ANY_CREATE_TOPIC
+                      """,
       accessMetadataType = MetadataObject.Type.SCHEMA)
   public Response createTopic(
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
@@ -192,9 +194,11 @@ public class TopicOperations {
   @ResponseMetered(name = "alter-topic", absolute = true)
   @AuthorizationExpression(
       expression =
-          "ANY(OWNER,METALAKE,CATALOG) || "
-              + "SCHEMA_OWNER_WITH_USE_CATALOG || "
-              + "ANY_USE_CATALOG && ANY_USE_SCHEMA && (TOPIC::OWNER || ANY_PRODUCE_TOPIC)",
+          """
+                    ANY(OWNER,METALAKE,CATALOG) ||
+                    SCHEMA_OWNER_WITH_USE_CATALOG ||
+                    ANY_USE_CATALOG && ANY_USE_SCHEMA && (TOPIC::OWNER || ANY_PRODUCE_TOPIC)
+                      """,
       accessMetadataType = MetadataObject.Type.TOPIC)
   public Response alterTopic(
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
@@ -233,9 +237,11 @@ public class TopicOperations {
   @ResponseMetered(name = "drop-topic", absolute = true)
   @AuthorizationExpression(
       expression =
-          "ANY(OWNER,METALAKE,CATALOG) || "
-              + "SCHEMA_OWNER_WITH_USE_CATALOG || "
-              + "ANY_USE_CATALOG && ANY_USE_SCHEMA && TOPIC::OWNER",
+          """
+                      ANY(OWNER,METALAKE,CATALOG) ||
+                      SCHEMA_OWNER_WITH_USE_CATALOG ||
+                      ANY_USE_CATALOG && ANY_USE_SCHEMA && TOPIC::OWNER
+                      """,
       accessMetadataType = MetadataObject.Type.TOPIC)
   public Response dropTopic(
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)

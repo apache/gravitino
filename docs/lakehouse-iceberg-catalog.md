@@ -18,7 +18,7 @@ Apache Gravitino provides the ability to manage Apache Iceberg metadata.
 ### Requirements and limitations
 
 :::info
-Builds with Apache Iceberg `1.9.2`. The Apache Iceberg table format version is `2` by default.
+Builds with Apache Iceberg `1.10.0`. The Apache Iceberg table format version is `2` by default.
 :::
 
 ## Catalog
@@ -30,15 +30,16 @@ Builds with Apache Iceberg `1.9.2`. The Apache Iceberg table format version is `
 - Doesn't support snapshot or table management operations.
 - Supports multi storage, including S3, GCS, ADLS, OSS and HDFS.
 - Supports Kerberos or simple authentication for Iceberg catalog with Hive backend.
+- Supports table metadata cache.
 
 ### Catalog properties
 
-| Property name                                      | Description                                                                                                                                                                                                                                      | Default value                                                                  | Required                                                    | Since Version |
-|----------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|--------------------------------------------------------------------------------|-------------------------------------------------------------|---------------|
-| `catalog-backend`                                  | Catalog backend of Gravitino Iceberg catalog. Supports `hive` or `jdbc` or `rest`.                                                                                                                                                               | (none)                                                                         | Yes                                                         | 0.2.0         |
-| `uri`                                              | The URI configuration of the Iceberg catalog. `thrift://127.0.0.1:9083` or `jdbc:postgresql://127.0.0.1:5432/db_name` or `jdbc:mysql://127.0.0.1:3306/metastore_db` or `http://127.0.0.1:9001`.                                                  | (none)                                                                         | Yes                                                         | 0.2.0         |
-| `warehouse`                                        | Warehouse directory of catalog. `file:///user/hive/warehouse-hive/` for local fs or `hdfs://namespace/hdfs/path` for HDFS.                                                                                                                       | (none)                                                                         | Yes                                                         | 0.2.0         |
-| `catalog-backend-name`                             | The catalog name passed to underlying Iceberg catalog backend. Catalog name in JDBC backend is used to isolate namespace and tables.                                                                                                             | The property value of `catalog-backend`, like `jdbc` for JDBC catalog backend. | No                                                          | 0.5.2         |
+| Property name          | Description                                                                                                                                                                                     | Default value                                                                  | Required | Since Version |
+|------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|--------------------------------------------------------------------------------|----------|---------------|
+| `catalog-backend`      | Catalog backend of Gravitino Iceberg catalog. Supports `hive` or `jdbc` or `rest`.                                                                                                              | (none)                                                                         | Yes      | 0.2.0         |
+| `uri`                  | The URI configuration of the Iceberg catalog. `thrift://127.0.0.1:9083` or `jdbc:postgresql://127.0.0.1:5432/db_name` or `jdbc:mysql://127.0.0.1:3306/metastore_db` or `http://127.0.0.1:9001`. | (none)                                                                         | Yes      | 0.2.0         |
+| `warehouse`            | Warehouse directory of catalog. `file:///user/hive/warehouse-hive/` for local fs or `hdfs://namespace/hdfs/path` for HDFS.                                                                      | (none)                                                                         | Yes      | 0.2.0         |
+| `catalog-backend-name` | The catalog name passed to underlying Iceberg catalog backend. Catalog name in JDBC backend is used to isolate namespace and tables.                                                            | The property value of `catalog-backend`, like `jdbc` for JDBC catalog backend. | No       | 0.5.2         |
 
 
 Any property not defined by Gravitino with `gravitino.bypass.` prefix will pass to Iceberg catalog properties and HDFS configuration. For example, if specify `gravitino.bypass.list-all-tables`, `list-all-tables` will pass to Iceberg catalog properties.
@@ -83,7 +84,13 @@ Supports using static access-key-id and secret-access-key to access S3 data.
 For other Iceberg s3 properties not managed by Gravitino like `s3.sse.type`, you could config it directly by `gravitino.bypass.s3.sse.type`.
 
 :::info
-To configure the JDBC catalog backend, set the `warehouse` parameter to `s3://{bucket_name}/${prefix_name}`. For the Hive catalog backend, set `warehouse` to `s3a://{bucket_name}/${prefix_name}`. Additionally, download the [Iceberg AWS bundle](https://mvnrepository.com/artifact/org.apache.iceberg/iceberg-aws-bundle) and place it in the `catalogs/lakehouse-iceberg/libs/` directory.
+ - For the JDBC catalog backend, set the `warehouse` parameter to `s3://{bucket_name}/${prefix_name}`. 
+ - For the Hive catalog backend, set `warehouse` to `s3a://{bucket_name}/${prefix_name}`. 
+ - Additionally, download the [Gravitino Iceberg AWS bundle](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-iceberg-aws-bundle) and place it in the `catalogs/lakehouse-iceberg/libs/` directory.
+:::
+
+:::note
+Since Gravitino 1.1.0, the Gravitino Iceberg AWS bundle jar has already included the Iceberg AWS bundle jar, no need to download and include it separately.
 :::
 
 #### OSS
@@ -100,7 +107,11 @@ Gravitino Iceberg REST service supports using static access-key-id and secret-ac
 For other Iceberg OSS properties not managed by Gravitino like `client.security-token`, you could config it directly by `gravitino.bypass.client.security-token`.
 
 :::info
-Please set the `warehouse` parameter to `oss://{bucket_name}/${prefix_name}`. Additionally, download the [Aliyun OSS SDK](https://gosspublic.alicdn.com/sdks/java/aliyun_java_sdk_3.10.2.zip) and copy `aliyun-sdk-oss-3.10.2.jar`, `hamcrest-core-1.1.jar`, `jdom2-2.0.6.jar` in the `catalogs/lakehouse-iceberg/libs/` directory.
+Please set the `warehouse` parameter to `oss://{bucket_name}/${prefix_name}`. Additionally, download the [Gravitino Iceberg Aliyun bundle](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-iceberg-aliyun-bundle) and place it in the `catalogs/lakehouse-iceberg/libs/` directory.
+:::
+
+:::note
+Since Gravitino 1.1.0, the Gravitino Iceberg aliyun bundle jar has already included the Iceberg aliyun necessary dependency jars, no need to download and include them separately.
 :::
 
 #### GCS
@@ -116,10 +127,14 @@ For other Iceberg GCS properties not managed by Gravitino like `gcs.project-id`,
 Please make sure the credential file is accessible by Gravitino, like using `export GOOGLE_APPLICATION_CREDENTIALS=/xx/application_default_credentials.json` before Gravitino server is started.
 
 :::info
-Please set `warehouse` to `gs://{bucket_name}/${prefix_name}`, and download [Iceberg GCP bundle jar](https://mvnrepository.com/artifact/org.apache.iceberg/iceberg-gcp-bundle) and place it to `catalogs/lakehouse-iceberg/libs/`.
+Please set `warehouse` to `gs://{bucket_name}/${prefix_name}`, and download [Gravitino Iceberg GCP bundle jar](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-iceberg-gcp-bundle) and place it to `catalogs/lakehouse-iceberg/libs/`.
 :::
 
-#### ADLS 
+:::note
+Since Gravitino 1.1.0, the Gravitino Iceberg GCP bundle jar has already included the Iceberg GCP bundle jar, no need to download and include it separately.
+:::
+
+#### ADLS
 
 Supports using Azure account name and secret key to access ADLS data.
 
@@ -132,7 +147,11 @@ Supports using Azure account name and secret key to access ADLS data.
 For other Iceberg ADLS properties not managed by Gravitino like `adls.read.block-size-bytes`, you could config it directly by `gravitino.iceberg-rest.adls.read.block-size-bytes`.
 
 :::info
-Please set `warehouse` to `abfs[s]://{container-name}@{storage-account-name}.dfs.core.windows.net/{path}`, and download the [Iceberg Azure bundle](https://mvnrepository.com/artifact/org.apache.iceberg/iceberg-azure-bundle) and place it to `catalogs/lakehouse-iceberg/libs/`.
+Please set `warehouse` to `abfs[s]://{container-name}@{storage-account-name}.dfs.core.windows.net/{path}`, and download the [Gravitino Iceberg Azure bundle](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-iceberg-azure-bundle) and place it to `catalogs/lakehouse-iceberg/libs/`.
+:::
+
+:::note
+Since Gravitino 1.1.0, the Gravitino Iceberg Azure bundle jar has already included the Iceberg Azure bundle jar, no need to download and include it separately.
 :::
 
 #### Other storages
@@ -163,6 +182,18 @@ Users can use the following properties to configure the security of the catalog 
 | `authentication.kerberos.check-interval-sec`       | The check interval of Kerberos credential for Iceberg catalog.                                                                                                                                                                                   | 60            | No                                                                                                                                                                   | 0.6.0-incubating |
 | `authentication.kerberos.keytab-fetch-timeout-sec` | The fetch timeout of retrieving Kerberos keytab from `authentication.kerberos.keytab-uri`.                                                                                                                                                       | 60            | No                                                                                                                                                                   | 0.6.0-incubating |
 
+#### Table metadata cache
+
+Gravitino features a pluggable cache system for updating or retrieving table metadata in the cache. It validates the location of table metadata against the catalog backend to ensure the correctness of cached data.
+
+| Configuration item                    | Description                                 | Default value | Required | Since Version |
+|---------------------------------------|---------------------------------------------|---------------|----------|---------------|
+| `table-metadata-cache-impl`           | The implement of the cache.                 | (none)        | No       | 1.1.0         |
+| `table-metadata-cache-capacity`       | The capacity of table metadata cache.       | 200           | No       | 1.1.0         |
+| `table-metadata-cache-expire-minutes` | The expire minutes of table metadata cache. | 60            | No       | 1.1.0         |
+
+Gravitino provides the build-in `org.apache.gravitino.iceberg.common.cache.LocalTableMetadataCache` to store the cached data in the memory. You could also implement your custom table metadata cache by implementing the `org.apache.gravitino.iceberg.common.cache.TableMetadataCache` interface.
+
 ### Catalog operations
 
 Please refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metadata-using-gravitino.md#catalog-operations) for more details.
@@ -191,13 +222,13 @@ Please refer to [Manage Relational Metadata Using Gravitino](./manage-relational
 
 Supports transforms:
 
-  - `IdentityTransform`
-  - `BucketTransform`
-  - `TruncateTransform`
-  - `YearTransform`
-  - `MonthTransform`
-  - `DayTransform`
-  - `HourTransform`
+- `IdentityTransform`
+- `BucketTransform`
+- `TruncateTransform`
+- `YearTransform`
+- `MonthTransform`
+- `DayTransform`
+- `HourTransform`
 
 :::info
 Iceberg doesn't support multi fields in `BucketTransform`.

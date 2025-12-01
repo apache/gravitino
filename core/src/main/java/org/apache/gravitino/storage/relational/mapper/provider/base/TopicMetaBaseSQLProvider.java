@@ -30,10 +30,10 @@ public class TopicMetaBaseSQLProvider {
   public String insertTopicMeta(@Param("topicMeta") TopicPO topicPO) {
     return "INSERT INTO "
         + TABLE_NAME
-        + "(topic_id, topic_name, metalake_id, catalog_id, schema_id,"
+        + " (topic_id, topic_name, metalake_id, catalog_id, schema_id,"
         + " comment, properties, audit_info, current_version, last_version,"
         + " deleted_at)"
-        + " VALUES("
+        + " VALUES ("
         + " #{topicMeta.topicId},"
         + " #{topicMeta.topicName},"
         + " #{topicMeta.metalakeId},"
@@ -51,10 +51,10 @@ public class TopicMetaBaseSQLProvider {
   public String insertTopicMetaOnDuplicateKeyUpdate(@Param("topicMeta") TopicPO topicPO) {
     return "INSERT INTO "
         + TABLE_NAME
-        + "(topic_id, topic_name, metalake_id, catalog_id, schema_id,"
+        + " (topic_id, topic_name, metalake_id, catalog_id, schema_id,"
         + " comment, properties, audit_info, current_version, last_version,"
         + " deleted_at)"
-        + " VALUES("
+        + " VALUES ("
         + " #{topicMeta.topicId},"
         + " #{topicMeta.topicName},"
         + " #{topicMeta.metalakeId},"
@@ -101,7 +101,7 @@ public class TopicMetaBaseSQLProvider {
         + " FROM "
         + TABLE_NAME
         + " WHERE deleted_at = 0"
-        + " AND topic_id in ("
+        + " AND topic_id IN ("
         + "<foreach collection='topicIds' item='topicId' separator=','>"
         + "#{topicId}"
         + "</foreach>"

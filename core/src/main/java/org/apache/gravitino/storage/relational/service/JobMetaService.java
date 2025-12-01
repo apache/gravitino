@@ -18,6 +18,8 @@
  */
 package org.apache.gravitino.storage.relational.service;
 
+import static org.apache.gravitino.metrics.source.MetricsSource.GRAVITINO_RELATIONAL_STORE_METRIC_NAME;
+
 import java.io.IOException;
 import java.util.List;
 import java.util.Locale;
@@ -29,6 +31,7 @@ import org.apache.gravitino.exceptions.IllegalNamespaceException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.job.JobHandle;
 import org.apache.gravitino.meta.JobEntity;
+import org.apache.gravitino.metrics.Monitored;
 import org.apache.gravitino.storage.relational.mapper.JobMetaMapper;
 import org.apache.gravitino.storage.relational.po.JobPO;
 import org.apache.gravitino.storage.relational.utils.ExceptionUtils;
@@ -47,6 +50,9 @@ public class JobMetaService {
     return INSTANCE;
   }
 
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "listJobsByNamespace")
   public List<JobEntity> listJobsByNamespace(Namespace ns) {
     String metalakeName = ns.level(0);
     if (ns.length() == 3) {
@@ -74,15 +80,12 @@ public class JobMetaService {
     }
   }
 
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "getJobByIdentifier")
   public JobEntity getJobByIdentifier(NameIdentifier ident) {
     String metalakeName = ident.namespace().level(0);
-    String jobRunId = ident.name();
-    long jobRunIdLong;
-    try {
-      jobRunIdLong = Long.parseLong(jobRunId.substring(JobHandle.JOB_ID_PREFIX.length()));
-    } catch (NumberFormatException e) {
-      throw new NoSuchEntityException("Invalid job run ID format %s", jobRunId);
-    }
+    long jobRunIdLong = parseJobRunId(ident.name());
 
     JobPO jobPO =
         SessionUtils.getWithoutCommit(
@@ -92,16 +95,18 @@ public class JobMetaService {
       throw new NoSuchEntityException(
           NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
           Entity.EntityType.JOB.name().toLowerCase(Locale.ROOT),
-          jobRunId);
+          ident.toString());
     }
     return JobPO.fromJobPO(jobPO, ident.namespace());
   }
 
+  @Monitored(metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME, baseMetricName = "insertJob")
   public void insertJob(JobEntity jobEntity, boolean overwrite) throws IOException {
     String metalakeName = jobEntity.namespace().level(0);
 
     try {
-      Long metalakeId = MetalakeMetaService.getInstance().getMetalakeIdByName(metalakeName);
+      long metalakeId =
+          EntityIdService.getEntityId(NameIdentifier.of(metalakeName), Entity.EntityType.METALAKE);
 
       JobPO.JobPOBuilder builder = JobPO.builder().withMetalakeId(metalakeId);
       JobPO jobPO = JobPO.initializeJobPO(jobEntity, builder);
@@ -120,20 +125,18 @@ public class JobMetaService {
     }
   }
 
+  @Monitored(metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME, baseMetricName = "deleteJob")
   public boolean deleteJob(NameIdentifier jobIdent) {
-    String jobRunId = jobIdent.name();
-    long jobRunIdLong;
-    try {
-      jobRunIdLong = Long.parseLong(jobRunId.substring(JobHandle.JOB_ID_PREFIX.length()));
-    } catch (NumberFormatException e) {
-      throw new NoSuchEntityException("Invalid job run ID format %s", jobRunId);
-    }
+    long jobRunIdLong = parseJobRunId(jobIdent.name());
     int result =
         SessionUtils.doWithCommitAndFetchResult(
             JobMetaMapper.class, mapper -> mapper.softDeleteJobMetaByRunId(jobRunIdLong));
     return result > 0;
   }
 
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "deleteJobsByLegacyTimeline")
   public int deleteJobsByLegacyTimeline(long legacyTimeline, int limit) {
     // Mark jobs as deleted for finished jobs, so that they can be cleaned up later
     SessionUtils.doWithCommit(
@@ -142,5 +145,20 @@ public class JobMetaService {
     return SessionUtils.doWithCommitAndFetchResult(
         JobMetaMapper.class,
         mapper -> mapper.deleteJobMetasByLegacyTimeline(legacyTimeline, limit));
+  }
+
+  // Validate and parse a job run identifier of the form "job-<number>";
+  // throws NoSuchEntityException for any malformed input instead of leaking parsing errors.
+  private long parseJobRunId(String jobRunId) {
+    if (jobRunId == null
+        || !jobRunId.startsWith(JobHandle.JOB_ID_PREFIX)
+        || jobRunId.length() <= JobHandle.JOB_ID_PREFIX.length()) {
+      throw new NoSuchEntityException("Invalid job run ID format %s", jobRunId);
+    }
+    try {
+      return Long.parseLong(jobRunId.substring(JobHandle.JOB_ID_PREFIX.length()));
+    } catch (NumberFormatException e) {
+      throw new NoSuchEntityException("Invalid job run ID format %s", jobRunId);
+    }
   }
 }

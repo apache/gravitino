@@ -39,6 +39,7 @@ import java.util.stream.Stream;
 import javax.sql.DataSource;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Catalog;
+import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.SchemaChange;
@@ -64,6 +65,8 @@ import org.apache.gravitino.exceptions.NonEmptySchemaException;
 import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
 import org.apache.gravitino.exceptions.TableAlreadyExistsException;
 import org.apache.gravitino.meta.AuditInfo;
+import org.apache.gravitino.metrics.MetricsSystem;
+import org.apache.gravitino.metrics.source.JdbcCatalogMetricsSource;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.TableCatalog;
@@ -101,6 +104,8 @@ public class JdbcCatalogOperations implements CatalogOperations, SupportsSchemas
   private DataSource dataSource;
 
   private final JdbcColumnDefaultValueConverter columnDefaultValueConverter;
+
+  private JdbcCatalogMetricsSource catalogMetricsSource;
 
   public static class JDBCDriverInfo {
     public String name;
@@ -174,11 +179,25 @@ public class JdbcCatalogOperations implements CatalogOperations, SupportsSchemas
     if (tableOperation instanceof RequireDatabaseOperation) {
       ((RequireDatabaseOperation) tableOperation).setDatabaseOperation(databaseOperation);
     }
+
+    MetricsSystem metricsSystem = GravitinoEnv.getInstance().metricsSystem();
+    // Metrics System could be null in UT.
+    if (metricsSystem != null) {
+      this.catalogMetricsSource =
+          new JdbcCatalogMetricsSource(info.namespace().toString(), info.name());
+      catalogMetricsSource.registerDatasourceMetrics(dataSource);
+      metricsSystem.register(catalogMetricsSource);
+    }
   }
 
   /** Closes the Jdbc catalog and releases the associated client pool. */
   @Override
   public void close() {
+    // Metrics System could be null in UT.
+    MetricsSystem metricsSystem = GravitinoEnv.getInstance().metricsSystem();
+    if (metricsSystem != null) {
+      metricsSystem.unregister(catalogMetricsSource);
+    }
     DataSourceUtils.closeDataSource(dataSource);
   }
 
@@ -230,9 +249,9 @@ public class JdbcCatalogOperations implements CatalogOperations, SupportsSchemas
   public JdbcSchema createSchema(
       NameIdentifier ident, String comment, Map<String, String> properties)
       throws NoSuchCatalogException, SchemaAlreadyExistsException {
-    StringIdentifier identifier =
-        Preconditions.checkNotNull(
-            StringIdentifier.fromProperties(properties), GRAVITINO_ATTRIBUTE_DOES_NOT_EXIST_MSG);
+
+    StringIdentifier identifier = StringIdentifier.fromProperties(properties);
+    Preconditions.checkArgument(identifier != null, GRAVITINO_ATTRIBUTE_DOES_NOT_EXIST_MSG);
     String notAllowedKey =
         properties.keySet().stream()
             .filter(s -> !StringUtils.equals(s, StringIdentifier.ID_KEY))
@@ -434,9 +453,8 @@ public class JdbcCatalogOperations implements CatalogOperations, SupportsSchemas
     Preconditions.checkArgument(
         null == sortOrders || sortOrders.length == 0, "jdbc-catalog does not support sort orders");
 
-    StringIdentifier identifier =
-        Preconditions.checkNotNull(
-            StringIdentifier.fromProperties(properties), GRAVITINO_ATTRIBUTE_DOES_NOT_EXIST_MSG);
+    StringIdentifier identifier = StringIdentifier.fromProperties(properties);
+    Preconditions.checkArgument(identifier != null, GRAVITINO_ATTRIBUTE_DOES_NOT_EXIST_MSG);
     // The properties we write to the database do not require the id field, so it needs to be
     // removed.
     HashMap<String, String> resultProperties =
@@ -505,6 +523,8 @@ public class JdbcCatalogOperations implements CatalogOperations, SupportsSchemas
    */
   private Table renameTable(NameIdentifier tableIdent, TableChange.RenameTable renameTable)
       throws NoSuchTableException, IllegalArgumentException {
+    Preconditions.checkArgument(
+        !renameTable.getNewSchemaName().isPresent(), "Does not support rename schema yet");
     String databaseName = NameIdentifier.of(tableIdent.namespace().levels()).name();
     tableOperation.rename(databaseName, tableIdent.name(), renameTable.getNewName());
     return loadTable(NameIdentifier.of(tableIdent.namespace(), renameTable.getNewName()));

@@ -79,19 +79,7 @@ wget "https://jdbc.postgresql.org/download/${pg_driver}" -O "${gravitino_staging
 cp "${gravitino_staging_dir}/${pg_driver}" "${gravitino_package_dir}/catalogs/jdbc-postgresql/libs/"
 cp "${gravitino_staging_dir}/${pg_driver}" "${gravitino_package_dir}/catalogs/lakehouse-iceberg/libs/"
 cp "${gravitino_staging_dir}/${pg_driver}" "${gravitino_iceberg_rest_dir}"
-
-iceberg_version="1.9.2"
-iceberg_aws_bundle="iceberg-aws-bundle-${iceberg_version}.jar"
-wget "https://repo1.maven.org/maven2/org/apache/iceberg/iceberg-aws-bundle/${iceberg_version}/${iceberg_aws_bundle}" -O "${gravitino_staging_dir}/${iceberg_aws_bundle}"
-cp "${gravitino_staging_dir}/${iceberg_aws_bundle}" "${gravitino_iceberg_rest_dir}"
-
-iceberg_gcp_bundle="iceberg-gcp-bundle-${iceberg_version}.jar"
-wget "https://repo1.maven.org/maven2/org/apache/iceberg/iceberg-gcp-bundle/${iceberg_version}/${iceberg_gcp_bundle}" -O "${gravitino_staging_dir}/${iceberg_gcp_bundle}"
-cp "${gravitino_staging_dir}/${iceberg_gcp_bundle}" "${gravitino_iceberg_rest_dir}"
-
-iceberg_azure_bundle="iceberg-azure-bundle-${iceberg_version}.jar"
-wget "https://repo1.maven.org/maven2/org/apache/iceberg/iceberg-azure-bundle/${iceberg_version}/${iceberg_azure_bundle}" -O "${gravitino_staging_dir}/${iceberg_azure_bundle}"
-cp "${gravitino_staging_dir}/${iceberg_azure_bundle}" "${gravitino_iceberg_rest_dir}"
+cp "${gravitino_staging_dir}/${pg_driver}" "${gravitino_package_dir}/libs/"
 
 echo "Finish downloading"
 
@@ -103,14 +91,15 @@ fileset_lib_dir="${gravitino_dir}/packages/gravitino/catalogs/fileset/libs"
 
 # Copy the Aliyun, AWS, GCP and Azure bundles to the Fileset catalog libs
 find ${gravitino_home}/bundles/aliyun-bundle/build/libs/ -name 'gravitino-aliyun-bundle-*.jar' ! -name '*-empty.jar' -exec cp -v {} "${fileset_lib_dir}" \;
-find ${gravitino_home}/bundles/aws-bundle/build/libs/ -name 'gravitino-aws-*.jar' ! -name '*-empty.jar' -exec cp -v {} "${fileset_lib_dir}" \;
-find ${gravitino_home}/bundles/gcp-bundle/build/libs/ -name 'gravitino-gcp-*.jar' ! -name '*-empty.jar' -exec cp -v {} "${fileset_lib_dir}" \;
-find ${gravitino_home}/bundles/azure-bundle/build/libs/ -name 'gravitino-azure-*.jar' ! -name '*-empty.jar' -exec cp -v {} "${fileset_lib_dir}" \;
+find ${gravitino_home}/bundles/aws-bundle/build/libs/ -name 'gravitino-aws-bundle-*.jar' ! -name '*-empty.jar' -exec cp -v {} "${fileset_lib_dir}" \;
+find ${gravitino_home}/bundles/gcp-bundle/build/libs/ -name 'gravitino-gcp-bundle-*.jar' ! -name '*-empty.jar' -exec cp -v {} "${fileset_lib_dir}" \;
+find ${gravitino_home}/bundles/azure-bundle/build/libs/ -name 'gravitino-azure-bundle-*.jar' ! -name '*-empty.jar' -exec cp -v {} "${fileset_lib_dir}" \;
 
-find ${gravitino_home}/bundles/gcp/build/libs/ -name 'gravitino-gcp-*.jar' ! -name '*-empty.jar' -exec cp -v {} "${gravitino_iceberg_rest_dir}" \;
-find ${gravitino_home}/bundles/aws/build/libs/ -name 'gravitino-aws-*.jar' ! -name '*-empty.jar' -exec cp -v {} "${gravitino_iceberg_rest_dir}" \;
-find ${gravitino_home}/bundles/azure/build/libs/ -name 'gravitino-azure-*.jar' ! -name '*-empty.jar' -exec cp -v {} "${gravitino_iceberg_rest_dir}" \;
-find ${gravitino_home}/bundles/aliyun-bundle/build/libs/ -name 'gravitino-aliyun-bundle-*.jar' ! -name '*-empty.jar' -exec cp -v {} "${gravitino_iceberg_rest_dir}" \;
+# Copy the Aliyun, AWS, GCP and Azure bundles to the Iceberg REST server libs
+find ${gravitino_home}/bundles/iceberg-gcp-bundle/build/libs/ -name 'gravitino-iceberg-gcp-bundle-*.jar' ! -name '*-empty.jar' -exec cp -v {} "${gravitino_iceberg_rest_dir}" \;
+find ${gravitino_home}/bundles/iceberg-aws-bundle/build/libs/ -name 'gravitino-iceberg-aws-bundle-*.jar' ! -name '*-empty.jar' -exec cp -v {} "${gravitino_iceberg_rest_dir}" \;
+find ${gravitino_home}/bundles/iceberg-azure-bundle/build/libs/ -name 'gravitino-iceberg-azure-bundle-*.jar' ! -name '*-empty.jar' -exec cp -v {} "${gravitino_iceberg_rest_dir}" \;
+find ${gravitino_home}/bundles/iceberg-aliyun-bundle/build/libs/ -name 'gravitino-iceberg-aliyun-bundle-*.jar' ! -name '*-empty.jar' -exec cp -v {} "${gravitino_iceberg_rest_dir}" \;
 
 download_gcs_connector
 

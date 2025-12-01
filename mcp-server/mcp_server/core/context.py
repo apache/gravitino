@@ -22,7 +22,7 @@ from mcp_server.core.setting import Setting
 class GravitinoContext:
     def __init__(self, setting: Setting):
         self.gravitino_client = RESTClientFactory.create_rest_client(
-            setting.metalake, setting.uri
+            setting.metalake, setting.gravitino_uri
         )
 
     def rest_client(self):

@@ -29,6 +29,7 @@ import java.io.IOException;
 import java.net.URI;
 import java.nio.file.Files;
 import java.time.Instant;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -301,6 +302,53 @@ public class JobManager implements JobOperationDispatcher {
   }
 
   @Override
+  public JobTemplateEntity alterJobTemplate(
+      String metalake, String jobTemplateName, JobTemplateChange... changes)
+      throws NoSuchJobTemplateException, IllegalArgumentException {
+    checkMetalake(NameIdentifierUtil.ofMetalake(metalake), entityStore);
+
+    Optional<String> newName =
+        Arrays.stream(changes)
+            .filter(c -> c instanceof JobTemplateChange.RenameJobTemplate)
+            .map(c -> ((JobTemplateChange.RenameJobTemplate) c).getNewName())
+            .reduce((first, second) -> second);
+
+    NameIdentifier jobTemplateIdent = NameIdentifierUtil.ofJobTemplate(metalake, jobTemplateName);
+    return TreeLockUtils.doWithTreeLock(
+        jobTemplateIdent,
+        LockType.READ, // Use READ lock because the update method in JobTemplateMetaService will
+        // handle the update transactionally and update with a new version number. So we don't
+        // have to use a WRITE lock here.
+        () -> {
+          try {
+            return entityStore.update(
+                jobTemplateIdent,
+                JobTemplateEntity.class,
+                Entity.EntityType.JOB_TEMPLATE,
+                jobTemplateEntity ->
+                    updateJobTemplateEntity(jobTemplateIdent, jobTemplateEntity, changes));
+          } catch (NoSuchEntityException e) {
+            throw new NoSuchJobTemplateException(
+                "Job template with name %s under metalake %s does not exist, this could be due to"
+                    + " the job template not existing or updated concurrently. For the latter case"
+                    + " please retry the operation.",
+                jobTemplateName, metalake);
+          } catch (IOException ioe) {
+            throw new RuntimeException(ioe);
+          } catch (EntityAlreadyExistsException e) {
+            // If the EntityAlreadyExistsException is thrown, it means the new name already exists.
+            // So there should be a rename change, and the new name should be present.
+            throw new RuntimeException(
+                String.format(
+                    "Failed to rename job template from %s to %s under metalake %s, the new name "
+                        + "already exists",
+                    jobTemplateName, newName, metalake),
+                e);
+          }
+        });
+  }
+
+  @Override
   public List<JobEntity> listJobs(String metalake, Optional<String> jobTemplateName)
       throws NoSuchJobTemplateException {
     checkMetalake(NameIdentifierUtil.ofMetalake(metalake), entityStore);
@@ -503,7 +551,34 @@ public class JobManager implements JobOperationDispatcher {
 
       activeJobs.forEach(
           job -> {
-            JobHandle.Status newStatus = jobExecutor.getJobStatus(job.jobExecutionId());
+            JobHandle.Status newStatus = job.status();
+            try {
+              newStatus = jobExecutor.getJobStatus(job.jobExecutionId());
+            } catch (NoSuchJobException e) {
+              // If the job is not found in the external job executor, we assume the job is
+              // FAILED if it is not in CANCELLING status, otherwise we assume it is CANCELLED.
+              if (job.status() == JobHandle.Status.CANCELLING) {
+                newStatus = JobHandle.Status.CANCELLED;
+              } else {
+                newStatus = JobHandle.Status.FAILED;
+              }
+              LOG.warn(
+                  "Job {} with execution id {} under metalake {} is not found in the "
+                      + "external job executor, marking it as {}. This could be due to the job "
+                      + "being deleted by the external job executor. Please check the external job "
+                      + "executor to know more details.",
+                  job.name(),
+                  job.jobExecutionId(),
+                  metalake,
+                  newStatus);
+            } catch (Exception e) {
+              LOG.error(
+                  "Failed to get job status for job {} by execution id {}",
+                  job.name(),
+                  job.jobExecutionId(),
+                  e);
+            }
+
             if (newStatus != job.status()) {
               JobEntity newJobEntity =
                   JobEntity.builder()
@@ -522,6 +597,7 @@ public class JobManager implements JobOperationDispatcher {
                       .build();
 
               // Update the job entity with new status.
+              JobHandle.Status finalNewStatus = newStatus;
               TreeLockUtils.doWithTreeLock(
                   NameIdentifierUtil.ofJob(metalake, job.name()),
                   LockType.WRITE,
@@ -533,7 +609,7 @@ public class JobManager implements JobOperationDispatcher {
                       throw new RuntimeException(
                           String.format(
                               "Failed to update job entity %s to status %s",
-                              newJobEntity, newStatus),
+                              newJobEntity, finalNewStatus),
                           e);
                     }
                   });
@@ -595,7 +671,9 @@ public class JobManager implements JobOperationDispatcher {
     String comment = jobTemplateEntity.comment();
 
     JobTemplateEntity.TemplateContent content = jobTemplateEntity.templateContent();
-    String executable = fetchFileFromUri(content.executable(), stagingDir, TIMEOUT_IN_MS);
+    String executable =
+        fetchFileFromUri(
+            replacePlaceholder(content.executable(), jobConf), stagingDir, TIMEOUT_IN_MS);
 
     List<String> args =
         content.arguments().stream()
@@ -616,7 +694,13 @@ public class JobManager implements JobOperationDispatcher {
 
     // For shell job template
     if (content.jobType() == JobTemplate.JobType.SHELL) {
-      List<String> scripts = fetchFilesFromUri(content.scripts(), stagingDir, TIMEOUT_IN_MS);
+      List<String> scripts =
+          content.scripts().stream()
+              .map(
+                  script ->
+                      fetchFileFromUri(
+                          replacePlaceholder(script, jobConf), stagingDir, TIMEOUT_IN_MS))
+              .collect(Collectors.toList());
 
       return ShellJobTemplate.builder()
           .withName(name)
@@ -631,10 +715,30 @@ public class JobManager implements JobOperationDispatcher {
 
     // For Spark job template
     if (content.jobType() == JobTemplate.JobType.SPARK) {
-      String className = content.className();
-      List<String> jars = fetchFilesFromUri(content.jars(), stagingDir, TIMEOUT_IN_MS);
-      List<String> files = fetchFilesFromUri(content.files(), stagingDir, TIMEOUT_IN_MS);
-      List<String> archives = fetchFilesFromUri(content.archives(), stagingDir, TIMEOUT_IN_MS);
+      String className = replacePlaceholder(content.className(), jobConf);
+      List<String> jars =
+          content.jars().stream()
+              .map(
+                  jar ->
+                      fetchFileFromUri(replacePlaceholder(jar, jobConf), stagingDir, TIMEOUT_IN_MS))
+              .collect(Collectors.toList());
+
+      List<String> files =
+          content.files().stream()
+              .map(
+                  file ->
+                      fetchFileFromUri(
+                          replacePlaceholder(file, jobConf), stagingDir, TIMEOUT_IN_MS))
+              .collect(Collectors.toList());
+
+      List<String> archives =
+          content.archives().stream()
+              .map(
+                  archive ->
+                      fetchFileFromUri(
+                          replacePlaceholder(archive, jobConf), stagingDir, TIMEOUT_IN_MS))
+              .collect(Collectors.toList());
+
       Map<String, String> configs =
           content.configs().entrySet().stream()
               .collect(
@@ -735,5 +839,126 @@ public class JobManager implements JobOperationDispatcher {
     } catch (IOException e) {
       throw new RuntimeException("Failed to list in-use metalakes", e);
     }
+  }
+
+  @VisibleForTesting
+  JobTemplateEntity updateJobTemplateEntity(
+      NameIdentifier jobTemplateIdent,
+      JobTemplateEntity jobTemplateEntity,
+      JobTemplateChange... changes) {
+    String newName = jobTemplateEntity.name();
+    String newComment = jobTemplateEntity.comment();
+    JobTemplateEntity.Builder newTemplateBuilder = JobTemplateEntity.builder();
+    JobTemplateEntity.TemplateContent.TemplateContentBuilder newTemplateContentBuilder =
+        JobTemplateEntity.TemplateContent.builder()
+            .withJobType(jobTemplateEntity.templateContent().jobType())
+            .withExecutable(jobTemplateEntity.templateContent().executable())
+            .withArguments(jobTemplateEntity.templateContent().arguments())
+            .withEnvironments(jobTemplateEntity.templateContent().environments())
+            .withCustomFields(jobTemplateEntity.templateContent().customFields())
+            .withScripts(jobTemplateEntity.templateContent().scripts())
+            .withClassName(jobTemplateEntity.templateContent().className())
+            .withJars(jobTemplateEntity.templateContent().jars())
+            .withFiles(jobTemplateEntity.templateContent().files())
+            .withArchives(jobTemplateEntity.templateContent().archives())
+            .withConfigs(jobTemplateEntity.templateContent().configs());
+
+    for (JobTemplateChange change : changes) {
+      if (change instanceof JobTemplateChange.RenameJobTemplate) {
+        newName = ((JobTemplateChange.RenameJobTemplate) change).getNewName();
+
+      } else if (change instanceof JobTemplateChange.UpdateJobTemplateComment) {
+        newComment = ((JobTemplateChange.UpdateJobTemplateComment) change).getNewComment();
+
+      } else if (change instanceof JobTemplateChange.UpdateJobTemplate) {
+        JobTemplateEntity.TemplateContent oldTemplateContent = jobTemplateEntity.templateContent();
+        JobTemplateChange.TemplateUpdate templateUpdate =
+            ((JobTemplateChange.UpdateJobTemplate) change).getTemplateUpdate();
+        newTemplateContentBuilder
+            .withJobType(oldTemplateContent.jobType())
+            .withExecutable(
+                updatedValue(
+                    oldTemplateContent.executable(),
+                    Optional.ofNullable(templateUpdate.getNewExecutable())))
+            .withArguments(
+                updatedValue(
+                    oldTemplateContent.arguments(),
+                    Optional.ofNullable(templateUpdate.getNewArguments())))
+            .withEnvironments(
+                updatedValue(
+                    oldTemplateContent.environments(),
+                    Optional.ofNullable(templateUpdate.getNewEnvironments())))
+            .withCustomFields(
+                updatedValue(
+                    oldTemplateContent.customFields(),
+                    Optional.ofNullable(templateUpdate.getNewCustomFields())));
+
+        if (templateUpdate instanceof JobTemplateChange.ShellTemplateUpdate) {
+          Preconditions.checkArgument(
+              jobTemplateEntity.templateContent().jobType() == JobTemplate.JobType.SHELL,
+              "Job template %s is not a shell job template, cannot update to shell template",
+              jobTemplateIdent.name());
+
+          JobTemplateChange.ShellTemplateUpdate shellUpdate =
+              (JobTemplateChange.ShellTemplateUpdate) templateUpdate;
+          newTemplateContentBuilder.withScripts(
+              updatedValue(
+                  oldTemplateContent.scripts(), Optional.ofNullable(shellUpdate.getNewScripts())));
+
+        } else if (templateUpdate instanceof JobTemplateChange.SparkTemplateUpdate) {
+          Preconditions.checkArgument(
+              jobTemplateEntity.templateContent().jobType() == JobTemplate.JobType.SPARK,
+              "Job template %s is not a spark job template, cannot update to spark template",
+              jobTemplateIdent.name());
+
+          JobTemplateChange.SparkTemplateUpdate sparkUpdate =
+              (JobTemplateChange.SparkTemplateUpdate) templateUpdate;
+          newTemplateContentBuilder
+              .withClassName(
+                  updatedValue(
+                      oldTemplateContent.className(),
+                      Optional.ofNullable(sparkUpdate.getNewClassName())))
+              .withJars(
+                  updatedValue(
+                      oldTemplateContent.jars(), Optional.ofNullable(sparkUpdate.getNewJars())))
+              .withFiles(
+                  updatedValue(
+                      oldTemplateContent.files(), Optional.ofNullable(sparkUpdate.getNewFiles())))
+              .withArchives(
+                  updatedValue(
+                      oldTemplateContent.archives(),
+                      Optional.ofNullable(sparkUpdate.getNewArchives())))
+              .withConfigs(
+                  updatedValue(
+                      oldTemplateContent.configs(),
+                      Optional.ofNullable(sparkUpdate.getNewConfigs())));
+
+        } else {
+          throw new IllegalArgumentException("Unsupported template update: " + templateUpdate);
+        }
+
+      } else {
+        throw new IllegalArgumentException("Unsupported job template change: " + change);
+      }
+    }
+
+    return newTemplateBuilder
+        .withId(jobTemplateEntity.id())
+        .withName(newName)
+        .withComment(newComment)
+        .withNamespace(jobTemplateIdent.namespace())
+        .withTemplateContent(newTemplateContentBuilder.build())
+        .withAuditInfo(
+            AuditInfo.builder()
+                .withCreator(jobTemplateEntity.auditInfo().creator())
+                .withCreateTime(jobTemplateEntity.auditInfo().createTime())
+                .withLastModifier(PrincipalUtils.getCurrentPrincipal().getName())
+                .withLastModifiedTime(Instant.now())
+                .build())
+        .build();
+  }
+
+  private <T> T updatedValue(T currentValue, Optional<T> newValue) {
+    return newValue.orElse(currentValue);
   }
 }

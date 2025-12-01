@@ -114,4 +114,5 @@ public enum TestDatabaseName {
       return this.name().toLowerCase();
     }
   },
+  PG_ICEBERG_AUTHZ_IT,
 }

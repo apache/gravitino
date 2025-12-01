@@ -22,7 +22,7 @@ This capability allows users to perform federation queries, accessing data from 
 
 * Flink 1.18
 * Scala 2.12
-* JDK 8 or 11 or 17
+* JDK 8, 11 or 17
 
 ## How to use it
 

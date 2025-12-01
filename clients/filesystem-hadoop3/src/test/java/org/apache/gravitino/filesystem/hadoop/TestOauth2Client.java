@@ -56,6 +56,7 @@ import org.apache.gravitino.rest.RESTUtils;
 import org.apache.gravitino.server.authentication.OAuthConfig;
 import org.apache.gravitino.server.authentication.ServerAuthenticator;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hc.core5.http.HttpStatus;
 import org.apache.hc.core5.http.Method;
@@ -180,27 +181,47 @@ public class TestOauth2Client extends TestGvfsBase {
         GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_CLIENT_AUTH_TYPE_KEY,
         GravitinoVirtualFileSystemConfiguration.OAUTH2_AUTH_TYPE);
     assertThrows(
-        IllegalArgumentException.class, () -> managedFilesetPath.getFileSystem(configuration));
+        IllegalArgumentException.class,
+        () -> {
+          FileSystem fs = managedFilesetPath.getFileSystem(configuration);
+          // Trigger lazy initialization
+          fs.exists(managedFilesetPath);
+        });
 
     // set oauth server uri, but do not set other configs
     configuration.set(
         GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_CLIENT_OAUTH2_SERVER_URI_KEY,
         Oauth2MockServerBase.serverUri());
     assertThrows(
-        IllegalArgumentException.class, () -> managedFilesetPath.getFileSystem(configuration));
+        IllegalArgumentException.class,
+        () -> {
+          FileSystem fs = managedFilesetPath.getFileSystem(configuration);
+          // Trigger lazy initialization
+          fs.exists(managedFilesetPath);
+        });
 
     // set oauth server path, but do not set other configs
     configuration.set(
         GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_CLIENT_OAUTH2_PATH_KEY, normal_path);
     assertThrows(
-        IllegalArgumentException.class, () -> managedFilesetPath.getFileSystem(configuration));
+        IllegalArgumentException.class,
+        () -> {
+          FileSystem fs = managedFilesetPath.getFileSystem(configuration);
+          // Trigger lazy initialization
+          fs.exists(managedFilesetPath);
+        });
 
     // set oauth credential, but do not set other configs
     configuration.set(
         GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_CLIENT_OAUTH2_CREDENTIAL_KEY,
         credential);
     assertThrows(
-        IllegalArgumentException.class, () -> managedFilesetPath.getFileSystem(configuration));
+        IllegalArgumentException.class,
+        () -> {
+          FileSystem fs = managedFilesetPath.getFileSystem(configuration);
+          // Trigger lazy initialization
+          fs.exists(managedFilesetPath);
+        });
 
     // set oauth scope, all configs are set
     configuration.set(
@@ -231,7 +252,12 @@ public class TestOauth2Client extends TestGvfsBase {
         GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_CLIENT_OAUTH2_PATH_KEY, invalid_path);
     // should throw UnauthorizedException
     assertThrows(
-        UnauthorizedException.class, () -> managedFilesetPath.getFileSystem(configuration));
+        UnauthorizedException.class,
+        () -> {
+          FileSystem fs = managedFilesetPath.getFileSystem(configuration);
+          // Trigger lazy initialization
+          fs.exists(managedFilesetPath);
+        });
 
     // 2. test wrong client secret
     mockResponse = response().withStatusCode(HttpStatus.SC_INTERNAL_SERVER_ERROR);
@@ -255,7 +281,12 @@ public class TestOauth2Client extends TestGvfsBase {
               Times.exactly(1))
           .respond(mockResponse);
       assertThrows(
-          UnauthorizedException.class, () -> managedFilesetPath.getFileSystem(configuration));
+          UnauthorizedException.class,
+          () -> {
+            FileSystem fs = managedFilesetPath.getFileSystem(configuration);
+            // Trigger lazy initialization
+            fs.exists(managedFilesetPath);
+          });
     } catch (JsonProcessingException e) {
       throw new RuntimeException(e);
     }
@@ -333,7 +364,13 @@ public class TestOauth2Client extends TestGvfsBase {
     config1.set(
         GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_CLIENT_METALAKE_KEY, testMetalake);
     // UnauthorizedException will be caught by the client, and the RESTException will be thrown
-    assertThrows(RESTException.class, () -> newPath.getFileSystem(config1));
+    assertThrows(
+        RESTException.class,
+        () -> {
+          FileSystem fs = newPath.getFileSystem(config1);
+          // Trigger lazy initialization
+          fs.exists(newPath);
+        });
   }
 
   @Test
@@ -358,6 +395,12 @@ public class TestOauth2Client extends TestGvfsBase {
         GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_CLIENT_OAUTH2_PATH_KEY,
         invalid_path + "/bad");
     // should throw BadRequestException
-    assertThrows(BadRequestException.class, () -> managedFilesetPath.getFileSystem(configuration));
+    assertThrows(
+        BadRequestException.class,
+        () -> {
+          FileSystem fs = managedFilesetPath.getFileSystem(configuration);
+          // Trigger lazy initialization
+          fs.exists(managedFilesetPath);
+        });
   }
 }

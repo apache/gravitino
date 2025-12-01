@@ -24,12 +24,14 @@ plugins {
   id("idea")
   alias(libs.plugins.jcstress)
   alias(libs.plugins.jmh)
+  alias(libs.plugins.aspectj.post.compile.weaving)
 }
 
 dependencies {
   implementation(project(":api"))
   implementation(project(":common"))
   implementation(project(":catalogs:catalog-common"))
+  implementation(libs.aspectj.aspectjrt)
   implementation(libs.bundles.log4j)
   implementation(libs.bundles.metrics)
   implementation(libs.bundles.prometheus)
@@ -45,6 +47,9 @@ dependencies {
     exclude(group = "com.fasterxml.jackson.core", module = "*") // provided by gravitino
     exclude(group = "com.fasterxml.jackson.datatype", module = "*") // provided by gravitino
     exclude(group = "commons-codec", module = "commons-codec") // provided by jcasbin
+    exclude(group = "com.google.guava", module = "guava") // provided by gravitino
+    exclude(group = "org.apache.commons", module = "commons-lang3") // provided by gravitino
+    exclude(group = "org.junit.jupiter", module = "*") // provided by test scope
   }
   implementation(libs.mybatis)
 
@@ -71,6 +76,7 @@ dependencies {
   testRuntimeOnly(libs.junit.jupiter.engine)
 
   jcstressImplementation(libs.mockito.core)
+  jcstressImplementation(libs.aspectj.aspectjrt)
 }
 
 tasks.test {

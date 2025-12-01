@@ -34,7 +34,7 @@ public class RemoveUserPreEvent extends UserPreEvent {
    * @param metalake the metalake name of the metalake from which the user is to be removed.
    * @param userName the username which is requested to be removed from the metalake.
    */
-  protected RemoveUserPreEvent(String initiator, String metalake, String userName) {
+  public RemoveUserPreEvent(String initiator, String metalake, String userName) {
     super(initiator, NameIdentifierUtil.ofUser(metalake, userName));
 
     this.userName = userName;

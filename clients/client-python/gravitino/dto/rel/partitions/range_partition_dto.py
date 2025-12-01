@@ -18,7 +18,7 @@
 
 from typing import Dict
 
-from gravitino.api.expressions.partitions.range_partition import RangePartition
+from gravitino.api.rel.partitions.range_partition import RangePartition
 from gravitino.dto.rel.expressions.literal_dto import LiteralDTO
 from gravitino.dto.rel.partitions.partition_dto import PartitionDTO
 

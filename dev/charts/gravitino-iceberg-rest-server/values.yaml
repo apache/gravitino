@@ -78,6 +78,9 @@ icebergRest:
   #   ## JDBC driver class name
   #   ##
   #   driver: "com.mysql.cj.jdbc.Driver"
+  #   ## Schema version for JDBC catalog (required for view support)
+  #   ##
+  #   schemaVersion: "V1"
   ## Implementation class for Iceberg file I/O operations
   ##
   # ioImpl: "org.apache.iceberg.aws.s3.S3FileIO"
@@ -273,6 +276,12 @@ service:
   labels: {}
   portName: http
   nodePort: ""
+
+initScript: |
+  echo "Override config."
+  cp /tmp/conf/* ${GRAVITINO_HOME}/conf
+  echo "Start the Gravitino Iceberg Rest Catalog Server"
+  /bin/bash ${GRAVITINO_HOME}/bin/gravitino-iceberg-rest-server.sh run
 
 ## Readiness probe for the Gravitino deployment
 ##

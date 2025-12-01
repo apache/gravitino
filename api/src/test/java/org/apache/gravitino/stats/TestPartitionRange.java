@@ -88,4 +88,23 @@ public class TestPartitionRange {
     Assertions.assertEquals(PartitionRange.BoundType.CLOSED, range6.lowerBoundType().get());
     Assertions.assertEquals(PartitionRange.BoundType.OPEN, range6.upperBoundType().get());
   }
+
+  @Test
+  public void testUpToWithNullComparator() {
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> PartitionRange.upTo("upper", PartitionRange.BoundType.CLOSED, null));
+  }
+
+  @Test
+  public void testAllPartitionsComparator() {
+    SortOrder defaultSortOrder =
+        SortOrders.of(NamedReference.MetadataField.PARTITION_NAME_FIELD, SortDirection.ASCENDING);
+
+    PartitionRange allPartitions = PartitionRange.ALL_PARTITIONS;
+
+    Assertions.assertFalse(allPartitions.lowerPartitionName().isPresent());
+    Assertions.assertFalse(allPartitions.upperPartitionName().isPresent());
+    Assertions.assertEquals(defaultSortOrder, allPartitions.comparator());
+  }
 }

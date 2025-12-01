@@ -20,13 +20,13 @@ from typing import Dict, List
 
 from gravitino.api.catalog import Catalog
 from gravitino.api.metadata_object import MetadataObject
+from gravitino.api.metadata_objects import MetadataObjects
 from gravitino.api.schema import Schema
 from gravitino.api.schema_change import SchemaChange
 from gravitino.api.supports_schemas import SupportsSchemas
 from gravitino.client.metadata_object_credential_operations import (
     MetadataObjectCredentialOperations,
 )
-from gravitino.client.metadata_object_impl import MetadataObjectImpl
 from gravitino.dto.audit_dto import AuditDTO
 from gravitino.dto.catalog_dto import CatalogDTO
 from gravitino.dto.requests.schema_create_request import SchemaCreateRequest
@@ -35,11 +35,11 @@ from gravitino.dto.requests.schema_updates_request import SchemaUpdatesRequest
 from gravitino.dto.responses.drop_response import DropResponse
 from gravitino.dto.responses.entity_list_response import EntityListResponse
 from gravitino.dto.responses.schema_response import SchemaResponse
+from gravitino.exceptions.base import IllegalArgumentException
 from gravitino.exceptions.handlers.schema_error_handler import SCHEMA_ERROR_HANDLER
 from gravitino.namespace import Namespace
-from gravitino.utils import HTTPClient
 from gravitino.rest.rest_utils import encode_string
-from gravitino.exceptions.base import IllegalArgumentException
+from gravitino.utils import HTTPClient
 
 logger = logging.getLogger(__name__)
 
@@ -82,7 +82,7 @@ class BaseSchemaCatalog(CatalogDTO, SupportsSchemas):
         self.rest_client = rest_client
         self._catalog_namespace = catalog_namespace
 
-        metadata_object = MetadataObjectImpl([name], MetadataObject.Type.CATALOG)
+        metadata_object = MetadataObjects.of([name], MetadataObject.Type.CATALOG)
         self._object_credential_operations = MetadataObjectCredentialOperations(
             catalog_namespace.level(0), metadata_object, rest_client
         )

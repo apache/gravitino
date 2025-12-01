@@ -18,6 +18,8 @@
  */
 package org.apache.gravitino.storage.relational.service;
 
+import static org.apache.gravitino.metrics.source.MetricsSource.GRAVITINO_RELATIONAL_STORE_METRIC_NAME;
+
 import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.util.List;
@@ -32,8 +34,10 @@ import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NonEmptyEntityException;
 import org.apache.gravitino.meta.FilesetEntity;
 import org.apache.gravitino.meta.ModelEntity;
+import org.apache.gravitino.meta.NamespacedEntityId;
 import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.meta.TableEntity;
+import org.apache.gravitino.metrics.Monitored;
 import org.apache.gravitino.storage.relational.helper.SchemaIds;
 import org.apache.gravitino.storage.relational.mapper.FilesetMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.FilesetVersionMapper;
@@ -66,6 +70,9 @@ public class SchemaMetaService {
 
   private SchemaMetaService() {}
 
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "getSchemaPOByCatalogIdAndName")
   public SchemaPO getSchemaPOByCatalogIdAndName(Long catalogId, String schemaName) {
     SchemaPO schemaPO =
         SessionUtils.getWithoutCommit(
@@ -81,21 +88,31 @@ public class SchemaMetaService {
     return schemaPO;
   }
 
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "getSchemaIdByMetalakeNameAndCatalogNameAndSchemaName")
   public SchemaIds getSchemaIdByMetalakeNameAndCatalogNameAndSchemaName(
       String metalakeName, String catalogName, String schemaName) {
-    return SessionUtils.getWithoutCommit(
-        SchemaMetaMapper.class,
-        mapper ->
-            mapper.selectSchemaIdByMetalakeNameAndCatalogNameAndSchemaName(
-                metalakeName, catalogName, schemaName));
+    SchemaIds schemaIds =
+        SessionUtils.getWithoutCommit(
+            SchemaMetaMapper.class,
+            mapper ->
+                mapper.selectSchemaIdByMetalakeNameAndCatalogNameAndSchemaName(
+                    metalakeName, catalogName, schemaName));
+
+    if (schemaIds == null) {
+      throw new NoSuchEntityException(
+          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
+          Entity.EntityType.SCHEMA.name().toLowerCase(),
+          schemaName);
+    }
+
+    return schemaIds;
   }
 
-  // Schema may be deleted, so the SchemaPO may be null.
-  public SchemaPO getSchemaPOById(Long schemaId) {
-    return SessionUtils.getWithoutCommit(
-        SchemaMetaMapper.class, mapper -> mapper.selectSchemaMetaById(schemaId));
-  }
-
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "getSchemaIdByCatalogIdAndName")
   public Long getSchemaIdByCatalogIdAndName(Long catalogId, String schemaName) {
     Long schemaId =
         SessionUtils.getWithoutCommit(
@@ -111,22 +128,31 @@ public class SchemaMetaService {
     return schemaId;
   }
 
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "getSchemaByIdentifier")
   public SchemaEntity getSchemaByIdentifier(NameIdentifier identifier) {
     NameIdentifierUtil.checkSchema(identifier);
     String schemaName = identifier.name();
 
     Long catalogId =
-        CommonMetaService.getInstance().getParentEntityIdByNamespace(identifier.namespace());
+        EntityIdService.getEntityId(
+            NameIdentifier.of(identifier.namespace().levels()), Entity.EntityType.CATALOG);
 
     SchemaPO schemaPO = getSchemaPOByCatalogIdAndName(catalogId, schemaName);
 
     return POConverters.fromSchemaPO(schemaPO, identifier.namespace());
   }
 
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "listSchemasByNamespace")
   public List<SchemaEntity> listSchemasByNamespace(Namespace namespace) {
     NamespaceUtil.checkSchema(namespace);
 
-    Long catalogId = CommonMetaService.getInstance().getParentEntityIdByNamespace(namespace);
+    Long catalogId =
+        EntityIdService.getEntityId(
+            NameIdentifier.of(namespace.levels()), Entity.EntityType.CATALOG);
 
     List<SchemaPO> schemaPOs =
         SessionUtils.getWithoutCommit(
@@ -134,6 +160,9 @@ public class SchemaMetaService {
     return POConverters.fromSchemaPOs(schemaPOs, namespace);
   }
 
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "insertSchema")
   public void insertSchema(SchemaEntity schemaEntity, boolean overwrite) throws IOException {
     try {
       NameIdentifierUtil.checkSchema(schemaEntity.nameIdentifier());
@@ -158,13 +187,17 @@ public class SchemaMetaService {
     }
   }
 
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "updateSchema")
   public <E extends Entity & HasIdentifier> SchemaEntity updateSchema(
       NameIdentifier identifier, Function<E, E> updater) throws IOException {
     NameIdentifierUtil.checkSchema(identifier);
 
     String schemaName = identifier.name();
     Long catalogId =
-        CommonMetaService.getInstance().getParentEntityIdByNamespace(identifier.namespace());
+        EntityIdService.getEntityId(
+            NameIdentifier.of(identifier.namespace().levels()), Entity.EntityType.CATALOG);
 
     SchemaPO oldSchemaPO = getSchemaPOByCatalogIdAndName(catalogId, schemaName);
 
@@ -197,145 +230,143 @@ public class SchemaMetaService {
     }
   }
 
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "deleteSchema")
   public boolean deleteSchema(NameIdentifier identifier, boolean cascade) {
     NameIdentifierUtil.checkSchema(identifier);
 
     String schemaName = identifier.name();
-    Long catalogId =
-        CommonMetaService.getInstance().getParentEntityIdByNamespace(identifier.namespace());
-    Long schemaId = getSchemaIdByCatalogIdAndName(catalogId, schemaName);
+    Long schemaId = EntityIdService.getEntityId(identifier, Entity.EntityType.SCHEMA);
 
-    if (schemaId != null) {
-      if (cascade) {
-        SessionUtils.doMultipleWithCommit(
-            () ->
-                SessionUtils.doWithoutCommit(
-                    SchemaMetaMapper.class,
-                    mapper -> mapper.softDeleteSchemaMetasBySchemaId(schemaId)),
-            () ->
-                SessionUtils.doWithoutCommit(
-                    TableMetaMapper.class,
-                    mapper -> mapper.softDeleteTableMetasBySchemaId(schemaId)),
-            () ->
-                SessionUtils.doWithoutCommit(
-                    TableColumnMapper.class,
-                    mapper -> mapper.softDeleteColumnsBySchemaId(schemaId)),
-            () ->
-                SessionUtils.doWithoutCommit(
-                    FilesetMetaMapper.class,
-                    mapper -> mapper.softDeleteFilesetMetasBySchemaId(schemaId)),
-            () ->
-                SessionUtils.doWithoutCommit(
-                    FilesetVersionMapper.class,
-                    mapper -> mapper.softDeleteFilesetVersionsBySchemaId(schemaId)),
-            () ->
-                SessionUtils.doWithoutCommit(
-                    TopicMetaMapper.class,
-                    mapper -> mapper.softDeleteTopicMetasBySchemaId(schemaId)),
-            () ->
-                SessionUtils.doWithoutCommit(
-                    OwnerMetaMapper.class, mapper -> mapper.softDeleteOwnerRelBySchemaId(schemaId)),
-            () ->
-                SessionUtils.doWithoutCommit(
-                    SecurableObjectMapper.class,
-                    mapper -> mapper.softDeleteObjectRelsBySchemaId(schemaId)),
-            () ->
-                SessionUtils.doWithoutCommit(
-                    TagMetadataObjectRelMapper.class,
-                    mapper -> mapper.softDeleteTagMetadataObjectRelsBySchemaId(schemaId)),
-            () ->
-                SessionUtils.doWithoutCommit(
-                    PolicyMetadataObjectRelMapper.class,
-                    mapper -> mapper.softDeletePolicyMetadataObjectRelsBySchemaId(schemaId)),
-            () ->
-                SessionUtils.doWithoutCommit(
-                    ModelVersionAliasRelMapper.class,
-                    mapper -> mapper.softDeleteModelVersionAliasRelsBySchemaId(schemaId)),
-            () ->
-                SessionUtils.doWithoutCommit(
-                    ModelVersionMetaMapper.class,
-                    mapper -> mapper.softDeleteModelVersionMetasBySchemaId(schemaId)),
-            () ->
-                SessionUtils.doWithoutCommit(
-                    ModelMetaMapper.class,
-                    mapper -> mapper.softDeleteModelMetasBySchemaId(schemaId)),
-            () ->
-                SessionUtils.doWithoutCommit(
-                    StatisticMetaMapper.class,
-                    mapper -> mapper.softDeleteStatisticsBySchemaId(schemaId)));
-      } else {
-        List<TableEntity> tableEntities =
-            TableMetaService.getInstance()
-                .listTablesByNamespace(
-                    NamespaceUtil.ofTable(
-                        identifier.namespace().level(0),
-                        identifier.namespace().level(1),
-                        schemaName));
-        if (!tableEntities.isEmpty()) {
-          throw new NonEmptyEntityException(
-              "Entity %s has sub-entities, you should remove sub-entities first", identifier);
-        }
-        List<FilesetEntity> filesetEntities =
-            FilesetMetaService.getInstance()
-                .listFilesetsByNamespace(
-                    NamespaceUtil.ofFileset(
-                        identifier.namespace().level(0),
-                        identifier.namespace().level(1),
-                        schemaName));
-        if (!filesetEntities.isEmpty()) {
-          throw new NonEmptyEntityException(
-              "Entity %s has sub-entities, you should remove sub-entities first", identifier);
-        }
-        List<ModelEntity> modelEntities =
-            ModelMetaService.getInstance()
-                .listModelsByNamespace(
-                    NamespaceUtil.ofModel(
-                        identifier.namespace().level(0),
-                        identifier.namespace().level(1),
-                        schemaName));
-        if (!modelEntities.isEmpty()) {
-          throw new NonEmptyEntityException(
-              "Entity %s has sub-entities, you should remove sub-entities first", identifier);
-        }
-
-        SessionUtils.doMultipleWithCommit(
-            () ->
-                SessionUtils.doWithoutCommit(
-                    SchemaMetaMapper.class,
-                    mapper -> mapper.softDeleteSchemaMetasBySchemaId(schemaId)),
-            () ->
-                SessionUtils.doWithoutCommit(
-                    OwnerMetaMapper.class,
-                    mapper ->
-                        mapper.softDeleteOwnerRelByMetadataObjectIdAndType(
-                            schemaId, MetadataObject.Type.SCHEMA.name())),
-            () ->
-                SessionUtils.doWithoutCommit(
-                    SecurableObjectMapper.class,
-                    mapper ->
-                        mapper.softDeleteObjectRelsByMetadataObject(
-                            schemaId, MetadataObject.Type.SCHEMA.name())),
-            () ->
-                SessionUtils.doWithoutCommit(
-                    TagMetadataObjectRelMapper.class,
-                    mapper ->
-                        mapper.softDeleteTagMetadataObjectRelsByMetadataObject(
-                            schemaId, MetadataObject.Type.SCHEMA.name())),
-            () ->
-                SessionUtils.doWithoutCommit(
-                    StatisticMetaMapper.class,
-                    mapper -> mapper.softDeleteStatisticsByEntityId(schemaId)),
-            () ->
-                SessionUtils.doWithoutCommit(
-                    PolicyMetadataObjectRelMapper.class,
-                    mapper ->
-                        mapper.softDeletePolicyMetadataObjectRelsByMetadataObject(
-                            schemaId, MetadataObject.Type.SCHEMA.name())));
+    if (cascade) {
+      SessionUtils.doMultipleWithCommit(
+          () ->
+              SessionUtils.doWithoutCommit(
+                  SchemaMetaMapper.class,
+                  mapper -> mapper.softDeleteSchemaMetasBySchemaId(schemaId)),
+          () ->
+              SessionUtils.doWithoutCommit(
+                  TableMetaMapper.class, mapper -> mapper.softDeleteTableMetasBySchemaId(schemaId)),
+          () ->
+              SessionUtils.doWithoutCommit(
+                  TableColumnMapper.class, mapper -> mapper.softDeleteColumnsBySchemaId(schemaId)),
+          () ->
+              SessionUtils.doWithoutCommit(
+                  FilesetMetaMapper.class,
+                  mapper -> mapper.softDeleteFilesetMetasBySchemaId(schemaId)),
+          () ->
+              SessionUtils.doWithoutCommit(
+                  FilesetVersionMapper.class,
+                  mapper -> mapper.softDeleteFilesetVersionsBySchemaId(schemaId)),
+          () ->
+              SessionUtils.doWithoutCommit(
+                  TopicMetaMapper.class, mapper -> mapper.softDeleteTopicMetasBySchemaId(schemaId)),
+          () ->
+              SessionUtils.doWithoutCommit(
+                  OwnerMetaMapper.class, mapper -> mapper.softDeleteOwnerRelBySchemaId(schemaId)),
+          () ->
+              SessionUtils.doWithoutCommit(
+                  SecurableObjectMapper.class,
+                  mapper -> mapper.softDeleteObjectRelsBySchemaId(schemaId)),
+          () ->
+              SessionUtils.doWithoutCommit(
+                  TagMetadataObjectRelMapper.class,
+                  mapper -> mapper.softDeleteTagMetadataObjectRelsBySchemaId(schemaId)),
+          () ->
+              SessionUtils.doWithoutCommit(
+                  PolicyMetadataObjectRelMapper.class,
+                  mapper -> mapper.softDeletePolicyMetadataObjectRelsBySchemaId(schemaId)),
+          () ->
+              SessionUtils.doWithoutCommit(
+                  ModelVersionAliasRelMapper.class,
+                  mapper -> mapper.softDeleteModelVersionAliasRelsBySchemaId(schemaId)),
+          () ->
+              SessionUtils.doWithoutCommit(
+                  ModelVersionMetaMapper.class,
+                  mapper -> mapper.softDeleteModelVersionMetasBySchemaId(schemaId)),
+          () ->
+              SessionUtils.doWithoutCommit(
+                  ModelMetaMapper.class, mapper -> mapper.softDeleteModelMetasBySchemaId(schemaId)),
+          () ->
+              SessionUtils.doWithoutCommit(
+                  StatisticMetaMapper.class,
+                  mapper -> mapper.softDeleteStatisticsBySchemaId(schemaId)));
+    } else {
+      List<TableEntity> tableEntities =
+          TableMetaService.getInstance()
+              .listTablesByNamespace(
+                  NamespaceUtil.ofTable(
+                      identifier.namespace().level(0),
+                      identifier.namespace().level(1),
+                      schemaName));
+      if (!tableEntities.isEmpty()) {
+        throw new NonEmptyEntityException(
+            "Entity %s has sub-entities, you should remove sub-entities first", identifier);
       }
+      List<FilesetEntity> filesetEntities =
+          FilesetMetaService.getInstance()
+              .listFilesetsByNamespace(
+                  NamespaceUtil.ofFileset(
+                      identifier.namespace().level(0),
+                      identifier.namespace().level(1),
+                      schemaName));
+      if (!filesetEntities.isEmpty()) {
+        throw new NonEmptyEntityException(
+            "Entity %s has sub-entities, you should remove sub-entities first", identifier);
+      }
+      List<ModelEntity> modelEntities =
+          ModelMetaService.getInstance()
+              .listModelsByNamespace(
+                  NamespaceUtil.ofModel(
+                      identifier.namespace().level(0),
+                      identifier.namespace().level(1),
+                      schemaName));
+      if (!modelEntities.isEmpty()) {
+        throw new NonEmptyEntityException(
+            "Entity %s has sub-entities, you should remove sub-entities first", identifier);
+      }
+
+      SessionUtils.doMultipleWithCommit(
+          () ->
+              SessionUtils.doWithoutCommit(
+                  SchemaMetaMapper.class,
+                  mapper -> mapper.softDeleteSchemaMetasBySchemaId(schemaId)),
+          () ->
+              SessionUtils.doWithoutCommit(
+                  OwnerMetaMapper.class,
+                  mapper ->
+                      mapper.softDeleteOwnerRelByMetadataObjectIdAndType(
+                          schemaId, MetadataObject.Type.SCHEMA.name())),
+          () ->
+              SessionUtils.doWithoutCommit(
+                  SecurableObjectMapper.class,
+                  mapper ->
+                      mapper.softDeleteObjectRelsByMetadataObject(
+                          schemaId, MetadataObject.Type.SCHEMA.name())),
+          () ->
+              SessionUtils.doWithoutCommit(
+                  TagMetadataObjectRelMapper.class,
+                  mapper ->
+                      mapper.softDeleteTagMetadataObjectRelsByMetadataObject(
+                          schemaId, MetadataObject.Type.SCHEMA.name())),
+          () ->
+              SessionUtils.doWithoutCommit(
+                  StatisticMetaMapper.class,
+                  mapper -> mapper.softDeleteStatisticsByEntityId(schemaId)),
+          () ->
+              SessionUtils.doWithoutCommit(
+                  PolicyMetadataObjectRelMapper.class,
+                  mapper ->
+                      mapper.softDeletePolicyMetadataObjectRelsByMetadataObject(
+                          schemaId, MetadataObject.Type.SCHEMA.name())));
     }
     return true;
   }
 
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "deleteSchemaMetasByLegacyTimeline")
   public int deleteSchemaMetasByLegacyTimeline(Long legacyTimeline, int limit) {
     return SessionUtils.doWithCommitAndFetchResult(
         SchemaMetaMapper.class,
@@ -346,9 +377,10 @@ public class SchemaMetaService {
 
   private void fillSchemaPOBuilderParentEntityId(SchemaPO.Builder builder, Namespace namespace) {
     NamespaceUtil.checkSchema(namespace);
-    Long[] parentEntityIds =
-        CommonMetaService.getInstance().getParentEntityIdsByNamespace(namespace);
-    builder.withMetalakeId(parentEntityIds[0]);
-    builder.withCatalogId(parentEntityIds[1]);
+    NamespacedEntityId namespacedEntityId =
+        EntityIdService.getEntityIds(
+            NameIdentifier.of(namespace.levels()), Entity.EntityType.CATALOG);
+    builder.withMetalakeId(namespacedEntityId.namespaceIds()[0]);
+    builder.withCatalogId(namespacedEntityId.entityId());
   }
 }

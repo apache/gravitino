@@ -20,7 +20,7 @@ from collections.abc import Mapping
 from types import MappingProxyType
 from typing import Final, Pattern, Set
 
-from gravitino.api.types.types import Name, Types
+from gravitino.api.rel.types.types import Name, Types
 
 
 class SerdesUtilsBase:

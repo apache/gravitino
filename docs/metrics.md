@@ -49,3 +49,25 @@ Metrics with the `gravitino-server` prefix pertain to the Gravitino server, whil
 
 JVM metrics source uses [JVM instrumentation](https://metrics.dropwizard.io/4.2.0/manual/jvm.html) with BufferPoolMetricSet, GarbageCollectorMetricSet, and MemoryUsageGaugeSet.
 These metrics start with the `jvm` prefix, like `jvm.heap.used` in JSON format, `jvm_heap_used` in Prometheus format.
+
+#### Catalog metrics
+
+Catalog metrics provide the metrics from different catalog instances.
+All the catalog metrics start with the `gravitino-catalog` prefix in Prometheus format and with labels `provider`, `metalake`, and `catalog` to distinguish different catalog instances.
+
+Currently, Catalog metrics only support Fileset catalog and JDBC catalog. 
+
+You can get Prometheus metrics for a Fileset catalog named `test_catalog` under a metalake named `test_metalake` in the Gravitino server as follows:
+
+```text
+gravitino_catalog_filesystem_cache_hits{provider="fileset",metalake="test_metalake",catalog="test_catalog",} 0.0
+gravitino_catalog_filesystem_cache_misses{provider="fileset",metalake="test_metalake",catalog="test_catalog",} 0.0
+```
+
+You can get Prometheus metrics for a JDBC catalog named `test_catalog` under a metalake named `test_metalake` in the Gravitino server as follows:
+
+```text
+gravitino_catalog_datasource_idle_connections{provider="jdbc",metalake="test_metalake",catalog="test_catalog",} 1.0
+gravitino_catalog_datasource_active_connections{provider="jdbc",metalake="test_metalake",catalog="test_catalog",} 0.0
+gravitino_catalog_datasource_max_connections{provider="jdbc",metalake="test_metalake",catalog="test_catalog",} 10.0
+```

@@ -376,6 +376,22 @@ public class TestJobTemplateDTO {
         JsonUtils.objectMapper().readValue(nullConfigsSerJson, JobTemplateDTO.class);
     Assertions.assertEquals(nullConfigsJobTemplateDTO, nullConfigsDeserJobTemplateDTO);
 
+    // Test className is null
+    SparkJobTemplateDTO nullClassNameJobTemplateDTO =
+        SparkJobTemplateDTO.builder()
+            .withJobType(JobTemplate.JobType.SPARK)
+            .withName("testSparkJobNullClassName")
+            .withExecutable("/path/to/spark-submit")
+            .withAudit(AuditDTO.builder().withCreator("test").withCreateTime(Instant.now()).build())
+            .build();
+
+    Assertions.assertDoesNotThrow(nullClassNameJobTemplateDTO::validate);
+    String nullClassNameSerJson =
+        JsonUtils.objectMapper().writeValueAsString(nullClassNameJobTemplateDTO);
+    JobTemplateDTO nullClassNameDeserJobTemplateDTO =
+        JsonUtils.objectMapper().readValue(nullClassNameSerJson, JobTemplateDTO.class);
+    Assertions.assertEquals(nullClassNameJobTemplateDTO, nullClassNameDeserJobTemplateDTO);
+
     // Test name is null
     Assertions.assertThrows(
         IllegalArgumentException.class,
@@ -420,21 +436,5 @@ public class TestJobTemplateDTO {
           template.validate();
         },
         "\"jobType\" is required and cannot be null");
-
-    // Test className is null
-    Assertions.assertThrows(
-        IllegalArgumentException.class,
-        () -> {
-          SparkJobTemplateDTO template =
-              SparkJobTemplateDTO.builder()
-                  .withJobType(JobTemplate.JobType.SPARK)
-                  .withName("testSparkJobNullClassName")
-                  .withExecutable("/path/to/spark-submit")
-                  .withAudit(
-                      AuditDTO.builder().withCreator("test").withCreateTime(Instant.now()).build())
-                  .build();
-          template.validate();
-        },
-        "\"className\" is required and cannot be empty");
   }
 }

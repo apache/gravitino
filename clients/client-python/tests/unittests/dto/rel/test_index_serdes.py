@@ -21,7 +21,7 @@ from dataclasses import dataclass, field
 
 from dataclasses_json import DataClassJsonMixin, config
 
-from gravitino.api.expressions.indexes.index import Index
+from gravitino.api.rel.indexes.index import Index
 from gravitino.dto.rel.indexes.index_dto import IndexDTO
 from gravitino.dto.rel.indexes.json_serdes.index_serdes import IndexSerdes
 from gravitino.exceptions.base import IllegalArgumentException

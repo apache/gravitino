@@ -17,6 +17,7 @@
 
 from abc import ABC, abstractmethod
 from enum import Enum
+from typing import Optional
 
 
 class MetadataObject(ABC):
@@ -27,30 +28,85 @@ class MetadataObject(ABC):
 
     class Type(Enum):
         """The type of object in the Gravitino system. Every type will map one
-        kind of the entity of the underlying system."""
+        kind of the entity of the underlying system.
+        """
+
+        METALAKE = "metalake"
+        """A metalake is a concept of tenant. It means an organization. A metalake
+        contains many data sources.
+        """
 
         CATALOG = "catalog"
-        """"Metadata Type for catalog."""
+        """A catalog is a collection of metadata from a specific metadata source,
+        like Apache Hive catalog, Apache Iceberg catalog, JDBC catalog, etc.
+        """
+
+        SCHEMA = "schema"
+        """"A schema is a sub collection of the catalog. The schema can contain filesets,
+        tables, topics, etc.
+        """
 
         FILESET = "fileset"
-        """Metadata Type for Fileset System (including HDFS, S3, etc.), like path/to/file"""
+        """A fileset is mapped to a directory on a file system like HDFS, S3, ADLS,
+        GCS, etc.
+        """
+
+        TABLE = "table"
+        """A table is mapped the table of relational data sources like Apache Hive,
+        MySQL, etc.
+        """
+
+        TOPIC = "topic"
+        """A topic is mapped the topic of messaging data sources like Apache Kafka,
+        Apache Pulsar, etc.
+        """
+
+        COLUMN = "column"
+        """A column is a sub-collection of the table that represents a group of
+        same type data.
+        """
+
+        ROLE = "role"
+        """A role is an object contains specific securable objects with privileges."""
+
+        MODEL = "model"
+        """A model is mapped to the model artifact in ML."""
+
+    @abstractmethod
+    def parent(self) -> Optional[str]:
+        """The parent full name of the object.
+
+        If the object doesn't have parent, this method will return `None`.
+
+        Returns:
+            Optional[str]: The parent full name of the object.
+        """
 
     @abstractmethod
     def type(self) -> Type:
-        """
-        The type of the object.
+        """The type of the object.
 
         Returns:
-            The type of the object.
+            Type: The type of the object.
         """
-        pass
 
     @abstractmethod
     def name(self) -> str:
-        """
-        The name of the object.
+        """The name of the object.
 
         Returns:
-            The name of the object.
+            str: The name of the object.
         """
-        pass
+
+    def full_name(self) -> str:
+        """The full name of the object.
+
+        Full name will be separated by "." to represent a string identifier of the object,
+        like catalog, catalog.table, etc.
+
+        Returns:
+            str: The name of the object.
+        """
+
+        parent = self.parent()
+        return ".".join([parent, self.name()]) if parent else self.name()

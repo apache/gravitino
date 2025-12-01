@@ -19,6 +19,7 @@
 package org.apache.gravitino.catalog.lakehouse.iceberg;
 
 import static org.apache.gravitino.connector.PropertyEntry.enumImmutablePropertyEntry;
+import static org.apache.gravitino.connector.PropertyEntry.integerOptionalPropertyEntry;
 import static org.apache.gravitino.connector.PropertyEntry.stringOptionalPropertyEntry;
 import static org.apache.gravitino.connector.PropertyEntry.stringRequiredPropertyEntry;
 
@@ -121,6 +122,24 @@ public class IcebergCatalogPropertiesMetadata extends BaseCatalogPropertiesMetad
                 "Azure storage account key",
                 false /* immutable */,
                 null /* defaultValue */,
+                false /* hidden */),
+            stringOptionalPropertyEntry(
+                IcebergConstants.TABLE_METADATA_CACHE_IMPL,
+                "Table metadata cache implementation",
+                false /* immutable */,
+                null /* defaultValue */,
+                false /* hidden */),
+            integerOptionalPropertyEntry(
+                IcebergConstants.TABLE_METADATA_CACHE_CAPACITY,
+                "Table metadata cache capacity",
+                false /* immutable */,
+                200 /* defaultValue */,
+                false /* hidden */),
+            integerOptionalPropertyEntry(
+                IcebergConstants.TABLE_METADATA_CACHE_EXPIRE_MINUTES,
+                "Table metadata cache TTL in minutes",
+                false /* immutable */,
+                60 /* defaultValue */,
                 false /* hidden */));
     HashMap<String, PropertyEntry<?>> result = Maps.newHashMap();
     result.putAll(Maps.uniqueIndex(propertyEntries, PropertyEntry::getName));

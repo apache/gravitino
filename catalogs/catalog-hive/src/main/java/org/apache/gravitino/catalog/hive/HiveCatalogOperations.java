@@ -280,8 +280,8 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
         classRef = Class.forName("sun.security.krb5.Config");
       }
 
-      Method refershMethod = classRef.getMethod("refresh");
-      refershMethod.invoke(null);
+      Method refreshMethod = classRef.getMethod("refresh");
+      refreshMethod.invoke(null);
     } catch (Exception e) {
       throw new RuntimeException(e);
     }
@@ -968,6 +968,8 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
 
   private void doRenameTable(
       org.apache.hadoop.hive.metastore.api.Table hiveTable, TableChange.RenameTable change) {
+    Preconditions.checkArgument(
+        !change.getNewSchemaName().isPresent(), "Does not support rename schema yet");
     hiveTable.setTableName(change.getNewName());
   }
 

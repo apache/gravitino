@@ -20,6 +20,7 @@ package org.apache.gravitino.spark.connector.integration.test.iceberg;
 
 import com.google.common.collect.Maps;
 import java.util.Map;
+import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import org.apache.gravitino.spark.connector.iceberg.IcebergPropertiesConstants;
 import org.junit.jupiter.api.Tag;
 
@@ -37,6 +38,10 @@ public abstract class SparkIcebergCatalogHiveBackendIT extends SparkIcebergCatal
         IcebergPropertiesConstants.GRAVITINO_ICEBERG_CATALOG_WAREHOUSE, warehouse);
     catalogProperties.put(
         IcebergPropertiesConstants.GRAVITINO_ICEBERG_CATALOG_URI, hiveMetastoreUri);
+    catalogProperties.put(
+        IcebergConstants.TABLE_METADATA_CACHE_IMPL,
+        "org.apache.gravitino.iceberg.common.cache.LocalTableMetadataCache");
+
     return catalogProperties;
   }
 }

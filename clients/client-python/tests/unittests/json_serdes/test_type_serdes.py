@@ -19,10 +19,10 @@ import random
 import unittest
 from itertools import combinations, product
 
-from gravitino.api.types.json_serdes import TypeSerdes
-from gravitino.api.types.json_serdes._helper.serdes_utils import SerdesUtils
-from gravitino.api.types.type import PrimitiveType
-from gravitino.api.types.types import Types
+from gravitino.api.rel.types.json_serdes import TypeSerdes
+from gravitino.api.rel.types.json_serdes._helper.serdes_utils import SerdesUtils
+from gravitino.api.rel.types.type import PrimitiveType
+from gravitino.api.rel.types.types import Types
 from gravitino.exceptions.base import IllegalArgumentException
 
 

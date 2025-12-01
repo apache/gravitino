@@ -30,8 +30,7 @@ public class TagMetaPostgreSQLProvider extends TagMetaBaseSQLProvider {
   public String softDeleteTagMetaByMetalakeAndTagName(String metalakeName, String tagName) {
     return "UPDATE "
         + TAG_TABLE_NAME
-        + " tm SET deleted_at = floor(extract(epoch from(current_timestamp -"
-        + " timestamp '1970-01-01 00:00:00'))*1000)"
+        + " tm SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
         + " WHERE tm.metalake_id IN ("
         + " SELECT mm.metalake_id FROM "
         + MetalakeMetaMapper.TABLE_NAME
@@ -43,8 +42,7 @@ public class TagMetaPostgreSQLProvider extends TagMetaBaseSQLProvider {
   public String softDeleteTagMetasByMetalakeId(Long metalakeId) {
     return "UPDATE "
         + TAG_TABLE_NAME
-        + " SET deleted_at = floor(extract(epoch from(current_timestamp -"
-        + " timestamp '1970-01-01 00:00:00'))*1000)"
+        + " SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
         + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0";
   }
 
@@ -52,10 +50,10 @@ public class TagMetaPostgreSQLProvider extends TagMetaBaseSQLProvider {
   public String insertTagMetaOnDuplicateKeyUpdate(TagPO tagPO) {
     return "INSERT INTO "
         + TAG_TABLE_NAME
-        + "(tag_id, tag_name,"
+        + " (tag_id, tag_name,"
         + " metalake_id, tag_comment, properties, audit_info,"
         + " current_version, last_version, deleted_at)"
-        + " VALUES("
+        + " VALUES ("
         + " #{tagMeta.tagId},"
         + " #{tagMeta.tagName},"
         + " #{tagMeta.metalakeId},"

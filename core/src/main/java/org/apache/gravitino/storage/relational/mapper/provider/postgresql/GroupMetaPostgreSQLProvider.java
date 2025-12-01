@@ -31,8 +31,7 @@ public class GroupMetaPostgreSQLProvider extends GroupMetaBaseSQLProvider {
   public String softDeleteGroupMetaByGroupId(Long groupId) {
     return "UPDATE "
         + GROUP_TABLE_NAME
-        + " SET deleted_at = floor(extract(epoch from(current_timestamp -"
-        + " timestamp '1970-01-01 00:00:00'))*1000)"
+        + " SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
         + " WHERE group_id = #{groupId} AND deleted_at = 0";
   }
 
@@ -40,8 +39,7 @@ public class GroupMetaPostgreSQLProvider extends GroupMetaBaseSQLProvider {
   public String softDeleteGroupMetasByMetalakeId(Long metalakeId) {
     return "UPDATE "
         + GROUP_TABLE_NAME
-        + " SET deleted_at = floor(extract(epoch from(current_timestamp -"
-        + " timestamp '1970-01-01 00:00:00'))*1000)"
+        + " SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
         + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0";
   }
 
@@ -49,10 +47,10 @@ public class GroupMetaPostgreSQLProvider extends GroupMetaBaseSQLProvider {
   public String insertGroupMetaOnDuplicateKeyUpdate(GroupPO groupPO) {
     return "INSERT INTO "
         + GROUP_TABLE_NAME
-        + "(group_id, group_name,"
-        + "metalake_id, audit_info,"
+        + " (group_id, group_name,"
+        + " metalake_id, audit_info,"
         + " current_version, last_version, deleted_at)"
-        + " VALUES("
+        + " VALUES ("
         + " #{groupMeta.groupId},"
         + " #{groupMeta.groupName},"
         + " #{groupMeta.metalakeId},"

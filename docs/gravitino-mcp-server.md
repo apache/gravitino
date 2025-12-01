@@ -31,7 +31,7 @@ Gravitino MCP server provides the ability to manage Gravitino metadata for LLM.
         "mcp_server",
         "--metalake",
         "test",
-        "--uri",
+        "--gravitino-uri",
         "http://127.0.0.1:8090"
       ]
     }
@@ -39,7 +39,7 @@ Gravitino MCP server provides the ability to manage Gravitino metadata for LLM.
 }
 ```
 
-Or start a HTTP MCP server by `uv run mcp_server --metalake test --uri http://127.0.0.1:8090 --transport http --mcp-url http://localhost:8000/mcp`, and use the configuration:
+Or start an HTTP MCP server by `uv run mcp_server --metalake test --gravitino-uri http://127.0.0.1:8090 --transport http --mcp-url http://localhost:8000/mcp`, and use the configuration:
 
 ```json
 {
@@ -53,7 +53,7 @@ Or start a HTTP MCP server by `uv run mcp_server --metalake test --uri http://12
 
 ### Docker instructions
 
-You could start Gravitino MCP server by docker image, `docker run -p 8000:8000 apache/gravitino-mcp-server:latest --metalake test --transport http --mcp-url http://0.0.0.0:8000/mcp`. Please note that the MCP server in docker container doesn't support `stdio` transport mode.
+You could start Gravitino MCP server by Docker image, `docker run -p 8000:8000 --network=host apache/gravitino-mcp-server:latest --metalake test --transport http --mcp-url http://0.0.0.0:8000/mcp --gravitino-uri http://127.0.0.1:8090`. Please note that the MCP server in Docker container doesn't support `stdio` transport mode.
 
 ### Supported tools
 
@@ -101,9 +101,9 @@ Gravitino MCP server supports the following tools, and you could export tool by 
 
 You could config Gravitino MCP server by arguments, `uv run mcp_server -h` shows the detailed information.
 
-| Argument      | Description                                                     | Default value               | Required | Since version |
-|---------------|-----------------------------------------------------------------|-----------------------------|----------|---------------|
-| `--metalake`  | The Gravitino metalake name.                                    | none                        | Yes      | 1.0.0         |
-| `--uri`       | The URI of Gravitino server.                                    | `http://127.0.0.1:8090`     | No       | 1.0.0         |
-| `--transport` | Transport protocol type: stdio (local), http (Streamable HTTP). | `stdio`                     | No       | 1.0.0         |
-| `--mcp-url`   | The url of MCP server if using http transport.                  | `http://127.0.0.1:8000/mcp` | No       | 1.0.0         |
+| Argument          | Description                                                     | Default value               | Required | Since version |
+|-------------------|-----------------------------------------------------------------|-----------------------------|----------|---------------|
+| `--metalake`      | The Gravitino metalake name.                                    | none                        | Yes      | 1.0.0         |
+| `--gravitino-uri` | The URI of Gravitino server.                                    | `http://127.0.0.1:8090`     | No       | 1.0.0         |
+| `--transport`     | Transport protocol type: stdio (local), http (Streamable HTTP). | `stdio`                     | No       | 1.0.0         |
+| `--mcp-url`       | The url of MCP server if using http transport.                  | `http://127.0.0.1:8000/mcp` | No       | 1.0.0         |

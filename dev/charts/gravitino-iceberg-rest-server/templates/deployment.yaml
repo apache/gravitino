@@ -39,9 +39,11 @@ spec:
 
   template:
     metadata:
+
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
       # Pod annotations (if configured)
       {{- with .Values.podAnnotations }}
-      annotations:
         {{- toYaml . | nindent 8 }}
       {{- end }}
 

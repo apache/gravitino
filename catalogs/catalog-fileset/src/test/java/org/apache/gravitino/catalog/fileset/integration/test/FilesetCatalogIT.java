@@ -1300,7 +1300,8 @@ public class FilesetCatalogIT extends BaseIT {
       Path location = new Path(storageLocation);
       try {
         fileSystem.deleteOnExit(location);
-      } catch (IOException e) {
+        // Catch any exception to avoid test failure.
+      } catch (Exception e) {
         LOG.warn("Failed to delete location: {}", location, e);
       }
     }

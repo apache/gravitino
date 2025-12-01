@@ -21,7 +21,7 @@ from abc import abstractmethod
 from enum import Enum, unique
 from typing import TYPE_CHECKING, ClassVar, List
 
-from gravitino.api.expressions.expression import Expression
+from gravitino.api.rel.expressions.expression import Expression
 from gravitino.dto.rel.partition_utils import PartitionUtils
 
 if TYPE_CHECKING:

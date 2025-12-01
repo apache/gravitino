@@ -33,6 +33,7 @@ import javax.ws.rs.DELETE;
 import javax.ws.rs.DefaultValue;
 import javax.ws.rs.GET;
 import javax.ws.rs.POST;
+import javax.ws.rs.PUT;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
@@ -46,6 +47,8 @@ import org.apache.gravitino.dto.job.ShellJobTemplateDTO;
 import org.apache.gravitino.dto.job.SparkJobTemplateDTO;
 import org.apache.gravitino.dto.requests.JobRunRequest;
 import org.apache.gravitino.dto.requests.JobTemplateRegisterRequest;
+import org.apache.gravitino.dto.requests.JobTemplateUpdateRequest;
+import org.apache.gravitino.dto.requests.JobTemplateUpdatesRequest;
 import org.apache.gravitino.dto.responses.BaseResponse;
 import org.apache.gravitino.dto.responses.DropResponse;
 import org.apache.gravitino.dto.responses.JobListResponse;
@@ -55,6 +58,7 @@ import org.apache.gravitino.dto.responses.JobTemplateResponse;
 import org.apache.gravitino.dto.responses.NameListResponse;
 import org.apache.gravitino.dto.util.DTOConverters;
 import org.apache.gravitino.job.JobOperationDispatcher;
+import org.apache.gravitino.job.JobTemplateChange;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.JobEntity;
 import org.apache.gravitino.meta.JobTemplateEntity;
@@ -199,6 +203,40 @@ public class JobOperations {
 
     } catch (Exception e) {
       return ExceptionHandlers.handleJobTemplateException(OperationType.DELETE, name, metalake, e);
+    }
+  }
+
+  @PUT
+  @Path("templates/{name}")
+  @Produces("application/vnd.gravitino.v1+json")
+  @Timed(name = "alter-job-template." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
+  @ResponseMetered(name = "alter-job-template", absolute = true)
+  public Response alterJobTemplate(
+      @PathParam("metalake") String metalake,
+      @PathParam("name") String jobTemplateName,
+      JobTemplateUpdatesRequest request) {
+    LOG.info(
+        "Received request to alter job template: {} in metalake: {}", jobTemplateName, metalake);
+
+    try {
+      return Utils.doAs(
+          httpRequest,
+          () -> {
+            request.validate();
+            JobTemplateChange[] changes =
+                request.getUpdates().stream()
+                    .map(JobTemplateUpdateRequest::jobTemplateChange)
+                    .toArray(JobTemplateChange[]::new);
+
+            JobTemplateEntity updatedEntity =
+                jobOperationDispatcher.alterJobTemplate(metalake, jobTemplateName, changes);
+            Response response = Utils.ok(new JobTemplateResponse(toDTO(updatedEntity)));
+            LOG.info("Job template {} in metalake {} is altered", jobTemplateName, metalake);
+            return response;
+          });
+    } catch (Exception e) {
+      return ExceptionHandlers.handleJobTemplateException(
+          OperationType.ALTER, jobTemplateName, metalake, e);
     }
   }
 

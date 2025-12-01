@@ -59,12 +59,16 @@ public final class RangePartitioningDTO implements Partitioning {
     this.assignments = assignments;
   }
 
-  /** @return The name of the field to partition. */
+  /**
+   * @return The name of the field to partition.
+   */
   public String[] fieldName() {
     return fieldName;
   }
 
-  /** @return The name of the partitioning strategy. */
+  /**
+   * @return The name of the partitioning strategy.
+   */
   @Override
   public String name() {
     return strategy().name().toLowerCase();
@@ -75,13 +79,17 @@ public final class RangePartitioningDTO implements Partitioning {
     return assignments;
   }
 
-  /** @return The arguments of the partitioning. */
+  /**
+   * @return The arguments of the partitioning.
+   */
   @Override
   public Expression[] arguments() {
     return new Expression[] {field(fieldName)};
   }
 
-  /** @return The strategy of the partitioning. */
+  /**
+   * @return The strategy of the partitioning.
+   */
   @Override
   public Strategy strategy() {
     return Strategy.RANGE;

@@ -68,7 +68,9 @@ public class RoleDTO implements Role {
     this.securableObjects = securableObjects;
   }
 
-  /** @return The name of the Role DTO. */
+  /**
+   * @return The name of the Role DTO.
+   */
   @Override
   public String name() {
     return name;
@@ -96,7 +98,9 @@ public class RoleDTO implements Role {
     return Arrays.asList(securableObjects);
   }
 
-  /** @return The audit information of the Role DTO. */
+  /**
+   * @return The audit information of the Role DTO.
+   */
   @Override
   public Audit auditInfo() {
     return audit;

@@ -113,7 +113,7 @@ public class FilesetVersionBaseSQLProvider {
   public String selectFilesetVersionsByRetentionCount(
       @Param("versionRetentionCount") Long versionRetentionCount) {
     return "SELECT fileset_id as filesetId,"
-        + " Max(version) as version"
+        + " MAX(version) as version"
         + " FROM "
         + VERSION_TABLE_NAME
         + " WHERE version > #{versionRetentionCount} AND deleted_at = 0"

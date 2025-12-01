@@ -21,7 +21,7 @@ package org.apache.gravitino.listener.api.event;
 
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.annotation.DeveloperApi;
-import org.apache.gravitino.iceberg.service.IcebergRestUtils;
+import org.apache.gravitino.iceberg.service.IcebergRESTUtils;
 import org.apache.iceberg.rest.requests.CreateViewRequest;
 import org.apache.iceberg.rest.responses.LoadViewResponse;
 
@@ -39,9 +39,9 @@ public class IcebergCreateViewEvent extends IcebergViewEvent {
       LoadViewResponse loadViewResponse) {
     super(icebergRequestContext, viewIdentifier);
     this.createViewRequest =
-        IcebergRestUtils.cloneIcebergRESTObject(createViewRequest, CreateViewRequest.class);
+        IcebergRESTUtils.cloneIcebergRESTObject(createViewRequest, CreateViewRequest.class);
     this.loadViewResponse =
-        IcebergRestUtils.cloneIcebergRESTObject(loadViewResponse, LoadViewResponse.class);
+        IcebergRESTUtils.cloneIcebergRESTObject(loadViewResponse, LoadViewResponse.class);
   }
 
   public CreateViewRequest createViewRequest() {

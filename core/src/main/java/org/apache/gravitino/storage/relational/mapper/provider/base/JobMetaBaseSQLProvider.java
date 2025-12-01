@@ -97,7 +97,7 @@ public class JobMetaBaseSQLProvider {
       @Param("jobTemplateName") String jobTemplateName) {
     return "SELECT jrm.job_run_id AS jobRunId, jtm.job_template_name AS jobTemplateName,"
         + " jrm.metalake_id AS metalakeId, jrm.job_execution_id AS jobExecutionId,"
-        + " jrm.job_run_status AS jobRunStatus, jrm.job_finished_at AS jobFinishedAt, "
+        + " jrm.job_run_status AS jobRunStatus, jrm.job_finished_at AS jobFinishedAt,"
         + " jrm.audit_info AS auditInfo,"
         + " jrm.current_version AS currentVersion, jrm.last_version AS lastVersion,"
         + " jrm.deleted_at AS deletedAt"

@@ -44,13 +44,59 @@ import org.apache.gravitino.tag.SupportsTags;
 @Evolving
 public interface Table extends Auditable {
 
-  /** @return Name of the table. */
+  /**
+   * The property name for the table format. This property indicates the format of the table, such
+   * as "iceberg", "hudi", "lance", etc. generic lakehouse catalog will use this property to
+   * determine the table format and perform specific operations based on the format. For other
+   * relational catalogs, this property can be ignored.
+   *
+   * <p>This property is a must-have property for generic lakehouse catalog to create tables, and
+   * cannot be modified after table creation.
+   *
+   * <p>Current supported formats include:
+   *
+   * <ul>
+   *   <li>lance
+   * </ul>
+   */
+  String PROPERTY_TABLE_FORMAT = "format";
+
+  /**
+   * The property name to indicate whether the table is external. This property is a boolean value
+   * represented as a string ("true" or "false"). if true (the table is external), the drop
+   * operation will not delete the underlying data.
+   *
+   * <p>This property is optional and defaults to "false" if not specified. Also, it depends on the
+   * catalog implementation to decide whether to leverage and allow to alter this property.
+   */
+  String PROPERTY_EXTERNAL = "external";
+
+  /**
+   * The property name for the table location. This property indicates the physical location of the
+   * table's data, such as a file path or a URI.
+   *
+   * <p>The location property is optional, it can be specified when creating the table. If not, the
+   * catalog implementation may use a location based on the catalog and schema location properties.
+   *
+   * <p>It depends on the catalog implementation to decide whether to leverage and allow to alter
+   * this property after table creation. And the behavior of altering this property (moving the
+   * table data) is also catalog specific.
+   */
+  String PROPERTY_LOCATION = "location";
+
+  /**
+   * @return Name of the table.
+   */
   String name();
 
-  /** @return The columns of the table. */
+  /**
+   * @return The columns of the table.
+   */
   Column[] columns();
 
-  /** @return The physical partitioning of the table. */
+  /**
+   * @return The physical partitioning of the table.
+   */
   default Transform[] partitioning() {
     return Transforms.EMPTY_TRANSFORM;
   }
@@ -78,13 +124,17 @@ public interface Table extends Auditable {
     return Indexes.EMPTY_INDEXES;
   }
 
-  /** @return The comment of the table. Null is returned if no comment is set. */
+  /**
+   * @return The comment of the table. Null is returned if no comment is set.
+   */
   @Nullable
   default String comment() {
     return null;
   }
 
-  /** @return The properties of the table. Empty map is returned if no properties are set. */
+  /**
+   * @return The properties of the table. Empty map is returned if no properties are set.
+   */
   default Map<String, String> properties() {
     return Collections.emptyMap();
   }

@@ -89,16 +89,22 @@ public interface Fileset extends Auditable {
     EXTERNAL
   }
 
-  /** @return Name of the fileset object. */
+  /**
+   * @return Name of the fileset object.
+   */
   String name();
 
-  /** @return The comment of the fileset object. Null is returned if no comment is set. */
+  /**
+   * @return The comment of the fileset object. Null is returned if no comment is set.
+   */
   @Nullable
   default String comment() {
     return null;
   }
 
-  /** @return The type of the fileset object. */
+  /**
+   * @return The type of the fileset object.
+   */
   Type type();
 
   /**

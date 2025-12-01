@@ -40,7 +40,9 @@ public final class HourPartitioningDTO extends Partitioning.SingleFieldPartition
     this.fieldName = fieldName;
   }
 
-  /** @return The strategy of the partitioning. */
+  /**
+   * @return The strategy of the partitioning.
+   */
   @Override
   public Strategy strategy() {
     return Strategy.HOUR;

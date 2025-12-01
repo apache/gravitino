@@ -22,9 +22,6 @@ import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.HADOOP_SECURITY
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.HADOOP_SECURITY_AUTHORIZATION;
 
 import com.google.common.annotations.VisibleForTesting;
-import java.io.File;
-import java.io.IOException;
-import java.lang.reflect.Field;
 import java.sql.SQLException;
 import java.util.Collections;
 import java.util.HashMap;
@@ -36,20 +33,18 @@ import org.apache.gravitino.exceptions.ConnectionFailedException;
 import org.apache.gravitino.iceberg.common.ClosableHiveCatalog;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
 import org.apache.gravitino.iceberg.common.authentication.AuthenticationConfig;
-import org.apache.gravitino.iceberg.common.authentication.kerberos.KerberosClient;
-import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdfs.HdfsConfiguration;
-import org.apache.hadoop.hive.metastore.IMetaStoreClient;
 import org.apache.iceberg.CatalogProperties;
 import org.apache.iceberg.CatalogUtil;
-import org.apache.iceberg.ClientPool;
 import org.apache.iceberg.catalog.Catalog;
 import org.apache.iceberg.hive.HiveCatalog;
+import org.apache.iceberg.hive.HiveCatalogWithMetadataLocationSupport;
 import org.apache.iceberg.inmemory.InMemoryCatalog;
 import org.apache.iceberg.jdbc.JdbcCatalog;
+import org.apache.iceberg.jdbc.JdbcCatalogWithMetadataLocationSupport;
 import org.apache.iceberg.jdbc.UncheckedSQLException;
+import org.apache.iceberg.memory.MemoryCatalogWithMetadataLocationSupport;
 import org.apache.iceberg.rest.RESTCatalog;
-import org.apache.thrift.TException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -59,7 +54,7 @@ public class IcebergCatalogUtil {
 
   private static InMemoryCatalog loadMemoryCatalog(IcebergConfig icebergConfig) {
     String icebergCatalogName = icebergConfig.getCatalogBackendName();
-    InMemoryCatalog memoryCatalog = new InMemoryCatalog();
+    InMemoryCatalog memoryCatalog = new MemoryCatalogWithMetadataLocationSupport();
     Map<String, String> resultProperties = icebergConfig.getIcebergCatalogProperties();
     if (!resultProperties.containsKey(IcebergConstants.WAREHOUSE)) {
       resultProperties.put(IcebergConstants.WAREHOUSE, "/tmp");
@@ -69,7 +64,7 @@ public class IcebergCatalogUtil {
   }
 
   private static HiveCatalog loadHiveCatalog(IcebergConfig icebergConfig) {
-    ClosableHiveCatalog hiveCatalog = new ClosableHiveCatalog();
+    ClosableHiveCatalog hiveCatalog = new HiveCatalogWithMetadataLocationSupport();
     HdfsConfiguration hdfsConfiguration = new HdfsConfiguration();
     String icebergCatalogName = icebergConfig.getCatalogBackendName();
 
@@ -87,52 +82,10 @@ public class IcebergCatalogUtil {
       hdfsConfiguration.set(HADOOP_SECURITY_AUTHENTICATION, "kerberos");
       hiveCatalog.setConf(hdfsConfiguration);
       hiveCatalog.initialize(icebergCatalogName, resultProperties);
-      resetIcebergHiveClientPool(hiveCatalog, resultProperties);
-
-      KerberosClient kerberosClient = initKerberosAndReturnClient(properties, hdfsConfiguration);
-      hiveCatalog.setKerberosClient(kerberosClient);
       return hiveCatalog;
     } else {
       throw new UnsupportedOperationException(
           "Unsupported authentication method: " + authenticationConfig.getAuthType());
-    }
-  }
-
-  // Replace the original client pool with IcebergHiveCachedClientPool. Why do we need to do
-  // this? Because the original client pool in Iceberg uses a fixed username to create the
-  // client pool, and it will not work with kerberos authentication. We need to create a new
-  // client pool with the current user. For more, please see CachedClientPool#clientPool and
-  // notice the value of `key`
-  private static ClientPool<IMetaStoreClient, TException> resetIcebergHiveClientPool(
-      HiveCatalog hiveCatalog, Map<String, String> properties) {
-    try {
-      final Field m = HiveCatalog.class.getDeclaredField("clients");
-      m.setAccessible(true);
-
-      // TODO: we need to close the original client pool and thread pool, or it will cause memory
-      //  leak.
-      ClientPool<IMetaStoreClient, TException> newClientPool =
-          new IcebergHiveCachedClientPool(hiveCatalog.getConf(), properties);
-      m.set(hiveCatalog, newClientPool);
-      return newClientPool;
-    } catch (IllegalAccessException | NoSuchFieldException e) {
-      throw new RuntimeException("Failed to reset the iceberg hive client pool", e);
-    }
-  }
-
-  private static KerberosClient initKerberosAndReturnClient(
-      Map<String, String> properties, Configuration conf) {
-    try {
-      KerberosClient kerberosClient = new KerberosClient(properties, conf);
-
-      // For Iceberg rest server, we haven't set the catalog_uuid, so we set it to 0 as there is
-      // only one catalog in the rest server, so it's okay to set it to 0.
-      String catalogUUID = properties.getOrDefault("catalog_uuid", "0");
-      File keytabFile = kerberosClient.saveKeyTabFileFromUri(Long.valueOf(catalogUUID));
-      kerberosClient.login(keytabFile.getAbsolutePath());
-      return kerberosClient;
-    } catch (IOException e) {
-      throw new RuntimeException("Failed to login with kerberos", e);
     }
   }
 
@@ -149,7 +102,8 @@ public class IcebergCatalogUtil {
       throw new IllegalArgumentException("Couldn't load jdbc driver " + driverClassName);
     }
     JdbcCatalog jdbcCatalog =
-        new JdbcCatalog(null, null, icebergConfig.get(IcebergConfig.JDBC_INIT_TABLES));
+        new JdbcCatalogWithMetadataLocationSupport(
+            icebergConfig.get(IcebergConfig.JDBC_INIT_TABLES));
 
     HdfsConfiguration hdfsConfiguration = new HdfsConfiguration();
     properties.forEach(hdfsConfiguration::set);

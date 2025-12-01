@@ -37,6 +37,8 @@ import org.apache.gravitino.rel.expressions.literals.Literal;
 @Evolving
 public interface ListPartition extends Partition {
 
-  /** @return The values of the list partition. */
+  /**
+   * @return The values of the list partition.
+   */
   Literal<?>[][] lists();
 }

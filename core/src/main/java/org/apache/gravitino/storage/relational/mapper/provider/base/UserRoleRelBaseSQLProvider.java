@@ -32,7 +32,7 @@ public class UserRoleRelBaseSQLProvider {
       @Param("userRoleRelList") List<UserRoleRelPO> userRoleRelList) {
     return "<script> INSERT INTO "
         + USER_ROLE_RELATION_TABLE_NAME
-        + "(user_id, role_id,"
+        + " (user_id, role_id,"
         + " audit_info,"
         + " current_version, last_version, deleted_at)"
         + " VALUES "
@@ -52,7 +52,7 @@ public class UserRoleRelBaseSQLProvider {
     return "<script>"
         + "INSERT INTO "
         + USER_ROLE_RELATION_TABLE_NAME
-        + "(user_id, role_id,"
+        + " (user_id, role_id,"
         + " audit_info,"
         + " current_version, last_version, deleted_at)"
         + " VALUES "
@@ -77,8 +77,8 @@ public class UserRoleRelBaseSQLProvider {
   public String softDeleteUserRoleRelByUserId(@Param("userId") Long userId) {
     return "UPDATE "
         + USER_ROLE_RELATION_TABLE_NAME
-        + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0) "
-        + "+ EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
+        + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
+        + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
         + " WHERE user_id = #{userId} AND deleted_at = 0";
   }
 
@@ -87,22 +87,22 @@ public class UserRoleRelBaseSQLProvider {
     return "<script>"
         + "UPDATE "
         + USER_ROLE_RELATION_TABLE_NAME
-        + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0) "
-        + "+ EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
-        + " WHERE user_id = #{userId} AND role_id in ("
+        + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
+        + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
+        + " WHERE user_id = #{userId} AND role_id IN ("
         + "<foreach collection='roleIds' item='roleId' separator=','>"
         + "#{roleId}"
         + "</foreach>"
-        + ") "
-        + "AND deleted_at = 0"
+        + " )"
+        + " AND deleted_at = 0"
         + "</script>";
   }
 
   public String softDeleteUserRoleRelByMetalakeId(Long metalakeId) {
     return "UPDATE "
         + USER_ROLE_RELATION_TABLE_NAME
-        + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0) "
-        + "+ EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
+        + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
+        + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
         + " WHERE user_id IN (SELECT user_id FROM "
         + USER_TABLE_NAME
         + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0)"
@@ -112,8 +112,8 @@ public class UserRoleRelBaseSQLProvider {
   public String softDeleteUserRoleRelByRoleId(@Param("roleId") Long roleId) {
     return "UPDATE "
         + USER_ROLE_RELATION_TABLE_NAME
-        + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0) "
-        + "+ EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
+        + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
+        + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
         + " WHERE role_id = #{roleId} AND deleted_at = 0";
   }
 

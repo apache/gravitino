@@ -216,7 +216,9 @@ class TestGvfsWithHDFS(IntegrationTestEnv):
     @classmethod
     def _clean_test_data(cls):
         cls.gravitino_client = GravitinoClient(
-            uri="http://localhost:8090", metalake_name=cls.metalake_name
+            uri="http://localhost:8090",
+            metalake_name=cls.metalake_name,
+            client_config={"gravitino_client_request_timeout": 180},
         )
         catalog = cls.gravitino_client.load_catalog(name=cls.catalog_name)
 
@@ -270,7 +272,9 @@ class TestGvfsWithHDFS(IntegrationTestEnv):
             metalake_name=self.metalake_name,
             options=options,
         )
-        token = fs._operations._client._rest_client.auth_data_provider.get_token_data()
+        # Trigger lazy client initialization
+        client = fs._operations._get_gravitino_client()
+        token = client._rest_client.auth_data_provider.get_token_data()
         token_string = base64.b64decode(
             token.decode("utf-8")[len(AuthConstants.AUTHORIZATION_BASIC_HEADER) :]
         ).decode("utf-8")

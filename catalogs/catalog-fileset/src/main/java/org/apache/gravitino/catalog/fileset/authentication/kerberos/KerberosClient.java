@@ -19,6 +19,9 @@
 
 package org.apache.gravitino.catalog.fileset.authentication.kerberos;
 
+import static org.apache.gravitino.catalog.hadoop.fs.Constants.HADOOP_KRB5_CONF;
+import static org.apache.gravitino.catalog.hadoop.fs.Constants.SECURITY_KRB5_ENV;
+
 import com.google.common.base.Preconditions;
 import com.google.common.base.Splitter;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
@@ -52,7 +55,7 @@ public class KerberosClient implements Closeable {
   }
 
   public String login(String keytabFilePath) throws IOException {
-    KerberosConfig kerberosConfig = new KerberosConfig(conf);
+    KerberosConfig kerberosConfig = new KerberosConfig(conf, hadoopConf);
 
     // Check the principal and keytab file
     String catalogPrincipal = kerberosConfig.getPrincipalName();
@@ -62,6 +65,11 @@ public class KerberosClient implements Closeable {
     List<String> principalComponents = Splitter.on('@').splitToList(catalogPrincipal);
     Preconditions.checkArgument(
         principalComponents.size() == 2, "The principal has the wrong format");
+
+    String krb5Config = hadoopConf.get(HADOOP_KRB5_CONF);
+    if (krb5Config != null) {
+      System.setProperty(SECURITY_KRB5_ENV, krb5Config);
+    }
 
     // Login
     UserGroupInformation.setConfiguration(hadoopConf);
@@ -89,7 +97,7 @@ public class KerberosClient implements Closeable {
   }
 
   public File saveKeyTabFileFromUri(String keytabPath) throws IOException {
-    KerberosConfig kerberosConfig = new KerberosConfig(conf);
+    KerberosConfig kerberosConfig = new KerberosConfig(conf, hadoopConf);
 
     String keyTabUri = kerberosConfig.getKeytab();
     Preconditions.checkArgument(StringUtils.isNotBlank(keyTabUri), "Keytab uri can't be blank");

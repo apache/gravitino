@@ -19,7 +19,7 @@ The Apache Gravitino Spark connector leverages the Spark DataSourceV2 interface 
 
 * Spark 3.3 or 3.4 or 3.5
 * Scala 2.12 or 2.13
-* JDK 8 or 11 or 17
+* JDK 8, 11 or 17
 
 ## How to use it
 

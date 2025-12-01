@@ -307,6 +307,12 @@ public class TestTableChange {
     assertFalse(change1.equals(change2));
     assertFalse(change2.equals(change1));
     assertNotEquals(change1.hashCode(), change2.hashCode());
+
+    String schemaNameA = "Schema A";
+    RenameTable change3 = (RenameTable) TableChange.rename(nameA, schemaNameA);
+    RenameTable change4 = (RenameTable) TableChange.rename(nameB, schemaNameA);
+
+    assertNotEquals(change3, change4);
   }
 
   @Test

@@ -76,7 +76,7 @@ public class ModelMetaBaseSQLProvider {
         + " FROM "
         + ModelMetaMapper.TABLE_NAME
         + " WHERE deleted_at = 0"
-        + " AND model_id in ("
+        + " AND model_id IN ("
         + "<foreach collection='modelIds' item='modelId' separator=','>"
         + "#{modelId}"
         + "</foreach>"
@@ -106,7 +106,7 @@ public class ModelMetaBaseSQLProvider {
   public String selectModelMetaByModelId(@Param("modelId") Long modelId) {
     return "SELECT model_id AS modelId, model_name AS modelName, metalake_id AS metalakeId,"
         + " catalog_id AS catalogId, schema_id AS schemaId, model_comment AS modelComment,"
-        + " model_properties AS modelProperties, model_latest_version AS "
+        + " model_properties AS modelProperties, model_latest_version AS"
         + " modelLatestVersion, audit_info AS auditInfo, deleted_at AS deletedAt"
         + " FROM "
         + ModelMetaMapper.TABLE_NAME

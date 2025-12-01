@@ -38,7 +38,6 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
-import org.apache.gravitino.exceptions.UnmodifiableStatisticException;
 import org.apache.gravitino.lock.LockType;
 import org.apache.gravitino.lock.TreeLockUtils;
 import org.apache.gravitino.meta.AuditInfo;
@@ -56,7 +55,7 @@ import org.apache.gravitino.utils.PrincipalUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class StatisticManager implements Closeable {
+public class StatisticManager implements Closeable, StatisticDispatcher {
 
   private static final String OPTIONS_PREFIX = "gravitino.stats.partition.storageOption.";
   private static final Logger LOG = LoggerFactory.getLogger(StatisticManager.class);
@@ -86,6 +85,7 @@ public class StatisticManager implements Closeable {
     }
   }
 
+  @Override
   public List<Statistic> listStatistics(String metalake, MetadataObject metadataObject) {
     try {
       NameIdentifier identifier = MetadataObjectUtil.toEntityIdent(metalake, metadataObject);
@@ -94,7 +94,8 @@ public class StatisticManager implements Closeable {
           identifier,
           LockType.READ,
           () ->
-              store.list(Namespace.fromString(identifier.toString()), StatisticEntity.class, type)
+              store
+                  .list(Namespace.fromString(identifier.toString()), StatisticEntity.class, type)
                   .stream()
                   .map(
                       entity -> {
@@ -122,6 +123,7 @@ public class StatisticManager implements Closeable {
     }
   }
 
+  @Override
   public void updateStatistics(
       String metalake, MetadataObject metadataObject, Map<String, StatisticValue<?>> statistics) {
     try {
@@ -170,9 +172,9 @@ public class StatisticManager implements Closeable {
     }
   }
 
+  @Override
   public boolean dropStatistics(
-      String metalake, MetadataObject metadataObject, List<String> statistics)
-      throws UnmodifiableStatisticException {
+      String metalake, MetadataObject metadataObject, List<String> statistics) {
     try {
       NameIdentifier identifier = MetadataObjectUtil.toEntityIdent(metalake, metadataObject);
       Entity.EntityType type = StatisticEntity.getStatisticType(metadataObject.type());
@@ -207,6 +209,7 @@ public class StatisticManager implements Closeable {
     }
   }
 
+  @Override
   public boolean dropPartitionStatistics(
       String metalake,
       MetadataObject metadataObject,
@@ -231,6 +234,7 @@ public class StatisticManager implements Closeable {
     }
   }
 
+  @Override
   public void updatePartitionStatistics(
       String metalake,
       MetadataObject metadataObject,
@@ -259,6 +263,7 @@ public class StatisticManager implements Closeable {
     }
   }
 
+  @Override
   public List<PartitionStatistics> listPartitionStatistics(
       String metalake, MetadataObject metadataObject, PartitionRange range) {
     try {

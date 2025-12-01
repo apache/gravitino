@@ -75,7 +75,9 @@ public class PrivilegeDTO implements Privilege {
     }
   }
 
-  /** @return the builder for creating a new instance of PrivilegeDTO. */
+  /**
+   * @return the builder for creating a new instance of PrivilegeDTO.
+   */
   public static Builder builder() {
     return new Builder();
   }

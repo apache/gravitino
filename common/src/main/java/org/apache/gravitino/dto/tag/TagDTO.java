@@ -91,7 +91,9 @@ public class TagDTO implements Tag {
     return Objects.hashCode(name, comment, properties, audit);
   }
 
-  /** @return a new builder for constructing a Tag DTO. */
+  /**
+   * @return a new builder for constructing a Tag DTO.
+   */
   public static Builder builder() {
     return new Builder();
   }
@@ -159,7 +161,9 @@ public class TagDTO implements Tag {
       return this;
     }
 
-    /** @return The constructed Tag DTO. */
+    /**
+     * @return The constructed Tag DTO.
+     */
     public TagDTO build() {
       return tagDTO;
     }

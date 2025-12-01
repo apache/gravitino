@@ -29,10 +29,10 @@ public class SchemaMetaPostgreSQLProvider extends SchemaMetaBaseSQLProvider {
   public String insertSchemaMetaOnDuplicateKeyUpdate(SchemaPO schemaPO) {
     return "INSERT INTO "
         + TABLE_NAME
-        + "(schema_id, schema_name, metalake_id,"
+        + " (schema_id, schema_name, metalake_id,"
         + " catalog_id, schema_comment, properties, audit_info,"
         + " current_version, last_version, deleted_at)"
-        + " VALUES("
+        + " VALUES ("
         + " #{schemaMeta.schemaId},"
         + " #{schemaMeta.schemaName},"
         + " #{schemaMeta.metalakeId},"
@@ -44,7 +44,7 @@ public class SchemaMetaPostgreSQLProvider extends SchemaMetaBaseSQLProvider {
         + " #{schemaMeta.lastVersion},"
         + " #{schemaMeta.deletedAt}"
         + " )"
-        + " ON CONFLICT(schema_id) DO UPDATE SET "
+        + " ON CONFLICT(schema_id) DO UPDATE SET"
         + " schema_name = #{schemaMeta.schemaName},"
         + " metalake_id = #{schemaMeta.metalakeId},"
         + " catalog_id = #{schemaMeta.catalogId},"
@@ -60,8 +60,7 @@ public class SchemaMetaPostgreSQLProvider extends SchemaMetaBaseSQLProvider {
   public String softDeleteSchemaMetasBySchemaId(Long schemaId) {
     return "UPDATE "
         + TABLE_NAME
-        + " SET deleted_at = floor(extract(epoch from(current_timestamp -"
-        + " timestamp '1970-01-01 00:00:00'))*1000)"
+        + " SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
         + " WHERE schema_id = #{schemaId} AND deleted_at = 0";
   }
 
@@ -69,8 +68,7 @@ public class SchemaMetaPostgreSQLProvider extends SchemaMetaBaseSQLProvider {
   public String softDeleteSchemaMetasByMetalakeId(Long metalakeId) {
     return "UPDATE "
         + TABLE_NAME
-        + " SET deleted_at = floor(extract(epoch from(current_timestamp -"
-        + " timestamp '1970-01-01 00:00:00'))*1000)"
+        + " SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
         + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0";
   }
 
@@ -78,8 +76,7 @@ public class SchemaMetaPostgreSQLProvider extends SchemaMetaBaseSQLProvider {
   public String softDeleteSchemaMetasByCatalogId(Long catalogId) {
     return "UPDATE "
         + TABLE_NAME
-        + " SET deleted_at = floor(extract(epoch from(current_timestamp -"
-        + " timestamp '1970-01-01 00:00:00'))*1000)"
+        + " SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
         + " WHERE catalog_id = #{catalogId} AND deleted_at = 0";
   }
 
