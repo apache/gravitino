@@ -164,7 +164,8 @@ public class CatalogHiveIT extends BaseIT {
           "'gravitino_it_test'");
 
   protected void startNecessaryContainer() {
-    containerSuite.startHiveContainer();
+    containerSuite.startHiveContainer(
+        ImmutableMap.of(HiveContainer.HIVE_RUNTIME_VERSION, HiveContainer.HIVE3));
 
     HIVE_METASTORE_URIS =
         String.format(

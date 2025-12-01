@@ -18,7 +18,6 @@
  */
 package org.apache.gravitino.hive;
 
-import java.util.Map;
 import java.util.Properties;
 import org.apache.gravitino.exceptions.GravitinoRuntimeException;
 import org.apache.gravitino.hive.client.HiveClient;
@@ -50,8 +49,7 @@ public class HiveClientPool extends ClientPoolImpl<HiveClient, GravitinoRuntimeE
   @Override
   protected HiveClient newClient() {
     try {
-      IsolatedClientLoader loader = IsolatedClientLoader.forVersion("HIVE2", Map.of());
-      return loader.createClient(properties);
+      return IsolatedClientLoader.createHiveClient(properties);
     } catch (Exception e) {
       LOG.error("Failed to connect to Hive Metastore", e);
       throw new GravitinoRuntimeException(e, "Failed to connect to Hive Metastore");

@@ -274,7 +274,8 @@ subprojects {
   }
 
   if (project.path == ":catalogs:hive-metastore2-libs" ||
-      project.path == ":catalogs:hive-metastore3-libs") {
+    project.path == ":catalogs:hive-metastore3-libs"
+  ) {
     return@subprojects
   }
 

@@ -51,20 +51,17 @@ public final class IsolatedClientLoader {
   private static final String METHOD_GET_PROXY = "getProxy";
   private static final String METHOD_SET = "set";
 
+  private final HiveClient.HiveVersion version;
+  private final List<URL> execJars;
+  private final ClassLoader baseClassLoader;
+  private final URLClassLoader classLoader;
+
   /** Cache IsolatedClientLoader instances per Hive version to avoid re-creating classloaders. */
   private static final Map<HiveClient.HiveVersion, IsolatedClientLoader> LOADER_CACHE =
       new EnumMap<>(HiveClient.HiveVersion.class);
 
-  /**
-   * Creates isolated Hive client loaders by loading jars from the specified version directory.
-   *
-   * @param hiveMetastoreVersion The Hive version (HIVE2 or HIVE3)
-   * @param config Configuration map (currently unused, reserved for future use)
-   * @return An IsolatedClientLoader instance
-   * @throws IOException If an I/O error occurs while loading jars
-   */
-  public static synchronized IsolatedClientLoader forVersion(
-      String hiveMetastoreVersion, Map<String, String> config) throws IOException {
+  private static synchronized IsolatedClientLoader getClientLoaderForVersion(
+      String hiveMetastoreVersion, Properties config) throws IOException {
     Preconditions.checkArgument(
         hiveMetastoreVersion != null && !hiveMetastoreVersion.isEmpty(),
         "Hive metastore version cannot be null or empty");
@@ -88,8 +85,40 @@ public final class IsolatedClientLoader {
     return loader;
   }
 
+  public static HiveClient createHiveClient(Properties properties) {
+    RuntimeException lastFailure = null;
+
+    // Try Hive 2 first, then fall back to Hive 3 on failure.
+    for (HiveClient.HiveVersion version :
+        new HiveClient.HiveVersion[] {HiveClient.HiveVersion.HIVE2, HiveClient.HiveVersion.HIVE3}) {
+      try {
+        IsolatedClientLoader loader = getClientLoaderForVersion(version.name(), properties);
+        HiveClient client = loader.createClient(properties);
+        // Simple health check to ensure the client can talk to the metastore.
+        // Use an empty catalog name here; the shim will translate it as needed.
+        client.getAllDatabases("");
+        LOG.info("Successfully created Hive metastore client using version {}", version);
+        return client;
+      } catch (Exception e) {
+        RuntimeException wrapped =
+            (e instanceof RuntimeException)
+                ? (RuntimeException) e
+                : new GravitinoRuntimeException(
+                    e, "Failed to create Hive metastore client with version %s", version);
+        LOG.warn(
+            "Failed to create or validate Hive metastore client with version {}. "
+                + "Will try next available version if any.",
+            version,
+            wrapped);
+        lastFailure = wrapped;
+      }
+    }
+
+    throw lastFailure;
+  }
+
   private static IsolatedClientLoader createLoader(
-      HiveClient.HiveVersion hiveVersion, Map<String, String> config, ClassLoader baseLoader)
+      HiveClient.HiveVersion hiveVersion, Properties config, ClassLoader baseLoader)
       throws IOException {
     Path jarDir = getJarDirectory(hiveVersion);
     if (!Files.exists(jarDir) || !Files.isDirectory(jarDir)) {
@@ -162,15 +191,6 @@ public final class IsolatedClientLoader {
     }
   }
 
-  private final HiveClient.HiveVersion version;
-  private final List<URL> execJars;
-
-  @SuppressWarnings("UnusedVariable")
-  private final Map<String, String> config;
-
-  private final ClassLoader baseClassLoader;
-  private final URLClassLoader classLoader;
-
   /**
    * Constructs an IsolatedClientLoader.
    *
@@ -182,7 +202,7 @@ public final class IsolatedClientLoader {
   public IsolatedClientLoader(
       HiveClient.HiveVersion version,
       List<URL> execJars,
-      Map<String, String> config,
+      Properties config,
       ClassLoader baseClassLoader) {
     Preconditions.checkArgument(version != null, "Hive version cannot be null");
     Preconditions.checkArgument(
@@ -191,7 +211,6 @@ public final class IsolatedClientLoader {
 
     this.version = version;
     this.execJars = Collections.unmodifiableList(execJars);
-    this.config = config != null ? Collections.unmodifiableMap(config) : Collections.emptyMap();
     this.baseClassLoader = baseClassLoader;
     this.classLoader = createClassLoader();
   }
@@ -428,12 +447,7 @@ public final class IsolatedClientLoader {
     }
   }
 
-  /**
-   * Shutdown hook for all cached IsolatedClientLoader instances.
-   *
-   * <p>This will close the underlying classloaders for all cached versions and clear the cache.
-   * Calling {@link #forVersion(String, Map)} after shutdown will recreate loaders as needed.
-   */
+  /** Shutdown for all cached IsolatedClientLoader instances. */
   public static synchronized void shutdown() {
     for (IsolatedClientLoader loader : LOADER_CACHE.values()) {
       try {

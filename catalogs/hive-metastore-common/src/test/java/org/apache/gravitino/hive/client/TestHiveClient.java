@@ -88,8 +88,7 @@ public class TestHiveClient {
       throws Exception {
     Properties properties = new Properties();
     properties.setProperty("hive.metastore.uris", metastoreUri);
-    IsolatedClientLoader loader = IsolatedClientLoader.forVersion(version, Map.of());
-    HiveClient client = loader.createClient(properties);
+    HiveClient client = IsolatedClientLoader.createHiveClient(properties);
 
     String dbName = "gt_" + testPrefix + "_db_" + UUID.randomUUID().toString().replace("-", "");
     String tableName = "gt_" + testPrefix + "_tbl_" + UUID.randomUUID().toString().replace("-", "");
@@ -269,21 +268,19 @@ public class TestHiveClient {
 
   @Test
   void testHiveExceptionHandling() throws Exception {
-    testHiveExceptionHandlingForVersion("HIVE2", "", HIVE2_HMS_URL, HIVE2_HDFS_URL);
+    testHiveExceptionHandlingForVersion("", HIVE2_HMS_URL, HIVE2_HDFS_URL);
   }
 
   @Test
   void testHive3ExceptionHandling() throws Exception {
-    testHiveExceptionHandlingForVersion("HIVE3", "hive", HIVE3_HMS_URL, HIVE3_HDFS_URL);
+    testHiveExceptionHandlingForVersion("hive", HIVE3_HMS_URL, HIVE3_HDFS_URL);
   }
 
   private void testHiveExceptionHandlingForVersion(
-      String version, String catalogName, String metastoreUri, String hdfsBasePath)
-      throws Exception {
+      String catalogName, String metastoreUri, String hdfsBasePath) throws Exception {
     Properties properties = new Properties();
     properties.setProperty("hive.metastore.uris", metastoreUri);
-    IsolatedClientLoader loader = IsolatedClientLoader.forVersion(version, Map.of());
-    HiveClient client = loader.createClient(properties);
+    HiveClient client = IsolatedClientLoader.createHiveClient(properties);
 
     String dbName = "gt_exception_test_db_" + UUID.randomUUID().toString().replace("-", "");
     String tableName = "gt_exception_test_tbl_" + UUID.randomUUID().toString().replace("-", "");
@@ -368,15 +365,13 @@ public class TestHiveClient {
     Properties properties = new Properties();
     properties.setProperty("hive.metastore.uris", invalidMetastoreUri);
 
-    IsolatedClientLoader loader = IsolatedClientLoader.forVersion(version, Map.of());
-
     // Connection failure may occur during client creation or operation
     // Both should be converted to ConnectionFailedException
     Exception exception =
         Assertions.assertThrows(
             Exception.class,
             () -> {
-              HiveClient client = loader.createClient(properties);
+              HiveClient client = IsolatedClientLoader.createHiveClient(properties);
               client.getAllDatabases(catalogName);
             });
 
