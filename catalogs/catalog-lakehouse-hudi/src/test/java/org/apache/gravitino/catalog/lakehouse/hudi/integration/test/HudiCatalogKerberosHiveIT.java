@@ -171,8 +171,8 @@ public class HudiCatalogKerberosHiveIT extends BaseIT {
         classRef = Class.forName("sun.security.krb5.Config");
       }
 
-      java.lang.reflect.Method refershMethod = classRef.getMethod("refresh");
-      refershMethod.invoke(null);
+      java.lang.reflect.Method refreshMethod = classRef.getMethod("refresh");
+      refreshMethod.invoke(null);
     } catch (Exception e) {
       throw new RuntimeException(e);
     }
