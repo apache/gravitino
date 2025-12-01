@@ -17,6 +17,9 @@
  * under the License.
  */
 
+import org.gradle.api.publish.maven.tasks.PublishToMavenLocal
+import org.gradle.api.publish.maven.tasks.PublishToMavenRepository
+
 plugins {
   id("java")
   id("idea")
@@ -44,3 +47,6 @@ tasks {
     into("$rootDir/distribution/package/catalogs/hive/libs/hive-metastore2-libs")
   }
 }
+
+tasks.withType<PublishToMavenLocal>().configureEach { enabled = false }
+tasks.withType<PublishToMavenRepository>().configureEach { enabled = false }

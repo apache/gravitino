@@ -17,8 +17,6 @@
  * under the License.
  */
 
-import org.gradle.api.tasks.compile.JavaCompile
-
 plugins {
   id("java")
   id("idea")
