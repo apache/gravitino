@@ -25,6 +25,7 @@ import com.google.common.collect.Lists;
 import com.google.common.collect.MapDifference;
 import com.google.common.collect.Maps;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -203,7 +204,17 @@ public abstract class BaseCatalog extends AbstractCatalog {
 
   @Override
   public List<String> listViews(String s) throws DatabaseNotExistException, CatalogException {
-    throw new UnsupportedOperationException();
+    try {
+      List<String> views = realCatalog().listViews(s);
+      return views == null ? Collections.emptyList() : views;
+    } catch (UnsupportedOperationException e) {
+      // Wrapped catalog does not support views; align with Flink expectations by returning empty.
+      return Collections.emptyList();
+    } catch (DatabaseNotExistException | CatalogException e) {
+      throw e;
+    } catch (Exception e) {
+      throw new CatalogException(e);
+    }
   }
 
   @Override

@@ -20,10 +20,12 @@ package org.apache.gravitino.flink.connector.catalog;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import org.apache.flink.table.api.DataTypes;
 import org.apache.flink.table.api.Schema;
+import org.apache.flink.table.catalog.AbstractCatalog;
 import org.apache.flink.table.catalog.CatalogBaseTable;
 import org.apache.flink.table.catalog.CatalogDatabase;
 import org.apache.flink.table.catalog.CatalogDatabaseImpl;
@@ -31,9 +33,12 @@ import org.apache.flink.table.catalog.CatalogTable;
 import org.apache.flink.table.catalog.Column;
 import org.apache.flink.table.catalog.TableChange;
 import org.apache.gravitino.SchemaChange;
+import org.apache.gravitino.flink.connector.PartitionConverter;
+import org.apache.gravitino.flink.connector.PropertiesConverter;
 import org.apache.gravitino.rel.types.Types;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
 
 public class TestBaseCatalog {
 
@@ -115,5 +120,49 @@ public class TestBaseCatalog {
     List<org.apache.gravitino.rel.TableChange> expected =
         ImmutableList.of(org.apache.gravitino.rel.TableChange.updateComment("new comment"));
     Assertions.assertArrayEquals(expected.toArray(), tableChanges);
+  }
+
+  @Test
+  public void testListViewsDelegatesToWrappedCatalog() throws Exception {
+    AbstractCatalog delegate = Mockito.mock(AbstractCatalog.class);
+    Mockito.when(delegate.listViews("db")).thenReturn(ImmutableList.of("v1", "v2"));
+    BaseCatalog catalog = new TestableBaseCatalog(delegate);
+
+    List<String> views = catalog.listViews("db");
+
+    Assertions.assertEquals(ImmutableList.of("v1", "v2"), views);
+    Mockito.verify(delegate).listViews("db");
+  }
+
+  @Test
+  public void testListViewsReturnsEmptyWhenUnsupported() throws Exception {
+    AbstractCatalog delegate = Mockito.mock(AbstractCatalog.class);
+    Mockito.when(delegate.listViews("db")).thenThrow(new UnsupportedOperationException("no view"));
+    BaseCatalog catalog = new TestableBaseCatalog(delegate);
+
+    List<String> views = catalog.listViews("db");
+
+    Assertions.assertTrue(views.isEmpty());
+    Mockito.verify(delegate).listViews("db");
+  }
+
+  private static class TestableBaseCatalog extends BaseCatalog {
+
+    private final AbstractCatalog delegate;
+
+    TestableBaseCatalog(AbstractCatalog delegate) {
+      super(
+          "test",
+          Collections.emptyMap(),
+          "default",
+          Mockito.mock(PropertiesConverter.class),
+          Mockito.mock(PartitionConverter.class));
+      this.delegate = delegate;
+    }
+
+    @Override
+    protected AbstractCatalog realCatalog() {
+      return delegate;
+    }
   }
 }
