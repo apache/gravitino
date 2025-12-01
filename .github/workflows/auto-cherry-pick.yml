@@ -41,7 +41,7 @@ jobs:
           labels: |
             cherry-pick
           reviewers: |
-            jerryshao 
+            jerryshao
 
   cherry_pick_branch_1_2:
     runs-on: ubuntu-latest
@@ -59,7 +59,7 @@ jobs:
           labels: |
             cherry-pick
           reviewers: |
-            jerryshao          
+            jerryshao        
 
 env:
   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
