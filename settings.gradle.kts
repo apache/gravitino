@@ -32,6 +32,7 @@ include("catalogs:hive-metastore-common")
 include("catalogs:catalog-lakehouse-iceberg")
 include("catalogs:catalog-lakehouse-paimon")
 include("catalogs:catalog-lakehouse-hudi")
+include("catalogs:catalog-lakehouse-generic")
 include(
   "catalogs:catalog-jdbc-common",
   "catalogs:catalog-jdbc-doris",
@@ -51,7 +52,6 @@ include(
   "clients:client-python",
   "clients:cli"
 )
-include("catalogs:catalog-generic-lakehouse")
 if (gradle.startParameter.projectProperties["enableFuse"]?.toBoolean() == true) {
   include("clients:filesystem-fuse")
 } else {
@@ -59,6 +59,8 @@ if (gradle.startParameter.projectProperties["enableFuse"]?.toBoolean() == true) 
 }
 include("iceberg:iceberg-common")
 include("iceberg:iceberg-rest-server")
+include("lance:lance-common")
+include("lance:lance-rest-server")
 include("authorizations:authorization-ranger", "authorizations:authorization-common", "authorizations:authorization-chain")
 include("trino-connector:trino-connector", "trino-connector:integration-test")
 include("spark-connector:spark-common")
@@ -78,10 +80,10 @@ project(":spark-connector:spark-runtime-3.5").projectDir = file("spark-connector
 include("web:web", "web:integration-test")
 include("docs")
 include("integration-test-common")
-include(":bundles:aws", ":bundles:aws-bundle")
-include(":bundles:gcp", ":bundles:gcp-bundle")
-include(":bundles:aliyun", ":bundles:aliyun-bundle")
-include(":bundles:azure", ":bundles:azure-bundle")
+include(":bundles:aws", ":bundles:aws-bundle", ":bundles:iceberg-aws-bundle")
+include(":bundles:gcp", ":bundles:gcp-bundle", ":bundles:iceberg-gcp-bundle")
+include(":bundles:aliyun", ":bundles:aliyun-bundle", ":bundles:iceberg-aliyun-bundle")
+include(":bundles:azure", ":bundles:azure-bundle", ":bundles:iceberg-azure-bundle")
 include(":catalogs:hadoop-common")
 include(":lineage")
 include(":mcp-server")

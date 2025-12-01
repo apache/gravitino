@@ -18,7 +18,8 @@
  */
 package org.apache.gravitino.iceberg.server;
 
-import org.apache.gravitino.Config;
+import com.google.common.base.Preconditions;
+import org.apache.gravitino.Configs;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.iceberg.RESTService;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
@@ -33,12 +34,12 @@ public class GravitinoIcebergRESTServer {
 
   public static final String CONF_FILE = "gravitino-iceberg-rest-server.conf";
 
-  private final Config serverConfig;
+  private final ServerConfig serverConfig;
 
   private RESTService icebergRESTService;
   private GravitinoEnv gravitinoEnv;
 
-  public GravitinoIcebergRESTServer(Config config) {
+  public GravitinoIcebergRESTServer(ServerConfig config) {
     this.serverConfig = config;
     this.gravitinoEnv = GravitinoEnv.getInstance();
     this.icebergRESTService = new RESTService();
@@ -69,6 +70,9 @@ public class GravitinoIcebergRESTServer {
     LOG.info("Starting Gravitino Iceberg REST Server");
     String confPath = System.getenv("GRAVITINO_TEST") == null ? "" : args[0];
     ServerConfig serverConfig = ServerConfig.loadConfig(confPath, CONF_FILE);
+    Preconditions.checkArgument(
+        !serverConfig.get(Configs.ENABLE_AUTHORIZATION),
+        "Iceberg REST server standalone mode doesn't support authorization.");
     GravitinoIcebergRESTServer icebergRESTServer = new GravitinoIcebergRESTServer(serverConfig);
     icebergRESTServer.initialize();
 

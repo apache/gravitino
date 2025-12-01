@@ -1596,7 +1596,7 @@ public class GravitinoMetalake extends MetalakeDTO
 
     @Override
     public GravitinoMetalake build() {
-      Preconditions.checkNotNull(restClient, "restClient must be set");
+      Preconditions.checkArgument(restClient != null, "restClient must be set");
       Preconditions.checkArgument(StringUtils.isNotBlank(name), "name must not be null or empty");
       Preconditions.checkArgument(audit != null, "audit must not be null");
 

@@ -98,7 +98,17 @@ public interface Privilege {
     /** The privilege to create a tag */
     CREATE_TAG(0L, 1L << 21),
     /** The privilege to apply a tag */
-    APPLY_TAG(0L, 1L << 22);
+    APPLY_TAG(0L, 1L << 22),
+    /** The privilege to create a policy */
+    CREATE_POLICY(0L, 1L << 23),
+    /** The privilege to apply a policy */
+    APPLY_POLICY(0L, 1L << 24),
+    /** The privilege to register a job template */
+    REGISTER_JOB_TEMPLATE(0L, 1L << 25),
+    /** The privilege to use a job template */
+    USE_JOB_TEMPLATE(0L, 1L << 26),
+    /** The privilege to run a job */
+    RUN_JOB(0L, 1L << 27);
 
     private final long highBits;
     private final long lowBits;

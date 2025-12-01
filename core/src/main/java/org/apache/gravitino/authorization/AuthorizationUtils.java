@@ -357,7 +357,10 @@ public class AuthorizationUtils {
   }
 
   private static boolean needApplyAuthorization(MetadataObject.Type type) {
-    return type != MetadataObject.Type.ROLE && type != MetadataObject.Type.METALAKE;
+    return type != MetadataObject.Type.ROLE
+        && type != MetadataObject.Type.METALAKE
+        && type != MetadataObject.Type.TAG
+        && type != MetadataObject.Type.POLICY;
   }
 
   private static void callAuthorizationPluginImpl(

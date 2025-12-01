@@ -37,7 +37,7 @@ class TestGravitinoConnectorNullChecks {
     when(mockContext.getInternalConnector()).thenReturn(null);
     GravitinoConnector connector = new GravitinoConnector(mock(NameIdentifier.class), mockContext);
     assertThrows(
-        NullPointerException.class,
+        IllegalArgumentException.class,
         () -> connector.beginTransaction(IsolationLevel.READ_COMMITTED, true, true));
   }
 
@@ -50,7 +50,7 @@ class TestGravitinoConnectorNullChecks {
         .thenReturn(null);
     GravitinoConnector connector = new GravitinoConnector(mock(NameIdentifier.class), mockContext);
     assertThrows(
-        NullPointerException.class,
+        IllegalArgumentException.class,
         () -> connector.beginTransaction(IsolationLevel.READ_COMMITTED, true, true));
   }
 }

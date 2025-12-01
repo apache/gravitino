@@ -47,6 +47,12 @@ public interface TagMetaMapper {
   TagPO selectTagMetaByMetalakeAndName(
       @Param("metalakeName") String metalakeName, @Param("tagName") String tagName);
 
+  @SelectProvider(
+      type = TagMetaSQLProviderFactory.class,
+      method = "selectTagMetaByMetalakeIdAndName")
+  TagPO selectTagMetaByMetalakeIdAndName(
+      @Param("metalakeId") Long metalakeId, @Param("name") String tagName);
+
   @InsertProvider(type = TagMetaSQLProviderFactory.class, method = "insertTagMeta")
   void insertTagMeta(@Param("tagMeta") TagPO tagPO);
 
@@ -70,4 +76,7 @@ public interface TagMetaMapper {
   @DeleteProvider(type = TagMetaSQLProviderFactory.class, method = "deleteTagMetasByLegacyTimeline")
   Integer deleteTagMetasByLegacyTimeline(
       @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit);
+
+  @SelectProvider(type = TagMetaSQLProviderFactory.class, method = "selectTagByTagId")
+  TagPO selectTagByTagId(@Param("tagId") Long tagId);
 }

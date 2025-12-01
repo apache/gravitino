@@ -65,9 +65,20 @@ const AuthProvider = ({ children }) => {
   }, [isIdle])
 
   const goToMetalakeListPage = () => {
-    if (paramsSize) {
-      router.refresh()
-    } else {
+    try {
+      const pathname = window.location.pathname
+      const doneFlag = sessionStorage.getItem('authInitDone')
+
+      if (!doneFlag) {
+        sessionStorage.setItem('authInitDone', 'true')
+
+        if (pathname === '/' || pathname === '/ui' || pathname === '/ui/') {
+          router.replace('/metalakes')
+        } else {
+          router.replace(pathname + window.location.search)
+        }
+      }
+    } catch (e) {
       router.push('/metalakes')
     }
   }

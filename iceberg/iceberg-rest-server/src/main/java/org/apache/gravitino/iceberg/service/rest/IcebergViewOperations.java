@@ -39,7 +39,7 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.gravitino.iceberg.service.IcebergExceptionMapper;
 import org.apache.gravitino.iceberg.service.IcebergObjectMapper;
-import org.apache.gravitino.iceberg.service.IcebergRestUtils;
+import org.apache.gravitino.iceberg.service.IcebergRESTUtils;
 import org.apache.gravitino.iceberg.service.dispatcher.IcebergViewOperationDispatcher;
 import org.apache.gravitino.listener.api.event.IcebergRequestContext;
 import org.apache.gravitino.metrics.MetricNames;
@@ -78,7 +78,7 @@ public class IcebergViewOperations {
   @ResponseMetered(name = "list-view", absolute = true)
   public Response listView(
       @PathParam("prefix") String prefix, @Encoded() @PathParam("namespace") String namespace) {
-    String catalogName = IcebergRestUtils.getCatalogName(prefix);
+    String catalogName = IcebergRESTUtils.getCatalogName(prefix);
     Namespace icebergNS = RESTUtil.decodeNamespace(namespace);
     LOG.info("List Iceberg views, catalog: {}, namespace: {}", catalogName, icebergNS);
     try {
@@ -89,7 +89,7 @@ public class IcebergViewOperations {
                 new IcebergRequestContext(httpServletRequest(), catalogName);
             ListTablesResponse listTablesResponse =
                 viewOperationDispatcher.listView(context, icebergNS);
-            return IcebergRestUtils.ok(listTablesResponse);
+            return IcebergRESTUtils.ok(listTablesResponse);
           });
     } catch (Exception e) {
       return IcebergExceptionMapper.toRESTResponse(e);
@@ -104,7 +104,7 @@ public class IcebergViewOperations {
       @PathParam("prefix") String prefix,
       @Encoded() @PathParam("namespace") String namespace,
       CreateViewRequest createViewRequest) {
-    String catalogName = IcebergRestUtils.getCatalogName(prefix);
+    String catalogName = IcebergRESTUtils.getCatalogName(prefix);
     Namespace icebergNS = RESTUtil.decodeNamespace(namespace);
     LOG.info(
         "Create Iceberg view, catalog: {}, namespace: {}, createViewRequest: {}",
@@ -119,7 +119,7 @@ public class IcebergViewOperations {
                 new IcebergRequestContext(httpServletRequest(), catalogName);
             LoadViewResponse loadViewResponse =
                 viewOperationDispatcher.createView(context, icebergNS, createViewRequest);
-            return IcebergRestUtils.ok(loadViewResponse);
+            return IcebergRESTUtils.ok(loadViewResponse);
           });
     } catch (Exception e) {
       return IcebergExceptionMapper.toRESTResponse(e);
@@ -135,7 +135,7 @@ public class IcebergViewOperations {
       @PathParam("prefix") String prefix,
       @Encoded() @PathParam("namespace") String namespace,
       @PathParam("view") String view) {
-    String catalogName = IcebergRestUtils.getCatalogName(prefix);
+    String catalogName = IcebergRESTUtils.getCatalogName(prefix);
     Namespace icebergNS = RESTUtil.decodeNamespace(namespace);
     LOG.info(
         "Load Iceberg view, catalog: {}, namespace: {}, view: {}", catalogName, icebergNS, view);
@@ -148,7 +148,7 @@ public class IcebergViewOperations {
                 new IcebergRequestContext(httpServletRequest(), catalogName);
             LoadViewResponse loadViewResponse =
                 viewOperationDispatcher.loadView(context, viewIdentifier);
-            return IcebergRestUtils.ok(loadViewResponse);
+            return IcebergRESTUtils.ok(loadViewResponse);
           });
     } catch (Exception e) {
       return IcebergExceptionMapper.toRESTResponse(e);
@@ -165,7 +165,7 @@ public class IcebergViewOperations {
       @Encoded() @PathParam("namespace") String namespace,
       @PathParam("view") String view,
       UpdateTableRequest replaceViewRequest) {
-    String catalogName = IcebergRestUtils.getCatalogName(prefix);
+    String catalogName = IcebergRESTUtils.getCatalogName(prefix);
     Namespace icebergNS = RESTUtil.decodeNamespace(namespace);
     LOG.info(
         "Replace Iceberg view, catalog: {}, namespace: {}, view: {}, replaceViewRequest: {}",
@@ -182,7 +182,7 @@ public class IcebergViewOperations {
             TableIdentifier viewIdentifier = TableIdentifier.of(icebergNS, view);
             LoadViewResponse loadViewResponse =
                 viewOperationDispatcher.replaceView(context, viewIdentifier, replaceViewRequest);
-            return IcebergRestUtils.ok(loadViewResponse);
+            return IcebergRESTUtils.ok(loadViewResponse);
           });
     } catch (Exception e) {
       return IcebergExceptionMapper.toRESTResponse(e);
@@ -198,7 +198,7 @@ public class IcebergViewOperations {
       @PathParam("prefix") String prefix,
       @Encoded() @PathParam("namespace") String namespace,
       @PathParam("view") String view) {
-    String catalogName = IcebergRestUtils.getCatalogName(prefix);
+    String catalogName = IcebergRESTUtils.getCatalogName(prefix);
     Namespace icebergNS = RESTUtil.decodeNamespace(namespace);
     LOG.info(
         "Drop Iceberg view, catalog: {}, namespace: {}, view: {}", catalogName, icebergNS, view);
@@ -210,7 +210,7 @@ public class IcebergViewOperations {
             IcebergRequestContext context =
                 new IcebergRequestContext(httpServletRequest(), catalogName);
             viewOperationDispatcher.dropView(context, viewIdentifier);
-            return IcebergRestUtils.noContent();
+            return IcebergRESTUtils.noContent();
           });
     } catch (Exception e) {
       return IcebergExceptionMapper.toRESTResponse(e);
@@ -226,7 +226,7 @@ public class IcebergViewOperations {
       @PathParam("prefix") String prefix,
       @Encoded() @PathParam("namespace") String namespace,
       @PathParam("view") String view) {
-    String catalogName = IcebergRestUtils.getCatalogName(prefix);
+    String catalogName = IcebergRESTUtils.getCatalogName(prefix);
     Namespace icebergNS = RESTUtil.decodeNamespace(namespace);
     LOG.info(
         "Check Iceberg view exists, catalog: {}, namespace: {}, view: {}",
@@ -242,9 +242,9 @@ public class IcebergViewOperations {
             TableIdentifier viewIdentifier = TableIdentifier.of(icebergNS, view);
             boolean exists = viewOperationDispatcher.viewExists(context, viewIdentifier);
             if (exists) {
-              return IcebergRestUtils.noContent();
+              return IcebergRESTUtils.noContent();
             } else {
-              return IcebergRestUtils.notExists();
+              return IcebergRESTUtils.notExists();
             }
           });
     } catch (Exception e) {

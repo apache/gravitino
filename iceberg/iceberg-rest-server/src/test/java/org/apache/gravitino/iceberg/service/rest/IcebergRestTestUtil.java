@@ -37,6 +37,7 @@ import org.apache.gravitino.iceberg.common.IcebergConfig;
 import org.apache.gravitino.iceberg.service.IcebergCatalogWrapperManager;
 import org.apache.gravitino.iceberg.service.IcebergExceptionMapper;
 import org.apache.gravitino.iceberg.service.IcebergObjectMapperProvider;
+import org.apache.gravitino.iceberg.service.authorization.IcebergRESTServerContext;
 import org.apache.gravitino.iceberg.service.dispatcher.IcebergNamespaceEventDispatcher;
 import org.apache.gravitino.iceberg.service.dispatcher.IcebergNamespaceOperationDispatcher;
 import org.apache.gravitino.iceberg.service.dispatcher.IcebergNamespaceOperationExecutor;
@@ -131,6 +132,8 @@ public class IcebergRestTestUtil {
       // used to override register table interface
       IcebergCatalogWrapperManager icebergCatalogWrapperManager =
           new IcebergCatalogWrapperManagerForTest(catalogConf, configProvider);
+
+      IcebergRESTServerContext.create(configProvider, false);
 
       EventBus eventBus = new EventBus(eventListenerPlugins);
 

@@ -65,9 +65,14 @@ public interface GravitinoAuthorizer extends Closeable {
    * @param principal the user principal
    * @param metalake the metalake
    * @param metadataObject the metadataObject.
+   * @param requestContext authorization request context
    * @return authorization result.
    */
-  boolean isOwner(Principal principal, String metalake, MetadataObject metadataObject);
+  boolean isOwner(
+      Principal principal,
+      String metalake,
+      MetadataObject metadataObject,
+      AuthorizationRequestContext requestContext);
 
   /**
    * Determine whether the user is the service admin.

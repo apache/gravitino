@@ -136,8 +136,7 @@ if [[ "$1" == "finalize" ]]; then
   echo "Uploading Gravitino to PyPi"
   twine upload -u __token__  -p $PYPI_API_TOKEN \
     --repository-url https://upload.pypi.org/legacy/ \
-    "apache_gravitino-$PYGRAVITINO_VERSION.tar.gz" \
-    "apache_gravitino-$PYGRAVITINO_VERSION.tar.gz.asc"
+    "apache_gravitino-$PYGRAVITINO_VERSION.tar.gz"
   echo "Python Gravitino package uploaded"
   rm -fr gravitino
 
@@ -274,8 +273,7 @@ if [[ "$1" == "package" ]]; then
     echo "Uploading Gravitino Python package $RC_RC_PYGRAVITINO_VERSION to PyPi"
     twine upload -u __token__  -p $PYPI_API_TOKEN \
       --repository-url https://upload.pypi.org/legacy/ \
-      "apache_gravitino-$RC_PYGRAVITINO_VERSION.tar.gz" \
-      "apache_gravitino-$RC_PYGRAVITINO_VERSION.tar.gz.asc"
+      "apache_gravitino-$RC_PYGRAVITINO_VERSION.tar.gz"
 
     svn co --depth=empty $RELEASE_STAGING_LOCATION svn-gravitino
     rm -rf "svn-gravitino/${DEST_DIR_NAME}"

@@ -68,6 +68,10 @@ jobs:
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
 
+      - name: Free up disk space
+        run: |
+          dev/ci/util_free_space.sh  
+
       - name: Python Client Integration Test
         id: integrationTest
         run: |
