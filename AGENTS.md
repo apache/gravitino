@@ -300,6 +300,7 @@ The project uses custom CI Docker images:
 - **Cleanup**: Ensure tests clean up resources (temp files, Docker containers)
 - **Isolation**: Tests should not depend on execution order
 - **Assertions**: Use meaningful assertion messages
+- **Naming**: Use the `TestXxx` prefix for Java test classes (for example, `TestCatalogService`), not the `XxxTest` suffix
 
 ### Documentation Standards
 
