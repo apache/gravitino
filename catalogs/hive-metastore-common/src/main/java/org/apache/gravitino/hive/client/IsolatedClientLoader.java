@@ -112,9 +112,10 @@ public final class IsolatedClientLoader {
    */
   private static Path getJarDirectory(HiveClient.HiveVersion version) {
     String gravitinoHome = System.getenv("GRAVITINO_HOME");
+    String libsDir =
+        version == HiveClient.HiveVersion.HIVE2 ? "hive-metastore2-libs" : "hive-metastore3-libs";
     String jarPath = "";
     if (gravitinoHome != null) {
-      String libsDir = version == HiveClient.HiveVersion.HIVE2 ? "hive2" : "hive3";
       jarPath = Paths.get(gravitinoHome, "catalogs", "hive", "libs", libsDir).toString();
       if (Files.exists(Paths.get(jarPath))) {
         return Paths.get(jarPath).toAbsolutePath();
@@ -123,15 +124,15 @@ public final class IsolatedClientLoader {
           "Can not find Hive jar directory for version {} in directory : {}", version, jarPath);
     }
 
-    // Try to get project root directory from working directory
-    String workingDir = System.getProperty("user.dir");
-    String projectRoot = workingDir.substring(0, workingDir.indexOf("gravitino"));
-    String libsDir =
-        version == HiveClient.HiveVersion.HIVE2 ? "hive-metastore2-libs" : "hive-metastore3-libs";
-    jarPath = Paths.get(projectRoot, "catalogs", libsDir, "build", "libs").toString();
+    // Try to get project root directory from class resource path
+    String path = IsolatedClientLoader.class.getResource("/").getPath();
+    path = path.substring(0, path.indexOf("/catalogs/"));
+    jarPath = Paths.get(path, "catalogs", libsDir, "build", "libs").toString();
     if (!Files.exists(Paths.get(jarPath))) {
       throw new GravitinoRuntimeException(
-          "Cannot find Hive jar directory for version %s in directory: %s", version, jarPath);
+          "Cannot find Hive jar directory for version %s in directory <PROJECT_HOME>/catalogs/%s/build/libs "
+              + "or $GRAVITINO_HOME/catalogs/hive/libs/%s",
+          version, libsDir, libsDir);
     }
     return Paths.get(jarPath).toAbsolutePath();
   }

@@ -41,6 +41,6 @@ tasks {
   register("copyLibs", Copy::class) {
     dependsOn(copyDepends, "build")
     from("build/libs")
-    into("$rootDir/distribution/package/catalogs/hive/libs/hive2")
+    into("$rootDir/distribution/package/catalogs/hive/libs/hive-metastore2-libs")
   }
 }
