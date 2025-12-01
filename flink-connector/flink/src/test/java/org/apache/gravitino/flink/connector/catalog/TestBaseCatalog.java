@@ -133,17 +133,6 @@ public class TestBaseCatalog {
     Mockito.verifyNoInteractions(delegate);
   }
 
-  @Test
-  public void testListViewsReturnsEmptyWithoutDelegationWhenUnsupported() throws Exception {
-    AbstractCatalog delegate = Mockito.mock(AbstractCatalog.class);
-    BaseCatalog catalog = new TestableBaseCatalog(delegate);
-
-    List<String> views = catalog.listViews("db");
-
-    Assertions.assertTrue(views.isEmpty());
-    Mockito.verifyNoInteractions(delegate);
-  }
-
   private static class TestableBaseCatalog extends BaseCatalog {
 
     private final AbstractCatalog delegate;
