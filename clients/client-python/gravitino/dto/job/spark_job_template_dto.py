@@ -27,9 +27,14 @@ from ...api.job.job_template import JobType
 @register_job_template(JobType.SPARK)
 @dataclass
 class SparkJobTemplateDTO(JobTemplateDTO):
-    """Represents a Spark Job Template Data Transfer Object (DTO)."""
+    """
+    Represents a Spark Job Template Data Transfer Object (DTO).
 
-    _class_name: str = field(default=None, metadata=config(field_name="className"))
+    Note: The class_name field is required for Java/Scala Spark applications but is
+    optional for PySpark applications. For PySpark jobs, this field can be None.
+    """
+
+    _class_name: Optional[str] = field(default=None, metadata=config(field_name="className"))
     _jars: Optional[List[str]] = field(default=None, metadata=config(field_name="jars"))
     _files: Optional[List[str]] = field(
         default=None, metadata=config(field_name="files")
@@ -60,10 +65,3 @@ class SparkJobTemplateDTO(JobTemplateDTO):
     def configs(self) -> Optional[Dict[str, str]]:
         """Returns the configuration properties for the Spark job."""
         return self._configs
-
-    def validate(self) -> None:
-        """Validates the SparkJobTemplateDTO. Ensures that required fields are not null or empty."""
-        super().validate()
-
-        if self._class_name is None or not self._class_name.strip():
-            raise ValueError('"className" is required and cannot be empty')
