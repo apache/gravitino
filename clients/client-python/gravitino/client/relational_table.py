@@ -90,7 +90,7 @@ class RelationalTable(Table):
     def audit_info(self) -> Audit:
         return self._table.audit_info()
 
-    def get_partition_request_path(self) -> str:
+    def _get_partition_request_path(self) -> str:
         """Get the partition request path.
 
         Returns:
@@ -113,7 +113,7 @@ class RelationalTable(Table):
         """
 
         resp = self._rest_client.get(
-            endpoint=self.get_partition_request_path(),
+            endpoint=self._get_partition_request_path(),
             error_handler=PARTITION_ERROR_HANDLER,
         )
         partition_name_list_resp = PartitionNameListResponse.from_json(
@@ -132,7 +132,7 @@ class RelationalTable(Table):
 
         params = {"details": "true"}
         resp = self._rest_client.get(
-            endpoint=self.get_partition_request_path(),
+            endpoint=self._get_partition_request_path(),
             params=params,
             error_handler=PARTITION_ERROR_HANDLER,
         )
@@ -158,7 +158,7 @@ class RelationalTable(Table):
         """
 
         resp = self._rest_client.get(
-            endpoint=f"{self.get_partition_request_path()}/{partition_name}",
+            endpoint=f"{self._get_partition_request_path()}/{partition_name}",
             error_handler=PARTITION_ERROR_HANDLER,
         )
         partition_resp = PartitionResponse.from_json(resp.body, infer_missing=True)
@@ -176,7 +176,7 @@ class RelationalTable(Table):
             bool: `True` if the partition is dropped, `False` if the partition does not exist.
         """
         resp = self._rest_client.delete(
-            endpoint=f"{self.get_partition_request_path()}/{partition_name}",
+            endpoint=f"{self._get_partition_request_path()}/{partition_name}",
             error_handler=PARTITION_ERROR_HANDLER,
         )
         drop_resp = DropResponse.from_json(resp.body, infer_missing=True)
@@ -204,7 +204,7 @@ class RelationalTable(Table):
         req.validate()
 
         resp = self._rest_client.post(
-            endpoint=self.get_partition_request_path(),
+            endpoint=self._get_partition_request_path(),
             json=req,
             error_handler=PARTITION_ERROR_HANDLER,
         )
