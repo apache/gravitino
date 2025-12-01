@@ -17,7 +17,6 @@
 package org.apache.gravitino.hive.client;
 
 import com.google.common.base.Preconditions;
-import java.io.Closeable;
 import java.io.IOException;
 import java.io.InputStream;
 import java.lang.reflect.Constructor;
@@ -28,6 +27,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Collections;
+import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
@@ -41,7 +41,7 @@ import org.slf4j.LoggerFactory;
  * that loads Hive-specific classes from version-specific jar files while sharing common classes
  * with the base classloader.
  */
-public final class IsolatedClientLoader implements Closeable {
+public final class IsolatedClientLoader {
   private static final Logger LOG = LoggerFactory.getLogger(IsolatedClientLoader.class);
 
   private static final String RETRYING_META_STORE_CLIENT_CLASS =
@@ -50,6 +50,10 @@ public final class IsolatedClientLoader implements Closeable {
   private static final String CONFIGURATION_CLASS = "org.apache.hadoop.conf.Configuration";
   private static final String METHOD_GET_PROXY = "getProxy";
   private static final String METHOD_SET = "set";
+
+  /** Cache IsolatedClientLoader instances per Hive version to avoid re-creating classloaders. */
+  private static final Map<HiveClient.HiveVersion, IsolatedClientLoader> LOADER_CACHE =
+      new EnumMap<>(HiveClient.HiveVersion.class);
 
   /**
    * Creates isolated Hive client loaders by loading jars from the specified version directory.
@@ -72,6 +76,21 @@ public final class IsolatedClientLoader implements Closeable {
       throw new IllegalArgumentException("Unsupported Hive version: " + hiveMetastoreVersion, e);
     }
 
+    // Reuse loader per version to avoid repeatedly creating isolated classloaders.
+    IsolatedClientLoader cached = LOADER_CACHE.get(hiveVersion);
+    if (cached != null) {
+      return cached;
+    }
+
+    IsolatedClientLoader loader =
+        createLoader(hiveVersion, config, Thread.currentThread().getContextClassLoader());
+    LOADER_CACHE.put(hiveVersion, loader);
+    return loader;
+  }
+
+  private static IsolatedClientLoader createLoader(
+      HiveClient.HiveVersion hiveVersion, Map<String, String> config, ClassLoader baseLoader)
+      throws IOException {
     Path jarDir = getJarDirectory(hiveVersion);
     if (!Files.exists(jarDir) || !Files.isDirectory(jarDir)) {
       throw new IOException("Hive jar directory does not exist or is not a directory: " + jarDir);
@@ -82,8 +101,7 @@ public final class IsolatedClientLoader implements Closeable {
       throw new IOException("No jar files found in directory: " + jarDir);
     }
 
-    return new IsolatedClientLoader(
-        hiveVersion, jars, config, Thread.currentThread().getContextClassLoader());
+    return new IsolatedClientLoader(hiveVersion, jars, config, baseLoader);
   }
 
   /**
@@ -393,19 +411,30 @@ public final class IsolatedClientLoader implements Closeable {
     Constructor<?> constructor = clientImplClass.getConstructors()[0];
     return (HiveClient) constructor.newInstance(version, metastoreClient);
   }
-
-  /**
-   * Closes the classloader and releases resources.
-   *
-   * @throws IOException If an I/O error occurs
-   */
-  @Override
-  public void close() throws IOException {
+  /** Internal helper to close this loader's classloader. */
+  private void closeInternal() throws IOException {
     try {
       classLoader.close();
     } catch (Exception e) {
-      LOG.warn("Failed to close classloader", e);
-      throw new IOException("Failed to close classloader", e);
+      LOG.warn("Failed to close isolated Hive classloader", e);
+      throw new IOException("Failed to close isolated Hive classloader", e);
     }
+  }
+
+  /**
+   * Shutdown hook for all cached IsolatedClientLoader instances.
+   *
+   * <p>This will close the underlying classloaders for all cached versions and clear the cache.
+   * Calling {@link #forVersion(String, Map)} after shutdown will recreate loaders as needed.
+   */
+  public static synchronized void shutdown() {
+    for (IsolatedClientLoader loader : LOADER_CACHE.values()) {
+      try {
+        loader.closeInternal();
+      } catch (IOException e) {
+        LOG.warn("Failed to close isolated Hive classloader for version {}", loader.version, e);
+      }
+    }
+    LOADER_CACHE.clear();
   }
 }

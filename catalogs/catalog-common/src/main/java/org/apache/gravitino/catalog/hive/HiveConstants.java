@@ -21,6 +21,7 @@ package org.apache.gravitino.catalog.hive;
 public class HiveConstants {
   // Catalog properties
   public static final String METASTORE_URIS = "metastore.uris";
+  public static final String DEFAULT_CATALOG = "default.catalog";
   public static final String CLIENT_POOL_SIZE = "client.pool-size";
   public static final String CLIENT_POOL_CACHE_EVICTION_INTERVAL_MS =
       "client.pool-cache.eviction-interval-ms";
