@@ -99,4 +99,32 @@ public class TestMetadataObjects {
     MetadataObject roleObject3 = MetadataObjects.parse("role", MetadataObject.Type.ROLE);
     Assertions.assertEquals("role", roleObject3.fullName());
   }
+
+  @Test
+  public void testJobObject() {
+    MetadataObject jobObject = MetadataObjects.of(null, "job_12345", MetadataObject.Type.JOB);
+    Assertions.assertEquals("job_12345", jobObject.fullName());
+
+    MetadataObject jobObject2 = MetadataObjects.parse("job_12345", MetadataObject.Type.JOB);
+    Assertions.assertEquals("job_12345", jobObject2.fullName());
+
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> MetadataObjects.of("parent", "job_12345", MetadataObject.Type.JOB));
+  }
+
+  @Test
+  public void testJobTemplateObject() {
+    MetadataObject jobTemplateObject =
+        MetadataObjects.of(null, "template_abc", MetadataObject.Type.JOB_TEMPLATE);
+    Assertions.assertEquals("template_abc", jobTemplateObject.fullName());
+
+    MetadataObject jobTemplateObject2 =
+        MetadataObjects.parse("template_abc", MetadataObject.Type.JOB_TEMPLATE);
+    Assertions.assertEquals("template_abc", jobTemplateObject2.fullName());
+
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> MetadataObjects.of("parent", "template_abc", MetadataObject.Type.JOB_TEMPLATE));
+  }
 }

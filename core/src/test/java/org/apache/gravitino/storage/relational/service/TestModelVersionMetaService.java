@@ -22,7 +22,7 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import java.io.IOException;
-import java.time.Instant;
+import java.sql.SQLException;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -41,9 +41,7 @@ import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.storage.relational.TestJDBCBackend;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.ValueSource;
+import org.junit.jupiter.api.TestTemplate;
 
 public class TestModelVersionMetaService extends TestJDBCBackend {
 
@@ -55,16 +53,13 @@ public class TestModelVersionMetaService extends TestJDBCBackend {
 
   private static final Namespace MODEL_NS = Namespace.of(METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME);
 
-  private final AuditInfo auditInfo =
-      AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build();
-
   private final Map<String, String> properties = ImmutableMap.of("k1", "v1");
 
   private final List<String> aliases = Lists.newArrayList("alias1", "alias2");
 
-  @Test
+  @TestTemplate
   public void testInsertAndSelectModelVersion() throws IOException {
-    createParentEntities(METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME, auditInfo);
+    createParentEntities(METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME, AUDIT_INFO);
 
     // Create a model entity
     ModelEntity modelEntity =
@@ -75,7 +70,7 @@ public class TestModelVersionMetaService extends TestJDBCBackend {
             "model1 comment",
             0,
             properties,
-            auditInfo);
+            AUDIT_INFO);
 
     Assertions.assertDoesNotThrow(
         () -> ModelMetaService.getInstance().insertModel(modelEntity, false));
@@ -89,7 +84,7 @@ public class TestModelVersionMetaService extends TestJDBCBackend {
             aliases,
             "test comment",
             properties,
-            auditInfo);
+            AUDIT_INFO);
 
     Assertions.assertDoesNotThrow(
         () -> ModelVersionMetaService.getInstance().insertModelVersion(modelVersionEntity));
@@ -121,7 +116,7 @@ public class TestModelVersionMetaService extends TestJDBCBackend {
             null,
             null,
             null,
-            auditInfo);
+            AUDIT_INFO);
 
     Assertions.assertDoesNotThrow(
         () -> ModelVersionMetaService.getInstance().insertModelVersion(modelVersionEntity2));
@@ -190,16 +185,16 @@ public class TestModelVersionMetaService extends TestJDBCBackend {
             aliases,
             "test comment",
             properties,
-            auditInfo);
+            AUDIT_INFO);
 
     Assertions.assertThrows(
         NoSuchEntityException.class,
         () -> ModelVersionMetaService.getInstance().insertModelVersion(modelVersionEntity3));
   }
 
-  @Test
+  @TestTemplate
   public void testInsertAndListModelVersions() throws IOException {
-    createParentEntities(METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME, auditInfo);
+    createParentEntities(METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME, AUDIT_INFO);
 
     // Create a model entity
     ModelEntity modelEntity =
@@ -210,7 +205,7 @@ public class TestModelVersionMetaService extends TestJDBCBackend {
             "model1 comment",
             0,
             properties,
-            auditInfo);
+            AUDIT_INFO);
 
     Assertions.assertDoesNotThrow(
         () -> ModelMetaService.getInstance().insertModel(modelEntity, false));
@@ -224,7 +219,7 @@ public class TestModelVersionMetaService extends TestJDBCBackend {
             aliases,
             "test comment",
             properties,
-            auditInfo);
+            AUDIT_INFO);
 
     Assertions.assertDoesNotThrow(
         () -> ModelVersionMetaService.getInstance().insertModelVersion(modelVersionEntity));
@@ -244,7 +239,7 @@ public class TestModelVersionMetaService extends TestJDBCBackend {
             null,
             null,
             null,
-            auditInfo);
+            AUDIT_INFO);
 
     Assertions.assertDoesNotThrow(
         () -> ModelVersionMetaService.getInstance().insertModelVersion(modelVersionEntity2));
@@ -267,9 +262,9 @@ public class TestModelVersionMetaService extends TestJDBCBackend {
                     getModelVersionNs(NameIdentifier.of(MODEL_NS, "model2"))));
   }
 
-  @Test
+  @TestTemplate
   public void testInsertAndDeleteModelVersion() throws IOException {
-    createParentEntities(METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME, auditInfo);
+    createParentEntities(METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME, AUDIT_INFO);
 
     // Create a model entity
     ModelEntity modelEntity =
@@ -280,7 +275,7 @@ public class TestModelVersionMetaService extends TestJDBCBackend {
             "model1 comment",
             0,
             properties,
-            auditInfo);
+            AUDIT_INFO);
 
     Assertions.assertDoesNotThrow(
         () -> ModelMetaService.getInstance().insertModel(modelEntity, false));
@@ -294,7 +289,7 @@ public class TestModelVersionMetaService extends TestJDBCBackend {
             aliases,
             "test comment",
             properties,
-            auditInfo);
+            AUDIT_INFO);
 
     Assertions.assertDoesNotThrow(
         () -> ModelVersionMetaService.getInstance().insertModelVersion(modelVersionEntity));
@@ -341,7 +336,7 @@ public class TestModelVersionMetaService extends TestJDBCBackend {
             aliases,
             "test comment",
             properties,
-            auditInfo);
+            AUDIT_INFO);
 
     Assertions.assertDoesNotThrow(
         () -> ModelVersionMetaService.getInstance().insertModelVersion(modelVersionEntity2));
@@ -386,9 +381,9 @@ public class TestModelVersionMetaService extends TestJDBCBackend {
                     getModelVersionIdent(modelEntity.nameIdentifier(), "alias2")));
   }
 
-  @Test
+  @TestTemplate
   public void testModelVersionWithMultipleUris() throws IOException {
-    createParentEntities(METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME, auditInfo);
+    createParentEntities(METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME, AUDIT_INFO);
 
     // Create a model entity
     ModelEntity modelEntity =
@@ -399,7 +394,7 @@ public class TestModelVersionMetaService extends TestJDBCBackend {
             "model1 comment",
             0,
             properties,
-            auditInfo);
+            AUDIT_INFO);
     Assertions.assertDoesNotThrow(
         () -> ModelMetaService.getInstance().insertModel(modelEntity, false));
 
@@ -412,7 +407,7 @@ public class TestModelVersionMetaService extends TestJDBCBackend {
             aliases,
             "test comment",
             properties,
-            auditInfo);
+            AUDIT_INFO);
 
     Assertions.assertDoesNotThrow(
         () -> ModelVersionMetaService.getInstance().insertModelVersion(modelVersionEntity));
@@ -481,10 +476,16 @@ public class TestModelVersionMetaService extends TestJDBCBackend {
                     getModelVersionIdent(modelEntity.nameIdentifier(), 0)));
   }
 
-  @ParameterizedTest
-  @ValueSource(strings = {"model", "schema", "catalog", "metalake"})
-  public void testDeleteModelVersionsInDeletion(String input) throws IOException {
-    createParentEntities(METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME, auditInfo);
+  @TestTemplate
+  public void testDeleteModelVersionsInDeletion() throws IOException, SQLException {
+    for (String param : new String[] {"model", "schema", "catalog", "metalake"}) {
+      init();
+      performDeletionTestLogic(param);
+    }
+  }
+
+  private void performDeletionTestLogic(String input) throws IOException {
+    createParentEntities(METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME, AUDIT_INFO);
 
     // Create a model entity
     ModelEntity modelEntity =
@@ -495,7 +496,7 @@ public class TestModelVersionMetaService extends TestJDBCBackend {
             "model1 comment",
             0,
             properties,
-            auditInfo);
+            AUDIT_INFO);
 
     Assertions.assertDoesNotThrow(
         () -> ModelMetaService.getInstance().insertModel(modelEntity, false));
@@ -509,7 +510,7 @@ public class TestModelVersionMetaService extends TestJDBCBackend {
             aliases,
             "test comment",
             properties,
-            auditInfo);
+            AUDIT_INFO);
 
     Assertions.assertDoesNotThrow(
         () -> ModelVersionMetaService.getInstance().insertModelVersion(modelVersionEntity));
@@ -522,7 +523,7 @@ public class TestModelVersionMetaService extends TestJDBCBackend {
             null,
             null,
             null,
-            auditInfo);
+            AUDIT_INFO);
 
     Assertions.assertDoesNotThrow(
         () -> ModelVersionMetaService.getInstance().insertModelVersion(modelVersionEntity1));
@@ -579,9 +580,9 @@ public class TestModelVersionMetaService extends TestJDBCBackend {
     verifyModelVersionExists(getModelVersionIdent(modelEntity.nameIdentifier(), "alias2"));
   }
 
-  @Test
+  @TestTemplate
   void testUpdateVersionComment() throws IOException {
-    createParentEntities(METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME, auditInfo);
+    createParentEntities(METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME, AUDIT_INFO);
 
     Map<String, String> properties = ImmutableMap.of("k1", "v1");
     String modelName = randomModelName();
@@ -600,7 +601,7 @@ public class TestModelVersionMetaService extends TestJDBCBackend {
             modelComment,
             0,
             properties,
-            auditInfo);
+            AUDIT_INFO);
 
     ModelVersionEntity modelVersionEntity =
         createModelVersionEntity(
@@ -610,7 +611,7 @@ public class TestModelVersionMetaService extends TestJDBCBackend {
             modelVersionAliases,
             modelVersionComment,
             properties,
-            auditInfo);
+            AUDIT_INFO);
 
     ModelVersionEntity updatedModelVersionEntity =
         createModelVersionEntity(
@@ -662,9 +663,9 @@ public class TestModelVersionMetaService extends TestJDBCBackend {
                     updateCommentUpdater));
   }
 
-  @Test
+  @TestTemplate
   void testAlterModelVersionProperties() throws IOException {
-    createParentEntities(METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME, auditInfo);
+    createParentEntities(METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME, AUDIT_INFO);
 
     Map<String, String> properties = ImmutableMap.of("k1", "v1", "k2", "v2");
     String modelName = randomModelName();
@@ -684,7 +685,7 @@ public class TestModelVersionMetaService extends TestJDBCBackend {
             modelComment,
             0,
             properties,
-            auditInfo);
+            AUDIT_INFO);
 
     ModelVersionEntity modelVersionEntity =
         createModelVersionEntity(
@@ -694,7 +695,7 @@ public class TestModelVersionMetaService extends TestJDBCBackend {
             modelVersionAliases,
             modelVersionComment,
             properties,
-            auditInfo);
+            AUDIT_INFO);
 
     ModelVersionEntity updatedModelVersionEntity =
         createModelVersionEntity(
@@ -746,9 +747,9 @@ public class TestModelVersionMetaService extends TestJDBCBackend {
                     updatePropertiesUpdater));
   }
 
-  @Test
+  @TestTemplate
   void testUpdateModelVersionUri() throws IOException {
-    createParentEntities(METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME, auditInfo);
+    createParentEntities(METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME, AUDIT_INFO);
 
     Map<String, String> properties = ImmutableMap.of("k1", "v1", "k2", "v2");
     String modelName = randomModelName();
@@ -766,7 +767,7 @@ public class TestModelVersionMetaService extends TestJDBCBackend {
             modelComment,
             0,
             properties,
-            auditInfo);
+            AUDIT_INFO);
 
     ModelVersionEntity modelVersionEntity =
         createModelVersionEntity(
@@ -776,7 +777,7 @@ public class TestModelVersionMetaService extends TestJDBCBackend {
             modelVersionAliases,
             modelVersionComment,
             properties,
-            auditInfo);
+            AUDIT_INFO);
 
     Map<String, String> newModelVersionUris = ImmutableMap.of("n1", "u1-1", "n2", "u2");
     ModelVersionEntity updatedModelVersionEntity =
@@ -829,9 +830,9 @@ public class TestModelVersionMetaService extends TestJDBCBackend {
                     updatePropertiesUpdater));
   }
 
-  @Test
+  @TestTemplate
   void testUpdateModelVersionAliases() throws IOException {
-    createParentEntities(METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME, auditInfo);
+    createParentEntities(METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME, AUDIT_INFO);
 
     Map<String, String> properties = ImmutableMap.of("k1", "v1", "k2", "v2");
     String modelName = randomModelName();
@@ -850,7 +851,7 @@ public class TestModelVersionMetaService extends TestJDBCBackend {
             modelComment,
             0,
             properties,
-            auditInfo);
+            AUDIT_INFO);
 
     ModelVersionEntity modelVersionEntity =
         createModelVersionEntity(
@@ -860,7 +861,7 @@ public class TestModelVersionMetaService extends TestJDBCBackend {
             modelVersionAliases,
             modelVersionComment,
             properties,
-            auditInfo);
+            AUDIT_INFO);
 
     ModelVersionEntity updatedModelVersionEntity =
         createModelVersionEntity(
@@ -942,5 +943,24 @@ public class TestModelVersionMetaService extends TestJDBCBackend {
 
   private String randomModelName() {
     return "model_" + UUID.randomUUID().toString().replace("-", "");
+  }
+
+  private ModelVersionEntity createModelVersionEntity(
+      NameIdentifier modelId,
+      Integer version,
+      Map<String, String> modelUris,
+      List<String> aliases,
+      String comment,
+      Map<String, String> properties,
+      AuditInfo auditInfo) {
+    return ModelVersionEntity.builder()
+        .withModelIdentifier(modelId)
+        .withVersion(version)
+        .withUris(modelUris)
+        .withAliases(aliases)
+        .withComment(comment)
+        .withProperties(properties)
+        .withAuditInfo(auditInfo)
+        .build();
   }
 }

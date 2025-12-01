@@ -78,12 +78,12 @@ public abstract class JdbcPropertiesConverter implements PropertiesConverter {
     String jdbcUser = flinkCatalogProperties.get(JdbcPropertiesConstants.FLINK_JDBC_USER);
     String jdbcPassword = flinkCatalogProperties.get(JdbcPropertiesConstants.FLINK_JDBC_PASSWORD);
     String jdbcBaseUrl = flinkCatalogProperties.get(JdbcPropertiesConstants.FLINK_JDBC_URL);
-    Preconditions.checkNotNull(
-        jdbcUser, JdbcPropertiesConstants.FLINK_JDBC_USER + " should not be null.");
-    Preconditions.checkNotNull(
-        jdbcPassword, JdbcPropertiesConstants.FLINK_JDBC_PASSWORD + " should not be null.");
-    Preconditions.checkNotNull(
-        jdbcBaseUrl, JdbcPropertiesConstants.FLINK_JDBC_URL + " should not be null.");
+    Preconditions.checkArgument(
+        jdbcUser != null, JdbcPropertiesConstants.FLINK_JDBC_USER + " should not be null.");
+    Preconditions.checkArgument(
+        jdbcPassword != null, JdbcPropertiesConstants.FLINK_JDBC_PASSWORD + " should not be null.");
+    Preconditions.checkArgument(
+        jdbcBaseUrl != null, JdbcPropertiesConstants.FLINK_JDBC_URL + " should not be null.");
     Map<String, String> tableOptions = new HashMap<>();
     tableOptions.put(
         JdbcPropertiesConstants.FLINK_JDBC_TABLE_DATABASE_URL,

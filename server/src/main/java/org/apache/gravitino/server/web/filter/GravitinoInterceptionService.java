@@ -17,20 +17,20 @@
 
 package org.apache.gravitino.server.web.filter;
 
+import static org.apache.gravitino.server.web.filter.ParameterUtil.extractAuthorizationRequestTypeFromParameters;
+import static org.apache.gravitino.server.web.filter.ParameterUtil.extractMetadataObjectTypeFromParameters;
+import static org.apache.gravitino.server.web.filter.ParameterUtil.extractNameIdentifierFromParameters;
+
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
 import java.lang.reflect.Parameter;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
-import java.util.Optional;
 import java.util.Set;
-import javax.ws.rs.PathParam;
 import javax.ws.rs.core.Response;
 import org.aopalliance.intercept.ConstructorInterceptor;
 import org.aopalliance.intercept.MethodInterceptor;
@@ -38,32 +38,34 @@ import org.aopalliance.intercept.MethodInvocation;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.MetadataObject;
-import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.NameIdentifier;
-import org.apache.gravitino.authorization.AuthorizationRequestContext;
-import org.apache.gravitino.server.authorization.MetadataFilterHelper;
+import org.apache.gravitino.authorization.AuthorizationUtils;
+import org.apache.gravitino.exceptions.ForbiddenException;
+import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationExpression;
-import org.apache.gravitino.server.authorization.annotations.AuthorizationFullName;
-import org.apache.gravitino.server.authorization.annotations.AuthorizationMetadata;
-import org.apache.gravitino.server.authorization.annotations.AuthorizationObjectType;
+import org.apache.gravitino.server.authorization.annotations.AuthorizationRequest;
 import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionEvaluator;
 import org.apache.gravitino.server.web.Utils;
+import org.apache.gravitino.server.web.filter.authorization.AuthorizationExecutor;
+import org.apache.gravitino.server.web.filter.authorization.AuthorizeExecutorFactory;
 import org.apache.gravitino.server.web.rest.CatalogOperations;
 import org.apache.gravitino.server.web.rest.FilesetOperations;
 import org.apache.gravitino.server.web.rest.GroupOperations;
+import org.apache.gravitino.server.web.rest.MetadataObjectPolicyOperations;
+import org.apache.gravitino.server.web.rest.MetadataObjectTagOperations;
 import org.apache.gravitino.server.web.rest.MetalakeOperations;
 import org.apache.gravitino.server.web.rest.ModelOperations;
 import org.apache.gravitino.server.web.rest.OwnerOperations;
 import org.apache.gravitino.server.web.rest.PartitionOperations;
 import org.apache.gravitino.server.web.rest.PermissionOperations;
+import org.apache.gravitino.server.web.rest.PolicyOperations;
 import org.apache.gravitino.server.web.rest.RoleOperations;
 import org.apache.gravitino.server.web.rest.SchemaOperations;
 import org.apache.gravitino.server.web.rest.StatisticOperations;
 import org.apache.gravitino.server.web.rest.TableOperations;
+import org.apache.gravitino.server.web.rest.TagOperations;
 import org.apache.gravitino.server.web.rest.TopicOperations;
 import org.apache.gravitino.server.web.rest.UserOperations;
-import org.apache.gravitino.utils.MetadataObjectUtil;
-import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.PrincipalUtils;
 import org.glassfish.hk2.api.Descriptor;
 import org.glassfish.hk2.api.Filter;
@@ -95,7 +97,11 @@ public class GravitinoInterceptionService implements InterceptionService {
             RoleOperations.class.getName(),
             OwnerOperations.class.getName(),
             StatisticOperations.class.getName(),
-            PartitionOperations.class.getName()));
+            PartitionOperations.class.getName(),
+            MetadataObjectTagOperations.class.getName(),
+            TagOperations.class.getName(),
+            PolicyOperations.class.getName(),
+            MetadataObjectPolicyOperations.class.getName()));
   }
 
   @Override
@@ -126,42 +132,69 @@ public class GravitinoInterceptionService implements InterceptionService {
      */
     @Override
     public Object invoke(MethodInvocation methodInvocation) throws Throwable {
+      Method method = methodInvocation.getMethod();
+      Parameter[] parameters = method.getParameters();
+      AuthorizationExpression expressionAnnotation =
+          method.getAnnotation(AuthorizationExpression.class);
+
       try {
-        Method method = methodInvocation.getMethod();
-        Parameter[] parameters = method.getParameters();
-        AuthorizationExpression expressionAnnotation =
-            method.getAnnotation(AuthorizationExpression.class);
+        AuthorizationExecutor executor;
         if (expressionAnnotation != null) {
           String expression = expressionAnnotation.expression();
           Object[] args = methodInvocation.getArguments();
           String entityType = extractMetadataObjectTypeFromParameters(parameters, args);
           Map<Entity.EntityType, NameIdentifier> metadataContext =
               extractNameIdentifierFromParameters(parameters, args);
-          Map<String, Object> pathParams = extractPathParamsFromParameters(parameters, args);
-          AuthorizationExpressionEvaluator authorizationExpressionEvaluator =
-              new AuthorizationExpressionEvaluator(expression);
-          boolean authorizeResult =
-              authorizationExpressionEvaluator.evaluate(
-                  metadataContext,
-                  pathParams,
-                  new AuthorizationRequestContext(),
-                  Optional.ofNullable(entityType));
-          if (!authorizeResult) {
-            MetadataObject.Type type = expressionAnnotation.accessMetadataType();
-            NameIdentifier accessMetadataName =
-                metadataContext.get(Entity.EntityType.valueOf(type.name()));
-            String errorMessage = expressionAnnotation.errorMessage();
+
+          Map<String, Object> pathParams = Utils.extractPathParamsFromParameters(parameters, args);
+
+          // Check metalake and user existence before authorization
+          NameIdentifier metalakeIdent = metadataContext.get(Entity.EntityType.METALAKE);
+          if (metalakeIdent != null) {
             String currentUser = PrincipalUtils.getCurrentUserName();
-            String methodName = method.getName();
+            try {
+              AuthorizationUtils.checkCurrentUser(metalakeIdent.name(), currentUser);
+            } catch (NoSuchMetalakeException e) {
+              LOG.warn(
+                  "Metalake {} does not exist when validating user {}", metalakeIdent, currentUser);
+              return buildNoAuthResponse(expressionAnnotation, metadataContext, method, expression);
+            } catch (ForbiddenException ex) {
+              LOG.warn(
+                  "User validation failed - User: {}, Metalake: {}, Reason: {}",
+                  currentUser,
+                  metalakeIdent.name(),
+                  ex.getMessage());
+              return Utils.forbidden(ex.getMessage(), ex);
+            } catch (Exception ex) {
+              LOG.error(
+                  "Unexpected error during user validation - User: {}, Metalake: {}",
+                  currentUser,
+                  metalakeIdent.name(),
+                  ex);
+              return Utils.internalError("Failed to validate user", ex);
+            }
+          }
 
-            LOG.warn(
-                "Authorization failed - User: {}, Operation: {}, Metadata: {}, Expression: {}",
-                currentUser,
-                methodName,
-                accessMetadataName,
-                expression);
-
-            return buildNoAuthResponse(errorMessage, accessMetadataName, currentUser, methodName);
+          // If expression is empty, skip authorization check (method handles its own filtering)
+          if (StringUtils.isNotBlank(expression)) {
+            AuthorizationExpressionEvaluator authorizationExpressionEvaluator =
+                new AuthorizationExpressionEvaluator(expression);
+            AuthorizationRequest.RequestType requestType =
+                extractAuthorizationRequestTypeFromParameters(parameters);
+            executor =
+                AuthorizeExecutorFactory.create(
+                    expression,
+                    requestType,
+                    metadataContext,
+                    authorizationExpressionEvaluator,
+                    pathParams,
+                    entityType,
+                    parameters,
+                    args);
+            boolean authorizeResult = executor.execute();
+            if (!authorizeResult) {
+              return buildNoAuthResponse(expressionAnnotation, metadataContext, method, expression);
+            }
           }
         }
         return methodInvocation.proceed();
@@ -177,6 +210,28 @@ public class GravitinoInterceptionService implements InterceptionService {
         return Utils.internalError(
             "Authorization failed due to system internal error. Please contact administrator.", ex);
       }
+    }
+
+    private Response buildNoAuthResponse(
+        AuthorizationExpression expressionAnnotation,
+        Map<Entity.EntityType, NameIdentifier> metadataContext,
+        Method method,
+        String expression) {
+      MetadataObject.Type type = expressionAnnotation.accessMetadataType();
+      NameIdentifier accessMetadataName =
+          metadataContext.get(Entity.EntityType.valueOf(type.name()));
+      String errorMessage = expressionAnnotation.errorMessage();
+      String currentUser = PrincipalUtils.getCurrentUserName();
+      String methodName = method.getName();
+
+      LOG.warn(
+          "Authorization failed - User: {}, Operation: {}, Metadata: {}, Expression: {}",
+          currentUser,
+          methodName,
+          accessMetadataName,
+          expression);
+
+      return buildNoAuthResponse(errorMessage, accessMetadataName, currentUser, methodName);
     }
 
     private Response buildNoAuthResponse(
@@ -202,149 +257,10 @@ public class GravitinoInterceptionService implements InterceptionService {
       }
       return Utils.forbidden(contextualMessage, null);
     }
-
-    private Map<Entity.EntityType, NameIdentifier> extractNameIdentifierFromParameters(
-        Parameter[] parameters, Object[] args) {
-      Map<Entity.EntityType, String> entities = new HashMap<>();
-      Map<Entity.EntityType, NameIdentifier> nameIdentifierMap = new HashMap<>();
-      // Extract AuthorizationMetadata
-      for (int i = 0; i < parameters.length; i++) {
-        Parameter parameter = parameters[i];
-        AuthorizationMetadata authorizeResource =
-            parameter.getAnnotation(AuthorizationMetadata.class);
-        if (authorizeResource == null) {
-          continue;
-        }
-        Entity.EntityType type = authorizeResource.type();
-        entities.put(type, String.valueOf(args[i]));
-      }
-
-      String metalake = entities.get(Entity.EntityType.METALAKE);
-      String catalog = entities.get(Entity.EntityType.CATALOG);
-      String schema = entities.get(Entity.EntityType.SCHEMA);
-      String table = entities.get(Entity.EntityType.TABLE);
-      String topic = entities.get(Entity.EntityType.TOPIC);
-      String fileset = entities.get(Entity.EntityType.FILESET);
-
-      // Extract full name and types
-      String fullName = null;
-      String metadataObjectType = null;
-      for (int i = 0; i < parameters.length; i++) {
-        Parameter parameter = parameters[i];
-        AuthorizationFullName authorizeFullName =
-            parameter.getAnnotation(AuthorizationFullName.class);
-        if (authorizeFullName != null) {
-          fullName = String.valueOf(args[i]);
-        }
-
-        AuthorizationObjectType objectType = parameter.getAnnotation(AuthorizationObjectType.class);
-        if (objectType != null) {
-          metadataObjectType = String.valueOf(args[i]);
-        }
-      }
-
-      entities.forEach(
-          (type, metadata) -> {
-            switch (type) {
-              case CATALOG:
-                nameIdentifierMap.put(
-                    Entity.EntityType.CATALOG, NameIdentifierUtil.ofCatalog(metalake, catalog));
-                break;
-              case SCHEMA:
-                nameIdentifierMap.put(
-                    Entity.EntityType.SCHEMA,
-                    NameIdentifierUtil.ofSchema(metalake, catalog, schema));
-                break;
-              case TABLE:
-                nameIdentifierMap.put(
-                    Entity.EntityType.TABLE,
-                    NameIdentifierUtil.ofTable(metalake, catalog, schema, table));
-                break;
-              case TOPIC:
-                nameIdentifierMap.put(
-                    Entity.EntityType.TOPIC,
-                    NameIdentifierUtil.ofTopic(metalake, catalog, schema, topic));
-                break;
-              case FILESET:
-                nameIdentifierMap.put(
-                    Entity.EntityType.FILESET,
-                    NameIdentifierUtil.ofFileset(metalake, catalog, schema, fileset));
-                break;
-              case MODEL:
-                String model = entities.get(Entity.EntityType.MODEL);
-                nameIdentifierMap.put(
-                    Entity.EntityType.MODEL,
-                    NameIdentifierUtil.ofModel(metalake, catalog, schema, model));
-                break;
-              case METALAKE:
-                nameIdentifierMap.put(
-                    Entity.EntityType.METALAKE, NameIdentifierUtil.ofMetalake(metalake));
-                break;
-              case USER:
-                nameIdentifierMap.put(
-                    Entity.EntityType.USER,
-                    NameIdentifierUtil.ofUser(metadata, entities.get(Entity.EntityType.USER)));
-                break;
-              case GROUP:
-                nameIdentifierMap.put(
-                    Entity.EntityType.GROUP,
-                    NameIdentifierUtil.ofGroup(metalake, entities.get(Entity.EntityType.GROUP)));
-                break;
-              case ROLE:
-                nameIdentifierMap.put(
-                    Entity.EntityType.ROLE,
-                    NameIdentifierUtil.ofRole(metalake, entities.get(Entity.EntityType.ROLE)));
-                break;
-              default:
-                break;
-            }
-          });
-
-      // Extract fullName and metadataObjectType
-      if (fullName != null && metadataObjectType != null && metalake != null) {
-        MetadataObject.Type type =
-            MetadataObject.Type.valueOf(metadataObjectType.toUpperCase(Locale.ROOT));
-        NameIdentifier nameIdentifier =
-            MetadataObjectUtil.toEntityIdent(metalake, MetadataObjects.parse(fullName, type));
-        nameIdentifierMap.putAll(
-            MetadataFilterHelper.spiltMetadataNames(
-                metalake, MetadataObjectUtil.toEntityType(type), nameIdentifier));
-      }
-
-      return nameIdentifierMap;
-    }
-
-    private Map<String, Object> extractPathParamsFromParameters(
-        Parameter[] parameters, Object[] args) {
-      Map<String, Object> pathParams = new HashMap<>();
-      for (int i = 0; i < parameters.length; i++) {
-        Parameter parameter = parameters[i];
-        PathParam pathParam = parameter.getAnnotation(PathParam.class);
-        if (pathParam == null) {
-          continue;
-        }
-        pathParams.put("p_" + pathParam.value(), args[i]);
-      }
-      return pathParams;
-    }
   }
 
-  private static String extractMetadataObjectTypeFromParameters(
-      Parameter[] parameters, Object[] args) {
-    for (int i = 0; i < parameters.length; i++) {
-      Parameter parameter = parameters[i];
-      AuthorizationObjectType objectType = parameter.getAnnotation(AuthorizationObjectType.class);
-      if (objectType != null) {
-        return String.valueOf(args[i]).toUpperCase();
-      }
-    }
-    return null;
-  }
-
-  private static class ClassListFilter implements Filter {
-    private final Set<String> targetClasses;
-
-    public ClassListFilter(Set<String> targetClasses) {
+  private record ClassListFilter(Set<String> targetClasses) implements Filter {
+    private ClassListFilter(Set<String> targetClasses) {
       this.targetClasses = new HashSet<>(targetClasses);
     }
 

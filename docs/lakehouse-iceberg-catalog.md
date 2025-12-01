@@ -18,7 +18,7 @@ Apache Gravitino provides the ability to manage Apache Iceberg metadata.
 ### Requirements and limitations
 
 :::info
-Builds with Apache Iceberg `1.9.2`. The Apache Iceberg table format version is `2` by default.
+Builds with Apache Iceberg `1.10.0`. The Apache Iceberg table format version is `2` by default.
 :::
 
 ## Catalog
@@ -83,12 +83,14 @@ Supports using static access-key-id and secret-access-key to access S3 data.
 
 For other Iceberg s3 properties not managed by Gravitino like `s3.sse.type`, you could config it directly by `gravitino.bypass.s3.sse.type`.
 
-:::caution
-To resolve Log4j class conflict issues that may arise when using Iceberg AWS 1.9 bundle jars alongside the Gravitino server, it is recommended to remove the Log4j JAR files (specifically log4j-core and log4j-api) from the `catalogs/lakehouse-iceberg/libs` directory.
+:::info
+ - For the JDBC catalog backend, set the `warehouse` parameter to `s3://{bucket_name}/${prefix_name}`. 
+ - For the Hive catalog backend, set `warehouse` to `s3a://{bucket_name}/${prefix_name}`. 
+ - Additionally, download the [Gravitino Iceberg AWS bundle](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-iceberg-aws-bundle) and place it in the `catalogs/lakehouse-iceberg/libs/` directory.
 :::
 
-:::info
-To configure the JDBC catalog backend, set the `warehouse` parameter to `s3://{bucket_name}/${prefix_name}`. For the Hive catalog backend, set `warehouse` to `s3a://{bucket_name}/${prefix_name}`. Additionally, download the [Iceberg AWS bundle](https://mvnrepository.com/artifact/org.apache.iceberg/iceberg-aws-bundle) and place it in the `catalogs/lakehouse-iceberg/libs/` directory.
+:::note
+Since Gravitino 1.1.0, the Gravitino Iceberg AWS bundle jar has already included the Iceberg AWS bundle jar, no need to download and include it separately.
 :::
 
 #### OSS
@@ -105,7 +107,11 @@ Gravitino Iceberg REST service supports using static access-key-id and secret-ac
 For other Iceberg OSS properties not managed by Gravitino like `client.security-token`, you could config it directly by `gravitino.bypass.client.security-token`.
 
 :::info
-Please set the `warehouse` parameter to `oss://{bucket_name}/${prefix_name}`. Additionally, download the [Aliyun OSS SDK](https://gosspublic.alicdn.com/sdks/java/aliyun_java_sdk_3.10.2.zip) and copy `aliyun-sdk-oss-3.10.2.jar`, `hamcrest-core-1.1.jar`, `jdom2-2.0.6.jar` in the `catalogs/lakehouse-iceberg/libs/` directory.
+Please set the `warehouse` parameter to `oss://{bucket_name}/${prefix_name}`. Additionally, download the [Gravitino Iceberg Aliyun bundle](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-iceberg-aliyun-bundle) and place it in the `catalogs/lakehouse-iceberg/libs/` directory.
+:::
+
+:::note
+Since Gravitino 1.1.0, the Gravitino Iceberg aliyun bundle jar has already included the Iceberg aliyun necessary dependency jars, no need to download and include them separately.
 :::
 
 #### GCS
@@ -121,10 +127,14 @@ For other Iceberg GCS properties not managed by Gravitino like `gcs.project-id`,
 Please make sure the credential file is accessible by Gravitino, like using `export GOOGLE_APPLICATION_CREDENTIALS=/xx/application_default_credentials.json` before Gravitino server is started.
 
 :::info
-Please set `warehouse` to `gs://{bucket_name}/${prefix_name}`, and download [Iceberg GCP bundle jar](https://mvnrepository.com/artifact/org.apache.iceberg/iceberg-gcp-bundle) and place it to `catalogs/lakehouse-iceberg/libs/`.
+Please set `warehouse` to `gs://{bucket_name}/${prefix_name}`, and download [Gravitino Iceberg GCP bundle jar](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-iceberg-gcp-bundle) and place it to `catalogs/lakehouse-iceberg/libs/`.
 :::
 
-#### ADLS 
+:::note
+Since Gravitino 1.1.0, the Gravitino Iceberg GCP bundle jar has already included the Iceberg GCP bundle jar, no need to download and include it separately.
+:::
+
+#### ADLS
 
 Supports using Azure account name and secret key to access ADLS data.
 
@@ -137,7 +147,11 @@ Supports using Azure account name and secret key to access ADLS data.
 For other Iceberg ADLS properties not managed by Gravitino like `adls.read.block-size-bytes`, you could config it directly by `gravitino.iceberg-rest.adls.read.block-size-bytes`.
 
 :::info
-Please set `warehouse` to `abfs[s]://{container-name}@{storage-account-name}.dfs.core.windows.net/{path}`, and download the [Iceberg Azure bundle](https://mvnrepository.com/artifact/org.apache.iceberg/iceberg-azure-bundle) and place it to `catalogs/lakehouse-iceberg/libs/`.
+Please set `warehouse` to `abfs[s]://{container-name}@{storage-account-name}.dfs.core.windows.net/{path}`, and download the [Gravitino Iceberg Azure bundle](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-iceberg-azure-bundle) and place it to `catalogs/lakehouse-iceberg/libs/`.
+:::
+
+:::note
+Since Gravitino 1.1.0, the Gravitino Iceberg Azure bundle jar has already included the Iceberg Azure bundle jar, no need to download and include it separately.
 :::
 
 #### Other storages
@@ -208,13 +222,13 @@ Please refer to [Manage Relational Metadata Using Gravitino](./manage-relational
 
 Supports transforms:
 
-  - `IdentityTransform`
-  - `BucketTransform`
-  - `TruncateTransform`
-  - `YearTransform`
-  - `MonthTransform`
-  - `DayTransform`
-  - `HourTransform`
+- `IdentityTransform`
+- `BucketTransform`
+- `TruncateTransform`
+- `YearTransform`
+- `MonthTransform`
+- `DayTransform`
+- `HourTransform`
 
 :::info
 Iceberg doesn't support multi fields in `BucketTransform`.

@@ -19,10 +19,9 @@ There are some key difference between Gravitino Iceberg REST server and Gravitin
 
 ### Capabilities
 
-- Supports the Apache Iceberg REST API defined in Iceberg 1.9, and supports all namespace and table interfaces. The following interfaces are not implemented yet:
+- Supports the Apache Iceberg REST API defined in Iceberg 1.10, and supports all namespace and table interfaces. The following interfaces are not implemented yet:
   - multi table transaction
   - pagination
-  - scan planning
 - Works as a catalog proxy, supporting `Hive` and `JDBC` as catalog backend.
 - Supports credential vending for `S3`、`GCS`、`OSS` and `ADLS`.
 - Supports different storages like `S3`, `HDFS`, `OSS`, `GCS`, `ADLS` and provides the capability to support other storages.
@@ -250,7 +249,7 @@ Please refer the following configuration If you are using Spark to access Iceber
 
 ```shell
 ./bin/spark-sql -v \
---conf spark.jars=/Users/fanng/deploy/demo/jars/iceberg-spark-runtime-3.5_2.12-1.9.0.jar \
+--conf spark.jars=/Users/fanng/deploy/demo/jars/iceberg-spark-runtime-3.5_2.12-1.10.0.jar \
 --conf spark.sql.extensions=org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions \
 --conf spark.sql.catalog.rest=org.apache.iceberg.spark.SparkCatalog \
 --conf spark.sql.catalog.rest.rest.auth.type=oauth2 \
@@ -300,12 +299,10 @@ For other Iceberg s3 properties not managed by Gravitino like `s3.sse.type`, you
 
 Please refer to [S3 credentials](./security/credential-vending.md#s3-credentials) for credential related configurations.
 
-:::caution
-To resolve Log4j class conflict issues that may arise when using Iceberg AWS 1.9 bundle jars alongside the Gravitino Iceberg REST server, it is recommended to remove the Log4j JAR files (specifically log4j-core and log4j-api) from the `iceberg-rest-server/libs` directory.
-:::
-
 :::info
-To configure the JDBC catalog backend, set the `gravitino.iceberg-rest.warehouse` parameter to `s3://{bucket_name}/${prefix_name}`. For the Hive catalog backend, set `gravitino.iceberg-rest.warehouse` to `s3a://{bucket_name}/${prefix_name}`. Additionally, download the [Iceberg AWS bundle](https://mvnrepository.com/artifact/org.apache.iceberg/iceberg-aws-bundle) and place it in the classpath of Iceberg REST server.
+ - For the JDBC catalog backend, set the `gravitino.iceberg-rest.warehouse` parameter to `s3://{bucket_name}/${prefix_name}`. 
+ - For the Hive catalog backend, set `gravitino.iceberg-rest.warehouse` to `s3a://{bucket_name}/${prefix_name}`. 
+ - Additionally, download the [Gravitino Iceberg AWS bundle](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-iceberg-aws-bundle) and place it in the classpath of Iceberg REST server.
 :::
 
 #### OSS configuration
@@ -320,11 +317,7 @@ For other Iceberg OSS properties not managed by Gravitino like `client.security-
 
 Please refer to [OSS credentials](./security/credential-vending.md#oss-credentials) for credential related configurations.
 
-Additionally, Iceberg doesn't provide Iceberg Aliyun bundle jar which contains OSS packages, there are two alternatives to use OSS packages:
-1. Use [Gravitino Aliyun bundle jar with hadoop packages](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-aliyun-bundle).
-2. Use [Aliyun JAVA SDK](https://gosspublic.alicdn.com/sdks/java/aliyun_java_sdk_3.10.2.zip) and extract `aliyun-sdk-oss-3.10.2.jar`, `hamcrest-core-1.1.jar`, `jdom2-2.0.6.jar` jars.
-
-Please place the above jars in the classpath of Iceberg REST server, please refer to [server management](#server-management) for classpath details.
+Additionally, please download the [Gravitino Iceberg Aliyun bundle jar](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-iceberg-aliyun-bundle) and place it in the classpath of Iceberg REST server, you can refer to [server management](#server-management) for classpath details.
 
 :::info
 Please set the `gravitino.iceberg-rest.warehouse` parameter to `oss://{bucket_name}/${prefix_name}`.
@@ -347,7 +340,7 @@ Please ensure that the credential file can be accessed by the Gravitino server. 
 :::
 
 :::info
-Please set `gravitino.iceberg-rest.warehouse` to `gs://{bucket_name}/${prefix_name}`, and download [Iceberg gcp bundle](https://mvnrepository.com/artifact/org.apache.iceberg/iceberg-gcp-bundle) and place it to the classpath of Gravitino Iceberg REST server, `iceberg-rest-server/libs` for the auxiliary server, `libs` for the standalone server.
+Please set `gravitino.iceberg-rest.warehouse` to `gs://{bucket_name}/${prefix_name}`, and download [Gravitino Iceberg gcp bundle](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-iceberg-gcp-bundle) and place it to the classpath of Gravitino Iceberg REST server, `iceberg-rest-server/libs` for the auxiliary server, `libs` for the standalone server.
 :::
 
 #### ADLS
@@ -361,7 +354,7 @@ For other Iceberg ADLS properties not managed by Gravitino like `adls.read.block
 Please refer to [ADLS credentials](./security/credential-vending.md#adls-credentials) for credential related configurations.
 
 :::info
-Please set `gravitino.iceberg-rest.warehouse` to `abfs[s]://{container-name}@{storage-account-name}.dfs.core.windows.net/{path}`, and download the [Iceberg Azure bundle](https://mvnrepository.com/artifact/org.apache.iceberg/iceberg-azure-bundle) and place it in the classpath of Iceberg REST server.
+Please set `gravitino.iceberg-rest.warehouse` to `abfs[s]://{container-name}@{storage-account-name}.dfs.core.windows.net/{path}`, and download the [Gravitino Iceberg Azure bundle](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-iceberg-azure-bundle) and place it in the classpath of Iceberg REST server.
 :::
 
 #### HDFS configuration
@@ -396,7 +389,7 @@ You could access the view interface if using JDBC backend and enable `jdbc.schem
 
 ### Other Apache Iceberg catalog properties
 
-You can add other properties defined in [Iceberg catalog properties](https://iceberg.apache.org/docs/1.9.2/configuration/#catalog-properties).
+You can add other properties defined in [Iceberg catalog properties](https://iceberg.apache.org/docs/1.10.0/configuration/#catalog-properties).
 The `clients` property for example:
 
 | Configuration item               | Description                          | Default value | Required |
@@ -424,6 +417,17 @@ Gravitino provides a pluggable metrics store interface to store and delete Icebe
 | `gravitino.iceberg-rest.metricsStore`           | The Iceberg metrics storage class name.                                                                                             | (none)        | No       | 0.4.0         |
 | `gravitino.iceberg-rest.metricsStoreRetainDays` | The days to retain Iceberg metrics in store, the value not greater than 0 means retain forever.                                     | -1            | No       | 0.4.0         |
 | `gravitino.iceberg-rest.metricsQueueCapacity`   | The size of queue to store metrics temporally before storing to the persistent storage. Metrics will be dropped when queue is full. | 1000          | No       | 0.4.0         |
+
+If you want to use jdbc as metrics store, you can set the `gravitino.iceberg-rest.metricsStore` to `jdbc`, and set the following configurations to connect to the database.
+You should initialize the database using the sql scripts in the directory `scripts`.
+You must download the corresponding JDBC driver to the `iceberg-rest-server/libs` directory.
+
+| Configuration item                                  | Description                                                                                                                                         | Default value | Required | Since Version |
+|-----------------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------|---------------|----------|---------------|
+| `gravitino.iceberg-rest.jdbc-metrics.url`           | The JDBC connection address, such as `jdbc:postgresql://127.0.0.1:5432/database` for Postgres, or `jdbc:mysql://127.0.0.1:3306/database` for mysql. | (none)        | Yes      | 1.1.0         |
+| `gravitino.iceberg-rest.jdbc-metrics.jdbc-user`     | The username of the JDBC connection.                                                                                                                | (none)        | No       | 1.1.0         |
+| `gravitino.iceberg-rest.jdbc-metrics.jdbc-password` | The password of the JDBC connection.                                                                                                                | (none)        | No       | 1.1.0         |
+| `gravitino.iceberg-rest.jdbc-metrics.jdbc-driver`   | `com.mysql.jdbc.Driver` or `com.mysql.cj.jdbc.Driver` for MySQL, `org.postgresql.Driver` for PostgreSQL.                                            | (none)        | Yes      | 1.1.0         |
 
 ### Iceberg table metadata cache configuration
 
@@ -469,7 +473,7 @@ Normally you will see the output like `{"defaults":{},"overrides":{}, "endpoints
 
 ### Deploying Apache Spark with Apache Iceberg support
 
-Follow the [Spark Iceberg start guide](https://iceberg.apache.org/docs/1.9.2/spark-getting-started/) to set up Apache Spark's and Apache Iceberg's environment.
+Follow the [Spark Iceberg start guide](https://iceberg.apache.org/docs/1.10.0/spark-getting-started/) to set up Apache Spark's and Apache Iceberg's environment.
 
 ### Starting the Apache Spark client with the Apache Iceberg REST catalog
 

@@ -21,7 +21,7 @@ package org.apache.gravitino.listener.api.event;
 
 import java.util.Map;
 import javax.servlet.http.HttpServletRequest;
-import org.apache.gravitino.iceberg.service.IcebergRestUtils;
+import org.apache.gravitino.iceberg.service.IcebergRESTUtils;
 import org.apache.gravitino.utils.PrincipalUtils;
 
 /** The general request context information for Iceberg REST operations. */
@@ -59,7 +59,7 @@ public class IcebergRequestContext {
       HttpServletRequest httpRequest, String catalogName, boolean requestCredentialVending) {
     this.httpServletRequest = httpRequest;
     this.remoteHostName = httpRequest.getRemoteHost();
-    this.httpHeaders = IcebergRestUtils.getHttpHeaders(httpRequest);
+    this.httpHeaders = IcebergRESTUtils.getHttpHeaders(httpRequest);
     this.catalogName = catalogName;
     this.userName = PrincipalUtils.getCurrentUserName();
     this.requestCredentialVending = requestCredentialVending;

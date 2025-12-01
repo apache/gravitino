@@ -29,8 +29,7 @@ public class RoleMetaPostgreSQLProvider extends RoleMetaBaseSQLProvider {
   public String softDeleteRoleMetaByRoleId(Long roleId) {
     return "UPDATE "
         + ROLE_TABLE_NAME
-        + " SET deleted_at = floor(extract(epoch from(current_timestamp -"
-        + " timestamp '1970-01-01 00:00:00')) * 1000)"
+        + " SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
         + " WHERE role_id = #{roleId} AND deleted_at = 0";
   }
 
@@ -38,8 +37,7 @@ public class RoleMetaPostgreSQLProvider extends RoleMetaBaseSQLProvider {
   public String softDeleteRoleMetasByMetalakeId(Long metalakeId) {
     return "UPDATE "
         + ROLE_TABLE_NAME
-        + " SET deleted_at = floor(extract(epoch from(current_timestamp -"
-        + " timestamp '1970-01-01 00:00:00')) * 1000)"
+        + " SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
         + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0";
   }
 

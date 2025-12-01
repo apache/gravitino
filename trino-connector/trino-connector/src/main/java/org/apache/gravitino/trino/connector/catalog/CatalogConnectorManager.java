@@ -109,7 +109,8 @@ public class CatalogConnectorManager {
    * @param client the Gravitino admin client
    */
   public void config(GravitinoConfig config, GravitinoAdminClient client) {
-    this.config = Preconditions.checkNotNull(config, "config is not null");
+    Preconditions.checkArgument(config != null, "config is not null");
+    this.config = config;
     if (client == null) {
       this.gravitinoClient =
           GravitinoAdminClient.builder(config.getURI())

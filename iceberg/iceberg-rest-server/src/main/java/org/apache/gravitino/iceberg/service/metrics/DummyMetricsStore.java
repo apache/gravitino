@@ -20,6 +20,7 @@ package org.apache.gravitino.iceberg.service.metrics;
 
 import java.time.Instant;
 import java.util.Map;
+import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.metrics.MetricsReport;
 
 public class DummyMetricsStore implements IcebergMetricsStore {
@@ -29,7 +30,7 @@ public class DummyMetricsStore implements IcebergMetricsStore {
   public void init(Map<String, String> properties) {}
 
   @Override
-  public void recordMetric(MetricsReport metricsReport) {}
+  public void recordMetric(String catalog, Namespace namespace, MetricsReport metricsReport) {}
 
   @Override
   public void close() {}
