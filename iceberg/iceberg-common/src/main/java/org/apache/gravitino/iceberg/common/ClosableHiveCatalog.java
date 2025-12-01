@@ -70,7 +70,11 @@ public class ClosableHiveCatalog extends HiveCatalog implements Closeable, Suppo
   @Override
   public void initialize(String inputName, Map<String, String> properties) {
     super.initialize(inputName, properties);
-    this.kerberosClient = initKerberosClient();
+
+    AuthenticationConfig authenticationConfig = new AuthenticationConfig(properties);
+    if (authenticationConfig.isKerberosAuth()) {
+      this.kerberosClient = initKerberosClient();
+    }
 
     try {
       resetIcebergHiveClientPool();
@@ -113,6 +117,9 @@ public class ClosableHiveCatalog extends HiveCatalog implements Closeable, Suppo
       throws Throwable {
 
     AuthenticationConfig authenticationConfig = new AuthenticationConfig(properties);
+    if (!authenticationConfig.isKerberosAuth()) {
+      return executable.execute();
+    }
 
     final String finalPrincipalName;
     String proxyKerberosPrincipalName = PrincipalUtils.getCurrentPrincipal().getName();
