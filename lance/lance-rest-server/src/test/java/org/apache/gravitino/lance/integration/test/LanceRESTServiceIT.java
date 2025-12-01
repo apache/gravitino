@@ -664,12 +664,14 @@ public class LanceRESTServiceIT extends BaseIT {
     Assertions.assertEquals(newLocation, deregisterTableResponse.getLocation());
 
     // Test Overwrite again after deregister
+    String nonExistingLocation = tempDir + "/" + "non_existing_location/";
     registerTableRequest.setMode(ModeEnum.OVERWRITE);
     registerTableRequest.setId(ids);
+    registerTableRequest.setLocation(nonExistingLocation);
     response = Assertions.assertDoesNotThrow(() -> ns.registerTable(registerTableRequest));
     Assertions.assertNotNull(response);
-    Assertions.assertEquals(newLocation, response.getLocation());
-    Assertions.assertFalse(new File(newLocation).exists());
+    Assertions.assertEquals(nonExistingLocation, response.getLocation());
+    Assertions.assertFalse(new File(nonExistingLocation).exists());
   }
 
   @Test
