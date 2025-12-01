@@ -608,6 +608,9 @@ public class LanceRESTServiceIT extends BaseIT {
 
     RegisterTableResponse response = ns.registerTable(registerTableRequest);
     Assertions.assertNotNull(response);
+    // The location should not exist yet as we do not create it in advanced.
+    Assertions.assertEquals(location, response.getLocation());
+    Assertions.assertFalse(new File(location).exists());
 
     DescribeTableRequest describeTableRequest = new DescribeTableRequest();
     describeTableRequest.setId(ids);
@@ -623,6 +626,35 @@ public class LanceRESTServiceIT extends BaseIT {
     response = Assertions.assertDoesNotThrow(() -> ns.registerTable(registerTableRequest));
     Assertions.assertNotNull(response);
     Assertions.assertEquals(newLocation, response.getLocation());
+    // The location should not exist yet as we do not create it in advanced.
+    Assertions.assertFalse(new File(newLocation).exists());
+
+    // Register a new table with location exists
+    String existingLocation = tempDir + "/" + "existing_location/";
+    new File(existingLocation).mkdirs();
+    Assertions.assertTrue(new File(existingLocation).exists());
+    registerTableRequest.setMode(ModeEnum.CREATE);
+    registerTableRequest.setLocation(existingLocation);
+    registerTableRequest.setId(List.of(CATALOG_NAME, SCHEMA_NAME, "table_with_existing_location"));
+    RegisterTableResponse existingLocationResponse =
+        Assertions.assertDoesNotThrow(() -> ns.registerTable(registerTableRequest));
+    Assertions.assertNotNull(existingLocationResponse);
+    Assertions.assertEquals(existingLocation, existingLocationResponse.getLocation());
+    Assertions.assertTrue(new File(existingLocation).exists());
+
+    // Deregister the table with existing location
+    DeregisterTableRequest deregisterExistingLocationRequest = new DeregisterTableRequest();
+    deregisterExistingLocationRequest.setId(
+        List.of(CATALOG_NAME, SCHEMA_NAME, "table_with_existing_location"));
+    DeregisterTableResponse deregisterExistingLocationResponse =
+        ns.deregisterTable(deregisterExistingLocationRequest);
+    Assertions.assertNotNull(deregisterExistingLocationResponse);
+    Assertions.assertEquals(existingLocation, deregisterExistingLocationResponse.getLocation());
+    // Assert the location has not been dropped.
+    Assertions.assertTrue(
+        new File(Objects.requireNonNull(deregisterExistingLocationResponse.getLocation()))
+            .exists());
+    new File(existingLocation).deleteOnExit();
 
     // Test deregister table
     DeregisterTableRequest deregisterTableRequest = new DeregisterTableRequest();
@@ -630,6 +662,14 @@ public class LanceRESTServiceIT extends BaseIT {
     DeregisterTableResponse deregisterTableResponse = ns.deregisterTable(deregisterTableRequest);
     Assertions.assertNotNull(deregisterTableResponse);
     Assertions.assertEquals(newLocation, deregisterTableResponse.getLocation());
+
+    // Test Overwrite again after deregister
+    registerTableRequest.setMode(ModeEnum.OVERWRITE);
+    registerTableRequest.setId(ids);
+    response = Assertions.assertDoesNotThrow(() -> ns.registerTable(registerTableRequest));
+    Assertions.assertNotNull(response);
+    Assertions.assertEquals(newLocation, response.getLocation());
+    Assertions.assertFalse(new File(newLocation).exists());
   }
 
   @Test
