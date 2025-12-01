@@ -21,11 +21,13 @@ package org.apache.gravitino.lance.service.rest;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doNothing;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
 import com.lancedb.lance.namespace.LanceNamespaceException;
 import com.lancedb.lance.namespace.model.CreateEmptyTableRequest;
@@ -40,6 +42,7 @@ import com.lancedb.lance.namespace.model.DescribeTableRequest;
 import com.lancedb.lance.namespace.model.DescribeTableResponse;
 import com.lancedb.lance.namespace.model.DropNamespaceRequest;
 import com.lancedb.lance.namespace.model.DropNamespaceResponse;
+import com.lancedb.lance.namespace.model.DropTableResponse;
 import com.lancedb.lance.namespace.model.ErrorResponse;
 import com.lancedb.lance.namespace.model.ListNamespacesResponse;
 import com.lancedb.lance.namespace.model.RegisterTableRequest;
@@ -54,6 +57,7 @@ import javax.ws.rs.core.Response;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.lance.common.ops.LanceTableOperations;
 import org.apache.gravitino.lance.common.ops.NamespaceWrapper;
+import org.apache.gravitino.lance.common.utils.LanceConstants;
 import org.apache.gravitino.rest.RESTUtils;
 import org.glassfish.jersey.internal.inject.AbstractBinder;
 import org.glassfish.jersey.server.ResourceConfig;
@@ -513,7 +517,8 @@ public class TestLanceNamespaceOperations extends JerseyTest {
     // Test that the "register" property is set to "true"
     RegisterTableResponse registerTableResponse = new RegisterTableResponse();
     registerTableResponse.setLocation("/path/to/registered_table");
-    registerTableResponse.setProperties(ImmutableMap.of("key", "value", "register", "true"));
+    registerTableResponse.setProperties(
+        ImmutableMap.of("key", "value", LanceConstants.LANCE_TABLE_REGISTER, "true"));
     when(tableOps.registerTable(any(), any(), any(), any())).thenReturn(registerTableResponse);
 
     RegisterTableRequest tableRequest = new RegisterTableRequest();
@@ -538,7 +543,7 @@ public class TestLanceNamespaceOperations extends JerseyTest {
             Mockito.argThat(
                 props ->
                     props != null
-                        && "true".equals(props.get("register"))
+                        && "true".equals(props.get(LanceConstants.LANCE_TABLE_REGISTER))
                         && "/path/to/registered_table".equals(props.get("location"))
                         && "custom-value".equals(props.get("custom-key"))));
   }
@@ -664,5 +669,109 @@ public class TestLanceNamespaceOperations extends JerseyTest {
     ErrorResponse errorResp = resp.readEntity(ErrorResponse.class);
     Assertions.assertEquals("Runtime exception", errorResp.getError());
     Assertions.assertEquals(RuntimeException.class.getSimpleName(), errorResp.getType());
+  }
+
+  @Test
+  void testTableExists() {
+    String tableIds = "catalog.scheme.table_exists";
+    String delimiter = ".";
+
+    doReturn(true).when(tableOps).tableExists(any(), any());
+
+    Response resp =
+        target(String.format("/v1/table/%s/exists", tableIds))
+            .queryParam("delimiter", delimiter)
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .post(null);
+
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp.getStatus());
+
+    // test throw exception
+    doThrow(
+            LanceNamespaceException.notFound(
+                "Table not found", "NoSuchTableException", tableIds, ""))
+        .when(tableOps)
+        .tableExists(any(), any());
+    resp =
+        target(String.format("/v1/table/%s/exists", tableIds))
+            .queryParam("delimiter", delimiter)
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .post(null);
+
+    Assertions.assertEquals(Response.Status.NOT_FOUND.getStatusCode(), resp.getStatus());
+    Assertions.assertEquals(MediaType.APPLICATION_JSON_TYPE, resp.getMediaType());
+
+    ErrorResponse errorResp = resp.readEntity(ErrorResponse.class);
+    Assertions.assertEquals(404, errorResp.getCode());
+    Assertions.assertEquals("Table not found", errorResp.getError());
+    Assertions.assertEquals("NoSuchTableException", errorResp.getType());
+
+    // Test runtime exception
+    Mockito.reset(tableOps);
+    doThrow(new RuntimeException("Runtime exception")).when(tableOps).tableExists(any(), any());
+    resp =
+        target(String.format("/v1/table/%s/exists", tableIds))
+            .queryParam("delimiter", delimiter)
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .post(null);
+    Assertions.assertEquals(
+        Response.Status.INTERNAL_SERVER_ERROR.getStatusCode(), resp.getStatus());
+    Assertions.assertEquals(MediaType.APPLICATION_JSON_TYPE, resp.getMediaType());
+  }
+
+  @Test
+  void testDropTable() {
+    String tableIds = "catalog.scheme.drop_table";
+    String delimiter = ".";
+
+    DropTableResponse dropTableResponse = new DropTableResponse();
+    dropTableResponse.setId(Lists.newArrayList("catalog", "scheme", "drop_table"));
+    dropTableResponse.setProperties(ImmutableMap.of("key", "value"));
+    dropTableResponse.setLocation("/path/to/drop_table");
+    Mockito.doReturn(dropTableResponse).when(tableOps).dropTable(any(), any());
+
+    Response resp =
+        target(String.format("/v1/table/%s/drop", tableIds))
+            .queryParam("delimiter", delimiter)
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .post(null);
+
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp.getStatus());
+    DropTableResponse response = resp.readEntity(DropTableResponse.class);
+    Assertions.assertEquals(dropTableResponse.getId(), response.getId());
+    Assertions.assertEquals(dropTableResponse.getProperties(), response.getProperties());
+    Assertions.assertEquals(dropTableResponse.getLocation(), response.getLocation());
+
+    // test throw exception
+    doThrow(
+            LanceNamespaceException.notFound(
+                "Table not found", "NoSuchTableException", tableIds, ""))
+        .when(tableOps)
+        .dropTable(any(), any());
+    resp =
+        target(String.format("/v1/table/%s/drop", tableIds))
+            .queryParam("delimiter", delimiter)
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .post(null);
+
+    Assertions.assertEquals(Response.Status.NOT_FOUND.getStatusCode(), resp.getStatus());
+    Assertions.assertEquals(MediaType.APPLICATION_JSON_TYPE, resp.getMediaType());
+
+    ErrorResponse errorResp = resp.readEntity(ErrorResponse.class);
+    Assertions.assertEquals(404, errorResp.getCode());
+    Assertions.assertEquals("Table not found", errorResp.getError());
+    Assertions.assertEquals("NoSuchTableException", errorResp.getType());
+
+    // Test runtime exception
+    Mockito.reset(tableOps);
+    doThrow(new RuntimeException("Runtime exception")).when(tableOps).dropTable(any(), any());
+    resp =
+        target(String.format("/v1/table/%s/drop", tableIds))
+            .queryParam("delimiter", delimiter)
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .post(null);
+    Assertions.assertEquals(
+        Response.Status.INTERNAL_SERVER_ERROR.getStatusCode(), resp.getStatus());
+    Assertions.assertEquals(MediaType.APPLICATION_JSON_TYPE, resp.getMediaType());
   }
 }

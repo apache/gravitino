@@ -55,6 +55,7 @@ import org.apache.gravitino.hook.CatalogHookDispatcher;
 import org.apache.gravitino.hook.FilesetHookDispatcher;
 import org.apache.gravitino.hook.MetalakeHookDispatcher;
 import org.apache.gravitino.hook.ModelHookDispatcher;
+import org.apache.gravitino.hook.PolicyHookDispatcher;
 import org.apache.gravitino.hook.SchemaHookDispatcher;
 import org.apache.gravitino.hook.TableHookDispatcher;
 import org.apache.gravitino.hook.TagHookDispatcher;
@@ -211,7 +212,7 @@ public class GravitinoEnv {
    * @return The EntityStore instance.
    */
   public EntityStore entityStore() {
-    Preconditions.checkNotNull(entityStore, "GravitinoEnv is not initialized.");
+    Preconditions.checkArgument(entityStore != null, "GravitinoEnv is not initialized.");
     return entityStore;
   }
 
@@ -606,8 +607,9 @@ public class GravitinoEnv {
         new TagEventDispatcher(eventBus, new TagManager(idGenerator, entityStore));
     this.tagDispatcher = new TagHookDispatcher(tagEventDispatcher);
 
-    this.policyDispatcher =
+    PolicyEventDispatcher policyEventDispatcher =
         new PolicyEventDispatcher(eventBus, new PolicyManager(idGenerator, entityStore));
+    this.policyDispatcher = new PolicyHookDispatcher(policyEventDispatcher);
 
     this.jobOperationDispatcher =
         new JobEventDispatcher(eventBus, new JobManager(config, entityStore, idGenerator));

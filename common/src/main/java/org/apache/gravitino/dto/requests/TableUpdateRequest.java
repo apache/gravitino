@@ -831,7 +831,7 @@ public interface TableUpdateRequest extends RESTRequest {
      */
     @Override
     public void validate() throws IllegalArgumentException {
-      Preconditions.checkNotNull(index, "Index cannot be null");
+      Preconditions.checkArgument(index != null, "Index cannot be null");
       Preconditions.checkArgument(index.type() != null, "Index type cannot be null");
       Preconditions.checkArgument(
           index.fieldNames() != null && index.fieldNames().length > 0,
@@ -879,7 +879,7 @@ public interface TableUpdateRequest extends RESTRequest {
      */
     @Override
     public void validate() throws IllegalArgumentException {
-      Preconditions.checkNotNull(name, "Index name cannot be null");
+      Preconditions.checkArgument(name != null, "Index name cannot be null");
     }
 
     /**

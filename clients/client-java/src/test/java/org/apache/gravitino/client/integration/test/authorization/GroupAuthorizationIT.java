@@ -20,12 +20,15 @@ package org.apache.gravitino.client.integration.test.authorization;
 import static org.junit.Assert.assertThrows;
 
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.Maps;
+import java.lang.reflect.Method;
 import java.util.Collections;
 import java.util.HashMap;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.authorization.Privileges;
 import org.apache.gravitino.client.GravitinoMetalake;
+import org.apache.gravitino.dto.MetalakeDTO;
 import org.apache.gravitino.exceptions.ForbiddenException;
 import org.junit.jupiter.api.MethodOrderer;
 import org.junit.jupiter.api.Order;
@@ -70,5 +73,49 @@ public class GroupAuthorizationIT extends BaseRestApiAuthorizationIT {
         ImmutableList.of(Privileges.ManageGroups.allow()));
     gravitinoMetalake.grantRolesToUser(ImmutableList.of("role"), NORMAL_USER);
     normalUserClient.loadMetalake(METALAKE).removeGroup("group2");
+  }
+
+  @Test
+  @Order(3)
+  public void testListGroupsWithNonExistentMetalake() throws Exception {
+    // Test that listGroups with @AuthorizationExpression returns 403 Forbidden
+    // when the metalake doesn't exist, instead of 404 response
+    String nonExistentMetalake = "nonExistentMetalake";
+
+    // Access the restClient from normalUserClient using reflection
+    Method restClientMethod =
+        normalUserClient.getClass().getSuperclass().getDeclaredMethod("restClient");
+    restClientMethod.setAccessible(true);
+    Object restClient = restClientMethod.invoke(normalUserClient);
+
+    // Create a MetalakeDTO for the non-existent metalake
+    MetalakeDTO metalakeDTO =
+        MetalakeDTO.builder()
+            .withName(nonExistentMetalake)
+            .withComment("test")
+            .withProperties(Maps.newHashMap())
+            .withAudit(
+                org.apache.gravitino.dto.AuditDTO.builder()
+                    .withCreator("test")
+                    .withCreateTime(java.time.Instant.now())
+                    .build())
+            .build();
+
+    // Use DTOConverters.toMetaLake() via reflection to create GravitinoMetalake
+    Class<?> dtoConvertersClass = Class.forName("org.apache.gravitino.client.DTOConverters");
+    Method toMetaLakeMethod =
+        dtoConvertersClass.getDeclaredMethod(
+            "toMetaLake",
+            MetalakeDTO.class,
+            Class.forName("org.apache.gravitino.client.RESTClient"));
+    toMetaLakeMethod.setAccessible(true);
+    GravitinoMetalake nonExistentMetalakeObj =
+        (GravitinoMetalake) toMetaLakeMethod.invoke(null, metalakeDTO, restClient);
+
+    // Test listGroups - should return 403 ForbiddenException
+    assertThrows(ForbiddenException.class, nonExistentMetalakeObj::listGroups);
+
+    // Test listGroupNames - should return 403 ForbiddenException
+    assertThrows(ForbiddenException.class, nonExistentMetalakeObj::listGroupNames);
   }
 }

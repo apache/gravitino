@@ -18,15 +18,22 @@
  */
 package org.apache.gravitino.storage.relational.service;
 
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
 import java.io.IOException;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import org.apache.gravitino.Entity;
+import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
-import org.apache.gravitino.meta.AuditInfo;
+import org.apache.gravitino.meta.BaseMetalake;
+import org.apache.gravitino.meta.CatalogEntity;
 import org.apache.gravitino.meta.ColumnEntity;
 import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.meta.TableEntity;
@@ -34,19 +41,118 @@ import org.apache.gravitino.rel.expressions.literals.Literals;
 import org.apache.gravitino.rel.types.Types;
 import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.storage.relational.TestJDBCBackend;
+import org.apache.gravitino.utils.NamespaceUtil;
 import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestTemplate;
 
 public class TestTableMetaService extends TestJDBCBackend {
   private final String metalakeName = "metalake_for_table_test";
-  private final AuditInfo auditInfo =
-      AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
+  private final String catalogName = "catalog_for_table_test";
+  private final String schemaName = "schema_for_table_test";
 
-  @Test
+  @TestTemplate
+  public void testInsertAlreadyExistsException() throws IOException {
+    createAndInsertMakeLake(metalakeName);
+    createAndInsertCatalog(metalakeName, catalogName);
+    createAndInsertSchema(metalakeName, catalogName, schemaName);
+
+    TableEntity table =
+        createTableEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            NamespaceUtil.ofTable(metalakeName, catalogName, schemaName),
+            "table",
+            AUDIT_INFO);
+    TableEntity tableCopy =
+        createTableEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            NamespaceUtil.ofTable(metalakeName, catalogName, schemaName),
+            "table",
+            AUDIT_INFO);
+    backend.insert(table, false);
+    assertThrows(EntityAlreadyExistsException.class, () -> backend.insert(tableCopy, false));
+  }
+
+  @TestTemplate
+  public void testUpdateAlreadyExistsException() throws IOException {
+    createAndInsertMakeLake(metalakeName);
+    createAndInsertCatalog(metalakeName, catalogName);
+    createAndInsertSchema(metalakeName, catalogName, schemaName);
+
+    TableEntity table =
+        createTableEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            NamespaceUtil.ofTable(metalakeName, catalogName, schemaName),
+            "table",
+            AUDIT_INFO);
+    TableEntity tableCopy =
+        createTableEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            NamespaceUtil.ofTable(metalakeName, catalogName, schemaName),
+            "table1",
+            AUDIT_INFO);
+    backend.insert(table, false);
+    backend.insert(tableCopy, false);
+    assertThrows(
+        EntityAlreadyExistsException.class,
+        () ->
+            backend.update(
+                tableCopy.nameIdentifier(),
+                Entity.EntityType.TABLE,
+                e ->
+                    createTableEntity(tableCopy.id(), tableCopy.namespace(), "table", AUDIT_INFO)));
+  }
+
+  @TestTemplate
+  public void testMetaLifeCycleFromCreationToDeletion() throws IOException {
+    BaseMetalake metalake =
+        createBaseMakeLake(RandomIdGenerator.INSTANCE.nextId(), metalakeName, AUDIT_INFO);
+    backend.insert(metalake, false);
+
+    CatalogEntity catalog =
+        createCatalog(
+            RandomIdGenerator.INSTANCE.nextId(),
+            NamespaceUtil.ofCatalog(metalakeName),
+            catalogName,
+            AUDIT_INFO);
+    backend.insert(catalog, false);
+    SchemaEntity schema =
+        createSchemaEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            NamespaceUtil.ofSchema(metalakeName, catalogName),
+            schemaName,
+            AUDIT_INFO);
+    backend.insert(schema, false);
+
+    TableEntity table =
+        createTableEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            NamespaceUtil.ofTable(metalakeName, catalogName, schemaName),
+            "table",
+            AUDIT_INFO);
+    backend.insert(table, false);
+
+    List<TableEntity> tables = backend.list(table.namespace(), Entity.EntityType.TABLE, true);
+    assertTrue(tables.contains(table));
+
+    // meta data soft delete
+    backend.delete(metalake.nameIdentifier(), Entity.EntityType.METALAKE, true);
+    assertFalse(backend.exists(table.nameIdentifier(), Entity.EntityType.TABLE));
+
+    // check legacy record after soft delete
+    assertTrue(legacyRecordExistsInDB(table.id(), Entity.EntityType.TABLE));
+
+    // meta data hard delete
+    for (Entity.EntityType entityType : Entity.EntityType.values()) {
+      backend.hardDeleteLegacyData(entityType, Instant.now().toEpochMilli() + 1000);
+    }
+    assertFalse(legacyRecordExistsInDB(table.id(), Entity.EntityType.TABLE));
+  }
+
+  @TestTemplate
   public void testUpdateTable() throws IOException {
     String catalogName = "catalog1";
     String schemaName = "schema1";
-    createParentEntities(metalakeName, catalogName, schemaName, auditInfo);
+    createParentEntities(metalakeName, catalogName, schemaName, AUDIT_INFO);
 
     ColumnEntity column1 =
         ColumnEntity.builder()
@@ -58,7 +164,7 @@ public class TestTableMetaService extends TestJDBCBackend {
             .withNullable(true)
             .withAutoIncrement(false)
             .withDefaultValue(Literals.integerLiteral(1))
-            .withAuditInfo(auditInfo)
+            .withAuditInfo(AUDIT_INFO)
             .build();
     TableEntity createdTable =
         TableEntity.builder()
@@ -66,7 +172,7 @@ public class TestTableMetaService extends TestJDBCBackend {
             .withName("table1")
             .withNamespace(Namespace.of(metalakeName, catalogName, schemaName))
             .withColumns(List.of(column1))
-            .withAuditInfo(auditInfo)
+            .withAuditInfo(AUDIT_INFO)
             .build();
     TableMetaService.getInstance().insertTable(createdTable, false);
 
@@ -77,7 +183,7 @@ public class TestTableMetaService extends TestJDBCBackend {
             .withName("table2")
             .withNamespace(createdTable.namespace())
             .withColumns(createdTable.columns())
-            .withAuditInfo(auditInfo)
+            .withAuditInfo(AUDIT_INFO)
             .build();
     Function<TableEntity, TableEntity> updater = oldTable -> updatedTable;
     TableMetaService.getInstance().updateTable(createdTable.nameIdentifier(), updater);
@@ -99,7 +205,7 @@ public class TestTableMetaService extends TestJDBCBackend {
             .withName("table3")
             .withNamespace(Namespace.of(metalakeName, catalogName, newSchemaName))
             .withColumns(updatedTable.columns())
-            .withAuditInfo(auditInfo)
+            .withAuditInfo(AUDIT_INFO)
             .build();
     Function<TableEntity, TableEntity> updater2 = oldTable -> updatedTable2;
     Exception e =
@@ -116,7 +222,7 @@ public class TestTableMetaService extends TestJDBCBackend {
             RandomIdGenerator.INSTANCE.nextId(),
             Namespace.of(metalakeName, catalogName),
             newSchemaName,
-            auditInfo);
+            AUDIT_INFO);
     backend.insert(newSchema, false);
     TableMetaService.getInstance().updateTable(updatedTable.nameIdentifier(), updater2);
 

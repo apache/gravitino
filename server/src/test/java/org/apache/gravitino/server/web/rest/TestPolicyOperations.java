@@ -66,12 +66,11 @@ import org.apache.gravitino.rest.RESTUtils;
 import org.glassfish.jersey.client.HttpUrlConnectorProvider;
 import org.glassfish.jersey.internal.inject.AbstractBinder;
 import org.glassfish.jersey.server.ResourceConfig;
-import org.glassfish.jersey.test.JerseyTest;
 import org.glassfish.jersey.test.TestProperties;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
-public class TestPolicyOperations extends JerseyTest {
+public class TestPolicyOperations extends BaseOperationsTest {
 
   private static class MockServletRequestFactory extends ServletRequestFactoryBase {
 

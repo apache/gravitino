@@ -34,9 +34,12 @@ import com.lancedb.lance.namespace.model.DeregisterTableRequest;
 import com.lancedb.lance.namespace.model.DeregisterTableResponse;
 import com.lancedb.lance.namespace.model.DescribeTableRequest;
 import com.lancedb.lance.namespace.model.DescribeTableResponse;
+import com.lancedb.lance.namespace.model.DropTableRequest;
+import com.lancedb.lance.namespace.model.DropTableResponse;
 import com.lancedb.lance.namespace.model.RegisterTableRequest;
 import com.lancedb.lance.namespace.model.RegisterTableRequest.ModeEnum;
 import com.lancedb.lance.namespace.model.RegisterTableResponse;
+import com.lancedb.lance.namespace.model.TableExistsRequest;
 import java.util.Map;
 import java.util.Optional;
 import javax.inject.Inject;
@@ -53,6 +56,7 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.MultivaluedMap;
 import javax.ws.rs.core.Response;
 import org.apache.gravitino.lance.common.ops.NamespaceWrapper;
+import org.apache.gravitino.lance.common.utils.LanceConstants;
 import org.apache.gravitino.lance.common.utils.SerializationUtils;
 import org.apache.gravitino.lance.service.LanceExceptionMapper;
 import org.apache.gravitino.metrics.MetricNames;
@@ -162,7 +166,7 @@ public class LanceTableOperations {
               ? Maps.newHashMap()
               : Maps.newHashMap(registerTableRequest.getProperties());
       props.put(LANCE_LOCATION, registerTableRequest.getLocation());
-      props.put("register", "true");
+      props.put(LanceConstants.LANCE_TABLE_REGISTER, "true");
       ModeEnum mode = registerTableRequest.getMode();
 
       RegisterTableResponse response =
@@ -192,6 +196,46 @@ public class LanceTableOperations {
     }
   }
 
+  @POST
+  @Path("/exists")
+  @Timed(name = "table-exists." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
+  @ResponseMetered(name = "table-exists", absolute = true)
+  public Response tableExists(
+      @PathParam("id") String tableId,
+      @QueryParam("delimiter") @DefaultValue("$") String delimiter,
+      @Context HttpHeaders headers,
+      TableExistsRequest tableExistsRequest) {
+    try {
+      validateTableExists(tableExistsRequest);
+      // True if exists, false if not found and, otherwise throws exception
+      boolean exists = lanceNamespace.asTableOps().tableExists(tableId, delimiter);
+      if (exists) {
+        return Response.status(Response.Status.OK).build();
+      }
+      return Response.status(Response.Status.NOT_FOUND).build();
+    } catch (Exception e) {
+      return LanceExceptionMapper.toRESTResponse(tableId, e);
+    }
+  }
+
+  @POST
+  @Path("/drop")
+  @Timed(name = "drop-table." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
+  @ResponseMetered(name = "drop-table", absolute = true)
+  public Response dropTable(
+      @PathParam("id") String tableId,
+      @QueryParam("delimiter") @DefaultValue("$") String delimiter,
+      @Context HttpHeaders headers,
+      DropTableRequest dropTableRequest) {
+    try {
+      validateDropTableRequest(dropTableRequest);
+      DropTableResponse response = lanceNamespace.asTableOps().dropTable(tableId, delimiter);
+      return Response.ok(response).build();
+    } catch (Exception e) {
+      return LanceExceptionMapper.toRESTResponse(tableId, e);
+    }
+  }
+
   private void validateCreateEmptyTableRequest(
       @SuppressWarnings("unused") CreateEmptyTableRequest request) {
     // No specific fields to validate for now
@@ -210,6 +254,16 @@ public class LanceTableOperations {
 
   private void validateDescribeTableRequest(
       @SuppressWarnings("unused") DescribeTableRequest request) {
+    // We will ignore the id in the request body since it's already provided in the path param
+    // No specific fields to validate for now
+  }
+
+  private void validateTableExists(@SuppressWarnings("unused") TableExistsRequest request) {
+    // We will ignore the id in the request body since it's already provided in the path param
+    // No specific fields to validate for now
+  }
+
+  private void validateDropTableRequest(@SuppressWarnings("unused") DropTableRequest request) {
     // We will ignore the id in the request body since it's already provided in the path param
     // No specific fields to validate for now
   }

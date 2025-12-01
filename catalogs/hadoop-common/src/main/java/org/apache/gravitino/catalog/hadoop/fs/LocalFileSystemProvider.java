@@ -18,7 +18,6 @@
  */
 package org.apache.gravitino.catalog.hadoop.fs;
 
-import static org.apache.gravitino.catalog.hadoop.fs.Constants.BUILTIN_HDFS_FS_PROVIDER;
 import static org.apache.gravitino.catalog.hadoop.fs.Constants.BUILTIN_LOCAL_FS_PROVIDER;
 
 import java.io.IOException;
@@ -31,8 +30,7 @@ public class LocalFileSystemProvider implements FileSystemProvider {
 
   @Override
   public FileSystem getFileSystem(Path path, Map<String, String> config) throws IOException {
-    Configuration configuration =
-        FileSystemUtils.createConfiguration(BUILTIN_HDFS_FS_PROVIDER, config);
+    Configuration configuration = FileSystemUtils.createConfiguration(GRAVITINO_BYPASS, config);
     return FileSystem.newInstance(path.toUri(), configuration);
   }
 

@@ -34,6 +34,7 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.exceptions.IllegalMetadataObjectException;
 import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
+import org.apache.gravitino.exceptions.NoSuchPolicyException;
 import org.apache.gravitino.exceptions.NoSuchRoleException;
 import org.apache.gravitino.exceptions.NoSuchTagException;
 
@@ -53,6 +54,7 @@ public class MetadataObjectUtil {
           .put(MetadataObject.Type.ROLE, Entity.EntityType.ROLE)
           .put(MetadataObject.Type.MODEL, Entity.EntityType.MODEL)
           .put(MetadataObject.Type.TAG, Entity.EntityType.TAG)
+          .put(MetadataObject.Type.POLICY, Entity.EntityType.POLICY)
           .build();
 
   private MetadataObjectUtil() {}
@@ -108,6 +110,8 @@ public class MetadataObjectUtil {
         return AuthorizationUtils.ofRole(metalakeName, metadataObject.name());
       case TAG:
         return NameIdentifierUtil.ofTag(metalakeName, metadataObject.name());
+      case POLICY:
+        return NameIdentifierUtil.ofPolicy(metalakeName, metadataObject.name());
       case CATALOG:
       case SCHEMA:
       case TABLE:
@@ -192,7 +196,9 @@ public class MetadataObjectUtil {
         try {
           env.accessControlDispatcher().getRole(metalake, object.fullName());
         } catch (NoSuchRoleException nsr) {
-          throw checkNotNull(exceptionToThrowSupplier).get();
+          Preconditions.checkArgument(
+              exceptionToThrowSupplier != null, "exceptionToThrowSupplier should not be null");
+          throw exceptionToThrowSupplier.get();
         }
         break;
       case TAG:
@@ -200,6 +206,16 @@ public class MetadataObjectUtil {
         try {
           env.tagDispatcher().getTag(metalake, object.fullName());
         } catch (NoSuchTagException nsr) {
+          Preconditions.checkArgument(
+              exceptionToThrowSupplier != null, "exceptionToThrowSupplier should not be null");
+          throw exceptionToThrowSupplier.get();
+        }
+        break;
+      case POLICY:
+        NameIdentifierUtil.checkPolicy(identifier);
+        try {
+          env.policyDispatcher().getPolicy(metalake, object.fullName());
+        } catch (NoSuchPolicyException nsr) {
           throw checkNotNull(exceptionToThrowSupplier).get();
         }
         break;
@@ -212,7 +228,9 @@ public class MetadataObjectUtil {
   private static void check(
       final boolean expression, Supplier<? extends RuntimeException> exceptionToThrowSupplier) {
     if (!expression) {
-      throw checkNotNull(exceptionToThrowSupplier).get();
+      Preconditions.checkArgument(
+          exceptionToThrowSupplier != null, "exceptionToThrowSupplier should not be null");
+      throw exceptionToThrowSupplier.get();
     }
   }
 }
