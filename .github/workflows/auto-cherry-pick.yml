@@ -59,7 +59,7 @@ jobs:
           labels: |
             cherry-pick
           reviewers: |
-            jerryshao        
+            jerryshao  
 
 env:
   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
