@@ -32,11 +32,11 @@ import java.util.stream.Collectors;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
+import org.apache.gravitino.job.JobHandle;
 import org.apache.gravitino.meta.GenericEntity;
 import org.apache.gravitino.metrics.Monitored;
 import org.apache.gravitino.storage.relational.mapper.CatalogMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.FilesetMetaMapper;
-import org.apache.gravitino.storage.relational.mapper.JobMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.JobTemplateMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.MetalakeMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.ModelMetaMapper;
@@ -108,12 +108,7 @@ public class MetadataObjectService {
     }
 
     return jobIds.stream()
-        .collect(
-            Collectors.toMap(
-                jobId -> jobId,
-                jobId ->
-                    SessionUtils.getWithoutCommit(
-                        JobMetaMapper.class, jobMetaMapper -> jobMetaMapper.selectJobById(jobId))));
+        .collect(Collectors.toMap(jobId -> jobId, jobId -> JobHandle.JOB_ID_PREFIX + jobId));
   }
 
   private static Map<Long, String> getJobTemplateObjectsFullName(List<Long> jobTemplateIds) {
@@ -129,7 +124,9 @@ public class MetadataObjectService {
                     SessionUtils.getWithoutCommit(
                         JobTemplateMetaMapper.class,
                         jobTemplateMetaMapper ->
-                            jobTemplateMetaMapper.selectJobTemplateById(jobTemplateId))));
+                            jobTemplateMetaMapper
+                                .selectJobTemplateById(jobTemplateId)
+                                .jobTemplateName())));
   }
 
   private static Map<Long, String> getTagObjectsFullName(List<Long> tagIds) {

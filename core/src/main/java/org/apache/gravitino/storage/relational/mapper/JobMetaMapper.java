@@ -70,7 +70,4 @@ public interface JobMetaMapper {
 
   @UpdateProvider(type = JobMetaSQLProviderFactory.class, method = "softDeleteJobMetaByRunId")
   Integer softDeleteJobMetaByRunId(@Param("jobRunId") Long jobRunId);
-
-  @SelectProvider(type = JobMetaSQLProviderFactory.class, method = "selectJobById")
-  String selectJobById(Long jobId);
 }

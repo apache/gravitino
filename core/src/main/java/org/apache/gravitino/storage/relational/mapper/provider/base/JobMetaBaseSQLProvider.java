@@ -181,19 +181,4 @@ public class JobMetaBaseSQLProvider {
         + JobMetaMapper.TABLE_NAME
         + " WHERE deleted_at < #{legacyTimeline} AND deleted_at > 0 LIMIT #{limit}";
   }
-
-  public String selectJobById(Long jobId) {
-    return "SELECT jrm.job_run_id AS jobRunId, jtm.job_template_name AS jobTemplateName,"
-        + " jrm.metalake_id AS metalakeId, jrm.job_execution_id AS jobExecutionId,"
-        + " jrm.job_run_status AS jobRunStatus, jrm.job_finished_at AS jobFinishedAt,"
-        + " jrm.audit_info AS auditInfo,"
-        + " jrm.current_version AS currentVersion, jrm.last_version AS lastVersion,"
-        + " jrm.deleted_at AS deletedAt"
-        + " FROM "
-        + JobMetaMapper.TABLE_NAME
-        + " jrm JOIN "
-        + JobTemplateMetaMapper.TABLE_NAME
-        + " jtm ON jrm.job_template_id = jtm.job_template_id"
-        + " WHERE jrm.job_run_id = #{jobId} AND jrm.deleted_at = 0 AND jtm.deleted_at = 0";
-  }
 }

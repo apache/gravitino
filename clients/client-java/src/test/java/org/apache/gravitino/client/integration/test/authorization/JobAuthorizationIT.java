@@ -197,8 +197,9 @@ public class JobAuthorizationIT extends BaseRestApiAuthorizationIT {
     // Grant UseJobTemplate privilege on the metalake to normal user
     metalake.grantPrivilegesToRole(
         ROLE,
-        MetadataObjects.of(null, METALAKE, MetadataObject.Type.METALAKE),
+        MetadataObjects.of(null, "test_2", MetadataObject.Type.JOB_TEMPLATE),
         ImmutableList.of(Privileges.UseJobTemplate.allow()));
+    Assertions.assertDoesNotThrow(() -> metalake.getRole(ROLE));
 
     // Now normal user can run jobs on their own template (has both RunJob and UseJobTemplate)
     JobHandle normalUserJobHandle =

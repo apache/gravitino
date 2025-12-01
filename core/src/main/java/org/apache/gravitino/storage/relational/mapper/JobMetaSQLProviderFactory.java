@@ -98,8 +98,4 @@ public class JobMetaSQLProviderFactory {
   public static String softDeleteJobMetaByRunId(@Param("jobRunId") Long jobRunId) {
     return getProvider().softDeleteJobMetaByRunId(jobRunId);
   }
-
-  public static String selectJobById(@Param("jobId") Long jobId) {
-    return getProvider().selectJobById(jobId);
-  }
 }

@@ -78,5 +78,5 @@ public interface JobTemplateMetaMapper {
       @Param("metalakeId") long metalakeId, @Param("jobTemplateName") String jobTemplateName);
 
   @SelectProvider(type = JobTemplateMetaSQLProviderFactory.class, method = "selectJobTemplateById")
-  String selectJobTemplateById(Long jobTemplateId);
+  JobTemplatePO selectJobTemplateById(Long jobTemplateId);
 }
