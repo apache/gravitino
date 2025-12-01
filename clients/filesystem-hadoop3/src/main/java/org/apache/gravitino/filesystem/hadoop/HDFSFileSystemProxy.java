@@ -128,6 +128,26 @@ public class HDFSFileSystemProxy implements MethodInterceptor {
     return proxyFs;
   }
 
+  @Override
+  public Object intercept(Object o, Method method, Object[] objects, MethodProxy methodProxy)
+      throws Throwable {
+    // Intercept close() method to clean up the Kerberos renewal executor
+    boolean isCloseMethod = "close".equals(method.getName());
+    try {
+      Object result = invokeWithUgi(methodProxy, objects);
+      // Close the Kerberos renewal executor after FileSystem.close()
+      if (isCloseMethod) {
+        close();
+      }
+      return result;
+    } catch (Throwable e) {
+      if (isCloseMethod) {
+        close();
+      }
+      throw e;
+    }
+  }
+
   /** Schedule periodic Kerberos re-login to refresh TGT before expiry. */
   private void startKerberosRenewalTask(String principal) {
     kerberosRenewExecutor =
@@ -181,25 +201,5 @@ public class HDFSFileSystemProxy implements MethodInterceptor {
                 throw new RuntimeException("Failed to invoke method", e);
               }
             });
-  }
-
-  @Override
-  public Object intercept(Object o, Method method, Object[] objects, MethodProxy methodProxy)
-      throws Throwable {
-    // Intercept close() method to clean up the Kerberos renewal executor
-    boolean isCloseMethod = "close".equals(method.getName());
-    try {
-      Object result = invokeWithUgi(methodProxy, objects);
-      // Close the Kerberos renewal executor after FileSystem.close()
-      if (isCloseMethod) {
-        close();
-      }
-      return result;
-    } catch (Throwable e) {
-      if (isCloseMethod) {
-        close();
-      }
-      throw e;
-    }
   }
 }

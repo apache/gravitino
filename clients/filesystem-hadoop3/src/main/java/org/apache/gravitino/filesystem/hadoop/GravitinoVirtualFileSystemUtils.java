@@ -52,6 +52,20 @@ public class GravitinoVirtualFileSystemUtils {
       Pattern.compile("^(?:gvfs://fileset)?/([^/]+)/([^/]+)/([^/]+)(?>/[^/]+)*/?$");
 
   /**
+   * Transform the Hadoop configuration to a map.
+   *
+   * @param configuration The Hadoop configuration.
+   * @return The configuration map.
+   */
+  public static Map<String, String> getConfigMap(Configuration configuration) {
+    Map<String, String> maps = Maps.newHashMap();
+    // Don't use entry.getKey() directly in the lambda, because it cannot
+    // handle variable expansion in the Configuration values.
+    configuration.forEach(entry -> maps.put(entry.getKey(), configuration.get(entry.getKey())));
+    return maps;
+  }
+
+  /**
    * Extract non-default configuration from Hadoop Configuration.
    *
    * @param configuration The Hadoop configuration.
@@ -81,7 +95,7 @@ public class GravitinoVirtualFileSystemUtils {
    * @return The Gravitino client.
    */
   public static GravitinoClient createClient(Configuration configuration) {
-    return createClient(extractNonDefaultConfig(configuration));
+    return createClient(getConfigMap(configuration));
   }
 
   /**

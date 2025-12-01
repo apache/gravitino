@@ -18,7 +18,7 @@
  */
 package org.apache.gravitino.filesystem.hadoop;
 
-import static org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystemUtils.extractNonDefaultConfig;
+import static org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystemUtils.getConfigMap;
 
 import com.google.common.annotations.VisibleForTesting;
 import java.io.FileNotFoundException;
@@ -76,7 +76,7 @@ public class GravitinoVirtualFileSystem extends FileSystem {
       Class<? extends GravitinoVirtualFileSystemHook> clz =
           (Class<? extends GravitinoVirtualFileSystemHook>) Class.forName(hookClassName);
       this.hook = clz.getDeclaredConstructor().newInstance();
-      hook.initialize(extractNonDefaultConfig(configuration));
+      hook.initialize(getConfigMap(configuration));
     } catch (Exception e) {
       throw new GravitinoRuntimeException(e, "Cannot create hook instance: %s", hookClassName);
     }

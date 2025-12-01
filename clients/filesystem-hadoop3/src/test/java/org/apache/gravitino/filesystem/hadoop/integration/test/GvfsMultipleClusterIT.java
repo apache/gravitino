@@ -53,6 +53,11 @@ import org.junit.jupiter.api.condition.DisabledIf;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+/*
+In embedded mode, the Hadoop FileSystem within a single JVM process has some
+static variables and caches that interfere with each other,
+ leading to authentication failures.
+*/
 @Tag("gravitino-docker-test")
 @DisabledIf("org.apache.gravitino.integration.test.util.ITUtils#isEmbedded")
 public class GvfsMultipleClusterIT extends BaseIT {

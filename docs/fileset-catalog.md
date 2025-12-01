@@ -70,7 +70,7 @@ The Gravitino Fileset extends the following properties in the `xxx-site.xml`:
 ### Fileset catalog with Cloud Storage
 
 In the current implementation, the fileset uses the HDFS protocol to access its location. If users use S3, GCS, OSS,
-or Azure Blob Storage, they can also configure the `config.resources property` to specify custom configuration
+or Azure Blob Storage, they can also configure the `config.resources` to specify custom configuration
 files.
 
 - For S3, please refer to [Fileset-catalog-with-s3](./fileset-catalog-with-s3.md) for more details.

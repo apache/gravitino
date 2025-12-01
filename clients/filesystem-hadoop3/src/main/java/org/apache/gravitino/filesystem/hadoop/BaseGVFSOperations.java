@@ -686,46 +686,6 @@ public abstract class BaseGVFSOperations implements Closeable {
             });
   }
 
-  @VisibleForTesting
-  Cache<FileSystemCacheKey, FileSystem> internalFileSystemCache() {
-    return fileSystemCache;
-  }
-
-  /**
-   * Lazy initialization of GravitinoClient using double-checked locking pattern. This ensures the
-   * expensive client creation only happens when actually needed.
-   *
-   * @return the GravitinoClient
-   */
-  @VisibleForTesting
-  GravitinoClient getGravitinoClient() {
-    if (gravitinoClient == null) {
-      synchronized (this) {
-        if (gravitinoClient == null) {
-          this.gravitinoClient = GravitinoVirtualFileSystemUtils.createClient(conf);
-        }
-      }
-    }
-    return gravitinoClient;
-  }
-
-  private void setCallerContextForGetFileLocation(FilesetDataOperation operation) {
-    Map<String, String> contextMap = Maps.newHashMap();
-    contextMap.put(
-        FilesetAuditConstants.HTTP_HEADER_INTERNAL_CLIENT_TYPE,
-        InternalClientType.HADOOP_GVFS.name());
-    contextMap.put(FilesetAuditConstants.HTTP_HEADER_FILESET_DATA_OPERATION, operation.name());
-    CallerContext callerContext = CallerContext.builder().withContext(contextMap).build();
-    CallerContext.CallerContextHolder.set(callerContext);
-  }
-
-  private void setCallerContextForGetCredentials(String locationName) {
-    Map<String, String> contextMap = Maps.newHashMap();
-    contextMap.put(CredentialConstants.HTTP_HEADER_CURRENT_LOCATION_NAME, locationName);
-    CallerContext callerContext = CallerContext.builder().withContext(contextMap).build();
-    CallerContext.CallerContextHolder.set(callerContext);
-  }
-
   /**
    * Get the actual file system corresponding to the given fileset identifier and location name.
    *
@@ -793,6 +753,46 @@ public abstract class BaseGVFSOperations implements Closeable {
 
       throw e;
     }
+  }
+
+  @VisibleForTesting
+  Cache<FileSystemCacheKey, FileSystem> internalFileSystemCache() {
+    return fileSystemCache;
+  }
+
+  /**
+   * Lazy initialization of GravitinoClient using double-checked locking pattern. This ensures the
+   * expensive client creation only happens when actually needed.
+   *
+   * @return the GravitinoClient
+   */
+  @VisibleForTesting
+  GravitinoClient getGravitinoClient() {
+    if (gravitinoClient == null) {
+      synchronized (this) {
+        if (gravitinoClient == null) {
+          this.gravitinoClient = GravitinoVirtualFileSystemUtils.createClient(conf);
+        }
+      }
+    }
+    return gravitinoClient;
+  }
+
+  private void setCallerContextForGetFileLocation(FilesetDataOperation operation) {
+    Map<String, String> contextMap = Maps.newHashMap();
+    contextMap.put(
+        FilesetAuditConstants.HTTP_HEADER_INTERNAL_CLIENT_TYPE,
+        InternalClientType.HADOOP_GVFS.name());
+    contextMap.put(FilesetAuditConstants.HTTP_HEADER_FILESET_DATA_OPERATION, operation.name());
+    CallerContext callerContext = CallerContext.builder().withContext(contextMap).build();
+    CallerContext.CallerContextHolder.set(callerContext);
+  }
+
+  private void setCallerContextForGetCredentials(String locationName) {
+    Map<String, String> contextMap = Maps.newHashMap();
+    contextMap.put(CredentialConstants.HTTP_HEADER_CURRENT_LOCATION_NAME, locationName);
+    CallerContext callerContext = CallerContext.builder().withContext(contextMap).build();
+    CallerContext.CallerContextHolder.set(callerContext);
   }
 
   /**
