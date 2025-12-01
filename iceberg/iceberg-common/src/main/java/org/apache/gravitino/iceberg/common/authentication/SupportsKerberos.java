@@ -19,18 +19,27 @@
 
 package org.apache.gravitino.iceberg.common.authentication;
 
-import org.apache.gravitino.iceberg.common.authentication.kerberos.KerberosClient;
+import java.util.Map;
 
 /**
- * An interface to indicate that the implementing class supports Kerberos authentication and can
- * provide a Kerberos client.
+ * An interface to indicate that the implementing class supports Kerberos authentication and can do
+ * operations with Kerberos.
  */
 public interface SupportsKerberos {
 
   /**
-   * Get the Kerberos client.
+   * Perform operations with Kerberos authentication.
    *
-   * @return the Kerberos client
+   * @param properties the catalog properties
+   * @param executable the operations to be performed
+   * @return the result of the operations
+   * @param <R> the return type of the operations
    */
-  KerberosClient getKerberosClient();
+  <R> R doKerberosOperations(Map<String, String> properties, Executable<R> executable)
+      throws Throwable;
+
+  @FunctionalInterface
+  interface Executable<R> {
+    R execute() throws Throwable;
+  }
 }

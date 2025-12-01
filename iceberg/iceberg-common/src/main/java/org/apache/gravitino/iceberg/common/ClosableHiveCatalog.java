@@ -22,11 +22,22 @@ package org.apache.gravitino.iceberg.common;
 import com.google.common.collect.Lists;
 import java.io.Closeable;
 import java.io.IOException;
+import java.security.PrivilegedExceptionAction;
 import java.util.List;
+import java.util.Map;
 import lombok.Getter;
+import org.apache.commons.lang3.reflect.FieldUtils;
+import org.apache.gravitino.iceberg.common.authentication.AuthenticationConfig;
 import org.apache.gravitino.iceberg.common.authentication.SupportsKerberos;
 import org.apache.gravitino.iceberg.common.authentication.kerberos.KerberosClient;
+import org.apache.gravitino.utils.PrincipalUtils;
+import org.apache.hadoop.hive.metastore.IMetaStoreClient;
+import org.apache.hadoop.hive.thrift.DelegationTokenIdentifier;
+import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.hadoop.security.token.Token;
+import org.apache.iceberg.ClientPool;
 import org.apache.iceberg.hive.HiveCatalog;
+import org.apache.thrift.TException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -40,9 +51,6 @@ public class ClosableHiveCatalog extends HiveCatalog implements Closeable, Suppo
 
   @Getter private final List<Closeable> resources = Lists.newArrayList();
 
-  @SuppressWarnings("unused")
-  private ClosableHiveCatalog proxy;
-
   private KerberosClient kerberosClient;
 
   public ClosableHiveCatalog() {
@@ -55,11 +63,6 @@ public class ClosableHiveCatalog extends HiveCatalog implements Closeable, Suppo
 
   public void setKerberosClient(KerberosClient kerberosClient) {
     this.kerberosClient = kerberosClient;
-  }
-
-  @Override
-  public KerberosClient getKerberosClient() {
-    return kerberosClient;
   }
 
   @Override
@@ -84,5 +87,91 @@ public class ClosableHiveCatalog extends HiveCatalog implements Closeable, Suppo
             LOGGER.warn("Failed to close resource: {}", resource, e);
           }
         });
+  }
+
+  @Override
+  public <R> R doKerberosOperations(Map<String, String> properties, Executable<R> executable)
+      throws Throwable {
+
+    AuthenticationConfig authenticationConfig = new AuthenticationConfig(properties);
+
+    final String finalPrincipalName;
+    String proxyKerberosPrincipalName = PrincipalUtils.getCurrentPrincipal().getName();
+
+    if (!proxyKerberosPrincipalName.contains("@")) {
+      finalPrincipalName =
+          String.format("%s@%s", proxyKerberosPrincipalName, kerberosClient.getRealm());
+    } else {
+      finalPrincipalName = proxyKerberosPrincipalName;
+    }
+
+    UserGroupInformation realUser =
+        authenticationConfig.isImpersonationEnabled()
+            ? UserGroupInformation.createProxyUser(
+                finalPrincipalName, kerberosClient.getLoginUser())
+            : kerberosClient.getLoginUser();
+    try {
+      ClientPool<IMetaStoreClient, TException> newClientPool =
+          (ClientPool<IMetaStoreClient, TException>) FieldUtils.readField(this, "clients", true);
+      kerberosClient
+          .getLoginUser()
+          .doAs(
+              (PrivilegedExceptionAction<Void>)
+                  () -> {
+                    String token =
+                        newClientPool.run(
+                            client ->
+                                client.getDelegationToken(
+                                    finalPrincipalName,
+                                    kerberosClient.getLoginUser().getShortUserName()));
+
+                    Token<DelegationTokenIdentifier> delegationToken = new Token<>();
+                    delegationToken.decodeFromUrlString(token);
+                    realUser.addToken(delegationToken);
+                    return null;
+                  });
+    } catch (Exception e) {
+      throw new RuntimeException("Failed to get delegation token", e);
+    }
+    return (R)
+        realUser.doAs(
+            (PrivilegedExceptionAction<Object>)
+                () -> {
+                  try {
+                    return executable.execute();
+                  } catch (Throwable e) {
+                    if (RuntimeException.class.isAssignableFrom(e.getClass())) {
+                      throw (RuntimeException) e;
+                    }
+                    throw new RuntimeException("Failed to invoke method", e);
+                  }
+                });
+  }
+
+  public void resetHiveClientPool(String principalName, UserGroupInformation realUser) {
+    try {
+      ClientPool<IMetaStoreClient, TException> newClientPool =
+          (ClientPool<IMetaStoreClient, TException>) FieldUtils.readField(this, "clients", true);
+
+      kerberosClient
+          .getLoginUser()
+          .doAs(
+              (PrivilegedExceptionAction<Void>)
+                  () -> {
+                    String token =
+                        newClientPool.run(
+                            client ->
+                                client.getDelegationToken(
+                                    principalName,
+                                    kerberosClient.getLoginUser().getShortUserName()));
+
+                    Token<DelegationTokenIdentifier> delegationToken = new Token<>();
+                    delegationToken.decodeFromUrlString(token);
+                    realUser.addToken(delegationToken);
+                    return null;
+                  });
+    } catch (Exception e) {
+      throw new RuntimeException("Failed to get delegation token", e);
+    }
   }
 }
