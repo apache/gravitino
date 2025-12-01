@@ -16,40 +16,35 @@
  * specific language governing permissions and limitations
  * under the License.
  */
+import com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar
 
 plugins {
   `maven-publish`
   id("java")
+  alias(libs.plugins.shadow)
 }
 
 dependencies {
-  implementation(project(":api")) {
-    exclude("*")
-  }
-  implementation(project(":catalogs:catalog-common")) {
-    exclude("*")
-  }
-  implementation(project(":catalogs:hadoop-common")) {
-    exclude("*")
-  }
-  implementation(project(":common")) {
-    exclude("*")
-  }
-
-  implementation(libs.commons.lang3)
-  implementation(libs.guava)
-
-  compileOnly(libs.azure.identity)
-  compileOnly(libs.azure.storage.file.datalake)
-  compileOnly(libs.hadoop3.abs)
-  compileOnly(libs.hadoop3.client.api)
-
-  testImplementation(libs.azure.identity)
-  testImplementation(libs.junit.jupiter.api)
-  testImplementation(libs.junit.jupiter.params)
-  testRuntimeOnly(libs.junit.jupiter.engine)
+  implementation(libs.aliyun.credentials.sdk)
+  implementation(libs.aliyun.sdk.oss)
+  // Aliyun oss SDK depends on this package, and JDK >= 9 requires manual add
+  // https://www.alibabacloud.com/help/en/oss/developer-reference/java-installation?spm=a2c63.p38356.0.i1
+  implementation(libs.sun.activation)
 }
 
-tasks.compileJava {
-  dependsOn(":catalogs:catalog-fileset:runtimeJars")
+tasks.withType(ShadowJar::class.java) {
+  isZip64 = true
+  configurations = listOf(project.configurations.runtimeClasspath.get())
+  archiveClassifier.set("")
+
+  dependencies {
+    exclude(dependency("org.slf4j:slf4j-api"))
+  }
+
+  mergeServiceFiles()
+}
+
+tasks.jar {
+  dependsOn(tasks.named("shadowJar"))
+  archiveClassifier.set("empty")
 }
