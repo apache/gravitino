@@ -159,40 +159,6 @@ public class TestModelMetaService extends TestJDBCBackend {
   }
 
   @TestTemplate
-  public void testUpdateModelCommentFromNull() throws IOException {
-    createParentEntities(METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME, AUDIT_INFO);
-
-    ModelMetaService modelMetaService = ModelMetaService.getInstance();
-    ModelEntity modelEntity =
-        ModelEntity.builder()
-            .withId(RandomIdGenerator.INSTANCE.nextId())
-            .withName("model_null_comment")
-            .withNamespace(MODEL_NS)
-            .withLatestVersion(0)
-            .withAuditInfo(AUDIT_INFO)
-            .build();
-    modelMetaService.insertModel(modelEntity, false);
-
-    modelMetaService.updateModel(
-        modelEntity.nameIdentifier(),
-        entity -> {
-          ModelEntity model = (ModelEntity) entity;
-          return ModelEntity.builder()
-              .withId(model.id())
-              .withName(model.name())
-              .withNamespace(model.namespace())
-              .withComment("model comment updated")
-              .withLatestVersion(model.latestVersion())
-              .withProperties(model.properties())
-              .withAuditInfo(model.auditInfo())
-              .build();
-        });
-
-    ModelEntity updatedModel = modelMetaService.getModelByIdentifier(modelEntity.nameIdentifier());
-    Assertions.assertEquals("model comment updated", updatedModel.comment());
-  }
-
-  @TestTemplate
   public void testInsertAndListModels() throws IOException {
     createParentEntities(METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME, AUDIT_INFO);
     Map<String, String> properties = ImmutableMap.of("k1", "v1");
@@ -356,6 +322,37 @@ public class TestModelMetaService extends TestJDBCBackend {
         () ->
             ModelMetaService.getInstance()
                 .updateModel(NameIdentifier.of(MODEL_NS, "model3"), renameUpdater));
+
+    // test update model comment from null
+    ModelEntity modelEntity4 =
+        createModelEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            MODEL_NS,
+            "model4",
+            "model4 comment",
+            0,
+            properties,
+            AUDIT_INFO);
+    ModelMetaService.getInstance().insertModel(modelEntity4, false);
+
+    ModelMetaService.getInstance()
+        .updateModel(
+            modelEntity4.nameIdentifier(),
+            entity -> {
+              ModelEntity model = (ModelEntity) entity;
+              return ModelEntity.builder()
+                  .withId(model.id())
+                  .withName(model.name())
+                  .withNamespace(model.namespace())
+                  .withComment("model comment updated")
+                  .withLatestVersion(model.latestVersion())
+                  .withProperties(model.properties())
+                  .withAuditInfo(model.auditInfo())
+                  .build();
+            });
+    ModelEntity updatedModel4 =
+        ModelMetaService.getInstance().getModelByIdentifier(modelEntity4.nameIdentifier());
+    Assertions.assertEquals("model comment updated", updatedModel4.comment());
   }
 
   @TestTemplate

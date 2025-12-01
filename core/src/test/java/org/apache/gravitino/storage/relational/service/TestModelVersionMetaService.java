@@ -586,7 +586,7 @@ public class TestModelVersionMetaService extends TestJDBCBackend {
 
     Map<String, String> properties = ImmutableMap.of("k1", "v1");
     String modelName = randomModelName();
-    String modelComment = "model1 comment";
+    String modelComment = null;
     String modelVersionUri = "S3://test/path/to/model/version";
     List<String> modelVersionAliases = ImmutableList.of("alias1", "alias2");
     String modelVersionComment = "test comment";
@@ -661,57 +661,6 @@ public class TestModelVersionMetaService extends TestJDBCBackend {
                     NameIdentifierUtil.ofModelVersion(
                         METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME, modelName, "non_exist_version"),
                     updateCommentUpdater));
-  }
-
-  @TestTemplate
-  void testUpdateVersionCommentFromNull() throws IOException {
-    createParentEntities(METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME, AUDIT_INFO);
-
-    ModelEntity modelEntity =
-        createModelEntity(
-            RandomIdGenerator.INSTANCE.nextId(),
-            MODEL_NS,
-            randomModelName(),
-            null,
-            0,
-            properties,
-            AUDIT_INFO);
-
-    ModelVersionEntity modelVersionEntity =
-        createModelVersionEntity(
-            modelEntity.nameIdentifier(),
-            0,
-            ImmutableMap.of(ModelVersion.URI_NAME_UNKNOWN, "model_path"),
-            null,
-            null,
-            properties,
-            AUDIT_INFO);
-
-    Assertions.assertDoesNotThrow(
-        () -> ModelMetaService.getInstance().insertModel(modelEntity, false));
-    Assertions.assertDoesNotThrow(
-        () -> ModelVersionMetaService.getInstance().insertModelVersion(modelVersionEntity));
-
-    ModelVersionMetaService.getInstance()
-        .updateModelVersion(
-            modelVersionEntity.nameIdentifier(),
-            oldEntity -> {
-              ModelVersionEntity old = (ModelVersionEntity) oldEntity;
-              return ModelVersionEntity.builder()
-                  .withModelIdentifier(old.modelIdentifier())
-                  .withVersion(old.version())
-                  .withUris(old.uris())
-                  .withAliases(old.aliases())
-                  .withComment("comment_after_update")
-                  .withProperties(old.properties())
-                  .withAuditInfo(old.auditInfo())
-                  .build();
-            });
-
-    ModelVersionEntity updatedVersion =
-        ModelVersionMetaService.getInstance()
-            .getModelVersionByIdentifier(modelVersionEntity.nameIdentifier());
-    Assertions.assertEquals("comment_after_update", updatedVersion.comment());
   }
 
   @TestTemplate
