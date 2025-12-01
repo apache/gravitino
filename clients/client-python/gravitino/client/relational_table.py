@@ -158,7 +158,7 @@ class RelationalTable(Table):
         """
 
         resp = self._rest_client.get(
-            endpoint=f"{self._get_partition_request_path()}/{partition_name}",
+            endpoint=f"{self._get_partition_request_path()}/{encode_string(partition_name)}",
             error_handler=PARTITION_ERROR_HANDLER,
         )
         partition_resp = PartitionResponse.from_json(resp.body, infer_missing=True)
@@ -176,7 +176,7 @@ class RelationalTable(Table):
             bool: `True` if the partition is dropped, `False` if the partition does not exist.
         """
         resp = self._rest_client.delete(
-            endpoint=f"{self._get_partition_request_path()}/{partition_name}",
+            endpoint=f"{self._get_partition_request_path()}/{encode_string(partition_name)}",
             error_handler=PARTITION_ERROR_HANDLER,
         )
         drop_resp = DropResponse.from_json(resp.body, infer_missing=True)
