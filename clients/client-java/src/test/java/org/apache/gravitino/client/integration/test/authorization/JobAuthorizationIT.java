@@ -182,7 +182,8 @@ public class JobAuthorizationIT extends BaseRestApiAuthorizationIT {
         ImmutableList.of(Privileges.RunJob.allow()));
 
     // User with RunJob privilege but without UseJobTemplate privilege cannot run jobs
-    // The authorization expression is: METALAKE::OWNER || (METALAKE::RUN_JOB && (ANY_USE_JOB_TEMPLATE || JOB_TEMPLATE::OWNER))
+    // The authorization expression is: METALAKE::OWNER || (METALAKE::RUN_JOB &&
+    // (ANY_USE_JOB_TEMPLATE || JOB_TEMPLATE::OWNER))
     client.loadMetalake(METALAKE).registerJobTemplate(builder.withName("test_4").build());
     assertThrows(
         ForbiddenException.class,
