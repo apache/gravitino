@@ -62,4 +62,22 @@ public class KerberosAwareIcebergCatalogProxy implements MethodInterceptor {
     Class<?>[] argClass = new Class[] {IcebergConfig.class};
     return (IcebergCatalogWrapper) e.create(argClass, new Object[] {config});
   }
+
+  /**
+   * Create a proxy instance with catalogName and config constructor. It's used for class
+   * CatalogWrapperForREST or its subclass.
+   *
+   * @param catalogName Name of the catalog.
+   * @param config Iceberg configuration.
+   * @return The proxy instance.
+   */
+  public IcebergCatalogWrapper getProxy(String catalogName, IcebergConfig config) {
+    Enhancer e = new Enhancer();
+    e.setClassLoader(target.getClass().getClassLoader());
+    e.setSuperclass(target.getClass());
+    e.setCallback(this);
+
+    Class<?>[] argClass = new Class[] {String.class, IcebergConfig.class};
+    return (IcebergCatalogWrapper) e.create(argClass, new Object[] {catalogName, config});
+  }
 }
