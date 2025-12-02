@@ -206,7 +206,8 @@ public class ModelVersionMetaBaseSQLProvider {
         + " AND catalog_id = #{oldModelVersionMeta.catalogId}"
         + " AND schema_id = #{oldModelVersionMeta.schemaId}"
         + " AND version = #{oldModelVersionMeta.modelVersion}"
-        + " AND model_version_comment = #{oldModelVersionMeta.modelVersionComment}"
+        + " AND (model_version_comment = #{oldModelVersionMeta.modelVersionComment}"
+        + "   OR (model_version_comment IS NULL and #{oldModelVersionMeta.modelVersionComment} IS NULL))"
         + " AND model_version_properties = #{oldModelVersionMeta.modelVersionProperties}"
         + " AND audit_info = #{oldModelVersionMeta.auditInfo}"
         + " AND deleted_at = 0";

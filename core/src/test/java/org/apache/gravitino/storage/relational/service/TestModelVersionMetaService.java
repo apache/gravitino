@@ -586,7 +586,7 @@ public class TestModelVersionMetaService extends TestJDBCBackend {
 
     Map<String, String> properties = ImmutableMap.of("k1", "v1");
     String modelName = randomModelName();
-    String modelComment = "model1 comment";
+    String modelComment = null;
     String modelVersionUri = "S3://test/path/to/model/version";
     List<String> modelVersionAliases = ImmutableList.of("alias1", "alias2");
     String modelVersionComment = "test comment";

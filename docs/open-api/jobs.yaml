@@ -421,7 +421,7 @@ components:
       required:
         - name
         - jobType
-        - mainClass
+        - executable
       properties:
         name:
           type: string
@@ -456,9 +456,10 @@ components:
           default: { }
           additionalProperties:
             type: string
-        mainClass:
+        className:
           type: string
-          description: The main class of the Spark job template
+          description: The main class of the Spark job template. Required for Java/Scala Spark applications, optional for PySpark applications
+          nullable: true
         jars:
           type: array
           description: The JAR files of the Spark job template
@@ -600,7 +601,7 @@ components:
           nullable: true
         newClassName:
           type: string
-          description: The new class name of the Spark job template
+          description: The new class name of the Spark job template. Required for Java/Scala Spark applications, optional for PySpark applications
           nullable: true
         newJars:
           type: array
@@ -819,7 +820,7 @@ components:
             "executable": "/var/folders/90/v1d9hxsd6pj8m0jnn6f22tkr0000gn/T/tmpy65fiugc/spark-demo.jar",
             "jobType": "spark",
             "name": "test_run_get_spark",
-            "mainClass": "org.apache.spark.examples.SparkPi",
+            "className": "org.apache.spark.examples.SparkPi",
             "jars": [
               "/var/folders/90/v1d9hxsd6pj8m0jnn6f22tkr0000gn/T/tmpy65fiugc/spark-job.jar"
             ]

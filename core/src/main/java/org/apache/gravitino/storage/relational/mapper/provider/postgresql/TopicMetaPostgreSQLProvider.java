@@ -27,6 +27,36 @@ import org.apache.ibatis.annotations.Param;
 public class TopicMetaPostgreSQLProvider extends TopicMetaBaseSQLProvider {
 
   @Override
+  public String updateTopicMeta(
+      @Param("newTopicMeta") TopicPO newTopicPO, @Param("oldTopicMeta") TopicPO oldTopicPO) {
+    return "UPDATE "
+        + TABLE_NAME
+        + " SET topic_name = #{newTopicMeta.topicName},"
+        + " metalake_id = #{newTopicMeta.metalakeId},"
+        + " catalog_id = #{newTopicMeta.catalogId},"
+        + " schema_id = #{newTopicMeta.schemaId},"
+        + " comment = #{newTopicMeta.comment},"
+        + " properties = #{newTopicMeta.properties},"
+        + " audit_info = #{newTopicMeta.auditInfo},"
+        + " current_version = #{newTopicMeta.currentVersion},"
+        + " last_version = #{newTopicMeta.lastVersion},"
+        + " deleted_at = #{newTopicMeta.deletedAt}"
+        + " WHERE topic_id = #{oldTopicMeta.topicId}"
+        + " AND topic_name = #{oldTopicMeta.topicName}"
+        + " AND metalake_id = #{oldTopicMeta.metalakeId}"
+        + " AND catalog_id = #{oldTopicMeta.catalogId}"
+        + " AND schema_id = #{oldTopicMeta.schemaId}"
+        + " AND (comment = #{oldTopicMeta.comment}"
+        + "   OR (CAST(comment AS VARCHAR) IS NULL"
+        + "   AND CAST(#{oldTopicMeta.comment} AS VARCHAR) IS NULL))"
+        + " AND properties = #{oldTopicMeta.properties}"
+        + " AND audit_info = #{oldTopicMeta.auditInfo}"
+        + " AND current_version = #{oldTopicMeta.currentVersion}"
+        + " AND last_version = #{oldTopicMeta.lastVersion}"
+        + " AND deleted_at = 0";
+  }
+
+  @Override
   public String softDeleteTopicMetasByTopicId(Long topicId) {
     return "UPDATE "
         + TABLE_NAME
