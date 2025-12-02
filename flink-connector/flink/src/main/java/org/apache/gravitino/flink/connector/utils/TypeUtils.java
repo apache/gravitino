@@ -102,8 +102,9 @@ public class TypeUtils {
         return Types.TimestampType.withTimeZone(zonedPrecision);
       case ARRAY:
         ArrayType arrayType = (ArrayType) logicalType;
-        Type elementType = toGravitinoType(arrayType.getElementType());
-        return Types.ListType.of(elementType, arrayType.isNullable());
+        LogicalType elementLogicalType = arrayType.getElementType();
+        Type elementType = toGravitinoType(elementLogicalType);
+        return Types.ListType.of(elementType, elementLogicalType.isNullable());
       case MAP:
         MapType mapType = (MapType) logicalType;
         LogicalType keyType = mapType.getKeyType();
