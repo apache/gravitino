@@ -607,7 +607,19 @@ public class TestStarRocksTableOperations extends TestStarRocks {
     Assertions.assertDoesNotThrow(
         () ->
             TABLE_OPERATIONS.alterTable(
-                databaseName, tableName, TableChange.setProperty("replication_num", "2")));
+                databaseName, tableName, TableChange.setProperty("replication_num", "1")));
+
+    Assertions.assertDoesNotThrow(
+        () ->
+            TABLE_OPERATIONS.alterTable(
+                databaseName,
+                tableName,
+                TableChange.setProperty("dynamic_partition.enable", "true")));
+
+    Assertions.assertDoesNotThrow(
+        () ->
+            TABLE_OPERATIONS.alterTable(
+                databaseName, tableName, TableChange.setProperty("binlog.enable", "true")));
 
     Assertions.assertThrows(
         IllegalArgumentException.class,
