@@ -67,6 +67,14 @@ public class ClosableHiveCatalog extends HiveCatalog implements Closeable, Suppo
     resources.add(resource);
   }
 
+  /**
+   * Initialize the ClosableHiveCatalog with the given input name and properties.
+   *
+   * <p>Note: This method can only be called once as it will create new client pools.
+   *
+   * @param inputName name of the catalog
+   * @param properties properties for the catalog
+   */
   @Override
   public void initialize(String inputName, Map<String, String> properties) {
     super.initialize(inputName, properties);
@@ -157,21 +165,21 @@ public class ClosableHiveCatalog extends HiveCatalog implements Closeable, Suppo
                     return null;
                   });
     } catch (Exception e) {
-      throw new RuntimeException("Failed to get delegation token", e);
+      throw new RuntimeException(
+          "Failed to get delegation token for principal: " + finalPrincipalName, e);
     }
-    return (R)
-        realUser.doAs(
-            (PrivilegedExceptionAction<Object>)
-                () -> {
-                  try {
-                    return executable.execute();
-                  } catch (Throwable e) {
-                    if (RuntimeException.class.isAssignableFrom(e.getClass())) {
-                      throw (RuntimeException) e;
-                    }
-                    throw new RuntimeException("Failed to invoke method", e);
-                  }
-                });
+    return realUser.doAs(
+        (PrivilegedExceptionAction<R>)
+            () -> {
+              try {
+                return executable.execute();
+              } catch (Throwable e) {
+                if (RuntimeException.class.isAssignableFrom(e.getClass())) {
+                  throw (RuntimeException) e;
+                }
+                throw new RuntimeException("Failed to invoke method", e);
+              }
+            });
   }
 
   private ClientPool<IMetaStoreClient, TException> resetIcebergHiveClientPool()
@@ -273,7 +281,7 @@ public class ClosableHiveCatalog extends HiveCatalog implements Closeable, Suppo
       // For Iceberg rest server, we haven't set the catalog_uuid, so we set it to 0 as there is
       // only one catalog in the rest server, so it's okay to set it to 0.
       String catalogUUID = properties().getOrDefault("catalog_uuid", "0");
-      File keytabFile = kerberosClient.saveKeyTabFileFromUri(Long.valueOf(catalogUUID));
+      File keytabFile = kerberosClient.saveKeyTabFileFromUri(Long.parseLong(catalogUUID));
       kerberosClient.login(keytabFile.getAbsolutePath());
       return kerberosClient;
     } catch (IOException e) {

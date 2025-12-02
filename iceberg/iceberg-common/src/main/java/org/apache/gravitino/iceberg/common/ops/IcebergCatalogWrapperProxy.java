@@ -27,13 +27,17 @@ import org.apache.gravitino.iceberg.common.IcebergConfig;
 import org.apache.gravitino.iceberg.common.authentication.SupportsKerberos;
 import org.apache.iceberg.catalog.Catalog;
 
+/**
+ * A proxy class for IcebergCatalogWrapper to handle Kerberos authentication or other cross-cutting
+ * concerns.
+ */
 public class IcebergCatalogWrapperProxy implements MethodInterceptor {
   private final IcebergCatalogWrapper target;
   private final Catalog catalog;
 
   public IcebergCatalogWrapperProxy(IcebergCatalogWrapper target) {
     this.target = target;
-    this.catalog = target.catalog;
+    this.catalog = target.getCatalog();
   }
 
   @Override

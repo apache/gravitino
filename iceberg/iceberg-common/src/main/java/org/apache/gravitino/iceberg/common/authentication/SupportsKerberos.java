@@ -34,6 +34,7 @@ public interface SupportsKerberos {
    * @param executable the operations to be performed
    * @return the result of the operations
    * @param <R> the return type of the operations
+   * @throws Throwable if any error occurs during the operations
    */
   <R> R doKerberosOperations(Map<String, String> properties, Executable<R> executable)
       throws Throwable;

@@ -265,7 +265,7 @@ public class CatalogIcebergKerberosHiveIT extends BaseIT {
     kerberosHiveContainer.executeInContainer(
         "hadoop", "fs", "-chmod", "-R", "000", "/user/hive/warehouse-catalog-iceberg");
 
-    // Create table and the user has no permission to create table
+    // Create a table, and the user has no EXECUTE permission to create table
     NameIdentifier tableNameIdentifier1 = NameIdentifier.of(SCHEMA_NAME, TABLE_NAME);
     exception =
         Assertions.assertThrows(

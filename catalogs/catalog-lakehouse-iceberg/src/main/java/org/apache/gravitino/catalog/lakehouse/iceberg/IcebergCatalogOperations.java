@@ -116,13 +116,6 @@ public class IcebergCatalogOperations implements CatalogOperations, SupportsSche
     IcebergConfig icebergConfig = new IcebergConfig(resultConf);
 
     IcebergCatalogWrapper rawWrapper = new IcebergCatalogWrapper(icebergConfig);
-    // We have replaced `UserGroupInformation#loginUserFromKeytab` with
-    // `UserGroupInformation#loginUserFromKeytabAndReturnUGI`, the former will change the current
-    // login user globally, which is not expected in Gravitino as we are going to support multiple
-    // catalogs within the same class loader. The proxy will ensure each catalog has its own
-    // `UserGroupInformation` instance and I have removed old `HiveBackendProxy`. In
-    // IcebergCatalogWrapperProxy, we will do both Kerberos access and user impersonation if needed,
-    // so please check the code in IcebergCatalogWrapperProxy for details.
     this.icebergCatalogWrapper =
         rawWrapper.getCatalog() instanceof SupportsKerberos
             ? new IcebergCatalogWrapperProxy(rawWrapper).getProxy(icebergConfig)
