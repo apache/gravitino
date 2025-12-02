@@ -286,7 +286,7 @@ public class AuthorizationExpressionConverter {
     expression =
         expression.replaceAll(
             "ANY_USE_JOB_TEMPLATE",
-            "((ANY(USE_JOB_TEMPLATE,  METALAKE, JOB_TEMPLATE))"
+            "((ANY(USE_JOB_TEMPLATE, METALAKE, JOB_TEMPLATE))"
                 + "&& !(ANY(DENY_USE_JOB_TEMPLATE, METALAKE, JOB_TEMPLATE)))");
     expression =
         expression.replaceAll(
