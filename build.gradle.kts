@@ -967,8 +967,8 @@ tasks {
         !it.name.startsWith("iceberg") &&
         !it.name.startsWith("lance") &&
         !it.name.startsWith("spark") &&
+        !it.name.startsWith("hive-metastore") &&
         it.name != "hadoop-common" &&
-        it.name != "hive-metastore-common" &&
         it.name != "integration-test" &&
         it.name != "trino-connector" &&
         it.parent?.name != "bundles" &&
