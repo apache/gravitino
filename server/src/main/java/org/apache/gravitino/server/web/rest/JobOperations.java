@@ -389,7 +389,7 @@ public class JobOperations {
   public Response cancelJob(
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
           String metalake,
-      @AuthorizationMetadata(type = Entity.EntityType.JOB) @PathParam("jobId") String jobId) {
+      @PathParam("jobId") @AuthorizationMetadata(type = Entity.EntityType.JOB) String jobId) {
     LOG.info("Received request to cancel job {} in metalake {}", jobId, metalake);
 
     try {
