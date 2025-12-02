@@ -51,28 +51,22 @@ public final class IsolatedClientLoader {
   private static final String METHOD_GET_PROXY = "getProxy";
   private static final String METHOD_SET = "set";
 
-  private final HiveClient.HiveVersion version;
+  public enum HiveVersion {
+    HIVE2,
+    HIVE3,
+  }
+
+  private final HiveVersion version;
   private final List<URL> execJars;
   private final ClassLoader baseClassLoader;
   private final URLClassLoader classLoader;
 
   /** Cache IsolatedClientLoader instances per Hive version to avoid re-creating classloaders. */
-  private static final Map<HiveClient.HiveVersion, IsolatedClientLoader> LOADER_CACHE =
-      new EnumMap<>(HiveClient.HiveVersion.class);
+  private static final Map<HiveVersion, IsolatedClientLoader> LOADER_CACHE =
+      new EnumMap<>(HiveVersion.class);
 
   private static synchronized IsolatedClientLoader getClientLoaderForVersion(
-      String hiveMetastoreVersion, Properties config) throws IOException {
-    Preconditions.checkArgument(
-        hiveMetastoreVersion != null && !hiveMetastoreVersion.isEmpty(),
-        "Hive metastore version cannot be null or empty");
-
-    HiveClient.HiveVersion hiveVersion;
-    try {
-      hiveVersion = HiveClient.HiveVersion.valueOf(hiveMetastoreVersion);
-    } catch (IllegalArgumentException e) {
-      throw new IllegalArgumentException("Unsupported Hive version: " + hiveMetastoreVersion, e);
-    }
-
+      HiveVersion hiveVersion, Properties config) throws IOException {
     // Reuse loader per version to avoid repeatedly creating isolated classloaders.
     IsolatedClientLoader cached = LOADER_CACHE.get(hiveVersion);
     if (cached != null) {
@@ -86,40 +80,42 @@ public final class IsolatedClientLoader {
   }
 
   public static HiveClient createHiveClient(Properties properties) {
-    RuntimeException lastFailure = null;
+    HiveClient client = null;
+    try {
+      // try using Hive3 first
+      IsolatedClientLoader loader = getClientLoaderForVersion(HiveVersion.HIVE3, properties);
+      client = loader.createClient(properties);
+      client.getCatalogs();
+      LOG.info("Connected to Hive Metastore using Hive version HIVE3");
+      return client;
 
-    // Try Hive 2 first, then fall back to Hive 3 on failure.
-    for (HiveClient.HiveVersion version :
-        new HiveClient.HiveVersion[] {HiveClient.HiveVersion.HIVE2, HiveClient.HiveVersion.HIVE3}) {
-      try {
-        IsolatedClientLoader loader = getClientLoaderForVersion(version.name(), properties);
-        HiveClient client = loader.createClient(properties);
-        // Simple health check to ensure the client can talk to the metastore.
-        // Use an empty catalog name here; the shim will translate it as needed.
-        client.getAllDatabases("");
-        LOG.info("Successfully created Hive metastore client using version {}", version);
-        return client;
-      } catch (Exception e) {
-        RuntimeException wrapped =
-            (e instanceof RuntimeException)
-                ? (RuntimeException) e
-                : new GravitinoRuntimeException(
-                    e, "Failed to create Hive metastore client with version %s", version);
-        LOG.warn(
-            "Failed to create or validate Hive metastore client with version {}. "
-                + "Will try next available version if any.",
-            version,
-            wrapped);
-        lastFailure = wrapped;
+    } catch (GravitinoRuntimeException e) {
+      if (client != null) {
+        client.close();
       }
-    }
 
-    throw lastFailure;
+      try {
+        // failback to Hive2 if we can list databases
+        if (e.getMessage().contains("Invalid method name: 'get_catalogs'")
+            || e.getMessage().contains("class not found") // cause by MiniHiveMetastoreService
+        ) {
+          IsolatedClientLoader loader = getClientLoaderForVersion(HiveVersion.HIVE2, properties);
+          client = loader.createClient(properties);
+          LOG.info("Connected to Hive Metastore using Hive version HIVE2");
+          return client;
+        }
+        throw e;
+      } catch (Exception ex) {
+        LOG.error("Failed to connect to Hive Metastore using both Hive3 and Hive2", ex);
+        throw e;
+      }
+    } catch (Exception e) {
+      throw HiveExceptionConverter.toGravitinoException(e, "");
+    }
   }
 
   private static IsolatedClientLoader createLoader(
-      HiveClient.HiveVersion hiveVersion, Properties config, ClassLoader baseLoader)
-      throws IOException {
+      HiveVersion hiveVersion, Properties config, ClassLoader baseLoader) throws IOException {
     Path jarDir = getJarDirectory(hiveVersion);
     if (!Files.exists(jarDir) || !Files.isDirectory(jarDir)) {
       throw new IOException("Hive jar directory does not exist or is not a directory: " + jarDir);
@@ -139,10 +135,9 @@ public final class IsolatedClientLoader {
    * @param version The Hive version
    * @return The path to the jar directory
    */
-  private static Path getJarDirectory(HiveClient.HiveVersion version) {
+  private static Path getJarDirectory(HiveVersion version) {
     String gravitinoHome = System.getenv("GRAVITINO_HOME");
-    String libsDir =
-        version == HiveClient.HiveVersion.HIVE2 ? "hive-metastore2-libs" : "hive-metastore3-libs";
+    String libsDir = version == HiveVersion.HIVE2 ? "hive-metastore2-libs" : "hive-metastore3-libs";
     String jarPath = "";
     if (gravitinoHome != null) {
       jarPath = Paths.get(gravitinoHome, "catalogs", "hive", "libs", libsDir).toString();
@@ -200,10 +195,7 @@ public final class IsolatedClientLoader {
    * @param baseClassLoader The base classloader for shared classes
    */
   public IsolatedClientLoader(
-      HiveClient.HiveVersion version,
-      List<URL> execJars,
-      Properties config,
-      ClassLoader baseClassLoader) {
+      HiveVersion version, List<URL> execJars, Properties config, ClassLoader baseClassLoader) {
     Preconditions.checkArgument(version != null, "Hive version cannot be null");
     Preconditions.checkArgument(
         execJars != null && !execJars.isEmpty(), "Jar URLs cannot be null or empty");
@@ -358,9 +350,9 @@ public final class IsolatedClientLoader {
     Class<?> hiveConfClass = classLoader.loadClass(HIVE_CONF_CLASS);
     Class<?> confClass = classLoader.loadClass(CONFIGURATION_CLASS);
 
-    if (version == HiveClient.HiveVersion.HIVE2) {
+    if (version == HiveVersion.HIVE2) {
       return createHive2Client(clientClass, hiveConfClass, confClass, properties);
-    } else if (version == HiveClient.HiveVersion.HIVE3) {
+    } else if (version == HiveVersion.HIVE3) {
       return createHive3Client(clientClass, confClass, properties);
     } else {
       throw new IllegalArgumentException("Unsupported Hive version: " + version);

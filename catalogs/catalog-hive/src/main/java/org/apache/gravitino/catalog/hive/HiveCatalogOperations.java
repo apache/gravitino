@@ -185,9 +185,7 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
             propertiesMetadata
                 .catalogPropertiesMetadata()
                 .getOrDefault(conf, HiveCatalogPropertiesMetadata.DEFAULT_CATALOG);
-    if (defaultCatalog.isEmpty()) {
-      this.catalogName = defaultCatalog;
-    }
+    this.catalogName = defaultCatalog;
   }
 
   private void initKerberosIfNecessary(Map<String, String> conf, Configuration hadoopConf) {

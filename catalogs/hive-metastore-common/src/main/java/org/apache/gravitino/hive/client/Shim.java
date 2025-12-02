@@ -34,9 +34,9 @@ import org.apache.thrift.TException;
  */
 public abstract class Shim {
   protected final IMetaStoreClient client;
-  protected final HiveClient.HiveVersion version;
+  protected final IsolatedClientLoader.HiveVersion version;
 
-  protected Shim(IMetaStoreClient client, HiveClient.HiveVersion version) {
+  protected Shim(IMetaStoreClient client, IsolatedClientLoader.HiveVersion version) {
     this.client = client;
     this.version = version;
   }
@@ -96,4 +96,12 @@ public abstract class Shim {
 
   public abstract List<HiveTable> getTableObjectsByName(
       String catalogName, String databaseName, List<String> allTables);
+
+  public abstract List<String> getCatalogs();
+
+  public void close() throws Exception {
+    if (client != null) {
+      client.close();
+    }
+  }
 }

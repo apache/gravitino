@@ -17,7 +17,7 @@
 
 package org.apache.gravitino.hive.client;
 
-import static org.apache.gravitino.hive.client.HiveClient.HiveVersion.HIVE3;
+import static org.apache.gravitino.hive.client.IsolatedClientLoader.HiveVersion.HIVE3;
 
 import java.lang.reflect.Method;
 import java.util.List;
@@ -53,6 +53,7 @@ class HiveShimV3 extends HiveShimV2 {
   private final Method dropPartitionMethod;
   private final Method getTableObjectsByNameMethod;
   private final Method databaseSetCatalogNameMethod;
+  private final Method getCatalogsMethod;
   private final Method tableSetCatalogNameMethod;
   private final Method partitionSetCatalogNameMethod;
 
@@ -71,7 +72,12 @@ class HiveShimV3 extends HiveShimV2 {
               "alterDatabase", String.class, String.class, Database.class);
       this.dropDatabaseMethod =
           IMetaStoreClient.class.getMethod(
-              "dropDatabase", String.class, String.class, boolean.class, boolean.class);
+              "dropDatabase",
+              String.class,
+              String.class,
+              boolean.class,
+              boolean.class,
+              boolean.class);
 
       // Hive3 table methods with catalog support
       this.getTableMethod =
@@ -93,7 +99,7 @@ class HiveShimV3 extends HiveShimV2 {
           IMetaStoreClient.class.getMethod("getAllTables", String.class, String.class);
       this.listTableNamesByFilterMethod =
           IMetaStoreClient.class.getMethod(
-              "listTableNamesByFilter", String.class, String.class, String.class, short.class);
+              "listTableNamesByFilter", String.class, String.class, String.class, int.class);
 
       // Hive3 partition methods with catalog support (using int for pageSize)
       this.listPartitionNamesMethod =
@@ -118,6 +124,7 @@ class HiveShimV3 extends HiveShimV2 {
       this.getTableObjectsByNameMethod =
           IMetaStoreClient.class.getMethod(
               "getTableObjectsByName", String.class, String.class, List.class);
+      this.getCatalogsMethod = IMetaStoreClient.class.getMethod("getCatalogs");
 
       // SetCatalogName methods for Hive3
       this.databaseSetCatalogNameMethod =
@@ -164,7 +171,8 @@ class HiveShimV3 extends HiveShimV2 {
 
   @Override
   public void dropDatabase(String catalogName, String databaseName, boolean cascade) {
-    invoke(databaseName, client, dropDatabaseMethod, catalogName, databaseName, cascade, false);
+    invoke(
+        databaseName, client, dropDatabaseMethod, catalogName, databaseName, true, false, cascade);
   }
 
   @Override
@@ -348,6 +356,11 @@ class HiveShimV3 extends HiveShimV2 {
     return tables.stream().map(HiveTableConverter::fromHiveTable).toList();
   }
 
+  @Override
+  public List<String> getCatalogs() {
+    return (List<String>) invoke("", client, getCatalogsMethod);
+  }
+
   /**
    * Invokes a method on an object and converts any exception to a Gravitino exception.
    *
@@ -378,5 +391,10 @@ class HiveShimV3 extends HiveShimV2 {
       return (int) pageSize;
     }
     return pageSize;
+  }
+
+  @Override
+  public void close() throws Exception {
+    client.close();
   }
 }

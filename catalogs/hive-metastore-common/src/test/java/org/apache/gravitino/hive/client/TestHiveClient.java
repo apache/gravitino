@@ -59,33 +59,24 @@ public class TestHiveClient {
 
   @Test
   void testHive2Client() throws Exception {
-    runHiveClientTest("HIVE2", "", "hive2", HIVE2_HMS_URL, HIVE2_HDFS_URL + "/tmp/gravitino_test");
+    runHiveClientTest("", "hive2", HIVE2_HMS_URL, HIVE2_HDFS_URL + "/tmp/gravitino_test");
   }
 
   @Test
   void testHive3DefaultCatalog() throws Exception {
     // Hive3 default catalog is "hive", not empty string
     runHiveClientTest(
-        "HIVE3", "hive", "hive3_default", HIVE3_HMS_URL, HIVE3_HDFS_URL + "/tmp/gravitino_test");
+        "hive", "hive3_default", HIVE3_HMS_URL, HIVE3_HDFS_URL + "/tmp/gravitino_test");
   }
 
   @Test
   void testHive3SampleCatalog() throws Exception {
     runHiveClientTest(
-        "HIVE3",
-        "sample_catalog",
-        "hive3_sample",
-        HIVE3_HMS_URL,
-        HIVE3_HDFS_URL + "/tmp/gravitino_test");
+        "sample_catalog", "hive3_sample", HIVE3_HMS_URL, HIVE3_HDFS_URL + "/tmp/gravitino_test");
   }
 
   private void runHiveClientTest(
-      String version,
-      String catalogName,
-      String testPrefix,
-      String metastoreUri,
-      String hdfsBasePath)
-      throws Exception {
+      String catalogName, String testPrefix, String metastoreUri, String hdfsBasePath) {
     Properties properties = new Properties();
     properties.setProperty("hive.metastore.uris", metastoreUri);
     HiveClient client = IsolatedClientLoader.createHiveClient(properties);
@@ -136,7 +127,7 @@ public class TestHiveClient {
       Assertions.assertNotNull(alteredTable, "Altered table should not be null");
 
       List<String> filteredTables =
-          client.listTableNamesByFilter(catalogName, dbName, tableName, (short) 10);
+          client.listTableNamesByFilter(catalogName, dbName, "", (short) 10);
       Assertions.assertTrue(
           filteredTables.contains(tableName), "Filtered tables should contain the table");
 
@@ -358,8 +349,7 @@ public class TestHiveClient {
     }
   }
 
-  private void testConnectionFailedExceptionForVersion(String version, String catalogName)
-      throws Exception {
+  private void testConnectionFailedExceptionForVersion(String catalogName) {
     // Test with invalid/unreachable Hive Metastore URI
     String invalidMetastoreUri = "thrift://127.0.0.1:9999";
     Properties properties = new Properties();
@@ -386,9 +376,9 @@ public class TestHiveClient {
   @Test
   void testConnectionFailedException() throws Exception {
     // Test with HIVE2
-    testConnectionFailedExceptionForVersion("HIVE2", "");
+    testConnectionFailedExceptionForVersion("");
 
     // Test with HIVE3
-    testConnectionFailedExceptionForVersion("HIVE3", "hive");
+    testConnectionFailedExceptionForVersion("hive");
   }
 }

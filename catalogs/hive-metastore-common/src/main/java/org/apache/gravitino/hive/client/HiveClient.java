@@ -28,7 +28,7 @@ import org.apache.gravitino.hive.HiveTable;
  * internal and external classloaders for a given version of Hive and thus must expose only shared
  * classes.
  */
-public interface HiveClient {
+public interface HiveClient extends AutoCloseable {
 
   void createDatabase(HiveSchema database);
 
@@ -78,8 +78,7 @@ public interface HiveClient {
   List<HiveTable> getTableObjectsByName(
       String catalogName, String databaseName, List<String> allTables);
 
-  public enum HiveVersion {
-    HIVE2,
-    HIVE3,
-  }
+  List<String> getCatalogs();
+
+  void close();
 }

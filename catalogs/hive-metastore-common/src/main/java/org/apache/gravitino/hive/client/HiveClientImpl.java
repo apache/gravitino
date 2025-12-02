@@ -28,11 +28,11 @@ import org.apache.hadoop.hive.metastore.IMetaStoreClient;
  * Java version of HiveClientImpl from Spark Hive module. Provides full database, table, and
  * partition operations.
  */
-public class HiveClientImpl implements HiveClient {
+public class HiveClientImpl implements HiveClient, AutoCloseable {
 
   Shim shim;
 
-  public HiveClientImpl(HiveVersion hiveVersion, IMetaStoreClient hiveClient) {
+  public HiveClientImpl(IsolatedClientLoader.HiveVersion hiveVersion, IMetaStoreClient hiveClient) {
     switch (hiveVersion) {
       case HIVE2:
         shim = new HiveShimV2(hiveClient);
@@ -148,5 +148,19 @@ public class HiveClientImpl implements HiveClient {
   public List<HiveTable> getTableObjectsByName(
       String catalogName, String databaseName, List<String> allTables) {
     return shim.getTableObjectsByName(catalogName, databaseName, allTables);
+  }
+
+  @Override
+  public List<String> getCatalogs() {
+    return shim.getCatalogs();
+  }
+
+  @Override
+  public void close() {
+    try {
+      shim.close();
+    } catch (Exception e) {
+      throw new RuntimeException(e);
+    }
   }
 }

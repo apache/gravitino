@@ -17,7 +17,7 @@
 
 package org.apache.gravitino.hive.client;
 
-import static org.apache.gravitino.hive.client.HiveClient.HiveVersion.HIVE2;
+import static org.apache.gravitino.hive.client.IsolatedClientLoader.HiveVersion.HIVE2;
 
 import java.util.List;
 import org.apache.gravitino.hive.HivePartition;
@@ -34,7 +34,7 @@ class HiveShimV2 extends Shim {
     super(client, HIVE2);
   }
 
-  HiveShimV2(IMetaStoreClient client, HiveClient.HiveVersion version) {
+  HiveShimV2(IMetaStoreClient client, IsolatedClientLoader.HiveVersion version) {
     super(client, version);
   }
 
@@ -229,5 +229,15 @@ class HiveShimV2 extends Shim {
     } catch (Exception e) {
       throw HiveExceptionConverter.toGravitinoException(e, databaseName);
     }
+  }
+
+  @Override
+  public List<String> getCatalogs() {
+    return List.of();
+  }
+
+  @Override
+  public void close() throws Exception {
+    client.close();
   }
 }

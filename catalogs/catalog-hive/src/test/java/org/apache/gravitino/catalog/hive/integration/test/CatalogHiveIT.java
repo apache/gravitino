@@ -117,7 +117,7 @@ import org.slf4j.LoggerFactory;
 @Tag("gravitino-docker-test")
 public class CatalogHiveIT extends BaseIT {
   private static final Logger LOG = LoggerFactory.getLogger(CatalogHiveIT.class);
-  private static final String HMS_CATALOG = "";
+  private static final String HMS_CATALOG = "hive";
   public static final String metalakeName =
       GravitinoITUtils.genRandomName("CatalogHiveIT_metalake");
   public String catalogName = GravitinoITUtils.genRandomName("CatalogHiveIT_catalog");

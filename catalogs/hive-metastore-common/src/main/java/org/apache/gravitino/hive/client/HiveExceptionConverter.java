@@ -134,11 +134,11 @@ public class HiveExceptionConverter {
         return new NonEmptySchemaException(
             cause, "Hive schema %s is not empty in Hive Metastore", targetName);
       }
+    }
 
-      if (isConnectionKeyword(lowerMessage)) {
-        return new ConnectionFailedException(
-            cause, "Failed to connect to Hive Metastore: %s", targetName);
-      }
+    if (isConnectionKeyword(lowerMessage)) {
+      return new ConnectionFailedException(
+          cause, "Failed to connect to Hive Metastore: %s", targetName);
     }
 
     if (cause instanceof RuntimeException) {
