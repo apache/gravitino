@@ -94,7 +94,7 @@ public class FilesetCatalogAuthorizationCredentialIT extends BaseIT {
 
   @BeforeAll
   public void startIntegrationTest() {
-    // Do nothing - will be called by startUp()
+    // Intentionally override to prevent parent class's startIntegrationTest() from executing.
   }
 
   @BeforeAll
@@ -347,7 +347,7 @@ public class FilesetCatalogAuthorizationCredentialIT extends BaseIT {
   }
 
   @Test
-  @Order(6)
+  @Order(5)
   void testGetFilesetCredentialAsOwner() {
     String filesetName = GravitinoITUtils.genRandomName("test_fileset_owner");
     NameIdentifier filesetIdent = NameIdentifier.of(schemaName, filesetName);
