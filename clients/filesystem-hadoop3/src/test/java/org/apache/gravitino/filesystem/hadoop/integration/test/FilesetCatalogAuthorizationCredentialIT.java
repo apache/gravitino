@@ -56,10 +56,7 @@ import org.apache.gravitino.storage.S3Properties;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.api.MethodOrderer;
-import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.TestMethodOrder;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -69,7 +66,6 @@ import org.slf4j.LoggerFactory;
  * with proper privileges can retrieve credentials for filesets.
  */
 @EnabledIfEnvironmentVariable(named = "GRAVITINO_TEST_CLOUD_IT", matches = "true")
-@TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 public class FilesetCatalogAuthorizationCredentialIT extends BaseIT {
 
   private static final Logger LOG =
@@ -196,7 +192,6 @@ public class FilesetCatalogAuthorizationCredentialIT extends BaseIT {
   }
 
   @Test
-  @Order(1)
   void testGetCatalogCredentialWithPrivilege() {
     GravitinoMetalake normalUserMetalake = normalUserClient.loadMetalake(metalakeName);
     Catalog catalog = normalUserMetalake.loadCatalog(catalogName);
@@ -221,7 +216,6 @@ public class FilesetCatalogAuthorizationCredentialIT extends BaseIT {
   }
 
   @Test
-  @Order(2)
   void testGetFilesetCredentialWithoutPrivilege() {
     String filesetName = GravitinoITUtils.genRandomName("test_fileset_no_priv");
     NameIdentifier filesetIdent = NameIdentifier.of(schemaName, filesetName);
@@ -253,7 +247,6 @@ public class FilesetCatalogAuthorizationCredentialIT extends BaseIT {
   }
 
   @Test
-  @Order(3)
   void testGetFilesetCredentialWithReadPrivilege() {
     String filesetName = GravitinoITUtils.genRandomName("test_fileset_read_priv");
     NameIdentifier filesetIdent = NameIdentifier.of(schemaName, filesetName);
@@ -300,7 +293,6 @@ public class FilesetCatalogAuthorizationCredentialIT extends BaseIT {
   }
 
   @Test
-  @Order(4)
   void testGetFilesetCredentialWithWritePrivilege() {
     String filesetName = GravitinoITUtils.genRandomName("test_fileset_write_priv");
     NameIdentifier filesetIdent = NameIdentifier.of(schemaName, filesetName);
@@ -347,7 +339,6 @@ public class FilesetCatalogAuthorizationCredentialIT extends BaseIT {
   }
 
   @Test
-  @Order(5)
   void testGetFilesetCredentialAsOwner() {
     String filesetName = GravitinoITUtils.genRandomName("test_fileset_owner");
     NameIdentifier filesetIdent = NameIdentifier.of(schemaName, filesetName);
