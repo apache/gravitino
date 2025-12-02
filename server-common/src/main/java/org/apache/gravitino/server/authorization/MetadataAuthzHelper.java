@@ -106,6 +106,13 @@ public class MetadataAuthzHelper {
         });
   }
 
+  /**
+   * Filters MetadataObjectDTO array based on access permissions.
+   *
+   * @param metalake The metalake name
+   * @param metadataObjects The array of metadata object DTOs to filter
+   * @return Filtered array of metadata object DTOs that the current user has access to
+   */
   public static MetadataObjectDTO[] filterMetadataObject(
       String metalake, MetadataObjectDTO[] metadataObjects) {
     return doFilter(
@@ -121,6 +128,13 @@ public class MetadataAuthzHelper {
         metadataObject -> MetadataObjectUtil.toEntityType(metadataObject.type()));
   }
 
+  /**
+   * Filters MetadataObject array based on access permissions.
+   *
+   * @param metalake The metalake name
+   * @param metadataObjects The array of metadata objects to filter
+   * @return Filtered array of metadata objects that the current user has access to
+   */
   public static MetadataObject[] filterMetadataObject(
       String metalake, MetadataObject[] metadataObjects) {
     return doFilter(
@@ -231,6 +245,17 @@ public class MetadataAuthzHelper {
         });
   }
 
+  /**
+   * Filters entities based on authorization expression evaluation.
+   *
+   * @param expression The authorization expression to evaluate
+   * @param entities The array of entities to filter
+   * @param authorizer The authorizer used to evaluate permissions
+   * @param authorizationRequestContext The context of the authorization request
+   * @param extractMetadataNamesMap Function to extract metadata names map from entity
+   * @param <E> The type of entity
+   * @return Filtered array of entities that passed authorization check
+   */
   private static <E> E[] doFilter(
       String expression,
       E[] entities,
