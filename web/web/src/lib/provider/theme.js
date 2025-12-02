@@ -56,7 +56,7 @@ const ThemeProvider = props => {
     if (mode) {
       setMode(mode)
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
   }, [])
 
   const toggleTheme = () => {
