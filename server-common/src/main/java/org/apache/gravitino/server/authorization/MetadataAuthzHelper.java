@@ -20,7 +20,6 @@ package org.apache.gravitino.server.authorization;
 import java.lang.reflect.Array;
 import java.security.Principal;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -39,7 +38,6 @@ import org.apache.gravitino.Metalake;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.authorization.AuthorizationRequestContext;
 import org.apache.gravitino.authorization.GravitinoAuthorizer;
-import org.apache.gravitino.authorization.Privilege;
 import org.apache.gravitino.dto.tag.MetadataObjectDTO;
 import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants;
 import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionEvaluator;
@@ -60,35 +58,6 @@ public class MetadataAuthzHelper {
   private static volatile Executor executor = null;
 
   private MetadataAuthzHelper() {}
-
-  /**
-   * Call {@link GravitinoAuthorizer} to filter the metadata list
-   *
-   * @param entityType for example, CATALOG, SCHEMA,TABLE, etc.
-   * @param privilege for example, CREATE_CATALOG, CREATE_TABLE, etc.
-   * @param metadataList metadata list.
-   * @return metadata List that the user has permission to access.
-   */
-  public static NameIdentifier[] filterByPrivilege(
-      String metalake,
-      Entity.EntityType entityType,
-      String privilege,
-      NameIdentifier[] metadataList) {
-    GravitinoAuthorizer gravitinoAuthorizer =
-        GravitinoAuthorizerProvider.getInstance().getGravitinoAuthorizer();
-    Principal currentPrincipal = PrincipalUtils.getCurrentPrincipal();
-    AuthorizationRequestContext authorizationRequestContext = new AuthorizationRequestContext();
-    return Arrays.stream(metadataList)
-        .filter(
-            metaDataName ->
-                gravitinoAuthorizer.authorize(
-                    currentPrincipal,
-                    metalake,
-                    NameIdentifierUtil.toMetadataObject(metaDataName, entityType),
-                    Privilege.Name.valueOf(privilege),
-                    authorizationRequestContext))
-        .toArray(NameIdentifier[]::new);
-  }
 
   public static Metalake[] filterMetalakes(Metalake[] metalakes, String expression) {
     AuthorizationRequestContext authorizationRequestContext = new AuthorizationRequestContext();

@@ -32,7 +32,6 @@ import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.UserPrincipal;
-import org.apache.gravitino.authorization.Privilege;
 import org.apache.gravitino.dto.tag.MetadataObjectDTO;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.PrincipalUtils;
@@ -61,38 +60,6 @@ public class TestMetadataAuthzHelper {
   public static void stop() {
     if (mockedStaticGravitinoEnv != null) {
       mockedStaticGravitinoEnv.close();
-    }
-  }
-
-  @Test
-  public void testFilter() {
-    makeCompletableFutureUseCurrentThread();
-    try (MockedStatic<PrincipalUtils> principalUtilsMocked = mockStatic(PrincipalUtils.class);
-        MockedStatic<GravitinoAuthorizerProvider> mockStatic =
-            mockStatic(GravitinoAuthorizerProvider.class)) {
-      principalUtilsMocked
-          .when(PrincipalUtils::getCurrentPrincipal)
-          .thenReturn(new UserPrincipal("tester"));
-      principalUtilsMocked.when(() -> PrincipalUtils.doAs(any(), any())).thenCallRealMethod();
-
-      GravitinoAuthorizerProvider mockedProvider = mock(GravitinoAuthorizerProvider.class);
-      mockStatic.when(GravitinoAuthorizerProvider::getInstance).thenReturn(mockedProvider);
-      when(mockedProvider.getGravitinoAuthorizer()).thenReturn(new MockGravitinoAuthorizer());
-      NameIdentifier[] nameIdentifiers = new NameIdentifier[3];
-      nameIdentifiers[0] = NameIdentifierUtil.ofSchema("testMetalake", "testCatalog", "testSchema");
-      nameIdentifiers[1] =
-          NameIdentifierUtil.ofSchema("testMetalake", "testCatalog", "testSchema2");
-      nameIdentifiers[2] =
-          NameIdentifierUtil.ofSchema("testMetalake", "testCatalog2", "testSchema");
-      NameIdentifier[] filtered =
-          MetadataAuthzHelper.filterByPrivilege(
-              "testMetalake",
-              Entity.EntityType.SCHEMA,
-              Privilege.Name.USE_SCHEMA.name(),
-              nameIdentifiers);
-      Assertions.assertEquals(2, filtered.length);
-      Assertions.assertEquals("testMetalake.testCatalog.testSchema", filtered[0].toString());
-      Assertions.assertEquals("testMetalake.testCatalog2.testSchema", filtered[1].toString());
     }
   }
 
