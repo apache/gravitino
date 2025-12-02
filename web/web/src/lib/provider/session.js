@@ -66,17 +66,16 @@ const AuthProvider = ({ children }) => {
 
   const goToMetalakeListPage = () => {
     try {
-      const pathname = window.location.pathname
-      const doneFlag = sessionStorage.getItem('authInitDone')
+      let pathname = window.location.pathname
 
-      if (!doneFlag) {
-        sessionStorage.setItem('authInitDone', 'true')
-
-        if (pathname === '/' || pathname === '/ui' || pathname === '/ui/') {
-          router.replace('/metalakes')
-        } else {
-          router.replace(pathname + window.location.search)
-        }
+      // Remove /ui prefix since Next.js basePath will add it automatically
+      if (pathname.startsWith('/ui')) {
+        pathname = pathname.slice(3) || '/'
+      }
+      if (pathname === '/' || pathname === '') {
+        router.push('/metalakes')
+      } else {
+        router.push(pathname + window.location.search)
       }
     } catch (e) {
       router.push('/metalakes')
