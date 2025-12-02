@@ -27,7 +27,7 @@ import org.apache.ibatis.annotations.Param;
 
 public class UserRoleRelBaseSQLProvider {
 
-  public String batchInsertUserRoleRel(@Param("userRoleRels") List<UserRoleRelPO> userRoleRelList) {
+  public String batchInsertUserRoleRel(@Param("userRoleRels") List<UserRoleRelPO> userRoleRels) {
     return "<script> INSERT INTO "
         + USER_ROLE_RELATION_TABLE_NAME
         + "(user_id, role_id,"

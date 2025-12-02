@@ -28,6 +28,7 @@ import org.apache.gravitino.flink.connector.iceberg.IcebergPropertiesConstants;
 import org.apache.gravitino.flink.connector.integration.test.utils.TestUtils;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Tag;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.DisabledIf;
 
 @Tag("gravitino-docker-test")
@@ -48,6 +49,7 @@ public class FlinkIcebergRestCatalogIT extends FlinkIcebergCatalogIT {
   }
 
   @Override
+  @Test
   public void testListSchema() {
     doWithCatalog(
         currentCatalog(),

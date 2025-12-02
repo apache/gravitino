@@ -17,12 +17,13 @@
  * under the License.
  */
 
-package org.apache.gravitino.storage.relational.mapper;
+package org.apache.gravitino.storage.relational.mapper.provider.base;
 
 import com.google.common.collect.Lists;
 import java.io.File;
 import java.io.IOException;
 import java.sql.Connection;
+import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
@@ -34,6 +35,10 @@ import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.storage.relational.JDBCBackend;
+import org.apache.gravitino.storage.relational.mapper.MetalakeMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.RoleMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.UserMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.UserRoleRelMapper;
 import org.apache.gravitino.storage.relational.po.MetalakePO;
 import org.apache.gravitino.storage.relational.po.RolePO;
 import org.apache.gravitino.storage.relational.po.UserPO;
@@ -123,9 +128,10 @@ public class TestUserRoleRelMapper {
     try (SqlSession sqlSession =
         SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true)) {
       try (Connection connection = sqlSession.getConnection()) {
-        try (Statement statement = connection.createStatement()) {
-          String query = "SELECT count(*) FROM user_role_rel WHERE user_id = " + userId;
-          try (ResultSet rs = statement.executeQuery(query)) {
+        String query = "SELECT count(*) FROM user_role_rel WHERE user_id = ?";
+        try (PreparedStatement statement = connection.prepareStatement(query)) {
+          statement.setLong(1, userId);
+          try (ResultSet rs = statement.executeQuery()) {
             if (rs.next()) {
               return rs.getInt(1);
             }
