@@ -31,11 +31,11 @@ import org.apache.iceberg.catalog.Catalog;
  * A proxy class for IcebergCatalogWrapper to handle Kerberos authentication or other cross-cutting
  * concerns.
  */
-public class IcebergCatalogWrapperProxy implements MethodInterceptor {
+public class KerberosAwareIcebergCatalogProxy implements MethodInterceptor {
   private final IcebergCatalogWrapper target;
   private final Catalog catalog;
 
-  public IcebergCatalogWrapperProxy(IcebergCatalogWrapper target) {
+  public KerberosAwareIcebergCatalogProxy(IcebergCatalogWrapper target) {
     this.target = target;
     this.catalog = target.getCatalog();
   }

@@ -53,7 +53,7 @@ import org.apache.gravitino.iceberg.common.IcebergConfig;
 import org.apache.gravitino.iceberg.common.authentication.SupportsKerberos;
 import org.apache.gravitino.iceberg.common.ops.IcebergCatalogWrapper;
 import org.apache.gravitino.iceberg.common.ops.IcebergCatalogWrapper.IcebergTableChange;
-import org.apache.gravitino.iceberg.common.ops.IcebergCatalogWrapperProxy;
+import org.apache.gravitino.iceberg.common.ops.KerberosAwareIcebergCatalogProxy;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Table;
@@ -118,7 +118,7 @@ public class IcebergCatalogOperations implements CatalogOperations, SupportsSche
     IcebergCatalogWrapper rawWrapper = new IcebergCatalogWrapper(icebergConfig);
     this.icebergCatalogWrapper =
         rawWrapper.getCatalog() instanceof SupportsKerberos
-            ? new IcebergCatalogWrapperProxy(rawWrapper).getProxy(icebergConfig)
+            ? new KerberosAwareIcebergCatalogProxy(rawWrapper).getProxy(icebergConfig)
             : rawWrapper;
     this.icebergCatalogWrapperHelper =
         new IcebergCatalogWrapperHelper(icebergCatalogWrapper.getCatalog());
