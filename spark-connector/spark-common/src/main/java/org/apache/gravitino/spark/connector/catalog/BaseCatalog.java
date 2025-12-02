@@ -462,4 +462,9 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces {
           e);
     }
   }
+
+  @Override
+  public void invalidateTable(Identifier ident) {
+    sparkCatalog.invalidateTable(ident);
+  }
 }

@@ -77,9 +77,4 @@ public class GravitinoHiveCatalog extends BaseCatalog {
   protected SparkTypeConverter getSparkTypeConverter() {
     return new SparkHiveTypeConverter();
   }
-
-  @Override
-  public void invalidateTable(Identifier ident) {
-    sparkCatalog.invalidateTable(ident);
-  }
 }
