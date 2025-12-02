@@ -198,18 +198,50 @@ public class TestOwnerManager {
     Assertions.assertEquals(USER, owner.name());
     Assertions.assertEquals(Owner.Type.USER, owner.type());
 
-    // Test to set the group as the owner
-    Mockito.reset(authorizationPlugin);
-    ownerManager.setOwner(METALAKE, metalakeObject, GROUP, Owner.Type.GROUP);
-    Mockito.verify(authorizationPlugin).onOwnerSet(Mockito.any(), Mockito.any(), Mockito.any());
-
-    // Test not-existed metadata object
+    // Test not-existed metadata object when setting owner
     Assertions.assertThrows(
         NotFoundException.class,
-        () -> ownerManager.setOwner(METALAKE, notExistObject, GROUP, Owner.Type.GROUP));
+        () -> ownerManager.setOwner(METALAKE, notExistObject, USER, Owner.Type.USER));
+  }
 
-    owner = ownerManager.getOwner(METALAKE, metalakeObject).get();
-    Assertions.assertEquals(GROUP, owner.name());
-    Assertions.assertEquals(Owner.Type.GROUP, owner.type());
+  @Test
+  public void testGroupTypeOwnerNotSupported() {
+    // Test that GROUP type owner is not supported and throws IllegalArgumentException
+    MetadataObject metalakeObject =
+        MetadataObjects.of(Lists.newArrayList(METALAKE), MetadataObject.Type.METALAKE);
+
+    // Verify that setting GROUP type owner throws IllegalArgumentException
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> ownerManager.setOwner(METALAKE, metalakeObject, GROUP, Owner.Type.GROUP));
+
+    Assertions.assertEquals(
+        "Only USER type is supported as owner currently.", exception.getMessage());
+
+    // Verify that the authorization plugin was never called since validation failed
+    Mockito.verify(authorizationPlugin, Mockito.never())
+        .onOwnerSet(Mockito.any(), Mockito.any(), Mockito.any());
+
+    // Verify that no owner was set for the metadata object
+    Assertions.assertFalse(ownerManager.getOwner(METALAKE, metalakeObject).isPresent());
+  }
+
+  @Test
+  public void testUserTypeOwnerStillWorks() {
+    // Test that USER type owner continues to work as expected
+    MetadataObject metalakeObject =
+        MetadataObjects.of(Lists.newArrayList(METALAKE), MetadataObject.Type.METALAKE);
+
+    // Set USER type owner should work fine
+    ownerManager.setOwner(METALAKE, metalakeObject, USER, Owner.Type.USER);
+
+    // Verify the owner was set correctly
+    Owner owner = ownerManager.getOwner(METALAKE, metalakeObject).get();
+    Assertions.assertEquals(USER, owner.name());
+    Assertions.assertEquals(Owner.Type.USER, owner.type());
+
+    // Verify that the authorization plugin was called
+    Mockito.verify(authorizationPlugin).onOwnerSet(Mockito.any(), Mockito.any(), Mockito.any());
   }
 }
