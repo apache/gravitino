@@ -165,6 +165,10 @@ public class ReverseIndexRules {
                         entityType = Entity.EntityType.POLICY;
                         namespace = NamespaceUtil.ofPolicy(roleEntity.namespace().level(0));
                         break;
+                      case JOB_TEMPLATE:
+                        entityType = Entity.EntityType.JOB_TEMPLATE;
+                        namespace = NamespaceUtil.ofJobTemplate(roleEntity.namespace().level(0));
+                        break;
                       default:
                         throw new UnsupportedOperationException(
                             "Don't support securable object type: " + securableObject.type());
