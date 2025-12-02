@@ -51,19 +51,6 @@ import org.apache.gravitino.utils.MetadataObjectUtil;
 /** It is used to convert MetadataObject to MetadataId */
 public class MetadataIdConverter {
 
-  // Maps metadata type to entity type
-  private static final Map<MetadataObject.Type, Entity.EntityType> METADATA_TO_ENTITY_TYPE_MAPPING =
-      ImmutableMap.of(
-          MetadataObject.Type.METALAKE, Entity.EntityType.METALAKE,
-          MetadataObject.Type.CATALOG, Entity.EntityType.CATALOG,
-          MetadataObject.Type.SCHEMA, Entity.EntityType.SCHEMA,
-          MetadataObject.Type.TABLE, Entity.EntityType.TABLE,
-          MetadataObject.Type.MODEL, Entity.EntityType.MODEL,
-          MetadataObject.Type.FILESET, Entity.EntityType.FILESET,
-          MetadataObject.Type.TOPIC, Entity.EntityType.TOPIC,
-          MetadataObject.Type.COLUMN, Entity.EntityType.COLUMN,
-          MetadataObject.Type.ROLE, Entity.EntityType.ROLE,
-          MetadataObject.Type.TAG, Entity.EntityType.TAG);
   // Maps metadata type to capability scope
   private static final Map<MetadataObject.Type, Capability.Scope> METADATA_SCOPE_MAPPING =
       ImmutableMap.of(
@@ -111,7 +98,7 @@ public class MetadataIdConverter {
     NameIdentifier normalizedIdent =
         normalizeCaseSensitive(ident, METADATA_SCOPE_MAPPING.get(metadataType), catalogManager);
 
-    Entity.EntityType entityType = getEntityType(metadataType);
+    Entity.EntityType entityType = MetadataObjectUtil.toEntityType(metadataType);
 
     Entity entity;
     try {
@@ -133,10 +120,6 @@ public class MetadataIdConverter {
 
     Capability capability = CapabilityHelpers.getCapability(ident, catalogManager);
     return CapabilityHelpers.applyCaseSensitive(ident, scope, capability);
-  }
-
-  private static Entity.EntityType getEntityType(MetadataObject.Type metadataType) {
-    return METADATA_TO_ENTITY_TYPE_MAPPING.get(metadataType);
   }
 
   private static Long extractIdFromEntity(Entity entity) {

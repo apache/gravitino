@@ -18,7 +18,6 @@
  */
 package org.apache.gravitino.catalog.fileset;
 
-import static org.apache.gravitino.connector.BaseCatalog.CATALOG_BYPASS_PREFIX;
 import static org.apache.gravitino.file.Fileset.LOCATION_NAME_UNKNOWN;
 import static org.apache.gravitino.file.Fileset.PROPERTY_CATALOG_PLACEHOLDER;
 import static org.apache.gravitino.file.Fileset.PROPERTY_DEFAULT_LOCATION_NAME;
@@ -198,12 +197,6 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
 
   public CatalogInfo getCatalogInfo() {
     return catalogInfo;
-  }
-
-  public Configuration getHadoopConf() {
-    Configuration configuration = new Configuration();
-    conf.forEach((k, v) -> configuration.set(k.replace(CATALOG_BYPASS_PREFIX, ""), v));
-    return configuration;
   }
 
   public Map<String, String> getConf() {
@@ -467,13 +460,18 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
       try {
         // formalize the path to avoid path without scheme, uri, authority, etc.
         for (Map.Entry<String, Path> entry : filesetPaths.entrySet()) {
-
-          FileSystem tmpFs = getFileSystemWithCache(entry.getValue(), conf);
+          // merge the properties from catalog, schema and fileset to get the final configuration
+          // for fileset.
+          // the priority is: fileset properties > schema properties > catalog properties
+          Map<String, String> fsConf = new HashMap<>(conf);
+          fsConf.putAll(schemaEntity.properties());
+          fsConf.putAll(properties);
+          FileSystem tmpFs = getFileSystemWithCache(entry.getValue(), fsConf);
           Path formalizePath =
               entry.getValue().makeQualified(tmpFs.getUri(), tmpFs.getWorkingDirectory());
 
           filesetPathsBuilder.put(entry.getKey(), formalizePath);
-          FileSystem fs = getFileSystemWithCache(formalizePath, conf);
+          FileSystem fs = getFileSystemWithCache(formalizePath, fsConf);
 
           if (fs.exists(formalizePath) && fs.getFileStatus(formalizePath).isFile()) {
             throw new IllegalArgumentException(

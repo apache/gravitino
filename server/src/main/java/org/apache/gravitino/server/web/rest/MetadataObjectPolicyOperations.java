@@ -18,6 +18,8 @@
  */
 package org.apache.gravitino.server.web.rest;
 
+import static org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants.CAN_ACCESS_METADATA;
+
 import com.codahale.metrics.annotation.ResponseMetered;
 import com.codahale.metrics.annotation.Timed;
 import java.util.Arrays;
@@ -37,6 +39,7 @@ import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.Response;
 import org.apache.commons.lang3.ArrayUtils;
+import org.apache.gravitino.Entity;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.dto.policy.PolicyDTO;
@@ -48,7 +51,15 @@ import org.apache.gravitino.exceptions.NoSuchPolicyException;
 import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.metrics.MetricNames;
 import org.apache.gravitino.policy.PolicyDispatcher;
+import org.apache.gravitino.server.authorization.MetadataAuthzHelper;
+import org.apache.gravitino.server.authorization.annotations.AuthorizationExpression;
+import org.apache.gravitino.server.authorization.annotations.AuthorizationFullName;
+import org.apache.gravitino.server.authorization.annotations.AuthorizationMetadata;
+import org.apache.gravitino.server.authorization.annotations.AuthorizationObjectType;
+import org.apache.gravitino.server.authorization.annotations.AuthorizationRequest;
+import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants;
 import org.apache.gravitino.server.web.Utils;
+import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.glassfish.jersey.internal.guava.Sets;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -71,11 +82,16 @@ public class MetadataObjectPolicyOperations {
   @Produces("application/vnd.gravitino.v1+json")
   @Timed(name = "get-object-policy." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "get-object-policy", absolute = true)
+  @AuthorizationExpression(
+      expression =
+          "METALAKE::OWNER || ((POLICY::OWNER || ANY_APPLY_POLICY) && (CAN_ACCESS_METADATA))")
   public Response getPolicyForObject(
-      @PathParam("metalake") String metalake,
-      @PathParam("type") String type,
-      @PathParam("fullName") String fullName,
-      @PathParam("policy") String policyName) {
+      @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
+          String metalake,
+      @PathParam("type") @AuthorizationObjectType String type,
+      @PathParam("fullName") @AuthorizationFullName String fullName,
+      @PathParam("policy") @AuthorizationMetadata(type = Entity.EntityType.POLICY)
+          String policyName) {
     LOG.info(
         "Received get policy {} request for object type: {}, full name: {} under metalake: {}",
         policyName,
@@ -138,10 +154,12 @@ public class MetadataObjectPolicyOperations {
   @Produces("application/vnd.gravitino.v1+json")
   @Timed(name = "list-object-policies." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "list-object-policies", absolute = true)
+  @AuthorizationExpression(expression = CAN_ACCESS_METADATA)
   public Response listPoliciesForMetadataObject(
-      @PathParam("metalake") String metalake,
-      @PathParam("type") String type,
-      @PathParam("fullName") String fullName,
+      @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
+          String metalake,
+      @PathParam("type") @AuthorizationObjectType String type,
+      @PathParam("fullName") @AuthorizationFullName String fullName,
       @QueryParam("details") @DefaultValue("false") boolean verbose) {
     LOG.info(
         "Received list policy {} request for object type: {}, full name: {} under metalake: {}",
@@ -161,6 +179,13 @@ public class MetadataObjectPolicyOperations {
             Set<PolicyDTO> policies = Sets.newHashSet();
             PolicyEntity[] nonInheritedPolicies =
                 policyDispatcher.listPolicyInfosForMetadataObject(metalake, object);
+            nonInheritedPolicies =
+                MetadataAuthzHelper.filterByExpression(
+                    metalake,
+                    AuthorizationExpressionConstants.loadPolicyAuthorizationExpression,
+                    Entity.EntityType.POLICY,
+                    nonInheritedPolicies,
+                    (policyEntity -> NameIdentifierUtil.ofPolicy(metalake, policyEntity.name())));
             if (ArrayUtils.isNotEmpty(nonInheritedPolicies)) {
               Collections.addAll(
                   policies,
@@ -214,11 +239,16 @@ public class MetadataObjectPolicyOperations {
   @Produces("application/vnd.gravitino.v1+json")
   @Timed(name = "associate-object-policies." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "associate-object-policies", absolute = true)
+  @AuthorizationExpression(
+      expression =
+          "METALAKE::OWNER || ((POLICY::OWNER || ANY_APPLY_POLICY) && (CAN_ACCESS_METADATA))")
   public Response associatePoliciesForObject(
-      @PathParam("metalake") String metalake,
-      @PathParam("type") String type,
-      @PathParam("fullName") String fullName,
-      PoliciesAssociateRequest request) {
+      @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
+          String metalake,
+      @PathParam("type") @AuthorizationObjectType String type,
+      @PathParam("fullName") @AuthorizationFullName String fullName,
+      @AuthorizationRequest(type = AuthorizationRequest.RequestType.ASSOCIATE_POLICY)
+          PoliciesAssociateRequest request) {
     LOG.info(
         "Received associate policies request for object type: {}, full name: {} under metalake: {}",
         type,

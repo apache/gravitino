@@ -18,6 +18,10 @@
  */
 package org.apache.gravitino.catalog.lakehouse.lance.integration.test;
 
+import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_CREATION_MODE;
+import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_TABLE_FORMAT;
+import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_TABLE_REGISTER;
+
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
@@ -489,5 +493,408 @@ public class CatalogGenericCatalogLanceIT extends BaseIT {
     properties.put("key2", "val2");
 
     return properties;
+  }
+
+  @Test
+  public void testCreateTableWithExistOkMode() {
+    // Create initial table
+    Column[] columns =
+        new Column[] {
+          Column.of(LANCE_COL_NAME1, Types.IntegerType.get(), "col_1_comment"),
+          Column.of(LANCE_COL_NAME2, Types.StringType.get(), "col_2_comment"),
+          Column.of(LANCE_COL_NAME3, Types.LongType.get(), "col_3_comment")
+        };
+
+    NameIdentifier tableIdentifier = NameIdentifier.of(schemaName, tableName);
+    String location = String.format("%s/%s/%s", tempDirectory, schemaName, tableName);
+
+    Map<String, String> properties = createProperties();
+    properties.put(Table.PROPERTY_LOCATION, location);
+    properties.put(Table.PROPERTY_TABLE_FORMAT, LANCE_TABLE_FORMAT);
+    properties.put(Table.PROPERTY_EXTERNAL, "true");
+
+    Table createdTable =
+        catalog
+            .asTableCatalog()
+            .createTable(
+                tableIdentifier,
+                columns,
+                TABLE_COMMENT,
+                properties,
+                Transforms.EMPTY_TRANSFORM,
+                Distributions.NONE,
+                new SortOrder[0]);
+    Assertions.assertNotNull(createdTable);
+
+    // Try to create the same table again with EXIST_OK mode
+    Map<String, String> existOkProperties = createProperties();
+    existOkProperties.put(Table.PROPERTY_LOCATION, location);
+    existOkProperties.put(Table.PROPERTY_TABLE_FORMAT, LANCE_TABLE_FORMAT);
+    existOkProperties.put(LANCE_CREATION_MODE, "EXIST_OK");
+    existOkProperties.put(Table.PROPERTY_EXTERNAL, "true");
+
+    Table existingTable =
+        catalog
+            .asTableCatalog()
+            .createTable(
+                tableIdentifier,
+                columns,
+                TABLE_COMMENT,
+                existOkProperties,
+                Transforms.EMPTY_TRANSFORM,
+                Distributions.NONE,
+                new SortOrder[0]);
+
+    // Should return the existing table without error
+    Assertions.assertNotNull(existingTable);
+    Assertions.assertEquals(createdTable.name(), existingTable.name());
+
+    // Verify the table exists on disk
+    File tableDir = new File(location);
+    Assertions.assertTrue(tableDir.exists());
+  }
+
+  @Test
+  public void testCreateTableWithOverwriteMode() {
+    // Create initial table
+    Column[] columns =
+        new Column[] {
+          Column.of(LANCE_COL_NAME1, Types.IntegerType.get(), "col_1_comment"),
+          Column.of(LANCE_COL_NAME2, Types.StringType.get(), "col_2_comment")
+        };
+
+    NameIdentifier tableIdentifier =
+        NameIdentifier.of(schemaName, GravitinoITUtils.genRandomName(TABLE_PREFIX));
+    String location = String.format("%s/%s/%s", tempDirectory, schemaName, tableIdentifier.name());
+
+    Map<String, String> properties = createProperties();
+    properties.put(Table.PROPERTY_LOCATION, location);
+    properties.put(Table.PROPERTY_TABLE_FORMAT, LANCE_TABLE_FORMAT);
+    properties.put(Table.PROPERTY_EXTERNAL, "true");
+
+    Table createdTable =
+        catalog
+            .asTableCatalog()
+            .createTable(
+                tableIdentifier,
+                columns,
+                TABLE_COMMENT,
+                properties,
+                Transforms.EMPTY_TRANSFORM,
+                Distributions.NONE,
+                new SortOrder[0]);
+    Assertions.assertNotNull(createdTable);
+
+    // Create the table again with OVERWRITE mode and different columns
+    Column[] newColumns =
+        new Column[] {
+          Column.of(LANCE_COL_NAME1, Types.IntegerType.get(), "col_1_comment"),
+          Column.of(LANCE_COL_NAME2, Types.StringType.get(), "col_2_comment"),
+          Column.of(LANCE_COL_NAME3, Types.LongType.get(), "col_3_comment")
+        };
+
+    Map<String, String> overwriteProperties = createProperties();
+    overwriteProperties.put(Table.PROPERTY_LOCATION, location);
+    overwriteProperties.put(Table.PROPERTY_TABLE_FORMAT, LANCE_TABLE_FORMAT);
+    overwriteProperties.put(LANCE_CREATION_MODE, "OVERWRITE");
+    overwriteProperties.put(Table.PROPERTY_EXTERNAL, "true");
+
+    Table overwrittenTable =
+        catalog
+            .asTableCatalog()
+            .createTable(
+                tableIdentifier,
+                newColumns,
+                TABLE_COMMENT,
+                overwriteProperties,
+                Transforms.EMPTY_TRANSFORM,
+                Distributions.NONE,
+                new SortOrder[0]);
+
+    // Should create a new table
+    Assertions.assertNotNull(overwrittenTable);
+    Assertions.assertEquals(3, overwrittenTable.columns().length);
+
+    // Verify the table exists on disk
+    File tableDir = new File(location);
+    Assertions.assertTrue(tableDir.exists());
+  }
+
+  @Test
+  public void testCreateTableWithCreateModeFailsWhenExists() {
+    // Create initial table
+    Column[] columns =
+        new Column[] {
+          Column.of(LANCE_COL_NAME1, Types.IntegerType.get(), "col_1_comment"),
+          Column.of(LANCE_COL_NAME2, Types.StringType.get(), "col_2_comment")
+        };
+
+    NameIdentifier tableIdentifier =
+        NameIdentifier.of(schemaName, GravitinoITUtils.genRandomName(TABLE_PREFIX));
+    String location = String.format("%s/%s/%s", tempDirectory, schemaName, tableIdentifier.name());
+
+    Map<String, String> properties = createProperties();
+    properties.put(Table.PROPERTY_LOCATION, location);
+    properties.put(Table.PROPERTY_TABLE_FORMAT, LANCE_TABLE_FORMAT);
+    properties.put(Table.PROPERTY_EXTERNAL, "true");
+
+    Table createdTable =
+        catalog
+            .asTableCatalog()
+            .createTable(
+                tableIdentifier,
+                columns,
+                TABLE_COMMENT,
+                properties,
+                Transforms.EMPTY_TRANSFORM,
+                Distributions.NONE,
+                new SortOrder[0]);
+    Assertions.assertNotNull(createdTable);
+
+    // Try to create the same table again with CREATE mode (default) - should fail
+    Map<String, String> createProperties = createProperties();
+    createProperties.put(Table.PROPERTY_LOCATION, location);
+    createProperties.put(Table.PROPERTY_TABLE_FORMAT, LANCE_TABLE_FORMAT);
+    createProperties.put(LANCE_CREATION_MODE, "CREATE");
+    createProperties.put(Table.PROPERTY_EXTERNAL, "true");
+
+    Assertions.assertThrows(
+        Exception.class,
+        () ->
+            catalog
+                .asTableCatalog()
+                .createTable(
+                    tableIdentifier,
+                    columns,
+                    TABLE_COMMENT,
+                    createProperties,
+                    Transforms.EMPTY_TRANSFORM,
+                    Distributions.NONE,
+                    new SortOrder[0]));
+  }
+
+  @Test
+  public void testRegisterTableWithExistOkMode() throws IOException {
+    // First, create a physical Lance dataset
+    Column[] columns =
+        new Column[] {
+          Column.of(LANCE_COL_NAME1, Types.IntegerType.get(), "col_1_comment"),
+          Column.of(LANCE_COL_NAME2, Types.StringType.get(), "col_2_comment")
+        };
+
+    NameIdentifier tableIdentifier =
+        NameIdentifier.of(schemaName, GravitinoITUtils.genRandomName(TABLE_PREFIX));
+    String location = String.format("%s/%s/%s", tempDirectory, schemaName, tableIdentifier.name());
+
+    // Create a physical Lance dataset using Lance SDK directly
+    org.apache.arrow.vector.types.pojo.Schema arrowSchema =
+        new org.apache.arrow.vector.types.pojo.Schema(
+            Arrays.asList(
+                Field.nullable("lance_col_name1", new ArrowType.Int(32, true)),
+                Field.nullable("lance_col_name2", new ArrowType.Utf8())));
+
+    try (RootAllocator allocator = new RootAllocator();
+        Dataset dataset =
+            Dataset.create(allocator, location, arrowSchema, new WriteParams.Builder().build())) {
+      // Dataset created successfully
+    }
+
+    // Register the table in Gravitino
+    Map<String, String> properties = createProperties();
+    properties.put(Table.PROPERTY_LOCATION, location);
+    properties.put(Table.PROPERTY_TABLE_FORMAT, LANCE_TABLE_FORMAT);
+    properties.put(LANCE_TABLE_REGISTER, "true");
+    properties.put(Table.PROPERTY_EXTERNAL, "true");
+
+    Table registeredTable =
+        catalog
+            .asTableCatalog()
+            .createTable(
+                tableIdentifier,
+                columns,
+                TABLE_COMMENT,
+                properties,
+                Transforms.EMPTY_TRANSFORM,
+                Distributions.NONE,
+                new SortOrder[0]);
+
+    Assertions.assertNotNull(registeredTable);
+    Assertions.assertEquals(tableIdentifier.name(), registeredTable.name());
+
+    Map<String, String> existOkProperties = createProperties();
+    existOkProperties.put(Table.PROPERTY_LOCATION, location);
+    existOkProperties.put(Table.PROPERTY_TABLE_FORMAT, LANCE_TABLE_FORMAT);
+    existOkProperties.put(LANCE_TABLE_REGISTER, "true");
+    existOkProperties.put(Table.PROPERTY_EXTERNAL, "true");
+    existOkProperties.put(LANCE_CREATION_MODE, "EXIST_OK");
+
+    // Throw an exception for registering the table with EXIST_OK mode, since register operation
+    // doesn't support EXIST_OK mode currently.
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            catalog
+                .asTableCatalog()
+                .createTable(
+                    tableIdentifier,
+                    columns,
+                    TABLE_COMMENT,
+                    existOkProperties,
+                    Transforms.EMPTY_TRANSFORM,
+                    Distributions.NONE,
+                    new SortOrder[0]));
+  }
+
+  @Test
+  public void testRegisterTableWithOverwriteMode() throws IOException {
+    // First, create a physical Lance dataset
+    Column[] columns =
+        new Column[] {
+          Column.of(LANCE_COL_NAME1, Types.IntegerType.get(), "col_1_comment"),
+          Column.of(LANCE_COL_NAME2, Types.StringType.get(), "col_2_comment")
+        };
+
+    NameIdentifier tableIdentifier =
+        NameIdentifier.of(schemaName, GravitinoITUtils.genRandomName(TABLE_PREFIX));
+    String location = String.format("%s/%s/%s", tempDirectory, schemaName, tableIdentifier.name());
+
+    // Create a physical Lance dataset
+    org.apache.arrow.vector.types.pojo.Schema arrowSchema =
+        new org.apache.arrow.vector.types.pojo.Schema(
+            Arrays.asList(
+                Field.nullable("lance_col_name1", new ArrowType.Int(32, true)),
+                Field.nullable("lance_col_name2", new ArrowType.Utf8())));
+
+    try (RootAllocator allocator = new RootAllocator();
+        Dataset dataset =
+            Dataset.create(allocator, location, arrowSchema, new WriteParams.Builder().build())) {
+      // Dataset created
+    }
+
+    // Register the table in Gravitino
+    Map<String, String> properties = createProperties();
+    properties.put(Table.PROPERTY_LOCATION, location);
+    properties.put(Table.PROPERTY_TABLE_FORMAT, LANCE_TABLE_FORMAT);
+    properties.put(Table.PROPERTY_EXTERNAL, "true");
+    properties.put(LANCE_TABLE_REGISTER, "true");
+
+    Table registeredTable =
+        catalog
+            .asTableCatalog()
+            .createTable(
+                tableIdentifier,
+                columns,
+                TABLE_COMMENT,
+                properties,
+                Transforms.EMPTY_TRANSFORM,
+                Distributions.NONE,
+                new SortOrder[0]);
+
+    Assertions.assertNotNull(registeredTable);
+
+    // Register again with OVERWRITE mode - should replace metadata
+    Column[] newColumns =
+        new Column[] {
+          Column.of(LANCE_COL_NAME1, Types.IntegerType.get(), "col_1_comment"),
+          Column.of(LANCE_COL_NAME2, Types.StringType.get(), "col_2_comment"),
+          Column.of(LANCE_COL_NAME3, Types.LongType.get(), "col_3_comment")
+        };
+
+    Map<String, String> overwriteProperties = createProperties();
+    overwriteProperties.put(Table.PROPERTY_LOCATION, location);
+    overwriteProperties.put(Table.PROPERTY_TABLE_FORMAT, LANCE_TABLE_FORMAT);
+    overwriteProperties.put(Table.PROPERTY_EXTERNAL, "true");
+    overwriteProperties.put(LANCE_TABLE_REGISTER, "true");
+    overwriteProperties.put(LANCE_CREATION_MODE, "OVERWRITE");
+
+    Table overwrittenTable =
+        catalog
+            .asTableCatalog()
+            .createTable(
+                tableIdentifier,
+                newColumns,
+                "Updated comment",
+                overwriteProperties,
+                Transforms.EMPTY_TRANSFORM,
+                Distributions.NONE,
+                new SortOrder[0]);
+
+    Assertions.assertNotNull(overwrittenTable);
+    Assertions.assertEquals(3, overwrittenTable.columns().length);
+    Assertions.assertEquals("Updated comment", overwrittenTable.comment());
+
+    // Verify physical dataset still exists
+    File tableDir = new File(location);
+    Assertions.assertTrue(tableDir.exists());
+  }
+
+  @Test
+  public void testRegisterTableWithCreateModeFailsWhenExists() throws IOException {
+    // First, create a physical Lance dataset
+    Column[] columns =
+        new Column[] {
+          Column.of(LANCE_COL_NAME1, Types.IntegerType.get(), "col_1_comment"),
+          Column.of(LANCE_COL_NAME2, Types.StringType.get(), "col_2_comment")
+        };
+
+    NameIdentifier tableIdentifier =
+        NameIdentifier.of(schemaName, GravitinoITUtils.genRandomName(TABLE_PREFIX));
+    String location = String.format("%s/%s/%s", tempDirectory, schemaName, tableIdentifier.name());
+
+    // Create a physical Lance dataset
+    org.apache.arrow.vector.types.pojo.Schema arrowSchema =
+        new org.apache.arrow.vector.types.pojo.Schema(
+            Arrays.asList(
+                Field.nullable("lance_col_name1", new ArrowType.Int(32, true)),
+                Field.nullable("lance_col_name2", new ArrowType.Utf8())));
+
+    try (RootAllocator allocator = new RootAllocator();
+        Dataset dataset =
+            Dataset.create(allocator, location, arrowSchema, new WriteParams.Builder().build())) {
+      // Dataset created
+    }
+
+    // Register the table in Gravitino
+    Map<String, String> properties = createProperties();
+    properties.put(Table.PROPERTY_LOCATION, location);
+    properties.put(Table.PROPERTY_TABLE_FORMAT, LANCE_TABLE_FORMAT);
+    properties.put(Table.PROPERTY_EXTERNAL, "true");
+    properties.put(LANCE_TABLE_REGISTER, "true");
+
+    Table registeredTable =
+        catalog
+            .asTableCatalog()
+            .createTable(
+                tableIdentifier,
+                columns,
+                TABLE_COMMENT,
+                properties,
+                Transforms.EMPTY_TRANSFORM,
+                Distributions.NONE,
+                new SortOrder[0]);
+
+    Assertions.assertNotNull(registeredTable);
+
+    // Try to register again with CREATE mode - should fail
+    Map<String, String> createProperties = createProperties();
+    createProperties.put(Table.PROPERTY_LOCATION, location);
+    createProperties.put(Table.PROPERTY_TABLE_FORMAT, LANCE_TABLE_FORMAT);
+    createProperties.put(Table.PROPERTY_EXTERNAL, "true");
+    createProperties.put(LANCE_TABLE_REGISTER, "true");
+    createProperties.put(LANCE_CREATION_MODE, "CREATE");
+
+    Assertions.assertThrows(
+        Exception.class,
+        () ->
+            catalog
+                .asTableCatalog()
+                .createTable(
+                    tableIdentifier,
+                    columns,
+                    TABLE_COMMENT,
+                    createProperties,
+                    Transforms.EMPTY_TRANSFORM,
+                    Distributions.NONE,
+                    new SortOrder[0]));
   }
 }

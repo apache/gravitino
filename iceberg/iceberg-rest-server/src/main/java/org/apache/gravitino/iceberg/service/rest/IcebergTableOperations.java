@@ -66,11 +66,13 @@ import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.rest.RESTUtil;
 import org.apache.iceberg.rest.requests.CreateTableRequest;
+import org.apache.iceberg.rest.requests.PlanTableScanRequest;
 import org.apache.iceberg.rest.requests.ReportMetricsRequest;
 import org.apache.iceberg.rest.requests.UpdateTableRequest;
 import org.apache.iceberg.rest.responses.ListTablesResponse;
 import org.apache.iceberg.rest.responses.LoadCredentialsResponse;
 import org.apache.iceberg.rest.responses.LoadTableResponse;
+import org.apache.iceberg.rest.responses.PlanTableScanResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -438,6 +440,52 @@ public class IcebergTableOperations {
             return IcebergRESTUtils.ok(credentialsResponse);
           });
     } catch (Exception e) {
+      return IcebergExceptionMapper.toRESTResponse(e);
+    }
+  }
+
+  /**
+   * Plan table scan endpoint. Allows clients to request a scan plan from the server to optimize
+   * scan planning by leveraging server-side resources.
+   *
+   * @param prefix The catalog prefix
+   * @param namespace The namespace
+   * @param table The table name
+   * @param scanRequest The scan request containing filters, projections, etc.
+   * @return Response containing the scan plan with tasks
+   */
+  @POST
+  @Path("{table}/scan")
+  @Produces(MediaType.APPLICATION_JSON)
+  @Consumes(MediaType.APPLICATION_JSON)
+  @Timed(name = "plan-table-scan." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
+  @ResponseMetered(name = "plan-table-scan", absolute = true)
+  public Response planTableScan(
+      @PathParam("prefix") String prefix,
+      @Encoded() @PathParam("namespace") String namespace,
+      @PathParam("table") String table,
+      PlanTableScanRequest scanRequest) {
+    String catalogName = IcebergRESTUtils.getCatalogName(prefix);
+    Namespace icebergNS = RESTUtil.decodeNamespace(namespace);
+
+    LOG.info(
+        "Plan table scan, catalog: {}, namespace: {}, table: {}", catalogName, icebergNS, table);
+
+    try {
+      return Utils.doAs(
+          httpRequest,
+          () -> {
+            TableIdentifier tableIdentifier = TableIdentifier.of(icebergNS, table);
+            IcebergRequestContext context =
+                new IcebergRequestContext(httpServletRequest(), catalogName);
+
+            PlanTableScanResponse scanResponse =
+                tableOperationDispatcher.planTableScan(context, tableIdentifier, scanRequest);
+
+            return IcebergRESTUtils.ok(scanResponse);
+          });
+    } catch (Exception e) {
+      LOG.error("Failed to plan table scan: {}", e.getMessage(), e);
       return IcebergExceptionMapper.toRESTResponse(e);
     }
   }

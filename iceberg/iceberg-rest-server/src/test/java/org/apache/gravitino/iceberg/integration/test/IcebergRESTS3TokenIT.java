@@ -20,7 +20,6 @@
 package org.apache.gravitino.iceberg.integration.test;
 
 import com.google.common.collect.ImmutableList;
-import java.io.IOException;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -29,7 +28,6 @@ import org.apache.gravitino.credential.CredentialConstants;
 import org.apache.gravitino.credential.S3TokenCredential;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
 import org.apache.gravitino.integration.test.util.BaseIT;
-import org.apache.gravitino.integration.test.util.DownloaderUtils;
 import org.apache.gravitino.integration.test.util.ITUtils;
 import org.apache.gravitino.storage.S3Properties;
 import org.apache.iceberg.TableProperties;
@@ -61,12 +59,6 @@ public class IcebergRESTS3TokenIT extends IcebergRESTJdbcCatalogIT {
     this.externalId = System.getenv().getOrDefault("GRAVITINO_S3_EXTERNAL_ID", "");
     if (ITUtils.isEmbedded()) {
       return;
-    }
-    try {
-      downloadIcebergAwsBundleJar();
-    } catch (IOException e) {
-      LOG.warn("Download Iceberg AWS bundle jar failed,", e);
-      throw new RuntimeException(e);
     }
     copyS3BundleJar();
   }
@@ -110,21 +102,10 @@ public class IcebergRESTS3TokenIT extends IcebergRESTJdbcCatalogIT {
     return configMap;
   }
 
-  private void downloadIcebergAwsBundleJar() throws IOException {
-    String icebergBundleJarUri =
-        String.format(
-            "https://repo1.maven.org/maven2/org/apache/iceberg/"
-                + "iceberg-aws-bundle/%s/iceberg-aws-bundle-%s.jar",
-            ITUtils.icebergVersion(), ITUtils.icebergVersion());
-    String gravitinoHome = System.getenv("GRAVITINO_HOME");
-    String targetDir = String.format("%s/iceberg-rest-server/libs/", gravitinoHome);
-    DownloaderUtils.downloadFile(icebergBundleJarUri, targetDir);
-  }
-
   private void copyS3BundleJar() {
     String gravitinoHome = System.getenv("GRAVITINO_HOME");
     String targetDir = String.format("%s/iceberg-rest-server/libs/", gravitinoHome);
-    BaseIT.copyBundleJarsToDirectory("aws", targetDir);
+    BaseIT.copyBundleJarsToDirectory("iceberg-aws-bundle", targetDir);
   }
 
   /**
