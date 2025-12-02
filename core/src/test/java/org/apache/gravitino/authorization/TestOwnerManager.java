@@ -228,7 +228,7 @@ public class TestOwnerManager {
   }
 
   @Test
-  public void testUserTypeOwnerStillWorks() {
+  public void testSetUserTypeOwner() {
     // Test that USER type owner continues to work as expected
     MetadataObject metalakeObject =
         MetadataObjects.of(Lists.newArrayList(METALAKE), MetadataObject.Type.METALAKE);
