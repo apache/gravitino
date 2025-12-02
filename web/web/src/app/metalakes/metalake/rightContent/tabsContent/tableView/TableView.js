@@ -875,7 +875,6 @@ const TableView = () => {
 
   useEffect(() => {
     setPaginationModel({ ...paginationModel, page: 0 })
-     
   }, [store.tableLoading])
 
   return (

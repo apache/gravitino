@@ -142,8 +142,6 @@ const TabsContent = () => {
     } else {
       setTab('table')
     }
-
-     
   }, [searchParams])
 
   return (

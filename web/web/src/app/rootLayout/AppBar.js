@@ -64,7 +64,6 @@ const AppBar = () => {
     }
     const metalakeItems = store.metalakes.map(i => i.name)
     setMetalakes(metalakeItems)
-     
   }, [store.metalakes, metalake, dispatch])
 
   return (

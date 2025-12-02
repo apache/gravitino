@@ -132,7 +132,6 @@ const CreateCatalogDialog = props => {
       return item
     })
     setInnerProps(updateProps)
-     
   }, [catalogBackendSelect])
 
   const handleFormChange = ({ index, event }) => {
@@ -340,8 +339,6 @@ const CreateCatalogDialog = props => {
         break
       }
     }
-
-     
   }, [typeSelect, open])
 
   useEffect(() => {
@@ -358,8 +355,6 @@ const CreateCatalogDialog = props => {
       setInnerProps(defaultProps)
       setValue('propItems', defaultProps)
     }
-
-     
   }, [providerSelect])
 
   useEffect(() => {

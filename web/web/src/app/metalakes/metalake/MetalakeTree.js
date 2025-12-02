@@ -338,7 +338,6 @@ const MetalakeTree = props => {
 
   useEffect(() => {
     dispatch(setExpandedNodes(store.expandedNodes))
-     
   }, [store.metalakeTree, dispatch])
 
   return (

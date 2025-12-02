@@ -29,8 +29,6 @@ export function NavigationEvents() {
 
   useEffect(() => {
     const url = `${pathname}?${searchParams}`
-
-     
   }, [pathname, searchParams])
 
   return null

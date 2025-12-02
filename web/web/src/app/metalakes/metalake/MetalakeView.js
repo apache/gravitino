@@ -152,8 +152,6 @@ const MetalakeView = () => {
     fetchDependsData()
 
     dispatch(setSelectedNodes(routeParams.catalog ? [buildNodePath(routeParams)] : []))
-
-     
   }, [searchParams])
 
   return (

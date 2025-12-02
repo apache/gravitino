@@ -116,7 +116,6 @@ const AuthProvider = ({ children }) => {
     }
 
     initAuth()
-     
   }, [])
 
   const values = {

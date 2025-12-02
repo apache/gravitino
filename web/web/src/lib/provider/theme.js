@@ -56,7 +56,6 @@ const ThemeProvider = props => {
     if (mode) {
       setMode(mode)
     }
-     
   }, [])
 
   const toggleTheme = () => {
