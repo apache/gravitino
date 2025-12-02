@@ -56,6 +56,14 @@ import org.slf4j.LoggerFactory;
 public class PolicyManager implements PolicyDispatcher {
 
   private static final Logger LOG = LoggerFactory.getLogger(PolicyManager.class);
+  private static final Set<MetadataObject.Type> SUPPORTED_METADATA_OBJECT_TYPES_FOR_POLICIES =
+      Sets.newHashSet(
+          MetadataObject.Type.CATALOG,
+          MetadataObject.Type.SCHEMA,
+          MetadataObject.Type.TABLE,
+          MetadataObject.Type.FILESET,
+          MetadataObject.Type.TOPIC,
+          MetadataObject.Type.MODEL);
 
   private final IdGenerator idGenerator;
   private final EntityStore entityStore;
@@ -295,9 +303,7 @@ public class PolicyManager implements PolicyDispatcher {
       String[] policiesToAdd,
       String[] policiesToRemove) {
     Preconditions.checkArgument(
-        !metadataObject.type().equals(MetadataObject.Type.METALAKE)
-            && !metadataObject.type().equals(MetadataObject.Type.ROLE)
-            && !metadataObject.type().equals(MetadataObject.Type.COLUMN),
+        SUPPORTED_METADATA_OBJECT_TYPES_FOR_POLICIES.contains(metadataObject.type()),
         "Cannot associate policies for unsupported metadata object type %s",
         metadataObject.type());
 

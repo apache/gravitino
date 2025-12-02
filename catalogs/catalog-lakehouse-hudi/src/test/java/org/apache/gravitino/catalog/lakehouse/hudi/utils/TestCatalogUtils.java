@@ -35,4 +35,16 @@ public class TestCatalogUtils {
     Assertions.assertInstanceOf(HudiHMSBackend.class, catalogBackend);
     Assertions.assertInstanceOf(HudiHMSBackendOps.class, catalogBackend.backendOps());
   }
+
+  @Test
+  public void testLoadHudiCatalogBackendMissingProperty() {
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> CatalogUtils.loadHudiCatalogBackend(ImmutableMap.of()));
+    Assertions.assertTrue(
+        exception
+            .getMessage()
+            .contains("Property " + CATALOG_BACKEND + " must not be null or empty"));
+  }
 }

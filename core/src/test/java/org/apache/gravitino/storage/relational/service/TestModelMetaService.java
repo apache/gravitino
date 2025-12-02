@@ -322,6 +322,37 @@ public class TestModelMetaService extends TestJDBCBackend {
         () ->
             ModelMetaService.getInstance()
                 .updateModel(NameIdentifier.of(MODEL_NS, "model3"), renameUpdater));
+
+    // test update model comment from null
+    ModelEntity modelEntity4 =
+        createModelEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            MODEL_NS,
+            "model4",
+            "model4 comment",
+            0,
+            properties,
+            AUDIT_INFO);
+    ModelMetaService.getInstance().insertModel(modelEntity4, false);
+
+    ModelMetaService.getInstance()
+        .updateModel(
+            modelEntity4.nameIdentifier(),
+            entity -> {
+              ModelEntity model = (ModelEntity) entity;
+              return ModelEntity.builder()
+                  .withId(model.id())
+                  .withName(model.name())
+                  .withNamespace(model.namespace())
+                  .withComment("model comment updated")
+                  .withLatestVersion(model.latestVersion())
+                  .withProperties(model.properties())
+                  .withAuditInfo(model.auditInfo())
+                  .build();
+            });
+    ModelEntity updatedModel4 =
+        ModelMetaService.getInstance().getModelByIdentifier(modelEntity4.nameIdentifier());
+    Assertions.assertEquals("model comment updated", updatedModel4.comment());
   }
 
   @TestTemplate
