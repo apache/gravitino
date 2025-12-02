@@ -2,202 +2,403 @@
 title: "Lance REST service"
 slug: /lance-rest-service
 keywords:
-  - Lance REST 
+  - Lance REST
+  - Lance datasets
+  - REST API
 license: "This software is licensed under the Apache License version 2."
 ---
 
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
-## Background
+## Overview
 
-Since version 1.1.0, Gravitino includes a REST service for Lance datasets. The Lance REST service is a web service that allows you to interact with Lance datasets over HTTP. It provides endpoints for querying, inserting, updating, and deleting data in Lance datasets.
-It abides by the [Lance REST API specification](https://editor-next.swagger.io/?url=https://raw.githubusercontent.com/lancedb/lance-namespace/refs/heads/main/docs/src/rest.yaml). More details about the specification, please refer to docs [here](https://lance.org/format/namespace/impls/rest/)
+The Lance REST service provides a RESTful interface for managing Lance datasets through HTTP endpoints. Introduced in Gravitino version 1.1.0, this service enables seamless interaction with Lance datasets for data operations and metadata management.
 
-Besides, Lance REST service can be run standalone without Gravitino server.
+The service implements the [Lance REST API specification](https://editor-next.swagger.io/?url=https://raw.githubusercontent.com/lancedb/lance-namespace/refs/heads/main/docs/src/rest.yaml). For detailed specification documentation, see the [official Lance REST documentation](https://lance.org/format/namespace/impls/rest/).
 
-## Capabilities
+### What is Lance?
 
-The Lance REST service supports the APIs defined in the Lance REST API specification. The following are some of the key capabilities of the Lance REST service:
-- Namespace management including creating namespace, listing namespaces, describing, deleting namespace, namespace exists check.
-- Table management including creating tables including creating empty tables, dropping tables, registering tables and unregistering tables.
-- Index management including creating index, listing indexes. Dropping index is not supported in 1.1.0.
+[Lance](https://lancedb.github.io/lance/) is a modern columnar data format designed for AI/ML workloads. It provides:
 
-Full capabilities are listed in the following table:
+- **High-performance vector search**: Native support for similarity search on high-dimensional embeddings
+- **Columnar storage**: Optimized for analytical queries and machine learning pipelines
+- **Fast random access**: Efficient row-level operations unlike traditional columnar formats
+- **Version control**: Built-in dataset versioning and time-travel capabilities
+- **Incremental updates**: Append and update data without full rewrites
 
-| Operation ID      | Description                                                                                         | Since version | 
-|-------------------|-----------------------------------------------------------------------------------------------------|---------------|
-| CreateNamespace   | Create a Lance namespace                                                                            | 1.1.0         |              
-| ListNamespaces    | List all namespaces under a specific namespace                                                      | 1.1.0         |
-| DescribeNamespace | Get details of a specific namespace                                                                 | 1.1.0         |                             
-| DropNamespace     | Delete a specific namespace                                                                         | 1.1.0         |                            
-| NamespaceExists   | Check if a namespace exists                                                                         | 1.1.0         |                             
-| ListTables        | List all tables in a specific namespace                                                             | 1.1.0         | 
-| CreateTable       | Create a new table in a specific namespace                                                          | 1.1.0         |
-| DropTable         | Delete a specific table from a namespace, drop table will drop metadata and Lance data all together | 1.1.0         |
-| TableExists       | Check if a specific table exists in a namespace                                                     | 1.1.0         |
-| RegisterTable     | Register an existing Lance table to a specific namespace                                            | 1.1.0         |
-| DeregisterTable   | Unregister a specific table from a namespace, it will only remove metadata, Lance data will be kept | 1.1.0         |   
-| CreateIndex       | Create an index on a specific table                                                                 | 1.1.0         |
-| ListIndexes       | List all indexes on a specific table                                                                | 1.1.0         |
+### Architecture
 
-## Getting started
+The Lance REST service acts as a bridge between Lance datasets and applications:
 
-### Running Lance REST service with Gravitino
+```
+┌─────────────────┐
+│   Applications  │
+│  (Python/Java)  │
+└────────┬────────┘
+         │ HTTP/REST
+         ▼
+┌─────────────────┐
+│  Lance REST     │◄──── Gravitino Metalake
+│    Service      │      (Metadata Backend)
+└────────┬────────┘
+         │ File System Operations
+         ▼
+┌─────────────────┐
+│  Lance Datasets │
+│ (S3/HDFS/Local) │
+└─────────────────┘
+```
 
-To use the Lance REST service, you need to have Gravitino server running with Lance REST service enabled. The following are configurations to enable Lance REST service in Gravitino server.
+**Key Features:**
+- Full compliance with Lance REST API specification
+- Can run standalone or integrated with Gravitino server
+- Support for namespace and table management
+- Index creation and management capabilities
+- Metadata stored in Gravitino for unified governance
 
-| Configuration item                             | Description                                                                                                                                                                                                                           | Default value           | Required                                   | Since Version |
-|------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-------------------------|--------------------------------------------|---------------|
-| `gravitino.auxService.names`                   | Auxiliary service that runs Lance REST service, currently it supports `iceberg-rest` and `lance-rest`. It should include `lance-rest` if you want to start the Lance REST service such as `lance-rest`, or `lance-rest, iceberg-rest` | iceberg-rest,lance-rest | Yes if Lance REST service is going to run  | 0.2.0         |
-| `gravitino.lance-rest.classpath`               | The classpath of Lance REST service, relative to the Gravitino home directory.                                                                                                                                                        | lance-rest-server/libs  | Yes if Lance REST service is going to run  | 1.1.0         |
-| `gravitino.lance-rest.port`                    | The port number that Lance REST service listens on.                                                                                                                                                                                   | 9101                    | Yes if Lance REST service is going to run  | 1.1.0         |
-| `gravitino.lance-rest.host`                    | The hostname that the Lance REST service run on.                                                                                                                                                                                      | 0.0.0.0                 | Yes if Lance REST service is going to run  | 1.1.0         | 
-| `gravitino.lance-rest.namespace-backend`       | backend to store namespace metadata, currently it only supports `gravitino`                                                                                                                                                           | gravitino               | Yes if Lance REST service is going to run  | 1.1.0         |
-| `gravitino.lance-rest.gravitino.uri`           | Gravitino server URI, it should be set when `namespace-backend` is `gravitino`                                                                                                                                                        | http://localhost:8090   | Yes if Lance REST service is going to run  | 1.1.0         |
-| `gravitino.lance-rest.gravitino.metalake-name` | Gravitino metalake name, it should be set when `namespace-backend` is `gravitino`                                                                                                                                                     | (none)                  | Yes if Lance REST service is going to run  | 1.1.0         |
+## Supported Operations
 
-### Running Lance REST service standalone
+The Lance REST service provides comprehensive support for namespace management, table management, and index operations. The table below lists all supported operations:
 
-To run Lance REST service standalone without Gravitino server, you can use the following command:
+| Operation         | Description                                                        | HTTP Method | Endpoint Pattern                    | Since Version |
+|-------------------|--------------------------------------------------------------------|-------------|-------------------------------------|---------------|
+| CreateNamespace   | Create a new Lance namespace                                       | POST        | `/lance/v1/namespace/{id}/create`   | 1.1.0         |
+| ListNamespaces    | List all namespaces under a parent namespace                       | GET         | `/lance/v1/namespace/{parent}/list` | 1.1.0         |
+| DescribeNamespace | Retrieve detailed information about a specific namespace           | POST        | `/lance/v1/namespace/{id}/describe` | 1.1.0         |
+| DropNamespace     | Delete a namespace                                                 | POST        | `/lance/v1/namespace/{id}/drop`     | 1.1.0         |
+| NamespaceExists   | Check whether a namespace exists                                   | POST        | `/lance/v1/namespace/{id}/exists`   | 1.1.0         |
+| ListTables        | List all tables in a namespace                                     | GET         | `/lance/v1/table/{namespace}/list`  | 1.1.0         |
+| CreateTable       | Create a new table in a namespace                                  | POST        | `/lance/v1/table/{id}/create`       | 1.1.0         |
+| DropTable         | Delete a table including both metadata and data                    | POST        | `/lance/v1/table/{id}/drop`         | 1.1.0         |
+| TableExists       | Check whether a table exists                                       | POST        | `/lance/v1/table/{id}/exists`       | 1.1.0         |
+| RegisterTable     | Register an existing Lance table to a namespace                    | POST        | `/lance/v1/table/{id}/register`     | 1.1.0         |
+| DeregisterTable   | Unregister a table from a namespace (metadata only, data remains)  | POST        | `/lance/v1/table/{id}/deregister`   | 1.1.0         |
+
+### Operation Details
+
+#### Namespace Operations
+
+**CreateNamespace** supports three modes:
+- `create`: Fails if namespace already exists
+- `exist_ok`: Succeeds even if namespace exists  
+- `overwrite`: Replaces existing namespace
+
+**DropNamespace** behavior:
+- Recursively deletes all child namespaces and tables
+- Deletes both metadata and Lance data files
+- Operation is irreversible
+
+#### Table Operations
+
+**RegisterTable vs CreateTable**:
+- **RegisterTable**: Links existing Lance datasets into Gravitino catalog without data movement
+- **CreateTable**: Creates new Lance table with schema and writes data files
+
+**DropTable vs DeregisterTable**:
+- **DropTable**: Permanently deletes metadata and data files from storage
+- **DeregisterTable**: Removes metadata from Gravitino but preserves Lance data files
+
+:::note
+Index deletion is not supported in version 1.1.0.
+:::
+
+## Deployment
+
+### Running with Gravitino Server
+
+To enable the Lance REST service within Gravitino server, configure the following properties in your Gravitino configuration file:
+
+| Configuration Property                         | Description                                                                                          | Default Value           | Required | Since Version |
+|------------------------------------------------|------------------------------------------------------------------------------------------------------|-------------------------|----------|---------------|
+| `gravitino.auxService.names`                   | Auxiliary services to run. Include `lance-rest` to enable Lance REST service                         | iceberg-rest,lance-rest | Yes      | 0.2.0         |
+| `gravitino.lance-rest.classpath`               | Classpath for Lance REST service, relative to Gravitino home directory                               | lance-rest-server/libs  | Yes      | 1.1.0         |
+| `gravitino.lance-rest.port`                    | Port number for Lance REST service                                                                   | 9101                    | Yes      | 1.1.0         |
+| `gravitino.lance-rest.host`                    | Hostname for Lance REST service                                                                      | 0.0.0.0                 | Yes      | 1.1.0         |
+| `gravitino.lance-rest.namespace-backend`       | Namespace metadata backend (currently only `gravitino` is supported)                                 | gravitino               | Yes      | 1.1.0         |
+| `gravitino.lance-rest.gravitino.uri`           | Gravitino server URI (required when namespace-backend is `gravitino`)                                | http://localhost:8090   | Yes      | 1.1.0         |
+| `gravitino.lance-rest.gravitino.metalake-name` | Gravitino metalake name (required when namespace-backend is `gravitino`)                             | (none)                  | Yes      | 1.1.0         |
+
+**Example Configuration:**
+
+```properties
+gravitino.auxService.names = lance-rest
+gravitino.lance-rest.port = 9101
+gravitino.lance-rest.host = 0.0.0.0
+gravitino.lance-rest.namespace-backend = gravitino
+gravitino.lance-rest.gravitino.uri = http://localhost:8090
+gravitino.lance-rest.gravitino.metalake-name = my_metalake
+```
+
+### Running Standalone
+
+To run Lance REST service independently without Gravitino server:
 
 ```shell
 {GRAVITINO_HOME}/bin/gravitino-lance-rest-server.sh start
 ```
 
-The following configurations are required to run Lance REST service standalone, you can set them in `gravitino-lance-rest-server.conf` file or pass them as command line arguments.
-Typically, you only need to change the following configurations:
+Configure the service by editing `gravitino-lance-rest-server.conf` or passing command-line arguments:
 
-| Configuration item                             | Description                                                                       | Default value            | Required                                   | Since Version |
-|------------------------------------------------|-----------------------------------------------------------------------------------|--------------------------|--------------------------------------------|---------------|
-| `gravitino.lance-rest.namespace-backend`       | Backend to store namespace metadata, currently it only supports `gravitino`       | gravitino                | Yes if Lance REST service is going to run  | 1.1.0         |
-| `gravitino.lance-rest.gravitino.uri`           | Gravitino server URI, it should be set when `namespace-backend` is `gravitino`    | http://localhost:8090    | Yes if Lance REST service is going to run  | 1.1.0         |
-| `gravitino.lance-rest.gravitino.metalake-name` | Gravitino metalake name, it should be set when `namespace-backend` is `gravitino` | (none)                   | Yes if Lance REST service is going to run  | 1.1.0         |
-| `gravitino.lance-rest.port`                    | The port number that Lance REST service listens on.                               | 9101                     | Yes if Lance REST service is going to run  | 1.1.0         |
-| `gravitino.lance-rest.host`                    | The host name that Lance REST service run on                                      | 0.0.0.0                  | Yes if Lance REST service is going to run  | 1.1.0         |
+| Configuration Property                         | Description                                                      | Default Value         | Required | Since Version |
+|------------------------------------------------|------------------------------------------------------------------|-----------------------|----------|---------------|
+| `gravitino.lance-rest.namespace-backend`       | Namespace metadata backend                                       | gravitino             | Yes      | 1.1.0         |
+| `gravitino.lance-rest.gravitino.uri`           | Gravitino server URI                                             | http://localhost:8090 | Yes      | 1.1.0         |
+| `gravitino.lance-rest.gravitino.metalake-name` | Gravitino metalake name                                          | (none)                | Yes      | 1.1.0         |
+| `gravitino.lance-rest.port`                    | Service port number                                              | 9101                  | No       | 1.1.0         |
+| `gravitino.lance-rest.host`                    | Service hostname                                                 | 0.0.0.0               | No       | 1.1.0         |
 
-`namespace-backend`, `uri`, `port` and `host` have the same meaning as described in the previous section, and they have the default values. In most cases you only need to change `metalake-name` to your Gravitino metalake name. 
-For other configurations listed in the file, just keep their default values.
+:::tip
+In most cases, you only need to configure `gravitino.lance-rest.gravitino.metalake-name`. Other properties can use their default values.
+:::
 
-## Using Lance REST service
+## Usage Guidelines
 
-Currently, as the Lance REST service only supports Gravitino backend, there are some limitations when using Lance REST service:
-- You need to have a running Gravitino server with a metalake created. 
-- As Gravitino has three hierarchies: catalog -> schema -> table, so when you create namespaces or a table via Lance REST service, you need to make sure the parent hierarchy exists. For example, when you create a namespace `lance_catalog/schema`, you need to make sure the catalog `lance_catalog` already exists in Gravitino metalake. If not, you need to create the namespace(catalog) `lance_catalog` first.
-- Currently, we can only support two layers of namespaces and then tables, that is to say, you can create namespace like `lance_catalog/schema`, but you cannot create namespace like `lance_catalog/schema/sub_schema`. Tables can only be created under the namespace `lance_catalog/schema`.
+When using Lance REST service with Gravitino backend, keep the following considerations in mind:
 
-## Example
+### Prerequisites
+- A running Gravitino server with a created metalake
+- A generic-lakehouse catalog created in Gravitino metalake
 
-When Gravitino server is started with Lance REST service starts successfully, and a `generic-lakehouse` catalog named `lance_catalog` is created in Gravitino metalake, you can use the following Python code to interact with Lance REST service:
+### Namespace Hierarchy
+Gravitino follows a three-level hierarchy: **catalog → schema → table**. When creating namespaces or tables:
 
+1. **Parent must exist:** Before creating `lance_catalog/schema`, ensure `lance_catalog` catalog exists in Gravitino metalake
+2. **Two-level limit:** You can create `lance_catalog/schema`, but **not** `lance_catalog/schema/sub_schema`
+3. **Table placement:** Tables can only be created under `lance_catalog/schema`, not at catalog level
 
+**Example Hierarchy:**
+```
+metalake
+└── lance_catalog (catalog - must pre-exist in Gravitino)
+    └── schema (namespace - create via REST)
+        └── table01 (table - create via REST)
+```
+
+### Delimiter Convention
+
+The Lance REST API uses `$` as the default delimiter to separate namespace levels in URIs. When making HTTP requests:
+
+- **URL Encoding Required**: `$` must be URL-encoded as `%24`
+- **Example**: `lance_catalog$schema$table01` becomes `lance_catalog%24schema%24table01` in URLs
+
+**Common Delimiters:**
+```
+Namespace path:     lance_catalog.schema.table01
+URI representation: lance_catalog$schema$table01  
+URL encoded:        lance_catalog%24schema%24table01
+```
+
+:::caution Important Limitations
+- Currently supports only **two levels of namespaces** before tables
+- Tables **cannot** be nested deeper than schema level  
+- Parent catalog must be created in Gravitino before using Lance REST API
+- Metadata operations require Gravitino server to be available
+- Namespace deletion is recursive and irreversible
+:::
+- Currently supports only **two levels of namespaces** before tables
+- Tables **cannot** be nested deeper than schema level
+- Parent catalog must be created in Gravitino before using Lance REST API
+:::
+
+## Examples
+
+The following examples demonstrate how to interact with Lance REST service using different programming languages and tools.
+
+**Prerequisites:**
+- Gravitino server is running with Lance REST service enabled.
+- A metalake has been created in Gravitino.
 
 <Tabs groupId="language" queryString>
 <TabItem value="shell" label="Shell">
 
 ```shell
-# Create a namespace
-# mode can be create or exist_ok or overwrite
-curl -X POST http://localhost:9101/lance/v1/namespace/lance_catalog/create -H 'Content-Type: application/json' -d '{
+# Create a catalog-level namespace
+# mode: "create" | "exist_ok" | "overwrite"
+curl -X POST http://localhost:9101/lance/v1/namespace/lance_catalog/create \
+  -H 'Content-Type: application/json' \
+  -d '{
     "id": ["lance_catalog"],
     "mode": "create"
-}'
+  }'
 
 # Create a schema namespace
-# %24 is the URL encoded character for $
-curl -X POST http://localhost:9101/lance/v1/namespace/lance_catalog%24schema/create -H 'Content-Type: application/json' -d '{
+# Note: %24 is URL-encoded '$' character used as delimiter
+curl -X POST http://localhost:9101/lance/v1/namespace/lance_catalog%24schema/create \
+  -H 'Content-Type: application/json' \
+  -d '{
     "id": ["lance_catalog", "schema"],
     "mode": "create"
-}'
+  }'
 
-# register a table
-curl -X POST http://localhost:9101/lance/v1/table/lance_catalog%24schema%24table01/register -H 'Content-Type: application/json' -d '{
-    "id": ["lance_catalog","schema","table01"],
+# Register an existing table
+curl -X POST http://localhost:9101/lance/v1/table/lance_catalog%24schema%24table01/register \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "id": ["lance_catalog", "schema", "table01"],
     "location": "/tmp/lance_catalog/schema/table01"
-}'
+  }'
 
+# Create a new empty table
+curl -X POST http://localhost:9101/lance/v1/table/lance_catalog%24schema%24table02/create \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "id": ["lance_catalog", "schema", "table02"],
+    "location": "/tmp/lance_catalog/schema/table02",
+    "properties": { "description": "This is table02"  }
+  }'  
+  
+# Create a new table with IPC data
+curl -X POST http://localhost:9101/lance/v1/table/lance_catalog%24schema%24table03/create-empty \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "id": ["lance_catalog", "schema", "table03"],
+    "location": "/tmp/lance_catalog/schema/table03",
+    "dataFormat": "IPC",
+    "properties": { "description": "This is table03 with IPC data"  } 
+    
+# Create a table with schema, the schema is inferred from the Arrow IPC file
+curl -X POST \
+     "http://localhost:9101/lance/v1/table/lance_catalog%24schema%24table04/create" \
+     -H 'Content-Type: application/vnd.apache.arrow.stream' \
+     -H "x-lance-table-location: "/tmp/lance_catalog/schema/table04" \
+     -H "x-lance-table-properties: {}" \
+     --data-binary "@${ARROW_FILE}"    
 ```
 
 </TabItem>
 <TabItem value="java" label="Java">
 
 ```java
-// implementation("com.lancedb:lance-namespace-core:0.0.20")
+// Add dependency: implementation("com.lancedb:lance-namespace-core:0.0.20")
 
+import org.apache.arrow.memory.BufferAllocator;
+import org.apache.arrow.memory.RootAllocator;
+import java.util.HashMap;
+import java.util.Map;
+
+// Initialize allocator and namespace connection
 private final BufferAllocator allocator = new RootAllocator(Long.MAX_VALUE);
-LanceNamespace ns = LanceNamespace.connect("rest", Map.of("uri", "http://localhost:9101/lance"));
-HashMap<String, String> props = Maps.newHashMap();
-props.put(RestNamespaceConfig.URI, getLanceRestServiceUrl());
+
+Map<String, String> props = new HashMap<>();
+props.put(RestNamespaceConfig.URI, "http://localhost:9101/lance");
 props.put(RestNamespaceConfig.DELIMITER, RestNamespaceConfig.DELIMITER_DEFAULT);
+
 LanceNamespace ns = LanceNamespaces.connect("rest", props, null, allocator);
 
-// Create a namespace
+// Create catalog namespace
 CreateNamespaceRequest createCatalogNsRequest = new CreateNamespaceRequest();
 createCatalogNsRequest.addIdItem("lance_catalog");
 createCatalogNsRequest.setMode(CreateNamespaceRequest.ModeEnum.CREATE);
 ns.createNamespace(createCatalogNsRequest);
 
-// Create a schema namespace
+// Create schema namespace
 CreateNamespaceRequest createSchemaNsRequest = new CreateNamespaceRequest();
 createSchemaNsRequest.addIdItem("lance_catalog");
 createSchemaNsRequest.addIdItem("schema");
 createSchemaNsRequest.setMode(CreateNamespaceRequest.ModeEnum.CREATE);
-ns.createNamespace(createSchemaNsRequest);  
+ns.createNamespace(createSchemaNsRequest);
 
-// register a table
+// Register a table
 RegisterTableRequest registerTableRequest = new RegisterTableRequest();
-registerTableRequest.setLocation(location);
+registerTableRequest.setLocation("/tmp/lance_catalog/schema/table01");
 registerTableRequest.setId(Lists.newArrayList("lance_catalog", "schema", "table01"));
 ns.registerTable(registerTableRequest);
+
+// Create an empty table
+CreateEmptyTableRequest createEmptyTableRequest = new CreateEmptyTableRequest();
+createEmptyTableRequest.setLocation("/tmp/lance_catalog/schema/table02");
+createEmptyTableRequest.setId(Lists.newArrayList("lance_catalog", "schema", "table02"));
+ns.createEmptyTable(createEmptyTableRequest);
+
+// Create a table with schema inferred from Arrow IPC file
+CreateTableRequest createTableRequest = new CreateTableRequest();
+createTableRequest.setIds(Lists.newArrayList("lance_catalog", "schema", "table03"));
+createTableRequest.setLocation("/tmp/lance_catalog/schema/table03");
+org.apache.arrow.vector.types.pojo.Schema schema =
+        new org.apache.arrow.vector.types.pojo.Schema(
+                Arrays.asList(
+                        Field.nullable("id", new ArrowType.Int(32, true)),
+                        Field.nullable("value", new ArrowType.Utf8())));
+byte[] body = ArrowUtils.generateIpcStream(schema);
+ns.createTable(createTableRequest, body);
+
 ```
 
 </TabItem>
 <TabItem value="python" label="Python">
 
 ```python
-# you need to install lance-namespace package first by 'pip install lance-namespace==0.0.20'
+# Install: pip install lance-namespace==0.0.20
+
 import lance_namespace as ln
+
+# Connect to Lance REST service
 ns = ln.connect("rest", {"uri": "http://localhost:9101/lance"})
-# Create a namespace
+
+# Create catalog namespace
 create_catalog_ns_request = ln.CreateNamespaceRequest(id=["lance_catalog"])
 catalog = ns.create_namespace(create_catalog_ns_request)
+
+# Create schema namespace
 create_schema_ns_request = ln.CreateNamespaceRequest(id=["lance_catalog", "schema"])
 schema = ns.create_namespace(create_schema_ns_request)
 
-# register a table
-register_table_request=ln.RegisterTableRequest(id=['lance_catalog','schema','table01'], location='/tmp/lance_catalog/schema/table01')
+# Register a table
+register_table_request = ln.RegisterTableRequest(
+    id=['lance_catalog', 'schema', 'table01'],
+    location='/tmp/lance_catalog/schema/table01'
+)
 ns.register_table(register_table_request)
+
+# Create an empty table
+create_empty_table_request = ln.CreateEmptyTableRequest(
+    id=['lance_catalog', 'schema', 'table02'],
+    location='/tmp/lance_catalog/schema/table02'
+)
+
+# Create a table with schema inferred from Arrow IPC file
+create_table_request = ln.CreateTableRequest(
+    id=['lance_catalog', 'schema', 'table03'],
+    location='/tmp/lance_catalog/schema/table03'
+)
+with open('schema.ipc', 'rb') as f:
+    body = f.read()
+
+ns.create_table(create_table_request, body)
 ```
 
 </TabItem>
 </Tabs>
 
 
-## Using Lance REST service with Docker
+### Running with Docker
 
-You can also run Lance REST service with Docker. The following is an example command to run Lance REST service with Docker:
+Launch Lance REST service using Docker:
 
 ```shell
 docker run -d --name lance-rest-service -p 9101:9101 \
   -e LANCE_REST_GRAVITINO_URI=http://gravitino-host:8090 \
   -e LANCE_REST_GRAVITINO_METALAKE_NAME=your_metalake_name \
   apache/gravitino-lance-rest:latest
-```       
+```
 
-Then you can access Lance REST service at `http://localhost:9101`.
+Access the service at `http://localhost:9101`.
 
-The following environment variables are used to configure Lance REST service in Docker:
+**Environment Variables:**
 
-| Environment variables                | Configuration items                            | Required | Default                 | Since version |
-|--------------------------------------|------------------------------------------------|----------|-------------------------|---------------|
-| `LANCE_REST_NAMESPACE_BACKEND`       | `gravitino.lance-rest.namespace-backend`       | N        | `gravitino`             | 1.1.0         |
-| `LANCE_REST_GRAVITINO_METALAKE_NAME` | `gravitino.lance-rest.gravitino.metalake-name` | Y        | (none)                  | 1.1.0         |
-| `LANCE_REST_GRAVITINO_URI`           | `gravitino.lance-rest.gravitino.uri`           | N        | `http://localhost:8090` | 1.1.0         |
-| `LANCE_REST_HOST`                    | `gravitino.lance-rest.host`                    | N        | `0.0.0.0`               | 1.1.0         |
-| `LANCE_REST_PORT`                    | `gravitino.lance-rest.httpPort`                | N        | `9101`                  | 1.1.0         |
+| Environment Variable                 | Configuration Property                             | Required | Default Value           | Since Version |
+|--------------------------------------|----------------------------------------------------|----------|-------------------------|---------------|
+| `LANCE_REST_NAMESPACE_BACKEND`       | `gravitino.lance-rest.namespace-backend`           | No       | `gravitino`             | 1.1.0         |
+| `LANCE_REST_GRAVITINO_METALAKE_NAME` | `gravitino.lance-rest.gravitino.metalake-name`     | Yes      | (none)                  | 1.1.0         |
+| `LANCE_REST_GRAVITINO_URI`           | `gravitino.lance-rest.gravitino.uri`               | No       | `http://localhost:8090` | 1.1.0         |
+| `LANCE_REST_HOST`                    | `gravitino.lance-rest.host`                        | No       | `0.0.0.0`               | 1.1.0         |
+| `LANCE_REST_PORT`                    | `gravitino.lance-rest.httpPort`                    | No       | `9101`                  | 1.1.0         |
 
-- In most cases, you only need to set `LANCE_REST_GRAVITINO_METALAKE_NAME` to your Gravitino metalake name.
-- If your Gravitino server is not running on `localhost`, you need to set `LANCE_REST_GRAVITINO_URI` to the correct Gravitino server URI.
-- Other three environment variables are optional, you can keep their default values if there are no special requirements.
+:::tip Configuration Tips
+- **Required:** Set `LANCE_REST_GRAVITINO_METALAKE_NAME` to your Gravitino metalake name
+- **Conditional:** Update `LANCE_REST_GRAVITINO_URI` if Gravitino server is not on `localhost`
+- **Optional:** Other variables can use default values unless you have specific requirements
+:::
 
 
