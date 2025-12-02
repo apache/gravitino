@@ -382,7 +382,7 @@ public class JobAuthorizationIT extends BaseRestApiAuthorizationIT {
   private static String generateTestEntryScript() {
     String content =
         "#!/bin/bash\n"
-            + "echo \"starting test test job\"\n\n"
+            + "echo \"starting test job\"\n\n"
             + "bin=\"$(dirname \"${BASH_SOURCE-$0}\")\"\n"
             + "bin=\"$(cd \"${bin}\">/dev/null; pwd)\"\n\n"
             + ". \"${bin}/common.sh\"\n\n"
