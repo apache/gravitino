@@ -127,7 +127,7 @@ public class CatalogIcebergKerberosHiveIT extends BaseIT {
       // Config kerberos configuration for Gravitino server
       addKerberosConfig();
 
-      ignoreIcebergRestService = false;
+      super.ignoreIcebergAuxRestService = false;
       // Start Gravitino server
       super.startIntegrationTest();
     } catch (Exception e) {
@@ -194,8 +194,8 @@ public class CatalogIcebergKerberosHiveIT extends BaseIT {
         classRef = Class.forName("sun.security.krb5.Config");
       }
 
-      Method refershMethod = classRef.getMethod("refresh");
-      refershMethod.invoke(null);
+      Method refreshMethod = classRef.getMethod("refresh");
+      refreshMethod.invoke(null);
     } catch (Exception e) {
       throw new RuntimeException(e);
     }

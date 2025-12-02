@@ -66,7 +66,7 @@ public class TableColumnMetaService {
   @Monitored(
       metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
       baseMetricName = "getColumnIdByTableIdAndName")
-  Long getColumnIdByTableIdAndName(Long tableId, String columnName) {
+  public Long getColumnIdByTableIdAndName(Long tableId, String columnName) {
     Long columnId =
         SessionUtils.getWithoutCommit(
             TableColumnMapper.class,

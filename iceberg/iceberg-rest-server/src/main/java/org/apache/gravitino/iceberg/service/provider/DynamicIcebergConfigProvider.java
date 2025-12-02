@@ -27,6 +27,7 @@ import java.util.Map;
 import java.util.Optional;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Catalog;
+import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.auth.AuthProperties;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import org.apache.gravitino.client.DefaultOAuth2TokenProvider;
@@ -34,6 +35,7 @@ import org.apache.gravitino.client.GravitinoClient;
 import org.apache.gravitino.client.GravitinoClient.ClientBuilder;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
+import org.apache.gravitino.server.web.JettyServerConfig;
 import org.apache.gravitino.utils.MapUtils;
 
 /**
@@ -56,6 +58,13 @@ public class DynamicIcebergConfigProvider implements IcebergConfigProvider {
   public void initialize(Map<String, String> properties) {
     String uri = properties.get(IcebergConstants.GRAVITINO_URI);
     String metalake = properties.get(IcebergConstants.GRAVITINO_METALAKE);
+    if (StringUtils.isBlank(uri)) {
+      JettyServerConfig config =
+          JettyServerConfig.fromConfig(
+              GravitinoEnv.getInstance().config(),
+              JettyServerConfig.GRAVITINO_SERVER_CONFIG_PREFIX);
+      uri = String.format("http://%s:%d", config.getHost(), config.getHttpPort());
+    }
 
     Preconditions.checkArgument(
         StringUtils.isNotBlank(uri), IcebergConstants.GRAVITINO_URI + " is blank");
@@ -126,6 +135,11 @@ public class DynamicIcebergConfigProvider implements IcebergConfigProvider {
     properties.putAll(catalogProperties);
 
     return new IcebergConfig(properties);
+  }
+
+  @Override
+  public String getDefaultCatalogName() {
+    return defaultDynamicCatalogName.orElse(IcebergConstants.ICEBERG_REST_DEFAULT_CATALOG);
   }
 
   // client is lazy loaded because the Gravitino server may not be started yet when the provider is

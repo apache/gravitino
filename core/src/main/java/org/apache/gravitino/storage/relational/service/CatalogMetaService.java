@@ -92,9 +92,18 @@ public class CatalogMetaService {
       metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
       baseMetricName = "getCatalogIdByMetalakeAndCatalogName")
   public CatalogIds getCatalogIdByMetalakeAndCatalogName(String metalakeName, String catalogName) {
-    return SessionUtils.getWithoutCommit(
-        CatalogMetaMapper.class,
-        mapper -> mapper.selectCatalogIdByMetalakeNameAndCatalogName(metalakeName, catalogName));
+    CatalogIds catalogIds =
+        SessionUtils.getWithoutCommit(
+            CatalogMetaMapper.class,
+            mapper ->
+                mapper.selectCatalogIdByMetalakeNameAndCatalogName(metalakeName, catalogName));
+    if (catalogIds == null) {
+      throw new NoSuchEntityException(
+          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
+          Entity.EntityType.CATALOG.name().toLowerCase(),
+          catalogName);
+    }
+    return catalogIds;
   }
 
   @Monitored(
@@ -165,8 +174,9 @@ public class CatalogMetaService {
     try {
       NameIdentifierUtil.checkCatalog(catalogEntity.nameIdentifier());
 
+      String metalake = NameIdentifierUtil.getMetalake(catalogEntity.nameIdentifier());
       Long metalakeId =
-          CommonMetaService.getInstance().getParentEntityIdByNamespace(catalogEntity.namespace());
+          EntityIdService.getEntityId(NameIdentifier.of(metalake), Entity.EntityType.METALAKE);
 
       SessionUtils.doWithCommit(
           CatalogMetaMapper.class,
@@ -234,9 +244,8 @@ public class CatalogMetaService {
   public boolean deleteCatalog(NameIdentifier identifier, boolean cascade) {
     NameIdentifierUtil.checkCatalog(identifier);
 
-    String metalakeName = identifier.namespace().level(0);
     String catalogName = identifier.name();
-    long catalogId = getCatalogIdByName(metalakeName, catalogName);
+    long catalogId = EntityIdService.getEntityId(identifier, Entity.EntityType.CATALOG);
 
     if (cascade) {
       SessionUtils.doMultipleWithCommit(

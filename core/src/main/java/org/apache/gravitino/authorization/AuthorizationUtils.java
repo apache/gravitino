@@ -66,6 +66,14 @@ public class AuthorizationUtils {
   static final String USER_DOES_NOT_EXIST_MSG = "User %s does not exist in the metalake %s";
   static final String GROUP_DOES_NOT_EXIST_MSG = "Group %s does not exist in the metalake %s";
   static final String ROLE_DOES_NOT_EXIST_MSG = "Role %s does not exist in the metalake %s";
+  private static final Set<MetadataObject.Type> SKIP_APPLY_TYPES =
+      Sets.newHashSet(
+          MetadataObject.Type.ROLE,
+          MetadataObject.Type.METALAKE,
+          MetadataObject.Type.JOB,
+          MetadataObject.Type.JOB_TEMPLATE,
+          MetadataObject.Type.TAG,
+          MetadataObject.Type.POLICY);
 
   private static final Set<Privilege.Name> FILESET_PRIVILEGES =
       Sets.immutableEnumSet(
@@ -357,7 +365,7 @@ public class AuthorizationUtils {
   }
 
   private static boolean needApplyAuthorization(MetadataObject.Type type) {
-    return type != MetadataObject.Type.ROLE && type != MetadataObject.Type.METALAKE;
+    return !SKIP_APPLY_TYPES.contains(type);
   }
 
   private static void callAuthorizationPluginImpl(

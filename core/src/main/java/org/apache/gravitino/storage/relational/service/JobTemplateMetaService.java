@@ -84,8 +84,8 @@ public class JobTemplateMetaService {
     String metalakeName = jobTemplateEntity.namespace().level(0);
 
     try {
-      Long metalakeId = MetalakeMetaService.getInstance().getMetalakeIdByName(metalakeName);
-
+      Long metalakeId =
+          EntityIdService.getEntityId(NameIdentifier.of(metalakeName), Entity.EntityType.METALAKE);
       JobTemplatePO.JobTemplatePOBuilder builder =
           JobTemplatePO.builder().withMetalakeId(metalakeId);
       JobTemplatePO jobTemplatePO =
@@ -203,5 +203,20 @@ public class JobTemplateMetaService {
           jobTemplateName);
     }
     return jobTemplatePO;
+  }
+
+  public long getJobTemplateIdByMetalakeIdAndName(long metalakeId, String name) {
+    Long jobTemplateId =
+        SessionUtils.getWithoutCommit(
+            JobTemplateMetaMapper.class,
+            mapper -> mapper.selectJobTemplateIdByMetalakeAndName(metalakeId, name));
+
+    if (jobTemplateId == null) {
+      throw new NoSuchEntityException(
+          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
+          Entity.EntityType.JOB_TEMPLATE.name().toLowerCase(Locale.ROOT),
+          name);
+    }
+    return jobTemplateId;
   }
 }

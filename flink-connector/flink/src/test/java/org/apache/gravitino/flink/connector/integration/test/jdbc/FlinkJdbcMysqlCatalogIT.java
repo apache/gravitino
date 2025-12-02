@@ -82,7 +82,7 @@ public class FlinkJdbcMysqlCatalogIT extends FlinkCommonIT {
 
   @AfterAll
   void jdbcStop() {
-    Preconditions.checkNotNull(metalake);
+    Preconditions.checkArgument(metalake != null, "metalake is null");
     metalake.dropCatalog(CATALOG_NAME, true);
   }
 
@@ -97,7 +97,7 @@ public class FlinkJdbcMysqlCatalogIT extends FlinkCommonIT {
   }
 
   private void init() {
-    Preconditions.checkNotNull(metalake);
+    Preconditions.checkArgument(metalake != null, "metalake is null");
     catalog =
         metalake.createCatalog(
             CATALOG_NAME,

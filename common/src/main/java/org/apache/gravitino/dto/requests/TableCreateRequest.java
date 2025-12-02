@@ -122,9 +122,6 @@ public class TableCreateRequest implements RESTRequest {
   public void validate() throws IllegalArgumentException {
     Preconditions.checkArgument(
         StringUtils.isNotBlank(name), "\"name\" field is required and cannot be empty");
-    Preconditions.checkArgument(
-        columns != null && columns.length != 0,
-        "\"columns\" field is required and cannot be empty");
 
     if (sortOrders != null) {
       Arrays.stream(sortOrders).forEach(sortOrder -> sortOrder.validate(columns));
@@ -161,7 +158,10 @@ public class TableCreateRequest implements RESTRequest {
               index -> {
                 Preconditions.checkArgument(index.type() != null, "Index type cannot be null");
                 Preconditions.checkArgument(
-                    index.fieldNames().length > 0, "Index field names cannot be null");
+                    index.fieldNames() != null, "Index fieldNames cannot be null");
+                Preconditions.checkArgument(
+                    index.fieldNames().length > 0,
+                    "Index fieldNames length must be greater than 0");
               });
     }
   }

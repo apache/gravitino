@@ -121,8 +121,8 @@ public class EventBus {
     SupportsChangingPreEvent tmpPreEvent = preEvent;
     for (EventListenerPlugin eventListener : eventListeners) {
       tmpPreEvent = eventListener.transformPreEvent(tmpPreEvent);
-      Preconditions.checkNotNull(
-          tmpPreEvent,
+      Preconditions.checkArgument(
+          tmpPreEvent != null,
           String.format("%s transformPreEvent return null", getListenerName(eventListener)));
     }
     return tmpPreEvent;

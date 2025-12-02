@@ -184,5 +184,8 @@ public class GravitinoVirtualFileSystemConfiguration {
   /** The default value for whether to enable auto-creation of fileset location. */
   public static final boolean FS_GRAVITINO_AUTO_CREATE_LOCATION_DEFAULT = true;
 
+  /** The prefix for user-defined location configs: {@code fs.path.config.<locationName>=<path>}. */
+  public static final String FS_GRAVITINO_PATH_CONFIG_PREFIX = "fs.path.config.";
+
   private GravitinoVirtualFileSystemConfiguration() {}
 }
