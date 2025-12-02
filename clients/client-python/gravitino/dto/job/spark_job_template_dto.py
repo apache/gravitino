@@ -34,7 +34,9 @@ class SparkJobTemplateDTO(JobTemplateDTO):
     optional for PySpark applications. For PySpark jobs, this field can be None.
     """
 
-    _class_name: Optional[str] = field(default=None, metadata=config(field_name="className"))
+    _class_name: Optional[str] = field(
+        default=None, metadata=config(field_name="className")
+    )
     _jars: Optional[List[str]] = field(default=None, metadata=config(field_name="jars"))
     _files: Optional[List[str]] = field(
         default=None, metadata=config(field_name="files")
