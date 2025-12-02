@@ -21,27 +21,27 @@ package org.apache.gravitino.catalog.lakehouse.hudi.backend.hms;
 import static org.apache.gravitino.catalog.lakehouse.hudi.HudiCatalogPropertiesMetadata.URI;
 import static org.apache.gravitino.catalog.lakehouse.hudi.HudiSchemaPropertiesMetadata.LOCATION;
 
-import com.google.common.collect.ImmutableMap;
-import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
+import java.time.Instant;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.Map;
+import java.util.Properties;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.catalog.lakehouse.hudi.HudiColumn;
 import org.apache.gravitino.catalog.lakehouse.hudi.HudiSchema;
 import org.apache.gravitino.catalog.lakehouse.hudi.HudiTable;
 import org.apache.gravitino.exceptions.NoSuchTableException;
+import org.apache.gravitino.hive.HiveClientPool;
+import org.apache.gravitino.hive.HiveTable;
+import org.apache.gravitino.hive.client.HiveClient;
 import org.apache.gravitino.hive.hms.MiniHiveMetastoreService;
+import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.types.Types;
 import org.apache.hadoop.hive.conf.HiveConf;
-import org.apache.hadoop.hive.metastore.api.FieldSchema;
-import org.apache.hadoop.hive.metastore.api.SerDeInfo;
-import org.apache.hadoop.hive.metastore.api.StorageDescriptor;
-import org.apache.hadoop.hive.metastore.api.Table;
 import org.apache.spark.sql.SparkSession;
-import org.apache.thrift.TException;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
@@ -54,29 +54,30 @@ public class TestHudiHMSBackendOps extends MiniHiveMetastoreService {
   private static final String CATALOG_NAME = "catalog";
   private static final String HIVE_TABLE_NAME = "hive_table";
   private static final String HUDI_TABLE_NAME = "hudi_table";
+  private static final String CATALOG = "";
+  private static HiveClientPool hiveClientPool;
 
   @BeforeAll
-  public static void prepare() throws TException {
+  public static void prepare() throws Exception {
+    String hiveMetastoreUris = hiveConf.get(HiveConf.ConfVars.METASTOREURIS.varname);
+
     Map<String, String> props = Maps.newHashMap();
-    props.put(URI, hiveConf.get(HiveConf.ConfVars.METASTOREURIS.varname));
+    props.put(URI, hiveMetastoreUris);
     ops.initialize(props);
 
-    // create a hive table
-    Table table = new Table();
-    table.setDbName(DB_NAME);
-    table.setTableName(HIVE_TABLE_NAME);
-    StorageDescriptor strgDesc = new StorageDescriptor();
-    strgDesc.setCols(Lists.newArrayList(new FieldSchema("col1", "string", "description")));
-    strgDesc.setSerdeInfo(new SerDeInfo());
-    table.setSd(strgDesc);
-    metastoreClient.createTable(table);
+    Properties properties = new Properties();
+    properties.setProperty(HiveConf.ConfVars.METASTOREURIS.varname, hiveMetastoreUris);
+    hiveClientPool = new HiveClientPool(1, properties);
+
+    // create a hive table using HiveClient
+    createHiveTable();
 
     // use Spark to create a hudi table
     SparkSession sparkSession =
         SparkSession.builder()
             .master("local[1]")
             .appName("Hudi Catalog integration test")
-            .config("hive.metastore.uris", hiveConf.get(HiveConf.ConfVars.METASTOREURIS.varname))
+            .config("hive.metastore.uris", hiveMetastoreUris)
             .config("spark.serializer", "org.apache.spark.serializer.KryoSerializer")
             .config("spark.sql.extensions", "org.apache.spark.sql.hudi.HoodieSparkSessionExtension")
             .config(
@@ -92,15 +93,46 @@ public class TestHudiHMSBackendOps extends MiniHiveMetastoreService {
         String.format("CREATE TABLE %s.%s (ts BIGINT) USING HUDI", DB_NAME, HUDI_TABLE_NAME));
   }
 
+  private static void createHiveTable() throws Exception {
+    Column col = Column.of("col1", Types.StringType.get(), "description");
+
+    HiveTable hiveTable =
+        HiveTable.builder()
+            .withName(HIVE_TABLE_NAME)
+            .withColumns(new Column[] {col})
+            .withComment("description")
+            .withProperties(new HashMap<>())
+            .withAuditInfo(
+                AuditInfo.builder()
+                    .withCreator(System.getProperty("user.name", "gravitino"))
+                    .withCreateTime(Instant.now())
+                    .build())
+            .withCatalogName(CATALOG)
+            .withDatabaseName(DB_NAME)
+            .build();
+
+    hiveClientPool.run(
+        (HiveClient client) -> {
+          client.createTable(hiveTable);
+          return null;
+        });
+  }
+
   @AfterAll
-  public static void cleanup() throws TException {
+  public static void cleanup() throws Exception {
+    if (hiveClientPool != null) {
+      hiveClientPool.close();
+    }
     ops.close();
   }
 
   @Test
   public void testInitialize() {
     try (HudiHMSBackendOps ops = new HudiHMSBackendOps()) {
-      ops.initialize(ImmutableMap.of());
+      String hiveMetastoreUris = hiveConf.get(HiveConf.ConfVars.METASTOREURIS.varname);
+      Map<String, String> props = Maps.newHashMap();
+      props.put(URI, hiveMetastoreUris);
+      ops.initialize(props);
       Assertions.assertNotNull(ops.clientPool);
     }
   }

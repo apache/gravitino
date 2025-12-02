@@ -28,6 +28,7 @@ import java.io.File;
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
+import java.util.Properties;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.Schema;
@@ -72,8 +73,11 @@ public class HudiHMSBackendOps implements HudiCatalogBackendOps {
   @Override
   public void initialize(Map<String, String> properties) {
     HiveConf hiveConf = buildHiveConfAndInitKerberosAuth(properties);
-    // todo yuhui: add more configurations if needed
-    this.clientPool = new CachedClientPool(null, properties);
+    Properties clientProperties = new Properties();
+    for (Map.Entry<String, String> entry : hiveConf) {
+      clientProperties.setProperty(entry.getKey(), entry.getValue());
+    }
+    this.clientPool = new CachedClientPool(clientProperties, properties);
   }
 
   @Override
@@ -196,7 +200,8 @@ public class HudiHMSBackendOps implements HudiCatalogBackendOps {
     // simplify the logic, we just check the prefix of the input format
 
     // todo yuhui: better way to identify Hudi table?
-    return true;
+    String inputFormat = table.properties().get("input-format");
+    return inputFormat != null && inputFormat.startsWith(HUDI_PACKAGE_PREFIX);
   }
 
   private HiveConf buildHiveConfAndInitKerberosAuth(Map<String, String> properties) {

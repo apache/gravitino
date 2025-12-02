@@ -18,8 +18,10 @@
  */
 package org.apache.gravitino.catalog.lakehouse.hudi.backend.hms;
 
+import org.apache.gravitino.catalog.lakehouse.hudi.HudiColumn;
 import org.apache.gravitino.catalog.lakehouse.hudi.HudiTable;
 import org.apache.gravitino.meta.AuditInfo;
+import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Table;
 
 public class HudiHMSTable extends HudiTable<Table> {
@@ -56,7 +58,21 @@ public class HudiHMSTable extends HudiTable<Table> {
     protected HudiHMSTable buildFromTable(Table hmsTable) {
       name = hmsTable.name();
       comment = hmsTable.comment();
-      columns = hmsTable.columns();
+      Column[] backendColumns = hmsTable.columns();
+      HudiColumn[] hudiColumns = new HudiColumn[backendColumns.length];
+      for (int i = 0; i < backendColumns.length; i++) {
+        Column c = backendColumns[i];
+        hudiColumns[i] =
+            HudiColumn.builder()
+                .withName(c.name())
+                .withComment(c.comment())
+                .withType(c.dataType())
+                .withNullable(c.nullable())
+                .withAutoIncrement(c.autoIncrement())
+                .withDefaultValue(c.defaultValue())
+                .build();
+      }
+      columns = hudiColumns;
       partitioning = hmsTable.partitioning();
 
       sortOrders = hmsTable.sortOrder();
