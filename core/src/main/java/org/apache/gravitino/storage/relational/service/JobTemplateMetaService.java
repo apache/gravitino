@@ -205,17 +205,17 @@ public class JobTemplateMetaService {
     return jobTemplatePO;
   }
 
-  public long getJobTemplateIdByMetalakeIdAndName(long metalakeId, String fullName) {
+  public long getJobTemplateIdByMetalakeIdAndName(long metalakeId, String name) {
     Long jobTemplateId =
         SessionUtils.getWithoutCommit(
             JobTemplateMetaMapper.class,
-            mapper -> mapper.selectJobTemplateIdByMetalakeAndName(metalakeId, fullName));
+            mapper -> mapper.selectJobTemplateIdByMetalakeAndName(metalakeId, name));
 
     if (jobTemplateId == null) {
       throw new NoSuchEntityException(
           NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
           Entity.EntityType.JOB_TEMPLATE.name().toLowerCase(Locale.ROOT),
-          fullName);
+          name);
     }
     return jobTemplateId;
   }
