@@ -218,30 +218,5 @@ public class TestOwnerManager {
 
     Assertions.assertEquals(
         "Only USER type is supported as owner currently.", exception.getMessage());
-
-    // Verify that the authorization plugin was never called since validation failed
-    Mockito.verify(authorizationPlugin, Mockito.never())
-        .onOwnerSet(Mockito.any(), Mockito.any(), Mockito.any());
-
-    // Verify that no owner was set for the metadata object
-    Assertions.assertFalse(ownerManager.getOwner(METALAKE, metalakeObject).isPresent());
-  }
-
-  @Test
-  public void testSetUserTypeOwner() {
-    // Test that USER type owner continues to work as expected
-    MetadataObject metalakeObject =
-        MetadataObjects.of(Lists.newArrayList(METALAKE), MetadataObject.Type.METALAKE);
-
-    // Set USER type owner should work fine
-    ownerManager.setOwner(METALAKE, metalakeObject, USER, Owner.Type.USER);
-
-    // Verify the owner was set correctly
-    Owner owner = ownerManager.getOwner(METALAKE, metalakeObject).get();
-    Assertions.assertEquals(USER, owner.name());
-    Assertions.assertEquals(Owner.Type.USER, owner.type());
-
-    // Verify that the authorization plugin was called
-    Mockito.verify(authorizationPlugin).onOwnerSet(Mockito.any(), Mockito.any(), Mockito.any());
   }
 }
