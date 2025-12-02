@@ -153,9 +153,11 @@ public class HiveContainer extends BaseContainer {
             });
 
     final String showDatabaseSQL = "show databases";
+    // Starting both the regular Hive cluster and the Kerberos-enabled Hive cluster at the same time
+    // takes a long time.
     await()
-        .atMost(30, TimeUnit.SECONDS)
-        .pollInterval(30 / retryLimit, TimeUnit.SECONDS)
+        .atMost(120, TimeUnit.SECONDS)
+        .pollInterval(120 / retryLimit, TimeUnit.SECONDS)
         .until(
             () -> {
               try {
@@ -172,8 +174,8 @@ public class HiveContainer extends BaseContainer {
         "CREATE TABLE IF NOT EXISTS default.employee ( eid int, name String, "
             + "salary String, destination String) ";
     await()
-        .atMost(30, TimeUnit.SECONDS)
-        .pollInterval(30 / retryLimit, TimeUnit.SECONDS)
+        .atMost(120, TimeUnit.SECONDS)
+        .pollInterval(120 / retryLimit, TimeUnit.SECONDS)
         .until(
             () -> {
               try {
