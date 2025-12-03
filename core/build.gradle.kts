@@ -52,6 +52,7 @@ dependencies {
     exclude(group = "org.apache.commons", module = "commons-lang3") // provided by gravitino
     exclude(group = "org.junit.jupiter", module = "*") // provided by test scope
     exclude(group = "com.fasterxml.jackson.jaxrs", module = "jackson-jaxrs-json-provider") // using gravitino's version
+    exclude(group = "org.apache.httpcomponents.client5", module = "*") // provided by gravitino
   }
   implementation(libs.mybatis)
 

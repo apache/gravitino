@@ -34,10 +34,20 @@ dependencies {
     exclude("*")
   }
 
-  implementation(libs.guava)
   implementation(libs.commons.lang3)
+  implementation(libs.guava)
+  implementation(libs.jackson.annotations)
+  implementation(libs.jackson.databind)
+  implementation(libs.jackson.datatype.jdk8)
+  implementation(libs.jackson.datatype.jsr310)
+  implementation(libs.jackson.jaxrs.json.provider)
   implementation(libs.lance.namespace.core) {
     exclude(group = "com.lancedb", module = "lance-core")
+    exclude(group = "com.google.guava", module = "guava") // provided by gravitino
+    exclude(group = "com.fasterxml.jackson.core", module = "*") // provided by gravitino
+    exclude(group = "com.fasterxml.jackson.datatype", module = "*") // provided by gravitino
+    exclude(group = "com.fasterxml.jackson.jaxrs", module = "jackson-jaxrs-json-provider") // using gravitino's version
+    exclude(group = "org.apache.opendal", module = "*")
   }
   implementation(libs.slf4j.api)
 

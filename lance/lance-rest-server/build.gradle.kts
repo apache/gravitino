@@ -32,14 +32,12 @@ dependencies {
   implementation(project(":core")) {
     exclude("*")
   }
+  implementation(project(":lance:lance-common"))
   implementation(project(":server-common")) {
     exclude("*")
   }
 
-  implementation(project(":lance:lance-common"))
-  implementation(libs.lance)
   implementation(libs.commons.lang3)
-
   implementation(libs.bundles.jetty)
   implementation(libs.bundles.jersey)
   implementation(libs.bundles.log4j)
@@ -48,6 +46,11 @@ dependencies {
   implementation(libs.commons.lang3)
   implementation(libs.lance.namespace.core) {
     exclude(group = "com.lancedb", module = "lance-core")
+    exclude(group = "com.google.guava", module = "guava") // provided by gravitino
+    exclude(group = "com.fasterxml.jackson.core", module = "*") // provided by gravitino
+    exclude(group = "com.fasterxml.jackson.datatype", module = "*") // provided by gravitino
+    exclude(group = "com.fasterxml.jackson.jaxrs", module = "jackson-jaxrs-json-provider") // using gravitino's version
+    exclude(group = "org.apache.opendal", module = "*")
   }
   implementation(libs.metrics.jersey2)
   implementation(libs.guava)
@@ -55,6 +58,7 @@ dependencies {
   implementation(libs.jackson.databind)
   implementation(libs.jackson.datatype.jdk8)
   implementation(libs.jackson.datatype.jsr310)
+  implementation(libs.jackson.jaxrs.json.provider)
 
   testImplementation(project(":clients:client-java"))
   testImplementation(project(":server"))
