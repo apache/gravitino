@@ -20,15 +20,9 @@
 package org.apache.gravitino.iceberg.service.authorization;
 
 import com.google.common.base.Preconditions;
-import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
-import org.apache.gravitino.iceberg.service.provider.DynamicIcebergConfigProvider;
 import org.apache.gravitino.iceberg.service.provider.IcebergConfigProvider;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 public class IcebergRESTServerContext {
-  private static final Logger LOG = LoggerFactory.getLogger(IcebergRESTServerContext.class);
-
   private boolean isAuthorizationEnabled;
   private String metalakeName;
   private String defaultCatalogName;
@@ -46,14 +40,6 @@ public class IcebergRESTServerContext {
 
   public static IcebergRESTServerContext create(
       IcebergConfigProvider configProvider, Boolean enableAuth) {
-    if (enableAuth && !(configProvider instanceof DynamicIcebergConfigProvider)) {
-      LOG.warn(
-          "Authorization is enabled but the Iceberg REST catalog-config-provider is not '{}'. "
-              + "Requests to Iceberg REST will fail until "
-              + "`gravitino.iceberg-rest.catalog-config-provider` is set to '{}'.",
-          IcebergConstants.DYNAMIC_ICEBERG_CATALOG_CONFIG_PROVIDER_NAME,
-          IcebergConstants.DYNAMIC_ICEBERG_CATALOG_CONFIG_PROVIDER_NAME);
-    }
     InstanceHolder.INSTANCE =
         new IcebergRESTServerContext(
             enableAuth, configProvider.getMetalakeName(), configProvider.getDefaultCatalogName());
