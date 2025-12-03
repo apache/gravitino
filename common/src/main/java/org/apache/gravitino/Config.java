@@ -86,10 +86,11 @@ public abstract class Config {
   public Config loadFromFile(String name) throws Exception {
     String confDir =
         Optional.ofNullable(System.getenv("GRAVITINO_CONF_DIR"))
-            .orElse(
-                Optional.ofNullable(System.getenv("GRAVITINO_HOME"))
-                    .map(s -> s + File.separator + "conf")
-                    .orElse(null));
+            .orElseGet(
+                () ->
+                    Optional.ofNullable(System.getenv("GRAVITINO_HOME"))
+                        .map(s -> s + File.separator + "conf")
+                        .orElse(null));
 
     if (confDir == null) {
       throw new IllegalArgumentException("GRAVITINO_CONF_DIR or GRAVITINO_HOME not set");
