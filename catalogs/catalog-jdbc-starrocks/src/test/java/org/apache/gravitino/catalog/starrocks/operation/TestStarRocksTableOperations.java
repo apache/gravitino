@@ -37,6 +37,7 @@ import org.apache.gravitino.catalog.jdbc.converter.JdbcTypeConverter;
 import org.apache.gravitino.catalog.jdbc.operation.JdbcTablePartitionOperations;
 import org.apache.gravitino.catalog.starrocks.converter.StarRocksTypeConverter;
 import org.apache.gravitino.catalog.starrocks.operations.StarRocksTablePartitionOperations;
+import org.apache.gravitino.exceptions.GravitinoRuntimeException;
 import org.apache.gravitino.integration.test.util.GravitinoITUtils;
 import org.apache.gravitino.rel.TableChange;
 import org.apache.gravitino.rel.expressions.Expression;
@@ -58,11 +59,9 @@ import org.apache.gravitino.rel.types.Types;
 import org.apache.gravitino.utils.RandomNameUtils;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.testcontainers.shaded.org.awaitility.Awaitility;
 
-@Tag("gravitino-docker-test")
 public class TestStarRocksTableOperations extends TestStarRocks {
   private static final JdbcTypeConverter TYPE_CONVERTER = new StarRocksTypeConverter();
   private static final Type VARCHAR_255 = Types.VarCharType.of(255);
@@ -609,14 +608,16 @@ public class TestStarRocksTableOperations extends TestStarRocks {
             TABLE_OPERATIONS.alterTable(
                 databaseName, tableName, TableChange.setProperty("replication_num", "1")));
 
-    Assertions.assertDoesNotThrow(
+    Assertions.assertThrows(
+        GravitinoRuntimeException.class,
         () ->
             TABLE_OPERATIONS.alterTable(
                 databaseName,
                 tableName,
                 TableChange.setProperty("dynamic_partition.enable", "true")));
 
-    Assertions.assertDoesNotThrow(
+    Assertions.assertThrows(
+        GravitinoRuntimeException.class,
         () ->
             TABLE_OPERATIONS.alterTable(
                 databaseName, tableName, TableChange.setProperty("binlog.enable", "true")));
