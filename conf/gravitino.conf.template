@@ -93,6 +93,11 @@ gravitino.iceberg-rest.httpPort = 9001
 gravitino.iceberg-rest.catalog-backend = memory
 # The warehouse directory of Iceberg catalog for Iceberg REST service
 gravitino.iceberg-rest.warehouse = /tmp/
+# If authorization is enabled, use the dynamic config provider and point it at a metalake
+# gravitino.iceberg-rest.catalog-config-provider = dynamic-config-provider
+# gravitino.iceberg-rest.gravitino-uri = http://localhost:8090
+# gravitino.iceberg-rest.gravitino-metalake = <metalake-name>
+# gravitino.iceberg-rest.default-catalog-name = <default-iceberg-catalog>
 
 # Lance REST service classpath
 gravitino.lance-rest.classpath = lance-rest-server/libs
