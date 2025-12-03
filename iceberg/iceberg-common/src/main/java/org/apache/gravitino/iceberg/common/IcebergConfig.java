@@ -283,10 +283,24 @@ public class IcebergConfig extends Config implements OverwriteDefaultConfig {
           .intConf()
           .createWithDefault(60);
 
+  public static final ConfigEntry<String> SCAN_PLAN_CACHE_IMPL =
+      new ConfigBuilder(IcebergConstants.SCAN_PLAN_CACHE_IMPL)
+          .doc(
+              "The implementation of the scan plan cache. Gravitino provides a built-in "
+                  + "LocalScanPlanCache that stores cached data in memory. If not specified, "
+                  + "LocalScanPlanCache will be used by default. You can implement a custom scan plan "
+                  + "cache by implementing the ScanPlanCache interface.")
+          .version(ConfigConstants.VERSION_1_1_0)
+          .stringConf()
+          .create();
+
   public static final ConfigEntry<Integer> SCAN_PLAN_CACHE_CAPACITY =
       new ConfigBuilder(IcebergConstants.SCAN_PLAN_CACHE_CAPACITY)
           .doc(
-              "Maximum number of scan plan results to cache. Larger values allow more queries to benefit from caching but use more memory.")
+              "Maximum number of scan plan results to cache. Larger values allow more queries to benefit "
+                  + "from caching but use more memory. Each cached entry stores the complete scan plan response, "
+                  + "which can be large for tables with many files. A typical scan plan might be several KB to MB "
+                  + "depending on table size.")
           .version(ConfigConstants.VERSION_1_1_0)
           .intConf()
           .createWithDefault(200);
