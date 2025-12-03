@@ -18,9 +18,12 @@
  */
 package org.apache.gravitino.iceberg.server;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import java.util.Map;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.GravitinoEnv;
+import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import org.apache.gravitino.iceberg.RESTService;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
 import org.apache.gravitino.server.ServerConfig;
@@ -70,6 +73,9 @@ public class GravitinoIcebergRESTServer {
     LOG.info("Starting Gravitino Iceberg REST Server");
     String confPath = System.getenv("GRAVITINO_TEST") == null ? "" : args[0];
     ServerConfig serverConfig = ServerConfig.loadConfig(confPath, CONF_FILE);
+    Map<String, String> icebergConfigs =
+        serverConfig.getConfigsWithPrefix(IcebergConfig.ICEBERG_CONFIG_PREFIX);
+    validateAuthorizationConfig(serverConfig.get(Configs.ENABLE_AUTHORIZATION), icebergConfigs);
     Preconditions.checkArgument(
         !serverConfig.get(Configs.ENABLE_AUTHORIZATION),
         "Iceberg REST server standalone mode doesn't support authorization.");
@@ -107,5 +113,20 @@ public class GravitinoIcebergRESTServer {
     } catch (Exception e) {
       LOG.error("Error while stopping Gravitino Iceberg REST Server", e);
     }
+  }
+
+  @VisibleForTesting
+  static void validateAuthorizationConfig(
+      boolean enableAuthorization, Map<String, String> icebergConfigs) {
+    if (!enableAuthorization) {
+      return;
+    }
+
+    IcebergConfig icebergConfig = new IcebergConfig(icebergConfigs);
+    Preconditions.checkArgument(
+        IcebergConstants.DYNAMIC_ICEBERG_CATALOG_CONFIG_PROVIDER_NAME.equals(
+            icebergConfig.get(IcebergConfig.ICEBERG_REST_CATALOG_CONFIG_PROVIDER)),
+        "When authorization is enabled, set "
+            + "`gravitino.iceberg-rest.catalog-config-provider=dynamic-config-provider`.");
   }
 }
