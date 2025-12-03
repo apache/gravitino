@@ -19,7 +19,6 @@
 
 package org.apache.gravitino.iceberg.integration.test;
 
-import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
@@ -27,7 +26,6 @@ import org.apache.gravitino.credential.AzureAccountKeyCredential;
 import org.apache.gravitino.credential.CredentialConstants;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
 import org.apache.gravitino.integration.test.util.BaseIT;
-import org.apache.gravitino.integration.test.util.DownloaderUtils;
 import org.apache.gravitino.integration.test.util.ITUtils;
 import org.apache.gravitino.storage.AzureProperties;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
@@ -56,12 +54,6 @@ public class IcebergRESTAzureAccountKeyIT extends IcebergRESTJdbcCatalogIT {
 
     if (ITUtils.isEmbedded()) {
       return;
-    }
-    try {
-      downloadIcebergAzureBundleJar();
-    } catch (IOException e) {
-      LOG.warn("Download Iceberg Azure bundle jar failed,", e);
-      throw new RuntimeException(e);
     }
     copyAzureBundleJar();
   }
@@ -99,20 +91,9 @@ public class IcebergRESTAzureAccountKeyIT extends IcebergRESTJdbcCatalogIT {
     return configMap;
   }
 
-  private void downloadIcebergAzureBundleJar() throws IOException {
-    String icebergBundleJarUri =
-        String.format(
-            "https://repo1.maven.org/maven2/org/apache/iceberg/"
-                + "iceberg-azure-bundle/%s/iceberg-azure-bundle-%s.jar",
-            ITUtils.icebergVersion(), ITUtils.icebergVersion());
-    String gravitinoHome = System.getenv("GRAVITINO_HOME");
-    String targetDir = String.format("%s/iceberg-rest-server/libs/", gravitinoHome);
-    DownloaderUtils.downloadFile(icebergBundleJarUri, targetDir);
-  }
-
   private void copyAzureBundleJar() {
     String gravitinoHome = System.getenv("GRAVITINO_HOME");
     String targetDir = String.format("%s/iceberg-rest-server/libs/", gravitinoHome);
-    BaseIT.copyBundleJarsToDirectory("azure", targetDir);
+    BaseIT.copyBundleJarsToDirectory("iceberg-azure-bundle", targetDir);
   }
 }

@@ -132,7 +132,6 @@ const CreateCatalogDialog = props => {
       return item
     })
     setInnerProps(updateProps)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [catalogBackendSelect])
 
   const handleFormChange = ({ index, event }) => {
@@ -340,8 +339,6 @@ const CreateCatalogDialog = props => {
         break
       }
     }
-
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [typeSelect, open])
 
   useEffect(() => {
@@ -358,8 +355,6 @@ const CreateCatalogDialog = props => {
       setInnerProps(defaultProps)
       setValue('propItems', defaultProps)
     }
-
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [providerSelect])
 
   useEffect(() => {

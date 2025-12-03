@@ -29,9 +29,10 @@ import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.GravitinoEnv;
+import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.UserPrincipal;
-import org.apache.gravitino.authorization.Privilege;
+import org.apache.gravitino.dto.tag.MetadataObjectDTO;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.PrincipalUtils;
 import org.junit.jupiter.api.AfterAll;
@@ -59,38 +60,6 @@ public class TestMetadataAuthzHelper {
   public static void stop() {
     if (mockedStaticGravitinoEnv != null) {
       mockedStaticGravitinoEnv.close();
-    }
-  }
-
-  @Test
-  public void testFilter() {
-    makeCompletableFutureUseCurrentThread();
-    try (MockedStatic<PrincipalUtils> principalUtilsMocked = mockStatic(PrincipalUtils.class);
-        MockedStatic<GravitinoAuthorizerProvider> mockStatic =
-            mockStatic(GravitinoAuthorizerProvider.class)) {
-      principalUtilsMocked
-          .when(PrincipalUtils::getCurrentPrincipal)
-          .thenReturn(new UserPrincipal("tester"));
-      principalUtilsMocked.when(() -> PrincipalUtils.doAs(any(), any())).thenCallRealMethod();
-
-      GravitinoAuthorizerProvider mockedProvider = mock(GravitinoAuthorizerProvider.class);
-      mockStatic.when(GravitinoAuthorizerProvider::getInstance).thenReturn(mockedProvider);
-      when(mockedProvider.getGravitinoAuthorizer()).thenReturn(new MockGravitinoAuthorizer());
-      NameIdentifier[] nameIdentifiers = new NameIdentifier[3];
-      nameIdentifiers[0] = NameIdentifierUtil.ofSchema("testMetalake", "testCatalog", "testSchema");
-      nameIdentifiers[1] =
-          NameIdentifierUtil.ofSchema("testMetalake", "testCatalog", "testSchema2");
-      nameIdentifiers[2] =
-          NameIdentifierUtil.ofSchema("testMetalake", "testCatalog2", "testSchema");
-      NameIdentifier[] filtered =
-          MetadataAuthzHelper.filterByPrivilege(
-              "testMetalake",
-              Entity.EntityType.SCHEMA,
-              Privilege.Name.USE_SCHEMA.name(),
-              nameIdentifiers);
-      Assertions.assertEquals(2, filtered.length);
-      Assertions.assertEquals("testMetalake.testCatalog.testSchema", filtered[0].toString());
-      Assertions.assertEquals("testMetalake.testCatalog2.testSchema", filtered[1].toString());
     }
   }
 
@@ -128,6 +97,96 @@ public class TestMetadataAuthzHelper {
       Assertions.assertEquals(2, filtered2.length);
       Assertions.assertEquals("testMetalake.testCatalog.testSchema", filtered2[0].toString());
       Assertions.assertEquals("testMetalake.testCatalog.testSchema2", filtered2[1].toString());
+    }
+  }
+
+  @Test
+  public void testFilterMetadataObject() {
+    makeCompletableFutureUseCurrentThread();
+    try (MockedStatic<PrincipalUtils> principalUtilsMocked = mockStatic(PrincipalUtils.class);
+        MockedStatic<GravitinoAuthorizerProvider> mockStatic =
+            mockStatic(GravitinoAuthorizerProvider.class)) {
+      principalUtilsMocked
+          .when(PrincipalUtils::getCurrentPrincipal)
+          .thenReturn(new UserPrincipal("tester"));
+      principalUtilsMocked.when(() -> PrincipalUtils.doAs(any(), any())).thenCallRealMethod();
+
+      GravitinoAuthorizerProvider mockedProvider = mock(GravitinoAuthorizerProvider.class);
+      mockStatic.when(GravitinoAuthorizerProvider::getInstance).thenReturn(mockedProvider);
+      when(mockedProvider.getGravitinoAuthorizer()).thenReturn(new MockGravitinoAuthorizer());
+
+      // Create test MetadataObjectDTO instances
+      MetadataObjectDTO[] metadataObjects = new MetadataObjectDTO[3];
+      metadataObjects[0] =
+          MetadataObjectDTO.builder()
+              .withName("testSchema")
+              .withParent("testCatalog")
+              .withType(MetadataObject.Type.SCHEMA)
+              .build();
+      metadataObjects[1] =
+          MetadataObjectDTO.builder()
+              .withName("testSchema2")
+              .withParent("testCatalog")
+              .withType(MetadataObject.Type.SCHEMA)
+              .build();
+      metadataObjects[2] =
+          MetadataObjectDTO.builder()
+              .withName("testSchema3")
+              .withParent("testCatalog2")
+              .withType(MetadataObject.Type.SCHEMA)
+              .build();
+
+      MetadataObjectDTO[] filtered =
+          MetadataAuthzHelper.filterMetadataObject("testMetalake", metadataObjects);
+
+      // Based on the MockGravitinoAuthorizer, 2 of the 3 schemas should be accessible
+      Assertions.assertEquals(1, filtered.length);
+      Assertions.assertEquals("testSchema", filtered[0].name());
+    }
+  }
+
+  @Test
+  public void testFilterMetadataObjectDTO() {
+    makeCompletableFutureUseCurrentThread();
+    try (MockedStatic<PrincipalUtils> principalUtilsMocked = mockStatic(PrincipalUtils.class);
+        MockedStatic<GravitinoAuthorizerProvider> mockStatic =
+            mockStatic(GravitinoAuthorizerProvider.class)) {
+      principalUtilsMocked
+          .when(PrincipalUtils::getCurrentPrincipal)
+          .thenReturn(new UserPrincipal("tester"));
+      principalUtilsMocked.when(() -> PrincipalUtils.doAs(any(), any())).thenCallRealMethod();
+
+      GravitinoAuthorizerProvider mockedProvider = mock(GravitinoAuthorizerProvider.class);
+      mockStatic.when(GravitinoAuthorizerProvider::getInstance).thenReturn(mockedProvider);
+      when(mockedProvider.getGravitinoAuthorizer()).thenReturn(new MockGravitinoAuthorizer());
+
+      // Create test MetadataObjectDTO instances
+      MetadataObjectDTO[] metadataObjects = new MetadataObjectDTO[3];
+      metadataObjects[0] =
+          MetadataObjectDTO.builder()
+              .withName("testSchema")
+              .withParent("testCatalog")
+              .withType(MetadataObject.Type.SCHEMA)
+              .build();
+      metadataObjects[1] =
+          MetadataObjectDTO.builder()
+              .withName("testSchema2")
+              .withParent("testCatalog")
+              .withType(MetadataObject.Type.SCHEMA)
+              .build();
+      metadataObjects[2] =
+          MetadataObjectDTO.builder()
+              .withName("testSchema3")
+              .withParent("testCatalog")
+              .withType(MetadataObject.Type.SCHEMA)
+              .build();
+
+      MetadataObjectDTO[] filtered =
+          MetadataAuthzHelper.filterMetadataObject("testMetalake", metadataObjects);
+
+      // Based on the MockGravitinoAuthorizer, 2 of the 3 tables should be accessible
+      Assertions.assertEquals(1, filtered.length);
+      Assertions.assertEquals("testSchema", filtered[0].name());
     }
   }
 

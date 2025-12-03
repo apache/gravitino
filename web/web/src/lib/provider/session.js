@@ -65,10 +65,20 @@ const AuthProvider = ({ children }) => {
   }, [isIdle])
 
   const goToMetalakeListPage = () => {
-    if (paramsSize) {
-      router.refresh()
-    } else {
-      router.push('/metalakes')
+    try {
+      let pathname = window.location.pathname
+
+      // Remove /ui prefix since Next.js basePath will add it automatically
+      if (pathname.startsWith('/ui')) {
+        pathname = pathname.slice(3) || '/'
+      }
+      if (pathname === '/' || pathname === '') {
+        router.replace('/metalakes')
+      } else {
+        router.replace(pathname + window.location.search)
+      }
+    } catch (e) {
+      router.replace('/metalakes')
     }
   }
 
@@ -105,7 +115,6 @@ const AuthProvider = ({ children }) => {
     }
 
     initAuth()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const values = {

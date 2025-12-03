@@ -159,7 +159,7 @@ Gravitino supports custom credentials, you can implement the `org.apache.graviti
 
 ## Deployment
 
-Besides setting credentials related configuration, please download Gravitino cloud bundle jar and place it in the classpath of Iceberg REST server or Hadoop catalog.
+Besides setting credentials related configuration, please download the related cloud bundle jar and place it in the classpath of Iceberg REST server or Fileset catalog.
 
 For Fileset catalog, please use Gravitino cloud bundle jar with Hadoop and cloud packages:
 
@@ -168,15 +168,15 @@ For Fileset catalog, please use Gravitino cloud bundle jar with Hadoop and cloud
 - [Gravitino GCP bundle jar with Hadoop and cloud packages](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-gcp-bundle)
 - [Gravitino Azure bundle jar with Hadoop and cloud packages](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-azure-bundle)
 
-For Iceberg REST catalog server, please use the Gravitino cloud bundle jar without Hadoop and cloud packages. Additionally, download the corresponding Iceberg cloud packages.
+For Iceberg REST catalog server, please download the corresponding Gravitino cloud packages.
 
-- [Gravitino AWS bundle jar without Hadoop and cloud packages](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-aws)
-- [Gravitino Aliyun bundle jar without Hadoop and cloud packages](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-aliyun)
-- [Gravitino GCP bundle jar without Hadoop and cloud packages](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-gcp)
-- [Gravitino Azure bundle jar without Hadoop and cloud packages](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-azure)
+- [Gravitino Iceberg AWS bundle JAR](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-iceberg-aws-bundle)
+- [Gravitino Iceberg GCP bundle JAR](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-iceberg-aliyun-bundle)
+- [Gravitino Iceberg Aliyun bundle JAR](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-iceberg-gcp-bundle)
+- [Gravitino Iceberg Azure bundle JAR](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-iceberg-azure-bundle)
 
 :::note
-For OSS, Iceberg doesn't provide Iceberg Aliyun bundle jar which contains OSS packages, you could provide the OSS jar by yourself or use [Gravitino Aliyun bundle jar with Hadoop and cloud packages](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-aliyun-bundle), please refer to [OSS configuration](../iceberg-rest-service.md#oss-configuration) for more details.
+Since Gravitino 1.1.0, the above Gravitino Iceberg cloud bundle jars have already included the Iceberg cloud bundle jars, no need to download and include them separately.
 :::
 
 The classpath of the server:
@@ -190,7 +190,7 @@ The classpath of the server:
 
 Suppose the Iceberg table data is stored in S3, follow the steps below:
 
-1. Download the [Gravitino AWS bundle jar without hadoop packages](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-aws), and place it to the classpath of Iceberg REST server.
+1. Download the [Gravitino Iceberg AWS bundle JAR](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-iceberg-aws-bundle), and place it in the classpath of Iceberg REST server.
 
 2. Add s3 token credential configurations.
 
@@ -204,7 +204,7 @@ gravitino.iceberg-rest.s3-region = {region_name}
 gravitino.iceberg-rest.s3-role-arn = {role_arn}
 ```
 
-3. Exploring the Iceberg table with Spark client with credential vending enabled.
+3. Exploring the Iceberg table with a Spark client with credential vending enabled.
 
 ```shell
 ./bin/spark-sql -v \

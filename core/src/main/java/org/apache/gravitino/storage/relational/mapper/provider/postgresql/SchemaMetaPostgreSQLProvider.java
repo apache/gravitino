@@ -57,6 +57,34 @@ public class SchemaMetaPostgreSQLProvider extends SchemaMetaBaseSQLProvider {
   }
 
   @Override
+  public String updateSchemaMeta(
+      @Param("newSchemaMeta") SchemaPO newSchemaPO, @Param("oldSchemaMeta") SchemaPO oldSchemaPO) {
+    return "UPDATE "
+        + TABLE_NAME
+        + " SET schema_name = #{newSchemaMeta.schemaName},"
+        + " metalake_id = #{newSchemaMeta.metalakeId},"
+        + " catalog_id = #{newSchemaMeta.catalogId},"
+        + " schema_comment = #{newSchemaMeta.schemaComment},"
+        + " properties = #{newSchemaMeta.properties},"
+        + " audit_info = #{newSchemaMeta.auditInfo},"
+        + " current_version = #{newSchemaMeta.currentVersion},"
+        + " last_version = #{newSchemaMeta.lastVersion},"
+        + " deleted_at = #{newSchemaMeta.deletedAt}"
+        + " WHERE schema_id = #{oldSchemaMeta.schemaId}"
+        + " AND schema_name = #{oldSchemaMeta.schemaName}"
+        + " AND metalake_id = #{oldSchemaMeta.metalakeId}"
+        + " AND catalog_id = #{oldSchemaMeta.catalogId}"
+        + " AND (schema_comment = #{oldSchemaMeta.schemaComment}"
+        + "   OR (CAST(schema_comment AS VARCHAR) IS NULL"
+        + "   AND CAST(#{oldSchemaMeta.schemaComment} AS VARCHAR) IS NULL))"
+        + " AND properties = #{oldSchemaMeta.properties}"
+        + " AND audit_info = #{oldSchemaMeta.auditInfo}"
+        + " AND current_version = #{oldSchemaMeta.currentVersion}"
+        + " AND last_version = #{oldSchemaMeta.lastVersion}"
+        + " AND deleted_at = 0";
+  }
+
+  @Override
   public String softDeleteSchemaMetasBySchemaId(Long schemaId) {
     return "UPDATE "
         + TABLE_NAME

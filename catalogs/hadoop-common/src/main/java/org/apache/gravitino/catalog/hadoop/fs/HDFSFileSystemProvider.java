@@ -30,6 +30,9 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 
 public class HDFSFileSystemProvider implements FileSystemProvider {
+  public static final String IPC_FALLBACK_TO_SIMPLE_AUTH_ALLOWED =
+      "hadoop.rpc.protection.fallback-to-simple-auth-allowed";
+  public static final String SCHEME_HDFS = "hdfs";
 
   @Override
   public FileSystem getFileSystem(@Nonnull Path path, @Nonnull Map<String, String> config)
@@ -42,7 +45,7 @@ public class HDFSFileSystemProvider implements FileSystemProvider {
 
   @Override
   public String scheme() {
-    return "hdfs";
+    return SCHEME_HDFS;
   }
 
   private Map<String, String> additionalHDFSConfig(Map<String, String> configs) {

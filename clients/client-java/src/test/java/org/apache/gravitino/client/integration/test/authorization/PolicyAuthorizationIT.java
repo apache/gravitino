@@ -25,6 +25,7 @@ import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Maps;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -33,6 +34,7 @@ import org.apache.gravitino.Catalog;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.authorization.Owner;
 import org.apache.gravitino.authorization.Privileges;
 import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.authorization.SecurableObjects;
@@ -372,6 +374,53 @@ public class PolicyAuthorizationIT extends BaseRestApiAuthorizationIT {
 
   @Test
   @Order(9)
+  public void testListObjForPolicy() {
+    GravitinoMetalake gravitinoMetalake = client.loadMetalake(METALAKE);
+    GravitinoMetalake gravitinoMetalakeLoadByNormalUser = normalUserClient.loadMetalake(METALAKE);
+    String[] tables =
+        Arrays.stream(
+                gravitinoMetalakeLoadByNormalUser
+                    .getPolicy("policy2")
+                    .associatedObjects()
+                    .objects())
+            .map(MetadataObject::name)
+            .toList()
+            .toArray(new String[0]);
+    Arrays.sort(tables);
+    Assertions.assertArrayEquals(new String[] {"table2", "table3"}, tables);
+    MetadataObject metadataObject =
+        MetadataObjects.of(ImmutableList.of(CATALOG, SCHEMA, "table2"), MetadataObject.Type.TABLE);
+    gravitinoMetalake.setOwner(metadataObject, USER, Owner.Type.USER);
+    gravitinoMetalake.grantPrivilegesToRole(
+        role, metadataObject, ImmutableSet.of(Privileges.SelectTable.deny()));
+    tables =
+        Arrays.stream(
+                gravitinoMetalakeLoadByNormalUser
+                    .getPolicy("policy2")
+                    .associatedObjects()
+                    .objects())
+            .map(MetadataObject::name)
+            .toList()
+            .toArray(new String[0]);
+    Arrays.sort(tables);
+    Assertions.assertArrayEquals(new String[] {"table3"}, tables);
+    assertThrows(
+        "Can not access metadata.",
+        ForbiddenException.class,
+        () -> {
+          gravitinoMetalakeLoadByNormalUser.getPolicy("policy1").associatedObjects().objects();
+        });
+    tables =
+        Arrays.stream(gravitinoMetalake.getPolicy("policy1").associatedObjects().objects())
+            .map(MetadataObject::name)
+            .toList()
+            .toArray(new String[0]);
+    Arrays.sort(tables);
+    Assertions.assertArrayEquals(new String[] {"table1"}, tables);
+  }
+
+  @Test
+  @Order(10)
   public void testDropPolicy() {
     GravitinoMetalake gravitinoMetalake = client.loadMetalake(METALAKE);
     GravitinoMetalake metalakeLoadByNormalUser = normalUserClient.loadMetalake(METALAKE);
