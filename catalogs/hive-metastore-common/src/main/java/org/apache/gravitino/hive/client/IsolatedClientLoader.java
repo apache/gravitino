@@ -34,6 +34,7 @@ import java.util.Properties;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.exceptions.GravitinoRuntimeException;
+import org.apache.gravitino.hive.client.HiveExceptionConverter.ExceptionTarget;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -111,7 +112,7 @@ public final class IsolatedClientLoader {
         throw e;
       }
     } catch (Exception e) {
-      throw HiveExceptionConverter.toGravitinoException(e, "");
+      throw HiveExceptionConverter.toGravitinoException(e, ExceptionTarget.other(""));
     }
   }
 
@@ -345,7 +346,7 @@ public final class IsolatedClientLoader {
       return createHiveClientImpl(metastoreClient);
     } catch (Exception e) {
       throw HiveExceptionConverter.toGravitinoException(
-          e, properties.getProperty("hive.metastore.uris"));
+          e, ExceptionTarget.other(properties.getProperty("hive.metastore.uris")));
     } finally {
       Thread.currentThread().setContextClassLoader(origLoader);
     }

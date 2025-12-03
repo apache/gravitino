@@ -20,6 +20,7 @@ package org.apache.gravitino.hive.client;
 
 import java.lang.reflect.InvocationTargetException;
 import java.util.Locale;
+import org.apache.gravitino.exceptions.AlreadyExistsException;
 import org.apache.gravitino.exceptions.ConnectionFailedException;
 import org.apache.gravitino.exceptions.GravitinoRuntimeException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
@@ -45,18 +46,65 @@ import org.apache.gravitino.exceptions.TableAlreadyExistsException;
  */
 public class HiveExceptionConverter {
 
+  private enum TargetType {
+    TABLE,
+    SCHEMA,
+    PARTITION,
+    CATALOG,
+    OTHER
+  }
+
+  /** Represents the target Hive object (name + type) associated with an operation. */
+  public static final class ExceptionTarget {
+    private final String name;
+    private final TargetType type;
+
+    private ExceptionTarget(String name, TargetType type) {
+      this.name = name;
+      this.type = type;
+    }
+
+    public static ExceptionTarget table(String name) {
+      return new ExceptionTarget(name, TargetType.TABLE);
+    }
+
+    public static ExceptionTarget schema(String name) {
+      return new ExceptionTarget(name, TargetType.SCHEMA);
+    }
+
+    public static ExceptionTarget catalog(String name) {
+      return new ExceptionTarget(name, TargetType.CATALOG);
+    }
+
+    public static ExceptionTarget partition(String name) {
+      return new ExceptionTarget(name, TargetType.PARTITION);
+    }
+
+    public static ExceptionTarget other(String name) {
+      return new ExceptionTarget(name, TargetType.OTHER);
+    }
+
+    public String name() {
+      return name;
+    }
+
+    public TargetType type() {
+      return type;
+    }
+  }
+
   private HiveExceptionConverter() {}
 
   /**
-   * Converts a generic exception to a Gravitino exception with a target Hive object name.
+   * Converts a generic exception to a Gravitino exception with a target Hive object.
    *
    * @param e The exception to convert
-   * @param targetName The Hive object name related to the operation (table, partition, etc.)
+   * @param target The Hive object related to the operation (table, partition, schema, etc.)
    * @return A Gravitino exception
    */
-  public static RuntimeException toGravitinoException(Exception e, String targetName) {
+  public static RuntimeException toGravitinoException(Exception e, ExceptionTarget target) {
     Throwable cause = unwrapException(e);
-    return convertException(cause, targetName);
+    return convertException(cause, target);
   }
 
   /**
@@ -81,11 +129,12 @@ public class HiveExceptionConverter {
    * Converts the exception to the appropriate Gravitino exception based on its type.
    *
    * @param cause The exception cause
+   * @param target The target Hive object of the operation
    * @return A Gravitino exception
    */
-  private static RuntimeException convertException(Throwable cause, String targetName) {
+  private static RuntimeException convertException(Throwable cause, ExceptionTarget target) {
     if (cause instanceof RuntimeException && cause.getCause() instanceof Exception) {
-      return toGravitinoException((Exception) cause.getCause(), targetName);
+      return toGravitinoException((Exception) cause.getCause(), target);
     }
 
     String message = cause.getMessage();
@@ -93,7 +142,7 @@ public class HiveExceptionConverter {
     String exceptionClassName = cause.getClass().getName();
 
     if (exceptionClassName.contains("AlreadyExistsException")) {
-      return toAlreadyExistsException(cause, lowerMessage, targetName, message);
+      return toAlreadyExistsException(cause, target, message);
     }
     if (exceptionClassName.contains("NoSuchObjectException")
         || exceptionClassName.contains("UnknownTableException")
@@ -101,43 +150,43 @@ public class HiveExceptionConverter {
         || exceptionClassName.contains("UnknownPartitionException")
         || exceptionClassName.contains("InvalidObjectException")
         || exceptionClassName.contains("InvalidPartitionException")) {
-      return toNoSuchObjectException(cause, lowerMessage, targetName, message);
+      return toNoSuchObjectException(cause, target, message);
     }
     if (exceptionClassName.contains("InvalidOperationException")) {
       if (isNonEmptySchemaMessage(lowerMessage)) {
         return new NonEmptySchemaException(
-            cause, "Hive schema %s is not empty in Hive Metastore", targetName);
+            cause, "Hive schema %s is not empty in Hive Metastore", target.name());
       }
       return new IllegalArgumentException(cause.getMessage(), cause);
     }
 
     if (exceptionClassName.contains("MetaException")) {
-      if (message.contains("Invalid partition key")) {
+      if (lowerMessage.contains("invalid partition key")) {
         return new NoSuchPartitionException(
-            cause, "Hive partition %s does not exist in Hive Metastore", targetName);
+            cause, "Hive partition %s does not exist in Hive Metastore", target.name());
       }
     }
 
     if (exceptionClassName.contains("TException")) {
       if (lowerMessage.contains("already exists")) {
-        return toAlreadyExistsException(cause, lowerMessage, targetName, message);
+        return toAlreadyExistsException(cause, target, message);
       }
       if (lowerMessage.contains("does not exist")
           || lowerMessage.contains("not found")
           || lowerMessage.contains("no such")
           || lowerMessage.contains("there is no")
           || lowerMessage.contains("invalid partition")) {
-        return toNoSuchObjectException(cause, lowerMessage, targetName, message);
+        return toNoSuchObjectException(cause, target, message);
       }
       if (isNonEmptySchemaMessage(lowerMessage)) {
         return new NonEmptySchemaException(
-            cause, "Hive schema %s is not empty in Hive Metastore", targetName);
+            cause, "Hive schema %s is not empty in Hive Metastore", target.name());
       }
     }
 
     if (isConnectionKeyword(lowerMessage)) {
       return new ConnectionFailedException(
-          cause, "Failed to connect to Hive Metastore: %s", targetName);
+          cause, "Failed to connect to Hive Metastore: %s", target.name());
     }
 
     if (cause instanceof RuntimeException) {
@@ -147,9 +196,6 @@ public class HiveExceptionConverter {
   }
 
   private static boolean isConnectionKeyword(String lowerMessage) {
-    if (lowerMessage == null) {
-      return false;
-    }
     return lowerMessage.contains("connection")
         || lowerMessage.contains("connect")
         || lowerMessage.contains("timeout")
@@ -157,61 +203,34 @@ public class HiveExceptionConverter {
   }
 
   private static boolean isNonEmptySchemaMessage(String lowerMessage) {
-    if (lowerMessage == null) {
-      return false;
-    }
     return (lowerMessage.contains("non-empty") || lowerMessage.contains("not empty"))
         && (lowerMessage.contains("schema") || lowerMessage.contains("database"));
   }
 
   private static RuntimeException toAlreadyExistsException(
-      Throwable cause, String lowerMessage, String target, String rawMessage) {
-    HiveObjectType objectType = detectObjectType(lowerMessage);
+      Throwable cause, ExceptionTarget target, String rawMessage) {
+    TargetType objectType = target.type();
     return switch (objectType) {
       case PARTITION -> new PartitionAlreadyExistsException(
-          cause, "Hive partition %s already exists in Hive Metastore", target);
+          cause, "Hive partition %s already exists in Hive Metastore", target.name());
       case TABLE -> new TableAlreadyExistsException(
-          cause, "Hive table %s already exists in Hive Metastore", target);
+          cause, "Hive table %s already exists in Hive Metastore", target.name());
       case SCHEMA -> new SchemaAlreadyExistsException(
-          cause, "Hive schema %s already exists in Hive Metastore", target);
-      default -> new GravitinoRuntimeException(cause, rawMessage);
+          cause, "Hive schema %s already exists in Hive Metastore", target.name());
+      default -> new AlreadyExistsException(cause, "%s", rawMessage);
     };
   }
 
   private static RuntimeException toNoSuchObjectException(
-      Throwable cause, String lowerMessage, String target, String rawMessage) {
-    HiveObjectType objectType = detectObjectType(lowerMessage);
-    return switch (objectType) {
+      Throwable cause, ExceptionTarget target, String rawMessage) {
+    return switch (target.type()) {
       case PARTITION -> new NoSuchPartitionException(
-          cause, "Hive partition %s does not exist in Hive Metastore", target);
+          cause, "Hive partition %s does not exist in Hive Metastore", target.name());
       case TABLE -> new NoSuchTableException(
-          cause, "Hive table %s does not exist in Hive Metastore", target);
+          cause, "Hive table %s does not exist in Hive Metastore", target.name());
       case SCHEMA -> new NoSuchSchemaException(
-          cause, "Hive schema %s does not exist in Hive Metastore", target);
+          cause, "Hive schema %s does not exist in Hive Metastore", target.name());
       default -> new NoSuchEntityException(cause, "%s", rawMessage);
     };
-  }
-
-  private static HiveObjectType detectObjectType(String lowerMessage) {
-    if (lowerMessage == null || lowerMessage.isEmpty()) {
-      return HiveObjectType.UNKNOWN;
-    }
-    if (lowerMessage.contains("partition")) {
-      return HiveObjectType.PARTITION;
-    }
-    if (lowerMessage.contains("table")) {
-      return HiveObjectType.TABLE;
-    }
-    if (lowerMessage.contains("schema") || lowerMessage.contains("database")) {
-      return HiveObjectType.SCHEMA;
-    }
-    return HiveObjectType.UNKNOWN;
-  }
-
-  private enum HiveObjectType {
-    TABLE,
-    SCHEMA,
-    PARTITION,
-    UNKNOWN
   }
 }

@@ -25,6 +25,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.hive.HivePartition;
 import org.apache.gravitino.hive.HiveSchema;
 import org.apache.gravitino.hive.HiveTable;
+import org.apache.gravitino.hive.client.HiveExceptionConverter.ExceptionTarget;
 import org.apache.gravitino.hive.converter.HiveDatabaseConverter;
 import org.apache.gravitino.hive.converter.HiveTableConverter;
 import org.apache.hadoop.hive.metastore.IMetaStoreClient;
@@ -137,7 +138,7 @@ class HiveShimV3 extends HiveShimV2 {
               org.apache.hadoop.hive.metastore.api.Partition.class, "setCatName", String.class);
 
     } catch (Exception e) {
-      throw HiveExceptionConverter.toGravitinoException(e, "HiveShimV3");
+      throw HiveExceptionConverter.toGravitinoException(e, ExceptionTarget.other("HiveShimV3"));
     }
   }
 
@@ -146,39 +147,64 @@ class HiveShimV3 extends HiveShimV2 {
     Database db = HiveDatabaseConverter.toHiveDb(database);
     String catalogName = database.catalogName();
     catalogName = StringUtils.isEmpty(catalogName) ? DEFAULT_HIVE3_CATALOG : catalogName;
-    invoke("", db, databaseSetCatalogNameMethod, catalogName);
-    invoke(database.name(), client, createDatabaseMethod, db);
+    invoke(ExceptionTarget.other(""), db, databaseSetCatalogNameMethod, catalogName);
+    invoke(ExceptionTarget.schema(database.name()), client, createDatabaseMethod, db);
   }
 
   @Override
   public List<String> getAllDatabases(String catalogName) {
-    return (List<String>) invoke(catalogName, client, getAllDatabasesMethod, catalogName);
+    return (List<String>)
+        invoke(ExceptionTarget.catalog(catalogName), client, getAllDatabasesMethod, catalogName);
   }
 
   @Override
   public HiveSchema getDatabase(String catalogName, String databaseName) {
     Database db =
-        (Database) invoke(databaseName, client, getDatabaseMethod, catalogName, databaseName);
+        (Database)
+            invoke(
+                ExceptionTarget.schema(databaseName),
+                client,
+                getDatabaseMethod,
+                catalogName,
+                databaseName);
     return HiveDatabaseConverter.fromHiveDB(db);
   }
 
   @Override
   public void alterDatabase(String catalogName, String databaseName, HiveSchema database) {
     Database db = HiveDatabaseConverter.toHiveDb(database);
-    invoke("", db, databaseSetCatalogNameMethod, catalogName);
-    invoke(databaseName, client, alterDatabaseMethod, catalogName, databaseName, db);
+    invoke(ExceptionTarget.other(""), db, databaseSetCatalogNameMethod, catalogName);
+    invoke(
+        ExceptionTarget.schema(databaseName),
+        client,
+        alterDatabaseMethod,
+        catalogName,
+        databaseName,
+        db);
   }
 
   @Override
   public void dropDatabase(String catalogName, String databaseName, boolean cascade) {
     invoke(
-        databaseName, client, dropDatabaseMethod, catalogName, databaseName, true, false, cascade);
+        ExceptionTarget.schema(databaseName),
+        client,
+        dropDatabaseMethod,
+        catalogName,
+        databaseName,
+        true,
+        false,
+        cascade);
   }
 
   @Override
   public List<String> getAllTables(String catalogName, String databaseName) {
     return (List<String>)
-        invoke(databaseName, client, getAllTablesMethod, catalogName, databaseName);
+        invoke(
+            ExceptionTarget.schema(databaseName),
+            client,
+            getAllTablesMethod,
+            catalogName,
+            databaseName);
   }
 
   @Override
@@ -187,7 +213,7 @@ class HiveShimV3 extends HiveShimV2 {
     Object pageSizeArg = convertPageSize(listTableNamesByFilterMethod, 3, pageSize);
     return (List<String>)
         invoke(
-            databaseName,
+            ExceptionTarget.schema(databaseName),
             client,
             listTableNamesByFilterMethod,
             catalogName,
@@ -200,7 +226,13 @@ class HiveShimV3 extends HiveShimV2 {
   public HiveTable getTable(String catalogName, String databaseName, String tableName) {
     var tb =
         (org.apache.hadoop.hive.metastore.api.Table)
-            invoke(tableName, client, getTableMethod, catalogName, databaseName, tableName);
+            invoke(
+                ExceptionTarget.table(tableName),
+                client,
+                getTableMethod,
+                catalogName,
+                databaseName,
+                tableName);
     return HiveTableConverter.fromHiveTable(tb);
   }
 
@@ -208,8 +240,15 @@ class HiveShimV3 extends HiveShimV2 {
   public void alterTable(
       String catalogName, String databaseName, String tableName, HiveTable alteredHiveTable) {
     var tb = HiveTableConverter.toHiveTable(alteredHiveTable);
-    invoke("", tb, tableSetCatalogNameMethod, catalogName);
-    invoke(tableName, client, alterTableMethod, catalogName, databaseName, tableName, tb);
+    invoke(ExceptionTarget.other(""), tb, tableSetCatalogNameMethod, catalogName);
+    invoke(
+        ExceptionTarget.table(tableName),
+        client,
+        alterTableMethod,
+        catalogName,
+        databaseName,
+        tableName,
+        tb);
   }
 
   @Override
@@ -220,7 +259,7 @@ class HiveShimV3 extends HiveShimV2 {
       boolean deleteData,
       boolean ifPurge) {
     invoke(
-        tableName,
+        ExceptionTarget.table(tableName),
         client,
         dropTableMethod,
         catalogName,
@@ -234,8 +273,8 @@ class HiveShimV3 extends HiveShimV2 {
   public void createTable(HiveTable hiveTable) {
     String catalogName = hiveTable.catalogName();
     var tb = HiveTableConverter.toHiveTable(hiveTable);
-    invoke("", tb, tableSetCatalogNameMethod, catalogName);
-    invoke(hiveTable != null ? hiveTable.name() : null, client, createTableMethod, tb);
+    invoke(ExceptionTarget.other(""), tb, tableSetCatalogNameMethod, catalogName);
+    invoke(ExceptionTarget.schema(hiveTable.name()), client, createTableMethod, tb);
   }
 
   @Override
@@ -245,7 +284,7 @@ class HiveShimV3 extends HiveShimV2 {
     Object pageSizeArg = convertPageSize(listPartitionNamesMethod, 3, pageSize);
     return (List<String>)
         invoke(
-            table.name(),
+            ExceptionTarget.table(table.name()),
             client,
             listPartitionNamesMethod,
             catalogName,
@@ -262,7 +301,7 @@ class HiveShimV3 extends HiveShimV2 {
     var partitions =
         (List<org.apache.hadoop.hive.metastore.api.Partition>)
             invoke(
-                table.name(),
+                ExceptionTarget.table(table.name()),
                 client,
                 listPartitionsMethod,
                 catalogName,
@@ -281,7 +320,7 @@ class HiveShimV3 extends HiveShimV2 {
     var partitions =
         (List<org.apache.hadoop.hive.metastore.api.Partition>)
             invoke(
-                table.name(),
+                ExceptionTarget.table(table.name()),
                 client,
                 listPartitionsWithFilterMethod,
                 catalogName,
@@ -300,7 +339,7 @@ class HiveShimV3 extends HiveShimV2 {
     var partition =
         (org.apache.hadoop.hive.metastore.api.Partition)
             invoke(
-                partitionName,
+                ExceptionTarget.partition(partitionName),
                 client,
                 getPartitionMethod,
                 catalogName,
@@ -315,11 +354,11 @@ class HiveShimV3 extends HiveShimV2 {
     String catalogName = table.catalogName();
     String databaseName = table.databaseName();
     var hivePartition = HiveTableConverter.toHivePartition(databaseName, table, partition);
-    invoke("", hivePartition, partitionSetCatalogNameMethod, catalogName);
+    invoke(ExceptionTarget.other(""), hivePartition, partitionSetCatalogNameMethod, catalogName);
     var addedPartition =
         (org.apache.hadoop.hive.metastore.api.Partition)
             invoke(
-                partition != null ? partition.name() : null,
+                ExceptionTarget.partition(partition.name()),
                 client,
                 addPartitionMethod,
                 hivePartition);
@@ -331,7 +370,7 @@ class HiveShimV3 extends HiveShimV2 {
       String catalogName, String databaseName, String tableName, String partitionName, boolean b) {
     var partitionValues = HivePartition.extractPartitionValues(partitionName);
     invoke(
-        partitionName,
+        ExceptionTarget.partition(partitionName),
         client,
         dropPartitionMethod,
         catalogName,
@@ -347,7 +386,7 @@ class HiveShimV3 extends HiveShimV2 {
     var tables =
         (List<org.apache.hadoop.hive.metastore.api.Table>)
             invoke(
-                databaseName,
+                ExceptionTarget.schema(databaseName),
                 client,
                 getTableObjectsByNameMethod,
                 catalogName,
@@ -358,23 +397,23 @@ class HiveShimV3 extends HiveShimV2 {
 
   @Override
   public List<String> getCatalogs() {
-    return (List<String>) invoke("", client, getCatalogsMethod);
+    return (List<String>) invoke(ExceptionTarget.other(""), client, getCatalogsMethod);
   }
 
   /**
    * Invokes a method on an object and converts any exception to a Gravitino exception.
    *
-   * @param targetName Hive object name used in error messages
+   * @param target Hive object info used in error messages and exception mapping
    * @param object The object to invoke the method on
    * @param method The method to invoke
    * @param args The arguments to pass to the method
    * @return The result of the method invocation
    */
-  private Object invoke(String targetName, Object object, Method method, Object... args) {
+  private Object invoke(ExceptionTarget target, Object object, Method method, Object... args) {
     try {
       return method.invoke(object, args);
     } catch (Exception e) {
-      throw HiveExceptionConverter.toGravitinoException(e, targetName);
+      throw HiveExceptionConverter.toGravitinoException(e, target);
     }
   }
 

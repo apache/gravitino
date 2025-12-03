@@ -1006,6 +1006,8 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
       LOG.info("Dropped Hive table {}", tableIdent.name());
       return true;
 
+    } catch (NoSuchTableException e) {
+      return false;
     } catch (InterruptedException e) {
       throw new RuntimeException(e);
     }

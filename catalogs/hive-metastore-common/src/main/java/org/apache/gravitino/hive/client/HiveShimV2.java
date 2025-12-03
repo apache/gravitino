@@ -23,6 +23,7 @@ import java.util.List;
 import org.apache.gravitino.hive.HivePartition;
 import org.apache.gravitino.hive.HiveSchema;
 import org.apache.gravitino.hive.HiveTable;
+import org.apache.gravitino.hive.client.HiveExceptionConverter.ExceptionTarget;
 import org.apache.gravitino.hive.converter.HiveDatabaseConverter;
 import org.apache.gravitino.hive.converter.HiveTableConverter;
 import org.apache.hadoop.hive.metastore.IMetaStoreClient;
@@ -44,7 +45,7 @@ class HiveShimV2 extends Shim {
       Database db = HiveDatabaseConverter.toHiveDb(database);
       client.createDatabase(db);
     } catch (Exception e) {
-      throw HiveExceptionConverter.toGravitinoException(e, database.name());
+      throw HiveExceptionConverter.toGravitinoException(e, ExceptionTarget.schema(database.name()));
     }
   }
 
@@ -54,7 +55,7 @@ class HiveShimV2 extends Shim {
       Database db = client.getDatabase(databaseName);
       return HiveDatabaseConverter.fromHiveDB(db);
     } catch (Exception e) {
-      throw HiveExceptionConverter.toGravitinoException(e, databaseName);
+      throw HiveExceptionConverter.toGravitinoException(e, ExceptionTarget.schema(databaseName));
     }
   }
 
@@ -64,7 +65,7 @@ class HiveShimV2 extends Shim {
       Database db = HiveDatabaseConverter.toHiveDb(database);
       client.alterDatabase(databaseName, db);
     } catch (Exception e) {
-      throw HiveExceptionConverter.toGravitinoException(e, databaseName);
+      throw HiveExceptionConverter.toGravitinoException(e, ExceptionTarget.schema(databaseName));
     }
   }
 
@@ -73,7 +74,7 @@ class HiveShimV2 extends Shim {
     try {
       client.dropDatabase(databaseName, false, false, cascade);
     } catch (Exception e) {
-      throw HiveExceptionConverter.toGravitinoException(e, databaseName);
+      throw HiveExceptionConverter.toGravitinoException(e, ExceptionTarget.schema(databaseName));
     }
   }
 
@@ -82,7 +83,7 @@ class HiveShimV2 extends Shim {
     try {
       return client.getAllTables(databaseName);
     } catch (Exception e) {
-      throw HiveExceptionConverter.toGravitinoException(e, databaseName);
+      throw HiveExceptionConverter.toGravitinoException(e, ExceptionTarget.schema(databaseName));
     }
   }
 
@@ -92,7 +93,7 @@ class HiveShimV2 extends Shim {
     try {
       return client.listTableNamesByFilter(databaseName, filter, pageSize);
     } catch (Exception e) {
-      throw HiveExceptionConverter.toGravitinoException(e, databaseName);
+      throw HiveExceptionConverter.toGravitinoException(e, ExceptionTarget.schema(databaseName));
     }
   }
 
@@ -102,7 +103,7 @@ class HiveShimV2 extends Shim {
       var tb = client.getTable(databaseName, tableName);
       return HiveTableConverter.fromHiveTable(tb);
     } catch (Exception e) {
-      throw HiveExceptionConverter.toGravitinoException(e, tableName);
+      throw HiveExceptionConverter.toGravitinoException(e, ExceptionTarget.table(tableName));
     }
   }
 
@@ -113,7 +114,7 @@ class HiveShimV2 extends Shim {
       var tb = HiveTableConverter.toHiveTable(alteredHiveTable);
       client.alter_table(databaseName, tableName, tb);
     } catch (Exception e) {
-      throw HiveExceptionConverter.toGravitinoException(e, tableName);
+      throw HiveExceptionConverter.toGravitinoException(e, ExceptionTarget.table(tableName));
     }
   }
 
@@ -127,7 +128,7 @@ class HiveShimV2 extends Shim {
     try {
       client.dropTable(databaseName, tableName, deleteData, ifPurge);
     } catch (Exception e) {
-      throw HiveExceptionConverter.toGravitinoException(e, tableName);
+      throw HiveExceptionConverter.toGravitinoException(e, ExceptionTarget.table(tableName));
     }
   }
 
@@ -137,7 +138,7 @@ class HiveShimV2 extends Shim {
       var tb = HiveTableConverter.toHiveTable(hiveTable);
       client.createTable(tb);
     } catch (Exception e) {
-      throw HiveExceptionConverter.toGravitinoException(e, hiveTable.name());
+      throw HiveExceptionConverter.toGravitinoException(e, ExceptionTarget.table(hiveTable.name()));
     }
   }
 
@@ -147,7 +148,7 @@ class HiveShimV2 extends Shim {
       String databaseName = table.databaseName();
       return client.listPartitionNames(databaseName, table.name(), pageSize);
     } catch (Exception e) {
-      throw HiveExceptionConverter.toGravitinoException(e, table.name());
+      throw HiveExceptionConverter.toGravitinoException(e, ExceptionTarget.table(table.name()));
     }
   }
 
@@ -158,7 +159,7 @@ class HiveShimV2 extends Shim {
       var partitions = client.listPartitions(databaseName, table.name(), pageSize);
       return partitions.stream().map(p -> HiveTableConverter.fromHivePartition(table, p)).toList();
     } catch (Exception e) {
-      throw HiveExceptionConverter.toGravitinoException(e, table.name());
+      throw HiveExceptionConverter.toGravitinoException(e, ExceptionTarget.table(table.name()));
     }
   }
 
@@ -171,7 +172,7 @@ class HiveShimV2 extends Shim {
           client.listPartitions(databaseName, table.name(), filterPartitionValueList, pageSize);
       return partitions.stream().map(p -> HiveTableConverter.fromHivePartition(table, p)).toList();
     } catch (Exception e) {
-      throw HiveExceptionConverter.toGravitinoException(e, table.name());
+      throw HiveExceptionConverter.toGravitinoException(e, ExceptionTarget.table(table.name()));
     }
   }
 
@@ -183,7 +184,8 @@ class HiveShimV2 extends Shim {
       var partition = client.getPartition(databaseName, table.name(), partitionValues);
       return HiveTableConverter.fromHivePartition(table, partition);
     } catch (Exception e) {
-      throw HiveExceptionConverter.toGravitinoException(e, partitionName);
+      throw HiveExceptionConverter.toGravitinoException(
+          e, ExceptionTarget.partition(partitionName));
     }
   }
 
@@ -195,7 +197,8 @@ class HiveShimV2 extends Shim {
       var addedPartition = client.add_partition(hivePartition);
       return HiveTableConverter.fromHivePartition(table, addedPartition);
     } catch (Exception e) {
-      throw HiveExceptionConverter.toGravitinoException(e, partition.name());
+      throw HiveExceptionConverter.toGravitinoException(
+          e, ExceptionTarget.partition(partition.name()));
     }
   }
 
@@ -206,7 +209,8 @@ class HiveShimV2 extends Shim {
       var partitionValues = HivePartition.extractPartitionValues(partitionName);
       client.dropPartition(databaseName, tableName, partitionValues, b);
     } catch (Exception e) {
-      throw HiveExceptionConverter.toGravitinoException(e, partitionName);
+      throw HiveExceptionConverter.toGravitinoException(
+          e, ExceptionTarget.partition(partitionName));
     }
   }
 
@@ -215,7 +219,8 @@ class HiveShimV2 extends Shim {
     try {
       return client.getDelegationToken(finalPrincipalName, userName);
     } catch (Exception e) {
-      throw HiveExceptionConverter.toGravitinoException(e, finalPrincipalName);
+      throw HiveExceptionConverter.toGravitinoException(
+          e, ExceptionTarget.other(finalPrincipalName));
     }
   }
 
@@ -227,7 +232,7 @@ class HiveShimV2 extends Shim {
       var tables = client.getTableObjectsByName(databaseName, allTables);
       return tables.stream().map(HiveTableConverter::fromHiveTable).toList();
     } catch (Exception e) {
-      throw HiveExceptionConverter.toGravitinoException(e, databaseName);
+      throw HiveExceptionConverter.toGravitinoException(e, ExceptionTarget.schema(databaseName));
     }
   }
 
