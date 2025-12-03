@@ -121,9 +121,8 @@ public class ClosableHiveCatalog extends HiveCatalog implements Closeable, Suppo
   }
 
   @Override
-  public <R> R doKerberosOperations(Map<String, String> properties, Executable<R> executable)
-      throws Throwable {
-
+  public <R> R doKerberosOperations(Executable<R> executable) throws Throwable {
+    Map<String, String> properties = this.properties();
     AuthenticationConfig authenticationConfig = new AuthenticationConfig(properties);
     if (!authenticationConfig.isKerberosAuth()) {
       return executable.execute();
@@ -278,8 +277,7 @@ public class ClosableHiveCatalog extends HiveCatalog implements Closeable, Suppo
   private KerberosClient initKerberosClient() {
     try {
       KerberosClient kerberosClient = new KerberosClient(this.properties(), this.getConf());
-      // For Iceberg rest server, we haven't set the catalog_uuid, so we set it to 0 as there is
-      // only one catalog in the rest server, so it's okay to set it to 0.
+      // catalog_uuid always exists for Gravitino managed catalogs, `0` is just a fallback value.
       String catalogUUID = properties().getOrDefault("catalog_uuid", "0");
       File keytabFile = kerberosClient.saveKeyTabFileFromUri(Long.parseLong(catalogUUID));
       kerberosClient.login(keytabFile.getAbsolutePath());

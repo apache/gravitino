@@ -45,9 +45,7 @@ public class KerberosAwareIcebergCatalogProxy implements MethodInterceptor {
       throws Throwable {
     if (catalog instanceof SupportsKerberos) {
       SupportsKerberos kerberosCatalog = (SupportsKerberos) catalog;
-      return kerberosCatalog.doKerberosOperations(
-          target.getIcebergConfig().getIcebergCatalogProperties(),
-          () -> methodProxy.invoke(target, objects));
+      return kerberosCatalog.doKerberosOperations(() -> methodProxy.invoke(target, objects));
     }
 
     return method.invoke(target, objects);
