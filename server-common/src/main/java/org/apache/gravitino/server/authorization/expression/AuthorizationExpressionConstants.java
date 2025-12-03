@@ -118,4 +118,10 @@ public class AuthorizationExpressionConstants {
       """
           METALAKE::OWNER || POLICY::OWNER || ANY_APPLY_POLICY
           """;
+
+  public static final String loadMetalakeAuthorizationExpression = "METALAKE_USER";
+
+  public static final String loadJobAuthorizationExpression = "METALAKE::OWNER || JOB::OWNER";
+
+  public static final String loadJobTemplateAuthorizationExpression = "METALAKE::OWNER || JOB_TEMPLATE::OWNER || ANY_USE_JOB_TEMPLATE";
 }

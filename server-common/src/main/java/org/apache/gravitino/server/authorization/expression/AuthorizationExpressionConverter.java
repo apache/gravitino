@@ -19,9 +19,15 @@ package org.apache.gravitino.server.authorization.expression;
 
 import static org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants.loadCatalogAuthorizationExpression;
 import static org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants.loadFilesetAuthorizationExpression;
+import static org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants.loadJobAuthorizationExpression;
+import static org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants.loadJobTemplateAuthorizationExpression;
+import static org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants.loadMetalakeAuthorizationExpression;
 import static org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants.loadModelAuthorizationExpression;
+import static org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants.loadPolicyAuthorizationExpression;
+import static org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants.loadRoleAuthorizationExpression;
 import static org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants.loadSchemaAuthorizationExpression;
 import static org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants.loadTableAuthorizationExpression;
+import static org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants.loadTagAuthorizationExpression;
 import static org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants.loadTopicsAuthorizationExpression;
 
 import java.util.Map;
@@ -164,16 +170,16 @@ public class AuthorizationExpressionConverter {
         """
               ( entityType == 'CATALOG' && (%s)) ||
               ( entityType == 'SCHEMA' && (%s)) ||
-               ( entityType == 'TABLE' && (%s)) ||
+              ( entityType == 'TABLE' && (%s)) ||
               ( entityType == 'MODEL' && (%s)) ||
               ( entityType == 'FILESET' && (%s)) ||
               ( entityType == 'TOPIC' && (%s)) ||
-              ( entityType != 'CATALOG' &&
-              entityType != 'SCHEMA' &&
-              entityType != 'TABLE' &&
-              entityType != 'MODEL' &&
-              entityType != 'FILESET' &&
-              entityType != 'TOPIC')
+              ( entityType == 'ROLE' && (%s)) ||
+              ( entityType == 'METALAKE' && (%s)) ||
+              ( entityType == 'POLICY' && (%s)) ||
+              ( entityType == 'TAG' && (%s)) ||
+              ( entityType == 'JOB' && (%s)) ||
+              ( entityType == 'JOB_TEMPLATE' && (%s))
               """
             .formatted(
                 loadCatalogAuthorizationExpression,
@@ -181,7 +187,14 @@ public class AuthorizationExpressionConverter {
                 loadTableAuthorizationExpression,
                 loadModelAuthorizationExpression,
                 loadFilesetAuthorizationExpression,
-                loadTopicsAuthorizationExpression));
+                loadTopicsAuthorizationExpression,
+                    loadRoleAuthorizationExpression,
+                    loadMetalakeAuthorizationExpression,
+                    loadPolicyAuthorizationExpression,
+                    loadTagAuthorizationExpression,
+                    loadJobAuthorizationExpression,
+                    loadJobTemplateAuthorizationExpression
+                    ));
   }
 
   /**

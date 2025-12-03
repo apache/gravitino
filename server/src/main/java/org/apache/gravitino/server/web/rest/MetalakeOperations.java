@@ -57,6 +57,7 @@ import org.apache.gravitino.metrics.MetricNames;
 import org.apache.gravitino.server.authorization.MetadataAuthzHelper;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationExpression;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationMetadata;
+import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants;
 import org.apache.gravitino.server.web.Utils;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.slf4j.Logger;
@@ -89,7 +90,7 @@ public class MetalakeOperations {
           httpRequest,
           () -> {
             Metalake[] metalakes = metalakeDispatcher.listMetalakes();
-            metalakes = MetadataAuthzHelper.filterMetalakes(metalakes, "METALAKE_USER");
+            metalakes = MetadataAuthzHelper.filterMetalakes(metalakes, AuthorizationExpressionConstants.loadMetalakeAuthorizationExpression);
             MetalakeDTO[] metalakeDTOs =
                 Arrays.stream(metalakes).map(DTOConverters::toDTO).toArray(MetalakeDTO[]::new);
             Response response = Utils.ok(new MetalakeListResponse(metalakeDTOs));
@@ -138,7 +139,7 @@ public class MetalakeOperations {
   @Produces("application/vnd.gravitino.v1+json")
   @Timed(name = "load-metalake." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "load-metalake", absolute = true)
-  @AuthorizationExpression(expression = "METALAKE_USER")
+  @AuthorizationExpression(expression = AuthorizationExpressionConstants.loadMetalakeAuthorizationExpression)
   public Response loadMetalake(
       @PathParam("name") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
           String metalakeName) {
