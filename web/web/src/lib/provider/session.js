@@ -73,12 +73,12 @@ const AuthProvider = ({ children }) => {
         pathname = pathname.slice(3) || '/'
       }
       if (pathname === '/' || pathname === '') {
-        router.push('/metalakes')
+        router.replace('/metalakes')
       } else {
-        router.push(pathname + window.location.search)
+        router.replace(pathname + window.location.search)
       }
     } catch (e) {
-      router.push('/metalakes')
+      router.replace('/metalakes')
     }
   }
 
