@@ -20,6 +20,7 @@ package org.apache.gravitino.iceberg.integration.test;
 
 import java.util.HashMap;
 import java.util.Map;
+import javax.annotation.Nullable;
 import org.apache.spark.SparkConf;
 import org.apache.spark.sql.SparkSession;
 import org.junit.jupiter.api.BeforeAll;
@@ -85,6 +86,25 @@ public class IcebergRestKerberosHiveWithUserImpersonationCatalogIT
     }
 
     sparkSession = SparkSession.builder().master("local[1]").config(sparkConf).getOrCreate();
+  }
+
+  protected String getTestNamespace(@Nullable String childNamespace) {
+    String separator;
+    String parentNamespace;
+
+    if (supportsNestedNamespaces()) {
+      parentNamespace = "iceberg_rest.nested.table_test";
+      separator = ".";
+    } else {
+      parentNamespace = "iceberg_rest_with_kerberos_impersonation_table_test";
+      separator = "_";
+    }
+
+    if (childNamespace != null) {
+      return parentNamespace + separator + childNamespace;
+    } else {
+      return parentNamespace;
+    }
   }
 
   // Disable the following three tests as they contain data insert operations and which are not
