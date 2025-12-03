@@ -43,7 +43,6 @@ dependencies {
   implementation(libs.bundles.log4j)
   implementation(libs.bundles.metrics)
   implementation(libs.bundles.prometheus)
-  implementation(libs.commons.lang3)
   implementation(libs.lance.namespace.core) {
     exclude(group = "com.lancedb", module = "lance-core")
     exclude(group = "com.google.guava", module = "guava") // provided by gravitino
