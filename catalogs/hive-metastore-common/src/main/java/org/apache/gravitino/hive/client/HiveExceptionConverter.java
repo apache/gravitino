@@ -30,7 +30,6 @@ import org.apache.gravitino.exceptions.NonEmptySchemaException;
 import org.apache.gravitino.exceptions.PartitionAlreadyExistsException;
 import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
 import org.apache.gravitino.exceptions.TableAlreadyExistsException;
-import org.apache.thrift.TException;
 
 /**
  * Utility class to convert Hive exceptions to Gravitino exceptions. This class handles various
@@ -112,14 +111,14 @@ public class HiveExceptionConverter {
       return new IllegalArgumentException(cause.getMessage(), cause);
     }
 
-    if (exceptionClassName.contains("MetaException") && message != null) {
+    if (exceptionClassName.contains("MetaException")) {
       if (message.contains("Invalid partition key")) {
         return new NoSuchPartitionException(
             cause, "Hive partition %s does not exist in Hive Metastore", targetName);
       }
     }
 
-    if (cause instanceof TException && message != null) {
+    if (exceptionClassName.contains("TException")) {
       if (lowerMessage.contains("already exists")) {
         return toAlreadyExistsException(cause, lowerMessage, targetName, message);
       }
