@@ -203,7 +203,8 @@ public abstract class BaseCatalog extends AbstractCatalog {
   }
 
   @Override
-  public List<String> listViews(String databaseName) throws DatabaseNotExistException, CatalogException {
+  public List<String> listViews(String databaseName)
+      throws DatabaseNotExistException, CatalogException {
     // Gravitino does not support views yet; return empty to keep Flink callers happy.
     return Collections.emptyList();
   }
