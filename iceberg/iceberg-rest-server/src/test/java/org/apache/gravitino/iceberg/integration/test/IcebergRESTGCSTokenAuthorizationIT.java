@@ -44,8 +44,8 @@ import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
  *   <li>GRAVITINO_TEST_CLOUD_IT=true - enables cloud integration tests
  *   <li>GRAVITINO_GCS_BUCKET - GCS bucket name (e.g., "my-bucket")
  *   <li>GRAVITINO_GCS_PATH_PREFIX - path prefix within bucket (e.g., "test/gravitino")
- *   <li>GRAVITINO_GCS_SERVICE_ACCOUNT_FILE (optional) - path to service account JSON key. If
- *       omitted, uses ADC (requires: gcloud auth application-default login)
+ *   <li>GOOGLE_APPLICATION_CREDENTIALS - path to GCP service account JSON file (optional; if not
+ *       provided, ADC will be used)
  * </ul>
  */
 @SuppressWarnings("FormatStringAnnotation")
@@ -61,7 +61,7 @@ public class IcebergRESTGCSTokenAuthorizationIT extends IcebergRESTCloudTokenAut
     String pathPrefix = System.getenv().getOrDefault("GRAVITINO_GCS_PATH_PREFIX", "test1");
     this.gcsWarehouse = String.format("gs://%s/%s", bucket, pathPrefix);
     // Use null to trigger ADC (Application Default Credentials) if not explicitly provided
-    this.serviceAccountFile = System.getenv().get("GRAVITINO_GCS_SERVICE_ACCOUNT_FILE");
+    this.serviceAccountFile = System.getenv().get("GOOGLE_APPLICATION_CREDENTIALS");
 
     super.startIntegrationTest();
 
