@@ -91,6 +91,7 @@ public class TestHudiHMSBackendOps extends MiniHiveMetastoreService {
     // create a hudi table
     sparkSession.sql(
         String.format("CREATE TABLE %s.%s (ts BIGINT) USING HUDI", DB_NAME, HUDI_TABLE_NAME));
+    sparkSession.close();
   }
 
   private static void createHiveTable() throws Exception {
