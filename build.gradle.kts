@@ -477,7 +477,7 @@ subprojects {
   if (project.name in listOf("web", "docs")) {
     plugins.apply(NodePlugin::class)
     configure<NodeExtension> {
-      version.set("20.9.0")
+      version.set("20.19.0")
       pnpmVersion.set("9.x")
       nodeProjectDir.set(file("$rootDir/.node"))
       download.set(true)

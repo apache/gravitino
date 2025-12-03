@@ -875,7 +875,6 @@ const TableView = () => {
 
   useEffect(() => {
     setPaginationModel({ ...paginationModel, page: 0 })
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [store.tableLoading])
 
   return (

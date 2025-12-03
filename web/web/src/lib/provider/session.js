@@ -115,7 +115,6 @@ const AuthProvider = ({ children }) => {
     }
 
     initAuth()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const values = {
