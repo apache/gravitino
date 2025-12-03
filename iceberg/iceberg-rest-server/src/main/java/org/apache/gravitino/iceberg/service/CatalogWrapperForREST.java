@@ -345,12 +345,6 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
     Long endSnapshotId = scanRequest.endSnapshotId();
     // Use IncrementalAppendScan if both start and end snapshot IDs are provided
     if (startSnapshotId != null && endSnapshotId != null) {
-      if (startSnapshotId >= endSnapshotId) {
-        throw new IllegalArgumentException(
-            String.format(
-                "Invalid snapshot range: startSnapshotId (%d) must be less than endSnapshotId (%d)",
-                startSnapshotId, endSnapshotId));
-      }
       LOG.debug(
           "Using IncrementalAppendScan for table: {}, from snapshot: {} to snapshot: {}",
           tableIdentifier,
@@ -365,7 +359,8 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
       return incrementalScan.planFiles();
     } else {
       TableScan tableScan = table.newScan();
-      if (scanRequest.snapshotId() != null && scanRequest.snapshotId() != 0L) {
+      // Snapshot ID 0 has no special meaning in Iceberg, so we only apply if not null
+      if (scanRequest.snapshotId() != null) {
         tableScan = tableScan.useSnapshot(scanRequest.snapshotId());
         LOG.debug("Applied snapshot filter: snapshot-id={}", scanRequest.snapshotId());
       }

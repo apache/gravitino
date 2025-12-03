@@ -24,11 +24,16 @@ import java.util.Map;
 import javax.annotation.Nullable;
 
 /**
- * Interface for credential providers.
+ * An interface for providing credentials to access external systems.
  *
- * <p>A credential provider is responsible for managing and retrieving credentials.
+ * <p>Implementations of this interface are discovered using Java's {@link java.util.ServiceLoader}.
+ * To prevent class loading issues and unnecessary dependency bloat, all implementations must be
+ * lightweight. Any logic that requires heavy external dependencies (e.g., cloud SDKs) should be
+ * isolated in a separate {@link CredentialGenerator} class and loaded reflectively at runtime. The
+ * {@link CredentialProviderDelegator} provides a convenient base class for this pattern.
  */
 public interface CredentialProvider extends Closeable {
+
   /**
    * Initializes the credential provider with catalog properties.
    *
@@ -45,7 +50,7 @@ public interface CredentialProvider extends Closeable {
   String credentialType();
 
   /**
-   * Obtains a credential based on the provided context information.
+   * Gets a credential based on the provided context information.
    *
    * @param context A context object providing necessary information for retrieving credentials.
    * @return A Credential object containing the authentication information needed to access a system
