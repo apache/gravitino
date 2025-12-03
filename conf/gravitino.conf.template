@@ -93,7 +93,7 @@ gravitino.iceberg-rest.httpPort = 9001
 gravitino.iceberg-rest.catalog-backend = memory
 # The warehouse directory of Iceberg catalog for Iceberg REST service
 gravitino.iceberg-rest.warehouse = /tmp/
-# If authorization is enabled, use the dynamic config provider and point it at a metalake
+# If authorization is enabled, you must use dynamic config provider for Iceberg REST server
 # gravitino.iceberg-rest.catalog-config-provider = dynamic-config-provider
 # URI of the Gravitino server that the dynamic config provider will call to fetch catalog configs
 # gravitino.iceberg-rest.gravitino-uri = http://localhost:8090
