@@ -159,11 +159,26 @@ public class ParameterUtil {
                   Entity.EntityType.TAG,
                   NameIdentifierUtil.ofTag(metalake, entities.get(Entity.EntityType.TAG)));
               break;
+
             case POLICY:
               nameIdentifierMap.put(
                   Entity.EntityType.POLICY,
                   NameIdentifierUtil.ofPolicy(metalake, entities.get(Entity.EntityType.POLICY)));
               break;
+
+            case JOB:
+              nameIdentifierMap.put(
+                  Entity.EntityType.JOB,
+                  NameIdentifierUtil.ofJob(metalake, entities.get(Entity.EntityType.JOB)));
+              break;
+
+            case JOB_TEMPLATE:
+              nameIdentifierMap.put(
+                  Entity.EntityType.JOB_TEMPLATE,
+                  NameIdentifierUtil.ofJobTemplate(
+                      metalake, entities.get(Entity.EntityType.JOB_TEMPLATE)));
+              break;
+
             default:
               break;
           }

@@ -460,10 +460,17 @@ public class IcebergTableOperations {
   @Consumes(MediaType.APPLICATION_JSON)
   @Timed(name = "plan-table-scan." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "plan-table-scan", absolute = true)
+  @AuthorizationExpression(
+      expression =
+          "ANY(OWNER, METALAKE, CATALOG) || "
+              + "SCHEMA_OWNER_WITH_USE_CATALOG || "
+              + "ANY_USE_CATALOG && ANY_USE_SCHEMA  && (TABLE::OWNER || ANY_SELECT_TABLE|| ANY_MODIFY_TABLE)",
+      accessMetadataType = MetadataObject.Type.TABLE)
   public Response planTableScan(
-      @PathParam("prefix") String prefix,
-      @Encoded() @PathParam("namespace") String namespace,
-      @PathParam("table") String table,
+      @PathParam("prefix") @AuthorizationMetadata(type = EntityType.CATALOG) String prefix,
+      @Encoded() @PathParam("namespace") @AuthorizationMetadata(type = EntityType.SCHEMA)
+          String namespace,
+      @PathParam("table") @AuthorizationMetadata(type = EntityType.TABLE) String table,
       PlanTableScanRequest scanRequest) {
     String catalogName = IcebergRESTUtils.getCatalogName(prefix);
     Namespace icebergNS = RESTUtil.decodeNamespace(namespace);

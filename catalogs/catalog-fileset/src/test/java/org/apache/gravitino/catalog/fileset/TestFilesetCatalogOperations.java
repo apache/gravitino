@@ -37,6 +37,7 @@ import static org.apache.gravitino.catalog.fileset.FilesetCatalogImpl.FILESET_PR
 import static org.apache.gravitino.catalog.fileset.FilesetCatalogImpl.SCHEMA_PROPERTIES_META;
 import static org.apache.gravitino.catalog.fileset.FilesetCatalogPropertiesMetadata.DISABLE_FILESYSTEM_OPS;
 import static org.apache.gravitino.catalog.fileset.FilesetCatalogPropertiesMetadata.LOCATION;
+import static org.apache.gravitino.catalog.hadoop.fs.FileSystemProvider.GRAVITINO_BYPASS;
 import static org.apache.gravitino.file.Fileset.LOCATION_NAME_UNKNOWN;
 import static org.apache.gravitino.file.Fileset.PROPERTY_DEFAULT_LOCATION_NAME;
 import static org.apache.gravitino.file.Fileset.PROPERTY_MULTIPLE_LOCATIONS_PREFIX;
@@ -79,6 +80,7 @@ import org.apache.gravitino.UserPrincipal;
 import org.apache.gravitino.audit.CallerContext;
 import org.apache.gravitino.audit.FilesetAuditConstants;
 import org.apache.gravitino.audit.FilesetDataOperation;
+import org.apache.gravitino.catalog.hadoop.fs.FileSystemUtils;
 import org.apache.gravitino.connector.CatalogInfo;
 import org.apache.gravitino.connector.HasPropertyMetadata;
 import org.apache.gravitino.connector.PropertiesMetadata;
@@ -350,7 +352,7 @@ public class TestFilesetCatalogOperations {
 
     CatalogInfo catalogInfo = randomCatalogInfo();
     ops.initialize(emptyProps, catalogInfo, FILESET_PROPERTIES_METADATA);
-    Configuration conf = ops.getHadoopConf();
+    Configuration conf = FileSystemUtils.createConfiguration(GRAVITINO_BYPASS, ops.getConf());
     String value = conf.get("fs.defaultFS");
     Assertions.assertEquals("file:///", value);
 
@@ -1145,7 +1147,7 @@ public class TestFilesetCatalogOperations {
   }
 
   @Test
-  public void testFormalizePath() throws IOException, IllegalAccessException {
+  public void testFormalizePath() throws IOException, IllegalAccessException, InterruptedException {
 
     String[] paths =
         new String[] {"tmp/catalog", "/tmp/catalog", "file:/tmp/catalog", "file:///tmp/catalog"};
@@ -1724,21 +1726,6 @@ public class TestFilesetCatalogOperations {
                   createMultiLocationSchema("s1", "comment", ImmutableMap.of(), illegalLocations));
       Assertions.assertEquals("Location name must not be blank", exception.getMessage());
 
-      // empty location name in storage location
-      exception =
-          Assertions.assertThrows(
-              IllegalArgumentException.class,
-              () ->
-                  createMultiLocationFileset(
-                      "fileset_test",
-                      "s1",
-                      null,
-                      Fileset.Type.MANAGED,
-                      ImmutableMap.of(),
-                      ImmutableMap.of("", TEST_ROOT_PATH + "/fileset31"),
-                      null));
-      Assertions.assertEquals("Location name must not be blank", exception.getMessage());
-
       // empty location in catalog location
       Map<String, String> illegalLocations2 =
           new HashMap<String, String>() {
@@ -1767,23 +1754,6 @@ public class TestFilesetCatalogOperations {
       Assertions.assertEquals(
           "The value of the schema property location must not be blank", exception.getMessage());
 
-      // empty fileset storage location
-      exception =
-          Assertions.assertThrows(
-              IllegalArgumentException.class,
-              () ->
-                  createMultiLocationFileset(
-                      "fileset_test",
-                      "s1",
-                      null,
-                      Fileset.Type.MANAGED,
-                      ImmutableMap.of(),
-                      ImmutableMap.of("location1", ""),
-                      null));
-      Assertions.assertEquals(
-          "Storage location must not be blank for location name: location1",
-          exception.getMessage());
-
       // storage location is parent of schema location
       Schema multipLocationSchema =
           createMultiLocationSchema(
@@ -1810,6 +1780,38 @@ public class TestFilesetCatalogOperations {
               .contains(
                   "The fileset property default-location-name must be set and must be one of the fileset locations"),
           "Exception message: " + exception.getMessage());
+
+      // empty location name in storage location
+      exception =
+          Assertions.assertThrows(
+              IllegalArgumentException.class,
+              () ->
+                  createMultiLocationFileset(
+                      "fileset_test",
+                      "s1",
+                      null,
+                      Fileset.Type.MANAGED,
+                      ImmutableMap.of(),
+                      ImmutableMap.of("", TEST_ROOT_PATH + "/fileset31"),
+                      null));
+      Assertions.assertEquals("Location name must not be blank", exception.getMessage());
+
+      // empty fileset storage location
+      exception =
+          Assertions.assertThrows(
+              IllegalArgumentException.class,
+              () ->
+                  createMultiLocationFileset(
+                      "fileset_test",
+                      "s1",
+                      null,
+                      Fileset.Type.MANAGED,
+                      ImmutableMap.of(),
+                      ImmutableMap.of("location1", ""),
+                      null));
+      Assertions.assertEquals(
+          "Storage location must not be blank for location name: location1",
+          exception.getMessage());
     }
   }
 
