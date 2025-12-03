@@ -20,21 +20,19 @@ package org.apache.gravitino.catalog.hive;
 
 import static org.apache.gravitino.catalog.hive.HiveCatalogPropertiesMetadata.LIST_ALL_TABLES;
 import static org.apache.gravitino.catalog.hive.HiveCatalogPropertiesMetadata.METASTORE_URIS;
-import static org.apache.gravitino.catalog.hive.HiveCatalogPropertiesMetadata.PRINCIPAL;
+import static org.apache.gravitino.catalog.hive.HiveConstants.HIVE_FILTER_FIELD_PARAMS;
+import static org.apache.gravitino.catalog.hive.HiveConstants.HIVE_METASTORE_URIS;
 import static org.apache.gravitino.catalog.hive.HiveConstants.TABLE_TYPE;
+import static org.apache.gravitino.catalog.hive.TableType.EXTERNAL_TABLE;
 import static org.apache.gravitino.connector.BaseCatalog.CATALOG_BYPASS_PREFIX;
 import static org.apache.gravitino.hive.HiveTable.SUPPORT_TABLE_TYPES;
-import static org.apache.hadoop.hive.metastore.TableType.EXTERNAL_TABLE;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
-import com.google.common.base.Splitter;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.io.IOException;
-import java.io.UncheckedIOException;
-import java.lang.reflect.Method;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -49,10 +47,8 @@ import java.util.Properties;
 import java.util.Set;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.ThreadFactory;
-import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.ArrayUtils;
-import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
@@ -60,7 +56,6 @@ import org.apache.gravitino.SchemaChange;
 import org.apache.gravitino.connector.CatalogInfo;
 import org.apache.gravitino.connector.CatalogOperations;
 import org.apache.gravitino.connector.HasPropertyMetadata;
-import org.apache.gravitino.connector.ProxyPlugin;
 import org.apache.gravitino.connector.SupportsSchemas;
 import org.apache.gravitino.exceptions.ConnectionFailedException;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
@@ -87,11 +82,6 @@ import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.expressions.transforms.Transforms;
 import org.apache.gravitino.rel.indexes.Index;
 import org.apache.gravitino.rel.types.Type;
-import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.hive.conf.HiveConf;
-import org.apache.hadoop.hive.conf.HiveConf.ConfVars;
-import org.apache.hadoop.hive.metastore.api.hive_metastoreConstants;
-import org.apache.hadoop.security.SecurityUtil;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -104,8 +94,6 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
 
   @VisibleForTesting CachedClientPool clientPool;
 
-  @VisibleForTesting HiveConf hiveConf;
-
   private CatalogInfo info;
 
   private HasPropertyMetadata propertiesMetadata;
@@ -113,8 +101,6 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
   private String catalogName;
 
   private ScheduledThreadPoolExecutor checkTgtExecutor;
-  private String kerberosRealm;
-  private ProxyPlugin proxyPlugin;
   private boolean listAllTables = true;
   // The maximum number of tables that can be returned by the listTableNamesByFilter function.
   // The default value is -1, which means that all tables are returned.
@@ -124,7 +110,7 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
   // will only need to set the configuration 'METASTORE_URL' in Gravitino and Gravitino will change
   // it to `METASTOREURIS` automatically and pass it to Hive.
   public static final Map<String, String> GRAVITINO_CONFIG_TO_HIVE =
-      ImmutableMap.of(METASTORE_URIS, ConfVars.METASTOREURIS.varname);
+      ImmutableMap.of(METASTORE_URIS, HIVE_METASTORE_URIS);
 
   /**
    * Initializes the Hive catalog operations with the provided configuration.
@@ -141,6 +127,21 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
     this.info = info;
     this.propertiesMetadata = propertiesMetadata;
 
+    Properties prop = mergeProperties(conf);
+    this.clientPool = new CachedClientPool(prop, conf);
+    this.listAllTables = enableListAllTables(conf);
+
+    // Initialize the HMS catalog name from catalog properties (default to DEFAULT_HMS_CATALOG)
+    String defaultCatalog =
+        (String)
+            propertiesMetadata
+                .catalogPropertiesMetadata()
+                .getOrDefault(conf, HiveCatalogPropertiesMetadata.DEFAULT_CATALOG);
+    this.catalogName = defaultCatalog;
+  }
+
+  @VisibleForTesting
+  protected Properties mergeProperties(Map<String, String> conf) {
     // Key format like gravitino.bypass.a.b
     Map<String, String> byPassConfig = Maps.newHashMap();
     // Hold keys that lie in GRAVITINO_CONFIG_TO_HIVE
@@ -161,140 +162,10 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
           }
         });
 
-    Map<String, String> mergeConfig = Maps.newHashMap(byPassConfig);
-    // `gravitinoConfig` overwrite byPassConfig if possible
-    mergeConfig.putAll(gravitinoConfig);
-
-    Configuration hadoopConf = new Configuration();
-    // Set byPass first to make Gravitino config overwrite it, only keys in byPassConfig
-    // and gravitinoConfig will be passed to Hive config, and gravitinoConfig has higher priority
-    mergeConfig.forEach(hadoopConf::set);
-    hiveConf = new HiveConf(hadoopConf, HiveCatalogOperations.class);
-
-    initKerberosIfNecessary(conf, hadoopConf);
-
     Properties prop = new Properties();
-    mergeConfig.forEach(prop::setProperty);
-    this.clientPool = new CachedClientPool(prop, conf);
-
-    this.listAllTables = enableListAllTables(conf);
-
-    // Initialize the HMS catalog name from catalog properties (default to DEFAULT_HMS_CATALOG)
-    String defaultCatalog =
-        (String)
-            propertiesMetadata
-                .catalogPropertiesMetadata()
-                .getOrDefault(conf, HiveCatalogPropertiesMetadata.DEFAULT_CATALOG);
-    this.catalogName = defaultCatalog;
-  }
-
-  private void initKerberosIfNecessary(Map<String, String> conf, Configuration hadoopConf) {
-    if (UserGroupInformation.AuthenticationMethod.KERBEROS
-        == SecurityUtil.getAuthenticationMethod(hadoopConf)) {
-      try {
-        Path keytabsPath = Paths.get("keytabs");
-        if (!Files.exists(keytabsPath)) {
-          // Ignore the return value, because there exists many Hive catalog operations making
-          // this directory.
-          Files.createDirectory(keytabsPath);
-        }
-
-        // The id of entity is a random unique id.
-        Path keytabPath = Paths.get(String.format(GRAVITINO_KEYTAB_FORMAT, info.id()));
-        keytabPath.toFile().deleteOnExit();
-        if (Files.exists(keytabPath)) {
-          try {
-            Files.delete(keytabPath);
-          } catch (IOException e) {
-            throw new IllegalStateException(
-                String.format("Fail to delete keytab file %s", keytabPath.toAbsolutePath()), e);
-          }
-        }
-
-        String keytabUri =
-            (String)
-                propertiesMetadata
-                    .catalogPropertiesMetadata()
-                    .getOrDefault(conf, HiveCatalogPropertiesMetadata.KEY_TAB_URI);
-        Preconditions.checkArgument(StringUtils.isNotBlank(keytabUri), "Keytab uri can't be blank");
-        // TODO: Support to download the file from Kerberos HDFS
-        Preconditions.checkArgument(
-            !keytabUri.trim().startsWith("hdfs"), "Keytab uri doesn't support to use HDFS");
-
-        int fetchKeytabFileTimeout =
-            (int)
-                propertiesMetadata
-                    .catalogPropertiesMetadata()
-                    .getOrDefault(conf, HiveCatalogPropertiesMetadata.FETCH_TIMEOUT_SEC);
-
-        FetchFileUtils.fetchFileFromUri(
-            keytabUri, keytabPath.toFile(), fetchKeytabFileTimeout, hadoopConf);
-
-        hiveConf.setVar(
-            ConfVars.METASTORE_KERBEROS_KEYTAB_FILE, keytabPath.toAbsolutePath().toString());
-
-        String catalogPrincipal =
-            (String) propertiesMetadata.catalogPropertiesMetadata().getOrDefault(conf, PRINCIPAL);
-        Preconditions.checkArgument(
-            StringUtils.isNotBlank(catalogPrincipal), "The principal can't be blank");
-        @SuppressWarnings("null")
-        List<String> principalComponents = Splitter.on('@').splitToList(catalogPrincipal);
-        Preconditions.checkArgument(
-            principalComponents.size() == 2, "The principal has the wrong format");
-        this.kerberosRealm = principalComponents.get(1);
-
-        checkTgtExecutor =
-            new ScheduledThreadPoolExecutor(
-                1, getThreadFactory(String.format("Kerberos-check-%s", info.id())));
-
-        LOG.info("krb5 path: {}", System.getProperty("java.security.krb5.conf"));
-        refreshKerberosConfig();
-        UserGroupInformation.setConfiguration(hadoopConf);
-        UserGroupInformation.loginUserFromKeytab(
-            catalogPrincipal, keytabPath.toAbsolutePath().toString());
-
-        UserGroupInformation kerberosLoginUgi = UserGroupInformation.getCurrentUser();
-
-        int checkInterval =
-            (int)
-                propertiesMetadata
-                    .catalogPropertiesMetadata()
-                    .getOrDefault(conf, HiveCatalogPropertiesMetadata.CHECK_INTERVAL_SEC);
-
-        checkTgtExecutor.scheduleAtFixedRate(
-            () -> {
-              try {
-                kerberosLoginUgi.checkTGTAndReloginFromKeytab();
-              } catch (Exception e) {
-                LOG.error("Fail to refresh ugi token: ", e);
-              }
-            },
-            checkInterval,
-            checkInterval,
-            TimeUnit.SECONDS);
-
-      } catch (IOException ioe) {
-        throw new UncheckedIOException(ioe);
-      } catch (Exception e) {
-        throw new RuntimeException(e);
-      }
-    }
-  }
-
-  private void refreshKerberosConfig() {
-    Class<?> classRef;
-    try {
-      if (System.getProperty("java.vendor").contains("IBM")) {
-        classRef = Class.forName("com.ibm.security.krb5.internal.Config");
-      } else {
-        classRef = Class.forName("sun.security.krb5.Config");
-      }
-
-      Method refreshMethod = classRef.getMethod("refresh");
-      refreshMethod.invoke(null);
-    } catch (Exception e) {
-      throw new RuntimeException(e);
-    }
+    byPassConfig.forEach(prop::setProperty);
+    gravitinoConfig.forEach(prop::setProperty);
+    return prop;
   }
 
   boolean enableListAllTables(Map<String, String> conf) {
@@ -527,9 +398,7 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
         allTables.removeAll(icebergAndPaimonTables);
 
         // filter out the Hudi tables
-        String hudiFilter =
-            String.format(
-                "%sprovider like \"hudi\"", hive_metastoreConstants.HIVE_FILTER_FIELD_PARAMS);
+        String hudiFilter = String.format("%sprovider like \"hudi\"", HIVE_FILTER_FIELD_PARAMS);
         List<String> hudiTables =
             clientPool.run(
                 c ->
@@ -547,12 +416,8 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
   }
 
   private static String getIcebergAndPaimonFilter() {
-    String icebergFilter =
-        String.format(
-            "%stable_type like \"ICEBERG\"", hive_metastoreConstants.HIVE_FILTER_FIELD_PARAMS);
-    String paimonFilter =
-        String.format(
-            "%stable_type like \"PAIMON\"", hive_metastoreConstants.HIVE_FILTER_FIELD_PARAMS);
+    String icebergFilter = String.format("%stable_type like \"ICEBERG\"", HIVE_FILTER_FIELD_PARAMS);
+    String paimonFilter = String.format("%stable_type like \"PAIMON\"", HIVE_FILTER_FIELD_PARAMS);
     return String.format("%s or %s", icebergFilter, paimonFilter);
   }
 
@@ -587,7 +452,6 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
     try {
       HiveTable table =
           clientPool.run(c -> c.getTable(catalogName, schemaIdent.name(), tableIdent.name()));
-      table.setProxyPlugin(proxyPlugin);
       return new HiveTableHandle(table, clientPool);
 
     } catch (InterruptedException e) {
@@ -746,7 +610,6 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
               .withProperties(properties)
               .withDistribution(distribution)
               .withSortOrders(sortOrders)
-              .withProxyPlugin(proxyPlugin)
               .withAuditInfo(
                   AuditInfo.builder()
                       .withCreator(UserGroupInformation.getCurrentUser().getUserName())
@@ -1152,10 +1015,6 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
     return clientPool;
   }
 
-  HiveConf getHiveConf() {
-    return hiveConf;
-  }
-
   private boolean isExternalTable(NameIdentifier tableIdent) {
     HiveTableHandle hiveTable = loadHiveTable(tableIdent);
     return EXTERNAL_TABLE.name().equalsIgnoreCase(hiveTable.getTableType());
@@ -1163,13 +1022,5 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
 
   private static ThreadFactory getThreadFactory(String factoryName) {
     return new ThreadFactoryBuilder().setDaemon(true).setNameFormat(factoryName + "-%d").build();
-  }
-
-  public String getKerberosRealm() {
-    return kerberosRealm;
-  }
-
-  void setProxyPlugin(HiveProxyPlugin hiveProxyPlugin) {
-    this.proxyPlugin = hiveProxyPlugin;
   }
 }

@@ -972,13 +972,6 @@ public class CatalogHive2IT extends BaseIT {
     String selectTemplate =
         "SELECT * FROM %s.%s WHERE hive_col_name2 = '2023-01-02' AND hive_col_name3 = 'gravitino_it_test2'";
     String sql = String.format(selectTemplate, schemaName, createdTable.name());
-
-    String a = sparkSession.table(schemaName + "." + createdTable.name()).schema().toString();
-    String s =
-        sparkSession
-            .sql(String.format("SHOW PARTITIONS %s.%s", schemaName, createdTable.name()))
-            .collectAsList()
-            .toString();
     long count = sparkSession.sql(sql).count();
     Assertions.assertEquals(0, count);
 

@@ -42,6 +42,7 @@ dependencies {
   }
 
   implementation(libs.commons.collections3)
+  implementation(libs.commons.lang3)
   implementation(libs.commons.configuration1)
   implementation(libs.htrace.core4)
   implementation(libs.commons.io)
@@ -49,13 +50,12 @@ dependencies {
   implementation(libs.hadoop2.auth) {
     exclude("*")
   }
-  implementation(libs.woodstox.core)
-  implementation(libs.hadoop2.mapreduce.client.core) {
+  implementation(libs.hadoop2.common) {
     exclude("*")
   }
+  implementation(libs.woodstox.core)
   implementation(libs.slf4j.api)
 
-  compileOnly(libs.hive2.metastore)
   compileOnly(libs.immutables.value)
   compileOnly(libs.lombok)
 
@@ -85,31 +85,6 @@ dependencies {
   testImplementation(libs.hive2.common) {
     exclude("org.eclipse.jetty.aggregate", "jetty-all")
     exclude("org.eclipse.jetty.orbit", "javax.servlet")
-  }
-  testImplementation(libs.hive2.metastore) {
-    exclude("ant")
-    exclude("co.cask.tephra")
-    exclude("com.github.joshelser")
-    exclude("com.google.code.findbugs", "jsr305")
-    exclude("com.google.code.findbugs", "sr305")
-    exclude("com.tdunning", "json")
-    exclude("com.zaxxer", "HikariCP")
-    exclude("io.dropwizard.metrics")
-    exclude("javax.transaction", "transaction-api")
-    exclude("org.apache.ant")
-    exclude("org.apache.avro")
-    exclude("org.apache.curator")
-    exclude("org.apache.derby")
-    exclude("org.apache.hadoop", "hadoop-yarn-server-resourcemanager")
-    exclude("org.apache.hbase")
-    exclude("org.apache.logging.log4j")
-    exclude("org.apache.parquet", "parquet-hadoop-bundle")
-    exclude("org.apache.zookeeper")
-    exclude("org.datanucleus")
-    exclude("org.eclipse.jetty.aggregate", "jetty-all")
-    exclude("org.eclipse.jetty.orbit", "javax.servlet")
-    exclude("org.openjdk.jol")
-    exclude("org.slf4j")
   }
   testImplementation(libs.junit.jupiter.api)
   testImplementation(libs.mockito.core)

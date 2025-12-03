@@ -41,6 +41,7 @@ import static org.mockito.Mockito.when;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import java.util.Map;
+import java.util.Properties;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.connector.BaseCatalog;
@@ -53,21 +54,6 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 class TestHiveCatalogOperations {
-  @Test
-  void testInitialize() {
-    Map<String, String> properties = Maps.newHashMap();
-    HiveCatalogOperations hiveCatalogOperations = new HiveCatalogOperations();
-    hiveCatalogOperations.initialize(properties, null, HIVE_PROPERTIES_METADATA);
-    String v = hiveCatalogOperations.hiveConf.get("mapreduce.job.reduces");
-    Assertions.assertEquals("10", v);
-
-    // Test If we can override the value in hive-site.xml
-    properties.put(CATALOG_BYPASS_PREFIX + "mapreduce.job.reduces", "20");
-    hiveCatalogOperations.initialize(properties, null, HIVE_PROPERTIES_METADATA);
-    v = hiveCatalogOperations.hiveConf.get("mapreduce.job.reduces");
-    Assertions.assertEquals("20", v);
-  }
-
   @Test
   void testPropertyMeta() {
     Map<String, PropertyEntry<?>> propertyEntryMap =
@@ -114,8 +100,9 @@ class TestHiveCatalogOperations {
     HiveCatalogOperations op = new HiveCatalogOperations();
     op.initialize(maps, null, HIVE_PROPERTIES_METADATA);
 
-    Assertions.assertEquals("v2", op.hiveConf.get("a.b"));
-    Assertions.assertEquals("v4", op.hiveConf.get("c.d"));
+    Properties pp = op.mergeProperties(maps);
+    Assertions.assertEquals("v2", pp.get("a.b"));
+    Assertions.assertEquals("v4", pp.get("c.d"));
   }
 
   @Test
@@ -128,14 +115,15 @@ class TestHiveCatalogOperations {
 
     HiveCatalogOperations hiveCatalogOperations = new HiveCatalogOperations();
     hiveCatalogOperations.initialize(properties, null, HIVE_PROPERTIES_METADATA);
+    Properties pp = hiveCatalogOperations.mergeProperties(properties);
 
     // Verify that the normal bypass configuration is correctly applied
-    String v = hiveCatalogOperations.hiveConf.get("mapreduce.job.reduces");
+    String v = pp.getProperty("mapreduce.job.reduces");
     Assertions.assertEquals("20", v);
 
     // Verify that the empty bypass configuration is not applied
     // This will fail if the empty key is incorrectly added
-    Assertions.assertNull(hiveCatalogOperations.hiveConf.get(""));
+    Assertions.assertNull(pp.getProperty(""));
   }
 
   @Test

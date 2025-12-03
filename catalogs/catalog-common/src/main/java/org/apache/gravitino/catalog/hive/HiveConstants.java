@@ -46,4 +46,8 @@ public class HiveConstants {
   public static final String SERDE_LIB = "serde-lib";
   public static final String SERDE_PARAMETER_PREFIX = "serde.parameter.";
   public static final String TRANSIENT_LAST_DDL_TIME = "transient_lastDdlTime";
+
+  // Hive metastore constants
+  public static final String HIVE_METASTORE_URIS = "hive.metastore.uris";
+  public static final String HIVE_FILTER_FIELD_PARAMS = "hive_filter_field_params__";
 }

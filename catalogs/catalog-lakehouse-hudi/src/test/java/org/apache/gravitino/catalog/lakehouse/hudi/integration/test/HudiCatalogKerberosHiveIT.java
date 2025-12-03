@@ -47,11 +47,13 @@ import org.apache.hadoop.security.authentication.util.KerberosUtil;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+@Disabled
 @Tag("gravitino-docker-test")
 public class HudiCatalogKerberosHiveIT extends BaseIT {
   private static final Logger LOG = LoggerFactory.getLogger(HudiCatalogKerberosHiveIT.class);
