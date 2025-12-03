@@ -40,6 +40,7 @@ import static org.apache.gravitino.catalog.fileset.FilesetCatalogPropertiesMetad
 import static org.apache.gravitino.file.Fileset.LOCATION_NAME_UNKNOWN;
 import static org.apache.gravitino.file.Fileset.PROPERTY_DEFAULT_LOCATION_NAME;
 import static org.apache.gravitino.file.Fileset.PROPERTY_MULTIPLE_LOCATIONS_PREFIX;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.when;
@@ -79,6 +80,8 @@ import org.apache.gravitino.UserPrincipal;
 import org.apache.gravitino.audit.CallerContext;
 import org.apache.gravitino.audit.FilesetAuditConstants;
 import org.apache.gravitino.audit.FilesetDataOperation;
+import org.apache.gravitino.catalog.hadoop.fs.FileSystemProvider;
+import org.apache.gravitino.catalog.hadoop.fs.LocalFileSystemProvider;
 import org.apache.gravitino.connector.CatalogInfo;
 import org.apache.gravitino.connector.HasPropertyMetadata;
 import org.apache.gravitino.connector.PropertiesMetadata;
@@ -104,6 +107,7 @@ import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.PrincipalUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.LocalFileSystem;
 import org.apache.hadoop.fs.Path;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
@@ -1453,9 +1457,9 @@ public class TestFilesetCatalogOperations {
       String subPath = "/test/test.parquet";
       when(mockOps.getFileLocation(filesetIdent, subPath)).thenCallRealMethod();
       when(mockOps.getFileLocation(filesetIdent, subPath, null)).thenCallRealMethod();
-      when(mockOps.getFileSystem(Mockito.any(), Mockito.any()))
+      when(mockOps.getFileSystem(any(), any()))
           .thenReturn(FileSystem.getLocal(new Configuration()));
-      when(mockOps.getFileSystemWithCache(Mockito.any(), Mockito.any())).thenCallRealMethod();
+      when(mockOps.getFileSystemWithCache(any(), any())).thenCallRealMethod();
       String fileLocation = mockOps.getFileLocation(filesetIdent, subPath);
       Assertions.assertEquals(
           String.format("%s%s", mockFileset.storageLocation(), subPath.substring(1)), fileLocation);
@@ -1863,6 +1867,41 @@ public class TestFilesetCatalogOperations {
         callerContextHolder.when(CallerContext.CallerContextHolder::get).thenReturn(callerContext);
         Assertions.assertEquals("file://a/b/e", ops.getTargetLocation(filesetWithMultipleLocation));
       }
+    }
+  }
+
+  @Test
+  void testGetFileSystemWithTimeout() throws Exception {
+    FieldUtils.writeField(
+        GravitinoEnv.getInstance(), "entityStore", new RelationalEntityStore(), true);
+
+    FilesetCatalogOperations filesetCatalogOperations = new FilesetCatalogOperations();
+
+    LocalFileSystemProvider localFileSystemProvider = Mockito.mock(LocalFileSystemProvider.class);
+    when(localFileSystemProvider.scheme()).thenReturn("file");
+    when(localFileSystemProvider.getFileSystem(Mockito.any(Path.class), Mockito.anyMap()))
+        .thenAnswer(
+            invocation -> {
+              // Sleep 100s, however, the timeout is set to 6s by default in
+              // FilesetCatalogOperations, so
+              // it's expected to over within 10s
+              Thread.sleep(100000); // Simulate delay
+              return new LocalFileSystem();
+            });
+    Map<String, FileSystemProvider> fileSystemProviderMapOriginal = new HashMap<>();
+    fileSystemProviderMapOriginal.put("file", localFileSystemProvider);
+    FieldUtils.writeField(
+        filesetCatalogOperations, "fileSystemProvidersMap", fileSystemProviderMapOriginal, true);
+
+    FieldUtils.writeField(
+        filesetCatalogOperations, "propertiesMetadata", FILESET_PROPERTIES_METADATA, true);
+
+    // Test the following method should finish with 10s
+    long now = System.currentTimeMillis();
+    try {
+      filesetCatalogOperations.getFileSystem(new Path("file:///tmp"), ImmutableMap.of());
+    } catch (IOException e) {
+      Assertions.assertTrue(System.currentTimeMillis() - now <= 10000);
     }
   }
 
