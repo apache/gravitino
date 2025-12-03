@@ -22,7 +22,6 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
-import java.io.File;
 import java.lang.reflect.Method;
 import java.nio.file.Files;
 import java.util.Collections;
@@ -377,6 +376,4 @@ public class JobAuthorizationIT extends BaseRestApiAuthorizationIT {
       FileUtils.deleteDirectory(testStagingDir);
     }
   }
-
-
 }

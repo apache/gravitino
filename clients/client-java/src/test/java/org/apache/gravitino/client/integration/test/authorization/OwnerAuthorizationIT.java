@@ -18,8 +18,6 @@
 package org.apache.gravitino.client.integration.test.authorization;
 
 import static org.junit.Assert.assertThrows;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.mockStatic;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
@@ -32,14 +30,12 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
-
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.authorization.Owner;
 import org.apache.gravitino.authorization.Privileges;
-import org.apache.gravitino.client.GravitinoAdminClient;
 import org.apache.gravitino.client.GravitinoMetalake;
 import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.integration.test.container.ContainerSuite;
@@ -47,14 +43,10 @@ import org.apache.gravitino.integration.test.container.HiveContainer;
 import org.apache.gravitino.job.JobHandle;
 import org.apache.gravitino.job.JobTemplate;
 import org.apache.gravitino.job.ShellJobTemplate;
-import org.apache.gravitino.policy.Policy;
 import org.apache.gravitino.policy.PolicyContents;
-import org.apache.gravitino.policy.SupportsPolicies;
 import org.apache.gravitino.rel.Column;
-import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.TableCatalog;
 import org.apache.gravitino.rel.types.Types;
-import org.apache.gravitino.utils.MetadataObjectUtil;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.MethodOrderer;
@@ -62,7 +54,6 @@ import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestMethodOrder;
-import org.mockito.MockedStatic;
 
 @Tag("gravitino-docker-test")
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
@@ -359,11 +350,11 @@ public class OwnerAuthorizationIT extends BaseRestApiAuthorizationIT {
         MetadataObjects.of(ImmutableList.of(CATALOG, SCHEMA), MetadataObject.Type.SCHEMA));
     GravitinoMetalake gravitinoMetalakeLoadByNormalUser = normalUserClient.loadMetalake(METALAKE);
     gravitinoMetalakeLoadByNormalUser.getOwner(
-            MetadataObjects.of(ImmutableList.of(CATALOG, SCHEMA), MetadataObject.Type.SCHEMA));
+        MetadataObjects.of(ImmutableList.of(CATALOG, SCHEMA), MetadataObject.Type.SCHEMA));
     gravitinoMetalake.revokePrivilegesFromRole(
-            role,
-            MetadataObjects.of(ImmutableList.of(CATALOG, SCHEMA), MetadataObject.Type.SCHEMA),
-            ImmutableSet.of(Privileges.UseSchema.allow()));
+        role,
+        MetadataObjects.of(ImmutableList.of(CATALOG, SCHEMA), MetadataObject.Type.SCHEMA),
+        ImmutableSet.of(Privileges.UseSchema.allow()));
     assertThrows(
         "Current user can not get owner",
         ForbiddenException.class,
@@ -372,9 +363,9 @@ public class OwnerAuthorizationIT extends BaseRestApiAuthorizationIT {
               MetadataObjects.of(ImmutableList.of(CATALOG, SCHEMA), MetadataObject.Type.SCHEMA));
         });
     gravitinoMetalake.grantPrivilegesToRole(
-            role,
-            MetadataObjects.of(ImmutableList.of(CATALOG, SCHEMA), MetadataObject.Type.SCHEMA),
-            ImmutableSet.of(Privileges.UseSchema.allow()));
+        role,
+        MetadataObjects.of(ImmutableList.of(CATALOG, SCHEMA), MetadataObject.Type.SCHEMA),
+        ImmutableSet.of(Privileges.UseSchema.allow()));
   }
 
   @Test
@@ -399,50 +390,49 @@ public class OwnerAuthorizationIT extends BaseRestApiAuthorizationIT {
   public void testGetMetalakeOwner() {
     GravitinoMetalake gravitinoMetalake = client.loadMetalake(METALAKE);
     gravitinoMetalake.getOwner(
-            MetadataObjects.of(ImmutableList.of(METALAKE), MetadataObject.Type.METALAKE));
+        MetadataObjects.of(ImmutableList.of(METALAKE), MetadataObject.Type.METALAKE));
     GravitinoMetalake gravitinoMetalakeLoadByNormalUser = normalUserClient.loadMetalake(METALAKE);
     gravitinoMetalakeLoadByNormalUser.getOwner(
-            MetadataObjects.of(ImmutableList.of(METALAKE), MetadataObject.Type.METALAKE));
+        MetadataObjects.of(ImmutableList.of(METALAKE), MetadataObject.Type.METALAKE));
     client.createMetalake("tempMetalake", "metalake1 comment", Collections.emptyMap());
   }
 
   @Test
   @Order(10)
-  public void testGetPolicyOwner(){
+  public void testGetPolicyOwner() {
     GravitinoMetalake gravitinoMetalake = client.loadMetalake(METALAKE);
     GravitinoMetalake gravitinoMetalakeLoadByNormalUser = normalUserClient.loadMetalake(METALAKE);
     Set<MetadataObject.Type> supportedTypes = ImmutableSet.of(MetadataObject.Type.TABLE);
     String policyName = "policy1";
     gravitinoMetalake.createPolicy(
-            policyName, "custom", "policy1", true,
-            PolicyContents.custom(null, supportedTypes, null));
-    gravitinoMetalake
-            .getOwner(MetadataObjects.of(ImmutableList.of(policyName), MetadataObject.Type.POLICY));
+        policyName, "custom", "policy1", true, PolicyContents.custom(null, supportedTypes, null));
+    gravitinoMetalake.getOwner(
+        MetadataObjects.of(ImmutableList.of(policyName), MetadataObject.Type.POLICY));
     assertThrows(
-            "Current user can not get owner",
-            ForbiddenException.class,
-            () -> {
-              gravitinoMetalakeLoadByNormalUser
-                      .getOwner(MetadataObjects.of(ImmutableList.of(policyName), MetadataObject.Type.POLICY));
-            });
+        "Current user can not get owner",
+        ForbiddenException.class,
+        () -> {
+          gravitinoMetalakeLoadByNormalUser.getOwner(
+              MetadataObjects.of(ImmutableList.of(policyName), MetadataObject.Type.POLICY));
+        });
   }
 
   @Test
   @Order(11)
-  public void testGetTagOwner(){
+  public void testGetTagOwner() {
     GravitinoMetalake gravitinoMetalake = client.loadMetalake(METALAKE);
     GravitinoMetalake gravitinoMetalakeLoadByNormalUser = normalUserClient.loadMetalake(METALAKE);
     String tagName = "tag1";
     gravitinoMetalake.createTag("tag1", "tag1", Map.of());
-    gravitinoMetalake
-            .getOwner(MetadataObjects.of(ImmutableList.of(tagName), MetadataObject.Type.TAG));
+    gravitinoMetalake.getOwner(
+        MetadataObjects.of(ImmutableList.of(tagName), MetadataObject.Type.TAG));
     assertThrows(
-            "Current user can not get owner",
-            ForbiddenException.class,
-            () -> {
-              gravitinoMetalakeLoadByNormalUser
-                      .getOwner(MetadataObjects.of(ImmutableList.of(tagName), MetadataObject.Type.TAG));
-            });
+        "Current user can not get owner",
+        ForbiddenException.class,
+        () -> {
+          gravitinoMetalakeLoadByNormalUser.getOwner(
+              MetadataObjects.of(ImmutableList.of(tagName), MetadataObject.Type.TAG));
+        });
   }
 
   @Test
@@ -455,53 +445,52 @@ public class OwnerAuthorizationIT extends BaseRestApiAuthorizationIT {
     String testLibScriptPath = generateTestLibScript();
 
     builder =
-            ShellJobTemplate.builder()
-                    .withComment("Test shell job template")
-                    .withExecutable(testEntryScriptPath)
-                    .withArguments(Lists.newArrayList("{{arg1}}", "{{arg2}}"))
-                    .withEnvironments(ImmutableMap.of("ENV_VAR", "{{env_var}}"))
-                    .withScripts(Lists.newArrayList(testLibScriptPath))
-                    .withCustomFields(Collections.emptyMap());
+        ShellJobTemplate.builder()
+            .withComment("Test shell job template")
+            .withExecutable(testEntryScriptPath)
+            .withArguments(Lists.newArrayList("{{arg1}}", "{{arg2}}"))
+            .withEnvironments(ImmutableMap.of("ENV_VAR", "{{env_var}}"))
+            .withScripts(Lists.newArrayList(testLibScriptPath))
+            .withCustomFields(Collections.emptyMap());
     JobTemplate template1 = builder.withName("test_1").build();
     gravitinoMetalake.registerJobTemplate(template1);
-    gravitinoMetalake.getOwner(MetadataObjects.of(ImmutableList.of("test_1"), MetadataObject.Type.JOB_TEMPLATE));
+    gravitinoMetalake.getOwner(
+        MetadataObjects.of(ImmutableList.of("test_1"), MetadataObject.Type.JOB_TEMPLATE));
     assertThrows(
-            "Current user can not get owner",
-            ForbiddenException.class,
-            () -> {
-              gravitinoMetalakeLoadByNormalUser
-                      .getOwner(MetadataObjects.of(ImmutableList.of("test_1"), MetadataObject.Type.JOB_TEMPLATE));
-            });
-    JobHandle jobHandle = gravitinoMetalake
-            .runJob(
-                    "test_1",
-                    ImmutableMap.of("arg1", "value1", "arg2", "success", "env_var", "value2"));
-    gravitinoMetalake.getOwner(MetadataObjects.of(ImmutableList.of(jobHandle.jobId())
-            , MetadataObject.Type.JOB));
+        "Current user can not get owner",
+        ForbiddenException.class,
+        () -> {
+          gravitinoMetalakeLoadByNormalUser.getOwner(
+              MetadataObjects.of(ImmutableList.of("test_1"), MetadataObject.Type.JOB_TEMPLATE));
+        });
+    JobHandle jobHandle =
+        gravitinoMetalake.runJob(
+            "test_1", ImmutableMap.of("arg1", "value1", "arg2", "success", "env_var", "value2"));
+    gravitinoMetalake.getOwner(
+        MetadataObjects.of(ImmutableList.of(jobHandle.jobId()), MetadataObject.Type.JOB));
     assertThrows(
-            "Current user can not get owner",
-            ForbiddenException.class,
-            () -> {
-              gravitinoMetalakeLoadByNormalUser
-                      .getOwner(MetadataObjects.of(ImmutableList.of(jobHandle.jobId())
-                              , MetadataObject.Type.JOB));
-            });
+        "Current user can not get owner",
+        ForbiddenException.class,
+        () -> {
+          gravitinoMetalakeLoadByNormalUser.getOwner(
+              MetadataObjects.of(ImmutableList.of(jobHandle.jobId()), MetadataObject.Type.JOB));
+        });
   }
 
   @Test
   @Order(13)
-  public void getRoleOwner(){
+  public void getRoleOwner() {
     GravitinoMetalake gravitinoMetalake = client.loadMetalake(METALAKE);
     GravitinoMetalake gravitinoMetalakeLoadByNormalUser = normalUserClient.loadMetalake(METALAKE);
-    gravitinoMetalakeLoadByNormalUser
-            .getOwner(MetadataObjects.of(ImmutableList.of(role), MetadataObject.Type.ROLE));
+    gravitinoMetalakeLoadByNormalUser.getOwner(
+        MetadataObjects.of(ImmutableList.of(role), MetadataObject.Type.ROLE));
     gravitinoMetalake.revokeRolesFromUser(ImmutableList.of(role), NORMAL_USER);
     assertThrows(
-            "Current user can not get owner",
-            ForbiddenException.class,
-            () -> {
-              gravitinoMetalakeLoadByNormalUser
-                      .getOwner(MetadataObjects.of(ImmutableList.of(role), MetadataObject.Type.ROLE));
-            });
+        "Current user can not get owner",
+        ForbiddenException.class,
+        () -> {
+          gravitinoMetalakeLoadByNormalUser.getOwner(
+              MetadataObjects.of(ImmutableList.of(role), MetadataObject.Type.ROLE));
+        });
   }
 }

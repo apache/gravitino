@@ -91,7 +91,6 @@ public class BaseRestApiAuthorizationIT extends BaseIT {
     super.stopIntegrationTest();
   }
 
-
   /**
    * Generate a test entry script for job operation test
    *
@@ -99,24 +98,24 @@ public class BaseRestApiAuthorizationIT extends BaseIT {
    */
   protected static String generateTestEntryScript() {
     String content =
-            "#!/bin/bash\n"
-                    + "echo \"starting test job\"\n\n"
-                    + "bin=\"$(dirname \"${BASH_SOURCE-$0}\")\"\n"
-                    + "bin=\"$(cd \"${bin}\">/dev/null; pwd)\"\n\n"
-                    + ". \"${bin}/common.sh\"\n\n"
-                    + "sleep 3\n\n"
-                    + "JOB_NAME=\"test_job-$(date +%s)-$1\"\n\n"
-                    + "echo \"Submitting job with name: $JOB_NAME\"\n\n"
-                    + "echo \"$1\"\n\n"
-                    + "echo \"$2\"\n\n"
-                    + "echo \"$ENV_VAR\"\n\n"
-                    + "if [[ \"$2\" == \"success\" ]]; then\n"
-                    + "  exit 0\n"
-                    + "elif [[ \"$2\" == \"fail\" ]]; then\n"
-                    + "  exit 1\n"
-                    + "else\n"
-                    + "  exit 2\n"
-                    + "fi\n";
+        "#!/bin/bash\n"
+            + "echo \"starting test job\"\n\n"
+            + "bin=\"$(dirname \"${BASH_SOURCE-$0}\")\"\n"
+            + "bin=\"$(cd \"${bin}\">/dev/null; pwd)\"\n\n"
+            + ". \"${bin}/common.sh\"\n\n"
+            + "sleep 3\n\n"
+            + "JOB_NAME=\"test_job-$(date +%s)-$1\"\n\n"
+            + "echo \"Submitting job with name: $JOB_NAME\"\n\n"
+            + "echo \"$1\"\n\n"
+            + "echo \"$2\"\n\n"
+            + "echo \"$ENV_VAR\"\n\n"
+            + "if [[ \"$2\" == \"success\" ]]; then\n"
+            + "  exit 0\n"
+            + "elif [[ \"$2\" == \"fail\" ]]; then\n"
+            + "  exit 1\n"
+            + "else\n"
+            + "  exit 2\n"
+            + "fi\n";
 
     try {
       File scriptFile = new File(testStagingDir, "test-job.sh");

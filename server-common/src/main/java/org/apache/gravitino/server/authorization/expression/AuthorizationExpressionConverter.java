@@ -188,13 +188,12 @@ public class AuthorizationExpressionConverter {
                 loadModelAuthorizationExpression,
                 loadFilesetAuthorizationExpression,
                 loadTopicsAuthorizationExpression,
-                    loadRoleAuthorizationExpression,
-                    loadMetalakeAuthorizationExpression,
-                    loadPolicyAuthorizationExpression,
-                    loadTagAuthorizationExpression,
-                    loadJobAuthorizationExpression,
-                    loadJobTemplateAuthorizationExpression
-                    ));
+                loadRoleAuthorizationExpression,
+                loadMetalakeAuthorizationExpression,
+                loadPolicyAuthorizationExpression,
+                loadTagAuthorizationExpression,
+                loadJobAuthorizationExpression,
+                loadJobTemplateAuthorizationExpression));
   }
 
   /**

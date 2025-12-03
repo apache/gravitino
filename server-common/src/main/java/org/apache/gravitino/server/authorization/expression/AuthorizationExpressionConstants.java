@@ -123,5 +123,6 @@ public class AuthorizationExpressionConstants {
 
   public static final String loadJobAuthorizationExpression = "METALAKE::OWNER || JOB::OWNER";
 
-  public static final String loadJobTemplateAuthorizationExpression = "METALAKE::OWNER || JOB_TEMPLATE::OWNER || ANY_USE_JOB_TEMPLATE";
+  public static final String loadJobTemplateAuthorizationExpression =
+      "METALAKE::OWNER || JOB_TEMPLATE::OWNER || ANY_USE_JOB_TEMPLATE";
 }

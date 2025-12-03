@@ -112,7 +112,7 @@ public class JobOperations {
                 Lists.newArrayList(
                     MetadataAuthzHelper.filterByExpression(
                         metalake,
-                            AuthorizationExpressionConstants.loadJobTemplateAuthorizationExpression,
+                        AuthorizationExpressionConstants.loadJobTemplateAuthorizationExpression,
                         Entity.EntityType.JOB_TEMPLATE,
                         jobOperationDispatcher
                             .listJobTemplates(metalake)
@@ -299,7 +299,7 @@ public class JobOperations {
                 Lists.newArrayList(
                     MetadataAuthzHelper.filterByExpression(
                         metalake,
-                            AuthorizationExpressionConstants.loadJobAuthorizationExpression,
+                        AuthorizationExpressionConstants.loadJobAuthorizationExpression,
                         Entity.EntityType.JOB,
                         jobOperationDispatcher
                             .listJobs(metalake, Optional.ofNullable(jobTemplateName))
@@ -321,7 +321,8 @@ public class JobOperations {
   @Produces("application/vnd.gravitino.v1+json")
   @Timed(name = "get-job." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "get-job", absolute = true)
-  @AuthorizationExpression(expression = AuthorizationExpressionConstants.loadJobAuthorizationExpression)
+  @AuthorizationExpression(
+      expression = AuthorizationExpressionConstants.loadJobAuthorizationExpression)
   public Response getJob(
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
           String metalake,
