@@ -139,7 +139,7 @@ docker run --rm -d -p 9102:9102 -e LANCE_REST_GRAVITINO_METALAKE_NAME=test -e LA
 
 Memory settings
 
-Use `GRAVITINO_MEM` to size the JVM (default `-Xms1024m -Xmx1024m -XX:MaxMetaspaceSize=512m`). Example: `-e GRAVITINO_MEM="-Xms2g -Xmx2g"`. This value is appended by the launcher, so set `GRAVITINO_MEM` when you need different heap sizes.
+Use `GRAVITINO_MEM` to size the JVM (default `-Xms1024m -Xmx1024m -XX:MaxMetaspaceSize=512m`). Example: `-e GRAVITINO_MEM="-Xms2g -Xmx2g -XX:MaxMetaspaceSize=512m"`. This value is appended by the launcher, so set `GRAVITINO_MEM` when you need different heap sizes.
 
 Currently, Gravitino Lance REST server supports setting the following environment variables
 - LANCE_REST_GRAVITINO_METALAKE_NAME: It will overwrite the configuration "gravitino.lance-rest.gravitino.metalake-name" in configuration file `conf/gravitino-lance-rest-server.conf`. **You should set it to your Gravitino metalake name.**
