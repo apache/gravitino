@@ -171,7 +171,7 @@ function get_release_info {
   fi
 
   export GIT_EMAIL="$ASF_USERNAME@apache.org"
-  export GPG_KEY=$(read_config "GPG key" "$GIT_EMAIL")
+  export GPG_KEY=$(read_config "GPG key" "$GPG_KEY")
 
   cat <<EOF
 ================
