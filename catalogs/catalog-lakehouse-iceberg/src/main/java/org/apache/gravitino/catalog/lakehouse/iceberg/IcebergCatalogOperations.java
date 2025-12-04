@@ -50,6 +50,7 @@ import org.apache.gravitino.exceptions.NonEmptySchemaException;
 import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
 import org.apache.gravitino.exceptions.TableAlreadyExistsException;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
+import org.apache.gravitino.iceberg.common.authentication.AuthenticationConfig;
 import org.apache.gravitino.iceberg.common.authentication.SupportsKerberos;
 import org.apache.gravitino.iceberg.common.ops.IcebergCatalogWrapper;
 import org.apache.gravitino.iceberg.common.ops.IcebergCatalogWrapper.IcebergTableChange;
@@ -116,8 +117,10 @@ public class IcebergCatalogOperations implements CatalogOperations, SupportsSche
     IcebergConfig icebergConfig = new IcebergConfig(resultConf);
 
     IcebergCatalogWrapper rawWrapper = new IcebergCatalogWrapper(icebergConfig);
+
+    AuthenticationConfig authenticationConfig = new AuthenticationConfig(resultConf);
     this.icebergCatalogWrapper =
-        rawWrapper.getCatalog() instanceof SupportsKerberos
+        authenticationConfig.isKerberosAuth() && rawWrapper.getCatalog() instanceof SupportsKerberos
             ? new KerberosAwareIcebergCatalogProxy(rawWrapper).getProxy(icebergConfig)
             : rawWrapper;
     this.icebergCatalogWrapperHelper =

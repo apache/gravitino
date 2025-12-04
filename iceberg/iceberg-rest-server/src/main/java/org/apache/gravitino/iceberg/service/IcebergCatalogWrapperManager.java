@@ -29,6 +29,7 @@ import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
+import org.apache.gravitino.iceberg.common.authentication.AuthenticationConfig;
 import org.apache.gravitino.iceberg.common.authentication.SupportsKerberos;
 import org.apache.gravitino.iceberg.common.ops.IcebergCatalogWrapper;
 import org.apache.gravitino.iceberg.common.ops.KerberosAwareIcebergCatalogProxy;
@@ -103,7 +104,9 @@ public class IcebergCatalogWrapperManager implements AutoCloseable {
   protected CatalogWrapperForREST createCatalogWrapper(
       String catalogName, IcebergConfig icebergConfig) {
     CatalogWrapperForREST rest = new CatalogWrapperForREST(catalogName, icebergConfig);
-    if (rest.getCatalog() instanceof SupportsKerberos) {
+    AuthenticationConfig authenticationConfig =
+        new AuthenticationConfig(icebergConfig.getAllConfig());
+    if (rest.getCatalog() instanceof SupportsKerberos && authenticationConfig.isKerberosAuth()) {
       return (CatalogWrapperForREST)
           new KerberosAwareIcebergCatalogProxy(rest).getProxy(catalogName, icebergConfig);
     }
