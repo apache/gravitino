@@ -65,7 +65,7 @@ public class OwnerManager implements OwnerDispatcher {
   @Override
   public void setOwner(
       String metalake, MetadataObject metadataObject, String ownerName, Owner.Type ownerType) {
-    // TODO: Support GROUP type owner in the future.
+    // TODO(ISSUE-9375): Support GROUP type owner in the future.
     Preconditions.checkArgument(
         ownerType == Owner.Type.USER, "Only USER type is supported as owner currently.");
     NameIdentifier objectIdent = MetadataObjectUtil.toEntityIdent(metalake, metadataObject);
