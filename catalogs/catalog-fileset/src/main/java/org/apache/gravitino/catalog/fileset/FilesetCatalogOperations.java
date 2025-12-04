@@ -142,10 +142,8 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
 
   private final ThreadPoolExecutor fileSystemExecutor =
       new ThreadPoolExecutor(
-          // Core pool size max is 12
-          Math.min(Math.max(4, Runtime.getRuntime().availableProcessors()), 12),
-          // The Maximum pool size max is 24
-          Math.min(Math.max(10, Runtime.getRuntime().availableProcessors() * 2), 24),
+          Math.max(2, Math.min(Runtime.getRuntime().availableProcessors() * 2, 16)),
+          Math.max(2, Math.min(Runtime.getRuntime().availableProcessors() * 2, 32)),
           5L,
           TimeUnit.SECONDS,
           new ArrayBlockingQueue<>(1000),
