@@ -18,6 +18,10 @@
  */
 package org.apache.gravitino.oss.fs;
 
+import static org.apache.gravitino.catalog.hadoop.fs.Constants.DEFAULT_CONNECTION_TIMEOUT;
+import static org.apache.gravitino.catalog.hadoop.fs.Constants.OSS_ESTABLISH_TIMEOUT_KEY;
+import static org.apache.gravitino.catalog.hadoop.fs.Constants.OSS_MAX_ERROR_RETRIES_KEY;
+
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
@@ -82,25 +86,6 @@ public class OSSFileSystemProvider implements FileSystemProvider, SupportsCreden
     return result;
   }
 
-  private Map<String, String> additionalOSSConfig(Map<String, String> configs) {
-    Map<String, String> additionalConfigs = Maps.newHashMap(configs);
-
-    // Avoid multiple retries to speed up failure in test cases.
-    // Use hard code instead of Constants.ESTABLISH_TIMEOUT_KEY to avoid dependency on a specific
-    // Hadoop version.
-    if (!configs.containsKey("fs.oss.connection.establish.timeout")) {
-      additionalConfigs.put("fs.oss.connection.establish.timeout", "5000");
-    }
-
-    if (!configs.containsKey("fs.oss.attempts.maximum")) {
-      additionalConfigs.put("fs.oss.attempts.maximum", "2");
-    }
-
-    // More tuning can be added here.
-
-    return ImmutableMap.copyOf(additionalConfigs);
-  }
-
   @Override
   public String scheme() {
     return "oss";
@@ -109,5 +94,30 @@ public class OSSFileSystemProvider implements FileSystemProvider, SupportsCreden
   @Override
   public String name() {
     return "oss";
+  }
+
+  /**
+   * Add additional OSS configurations for better performance and reliability.
+   *
+   * @param configs Original configurations
+   * @return Configurations with additional OSS settings
+   */
+  private Map<String, String> additionalOSSConfig(Map<String, String> configs) {
+    Map<String, String> additionalConfigs = Maps.newHashMap(configs);
+
+    // Avoid multiple retries to speed up failure in test cases.
+    // Use hard code instead of Constants.ESTABLISH_TIMEOUT_KEY to avoid dependency on a specific
+    // Hadoop version.
+    if (!configs.containsKey(OSS_ESTABLISH_TIMEOUT_KEY)) {
+      additionalConfigs.put(OSS_ESTABLISH_TIMEOUT_KEY, DEFAULT_CONNECTION_TIMEOUT);
+    }
+
+    if (!configs.containsKey(OSS_MAX_ERROR_RETRIES_KEY)) {
+      additionalConfigs.put(OSS_MAX_ERROR_RETRIES_KEY, "2");
+    }
+
+    // More tuning can be added here.
+
+    return ImmutableMap.copyOf(additionalConfigs);
   }
 }
