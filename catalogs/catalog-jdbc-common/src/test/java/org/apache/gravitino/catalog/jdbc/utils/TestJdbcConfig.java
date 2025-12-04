@@ -36,4 +36,14 @@ public class TestJdbcConfig {
     jdbcConfig = new JdbcConfig(immutableMap);
     Assertions.assertFalse(jdbcConfig.getTestOnBorrow());
   }
+
+  @Test
+  void testMaxWaitMs() {
+    JdbcConfig jdbcConfig = new JdbcConfig(Maps.newHashMap());
+    Assertions.assertEquals(30000L, jdbcConfig.getMaxWaitMs());
+
+    ImmutableMap immutableMap = ImmutableMap.of("jdbc.pool.max-wait-ms", "60000");
+    jdbcConfig = new JdbcConfig(immutableMap);
+    Assertions.assertEquals(60000L, jdbcConfig.getMaxWaitMs());
+  }
 }

@@ -102,13 +102,15 @@ public class TypeUtils {
         return Types.TimestampType.withTimeZone(zonedPrecision);
       case ARRAY:
         ArrayType arrayType = (ArrayType) logicalType;
-        Type elementType = toGravitinoType(arrayType.getElementType());
-        return Types.ListType.of(elementType, arrayType.isNullable());
+        LogicalType elementLogicalType = arrayType.getElementType();
+        Type elementType = toGravitinoType(elementLogicalType);
+        return Types.ListType.of(elementType, elementLogicalType.isNullable());
       case MAP:
         MapType mapType = (MapType) logicalType;
-        Type keyType = toGravitinoType(mapType.getKeyType());
-        Type valueType = toGravitinoType(mapType.getValueType());
-        return Types.MapType.of(keyType, valueType, mapType.isNullable());
+        LogicalType keyType = mapType.getKeyType();
+        LogicalType valueType = mapType.getValueType();
+        return Types.MapType.of(
+            toGravitinoType(keyType), toGravitinoType(valueType), valueType.isNullable());
       case ROW:
         RowType rowType = (RowType) logicalType;
         Types.StructType.Field[] fields =
