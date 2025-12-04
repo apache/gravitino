@@ -18,6 +18,10 @@
  */
 package org.apache.gravitino.gcs.fs;
 
+import static org.apache.gravitino.catalog.hadoop.fs.Constants.DEFAULT_CONNECTION_TIMEOUT;
+import static org.apache.gravitino.catalog.hadoop.fs.Constants.GCS_GCS_HTTP_CONNECT_TIMEOUT_KEY;
+import static org.apache.gravitino.catalog.hadoop.fs.Constants.GCS_HTTP_MAX_RETRY_KEY;
+
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
@@ -64,25 +68,6 @@ public class GCSFileSystemProvider implements FileSystemProvider, SupportsCreden
     return result;
   }
 
-  private Map<String, String> additionalGCSConfig(Map<String, String> configs) {
-    Map<String, String> additionalConfigs = Maps.newHashMap(configs);
-
-    // Avoid multiple retries to speed up failure in test cases.
-    // Use hard code instead of GoogleHadoopFileSystemBase.GCS_HTTP_CONNECT_TIMEOUT_KEY to avoid
-    // dependency on a specific Hadoop version
-    if (!configs.containsKey("fs.gs.http.connect-timeout")) {
-      additionalConfigs.put("fs.gs.http.connect-timeout", "5000");
-    }
-
-    if (!configs.containsKey("fs.gs.http.max.retry")) {
-      additionalConfigs.put("fs.gs.http.max.retry", "2");
-    }
-
-    // More tuning can be added here.
-
-    return ImmutableMap.copyOf(additionalConfigs);
-  }
-
   @Override
   public String scheme() {
     return "gs";
@@ -91,5 +76,31 @@ public class GCSFileSystemProvider implements FileSystemProvider, SupportsCreden
   @Override
   public String name() {
     return "gcs";
+  }
+
+  /**
+   * Add additional GCS specific configuration to tune the performance.
+   *
+   * @param configs original configuration
+   * @return the configuration with additional GCS tuning parameters
+   */
+  private Map<String, String> additionalGCSConfig(Map<String, String> configs) {
+    Map<String, String> additionalConfigs = Maps.newHashMap(configs);
+
+    // Avoid multiple retries to speed up failure in test cases.
+    // Use hard code instead of GoogleHadoopFileSystemBase.GCS_HTTP_CONNECT_TIMEOUT_KEY to avoid
+    // dependency on a specific Hadoop version
+    if (!configs.containsKey(GCS_GCS_HTTP_CONNECT_TIMEOUT_KEY)) {
+      //
+      additionalConfigs.put(GCS_GCS_HTTP_CONNECT_TIMEOUT_KEY, DEFAULT_CONNECTION_TIMEOUT);
+    }
+
+    if (!configs.containsKey(GCS_HTTP_MAX_RETRY_KEY)) {
+      additionalConfigs.put(GCS_HTTP_MAX_RETRY_KEY, "2");
+    }
+
+    // More tuning can be added here.
+
+    return ImmutableMap.copyOf(additionalConfigs);
   }
 }

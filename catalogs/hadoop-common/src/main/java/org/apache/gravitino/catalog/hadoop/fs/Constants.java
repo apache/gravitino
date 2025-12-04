@@ -46,4 +46,33 @@ public class Constants {
   public static final String AUTH_KERBEROS = "kerberos";
   // Simple authentication type
   public static final String AUTH_SIMPLE = "simple";
+
+  // The following parts are configuration keys for different file systems.
+
+  // S3 specific configuration keys, in case of specific hadoop version binding, we will
+  // map these keys to the corresponding hadoop s3 keys.
+  public static final String S3_MAX_ERROR_RETRIES = "fs.s3a.attempts.maximum";
+
+  public static final String S3_ESTABLISH_TIMEOUT = "fs.s3a.connection.establish.timeout";
+
+  public static final String S3_RETRY_LIMIT = "fs.s3a.retry.limit";
+
+  public static final String S3_RETRY_THROTTLE_LIMIT = "fs.s3a.retry.throttle.limit";
+
+  // GCS specific configuration keys
+  public static final String GCS_GCS_HTTP_CONNECT_TIMEOUT_KEY = "fs.gs.http.connect-timeout";
+  public static final String GCS_HTTP_MAX_RETRY_KEY = "fs.gs.http.max.retry";
+
+  // OSS specific configuration keys
+  public static final String OSS_ESTABLISH_TIMEOUT_KEY = "fs.oss.connection.establish.timeout";
+  public static final String OSS_MAX_ERROR_RETRIES_KEY = "fs.oss.attempts.maximum";
+
+  // Azure Blob Storage specific configuration keys, please see: AbfsConfiguration
+  public static final String ADLS_MAX_RETRIES = "fs.azure.io.retry.max.retries";
+
+  // HDFS specific configuration keys
+  public static final String HDFS_IPC_CLIENT_CONNECT_TIMEOUT_KEY = "ipc.client.connect.timeout";
+  public static final String HDFS_IPC_PING_KEY = "ipc.client.ping";
+
+  public static final String DEFAULT_CONNECTION_TIMEOUT = "5000";
 }
