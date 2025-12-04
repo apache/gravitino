@@ -86,18 +86,29 @@ public class TestTypeUtils {
             new YearMonthIntervalType(YearMonthIntervalType.YearMonthResolution.YEAR)));
     Assertions.assertEquals(
         Types.ListType.notNull(Types.IntegerType.get()),
-        TypeUtils.toGravitinoType(new ArrayType(false, new IntType())));
+        TypeUtils.toGravitinoType(new ArrayType(false, new IntType(false))));
     Assertions.assertEquals(
         Types.ListType.nullable(Types.IntegerType.get()),
-        TypeUtils.toGravitinoType(new ArrayType(true, new IntType())));
+        TypeUtils.toGravitinoType(new ArrayType(true, new IntType(true))));
+    Assertions.assertEquals(
+        Types.ListType.nullable(Types.IntegerType.get()),
+        TypeUtils.toGravitinoType(new ArrayType(false, new IntType(true))));
     Assertions.assertEquals(
         Types.MapType.of(Types.StringType.get(), Types.IntegerType.get(), true),
         TypeUtils.toGravitinoType(
-            new MapType(true, new VarCharType(Integer.MAX_VALUE), new IntType())));
+            new MapType(true, new VarCharType(Integer.MAX_VALUE), new IntType(true))));
     Assertions.assertEquals(
         Types.MapType.of(Types.StringType.get(), Types.IntegerType.get(), false),
         TypeUtils.toGravitinoType(
-            new MapType(false, new VarCharType(Integer.MAX_VALUE), new IntType())));
+            new MapType(true, new VarCharType(Integer.MAX_VALUE), new IntType(false))));
+    Assertions.assertEquals(
+        Types.MapType.of(Types.StringType.get(), Types.IntegerType.get(), false),
+        TypeUtils.toGravitinoType(
+            new MapType(false, new VarCharType(Integer.MAX_VALUE), new IntType(false))));
+    Assertions.assertEquals(
+        Types.MapType.of(Types.StringType.get(), Types.IntegerType.get(), true),
+        TypeUtils.toGravitinoType(
+            new MapType(false, new VarCharType(Integer.MAX_VALUE), new IntType(true))));
     Assertions.assertEquals(
         Types.StructType.of(
             Types.StructType.Field.nullableField("a", Types.IntegerType.get()),
@@ -150,6 +161,10 @@ public class TestTypeUtils {
         DataTypes.MAP(DataTypes.STRING(), DataTypes.INT().nullable()),
         TypeUtils.toFlinkType(
             Types.MapType.of(Types.StringType.get(), Types.IntegerType.get(), true)));
+    Assertions.assertEquals(
+        DataTypes.MAP(DataTypes.STRING(), DataTypes.INT().notNull()),
+        TypeUtils.toFlinkType(
+            Types.MapType.of(Types.StringType.get(), Types.IntegerType.get(), false)));
     Assertions.assertEquals(
         DataTypes.ROW(
             DataTypes.FIELD("a", DataTypes.INT().nullable()),
