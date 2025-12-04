@@ -447,6 +447,14 @@ Gravitino provides the build-in `org.apache.gravitino.iceberg.common.cache.Local
 |---------------------------------------------|--------------------------------------------------------------|---------------|----------|------------------|
 | `gravitino.iceberg-rest.extension-packages` | Comma-separated list of Iceberg REST API packages to expand. | (none)        | No       | 0.7.0-incubating |
 
+### Memory settings
+
+- The Iceberg REST server uses `GRAVITINO_MEM` for JVM heap/metaspace flags. Default: `-Xms1024m -Xmx1024m -XX:MaxMetaspaceSize=512m`. The launch script appends this to `JAVA_OPTS`; set `GRAVITINO_MEM` to change the heap size used at runtime.
+- Example tuning:
+  - Development: `GRAVITINO_MEM="-Xms1g -Xmx2g"`
+  - Medium workloads: `GRAVITINO_MEM="-Xms4g -Xmx4g -XX:MaxMetaspaceSize=1g"`
+  - Heavier concurrency/catalog count: raise heap and metaspace accordingly.
+
 ## Starting the Iceberg REST server
 
 To start as an auxiliary service with Gravitino server:
@@ -668,4 +676,3 @@ sh ./dev/docker/build-docker.sh --platform linux/arm64 --type iceberg-rest-serve
 ```
 
 You could try Spark with Gravitino REST catalog service in our [playground](./how-to-use-the-playground.md#using-apache-iceberg-rest-service).
-
