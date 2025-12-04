@@ -19,6 +19,12 @@
 
 package org.apache.gravitino.s3.fs;
 
+import static org.apache.gravitino.catalog.hadoop.fs.Constants.DEFAULT_CONNECTION_TIMEOUT;
+import static org.apache.gravitino.catalog.hadoop.fs.Constants.S3_ESTABLISH_TIMEOUT;
+import static org.apache.gravitino.catalog.hadoop.fs.Constants.S3_MAX_ERROR_RETRIES;
+import static org.apache.gravitino.catalog.hadoop.fs.Constants.S3_RETRY_LIMIT;
+import static org.apache.gravitino.catalog.hadoop.fs.Constants.S3_RETRY_THROTTLE_LIMIT;
+
 import com.amazonaws.auth.AWSCredentialsProvider;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Joiner;
@@ -131,33 +137,6 @@ public class S3FileSystemProvider implements FileSystemProvider, SupportsCredent
     }
   }
 
-  private Map<String, String> additionalS3Config(Map<String, String> configs) {
-    Map<String, String> additionalConfigs = Maps.newHashMap(configs);
-
-    // Avoid multiple retries to speed up failure in test cases.
-    // Use hard code instead of Constants.MAX_ERROR_RETRIES to avoid dependency on a specific Hadoop
-    // version
-    if (!configs.containsKey("fs.s3a.attempts.maximum")) {
-      additionalConfigs.put("fs.s3a.attempts.maximum", "2");
-    }
-
-    if (!configs.containsKey("fs.s3a.connection.establish.timeout")) {
-      additionalConfigs.put("fs.s3a.connection.establish.timeout", "5000");
-    }
-
-    if (!configs.containsKey("fs.s3a.retry.limit")) {
-      additionalConfigs.put("fs.s3a.retry.limit", "2");
-    }
-
-    if (!configs.containsKey("fs.s3a.retry.throttle.limit")) {
-      additionalConfigs.put("fs.s3a.retry.throttle.limit", "2");
-    }
-
-    // More tuning can be added here.
-
-    return ImmutableMap.copyOf(additionalConfigs);
-  }
-
   /**
    * Get the scheme of the FileSystem. Attention, for S3 the schema is "s3a", not "s3". Users should
    * use "s3a://..." to access S3.
@@ -170,5 +149,38 @@ public class S3FileSystemProvider implements FileSystemProvider, SupportsCredent
   @Override
   public String name() {
     return "s3";
+  }
+
+  /**
+   * Add additional S3 configurations to improve performance and reliability.
+   *
+   * @param configs Original configurations
+   * @return Configurations with additional S3 settings
+   */
+  private Map<String, String> additionalS3Config(Map<String, String> configs) {
+    Map<String, String> additionalConfigs = Maps.newHashMap(configs);
+
+    // Avoid multiple retries to speed up failure in test cases.
+    // Use hard code instead of Constants.MAX_ERROR_RETRIES to avoid dependency on a specific Hadoop
+    // version
+    if (!configs.containsKey(S3_MAX_ERROR_RETRIES)) {
+      additionalConfigs.put(S3_MAX_ERROR_RETRIES, "2");
+    }
+
+    if (!configs.containsKey(S3_ESTABLISH_TIMEOUT)) {
+      additionalConfigs.put(S3_ESTABLISH_TIMEOUT, DEFAULT_CONNECTION_TIMEOUT);
+    }
+
+    if (!configs.containsKey(S3_RETRY_LIMIT)) {
+      additionalConfigs.put(S3_RETRY_LIMIT, "2");
+    }
+
+    if (!configs.containsKey(S3_RETRY_THROTTLE_LIMIT)) {
+      additionalConfigs.put(S3_RETRY_THROTTLE_LIMIT, "2");
+    }
+
+    // More tuning can be added here.
+
+    return ImmutableMap.copyOf(additionalConfigs);
   }
 }

@@ -115,11 +115,13 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.MockedStatic;
 import org.mockito.Mockito;
+import org.testcontainers.shaded.org.awaitility.Awaitility;
 
 public class TestFilesetCatalogOperations {
 
@@ -1873,37 +1875,38 @@ public class TestFilesetCatalogOperations {
   }
 
   @Test
-  void testGetFileSystemWithTimeout() throws Exception {
+  @Timeout(15)
+  void testGetFileSystemTimeoutThrowsException() throws Exception {
     FieldUtils.writeField(
         GravitinoEnv.getInstance(), "entityStore", new RelationalEntityStore(), true);
 
-    FilesetCatalogOperations filesetCatalogOperations = new FilesetCatalogOperations();
+    try (FilesetCatalogOperations filesetCatalogOperations = new FilesetCatalogOperations()) {
+      LocalFileSystemProvider localFileSystemProvider = Mockito.mock(LocalFileSystemProvider.class);
+      when(localFileSystemProvider.scheme()).thenReturn("file");
+      when(localFileSystemProvider.getFileSystem(Mockito.any(Path.class), Mockito.anyMap()))
+          .thenAnswer(
+              invocation -> {
+                // Block 100s, however, the timeout is set to 6s by default in
+                // FilesetCatalogOperations, so it's expected to be over within 10s
+                Awaitility.await().forever().until(() -> false);
+                return new LocalFileSystem();
+              });
+      Map<String, FileSystemProvider> fileSystemProviderMapOriginal = new HashMap<>();
+      fileSystemProviderMapOriginal.put("file", localFileSystemProvider);
+      FieldUtils.writeField(
+          filesetCatalogOperations, "fileSystemProvidersMap", fileSystemProviderMapOriginal, true);
 
-    LocalFileSystemProvider localFileSystemProvider = Mockito.mock(LocalFileSystemProvider.class);
-    when(localFileSystemProvider.scheme()).thenReturn("file");
-    when(localFileSystemProvider.getFileSystem(Mockito.any(Path.class), Mockito.anyMap()))
-        .thenAnswer(
-            invocation -> {
-              // Sleep 100s, however, the timeout is set to 6s by default in
-              // FilesetCatalogOperations, so
-              // it's expected to over within 10s
-              Thread.sleep(100000); // Simulate delay
-              return new LocalFileSystem();
-            });
-    Map<String, FileSystemProvider> fileSystemProviderMapOriginal = new HashMap<>();
-    fileSystemProviderMapOriginal.put("file", localFileSystemProvider);
-    FieldUtils.writeField(
-        filesetCatalogOperations, "fileSystemProvidersMap", fileSystemProviderMapOriginal, true);
+      FieldUtils.writeField(
+          filesetCatalogOperations, "propertiesMetadata", FILESET_PROPERTIES_METADATA, true);
 
-    FieldUtils.writeField(
-        filesetCatalogOperations, "propertiesMetadata", FILESET_PROPERTIES_METADATA, true);
-
-    // Test the following method should finish with 10s
-    long now = System.currentTimeMillis();
-    try {
-      filesetCatalogOperations.getFileSystem(new Path("file:///tmp"), ImmutableMap.of());
-    } catch (IOException e) {
-      Assertions.assertTrue(System.currentTimeMillis() - now <= 10000);
+      // Test the following method should finish with 10s
+      long now = System.currentTimeMillis();
+      try {
+        filesetCatalogOperations.getFileSystem(new Path("file:///tmp"), ImmutableMap.of());
+      } catch (IOException e) {
+        long timeTake = System.currentTimeMillis() - now;
+        Assertions.assertTrue(timeTake <= 10000);
+      }
     }
   }
 

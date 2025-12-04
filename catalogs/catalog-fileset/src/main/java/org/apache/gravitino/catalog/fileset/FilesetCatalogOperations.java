@@ -1436,7 +1436,7 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
 
       throw new IOException(
           String.format(
-              "Failed to get FileSystem for path: %s, scheme: %s, provider: %s, within %s "
+              "Failed to get FileSystem for path: %s, scheme: %s, provider: %s within %s "
                   + "seconds, please check the configuration or increase the "
                   + "file system connection timeout time by setting catalog property: %s",
               path,
