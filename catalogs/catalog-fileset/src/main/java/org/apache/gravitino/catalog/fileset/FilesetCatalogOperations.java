@@ -1017,14 +1017,6 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
     }
 
     fileSystemExecutor.shutdownNow();
-    try {
-      if (!fileSystemExecutor.awaitTermination(5, TimeUnit.SECONDS)) {
-        LOG.warn("FileSystem executor did not terminate in time");
-      }
-    } catch (InterruptedException e) {
-      Thread.currentThread().interrupt();
-      LOG.warn("Interrupted while waiting for executor shutdown", e);
-    }
 
     if (fileSystemCache != null) {
       fileSystemCache
