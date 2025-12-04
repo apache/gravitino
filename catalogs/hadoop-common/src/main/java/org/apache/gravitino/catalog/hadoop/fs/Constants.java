@@ -70,5 +70,9 @@ public class Constants {
   // Azure Blob Storage specific configuration keys, please see: AbfsConfiguration
   public static final String ADLS_MAX_RETRIES = "fs.azure.io.retry.max.retries";
 
+  // HDFS specific configuration keys
+  public static final String HDFS_IPC_CLIENT_CONNECT_TIMEOUT_KEY = "ipc.client.connect.timeout";
+  public static final String HDFS_IPC_PING_KEY = "ipc.client.ping";
+
   public static final String DEFAULT_CONNECTION_TIMEOUT = "5000";
 }
