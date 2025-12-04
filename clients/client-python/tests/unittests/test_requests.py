@@ -25,15 +25,66 @@ from gravitino.exceptions.base import IllegalArgumentException
 
 class TestRequests(unittest.TestCase):
     def test_add_partitions_request(self):
-        partitions = ["p202508_California"]
-        json_str = json.dumps({"partitions": partitions})
+        json_str = """
+            {
+                "partitions": [
+                    {
+                        "type": "identity",
+                        "name": "partition_1",
+                        "fieldNames": [["id"]],
+                        "values": [
+                            {
+                                "type": "literal",
+                                "dataType": "integer",
+                                "value": "0"
+                            }
+                        ],
+                        "properties": {
+                            "key1": "value1",
+                            "key2": "value2"
+                        }
+                    }
+                ]
+            }
+        """
+        partitions = json.loads(json_str)
         req = AddPartitionsRequest.from_json(json_str)
         req_dict = cast(dict, req.to_dict())
-        self.assertListEqual(req_dict["partitions"], partitions)
+        self.assertListEqual(req_dict["partitions"], partitions["partitions"])
 
+        multiple_partitions_json = """
+            {
+                "partitions": [
+                    {
+                        "type": "identity",
+                        "name": "partition_1",
+                        "fieldNames": [["id"]],
+                        "values": [
+                            {
+                                "type": "literal",
+                                "dataType": "integer",
+                                "value": "0"
+                            }
+                        ]
+                    },
+                    {
+                        "type": "identity",
+                        "name": "partition_2",
+                        "fieldNames": [["id"]],
+                        "values": [
+                            {
+                                "type": "literal",
+                                "dataType": "integer",
+                                "value": "1"
+                            }
+                        ]
+                    }
+                ]
+            }
+        """
         exceptions = {
             "partitions must not be null": '{"partitions": null}',
-            "Haven't yet implemented multiple partitions": '{"partitions": ["p1", "p2"]}',
+            "Haven't yet implemented multiple partitions": multiple_partitions_json,
         }
         for exception_str, json_str in exceptions.items():
             with self.assertRaisesRegex(IllegalArgumentException, exception_str):
