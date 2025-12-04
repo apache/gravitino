@@ -77,7 +77,7 @@ docker run --rm -d -p 9001:9001 apache/gravitino-iceberg-rest:0.7.0-incubating
 
 Memory settings
 
-`GRAVITINO_MEM` controls JVM memory (default `-Xms1024m -Xmx1024m -XX:MaxMetaspaceSize=512m`). Override with `-e GRAVITINO_MEM="-Xms4g -Xmx4g -XX:MaxMetaspaceSize=1g"`. The launcher appends this to `JAVA_OPTS`, so set `GRAVITINO_MEM` to change heap sizing.
+`GRAVITINO_MEM` controls JVM memory (default `-Xms1024m -Xmx1024m -XX:MaxMetaspaceSize=512m`). Override with `-e GRAVITINO_MEM="-Xms4g -Xmx4g -XX:MaxMetaspaceSize=1g"`. This value is appended to `JAVA_OPTS` by the launch scripts, so set `GRAVITINO_MEM` to change heap sizing.
 
 Changelog
 - apache/gravitino-iceberg-rest:1.0.0
