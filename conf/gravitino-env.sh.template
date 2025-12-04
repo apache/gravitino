@@ -28,4 +28,6 @@ GRAVITINO_VERSION=GRAVITINO_VERSION_PLACEHOLDER
 # export GRAVITINO_HOME
 # export GRAVITINO_CONF_DIR
 # export GRAVITINO_LOG_DIR     # Where log files are stored.  PWD by default.
-# export GRAVITINO_MEM         # JVM mem options for Gravitino server, Iceberg REST server, and Lance REST server. Default: -Xms1024m -Xmx1024m -XX:MaxMetaspaceSize=512m. This is appended to JAVA_OPTS in the launch scripts, so set GRAVITINO_MEM if you need to change heap/metaspace sizes.
+# export GRAVITINO_MEM         # JVM mem options for Gravitino server, Iceberg REST server, and Lance REST server.
+#                             # Default: -Xms1024m -Xmx1024m -XX:MaxMetaspaceSize=512m
+#                             # This is appended to JAVA_OPTS in the launch scripts, so set GRAVITINO_MEM if you need to change heap/metaspace sizes.
