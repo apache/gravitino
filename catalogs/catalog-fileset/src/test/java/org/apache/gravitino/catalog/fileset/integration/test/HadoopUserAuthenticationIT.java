@@ -516,6 +516,7 @@ public class HadoopUserAuthenticationIT extends BaseIT {
                         null,
                         tableProperty));
     exceptionMessage = Throwables.getStackTraceAsString(exception);
+    LOG.info("Exception message: {}", exceptionMessage);
     Assertions.assertTrue(
         exceptionMessage.contains("Permission denied: user=gravitino_client, access=WRITE"));
 
