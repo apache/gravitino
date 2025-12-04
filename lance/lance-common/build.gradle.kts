@@ -25,8 +25,8 @@ plugins {
 }
 
 dependencies {
-  implementation(project(":clients:client-java"))
   implementation(project(":api"))
+  implementation(project(":clients:client-java"))
   implementation(project(":common")) {
     exclude("*")
   }
@@ -47,7 +47,9 @@ dependencies {
     exclude(group = "com.fasterxml.jackson.core", module = "*") // provided by gravitino
     exclude(group = "com.fasterxml.jackson.datatype", module = "*") // provided by gravitino
     exclude(group = "com.fasterxml.jackson.jaxrs", module = "jackson-jaxrs-json-provider") // using gravitino's version
+    exclude(group = "org.apache.commons", module = "commons-lang3") // provided by gravitino
     exclude(group = "org.apache.opendal", module = "*")
+    exclude(group = "org.junit.jupiter", module = "*")
   }
   implementation(libs.slf4j.api)
 

@@ -40,18 +40,14 @@ dependencies {
   }
 
   implementation(libs.bundles.log4j)
-  implementation(libs.cglib)
-  implementation(libs.commons.collections4)
   implementation(libs.commons.io)
-  implementation(libs.commons.lang3)
   implementation(libs.guava)
 
   annotationProcessor(libs.lombok)
 
-  compileOnly(libs.lance) // This is provided at runtime by core module
+  compileOnly(libs.lance) // This will be provided by core module at runtime
   compileOnly(libs.lombok)
 
-  testImplementation(project(":catalogs:catalog-jdbc-common", "testArtifacts"))
   testImplementation(project(":clients:client-java"))
   testImplementation(project(":integration-test-common", "testArtifacts"))
   testImplementation(project(":server"))
