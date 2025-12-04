@@ -98,7 +98,10 @@ public class OwnerAuthorizationIT extends BaseRestApiAuthorizationIT {
   @AfterAll
   @Override
   public void stopIntegrationTest() throws IOException, InterruptedException {
-    client.loadMetalake(METALAKE).loadCatalog(CATALOG).asSchemas().dropSchema(SCHEMA, true);
+    GravitinoMetalake gravitinoMetalake = client.loadMetalake(METALAKE);
+    gravitinoMetalake.loadCatalog(CATALOG).asSchemas().dropSchema(SCHEMA, true);
+    gravitinoMetalake.dropCatalog(CATALOG, true);
+    gravitinoMetalake.deleteRole(role);
     super.stopIntegrationTest();
   }
 
@@ -394,7 +397,6 @@ public class OwnerAuthorizationIT extends BaseRestApiAuthorizationIT {
     GravitinoMetalake gravitinoMetalakeLoadByNormalUser = normalUserClient.loadMetalake(METALAKE);
     gravitinoMetalakeLoadByNormalUser.getOwner(
         MetadataObjects.of(ImmutableList.of(METALAKE), MetadataObject.Type.METALAKE));
-    client.createMetalake("tempMetalake", "metalake1 comment", Collections.emptyMap());
   }
 
   @Test
@@ -479,7 +481,7 @@ public class OwnerAuthorizationIT extends BaseRestApiAuthorizationIT {
 
   @Test
   @Order(13)
-  public void getRoleOwner() {
+  public void testGetRoleOwner() {
     GravitinoMetalake gravitinoMetalake = client.loadMetalake(METALAKE);
     GravitinoMetalake gravitinoMetalakeLoadByNormalUser = normalUserClient.loadMetalake(METALAKE);
     gravitinoMetalakeLoadByNormalUser.getOwner(
