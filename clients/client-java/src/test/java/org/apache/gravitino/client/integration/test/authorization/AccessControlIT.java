@@ -203,6 +203,7 @@ public class AccessControlIT extends BaseIT {
   }
 
   @Test
+  @SuppressWarnings("deprecation")
   void testManageRoles() {
     String roleName = "role#123";
     Map<String, String> properties = Maps.newHashMap();
@@ -232,8 +233,8 @@ public class AccessControlIT extends BaseIT {
         SecurableObjects.ofMetalake(
             metalakeName,
             Lists.newArrayList(
-                Privileges.CreateModel.allow(),
-                Privileges.CreateModelVersion.allow(),
+                Privileges.RegisterModel.allow(),
+                Privileges.LinkModelVersion.allow(),
                 Privileges.UseModel.allow()));
 
     role =
@@ -248,8 +249,8 @@ public class AccessControlIT extends BaseIT {
         SecurableObjects.ofCatalog(
             "model_catalog",
             Lists.newArrayList(
-                Privileges.CreateModel.allow(),
-                Privileges.CreateModelVersion.allow(),
+                Privileges.RegisterModel.allow(),
+                Privileges.LinkModelVersion.allow(),
                 Privileges.UseModel.allow()));
     role =
         metalake.createRole(
@@ -263,8 +264,8 @@ public class AccessControlIT extends BaseIT {
             catalogObjectWithModelPrivs,
             "model_schema",
             Lists.newArrayList(
-                Privileges.CreateModel.allow(),
-                Privileges.CreateModelVersion.allow(),
+                Privileges.RegisterModel.allow(),
+                Privileges.LinkModelVersion.allow(),
                 Privileges.UseModel.allow()));
     role =
         metalake.createRole(
@@ -277,10 +278,24 @@ public class AccessControlIT extends BaseIT {
         SecurableObjects.ofModel(
             schemaObjectWithModelPrivs,
             "model",
-            Lists.newArrayList(Privileges.CreateModelVersion.allow(), Privileges.UseModel.allow()));
+            Lists.newArrayList(Privileges.LinkModelVersion.allow(), Privileges.UseModel.allow()));
     role =
         metalake.createRole(
             "model_name", properties, Lists.newArrayList(modelObjectWithCorrectPriv));
+    Assertions.assertEquals("model_name", role.name());
+    Assertions.assertEquals(properties, role.properties());
+    metalake.deleteRole("model_name");
+
+    // Test legacy privilege name
+    SecurableObject modelObjectWithLegacyPriv =
+        SecurableObjects.ofModel(
+            schemaObjectWithModelPrivs,
+            "model",
+            Lists.newArrayList(
+                Privileges.CreateModelVersion.allow(), Privileges.CreateModelVersion.allow()));
+    role =
+        metalake.createRole(
+            "model_name", properties, Lists.newArrayList(modelObjectWithLegacyPriv));
     Assertions.assertEquals("model_name", role.name());
     Assertions.assertEquals(properties, role.properties());
     metalake.deleteRole("model_name");
@@ -289,7 +304,7 @@ public class AccessControlIT extends BaseIT {
         SecurableObjects.ofModel(
             schemaObjectWithModelPrivs,
             "model",
-            Lists.newArrayList(Privileges.CreateModel.allow()));
+            Lists.newArrayList(Privileges.RegisterModel.allow()));
     Assertions.assertThrows(
         IllegalArgumentException.class,
         () ->
@@ -338,7 +353,7 @@ public class AccessControlIT extends BaseIT {
     // Create a role with wrong model privilege
     SecurableObject wrongCatalogObject2 =
         SecurableObjects.ofCatalog(
-            "fileset_catalog", Lists.newArrayList(Privileges.CreateModel.allow()));
+            "fileset_catalog", Lists.newArrayList(Privileges.RegisterModel.allow()));
     Assertions.assertThrows(
         IllegalArgumentException.class,
         () ->

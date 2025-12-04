@@ -33,8 +33,8 @@ import org.apache.gravitino.Catalog;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.authorization.Privilege;
-import org.apache.gravitino.authorization.Privileges;
 import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.authorization.SecurableObjects;
 import org.apache.gravitino.dto.rel.DistributionDTO;
@@ -1306,11 +1306,10 @@ public class POConverters {
 
       List<Privilege> privileges = Lists.newArrayList();
       for (int index = 0; index < privilegeNames.size(); index++) {
-        if (Privilege.Condition.ALLOW.name().equals(privilegeConditions.get(index))) {
-          privileges.add(Privileges.allow(privilegeNames.get(index)));
-        } else {
-          privileges.add(Privileges.deny(privilegeNames.get(index)));
-        }
+        privileges.add(
+            AuthorizationUtils.replaceLegacyPrivilege(
+                Privilege.Name.valueOf(privilegeNames.get(index)),
+                Privilege.Condition.valueOf(privilegeConditions.get(index))));
       }
 
       return SecurableObjects.parse(fullName, type, privileges);

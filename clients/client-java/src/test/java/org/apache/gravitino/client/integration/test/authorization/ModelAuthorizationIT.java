@@ -100,6 +100,7 @@ public class ModelAuthorizationIT extends BaseRestApiAuthorizationIT {
 
   @Test
   @Order(1)
+  @SuppressWarnings("deprecation")
   public void testCreateModel() {
     ModelCatalog modelCatalog = client.loadMetalake(METALAKE).loadCatalog(CATALOG).asModelCatalog();
     modelCatalog.registerModel(NameIdentifier.of(SCHEMA, "model1"), "", new HashMap<>());
@@ -124,8 +125,24 @@ public class ModelAuthorizationIT extends BaseRestApiAuthorizationIT {
     gravitinoMetalake.grantPrivilegesToRole(
         role,
         MetadataObjects.of(null, CATALOG, MetadataObject.Type.CATALOG),
-        ImmutableList.of(Privileges.UseSchema.allow(), Privileges.CreateModel.allow()));
+        ImmutableList.of(Privileges.UseSchema.allow(), Privileges.RegisterModel.allow()));
     normalUserCatalog.registerModel(NameIdentifier.of(SCHEMA, "model2"), "", new HashMap<>());
+
+    // revoke privilege
+    gravitinoMetalake.revokePrivilegesFromRole(
+        role,
+        MetadataObjects.of(null, CATALOG, MetadataObject.Type.CATALOG),
+        ImmutableSet.of(Privileges.CreateModel.allow()));
+    assertThrows(
+        ForbiddenException.class,
+        () -> {
+          normalUserCatalog.registerModel(NameIdentifier.of(SCHEMA, "model3"), "", new HashMap<>());
+        });
+    // grant privilege again
+    gravitinoMetalake.grantPrivilegesToRole(
+        role,
+        MetadataObjects.of(null, CATALOG, MetadataObject.Type.CATALOG),
+        ImmutableList.of(Privileges.RegisterModel.allow()));
     normalUserCatalog.registerModel(NameIdentifier.of(SCHEMA, "model3"), "", new HashMap<>());
   }
 
@@ -222,15 +239,12 @@ public class ModelAuthorizationIT extends BaseRestApiAuthorizationIT {
 
   @Test
   @Order(6)
+  @SuppressWarnings("deprecation")
   public void testLinkModel() {
     ModelCatalog modelCatalog = client.loadMetalake(METALAKE).loadCatalog(CATALOG).asModelCatalog();
     Catalog catalogEntityLoadByNormalUser =
         normalUserClient.loadMetalake(METALAKE).loadCatalog(CATALOG);
     ModelCatalog modelCatalogLoadByNormalUser = catalogEntityLoadByNormalUser.asModelCatalog();
-    modelCatalog.linkModelVersion(
-        NameIdentifier.of(SCHEMA, "model1"), "uri1", new String[] {"alias1"}, "comment2", null);
-    modelCatalog.linkModelVersion(
-        NameIdentifier.of(SCHEMA, "model1"), "uri2", new String[] {"alias2"}, "comment2", null);
     assertThrows(
         "Can not access metadata {" + METALAKE + "," + CATALOG + "." + SCHEMA + "model1" + "}.",
         ForbiddenException.class,
@@ -242,6 +256,40 @@ public class ModelAuthorizationIT extends BaseRestApiAuthorizationIT {
               "comment2",
               null);
         });
+    GravitinoMetalake gravitinoMetalake = client.loadMetalake(METALAKE);
+    gravitinoMetalake.grantPrivilegesToRole(
+        role,
+        MetadataObjects.of(ImmutableList.of(CATALOG, SCHEMA, "model1"), MetadataObject.Type.MODEL),
+        ImmutableSet.of(Privileges.UseModel.allow(), Privileges.LinkModelVersion.allow()));
+
+    modelCatalogLoadByNormalUser.linkModelVersion(
+        NameIdentifier.of(SCHEMA, "model1"), "uri2", new String[] {"alias2"}, "comment2", null);
+
+    gravitinoMetalake.revokePrivilegesFromRole(
+        role,
+        MetadataObjects.of(ImmutableList.of(CATALOG, SCHEMA, "model1"), MetadataObject.Type.MODEL),
+        ImmutableSet.of(Privileges.LinkModelVersion.allow()));
+    assertThrows(
+        ForbiddenException.class,
+        () -> {
+          modelCatalogLoadByNormalUser.linkModelVersion(
+              NameIdentifier.of(SCHEMA, "model1"),
+              "uri3",
+              new String[] {"alias3"},
+              "comment3",
+              null);
+        });
+
+    gravitinoMetalake.grantPrivilegesToRole(
+        role,
+        MetadataObjects.of(ImmutableList.of(CATALOG, SCHEMA, "model1"), MetadataObject.Type.MODEL),
+        ImmutableSet.of(Privileges.CreateModelVersion.allow()));
+    modelCatalog.linkModelVersion(
+        NameIdentifier.of(SCHEMA, "model1"), "uri1", new String[] {"alias1"}, "comment2", null);
+    gravitinoMetalake.revokePrivilegesFromRole(
+        role,
+        MetadataObjects.of(ImmutableList.of(CATALOG, SCHEMA, "model1"), MetadataObject.Type.MODEL),
+        ImmutableSet.of(Privileges.CreateModelVersion.allow(), Privileges.UseModel.allow()));
   }
 
   @Test

@@ -177,8 +177,8 @@ public class RoleOperations {
                                 securableObjectDTO.privileges().stream()
                                     .map(
                                         privilege ->
-                                            DTOConverters.fromPrivilegeDTO(
-                                                (PrivilegeDTO) privilege))
+                                            AuthorizationUtils.replaceLegacyPrivilege(
+                                                privilege.name(), privilege.condition()))
                                     .collect(Collectors.toList())))
                     .collect(Collectors.toList());
             return Utils.ok(

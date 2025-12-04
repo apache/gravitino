@@ -177,8 +177,8 @@ public class TestSecurableObjects {
     Privilege manageUsers = Privileges.ManageUsers.allow();
     Privilege manageGroups = Privileges.ManageGroups.allow();
     Privilege manageGrants = Privileges.ManageGrants.allow();
-    Privilege createModel = Privileges.CreateModel.allow();
-    Privilege createModelVersion = Privileges.CreateModelVersion.allow();
+    Privilege createModel = Privileges.RegisterModel.allow();
+    Privilege createModelVersion = Privileges.LinkModelVersion.allow();
     Privilege useModel = Privileges.UseModel.allow();
     Privilege createTag = Privileges.CreateTag.allow();
     Privilege applyTag = Privileges.ApplyTag.allow();

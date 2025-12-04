@@ -87,9 +87,9 @@ public class AuthorizationUtils {
 
   private static final Set<Privilege.Name> MODEL_PRIVILEGES =
       Sets.immutableEnumSet(
-          Privilege.Name.CREATE_MODEL,
+          Privilege.Name.REGISTER_MODEL,
           Privilege.Name.USE_MODEL,
-          Privilege.Name.CREATE_MODEL_VERSION);
+          Privilege.Name.LINK_MODEL_VERSION);
 
   private AuthorizationUtils() {}
 
@@ -229,7 +229,26 @@ public class AuthorizationUtils {
             "Doesn't support duplicated privilege name %s with different condition",
             privilege.name());
       }
-      privilegeNameSet.add(privilege.name());
+      privilegeNameSet.add(replaceLegacyPrivilegeName(privilege.name()));
+    }
+  }
+
+  public static Privilege.Name replaceLegacyPrivilegeName(Privilege.Name privilegeName) {
+    if (privilegeName == Privilege.Name.CREATE_MODEL) {
+      return Privilege.Name.REGISTER_MODEL;
+    } else if (privilegeName == Privilege.Name.CREATE_MODEL_VERSION) {
+      return Privilege.Name.LINK_MODEL_VERSION;
+    } else {
+      return privilegeName;
+    }
+  }
+
+  public static Privilege replaceLegacyPrivilege(
+      Privilege.Name privilege, Privilege.Condition condition) {
+    if (condition == Privilege.Condition.ALLOW) {
+      return Privileges.allow(privilege.name());
+    } else {
+      return Privileges.deny(privilege.name());
     }
   }
 

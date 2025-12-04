@@ -219,7 +219,10 @@ public class PermissionOperations {
                             role,
                             object,
                             privilegeGrantRequest.getPrivileges().stream()
-                                .map(DTOConverters::fromPrivilegeDTO)
+                                .map(
+                                    privilege ->
+                                        AuthorizationUtils.replaceLegacyPrivilege(
+                                            privilege.name(), privilege.condition()))
                                 .collect(Collectors.toSet())))));
           });
     } catch (Exception e) {
@@ -266,7 +269,10 @@ public class PermissionOperations {
                             role,
                             object,
                             privilegeRevokeRequest.getPrivileges().stream()
-                                .map(DTOConverters::fromPrivilegeDTO)
+                                .map(
+                                    privilege ->
+                                        AuthorizationUtils.replaceLegacyPrivilege(
+                                            privilege.name(), privilege.condition()))
                                 .collect(Collectors.toSet())))));
           });
     } catch (Exception e) {
