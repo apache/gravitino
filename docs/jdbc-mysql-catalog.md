@@ -41,14 +41,15 @@ When you use the Gravitino with Trino. You can pass the Trino MySQL connector co
 If you use a JDBC catalog, you must provide `jdbc-url`, `jdbc-driver`, `jdbc-user` and `jdbc-password` to catalog properties.
 Besides the [common catalog properties](./gravitino-server-config.md#apache-gravitino-catalog-properties-configuration), the MySQL catalog has the following properties:
 
-| Configuration item   | Description                                                                                            | Default value | Required | Since Version |
-|----------------------|--------------------------------------------------------------------------------------------------------|---------------|----------|---------------|
-| `jdbc-url`           | JDBC URL for connecting to the database. For example, `jdbc:mysql://localhost:3306`                    | (none)        | Yes      | 0.3.0         |
-| `jdbc-driver`        | The driver of the JDBC connection. For example, `com.mysql.jdbc.Driver` or `com.mysql.cj.jdbc.Driver`. | (none)        | Yes      | 0.3.0         |
-| `jdbc-user`          | The JDBC user name.                                                                                    | (none)        | Yes      | 0.3.0         |
-| `jdbc-password`      | The JDBC password.                                                                                     | (none)        | Yes      | 0.3.0         |
-| `jdbc.pool.min-size` | The minimum number of connections in the pool. `2` by default.                                         | `2`           | No       | 0.3.0         |
-| `jdbc.pool.max-size` | The maximum number of connections in the pool. `10` by default.                                        | `10`          | No       | 0.3.0         |
+| Configuration item      | Description                                                                                            | Default value | Required | Since Version |
+|-------------------------|--------------------------------------------------------------------------------------------------------|---------------|----------|---------------|
+| `jdbc-url`              | JDBC URL for connecting to the database. For example, `jdbc:mysql://localhost:3306`                    | (none)        | Yes      | 0.3.0         |
+| `jdbc-driver`           | The driver of the JDBC connection. For example, `com.mysql.jdbc.Driver` or `com.mysql.cj.jdbc.Driver`. | (none)        | Yes      | 0.3.0         |
+| `jdbc-user`             | The JDBC user name.                                                                                    | (none)        | Yes      | 0.3.0         |
+| `jdbc-password`         | The JDBC password.                                                                                     | (none)        | Yes      | 0.3.0         |
+| `jdbc.pool.min-size`    | The minimum number of connections in the pool. `2` by default.                                         | `2`           | No       | 0.3.0         |
+| `jdbc.pool.max-size`    | The maximum number of connections in the pool. `10` by default.                                        | `10`          | No       | 0.3.0         |
+| `jdbc.pool.max-wait-ms` | The maximum Duration that the pool will wait for a connection to be returned. `30000` by default.      | `30000`       | No       | 1.1.0         |
 
 :::caution
 You must download the corresponding JDBC driver to the `catalogs/jdbc-mysql/libs` directory.
