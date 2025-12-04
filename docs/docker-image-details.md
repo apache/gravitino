@@ -19,7 +19,7 @@ docker run --rm -d -p 8090:8090 -p 9001:9001 apache/gravitino:0.7.0-incubating
 
 Memory settings
 
-- The JVM heap/metaspace options are controlled by `GRAVITINO_MEM` (default `-Xms1024m -Xmx1024m -XX:MaxMetaspaceSize=512m`). Override with `-e GRAVITINO_MEM="-Xms4g -Xmx4g -XX:MaxMetaspaceSize=1g"`. The launch script appends `GRAVITINO_MEM` to `JAVA_OPTS`, so set `GRAVITINO_MEM` when you need different heap sizes.
+The JVM heap/metaspace options are controlled by `GRAVITINO_MEM` (default `-Xms1024m -Xmx1024m -XX:MaxMetaspaceSize=512m`). Override with `-e GRAVITINO_MEM="-Xms4g -Xmx4g -XX:MaxMetaspaceSize=1g"`. The launch script appends `GRAVITINO_MEM` to `JAVA_OPTS`, so set `GRAVITINO_MEM` when you need different heap sizes.
 
 Changelog
 
@@ -77,7 +77,7 @@ docker run --rm -d -p 9001:9001 apache/gravitino-iceberg-rest:0.7.0-incubating
 
 Memory settings
 
-- `GRAVITINO_MEM` controls JVM memory (default `-Xms1024m -Xmx1024m -XX:MaxMetaspaceSize=512m`). Override with `-e GRAVITINO_MEM="-Xms4g -Xmx4g -XX:MaxMetaspaceSize=1g"`. The launcher appends this to `JAVA_OPTS`, so set `GRAVITINO_MEM` to change heap sizing.
+`GRAVITINO_MEM` controls JVM memory (default `-Xms1024m -Xmx1024m -XX:MaxMetaspaceSize=512m`). Override with `-e GRAVITINO_MEM="-Xms4g -Xmx4g -XX:MaxMetaspaceSize=1g"`. The launcher appends this to `JAVA_OPTS`, so set `GRAVITINO_MEM` to change heap sizing.
 
 Changelog
 - apache/gravitino-iceberg-rest:1.0.0
@@ -139,7 +139,7 @@ docker run --rm -d -p 9102:9102 -e LANCE_REST_GRAVITINO_METALAKE_NAME=test -e LA
 
 Memory settings
 
-- Use `GRAVITINO_MEM` to size the JVM (default `-Xms1024m -Xmx1024m -XX:MaxMetaspaceSize=512m`). Example: `-e GRAVITINO_MEM="-Xms2g -Xmx2g"`. This value is appended by the launcher, so set `GRAVITINO_MEM` when you need different heap sizes.
+Use `GRAVITINO_MEM` to size the JVM (default `-Xms1024m -Xmx1024m -XX:MaxMetaspaceSize=512m`). Example: `-e GRAVITINO_MEM="-Xms2g -Xmx2g"`. This value is appended by the launcher, so set `GRAVITINO_MEM` when you need different heap sizes.
 
 Currently, Gravitino Lance REST server supports setting the following environment variables
 - LANCE_REST_GRAVITINO_METALAKE_NAME: It will overwrite the configuration "gravitino.lance-rest.gravitino.metalake-name" in configuration file `conf/gravitino-lance-rest-server.conf`. **You should set it to your Gravitino metalake name.**
