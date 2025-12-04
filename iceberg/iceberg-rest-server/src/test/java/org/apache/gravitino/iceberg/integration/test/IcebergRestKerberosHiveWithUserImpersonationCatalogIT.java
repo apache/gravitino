@@ -44,6 +44,11 @@ public class IcebergRestKerberosHiveWithUserImpersonationCatalogIT
 
   @BeforeAll
   void prepareSQLContext() {
+
+    // Change the ownership of /user/hive to normal user for user impersonation test. If we do not
+    // change the ownership, the normal user will not have the permission to create table in Hive
+    // as the /user/hive is owned by user `cli`, please see what's done in `initEnv` method in
+    // superclass.
     containerSuite
         .getKerberosHiveContainer()
         .executeInContainer("hadoop", "fs", "-chown", "-R", NORMAL_USER, "/user/hive/");
@@ -56,6 +61,8 @@ public class IcebergRestKerberosHiveWithUserImpersonationCatalogIT
     Map<String, String> superConfig = super.getCatalogConfig();
     Map<String, String> configMap = new HashMap<>(superConfig);
 
+    // Enable user impersonation in Iceberg REST server side, so the user passed to
+    // HDFS is `normal` instead of `cli`.
     configMap.put("gravitino.iceberg-rest.authentication.impersonation-enable", "true");
     return configMap;
   }
@@ -73,6 +80,9 @@ public class IcebergRestKerberosHiveWithUserImpersonationCatalogIT
             .set("spark.sql.catalog.rest", "org.apache.iceberg.spark.SparkCatalog")
             .set("spark.sql.catalog.rest.type", "rest")
             .set("spark.sql.catalog.rest.uri", icebergRESTUri)
+
+            // Add basic auth to connect to Iceberg REST server, so the user name is `normal` and
+            // the final real user is `normal` via user impersonation.
             .set("spark.sql.catalog.rest.rest.auth.type", "basic")
             .set("spark.sql.catalog.rest.rest.auth.basic.username", NORMAL_USER)
             .set("spark.sql.catalog.rest.rest.auth.basic.password", "mock")
