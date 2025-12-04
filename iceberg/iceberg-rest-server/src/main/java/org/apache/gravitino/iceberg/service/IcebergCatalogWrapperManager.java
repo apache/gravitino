@@ -30,6 +30,8 @@ import java.util.concurrent.TimeUnit;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
 import org.apache.gravitino.iceberg.common.ops.IcebergCatalogWrapper;
+import org.apache.gravitino.iceberg.service.authorization.IcebergRESTServerContext;
+import org.apache.gravitino.iceberg.service.provider.DynamicIcebergConfigProvider;
 import org.apache.gravitino.iceberg.service.provider.IcebergConfigProvider;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -88,6 +90,14 @@ public class IcebergCatalogWrapperManager implements AutoCloseable {
   }
 
   private CatalogWrapperForREST createCatalogWrapper(String catalogName) {
+    IcebergRESTServerContext serverContext = IcebergRESTServerContext.getInstance();
+    if (serverContext.isAuthorizationEnabled()
+        && !(configProvider instanceof DynamicIcebergConfigProvider)) {
+      throw new IllegalArgumentException(
+          "Authorization is enabled. Set `gravitino.iceberg-rest.catalog-config-provider="
+              + "dynamic-config-provider` in gravitino.conf for Iceberg REST.");
+    }
+
     Optional<IcebergConfig> icebergConfig = configProvider.getIcebergCatalogConfig(catalogName);
     if (!icebergConfig.isPresent()) {
       throw new NoSuchCatalogException(

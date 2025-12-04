@@ -20,7 +20,6 @@
 package org.apache.gravitino.iceberg.service.authorization;
 
 import com.google.common.base.Preconditions;
-import org.apache.gravitino.iceberg.service.provider.DynamicIcebergConfigProvider;
 import org.apache.gravitino.iceberg.service.provider.IcebergConfigProvider;
 
 public class IcebergRESTServerContext {
@@ -41,11 +40,6 @@ public class IcebergRESTServerContext {
 
   public static IcebergRESTServerContext create(
       IcebergConfigProvider configProvider, Boolean enableAuth) {
-    if (enableAuth) {
-      Preconditions.checkArgument(
-          configProvider instanceof DynamicIcebergConfigProvider,
-          "Please enable dynamic config provider if using authorization.");
-    }
     InstanceHolder.INSTANCE =
         new IcebergRESTServerContext(
             enableAuth, configProvider.getMetalakeName(), configProvider.getDefaultCatalogName());
