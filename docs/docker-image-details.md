@@ -19,7 +19,7 @@ docker run --rm -d -p 8090:8090 -p 9001:9001 apache/gravitino:0.7.0-incubating
 
 Memory settings
 
-The JVM heap/metaspace options are controlled by `GRAVITINO_MEM` (default `-Xms1024m -Xmx1024m -XX:MaxMetaspaceSize=512m`). Override with `-e GRAVITINO_MEM="-Xms4g -Xmx4g -XX:MaxMetaspaceSize=1g"`. The launch script appends `GRAVITINO_MEM` to `JAVA_OPTS`, so set `GRAVITINO_MEM` when you need different heap sizes.
+The JVM heap/metaspace options are controlled by `GRAVITINO_MEM` (default `-Xms1024m -Xmx1024m -XX:MaxMetaspaceSize=512m`). Override with `-e GRAVITINO_MEM="-Xms4g -Xmx4g -XX:MaxMetaspaceSize=1g"`. The launch script appends `GRAVITINO_MEM` to `JAVA_OPTS`, so set `GRAVITINO_MEM` to change the heap size used at runtime.
 
 Changelog
 
