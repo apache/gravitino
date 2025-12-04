@@ -284,6 +284,29 @@ The detailed configuration items are as follows:
 
 Please refer to [Credential vending](./security/credential-vending.md) for more details.
 
+### Access control
+
+#### Prerequisites
+
+To use access control with the Iceberg REST service:
+
+1. Enable authorization in the Gravitino server by setting `gravitino.authorization.enable = true`
+2. Use the [dynamic configuration provider](#dynamic-catalog-configuration-provider) to retrieve catalog configurations from Gravitino
+
+Please refer to [Access Control](./security/access-control.md) for details on how to configure authorization, create roles, and grant privileges in Gravitino.
+
+#### How access control works
+
+When access control is enabled:
+
+1. Clients authenticate with the Iceberg REST service (Now we supports Basic auth and OAuth2)
+2. The Iceberg REST service forwards the authenticated user identity to the Gravitino server
+3. Gravitino verifies the user has necessary privileges to perform the requested operation
+4. Users can only access catalogs and perform operations they have been explicitly granted privileges for
+
+Please refer to [Access Control](./security/access-control.md) for the complete list of privileges and how to grant them.
+
+
 ### Storage
 
 #### S3 configuration
