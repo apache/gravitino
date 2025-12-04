@@ -179,7 +179,8 @@ public class AuthorizationExpressionConverter {
               ( entityType == 'POLICY' && (%s)) ||
               ( entityType == 'TAG' && (%s)) ||
               ( entityType == 'JOB' && (%s)) ||
-              ( entityType == 'JOB_TEMPLATE' && (%s))
+              ( entityType == 'JOB_TEMPLATE' && (%s)) ||
+              ( entityType == 'COLUMN' && (%s))
               """
             .formatted(
                 loadCatalogAuthorizationExpression,
@@ -193,7 +194,8 @@ public class AuthorizationExpressionConverter {
                 loadPolicyAuthorizationExpression,
                 loadTagAuthorizationExpression,
                 loadJobAuthorizationExpression,
-                loadJobTemplateAuthorizationExpression));
+                loadJobTemplateAuthorizationExpression,
+                loadTableAuthorizationExpression));
   }
 
   /**
