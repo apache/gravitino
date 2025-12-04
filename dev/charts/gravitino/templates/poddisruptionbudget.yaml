@@ -18,7 +18,9 @@
   */}}
 
 {{- if .Values.podDisruptionBudget.enabled }}
-{{- if and .Values.podDisruptionBudget.minAvailable .Values.podDisruptionBudget.maxUnavailable }}
+{{- $minAvailableSet := and (ne (toString .Values.podDisruptionBudget.minAvailable) "") (or .Values.podDisruptionBudget.minAvailable (eq (.Values.podDisruptionBudget.minAvailable | int) 0)) }}
+{{- $maxUnavailableSet := ne (toString .Values.podDisruptionBudget.maxUnavailable) "" }}
+{{- if and $minAvailableSet $maxUnavailableSet }}
 {{- fail "podDisruptionBudget.minAvailable and podDisruptionBudget.maxUnavailable cannot both be specified. Please specify only one." }}
 {{- end }}
 apiVersion: policy/v1
