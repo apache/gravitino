@@ -710,7 +710,6 @@ Add the following to your Gravitino Iceberg REST server configuration (e.g., `gr
 
 ```properties
 gravitino.authorization.enable = true
-gravitino.authorization.provider = dynamic
 gravitino.authorization.serviceAdmins = adminUser
 
 gravitino.iceberg-rest.catalog-config-provider = dynamic-config-provider
@@ -760,7 +759,11 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
          "type": "CATALOG",
          "privileges": [
             {
-               "name": "USE_CATALOG",
+               "name": "USE_SCHEMA",
+               "condition": "ALLOW"
+            },
+            {
+               "name": "SELECT_TABLE",
                "condition": "ALLOW"
             }
          ]
@@ -783,7 +786,7 @@ curl -X PUT -H "Accept: application/vnd.gravitino.v1+json" \
 ---
 
 **Summary:**
-- Enable authorization and set provider to `dynamic`
+- Enable authorization and set configuration provider to `dynamic`
 - Create metalake
 - Create catalog
 - Create role and grant privileges
