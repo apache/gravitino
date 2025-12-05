@@ -19,6 +19,8 @@
 
 package org.apache.gravitino.abs.fs;
 
+import static org.apache.gravitino.catalog.hadoop.fs.Constants.ADLS_MAX_RETRIES;
+import static org.apache.gravitino.catalog.hadoop.fs.Constants.DEFAULT_RETRY_LIMIT;
 import static org.apache.hadoop.fs.azurebfs.constants.ConfigurationKeys.FS_AZURE_ACCOUNT_AUTH_TYPE_PROPERTY_NAME;
 import static org.apache.hadoop.fs.azurebfs.constants.ConfigurationKeys.FS_AZURE_ACCOUNT_IS_HNS_ENABLED;
 import static org.apache.hadoop.fs.azurebfs.constants.ConfigurationKeys.FS_AZURE_SAS_TOKEN_PROVIDER_TYPE;
@@ -71,6 +73,8 @@ public class AzureFileSystemProvider implements FileSystemProvider, SupportsCred
       hadoopConfMap.put(ABFS_IMPL_KEY, ABFS_IMPL);
     }
 
+    hadoopConfMap = additionalAzureConfig(hadoopConfMap);
+
     Configuration configuration = FileSystemUtils.createConfiguration(hadoopConfMap);
     return FileSystem.newInstance(path.toUri(), configuration);
   }
@@ -109,5 +113,24 @@ public class AzureFileSystemProvider implements FileSystemProvider, SupportsCred
   @Override
   public String name() {
     return ABS_PROVIDER_NAME;
+  }
+
+  /**
+   * Add additional Azure specific configuration to tune the performance.
+   *
+   * @param configs original configuration
+   * @return the configuration with additional Azure tuning parameters
+   */
+  private Map<String, String> additionalAzureConfig(Map<String, String> configs) {
+    Map<String, String> additionalConfigs = Maps.newHashMap(configs);
+
+    // Avoid multiple retries to speed up failure in test cases.
+    if (!configs.containsKey(ADLS_MAX_RETRIES)) {
+      additionalConfigs.put(ADLS_MAX_RETRIES, DEFAULT_RETRY_LIMIT);
+    }
+
+    // More tuning can be added here.
+
+    return ImmutableMap.copyOf(additionalConfigs);
   }
 }

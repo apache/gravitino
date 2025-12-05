@@ -46,8 +46,13 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
+import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -99,8 +104,6 @@ import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.security.UserGroupInformation;
-import org.awaitility.Awaitility;
-import org.awaitility.core.ConditionTimeoutException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -136,6 +139,23 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
 
   @VisibleForTesting ScheduledThreadPoolExecutor scheduler;
   @VisibleForTesting Cache<FileSystemCacheKey, FileSystem> fileSystemCache;
+
+  private final ThreadPoolExecutor fileSystemExecutor =
+      new ThreadPoolExecutor(
+          Math.max(2, Math.min(Runtime.getRuntime().availableProcessors() * 2, 16)),
+          Math.max(2, Math.min(Runtime.getRuntime().availableProcessors() * 2, 32)),
+          5L,
+          TimeUnit.SECONDS,
+          new ArrayBlockingQueue<>(1000),
+          new ThreadFactoryBuilder()
+              .setDaemon(true)
+              .setNameFormat("fileset-filesystem-getter-pool-%d")
+              .build(),
+          new ThreadPoolExecutor.AbortPolicy()) {
+        {
+          allowCoreThreadTimeOut(true);
+        }
+      };
 
   FilesetCatalogOperations(EntityStore store) {
     this.store = store;
@@ -994,6 +1014,10 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
       scheduler.shutdownNow();
     }
 
+    if (!fileSystemExecutor.isShutdown()) {
+      fileSystemExecutor.shutdownNow();
+    }
+
     if (fileSystemCache != null) {
       fileSystemCache
           .asMap()
@@ -1395,30 +1419,47 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
                 .catalogPropertiesMetadata()
                 .getOrDefault(
                     config, FilesetCatalogPropertiesMetadata.FILESYSTEM_CONNECTION_TIMEOUT_SECONDS);
+
+    Future<FileSystem> fileSystemFuture =
+        fileSystemExecutor.submit(() -> provider.getFileSystem(path, config));
+
     try {
-      AtomicReference<FileSystem> fileSystem = new AtomicReference<>();
-      Awaitility.await()
-          .atMost(timeoutSeconds, TimeUnit.SECONDS)
-          .pollInterval(1, TimeUnit.MILLISECONDS)
-          .until(
-              () -> {
-                fileSystem.set(provider.getFileSystem(path, config));
-                return true;
-              });
-      return fileSystem.get();
-    } catch (ConditionTimeoutException e) {
+      return fileSystemFuture.get(timeoutSeconds, TimeUnit.SECONDS);
+    } catch (TimeoutException e) {
+      fileSystemFuture.cancel(true);
+
+      LOG.warn(
+          "Timeout when getting FileSystem for path: {}, scheme: {}, provider: {} within {} seconds",
+          path,
+          scheme,
+          provider,
+          timeoutSeconds,
+          e);
+
       throw new IOException(
           String.format(
-              "Failed to get FileSystem for path: %s, scheme: %s, provider: %s, config: %s within %s "
+              "Failed to get FileSystem for path: %s, scheme: %s, provider: %s within %s "
                   + "seconds, please check the configuration or increase the "
                   + "file system connection timeout time by setting catalog property: %s",
               path,
               scheme,
               provider,
-              config,
               timeoutSeconds,
               FilesetCatalogPropertiesMetadata.FILESYSTEM_CONNECTION_TIMEOUT_SECONDS),
           e);
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+      LOG.warn(
+          "Interrupted when getting FileSystem for path: {}, possibly the server is"
+              + " shutting down or catalog is been dropped",
+          path);
+      throw new RuntimeException("Interrupted when getting FileSystem for path: " + path, e);
+    } catch (ExecutionException e) {
+      Throwable cause = e.getCause();
+      if (cause instanceof IOException) {
+        throw (IOException) cause;
+      }
+      throw new IOException("Failed to create FileSystem", cause);
     }
   }
 }
