@@ -424,15 +424,11 @@ const CreateTableDialog = props => {
         if (currentCatalog?.provider === 'lakehouse-generic') {
           try {
             // Check catalog properties for location
-            const [catalogErr, catalogRes] = await to(
-              getCatalogDetailsApi({ metalake, catalog })
-            )
+            const [catalogErr, catalogRes] = await to(getCatalogDetailsApi({ metalake, catalog }))
             const catalogLocation = catalogRes?.catalog?.properties?.location
 
             // Check schema properties for location
-            const [schemaErr, schemaRes] = await to(
-              getSchemaDetailsApi({ metalake, catalog, schema: schemaName })
-            )
+            const [schemaErr, schemaRes] = await to(getSchemaDetailsApi({ metalake, catalog, schema: schemaName }))
             const schemaLocation = schemaRes?.schema?.properties?.location
 
             // Location is required if not set in both catalog and schema
@@ -445,7 +441,7 @@ const CreateTableDialog = props => {
         const defaultPropertyItems = propInfo.defaultProps.map(prop => ({
           key: prop.key,
           value: prop.value || '',
-          required: prop.key === 'location' ? isLocationRequired : (prop.required || false),
+          required: prop.key === 'location' ? isLocationRequired : prop.required || false,
           description: prop.description || '',
           disabled: prop.disabled || false
         }))
