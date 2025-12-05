@@ -299,7 +299,7 @@ Please refer to [Access Control](./security/access-control.md) for details on ho
 
 When access control is enabled:
 
-1. Clients authenticate with the Iceberg REST service (Now we supports Basic auth and OAuth2)
+1. Clients authenticate with the Iceberg REST service (Now we support Basic auth and OAuth2)
 2. The Iceberg REST service forwards the authenticated user identity to the Gravitino server
 3. Gravitino verifies the user has necessary privileges to perform the requested operation
 4. Users can only access catalogs and perform operations they have been explicitly granted privileges for
@@ -706,7 +706,7 @@ To enable access control for the Iceberg REST server using Gravitino's dynamic c
 
 ### 1. Enable Authorization and Dynamic Config Provider
 
-Add the following to your Gravitino Iceberg REST server configuration (e.g., `gravitino-iceberg-rest-server.conf`):
+Add the following to your Gravitino server configuration file (`gravitino.conf`) if running the Iceberg REST server as an auxiliary service (recommended for access control):
 
 ```properties
 gravitino.authorization.enable = true
@@ -785,6 +785,28 @@ curl -X PUT -H "Accept: application/vnd.gravitino.v1+json" \
 
 ---
 
+### 6. Verify Access Control in Action
+
+Before granting privileges, the user should not be able to access the table. For example, try to list tables as `user1` (replace with your actual authentication method):
+
+```shell
+curl -u user1:password -H "Accept: application/vnd.gravitino.v1+json" \
+  http://localhost:9001/iceberg/v1/catalog1/namespaces/default/tables
+```
+
+This should return an error indicating insufficient privileges (such as HTTP 403 Forbidden).
+
+After granting the role with privileges, repeat the request as `user1`:
+
+```shell
+curl -u user1:password -H "Accept: application/vnd.gravitino.v1+json" \
+  http://localhost:9001/iceberg/v1/catalog1/namespaces/default/tables
+```
+
+This time, the request should succeed and return the list of tables.
+
+---
+
 **Summary:**
 - Enable authorization and set configuration provider to `dynamic-config-provider`
 - Create metalake
@@ -793,3 +815,7 @@ curl -X PUT -H "Accept: application/vnd.gravitino.v1+json" \
 - Assign role to user
 
 For more details, see the [Access Control documentation](./security/access-control.md).
+
+> **Note:** IRC (Iceberg REST Catalog) authorization is not supported for standalone Iceberg REST server deployments.
+> Access control features described here require the Iceberg REST server to be run as an auxiliary service within the Gravitino server,
+> using the dynamic configuration provider. Standalone deployments do not support IRC-based authorization.
