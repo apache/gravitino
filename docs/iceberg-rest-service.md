@@ -449,11 +449,11 @@ Gravitino provides the build-in `org.apache.gravitino.iceberg.common.cache.Local
 
 ### Memory settings
 
-The Iceberg REST server uses `GRAVITINO_MEM` for JVM heap/metaspace flags. Default: `-Xms1024m -Xmx1024m -XX:MaxMetaspaceSize=512m`. The launch script appends `GRAVITINO_MEM` to `JAVA_OPTS`; set `GRAVITINO_MEM` to change the heap size used at runtime.
+The Iceberg REST server uses `GRAVITINO_MEM` for JVM heap/metaspace flags. Default: `-Xms1024m -Xmx1024m -XX:MaxMetaspaceSize=512m`. Launch scripts append `GRAVITINO_MEM` to `JAVA_OPTS`; set it to adjust heap/metaspace sizing.
 Example tuning:
 - Development: `GRAVITINO_MEM="-Xms1g -Xmx1g -XX:MaxMetaspaceSize=512m"`
 - Medium workloads: `GRAVITINO_MEM="-Xms4g -Xmx4g -XX:MaxMetaspaceSize=1g"`
-- Heavier concurrency/catalog count: raise heap and metaspace accordingly.
+- Higher concurrency or catalog counts: increase heap and metaspace accordingly.
 
 ## Starting the Iceberg REST server
 

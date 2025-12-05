@@ -19,7 +19,7 @@ docker run --rm -d -p 8090:8090 -p 9001:9001 apache/gravitino:0.7.0-incubating
 
 Memory settings
 
-The JVM heap/metaspace options are controlled by `GRAVITINO_MEM` (default `-Xms1024m -Xmx1024m -XX:MaxMetaspaceSize=512m`). Override with `-e GRAVITINO_MEM="-Xms4g -Xmx4g -XX:MaxMetaspaceSize=1g"`. The launch script appends `GRAVITINO_MEM` to `JAVA_OPTS`, so set `GRAVITINO_MEM` to change the heap size used at runtime.
+JVM heap and metaspace are controlled by `GRAVITINO_MEM` (default `-Xms1024m -Xmx1024m -XX:MaxMetaspaceSize=512m`). Override with `-e GRAVITINO_MEM="-Xms4g -Xmx4g -XX:MaxMetaspaceSize=1g"` to tune sizing. Launch scripts append `GRAVITINO_MEM` to `JAVA_OPTS`, so set it whenever you need different heap/metaspace sizes.
 
 Changelog
 
@@ -77,7 +77,7 @@ docker run --rm -d -p 9001:9001 apache/gravitino-iceberg-rest:0.7.0-incubating
 
 Memory settings
 
-`GRAVITINO_MEM` controls JVM memory (default `-Xms1024m -Xmx1024m -XX:MaxMetaspaceSize=512m`). Override with `-e GRAVITINO_MEM="-Xms4g -Xmx4g -XX:MaxMetaspaceSize=1g"`. This value is appended to `JAVA_OPTS` by the launch scripts, so set `GRAVITINO_MEM` to change heap sizing.
+Use `GRAVITINO_MEM` to size the JVM (default `-Xms1024m -Xmx1024m -XX:MaxMetaspaceSize=512m`). Override with `-e GRAVITINO_MEM="-Xms4g -Xmx4g -XX:MaxMetaspaceSize=1g"` when you need different sizing. Launch scripts append `GRAVITINO_MEM` to `JAVA_OPTS`, so set it to change heap/metaspace settings.
 
 Changelog
 - apache/gravitino-iceberg-rest:1.0.0
@@ -139,7 +139,7 @@ docker run --rm -d -p 9102:9102 -e LANCE_REST_GRAVITINO_METALAKE_NAME=test -e LA
 
 Memory settings
 
-Use `GRAVITINO_MEM` to size the JVM (default `-Xms1024m -Xmx1024m -XX:MaxMetaspaceSize=512m`). Example: `-e GRAVITINO_MEM="-Xms2g -Xmx2g -XX:MaxMetaspaceSize=512m"`. The launch script appends `GRAVITINO_MEM` to `JAVA_OPTS`, so set `GRAVITINO_MEM` when you need different heap sizes.
+Use `GRAVITINO_MEM` to size the JVM (default `-Xms1024m -Xmx1024m -XX:MaxMetaspaceSize=512m`). Example: `-e GRAVITINO_MEM="-Xms2g -Xmx2g -XX:MaxMetaspaceSize=512m"`. Launch scripts append `GRAVITINO_MEM` to `JAVA_OPTS`, so set it whenever you need different heap/metaspace sizes.
 
 Currently, Gravitino Lance REST server supports setting the following environment variables
 - LANCE_REST_GRAVITINO_METALAKE_NAME: It will overwrite the configuration "gravitino.lance-rest.gravitino.metalake-name" in configuration file `conf/gravitino-lance-rest-server.conf`. **You should set it to your Gravitino metalake name.**

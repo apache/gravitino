@@ -268,14 +268,14 @@ Refer to [security](security/security.md) for HTTPS and authentication configura
 
 ### Memory settings
 
-`GRAVITINO_MEM` controls JVM heap/metaspace settings for the Gravitino server, and is also used by the Iceberg REST server and Lance REST server launchers.
+`GRAVITINO_MEM` sets JVM heap/metaspace flags for the Gravitino server and is also read by the Iceberg REST server and Lance REST server launchers.
 
-The default is `-Xms1024m -Xmx1024m -XX:MaxMetaspaceSize=512m` (see `bin/common.sh`). The launch script appends this to `JAVA_OPTS`; set `GRAVITINO_MEM` to change the heap size.
+Default: `-Xms1024m -Xmx1024m -XX:MaxMetaspaceSize=512m` (see `bin/common.sh`). Launch scripts append this to `JAVA_OPTS`; override `GRAVITINO_MEM` when you need different heap/metaspace sizing.
 
 Typical values:
-- Development `-Xms1g -Xmx1g -XX:MaxMetaspaceSize=512m`
-- Moderate production `-Xms4g -Xmx4g -XX:MaxMetaspaceSize=1g`
-- Larger deployments `-Xms8g -Xmx8g -XX:MaxMetaspaceSize=1g` or higher depending on catalog count, plugins, and query concurrency
+- Development: `-Xms1g -Xmx1g -XX:MaxMetaspaceSize=512m`
+- Moderate production: `-Xms4g -Xmx4g -XX:MaxMetaspaceSize=1g`
+- Larger deployments: `-Xms8g -Xmx8g -XX:MaxMetaspaceSize=1g` or higher depending on catalog count, plugins, and query concurrency
 
 ## Apache Gravitino catalog properties configuration
 
