@@ -95,7 +95,9 @@ public interface Privilege {
     CREATE_MODEL(0L, 1L << 18),
     /** The privilege to link a model version */
     LINK_MODEL_VERSION(0L, 1L << 19),
-    /** The privilege to create a model version. This deprecated. Please use LINK_MODEL_VERSION */
+    /**
+     * The privilege to create a model version. This is deprecated. Please use LINK_MODEL_VERSION
+     */
     CREATE_MODEL_VERSION(0L, 1L << 19),
     /** The privilege to view the metadata of the model and download all the model versions */
     USE_MODEL(0L, 1L << 20),
