@@ -1449,7 +1449,11 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
           e);
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
-      throw new IOException("Interrupted while waiting for FileSystem", e);
+      LOG.warn(
+          "Interrupted when getting FileSystem for path: {}, possibly the server is"
+              + " shutting down or catalog is been dropped",
+          path);
+      throw new RuntimeException("Interrupted when getting FileSystem for path: " + path, e);
     } catch (ExecutionException e) {
       Throwable cause = e.getCause();
       if (cause instanceof IOException) {
