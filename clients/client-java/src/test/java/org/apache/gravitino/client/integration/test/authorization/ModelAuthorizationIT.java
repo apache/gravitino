@@ -142,7 +142,7 @@ public class ModelAuthorizationIT extends BaseRestApiAuthorizationIT {
     gravitinoMetalake.grantPrivilegesToRole(
         role,
         MetadataObjects.of(null, CATALOG, MetadataObject.Type.CATALOG),
-        ImmutableList.of(Privileges.RegisterModel.allow()));
+        ImmutableList.of(Privileges.CreateModel.allow()));
     normalUserCatalog.registerModel(NameIdentifier.of(SCHEMA, "model3"), "", new HashMap<>());
   }
 
@@ -268,7 +268,7 @@ public class ModelAuthorizationIT extends BaseRestApiAuthorizationIT {
     gravitinoMetalake.revokePrivilegesFromRole(
         role,
         MetadataObjects.of(ImmutableList.of(CATALOG, SCHEMA, "model1"), MetadataObject.Type.MODEL),
-        ImmutableSet.of(Privileges.LinkModelVersion.allow()));
+        ImmutableSet.of(Privileges.CreateModelVersion.allow()));
     assertThrows(
         ForbiddenException.class,
         () -> {
@@ -289,7 +289,18 @@ public class ModelAuthorizationIT extends BaseRestApiAuthorizationIT {
     gravitinoMetalake.revokePrivilegesFromRole(
         role,
         MetadataObjects.of(ImmutableList.of(CATALOG, SCHEMA, "model1"), MetadataObject.Type.MODEL),
-        ImmutableSet.of(Privileges.CreateModelVersion.allow(), Privileges.UseModel.allow()));
+        ImmutableSet.of(Privileges.LinkModelVersion.allow(), Privileges.UseModel.allow()));
+
+    assertThrows(
+        ForbiddenException.class,
+        () -> {
+          modelCatalogLoadByNormalUser.linkModelVersion(
+              NameIdentifier.of(SCHEMA, "model1"),
+              "uri4",
+              new String[] {"alias4"},
+              "comment4",
+              null);
+        });
   }
 
   @Test

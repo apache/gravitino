@@ -641,7 +641,7 @@ class PermissionManager {
     // Remove model privileges if exists
     for (Privilege privilege : privileges) {
       if (privilege.name() == Privilege.Name.CREATE_MODEL
-          || privilege.name() == Privilege.Name.LINK_MODEL_VERSION) {
+          || privilege.name() == Privilege.Name.CREATE_MODEL_VERSION) {
         updatePrivileges.remove(
             AuthorizationUtils.replaceLegacyPrivilege(privilege.name(), privilege.condition()));
       } else if (privilege.name() == Privilege.Name.REGISTER_MODEL

@@ -292,12 +292,24 @@ public class AccessControlIT extends BaseIT {
             schemaObjectWithModelPrivs,
             "model",
             Lists.newArrayList(
-                Privileges.CreateModelVersion.allow(), Privileges.CreateModelVersion.allow()));
+                Privileges.CreateModel.allow(), Privileges.CreateModelVersion.allow()));
     role =
         metalake.createRole(
             "model_name", properties, Lists.newArrayList(modelObjectWithLegacyPriv));
     Assertions.assertEquals("model_name", role.name());
     Assertions.assertEquals(properties, role.properties());
+    // Verify privileges - test legacy privilege compatibility
+    Assertions.assertEquals(1, role.securableObjects().size());
+    List<Privilege> actualPrivileges =
+        Lists.newArrayList(role.securableObjects().get(0).privileges());
+    Assertions.assertEquals(2, actualPrivileges.size());
+    // Sort privileges by name to ensure consistent ordering
+    actualPrivileges.sort(Comparator.comparing(p -> p.name().name()));
+    // After sorting: CREATE_MODEL comes before CREATE_MODEL_VERSION alphabetically
+    Assertions.assertEquals(Privilege.Name.CREATE_MODEL, actualPrivileges.get(0).name());
+    Assertions.assertEquals(Privilege.Condition.ALLOW, actualPrivileges.get(0).condition());
+    Assertions.assertEquals(Privilege.Name.CREATE_MODEL_VERSION, actualPrivileges.get(1).name());
+    Assertions.assertEquals(Privilege.Condition.ALLOW, actualPrivileges.get(1).condition());
     metalake.deleteRole("model_name");
 
     SecurableObject modelObjectWithWrongPriv =
