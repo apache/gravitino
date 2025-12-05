@@ -245,10 +245,11 @@ public class AuthorizationUtils {
 
   public static Privilege replaceLegacyPrivilege(
       Privilege.Name privilege, Privilege.Condition condition) {
+    Privilege.Name replacedPrivilegeName = replaceLegacyPrivilegeName(privilege);
     if (condition == Privilege.Condition.ALLOW) {
-      return Privileges.allow(privilege.name());
+      return Privileges.allow(replacedPrivilegeName);
     } else {
-      return Privileges.deny(privilege.name());
+      return Privileges.deny(replacedPrivilegeName);
     }
   }
 
