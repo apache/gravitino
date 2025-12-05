@@ -37,6 +37,7 @@ val scalaJava8CompatVersion: String = libs.versions.scala.java.compat.get()
 val scalaCollectionCompatVersion: String = libs.versions.scala.collection.compat.get()
 
 if (hasProperty("excludePackagesForSparkConnector")) {
+  @Suppress("UNCHECKED_CAST")
   val configureFunc = properties["excludePackagesForSparkConnector"] as? (Project) -> Unit
   configureFunc?.invoke(project)
 }
