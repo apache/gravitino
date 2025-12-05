@@ -59,9 +59,11 @@ import org.apache.gravitino.rel.types.Types;
 import org.apache.gravitino.utils.RandomNameUtils;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.testcontainers.shaded.org.awaitility.Awaitility;
 
+@Tag("gravitino-docker-test")
 public class TestStarRocksTableOperations extends TestStarRocks {
   private static final JdbcTypeConverter TYPE_CONVERTER = new StarRocksTypeConverter();
   private static final Type VARCHAR_255 = Types.VarCharType.of(255);
