@@ -236,11 +236,12 @@ curl -X POST http://localhost:9101/lance/v1/table/lance_catalog%24schema%24table
   -H 'Content-Type: application/json' \
   -d '{
     "id": ["lance_catalog", "schema", "table01"],
-    "location": "/tmp/lance_catalog/schema/table01"
+    "location": "/tmp/lance_catalog/schema/table01",
+    "mode": "CREATE"
   }'
 
 # Create a new empty table
-curl -X POST http://localhost:9101/lance/v1/table/lance_catalog%24schema%24table02/create \
+curl -X POST http://localhost:9101/lance/v1/table/lance_catalog%24schema%24table02/create-empty \
   -H 'Content-Type: application/json' \
   -d '{
     "id": ["lance_catalog", "schema", "table02"],
@@ -248,18 +249,9 @@ curl -X POST http://localhost:9101/lance/v1/table/lance_catalog%24schema%24table
     "properties": { "description": "This is table02"  }
   }'  
   
-# Create a new table with IPC data
-curl -X POST http://localhost:9101/lance/v1/table/lance_catalog%24schema%24table03/create-empty \
-  -H 'Content-Type: application/json' \
-  -d '{
-    "id": ["lance_catalog", "schema", "table03"],
-    "location": "/tmp/lance_catalog/schema/table03",
-    "dataFormat": "IPC",
-    "properties": { "description": "This is table03 with IPC data"  } 
-    
 # Create a table with schema, the schema is inferred from the Arrow IPC file
 curl -X POST \
-     "http://localhost:9101/lance/v1/table/lance_catalog%24schema%24table04/create" \
+     "http://localhost:9101/lance/v1/table/lance_catalog%24schema%24table03/create" \
      -H 'Content-Type: application/vnd.apache.arrow.stream' \
      -H "x-lance-table-location: "/tmp/lance_catalog/schema/table04" \
      -H "x-lance-table-properties: {}" \
@@ -303,6 +295,7 @@ ns.createNamespace(createSchemaNsRequest);
 RegisterTableRequest registerTableRequest = new RegisterTableRequest();
 registerTableRequest.setLocation("/tmp/lance_catalog/schema/table01");
 registerTableRequest.setId(Lists.newArrayList("lance_catalog", "schema", "table01"));
+registerTableRequest.setMode(RegisterTableRequest.ModeEnum.CREATE);
 ns.registerTable(registerTableRequest);
 
 // Create an empty table
