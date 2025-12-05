@@ -53,7 +53,7 @@ dependencies {
     exclude(group = "org.junit.jupiter", module = "*") // provided by test scope
     exclude(group = "com.fasterxml.jackson.jaxrs", module = "jackson-jaxrs-json-provider") // using gravitino's version
     exclude(group = "org.apache.httpcomponents.client5", module = "*") // provided by gravitino
-    exclude(group = "com.lancedb", module = "lance-namespace-core") // This is no need in the core module
+    exclude(group = "com.lancedb", module = "lance-namespace-core") // This is unnecessary in the core module
   }
   implementation(libs.mybatis)
 
