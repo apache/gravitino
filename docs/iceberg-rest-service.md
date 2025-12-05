@@ -299,7 +299,7 @@ Please refer to [Access Control](./security/access-control.md) for details on ho
 
 When access control is enabled:
 
-1. Clients authenticate with the Iceberg REST service (Now we support Basic auth and OAuth2)
+1. Clients authenticate with the Iceberg REST service. Currently supported authentication methods are Basic Auth and OAuth2.
 2. The Iceberg REST service forwards the authenticated user identity to the Gravitino server
 3. Gravitino verifies the user has necessary privileges to perform the requested operation
 4. Users can only access catalogs and perform operations they have been explicitly granted privileges for
