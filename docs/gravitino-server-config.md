@@ -273,9 +273,9 @@ Refer to [security](security/security.md) for HTTPS and authentication configura
 The default is `-Xms1024m -Xmx1024m -XX:MaxMetaspaceSize=512m` (see `bin/common.sh`). The launch script appends this to `JAVA_OPTS`; set `GRAVITINO_MEM` to change the heap size.
 
 Typical values:
-- development `-Xms1g -Xmx1g -XX:MaxMetaspaceSize=512m`
-- moderate production `-Xms4g -Xmx4g -XX:MaxMetaspaceSize=1g`
-- larger deployments `-Xms8g -Xmx8g -XX:MaxMetaspaceSize=1g` or higher depending on catalog count, plugins, and query concurrency
+- Development `-Xms1g -Xmx1g -XX:MaxMetaspaceSize=512m`
+- Moderate production `-Xms4g -Xmx4g -XX:MaxMetaspaceSize=1g`
+- Larger deployments `-Xms8g -Xmx8g -XX:MaxMetaspaceSize=1g` or higher depending on catalog count, plugins, and query concurrency
 
 ## Apache Gravitino catalog properties configuration
 
