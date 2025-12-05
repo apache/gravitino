@@ -93,11 +93,6 @@ public class MockGravitinoAuthorizer implements GravitinoAuthorizer {
   }
 
   @Override
-  public boolean isMetalakeUser(String metalake) {
-    return true;
-  }
-
-  @Override
   public boolean hasSetOwnerPermission(
       String metalake, String type, String fullName, AuthorizationRequestContext requestContext) {
     return true;

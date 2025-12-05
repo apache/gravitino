@@ -35,7 +35,6 @@ import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadPoolExecutor;
 import org.apache.commons.io.IOUtils;
-import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityStore;
@@ -215,27 +214,6 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
     return GravitinoEnv.getInstance()
         .accessControlDispatcher()
         .isServiceAdmin(PrincipalUtils.getCurrentUserName());
-  }
-
-  @Override
-  public boolean isMetalakeUser(String metalake) {
-    String currentUserName = PrincipalUtils.getCurrentUserName();
-    if (StringUtils.isBlank(currentUserName)) {
-      return false;
-    }
-
-    try {
-      return GravitinoEnv.getInstance()
-              .entityStore()
-              .get(
-                  NameIdentifierUtil.ofUser(metalake, currentUserName),
-                  Entity.EntityType.USER,
-                  UserEntity.class)
-          != null;
-    } catch (Exception e) {
-      LOG.warn("Can not get user {} in metalake {}", currentUserName, metalake, e);
-      return false;
-    }
   }
 
   @Override
