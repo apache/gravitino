@@ -21,7 +21,7 @@ package org.apache.gravitino.listener.api.event;
 
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.annotation.DeveloperApi;
-import org.apache.gravitino.iceberg.service.IcebergRestUtils;
+import org.apache.gravitino.iceberg.service.IcebergRESTUtils;
 import org.apache.iceberg.rest.responses.GetNamespaceResponse;
 
 /** Represent an event after loading Iceberg namespace successfully. */
@@ -35,7 +35,7 @@ public class IcebergLoadNamespaceEvent extends IcebergNamespaceEvent {
       GetNamespaceResponse getNamespaceResponse) {
     super(icebergRequestContext, nameIdentifier);
     this.getNamespaceResponse =
-        IcebergRestUtils.cloneIcebergRESTObject(getNamespaceResponse, GetNamespaceResponse.class);
+        IcebergRESTUtils.cloneIcebergRESTObject(getNamespaceResponse, GetNamespaceResponse.class);
   }
 
   public GetNamespaceResponse getNamespaceResponse() {

@@ -21,6 +21,7 @@ package org.apache.gravitino.iceberg.service.metrics;
 
 import java.time.Instant;
 import java.util.Map;
+import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.metrics.MetricsReport;
 
 /** Store Iceberg metrics in memory, used for test */
@@ -35,7 +36,7 @@ public class MemoryMetricsStore implements IcebergMetricsStore {
   }
 
   @Override
-  public void recordMetric(MetricsReport metricsReport) {
+  public void recordMetric(String catalog, Namespace namespace, MetricsReport metricsReport) {
     this.metricsReport = metricsReport;
     this.recordTime = Instant.now();
   }

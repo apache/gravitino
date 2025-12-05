@@ -70,12 +70,16 @@ public class Version {
     }
   }
 
-  /** @return the current versionInfo */
+  /**
+   * @return the current versionInfo
+   */
   public static VersionInfo getCurrentVersion() {
     return INSTANCE.versionInfo;
   }
 
-  /** @return the current version DTO */
+  /**
+   * @return the current version DTO
+   */
   public static VersionDTO getCurrentVersionDTO() {
     return INSTANCE.versionDTO;
   }

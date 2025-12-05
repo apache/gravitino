@@ -37,16 +37,35 @@ import org.apache.gravitino.tag.SupportsTags;
 @Evolving
 public interface Schema extends Auditable {
 
-  /** @return The name of the Schema. */
+  /**
+   * The property name for the location of the schema. This property indicates the physical storage
+   * location of the schema, such as a directory path in a file system or a URI.
+   *
+   * <p>This property is optional, and it can be specified during schema creation.
+   *
+   * <p>It depends on the catalog implementation to decide whether to use this property or not. It
+   * also depends on the catalog implementation to decide whether this property can be altered after
+   * schema creation. Besides, the behavior of altering this property (moving data or not) is also
+   * determined by the catalog implementation.
+   */
+  String PROPERTY_LOCATION = "location";
+
+  /**
+   * @return The name of the Schema.
+   */
   String name();
 
-  /** @return The comment of the Schema. Null is returned if the comment is not set. */
+  /**
+   * @return The comment of the Schema. Null is returned if the comment is not set.
+   */
   @Nullable
   default String comment() {
     return null;
   }
 
-  /** @return The properties of the Schema. An empty map is returned if no properties are set. */
+  /**
+   * @return The properties of the Schema. An empty map is returned if no properties are set.
+   */
   default Map<String, String> properties() {
     return Collections.emptyMap();
   }

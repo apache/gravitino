@@ -45,8 +45,8 @@ public abstract class GravitinoJdbcCatalogFactory implements BaseCatalogFactory 
         FactoryUtils.createCatalogFactoryHelper(this, context);
     String defaultDatabase =
         helper.getOptions().get(GravitinoJdbcCatalogFactoryOptions.DEFAULT_DATABASE);
-    Preconditions.checkNotNull(
-        defaultDatabase,
+    Preconditions.checkArgument(
+        defaultDatabase != null,
         GravitinoJdbcCatalogFactoryOptions.DEFAULT_DATABASE.key() + " should not be null.");
     return new GravitinoJdbcCatalog(
         context, defaultDatabase, propertiesConverter(), partitionConverter());

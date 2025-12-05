@@ -29,8 +29,7 @@ public class CatalogMetaPostgreSQLProvider extends CatalogMetaBaseSQLProvider {
   public String softDeleteCatalogMetasByCatalogId(Long catalogId) {
     return "UPDATE "
         + TABLE_NAME
-        + " SET deleted_at = floor(extract(epoch from(current_timestamp -"
-        + " timestamp '1970-01-01 00:00:00'))*1000)"
+        + " SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
         + " WHERE catalog_id = #{catalogId} AND deleted_at = 0";
   }
 
@@ -38,8 +37,7 @@ public class CatalogMetaPostgreSQLProvider extends CatalogMetaBaseSQLProvider {
   public String softDeleteCatalogMetasByMetalakeId(Long metalakeId) {
     return "UPDATE "
         + TABLE_NAME
-        + " SET deleted_at = floor(extract(epoch from(current_timestamp -"
-        + " timestamp '1970-01-01 00:00:00'))*1000)"
+        + " SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
         + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0";
   }
 
@@ -57,10 +55,10 @@ public class CatalogMetaPostgreSQLProvider extends CatalogMetaBaseSQLProvider {
   public String insertCatalogMetaOnDuplicateKeyUpdate(CatalogPO catalogPO) {
     return "INSERT INTO "
         + TABLE_NAME
-        + "(catalog_id, catalog_name, metalake_id,"
+        + " (catalog_id, catalog_name, metalake_id,"
         + " type, provider, catalog_comment, properties, audit_info,"
         + " current_version, last_version, deleted_at)"
-        + " VALUES("
+        + " VALUES ("
         + " #{catalogMeta.catalogId},"
         + " #{catalogMeta.catalogName},"
         + " #{catalogMeta.metalakeId},"

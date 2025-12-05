@@ -36,6 +36,12 @@ class Indexes:
     DEFAULT_MYSQL_PRIMARY_KEY_NAME: ClassVar[str] = "PRIMARY"
 
     @staticmethod
+    def of(
+        index_type: Index.IndexType, name: Optional[str], field_names: List[List[str]]
+    ) -> Index:
+        return Indexes.IndexImpl(index_type, name, field_names)
+
+    @staticmethod
     def unique(name: str, field_names: List[List[str]]) -> Index:
         return Indexes.IndexImpl(Index.IndexType.UNIQUE_KEY, name, field_names)
 

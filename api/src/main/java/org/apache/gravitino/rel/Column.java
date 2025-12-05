@@ -52,19 +52,29 @@ public interface Column {
    */
   Expression DEFAULT_VALUE_OF_CURRENT_TIMESTAMP = FunctionExpression.of("current_timestamp");
 
-  /** @return The name of this column. */
+  /**
+   * @return The name of this column.
+   */
   String name();
 
-  /** @return The data type of this column. */
+  /**
+   * @return The data type of this column.
+   */
   Type dataType();
 
-  /** @return The comment of this column, null if not specified. */
+  /**
+   * @return The comment of this column, null if not specified.
+   */
   String comment();
 
-  /** @return True if this column may produce null values. Default is true. */
+  /**
+   * @return True if this column may produce null values. Default is true.
+   */
   boolean nullable();
 
-  /** @return True if this column is an auto-increment column. Default is false. */
+  /**
+   * @return True if this column is an auto-increment column. Default is false.
+   */
   boolean autoIncrement();
 
   /**

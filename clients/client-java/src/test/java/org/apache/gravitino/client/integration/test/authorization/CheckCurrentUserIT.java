@@ -95,7 +95,9 @@ public class CheckCurrentUserIT extends BaseIT {
     GravitinoAdminClient anotherClient = GravitinoAdminClient.builder(uri).withSimpleAuth().build();
 
     metalake = client.createMetalake(metalakeName, "metalake comment", Collections.emptyMap());
+    metalake.addUser("test");
     anotherMetalake = anotherClient.loadMetalake(metalakeName);
+    metalake.removeUser("test");
   }
 
   @AfterAll
@@ -167,7 +169,9 @@ public class CheckCurrentUserIT extends BaseIT {
             catalogName, Catalog.Type.FILESET, "hadoop", "comment", Collections.emptyMap());
 
     // Test to create a schema with a not-existed user
+    metalake.addUser("test");
     Catalog anotherCatalog = anotherMetalake.loadCatalog(catalogName);
+    metalake.removeUser("test");
     Assertions.assertThrows(
         ForbiddenException.class,
         () -> anotherCatalog.asSchemas().createSchema("schema", "comment", Collections.emptyMap()));
@@ -202,12 +206,15 @@ public class CheckCurrentUserIT extends BaseIT {
     SecurableObject metalakeSecObject =
         SecurableObjects.ofMetalake(
             metalakeName, Lists.newArrayList(Privileges.CreateCatalog.allow()));
+
+    // Test creating role with non-existent user fails
     Assertions.assertThrows(
         ForbiddenException.class,
         () ->
             anotherMetalake.createRole(
                 "role", Collections.emptyMap(), Lists.newArrayList(metalakeSecObject)));
 
+    // Test creating role with admin user succeeds
     Assertions.assertDoesNotThrow(
         () ->
             metalake.createRole(
@@ -232,7 +239,9 @@ public class CheckCurrentUserIT extends BaseIT {
             catalogName, Catalog.Type.RELATIONAL, "hive", "catalog comment", properties);
 
     // Test to create schema with not-existed user
+    metalake.addUser("test");
     Catalog anotherCatalog = anotherMetalake.loadCatalog(catalogName);
+    metalake.removeUser("test");
     Assertions.assertThrows(
         ForbiddenException.class,
         () -> anotherCatalog.asSchemas().createSchema("schema", "comment", Collections.emptyMap()));

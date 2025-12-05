@@ -51,7 +51,7 @@ public abstract class FlinkPaimonCatalogIT extends FlinkCommonIT {
   }
 
   private void initPaimonCatalog() {
-    Preconditions.checkNotNull(metalake);
+    Preconditions.checkArgument(metalake != null, "metalake should not be null");
     catalog =
         metalake.createCatalog(
             getPaimonCatalogName(),
@@ -74,7 +74,7 @@ public abstract class FlinkPaimonCatalogIT extends FlinkCommonIT {
 
   @AfterAll
   void paimonStop() {
-    Preconditions.checkNotNull(metalake);
+    Preconditions.checkArgument(metalake != null, "metalake should not be null");
     metalake.dropCatalog(getPaimonCatalogName(), true);
   }
 

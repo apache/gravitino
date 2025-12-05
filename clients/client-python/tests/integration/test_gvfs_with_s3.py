@@ -56,6 +56,7 @@ class TestGvfsWithS3(TestGvfsWithHDFS):
     bucket_name = os.environ.get("S3_BUCKET_NAME")
 
     metalake_name: str = "TestGvfsWithS3_metalake" + str(randint(1, 10000))
+    catalog_name: str = "test_gvfs_catalog" + str(randint(1, 10000))
 
     def setUp(self):
         self.options = {

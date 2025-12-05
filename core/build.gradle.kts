@@ -43,10 +43,16 @@ dependencies {
   implementation(libs.concurrent.trees)
   implementation(libs.guava)
   implementation(libs.h2db)
+  implementation(libs.jackson.jaxrs.json.provider) // This is required by lance
   implementation(libs.lance) {
     exclude(group = "com.fasterxml.jackson.core", module = "*") // provided by gravitino
     exclude(group = "com.fasterxml.jackson.datatype", module = "*") // provided by gravitino
     exclude(group = "commons-codec", module = "commons-codec") // provided by jcasbin
+    exclude(group = "com.google.guava", module = "guava") // provided by gravitino
+    exclude(group = "org.apache.commons", module = "commons-lang3") // provided by gravitino
+    exclude(group = "org.junit.jupiter", module = "*") // provided by test scope
+    exclude(group = "com.fasterxml.jackson.jaxrs", module = "jackson-jaxrs-json-provider") // using gravitino's version
+    exclude(group = "org.apache.httpcomponents.client5", module = "*") // provided by gravitino
   }
   implementation(libs.mybatis)
 

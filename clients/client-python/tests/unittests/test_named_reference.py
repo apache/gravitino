@@ -16,7 +16,8 @@
 # under the License.
 
 import unittest
-from gravitino.api.expressions.named_reference import NamedReference, FieldReference
+
+from gravitino.api.rel.expressions.named_reference import FieldReference, NamedReference
 
 
 class TestNamedReference(unittest.TestCase):

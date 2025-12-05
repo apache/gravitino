@@ -25,6 +25,7 @@ import com.google.common.collect.Lists;
 import com.google.common.collect.MapDifference;
 import com.google.common.collect.Maps;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -202,8 +203,10 @@ public abstract class BaseCatalog extends AbstractCatalog {
   }
 
   @Override
-  public List<String> listViews(String s) throws DatabaseNotExistException, CatalogException {
-    throw new UnsupportedOperationException();
+  public List<String> listViews(String databaseName)
+      throws DatabaseNotExistException, CatalogException {
+    // Gravitino does not support views yet; return empty to keep Flink callers happy.
+    return Collections.emptyList();
   }
 
   @Override
@@ -668,7 +671,8 @@ public abstract class BaseCatalog extends AbstractCatalog {
   @VisibleForTesting
   static TableChange[] getGravitinoTableChanges(
       CatalogBaseTable existingTable, CatalogBaseTable newTable) {
-    Preconditions.checkNotNull(newTable.getComment(), "The new comment should not be null");
+    Preconditions.checkArgument(
+        newTable.getComment() != null, "The new comment should not be null");
     List<TableChange> changes = Lists.newArrayList();
     if (!Objects.equals(newTable.getComment(), existingTable.getComment())) {
       changes.add(TableChange.updateComment(newTable.getComment()));

@@ -190,6 +190,37 @@ public class JobTemplateEntity implements Entity, Auditable, HasIdentifier {
     return Objects.hash(id, name, namespace, comment, templateContent, auditInfo);
   }
 
+  public JobTemplate toJobTemplate() {
+    JobTemplate.JobType jobType = this.templateContent.jobType();
+    if (jobType == JobTemplate.JobType.SHELL) {
+      return ShellJobTemplate.builder()
+          .withName(name)
+          .withComment(comment)
+          .withExecutable(this.templateContent.executable())
+          .withArguments(this.templateContent.arguments())
+          .withEnvironments(this.templateContent.environments())
+          .withCustomFields(this.templateContent.customFields())
+          .withScripts(this.templateContent.scripts())
+          .build();
+    } else if (jobType == JobTemplate.JobType.SPARK) {
+      return SparkJobTemplate.builder()
+          .withName(name)
+          .withComment(comment)
+          .withExecutable(this.templateContent.executable())
+          .withArguments(this.templateContent.arguments())
+          .withEnvironments(this.templateContent.environments())
+          .withCustomFields(this.templateContent.customFields())
+          .withClassName(this.templateContent.className())
+          .withJars(this.templateContent.jars())
+          .withFiles(this.templateContent.files())
+          .withArchives(this.templateContent.archives())
+          .withConfigs(this.templateContent.configs())
+          .build();
+    } else {
+      throw new IllegalStateException("Unsupported job type: " + jobType);
+    }
+  }
+
   public static Builder builder() {
     return new Builder();
   }

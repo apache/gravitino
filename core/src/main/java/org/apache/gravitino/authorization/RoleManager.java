@@ -154,7 +154,8 @@ class RoleManager {
     try {
       checkMetalake(NameIdentifier.of(metalake), store);
 
-      return store.relationOperations()
+      return store
+          .relationOperations()
           .listEntitiesByRelation(
               SupportsRelationOperations.Type.METADATA_OBJECT_ROLE_REL,
               MetadataObjectUtil.toEntityIdent(metalake, object),

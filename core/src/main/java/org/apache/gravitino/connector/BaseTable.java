@@ -85,56 +85,74 @@ public abstract class BaseTable implements Table {
     return ops;
   }
 
-  /** @return the audit details of the table. */
+  /**
+   * @return the audit details of the table.
+   */
   @Override
   public AuditInfo auditInfo() {
     return auditInfo;
   }
 
-  /** @return the name of the table. */
+  /**
+   * @return the name of the table.
+   */
   @Override
   public String name() {
     return name;
   }
 
-  /** @return an array of columns that make up the table. */
+  /**
+   * @return an array of columns that make up the table.
+   */
   @Override
   public Column[] columns() {
     return columns;
   }
 
-  /** @return the comment or description for the table. */
+  /**
+   * @return the comment or description for the table.
+   */
   @Nullable
   @Override
   public String comment() {
     return comment;
   }
 
-  /** @return the associated properties of the table. */
+  /**
+   * @return the associated properties of the table.
+   */
   @Override
   public Map<String, String> properties() {
     return properties;
   }
 
-  /** @return the partitioning strategies of the table. */
+  /**
+   * @return the partitioning strategies of the table.
+   */
   @Override
   public Transform[] partitioning() {
     return partitioning;
   }
 
-  /** @return the array of {@link SortOrder} of the table. */
+  /**
+   * @return the array of {@link SortOrder} of the table.
+   */
   @Override
   public SortOrder[] sortOrder() {
     return sortOrders;
   }
 
-  /** @return The distribution strategy of the table. */
+  /**
+   * @return The distribution strategy of the table.
+   */
   @Override
   public Distribution distribution() {
     return distribution;
   }
 
-  /** @return The indexes associated with the table. */
+  /**
+   * @return The indexes associated with the table.
+   */
   @Override
   public Index[] index() {
     return indexes;

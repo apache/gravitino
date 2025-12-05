@@ -52,8 +52,7 @@ public class ModelMetaPostgreSQLProvider extends ModelMetaBaseSQLProvider {
       @Param("schemaId") Long schemaId, @Param("modelName") String modelName) {
     return "UPDATE "
         + ModelMetaMapper.TABLE_NAME
-        + " SET deleted_at = floor(extract(epoch from(current_timestamp -"
-        + " timestamp '1970-01-01 00:00:00'))*1000)"
+        + " SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
         + " WHERE schema_id = #{schemaId} AND model_name = #{modelName} AND deleted_at = 0";
   }
 
@@ -61,8 +60,7 @@ public class ModelMetaPostgreSQLProvider extends ModelMetaBaseSQLProvider {
   public String softDeleteModelMetasByCatalogId(@Param("catalogId") Long catalogId) {
     return "UPDATE "
         + ModelMetaMapper.TABLE_NAME
-        + " SET deleted_at = floor(extract(epoch from(current_timestamp -"
-        + " timestamp '1970-01-01 00:00:00'))*1000)"
+        + " SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
         + " WHERE catalog_id = #{catalogId} AND deleted_at = 0";
   }
 
@@ -70,8 +68,7 @@ public class ModelMetaPostgreSQLProvider extends ModelMetaBaseSQLProvider {
   public String softDeleteModelMetasByMetalakeId(@Param("metalakeId") Long metalakeId) {
     return "UPDATE "
         + ModelMetaMapper.TABLE_NAME
-        + " SET deleted_at = floor(extract(epoch from(current_timestamp -"
-        + " timestamp '1970-01-01 00:00:00'))*1000)"
+        + " SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
         + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0";
   }
 
@@ -79,8 +76,7 @@ public class ModelMetaPostgreSQLProvider extends ModelMetaBaseSQLProvider {
   public String softDeleteModelMetasBySchemaId(@Param("schemaId") Long schemaId) {
     return "UPDATE "
         + ModelMetaMapper.TABLE_NAME
-        + " SET deleted_at = floor(extract(epoch from(current_timestamp -"
-        + " timestamp '1970-01-01 00:00:00'))*1000)"
+        + " SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
         + " WHERE schema_id = #{schemaId} AND deleted_at = 0";
   }
 
@@ -92,5 +88,33 @@ public class ModelMetaPostgreSQLProvider extends ModelMetaBaseSQLProvider {
         + " WHERE model_id IN (SELECT model_id FROM "
         + ModelMetaMapper.TABLE_NAME
         + " WHERE deleted_at > 0 AND deleted_at < #{legacyTimeline} LIMIT #{limit})";
+  }
+
+  @Override
+  public String updateModelMeta(
+      @Param("newModelMeta") ModelPO newModelPO, @Param("oldModelMeta") ModelPO oldModelPO) {
+    return "UPDATE "
+        + ModelMetaMapper.TABLE_NAME
+        + " SET model_name = #{newModelMeta.modelName},"
+        + " metalake_id = #{newModelMeta.metalakeId},"
+        + " catalog_id = #{newModelMeta.catalogId},"
+        + " schema_id = #{newModelMeta.schemaId},"
+        + " model_comment = #{newModelMeta.modelComment},"
+        + " model_properties = #{newModelMeta.modelProperties},"
+        + " model_latest_version = #{newModelMeta.modelLatestVersion},"
+        + " audit_info = #{newModelMeta.auditInfo},"
+        + " deleted_at = #{newModelMeta.deletedAt}"
+        + " WHERE model_id = #{oldModelMeta.modelId}"
+        + " AND model_name = #{oldModelMeta.modelName}"
+        + " AND metalake_id = #{oldModelMeta.metalakeId}"
+        + " AND catalog_id = #{oldModelMeta.catalogId}"
+        + " AND schema_id = #{oldModelMeta.schemaId}"
+        + " AND (model_comment = #{oldModelMeta.modelComment}"
+        + "   OR (CAST(model_comment AS VARCHAR) IS NULL"
+        + "   AND CAST(#{oldModelMeta.modelComment} AS VARCHAR) IS NULL))"
+        + " AND model_properties = #{oldModelMeta.modelProperties}"
+        + " AND model_latest_version = #{oldModelMeta.modelLatestVersion}"
+        + " AND audit_info = #{oldModelMeta.auditInfo}"
+        + " AND deleted_at = 0";
   }
 }

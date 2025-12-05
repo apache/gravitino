@@ -52,18 +52,37 @@ configurations.all {
 dependencies {
   implementation(project(":clients:client-java-runtime", configuration = "shadow"))
   implementation(project(":flink-connector:flink"))
+
+  testImplementation(libs.junit.jupiter.api)
+  testRuntimeOnly(libs.junit.jupiter.engine)
 }
 
-tasks.withType<ShadowJar>(ShadowJar::class.java) {
+val shadowJarTask = tasks.named<ShadowJar>("shadowJar")
+
+shadowJarTask.configure {
   isZip64 = true
   configurations = listOf(project.configurations.runtimeClasspath.get())
   archiveFileName.set("$baseName-$version.jar")
   archiveClassifier.set("")
 
+  exclude("org/slf4j/**")
+  exclude("META-INF/maven/org.slf4j/**")
+
   // Relocate dependencies to avoid conflicts
   relocate("com.google", "org.apache.gravitino.shaded.com.google")
   relocate("google", "org.apache.gravitino.shaded.google")
   relocate("org.apache.hc", "org.apache.gravitino.shaded.org.apache.hc")
+}
+
+tasks.test {
+  useJUnitPlatform()
+  dependsOn(shadowJarTask)
+  doFirst {
+    systemProperty(
+      "shadowJarPath",
+      shadowJarTask.get().archiveFile.get().asFile.absolutePath
+    )
+  }
 }
 
 publishing {

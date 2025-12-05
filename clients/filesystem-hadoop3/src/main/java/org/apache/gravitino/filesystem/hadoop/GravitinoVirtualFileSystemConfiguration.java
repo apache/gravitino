@@ -175,5 +175,17 @@ public class GravitinoVirtualFileSystemConfiguration {
   /** The default value for whether to enable fileset and catalog cache. */
   public static final boolean FS_GRAVITINO_FILESET_METADATA_CACHE_ENABLE_DEFAULT = false;
 
+  /**
+   * The configuration key for whether to enable auto-creation of fileset location when the
+   * server-side filesystem ops are disabled and the location does not exist. The default is true.
+   */
+  public static final String FS_GRAVITINO_AUTO_CREATE_LOCATION = "fs.gravitino.autoCreateLocation";
+
+  /** The default value for whether to enable auto-creation of fileset location. */
+  public static final boolean FS_GRAVITINO_AUTO_CREATE_LOCATION_DEFAULT = true;
+
+  /** The prefix for user-defined location configs: {@code fs.path.config.<locationName>=<path>}. */
+  public static final String FS_GRAVITINO_PATH_CONFIG_PREFIX = "fs.path.config.";
+
   private GravitinoVirtualFileSystemConfiguration() {}
 }

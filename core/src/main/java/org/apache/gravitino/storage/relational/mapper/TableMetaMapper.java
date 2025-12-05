@@ -56,9 +56,6 @@ public interface TableMetaMapper {
   TablePO selectTableMetaBySchemaIdAndName(
       @Param("schemaId") Long schemaId, @Param("tableName") String name);
 
-  @SelectProvider(type = TableMetaSQLProviderFactory.class, method = "selectTableMetaById")
-  TablePO selectTableMetaById(@Param("tableId") Long tableId);
-
   @InsertProvider(type = TableMetaSQLProviderFactory.class, method = "insertTableMeta")
   void insertTableMeta(@Param("tableMeta") TablePO tablePO);
 

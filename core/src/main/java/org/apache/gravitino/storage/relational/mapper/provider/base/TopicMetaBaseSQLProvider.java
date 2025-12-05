@@ -30,10 +30,10 @@ public class TopicMetaBaseSQLProvider {
   public String insertTopicMeta(@Param("topicMeta") TopicPO topicPO) {
     return "INSERT INTO "
         + TABLE_NAME
-        + "(topic_id, topic_name, metalake_id, catalog_id, schema_id,"
+        + " (topic_id, topic_name, metalake_id, catalog_id, schema_id,"
         + " comment, properties, audit_info, current_version, last_version,"
         + " deleted_at)"
-        + " VALUES("
+        + " VALUES ("
         + " #{topicMeta.topicId},"
         + " #{topicMeta.topicName},"
         + " #{topicMeta.metalakeId},"
@@ -51,10 +51,10 @@ public class TopicMetaBaseSQLProvider {
   public String insertTopicMetaOnDuplicateKeyUpdate(@Param("topicMeta") TopicPO topicPO) {
     return "INSERT INTO "
         + TABLE_NAME
-        + "(topic_id, topic_name, metalake_id, catalog_id, schema_id,"
+        + " (topic_id, topic_name, metalake_id, catalog_id, schema_id,"
         + " comment, properties, audit_info, current_version, last_version,"
         + " deleted_at)"
-        + " VALUES("
+        + " VALUES ("
         + " #{topicMeta.topicId},"
         + " #{topicMeta.topicName},"
         + " #{topicMeta.metalakeId},"
@@ -101,7 +101,7 @@ public class TopicMetaBaseSQLProvider {
         + " FROM "
         + TABLE_NAME
         + " WHERE deleted_at = 0"
-        + " AND topic_id in ("
+        + " AND topic_id IN ("
         + "<foreach collection='topicIds' item='topicId' separator=','>"
         + "#{topicId}"
         + "</foreach>"
@@ -151,7 +151,8 @@ public class TopicMetaBaseSQLProvider {
         + " AND metalake_id = #{oldTopicMeta.metalakeId}"
         + " AND catalog_id = #{oldTopicMeta.catalogId}"
         + " AND schema_id = #{oldTopicMeta.schemaId}"
-        + " AND comment = #{oldTopicMeta.comment}"
+        + " AND (comment = #{oldTopicMeta.comment}"
+        + "   OR (comment IS NULL and #{oldTopicMeta.comment} IS NULL))"
         + " AND properties = #{oldTopicMeta.properties}"
         + " AND audit_info = #{oldTopicMeta.auditInfo}"
         + " AND current_version = #{oldTopicMeta.currentVersion}"

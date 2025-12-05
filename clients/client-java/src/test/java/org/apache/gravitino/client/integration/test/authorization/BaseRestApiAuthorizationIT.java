@@ -17,7 +17,9 @@
 
 package org.apache.gravitino.client.integration.test.authorization;
 
+import java.io.File;
 import java.io.IOException;
+import java.nio.file.Files;
 import java.util.HashMap;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.client.GravitinoAdminClient;
@@ -41,6 +43,9 @@ public class BaseRestApiAuthorizationIT extends BaseIT {
   protected static GravitinoAdminClient normalUserClient;
 
   private static final Logger LOG = LoggerFactory.getLogger(BaseRestApiAuthorizationIT.class);
+
+  /** Mock a test staging directory for job test. */
+  protected static File testStagingDir;
 
   @BeforeAll
   @Override
@@ -84,5 +89,63 @@ public class BaseRestApiAuthorizationIT extends BaseIT {
       LOG.error("Exception in closing CloseableGroup", e);
     }
     super.stopIntegrationTest();
+  }
+
+  /**
+   * Generate a test entry script for job operation test
+   *
+   * @return the path of the entry script
+   */
+  protected static String generateTestEntryScript() {
+    String content =
+        "#!/bin/bash\n"
+            + "echo \"starting test job\"\n\n"
+            + "bin=\"$(dirname \"${BASH_SOURCE-$0}\")\"\n"
+            + "bin=\"$(cd \"${bin}\">/dev/null; pwd)\"\n\n"
+            + ". \"${bin}/common.sh\"\n\n"
+            + "sleep 3\n\n"
+            + "JOB_NAME=\"test_job-$(date +%s)-$1\"\n\n"
+            + "echo \"Submitting job with name: $JOB_NAME\"\n\n"
+            + "echo \"$1\"\n\n"
+            + "echo \"$2\"\n\n"
+            + "echo \"$ENV_VAR\"\n\n"
+            + "if [[ \"$2\" == \"success\" ]]; then\n"
+            + "  exit 0\n"
+            + "elif [[ \"$2\" == \"fail\" ]]; then\n"
+            + "  exit 1\n"
+            + "else\n"
+            + "  exit 2\n"
+            + "fi\n";
+
+    try {
+      File scriptFile = new File(testStagingDir, "test-job.sh");
+      Files.writeString(scriptFile.toPath(), content);
+      if (!scriptFile.setExecutable(true)) {
+        throw new RuntimeException("Failed to set script as executable");
+      }
+      return scriptFile.getAbsolutePath();
+    } catch (Exception e) {
+      throw new RuntimeException("Failed to create test entry script", e);
+    }
+  }
+
+  /**
+   * Generate a test lib script for job operation test
+   *
+   * @return the path of the lib script
+   */
+  protected static String generateTestLibScript() {
+    String content = "#!/bin/bash\necho \"in common script\"\n";
+
+    try {
+      File scriptFile = new File(testStagingDir, "common.sh");
+      Files.writeString(scriptFile.toPath(), content);
+      if (!scriptFile.setExecutable(true)) {
+        throw new RuntimeException("Failed to set script as executable");
+      }
+      return scriptFile.getAbsolutePath();
+    } catch (Exception e) {
+      throw new RuntimeException("Failed to create test lib script", e);
+    }
   }
 }
