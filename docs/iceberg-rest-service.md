@@ -699,3 +699,94 @@ sh ./dev/docker/build-docker.sh --platform linux/arm64 --type iceberg-rest-serve
 ```
 
 You could try Spark with Gravitino REST catalog service in our [playground](./how-to-use-the-playground.md#using-apache-iceberg-rest-service).
+
+## Quick Start: Enable Access Control for Iceberg REST Server
+
+To enable access control for the Iceberg REST server using Gravitino's dynamic configuration provider, follow these steps:
+
+### 1. Enable Authorization and Dynamic Config Provider
+
+Add the following to your Gravitino Iceberg REST server configuration (e.g., `gravitino-iceberg-rest-server.conf`):
+
+```properties
+gravitino.authorization.enable = true
+gravitino.authorization.provider = dynamic
+gravitino.authorization.serviceAdmins = adminUser
+
+gravitino.iceberg-rest.catalog-config-provider = dynamic-config-provider
+gravitino.iceberg-rest.gravitino-uri = http://127.0.0.1:8090
+gravitino.iceberg-rest.gravitino-metalake = test
+```
+
+Restart the Iceberg REST server after updating the configuration.
+
+---
+
+### 2. Create a Metalake
+
+```shell
+curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
+-H "Content-Type: application/json" -d '{
+  "name": "test"
+}' http://localhost:8090/api/metalakes
+```
+
+---
+
+### 3. Create a Catalog
+
+```shell
+curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
+-H "Content-Type: application/json" -d '{
+  "name": "catalog1",
+  "type": "ICEBERG",
+  "comment": "Iceberg catalog",
+  "properties": {}
+}' http://localhost:8090/api/metalakes/test/catalogs
+```
+
+---
+
+### 4. Create a Role and Grant Privileges
+
+```shell
+curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
+-H "Content-Type: application/json" -d '{
+   "name": "role1",
+   "properties": {},
+   "securableObjects": [
+      {
+         "fullName": "catalog1",
+         "type": "CATALOG",
+         "privileges": [
+            {
+               "name": "USE_CATALOG",
+               "condition": "ALLOW"
+            }
+         ]
+      }
+   ]
+}' http://localhost:8090/api/metalakes/test/roles
+```
+
+---
+
+### 5. Grant Role to User
+
+```shell
+curl -X PUT -H "Accept: application/vnd.gravitino.v1+json" \
+-H "Content-Type: application/json" -d '{
+    "roleNames": ["role1"]
+}' http://localhost:8090/api/metalakes/test/permissions/users/user1/grant
+```
+
+---
+
+**Summary:**
+- Enable authorization and set provider to `dynamic`
+- Create metalake
+- Create catalog
+- Create role and grant privileges
+- Assign role to user
+
+For more details, see the [Access Control documentation](./security/access-control.md).
