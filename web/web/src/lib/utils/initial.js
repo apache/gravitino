@@ -256,6 +256,11 @@ export const providers = [
     ]
   },
   {
+    label: 'Lakehouse Generic',
+    value: 'lakehouse-generic',
+    defaultProps: []
+  },
+  {
     label: 'MySQL',
     value: 'jdbc-mysql',
     defaultProps: [
@@ -607,6 +612,26 @@ const relationalColumnTypeMap = {
     'timestamp_tz',
     'varchar'
   ],
+  'lakehouse-generic': [
+    'binary',
+    'boolean',
+    'byte',
+    'date',
+    'decimal',
+    'double',
+    'external',
+    'fixed',
+    'float',
+    'integer',
+    'interval_day',
+    'interval_year',
+    'long',
+    'null',
+    'short',
+    'string',
+    'time',
+    'timestamp'
+  ],
   'jdbc-oceanbase': [
     'binary',
     'byte',
@@ -715,6 +740,27 @@ const relationalTablePropInfoMap = {
     immutable: ['merge-engine', 'rowkind.field', 'sequence.field'],
     allowDelete: true,
     allowAdd: true
+  },
+  'lakehouse-generic': {
+    reserved: [],
+    immutable: ['format', 'location'],
+    allowDelete: true,
+    allowAdd: true,
+    defaultProps: [
+      {
+        key: 'location',
+        value: '',
+        required: false,
+        description: 'The storage location of the table. Required if not set in catalog or schema.'
+      },
+      {
+        key: 'format',
+        value: 'lance',
+        required: true,
+        description: "The table format. Currently only 'lance' is supported.",
+        disabled: true
+      }
+    ]
   }
 }
 

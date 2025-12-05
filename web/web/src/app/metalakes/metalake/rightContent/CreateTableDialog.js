@@ -86,6 +86,9 @@ import { genUpdates } from '@/lib/utils'
 import { nameRegex, nameRegexDesc, keyRegex } from '@/lib/utils/regex'
 import { useSearchParams } from 'next/navigation'
 import { getRelationalColumnType, getParameterizedColumnType, getRelationalTablePropInfo } from '@/lib/utils/initial'
+import { getCatalogDetailsApi } from '@/lib/api/catalogs'
+import { getSchemaDetailsApi } from '@/lib/api/schemas'
+import { to } from '@/lib/utils'
 
 // Default form values
 const defaultFormValues = {
@@ -327,6 +330,8 @@ const CreateTableDialog = props => {
   const submitForm = formData => {
     const hasErrorProperties = innerProps.some(prop => prop.hasDuplicateKey || prop.isReserved || prop.invalid)
 
+    const hasRequiredEmptyProperties = innerProps.some(prop => prop.required && !prop.value?.trim())
+
     const hasDuplicateColumnNames = tableColumns
       .filter(col => col.name.trim() !== '')
       .some(
@@ -336,7 +341,7 @@ const CreateTableDialog = props => {
 
     const hasInvalidColumnTypes = tableColumns.some(col => col.paramErrors)
 
-    if (hasErrorProperties || hasDuplicateColumnNames || hasInvalidColumnTypes) {
+    if (hasErrorProperties || hasDuplicateColumnNames || hasInvalidColumnTypes || hasRequiredEmptyProperties) {
       return
     }
 
@@ -405,6 +410,52 @@ const CreateTableDialog = props => {
   const handleValidationError = errors => {
     console.error('Form validation errors:', errors)
   }
+
+  /**
+   * Effect to initialize default properties when creating a new table
+   * For lakehouse-generic, checks if location is set in catalog or schema
+   */
+  useEffect(() => {
+    const initDefaultProps = async () => {
+      if (open && type === 'create' && propInfo.defaultProps && propInfo.defaultProps.length > 0) {
+        let isLocationRequired = false
+
+        // For lakehouse-generic, check if location is set in catalog or schema
+        if (currentCatalog?.provider === 'lakehouse-generic') {
+          try {
+            // Check catalog properties for location
+            const [catalogErr, catalogRes] = await to(
+              getCatalogDetailsApi({ metalake, catalog })
+            )
+            const catalogLocation = catalogRes?.catalog?.properties?.location
+
+            // Check schema properties for location
+            const [schemaErr, schemaRes] = await to(
+              getSchemaDetailsApi({ metalake, catalog, schema: schemaName })
+            )
+            const schemaLocation = schemaRes?.schema?.properties?.location
+
+            // Location is required if not set in both catalog and schema
+            isLocationRequired = !catalogLocation && !schemaLocation
+          } catch (error) {
+            console.error('Error checking location in catalog/schema:', error)
+          }
+        }
+
+        const defaultPropertyItems = propInfo.defaultProps.map(prop => ({
+          key: prop.key,
+          value: prop.value || '',
+          required: prop.key === 'location' ? isLocationRequired : (prop.required || false),
+          description: prop.description || '',
+          disabled: prop.disabled || false
+        }))
+        setInnerProps(defaultPropertyItems)
+        setValue('propItems', defaultPropertyItems)
+      }
+    }
+
+    initDefaultProps()
+  }, [open, type, propInfo, setValue, currentCatalog, metalake, catalog, schemaName])
 
   /**
    * Effect to populate form when editing existing table
@@ -749,7 +800,7 @@ const CreateTableDialog = props => {
                                 size='small'
                                 name='value'
                                 label='Value'
-                                error={item.required && item.value === ''}
+                                error={item.required && !item.value?.trim()}
                                 value={item.value}
                                 disabled={item.disabled}
                                 onChange={event => handlePropertyChange({ index, event })}
@@ -771,11 +822,13 @@ const CreateTableDialog = props => {
                         </Box>
                         <FormHelperText
                           sx={{
-                            color: item.required && item.value === '' ? 'error.main' : 'text.main',
+                            color: item.required && !item.value?.trim() ? 'error.main' : 'text.main',
                             maxWidth: 'calc(100% - 40px)'
                           }}
                         >
-                          {item.description}
+                          {item.required && !item.value?.trim()
+                            ? `${item.description ? item.description + ' ' : ''}(Required)`
+                            : item.description}
                         </FormHelperText>
                         {item.hasDuplicateKey && (
                           <FormHelperText className={'twc-text-error-main'}>Key already exists</FormHelperText>
