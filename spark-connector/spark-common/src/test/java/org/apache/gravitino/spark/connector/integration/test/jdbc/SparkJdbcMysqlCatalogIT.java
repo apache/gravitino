@@ -26,10 +26,7 @@ import org.apache.gravitino.integration.test.container.ContainerSuite;
 import org.apache.gravitino.spark.connector.integration.test.SparkCommonIT;
 import org.apache.gravitino.spark.connector.integration.test.util.SparkTableInfoChecker;
 import org.apache.gravitino.spark.connector.jdbc.JdbcPropertiesConstants;
-import org.apache.spark.SparkException;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Tag;
-import org.junit.jupiter.api.Test;
 
 @Tag("gravitino-docker-test")
 public abstract class SparkJdbcMysqlCatalogIT extends SparkCommonIT {
