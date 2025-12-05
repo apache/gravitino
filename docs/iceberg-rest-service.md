@@ -759,6 +759,10 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
          "type": "CATALOG",
          "privileges": [
             {
+               "name": "USE_CATALOG",
+               "condition": "ALLOW"
+            },
+            {
                "name": "USE_SCHEMA",
                "condition": "ALLOW"
             },
