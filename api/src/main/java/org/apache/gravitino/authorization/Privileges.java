@@ -844,7 +844,7 @@ public class Privileges {
     }
   }
 
-  /** The privilege to create a model */
+  /** The privilege to register a model */
   public static class RegisterModel extends GenericPrivilege<RegisterModel> {
     private static final RegisterModel ALLOW_INSTANCE =
         new RegisterModel(Condition.ALLOW, Name.REGISTER_MODEL);
