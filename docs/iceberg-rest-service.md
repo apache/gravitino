@@ -787,7 +787,8 @@ curl -X PUT -H "Accept: application/vnd.gravitino.v1+json" \
 
 ### 6. Verify Access Control in Action
 
-Before granting privileges, the user should not be able to access the table. For example, try to list tables as `user1` (replace with your actual authentication method):
+Before granting privileges, the user should not be able to access the table.
+For example, try to list tables as `user1` (replace with your actual authentication method):
 
 ```shell
 curl -u user1:password -H "Accept: application/vnd.gravitino.v1+json" \
