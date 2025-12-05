@@ -128,12 +128,13 @@ public class Privileges {
 
         //  Model
       case REGISTER_MODEL:
-      case CREATE_MODEL:
         return RegisterModel.allow();
+      case CREATE_MODEL:
+        return CreateModel.allow();
       case LINK_MODEL_VERSION:
         return LinkModelVersion.allow();
       case CREATE_MODEL_VERSION:
-        return LinkModelVersion.allow();
+        return CreateModelVersion.allow();
       case USE_MODEL:
         return UseModel.allow();
 
@@ -235,11 +236,13 @@ public class Privileges {
 
         // Model
       case REGISTER_MODEL:
-      case CREATE_MODEL:
         return RegisterModel.deny();
+      case CREATE_MODEL:
+        return CreateModel.deny();
       case LINK_MODEL_VERSION:
-      case CREATE_MODEL_VERSION:
         return LinkModelVersion.deny();
+      case CREATE_MODEL_VERSION:
+        return CreateModelVersion.deny();
       case USE_MODEL:
         return UseModel.deny();
 

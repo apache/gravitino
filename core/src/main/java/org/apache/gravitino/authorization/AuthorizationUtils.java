@@ -224,12 +224,13 @@ public class AuthorizationUtils {
   public static void checkDuplicatedNamePrivilege(Collection<Privilege> privileges) {
     Set<Privilege.Name> privilegeNameSet = Sets.newHashSet();
     for (Privilege privilege : privileges) {
-      if (privilegeNameSet.contains(privilege.name())) {
+      Privilege.Name replacePrivilegeName = replaceLegacyPrivilegeName(privilege.name());
+      if (privilegeNameSet.contains(replacePrivilegeName)) {
         throw new IllegalPrivilegeException(
             "Doesn't support duplicated privilege name %s with different condition",
             privilege.name());
       }
-      privilegeNameSet.add(replaceLegacyPrivilegeName(privilege.name()));
+      privilegeNameSet.add(replacePrivilegeName);
     }
   }
 
