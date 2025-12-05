@@ -42,10 +42,10 @@ spec:
     matchLabels:
       app: {{ include "gravitino.name" . }}
       release: {{ .Release.Name }}
-  {{- if .Values.podDisruptionBudget.minAvailable }}
+  {{- if $minAvailableSet }}
   minAvailable: {{ .Values.podDisruptionBudget.minAvailable }}
   {{- end }}
-  {{- if .Values.podDisruptionBudget.maxUnavailable }}
+  {{- if $maxUnavailableSet }}
   maxUnavailable: {{ .Values.podDisruptionBudget.maxUnavailable }}
   {{- end }}
 {{- end }}

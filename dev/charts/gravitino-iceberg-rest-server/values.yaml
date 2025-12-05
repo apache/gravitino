@@ -373,6 +373,7 @@ podDisruptionBudget:
   ## - Recommended for production deployments to ensure service availability
   ## - With single replica (replicas: 1), minAvailable: 1 prevents all voluntary disruptions
   ## - With multiple replicas, allows disruptions while maintaining minimum availability
+  ## Only used when podDisruptionBudget.enabled is true
   ##
   minAvailable: 1
 
@@ -391,7 +392,7 @@ podDisruptionBudget:
   ## - More flexible than minAvailable when scaling up/down
   ##
   ## IMPORTANT: Specify either minAvailable OR maxUnavailable, not both
-  ## If both are specified, Kubernetes will use both constraints, which may be overly restrictive
+  ## If both are specified, Kubernetes will reject the PodDisruptionBudget and fail with an API validation error
   ##
   maxUnavailable: ""
 
