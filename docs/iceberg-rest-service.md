@@ -823,4 +823,4 @@ For more details, see the [Access Control documentation](./security/access-contr
 
 > **Note:** IRC (Iceberg REST Catalog) authorization is not supported for standalone Iceberg REST server deployments.
 > Access control features described here require the Iceberg REST server to be run as an auxiliary service within the Gravitino server,
-> using the dynamic configuration provider. Standalone deployments do not support IRC-based authorization.
+> using the dynamic configuration provider.
