@@ -435,7 +435,7 @@ curl -X DELETE -H "Accept: application/vnd.gravitino.v1+json" \
 ```java
 GravitinoClient client = ...
 boolean deleted =
-    client.deleteUser("user1");
+    client.removeUser("user1");
 ```
 
 </TabItem>
