@@ -42,10 +42,7 @@ The catalog works with lakehouse systems built on top of:
 - **Local File Systems:** For development and testing
 
 **Lakehouse Formats:**
-- **Lance** ✅ (Production ready - Full support)
-- **Apache Iceberg** ⚠️ (Theoretical support)
-- **Delta Lake** ⚠️ (Theoretical support)  
-- **Apache Hudi** ⚠️ (Theoretical support)
+- **Lance** ✅ (We only support Lance format fully at present)
 
 :::info Current Support Status
 While the architecture is designed to support various lakehouse formats, Gravitino currently provides **native production support only for Lance-based lakehouse systems** with comprehensive testing and optimization.
@@ -333,13 +330,14 @@ For Arrow types not natively mapped in Gravitino, use the `External(arrow_field_
 
 Required and optional properties for tables in a Generic Lakehouse Catalog:
 
-| Property              | Description                                                                                                                                                                                                                                              | Default  | Required     | Since Version |
-|-----------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|----------|--------------|---------------|
-| `format`              | Table format: `lance`, `iceberg`, etc. (currently only `lance` is fully supported)                                                                                                                                                                       | (none)   | Yes          | 1.1.0         |
-| `location`            | Storage path for table metadata and data                                                                                                                                                                                                                 | (none)   | Conditional* | 1.1.0         |
-| `external`            | Whether the data directory is an external location. If it's `true`, dropping a table will only remove metadata in Gravitino and will not delete the data directory, and purge table will delete both. For a non-external table, dropping will drop both. | false    | No           | 1.1.0         |
-| `lance.creation-mode` | Create mode: for create table, it can be `CREATE`, `EXIST_OK` or `OVERWRITE`. and it should be `CREATE` and `OVERWRITE` for registering tables                                                                                                           | `CREATE` | No           | 1.1.0         |
-| `lance.register`      | Whether it is a register table operation. This API will not create data directory acutally and it's the user responsibility to create and manage the data directory.                                                                                     | false    | No           | 1.1.0         |
+| Property              | Description                                                                                                                                                                                                                                                                                                                                     | Default  | Required     | Since Version |
+|-----------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|----------|--------------|---------------|
+| `format`              | Table format: `lance`, `iceberg`, etc. (currently only `lance` is fully supported)                                                                                                                                                                                                                                                              | (none)   | Yes          | 1.1.0         |
+| `location`            | Storage path for table metadata and data                                                                                                                                                                                                                                                                                                        | (none)   | Conditional* | 1.1.0         |
+| `external`            | Whether the data directory is an external location. If it's `true`, dropping a table will only remove metadata in Gravitino and will not delete the data directory, and purge table will delete both. For a non-external table, dropping will drop both.                                                                                        | false    | No           | 1.1.0         |
+| `lance.creation-mode` | Create mode: for create table, it can be `CREATE`, `EXIST_OK` or `OVERWRITE`. and it should be `CREATE` and `OVERWRITE` for registering tables                                                                                                                                                                                                  | `CREATE` | No           | 1.1.0         |
+| `lance.register`      | Whether it is a register table operation. This API will not create data directory acutally and it's the user responsibility to create and manage the data directory.                                                                                                                                                                            | false    | No           | 1.1.0         |
+| `lance.storage.xxxx`  | Any additional storage-specific properties required by Lance format (e.g., S3 credentials, HDFS configs). Replace `xxxx` with actual property names. For example, we can use `lance.storage.aws_access_key_id` to set S3 aws_access_key_id when using a S3 location, for detail, please refer to https://lancedb.com/docs/storage/integrations/ | (none)   | No           | 1.1.0         |
 
 
 \* **Location Requirement:** Must be specified at catalog, schema, or table level. See [Location Resolution](#location-resolution) below.

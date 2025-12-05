@@ -113,7 +113,7 @@ To enable the Lance REST service within Gravitino server, configure the followin
 |------------------------------------------------|------------------------------------------------------------------------------------------------------|-------------------------|----------|---------------|
 | `gravitino.auxService.names`                   | Auxiliary services to run. Include `lance-rest` to enable Lance REST service                         | iceberg-rest,lance-rest | Yes      | 0.2.0         |
 | `gravitino.lance-rest.classpath`               | Classpath for Lance REST service, relative to Gravitino home directory                               | lance-rest-server/libs  | Yes      | 1.1.0         |
-| `gravitino.lance-rest.port`                    | Port number for Lance REST service                                                                   | 9101                    | Yes      | 1.1.0         |
+| `gravitino.lance-rest.httpPort`                    | Port number for Lance REST service                                                                   | 9101                    | Yes      | 1.1.0         |
 | `gravitino.lance-rest.host`                    | Hostname for Lance REST service                                                                      | 0.0.0.0                 | Yes      | 1.1.0         |
 | `gravitino.lance-rest.namespace-backend`       | Namespace metadata backend (currently only `gravitino` is supported)                                 | gravitino               | Yes      | 1.1.0         |
 | `gravitino.lance-rest.gravitino.uri`           | Gravitino server URI (required when namespace-backend is `gravitino`)                                | http://localhost:8090   | Yes      | 1.1.0         |
@@ -123,7 +123,7 @@ To enable the Lance REST service within Gravitino server, configure the followin
 
 ```properties
 gravitino.auxService.names = lance-rest
-gravitino.lance-rest.port = 9101
+gravitino.lance-rest.httpPort = 9101
 gravitino.lance-rest.host = 0.0.0.0
 gravitino.lance-rest.namespace-backend = gravitino
 gravitino.lance-rest.gravitino.uri = http://localhost:8090
@@ -145,7 +145,7 @@ Configure the service by editing `gravitino-lance-rest-server.conf` or passing c
 | `gravitino.lance-rest.namespace-backend`       | Namespace metadata backend                                       | gravitino             | Yes      | 1.1.0         |
 | `gravitino.lance-rest.gravitino.uri`           | Gravitino server URI                                             | http://localhost:8090 | Yes      | 1.1.0         |
 | `gravitino.lance-rest.gravitino.metalake-name` | Gravitino metalake name                                          | (none)                | Yes      | 1.1.0         |
-| `gravitino.lance-rest.port`                    | Service port number                                              | 9101                  | No       | 1.1.0         |
+| `gravitino.lance-rest.httpPort`                | Service port number                                              | 9101                  | No       | 1.1.0         |
 | `gravitino.lance-rest.host`                    | Service hostname                                                 | 0.0.0.0               | No       | 1.1.0         |
 
 :::tip
