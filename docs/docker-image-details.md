@@ -19,7 +19,7 @@ docker run --rm -d -p 8090:8090 -p 9001:9001 apache/gravitino:0.7.0-incubating
 
 Memory settings
 
-JVM heap and metaspace are controlled by `GRAVITINO_MEM` (default `-Xms1024m -Xmx1024m -XX:MaxMetaspaceSize=512m`). Override with `-e GRAVITINO_MEM="-Xms4g -Xmx4g -XX:MaxMetaspaceSize=1g"` to tune sizing. Launch scripts append `GRAVITINO_MEM` to `JAVA_OPTS`, so set it whenever you need different heap/metaspace sizes.
+JVM heap and metaspace are controlled by `GRAVITINO_MEM` (default `-Xms1024m -Xmx1024m -XX:MaxMetaspaceSize=512m`). Override with `-e GRAVITINO_MEM="-Xms4g -Xmx4g -XX:MaxMetaspaceSize=1g"` to tune sizes. Launch scripts append `GRAVITINO_MEM` to `JAVA_OPTS`, so set it whenever you need different heap/metaspace sizes.
 
 Changelog
 
@@ -77,7 +77,7 @@ docker run --rm -d -p 9001:9001 apache/gravitino-iceberg-rest:0.7.0-incubating
 
 Memory settings
 
-Use `GRAVITINO_MEM` to size the JVM (default `-Xms1024m -Xmx1024m -XX:MaxMetaspaceSize=512m`). Override with `-e GRAVITINO_MEM="-Xms4g -Xmx4g -XX:MaxMetaspaceSize=1g"` when you need different sizing. Launch scripts append `GRAVITINO_MEM` to `JAVA_OPTS`, so set it to change heap/metaspace settings.
+Use `GRAVITINO_MEM` to size the JVM (default `-Xms1024m -Xmx1024m -XX:MaxMetaspaceSize=512m`). Override with `-e GRAVITINO_MEM="-Xms4g -Xmx4g -XX:MaxMetaspaceSize=1g"` when you need different sizes. Launch scripts append `GRAVITINO_MEM` to `JAVA_OPTS`, so set it to change heap/metaspace settings.
 
 Changelog
 - apache/gravitino-iceberg-rest:1.0.0

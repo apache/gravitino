@@ -270,7 +270,7 @@ Refer to [security](security/security.md) for HTTPS and authentication configura
 
 `GRAVITINO_MEM` sets JVM heap/metaspace flags for the Gravitino server and is also read by the Iceberg REST server and Lance REST server launchers.
 
-Default: `-Xms1024m -Xmx1024m -XX:MaxMetaspaceSize=512m` (see `bin/common.sh`). Launch scripts append this to `JAVA_OPTS`; override `GRAVITINO_MEM` when you need different heap/metaspace sizing.
+Default: `-Xms1024m -Xmx1024m -XX:MaxMetaspaceSize=512m` (see `bin/common.sh`). Launch scripts append this to `JAVA_OPTS`; override `GRAVITINO_MEM` when you need different heap/metaspace sizes.
 
 Typical values:
 - Development: `-Xms1g -Xmx1g -XX:MaxMetaspaceSize=512m`
