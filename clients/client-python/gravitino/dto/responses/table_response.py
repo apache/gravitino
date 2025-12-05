@@ -19,34 +19,28 @@ from dataclasses import dataclass, field
 
 from dataclasses_json import config
 
-from gravitino.dto.rel.partitions.json_serdes.partition_dto_serdes import (
-    PartitionDTOSerdes,
-)
-from gravitino.dto.rel.partitions.partition_dto import PartitionDTO
-from gravitino.rest.rest_message import RESTRequest
+from gravitino.dto.rel.table_dto import TableDTO
+from gravitino.dto.responses.base_response import BaseResponse
 from gravitino.utils.precondition import Precondition
 
 
 @dataclass
-class AddPartitionsRequest(RESTRequest):
-    """Request to add partitions to a table."""
+class TableResponse(BaseResponse):
+    """Represents a response for a table."""
 
-    _partitions: list[PartitionDTO] = field(
-        metadata=config(
-            field_name="partitions",
-            encoder=lambda items: [
-                PartitionDTOSerdes.serialize(item) for item in items
-            ],
-            decoder=lambda values: [
-                PartitionDTOSerdes.deserialize(value) for value in values
-            ],
-        )
-    )
+    _table: TableDTO = field(metadata=config(field_name="table"))
 
-    def validate(self):
-        Precondition.check_argument(
-            self._partitions is not None, "partitions must not be null"
+    def table(self) -> TableDTO:
+        return self._table
+
+    def validate(self) -> None:
+        Precondition.check_string_not_empty(
+            self._table.name(), "table 'name' must not be null and empty"
         )
         Precondition.check_argument(
-            len(self._partitions) == 1, "Haven't yet implemented multiple partitions"
+            self._table.audit_info() is not None, "table 'audit' must not be null"
+        )
+        Precondition.check_argument(
+            self._table.partitioning() is not None,
+            "table 'partitions' must not be null",
         )
