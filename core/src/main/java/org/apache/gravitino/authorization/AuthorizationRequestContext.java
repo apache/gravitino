@@ -36,6 +36,8 @@ public class AuthorizationRequestContext {
   /** Used to determine whether the role has already been loaded. */
   private final AtomicBoolean hasLoadRole = new AtomicBoolean();
 
+  private volatile String originalAuthorizationExpression;
+
   /**
    * check allow
    *
@@ -82,6 +84,14 @@ public class AuthorizationRequestContext {
     }
     runnable.run();
     hasLoadRole.set(true);
+  }
+
+  public String getOriginalAuthorizationExpression() {
+    return originalAuthorizationExpression;
+  }
+
+  public void setOriginalAuthorizationExpression(String originalAuthorizationExpression) {
+    this.originalAuthorizationExpression = originalAuthorizationExpression;
   }
 
   public static class AuthorizationKey {

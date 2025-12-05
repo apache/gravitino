@@ -34,11 +34,11 @@ import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.MetadataObject;
-import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchTagException;
+import org.apache.gravitino.meta.GenericEntity;
 import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.metrics.Monitored;
 import org.apache.gravitino.storage.relational.mapper.TagMetaMapper;
@@ -179,10 +179,7 @@ public class TagMetaService {
 
     List<TagPO> tagPOs = null;
     try {
-      Long metalakeId = MetalakeMetaService.getInstance().getMetalakeIdByName(metalake);
-      Long metadataObjectId =
-          MetadataObjectService.getMetadataObjectId(
-              metalakeId, metadataObject.fullName(), metadataObject.type());
+      Long metadataObjectId = EntityIdService.getEntityId(objectIdent, objectType);
 
       tagPOs =
           SessionUtils.getWithoutCommit(
@@ -211,10 +208,7 @@ public class TagMetaService {
 
     TagPO tagPO = null;
     try {
-      Long metalakeId = MetalakeMetaService.getInstance().getMetalakeIdByName(metalake);
-      Long metadataObjectId =
-          MetadataObjectService.getMetadataObjectId(
-              metalakeId, metadataObject.fullName(), metadataObject.type());
+      Long metadataObjectId = EntityIdService.getEntityId(objectIdent, objectType);
 
       tagPO =
           SessionUtils.getWithoutCommit(
@@ -240,7 +234,7 @@ public class TagMetaService {
   @Monitored(
       metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
       baseMetricName = "listAssociatedMetadataObjectsForTag")
-  public List<MetadataObject> listAssociatedMetadataObjectsForTag(NameIdentifier tagIdent)
+  public List<GenericEntity> listAssociatedMetadataObjectsForTag(NameIdentifier tagIdent)
       throws IOException {
     String metalakeName = tagIdent.namespace().level(0);
     String tagName = tagIdent.name();
@@ -252,7 +246,7 @@ public class TagMetaService {
               mapper ->
                   mapper.listTagMetadataObjectRelsByMetalakeAndTagName(metalakeName, tagName));
 
-      List<MetadataObject> metadataObjects = Lists.newArrayList();
+      List<GenericEntity> metadataObjects = Lists.newArrayList();
       Map<String, List<TagMetadataObjectRelPO>> tagMetadataObjectRelPOsByType =
           tagMetadataObjectRelPOs.stream()
               .collect(Collectors.groupingBy(TagMetadataObjectRelPO::getMetadataObjectType));
@@ -278,7 +272,11 @@ public class TagMetaService {
           // return null, we should skip this metadata object.
           if (fullName != null) {
             metadataObjects.add(
-                MetadataObjects.parse(fullName, MetadataObject.Type.valueOf(metadataObjectType)));
+                GenericEntity.builder()
+                    .withName(fullName)
+                    .withEntityType(Entity.EntityType.valueOf(metadataObjectType))
+                    .withId(metadataObjectName.getKey())
+                    .build());
           }
         }
       }
@@ -303,10 +301,7 @@ public class TagMetaService {
     String metalake = objectIdent.namespace().level(0);
 
     try {
-      Long metalakeId = MetalakeMetaService.getInstance().getMetalakeIdByName(metalake);
-      Long metadataObjectId =
-          MetadataObjectService.getMetadataObjectId(
-              metalakeId, metadataObject.fullName(), metadataObject.type());
+      Long metadataObjectId = EntityIdService.getEntityId(objectIdent, objectType);
 
       // Fetch all the tags need to associate with the metadata object.
       List<String> tagNamesToAdd =
@@ -412,6 +407,13 @@ public class TagMetaService {
           tagName);
     }
     return tagPO;
+  }
+
+  public Long getTagIdByTagName(Long metalakeId, String tagName) {
+    return SessionUtils.getWithoutCommit(
+            TagMetaMapper.class,
+            mapper -> mapper.selectTagMetaByMetalakeIdAndName(metalakeId, tagName))
+        .getTagId();
   }
 
   private List<TagPO> getTagPOsByMetalakeAndNames(String metalakeName, List<String> tagNames) {

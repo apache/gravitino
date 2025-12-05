@@ -18,7 +18,7 @@
 from abc import abstractmethod
 from typing import Any, List
 
-from gravitino.api.expressions.literals.literal import Literal
+from gravitino.api.rel.expressions.literals.literal import Literal
 from gravitino.api.rel.partitions.partition import Partition
 
 

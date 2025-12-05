@@ -19,7 +19,7 @@ from __future__ import annotations
 
 from typing import List
 
-from gravitino.api.expressions.named_reference import NamedReference
+from gravitino.api.rel.expressions.named_reference import NamedReference
 from gravitino.dto.rel.expressions.function_arg import FunctionArg
 
 

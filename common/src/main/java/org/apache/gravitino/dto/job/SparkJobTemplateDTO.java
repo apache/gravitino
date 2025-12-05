@@ -19,7 +19,6 @@
 package org.apache.gravitino.dto.job;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.google.common.base.Preconditions;
 import java.util.List;
 import java.util.Map;
 import lombok.EqualsAndHashCode;
@@ -27,9 +26,13 @@ import lombok.Getter;
 import lombok.ToString;
 import lombok.experimental.Accessors;
 import lombok.experimental.SuperBuilder;
-import org.apache.commons.lang3.StringUtils;
 
-/** Represents a Spark Job Template Data Transfer Object (DTO). */
+/**
+ * Represents a Spark Job Template Data Transfer Object (DTO).
+ *
+ * <p>Note: The {@code className} field is required for Java/Scala Spark applications but is
+ * optional for PySpark applications. For PySpark jobs, this field can be {@code null}.
+ */
 @Getter
 @Accessors(fluent = true)
 @EqualsAndHashCode(callSuper = true)
@@ -56,13 +59,5 @@ public class SparkJobTemplateDTO extends JobTemplateDTO {
   private SparkJobTemplateDTO() {
     // Default constructor for Jackson
     super();
-  }
-
-  @Override
-  public void validate() {
-    super.validate();
-
-    Preconditions.checkArgument(
-        StringUtils.isNotBlank(className), "\"className\" is required and cannot be empty");
   }
 }

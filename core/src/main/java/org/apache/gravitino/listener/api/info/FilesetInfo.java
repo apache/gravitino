@@ -144,7 +144,9 @@ public final class FilesetInfo {
     return storageLocations.get(LOCATION_NAME_UNKNOWN);
   }
 
-  /** @return The storage locations of the fileset. */
+  /**
+   * @return The storage locations of the fileset.
+   */
   public Map<String, String> storageLocations() {
     return storageLocations;
   }

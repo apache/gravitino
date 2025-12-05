@@ -22,6 +22,7 @@ import org.apache.gravitino.storage.relational.mapper.ModelMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.ModelVersionAliasRelMapper;
 import org.apache.gravitino.storage.relational.mapper.ModelVersionMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.provider.base.ModelVersionMetaBaseSQLProvider;
+import org.apache.gravitino.storage.relational.po.ModelVersionPO;
 import org.apache.ibatis.annotations.Param;
 
 public class ModelVersionMetaPostgreSQLProvider extends ModelVersionMetaBaseSQLProvider {
@@ -31,8 +32,7 @@ public class ModelVersionMetaPostgreSQLProvider extends ModelVersionMetaBaseSQLP
       @Param("schemaId") Long schemaId, @Param("modelName") String modelName) {
     return "UPDATE "
         + ModelVersionMetaMapper.TABLE_NAME
-        + " mvi SET deleted_at = floor(extract(epoch from(current_timestamp -"
-        + " timestamp '1970-01-01 00:00:00'))*1000)"
+        + " mvi SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
         + " WHERE mvi.schema_id = #{schemaId} AND mvi.model_id = ("
         + " SELECT mm.model_id FROM "
         + ModelMetaMapper.TABLE_NAME
@@ -45,8 +45,7 @@ public class ModelVersionMetaPostgreSQLProvider extends ModelVersionMetaBaseSQLP
       @Param("modelId") Long modelId, @Param("modelVersion") Integer modelVersion) {
     return "UPDATE "
         + ModelVersionMetaMapper.TABLE_NAME
-        + " SET deleted_at = floor(extract(epoch from(current_timestamp -"
-        + " timestamp '1970-01-01 00:00:00'))*1000)"
+        + " SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
         + " WHERE model_id = #{modelId} AND version = #{modelVersion} AND deleted_at = 0";
   }
 
@@ -55,8 +54,7 @@ public class ModelVersionMetaPostgreSQLProvider extends ModelVersionMetaBaseSQLP
       @Param("modelId") Long modelId, @Param("alias") String alias) {
     return "UPDATE "
         + ModelVersionMetaMapper.TABLE_NAME
-        + " SET deleted_at = floor(extract(epoch from(current_timestamp -"
-        + " timestamp '1970-01-01 00:00:00'))*1000)"
+        + " SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
         + " WHERE model_id = #{modelId} AND version = ("
         + " SELECT model_version FROM "
         + ModelVersionAliasRelMapper.TABLE_NAME
@@ -68,8 +66,7 @@ public class ModelVersionMetaPostgreSQLProvider extends ModelVersionMetaBaseSQLP
   public String softDeleteModelVersionMetasBySchemaId(@Param("schemaId") Long schemaId) {
     return "UPDATE "
         + ModelVersionMetaMapper.TABLE_NAME
-        + " SET deleted_at = floor(extract(epoch from(current_timestamp -"
-        + " timestamp '1970-01-01 00:00:00'))*1000)"
+        + " SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
         + " WHERE schema_id = #{schemaId} AND deleted_at = 0";
   }
 
@@ -77,8 +74,7 @@ public class ModelVersionMetaPostgreSQLProvider extends ModelVersionMetaBaseSQLP
   public String softDeleteModelVersionMetasByCatalogId(@Param("catalogId") Long catalogId) {
     return "UPDATE "
         + ModelVersionMetaMapper.TABLE_NAME
-        + " SET deleted_at = floor(extract(epoch from(current_timestamp -"
-        + " timestamp '1970-01-01 00:00:00'))*1000)"
+        + " SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
         + " WHERE catalog_id = #{catalogId} AND deleted_at = 0";
   }
 
@@ -86,8 +82,7 @@ public class ModelVersionMetaPostgreSQLProvider extends ModelVersionMetaBaseSQLP
   public String softDeleteModelVersionMetasByMetalakeId(@Param("metalakeId") Long metalakeId) {
     return "UPDATE "
         + ModelVersionMetaMapper.TABLE_NAME
-        + " SET deleted_at = floor(extract(epoch from(current_timestamp -"
-        + " timestamp '1970-01-01 00:00:00'))*1000)"
+        + " SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
         + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0";
   }
 
@@ -99,5 +94,35 @@ public class ModelVersionMetaPostgreSQLProvider extends ModelVersionMetaBaseSQLP
         + " WHERE id IN (SELECT id FROM "
         + ModelMetaMapper.TABLE_NAME
         + " WHERE deleted_at > 0 AND deleted_at < #{legacyTimeline} LIMIT #{limit})";
+  }
+
+  @Override
+  public String updateModelVersionMeta(
+      @Param("newModelVersionMeta") ModelVersionPO newModelVersionPO,
+      @Param("oldModelVersionMeta") ModelVersionPO oldModelVersionPO) {
+
+    return "UPDATE "
+        + ModelVersionMetaMapper.TABLE_NAME
+        + " SET"
+        + " metalake_id = #{newModelVersionMeta.metalakeId},"
+        + " catalog_id = #{newModelVersionMeta.catalogId},"
+        + " schema_id = #{newModelVersionMeta.schemaId},"
+        + " model_id = #{newModelVersionMeta.modelId},"
+        + " version = #{newModelVersionMeta.modelVersion},"
+        + " model_version_comment = #{newModelVersionMeta.modelVersionComment},"
+        + " model_version_properties = #{newModelVersionMeta.modelVersionProperties},"
+        + " audit_info = #{newModelVersionMeta.auditInfo},"
+        + " deleted_at = #{newModelVersionMeta.deletedAt}"
+        + " WHERE model_id = #{oldModelVersionMeta.modelId}"
+        + " AND metalake_id = #{oldModelVersionMeta.metalakeId}"
+        + " AND catalog_id = #{oldModelVersionMeta.catalogId}"
+        + " AND schema_id = #{oldModelVersionMeta.schemaId}"
+        + " AND version = #{oldModelVersionMeta.modelVersion}"
+        + " AND (model_version_comment = #{oldModelVersionMeta.modelVersionComment}"
+        + "   OR (CAST(model_version_comment AS VARCHAR) IS NULL"
+        + "   AND CAST(#{oldModelVersionMeta.modelVersionComment} AS VARCHAR) IS NULL))"
+        + " AND model_version_properties = #{oldModelVersionMeta.modelVersionProperties}"
+        + " AND audit_info = #{oldModelVersionMeta.auditInfo}"
+        + " AND deleted_at = 0";
   }
 }

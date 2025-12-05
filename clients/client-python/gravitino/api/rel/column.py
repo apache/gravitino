@@ -21,8 +21,8 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from typing import Optional
 
-from gravitino.api.expressions.expression import Expression
-from gravitino.api.expressions.function_expression import FunctionExpression
+from gravitino.api.rel.expressions.expression import Expression
+from gravitino.api.rel.expressions.function_expression import FunctionExpression
 from gravitino.api.rel.types.type import Type
 from gravitino.api.tag.supports_tags import SupportsTags
 from gravitino.exceptions.base import UnsupportedOperationException
@@ -219,6 +219,10 @@ class ColumnImpl(Column):
                 self._comment,
                 self._nullable,
                 self._auto_increment,
-                tuple(self._default_value),
+                (
+                    tuple(self._default_value)
+                    if self._default_value is Column.DEFAULT_VALUE_NOT_SET
+                    else self._default_value
+                ),
             )
         )

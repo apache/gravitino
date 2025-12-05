@@ -28,10 +28,14 @@ import org.apache.gravitino.annotation.Unstable;
 @Unstable
 public interface Privilege {
 
-  /** @return The generic name of the privilege. */
+  /**
+   * @return The generic name of the privilege.
+   */
   Name name();
 
-  /** @return A readable string representation for the privilege. */
+  /**
+   * @return A readable string representation for the privilege.
+   */
   String simpleString();
 
   /**
@@ -90,7 +94,21 @@ public interface Privilege {
     /** The privilege to create a model version */
     CREATE_MODEL_VERSION(0L, 1L << 19),
     /** The privilege to view the metadata of the model and download all the model versions */
-    USE_MODEL(0L, 1L << 20);
+    USE_MODEL(0L, 1L << 20),
+    /** The privilege to create a tag */
+    CREATE_TAG(0L, 1L << 21),
+    /** The privilege to apply a tag */
+    APPLY_TAG(0L, 1L << 22),
+    /** The privilege to create a policy */
+    CREATE_POLICY(0L, 1L << 23),
+    /** The privilege to apply a policy */
+    APPLY_POLICY(0L, 1L << 24),
+    /** The privilege to register a job template */
+    REGISTER_JOB_TEMPLATE(0L, 1L << 25),
+    /** The privilege to use a job template */
+    USE_JOB_TEMPLATE(0L, 1L << 26),
+    /** The privilege to run a job */
+    RUN_JOB(0L, 1L << 27);
 
     private final long highBits;
     private final long lowBits;

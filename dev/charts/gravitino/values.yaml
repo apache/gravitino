@@ -69,6 +69,44 @@ mysql:
     ##
     password: gravitino
 
+## PostgreSQL chart configuration
+## ref: https://github.com/bitnami/charts/blob/master/bitnami/postgresql/values.yaml
+##
+postgresql:
+  ## @param postgresql.enabled Deploy PostgreSQL container(s)
+  ##
+  enabled: false
+  ## Bitnami PostgreSQL image version
+  ## ref: https://hub.docker.com/r/bitnami/postgresql/tags/
+  ## @param image.registry PostgreSQL image registry
+  ## @param image.repository PostgreSQL image repository
+  ## @param image.tag PostgreSQL image tag (immutable tags are recommended)
+  ##
+  image:
+    registry: docker.io
+    repository: bitnamilegacy/postgresql
+    tag: 16.3.0-debian-12-r10
+  auth:
+    ## @param auth.username Name for a custom user to create
+    ##
+    username: gravitino
+    ## @param auth.password Password for the custom user to create
+    ##
+    password: gravitino
+    ## @param auth.database Name for a custom database to create
+    ##
+    database: gravitino
+    ## @param auth.existingSecret Name of existing secret to use for PostgreSQL credentials
+    ## `auth.postgresPassword`, `auth.password`, and `auth.replicationPassword` will be ignored and picked up from this secret
+    ## The secret must contain the keys `postgres-password` (which is the password for "postgres" admin user),
+    ## `password` (which is the password for the custom user to create when `auth.username` is set),
+    ## and `replication-password` (which is the password for replication user).
+    ## The secret might also contains the key `ldap-password` if LDAP is enabled. `ldap.bind_password` will be ignored and
+    ## picked from this secret in this case.
+    ## The value is evaluated as a template.
+    ##
+    existingSecret: ""
+
 ## THE CONFIGURATION FOR Gravitino ENTITY STORE
 ##
 entity:
@@ -212,6 +250,9 @@ icebergRest:
   #   ## JDBC driver class name
   #   ##
   #   driver: "com.mysql.cj.jdbc.Driver"
+  #   ## Schema version for JDBC catalog (required for view support)
+  #   ##
+  #   schemaVersion: "V1"
   ## Implementation class for Iceberg file I/O operations
   ##
   # ioImpl: "org.apache.iceberg.aws.s3.S3FileIO"
@@ -383,6 +424,11 @@ additionalLog4j2Properties:
   appender.console.layout.pattern: "%d{yyyy-MM-dd HH:mm:ss} %-5p [%t] %c{1}:%L - %m%n"
   rootLogger.appenderRef.console.ref: consoleLogger
 
+initScript: |
+  cp /tmp/conf/* ${GRAVITINO_HOME}/conf
+  echo "Start the Gravitino Server"
+  /bin/bash ${GRAVITINO_HOME}/bin/gravitino.sh run
+
 ## Expose the gravitino service to be accessed from outside the cluster (LoadBalancer service).
 ## or access it from within the cluster (ClusterIP service). Set the service type and the port to serve it.
 ## ref: http://kubernetes.io/docs/user-guide/services/
@@ -513,3 +559,77 @@ tolerations: []
 ## ref: https://kubernetes.io/docs/concepts/configuration/assign-pod-node/#affinity-and-anti-affinity
 ##
 affinity: {}
+
+## PodDisruptionBudget configuration
+## PodDisruptionBudgets limit the number of pods that can be down simultaneously during voluntary disruptions
+## (such as node drains, cluster upgrades, or pod evictions), ensuring high availability and service continuity.
+## ref: https://kubernetes.io/docs/tasks/run-application/configure-pdb/
+##
+podDisruptionBudget:
+  ## @param podDisruptionBudget.enabled Enable PodDisruptionBudget creation
+  ## Set to true to create a PodDisruptionBudget resource for the Gravitino deployment
+  ##
+  enabled: false
+
+  ## @param podDisruptionBudget.minAvailable Minimum number/percentage of pods that must remain available
+  ## Specify either an integer (e.g., 1, 2) or a percentage string (e.g., "50%")
+  ## This ensures at least this many pods stay running during voluntary disruptions
+  ##
+  ## Examples:
+  ##   minAvailable: 1           # At least 1 pod must remain available
+  ##   minAvailable: 2           # At least 2 pods must remain available
+  ##   minAvailable: "50%"       # At least 50% of pods must remain available
+  ##
+  ## When to use minAvailable:
+  ## - Use when you want to guarantee a minimum number of pods stay running
+  ## - Recommended for production deployments to ensure service availability
+  ## - With single replica (replicas: 1), minAvailable: 1 prevents all voluntary disruptions
+  ## - With multiple replicas, allows disruptions while maintaining minimum availability
+  ## - Only used when podDisruptionBudget.enabled: true. Set explicitly when enabling PDB.
+  ##
+  minAvailable: 1
+
+  ## @param podDisruptionBudget.maxUnavailable Maximum number/percentage of pods that can be unavailable
+  ## Specify either an integer (e.g., 1, 2) or a percentage string (e.g., "50%")
+  ## This limits how many pods can be down simultaneously during voluntary disruptions
+  ##
+  ## Examples:
+  ##   maxUnavailable: 1         # At most 1 pod can be unavailable
+  ##   maxUnavailable: 2         # At most 2 pods can be unavailable
+  ##   maxUnavailable: "25%"     # At most 25% of pods can be unavailable
+  ##
+  ## When to use maxUnavailable:
+  ## - Use when you want to control the rate of disruptions
+  ## - Useful for rolling updates and gradual scaling operations
+  ## - More flexible than minAvailable when scaling up/down
+  ##
+  ## IMPORTANT: Specify either minAvailable OR maxUnavailable, not both
+  ## If both are specified, Kubernetes will reject the PodDisruptionBudget and fail with an API validation error
+  ##
+  maxUnavailable: ""
+
+  ## @param podDisruptionBudget.labels Additional labels to apply to the PodDisruptionBudget resource
+  ## These labels are merged with the default Helm labels
+  ##
+  labels: {}
+  #   custom-label: value
+
+  ## @param podDisruptionBudget.annotations Additional annotations to apply to the PodDisruptionBudget resource
+  ## Useful for adding metadata or integration with other tools
+  ##
+  annotations: {}
+  #   custom-annotation: value
+
+## Relationship between PDB and replica count:
+## - Single replica (replicas: 1) + minAvailable: 1 = No voluntary disruptions allowed
+##   This prevents node drains and upgrades from evicting the only pod
+## - Multiple replicas (replicas: 3) + minAvailable: 2 = At least 2 pods must stay running
+##   Allows 1 pod to be disrupted at a time for maintenance
+## - Multiple replicas (replicas: 3) + maxUnavailable: 1 = At most 1 pod can be down
+##   Equivalent to minAvailable: 2 in this case
+##
+## Best practices:
+## - For production: Enable PDB with appropriate minAvailable or maxUnavailable
+## - For development/testing: Keep PDB disabled (default) for faster iterations
+## - Consider your replica count when setting PDB values
+## - Test PDB behavior in staging before applying to production

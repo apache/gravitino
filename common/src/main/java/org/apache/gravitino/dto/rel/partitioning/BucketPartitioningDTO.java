@@ -67,7 +67,9 @@ public final class BucketPartitioningDTO implements Partitioning {
     return fieldNames;
   }
 
-  /** @return The strategy of the partitioning. */
+  /**
+   * @return The strategy of the partitioning.
+   */
   @Override
   public Strategy strategy() {
     return Strategy.BUCKET;
@@ -85,13 +87,17 @@ public final class BucketPartitioningDTO implements Partitioning {
         .forEach(fieldName -> PartitionUtils.validateFieldExistence(columns, fieldName));
   }
 
-  /** @return The name of the partitioning strategy. */
+  /**
+   * @return The name of the partitioning strategy.
+   */
   @Override
   public String name() {
     return strategy().name().toLowerCase();
   }
 
-  /** @return The arguments of the partitioning strategy. */
+  /**
+   * @return The arguments of the partitioning strategy.
+   */
   @Override
   public Expression[] arguments() {
     return bucket(numBuckets, fieldNames).arguments();

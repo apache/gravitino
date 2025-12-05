@@ -29,8 +29,7 @@ public class MetalakeMetaPostgreSQLProvider extends MetalakeMetaBaseSQLProvider 
   public String softDeleteMetalakeMetaByMetalakeId(Long metalakeId) {
     return "UPDATE "
         + TABLE_NAME
-        + " SET deleted_at = floor(extract(epoch from(current_timestamp -"
-        + " timestamp '1970-01-01 00:00:00'))*1000)"
+        + " SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
         + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0";
   }
 
@@ -38,9 +37,9 @@ public class MetalakeMetaPostgreSQLProvider extends MetalakeMetaBaseSQLProvider 
   public String insertMetalakeMetaOnDuplicateKeyUpdate(MetalakePO metalakePO) {
     return "INSERT INTO "
         + TABLE_NAME
-        + "(metalake_id, metalake_name, metalake_comment, properties, audit_info,"
+        + " (metalake_id, metalake_name, metalake_comment, properties, audit_info,"
         + " schema_version, current_version, last_version, deleted_at)"
-        + " VALUES("
+        + " VALUES ("
         + " #{metalakeMeta.metalakeId},"
         + " #{metalakeMeta.metalakeName},"
         + " #{metalakeMeta.metalakeComment},"

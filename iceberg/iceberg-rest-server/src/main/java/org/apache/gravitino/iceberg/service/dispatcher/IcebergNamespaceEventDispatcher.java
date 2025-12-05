@@ -21,7 +21,7 @@ package org.apache.gravitino.iceberg.service.dispatcher;
 
 import java.util.Optional;
 import org.apache.gravitino.NameIdentifier;
-import org.apache.gravitino.iceberg.service.IcebergRestUtils;
+import org.apache.gravitino.iceberg.service.IcebergRESTUtils;
 import org.apache.gravitino.listener.EventBus;
 import org.apache.gravitino.listener.api.event.BaseEvent;
 import org.apache.gravitino.listener.api.event.IcebergCreateNamespaceEvent;
@@ -81,7 +81,7 @@ public class IcebergNamespaceEventDispatcher implements IcebergNamespaceOperatio
   public CreateNamespaceResponse createNamespace(
       IcebergRequestContext context, CreateNamespaceRequest createRequest) {
     NameIdentifier nameIdentifier =
-        IcebergRestUtils.getGravitinoNameIdentifier(
+        IcebergRESTUtils.getGravitinoNameIdentifier(
             metalakeName, context.catalogName(), createRequest.namespace());
 
     Optional<BaseEvent> transformedEvent =
@@ -117,7 +117,7 @@ public class IcebergNamespaceEventDispatcher implements IcebergNamespaceOperatio
       Namespace namespace,
       UpdateNamespacePropertiesRequest updateRequest) {
     NameIdentifier nameIdentifier =
-        IcebergRestUtils.getGravitinoNameIdentifier(metalakeName, context.catalogName(), namespace);
+        IcebergRESTUtils.getGravitinoNameIdentifier(metalakeName, context.catalogName(), namespace);
 
     Optional<BaseEvent> transformedEvent =
         eventBus.dispatchEvent(
@@ -152,7 +152,7 @@ public class IcebergNamespaceEventDispatcher implements IcebergNamespaceOperatio
   @Override
   public void dropNamespace(IcebergRequestContext context, Namespace namespace) {
     NameIdentifier nameIdentifier =
-        IcebergRestUtils.getGravitinoNameIdentifier(metalakeName, context.catalogName(), namespace);
+        IcebergRESTUtils.getGravitinoNameIdentifier(metalakeName, context.catalogName(), namespace);
     eventBus.dispatchEvent(new IcebergDropNamespacePreEvent(context, nameIdentifier));
 
     try {
@@ -168,7 +168,7 @@ public class IcebergNamespaceEventDispatcher implements IcebergNamespaceOperatio
   @Override
   public GetNamespaceResponse loadNamespace(IcebergRequestContext context, Namespace namespace) {
     NameIdentifier nameIdentifier =
-        IcebergRestUtils.getGravitinoNameIdentifier(metalakeName, context.catalogName(), namespace);
+        IcebergRESTUtils.getGravitinoNameIdentifier(metalakeName, context.catalogName(), namespace);
     eventBus.dispatchEvent(new IcebergLoadNamespacePreEvent(context, nameIdentifier));
 
     GetNamespaceResponse getResponse;
@@ -187,7 +187,7 @@ public class IcebergNamespaceEventDispatcher implements IcebergNamespaceOperatio
   public ListNamespacesResponse listNamespaces(
       IcebergRequestContext context, Namespace parentNamespace) {
     NameIdentifier nameIdentifier =
-        IcebergRestUtils.getGravitinoNameIdentifier(
+        IcebergRESTUtils.getGravitinoNameIdentifier(
             metalakeName, context.catalogName(), parentNamespace);
     eventBus.dispatchEvent(new IcebergListNamespacesPreEvent(context, nameIdentifier));
 
@@ -206,7 +206,7 @@ public class IcebergNamespaceEventDispatcher implements IcebergNamespaceOperatio
   @Override
   public boolean namespaceExists(IcebergRequestContext context, Namespace namespace) {
     NameIdentifier nameIdentifier =
-        IcebergRestUtils.getGravitinoNameIdentifier(metalakeName, context.catalogName(), namespace);
+        IcebergRESTUtils.getGravitinoNameIdentifier(metalakeName, context.catalogName(), namespace);
     eventBus.dispatchEvent(new IcebergNamespaceExistsPreEvent(context, nameIdentifier));
 
     boolean isExists;
@@ -228,7 +228,7 @@ public class IcebergNamespaceEventDispatcher implements IcebergNamespaceOperatio
       RegisterTableRequest registerTableRequest) {
     TableIdentifier tableIdentifier = TableIdentifier.of(namespace, registerTableRequest.name());
     NameIdentifier nameIdentifier =
-        IcebergRestUtils.getGravitinoNameIdentifier(
+        IcebergRESTUtils.getGravitinoNameIdentifier(
             metalakeName, context.catalogName(), tableIdentifier);
 
     eventBus.dispatchEvent(

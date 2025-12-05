@@ -21,11 +21,16 @@ package org.apache.gravitino.metrics;
 
 public class MetricNames {
   public static final String HTTP_PROCESS_DURATION = "http-request-duration-seconds";
-  public static final String SERVER_IDLE_THREAD_NUM = "http-server.idle-thread.num";
   public static final String DATASOURCE_ACTIVE_CONNECTIONS = "datasource.active-connections";
   public static final String DATASOURCE_IDLE_CONNECTIONS = "datasource.idle-connections";
   public static final String DATASOURCE_MAX_CONNECTIONS = "datasource.max-connections";
   public static final String FILESYSTEM_CACHE = "filesystem-cache";
+  public static final String SERVER_BUSY_THREAD_NUM = "http-server.busy-thread.num";
+  public static final String SERVER_IDLE_THREAD_NUM = "http-server.idle-thread.num";
+  public static final String SERVER_QUEUED_REQUEST_NUM = "http-server.queued-request.num";
+  public static final String SERVER_TOTAL_THREAD_NUM = "http-server.total-thread.num";
+  public static final String SERVER_MIN_THREAD_NUM = "http-server.min-thread.num";
+  public static final String SERVER_MAX_THREAD_NUM = "http-server.max-thread.num";
 
   private MetricNames() {}
 }

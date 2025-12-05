@@ -55,7 +55,9 @@ public class GroupDTO implements Group {
     this.roles = roles;
   }
 
-  /** @return The name of the Group DTO. */
+  /**
+   * @return The name of the Group DTO.
+   */
   @Override
   public String name() {
     return name;
@@ -71,7 +73,9 @@ public class GroupDTO implements Group {
     return roles;
   }
 
-  /** @return The audit information of the Group DTO. */
+  /**
+   * @return The audit information of the Group DTO.
+   */
   @Override
   public Audit auditInfo() {
     return audit;

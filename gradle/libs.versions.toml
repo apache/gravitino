@@ -28,7 +28,8 @@ guava = "32.1.3-jre"
 lombok = "1.18.20"
 slf4j = "2.0.16"
 log4j = "2.24.3"
-lance = "0.34.0"
+lance = "0.39.0"
+lance-namespace = "0.0.20"
 jetty = "9.4.51.v20230217"
 jersey = "2.41"
 mockito = "4.11.0"
@@ -57,7 +58,7 @@ commons-collections3 = "3.2.2"
 commons-configuration1 = "1.6"
 commons-dbcp2 = "2.11.0"
 caffeine = "2.9.3"
-iceberg = '1.9.2' # used for Gravitino Iceberg catalog and Iceberg REST service
+iceberg = '1.10.0' # used for Gravitino Iceberg catalog and Iceberg REST service
 iceberg4connector = "1.6.1" # used for compile connectors like Spark, Flink, etc
 paimon = '1.2.0'
 spark33 = "3.3.4"
@@ -79,7 +80,7 @@ metrics = "4.2.25"
 prometheus = "0.16.0"
 mysql = "8.0.33"
 postgresql = "42.6.0"
-immutables-value = "2.10.1"
+immutables-value = "2.11.7"
 selenium = "3.141.59"
 rauschig = "1.2.0"
 mybatis = "3.5.6"
@@ -91,7 +92,10 @@ servlet = "3.1.0"
 jodd = "3.5.2"
 flink = "1.18.0"
 flinkjdbc = "3.2.0-1.18"
-cglib = "2.2"
+# cglib upgraded from 2. to 3.3.0 for Java 17 compatibility.
+# Explicit ASM dependency (9.8) is required due to cglib's internal use and Java 17 module system.
+cglib = "3.3.0"
+asm = "9.8"
 ranger = "2.4.0"
 javax-jaxb-api = "2.3.1"
 javax-ws-rs-api = "2.1.1"
@@ -119,6 +123,7 @@ datanucleus-jdo = "3.2.0-m3"
 hudi = "0.15.0"
 google-auth = "1.28.0"
 aliyun-credentials = "0.3.12"
+aliyun-sdk-oss = "3.10.2"
 openlineage = "1.29.0"
 jcstress = "0.8.15"
 jmh-plugin = "0.7.3"
@@ -145,6 +150,7 @@ jackson-annotations = { group = "com.fasterxml.jackson.core", name = "jackson-an
 jackson-datatype-jdk8 = { group = "com.fasterxml.jackson.datatype", name = "jackson-datatype-jdk8", version.ref = "jackson" }
 jackson-datatype-jsr310 = { group = "com.fasterxml.jackson.datatype", name = "jackson-datatype-jsr310", version.ref = "jackson" }
 jackson-dataformat-yaml = { group = "com.fasterxml.jackson.dataformat", name = "jackson-dataformat-yaml", version.ref = "jackson" }
+jackson-jaxrs-json-provider = { group = "com.fasterxml.jackson.jaxrs", name = "jackson-jaxrs-json-provider", version.ref = "jackson" }
 guava = { group = "com.google.guava", name = "guava", version.ref = "guava" }
 kerby-core = { group = "org.apache.kerby", name = "kerb-core", version.ref = "kerby"}
 kerby-simplekdc = { group = "org.apache.kerby", name = "kerb-simplekdc", version.ref = "kerby"}
@@ -161,6 +167,7 @@ log4j-core = { group = "org.apache.logging.log4j", name = "log4j-core", version.
 log4j-12-api = { group = "org.apache.logging.log4j", name = "log4j-1.2-api", version.ref = "log4j" }
 log4j-layout-template-json = { group = "org.apache.logging.log4j", name = "log4j-layout-template-json", version.ref = "log4j" }
 lance = { group = "com.lancedb", name = "lance-core", version.ref = "lance" }
+lance-namespace-core = { group = "com.lancedb", name = "lance-namespace-core", version.ref = "lance-namespace" }
 jakarta-validation-api = { group = "jakarta.validation", name = "jakarta.validation-api", version.ref = "jakarta-validation" }
 jetty-server = { group = "org.eclipse.jetty", name = "jetty-server", version.ref = "jetty" }
 jetty-servlet = { group = "org.eclipse.jetty", name = "jetty-servlet", version.ref = "jetty" }
@@ -272,6 +279,7 @@ kafka-clients = { group = "org.apache.kafka", name = "kafka-clients", version.re
 kafka = { group = "org.apache.kafka", name = "kafka_2.12", version.ref = "kafka" }
 curator-test = { group = "org.apache.curator", name = "curator-test", version.ref = "curator"}
 cglib = { group = "cglib", name = "cglib", version.ref = "cglib"}
+asm = { group = "org.ow2.asm", name = "asm", version.ref = "asm"}
 woodstox-core = { group = "com.fasterxml.woodstox", name = "woodstox-core", version.ref = "woodstox-core"}
 thrift = { group = "org.apache.thrift", name = "libthrift", version.ref = "thrift"}
 derby = { group = "org.apache.derby", name = "derby", version.ref = "derby"}
@@ -297,6 +305,7 @@ google-auth-http = { group = "com.google.auth", name = "google-auth-library-oaut
 google-auth-credentials = { group = "com.google.auth", name = "google-auth-library-credentials", version.ref = "google-auth" }
 
 aliyun-credentials-sdk = { group='com.aliyun', name='credentials-java', version.ref='aliyun-credentials' }
+aliyun-sdk-oss = { module = "com.aliyun.oss:aliyun-sdk-oss", version.ref = "aliyun-sdk-oss" }
 flinkjdbc = {group='org.apache.flink',name='flink-connector-jdbc', version.ref='flinkjdbc'}
 concurrent-trees = { group = "com.googlecode.concurrent-trees", name = "concurrent-trees", version.ref = "concurrent-trees" }
 jcasbin = { group='org.casbin', name='jcasbin', version.ref="jcasbin" }

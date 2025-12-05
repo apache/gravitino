@@ -17,7 +17,7 @@
 
 from __future__ import annotations
 
-from gravitino.api.expressions.unparsed_expression import UnparsedExpression
+from gravitino.api.rel.expressions.unparsed_expression import UnparsedExpression
 from gravitino.dto.rel.expressions.function_arg import FunctionArg
 
 

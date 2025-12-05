@@ -22,6 +22,7 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import java.io.File;
 import java.io.IOException;
+import java.lang.reflect.Field;
 import java.net.URL;
 import java.nio.file.Files;
 import java.util.Collections;
@@ -225,5 +226,31 @@ public class TestLocalJobExecutor {
 
     Assertions.assertDoesNotThrow(() -> jobExecutor.cancelJob(failJobId));
     Assertions.assertEquals(JobHandle.Status.FAILED, jobExecutor.getJobStatus(failJobId));
+  }
+
+  @Test
+  public void testInitializeWithSmallJobStatusKeepTimeIsClampedToMinimum()
+      throws NoSuchFieldException, IllegalAccessException {
+    LocalJobExecutor exec = new LocalJobExecutor();
+
+    exec.initialize(ImmutableMap.of(LocalJobExecutorConfigs.JOB_STATUS_KEEP_TIME_MS, "1"));
+
+    Field field = LocalJobExecutor.class.getDeclaredField("jobStatusKeepTimeInMs");
+    field.setAccessible(true);
+    long actualValue = (long) field.get(exec);
+    Assertions.assertEquals(10L, actualValue);
+  }
+
+  @Test
+  public void TestInitializeWithLargeJobStatusKeepTimeIsClampedToSameValue()
+      throws NoSuchFieldException, IllegalAccessException {
+    LocalJobExecutor exec = new LocalJobExecutor();
+
+    exec.initialize(ImmutableMap.of(LocalJobExecutorConfigs.JOB_STATUS_KEEP_TIME_MS, "11"));
+
+    Field field = LocalJobExecutor.class.getDeclaredField("jobStatusKeepTimeInMs");
+    field.setAccessible(true);
+    long actualValue = (long) field.get(exec);
+    Assertions.assertEquals(11L, actualValue);
   }
 }

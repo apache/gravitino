@@ -65,7 +65,9 @@ public class JdbcColumnDefaultValueConverter {
         // Not display default value if default value is null
         return null;
       } else if (type instanceof Types.TimestampType) {
-        /** @see LocalDateTime#toString() would return like 'yyyy-MM-ddTHH:mm:ss' */
+        /**
+         * @see LocalDateTime#toString() would return like 'yyyy-MM-ddTHH:mm:ss'
+         */
         if (literal.value() instanceof String || literal.value() instanceof LocalDateTime) {
           return literal.value().toString().replace("T", " ");
         }
