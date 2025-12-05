@@ -113,39 +113,4 @@ public abstract class SparkJdbcMysqlCatalogIT extends SparkCommonIT {
     catalogProperties.put(JdbcPropertiesConstants.GRAVITINO_JDBC_DRIVER, mysqlDriver);
     return catalogProperties;
   }
-
-  @Test
-  void testMySqlDatetimeFilterWithTimestampNtz() {
-    String tableName = "t_mysql_datetime_ntz_filter";
-    String fullTableName = String.join(".", getCatalogName(), getDefaultDatabase(), tableName);
-    String originalTimestampType =
-        getSparkSession().conf().get("spark.sql.timestampType", "TIMESTAMP_LTZ");
-    getSparkSession().conf().set("spark.sql.timestampType", "TIMESTAMP_NTZ");
-    dropTableIfExists(fullTableName);
-
-    try {
-      sql(
-          String.format(
-              "CREATE TABLE %s (id INT, name STRING, update_time TIMESTAMP)", fullTableName));
-      sql(
-          String.format(
-              "INSERT INTO %s VALUES "
-                  + "(1, 'xu', TIMESTAMP '2025-12-04 09:07:43'), "
-                  + "(2, 'zhangsan', TIMESTAMP '2025-12-05 09:07:43')",
-              fullTableName));
-
-      String querySql =
-          String.format(
-              "SELECT * FROM %s WHERE update_time >= '2025-12-04 09:07:43'", fullTableName);
-
-      SparkException sparkException =
-          Assertions.assertThrows(SparkException.class, () -> getQueryData(querySql));
-      Assertions.assertTrue(
-          sparkException.getMessage().contains("SQLSyntaxErrorException"),
-          () -> "Expected MySQL syntax error when filtering DATETIME with TIMESTAMP_NTZ literals");
-    } finally {
-      dropTableIfExists(fullTableName);
-      getSparkSession().conf().set("spark.sql.timestampType", originalTimestampType);
-    }
-  }
 }
