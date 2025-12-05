@@ -17,7 +17,7 @@
 
 package org.apache.gravitino.hive.client;
 
-import static org.apache.gravitino.hive.client.IsolatedClientLoader.HiveVersion.HIVE3;
+import static org.apache.gravitino.hive.client.HiveClientClassLoader.HiveVersion.HIVE3;
 
 import java.lang.reflect.Method;
 import java.util.List;

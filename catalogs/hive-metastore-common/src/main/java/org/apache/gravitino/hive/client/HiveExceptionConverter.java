@@ -184,7 +184,7 @@ public class HiveExceptionConverter {
       }
     }
 
-    if (isConnectionKeyword(lowerMessage)) {
+    if (isConnectionKeyword(lowerMessage) || exceptionClassName.contains("TransportException")) {
       return new ConnectionFailedException(
           cause, "Failed to connect to Hive Metastore: %s", target.name());
     }

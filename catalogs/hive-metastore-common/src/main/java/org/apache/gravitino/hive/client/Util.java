@@ -28,7 +28,7 @@ public class Util {
     return klass.getMethod(name, args);
   }
 
-  protected Method findStaticMethod(Class<?> klass, String name, Class<?>... args)
+  protected static Method findStaticMethod(Class<?> klass, String name, Class<?>... args)
       throws NoSuchMethodException {
     Method method = findMethod(klass, name, args);
 

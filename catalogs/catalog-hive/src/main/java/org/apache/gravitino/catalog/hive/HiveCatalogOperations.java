@@ -18,14 +18,20 @@
  */
 package org.apache.gravitino.catalog.hive;
 
+import static org.apache.gravitino.catalog.hive.HiveCatalogPropertiesMetadata.IMPERSONATION_ENABLE;
+import static org.apache.gravitino.catalog.hive.HiveCatalogPropertiesMetadata.KEY_TAB_URI;
 import static org.apache.gravitino.catalog.hive.HiveCatalogPropertiesMetadata.LIST_ALL_TABLES;
 import static org.apache.gravitino.catalog.hive.HiveCatalogPropertiesMetadata.METASTORE_URIS;
+import static org.apache.gravitino.catalog.hive.HiveCatalogPropertiesMetadata.PRINCIPAL;
 import static org.apache.gravitino.catalog.hive.HiveConstants.HIVE_FILTER_FIELD_PARAMS;
 import static org.apache.gravitino.catalog.hive.HiveConstants.HIVE_METASTORE_URIS;
 import static org.apache.gravitino.catalog.hive.HiveConstants.TABLE_TYPE;
 import static org.apache.gravitino.catalog.hive.TableType.EXTERNAL_TABLE;
 import static org.apache.gravitino.connector.BaseCatalog.CATALOG_BYPASS_PREFIX;
 import static org.apache.gravitino.hive.HiveTable.SUPPORT_TABLE_TYPES;
+import static org.apache.gravitino.hive.kerberos.AuthenticationConfig.IMPERSONATION_ENABLE_KEY;
+import static org.apache.gravitino.hive.kerberos.KerberosConfig.KEY_TAB_URI_KEY;
+import static org.apache.gravitino.hive.kerberos.KerberosConfig.PRINCIPAL_KEY;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
@@ -110,7 +116,11 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
   // will only need to set the configuration 'METASTORE_URL' in Gravitino and Gravitino will change
   // it to `METASTOREURIS` automatically and pass it to Hive.
   public static final Map<String, String> GRAVITINO_CONFIG_TO_HIVE =
-      ImmutableMap.of(METASTORE_URIS, HIVE_METASTORE_URIS);
+      ImmutableMap.of(
+          METASTORE_URIS, HIVE_METASTORE_URIS,
+          IMPERSONATION_ENABLE, IMPERSONATION_ENABLE_KEY,
+          KEY_TAB_URI, KEY_TAB_URI_KEY,
+          PRINCIPAL, PRINCIPAL_KEY);
 
   /**
    * Initializes the Hive catalog operations with the provided configuration.

@@ -36,6 +36,9 @@ dependencies {
   implementation(project(":catalogs:catalog-common")) {
     exclude("*")
   }
+  implementation(project(":common")) {
+    exclude("*")
+  }
   implementation(project(":catalogs:hive-metastore-common"))
   implementation(project(":core")) {
     exclude("*")

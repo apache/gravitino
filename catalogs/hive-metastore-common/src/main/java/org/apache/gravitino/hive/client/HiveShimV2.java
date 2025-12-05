@@ -17,7 +17,7 @@
 
 package org.apache.gravitino.hive.client;
 
-import static org.apache.gravitino.hive.client.IsolatedClientLoader.HiveVersion.HIVE2;
+import static org.apache.gravitino.hive.client.HiveClientClassLoader.HiveVersion.HIVE2;
 
 import java.util.List;
 import org.apache.gravitino.hive.HivePartition;
@@ -35,7 +35,7 @@ class HiveShimV2 extends Shim {
     super(client, HIVE2);
   }
 
-  HiveShimV2(IMetaStoreClient client, IsolatedClientLoader.HiveVersion version) {
+  HiveShimV2(IMetaStoreClient client, HiveClientClassLoader.HiveVersion version) {
     super(client, version);
   }
 

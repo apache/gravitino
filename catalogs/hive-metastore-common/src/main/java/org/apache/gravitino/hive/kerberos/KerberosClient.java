@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package org.apache.gravitino.catalog.lakehouse.hudi.backend.hms.kerberos;
+package org.apache.gravitino.hive.kerberos;
 
 import com.google.common.base.Preconditions;
 import com.google.common.base.Splitter;
@@ -49,7 +49,7 @@ public class KerberosClient implements java.io.Closeable {
   }
 
   public String login(String keytabFilePath) throws IOException {
-    KerberosConfig kerberosConfig = new KerberosConfig(conf);
+    KerberosConfig kerberosConfig = new KerberosConfig(conf, hadoopConf);
 
     // Check the principal and keytab file
     String catalogPrincipal = kerberosConfig.getPrincipalName();
@@ -86,7 +86,7 @@ public class KerberosClient implements java.io.Closeable {
   }
 
   public File saveKeyTabFileFromUri(String keytabPath) throws IOException {
-    KerberosConfig kerberosConfig = new KerberosConfig(conf);
+    KerberosConfig kerberosConfig = new KerberosConfig(conf, hadoopConf);
 
     String keyTabUri = kerberosConfig.getKeytab();
     Preconditions.checkArgument(StringUtils.isNotBlank(keyTabUri), "Keytab uri can't be blank");

@@ -34,9 +34,9 @@ import org.apache.thrift.TException;
  */
 public abstract class Shim {
   protected final IMetaStoreClient client;
-  protected final IsolatedClientLoader.HiveVersion version;
+  protected final HiveClientClassLoader.HiveVersion version;
 
-  protected Shim(IMetaStoreClient client, IsolatedClientLoader.HiveVersion version) {
+  protected Shim(IMetaStoreClient client, HiveClientClassLoader.HiveVersion version) {
     this.client = client;
     this.version = version;
   }

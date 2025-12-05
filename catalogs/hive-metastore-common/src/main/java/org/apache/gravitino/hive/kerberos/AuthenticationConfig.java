@@ -17,12 +17,16 @@
  * under the License.
  */
 
-package org.apache.gravitino.catalog.lakehouse.hudi.backend.hms.kerberos;
+package org.apache.gravitino.hive.kerberos;
 
+import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.HADOOP_SECURITY_AUTHENTICATION;
+
+import java.util.Map;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.config.ConfigBuilder;
 import org.apache.gravitino.config.ConfigConstants;
 import org.apache.gravitino.config.ConfigEntry;
+import org.apache.hadoop.conf.Configuration;
 
 public class AuthenticationConfig extends Config {
 
@@ -38,9 +42,15 @@ public class AuthenticationConfig extends Config {
 
   public static final boolean KERBEROS_DEFAULT_IMPERSONATION_ENABLE = false;
 
-  public AuthenticationConfig(java.util.Map<String, String> properties) {
+  public AuthenticationConfig(Map<String, String> properties, Configuration configuration) {
     super(false);
+    loadFromHdfsConfiguration(configuration);
     loadFromMap(properties, k -> true);
+  }
+
+  private void loadFromHdfsConfiguration(Configuration configuration) {
+    String authType = configuration.get(HADOOP_SECURITY_AUTHENTICATION, "simple");
+    configMap.put(AUTH_TYPE_KEY, authType);
   }
 
   public static final ConfigEntry<String> AUTH_TYPE_ENTRY =

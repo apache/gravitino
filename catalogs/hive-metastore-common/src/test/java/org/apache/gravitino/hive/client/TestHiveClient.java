@@ -46,16 +46,18 @@ import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.expressions.transforms.Transforms;
 import org.apache.gravitino.rel.types.Types;
 import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 
-@Disabled
+// This class is use for manual testing against real Hive Metastore instances.
+// @Disabled
 public class TestHiveClient {
 
   private static final String HIVE2_HMS_URL = "thrift://172.17.0.2:9083";
   private static final String HIVE2_HDFS_URL = "hdfs://172.17.0.2:9000";
   private static final String HIVE3_HMS_URL = "thrift://172.17.0.3:9083";
   private static final String HIVE3_HDFS_URL = "hdfs://172.17.0.3:9000";
+
+  private static final String KERBEROS_HIVE2_HMS_URL = "thrift://172.17.0.2:9083";
 
   @Test
   void testHive2Client() throws Exception {
@@ -79,7 +81,7 @@ public class TestHiveClient {
       String catalogName, String testPrefix, String metastoreUri, String hdfsBasePath) {
     Properties properties = new Properties();
     properties.setProperty("hive.metastore.uris", metastoreUri);
-    HiveClient client = IsolatedClientLoader.createHiveClient(properties);
+    HiveClient client = HiveClientFactory.createHiveClient(properties);
 
     String dbName = "gt_" + testPrefix + "_db_" + UUID.randomUUID().toString().replace("-", "");
     String tableName = "gt_" + testPrefix + "_tbl_" + UUID.randomUUID().toString().replace("-", "");
@@ -271,7 +273,7 @@ public class TestHiveClient {
       String catalogName, String metastoreUri, String hdfsBasePath) throws Exception {
     Properties properties = new Properties();
     properties.setProperty("hive.metastore.uris", metastoreUri);
-    HiveClient client = IsolatedClientLoader.createHiveClient(properties);
+    HiveClient client = HiveClientFactory.createHiveClient(properties);
 
     String dbName = "gt_exception_test_db_" + UUID.randomUUID().toString().replace("-", "");
     String tableName = "gt_exception_test_tbl_" + UUID.randomUUID().toString().replace("-", "");
@@ -361,7 +363,7 @@ public class TestHiveClient {
         Assertions.assertThrows(
             Exception.class,
             () -> {
-              HiveClient client = IsolatedClientLoader.createHiveClient(properties);
+              HiveClient client = HiveClientFactory.createHiveClient(properties);
               client.getAllDatabases(catalogName);
             });
 
@@ -380,5 +382,33 @@ public class TestHiveClient {
 
     // Test with HIVE3
     testConnectionFailedExceptionForVersion("hive");
+  }
+
+  @Test
+  void testKerberosConnection() {
+    // This method can be implemented to test Kerberos authentication with Hive Metastore
+    // when a Kerberos-enabled environment is available.
+    Properties properties = new Properties();
+    properties.setProperty("hive.metastore.uris", "thrift://172.17.0.2:9083");
+    properties.setProperty("authentication.kerberos.principal", "cli@HADOOPKRB");
+    properties.setProperty("authentication.impersonation-enable", "true");
+    properties.setProperty(
+        "authentication.kerberos.keytab-uri", "/tmp/test4310082059861441407/client.keytab");
+    properties.setProperty("hive.metastore.kerberos.principal", "hive/6b1955fcb754@HADOOPKRB");
+    properties.setProperty("hive.metastore.sasl.enabled", "true");
+    properties.setProperty("hadoop.security.authentication", "kerberos");
+
+    System.setProperty("java.security.krb5.conf", "/tmp/test4310082059861441407/krb5.conf");
+
+    String catalogName = "hive";
+    String dbName = "test_kerberos_db";
+    String dbLocation = HIVE2_HDFS_URL + "/tmp/gravitino_kerberos_test/" + dbName;
+
+    HiveClient client = HiveClientFactory.createHiveClient(properties);
+    HiveSchema schema = createTestSchema(catalogName, dbName, dbLocation);
+    client.createDatabase(schema);
+    List<String> allDatabases = client.getAllDatabases(catalogName);
+    Assertions.assertTrue(allDatabases.contains(dbName), "Database should be in the list");
+    client.dropDatabase(catalogName, dbName, true);
   }
 }
