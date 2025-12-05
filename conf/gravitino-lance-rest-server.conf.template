@@ -44,6 +44,6 @@ gravitino.lance-rest.responseHeaderSize = 131072
 # The backend Lance namespace for Lance REST service, it's recommended to use Gravitino
 gravitino.lance-rest.namespace-backend = gravitino
 # The uri of the Lance REST service gravitino namespace backend
-gravitino.lance-rest.gravitino.uri = http://localhost:8090
+gravitino.lance-rest.gravitino-uri = http://localhost:8090
 # The metalake name used for Lance REST service gravitino namespace backend, please create the metalake before using it, and configure the metalake name here.
-# gravitino.lance-rest.gravitino.metalake-name = metalake
+# gravitino.lance-rest.gravitino-metalake = metalake
