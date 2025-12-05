@@ -761,6 +761,36 @@ public class JobManager implements JobOperationDispatcher {
           .build();
     }
 
+    // For HTTP job template
+    if (content.jobType() == JobTemplate.JobType.HTTP) {
+      executable = replacePlaceholder(content.executable(), jobConf);
+      String url = replacePlaceholder(content.url(), jobConf);
+      Map<String, String> headers =
+          content.headers().entrySet().stream()
+              .collect(
+                  Collectors.toMap(
+                      entry -> replacePlaceholder(entry.getKey(), jobConf),
+                      entry -> replacePlaceholder(entry.getValue(), jobConf)));
+      String body = replacePlaceholder(content.body(), jobConf);
+      List<String> queryParams =
+          content.queryParams().stream()
+              .map(param -> replacePlaceholder(param, jobConf))
+              .collect(Collectors.toList());
+
+      return HttpJobTemplate.builder()
+          .withName(name)
+          .withComment(comment)
+          .withExecutable(executable)
+          .withArguments(args)
+          .withEnvironments(environments)
+          .withCustomFields(customFields)
+          .withUrl(url)
+          .withHeaders(headers)
+          .withBody(body)
+          .withQueryParams(queryParams)
+          .build();
+    }
+
     throw new IllegalArgumentException("Unsupported job type: " + content.jobType());
   }
 
@@ -932,6 +962,30 @@ public class JobManager implements JobOperationDispatcher {
                   updatedValue(
                       oldTemplateContent.configs(),
                       Optional.ofNullable(sparkUpdate.getNewConfigs())));
+
+        } else if (templateUpdate instanceof JobTemplateChange.HttpTemplateUpdate) {
+          Preconditions.checkArgument(
+              jobTemplateEntity.templateContent().jobType() == JobTemplate.JobType.HTTP,
+              "Job template %s is not an http job template, cannot update to http template",
+              jobTemplateIdent.name());
+
+          JobTemplateChange.HttpTemplateUpdate httpUpdate =
+              (JobTemplateChange.HttpTemplateUpdate) templateUpdate;
+          newTemplateContentBuilder
+              .withUrl(
+                  updatedValue(
+                      oldTemplateContent.url(), Optional.ofNullable(httpUpdate.getNewUrl())))
+              .withHeaders(
+                  updatedValue(
+                      oldTemplateContent.headers(),
+                      Optional.ofNullable(httpUpdate.getNewHeaders())))
+              .withBody(
+                  updatedValue(
+                      oldTemplateContent.body(), Optional.ofNullable(httpUpdate.getNewBody())))
+              .withQueryParams(
+                  updatedValue(
+                      oldTemplateContent.queryParams(),
+                      Optional.ofNullable(httpUpdate.getNewQueryParams())));
 
         } else {
           throw new IllegalArgumentException("Unsupported template update: " + templateUpdate);

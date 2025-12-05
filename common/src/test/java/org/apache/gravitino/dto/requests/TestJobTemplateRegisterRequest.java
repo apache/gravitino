@@ -23,6 +23,7 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import java.time.Instant;
 import org.apache.gravitino.dto.AuditDTO;
+import org.apache.gravitino.dto.job.HttpJobTemplateDTO;
 import org.apache.gravitino.dto.job.JobTemplateDTO;
 import org.apache.gravitino.dto.job.ShellJobTemplateDTO;
 import org.apache.gravitino.dto.job.SparkJobTemplateDTO;
@@ -79,5 +80,29 @@ public class TestJobTemplateRegisterRequest {
         JsonUtils.objectMapper().readValue(sparkSerJson, JobTemplateRegisterRequest.class);
 
     Assertions.assertEquals(sparkJobTemplateDTO, sparkDeserRequest.getJobTemplate());
+
+    JobTemplateDTO httpJobTemplateDTO =
+        HttpJobTemplateDTO.builder()
+            .withJobType(JobTemplate.JobType.HTTP)
+            .withName("testHttpJob")
+            .withComment("This is a test http job template")
+            .withExecutable("GET")
+            .withArguments(Lists.newArrayList("arg1", "arg2"))
+            .withEnvironments(ImmutableMap.of("HTTP_ENV_VAR", "value"))
+            .withCustomFields(ImmutableMap.of("customField1", "value1"))
+            .withUrl("http://example.com/api")
+            .withHeaders(ImmutableMap.of("Content-Type", "application/json"))
+            .withBody("{\"key\": \"value\"}")
+            .withQueryParams(Lists.newArrayList("param1=value1", "param2=value2"))
+            .withAudit(AuditDTO.builder().withCreator("test").withCreateTime(Instant.now()).build())
+            .build();
+
+    JobTemplateRegisterRequest httpRequest = new JobTemplateRegisterRequest(httpJobTemplateDTO);
+
+    String httpSerJson = JsonUtils.objectMapper().writeValueAsString(httpRequest);
+    JobTemplateRegisterRequest httpDeserRequest =
+        JsonUtils.objectMapper().readValue(httpSerJson, JobTemplateRegisterRequest.class);
+
+    Assertions.assertEquals(httpJobTemplateDTO, httpDeserRequest.getJobTemplate());
   }
 }

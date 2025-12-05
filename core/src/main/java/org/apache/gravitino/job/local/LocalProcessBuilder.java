@@ -20,6 +20,7 @@ package org.apache.gravitino.job.local;
 
 import java.io.File;
 import java.util.Map;
+import org.apache.gravitino.job.HttpJobTemplate;
 import org.apache.gravitino.job.JobTemplate;
 import org.apache.gravitino.job.ShellJobTemplate;
 import org.apache.gravitino.job.SparkJobTemplate;
@@ -44,6 +45,8 @@ public abstract class LocalProcessBuilder {
       return new ShellProcessBuilder((ShellJobTemplate) jobTemplate, configs);
     } else if (jobTemplate instanceof SparkJobTemplate) {
       return new SparkProcessBuilder((SparkJobTemplate) jobTemplate, configs);
+    } else if (jobTemplate instanceof HttpJobTemplate) {
+      return new HttpProcessBuilder((HttpJobTemplate) jobTemplate, configs);
     } else {
       throw new IllegalArgumentException(
           "Unsupported job template type: " + jobTemplate.getClass().getName());
