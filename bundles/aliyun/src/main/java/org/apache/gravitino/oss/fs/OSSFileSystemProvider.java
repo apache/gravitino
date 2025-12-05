@@ -19,6 +19,7 @@
 package org.apache.gravitino.oss.fs;
 
 import static org.apache.gravitino.catalog.hadoop.fs.Constants.DEFAULT_CONNECTION_TIMEOUT;
+import static org.apache.gravitino.catalog.hadoop.fs.Constants.DEFAULT_RETRY_LIMIT;
 import static org.apache.gravitino.catalog.hadoop.fs.Constants.OSS_ESTABLISH_TIMEOUT_KEY;
 import static org.apache.gravitino.catalog.hadoop.fs.Constants.OSS_MAX_ERROR_RETRIES_KEY;
 
@@ -113,7 +114,7 @@ public class OSSFileSystemProvider implements FileSystemProvider, SupportsCreden
     }
 
     if (!configs.containsKey(OSS_MAX_ERROR_RETRIES_KEY)) {
-      additionalConfigs.put(OSS_MAX_ERROR_RETRIES_KEY, "2");
+      additionalConfigs.put(OSS_MAX_ERROR_RETRIES_KEY, DEFAULT_RETRY_LIMIT);
     }
 
     // More tuning can be added here.

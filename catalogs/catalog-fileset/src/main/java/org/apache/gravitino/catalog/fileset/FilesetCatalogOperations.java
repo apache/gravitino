@@ -1014,7 +1014,9 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
       scheduler.shutdownNow();
     }
 
-    fileSystemExecutor.shutdownNow();
+    if (!fileSystemExecutor.isShutdown()) {
+      fileSystemExecutor.shutdownNow();
+    }
 
     if (fileSystemCache != null) {
       fileSystemCache

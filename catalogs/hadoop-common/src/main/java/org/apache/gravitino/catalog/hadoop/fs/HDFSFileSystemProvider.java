@@ -20,6 +20,7 @@ package org.apache.gravitino.catalog.hadoop.fs;
 
 import static org.apache.gravitino.catalog.hadoop.fs.Constants.BUILTIN_HDFS_FS_PROVIDER;
 import static org.apache.gravitino.catalog.hadoop.fs.Constants.DEFAULT_CONNECTION_TIMEOUT;
+import static org.apache.gravitino.catalog.hadoop.fs.Constants.DEFAULT_HDFS_IPC_PING;
 import static org.apache.gravitino.catalog.hadoop.fs.Constants.HDFS_IPC_CLIENT_CONNECT_TIMEOUT_KEY;
 import static org.apache.gravitino.catalog.hadoop.fs.Constants.HDFS_IPC_PING_KEY;
 
@@ -73,7 +74,7 @@ public class HDFSFileSystemProvider implements FileSystemProvider {
     }
 
     if (!configs.containsKey(HDFS_IPC_PING_KEY)) {
-      additionalConfigs.put(HDFS_IPC_PING_KEY, "true");
+      additionalConfigs.put(HDFS_IPC_PING_KEY, DEFAULT_HDFS_IPC_PING);
     }
 
     // More tuning can be added here.

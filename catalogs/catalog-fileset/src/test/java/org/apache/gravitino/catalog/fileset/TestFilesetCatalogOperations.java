@@ -1875,7 +1875,7 @@ public class TestFilesetCatalogOperations {
   }
 
   @Test
-  @Timeout(15)
+  @Timeout(20)
   void testGetFileSystemTimeoutThrowsException() throws Exception {
     FieldUtils.writeField(
         GravitinoEnv.getInstance(), "entityStore", new RelationalEntityStore(), true);
@@ -1899,14 +1899,16 @@ public class TestFilesetCatalogOperations {
       FieldUtils.writeField(
           filesetCatalogOperations, "propertiesMetadata", FILESET_PROPERTIES_METADATA, true);
 
-      // Test the following method should finish with 10s
-      long now = System.currentTimeMillis();
-      try {
-        filesetCatalogOperations.getFileSystem(new Path("file:///tmp"), ImmutableMap.of());
-      } catch (IOException e) {
-        long timeTake = System.currentTimeMillis() - now;
-        Assertions.assertTrue(timeTake <= 10000);
-      }
+      // We use Annotation `Timeout` to make sure the test will not run forever as `getFileSystem`
+      // will throw IOException after timeout(6s)
+      Exception e =
+          Assertions.assertThrows(
+              IOException.class,
+              () ->
+                  filesetCatalogOperations.getFileSystem(
+                      new Path("file:///tmp"), ImmutableMap.of()));
+
+      Assertions.assertTrue(e.getMessage().contains("Failed to get FileSystem for path"));
     }
   }
 

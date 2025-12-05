@@ -20,6 +20,7 @@
 package org.apache.gravitino.abs.fs;
 
 import static org.apache.gravitino.catalog.hadoop.fs.Constants.ADLS_MAX_RETRIES;
+import static org.apache.gravitino.catalog.hadoop.fs.Constants.DEFAULT_RETRY_LIMIT;
 import static org.apache.hadoop.fs.azurebfs.constants.ConfigurationKeys.FS_AZURE_ACCOUNT_AUTH_TYPE_PROPERTY_NAME;
 import static org.apache.hadoop.fs.azurebfs.constants.ConfigurationKeys.FS_AZURE_ACCOUNT_IS_HNS_ENABLED;
 import static org.apache.hadoop.fs.azurebfs.constants.ConfigurationKeys.FS_AZURE_SAS_TOKEN_PROVIDER_TYPE;
@@ -125,7 +126,7 @@ public class AzureFileSystemProvider implements FileSystemProvider, SupportsCred
 
     // Avoid multiple retries to speed up failure in test cases.
     if (!configs.containsKey(ADLS_MAX_RETRIES)) {
-      additionalConfigs.put(ADLS_MAX_RETRIES, "2");
+      additionalConfigs.put(ADLS_MAX_RETRIES, DEFAULT_RETRY_LIMIT);
     }
 
     // More tuning can be added here.

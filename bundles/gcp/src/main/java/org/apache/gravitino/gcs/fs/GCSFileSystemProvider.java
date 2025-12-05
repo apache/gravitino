@@ -19,6 +19,7 @@
 package org.apache.gravitino.gcs.fs;
 
 import static org.apache.gravitino.catalog.hadoop.fs.Constants.DEFAULT_CONNECTION_TIMEOUT;
+import static org.apache.gravitino.catalog.hadoop.fs.Constants.DEFAULT_RETRY_LIMIT;
 import static org.apache.gravitino.catalog.hadoop.fs.Constants.GCS_GCS_HTTP_CONNECT_TIMEOUT_KEY;
 import static org.apache.gravitino.catalog.hadoop.fs.Constants.GCS_HTTP_MAX_RETRY_KEY;
 
@@ -91,12 +92,11 @@ public class GCSFileSystemProvider implements FileSystemProvider, SupportsCreden
     // Use hard code instead of GoogleHadoopFileSystemBase.GCS_HTTP_CONNECT_TIMEOUT_KEY to avoid
     // dependency on a specific Hadoop version
     if (!configs.containsKey(GCS_GCS_HTTP_CONNECT_TIMEOUT_KEY)) {
-      //
       additionalConfigs.put(GCS_GCS_HTTP_CONNECT_TIMEOUT_KEY, DEFAULT_CONNECTION_TIMEOUT);
     }
 
     if (!configs.containsKey(GCS_HTTP_MAX_RETRY_KEY)) {
-      additionalConfigs.put(GCS_HTTP_MAX_RETRY_KEY, "2");
+      additionalConfigs.put(GCS_HTTP_MAX_RETRY_KEY, DEFAULT_RETRY_LIMIT);
     }
 
     // More tuning can be added here.

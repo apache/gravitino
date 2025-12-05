@@ -73,6 +73,8 @@ public class Constants {
   // HDFS specific configuration keys
   public static final String HDFS_IPC_CLIENT_CONNECT_TIMEOUT_KEY = "ipc.client.connect.timeout";
   public static final String HDFS_IPC_PING_KEY = "ipc.client.ping";
+  public static final String DEFAULT_HDFS_IPC_PING = "true";
 
   public static final String DEFAULT_CONNECTION_TIMEOUT = "5000";
+  public static final String DEFAULT_RETRY_LIMIT = "2";
 }

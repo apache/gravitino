@@ -20,6 +20,7 @@
 package org.apache.gravitino.s3.fs;
 
 import static org.apache.gravitino.catalog.hadoop.fs.Constants.DEFAULT_CONNECTION_TIMEOUT;
+import static org.apache.gravitino.catalog.hadoop.fs.Constants.DEFAULT_RETRY_LIMIT;
 import static org.apache.gravitino.catalog.hadoop.fs.Constants.S3_ESTABLISH_TIMEOUT;
 import static org.apache.gravitino.catalog.hadoop.fs.Constants.S3_MAX_ERROR_RETRIES;
 import static org.apache.gravitino.catalog.hadoop.fs.Constants.S3_RETRY_LIMIT;
@@ -164,7 +165,7 @@ public class S3FileSystemProvider implements FileSystemProvider, SupportsCredent
     // Use hard code instead of Constants.MAX_ERROR_RETRIES to avoid dependency on a specific Hadoop
     // version
     if (!configs.containsKey(S3_MAX_ERROR_RETRIES)) {
-      additionalConfigs.put(S3_MAX_ERROR_RETRIES, "2");
+      additionalConfigs.put(S3_MAX_ERROR_RETRIES, DEFAULT_RETRY_LIMIT);
     }
 
     if (!configs.containsKey(S3_ESTABLISH_TIMEOUT)) {
@@ -172,11 +173,11 @@ public class S3FileSystemProvider implements FileSystemProvider, SupportsCredent
     }
 
     if (!configs.containsKey(S3_RETRY_LIMIT)) {
-      additionalConfigs.put(S3_RETRY_LIMIT, "2");
+      additionalConfigs.put(S3_RETRY_LIMIT, DEFAULT_RETRY_LIMIT);
     }
 
     if (!configs.containsKey(S3_RETRY_THROTTLE_LIMIT)) {
-      additionalConfigs.put(S3_RETRY_THROTTLE_LIMIT, "2");
+      additionalConfigs.put(S3_RETRY_THROTTLE_LIMIT, DEFAULT_RETRY_LIMIT);
     }
 
     // More tuning can be added here.
