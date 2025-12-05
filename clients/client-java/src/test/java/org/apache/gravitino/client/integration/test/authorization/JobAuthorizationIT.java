@@ -22,7 +22,6 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
-import java.io.File;
 import java.lang.reflect.Method;
 import java.nio.file.Files;
 import java.util.Collections;
@@ -50,7 +49,6 @@ import org.junit.jupiter.api.TestMethodOrder;
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 public class JobAuthorizationIT extends BaseRestApiAuthorizationIT {
 
-  private static File testStagingDir;
   private static ShellJobTemplate.Builder builder;
   private static final String ROLE = "job_test_role";
 
@@ -376,54 +374,6 @@ public class JobAuthorizationIT extends BaseRestApiAuthorizationIT {
   public static void tearDown() throws Exception {
     if (testStagingDir != null && testStagingDir.exists()) {
       FileUtils.deleteDirectory(testStagingDir);
-    }
-  }
-
-  private static String generateTestEntryScript() {
-    String content =
-        "#!/bin/bash\n"
-            + "echo \"starting test job\"\n\n"
-            + "bin=\"$(dirname \"${BASH_SOURCE-$0}\")\"\n"
-            + "bin=\"$(cd \"${bin}\">/dev/null; pwd)\"\n\n"
-            + ". \"${bin}/common.sh\"\n\n"
-            + "sleep 3\n\n"
-            + "JOB_NAME=\"test_job-$(date +%s)-$1\"\n\n"
-            + "echo \"Submitting job with name: $JOB_NAME\"\n\n"
-            + "echo \"$1\"\n\n"
-            + "echo \"$2\"\n\n"
-            + "echo \"$ENV_VAR\"\n\n"
-            + "if [[ \"$2\" == \"success\" ]]; then\n"
-            + "  exit 0\n"
-            + "elif [[ \"$2\" == \"fail\" ]]; then\n"
-            + "  exit 1\n"
-            + "else\n"
-            + "  exit 2\n"
-            + "fi\n";
-
-    try {
-      File scriptFile = new File(testStagingDir, "test-job.sh");
-      Files.writeString(scriptFile.toPath(), content);
-      if (!scriptFile.setExecutable(true)) {
-        throw new RuntimeException("Failed to set script as executable");
-      }
-      return scriptFile.getAbsolutePath();
-    } catch (Exception e) {
-      throw new RuntimeException("Failed to create test entry script", e);
-    }
-  }
-
-  private static String generateTestLibScript() {
-    String content = "#!/bin/bash\necho \"in common script\"\n";
-
-    try {
-      File scriptFile = new File(testStagingDir, "common.sh");
-      Files.writeString(scriptFile.toPath(), content);
-      if (!scriptFile.setExecutable(true)) {
-        throw new RuntimeException("Failed to set script as executable");
-      }
-      return scriptFile.getAbsolutePath();
-    } catch (Exception e) {
-      throw new RuntimeException("Failed to create test lib script", e);
     }
   }
 }
