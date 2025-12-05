@@ -56,6 +56,10 @@ dependencies {
   implementation(libs.bundles.metrics)
   implementation(libs.bundles.prometheus)
   implementation(libs.caffeine)
+  implementation(libs.cglib) {
+    // The version of build-in asm is 7.1, which is not compatible with Java 17 well
+    exclude("org.ow2.asm")
+  }
   implementation(libs.commons.dbcp2)
   implementation(libs.commons.lang3)
   implementation(libs.concurrent.trees)
@@ -108,6 +112,11 @@ dependencies {
   testImplementation(libs.sqlite.jdbc)
   testImplementation(libs.slf4j.api)
   testImplementation(libs.testcontainers)
+  testImplementation(libs.cglib) {
+    // The version of build-in asm is 7.1, which is not compatible with Java 17 well
+    exclude("org.ow2.asm")
+  }
+  testImplementation(libs.asm)
   testImplementation(libs.testcontainers.postgresql)
 
   // Add Hadoop 3.3+ dependencies since Spark's Hadoop is excluded

@@ -111,21 +111,22 @@ public class GCSTokenGenerator implements CredentialGenerator<GCSTokenCredential
 
   // "a/b/c" will get ["a", "a/", "a/b", "a/b/", "a/b/c"]
   static List<String> getAllResources(String resourcePath) {
+    if (resourcePath == null || resourcePath.isEmpty() || resourcePath.equals("/")) {
+      return Arrays.asList("");
+    }
     if (resourcePath.endsWith("/")) {
       resourcePath = resourcePath.substring(0, resourcePath.length() - 1);
-    }
-    if (resourcePath.isEmpty()) {
-      return Arrays.asList("");
     }
     Preconditions.checkArgument(
         !resourcePath.startsWith("/"), resourcePath + " should not start with /");
     List<String> parts = Arrays.asList(resourcePath.split("/"));
     List<String> results = new ArrayList<>();
-    String parent = "";
+    StringBuilder parent = new StringBuilder();
     for (int i = 0; i < parts.size() - 1; i++) {
-      results.add(parts.get(i));
-      parent += parts.get(i) + "/";
-      results.add(parent);
+      String part = parts.get(i);
+      results.add(parent + part);
+      parent.append(part).append("/");
+      results.add(parent.toString());
     }
     results.add(parent + parts.get(parts.size() - 1));
     return results;

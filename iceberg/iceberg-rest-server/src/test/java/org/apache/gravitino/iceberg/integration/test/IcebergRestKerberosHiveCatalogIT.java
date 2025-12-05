@@ -41,10 +41,10 @@ import org.junit.jupiter.api.condition.EnabledIf;
 @EnabledIf("isEmbedded")
 public class IcebergRestKerberosHiveCatalogIT extends IcebergRESTHiveCatalogIT {
 
-  private static final String HIVE_METASTORE_CLIENT_PRINCIPAL = "cli@HADOOPKRB";
-  private static final String HIVE_METASTORE_CLIENT_KEYTAB = "/client.keytab";
+  protected static final String HIVE_METASTORE_CLIENT_PRINCIPAL = "cli@HADOOPKRB";
+  protected static final String HIVE_METASTORE_CLIENT_KEYTAB = "/client.keytab";
 
-  private static String tempDir;
+  protected static String tempDir;
 
   public IcebergRestKerberosHiveCatalogIT() {
     super();
@@ -150,7 +150,7 @@ public class IcebergRestKerberosHiveCatalogIT extends IcebergRESTHiveCatalogIT {
     return configMap;
   }
 
-  private static boolean isEmbedded() {
+  protected static boolean isEmbedded() {
     String mode =
         System.getProperty(ITUtils.TEST_MODE) == null
             ? ITUtils.EMBEDDED_TEST_MODE
@@ -159,7 +159,7 @@ public class IcebergRestKerberosHiveCatalogIT extends IcebergRESTHiveCatalogIT {
     return Objects.equals(mode, ITUtils.EMBEDDED_TEST_MODE);
   }
 
-  private static void refreshKerberosConfig() {
+  protected static void refreshKerberosConfig() {
     Class<?> classRef;
     try {
       if (System.getProperty("java.vendor").contains("IBM")) {
