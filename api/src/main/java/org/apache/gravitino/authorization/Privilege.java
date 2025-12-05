@@ -91,7 +91,7 @@ public interface Privilege {
     MANAGE_GRANTS(0L, 1L << 17),
     /** The privilege to register a model */
     REGISTER_MODEL(0L, 1L << 18),
-    /** The privilege to create a model. The is deprecated. Please use REGISTER_MODEL */
+    /** The privilege to create a model. This is deprecated. Please use REGISTER_MODEL */
     CREATE_MODEL(0L, 1L << 18),
     /** The privilege to link a model version */
     LINK_MODEL_VERSION(0L, 1L << 19),
