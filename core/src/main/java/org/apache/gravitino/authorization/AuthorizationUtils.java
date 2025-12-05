@@ -254,6 +254,24 @@ public class AuthorizationUtils {
     }
   }
 
+  public static Privilege getLegacyPrivilege(
+      Privilege.Name privilegeName, Privilege.Condition condition) {
+    Privilege.Name legacyPrivilegeName;
+    if (privilegeName == Privilege.Name.REGISTER_MODEL) {
+      legacyPrivilegeName = Privilege.Name.CREATE_MODEL;
+    } else if (privilegeName == Privilege.Name.LINK_MODEL_VERSION) {
+      legacyPrivilegeName = Privilege.Name.CREATE_MODEL_VERSION;
+    } else {
+      throw new UnsupportedOperationException(
+          "The privilege " + privilegeName + " is not a legacy privilege");
+    }
+    if (condition == Privilege.Condition.ALLOW) {
+      return Privileges.allow(legacyPrivilegeName);
+    } else {
+      return Privileges.deny(legacyPrivilegeName);
+    }
+  }
+
   public static void checkPrivilege(
       PrivilegeDTO privilegeDTO, MetadataObject object, String metalake) {
     Privilege privilege = DTOConverters.fromPrivilegeDTO(privilegeDTO);

@@ -638,8 +638,8 @@ class PermissionManager {
     updatePrivileges.addAll(targetObject.privileges());
     privileges.forEach(updatePrivileges::remove);
 
-    // Remove legacy privileges if exists
-    for (Privilege privilege : updatePrivileges) {
+    // Remove model privileges if exists
+    for (Privilege privilege : privileges) {
       if (privilege.name() == Privilege.Name.CREATE_MODEL
           || privilege.name() == Privilege.Name.LINK_MODEL_VERSION) {
         updatePrivileges.remove(
@@ -647,7 +647,7 @@ class PermissionManager {
       } else if (privilege.name() == Privilege.Name.REGISTER_MODEL
           || privilege.name() == Privilege.Name.LINK_MODEL_VERSION) {
         updatePrivileges.remove(
-            AuthorizationUtils.replaceLegacyPrivilege(privilege.name(), privilege.condition()));
+            AuthorizationUtils.getLegacyPrivilege(privilege.name(), privilege.condition()));
       }
     }
 

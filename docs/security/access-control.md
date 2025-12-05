@@ -261,11 +261,13 @@ DENY `WRITE_FILESET` won‘t deny the `READ_FILESET` operation if the user has t
 
 ### Model privileges
 
-| Name               | Supports Securable Object        | Operation                                                          |
-|--------------------|----------------------------------|--------------------------------------------------------------------|
-| REGISTER_MODEL     | Metalake, Catalog, Schema        | Register a model                                                   |
-| LINK_MODEL_VERSION | Metalake, Catalog, Schema, Model | Link a model version                                               |
-| USE_MODEL          | Metalake, Catalog, Schema, Model | View the metadata of the model and download all the model versions |
+| Name                 | Supports Securable Object        | Operation                                                                          |
+|----------------------|----------------------------------|------------------------------------------------------------------------------------|
+| REGISTER_MODEL       | Metalake, Catalog, Schema        | Register a model                                                                   |
+| LINK_MODEL_VERSION   | Metalake, Catalog, Schema, Model | Link a model version                                                               |
+| USE_MODEL            | Metalake, Catalog, Schema, Model | View the metadata of the model and download all the model versions                 |
+| CREATE_MODEL         | Metalake, Catalog, Schema        | Register a model, this is deprecated. Please use `REGISTER_MODEL` instead.         |
+| CREATE_MODEL_VERSION | Metalake, Catalog, Schema, Model | Link a model version, this is deprecated. Please use `LINK_MODEL_VERSION` instead. |
 
 ### Tag privileges
 
