@@ -15,9 +15,9 @@
 # specific language governing permissions and limitations
 # under the License.
 
+from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import List
 
 from gravitino.api.tag.tag import Tag
 
@@ -29,20 +29,20 @@ class SupportsTags(ABC):
     """
 
     @abstractmethod
-    def list_tags(self) -> List[str]:
+    def list_tags(self) -> list[str]:
         """List all the tag names for the specific object.
 
         Returns:
-            List[str]: The list of tag names.
+            list[str]: The list of tag names.
         """
         pass
 
     @abstractmethod
-    def list_tags_info(self) -> List[Tag]:
+    def list_tags_info(self) -> list[Tag]:
         """List all the tags with details for the specific object.
 
         Returns:
-            List[Tag]: The list of tags.
+            list[Tag]: The list of tags.
         """
         pass
 
@@ -63,8 +63,8 @@ class SupportsTags(ABC):
 
     @abstractmethod
     def associate_tags(
-        self, tags_to_add: List[str], tags_to_remove: List[str]
-    ) -> List[str]:
+        self, tags_to_add: list[str], tags_to_remove: list[str]
+    ) -> list[str]:
         """Associate tags to the specific object.
 
         The `tags_to_add` will be added to the object, and the `tags_to_remove` will be removed from the object.
@@ -75,13 +75,13 @@ class SupportsTags(ABC):
         3. If the tag is already associated with the object, it will raise `TagAlreadyAssociatedException`.
 
         Args:
-            tags_to_add (List[str]): The arrays of tag name to be added to the object.
-            tags_to_remove (List[str]): The array of tag name to be removed from the object.
+            tags_to_add (list[str]): The arrays of tag name to be added to the object.
+            tags_to_remove (list[str]): The array of tag name to be removed from the object.
 
         Raises:
             TagAlreadyAssociatedException: If the tag is already associated with the object.
 
         Returns:
-            List[str]: The array of tag names that are associated with the object.
+            list[str]: The array of tag names that are associated with the object.
         """
         pass
