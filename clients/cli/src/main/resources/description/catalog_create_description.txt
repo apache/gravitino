@@ -1,0 +1,21 @@
+Create a new catalog in a Metalake. The type of catalog to be created is specified by the `--provider` option. Different catalogs require different properties, for example, a Hive catalog requires a metastore-uri property.
+
+Example commands
+
+# Create a Hive catalog
+gcli catalog create -m demo_metalake --name hive --provider hive --properties metastore.uris=thrift://hive-host:9083
+
+# Create an Iceberg catalog
+gcli catalog create -m demo_metalake  --name iceberg --provider iceberg --properties "uri=thrift://hive-host:9083,catalog-backend=hive,warehouse=hdfs://hdfs-host:9000/user/iceberg/warehouse"
+
+# Create a MySQL catalog
+gcli catalog create -m demo_metalake  --name mysql --provider mysql --properties "
+jdbc-url=jdbc:mysql://mysql-host:3306?useSSL=false,jdbc-user=user,jdbc-password=password,jdbc-driver=com.mysql.cj.jdbc.Driver"
+
+# Create a Postgres catalog
+gcli catalog create -m demo_metalake  --name postgres --provider postgres --properties "
+jdbc-url=jdbc:postgresql://postgresql-host/mydb,jdbc-user=user,jdbc-password=password,jdbc-database=db,jdbc-driver=org.postgresql.Driver%n "
+
+# Create a Kafka catalog
+gcli catalog create -m demo_metalake --name kafka "
+--provider kafka --properties bootstrap.servers=127.0.0.1:9092,127.0.0.2:9092;

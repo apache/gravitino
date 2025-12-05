@@ -1,0 +1,9 @@
+List all Metalakes, you can specify the output format using the --output option.
+
+Example commands
+
+# List all Metalakes in plain format
+gcli metalake list
+
+# List all Metalakes in Table format
+gcli metalake list --output TABLE
