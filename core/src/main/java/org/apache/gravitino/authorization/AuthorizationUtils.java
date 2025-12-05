@@ -87,9 +87,9 @@ public class AuthorizationUtils {
 
   private static final Set<Privilege.Name> MODEL_PRIVILEGES =
       Sets.immutableEnumSet(
-          Privilege.Name.CREATE_MODEL,
+          Privilege.Name.REGISTER_MODEL,
           Privilege.Name.USE_MODEL,
-          Privilege.Name.CREATE_MODEL_VERSION);
+          Privilege.Name.LINK_MODEL_VERSION);
 
   private AuthorizationUtils() {}
 
@@ -224,12 +224,51 @@ public class AuthorizationUtils {
   public static void checkDuplicatedNamePrivilege(Collection<Privilege> privileges) {
     Set<Privilege.Name> privilegeNameSet = Sets.newHashSet();
     for (Privilege privilege : privileges) {
-      if (privilegeNameSet.contains(privilege.name())) {
+      Privilege.Name replacePrivilegeName = replaceLegacyPrivilegeName(privilege.name());
+      if (privilegeNameSet.contains(replacePrivilegeName)) {
         throw new IllegalPrivilegeException(
             "Doesn't support duplicated privilege name %s with different condition",
             privilege.name());
       }
-      privilegeNameSet.add(privilege.name());
+      privilegeNameSet.add(replacePrivilegeName);
+    }
+  }
+
+  public static Privilege.Name replaceLegacyPrivilegeName(Privilege.Name privilegeName) {
+    if (privilegeName == Privilege.Name.CREATE_MODEL) {
+      return Privilege.Name.REGISTER_MODEL;
+    } else if (privilegeName == Privilege.Name.CREATE_MODEL_VERSION) {
+      return Privilege.Name.LINK_MODEL_VERSION;
+    } else {
+      return privilegeName;
+    }
+  }
+
+  public static Privilege replaceLegacyPrivilege(
+      Privilege.Name privilege, Privilege.Condition condition) {
+    Privilege.Name replacedPrivilegeName = replaceLegacyPrivilegeName(privilege);
+    if (condition == Privilege.Condition.ALLOW) {
+      return Privileges.allow(replacedPrivilegeName);
+    } else {
+      return Privileges.deny(replacedPrivilegeName);
+    }
+  }
+
+  public static Privilege getLegacyPrivilege(
+      Privilege.Name privilegeName, Privilege.Condition condition) {
+    Privilege.Name legacyPrivilegeName;
+    if (privilegeName == Privilege.Name.REGISTER_MODEL) {
+      legacyPrivilegeName = Privilege.Name.CREATE_MODEL;
+    } else if (privilegeName == Privilege.Name.LINK_MODEL_VERSION) {
+      legacyPrivilegeName = Privilege.Name.CREATE_MODEL_VERSION;
+    } else {
+      throw new UnsupportedOperationException(
+          "The privilege " + privilegeName + " is not a legacy privilege");
+    }
+    if (condition == Privilege.Condition.ALLOW) {
+      return Privileges.allow(legacyPrivilegeName);
+    } else {
+      return Privileges.deny(legacyPrivilegeName);
     }
   }
 

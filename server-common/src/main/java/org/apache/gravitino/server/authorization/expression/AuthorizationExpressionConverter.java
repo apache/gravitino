@@ -255,14 +255,14 @@ public class AuthorizationExpressionConverter {
                 + "!(ANY(DENY_USE_MODEL, METALAKE, CATALOG, SCHEMA, MODEL)))");
     expression =
         expression.replaceAll(
-            "ANY_CREATE_MODEL_VERSION",
-            "((ANY(CREATE_MODEL_VERSION, METALAKE, CATALOG, SCHEMA, MODEL)) "
-                + "&& !(ANY(DENY_CREATE_MODEL_VERSION, METALAKE, CATALOG, SCHEMA, MODEL)))");
+            "ANY_LINK_MODEL_VERSION",
+            "((ANY(LINK_MODEL_VERSION, METALAKE, CATALOG, SCHEMA, MODEL)) "
+                + "&& !(ANY(DENY_LINK_MODEL_VERSION, METALAKE, CATALOG, SCHEMA, MODEL)))");
     expression =
         expression.replaceAll(
-            "ANY_CREATE_MODEL",
-            "((ANY(CREATE_MODEL, METALAKE, CATALOG, SCHEMA)) "
-                + "&& !(ANY(DENY_CREATE_MODEL, METALAKE, CATALOG, SCHEMA)))");
+            "ANY_REGISTER_MODEL",
+            "((ANY(REGISTER_MODEL, METALAKE, CATALOG, SCHEMA)) "
+                + "&& !(ANY(DENY_REGISTER_MODEL, METALAKE, CATALOG, SCHEMA)))");
     expression =
         expression.replaceAll(
             "ANY_CREATE_TOPIC",
