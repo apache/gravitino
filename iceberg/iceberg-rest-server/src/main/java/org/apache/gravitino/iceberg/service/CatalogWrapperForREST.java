@@ -157,6 +157,7 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
 
   @Override
   public void close() throws Exception {
+    LOG.info("close Iceberg REST wrapper");
     try {
       if (catalogCredentialManager != null) {
         catalogCredentialManager.close();
@@ -172,6 +173,11 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
 
   public Map<String, String> getCatalogConfigToClient() {
     return catalogConfigToClients;
+  }
+
+  @Override
+  protected boolean useDifferentClassLoader() {
+    return false;
   }
 
   private LoadTableResponse injectCredentialConfig(

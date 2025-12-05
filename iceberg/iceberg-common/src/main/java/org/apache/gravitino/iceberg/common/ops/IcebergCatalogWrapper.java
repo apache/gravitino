@@ -279,13 +279,27 @@ public class IcebergCatalogWrapper implements AutoCloseable {
 
   @Override
   public void close() throws Exception {
+    LOG.info("Closing IcebergCatalogWrapper for catalog: {}", catalog.name());
     if (catalog instanceof AutoCloseable) {
       // JdbcCatalog and ClosableHiveCatalog implement AutoCloseable and will handle their own
       // cleanup
+      LOG.info("do catalog cleanup");
       ((AutoCloseable) catalog).close();
     }
     metadataCache.close();
 
+    // For Iceberg REST server which has same classloader for each catalog wrapper, the Driver
+    // couldn't be reloaded after deregister()
+    if (useDifferentClassLoader()) {
+      closeJdbcDriverResources();
+    }
+  }
+
+  protected boolean useDifferentClassLoader() {
+    return true;
+  }
+
+  private void closeJdbcDriverResources() {
     // Because each catalog in Gravitino has its own classloader, after a catalog is no longer used
     // for a long time or dropped, the instance of classloader needs to be released. In order to
     // let JVM GC remove the classloader, we need to release the resources of the classloader. The
