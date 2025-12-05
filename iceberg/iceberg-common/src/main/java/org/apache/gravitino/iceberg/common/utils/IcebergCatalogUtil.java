@@ -22,8 +22,6 @@ import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.HADOOP_SECURITY
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.HADOOP_SECURITY_AUTHORIZATION;
 
 import com.google.common.annotations.VisibleForTesting;
-import java.io.File;
-import java.io.IOException;
 import java.sql.SQLException;
 import java.util.Collections;
 import java.util.HashMap;
@@ -35,9 +33,6 @@ import org.apache.gravitino.exceptions.ConnectionFailedException;
 import org.apache.gravitino.iceberg.common.ClosableHiveCatalog;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
 import org.apache.gravitino.iceberg.common.authentication.AuthenticationConfig;
-import org.apache.gravitino.iceberg.common.authentication.kerberos.HiveBackendProxy;
-import org.apache.gravitino.iceberg.common.authentication.kerberos.KerberosClient;
-import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdfs.HdfsConfiguration;
 import org.apache.iceberg.CatalogProperties;
 import org.apache.iceberg.CatalogUtil;
@@ -86,36 +81,11 @@ public class IcebergCatalogUtil {
       hdfsConfiguration.set(HADOOP_SECURITY_AUTHORIZATION, "true");
       hdfsConfiguration.set(HADOOP_SECURITY_AUTHENTICATION, "kerberos");
       hiveCatalog.setConf(hdfsConfiguration);
-      hiveCatalog.initialize(icebergCatalogName, properties);
-
-      KerberosClient kerberosClient = initKerberosAndReturnClient(properties, hdfsConfiguration);
-      hiveCatalog.addResource(kerberosClient);
-      if (authenticationConfig.isImpersonationEnabled()) {
-        HiveBackendProxy proxyHiveCatalog =
-            new HiveBackendProxy(resultProperties, hiveCatalog, kerberosClient.getRealm());
-        return proxyHiveCatalog.getProxy();
-      }
-
+      hiveCatalog.initialize(icebergCatalogName, resultProperties);
       return hiveCatalog;
     } else {
       throw new UnsupportedOperationException(
           "Unsupported authentication method: " + authenticationConfig.getAuthType());
-    }
-  }
-
-  private static KerberosClient initKerberosAndReturnClient(
-      Map<String, String> properties, Configuration conf) {
-    try {
-      KerberosClient kerberosClient = new KerberosClient(properties, conf);
-
-      // For Iceberg rest server, we haven't set the catalog_uuid, so we set it to 0 as there is
-      // only one catalog in the rest server, so it's okay to set it to 0.
-      String catalogUUID = properties.getOrDefault("catalog_uuid", "0");
-      File keytabFile = kerberosClient.saveKeyTabFileFromUri(Long.valueOf(catalogUUID));
-      kerberosClient.login(keytabFile.getAbsolutePath());
-      return kerberosClient;
-    } catch (IOException e) {
-      throw new RuntimeException("Failed to login with kerberos", e);
     }
   }
 
