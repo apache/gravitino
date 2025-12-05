@@ -786,7 +786,7 @@ curl -X PUT -H "Accept: application/vnd.gravitino.v1+json" \
 ---
 
 **Summary:**
-- Enable authorization and set configuration provider to `dynamic`
+- Enable authorization and set configuration provider to `dynamic-config-provider`
 - Create metalake
 - Create catalog
 - Create role and grant privileges
