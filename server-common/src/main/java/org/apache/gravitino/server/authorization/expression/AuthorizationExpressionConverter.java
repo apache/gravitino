@@ -206,7 +206,6 @@ public class AuthorizationExpressionConverter {
    */
   public static String replaceAnyPrivilege(String expression) {
     expression = expression.replaceAll("SERVICE_ADMIN", "authorizer.isServiceAdmin()");
-    expression = expression.replaceAll("METALAKE_USER", "authorizer.isMetalakeUser(METALAKE_NAME)");
     expression =
         expression.replaceAll(
             "ANY_USE_CATALOG",

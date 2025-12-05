@@ -142,8 +142,7 @@ public class MetalakeOperations {
   @Produces("application/vnd.gravitino.v1+json")
   @Timed(name = "load-metalake." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "load-metalake", absolute = true)
-  @AuthorizationExpression(
-      expression = AuthorizationExpressionConstants.loadMetalakeAuthorizationExpression)
+  @AuthorizationExpression(expression = "")
   public Response loadMetalake(
       @PathParam("name") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
           String metalakeName) {
