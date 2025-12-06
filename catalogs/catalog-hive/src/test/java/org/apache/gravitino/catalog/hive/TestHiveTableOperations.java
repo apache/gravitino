@@ -32,6 +32,7 @@ import java.util.Arrays;
 import java.util.Map;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.exceptions.NoSuchPartitionException;
+import org.apache.gravitino.hive.HiveColumn;
 import org.apache.gravitino.hive.hms.MiniHiveMetastoreService;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.SupportsPartitions;
@@ -51,7 +52,7 @@ public class TestHiveTableOperations extends MiniHiveMetastoreService {
       NameIdentifier.of(META_LAKE_NAME, HIVE_CATALOG_NAME, HIVE_SCHEMA_NAME, genRandomName());
   private static HiveCatalog hiveCatalog;
   private static HiveCatalogOperations hiveCatalogOperations;
-  private static HiveTable hiveTable;
+  private static HiveTableHandle hiveTable;
   private static Column[] columns;
   private static Partition existingPartition;
 
@@ -74,7 +75,7 @@ public class TestHiveTableOperations extends MiniHiveMetastoreService {
     existingPartition = hiveTable.supportPartitions().addPartition(partition);
   }
 
-  private static HiveTable createPartitionedTable() {
+  private static HiveTableHandle createPartitionedTable() {
     Map<String, String> properties = Maps.newHashMap();
     properties.put("key1", "val1");
     properties.put("key2", "val2");
@@ -88,7 +89,7 @@ public class TestHiveTableOperations extends MiniHiveMetastoreService {
 
     Transform[] partitioning = new Transform[] {identity(col1.name()), identity(col2.name())};
 
-    return (HiveTable)
+    return (HiveTableHandle)
         hiveCatalogOperations.createTable(
             tableIdentifier, columns, HIVE_COMMENT, properties, partitioning);
   }

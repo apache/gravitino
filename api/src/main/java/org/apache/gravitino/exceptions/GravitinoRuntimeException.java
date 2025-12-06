@@ -55,4 +55,14 @@ public class GravitinoRuntimeException extends RuntimeException {
   public GravitinoRuntimeException(Throwable cause, @FormatString String message, Object... args) {
     super(String.format(message, args), cause);
   }
+
+  /**
+   * Constructs a new exception with the specified detail message and cause.
+   *
+   * @param cause the cause.
+   * @param message the detail message.
+   */
+  public GravitinoRuntimeException(Throwable cause, String message) {
+    super(message, cause);
+  }
 }

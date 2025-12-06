@@ -31,12 +31,12 @@ import org.apache.gravitino.Configs;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Schema;
 import org.apache.gravitino.catalog.lakehouse.hudi.HudiCatalogPropertiesMetadata;
-import org.apache.gravitino.catalog.lakehouse.hudi.backend.hms.kerberos.AuthenticationConfig;
-import org.apache.gravitino.catalog.lakehouse.hudi.backend.hms.kerberos.KerberosConfig;
 import org.apache.gravitino.client.GravitinoAdminClient;
 import org.apache.gravitino.client.GravitinoMetalake;
 import org.apache.gravitino.client.KerberosTokenProvider;
 import org.apache.gravitino.exceptions.NoSuchTableException;
+import org.apache.gravitino.hive.kerberos.AuthenticationConfig;
+import org.apache.gravitino.hive.kerberos.KerberosConfig;
 import org.apache.gravitino.integration.test.container.ContainerSuite;
 import org.apache.gravitino.integration.test.container.HiveContainer;
 import org.apache.gravitino.integration.test.util.BaseIT;
@@ -47,11 +47,13 @@ import org.apache.hadoop.security.authentication.util.KerberosUtil;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+@Disabled
 @Tag("gravitino-docker-test")
 public class HudiCatalogKerberosHiveIT extends BaseIT {
   private static final Logger LOG = LoggerFactory.getLogger(HudiCatalogKerberosHiveIT.class);

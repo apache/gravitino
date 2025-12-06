@@ -31,13 +31,34 @@ dependencies {
   implementation(project(":catalogs:catalog-common")) {
     exclude("*")
   }
+  implementation(project(":common")) {
+    exclude("*")
+  }
   implementation(project(":core")) {
     exclude("*")
   }
+  implementation(project(":clients:client-java-runtime", configuration = "shadow"))
 
   implementation(libs.caffeine)
   implementation(libs.guava)
-  implementation(libs.hive2.metastore) {
+  implementation(libs.slf4j.api)
+
+  compileOnly(libs.hive2.metastore)
+  compileOnly(libs.immutables.value)
+  compileOnly(libs.lombok)
+
+  annotationProcessor(libs.immutables.value)
+  annotationProcessor(libs.lombok)
+
+  testImplementation(libs.bundles.log4j)
+  testImplementation(libs.commons.collections3)
+  testImplementation(libs.commons.configuration1)
+  testImplementation(libs.datanucleus.core)
+  testImplementation(libs.datanucleus.api.jdo)
+  testImplementation(libs.datanucleus.rdbms)
+  testImplementation(libs.datanucleus.jdo)
+  testImplementation(libs.derby)
+  testImplementation(libs.hive2.metastore) {
     exclude("ant")
     exclude("co.cask.tephra")
     exclude("com.github.joshelser")
@@ -62,23 +83,9 @@ dependencies {
     exclude("org.openjdk.jol")
     exclude("org.slf4j")
   }
-  implementation(libs.hadoop2.common) {
+  testImplementation(libs.hadoop2.common) {
     exclude("*")
   }
-  implementation(libs.slf4j.api)
-
-  compileOnly(libs.immutables.value)
-
-  annotationProcessor(libs.immutables.value)
-
-  testImplementation(libs.bundles.log4j)
-  testImplementation(libs.commons.collections3)
-  testImplementation(libs.commons.configuration1)
-  testImplementation(libs.datanucleus.core)
-  testImplementation(libs.datanucleus.api.jdo)
-  testImplementation(libs.datanucleus.rdbms)
-  testImplementation(libs.datanucleus.jdo)
-  testImplementation(libs.derby)
   testImplementation(libs.hadoop2.auth) {
     exclude("*")
   }
@@ -129,4 +136,14 @@ configurations {
 
 artifacts {
   add("testArtifacts", testJar)
+}
+
+// Ensure the shaded Hive metastore lib jars exist before compiling this module,
+// since compileOnly(project(":catalogs:hive-metastore{2,3}-libs")) puts those
+// jars on the compile classpath and they are produced by the copyDepends tasks.
+tasks.named<JavaCompile>("compileJava") {
+  dependsOn(
+    ":catalogs:hive-metastore2-libs:copyDepends",
+    ":catalogs:hive-metastore3-libs:copyDepends"
+  )
 }
