@@ -25,19 +25,17 @@ import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
 import java.lang.reflect.UndeclaredThrowableException;
 import java.security.PrivilegedExceptionAction;
-import org.apache.gravitino.utils.PrincipalUtils;
-import org.apache.hadoop.hive.thrift.DelegationTokenIdentifier;
+import java.util.Properties;
 import org.apache.hadoop.security.UserGroupInformation;
-import org.apache.hadoop.security.token.Token;
 
 public class KerberosHiveClientImpl implements InvocationHandler {
 
   private final HiveClient delegate;
-  private final UserGroupInformation realUser;
+  private final UserGroupInformation ugi;
 
-  private KerberosHiveClientImpl(HiveClient delegate, UserGroupInformation realUser) {
+  private KerberosHiveClientImpl(HiveClient delegate, UserGroupInformation ugi) {
     this.delegate = delegate;
-    this.realUser = realUser;
+    this.ugi = ugi;
   }
 
   /**
@@ -47,44 +45,28 @@ public class KerberosHiveClientImpl implements InvocationHandler {
    * <p>Callers should ensure Kerberos has been configured and the login user is set appropriately
    * (for example via keytab) before calling this method.
    */
-  public static HiveClient createClient(HiveClient hiveClient) {
+  public static HiveClient createClient(
+      HiveClientClassLoader.HiveVersion version, UserGroupInformation ugi, Properties properties) {
     try {
-      UserGroupInformation currentUser = UserGroupInformation.getCurrentUser();
+      HiveClientImpl client =
+          ugi.doAs(
+              (PrivilegedExceptionAction<HiveClientImpl>)
+                  () -> new HiveClientImpl(version, properties));
       return (HiveClient)
           Proxy.newProxyInstance(
-              hiveClient.getClass().getClassLoader(),
+              HiveClient.class.getClassLoader(),
               new Class<?>[] {HiveClient.class},
-              new KerberosHiveClientImpl(hiveClient, currentUser));
-    } catch (IOException e) {
-      throw new RuntimeException("Failed to obtain current UserGroupInformation", e);
+              new KerberosHiveClientImpl(client, ugi));
+
+    } catch (IOException | InterruptedException ex) {
+      throw new RuntimeException("Failed to create Kerberos Hive client", ex);
     }
   }
 
   @Override
   public Object invoke(Object proxy, Method method, Object[] args) throws Throwable {
-    // Default to the login user; optionally create a proxy user for impersonation and attach a
-    // delegation token, similar to HiveProxyPlugin.
-    UserGroupInformation ugiToUse = realUser;
-    if (UserGroupInformation.isSecurityEnabled()) {
-      String proxyKerberosPrincipalName = PrincipalUtils.getCurrentUserName();
-      if (proxyKerberosPrincipalName != null && !proxyKerberosPrincipalName.isEmpty()) {
-        final String finalPrincipalName = proxyKerberosPrincipalName;
-        UserGroupInformation proxyUser =
-            UserGroupInformation.createProxyUser(finalPrincipalName, realUser);
-
-        // Acquire HMS delegation token for the proxy user and attach it to UGI
-        String tokenStr =
-            delegate.getDelegationToken(finalPrincipalName, realUser.getShortUserName());
-        Token<DelegationTokenIdentifier> delegationToken = new Token<>();
-        delegationToken.decodeFromUrlString(tokenStr);
-        proxyUser.addToken(delegationToken);
-
-        ugiToUse = proxyUser;
-      }
-    }
-
     try {
-      return ugiToUse.doAs(
+      return ugi.doAs(
           (PrivilegedExceptionAction<Object>)
               () -> {
                 try {

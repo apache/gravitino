@@ -22,6 +22,7 @@ import java.util.List;
 import org.apache.gravitino.hive.HivePartition;
 import org.apache.gravitino.hive.HiveSchema;
 import org.apache.gravitino.hive.HiveTable;
+import org.apache.hadoop.security.UserGroupInformation;
 
 /**
  * An externally visible interface to the Hive client. This interface is shared across both the
@@ -81,4 +82,6 @@ public interface HiveClient extends AutoCloseable {
   List<String> getCatalogs();
 
   void close();
+
+  UserGroupInformation getUser();
 }

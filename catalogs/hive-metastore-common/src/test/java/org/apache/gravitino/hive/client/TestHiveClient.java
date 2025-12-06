@@ -52,8 +52,8 @@ import org.junit.jupiter.api.Test;
 // @Disabled
 public class TestHiveClient {
 
-  private static final String HIVE2_HMS_URL = "thrift://172.17.0.2:9083";
-  private static final String HIVE2_HDFS_URL = "hdfs://172.17.0.2:9000";
+  private static final String HIVE2_HMS_URL = "thrift://172.17.0.4:9083";
+  private static final String HIVE2_HDFS_URL = "hdfs://172.17.0.4:9000";
   private static final String HIVE3_HMS_URL = "thrift://172.17.0.3:9083";
   private static final String HIVE3_HDFS_URL = "hdfs://172.17.0.3:9000";
 

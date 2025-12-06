@@ -19,10 +19,11 @@
 package org.apache.gravitino.hive.client;
 
 import java.util.List;
+import java.util.Properties;
 import org.apache.gravitino.hive.HivePartition;
 import org.apache.gravitino.hive.HiveSchema;
 import org.apache.gravitino.hive.HiveTable;
-import org.apache.hadoop.hive.metastore.IMetaStoreClient;
+import org.apache.hadoop.security.UserGroupInformation;
 
 /**
  * Java version of HiveClientImpl from Spark Hive module. Provides full database, table, and
@@ -32,15 +33,18 @@ public class HiveClientImpl implements HiveClient {
 
   Shim shim;
 
-  public HiveClientImpl(
-      HiveClientClassLoader.HiveVersion hiveVersion, IMetaStoreClient hiveClient) {
+  public HiveClientImpl(HiveClientClassLoader.HiveVersion hiveVersion, Properties properties) {
     switch (hiveVersion) {
       case HIVE2:
-        shim = new HiveShimV2(hiveClient);
-        break;
+        {
+          shim = new HiveShimV2(properties);
+          break;
+        }
       case HIVE3:
-        shim = new HiveShimV3(hiveClient);
-        break;
+        {
+          shim = new HiveShimV3(properties);
+          break;
+        }
       default:
         throw new IllegalArgumentException("Unsupported Hive version: " + hiveVersion);
     }
@@ -162,6 +166,15 @@ public class HiveClientImpl implements HiveClient {
       shim.close();
     } catch (Exception e) {
       throw new RuntimeException(e);
+    }
+  }
+
+  @Override
+  public UserGroupInformation getUser() {
+    try {
+      return UserGroupInformation.getCurrentUser();
+    } catch (Exception e) {
+      throw new RuntimeException("Failed to get current user", e);
     }
   }
 }

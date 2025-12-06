@@ -18,25 +18,53 @@
 package org.apache.gravitino.hive.client;
 
 import static org.apache.gravitino.hive.client.HiveClientClassLoader.HiveVersion.HIVE2;
+import static org.apache.gravitino.hive.client.Util.buildConfiguration;
 
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Method;
 import java.util.List;
+import java.util.Properties;
 import org.apache.gravitino.hive.HivePartition;
 import org.apache.gravitino.hive.HiveSchema;
 import org.apache.gravitino.hive.HiveTable;
 import org.apache.gravitino.hive.client.HiveExceptionConverter.ExceptionTarget;
 import org.apache.gravitino.hive.converter.HiveDatabaseConverter;
 import org.apache.gravitino.hive.converter.HiveTableConverter;
+import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hive.metastore.IMetaStoreClient;
 import org.apache.hadoop.hive.metastore.api.Database;
 
 class HiveShimV2 extends Shim {
 
-  HiveShimV2(IMetaStoreClient client) {
-    super(client, HIVE2);
+  HiveShimV2(Properties properties) {
+    super(HIVE2, properties);
   }
 
-  HiveShimV2(IMetaStoreClient client, HiveClientClassLoader.HiveVersion version) {
-    super(client, version);
+  HiveShimV2(HiveClientClassLoader.HiveVersion version, Properties properties) {
+    super(version, properties);
+  }
+
+  @Override
+  public IMetaStoreClient createMetaStoreClient(Properties properties) {
+    try {
+      ClassLoader classLoader = this.getClass().getClassLoader();
+      Class<?> clientClass = classLoader.loadClass(RETRYING_META_STORE_CLIENT_CLASS);
+      Class<?> hiveConfClass = classLoader.loadClass(HIVE_CONF_CLASS);
+      Class<?> confClass = classLoader.loadClass(CONFIGURATION_CLASS);
+
+      Object conf = confClass.getDeclaredConstructor().newInstance();
+      buildConfiguration(properties, (Configuration) conf);
+
+      Constructor<?> hiveConfCtor = hiveConfClass.getConstructor(confClass, Class.class);
+      Object hiveConfInstance = hiveConfCtor.newInstance(conf, hiveConfClass);
+
+      Method getProxyMethod = clientClass.getMethod(METHOD_GET_PROXY, hiveConfClass, boolean.class);
+      return (IMetaStoreClient) getProxyMethod.invoke(null, hiveConfInstance, false);
+
+    } catch (Exception e) {
+      throw HiveExceptionConverter.toGravitinoException(
+          e, ExceptionTarget.other("MetaStoreClient"));
+    }
   }
 
   @Override

@@ -18,9 +18,11 @@
 package org.apache.gravitino.hive.client;
 
 import static org.apache.gravitino.hive.client.HiveClientClassLoader.HiveVersion.HIVE3;
+import static org.apache.gravitino.hive.client.Util.buildConfiguration;
 
 import java.lang.reflect.Method;
 import java.util.List;
+import java.util.Properties;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.hive.HivePartition;
 import org.apache.gravitino.hive.HiveSchema;
@@ -28,6 +30,7 @@ import org.apache.gravitino.hive.HiveTable;
 import org.apache.gravitino.hive.client.HiveExceptionConverter.ExceptionTarget;
 import org.apache.gravitino.hive.converter.HiveDatabaseConverter;
 import org.apache.gravitino.hive.converter.HiveTableConverter;
+import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hive.metastore.IMetaStoreClient;
 import org.apache.hadoop.hive.metastore.api.Database;
 
@@ -58,8 +61,8 @@ class HiveShimV3 extends HiveShimV2 {
   private final Method tableSetCatalogNameMethod;
   private final Method partitionSetCatalogNameMethod;
 
-  HiveShimV3(IMetaStoreClient client) {
-    super(client, HIVE3);
+  HiveShimV3(Properties properties) {
+    super(HIVE3, properties);
     try {
       // Hive3 database methods with catalog support
       this.createDatabaseMethod =
@@ -139,6 +142,25 @@ class HiveShimV3 extends HiveShimV2 {
 
     } catch (Exception e) {
       throw HiveExceptionConverter.toGravitinoException(e, ExceptionTarget.other("HiveShimV3"));
+    }
+  }
+
+  @Override
+  public IMetaStoreClient createMetaStoreClient(Properties properties) {
+    try {
+      ClassLoader classLoader = this.getClass().getClassLoader();
+      Class<?> clientClass = classLoader.loadClass(RETRYING_META_STORE_CLIENT_CLASS);
+      Class<?> confClass = classLoader.loadClass(CONFIGURATION_CLASS);
+
+      Object conf = confClass.getDeclaredConstructor().newInstance();
+      buildConfiguration(properties, (Configuration) conf);
+
+      Method getProxyMethod = clientClass.getMethod(METHOD_GET_PROXY, confClass, boolean.class);
+      return (IMetaStoreClient) getProxyMethod.invoke(null, conf, false);
+
+    } catch (Exception e) {
+      throw HiveExceptionConverter.toGravitinoException(
+          e, ExceptionTarget.other("MetaStoreClient"));
     }
   }
 

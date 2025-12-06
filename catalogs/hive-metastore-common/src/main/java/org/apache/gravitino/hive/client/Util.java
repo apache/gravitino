@@ -20,8 +20,14 @@ package org.apache.gravitino.hive.client;
 
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
+import java.util.Properties;
+import org.apache.commons.lang3.StringUtils;
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.Path;
 
 public class Util {
+
+  public static final String HIVE_CONFIG_RESOURCES = "hive.config.resources";
 
   public static Method findMethod(Class<?> klass, String name, Class<?>... args)
       throws NoSuchMethodException {
@@ -37,5 +43,23 @@ public class Util {
           "Method " + name + " of class " + klass.getName() + " is not static.");
     }
     return method;
+  }
+
+  public static void buildConfiguration(Properties config, Configuration configuration) {
+    try {
+      String hdfsConfigResources = config.getProperty(HIVE_CONFIG_RESOURCES);
+      if (StringUtils.isNotBlank(hdfsConfigResources)) {
+        for (String resource : hdfsConfigResources.split(",")) {
+          resource = resource.trim();
+          if (StringUtils.isNotBlank(resource)) {
+            configuration.addResource(new Path(resource));
+          }
+        }
+      }
+
+      config.forEach((k, v) -> configuration.set(k.toString(), v.toString()));
+    } catch (Exception e) {
+      throw new RuntimeException("Failed to create configuration", e);
+    }
   }
 }

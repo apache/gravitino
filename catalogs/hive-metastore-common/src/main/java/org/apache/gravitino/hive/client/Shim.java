@@ -19,6 +19,7 @@
 package org.apache.gravitino.hive.client;
 
 import java.util.List;
+import java.util.Properties;
 import org.apache.gravitino.hive.HivePartition;
 import org.apache.gravitino.hive.HiveSchema;
 import org.apache.gravitino.hive.HiveTable;
@@ -33,13 +34,24 @@ import org.apache.thrift.TException;
  * methods according to the behavior of the corresponding Hive release.
  */
 public abstract class Shim {
+
+  protected static final String RETRYING_META_STORE_CLIENT_CLASS =
+      "org.apache.hadoop.hive.metastore.RetryingMetaStoreClient";
+  protected static final String IMETA_STORE_CLIENT_CLASS =
+      "org.apache.hadoop.hive.metastore.IMetaStoreClient";
+  protected static final String HIVE_CONF_CLASS = "org.apache.hadoop.hive.conf.HiveConf";
+  protected static final String CONFIGURATION_CLASS = "org.apache.hadoop.conf.Configuration";
+  protected static final String METHOD_GET_PROXY = "getProxy";
+
   protected final IMetaStoreClient client;
   protected final HiveClientClassLoader.HiveVersion version;
 
-  protected Shim(IMetaStoreClient client, HiveClientClassLoader.HiveVersion version) {
-    this.client = client;
+  protected Shim(HiveClientClassLoader.HiveVersion version, Properties properties) {
+    this.client = createMetaStoreClient(properties);
     this.version = version;
   }
+
+  public abstract IMetaStoreClient createMetaStoreClient(Properties properties);
 
   public List<String> getAllDatabases(String catalogName) {
     try {

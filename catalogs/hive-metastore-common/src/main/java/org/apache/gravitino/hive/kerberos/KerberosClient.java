@@ -19,17 +19,28 @@
 
 package org.apache.gravitino.hive.kerberos;
 
+import static org.apache.gravitino.catalog.hive.HiveConstants.HIVE_METASTORE_TOKEN_SIGNATURE;
+import static org.apache.gravitino.hive.kerberos.KerberosConfig.PRINCIPAL_KEY;
+
 import com.google.common.base.Preconditions;
 import com.google.common.base.Splitter;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.io.File;
 import java.io.IOException;
+import java.util.List;
+import java.util.Properties;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.gravitino.hive.client.HiveClient;
+import org.apache.gravitino.hive.client.HiveClientClassLoader;
+import org.apache.gravitino.hive.client.HiveClientImpl;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hive.thrift.DelegationTokenIdentifier;
+import org.apache.hadoop.io.Text;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.hadoop.security.token.Token;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -37,18 +48,79 @@ public class KerberosClient implements java.io.Closeable {
   private static final Logger LOG = LoggerFactory.getLogger(KerberosClient.class);
 
   private ScheduledThreadPoolExecutor checkTgtExecutor;
-  private final java.util.Map<String, String> conf;
+  private final Properties conf;
   private final Configuration hadoopConf;
   private final boolean refreshCredentials;
+  private UserGroupInformation realLoginUgi;
+  private String keytabFilePath;
+  private HiveClient hiveClient = null;
+  private HiveClientClassLoader.HiveVersion version;
 
   public KerberosClient(
-      java.util.Map<String, String> conf, Configuration hadoopConf, boolean refreshCredentials) {
-    this.conf = conf;
+      HiveClientClassLoader.HiveVersion version,
+      Properties properties,
+      Configuration hadoopConf,
+      boolean refreshCredentials,
+      String keytabFilePath) {
+    this.conf = properties;
     this.hadoopConf = hadoopConf;
     this.refreshCredentials = refreshCredentials;
+    this.keytabFilePath = keytabFilePath;
+    this.version = version;
   }
 
-  public String login(String keytabFilePath) throws IOException {
+  public UserGroupInformation login(String userName) throws IOException {
+    if (realLoginUgi == null) {
+      return login();
+    } else {
+      if (userName.equals(realLoginUgi.getUserName())) {
+        return realLoginUgi;
+      } else {
+        return proxy(userName);
+      }
+    }
+  }
+
+  private UserGroupInformation proxy(String currentUser) {
+    try {
+      String tokenSignature = conf.getProperty(HIVE_METASTORE_TOKEN_SIGNATURE, "");
+      String principal = conf.getProperty(PRINCIPAL_KEY, "");
+      List<String> principalComponents = Splitter.on('@').splitToList(principal);
+      Preconditions.checkArgument(
+          principalComponents.size() == 2, "The principal has the wrong format");
+      String kerberosRealm = principalComponents.get(1);
+
+      UserGroupInformation proxyUser;
+      if (UserGroupInformation.isSecurityEnabled()) {
+        final String finalPrincipalName;
+        if (!currentUser.contains("@")) {
+          finalPrincipalName = String.format("%s@%s", currentUser, kerberosRealm);
+        } else {
+          finalPrincipalName = currentUser;
+        }
+
+        proxyUser = UserGroupInformation.createProxyUser(finalPrincipalName, realLoginUgi);
+
+        // Acquire HMS delegation token for the proxy user and attach it to UGI
+        String tokenStr =
+            hiveClient.getDelegationToken(finalPrincipalName, realLoginUgi.getUserName());
+
+        Token<DelegationTokenIdentifier> delegationToken = new Token<>();
+        delegationToken.decodeFromUrlString(tokenStr);
+        delegationToken.setService(new Text(tokenSignature));
+        proxyUser.addToken(delegationToken);
+
+      } else {
+        proxyUser = UserGroupInformation.createProxyUser(currentUser, realLoginUgi);
+      }
+
+      return proxyUser;
+    } catch (Exception e) {
+      throw new RuntimeException("Failed to create proxy user for Kerberos Hive client", e);
+    }
+  }
+
+  public UserGroupInformation login() throws IOException {
     KerberosConfig kerberosConfig = new KerberosConfig(conf, hadoopConf);
 
     // Check the principal and keytab file
@@ -63,7 +135,8 @@ public class KerberosClient implements java.io.Closeable {
     // Login
     UserGroupInformation.setConfiguration(hadoopConf);
     UserGroupInformation.loginUserFromKeytab(catalogPrincipal, keytabFilePath);
-    UserGroupInformation kerberosLoginUgi = UserGroupInformation.getLoginUser();
+    realLoginUgi = UserGroupInformation.getLoginUser();
+    hiveClient = new HiveClientImpl(version, conf);
 
     // Refresh the cache if it's out of date.
     if (refreshCredentials) {
@@ -72,7 +145,7 @@ public class KerberosClient implements java.io.Closeable {
       checkTgtExecutor.scheduleAtFixedRate(
           () -> {
             try {
-              kerberosLoginUgi.checkTGTAndReloginFromKeytab();
+              realLoginUgi.checkTGTAndReloginFromKeytab();
             } catch (Exception e) {
               LOG.error("Fail to refresh ugi token: ", e);
             }
@@ -82,10 +155,10 @@ public class KerberosClient implements java.io.Closeable {
           TimeUnit.SECONDS);
     }
 
-    return principalComponents.get(1);
+    return realLoginUgi;
   }
 
-  public File saveKeyTabFileFromUri(String keytabPath) throws IOException {
+  public File saveKeyTabFileFromUri() throws IOException {
     KerberosConfig kerberosConfig = new KerberosConfig(conf, hadoopConf);
 
     String keyTabUri = kerberosConfig.getKeytab();
@@ -97,7 +170,7 @@ public class KerberosClient implements java.io.Closeable {
     if (!keytabsDir.exists()) {
       keytabsDir.mkdir();
     }
-    File keytabFile = new File(keytabPath);
+    File keytabFile = new File(keytabFilePath);
     keytabFile.deleteOnExit();
     if (keytabFile.exists() && !keytabFile.delete()) {
       throw new IllegalStateException(

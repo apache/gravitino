@@ -20,6 +20,7 @@
 package org.apache.gravitino.hive.kerberos;
 
 import java.util.Map;
+import java.util.Properties;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.config.ConfigBuilder;
 import org.apache.gravitino.config.ConfigConstants;
@@ -68,10 +69,10 @@ public class KerberosConfig extends AuthenticationConfig {
           .checkValue(value -> value > 0, ConfigConstants.POSITIVE_NUMBER_ERROR_MSG)
           .createWithDefault(60);
 
-  public KerberosConfig(Map<String, String> properties, Configuration configuration) {
+  public KerberosConfig(Properties properties, Configuration configuration) {
     super(properties, configuration);
     loadFromHdfsConfiguration(configuration);
-    loadFromMap(properties, k -> true);
+    loadFromMap((Map) properties, k -> true);
   }
 
   private void loadFromHdfsConfiguration(Configuration configuration) {}

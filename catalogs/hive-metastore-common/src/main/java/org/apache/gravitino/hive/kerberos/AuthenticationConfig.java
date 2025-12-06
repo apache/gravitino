@@ -22,6 +22,7 @@ package org.apache.gravitino.hive.kerberos;
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.HADOOP_SECURITY_AUTHENTICATION;
 
 import java.util.Map;
+import java.util.Properties;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.config.ConfigBuilder;
 import org.apache.gravitino.config.ConfigConstants;
@@ -42,10 +43,10 @@ public class AuthenticationConfig extends Config {
 
   public static final boolean KERBEROS_DEFAULT_IMPERSONATION_ENABLE = false;
 
-  public AuthenticationConfig(Map<String, String> properties, Configuration configuration) {
+  public AuthenticationConfig(Properties properties, Configuration configuration) {
     super(false);
     loadFromHdfsConfiguration(configuration);
-    loadFromMap(properties, k -> true);
+    loadFromMap((Map) properties, k -> true);
   }
 
   private void loadFromHdfsConfiguration(Configuration configuration) {
