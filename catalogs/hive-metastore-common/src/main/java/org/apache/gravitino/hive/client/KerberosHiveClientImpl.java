@@ -48,10 +48,12 @@ public class KerberosHiveClientImpl implements InvocationHandler {
   public static HiveClient createClient(
       HiveClientClassLoader.HiveVersion version, UserGroupInformation ugi, Properties properties) {
     try {
-      HiveClientImpl client =
+      HiveClient client =
           ugi.doAs(
-              (PrivilegedExceptionAction<HiveClientImpl>)
-                  () -> new HiveClientImpl(version, properties));
+              (PrivilegedExceptionAction<HiveClient>)
+                  () ->
+                      HiveClientFactory.createHiveClientImpl(
+                          version, properties, Thread.currentThread().getContextClassLoader()));
       return (HiveClient)
           Proxy.newProxyInstance(
               HiveClient.class.getClassLoader(),

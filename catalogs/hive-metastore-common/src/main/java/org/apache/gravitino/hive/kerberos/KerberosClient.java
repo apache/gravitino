@@ -35,7 +35,7 @@ import java.util.concurrent.TimeUnit;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.hive.client.HiveClient;
 import org.apache.gravitino.hive.client.HiveClientClassLoader;
-import org.apache.gravitino.hive.client.HiveClientImpl;
+import org.apache.gravitino.hive.client.HiveClientFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hive.thrift.DelegationTokenIdentifier;
 import org.apache.hadoop.io.Text;
@@ -69,19 +69,19 @@ public class KerberosClient implements java.io.Closeable {
     this.version = version;
   }
 
-  public UserGroupInformation login(String userName) throws IOException {
+  public UserGroupInformation login(String userName) throws Exception {
     if (realLoginUgi == null) {
-      return login();
+      return loginRealUser(userName);
     } else {
       if (userName.equals(realLoginUgi.getUserName())) {
         return realLoginUgi;
       } else {
-        return proxy(userName);
+        return loginProxyUser(userName);
       }
     }
   }
 
-  private UserGroupInformation proxy(String currentUser) {
+  private UserGroupInformation loginProxyUser(String currentUser) {
     try {
       String tokenSignature = conf.getProperty(HIVE_METASTORE_TOKEN_SIGNATURE, "");
       String principal = conf.getProperty(PRINCIPAL_KEY, "");
@@ -120,7 +120,7 @@ public class KerberosClient implements java.io.Closeable {
     }
   }
 
-  public UserGroupInformation login() throws IOException {
+  public UserGroupInformation loginRealUser(String userName) throws Exception {
     KerberosConfig kerberosConfig = new KerberosConfig(conf, hadoopConf);
 
     // Check the principal and keytab file
@@ -136,7 +136,9 @@ public class KerberosClient implements java.io.Closeable {
     UserGroupInformation.setConfiguration(hadoopConf);
     UserGroupInformation.loginUserFromKeytab(catalogPrincipal, keytabFilePath);
     realLoginUgi = UserGroupInformation.getLoginUser();
-    hiveClient = new HiveClientImpl(version, conf);
+    hiveClient =
+        HiveClientFactory.createHiveClientImpl(
+            version, conf, Thread.currentThread().getContextClassLoader());
 
     // Refresh the cache if it's out of date.
     if (refreshCredentials) {
@@ -153,6 +155,10 @@ public class KerberosClient implements java.io.Closeable {
           checkInterval,
           checkInterval,
           TimeUnit.SECONDS);
+    }
+
+    if (!realLoginUgi.getUserName().equals(userName)) {
+      return loginProxyUser(userName);
     }
 
     return realLoginUgi;

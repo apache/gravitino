@@ -23,7 +23,6 @@ import static org.apache.gravitino.hive.client.HiveClientClassLoader.getClientLo
 import static org.apache.gravitino.hive.client.Util.buildConfiguration;
 
 import com.google.common.base.Preconditions;
-import java.io.IOException;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
 import java.util.Properties;
@@ -101,6 +100,16 @@ public final class HiveClientFactory {
     }
   }
 
+  public static HiveClient createHiveClientImpl(
+      HiveClientClassLoader.HiveVersion version, Properties properties, ClassLoader classloader)
+      throws Exception {
+    Class<?> hiveClientImplClass = classloader.loadClass(HiveClientImpl.class.getName());
+    Constructor<?> hiveClientImplCtor =
+        hiveClientImplClass.getConstructor(
+            HiveClientClassLoader.HiveVersion.class, Properties.class);
+    return (HiveClient) hiveClientImplCtor.newInstance(version, properties);
+  }
+
   private HiveClient createHiveClientInternal(
       Properties properties, HiveClientClassLoader classloader) {
     ClassLoader origLoader = Thread.currentThread().getContextClassLoader();
@@ -108,13 +117,7 @@ public final class HiveClientFactory {
     try {
       UserGroupInformation ugi = initKerberosIfNecessary(classloader.getHiveVersion(), properties);
       if (ugi == null) {
-        Class<?> hiveClientImplClass = classloader.loadClass(HiveClientImpl.class.getName());
-        Constructor<?> hiveClientImplCtor =
-            hiveClientImplClass.getConstructor(
-                HiveClientClassLoader.HiveVersion.class, Properties.class);
-        return (HiveClient)
-            hiveClientImplCtor.newInstance(classloader.getHiveVersion(), properties);
-
+        return createHiveClientImpl(classloader.getHiveVersion(), properties, classloader);
       } else {
         Class<?> hiveClientImplClass =
             classloader.loadClass(KerberosHiveClientImpl.class.getName());
@@ -158,7 +161,7 @@ public final class HiveClientFactory {
       kerberosClient.saveKeyTabFileFromUri();
       return kerberosClient.login(PrincipalUtils.getCurrentUserName());
 
-    } catch (IOException e) {
+    } catch (Exception e) {
       throw new RuntimeException("Failed to login with kerberos", e);
     }
   }

@@ -58,6 +58,7 @@ public class TestHiveClient {
   private static final String HIVE3_HDFS_URL = "hdfs://172.17.0.3:9000";
 
   private static final String KERBEROS_HIVE2_HMS_URL = "thrift://172.17.0.2:9083";
+  private static final String KERBEROS_HIVE2_HDFS_URL = "hdfs://172.17.0.2:9000";
 
   @Test
   void testHive2Client() throws Exception {
@@ -389,7 +390,7 @@ public class TestHiveClient {
     // This method can be implemented to test Kerberos authentication with Hive Metastore
     // when a Kerberos-enabled environment is available.
     Properties properties = new Properties();
-    properties.setProperty("hive.metastore.uris", "thrift://172.17.0.2:9083");
+    properties.setProperty("hive.metastore.uris", KERBEROS_HIVE2_HMS_URL);
     properties.setProperty("authentication.kerberos.principal", "cli@HADOOPKRB");
     properties.setProperty("authentication.impersonation-enable", "true");
     properties.setProperty(
@@ -402,7 +403,7 @@ public class TestHiveClient {
 
     String catalogName = "hive";
     String dbName = "test_kerberos_db";
-    String dbLocation = HIVE2_HDFS_URL + "/tmp/gravitino_kerberos_test/" + dbName;
+    String dbLocation = KERBEROS_HIVE2_HDFS_URL + "/tmp/gravitino_kerberos_test/" + dbName;
 
     HiveClient client = HiveClientFactory.createHiveClient(properties);
     HiveSchema schema = createTestSchema(catalogName, dbName, dbLocation);

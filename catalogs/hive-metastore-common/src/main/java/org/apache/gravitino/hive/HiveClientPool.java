@@ -51,7 +51,7 @@ public class HiveClientPool extends ClientPoolImpl<HiveClient, GravitinoRuntimeE
   protected HiveClient newClient() {
     try {
       String user = PrincipalUtils.getCurrentUserName();
-      return HiveClientFactory.createHiveClient(properties);
+       return HiveClientFactory.createHiveClient(properties);
     } catch (Exception e) {
       LOG.error("Failed to connect to Hive Metastore", e);
       throw new GravitinoRuntimeException(e, "Failed to connect to Hive Metastore");
