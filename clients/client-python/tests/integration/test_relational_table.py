@@ -51,7 +51,6 @@ class TestRelationalTable(IntegrationTestEnv):
     CATALOG_PROVIDER: str = "hive"
     SCHEMA_NAME: str = "test_schema"
     TABLE_NAME: str = "test_table"
-    HIVE_METASTORE_URI = "thrift://localhost:9083"
     TABLE_IDENT: NameIdentifier = NameIdentifier.of(
         METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME, TABLE_NAME
     )
@@ -60,6 +59,7 @@ class TestRelationalTable(IntegrationTestEnv):
     def setUpClass(cls):
         super().setUpClass()
         cls.hdfs_container: HDFSContainer = HDFSContainer()
+        cls.HIVE_METASTORE_URI = f"thrift://{cls.hdfs_container.get_ip()}:9083"
         logger.info(
             "Started Hive container with metastore URI: %s", cls.HIVE_METASTORE_URI
         )
