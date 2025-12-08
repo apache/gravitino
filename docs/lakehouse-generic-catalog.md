@@ -55,7 +55,7 @@ While the architecture is designed to support various lakehouse formats, Graviti
 
 1. **Unified Metadata Management**: Single source of truth for table metadata across multiple storage backends
 2. **Multi-Format Support**: Extensible architecture to support various lakehouse table formats
-3. **Storage Flexibility**: Work with any file system - local, HDFS, or cloud object stores
+3. **Storage Flexibility**: Work with any file system - local, or cloud object stores
 4. **Gravitino Integration**: Leverage Gravitino's access control, lineage tracking, and data discovery
 5. **Easy Migration**: Register existing lakehouse tables without data movement
 
@@ -111,7 +111,6 @@ The `location` property specifies the root directory for the lakehouse storage s
 2. Schema-level `location`
 3. Catalog-level `location` (fallback)
 
-
 **Example Location Hierarchy:**
 ```
 Catalog location: hdfs://namenode:9000/lakehouse
@@ -119,7 +118,6 @@ Catalog location: hdfs://namenode:9000/lakehouse
     ├── Table: orders (hdfs://namenode:9000/lakehouse/sales/orders)
     └── Table: customers (custom: s3://analytics-bucket/customers)
 ```
-
 
 ### Creating a Catalog
 
@@ -178,7 +176,7 @@ Schema operations follow the same patterns as relational catalogs:
 - ✅ List all schemas in a catalog
 - ✅ Load schema metadata and properties
 - ✅ Update schema properties
-- ✅ Delete schemas (must be empty)
+- ✅ Delete schemas
 - ✅ Check schema existence
 
 See [Schema Operations](./manage-relational-metadata-using-gravitino.md#schema-operations) for detailed documentation.
@@ -375,6 +373,9 @@ For more details on table indexes, see [Table Partitioning, Distribution, Sort O
 Table operations follow standard relational catalog patterns. See [Table Operations](./manage-relational-metadata-using-gravitino.md#table-operations) for comprehensive documentation.
 
 **Key Requirement:** Specify the `format` property (e.g., `"format": "lance"`) when creating or registering tables.
+
+The following sections provide examples and important details for working with Lance tables. Please note that: Different lakehouse formats may have unique requirements though the overall patterns remain similar.
+For example, Lance does not support HDFS storage for table data, while other formats may, please be aware of such differences when working with various formats.
 
 #### Creating a Lance Table
 
