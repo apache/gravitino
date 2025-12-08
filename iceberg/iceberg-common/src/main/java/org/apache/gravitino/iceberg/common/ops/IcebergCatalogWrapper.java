@@ -283,18 +283,19 @@ public class IcebergCatalogWrapper implements AutoCloseable {
     if (catalog instanceof AutoCloseable) {
       // JdbcCatalog and ClosableHiveCatalog implement AutoCloseable and will handle their own
       // cleanup
-      LOG.info("do catalog cleanup");
       ((AutoCloseable) catalog).close();
     }
     metadataCache.close();
 
-    // For Iceberg REST server which has same classloader for each catalog wrapper, the Driver
+    // For Iceberg REST server which use same classloader when recreating catalog wrapper, the
+    // Driver
     // couldn't be reloaded after deregister()
     if (useDifferentClassLoader()) {
       closeJdbcDriverResources();
     }
   }
 
+  // Whether to use same classloader when recreating IcebergCatalogWrapper
   protected boolean useDifferentClassLoader() {
     return true;
   }

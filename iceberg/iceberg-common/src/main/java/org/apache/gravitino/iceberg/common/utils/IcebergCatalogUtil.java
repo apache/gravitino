@@ -127,9 +127,7 @@ public class IcebergCatalogUtil {
     Map<String, String> properties = icebergConfig.getIcebergCatalogProperties();
     try {
       // Load the jdbc driver
-      Class driverClass =
-          Class.forName(driverClassName, true, Thread.currentThread().getContextClassLoader());
-      LOG.info("loading jdbc driver class: {}", driverClass.getName());
+      Class.forName(driverClassName);
     } catch (ClassNotFoundException e) {
       throw new IllegalArgumentException("Couldn't load jdbc driver " + driverClassName);
     }

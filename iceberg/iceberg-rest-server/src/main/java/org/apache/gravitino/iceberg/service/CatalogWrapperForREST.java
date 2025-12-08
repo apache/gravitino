@@ -157,7 +157,6 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
 
   @Override
   public void close() throws Exception {
-    LOG.info("close Iceberg REST wrapper");
     try {
       if (catalogCredentialManager != null) {
         catalogCredentialManager.close();
