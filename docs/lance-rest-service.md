@@ -33,20 +33,20 @@ The Lance REST service acts as a bridge between Lance datasets and applications:
 
 ```
 ┌─────────────────┐
-│   Applications  │
-│  (Python/Java)  │
+│   Applications   │
+│  (Python/Java)   │
 └────────┬────────┘
          │ HTTP/REST
          ▼
 ┌─────────────────┐
-│  Lance REST     │◄──── Gravitino Metalake
-│    Service      │      (Metadata Backend)
+│  Lance REST      │◄──── Gravitino Metalake
+│    Service       │      (Metadata Backend)
 └────────┬────────┘
          │ File System Operations
          ▼
 ┌─────────────────┐
-│  Lance Datasets │
-│ (S3/HDFS/Local) │
+│  Lance Datasets  │ 
+│ (S3/GCS/Local)  │
 └─────────────────┘
 ```
 
