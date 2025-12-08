@@ -40,7 +40,7 @@
 'use client'
 
 // Import required React hooks
-import { useState, forwardRef, useEffect, Fragment } from 'react'
+import { useState, forwardRef, useEffect, Fragment, useRef, useMemo, useCallback } from 'react'
 
 // Import Material UI components
 import {
@@ -119,11 +119,14 @@ const schema = yup.object().shape({
   propItems: yup.array().of(
     yup.object().shape({
       required: yup.boolean(),
-      key: yup.string().required(),
-      value: yup.string().when('required', {
-        is: true,
-        then: schema => schema.required()
-      })
+      key: yup.string().trim().required(),
+      value: yup
+        .string()
+        .trim()
+        .when('required', {
+          is: true,
+          then: schema => schema.required('Value is required for this property')
+        })
     })
   )
 })
@@ -150,8 +153,15 @@ const CreateTableDialog = props => {
 
   const store = useAppSelector(state => state.metalakes)
   const currentCatalog = store.catalogs.find(ca => ca.name === catalog)
-  const columnTypes = getRelationalColumnType(currentCatalog?.provider)
-  const propInfo = getRelationalTablePropInfo(currentCatalog?.provider)
+  const provider = currentCatalog?.provider
+  const columnTypes = useMemo(() => getRelationalColumnType(provider), [provider])
+  const propInfo = useMemo(() => getRelationalTablePropInfo(provider), [provider])
+
+  // Cache for location requirement check to avoid duplicate API calls
+  const locationCheckCache = useRef({
+    key: null,
+    isLocationRequired: false
+  })
 
   const [innerProps, setInnerProps] = useState([])
   const [tableColumns, setTableColumns] = useState([{ name: '', type: '', nullable: true, comment: '' }])
@@ -412,46 +422,98 @@ const CreateTableDialog = props => {
   }
 
   /**
+   * Check if location is required for lakehouse-generic tables
+   * Uses caching to avoid duplicate API calls
+   */
+  const checkLocationRequired = useCallback(async () => {
+    const cacheKey = `${metalake}-${catalog}-${schemaName}`
+
+    // Return cached result if available
+    if (locationCheckCache.current.key === cacheKey) {
+      return locationCheckCache.current.isLocationRequired
+    }
+
+    let isLocationRequired = false
+
+    // Check catalog properties for location
+    const [catalogErr, catalogRes] = await to(getCatalogDetailsApi({ metalake, catalog }))
+    if (catalogErr) {
+      console.error('Error fetching catalog details:', catalogErr)
+
+      // If catalog fetch fails, we can't determine location requirement, default to not required
+      return false
+    }
+    const catalogLocation = catalogRes?.catalog?.properties?.location
+
+    // If catalog has location, no need to check schema
+    if (catalogLocation) {
+      locationCheckCache.current = {
+        key: cacheKey,
+        isLocationRequired: false
+      }
+
+      return false
+    }
+
+    // Check schema properties for location
+    const [schemaErr, schemaRes] = await to(getSchemaDetailsApi({ metalake, catalog, schema: schemaName }))
+    if (schemaErr) {
+      console.error('Error fetching schema details:', schemaErr)
+
+      // If schema fetch fails but catalog has no location, be safe and require location
+      isLocationRequired = true
+    } else {
+      const schemaLocation = schemaRes?.schema?.properties?.location
+
+      // Location is required if not set in both catalog and schema
+      isLocationRequired = !schemaLocation
+    }
+
+    // Cache the result
+    locationCheckCache.current = {
+      key: cacheKey,
+      isLocationRequired
+    }
+
+    return isLocationRequired
+  }, [metalake, catalog, schemaName])
+
+  /**
    * Effect to initialize default properties when creating a new table
    * For lakehouse-generic, checks if location is set in catalog or schema
    */
   useEffect(() => {
+    // Only run when dialog opens for create mode
+    if (!open || type !== 'create') {
+      return
+    }
+
+    // Skip if no default props configured
+    if (!propInfo.defaultProps || propInfo.defaultProps.length === 0) {
+      return
+    }
+
     const initDefaultProps = async () => {
-      if (open && type === 'create' && propInfo.defaultProps && propInfo.defaultProps.length > 0) {
-        let isLocationRequired = false
+      let isLocationRequired = false
 
-        // For lakehouse-generic, check if location is set in catalog or schema
-        if (currentCatalog?.provider === 'lakehouse-generic') {
-          try {
-            // Check catalog properties for location
-            const [catalogErr, catalogRes] = await to(getCatalogDetailsApi({ metalake, catalog }))
-            const catalogLocation = catalogRes?.catalog?.properties?.location
-
-            // Check schema properties for location
-            const [schemaErr, schemaRes] = await to(getSchemaDetailsApi({ metalake, catalog, schema: schemaName }))
-            const schemaLocation = schemaRes?.schema?.properties?.location
-
-            // Location is required if not set in both catalog and schema
-            isLocationRequired = !catalogLocation && !schemaLocation
-          } catch (error) {
-            console.error('Error checking location in catalog/schema:', error)
-          }
-        }
-
-        const defaultPropertyItems = propInfo.defaultProps.map(prop => ({
-          key: prop.key,
-          value: prop.value || '',
-          required: prop.key === 'location' ? isLocationRequired : prop.required || false,
-          description: prop.description || '',
-          disabled: prop.disabled || false
-        }))
-        setInnerProps(defaultPropertyItems)
-        setValue('propItems', defaultPropertyItems)
+      // For lakehouse-generic, check if location is set in catalog or schema
+      if (provider === 'lakehouse-generic') {
+        isLocationRequired = await checkLocationRequired()
       }
+
+      const defaultPropertyItems = propInfo.defaultProps.map(prop => ({
+        key: prop.key,
+        value: prop.value || '',
+        required: prop.key === 'location' ? isLocationRequired : prop.required || false,
+        description: prop.description || '',
+        disabled: prop.disabled || false
+      }))
+      setInnerProps(defaultPropertyItems)
+      setValue('propItems', defaultPropertyItems)
     }
 
     initDefaultProps()
-  }, [open, type, propInfo, setValue, currentCatalog, metalake, catalog, schemaName])
+  }, [open, type, propInfo, setValue, provider, checkLocationRequired])
 
   /**
    * Effect to populate form when editing existing table

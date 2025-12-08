@@ -78,7 +78,7 @@ const MetalakeTree = props => {
           case 'lakehouse-hudi':
             return 'custom-icons-hudi'
           case 'lakehouse-generic':
-            return 'fluent:database-plug-connected-20-regular'
+            return 'streamline-ultimate:data-lake-1'
           case 'jdbc-oceanbase':
             return 'custom-icons-oceanbase'
           default:
