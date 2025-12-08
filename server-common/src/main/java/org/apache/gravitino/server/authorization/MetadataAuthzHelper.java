@@ -64,6 +64,7 @@ public class MetadataAuthzHelper {
     return doFilter(
         expression,
         metalakes,
+        PrincipalUtils.getCurrentPrincipal(),
         GravitinoAuthorizerProvider.getInstance().getGravitinoAuthorizer(),
         authorizationRequestContext,
         metalake -> {
@@ -72,7 +73,8 @@ public class MetadataAuthzHelper {
               metalakeName,
               Entity.EntityType.METALAKE,
               NameIdentifierUtil.ofMetalake(metalakeName));
-        });
+        },
+        (unused) -> null);
   }
 
   /**
@@ -87,6 +89,7 @@ public class MetadataAuthzHelper {
     return doFilter(
         AuthorizationExpressionConstants.CAN_ACCESS_METADATA,
         metadataObjects,
+        PrincipalUtils.getCurrentPrincipal(),
         GravitinoAuthorizerProvider.getInstance().getGravitinoAuthorizer(),
         new AuthorizationRequestContext(),
         metadataObject ->
@@ -109,6 +112,7 @@ public class MetadataAuthzHelper {
     return doFilter(
         AuthorizationExpressionConstants.CAN_ACCESS_METADATA,
         metadataObjects,
+        PrincipalUtils.getCurrentPrincipal(),
         GravitinoAuthorizerProvider.getInstance().getGravitinoAuthorizer(),
         new AuthorizationRequestContext(),
         metadataObject ->
@@ -178,8 +182,18 @@ public class MetadataAuthzHelper {
       Function<E, NameIdentifier> toNameIdentifier) {
     GravitinoAuthorizer authorizer =
         GravitinoAuthorizerProvider.getInstance().getGravitinoAuthorizer();
-    return filterByExpression(
-        metalake, expression, entityType, entities, toNameIdentifier, authorizer);
+    AuthorizationRequestContext authorizationRequestContext = new AuthorizationRequestContext();
+    return doFilter(
+        expression,
+        entities,
+        PrincipalUtils.getCurrentPrincipal(),
+        authorizer,
+        authorizationRequestContext,
+        (entity) -> {
+          NameIdentifier nameIdentifier = toNameIdentifier.apply(entity);
+          return splitMetadataNames(metalake, entityType, nameIdentifier);
+        },
+        (unused) -> null);
   }
 
   /**
@@ -191,6 +205,7 @@ public class MetadataAuthzHelper {
    * @param entityType entity type
    * @param entities metadata entities
    * @param toNameIdentifier function to convert entity to NameIdentifier
+   * @param currentPrincipal current principal
    * @param authorizer authorizer to filter metadata
    * @return Filtered Metadata Entity
    * @param <E> Entity class
@@ -201,17 +216,20 @@ public class MetadataAuthzHelper {
       Entity.EntityType entityType,
       E[] entities,
       Function<E, NameIdentifier> toNameIdentifier,
+      Principal currentPrincipal,
       GravitinoAuthorizer authorizer) {
     AuthorizationRequestContext authorizationRequestContext = new AuthorizationRequestContext();
     return doFilter(
         expression,
         entities,
+        currentPrincipal,
         authorizer,
         authorizationRequestContext,
         (entity) -> {
           NameIdentifier nameIdentifier = toNameIdentifier.apply(entity);
           return splitMetadataNames(metalake, entityType, nameIdentifier);
-        });
+        },
+        (unused) -> null);
   }
 
   /**
@@ -219,30 +237,18 @@ public class MetadataAuthzHelper {
    *
    * @param expression The authorization expression to evaluate
    * @param entities The array of entities to filter
+   * @param currentPrincipal The principal used to evaluate permissions
    * @param authorizer The authorizer used to evaluate permissions
    * @param authorizationRequestContext The context of the authorization request
    * @param extractMetadataNamesMap Function to extract metadata names map from entity
+   * @param extractEntityType Function to extract entity type from entity
    * @param <E> The type of entity
    * @return Filtered array of entities that passed authorization check
    */
   private static <E> E[] doFilter(
       String expression,
       E[] entities,
-      GravitinoAuthorizer authorizer,
-      AuthorizationRequestContext authorizationRequestContext,
-      Function<E, Map<Entity.EntityType, NameIdentifier>> extractMetadataNamesMap) {
-    return doFilter(
-        expression,
-        entities,
-        authorizer,
-        authorizationRequestContext,
-        extractMetadataNamesMap,
-        (unused) -> null);
-  }
-
-  private static <E> E[] doFilter(
-      String expression,
-      E[] entities,
+      Principal currentPrincipal,
       GravitinoAuthorizer authorizer,
       AuthorizationRequestContext authorizationRequestContext,
       Function<E, Map<Entity.EntityType, NameIdentifier>> extractMetadataNamesMap,
@@ -251,7 +257,6 @@ public class MetadataAuthzHelper {
       return entities;
     }
     checkExecutor();
-    Principal currentPrincipal = PrincipalUtils.getCurrentPrincipal();
     authorizationRequestContext.setOriginalAuthorizationExpression(expression);
     List<CompletableFuture<E>> futures = new ArrayList<>();
     for (E entity : entities) {
