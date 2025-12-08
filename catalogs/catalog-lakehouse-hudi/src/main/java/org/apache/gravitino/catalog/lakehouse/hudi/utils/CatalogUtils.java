@@ -33,8 +33,13 @@ public class CatalogUtils {
   private CatalogUtils() {}
 
   public static HudiCatalogBackend loadHudiCatalogBackend(Map<String, String> properties) {
-    BackendType backendType =
-        BackendType.valueOf(properties.get(CATALOG_BACKEND).toUpperCase(Locale.ROOT));
+    String backend = properties.get(CATALOG_BACKEND);
+    if (backend == null || backend.trim().isEmpty()) {
+      throw new IllegalArgumentException(
+          "Property " + CATALOG_BACKEND + " must not be null or empty");
+    }
+
+    BackendType backendType = BackendType.valueOf(backend.trim().toUpperCase(Locale.ROOT));
     switch (backendType) {
       case HMS:
         HudiCatalogBackend hudiHMSBackend = new HudiHMSBackend();

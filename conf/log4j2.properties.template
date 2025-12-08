@@ -74,6 +74,7 @@ logger.lineage.additivity = false
 
 logger.rest.name = org.apache.gravitino.server.web.rest
 logger.rest.level = warn
+logger.rest.appenderRef.rolling.ref = fileLogger
 logger.rest.additivity = false
 
 # Configure root logger

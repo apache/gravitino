@@ -338,6 +338,30 @@ public class NamespaceUtil {
   }
 
   /**
+   * Check if the given job template namespace is legal, throw an {@link IllegalNamespaceException}
+   *
+   * @param namespace The job template namespace
+   */
+  public static void checkJobTemplate(Namespace namespace) {
+    check(
+        namespace != null && namespace.length() == 3,
+        "Job template namespace must be non-null and have 3 levels, the input namespace is %s",
+        namespace);
+  }
+
+  /**
+   * Check if the given job namespace is legal, throw an {@link IllegalNamespaceException}
+   *
+   * @param namespace The job namespace
+   */
+  public static void checkJob(Namespace namespace) {
+    check(
+        namespace != null && namespace.length() == 3,
+        "Job namespace must be non-null and have 3 levels, the input namespace is %s",
+        namespace);
+  }
+
+  /**
    * Check the given condition is true. Throw an {@link IllegalNamespaceException} if it's not.
    *
    * @param expression The expression to check.

@@ -435,7 +435,7 @@ curl -X DELETE -H "Accept: application/vnd.gravitino.v1+json" \
 ```java
 GravitinoClient client = ...
 boolean deleted =
-    client.deleteUser("user1");
+    client.removeUser("user1");
 ```
 
 </TabItem>
@@ -1083,3 +1083,4 @@ The following table lists the required privileges for each API.
 | run a job                         | The owner of the metalake , or have both `RUN_JOB` on the metalake and `USE_JOB_TEMPLATE` on the job template                                                                                                                                 |
 | get a job                         | The owner of the metalake or the job.                                                                                                                                                                                                         |
 | cancel a job                      | The owner of the metalake or the job.                                                                                                                                                                                                         |
+| get credential                    | If you can load the metadata object, you can get its credential.                                                                                                                                                                              | 

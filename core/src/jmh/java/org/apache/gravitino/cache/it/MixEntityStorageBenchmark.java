@@ -82,7 +82,6 @@ public class MixEntityStorageBenchmark<E extends Entity & HasIdentifier>
    * Test get from store.
    *
    * @return The entity.
-   * @throws IOException if an I/O error occurs.
    */
   @Benchmark
   @Group("ops")

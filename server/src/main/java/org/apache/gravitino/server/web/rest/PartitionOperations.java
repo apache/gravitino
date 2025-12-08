@@ -180,19 +180,22 @@ public class PartitionOperations {
       @PathParam("schema") @AuthorizationMetadata(type = Entity.EntityType.SCHEMA) String schema,
       @PathParam("table") @AuthorizationMetadata(type = Entity.EntityType.TABLE) String table,
       AddPartitionsRequest request) {
-    LOG.info(
-        "Received add {} partition(s) request for table {}.{}.{}.{} ",
-        request.getPartitions().length,
-        metalake,
-        catalog,
-        schema,
-        table);
-    Preconditions.checkArgument(
-        request.getPartitions().length == 1, "Only one partition is supported");
-
-    request.validate();
-
     try {
+      if (request == null || request.getPartitions() == null) {
+        throw new IllegalArgumentException("partitions must not be null");
+      }
+      LOG.info(
+          "Received add {} partition(s) request for table {}.{}.{}.{} ",
+          request.getPartitions().length,
+          metalake,
+          catalog,
+          schema,
+          table);
+      Preconditions.checkArgument(
+          request.getPartitions().length == 1, "Only one partition is supported");
+
+      request.validate();
+
       return Utils.doAs(
           httpRequest,
           () -> {

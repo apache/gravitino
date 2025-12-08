@@ -25,8 +25,8 @@ plugins {
 }
 
 dependencies {
-  implementation(project(":clients:client-java"))
   implementation(project(":api"))
+  implementation(project(":clients:client-java"))
   implementation(project(":common")) {
     exclude("*")
   }
@@ -34,10 +34,22 @@ dependencies {
     exclude("*")
   }
 
-  implementation(libs.guava)
   implementation(libs.commons.lang3)
+  implementation(libs.guava)
+  implementation(libs.jackson.annotations)
+  implementation(libs.jackson.databind)
+  implementation(libs.jackson.datatype.jdk8)
+  implementation(libs.jackson.datatype.jsr310)
+  implementation(libs.jackson.jaxrs.json.provider)
   implementation(libs.lance.namespace.core) {
     exclude(group = "com.lancedb", module = "lance-core")
+    exclude(group = "com.google.guava", module = "guava") // provided by gravitino
+    exclude(group = "com.fasterxml.jackson.core", module = "*") // provided by gravitino
+    exclude(group = "com.fasterxml.jackson.datatype", module = "*") // provided by gravitino
+    exclude(group = "com.fasterxml.jackson.jaxrs", module = "jackson-jaxrs-json-provider") // using gravitino's version
+    exclude(group = "org.apache.commons", module = "commons-lang3") // provided by gravitino
+    exclude(group = "org.apache.opendal", module = "*")
+    exclude(group = "org.junit.jupiter", module = "*")
   }
   implementation(libs.slf4j.api)
 

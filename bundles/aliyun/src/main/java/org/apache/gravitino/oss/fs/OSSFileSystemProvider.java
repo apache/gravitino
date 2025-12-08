@@ -18,6 +18,11 @@
  */
 package org.apache.gravitino.oss.fs;
 
+import static org.apache.gravitino.catalog.hadoop.fs.Constants.DEFAULT_CONNECTION_TIMEOUT;
+import static org.apache.gravitino.catalog.hadoop.fs.Constants.DEFAULT_RETRY_LIMIT;
+import static org.apache.gravitino.catalog.hadoop.fs.Constants.OSS_ESTABLISH_TIMEOUT_KEY;
+import static org.apache.gravitino.catalog.hadoop.fs.Constants.OSS_MAX_ERROR_RETRIES_KEY;
+
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
@@ -63,6 +68,8 @@ public class OSSFileSystemProvider implements FileSystemProvider, SupportsCreden
       hadoopConfMap.put(OSS_FILESYSTEM_IMPL, AliyunOSSFileSystem.class.getCanonicalName());
     }
 
+    hadoopConfMap = additionalOSSConfig(hadoopConfMap);
+
     Configuration configuration = FileSystemUtils.createConfiguration(hadoopConfMap);
 
     return AliyunOSSFileSystem.newInstance(path.toUri(), configuration);
@@ -88,5 +95,30 @@ public class OSSFileSystemProvider implements FileSystemProvider, SupportsCreden
   @Override
   public String name() {
     return "oss";
+  }
+
+  /**
+   * Add additional OSS configurations for better performance and reliability.
+   *
+   * @param configs Original configurations
+   * @return Configurations with additional OSS settings
+   */
+  private Map<String, String> additionalOSSConfig(Map<String, String> configs) {
+    Map<String, String> additionalConfigs = Maps.newHashMap(configs);
+
+    // Avoid multiple retries to speed up failure in test cases.
+    // Use hard code instead of Constants.ESTABLISH_TIMEOUT_KEY to avoid dependency on a specific
+    // Hadoop version.
+    if (!configs.containsKey(OSS_ESTABLISH_TIMEOUT_KEY)) {
+      additionalConfigs.put(OSS_ESTABLISH_TIMEOUT_KEY, DEFAULT_CONNECTION_TIMEOUT);
+    }
+
+    if (!configs.containsKey(OSS_MAX_ERROR_RETRIES_KEY)) {
+      additionalConfigs.put(OSS_MAX_ERROR_RETRIES_KEY, DEFAULT_RETRY_LIMIT);
+    }
+
+    // More tuning can be added here.
+
+    return ImmutableMap.copyOf(additionalConfigs);
   }
 }

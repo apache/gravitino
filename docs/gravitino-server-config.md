@@ -266,6 +266,17 @@ Refer to [security](security/security.md) for HTTPS and authentication configura
 |-------------------------------------------|------------------------------------------------------|---------------|----------|---------------|
 | `gravitino.metrics.timeSlidingWindowSecs` | The seconds of Gravitino metrics time sliding window | 60            | No       | 0.5.1         |
 
+### Memory settings
+
+`GRAVITINO_MEM` sets JVM heap/metaspace flags for the Gravitino server and is also read by the Iceberg REST server and Lance REST server launchers.
+
+Default: `-Xms1024m -Xmx1024m -XX:MaxMetaspaceSize=512m` (see `bin/common.sh`). Launch scripts append this to `JAVA_OPTS`; override `GRAVITINO_MEM` when you need different heap/metaspace sizes.
+
+Typical values:
+- Development: `-Xms1g -Xmx1g -XX:MaxMetaspaceSize=512m`
+- Moderate production: `-Xms4g -Xmx4g -XX:MaxMetaspaceSize=1g`
+- Larger deployments: `-Xms8g -Xmx8g -XX:MaxMetaspaceSize=1g` or higher depending on catalog count, plugins, and query concurrency
+
 ## Apache Gravitino catalog properties configuration
 
 There are three types of catalog properties:
