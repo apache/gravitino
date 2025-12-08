@@ -15,11 +15,11 @@ import TabItem from '@theme/TabItem';
 
 The Lance REST service provides a RESTful interface for managing Lance datasets through HTTP endpoints. Introduced in Gravitino version 1.1.0, this service enables seamless interaction with Lance datasets for data operations and metadata management.
 
-The service implements the [Lance REST API specification](https://editor-next.swagger.io/?url=https://raw.githubusercontent.com/lancedb/lance-namespace/refs/heads/main/docs/src/rest.yaml). For detailed specification documentation, see the [official Lance REST documentation](https://lance.org/format/namespace/impls/rest/).
+The service implements the [Lance REST API specification](https://docs.lancedb.com/api-reference/introduction). For detailed specification documentation, see the [official Lance REST documentation](https://lance.org/format/namespace/rest/catalog-spec/).
 
 ### What is Lance?
 
-[Lance](https://lancedb.github.io/lance/) is a modern columnar data format designed for AI/ML workloads. It provides:
+[Lance](https://lance.org/format/) is a modern columnar data format designed for AI/ML workloads. It provides:
 
 - **High-performance vector search**: Native support for similarity search on high-dimensional embeddings
 - **Columnar storage**: Optimized for analytical queries and machine learning pipelines
@@ -75,7 +75,7 @@ The Lance REST service provides comprehensive support for namespace management, 
 | RegisterTable     | Register an existing Lance table to a namespace                   | POST        | `/lance/v1/table/{id}/register`     | 1.1.0         |
 | DeregisterTable   | Unregister a table from a namespace (metadata only, data remains) | POST        | `/lance/v1/table/{id}/deregister`   | 1.1.0         |
 
-More details, please refer to the [Lance REST API specification](https://docs.lancedb.com/api-reference/introduction)
+More details, please refer to the [Lance REST API specification](https://lance.org/format/namespace/rest/catalog-spec/)
 
 ### Operation Details
 

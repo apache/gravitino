@@ -982,18 +982,18 @@ When defining a table column, you can specify a [literal](./expression.md#litera
 
 The following is a table of the column default value that Gravitino supports for different catalogs:
 
-| Catalog provider    | Supported default value |
-|---------------------|-------------------------|
-| `hive`              | &#10008;                |
-| `lakehouse-iceberg` | &#10008;                |
-| `lakehouse-paimon`  | &#10008;                |
-| `lakehouse-hudi`    | &#10008;                |
-| `jdbc-mysql`        | &#10004;                |
-| `jdbc-postgresql`   | &#10004;                |
-| `jdbc-doris`        | &#10004;                |
-| `jdbc-oceanbase`    | &#10004;                |
-| `jdbc-starrocks`    | &#10004;                |
- | `lakehouse-generic`| &#10008;                |
+| Catalog provider     | Supported default value |
+|----------------------|-------------------------|
+| `hive`               | &#10008;                |
+| `lakehouse-iceberg`  | &#10008;                |
+| `lakehouse-paimon`   | &#10008;                |
+| `lakehouse-hudi`     | &#10008;                |
+| `jdbc-mysql`         | &#10004;                |
+| `jdbc-postgresql`    | &#10004;                |
+| `jdbc-doris`         | &#10004;                |
+| `jdbc-oceanbase`     | &#10004;                |
+| `jdbc-starrocks`     | &#10004;                |
+| `lakehouse-generic`  | &#10008;                |
 
 #### Table column auto-increment
 
