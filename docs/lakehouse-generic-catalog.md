@@ -90,7 +90,7 @@ The Generic Lakehouse Catalog provides comprehensive relational metadata managem
 
 For detailed information on available operations, see [Manage Relational Metadata Using Gravitino](./manage-relational-metadata-using-gravitino.md).
 
-### Properties
+### Catalog Properties
 
 #### Required Properties
 

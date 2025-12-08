@@ -54,7 +54,7 @@ The Lance REST service acts as a bridge between Lance datasets and applications:
 - Full compliance with Lance REST API specification
 - Can run standalone or integrated with Gravitino server
 - Support for namespace and table management
-- Index creation and management capabilities
+- Index creation and management capabilities (Index operations are not supported in version 1.1.0)
 - Metadata stored in Gravitino for unified governance
 
 ## Supported Operations
@@ -75,7 +75,11 @@ The Lance REST service provides comprehensive support for namespace management, 
 | RegisterTable     | Register an existing Lance table to a namespace                   | POST        | `/lance/v1/table/{id}/register`     | 1.1.0         |
 | DeregisterTable   | Unregister a table from a namespace (metadata only, data remains) | POST        | `/lance/v1/table/{id}/deregister`   | 1.1.0         |
 
+More details, please refer to the [Lance REST API specification](https://docs.lancedb.com/api-reference/introduction)
+
 ### Operation Details
+
+Some operations have specific behaviors and modes. Below are important details to consider:
 
 #### Namespace Operations
 
@@ -99,9 +103,6 @@ The Lance REST service provides comprehensive support for namespace management, 
 - **DropTable**: Permanently deletes metadata and data files from storage
 - **DeregisterTable**: Removes metadata from Gravitino but preserves Lance data files
 
-:::note
-Index deletion is not supported in version 1.1.0.
-:::
 
 ## Deployment
 
@@ -138,7 +139,7 @@ To run Lance REST service independently without Gravitino server:
 {GRAVITINO_HOME}/bin/gravitino-lance-rest-server.sh start
 ```
 
-Configure the service by editing `gravitino-lance-rest-server.conf` or passing command-line arguments:
+Configure the service by editing `{GRAVITINO_HOME}/conf/gravitino-lance-rest-server.conf` or passing command-line arguments:
 
 | Configuration Property                         | Description                 | Default Value         | Required | Since Version |
 |------------------------------------------------|-----------------------------|-----------------------|----------|---------------|
@@ -149,8 +150,38 @@ Configure the service by editing `gravitino-lance-rest-server.conf` or passing c
 | `gravitino.lance-rest.host`                    | Service hostname            | 0.0.0.0               | No       | 1.1.0         |
 
 :::tip
-In most cases, you only need to configure `gravitino.lance-rest.gravitino.metalake-name`. Other properties can use their default values.
+In most cases, you only need to configure `gravitino.lance-rest.gravitino.metalake-name` and other properties can use their default values.
 :::
+
+
+### Running with Docker
+
+Launch Lance REST service using Docker:
+
+```shell
+docker run -d --name lance-rest-service -p 9101:9101 \
+  -e LANCE_REST_GRAVITINO_URI=http://gravitino-host:8090 \
+  -e LANCE_REST_GRAVITINO_METALAKE_NAME=your_metalake_name \
+  apache/gravitino-lance-rest:latest
+```
+
+Access the service at `http://localhost:9101`.
+
+**Environment Variables:**
+
+| Environment Variable                 | Configuration Property                    | Required | Default Value           | Since Version |
+|--------------------------------------|-------------------------------------------|----------|-------------------------|---------------|
+| `LANCE_REST_NAMESPACE_BACKEND`       | `gravitino.lance-rest.namespace-backend`  | No       | `gravitino`             | 1.1.0         |
+| `LANCE_REST_GRAVITINO_METALAKE_NAME` | `gravitino.lance-rest.gravitino-metalake` | Yes      | (none)                  | 1.1.0         |
+| `LANCE_REST_GRAVITINO_URI`           | `gravitino.lance-rest.gravitino-uri`      | No       | `http://localhost:8090` | 1.1.0         |
+| `LANCE_REST_HOST`                    | `gravitino.lance-rest.host`               | No       | `0.0.0.0`               | 1.1.0         |
+| `LANCE_REST_PORT`                    | `gravitino.lance-rest.httpPort`           | No       | `9101`                  | 1.1.0         |
+
+:::tip Configuration Tips
+- **Required:** Set `LANCE_REST_GRAVITINO_METALAKE_NAME` to your Gravitino metalake name
+- **Conditional:** Update `LANCE_REST_GRAVITINO_URI` if Gravitino server is not on `localhost`
+- **Optional:** Other variables can use default values unless you have specific requirements
+
 
 ## Usage Guidelines
 
@@ -158,19 +189,18 @@ When using Lance REST service with Gravitino backend, keep the following conside
 
 ### Prerequisites
 - A running Gravitino server with a created metalake
-- A generic-lakehouse catalog created in Gravitino metalake
 
 ### Namespace Hierarchy
 Gravitino follows a three-level hierarchy: **catalog → schema → table**. When creating namespaces or tables:
 
-1. **Parent must exist:** Before creating `lance_catalog/schema`, ensure `lance_catalog` catalog exists in Gravitino metalake
-2. **Two-level limit:** You can create `lance_catalog/schema`, but **not** `lance_catalog/schema/sub_schema`
-3. **Table placement:** Tables can only be created under `lance_catalog/schema`, not at catalog level
+1. **Parent must exist:** Before creating `lance_catalog/schema`, ensure `lance_catalog` catalog exists in Gravitino metalake.
+2. **Two-level limit:** You can create namespace `lance_catalog/schema`, but **not** `lance_catalog/schema/sub_schema`.
+3. **Table placement:** Tables can only be created under `lance_catalog/schema`, not at catalog level.
 
 **Example Hierarchy:**
 ```
 metalake
-└── lance_catalog (catalog - must pre-exist in Gravitino)
+└── lance_catalog (catalog - create via REST)
     └── schema (namespace - create via REST)
         └── table01 (table - create via REST)
 ```
@@ -195,11 +225,6 @@ URL encoded:        lance_catalog%24schema%24table01
 - Parent catalog must be created in Gravitino before using Lance REST API
 - Metadata operations require Gravitino server to be available
 - Namespace deletion is recursive and irreversible
-:::
-- Currently supports only **two levels of namespaces** before tables
-- Tables **cannot** be nested deeper than schema level
-- Parent catalog must be created in Gravitino before using Lance REST API
-:::
 
 ## Examples
 
@@ -214,7 +239,7 @@ The following examples demonstrate how to interact with Lance REST service using
 
 ```shell
 # Create a catalog-level namespace
-# mode: "create" | "exist_ok" | "overwrite"
+# mode: "create" | "exist_ok" | "overwrite" for create namespace/table; mode: "create" | "overwrite" for register table
 curl -X POST http://localhost:9101/lance/v1/namespace/lance_catalog/create \
   -H 'Content-Type: application/json' \
   -d '{
@@ -363,35 +388,3 @@ ns.create_table(create_table_request, body)
 
 </TabItem>
 </Tabs>
-
-
-### Running with Docker
-
-Launch Lance REST service using Docker:
-
-```shell
-docker run -d --name lance-rest-service -p 9101:9101 \
-  -e LANCE_REST_GRAVITINO_URI=http://gravitino-host:8090 \
-  -e LANCE_REST_GRAVITINO_METALAKE_NAME=your_metalake_name \
-  apache/gravitino-lance-rest:latest
-```
-
-Access the service at `http://localhost:9101`.
-
-**Environment Variables:**
-
-| Environment Variable                 | Configuration Property                             | Required | Default Value           | Since Version |
-|--------------------------------------|----------------------------------------------------|----------|-------------------------|---------------|
-| `LANCE_REST_NAMESPACE_BACKEND`       | `gravitino.lance-rest.namespace-backend`           | No       | `gravitino`             | 1.1.0         |
-| `LANCE_REST_GRAVITINO_METALAKE_NAME` | `gravitino.lance-rest.gravitino.metalake-name`     | Yes      | (none)                  | 1.1.0         |
-| `LANCE_REST_GRAVITINO_URI`           | `gravitino.lance-rest.gravitino.uri`               | No       | `http://localhost:8090` | 1.1.0         |
-| `LANCE_REST_HOST`                    | `gravitino.lance-rest.host`                        | No       | `0.0.0.0`               | 1.1.0         |
-| `LANCE_REST_PORT`                    | `gravitino.lance-rest.httpPort`                    | No       | `9101`                  | 1.1.0         |
-
-:::tip Configuration Tips
-- **Required:** Set `LANCE_REST_GRAVITINO_METALAKE_NAME` to your Gravitino metalake name
-- **Conditional:** Update `LANCE_REST_GRAVITINO_URI` if Gravitino server is not on `localhost`
-- **Optional:** Other variables can use default values unless you have specific requirements
-:::
-
-
