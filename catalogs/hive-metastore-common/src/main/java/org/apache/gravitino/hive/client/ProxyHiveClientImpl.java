@@ -28,12 +28,12 @@ import java.security.PrivilegedExceptionAction;
 import java.util.Properties;
 import org.apache.hadoop.security.UserGroupInformation;
 
-public class KerberosHiveClientImpl implements InvocationHandler {
+public class ProxyHiveClientImpl implements InvocationHandler {
 
   private final HiveClient delegate;
   private final UserGroupInformation ugi;
 
-  private KerberosHiveClientImpl(HiveClient delegate, UserGroupInformation ugi) {
+  private ProxyHiveClientImpl(HiveClient delegate, UserGroupInformation ugi) {
     this.delegate = delegate;
     this.ugi = ugi;
   }
@@ -58,7 +58,7 @@ public class KerberosHiveClientImpl implements InvocationHandler {
           Proxy.newProxyInstance(
               HiveClient.class.getClassLoader(),
               new Class<?>[] {HiveClient.class},
-              new KerberosHiveClientImpl(client, ugi));
+              new ProxyHiveClientImpl(client, ugi));
 
     } catch (IOException | InterruptedException ex) {
       throw new RuntimeException("Failed to create Kerberos Hive client", ex);

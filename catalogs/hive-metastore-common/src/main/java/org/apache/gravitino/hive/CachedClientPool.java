@@ -24,8 +24,6 @@ import com.github.benmanes.caffeine.cache.Scheduler;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.Lists;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
-import java.io.IOException;
-import java.io.UncheckedIOException;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
@@ -37,7 +35,7 @@ import org.apache.gravitino.catalog.hive.HiveConstants;
 import org.apache.gravitino.exceptions.GravitinoRuntimeException;
 import org.apache.gravitino.hive.client.HiveClient;
 import org.apache.gravitino.utils.ClientPool;
-import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.gravitino.utils.PrincipalUtils;
 import org.immutables.value.Value;
 
 /**
@@ -107,12 +105,7 @@ public class CachedClientPool implements ClientPool<HiveClient, GravitinoRuntime
   @VisibleForTesting
   public static Key extractKey() {
     List<Object> elements = Lists.newArrayList();
-    try {
-      elements.add(UserGroupInformation.getCurrentUser().getUserName());
-    } catch (IOException e) {
-      throw new UncheckedIOException(e);
-    }
-
+    elements.add(PrincipalUtils.getCurrentUserName());
     return Key.of(elements);
   }
 

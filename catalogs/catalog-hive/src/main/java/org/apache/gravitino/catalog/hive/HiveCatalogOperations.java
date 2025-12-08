@@ -88,6 +88,7 @@ import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.expressions.transforms.Transforms;
 import org.apache.gravitino.rel.indexes.Index;
 import org.apache.gravitino.rel.types.Type;
+import org.apache.gravitino.utils.PrincipalUtils;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -242,6 +243,7 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
       NameIdentifier ident, String comment, Map<String, String> properties)
       throws NoSuchCatalogException, SchemaAlreadyExistsException {
     try {
+      UserGroupInformation current = UserGroupInformation.getCurrentUser();
       HiveSchema hiveSchema =
           HiveSchema.builder()
               .withName(ident.name())
@@ -250,7 +252,7 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
               .withProperties(properties)
               .withAuditInfo(
                   AuditInfo.builder()
-                      .withCreator(UserGroupInformation.getCurrentUser().getUserName())
+                      .withCreator(PrincipalUtils.getCurrentUserName())
                       .withCreateTime(Instant.now())
                       .build())
               .build();
@@ -622,7 +624,7 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
               .withSortOrders(sortOrders)
               .withAuditInfo(
                   AuditInfo.builder()
-                      .withCreator(UserGroupInformation.getCurrentUser().getUserName())
+                      .withCreator(PrincipalUtils.getCurrentUserName())
                       .withCreateTime(Instant.now())
                       .build())
               .withPartitioning(partitioning)
@@ -636,7 +638,7 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
       LOG.info("Created Hive table {} in Hive Metastore", tableIdent.name());
       return new HiveTableHandle(hiveTable, clientPool);
 
-    } catch (IOException | InterruptedException e) {
+    } catch (InterruptedException e) {
       throw new RuntimeException(e);
     }
   }

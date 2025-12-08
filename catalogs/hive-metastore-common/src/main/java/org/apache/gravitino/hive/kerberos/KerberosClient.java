@@ -79,29 +79,24 @@ public class KerberosClient implements java.io.Closeable {
       String kerberosRealm = principalComponents.get(1);
 
       UserGroupInformation proxyUser;
-      if (UserGroupInformation.isSecurityEnabled()) {
-        final String finalPrincipalName;
-        if (!currentUser.contains("@")) {
-          finalPrincipalName = String.format("%s@%s", currentUser, kerberosRealm);
-        } else {
-          finalPrincipalName = currentUser;
-        }
-
-        proxyUser = UserGroupInformation.createProxyUser(finalPrincipalName, realLoginUgi);
-
-        // Acquire HMS delegation token for the proxy user and attach it to UGI
-        Preconditions.checkArgument(hiveClient != null, "HiveClient is not set in KerberosClient");
-        String tokenStr =
-            hiveClient.getDelegationToken(finalPrincipalName, realLoginUgi.getUserName());
-
-        Token<DelegationTokenIdentifier> delegationToken = new Token<>();
-        delegationToken.decodeFromUrlString(tokenStr);
-        delegationToken.setService(new Text(tokenSignature));
-        proxyUser.addToken(delegationToken);
-
+      final String finalPrincipalName;
+      if (!currentUser.contains("@")) {
+        finalPrincipalName = String.format("%s@%s", currentUser, kerberosRealm);
       } else {
-        proxyUser = UserGroupInformation.createProxyUser(currentUser, realLoginUgi);
+        finalPrincipalName = currentUser;
       }
+
+      proxyUser = UserGroupInformation.createProxyUser(finalPrincipalName, realLoginUgi);
+
+      // Acquire HMS delegation token for the proxy user and attach it to UGI
+      Preconditions.checkArgument(hiveClient != null, "HiveClient is not set in KerberosClient");
+      String tokenStr =
+          hiveClient.getDelegationToken(finalPrincipalName, realLoginUgi.getUserName());
+
+      Token<DelegationTokenIdentifier> delegationToken = new Token<>();
+      delegationToken.decodeFromUrlString(tokenStr);
+      delegationToken.setService(new Text(tokenSignature));
+      proxyUser.addToken(delegationToken);
 
       return proxyUser;
     } catch (Exception e) {

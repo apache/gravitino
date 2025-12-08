@@ -33,6 +33,7 @@ import org.apache.gravitino.hive.converter.HiveTableConverter;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hive.metastore.IMetaStoreClient;
 import org.apache.hadoop.hive.metastore.api.Database;
+import org.apache.hadoop.security.UserGroupInformation;
 
 class HiveShimV2 extends Shim {
 
@@ -70,6 +71,7 @@ class HiveShimV2 extends Shim {
   @Override
   public void createDatabase(HiveSchema database) {
     try {
+      UserGroupInformation userGroupInformation = UserGroupInformation.getCurrentUser();
       Database db = HiveDatabaseConverter.toHiveDb(database);
       client.createDatabase(db);
     } catch (Exception e) {

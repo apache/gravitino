@@ -148,27 +148,37 @@ public final class HiveClientFactory {
     return (HiveClient) hiveClientImplCtor.newInstance(version, properties);
   }
 
+  public static HiveClient createProxyHiveClientImpl(
+      HiveClientClassLoader.HiveVersion version,
+      Properties properties,
+      UserGroupInformation ugi,
+      ClassLoader classloader)
+      throws Exception {
+    Class<?> hiveClientImplClass = classloader.loadClass(ProxyHiveClientImpl.class.getName());
+    Method createMethod =
+        Util.findStaticMethod(
+            hiveClientImplClass,
+            "createClient",
+            HiveClientClassLoader.HiveVersion.class,
+            UserGroupInformation.class,
+            Properties.class);
+    return (HiveClient) createMethod.invoke(null, version, ugi, properties);
+  }
+
   private HiveClient createHiveClientInternal(HiveClientClassLoader classloader) {
     ClassLoader origLoader = Thread.currentThread().getContextClassLoader();
     Thread.currentThread().setContextClassLoader(classloader);
     try {
+      UserGroupInformation ugi;
       if (!enableKerberos) {
-        return createHiveClientImpl(classloader.getHiveVersion(), properties, classloader);
+        ugi = UserGroupInformation.getCurrentUser();
+        if (!ugi.getUserName().equals(PrincipalUtils.getCurrentUserName())) {
+          ugi = UserGroupInformation.createProxyUser(PrincipalUtils.getCurrentUserName(), ugi);
+        }
       } else {
-        UserGroupInformation ugi =
-            kerberosClient.loginProxyUser(PrincipalUtils.getCurrentUserName());
-        Class<?> hiveClientImplClass =
-            classloader.loadClass(KerberosHiveClientImpl.class.getName());
-        Method createMethod =
-            Util.findStaticMethod(
-                hiveClientImplClass,
-                "createClient",
-                HiveClientClassLoader.HiveVersion.class,
-                UserGroupInformation.class,
-                Properties.class);
-        return (HiveClient)
-            createMethod.invoke(null, classloader.getHiveVersion(), ugi, properties);
+        ugi = kerberosClient.loginProxyUser(PrincipalUtils.getCurrentUserName());
       }
+      return createProxyHiveClientImpl(classloader.getHiveVersion(), properties, ugi, classloader);
     } catch (Exception e) {
       throw HiveExceptionConverter.toGravitinoException(
           e,
