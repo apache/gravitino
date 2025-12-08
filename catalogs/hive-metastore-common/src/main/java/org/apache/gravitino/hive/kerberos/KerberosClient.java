@@ -111,8 +111,7 @@ public class KerberosClient implements java.io.Closeable {
     String catalogPrincipal = kerberosConfig.getPrincipalName();
     Preconditions.checkArgument(
         StringUtils.isNotBlank(catalogPrincipal), "The principal can't be blank");
-    @SuppressWarnings("null")
-    java.util.List<String> principalComponents = Splitter.on('@').splitToList(catalogPrincipal);
+    List<String> principalComponents = Splitter.on('@').splitToList(catalogPrincipal);
     Preconditions.checkArgument(
         principalComponents.size() == 2, "The principal has the wrong format");
 
