@@ -91,6 +91,29 @@ public class TestLineageSinkManager {
     Assertions.assertEquals("b", configs.get("sink2.a"));
   }
 
+  @Test
+  public void testGenerateEventListenerConfigsEnforcesMinimumQueueCapacity() {
+    // Test case where integer division would result in 0 (2 / 3 = 0)
+    List<String> sinks = Arrays.asList("sinkA", "sinkB", "sinkC");
+    Map<String, String> lineageConfigs = new HashMap<>();
+    lineageConfigs.put(LineageConfig.LINEAGE_SINK_QUEUE_CAPACITY, "2");
+
+    Map<String, String> eventListenerConfigs =
+        LineageSinkManager.transformToEventListenerConfigs(sinks, lineageConfigs);
+
+    sinks.forEach(
+        sink -> {
+          String capacityKey =
+              sink + "." + EventListenerManager.GRAVITINO_EVENT_LISTENER_QUEUE_CAPACITY;
+          String actualCapacity = eventListenerConfigs.get(capacityKey);
+
+          Assertions.assertEquals(
+              "1",
+              actualCapacity,
+              String.format("Queue capacity for %s should be at least 1", sink));
+        });
+  }
+
   private void checkLineageSink(LineageSinkForTest sink) {
     Map<String, String> configs = sink.getConfigs();
     Assertions.assertTrue(configs.containsKey("name"));

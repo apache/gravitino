@@ -79,7 +79,9 @@ public class LineageSinkManager implements Closeable {
     String queueCapacity = lineageConfigs.get(LineageConfig.LINEAGE_SINK_QUEUE_CAPACITY);
     Preconditions.checkArgument(
         StringUtils.isNotBlank(queueCapacity), "Lineage sink queue capacity is not set");
-    int capacityPerSink = Integer.valueOf(queueCapacity) / sinks.size();
+
+    int totalCapacity = Integer.parseInt(queueCapacity);
+    int capacityPerSink = Math.max(1, totalCapacity / sinks.size());
 
     eventListenerConfigs.put(
         EventListenerManager.GRAVITINO_EVENT_LISTENER_NAMES, String.join(",", sinks));
