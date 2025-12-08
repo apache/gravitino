@@ -24,11 +24,7 @@ import java.net.URLClassLoader;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.Collections;
-import java.util.EnumMap;
 import java.util.List;
-import java.util.Map;
-import java.util.Properties;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.exceptions.GravitinoRuntimeException;
@@ -48,24 +44,18 @@ public final class HiveClientClassLoader extends URLClassLoader {
     HIVE3,
   }
 
-  private final HiveVersion version;
-  private final List<URL> execJars;
   private final ClassLoader baseClassLoader;
-
-  /** Cache HiveClientClassLoader instances per Hive version to avoid re-creating classloaders. */
-  private static final Map<HiveVersion, HiveClientClassLoader> LOADER_CACHE =
-      new EnumMap<>(HiveVersion.class);
+  private final HiveVersion version;
 
   /**
    * Constructs an HiveClientClassLoader.
    *
    * @param version The Hive version
    * @param execJars List of jar file URLs to load
-   * @param config Configuration map (reserved for future use)
    * @param baseClassLoader The base classloader for shared classes
    */
   private HiveClientClassLoader(
-      HiveVersion version, List<URL> execJars, Properties config, ClassLoader baseClassLoader) {
+      HiveVersion version, List<URL> execJars, ClassLoader baseClassLoader) {
     super(version.toString(), execJars.toArray(new URL[0]), null);
     Preconditions.checkArgument(version != null, "Hive version cannot be null");
     Preconditions.checkArgument(
@@ -73,7 +63,6 @@ public final class HiveClientClassLoader extends URLClassLoader {
     Preconditions.checkArgument(baseClassLoader != null, "Base classloader cannot be null");
 
     this.version = version;
-    this.execJars = Collections.unmodifiableList(execJars);
     this.baseClassLoader = baseClassLoader;
   }
 
@@ -81,22 +70,18 @@ public final class HiveClientClassLoader extends URLClassLoader {
     return version;
   }
 
-  public static synchronized HiveClientClassLoader getClientLoaderForVersion(
-      HiveVersion hiveVersion, Properties config) throws IOException {
-    // Reuse loader per version to avoid repeatedly creating isolated classloaders.
-    HiveClientClassLoader cached = LOADER_CACHE.get(hiveVersion);
-    if (cached != null) {
-      return cached;
-    }
-
-    HiveClientClassLoader loader =
-        createLoader(hiveVersion, config, Thread.currentThread().getContextClassLoader());
-    LOADER_CACHE.put(hiveVersion, loader);
-    return loader;
-  }
-
-  private static HiveClientClassLoader createLoader(
-      HiveVersion hiveVersion, Properties config, ClassLoader baseLoader) throws IOException {
+  /**
+   * Creates a new {@link HiveClientClassLoader} instance for the given version.
+   *
+   * <p>This method does not perform any caching. Callers are responsible for managing and
+   * optionally caching returned instances.
+   *
+   * @param hiveVersion The Hive version to create a loader for.
+   * @param baseLoader The parent classloader to delegate shared classes to.
+   * @return A new {@link HiveClientClassLoader} instance.
+   */
+  public static HiveClientClassLoader createLoader(HiveVersion hiveVersion, ClassLoader baseLoader)
+      throws IOException {
     Path jarDir = getJarDirectory(hiveVersion);
     if (!Files.exists(jarDir) || !Files.isDirectory(jarDir)) {
       throw new IOException("Hive jar directory does not exist or is not a directory: " + jarDir);
@@ -107,7 +92,7 @@ public final class HiveClientClassLoader extends URLClassLoader {
       throw new IOException("No jar files found in directory: " + jarDir);
     }
 
-    return new HiveClientClassLoader(hiveVersion, jars, config, baseLoader);
+    return new HiveClientClassLoader(hiveVersion, jars, baseLoader);
   }
 
   /**
@@ -272,26 +257,5 @@ public final class HiveClientClassLoader extends URLClassLoader {
         || name.startsWith(HiveShimV3.class.getName())
         || name.startsWith(Util.class.getName())
         || name.startsWith("org.apache.gravitino.hive.converter.");
-  }
-
-  private void closeInternal() throws IOException {
-    try {
-      super.close();
-    } catch (Exception e) {
-      LOG.warn("Failed to close isolated Hive classloader", e);
-      throw new IOException("Failed to close isolated Hive classloader", e);
-    }
-  }
-
-  /** Shutdown for all cached HiveClientClassLoader instances. */
-  public static synchronized void shutdown() {
-    for (HiveClientClassLoader loader : LOADER_CACHE.values()) {
-      try {
-        loader.closeInternal();
-      } catch (IOException e) {
-        LOG.warn("Failed to close isolated Hive classloader for version {}", loader.version, e);
-      }
-    }
-    LOADER_CACHE.clear();
   }
 }

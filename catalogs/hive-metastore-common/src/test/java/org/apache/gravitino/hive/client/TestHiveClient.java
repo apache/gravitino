@@ -82,7 +82,7 @@ public class TestHiveClient {
       String catalogName, String testPrefix, String metastoreUri, String hdfsBasePath) {
     Properties properties = new Properties();
     properties.setProperty("hive.metastore.uris", metastoreUri);
-    HiveClient client = HiveClientFactory.createHiveClient(properties);
+    HiveClient client = new HiveClientFactory(properties, "").createHiveClient();
 
     String dbName = "gt_" + testPrefix + "_db_" + UUID.randomUUID().toString().replace("-", "");
     String tableName = "gt_" + testPrefix + "_tbl_" + UUID.randomUUID().toString().replace("-", "");
@@ -274,7 +274,7 @@ public class TestHiveClient {
       String catalogName, String metastoreUri, String hdfsBasePath) throws Exception {
     Properties properties = new Properties();
     properties.setProperty("hive.metastore.uris", metastoreUri);
-    HiveClient client = HiveClientFactory.createHiveClient(properties);
+    HiveClient client = new HiveClientFactory(properties, "").createHiveClient();
 
     String dbName = "gt_exception_test_db_" + UUID.randomUUID().toString().replace("-", "");
     String tableName = "gt_exception_test_tbl_" + UUID.randomUUID().toString().replace("-", "");
@@ -364,7 +364,7 @@ public class TestHiveClient {
         Assertions.assertThrows(
             Exception.class,
             () -> {
-              HiveClient client = HiveClientFactory.createHiveClient(properties);
+              HiveClient client = new HiveClientFactory(properties, "").createHiveClient();
               client.getAllDatabases(catalogName);
             });
 
@@ -405,7 +405,7 @@ public class TestHiveClient {
     String dbName = "test_kerberos_db";
     String dbLocation = KERBEROS_HIVE2_HDFS_URL + "/tmp/gravitino_kerberos_test/" + dbName;
 
-    HiveClient client = HiveClientFactory.createHiveClient(properties);
+    HiveClient client = new HiveClientFactory(properties, "").createHiveClient();
     HiveSchema schema = createTestSchema(catalogName, dbName, dbLocation);
     client.createDatabase(schema);
     List<String> allDatabases = client.getAllDatabases(catalogName);

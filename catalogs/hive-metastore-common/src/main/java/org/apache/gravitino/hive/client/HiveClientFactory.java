@@ -19,7 +19,8 @@
 
 package org.apache.gravitino.hive.client;
 
-import static org.apache.gravitino.hive.client.HiveClientClassLoader.getClientLoaderForVersion;
+import static org.apache.gravitino.hive.client.HiveClientClassLoader.HiveVersion.HIVE2;
+import static org.apache.gravitino.hive.client.HiveClientClassLoader.HiveVersion.HIVE3;
 import static org.apache.gravitino.hive.client.Util.buildConfiguration;
 
 import com.google.common.base.Preconditions;
@@ -40,36 +41,61 @@ public final class HiveClientFactory {
 
   public static final String GRAVITINO_KEYTAB_FORMAT = "keytabs/gravitino-hive-%s-keytab";
 
-  // Singleton instance
-  private static final HiveClientFactory INSTANCE = new HiveClientFactory();
+  // Remember which Hive backend version worked successfully for this factory.
+  private volatile HiveClientClassLoader.HiveVersion backendVersion;
+  private volatile HiveClientClassLoader backendClassLoader;
 
+  private volatile boolean enableKerberos;
   private KerberosClient kerberosClient;
 
-  private HiveClientFactory() {}
-
-  public static HiveClientFactory getInstance() {
-    return INSTANCE;
-  }
+  private final Configuration hadoopConf;
+  private final Properties properties;
+  private final String keytabPath;
 
   /**
-   * Public entry point to create a {@link HiveClient}. Keeps a static signature for convenience,
-   * while delegating to the singleton instance for actual work.
+   * Creates a {@link HiveClientFactory} bound to the given configuration properties.
+   *
+   * @param properties Hive client configuration, must not be null.
    */
-  public static HiveClient createHiveClient(Properties properties) {
-    return INSTANCE.createHiveClientInternal(properties);
+  public HiveClientFactory(Properties properties, String id) {
+    Preconditions.checkArgument(properties != null, "Properties cannot be null");
+    this.properties = properties;
+    this.keytabPath = String.format("keytabs/gravitino-%s-keytab", id);
+
+    try {
+      this.hadoopConf = new Configuration();
+      buildConfiguration(properties, hadoopConf);
+
+      this.enableKerberos = initKerberosIfNecessary();
+    } catch (Exception e) {
+      throw new RuntimeException("Failed to initialize HiveClientFactory", e);
+    }
   }
 
-  private HiveClient createHiveClientInternal(Properties properties) {
-    Preconditions.checkArgument(properties != null, "Properties cannot be null");
-
+  /** Creates a {@link HiveClient} using the properties associated with this factory. */
+  public HiveClient createHiveClient() {
     HiveClient client = null;
     try {
+      if (backendVersion != null) {
+        HiveClientClassLoader classLoader = getOrCreateClassLoader(backendVersion);
+        client = createHiveClientInternal(classLoader);
+        LOG.info("Connected to Hive Metastore using cached Hive version {}", backendVersion.name());
+        return client;
+      }
+    } catch (Exception e) {
+      LOG.warn(
+          "Failed to connect to Hive Metastore using cached Hive version {}", backendVersion, e);
+      throw new RuntimeException("Failed to connect to Hive Metastore", e);
+    }
+
+    try {
       // Try using Hive3 first
-      HiveClientClassLoader classloader =
-          getClientLoaderForVersion(HiveClientClassLoader.HiveVersion.HIVE3, properties);
-      client = createHiveClientInternal(properties, classloader);
+      HiveClientClassLoader classloader = getOrCreateClassLoader(HIVE3);
+      client = createHiveClientInternal(classloader);
       client.getCatalogs();
       LOG.info("Connected to Hive Metastore using Hive version HIVE3");
+      backendVersion = HiveClientClassLoader.HiveVersion.HIVE3;
+      backendClassLoader = classloader;
       return client;
 
     } catch (GravitinoRuntimeException e) {
@@ -82,10 +108,11 @@ public final class HiveClientFactory {
         if (e.getMessage().contains("Invalid method name: 'get_catalogs'")
             || e.getMessage().contains("class not found") // caused by MiniHiveMetastoreService
         ) {
-          HiveClientClassLoader classloader =
-              getClientLoaderForVersion(HiveClientClassLoader.HiveVersion.HIVE2, properties);
-          client = createHiveClientInternal(properties, classloader);
+          HiveClientClassLoader classloader = getOrCreateClassLoader(HIVE2);
+          client = createHiveClientInternal(classloader);
           LOG.info("Connected to Hive Metastore using Hive version HIVE2");
+          backendVersion = HIVE2;
+          backendClassLoader = classloader;
           return client;
         }
         throw e;
@@ -100,6 +127,17 @@ public final class HiveClientFactory {
     }
   }
 
+  private HiveClientClassLoader getOrCreateClassLoader(HiveClientClassLoader.HiveVersion version)
+      throws Exception {
+    if (backendVersion != version) {
+      backendClassLoader =
+          HiveClientClassLoader.createLoader(
+              version, Thread.currentThread().getContextClassLoader());
+      backendVersion = version;
+    }
+    return backendClassLoader;
+  }
+
   public static HiveClient createHiveClientImpl(
       HiveClientClassLoader.HiveVersion version, Properties properties, ClassLoader classloader)
       throws Exception {
@@ -110,15 +148,15 @@ public final class HiveClientFactory {
     return (HiveClient) hiveClientImplCtor.newInstance(version, properties);
   }
 
-  private HiveClient createHiveClientInternal(
-      Properties properties, HiveClientClassLoader classloader) {
+  private HiveClient createHiveClientInternal(HiveClientClassLoader classloader) {
     ClassLoader origLoader = Thread.currentThread().getContextClassLoader();
     Thread.currentThread().setContextClassLoader(classloader);
     try {
-      UserGroupInformation ugi = initKerberosIfNecessary(classloader.getHiveVersion(), properties);
-      if (ugi == null) {
+      if (!enableKerberos) {
         return createHiveClientImpl(classloader.getHiveVersion(), properties, classloader);
       } else {
+        UserGroupInformation ugi =
+            kerberosClient.loginProxyUser(PrincipalUtils.getCurrentUserName());
         Class<?> hiveClientImplClass =
             classloader.loadClass(KerberosHiveClientImpl.class.getName());
         Method createMethod =
@@ -141,28 +179,45 @@ public final class HiveClientFactory {
     }
   }
 
-  private UserGroupInformation initKerberosIfNecessary(
-      HiveClientClassLoader.HiveVersion version, Properties conf) {
-    Configuration hadoopConf = new Configuration();
-    buildConfiguration(conf, hadoopConf);
-    AuthenticationConfig authenticationConfig = new AuthenticationConfig(conf, hadoopConf);
-
-    if (!authenticationConfig.isKerberosAuth()) {
-      return null;
-    }
-
+  private boolean initKerberosIfNecessary() {
     try {
-      if (kerberosClient != null) {
-        return kerberosClient.login(PrincipalUtils.getCurrentUserName());
+      AuthenticationConfig authenticationConfig = new AuthenticationConfig(properties, hadoopConf);
+      if (!authenticationConfig.isKerberosAuth()) {
+        return false;
       }
 
-      String keytabPath = String.format(GRAVITINO_KEYTAB_FORMAT, conf.getOrDefault("id", ""));
-      kerberosClient = new KerberosClient(version, conf, hadoopConf, true, keytabPath);
+      kerberosClient = new KerberosClient(properties, hadoopConf, true, keytabPath);
       kerberosClient.saveKeyTabFileFromUri();
-      return kerberosClient.login(PrincipalUtils.getCurrentUserName());
-
+      kerberosClient.login();
+      HiveClient client = createHiveClient();
+      kerberosClient.setHiveClient(client);
+      return true;
     } catch (Exception e) {
-      throw new RuntimeException("Failed to login with kerberos", e);
+      throw new RuntimeException("Failed to initialize kerberos client", e);
+    }
+  }
+
+  /** Release resources held by this factory. */
+  public void close() {
+    try {
+      if (kerberosClient != null) {
+        try {
+          kerberosClient.close();
+        } catch (Exception e) {
+          LOG.warn("Failed to close Kerberos client", e);
+        } finally {
+          kerberosClient = null;
+        }
+      }
+
+      if (backendClassLoader != null) {
+        backendClassLoader.close();
+        backendClassLoader = null;
+      }
+
+      backendVersion = null;
+    } catch (Exception e) {
+      LOG.warn("Failed to close HiveClientFactory", e);
     }
   }
 }

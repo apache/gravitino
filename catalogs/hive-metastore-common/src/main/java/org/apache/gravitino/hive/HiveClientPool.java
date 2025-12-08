@@ -32,7 +32,7 @@ import org.slf4j.LoggerFactory;
 public class HiveClientPool extends ClientPoolImpl<HiveClient, GravitinoRuntimeException> {
 
   private static final Logger LOG = LoggerFactory.getLogger(HiveClientPool.class);
-  private final Properties properties;
+  private final HiveClientFactory clientFactory;
 
   /**
    * Creates a new HiveClientPool with the specified pool size and configuration.
@@ -43,13 +43,13 @@ public class HiveClientPool extends ClientPoolImpl<HiveClient, GravitinoRuntimeE
   public HiveClientPool(int poolSize, Properties properties) {
     // Do not allow retry by default as we rely on RetryingHiveClient
     super(poolSize, GravitinoRuntimeException.class, false);
-    this.properties = properties;
+    this.clientFactory = new HiveClientFactory(properties, "xxx");
   }
 
   @Override
   protected HiveClient newClient() {
     try {
-      return HiveClientFactory.createHiveClient(properties);
+      return clientFactory.createHiveClient();
     } catch (Exception e) {
       LOG.error("Failed to connect to Hive Metastore", e);
       throw new GravitinoRuntimeException(e, "Failed to connect to Hive Metastore");
