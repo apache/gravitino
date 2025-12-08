@@ -20,13 +20,13 @@
 package org.apache.gravitino.hive;
 
 import com.google.common.collect.ImmutableMap;
-import java.security.PrivilegedAction;
 import java.util.Map;
 import java.util.Properties;
 import java.util.concurrent.TimeUnit;
+import org.apache.gravitino.UserPrincipal;
 import org.apache.gravitino.catalog.hive.HiveConstants;
 import org.apache.gravitino.hive.hms.MiniHiveMetastoreService;
-import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.gravitino.utils.PrincipalUtils;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -60,16 +60,21 @@ public class TestCachedClientPool extends MiniHiveMetastoreService {
 
   @Test
   public void testCacheKey() throws Exception {
-    UserGroupInformation current = UserGroupInformation.getCurrentUser();
-    UserGroupInformation foo1 = UserGroupInformation.createProxyUser("foo", current);
-    UserGroupInformation foo2 = UserGroupInformation.createProxyUser("foo", current);
-    UserGroupInformation bar = UserGroupInformation.createProxyUser("bar", current);
     CachedClientPool.Key key1 =
-        foo1.doAs((PrivilegedAction<CachedClientPool.Key>) CachedClientPool::extractKey);
+        PrincipalUtils.doAs(
+            new UserPrincipal("foo"),
+            (java.security.PrivilegedExceptionAction<CachedClientPool.Key>)
+                CachedClientPool::extractKey);
     CachedClientPool.Key key2 =
-        foo2.doAs((PrivilegedAction<CachedClientPool.Key>) CachedClientPool::extractKey);
+        PrincipalUtils.doAs(
+            new UserPrincipal("foo"),
+            (java.security.PrivilegedExceptionAction<CachedClientPool.Key>)
+                CachedClientPool::extractKey);
     CachedClientPool.Key key3 =
-        bar.doAs((PrivilegedAction<CachedClientPool.Key>) CachedClientPool::extractKey);
+        PrincipalUtils.doAs(
+            new UserPrincipal("bar"),
+            (java.security.PrivilegedExceptionAction<CachedClientPool.Key>)
+                CachedClientPool::extractKey);
     Assertions.assertEquals(key1, key2);
     Assertions.assertNotEquals(key1, key3);
   }
