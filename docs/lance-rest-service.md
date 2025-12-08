@@ -61,19 +61,19 @@ The Lance REST service acts as a bridge between Lance datasets and applications:
 
 The Lance REST service provides comprehensive support for namespace management, table management, and index operations. The table below lists all supported operations:
 
-| Operation         | Description                                                        | HTTP Method | Endpoint Pattern                    | Since Version |
-|-------------------|--------------------------------------------------------------------|-------------|-------------------------------------|---------------|
-| CreateNamespace   | Create a new Lance namespace                                       | POST        | `/lance/v1/namespace/{id}/create`   | 1.1.0         |
-| ListNamespaces    | List all namespaces under a parent namespace                       | GET         | `/lance/v1/namespace/{parent}/list` | 1.1.0         |
-| DescribeNamespace | Retrieve detailed information about a specific namespace           | POST        | `/lance/v1/namespace/{id}/describe` | 1.1.0         |
-| DropNamespace     | Delete a namespace                                                 | POST        | `/lance/v1/namespace/{id}/drop`     | 1.1.0         |
-| NamespaceExists   | Check whether a namespace exists                                   | POST        | `/lance/v1/namespace/{id}/exists`   | 1.1.0         |
-| ListTables        | List all tables in a namespace                                     | GET         | `/lance/v1/table/{namespace}/list`  | 1.1.0         |
-| CreateTable       | Create a new table in a namespace                                  | POST        | `/lance/v1/table/{id}/create`       | 1.1.0         |
-| DropTable         | Delete a table including both metadata and data                    | POST        | `/lance/v1/table/{id}/drop`         | 1.1.0         |
-| TableExists       | Check whether a table exists                                       | POST        | `/lance/v1/table/{id}/exists`       | 1.1.0         |
-| RegisterTable     | Register an existing Lance table to a namespace                    | POST        | `/lance/v1/table/{id}/register`     | 1.1.0         |
-| DeregisterTable   | Unregister a table from a namespace (metadata only, data remains)  | POST        | `/lance/v1/table/{id}/deregister`   | 1.1.0         |
+| Operation         | Description                                                       | HTTP Method | Endpoint Pattern                    | Since Version |
+|-------------------|-------------------------------------------------------------------|-------------|-------------------------------------|---------------|
+| CreateNamespace   | Create a new Lance namespace                                      | POST        | `/lance/v1/namespace/{id}/create`   | 1.1.0         |
+| ListNamespaces    | List all namespaces under a parent namespace                      | GET         | `/lance/v1/namespace/{parent}/list` | 1.1.0         |
+| DescribeNamespace | Retrieve detailed information about a specific namespace          | POST        | `/lance/v1/namespace/{id}/describe` | 1.1.0         |
+| DropNamespace     | Delete a namespace                                                | POST        | `/lance/v1/namespace/{id}/drop`     | 1.1.0         |
+| NamespaceExists   | Check whether a namespace exists                                  | POST        | `/lance/v1/namespace/{id}/exists`   | 1.1.0         |
+| ListTables        | List all tables in a namespace                                    | GET         | `/lance/v1/table/{namespace}/list`  | 1.1.0         |
+| CreateTable       | Create a new table in a namespace                                 | POST        | `/lance/v1/table/{id}/create`       | 1.1.0         |
+| DropTable         | Delete a table including both metadata and data                   | POST        | `/lance/v1/table/{id}/drop`         | 1.1.0         |
+| TableExists       | Check whether a table exists                                      | POST        | `/lance/v1/table/{id}/exists`       | 1.1.0         |
+| RegisterTable     | Register an existing Lance table to a namespace                   | POST        | `/lance/v1/table/{id}/register`     | 1.1.0         |
+| DeregisterTable   | Unregister a table from a namespace (metadata only, data remains) | POST        | `/lance/v1/table/{id}/deregister`   | 1.1.0         |
 
 ### Operation Details
 
@@ -109,21 +109,21 @@ Index deletion is not supported in version 1.1.0.
 
 To enable the Lance REST service within Gravitino server, configure the following properties in your Gravitino configuration file:
 
-| Configuration Property                         | Description                                                                                          | Default Value           | Required | Since Version |
-|------------------------------------------------|------------------------------------------------------------------------------------------------------|-------------------------|----------|---------------|
-| `gravitino.auxService.names`                   | Auxiliary services to run. Include `lance-rest` to enable Lance REST service                         | iceberg-rest,lance-rest | Yes      | 0.2.0         |
-| `gravitino.lance-rest.classpath`               | Classpath for Lance REST service, relative to Gravitino home directory                               | lance-rest-server/libs  | Yes      | 1.1.0         |
-| `gravitino.lance-rest.port`                    | Port number for Lance REST service                                                                   | 9101                    | Yes      | 1.1.0         |
-| `gravitino.lance-rest.host`                    | Hostname for Lance REST service                                                                      | 0.0.0.0                 | Yes      | 1.1.0         |
-| `gravitino.lance-rest.namespace-backend`       | Namespace metadata backend (currently only `gravitino` is supported)                                 | gravitino               | Yes      | 1.1.0         |
-| `gravitino.lance-rest.gravitino.uri`           | Gravitino server URI (required when namespace-backend is `gravitino`)                                | http://localhost:8090   | Yes      | 1.1.0         |
-| `gravitino.lance-rest.gravitino.metalake-name` | Gravitino metalake name (required when namespace-backend is `gravitino`)                             | (none)                  | Yes      | 1.1.0         |
+| Configuration Property                    | Description                                                                  | Default Value           | Required | Since Version |
+|-------------------------------------------|------------------------------------------------------------------------------|-------------------------|----------|---------------|
+| `gravitino.auxService.names`              | Auxiliary services to run. Include `lance-rest` to enable Lance REST service | iceberg-rest,lance-rest | Yes      | 0.2.0         |
+| `gravitino.lance-rest.classpath`          | Classpath for Lance REST service, relative to Gravitino home directory       | lance-rest-server/libs  | Yes      | 1.1.0         |
+| `gravitino.lance-rest.httpPort`           | Port number for Lance REST service                                           | 9101                    | Yes      | 1.1.0         |
+| `gravitino.lance-rest.host`               | Hostname for Lance REST service                                              | 0.0.0.0                 | Yes      | 1.1.0         |
+| `gravitino.lance-rest.namespace-backend`  | Namespace metadata backend (currently only `gravitino` is supported)         | gravitino               | Yes      | 1.1.0         |
+| `gravitino.lance-rest.gravitino-uri`      | Gravitino server URI (required when namespace-backend is `gravitino`)        | http://localhost:8090   | Yes      | 1.1.0         |
+| `gravitino.lance-rest.gravitino-metalake` | Gravitino metalake name (required when namespace-backend is `gravitino`)     | (none)                  | Yes      | 1.1.0         |
 
 **Example Configuration:**
 
 ```properties
 gravitino.auxService.names = lance-rest
-gravitino.lance-rest.port = 9101
+gravitino.lance-rest.httpPort = 9101
 gravitino.lance-rest.host = 0.0.0.0
 gravitino.lance-rest.namespace-backend = gravitino
 gravitino.lance-rest.gravitino.uri = http://localhost:8090
@@ -140,13 +140,13 @@ To run Lance REST service independently without Gravitino server:
 
 Configure the service by editing `gravitino-lance-rest-server.conf` or passing command-line arguments:
 
-| Configuration Property                         | Description                                                      | Default Value         | Required | Since Version |
-|------------------------------------------------|------------------------------------------------------------------|-----------------------|----------|---------------|
-| `gravitino.lance-rest.namespace-backend`       | Namespace metadata backend                                       | gravitino             | Yes      | 1.1.0         |
-| `gravitino.lance-rest.gravitino.uri`           | Gravitino server URI                                             | http://localhost:8090 | Yes      | 1.1.0         |
-| `gravitino.lance-rest.gravitino.metalake-name` | Gravitino metalake name                                          | (none)                | Yes      | 1.1.0         |
-| `gravitino.lance-rest.port`                    | Service port number                                              | 9101                  | No       | 1.1.0         |
-| `gravitino.lance-rest.host`                    | Service hostname                                                 | 0.0.0.0               | No       | 1.1.0         |
+| Configuration Property                         | Description                 | Default Value         | Required | Since Version |
+|------------------------------------------------|-----------------------------|-----------------------|----------|---------------|
+| `gravitino.lance-rest.namespace-backend`       | Namespace metadata backend  | gravitino             | Yes      | 1.1.0         |
+| `gravitino.lance-rest.gravitino.uri`           | Gravitino server URI        | http://localhost:8090 | Yes      | 1.1.0         |
+| `gravitino.lance-rest.gravitino.metalake-name` | Gravitino metalake name     | (none)                | Yes      | 1.1.0         |
+| `gravitino.lance-rest.httpPort`                | Service port number         | 9101                  | No       | 1.1.0         |
+| `gravitino.lance-rest.host`                    | Service hostname            | 0.0.0.0               | No       | 1.1.0         |
 
 :::tip
 In most cases, you only need to configure `gravitino.lance-rest.gravitino.metalake-name`. Other properties can use their default values.
