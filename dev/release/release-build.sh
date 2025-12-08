@@ -247,6 +247,13 @@ if [[ "$1" == "package" ]]; then
       --detach-sig gravitino-iceberg-rest-server-$GRAVITINO_VERSION-bin.tar.gz
     shasum -a 512 gravitino-iceberg-rest-server-$GRAVITINO_VERSION-bin.tar.gz > gravitino-iceberg-rest-server-$GRAVITINO_VERSION-bin.tar.gz.sha512
 
+    echo "Copying and signing Gravitino Lance REST server binary distribution"
+    cp gravitino-$GRAVITINO_VERSION-bin/distribution/gravitino-lance-rest-server-$GRAVITINO_VERSION-bin.tar.gz .
+    echo $GPG_PASSPHRASE | $GPG --passphrase-fd 0 --armour \
+      --output gravitino-lance-rest-server-$GRAVITINO_VERSION-bin.tar.gz.asc \
+      --detach-sig gravitino-lance-rest-server-$GRAVITINO_VERSION-bin.tar.gz
+    shasum -a 512 gravitino-lance-rest-server-$GRAVITINO_VERSION-bin.tar.gz > gravitino-lance-rest-server-$GRAVITINO_VERSION-bin.tar.gz.sha512
+
     echo "Copying and signing Gravitino Trino connector binary distribution"
     cp gravitino-$GRAVITINO_VERSION-bin/distribution/gravitino-trino-connector-$GRAVITINO_VERSION.tar.gz .
     echo $GPG_PASSPHRASE | $GPG --passphrase-fd 0 --armour \
