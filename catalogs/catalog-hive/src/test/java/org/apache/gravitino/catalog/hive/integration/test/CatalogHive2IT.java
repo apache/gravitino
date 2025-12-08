@@ -258,7 +258,6 @@ public class CatalogHive2IT extends BaseIT {
     } catch (Exception e) {
       LOG.error("Failed to close CloseableGroup", e);
     }
-
     client = null;
   }
 

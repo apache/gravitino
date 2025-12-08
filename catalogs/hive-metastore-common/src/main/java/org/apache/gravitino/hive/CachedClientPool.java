@@ -154,6 +154,5 @@ public class CachedClientPool implements ClientPool<HiveClient, GravitinoRuntime
     // class loader is closed.
     clientPoolCache.asMap().forEach((key, value) -> value.close());
     clientPoolCache.invalidateAll();
-    scheduler.shutdownNow();
   }
 }

@@ -47,14 +47,14 @@ import org.slf4j.LoggerFactory;
 public class KerberosClient implements java.io.Closeable {
   private static final Logger LOG = LoggerFactory.getLogger(KerberosClient.class);
 
-  private ScheduledThreadPoolExecutor checkTgtExecutor;
+  private volatile ScheduledThreadPoolExecutor checkTgtExecutor;
   private final Properties conf;
   private final Configuration hadoopConf;
   private final boolean refreshCredentials;
-  private UserGroupInformation realLoginUgi;
-  private String keytabFilePath;
-  private HiveClient hiveClient = null;
-  private HiveClientClassLoader.HiveVersion version;
+  private volatile UserGroupInformation realLoginUgi;
+  private final String keytabFilePath;
+  private volatile HiveClient hiveClient = null;
+  private final HiveClientClassLoader.HiveVersion version;
 
   public KerberosClient(
       HiveClientClassLoader.HiveVersion version,
@@ -70,21 +70,29 @@ public class KerberosClient implements java.io.Closeable {
   }
 
   public UserGroupInformation login(String userName) throws Exception {
-    if (realLoginUgi == null) {
-      return loginRealUser(userName);
-    } else {
-      if (userName.equals(realLoginUgi.getUserName())) {
-        return realLoginUgi;
-      } else {
-        return loginProxyUser(userName);
+    UserGroupInformation localUgi = realLoginUgi;
+    if (localUgi == null) {
+      synchronized (this) {
+        if (realLoginUgi == null) {
+          return loginRealUser(userName);
+        }
+        localUgi = realLoginUgi;
       }
     }
+
+    if (userName.equals(localUgi.getUserName())) {
+      return localUgi;
+    }
+
+    return loginProxyUser(userName, localUgi);
   }
 
-  private UserGroupInformation loginProxyUser(String currentUser) {
+  private UserGroupInformation loginProxyUser(
+      String currentUser, UserGroupInformation baseUserInformation) {
     try {
       String tokenSignature = conf.getProperty(HIVE_METASTORE_TOKEN_SIGNATURE, "");
       String principal = conf.getProperty(PRINCIPAL_KEY, "");
+      @SuppressWarnings("null")
       List<String> principalComponents = Splitter.on('@').splitToList(principal);
       Preconditions.checkArgument(
           principalComponents.size() == 2, "The principal has the wrong format");
@@ -99,11 +107,11 @@ public class KerberosClient implements java.io.Closeable {
           finalPrincipalName = currentUser;
         }
 
-        proxyUser = UserGroupInformation.createProxyUser(finalPrincipalName, realLoginUgi);
+        proxyUser = UserGroupInformation.createProxyUser(finalPrincipalName, baseUserInformation);
 
         // Acquire HMS delegation token for the proxy user and attach it to UGI
         String tokenStr =
-            hiveClient.getDelegationToken(finalPrincipalName, realLoginUgi.getUserName());
+            hiveClient.getDelegationToken(finalPrincipalName, baseUserInformation.getUserName());
 
         Token<DelegationTokenIdentifier> delegationToken = new Token<>();
         delegationToken.decodeFromUrlString(tokenStr);
@@ -111,7 +119,7 @@ public class KerberosClient implements java.io.Closeable {
         proxyUser.addToken(delegationToken);
 
       } else {
-        proxyUser = UserGroupInformation.createProxyUser(currentUser, realLoginUgi);
+        proxyUser = UserGroupInformation.createProxyUser(currentUser, baseUserInformation);
       }
 
       return proxyUser;
@@ -120,7 +128,7 @@ public class KerberosClient implements java.io.Closeable {
     }
   }
 
-  public UserGroupInformation loginRealUser(String userName) throws Exception {
+  private UserGroupInformation loginRealUser(String userName) throws Exception {
     KerberosConfig kerberosConfig = new KerberosConfig(conf, hadoopConf);
 
     // Check the principal and keytab file
@@ -135,19 +143,25 @@ public class KerberosClient implements java.io.Closeable {
     // Login
     UserGroupInformation.setConfiguration(hadoopConf);
     UserGroupInformation.loginUserFromKeytab(catalogPrincipal, keytabFilePath);
-    realLoginUgi = UserGroupInformation.getLoginUser();
-    hiveClient =
+    UserGroupInformation loginUgi = UserGroupInformation.getLoginUser();
+
+    HiveClient createdHiveClient =
         HiveClientFactory.createHiveClientImpl(
             version, conf, Thread.currentThread().getContextClassLoader());
 
+    realLoginUgi = loginUgi;
+    hiveClient = createdHiveClient;
+
     // Refresh the cache if it's out of date.
     if (refreshCredentials) {
-      this.checkTgtExecutor = new ScheduledThreadPoolExecutor(1, getThreadFactory("check-tgt"));
+      if (checkTgtExecutor == null) {
+        checkTgtExecutor = new ScheduledThreadPoolExecutor(1, getThreadFactory("check-tgt"));
+      }
       int checkInterval = kerberosConfig.getCheckIntervalSec();
       checkTgtExecutor.scheduleAtFixedRate(
           () -> {
             try {
-              realLoginUgi.checkTGTAndReloginFromKeytab();
+              loginUgi.checkTGTAndReloginFromKeytab();
             } catch (Exception e) {
               LOG.error("Fail to refresh ugi token: ", e);
             }
@@ -157,11 +171,11 @@ public class KerberosClient implements java.io.Closeable {
           TimeUnit.SECONDS);
     }
 
-    if (!realLoginUgi.getUserName().equals(userName)) {
-      return loginProxyUser(userName);
+    if (!loginUgi.getUserName().equals(userName)) {
+      return loginProxyUser(userName, loginUgi);
     }
 
-    return realLoginUgi;
+    return loginUgi;
   }
 
   public File saveKeyTabFileFromUri() throws IOException {

@@ -66,7 +66,7 @@ public final class HiveClientFactory {
     try {
       // Try using Hive3 first
       HiveClientClassLoader classloader =
-          getClientLoaderForVersion(HiveClientClassLoader.HiveVersion.HIVE2, properties);
+          getClientLoaderForVersion(HiveClientClassLoader.HiveVersion.HIVE3, properties);
       client = createHiveClientInternal(properties, classloader);
       client.getCatalogs();
       LOG.info("Connected to Hive Metastore using Hive version HIVE3");

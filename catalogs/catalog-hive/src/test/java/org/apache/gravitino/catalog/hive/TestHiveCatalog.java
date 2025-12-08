@@ -34,6 +34,7 @@ import org.apache.gravitino.connector.PropertiesMetadata;
 import org.apache.gravitino.hive.hms.MiniHiveMetastoreService;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.CatalogEntity;
+import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.thrift.TException;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -95,6 +96,7 @@ public class TestHiveCatalog extends MiniHiveMetastoreService {
 
     Map<String, String> conf = Maps.newHashMap();
     metastore.hiveConf().forEach(e -> conf.put(e.getKey(), e.getValue()));
+    conf.put(METASTORE_URIS, hiveConf.get(HiveConf.ConfVars.METASTOREURIS.varname));
 
     try (HiveCatalogOperations ops = new HiveCatalogOperations()) {
       ops.initialize(conf, entity.toCatalogInfo(), HIVE_PROPERTIES_METADATA);
