@@ -46,10 +46,11 @@ import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.expressions.transforms.Transforms;
 import org.apache.gravitino.rel.types.Types;
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 
 // This class is use for manual testing against real Hive Metastore instances.
-// @Disabled
+@Disabled
 public class TestHiveClient {
 
   private static final String HIVE2_HMS_URL = "thrift://172.17.0.4:9083";
