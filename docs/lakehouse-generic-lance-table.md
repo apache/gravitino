@@ -9,7 +9,7 @@ keywords:
 - metadata
 - generic catalog
 - file system
-  license: "This software is licensed under the Apache License version 2."
+license: "This software is licensed under the Apache License version 2."
 ---
 
 import Tabs from '@theme/Tabs';
@@ -108,8 +108,8 @@ Required and optional properties for tables in a Generic Lakehouse Catalog:
 | `format`              | Table format: `lance`, `iceberg`, etc. (currently only `lance` is fully supported)                                                                                                                                                                                                                                                              | (none)   | Yes          | 1.1.0         |
 | `location`            | Storage path for table metadata and data, Lance currently supports: S3, GCS, OSS, AZ, File, Memory and file-object-store.                                                                                                                                                                                                                       | (none)   | Conditional* | 1.1.0         |
 | `external`            | Whether the data directory is an external location. If it's `true`, dropping a table will only remove metadata in Gravitino and will not delete the data directory, and purge table will delete both. For a non-external table, dropping will drop both.                                                                                        | false    | No           | 1.1.0         |
-| `lance.creation-mode` | Create mode: for create table, it can be `CREATE`, `EXIST_OK` or `OVERWRITE`. and it should be `CREATE` and `OVERWRITE` for registering tables                                                                                                                                                                                                  | `CREATE` | No           | 1.1.0         |
-| `lance.register`      | Whether it is a register table operation. This API will not create data directory acutally and it's the user responsibility to create and manage the data directory.                                                                                                                                                                            | false    | No           | 1.1.0         |
+| `lance.creation-mode` | Create mode: for create table, it can be `CREATE`, `EXIST_OK` or `OVERWRITE`. and it should be `CREATE` or `OVERWRITE` for registering tables                                                                                                                                                                                                   | `CREATE` | No           | 1.1.0         |
+| `lance.register`      | Whether it is a register table operation. This API will not create data directory actually and it's the user's responsibility to create and manage the data directory.                                                                                                                                                                          | false    | No           | 1.1.0         |
 | `lance.storage.xxxx`  | Any additional storage-specific properties required by Lance format (e.g., S3 credentials, HDFS configs). Replace `xxxx` with actual property names. For example, we can use `lance.storage.aws_access_key_id` to set S3 aws_access_key_id when using a S3 location, for detail, please refer to https://lancedb.com/docs/storage/integrations/ | (none)   | No           | 1.1.0         |
 
 
@@ -162,18 +162,12 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
       "name": "id",
       "type": "integer",
       "comment": "Primary identifier",
-      "nullable": false,
-      "autoIncrement": true,
-      "defaultValue": {
-        "type": "literal",
-        "dataType": "integer",
-        "value": "-1"
-      }
+      "nullable": false
     }
   ],
   "properties": {
     "format": "lance",
-    "location": "/tmp/lance_catalog/schema/lance_table1"
+    "location": "/tmp/lance_catalog/schema/lance_table"
   }
 }' http://localhost:8090/api/metalakes/test/catalogs/generic_lakehouse_lance_catalog/schemas/schema/tables
 ```

@@ -141,13 +141,13 @@ To run Lance REST service independently without Gravitino server:
 
 Configure the service by editing `{GRAVITINO_HOME}/conf/gravitino-lance-rest-server.conf` or passing command-line arguments:
 
-| Configuration Property                         | Description                 | Default Value         | Required | Since Version |
-|------------------------------------------------|-----------------------------|-----------------------|----------|---------------|
-| `gravitino.lance-rest.namespace-backend`       | Namespace metadata backend  | gravitino             | Yes      | 1.1.0         |
-| `gravitino.lance-rest.gravitino.uri`           | Gravitino server URI        | http://localhost:8090 | Yes      | 1.1.0         |
-| `gravitino.lance-rest.gravitino.metalake-name` | Gravitino metalake name     | (none)                | Yes      | 1.1.0         |
-| `gravitino.lance-rest.httpPort`                | Service port number         | 9101                  | No       | 1.1.0         |
-| `gravitino.lance-rest.host`                    | Service hostname            | 0.0.0.0               | No       | 1.1.0         |
+| Configuration Property                    | Description                 | Default Value         | Required | Since Version |
+|-------------------------------------------|-----------------------------|-----------------------|----------|---------------|
+| `gravitino.lance-rest.namespace-backend`  | Namespace metadata backend  | gravitino             | Yes      | 1.1.0         |
+| `gravitino.lance-rest.gravitino-uri`      | Gravitino server URI        | http://localhost:8090 | Yes      | 1.1.0         |
+| `gravitino.lance-rest.gravitino.metalake` | Gravitino metalake name     | (none)                | Yes      | 1.1.0         |
+| `gravitino.lance-rest.httpPort`           | Service port number         | 9101                  | No       | 1.1.0         |
+| `gravitino.lance-rest.host`               | Service hostname            | 0.0.0.0               | No       | 1.1.0         |
 
 :::tip
 In most cases, you only need to configure `gravitino.lance-rest.gravitino.metalake-name` and other properties can use their default values.
@@ -181,7 +181,7 @@ Access the service at `http://localhost:9101`.
 - **Required:** Set `LANCE_REST_GRAVITINO_METALAKE_NAME` to your Gravitino metalake name
 - **Conditional:** Update `LANCE_REST_GRAVITINO_URI` if Gravitino server is not on `localhost`
 - **Optional:** Other variables can use default values unless you have specific requirements
-
+:::
 
 ## Usage Guidelines
 
@@ -225,6 +225,7 @@ URL encoded:        lance_catalog%24schema%24table01
 - Parent catalog must be created in Gravitino before using Lance REST API
 - Metadata operations require Gravitino server to be available
 - Namespace deletion is recursive and irreversible
+:::
 
 ## Examples
 
@@ -278,7 +279,7 @@ curl -X POST http://localhost:9101/lance/v1/table/lance_catalog%24schema%24table
 curl -X POST \
      "http://localhost:9101/lance/v1/table/lance_catalog%24schema%24table03/create" \
      -H 'Content-Type: application/vnd.apache.arrow.stream' \
-     -H "x-lance-table-location: "/tmp/lance_catalog/schema/table04" \
+     -H "x-lance-table-location: /tmp/lance_catalog/schema/table03" \
      -H "x-lance-table-properties: {}" \
      --data-binary "@${ARROW_FILE}"    
 ```

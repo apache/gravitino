@@ -49,7 +49,7 @@ For detailed information on available operations, see [Manage Relational Metadat
 | Property   | Description                                  | Example                  | Required | Since Version |
 |------------|----------------------------------------------|--------------------------|----------|---------------|
 | `provider` | Catalog provider type                        | `lakehouse-generic`      | Yes      | 1.1.0         |
-| `location` | Root storage path for all schemas and tables | `s3://buecket/lakehouse` | False    | 1.1.0         |
+| `location` | Root storage path for all schemas and tables | `s3://bucket/lakehouse` | False    | 1.1.0         |
 
 
 #### Key Property: `location`
