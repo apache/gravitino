@@ -38,6 +38,7 @@ val scalaCollectionCompatVersion: String = libs.versions.scala.collection.compat
 val artifactName = "${rootProject.name}-spark-${sparkMajorVersion}_$scalaVersion"
 
 if (hasProperty("excludePackagesForSparkConnector")) {
+  @Suppress("UNCHECKED_CAST")
   val configureFunc = properties["excludePackagesForSparkConnector"] as? (Project) -> Unit
   configureFunc?.invoke(project)
 }

@@ -62,7 +62,7 @@ dependencies {
 }
 
 tasks {
-  val runtimeJars by registering(Copy::class) {
+  register("runtimeJars", Copy::class) {
     from(configurations.runtimeClasspath)
     into("build/libs")
   }
@@ -90,7 +90,7 @@ tasks {
     fileMode = 0b111101101
   }
 
-  val copyLibAndConfig by registering(Copy::class) {
+  register("copyLibAndConfig", Copy::class) {
     dependsOn(copyCatalogLibs, copyCatalogConfig)
   }
 }
