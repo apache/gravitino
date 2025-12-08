@@ -200,237 +200,75 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 
-   The Web UI also bundles various third-party components also under
-   different licenses, please see web/LICENSE.bin for these.
 
    This product bundles various third-party components also under the
    Apache Software License 2.0 from:
 
-   Apache Hive
-   Apache Iceberg
-   Apache Kafka
-   Apache Spark
-   Apache Submarine
-   Apache Zeppelin
-   Apache ZooKeeper
-   Java Classmate
-   Jackson Annotations
-   Jackson Core
-   Jackson Databind
-   Jackson Data Mapper
-   Jackson Datatype Guava
-   Jackson Datatype JDK8
-   Jackson Datatype Joda
-   Jackson Datatype JSR310
-   Jackson JAX RS Provider For JSON Content Type
-   Jackson Jaxb Annotations
-   Jackson JAXRS
-   Jackson JAXRS JSON
-   Jackson Parameter Names
-   Jackson Xml Compatibility Extensions
-   Caffeine
-   Dropwizard Hadoop Metrics
-   GSON
-   Error Prone Annotations
-   Failure Access
-   Guava
-   Google Guice
-   Google Guice Servlet
-   J2ObjC Annotations
-   Java XMLBuilder
-   BoneCP
-   Open JSON
-   Apache Commons Beanutils
-   Apache Commons CLI
    Apache Commons Codec
    Apache Commons Collections
-   Apache Commons Configuration
-   Apache Commons Daemon
-   Apache Commons DBCP
-   Apache Jakarta Commons Digester
-   Apache Jakarta HttpClient
-   Apache Commons IO
    Apache Commons Lang
-   Apache Commons Logging
-   Apache Commons Net
-   Apache Commons Pool
-   Air Compressor
-   Airlift
-   The Netty Project
-   Open Telemetry
-   Open Lineage
-   Trino
-   Jakarta Dependency Injection
-   Jakarta Bean Validation
-   atinject
-   Apache Java Data Objects (JDO)
-   Joda Time
-   Apache Log4j
-   Byte Buddy
-   Eigenbase Properties
-   JetS3t
-   OpenCSV
-   Apache Ant
-   Apache Avro
-   Apache Commons Compress
-   Apache Commons Math
-   Apache Curator Client
-   Apache Curator Framework
-   Apache Curator Recipes
-   Apache Derby
-   Apache Directory API ASN.1 API
-   Apache Directory LDAP API Utilities
-   ApacheDS I18n
-   ApacheDS Protocol Kerberos Codec
-   Apache Hadoop
-   Apache Hadoop Aliyun connector
-   Apache Hadoop GCS connector
-   Apache Hadoop AWS connector
-   Apache Hadoop Azure connector
-   Apache Hadoop Annotatations
-   Apache Hadoop Auth
-   Apache Hadoop Client Aggregator
-   Apache Hadoop Common
-   Apache Hadoop HDFS
-   Apache Hadoop HDFS Client
-   Apache Hadoop MapReduce Common
-   Apache Hadoop MapReduce Core
-   Apache Hadoop MapReduce JobClient
-   Apache Hadoop Yarn Client
-   Apache Hive
-   Apache HTrace
-   Apache HttpCore
-   Apache HttpClient
-   Apache Iceberg
-   Apache Iceberg Aliyun
-   Apache Iceberg api
-   Apache Iceberg AWS
-   Apache Iceberg Azure
-   Apache Iceberg core
-   Apache Iceberg Hive metastore
-   Apache Iceberg GCP
-   Apache Iceberg GCP bundle
-   Apache Ivy
    Apache Log4j 1.x Compatibility API
    Apache Log4j API
    Apache Log4j Core
+   Apache Log4j Layout Template JSON
    Apache Log4j SLF4J 2.0 Binding
-   Apache Log4j Layout For Templated JSON Encoding
-   Apache ORC
-   Apache Parquet Hadoop Bundle
-   Apache Thrift
-   Apache Velocity
-   Apache Groovy
-   Apache Yetus
-   Apache Yetus - Audience Annotations
-   Apache Kerby
-   Apache Kyuubi
-   Apache Ranger
-   Apache Ranger intg
-   Jackson JSON processor
-   DataNucleus
-   Modernizer Maven Plugin
-   Hibernate Validator
-   JBoss Logging
-   RoaringBitmap
-   cglib
-   jmxutils
-   SQLite JDBC
-   SnakeYAML
-   StAX API
-   Tomcat Jasper Compiler
-   Apache Xerces Java
-   Apache XML Commons XML APIs
-   Jettison
-   Woodstox Core
-   JSON Smart v2
-   JSON Small and Fast Parser
-   Prometheus instrumentation library for JVM applications
-   JSR-330: Dependency Injection for Java
-   Java JWT
-   JSqlParser
-   Nimbus JOSE + JWT
-   reload4j
-   JVM CPU Profiler
-   Slice
-   Jakarta Oro
-   OkHttp
-   Okio
-   J2ObjC
-   SQLite JDBC Driver
-   Immutables
-   MyBatis
-   Javax Inject
-   Javax JDO API
-   JBoss Threads
-   JCIP Annotations Under Apache License
-   Jetty SSLEngine
-   JJWT
-   LZ4 and XxHash
-   Prometheus Java Simpleclient
-   Snappy Java
-   XNIO API
-   WildFly
-   Confluent Kafka Streams Examples
-   Apache Arrow
-   Rome
-   Jettison
-   Awaitility
-   npgall concurrent-trees
-   reyerizo jcstress-gradle-plugin
-   melix jmh-gradle-plugin
-   Lance
-   JCasbin
-   OGNL
-   Google FlatBuffers
-   IPAddress
-   Aliyun SDK OSS
-
-   This product bundles various third-party components also under the
-   Apache Software Foundation License 1.1
-
-   Apache Commons EL
-
-   This product bundles various third-party components also under the
-   BSD license
-
-   JSR305
-   LevelDB JNI
-   JCraft
-   Javolution
-   ANTLR4
-   JAXB
-   Jakarta XML Binding
-   JLine
-   XMLenc
-   Stax2 API
-   String Template 4
-   JSch
-   ASM
-   Protobuf
-   ParaNamer
-   RE2/J
-   ZSTD JNI
-   fsspec
-   Google auth HTTP
-   Google auth Credentials
+   Dropwizard Metrics Core
+   Dropwizard Metrics Jersey2
+   Dropwizard Metrics JMX
+   Dropwizard Metrics JVM
+   Dropwizard Metrics Servlets
+   Dropwizard Metrics JSON
+   Dropwizard Metrics Healthchecks
+   Dropwizard Metrics Annotation
+   Error Prone Annotations
+   Guava InternalFutureFailureAccess and InternalFutures
+   Guava: Google Core Libraries For Java
+   Google Guice Core Library
+   Jackson Annotations
+   Jackson Core
+   Jackson Databind
+   Jackson Datatype Guava
+   Jackson Datatype JDK8
+   Jackson Datatype JSR310
+   Jackson JAXRS Base
+   Jackson JAXRS JSON Provider
+   Jackson Module JAXB Annotations
+   LanceDB Lance Namespace Core
+   LanceDB Lance Namespace Apache Client
+   Apache Arrow Vector
+   Apache Arrow Memory Core
+   Apache Arrow Memory Netty
+   Apache Arrow Format
    Apache HttpComponents Client5
    Apache HttpComponents Core5
+   Apache HttpComponents Core5 H2
+   The Netty Project
+   Prometheus instrumentation library
+   Prometheus Simpleclient
+   Prometheus Simpleclient Common
+   Prometheus Simpleclient Tracer Common
+   Prometheus Simpleclient Tracer OpenTelemetry
+   Prometheus Simpleclient Tracer OpenTelemetry Agent
+   FlatBuffers
    Helger Profiler
    OpenAPI Tools Jackson Databind Nullable
+   GSON
 
    This product bundles various third-party components also under the
    MIT license
 
-   SLF4J
-   SLF4J-API
    Checker Framework
-   Janino Common Compiler
-   Protocol Buffers
-   Treelayout
-   Kyligence/kylinpy
-   elarivie/pyReaderWriterLock
-   tkem/cachetools
+   SLF4J API Module
+
+   This product bundles various third-party components also under the
+   BSD license
+
+   ANTLR4
+   ASM
+   Javolution
+   JSR305
+   Protobuf
+   Stax2 API
 
    This product bundles various third-party components also under the
    Common Development and Distribution License 1.0
@@ -451,8 +289,8 @@
    This product bundles various third-party components also under the
    Eclipse Public License 1.0
 
-   Logback
    Eclipse Collections
+   Eclipse Collections API
    Eclipse Jetty
    Eclipse Jetty Continuation
    Eclipse Jetty Security
@@ -463,30 +301,30 @@
    Eclipse Jetty Utilities JSON
    Eclipse Jetty Webapp
    Eclipse Jetty XML
-   JTA
    AOP Alliance Repackaged
    OSGi Resource Locator
-   H2 Database Engine
 
    This product bundles various third-party components also under the
    Eclipse Public License 2.0
 
-   Eclipse AspectJ
-   Eclipse Jetty
-   Eclipse Jersey
    Eclipse GlassFish
-   Jakarta Activation API
-   Jakarta Annotations API
-   Jakarta Inject
-   Jakarta Transaction API
-   Jakarta Validation API
-   Jakarta RESTful WS API
-   Jakarta XML Binding API
-   JavaServer Pages(TM) API
-   Javax WS RS API
+   Eclipse Jersey
+   Eclipse Jersey Containers Jetty HTTP
+   Eclipse Jersey Container Servlet Core
+   Eclipse Jersey Core Client
+   Eclipse Jersey Core Server
+   Eclipse Jersey Ext Entity Filtering
+   Eclipse Jersey Inject HK2
+   Eclipse Jersey Media JSON Jackson
    HK2 API Module
    HK2 Service Locator
    HK2 Utils
+   Jakarta Activation API
+   Jakarta Annotations API
+   Jakarta Inject
+   Jakarta Validation API
+   Jakarta RESTful WS API
+   Jakarta XML Binding API
 
    This product bundles various third-party components also under the
    Mozilla Public License
@@ -497,6 +335,5 @@
    the public domain.
 
    AOP Alliance
-   XZ For Java
-   HdrHistogram
-   LatencyUtils
+
+

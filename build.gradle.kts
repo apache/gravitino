@@ -808,12 +808,12 @@ tasks {
 
       copy {
         from(projectDir.dir("licenses")) { into("${rootProject.name}-lance-rest-server/licenses") }
-        from(projectDir.file("LICENSE.rest")) { into("${rootProject.name}-lance-rest-server") }
-        from(projectDir.file("NOTICE.rest")) { into("${rootProject.name}-lance-rest-server") }
+        from(projectDir.file("LICENSE.lance")) { into("${rootProject.name}-lance-rest-server") }
+        from(projectDir.file("NOTICE.lance")) { into("${rootProject.name}-lance-rest-server") }
         from(projectDir.file("README.md")) { into("${rootProject.name}-lance-rest-server") }
         into(outputDir)
         rename { fileName ->
-          fileName.replace(".rest", "")
+          fileName.replace(".lance", "")
         }
       }
     }
