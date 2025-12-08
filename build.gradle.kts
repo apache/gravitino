@@ -763,12 +763,12 @@ tasks {
 
       copy {
         from(projectDir.dir("licenses")) { into("${rootProject.name}-iceberg-rest-server/licenses") }
-        from(projectDir.file("LICENSE.rest")) { into("${rootProject.name}-iceberg-rest-server") }
-        from(projectDir.file("NOTICE.rest")) { into("${rootProject.name}-iceberg-rest-server") }
+        from(projectDir.file("LICENSE.iceberg")) { into("${rootProject.name}-iceberg-rest-server") }
+        from(projectDir.file("NOTICE.iceberg")) { into("${rootProject.name}-iceberg-rest-server") }
         from(projectDir.file("README.md")) { into("${rootProject.name}-iceberg-rest-server") }
         into(outputDir)
         rename { fileName ->
-          fileName.replace(".rest", "")
+          fileName.replace(".iceberg", "")
         }
       }
     }
