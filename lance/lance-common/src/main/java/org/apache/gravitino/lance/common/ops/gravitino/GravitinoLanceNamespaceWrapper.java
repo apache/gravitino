@@ -25,6 +25,8 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.lancedb.lance.namespace.LanceNamespaceException;
 import com.lancedb.lance.namespace.util.CommonUtil;
+import java.util.HashMap;
+import java.util.Map;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.client.GravitinoClient;
@@ -65,7 +67,29 @@ public class GravitinoLanceNamespaceWrapper extends NamespaceWrapper {
         StringUtils.isNotBlank(metalakeName),
         "Metalake name must be provided for Lance Gravitino namespace backend");
 
-    this.client = GravitinoClient.builder(uri).withMetalake(metalakeName).build();
+    // Extract client configuration properties (e.g., connection pool settings)
+    Map<String, String> clientProperties = new HashMap<>();
+    config()
+        .getAllConfig()
+        .forEach(
+            (key, value) -> {
+              if (key.startsWith("gravitino.client.")) {
+                clientProperties.put(key, value);
+                LOG.info("Applying client config: {} = {}", key, value);
+              }
+            });
+
+    this.client =
+        GravitinoClient.builder(uri)
+            .withMetalake(metalakeName)
+            .withClientConfig(clientProperties)
+            .build();
+
+    LOG.info(
+        "GravitinoClient initialized with {} client properties for metalake: {}",
+        clientProperties.size(),
+        metalakeName);
+
     this.namespaceOperations = new GravitinoLanceNameSpaceOperations(this);
     this.tableOperations = new GravitinoLanceTableOperations(this);
   }
