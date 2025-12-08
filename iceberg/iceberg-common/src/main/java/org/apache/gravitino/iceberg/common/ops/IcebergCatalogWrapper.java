@@ -287,14 +287,21 @@ public class IcebergCatalogWrapper implements AutoCloseable {
     }
     metadataCache.close();
 
-    // For Iceberg REST server which use same classloader when recreating catalog wrapper, the
+    // For Iceberg REST server which use the same classloader when recreating catalog wrapper, the
     // Driver couldn't be reloaded after deregister()
     if (useDifferentClassLoader()) {
       closeJdbcDriverResources();
     }
   }
 
-  // Whether to use same classloader when recreating IcebergCatalogWrapper
+  /**
+   * Whether the wrapper is recreated with a different classloader.
+   *
+   * <p>Returning {@code true} allows JDBC drivers loaded by an isolated classloader to be
+   * deregistered when the wrapper closes so the classloader can be garbage collected. Implementors
+   * that intentionally reuse the same classloader (for example, an Iceberg REST server instance)
+   * should override and return {@code false} to skip deregistration.
+   */
   protected boolean useDifferentClassLoader() {
     return true;
   }
