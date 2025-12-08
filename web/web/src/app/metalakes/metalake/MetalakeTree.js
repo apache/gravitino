@@ -78,7 +78,7 @@ const MetalakeTree = props => {
           case 'lakehouse-hudi':
             return 'custom-icons-hudi'
           case 'lakehouse-generic':
-            return 'streamline-ultimate:data-lake-1'
+            return 'material-symbols:houseboat-outline'
           case 'jdbc-oceanbase':
             return 'custom-icons-oceanbase'
           default:
