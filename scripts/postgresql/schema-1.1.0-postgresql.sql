@@ -49,6 +49,8 @@ COMMENT ON COLUMN metalake_meta.current_version IS 'metalake current version';
 COMMENT ON COLUMN metalake_meta.last_version IS 'metalake last version';
 COMMENT ON COLUMN metalake_meta.deleted_at IS 'metalake deleted at';
 
+CREATE INDEX IF NOT EXISTS metalake_meta_idx_name_da ON metalake_meta (metalake_name, deleted_at);
+
 
 CREATE TABLE IF NOT EXISTS catalog_meta (
                                             catalog_id BIGINT NOT NULL,
@@ -79,6 +81,7 @@ COMMENT ON COLUMN catalog_meta.audit_info IS 'catalog audit info';
 COMMENT ON COLUMN catalog_meta.current_version IS 'catalog current version';
 COMMENT ON COLUMN catalog_meta.last_version IS 'catalog last version';
 COMMENT ON COLUMN catalog_meta.deleted_at IS 'catalog deleted at';
+CREATE INDEX IF NOT EXISTS catalog_meta_idx_name_da ON catalog_meta (catalog_name, deleted_at);
 
 
 CREATE TABLE IF NOT EXISTS schema_meta (
@@ -109,6 +112,9 @@ COMMENT ON COLUMN schema_meta.audit_info IS 'schema audit info';
 COMMENT ON COLUMN schema_meta.current_version IS 'schema current version';
 COMMENT ON COLUMN schema_meta.last_version IS 'schema last version';
 COMMENT ON COLUMN schema_meta.deleted_at IS 'schema deleted at';
+CREATE INDEX IF NOT EXISTS schema_meta_idx_name_da ON schema_meta (schema_name, deleted_at);
+
+
 
 
 CREATE TABLE IF NOT EXISTS table_meta (
@@ -127,6 +133,8 @@ CREATE TABLE IF NOT EXISTS table_meta (
 
 CREATE INDEX IF NOT EXISTS table_meta_idx_metalake_id ON table_meta (metalake_id);
 CREATE INDEX IF NOT EXISTS table_meta_idx_catalog_id ON table_meta (catalog_id);
+CREATE INDEX IF NOT EXISTS table_meta_idx_name_da ON table_meta (table_name, deleted_at);
+
 COMMENT ON TABLE table_meta IS 'table metadata';
 
 COMMENT ON COLUMN table_meta.table_id IS 'table id';

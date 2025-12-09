@@ -56,6 +56,15 @@ public interface TableMetaMapper {
   TablePO selectTableMetaBySchemaIdAndName(
       @Param("schemaId") Long schemaId, @Param("tableName") String name);
 
+  @SelectProvider(
+      type = TableMetaSQLProviderFactory.class,
+      method = "selectTableByFullQualifiedName")
+  TablePO selectTableByFullQualifiedName(
+      @Param("metalakeName") String metalakeName,
+      @Param("catalogName") String catalogName,
+      @Param("schemaName") String schemaName,
+      @Param("tableName") String tableName);
+
   @InsertProvider(type = TableMetaSQLProviderFactory.class, method = "insertTableMeta")
   void insertTableMeta(@Param("tableMeta") TablePO tablePO);
 

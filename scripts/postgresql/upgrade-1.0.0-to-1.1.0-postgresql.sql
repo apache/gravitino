@@ -41,3 +41,8 @@ COMMENT ON COLUMN table_version_info.indexes         IS 'table index info';
 COMMENT ON COLUMN table_version_info."comment"       IS 'table comment';
 COMMENT ON COLUMN table_version_info.version         IS 'table current version';
 COMMENT ON COLUMN table_version_info.deleted_at      IS 'table deletion timestamp, 0 means not deleted';
+
+CREATE INDEX IF NOT EXISTS metalake_meta_idx_name_da ON metalake_meta (metalake_name, deleted_at);
+CREATE INDEX IF NOT EXISTS catalog_meta_idx_name_da ON catalog_meta (catalog_name, deleted_at);
+CREATE INDEX IF NOT EXISTS schema_meta_idx_name_da ON schema_meta (schema_name, deleted_at);
+CREATE INDEX IF NOT EXISTS table_meta_idx_name_da ON table_meta (table_name, deleted_at);

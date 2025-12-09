@@ -30,3 +30,9 @@ CREATE TABLE IF NOT EXISTS `table_version_info` (
     `deleted_at`      BIGINT(20) UNSIGNED DEFAULT 0 COMMENT 'table deletion timestamp, 0 means not deleted',
     UNIQUE KEY `uk_table_id_version_deleted_at` (`table_id`, `version`, `deleted_at`)
 ) ENGINE=InnoDB COMMENT 'table detail information including format, location, properties, partition, distribution, sort order, index and so on';
+
+alter table `metalake_meta` add index idx_name_da (metalake_name, deleted_at);
+alter table `catalog_meta` add index idx_name_da (catalog_name, deleted_at);
+alter table `schema_meta` add index idx_name_da (schema_name, deleted_at);
+alter table `table_meta` add index idx_name_da (table_name, deleted_at);
+
