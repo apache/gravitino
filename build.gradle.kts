@@ -129,6 +129,21 @@ allprojects {
           "import\\s+(?:static\\s+)?[^*\\s]+\\*;(\\r\\n|\\r|\\n)",
           "$1"
         )
+        replaceRegex(
+          "Use Guava Sets instead of shadowed Glassfish Sets",
+          "import\\s+org\\.glassfish\\.jersey\\.internal\\.guava\\.Sets;",
+          "import com.google.common.collect.Sets;"
+        )
+        replaceRegex(
+          "Use Guava Maps instead of shadowed Glassfish Maps",
+          "import\\s+org\\.glassfish\\.jersey\\.internal\\.guava\\.Maps;",
+          "import com.google.common.collect.Maps;"
+        )
+        replaceRegex(
+          "Use Guava Lists instead of shadowed Glassfish Lists",
+          "import\\s+org\\.glassfish\\.jersey\\.internal\\.guava\\.Lists;",
+          "import com.google.common.collect.Lists;"
+        )
 
         targetExclude("**/build/**", "**/.pnpm/***")
       }
