@@ -120,4 +120,13 @@ public class HiveTable extends BaseTable {
       return hiveTable;
     }
   }
+
+  /**
+   * Creates a new instance of {@link Builder}.
+   *
+   * @return The new instance.
+   */
+  public static Builder builder() {
+    return new Builder();
+  }
 }
