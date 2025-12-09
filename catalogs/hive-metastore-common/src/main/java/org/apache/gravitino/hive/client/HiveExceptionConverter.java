@@ -24,7 +24,7 @@ package org.apache.gravitino.hive.client;
  *
  * <ul>
  *   <li>Reflection exceptions (InvocationTargetException)
- *   <Li>Hive Metastore exceptions (e.g., AlreadyExistsException, NoSuchObjectException,
+ *   <li>Hive Metastore exceptions (e.g., AlreadyExistsException, NoSuchObjectException,
  *       InvalidOperationException, MetaException)
  *   <li>Hive Thrift exceptions (TException)
  *   <li>Other runtime exceptions

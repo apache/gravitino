@@ -48,9 +48,9 @@ public class Util {
   public static Configuration buildConfigurationFromProperties(Properties properties) {
     try {
       Configuration config = new Configuration();
-      String hdfsConfigResources = properties.getProperty(HIVE_CONFIG_RESOURCES);
-      if (StringUtils.isNotBlank(hdfsConfigResources)) {
-        for (String resource : hdfsConfigResources.split(",")) {
+      String configResources = properties.getProperty(HIVE_CONFIG_RESOURCES);
+      if (StringUtils.isNotBlank(configResources)) {
+        for (String resource : configResources.split(",")) {
           resource = resource.trim();
           if (StringUtils.isNotBlank(resource)) {
             config.addResource(new Path(resource));

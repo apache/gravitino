@@ -19,6 +19,7 @@
 
 package org.apache.gravitino.hive.client;
 
+import static org.apache.gravitino.catalog.hive.HiveConstants.HIVE_METASTORE_URIS;
 import static org.apache.gravitino.hive.client.HiveClientClassLoader.HiveVersion.HIVE2;
 import static org.apache.gravitino.hive.client.HiveClientClassLoader.HiveVersion.HIVE3;
 import static org.apache.gravitino.hive.client.Util.buildConfigurationFromProperties;
@@ -63,7 +64,6 @@ public final class HiveClientFactory {
     }
   }
 
-  /** Creates a {@link HiveClient} using the properties associated with this factory. */
   public HiveClient createHiveClient() {
     HiveClient client = null;
     try {
@@ -170,7 +170,7 @@ public final class HiveClientFactory {
       throw HiveExceptionConverter.toGravitinoException(
           e,
           HiveExceptionConverter.ExceptionTarget.other(
-              properties.getProperty("hive.metastore.uris")));
+              properties.getProperty(HIVE_METASTORE_URIS)));
     } finally {
       Thread.currentThread().setContextClassLoader(origLoader);
     }

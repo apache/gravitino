@@ -30,8 +30,8 @@ import org.apache.thrift.TException;
  * Java translation of Scala's `Shim` sealed abstract class.
  *
  * <p>This class declares the compatibility layer between Spark and different Hive versions.
- * Concrete subclasses (e.g. Shim_v0_12, Shim_v0_13, Shim_v2_3, Shim_v3_0 ...) must implement these
- * methods according to the behavior of the corresponding Hive release.
+ * Concrete subclasses (e.g. HiveShimV2, HiveShimV3 ...) must implement these methods according to
+ * the behavior of the corresponding Hive release.
  */
 public abstract class HiveShim {
 

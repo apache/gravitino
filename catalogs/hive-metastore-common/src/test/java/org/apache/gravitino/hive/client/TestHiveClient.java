@@ -49,7 +49,7 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 
-// This class is use for manual testing against real Hive Metastore instances.
+// This class is used for manual testing against real Hive Metastore instances.
 @Disabled
 public class TestHiveClient {
 
@@ -60,6 +60,10 @@ public class TestHiveClient {
 
   private static final String KERBEROS_HIVE2_HMS_URL = "thrift://172.17.0.2:9083";
   private static final String KERBEROS_HIVE2_HDFS_URL = "hdfs://172.17.0.2:9000";
+  private static final String KERBEROS_PRINCIPAL = "cli@HADOOPKRB";
+  private static final String KERBEROS_KEYTAB = "/tmp/test4310082059861441407/client.keytab";
+  private static final String KERBEROS_METASTORE_PRINCIPAL = "hive/6b1955fcb754@HADOOPKRB";
+  private static final String KERBEROS_KRB5_CONF = "/tmp/test4310082059861441407/krb5.conf";
 
   @Test
   void testHive2Client() throws Exception {
@@ -392,15 +396,14 @@ public class TestHiveClient {
     // when a Kerberos-enabled environment is available.
     Properties properties = new Properties();
     properties.setProperty("hive.metastore.uris", KERBEROS_HIVE2_HMS_URL);
-    properties.setProperty("authentication.kerberos.principal", "cli@HADOOPKRB");
+    properties.setProperty("authentication.kerberos.principal", KERBEROS_PRINCIPAL);
     properties.setProperty("authentication.impersonation-enable", "true");
-    properties.setProperty(
-        "authentication.kerberos.keytab-uri", "/tmp/test4310082059861441407/client.keytab");
-    properties.setProperty("hive.metastore.kerberos.principal", "hive/6b1955fcb754@HADOOPKRB");
+    properties.setProperty("authentication.kerberos.keytab-uri", KERBEROS_KEYTAB);
+    properties.setProperty("hive.metastore.kerberos.principal", KERBEROS_METASTORE_PRINCIPAL);
     properties.setProperty("hive.metastore.sasl.enabled", "true");
     properties.setProperty("hadoop.security.authentication", "kerberos");
 
-    System.setProperty("java.security.krb5.conf", "/tmp/test4310082059861441407/krb5.conf");
+    System.setProperty("java.security.krb5.conf", KERBEROS_KRB5_CONF);
 
     String catalogName = "hive";
     String dbName = "test_kerberos_db";
