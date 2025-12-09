@@ -19,14 +19,12 @@
 package org.apache.gravitino.authorization;
 
 import com.google.common.base.Preconditions;
-import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableBiMap;
 import com.google.common.collect.Lists;
-import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
@@ -71,37 +69,25 @@ public class AuthorizationUtils {
   static final String ROLE_DOES_NOT_EXIST_MSG = "Role %s does not exist in the metalake %s";
 
   /**
-   * Map of deprecated privilege names to their new equivalents. This map is used for backward
-   * compatibility when handling legacy privilege names.
+   * Bidirectional map of deprecated privilege names to their new equivalents. This map is used for
+   * backward compatibility when handling legacy privilege names.
    *
-   * <p>When adding new deprecated privileges, simply add an entry to this map rather than adding
+   * <p>When adding new deprecated privileges, simply add an entry to this BiMap rather than adding
    * more if-else conditions in the conversion methods.
    *
-   * <p>This map is public to allow other classes to check if a privilege is deprecated or to
-   * perform their own conversions without going through helper methods.
+   * <p>This BiMap is public to allow other classes to:
+   *
+   * <ul>
+   *   <li>Check if a privilege is deprecated: {@code DEPRECATED_PRIVILEGE_MAP.containsKey(name)}
+   *   <li>Get the new equivalent: {@code DEPRECATED_PRIVILEGE_MAP.get(deprecatedName)}
+   *   <li>Get the deprecated equivalent: {@code DEPRECATED_PRIVILEGE_MAP.inverse().get(newName)}
+   * </ul>
    */
   @SuppressWarnings("deprecation")
-  public static final Map<Privilege.Name, Privilege.Name> DEPRECATED_PRIVILEGE_MAP =
-      ImmutableMap.of(
+  public static final ImmutableBiMap<Privilege.Name, Privilege.Name> DEPRECATED_PRIVILEGE_MAP =
+      ImmutableBiMap.of(
           Privilege.Name.CREATE_MODEL, Privilege.Name.REGISTER_MODEL,
           Privilege.Name.CREATE_MODEL_VERSION, Privilege.Name.LINK_MODEL_VERSION);
-
-  /**
-   * Reverse map from new privilege names to their deprecated equivalents. This is automatically
-   * built from DEPRECATED_PRIVILEGE_MAP.
-   *
-   * <p>This map is public to allow other classes to look up the legacy equivalent of a new
-   * privilege name.
-   */
-  public static final Map<Privilege.Name, Privilege.Name> NEW_TO_DEPRECATED_PRIVILEGE_MAP;
-
-  static {
-    Map<Privilege.Name, Privilege.Name> reverseMap = Maps.newHashMap();
-    for (Map.Entry<Privilege.Name, Privilege.Name> entry : DEPRECATED_PRIVILEGE_MAP.entrySet()) {
-      reverseMap.put(entry.getValue(), entry.getKey());
-    }
-    NEW_TO_DEPRECATED_PRIVILEGE_MAP = ImmutableMap.copyOf(reverseMap);
-  }
 
   private static final Set<MetadataObject.Type> SKIP_APPLY_TYPES =
       Sets.newHashSet(
@@ -288,7 +274,7 @@ public class AuthorizationUtils {
 
   public static Privilege getLegacyPrivilege(
       Privilege.Name privilegeName, Privilege.Condition condition) {
-    Privilege.Name legacyPrivilegeName = NEW_TO_DEPRECATED_PRIVILEGE_MAP.get(privilegeName);
+    Privilege.Name legacyPrivilegeName = DEPRECATED_PRIVILEGE_MAP.inverse().get(privilegeName);
     if (legacyPrivilegeName == null) {
       throw new UnsupportedOperationException(
           "The privilege " + privilegeName + " is not a legacy privilege");

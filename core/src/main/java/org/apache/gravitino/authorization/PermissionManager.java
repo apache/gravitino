@@ -655,7 +655,7 @@ class PermissionManager {
 
       // Check if this privilege has a deprecated equivalent and remove it
       Privilege.Name deprecatedPrivilegeName =
-          AuthorizationUtils.NEW_TO_DEPRECATED_PRIVILEGE_MAP.get(privilege.name());
+          AuthorizationUtils.DEPRECATED_PRIVILEGE_MAP.inverse().get(privilege.name());
       if (deprecatedPrivilegeName != null) {
         // This privilege has a deprecated equivalent, remove it
         updatePrivileges.remove(
