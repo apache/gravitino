@@ -41,7 +41,9 @@ public final class HiveClientFactory {
   private volatile HiveClientClassLoader.HiveVersion backendVersion;
   private volatile HiveClientClassLoader backendClassLoader;
 
+  @SuppressWarnings("UnusedVariable")
   private final Configuration hadoopConf;
+
   private final Properties properties;
 
   /**
@@ -55,8 +57,7 @@ public final class HiveClientFactory {
     this.properties = properties;
 
     try {
-      this.hadoopConf = new Configuration();
-      buildConfigurationFromProperties(properties);
+      this.hadoopConf = buildConfigurationFromProperties(properties);
     } catch (Exception e) {
       throw new RuntimeException("Failed to initialize HiveClientFactory", e);
     }

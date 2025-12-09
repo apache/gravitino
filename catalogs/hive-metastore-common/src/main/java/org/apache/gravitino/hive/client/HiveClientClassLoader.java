@@ -253,8 +253,6 @@ public final class HiveClientClassLoader extends URLClassLoader {
   private boolean isBarrierClass(String name) {
     return name.startsWith(HiveClientImpl.class.getName())
         || name.startsWith(HiveShim.class.getName())
-        || name.startsWith(HiveShimV2.class.getName())
-        || name.startsWith(HiveShimV3.class.getName())
         || name.startsWith(Util.class.getName())
         || name.startsWith("org.apache.gravitino.hive.converter.");
   }
