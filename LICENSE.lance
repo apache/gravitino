@@ -263,26 +263,17 @@
    This product bundles various third-party components also under the
    BSD license
 
-   ANTLR4
-   ASM
-   Javolution
    JSR305
-   Protobuf
-   Stax2 API
 
    This product bundles various third-party components also under the
    Common Development and Distribution License 1.0
 
    Javax Activation
-   Javax Mail
-   Stax API
    Java Servlet API
-   JSR311 API
 
    This product bundles various third-party components also under the
    Common Development and Distribution License 1.1
 
-   JSR 374 (JSON Processing) Default Provider
    JavaServlet
    Eclipse Jersey
 
@@ -335,5 +326,3 @@
    the public domain.
 
    AOP Alliance
-
-
