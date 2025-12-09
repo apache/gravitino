@@ -144,7 +144,7 @@ public class MetalakeManager implements MetalakeDispatcher, Closeable {
                 return store.get(key, EntityType.METALAKE, BaseMetalake.class);
               } catch (NoSuchEntityException e) {
                 LOG.warn("Metalake {} does not exist", key, e);
-                throw new RuntimeException(e);
+                throw new NoSuchMetalakeException(METALAKE_DOES_NOT_EXIST_MSG, ident);
               } catch (IOException e) {
                 LOG.error("Failed to do store operation", e);
                 throw new RuntimeException(e);
@@ -199,7 +199,7 @@ public class MetalakeManager implements MetalakeDispatcher, Closeable {
                       return store.get(key, EntityType.METALAKE, BaseMetalake.class);
                     } catch (NoSuchEntityException e) {
                       LOG.warn("Metalake {} does not exist", key, e);
-                      throw new RuntimeException(e);
+                      throw new NoSuchMetalakeException(METALAKE_DOES_NOT_EXIST_MSG, ident);
                     } catch (IOException e) {
                       LOG.error("Failed to do store operation", e);
                       throw new RuntimeException(e);
