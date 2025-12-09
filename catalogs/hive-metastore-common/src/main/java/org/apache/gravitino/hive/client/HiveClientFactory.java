@@ -89,7 +89,6 @@ public final class HiveClientFactory {
     HiveClientClassLoader classloader = null;
     try {
       // Try using Hive3 first
-
       classloader = getOrCreateClassLoader(HIVE3);
       client = createHiveClientInternal(classloader);
       client.getCatalogs();
