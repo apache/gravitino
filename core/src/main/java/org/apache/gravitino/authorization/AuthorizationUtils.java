@@ -76,9 +76,12 @@ public class AuthorizationUtils {
    *
    * <p>When adding new deprecated privileges, simply add an entry to this map rather than adding
    * more if-else conditions in the conversion methods.
+   *
+   * <p>This map is public to allow other classes to check if a privilege is deprecated or to
+   * perform their own conversions without going through helper methods.
    */
   @SuppressWarnings("deprecation")
-  private static final Map<Privilege.Name, Privilege.Name> DEPRECATED_PRIVILEGE_MAP =
+  public static final Map<Privilege.Name, Privilege.Name> DEPRECATED_PRIVILEGE_MAP =
       ImmutableMap.of(
           Privilege.Name.CREATE_MODEL, Privilege.Name.REGISTER_MODEL,
           Privilege.Name.CREATE_MODEL_VERSION, Privilege.Name.LINK_MODEL_VERSION);
@@ -86,8 +89,11 @@ public class AuthorizationUtils {
   /**
    * Reverse map from new privilege names to their deprecated equivalents. This is automatically
    * built from DEPRECATED_PRIVILEGE_MAP.
+   *
+   * <p>This map is public to allow other classes to look up the legacy equivalent of a new
+   * privilege name.
    */
-  private static final Map<Privilege.Name, Privilege.Name> NEW_TO_DEPRECATED_PRIVILEGE_MAP;
+  public static final Map<Privilege.Name, Privilege.Name> NEW_TO_DEPRECATED_PRIVILEGE_MAP;
 
   static {
     Map<Privilege.Name, Privilege.Name> reverseMap = Maps.newHashMap();

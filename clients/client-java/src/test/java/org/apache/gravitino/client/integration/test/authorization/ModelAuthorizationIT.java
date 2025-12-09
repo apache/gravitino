@@ -121,14 +121,17 @@ public class ModelAuthorizationIT extends BaseRestApiAuthorizationIT {
         });
 
     GravitinoMetalake gravitinoMetalake = client.loadMetalake(METALAKE);
-    // test grant create schema privilege
+    // Test Case 1: Grant using NEW privilege name (REGISTER_MODEL)
+    // This should allow the user to create models
     gravitinoMetalake.grantPrivilegesToRole(
         role,
         MetadataObjects.of(null, CATALOG, MetadataObject.Type.CATALOG),
         ImmutableList.of(Privileges.UseSchema.allow(), Privileges.RegisterModel.allow()));
     normalUserCatalog.registerModel(NameIdentifier.of(SCHEMA, "model2"), "", new HashMap<>());
 
-    // revoke privilege
+    // Test Case 2: Revoke using LEGACY privilege name (CREATE_MODEL)
+    // This should successfully revoke the permission, proving that CREATE_MODEL and REGISTER_MODEL
+    // are treated as equivalent by the authorization system
     gravitinoMetalake.revokePrivilegesFromRole(
         role,
         MetadataObjects.of(null, CATALOG, MetadataObject.Type.CATALOG),
@@ -138,7 +141,9 @@ public class ModelAuthorizationIT extends BaseRestApiAuthorizationIT {
         () -> {
           normalUserCatalog.registerModel(NameIdentifier.of(SCHEMA, "model3"), "", new HashMap<>());
         });
-    // grant privilege again
+
+    // Test Case 3: Grant using LEGACY privilege name (CREATE_MODEL)
+    // This should work, proving backward compatibility is maintained
     gravitinoMetalake.grantPrivilegesToRole(
         role,
         MetadataObjects.of(null, CATALOG, MetadataObject.Type.CATALOG),
@@ -257,6 +262,9 @@ public class ModelAuthorizationIT extends BaseRestApiAuthorizationIT {
               null);
         });
     GravitinoMetalake gravitinoMetalake = client.loadMetalake(METALAKE);
+
+    // Test Case 1: Grant using NEW privilege name (LINK_MODEL_VERSION)
+    // This should allow the user to link model versions
     gravitinoMetalake.grantPrivilegesToRole(
         role,
         MetadataObjects.of(ImmutableList.of(CATALOG, SCHEMA, "model1"), MetadataObject.Type.MODEL),
@@ -265,6 +273,9 @@ public class ModelAuthorizationIT extends BaseRestApiAuthorizationIT {
     modelCatalogLoadByNormalUser.linkModelVersion(
         NameIdentifier.of(SCHEMA, "model1"), "uri2", new String[] {"alias2"}, "comment2", null);
 
+    // Test Case 2: Revoke using LEGACY privilege name (CREATE_MODEL_VERSION)
+    // This should successfully revoke the permission, proving that CREATE_MODEL_VERSION and
+    // LINK_MODEL_VERSION are treated as equivalent by the authorization system
     gravitinoMetalake.revokePrivilegesFromRole(
         role,
         MetadataObjects.of(ImmutableList.of(CATALOG, SCHEMA, "model1"), MetadataObject.Type.MODEL),
@@ -280,12 +291,18 @@ public class ModelAuthorizationIT extends BaseRestApiAuthorizationIT {
               null);
         });
 
+    // Test Case 3: Grant using LEGACY privilege name (CREATE_MODEL_VERSION)
+    // This should work, proving backward compatibility is maintained
     gravitinoMetalake.grantPrivilegesToRole(
         role,
         MetadataObjects.of(ImmutableList.of(CATALOG, SCHEMA, "model1"), MetadataObject.Type.MODEL),
         ImmutableSet.of(Privileges.CreateModelVersion.allow()));
     modelCatalog.linkModelVersion(
         NameIdentifier.of(SCHEMA, "model1"), "uri1", new String[] {"alias1"}, "comment2", null);
+
+    // Test Case 4: Revoke using NEW privilege name (LINK_MODEL_VERSION)
+    // This should successfully revoke the permission that was granted using the legacy name,
+    // further proving bidirectional equivalence between old and new privilege names
     gravitinoMetalake.revokePrivilegesFromRole(
         role,
         MetadataObjects.of(ImmutableList.of(CATALOG, SCHEMA, "model1"), MetadataObject.Type.MODEL),

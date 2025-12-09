@@ -530,15 +530,19 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
               String.valueOf(roleEntity.id()),
               securableObject.type().name(),
               String.valueOf(MetadataIdConverter.getID(securableObject, metalake)),
-              AuthorizationUtils.replaceLegacyPrivilegeName(privilege.name()).name().toUpperCase(),
+              AuthorizationUtils.replaceLegacyPrivilegeName(privilege.name())
+                  .name()
+                  .toUpperCase(java.util.Locale.ROOT),
               AuthConstants.ALLOW);
         }
         allowEnforcer.addPolicy(
             String.valueOf(roleEntity.id()),
             securableObject.type().name(),
             String.valueOf(MetadataIdConverter.getID(securableObject, metalake)),
-            AuthorizationUtils.replaceLegacyPrivilegeName(privilege.name()).name().toUpperCase(),
-            condition.name().toLowerCase());
+            AuthorizationUtils.replaceLegacyPrivilegeName(privilege.name())
+                .name()
+                .toUpperCase(java.util.Locale.ROOT),
+            condition.name().toLowerCase(java.util.Locale.ROOT));
       }
     }
   }

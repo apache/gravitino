@@ -641,22 +641,23 @@ class PermissionManager {
     privileges.forEach(updatePrivileges::remove);
 
     // Handle backward compatibility for model privilege revocation
-    // Gravitino renamed model privileges: CREATE_MODEL -> REGISTER_MODEL,
-    // CREATE_MODEL_VERSION -> LINK_MODEL_VERSION
     // When revoking privileges, we need to handle both old and new privilege names to ensure
     // complete removal regardless of which name was used when granting the privilege.
     for (Privilege privilege : privileges) {
-      // If revoking legacy privileges (CREATE_MODEL or CREATE_MODEL_VERSION),
-      // also remove their new equivalents (REGISTER_MODEL or LINK_MODEL_VERSION)
-      if (privilege.name() == Privilege.Name.CREATE_MODEL
-          || privilege.name() == Privilege.Name.CREATE_MODEL_VERSION) {
+      // Check if this is a deprecated privilege and remove its new equivalent
+      Privilege.Name newPrivilegeName =
+          AuthorizationUtils.DEPRECATED_PRIVILEGE_MAP.get(privilege.name());
+      if (newPrivilegeName != null) {
+        // This is a deprecated privilege, remove its new equivalent
         updatePrivileges.remove(
             AuthorizationUtils.replaceLegacyPrivilege(privilege.name(), privilege.condition()));
       }
-      // If revoking new privileges (REGISTER_MODEL or LINK_MODEL_VERSION),
-      // also remove their legacy equivalents (CREATE_MODEL or CREATE_MODEL_VERSION)
-      else if (privilege.name() == Privilege.Name.REGISTER_MODEL
-          || privilege.name() == Privilege.Name.LINK_MODEL_VERSION) {
+
+      // Check if this privilege has a deprecated equivalent and remove it
+      Privilege.Name deprecatedPrivilegeName =
+          AuthorizationUtils.NEW_TO_DEPRECATED_PRIVILEGE_MAP.get(privilege.name());
+      if (deprecatedPrivilegeName != null) {
+        // This privilege has a deprecated equivalent, remove it
         updatePrivileges.remove(
             AuthorizationUtils.getLegacyPrivilege(privilege.name(), privilege.condition()));
       }
