@@ -205,8 +205,12 @@ public class MetadataAuthzHelper {
    * @param entityType entity type
    * @param entities metadata entities
    * @param toNameIdentifier function to convert entity to NameIdentifier
-   * @param currentPrincipal current principal
-   * @param authorizer authorizer to filter metadata
+   * @param currentPrincipal The principal to perform the authorization check as. This is intended
+   *     as an extension point for external modules to inject a specific security context, so please
+   *     do not remove it.
+   * @param authorizer The authorizer to use for the authorization check. This is intended as an
+   *     extension point for external modules to inject a specific authorization mechanism, so
+   *     please do not remove it.
    * @return Filtered Metadata Entity
    * @param <E> Entity class
    */
