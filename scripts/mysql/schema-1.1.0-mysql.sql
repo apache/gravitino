@@ -78,8 +78,8 @@ CREATE TABLE IF NOT EXISTS `table_meta` (
     PRIMARY KEY (`table_id`),
     UNIQUE KEY `uk_sid_tn_del` (`schema_id`, `table_name`, `deleted_at`),
     KEY `idx_mid` (`metalake_id`),
-    KEY `idx_cid` (`catalog_id`)
-    KEY idx_name_da (table_name, deleted_at),
+    KEY `idx_cid` (`catalog_id`),
+    KEY idx_name_da (table_name, deleted_at)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'table metadata';
 
 CREATE TABLE IF NOT EXISTS `table_column_version_info` (
