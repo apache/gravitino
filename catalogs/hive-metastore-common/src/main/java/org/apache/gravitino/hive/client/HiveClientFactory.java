@@ -68,6 +68,7 @@ public final class HiveClientFactory {
 
       this.enableKerberos = initKerberosIfNecessary();
       if (enableKerberos) {
+        // set hive client to kerberos client for retrieving delegation token
         HiveClient client = createHiveClient();
         kerberosClient.setHiveClient(client);
       }
@@ -98,8 +99,8 @@ public final class HiveClientFactory {
       client = createHiveClientInternal(classloader);
       client.getCatalogs();
       LOG.info("Connected to Hive Metastore using Hive version HIVE3");
-      backendVersion = HiveClientClassLoader.HiveVersion.HIVE3;
       backendClassLoader = classloader;
+      backendVersion = HiveClientClassLoader.HiveVersion.HIVE3;
       return client;
 
     } catch (GravitinoRuntimeException e) {
@@ -115,8 +116,8 @@ public final class HiveClientFactory {
           HiveClientClassLoader classloader = getOrCreateClassLoader(HIVE2);
           client = createHiveClientInternal(classloader);
           LOG.info("Connected to Hive Metastore using Hive version HIVE2");
-          backendVersion = HIVE2;
           backendClassLoader = classloader;
+          backendVersion = HIVE2;
           return client;
         }
         throw e;
