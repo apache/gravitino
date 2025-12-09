@@ -28,6 +28,7 @@ import com.google.common.base.Preconditions;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
 import java.util.Properties;
+import org.apache.commons.lang3.reflect.MethodUtils;
 import org.apache.gravitino.exceptions.GravitinoRuntimeException;
 import org.apache.gravitino.utils.PrincipalUtils;
 import org.apache.hadoop.conf.Configuration;
@@ -164,7 +165,7 @@ public final class HiveClientFactory {
       throws Exception {
     Class<?> hiveClientImplClass = classloader.loadClass(ProxyHiveClientImpl.class.getName());
     Method createMethod =
-        Util.findStaticMethod(
+        MethodUtils.getAccessibleMethod(
             hiveClientImplClass,
             "createClient",
             HiveClientClassLoader.HiveVersion.class,
