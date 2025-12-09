@@ -28,6 +28,7 @@ There are some key difference between Gravitino Iceberg REST server and Gravitin
 - Supports event listener.
 - Supports Audit log.
 - Supports OAuth2 and HTTPS.
+- Supports access control (when running as an auxiliary service).
 - Provides a pluggable metrics store interface to store and delete Iceberg metrics.
 - Supports table metadata cache.
 
@@ -283,6 +284,34 @@ The detailed configuration items are as follows:
 ### Credential vending
 
 Please refer to [Credential vending](./security/credential-vending.md) for more details.
+
+### Access control
+
+#### Prerequisites
+
+To use access control with the Iceberg REST service:
+
+1. The Iceberg REST service must be running as an auxiliary service within the Gravitino server (standalone mode is not supported for access control)
+2. Enable authorization in the Gravitino server by setting `gravitino.authorization.enable = true`
+3. Use the [dynamic configuration provider](#dynamic-catalog-configuration-provider) to retrieve catalog configurations from Gravitino
+
+:::note
+Access control for the Iceberg REST Catalog (IRC) is only supported when running as an auxiliary service embedded in the Gravitino server. Standalone Iceberg REST server deployments do not support access control features.
+:::
+
+Please refer to [Access Control](./security/access-control.md) for details on how to configure authorization, create roles, and grant privileges in Gravitino.
+
+#### How access control works
+
+When access control is enabled:
+
+1. Clients authenticate with the Iceberg REST service (Now we support Basic auth and OAuth2)
+2. The Iceberg REST service sends the authenticated user identity, target metadata object, and requested operation to the Gravitino server for authorization verification
+3. Gravitino verifies the user has the necessary privileges to perform the operation on the specified metadata object
+4. Upon successful authorization, the Iceberg REST service executes the operation; otherwise, it returns an authorization error
+
+Please refer to [Access Control](./security/access-control.md) for the complete list of privileges and how to grant them.
+
 
 ### Storage
 
@@ -676,3 +705,134 @@ sh ./dev/docker/build-docker.sh --platform linux/arm64 --type iceberg-rest-serve
 ```
 
 You could try Spark with Gravitino REST catalog service in our [playground](./how-to-use-the-playground.md#using-apache-iceberg-rest-service).
+
+## Quick Start: Enable Access Control for Iceberg REST Server
+
+To enable access control for the Iceberg REST server using Gravitino's dynamic configuration provider, follow these steps:
+
+### 1. Enable Authorization and Dynamic Config Provider
+
+Add the following to your Gravitino server configuration file (`gravitino.conf`). 
+Note that access control is only supported when running the Iceberg REST server as an auxiliary service within the Gravitino server:
+
+```properties
+gravitino.authorization.enable = true
+gravitino.authorization.serviceAdmins = adminUser
+
+gravitino.iceberg-rest.catalog-config-provider = dynamic-config-provider
+gravitino.iceberg-rest.gravitino-uri = http://127.0.0.1:8090
+gravitino.iceberg-rest.gravitino-metalake = test
+```
+
+Restart the Iceberg REST server after updating the configuration.
+
+---
+
+### 2. Create a Metalake
+
+```shell
+curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
+-H "Content-Type: application/json" -d '{
+  "name": "test"
+}' http://localhost:8090/api/metalakes
+```
+
+---
+
+### 3. Create a Catalog
+
+```shell
+curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
+-H "Content-Type: application/json" -d '{
+  "name": "catalog1",
+  "type": "ICEBERG",
+  "comment": "Iceberg catalog",
+  "properties": {}
+}' http://localhost:8090/api/metalakes/test/catalogs
+```
+
+---
+
+### 4. Create a Role and Grant Privileges
+
+```shell
+curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
+-H "Content-Type: application/json" -d '{
+   "name": "role1",
+   "properties": {},
+   "securableObjects": [
+      {
+         "fullName": "catalog1",
+         "type": "CATALOG",
+         "privileges": [
+            {
+               "name": "USE_CATALOG",
+               "condition": "ALLOW"
+            },
+            {
+               "name": "USE_SCHEMA",
+               "condition": "ALLOW"
+            },
+            {
+               "name": "SELECT_TABLE",
+               "condition": "ALLOW"
+            }
+         ]
+      }
+   ]
+}' http://localhost:8090/api/metalakes/test/roles
+```
+
+---
+
+#### Verify Access is Denied Without Privileges
+
+Before granting any privileges, verify that the user cannot access the catalog. Try to list tables as `user1` (replace with your actual authentication method):
+
+```shell
+curl -u user1:password -H "Accept: application/vnd.gravitino.v1+json" \
+  http://localhost:9001/iceberg/v1/catalog1/namespaces/default/tables
+```
+
+This should return an error indicating insufficient privileges (such as HTTP 403 Forbidden).
+
+---
+
+#### Grant Role to User
+
+Now grant the role with privileges to the user:
+
+```shell
+curl -X PUT -H "Accept: application/vnd.gravitino.v1+json" \
+-H "Content-Type: application/json" -d '{
+    "roleNames": ["role1"]
+}' http://localhost:8090/api/metalakes/test/permissions/users/user1/grant
+```
+
+---
+
+#### Verify Access is Granted With Privileges
+
+After granting the role with privileges, repeat the request as `user1`:
+
+```shell
+curl -u user1:password -H "Accept: application/vnd.gravitino.v1+json" \
+  http://localhost:9001/iceberg/v1/catalog1/namespaces/default/tables
+```
+
+This time, the request should succeed and return the list of tables.
+
+---
+
+**Summary:**
+- Enable authorization and set configuration provider to `dynamic-config-provider`
+- Create metalake
+- Create catalog
+- Create role and grant privileges
+- Assign role to user
+
+For more details, see the [Access Control documentation](./security/access-control.md).
+
+> **Note:** IRC (Iceberg REST Catalog) authorization is not supported for standalone Iceberg REST server deployments.
+> Access control features described here require the Iceberg REST server to be run as an auxiliary service within the Gravitino server,
+> using the dynamic configuration provider. Standalone deployments do not support IRC-based authorization.
