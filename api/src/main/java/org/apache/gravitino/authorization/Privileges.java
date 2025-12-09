@@ -966,7 +966,7 @@ public class Privileges {
 
     @Override
     public boolean canBindTo(MetadataObject.Type type) {
-      return MODEL_SUPPORTED_TYPES.contains(type);
+      return SCHEMA_SUPPORTED_TYPES.contains(type);
     }
   }
 
