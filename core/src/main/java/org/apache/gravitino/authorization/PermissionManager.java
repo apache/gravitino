@@ -625,6 +625,7 @@ class PermissionManager {
     return securableObject;
   }
 
+  @SuppressWarnings("deprecation")
   private static SecurableObject updateRevokedSecurableObject(
       String metalake,
       String role,

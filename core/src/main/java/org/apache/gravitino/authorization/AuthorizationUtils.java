@@ -234,6 +234,7 @@ public class AuthorizationUtils {
     }
   }
 
+  @SuppressWarnings("deprecation")
   public static Privilege.Name replaceLegacyPrivilegeName(Privilege.Name privilegeName) {
     if (privilegeName == Privilege.Name.CREATE_MODEL) {
       return Privilege.Name.REGISTER_MODEL;
@@ -254,6 +255,7 @@ public class AuthorizationUtils {
     }
   }
 
+  @SuppressWarnings("deprecation")
   public static Privilege getLegacyPrivilege(
       Privilege.Name privilegeName, Privilege.Condition condition) {
     Privilege.Name legacyPrivilegeName;

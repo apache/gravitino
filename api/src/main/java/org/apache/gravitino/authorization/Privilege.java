@@ -92,9 +92,9 @@ public interface Privilege {
     /** The privilege to register a model */
     REGISTER_MODEL(0L, 1L << 18),
     /**
-     * The privilege to create a model. This is deprecated. Please use REGISTER_MODEL
+     * The privilege to create a model. This is deprecated. Please use REGISTER_MODEL.
      *
-     * <p>Note: This enum shares the same bit value (1L << 18) as REGISTER_MODEL for backward
+     * <p>Note: This enum shares the same bit value (1L &lt;&lt; 18) as REGISTER_MODEL for backward
      * compatibility. This unconventional design allows legacy privilege names to be treated as
      * equivalent to new privilege names without requiring runtime privilege translation in the
      * authorization engine. However, this means:
@@ -110,12 +110,12 @@ public interface Privilege {
     /** The privilege to link a model version */
     LINK_MODEL_VERSION(0L, 1L << 19),
     /**
-     * The privilege to create a model version. This is deprecated. Please use LINK_MODEL_VERSION
+     * The privilege to create a model version. This is deprecated. Please use LINK_MODEL_VERSION.
      *
-     * <p>Note: This enum shares the same bit value (1L << 19) as LINK_MODEL_VERSION for backward
-     * compatibility. This unconventional design allows legacy privilege names to be treated as
-     * equivalent to new privilege names without requiring runtime privilege translation in the
-     * authorization engine. However, this means:
+     * <p>Note: This enum shares the same bit value (1L &lt;&lt; 19) as LINK_MODEL_VERSION for
+     * backward compatibility. This unconventional design allows legacy privilege names to be
+     * treated as equivalent to new privilege names without requiring runtime privilege translation
+     * in the authorization engine. However, this means:
      *
      * <ul>
      *   <li>The bit fields do not uniquely identify an enum value
