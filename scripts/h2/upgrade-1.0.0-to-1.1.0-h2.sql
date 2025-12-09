@@ -31,7 +31,7 @@ CREATE TABLE IF NOT EXISTS `table_version_info` (
     UNIQUE KEY `uk_table_id_version_deleted_at` (`table_id`, `version`, `deleted_at`)
 ) ENGINE=InnoDB COMMENT 'table detail information including format, location, properties, partition, distribution, sort order, index and so on';
 
-alter table `catalog_meta` add index idx_name_da (catalog_name, deleted_at);
-alter table `schema_meta` add index idx_name_da (schema_name, deleted_at);
-alter table `table_meta` add index idx_name_da (table_name, deleted_at);
+alter table `catalog_meta` add index key_catalog_meta_idx_name_da (catalog_name, deleted_at);
+alter table `schema_meta` add index key_schema_meta_idx_name_da (schema_name, deleted_at);
+alter table `table_meta` add index key_table_meta_idx_name_da (table_name, deleted_at);
 
