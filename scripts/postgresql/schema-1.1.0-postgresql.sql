@@ -49,8 +49,6 @@ COMMENT ON COLUMN metalake_meta.current_version IS 'metalake current version';
 COMMENT ON COLUMN metalake_meta.last_version IS 'metalake last version';
 COMMENT ON COLUMN metalake_meta.deleted_at IS 'metalake deleted at';
 
-CREATE INDEX IF NOT EXISTS metalake_meta_idx_name_da ON metalake_meta (metalake_name, deleted_at);
-
 
 CREATE TABLE IF NOT EXISTS catalog_meta (
                                             catalog_id BIGINT NOT NULL,

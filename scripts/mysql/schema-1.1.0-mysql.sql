@@ -28,7 +28,6 @@ CREATE TABLE IF NOT EXISTS `metalake_meta` (
     `last_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'metalake last version',
     `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'metalake deleted at',
     PRIMARY KEY (`metalake_id`),
-    KEY idx_name_da (metalake_name, deleted_at),
     UNIQUE KEY `uk_mn_del` (`metalake_name`, `deleted_at`)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'metalake metadata';
 
