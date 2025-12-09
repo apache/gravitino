@@ -277,7 +277,7 @@ if [[ "$1" == "package" ]]; then
       error 'The environment variable PYPI_API_TOKEN is not set. Exiting.'
     fi
 
-    echo "Uploading Gravitino Python package $RC_RC_PYGRAVITINO_VERSION to PyPi"
+    echo "Uploading Gravitino Python package $RC_PYGRAVITINO_VERSION to PyPi"
     twine upload -u __token__  -p $PYPI_API_TOKEN \
       --repository-url https://upload.pypi.org/legacy/ \
       "apache_gravitino-$RC_PYGRAVITINO_VERSION.tar.gz"
