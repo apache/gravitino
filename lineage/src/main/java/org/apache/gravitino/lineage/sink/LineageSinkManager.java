@@ -81,6 +81,7 @@ public class LineageSinkManager implements Closeable {
         StringUtils.isNotBlank(queueCapacity), "Lineage sink queue capacity is not set");
 
     int totalCapacity = Integer.parseInt(queueCapacity);
+    Preconditions.checkArgument(totalCapacity > 0, "Lineage sink queue capacity must be positive");
     int capacityPerSink = Math.max(1, totalCapacity / sinks.size());
 
     eventListenerConfigs.put(

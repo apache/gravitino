@@ -114,6 +114,17 @@ public class TestLineageSinkManager {
         });
   }
 
+  @Test
+  public void testInvalidQueueCapacityThrowsException() {
+    List<String> sinks = Arrays.asList("sinkA", "sinkB");
+    Map<String, String> lineageConfigs = new HashMap<>();
+    lineageConfigs.put(LineageConfig.LINEAGE_SINK_QUEUE_CAPACITY, "0");
+
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> LineageSinkManager.transformToEventListenerConfigs(sinks, lineageConfigs));
+  }
+
   private void checkLineageSink(LineageSinkForTest sink) {
     Map<String, String> configs = sink.getConfigs();
     Assertions.assertTrue(configs.containsKey("name"));
