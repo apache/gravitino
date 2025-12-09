@@ -28,6 +28,7 @@ There are some key difference between Gravitino Iceberg REST server and Gravitin
 - Supports event listener.
 - Supports Audit log.
 - Supports OAuth2 and HTTPS.
+- Supports access control (when running as an auxiliary service).
 - Provides a pluggable metrics store interface to store and delete Iceberg metrics.
 - Supports table metadata cache.
 
@@ -290,8 +291,13 @@ Please refer to [Credential vending](./security/credential-vending.md) for more 
 
 To use access control with the Iceberg REST service:
 
-1. Enable authorization in the Gravitino server by setting `gravitino.authorization.enable = true`
-2. Use the [dynamic configuration provider](#dynamic-catalog-configuration-provider) to retrieve catalog configurations from Gravitino
+1. The Iceberg REST service must be running as an auxiliary service within the Gravitino server (standalone mode is not supported for access control)
+2. Enable authorization in the Gravitino server by setting `gravitino.authorization.enable = true`
+3. Use the [dynamic configuration provider](#dynamic-catalog-configuration-provider) to retrieve catalog configurations from Gravitino
+
+:::note
+Access control for the Iceberg REST Catalog (IRC) is only supported when running as an auxiliary service embedded in the Gravitino server. Standalone Iceberg REST server deployments do not support access control features.
+:::
 
 Please refer to [Access Control](./security/access-control.md) for details on how to configure authorization, create roles, and grant privileges in Gravitino.
 
@@ -299,10 +305,10 @@ Please refer to [Access Control](./security/access-control.md) for details on ho
 
 When access control is enabled:
 
-1. Clients authenticate with the Iceberg REST service. Currently supported authentication methods are Basic Auth and OAuth2.
-2. The Iceberg REST service forwards the authenticated user identity to the Gravitino server
-3. Gravitino verifies the user has necessary privileges to perform the requested operation
-4. Users can only access catalogs and perform operations they have been explicitly granted privileges for
+1. Clients authenticate with the Iceberg REST service (Now we support Basic auth and OAuth2)
+2. The Iceberg REST service sends the authenticated user identity, target metadata object, and requested operation to the Gravitino server for authorization verification
+3. Gravitino verifies the user has the necessary privileges to perform the operation on the specified metadata object
+4. Upon successful authorization, the Iceberg REST service executes the operation; otherwise, it returns an authorization error
 
 Please refer to [Access Control](./security/access-control.md) for the complete list of privileges and how to grant them.
 
@@ -706,7 +712,8 @@ To enable access control for the Iceberg REST server using Gravitino's dynamic c
 
 ### 1. Enable Authorization and Dynamic Config Provider
 
-Add the following to your Gravitino server configuration file (`gravitino.conf`) if running the Iceberg REST server as an auxiliary service (recommended for access control):
+Add the following to your Gravitino server configuration file (`gravitino.conf`). 
+Note that access control is only supported when running the Iceberg REST server as an auxiliary service within the Gravitino server:
 
 ```properties
 gravitino.authorization.enable = true
@@ -778,7 +785,22 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
 
 ---
 
-### 5. Grant Role to User
+#### Verify Access is Denied Without Privileges
+
+Before granting any privileges, verify that the user cannot access the catalog. Try to list tables as `user1` (replace with your actual authentication method):
+
+```shell
+curl -u user1:password -H "Accept: application/vnd.gravitino.v1+json" \
+  http://localhost:9001/iceberg/v1/catalog1/namespaces/default/tables
+```
+
+This should return an error indicating insufficient privileges (such as HTTP 403 Forbidden).
+
+---
+
+#### Grant Role to User
+
+Now grant the role with privileges to the user:
 
 ```shell
 curl -X PUT -H "Accept: application/vnd.gravitino.v1+json" \
@@ -789,17 +811,7 @@ curl -X PUT -H "Accept: application/vnd.gravitino.v1+json" \
 
 ---
 
-### 6. Verify Access Control in Action
-
-Before granting privileges, the user should not be able to access the table.
-For example, try to list tables as `user1` (replace with your actual authentication method):
-
-```shell
-curl -u user1:password -H "Accept: application/vnd.gravitino.v1+json" \
-  http://localhost:9001/iceberg/v1/catalog1/namespaces/default/tables
-```
-
-This should return an error indicating insufficient privileges (such as HTTP 403 Forbidden).
+#### Verify Access is Granted With Privileges
 
 After granting the role with privileges, repeat the request as `user1`:
 
@@ -823,4 +835,4 @@ For more details, see the [Access Control documentation](./security/access-contr
 
 > **Note:** IRC (Iceberg REST Catalog) authorization is not supported for standalone Iceberg REST server deployments.
 > Access control features described here require the Iceberg REST server to be run as an auxiliary service within the Gravitino server,
-> using the dynamic configuration provider.
+> using the dynamic configuration provider. Standalone deployments do not support IRC-based authorization.
