@@ -417,9 +417,9 @@ User user =
 </TabItem>
 </Tabs>
 
-### Delete a user
+### Remove a user
 
-You can delete a user by its name.
+You can remove a user by its name.
 
 <Tabs groupId='language' queryString>
 <TabItem value="shell" label="Shell">
@@ -434,7 +434,7 @@ curl -X DELETE -H "Accept: application/vnd.gravitino.v1+json" \
 
 ```java
 GravitinoClient client = ...
-boolean deleted =
+boolean removed =
     client.removeUser("user1");
 ```
 
@@ -522,9 +522,9 @@ Group group =
 </TabItem>
 </Tabs>
 
-### Delete a group
+### Remove a group
 
-You can delete a group by its name.
+You can remove a group by its name.
 
 <Tabs groupId='language' queryString>
 <TabItem value="shell" label="Shell">
@@ -539,8 +539,8 @@ curl -X DELETE -H "Accept: application/vnd.gravitino.v1+json" \
 
 ```java
 GravitinoClient client = ...
-boolean deleted =
-    client.deleteGroup("group1");
+boolean removed =
+    client.removeGroup("group1");
 ```
 
 </TabItem>
@@ -1039,11 +1039,11 @@ The following table lists the required privileges for each API.
 | alter model version               | First, you should have the privilege to load the catalog and the schema. Then, you are one of the owners of the model, schema, metalake, catalog.                                                                                             |
 | delete model version alias        | First, you should have the privilege to load the catalog and the schema. Then, you are one of the owners of the model, schema, metalake, catalog.                                                                                             |
 | add user                          | `MANAGE_USERS` on the metalake  or the owner of the metalake                                                                                                                                                                                  |
-| delete user                       | `MANAGE_USERS` on the metalake  or the owner of the metalake                                                                                                                                                                                  |
+| remove user                       | `MANAGE_USERS` on the metalake  or the owner of the metalake                                                                                                                                                                                  |
 | get user                          | `MANAGE_USERS` on the metalake  or the owner of the metalake or himself                                                                                                                                                                       |
 | list users                        | `MANAGE_USERS` on the metalake  or the owner of the metalake can see all the users, others can see himself                                                                                                                                    |
 | add group                         | `MANAGE_GROUPS` on the metalake or the owner of the metalake                                                                                                                                                                                  |
-| delete group                      | `MANAGE_GROUPS` on the metalake or the owner of the metalake                                                                                                                                                                                  |
+| remove group                      | `MANAGE_GROUPS` on the metalake or the owner of the metalake                                                                                                                                                                                  |
 | get group                         | `MANAGE_GROUPS` on the metalake or the owner of the metalake or his groups                                                                                                                                                                    |
 | list groups                       | `MANAGE_GROUPS` on the metalake or the owner of the metalake can see all the groups, others can see his group                                                                                                                                 |
 | create role                       | `CREATE_ROLE` on the metalake or the owner of the metalake                                                                                                                                                                                    |
