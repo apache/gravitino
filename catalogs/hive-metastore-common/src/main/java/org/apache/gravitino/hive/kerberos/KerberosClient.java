@@ -57,16 +57,18 @@ public class KerberosClient implements java.io.Closeable {
       Properties properties,
       Configuration hadoopConf,
       boolean refreshCredentials,
-      String keytabFilePath) {
+      String keytabFilePath)
+      throws IOException {
     this.conf = properties;
     this.hadoopConf = hadoopConf;
     this.refreshCredentials = refreshCredentials;
-    this.keytabFilePath = keytabFilePath;
+    File keyTabFile = saveKeyTabFileFromUri(keytabFilePath);
+    this.keytabFilePath = keyTabFile.getAbsolutePath();
   }
 
   public UserGroupInformation loginProxyUser(String currentUser) {
     try {
-      if (currentUser.equals(realLoginUgi.getUserName())) {
+      if (currentUser.equals(realLoginUgi.getUserName()) || hiveClient == null) {
         return realLoginUgi;
       }
 
@@ -143,7 +145,7 @@ public class KerberosClient implements java.io.Closeable {
     return loginUgi;
   }
 
-  public File saveKeyTabFileFromUri() throws IOException {
+  public File saveKeyTabFileFromUri(String path) throws IOException {
     KerberosConfig kerberosConfig = new KerberosConfig(conf, hadoopConf);
 
     String keyTabUri = kerberosConfig.getKeytab();
@@ -155,7 +157,7 @@ public class KerberosClient implements java.io.Closeable {
     if (!keytabsDir.exists()) {
       keytabsDir.mkdir();
     }
-    File keytabFile = new File(keytabFilePath);
+    File keytabFile = new File(path);
     keytabFile.deleteOnExit();
     if (keytabFile.exists() && !keytabFile.delete()) {
       throw new IllegalStateException(

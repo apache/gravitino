@@ -406,7 +406,7 @@ public class TestHiveClient {
     String dbName = "test_kerberos_db";
     String dbLocation = KERBEROS_HIVE2_HDFS_URL + "/tmp/gravitino_kerberos_test/" + dbName;
 
-    HiveClient client = new HiveClientFactory(properties, "").createHiveClient();
+    HiveClient client = new HiveClientFactory(properties, "00").createHiveClient();
     HiveSchema schema = createTestSchema(catalogName, dbName, dbLocation);
     client.createDatabase(schema);
     List<String> allDatabases = client.getAllDatabases(catalogName);

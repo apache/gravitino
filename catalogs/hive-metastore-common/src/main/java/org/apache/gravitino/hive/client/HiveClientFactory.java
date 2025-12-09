@@ -67,6 +67,10 @@ public final class HiveClientFactory {
       buildConfiguration(properties, hadoopConf);
 
       this.enableKerberos = initKerberosIfNecessary();
+      if (enableKerberos) {
+        HiveClient client = createHiveClient();
+        kerberosClient.setHiveClient(client);
+      }
     } catch (Exception e) {
       throw new RuntimeException("Failed to initialize HiveClientFactory", e);
     }
@@ -197,10 +201,8 @@ public final class HiveClientFactory {
       }
 
       kerberosClient = new KerberosClient(properties, hadoopConf, true, keytabPath);
-      kerberosClient.saveKeyTabFileFromUri();
       kerberosClient.login();
-      HiveClient client = createHiveClient();
-      kerberosClient.setHiveClient(client);
+
       return true;
     } catch (Exception e) {
       throw new RuntimeException("Failed to initialize kerberos client", e);
