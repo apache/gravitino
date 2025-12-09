@@ -261,6 +261,10 @@ DENY `WRITE_FILESET` won‘t deny the `READ_FILESET` operation if the user has t
 
 ### Model privileges
 
+:::caution Deprecated Privileges
+The privileges `CREATE_MODEL` and `CREATE_MODEL_VERSION` are deprecated and will be removed in a future release. Please use `REGISTER_MODEL` and `LINK_MODEL_VERSION` instead. The deprecated privileges still work for backward compatibility.
+:::
+
 | Name                 | Supports Securable Object        | Operation                                                                          |
 |----------------------|----------------------------------|------------------------------------------------------------------------------------|
 | REGISTER_MODEL       | Metalake, Catalog, Schema        | Register a model                                                                   |

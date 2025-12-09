@@ -636,15 +636,25 @@ class PermissionManager {
     // Use set to deduplicate the privileges
     Set<Privilege> updatePrivileges = Sets.newHashSet();
     updatePrivileges.addAll(targetObject.privileges());
+    // Remove the privileges that are being revoked from the current privilege set
     privileges.forEach(updatePrivileges::remove);
 
-    // Remove model privileges if exists
+    // Handle backward compatibility for model privilege revocation
+    // Gravitino renamed model privileges: CREATE_MODEL -> REGISTER_MODEL,
+    // CREATE_MODEL_VERSION -> LINK_MODEL_VERSION
+    // When revoking privileges, we need to handle both old and new privilege names to ensure
+    // complete removal regardless of which name was used when granting the privilege.
     for (Privilege privilege : privileges) {
+      // If revoking legacy privileges (CREATE_MODEL or CREATE_MODEL_VERSION),
+      // also remove their new equivalents (REGISTER_MODEL or LINK_MODEL_VERSION)
       if (privilege.name() == Privilege.Name.CREATE_MODEL
           || privilege.name() == Privilege.Name.CREATE_MODEL_VERSION) {
         updatePrivileges.remove(
             AuthorizationUtils.replaceLegacyPrivilege(privilege.name(), privilege.condition()));
-      } else if (privilege.name() == Privilege.Name.REGISTER_MODEL
+      }
+      // If revoking new privileges (REGISTER_MODEL or LINK_MODEL_VERSION),
+      // also remove their legacy equivalents (CREATE_MODEL or CREATE_MODEL_VERSION)
+      else if (privilege.name() == Privilege.Name.REGISTER_MODEL
           || privilege.name() == Privilege.Name.LINK_MODEL_VERSION) {
         updatePrivileges.remove(
             AuthorizationUtils.getLegacyPrivilege(privilege.name(), privilege.condition()));

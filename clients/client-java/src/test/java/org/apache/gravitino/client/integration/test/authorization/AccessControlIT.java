@@ -288,9 +288,9 @@ public class AccessControlIT extends BaseIT {
 
     // Test legacy privilege name
     SecurableObject modelObjectWithLegacyPriv =
-        SecurableObjects.ofModel(
-            schemaObjectWithModelPrivs,
-            "model",
+        SecurableObjects.ofSchema(
+            catalogObjectWithModelPrivs,
+            "model_schema",
             Lists.newArrayList(
                 Privileges.CreateModel.allow(), Privileges.CreateModelVersion.allow()));
     role =
