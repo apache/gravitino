@@ -1,5 +1,3 @@
-
-
 ---
 title: "Generic lakehouse catalog with Lance"
 slug: /lakehouse-generic-catalog-with-lance
