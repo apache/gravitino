@@ -24,6 +24,7 @@ import static org.apache.gravitino.authorization.AuthorizationUtils.USER_DOES_NO
 import static org.apache.gravitino.authorization.AuthorizationUtils.filterSecurableObjects;
 
 import com.google.common.collect.Lists;
+import com.google.common.collect.Sets;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.List;
@@ -46,7 +47,6 @@ import org.apache.gravitino.meta.GroupEntity;
 import org.apache.gravitino.meta.RoleEntity;
 import org.apache.gravitino.meta.UserEntity;
 import org.apache.gravitino.utils.PrincipalUtils;
-import org.glassfish.jersey.internal.guava.Sets;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
