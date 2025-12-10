@@ -49,15 +49,14 @@ For detailed information on available operations, see [Manage Relational Metadat
 | `provider` | Catalog provider type                        | `lakehouse-generic`     | Yes      | 1.1.0         |
 | `location` | Root storage path for all schemas and tables | `s3://bucket/lakehouse` | False    | 1.1.0         |
 
-
 #### Key Property: `location`
 
-The `location` property specifies the root directory for the lakehouse storage system. All schemas and tables are stored under this location unless explicitly overridden at the schema or table level.
+The `location` property specifies the root directory for the lakehouse table. All schemas and tables are stored under this location unless explicitly overridden at the schema or table level.
 
 **Location Resolution Hierarchy:**
 1. Table-level `location` (highest priority)
-2. Schema-level `location`
-3. Catalog-level `location` (fallback)
+2. Schema-level `location`, then the location of the table will be `{schema_location}/{table_name}`
+3. Catalog-level `location` (fallback), then the location of the table will be `{catalog_location}/{schema_name}/{table_name}`
 
 **Example Location Hierarchy:**
 ```
@@ -134,11 +133,11 @@ See [Schema Operations](./manage-relational-metadata-using-gravitino.md#schema-o
 
 Schemas inherit catalog properties and can override specific settings:
 
-| Property   | Description                           | Inherited from Catalog | Required | Since version | 
-|------------|---------------------------------------|------------------------|----------|---------------|
-| `location` | Custom storage path for schema tables | Yes                    | No       | 1.1.0         |
+| Property   | Description                                              | Example                      | Required | Since version | 
+|------------|----------------------------------------------------------|------------------------------|----------|---------------|
+| `location` | Custom storage root path for all tables under the schema | 's3://bucket/path_to_schema' | No       | 1.1.0         |
 
-About the details of schema `location`, please refer to Key Property: `location` in [Catalog Properties](#key-property-location) section.
+About location resolution hierarchy, please see [Key Property: `location`](#key-property-location) in the Catalog Management section for more details.
 
 ### Schema Operations
 

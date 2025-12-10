@@ -97,7 +97,10 @@ Some operations have specific behaviors and modes. Below are important details t
 
 **RegisterTable vs CreateTable**:
 - **RegisterTable**: Links existing Lance datasets into Gravitino catalog without data movement
-- **CreateTable**: Creates new Lance table with schema and writes data files
+- **CreateTable**: Creates new Lance table with schema and write metadata files
+:::
+The `version` field of `CreateTable` response is always null, which stands for the latest version. 
+:::
 
 **DropTable vs DeregisterTable**:
 - **DropTable**: Permanently deletes metadata and data files from storage
