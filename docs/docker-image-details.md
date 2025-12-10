@@ -14,7 +14,7 @@ You can deploy the service with the Gravitino Docker image.
 Container startup commands
 
 ```shell
-docker run --rm -d -p 8090:8090 -p 9001:9001 apache/gravitino:0.7.0-incubating
+docker run --rm -d -p 8090:8090 -p 9001:9001 apache/gravitino:latest
 ```
 
 Changelog
@@ -70,7 +70,7 @@ You can deploy the standalone Gravitino Iceberg REST server with the Docker imag
 Container startup commands
 
 ```shell
-docker run --rm -d -p 9001:9001 apache/gravitino-iceberg-rest:0.7.0-incubating
+docker run --rm -d -p 9001:9001 apache/gravitino-iceberg-rest:latest
 ```
 
 Changelog
@@ -139,10 +139,9 @@ Changelog
 
 You can deploy the standalone Gravitino Lance REST server with the Docker image.
 
-Container startup commands
 
 ```shell
-docker run --rm -d -p 9102:9102 -e LANCE_REST_GRAVITINO_METALAKE_NAME=test -e LANCE_REST_PORT=9102 apache/gravitino-lance-rest:latest
+docker run --rm -d -p 9102:9102 -e LANCE_REST_GRAVITINO_METALAKE_NAME=test -e LANCE_REST_PORT=9102 apache/gravitino-lance-rest:latest 
 ```
 
 Currently, Gravitino Lance REST server supports setting the following environment variables
