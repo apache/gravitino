@@ -103,40 +103,26 @@ public final class HiveClientClassLoader extends URLClassLoader {
    */
   private static Path getJarDirectory(HiveVersion version) {
     String gravitinoHome = System.getenv("GRAVITINO_HOME");
-    if (StringUtils.isEmpty(gravitinoHome)) {
-      Path p = Paths.get(System.getProperty("user.dir"));
-      while (p != null) {
-        if (Files.exists(p.resolve("catalogs").resolve("hive-metastore-common"))) {
-          gravitinoHome = p.toString();
-          break;
-        }
-        p = p.getParent();
-      }
-    }
-
-    if (StringUtils.isEmpty(gravitinoHome)) {
-      throw new GravitinoRuntimeException(
-          "GRAVITINO_HOME environment variable is not set and cannot determine project root directory");
-    }
+    Preconditions.checkArgument(StringUtils.isNotEmpty(gravitinoHome), "GRAVITINO_HOME not set");
+    boolean testEnv = System.getenv("GRAVITINO_TEST") != null;
 
     String libsDir = version == HiveVersion.HIVE2 ? "hive-metastore2-libs" : "hive-metastore3-libs";
 
-    // try to get path from GRAVITINO_HOME in deployment mode
-    String jarPath = Paths.get(gravitinoHome, "catalogs", "hive", "libs", libsDir).toString();
-    if (Files.exists(Paths.get(jarPath))) {
-      return Paths.get(jarPath).toAbsolutePath();
+    Path jarDir;
+    if (testEnv) {
+      // In test, hive metastore client jars are under the build directory.
+      jarDir = Paths.get(gravitinoHome, "catalogs", libsDir, "build", "libs");
+    } else {
+      // In production, jars are placed under the hive catalog libs directory.
+      jarDir = Paths.get(gravitinoHome, "catalogs", "hive", "libs", libsDir);
     }
-    LOG.info("Can not find Hive jar directory for version {} in directory : {}", version, jarPath);
 
-    // Try to get project root directory from project root in development mode
-    jarPath = Paths.get(gravitinoHome, "catalogs", libsDir, "build", "libs").toString();
-    if (!Files.exists(Paths.get(jarPath))) {
+    if (!Files.exists(jarDir) || !Files.isDirectory(jarDir)) {
       throw new GravitinoRuntimeException(
-          "Cannot find Hive jar directory for version %s in directory <PROJECT_HOME>/catalogs/%s/build/libs "
-              + "or $GRAVITINO_HOME/catalogs/hive/libs/%s",
-          version, libsDir, libsDir);
+          "Cannot find Hive jar directory for version %s in directory %s", version, jarDir);
     }
-    return Paths.get(jarPath).toAbsolutePath();
+
+    return jarDir.toAbsolutePath();
   }
 
   /**
@@ -237,7 +223,7 @@ public final class HiveClientClassLoader extends URLClassLoader {
     }
 
     // Gravitino classes
-    if (name.startsWith("org.apache.gravitino.") || name.startsWith(HiveClient.class.getName())) {
+    if (name.startsWith("org.apache.gravitino.")) {
       return true;
     }
 
