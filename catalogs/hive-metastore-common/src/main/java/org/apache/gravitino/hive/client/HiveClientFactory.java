@@ -66,7 +66,7 @@ public final class HiveClientFactory {
   }
 
   public HiveClient createHiveClient() {
-    HiveClientClassLoader classLoader = null;
+    HiveClientClassLoader classLoader;
     if (backendClassLoader == null) {
       synchronized (classLoaderLock) {
         if (backendClassLoader == null) {
