@@ -129,6 +129,21 @@ allprojects {
           "import\\s+(?:static\\s+)?[^*\\s]+\\*;(\\r\\n|\\r|\\n)",
           "$1"
         )
+        replaceRegex(
+          "Use Guava Sets instead of shadowed Glassfish Sets",
+          "import\\s+org\\.glassfish\\.jersey\\.internal\\.guava\\.Sets;",
+          "import com.google.common.collect.Sets;"
+        )
+        replaceRegex(
+          "Use Guava Maps instead of shadowed Glassfish Maps",
+          "import\\s+org\\.glassfish\\.jersey\\.internal\\.guava\\.Maps;",
+          "import com.google.common.collect.Maps;"
+        )
+        replaceRegex(
+          "Use Guava Lists instead of shadowed Glassfish Lists",
+          "import\\s+org\\.glassfish\\.jersey\\.internal\\.guava\\.Lists;",
+          "import com.google.common.collect.Lists;"
+        )
 
         targetExclude("**/build/**", "**/.pnpm/***")
       }
@@ -763,12 +778,12 @@ tasks {
 
       copy {
         from(projectDir.dir("licenses")) { into("${rootProject.name}-iceberg-rest-server/licenses") }
-        from(projectDir.file("LICENSE.rest")) { into("${rootProject.name}-iceberg-rest-server") }
-        from(projectDir.file("NOTICE.rest")) { into("${rootProject.name}-iceberg-rest-server") }
+        from(projectDir.file("LICENSE.iceberg")) { into("${rootProject.name}-iceberg-rest-server") }
+        from(projectDir.file("NOTICE.iceberg")) { into("${rootProject.name}-iceberg-rest-server") }
         from(projectDir.file("README.md")) { into("${rootProject.name}-iceberg-rest-server") }
         into(outputDir)
         rename { fileName ->
-          fileName.replace(".rest", "")
+          fileName.replace(".iceberg", "")
         }
       }
     }
@@ -808,12 +823,12 @@ tasks {
 
       copy {
         from(projectDir.dir("licenses")) { into("${rootProject.name}-lance-rest-server/licenses") }
-        from(projectDir.file("LICENSE.rest")) { into("${rootProject.name}-lance-rest-server") }
-        from(projectDir.file("NOTICE.rest")) { into("${rootProject.name}-lance-rest-server") }
+        from(projectDir.file("LICENSE.lance")) { into("${rootProject.name}-lance-rest-server") }
+        from(projectDir.file("NOTICE.lance")) { into("${rootProject.name}-lance-rest-server") }
         from(projectDir.file("README.md")) { into("${rootProject.name}-lance-rest-server") }
         into(outputDir)
         rename { fileName ->
-          fileName.replace(".rest", "")
+          fileName.replace(".lance", "")
         }
       }
     }

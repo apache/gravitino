@@ -94,12 +94,12 @@ tasks.test {
 
 tasks.withType<JavaCompile>().configureEach {
   if (name.contains("jcstress", ignoreCase = true)) {
-    options.errorprone?.excludedPaths?.set(".*/generated/.*")
+    options.errorprone.excludedPaths.set(".*/generated/.*")
   }
 }
 
 tasks.named<JavaCompile>("jmhCompileGeneratedClasses").configure {
-  options.errorprone?.isEnabled = false
+  options.errorprone.isEnabled = false
   options.compilerArgs.removeAll { it.contains("Xplugin:ErrorProne") }
 }
 
