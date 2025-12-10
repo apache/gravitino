@@ -26,15 +26,10 @@ Gravitino addresses these challenges by implementing a universal privilege model
 
 ### Gravitino Privilege Model
 
-Gravitino provides a unified authorization model that works across all connected data sources while respecting each source's unique characteristics:
-
-**Key Principles:**
-1. **Non-invasive**: Gravitino doesn't merge underlying access control systems into a monolithic framework
-2. **Abstraction layer**: Provides a Gravitino-native privilege model that abstracts away data source differences
-3. **Separation of concerns**: Maintains clear boundaries between Gravitino's authorization layer and underlying data source permissions
-4. **Flexibility**: Allows each data source to maintain its own access control settings while providing centralized management
+Gravitino provides a unified authorization model that works across all connected data sources while respecting each source's unique characteristics.
 
 **Architecture:**
+
 When users or data engines access data through Gravitino, the privilege model:
 - Evaluates permissions at the Gravitino layer first
 - Translates Gravitino privileges to data source-specific permissions when needed
@@ -130,14 +125,17 @@ To enforce this, we’ll introduce the concept of Ownership as a complete replac
 
 ### Ownership
 
-Every securable object in Gravitino has an owner - the user or group with administrative control over that object.
+Every securable object in Gravitino has an owner - the user with administrative control over that object.
 
 **Key Characteristics:**
 
 - **Automatic assignment**: The creator of an object automatically becomes its owner
 - **Administrative privileges**: Owners have implicit management privileges (e.g., delete, alter)
 - **Exclusive control**: Only the owner can fully manage the object
-- **Group ownership**: For shared management, assign ownership to a user group
+
+:::info
+Group ownership is not currently supported. Only user ownership is available.
+:::
 
 **Supported Objects:**
 
@@ -169,9 +167,13 @@ A user represents an individual identity in Gravitino. Users can be:
 A group is a collection of users that simplifies permission management by allowing you to:
 - Grant permissions to multiple users at once
 - Manage access control for teams or departments
-- Assign ownership to enable shared administrative responsibilities
+- Assign roles that all group members will inherit
 
 All users in a group inherit the roles and privileges granted to that group.
+
+:::info
+Groups can be granted roles and privileges, but they cannot be owners of securable objects. Only users can be owners.
+:::
 
 ### Metadata Objects
 
