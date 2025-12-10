@@ -141,7 +141,7 @@ The Gravitino Iceberg REST server supports multiple catalog backend, and you cou
 | `gravitino.iceberg-rest.catalog-config-provider` | The className of catalog configuration provider, Gravitino provides build-in `static-config-provider` and `dynamic-config-provider`, you could also develop a custom class that implements `apache.gravitino.iceberg.service.provider.IcebergConfigProvider` and add the corresponding jar file to the Iceberg REST service classpath directory. | `static-config-provider` | No       | 0.7.0-incubating |
 
 Use `static-config-provider` to manage catalog configuration in the file, the catalog configuration is loaded when the server start up and couldn't be changed.
-While `dynamic-config-provider` is used to manage catalog config though Gravitino server, you could add&delete&change the catalog configurations dynamically.
+While `dynamic-config-provider` is used to manage catalog config through Gravitino server, you could add&delete&change the catalog configurations dynamically.
 
 #### Static catalog configuration provider
 
@@ -194,17 +194,17 @@ You can access different catalogs by setting the `warehouse` to the specific cat
 --conf spark.sql.catalog.default_rest_catalog.type=rest  \
 --conf spark.sql.catalog.default_rest_catalog.uri=http://127.0.0.1:9001/iceberg/ \
 ...
---conf spark.sql.catalog.hive_backend_catalog.type=rest  \
---conf spark.sql.catalog.hive_backend_catalog.uri=http://127.0.0.1:9001/iceberg/ \
---conf spark.sql.catalog.hive_backend_catalog.warehouse=hive_backend \
+--conf spark.sql.catalog.hive_backend_rest_catalog.type=rest  \
+--conf spark.sql.catalog.hive_backend_rest_catalog.uri=http://127.0.0.1:9001/iceberg/ \
+--conf spark.sql.catalog.hive_backend_rest_catalog.warehouse=hive_backend \
 ...
---conf spark.sql.catalog.jdbc_backend_catalog.type=rest  \
---conf spark.sql.catalog.jdbc_backend_catalog.uri=http://127.0.0.1:9001/iceberg/ \
---conf spark.sql.catalog.jdbc_backend_catalog.warehouse=jdbc_backend \
+--conf spark.sql.catalog.jdbc_backend_rest_catalog.type=rest  \
+--conf spark.sql.catalog.jdbc_backend_rest_catalog.uri=http://127.0.0.1:9001/iceberg/ \
+--conf spark.sql.catalog.jdbc_backend_rest_catalog.warehouse=jdbc_backend \
 ...
 ```
 
-In the Spark SQL side, you could use `default_rest_catalog` to access the default catalog backend, and use `hive_backend_catalog` and `jdbc_backend_catalog` to access the `hive_backend` and `jdbc_backend` catalog backend respectively.
+In the Spark SQL side, you could use `default_rest_catalog` to access the default catalog backend, and use `hive_backend_rest_catalog` and `jdbc_backend_rest_catalog` to access the `hive_backend` and `jdbc_backend` catalog backend respectively.
 
 ### Security
 
@@ -651,7 +651,7 @@ print(table.scan().to_arrow())
 
 ## Docker instructions
 
-You could run Gravitino Iceberg REST server though docker container:
+You could run Gravitino Iceberg REST server through docker container:
 
 ```shell
 docker run -d -p 9001:9001 apache/gravitino-iceberg-rest:latest
