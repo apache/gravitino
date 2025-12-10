@@ -90,7 +90,7 @@ For more information, see [Authorization Pushdown](authorization-pushdown.md).
 
 Gravitino uses a combined approach for access control:
 
-- **Ownership**: Controls management operations (create, delete, alter) on securable objects
+- **Ownership**: Controls management operations (create, drop, alter) on securable objects
 - **Roles**: Controls access to securable objects (read, write, use)
 
 When a user performs an operation on a resource, Gravitino evaluates both ownership and role-based permissions. If a user has multiple roles, Gravitino evaluates all of them to determine the final permission set.
@@ -105,7 +105,7 @@ A role is a named collection of privileges on securable objects. Roles simplify 
 
 **Ownership of Roles:**
 - The creator of a role is automatically the owner
-- Owners have full control over the role, including the ability to delete it
+- Owners have full control over the role, including the ability to drop it
 - Only the owner can modify the role's permissions
 
 ### Privilege
@@ -130,7 +130,7 @@ Every securable object in Gravitino has an owner - the user with administrative 
 **Key Characteristics:**
 
 - **Automatic assignment**: The creator of an object automatically becomes its owner
-- **Administrative privileges**: Owners have implicit management privileges (e.g., delete, alter)
+- **Administrative privileges**: Owners have implicit management privileges (e.g., drop, alter)
 - **Exclusive control**: Only the owner can fully manage the object
 
 :::info
@@ -219,10 +219,23 @@ The following diagrams illustrate the relationships between users, groups, roles
 
 ### Service Admin
 
-Service administrators manage metalakes and are typically system maintainers. This role has full control over:
-- Creating and managing metalakes
-- Configuring system-wide settings
-- Managing service-level permissions
+Service administrators are responsible for creating metalakes. This role is typically assigned to system maintainers or operators who bootstrap the initial metadata organization.
+
+**Privileges:**
+- Create metalakes
+
+**Ownership:**
+- When a service admin creates a metalake, they automatically become the owner of that metalake
+- As the owner, they have full control over the metalake, including the ability to drop it
+- Ownership can be transferred to another user if needed
+
+**Limitations:**
+- Cannot configure system-wide settings (handled through server configuration files)
+- Cannot manage service-level permissions
+
+:::info
+Service admins automatically become the owner of metalakes they create. However, ownership can be changed by setting a new owner for the metalake.
+:::
 
 ### Custom Roles
 
