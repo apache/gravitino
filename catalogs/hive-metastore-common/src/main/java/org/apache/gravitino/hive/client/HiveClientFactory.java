@@ -40,7 +40,6 @@ public final class HiveClientFactory {
   private static final Logger LOG = LoggerFactory.getLogger(HiveClientFactory.class);
 
   // Remember which Hive backend version worked successfully for this factory.
-  private volatile HiveClientClassLoader.HiveVersion backendVersion;
   private volatile HiveClientClassLoader backendClassLoader;
   private final Object classLoaderLock = new Object();
 
@@ -67,37 +66,45 @@ public final class HiveClientFactory {
   }
 
   public HiveClient createHiveClient() {
-    HiveClient client = null;
-    HiveClientClassLoader.HiveVersion cachedVersion;
+    HiveClient client;
+    HiveClientClassLoader classLoader = null;
 
     synchronized (classLoaderLock) {
-      cachedVersion = backendVersion;
+      if (backendClassLoader != null) {
+        classLoader = backendClassLoader;
+      }
     }
 
     try {
-      if (cachedVersion != null) {
-        HiveClientClassLoader classLoader = getOrCreateClassLoader(cachedVersion);
+      if (classLoader != null) {
         client = createHiveClientInternal(classLoader);
-        LOG.info("Connected to Hive Metastore using cached Hive version {}", cachedVersion.name());
+        LOG.info(
+            "Connected to Hive Metastore using cached Hive version {}",
+            classLoader.getHiveVersion());
         return client;
       }
     } catch (Exception e) {
       LOG.warn(
-          "Failed to connect to Hive Metastore using cached Hive version {}", cachedVersion, e);
+          "Failed to connect to Hive Metastore using cached Hive version {}",
+          classLoader.getHiveVersion(),
+          e);
       throw new RuntimeException("Failed to connect to Hive Metastore", e);
     }
 
+    return tryCreateHiveClientWithBackend();
+  }
+
+  public synchronized HiveClient tryCreateHiveClientWithBackend() {
+    HiveClient client = null;
     HiveClientClassLoader classloader = null;
     try {
       // Try using Hive3 first
-      classloader = getOrCreateClassLoader(HIVE3);
+      classloader =
+          HiveClientClassLoader.createLoader(HIVE3, Thread.currentThread().getContextClassLoader());
       client = createHiveClientInternal(classloader);
       client.getCatalogs();
       LOG.info("Connected to Hive Metastore using Hive version HIVE3");
-      synchronized (classLoaderLock) {
-        backendClassLoader = classloader;
-        backendVersion = HIVE3;
-      }
+      backendClassLoader = classloader;
       return client;
 
     } catch (GravitinoRuntimeException e) {
@@ -113,13 +120,12 @@ public final class HiveClientFactory {
         if (e.getMessage().contains("Invalid method name: 'get_catalogs'")
             || e.getMessage().contains("class not found") // caused by MiniHiveMetastoreService
         ) {
-          classloader = getOrCreateClassLoader(HIVE2);
+          classloader =
+              HiveClientClassLoader.createLoader(
+                  HIVE2, Thread.currentThread().getContextClassLoader());
           client = createHiveClientInternal(classloader);
           LOG.info("Connected to Hive Metastore using Hive version HIVE2");
-          synchronized (classLoaderLock) {
-            backendClassLoader = classloader;
-            backendVersion = HIVE2;
-          }
+          backendClassLoader = classloader;
           return client;
         }
         throw e;
@@ -131,19 +137,6 @@ public final class HiveClientFactory {
     } catch (Exception e) {
       throw HiveExceptionConverter.toGravitinoException(
           e, HiveExceptionConverter.ExceptionTarget.other(""));
-    }
-  }
-
-  private HiveClientClassLoader getOrCreateClassLoader(HiveClientClassLoader.HiveVersion version)
-      throws Exception {
-    synchronized (classLoaderLock) {
-      if (backendClassLoader == null || backendVersion != version) {
-        backendClassLoader =
-            HiveClientClassLoader.createLoader(
-                version, Thread.currentThread().getContextClassLoader());
-        backendVersion = version;
-      }
-      return backendClassLoader;
     }
   }
 
@@ -203,7 +196,6 @@ public final class HiveClientFactory {
           backendClassLoader = null;
         }
 
-        backendVersion = null;
       } catch (Exception e) {
         LOG.warn("Failed to close HiveClientFactory", e);
       }
