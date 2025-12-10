@@ -28,12 +28,16 @@ import com.lancedb.lance.index.DistanceType;
 import com.lancedb.lance.index.IndexParams;
 import com.lancedb.lance.index.IndexType;
 import com.lancedb.lance.index.vector.VectorIndexParams;
+import java.io.File;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
 import org.apache.arrow.memory.RootAllocator;
+import org.apache.arrow.util.VisibleForTesting;
 import org.apache.arrow.vector.types.pojo.Field;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.EntityStore;
@@ -107,9 +111,9 @@ public class LanceTableOperations extends ManagedTableOperations {
       Index[] indexes)
       throws NoSuchSchemaException, TableAlreadyExistsException {
     String location = properties.get(Table.PROPERTY_LOCATION);
-    Preconditions.checkArgument(
-        StringUtils.isNotBlank(location), "Table location must be specified");
 
+    Preconditions.checkArgument(
+        isValidLanceLocation(location), String.format("Table location is invalid:'%s'", location));
     // Extract creation mode from properties
     CreationMode mode =
         Optional.ofNullable(properties.get(LANCE_CREATION_MODE))
@@ -340,6 +344,36 @@ public class LanceTableOperations extends ManagedTableOperations {
             .build();
       default:
         throw new IllegalArgumentException("Unsupported index type: " + indexType);
+    }
+  }
+
+  /**
+   * Check if the location is valid for Lance table. For example, 'invalid://path/to/table' is
+   * invalid. We use `URI` to check it for simplicity, in fact, we'd better use
+   *
+   * <p>Dataset.open(location, new RootAllocator()).close(); to check, however, the code will throw
+   * exception if the path does not exist though it's indeed a valid path.
+   *
+   * @param location The location string.
+   * @return True if the location is valid, false otherwise.
+   */
+  @VisibleForTesting
+  boolean isValidLanceLocation(String location) {
+    if (StringUtils.isBlank(location)) {
+      return false;
+    }
+
+    try {
+      URI uri = new URI(location);
+      String scheme = uri.getScheme();
+      if (StringUtils.isNotBlank(scheme)) {
+        return true;
+      }
+
+      File file = new File(location);
+      return file.isAbsolute();
+    } catch (URISyntaxException e) {
+      return false;
     }
   }
 }

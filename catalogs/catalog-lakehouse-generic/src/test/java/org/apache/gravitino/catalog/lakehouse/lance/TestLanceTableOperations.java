@@ -24,6 +24,7 @@ import static org.mockito.Mockito.spy;
 
 import com.google.common.collect.Maps;
 import java.util.Map;
+import java.util.stream.Stream;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.catalog.ManagedSchemaOperations;
@@ -38,6 +39,9 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 
 public class TestLanceTableOperations {
 
@@ -88,5 +92,23 @@ public class TestLanceTableOperations {
                 null,
                 new SortOrder[0],
                 new Index[0]));
+  }
+
+  @ParameterizedTest
+  @MethodSource("pathProvider")
+  void testRegisterWithInvalidLocation(String location, boolean isValid) {
+    Assertions.assertEquals(isValid, lanceTableOps.isValidLanceLocation(location));
+  }
+
+  static Stream<Arguments> pathProvider() {
+    return Stream.of(
+        Arguments.of("/data/lance/table1", true),
+        Arguments.of("hdfs://namenode:8020/data/lance/table2", true),
+        Arguments.of("s3a://bucket/data/lance/table3", true),
+        Arguments.of("file:///data/lance/table4", true),
+        Arguments.of("ftp://server/data/lance/table5", true),
+        Arguments.of("invalid/path", false),
+        Arguments.of("", false),
+        Arguments.of(null, false));
   }
 }

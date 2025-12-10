@@ -672,6 +672,17 @@ public class LanceRESTServiceIT extends BaseIT {
     Assertions.assertNotNull(response);
     Assertions.assertEquals(nonExistingLocation, response.getLocation());
     Assertions.assertFalse(new File(nonExistingLocation).exists());
+
+    // Now try to register an invalid path
+    String invalidPath = "invalid/path";
+    ids = List.of(CATALOG_NAME, SCHEMA_NAME, "table_register_invalid_path");
+    registerTableRequest.setMode(ModeEnum.CREATE);
+    registerTableRequest.setId(ids);
+    registerTableRequest.setLocation(invalidPath);
+    LanceNamespaceException exception =
+        Assertions.assertThrows(
+            LanceNamespaceException.class, () -> ns.registerTable(registerTableRequest));
+    Assertions.assertTrue(exception.getMessage().contains("Table location is invalid"));
   }
 
   @Test
