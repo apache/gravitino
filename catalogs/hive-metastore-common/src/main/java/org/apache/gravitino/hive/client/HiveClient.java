@@ -72,7 +72,11 @@ public interface HiveClient extends AutoCloseable {
   HivePartition addPartition(HiveTable table, HivePartition partition);
 
   void dropPartition(
-      String catalogName, String databaseName, String tableName, String partitionName, boolean b);
+      String catalogName,
+      String databaseName,
+      String tableName,
+      String partitionName,
+      boolean deleteData);
 
   String getDelegationToken(String finalPrincipalName, String userName);
 

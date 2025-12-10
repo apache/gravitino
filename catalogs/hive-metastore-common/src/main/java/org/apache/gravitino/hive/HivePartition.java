@@ -167,7 +167,7 @@ public final class HivePartition implements IdentityPartition {
                 String[] keyValue = part.split(PARTITION_VALUE_DELIMITER, 2);
                 if (keyValue.length != 2) {
                   throw new IllegalArgumentException(
-                      String.format("Error partition format: %s", partitionSpec));
+                      String.format("Invalid partition format: %s", partitionSpec));
                 }
                 if (!partitionFieldNames.contains(keyValue[0])) {
                   throw new NoSuchPartitionException(

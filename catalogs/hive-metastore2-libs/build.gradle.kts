@@ -26,10 +26,8 @@ plugins {
 }
 
 dependencies {
-  implementation(libs.hive2.metastore) {
-  }
-  implementation(libs.hadoop2.common) {
-  }
+  implementation(libs.hive2.metastore)
+  implementation(libs.hadoop2.common)
 }
 
 tasks {

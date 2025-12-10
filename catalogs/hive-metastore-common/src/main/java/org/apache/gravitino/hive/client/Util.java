@@ -18,8 +18,6 @@
  */
 package org.apache.gravitino.hive.client;
 
-import java.lang.reflect.Method;
-import java.lang.reflect.Modifier;
 import java.util.Properties;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.conf.Configuration;
@@ -29,35 +27,21 @@ public class Util {
 
   public static final String HIVE_CONFIG_RESOURCES = "hive.config.resources";
 
-  public static Method findMethod(Class<?> klass, String name, Class<?>... args)
-      throws NoSuchMethodException {
-    return klass.getMethod(name, args);
-  }
-
-  protected static Method findStaticMethod(Class<?> klass, String name, Class<?>... args)
-      throws NoSuchMethodException {
-    Method method = findMethod(klass, name, args);
-
-    if (!Modifier.isStatic(method.getModifiers())) {
-      throw new IllegalArgumentException(
-          "Method " + name + " of class " + klass.getName() + " is not static.");
-    }
-    return method;
-  }
-
-  public static void buildConfiguration(Properties config, Configuration configuration) {
+  public static Configuration buildConfigurationFromProperties(Properties properties) {
     try {
-      String hdfsConfigResources = config.getProperty(HIVE_CONFIG_RESOURCES);
-      if (StringUtils.isNotBlank(hdfsConfigResources)) {
-        for (String resource : hdfsConfigResources.split(",")) {
+      Configuration config = new Configuration();
+      String configResources = properties.getProperty(HIVE_CONFIG_RESOURCES);
+      if (StringUtils.isNotBlank(configResources)) {
+        for (String resource : configResources.split(",")) {
           resource = resource.trim();
           if (StringUtils.isNotBlank(resource)) {
-            configuration.addResource(new Path(resource));
+            config.addResource(new Path(resource));
           }
         }
       }
 
-      config.forEach((k, v) -> configuration.set(k.toString(), v.toString()));
+      properties.forEach((k, v) -> config.set(k.toString(), v.toString()));
+      return config;
     } catch (Exception e) {
       throw new RuntimeException("Failed to create configuration", e);
     }
