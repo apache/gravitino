@@ -46,6 +46,7 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.SupportsRelationOperations;
 import org.apache.gravitino.auth.AuthConstants;
 import org.apache.gravitino.authorization.AuthorizationRequestContext;
+import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.authorization.GravitinoAuthorizer;
 import org.apache.gravitino.authorization.Privilege;
 import org.apache.gravitino.authorization.SecurableObject;
@@ -529,15 +530,19 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
               String.valueOf(roleEntity.id()),
               securableObject.type().name(),
               String.valueOf(MetadataIdConverter.getID(securableObject, metalake)),
-              privilege.name().name().toUpperCase(),
+              AuthorizationUtils.replaceLegacyPrivilegeName(privilege.name())
+                  .name()
+                  .toUpperCase(java.util.Locale.ROOT),
               AuthConstants.ALLOW);
         }
         allowEnforcer.addPolicy(
             String.valueOf(roleEntity.id()),
             securableObject.type().name(),
             String.valueOf(MetadataIdConverter.getID(securableObject, metalake)),
-            privilege.name().name().toUpperCase(),
-            condition.name().toLowerCase());
+            AuthorizationUtils.replaceLegacyPrivilegeName(privilege.name())
+                .name()
+                .toUpperCase(java.util.Locale.ROOT),
+            condition.name().toLowerCase(java.util.Locale.ROOT));
       }
     }
   }
