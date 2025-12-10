@@ -293,6 +293,12 @@ subprojects {
     return@subprojects
   }
 
+  if (project.path == ":catalogs:hive-metastore2-libs" ||
+    project.path == ":catalogs:hive-metastore3-libs"
+  ) {
+    return@subprojects
+  }
+
   apply(plugin = "jacoco")
   apply(plugin = "maven-publish")
   apply(plugin = "java")
@@ -981,8 +987,8 @@ tasks {
         !it.name.startsWith("iceberg") &&
         !it.name.startsWith("lance") &&
         !it.name.startsWith("spark") &&
+        !it.name.startsWith("hive-metastore") &&
         it.name != "hadoop-common" &&
-        it.name != "hive-metastore-common" &&
         it.name != "integration-test" &&
         it.name != "trino-connector" &&
         it.parent?.name != "bundles" &&
@@ -1015,6 +1021,8 @@ tasks {
         !it.name.startsWith("integration-test") &&
         !it.name.startsWith("spark") &&
         !it.name.startsWith("trino-connector") &&
+        it.name != "hive-metastore2-libs" &&
+        it.name != "hive-metastore3-libs" &&
         it.name != "hive-metastore-common" &&
         it.name != "docs" &&
         it.name != "hadoop-common" &&
@@ -1046,6 +1054,8 @@ tasks {
       ":catalogs:catalog-lakehouse-iceberg:copyLibAndConfig",
       ":catalogs:catalog-lakehouse-paimon:copyLibAndConfig",
       ":catalogs:catalog-model:copyLibAndConfig",
+      ":catalogs:hive-metastore2-libs:copyLibs",
+      ":catalogs:hive-metastore3-libs:copyLibs",
       ":catalogs:catalog-lakehouse-generic:copyLibAndConfig"
     )
   }
