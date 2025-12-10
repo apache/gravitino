@@ -31,7 +31,6 @@ import java.nio.charset.StandardCharsets;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
-import java.util.Properties;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import org.apache.gravitino.hive.HiveClientPool;
@@ -190,9 +189,7 @@ public class MiniHiveMetastore {
           HiveConf.ConfVars.METASTOREURIS.varname,
           hiveConf.getVar(HiveConf.ConfVars.METASTOREURIS));
 
-      Properties properties = new Properties();
-      properties.put("hive.metastore.uris", "thrift://localhost:" + port);
-      this.clientPool = new HiveClientPool(1, properties);
+      this.clientPool = new HiveClientPool(1, hiveConf);
     } catch (Exception e) {
       throw new RuntimeException("Cannot start TestHiveMetastore", e);
     }
@@ -228,11 +225,11 @@ public class MiniHiveMetastore {
 
   public void reset() throws Exception {
     if (clientPool != null) {
-      for (String dbName : clientPool.run(client -> client.getAllDatabases(""))) {
-        for (String tblName : clientPool.run(client -> client.getAllTables("", dbName))) {
+      for (String dbName : clientPool.run(client -> client.getAllDatabases())) {
+        for (String tblName : clientPool.run(client -> client.getAllTables(dbName))) {
           clientPool.run(
               client -> {
-                client.dropTable("", dbName, tblName, true, true);
+                client.dropTable(dbName, tblName, true, true, true);
                 return null;
               });
         }
@@ -241,7 +238,7 @@ public class MiniHiveMetastore {
           // Drop cascade, functions dropped by cascade
           clientPool.run(
               client -> {
-                client.dropDatabase("", dbName, true);
+                client.dropDatabase(dbName, true, true, true);
                 return null;
               });
         }
