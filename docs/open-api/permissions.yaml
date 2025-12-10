@@ -243,7 +243,7 @@ paths:
     parameters:
       - $ref: "./openapi.yaml#/components/parameters/metalake"
       - $ref: "./openapi.yaml#/components/parameters/role"
-      - $ref: "./openapi.yaml#/components/parameters/metadataObjectType"
+      - $ref: "./roles.yaml#/components/parameters/metadataObjectTypeOfRole"
       - $ref: "./openapi.yaml#/components/parameters/metadataObjectFullName"
 
     put:
@@ -302,7 +302,7 @@ paths:
     parameters:
       - $ref: "./openapi.yaml#/components/parameters/metalake"
       - $ref: "./openapi.yaml#/components/parameters/role"
-      - $ref: "./openapi.yaml#/components/parameters/metadataObjectType"
+      - $ref: "./roles.yaml#/components/parameters/metadataObjectTypeOfRole"
       - $ref: "./openapi.yaml#/components/parameters/metadataObjectFullName"
 
     put:
