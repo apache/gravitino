@@ -39,7 +39,7 @@ import org.slf4j.LoggerFactory;
 public final class HiveClientFactory {
   private static final Logger LOG = LoggerFactory.getLogger(HiveClientFactory.class);
 
-  // Remember which Hive backend version worked successfully for this factory.
+  // Remember which Hive backend classloader worked successfully for this factory.
   private volatile HiveClientClassLoader backendClassLoader;
   private final Object classLoaderLock = new Object();
 
@@ -66,23 +66,23 @@ public final class HiveClientFactory {
   }
 
   public HiveClient createHiveClient() {
-    HiveClient client;
     HiveClientClassLoader classLoader = null;
-
-    synchronized (classLoaderLock) {
-      if (backendClassLoader != null) {
-        classLoader = backendClassLoader;
+    if (backendClassLoader == null) {
+      synchronized (classLoaderLock) {
+        if (backendClassLoader == null) {
+          // initialize the backend classloader with try connecting to Hive metastore
+          return createHiveClientWithBackend();
+        }
       }
     }
+    classLoader = backendClassLoader;
 
+    HiveClient client;
     try {
-      if (classLoader != null) {
-        client = createHiveClientInternal(classLoader);
-        LOG.info(
-            "Connected to Hive Metastore using cached Hive version {}",
-            classLoader.getHiveVersion());
-        return client;
-      }
+      client = createHiveClientInternal(classLoader);
+      LOG.info(
+          "Connected to Hive Metastore using cached Hive version {}", classLoader.getHiveVersion());
+      return client;
     } catch (Exception e) {
       LOG.warn(
           "Failed to connect to Hive Metastore using cached Hive version {}",
@@ -90,11 +90,9 @@ public final class HiveClientFactory {
           e);
       throw new RuntimeException("Failed to connect to Hive Metastore", e);
     }
-
-    return createHiveClientWithBackend();
   }
 
-  public synchronized HiveClient createHiveClientWithBackend() {
+  public HiveClient createHiveClientWithBackend() {
     HiveClient client = null;
     HiveClientClassLoader classloader = null;
     try {
