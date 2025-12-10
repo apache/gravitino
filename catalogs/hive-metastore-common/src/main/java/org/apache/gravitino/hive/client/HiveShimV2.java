@@ -232,10 +232,14 @@ class HiveShimV2 extends HiveShim {
 
   @Override
   public void dropPartition(
-      String catalogName, String databaseName, String tableName, String partitionName, boolean b) {
+      String catalogName,
+      String databaseName,
+      String tableName,
+      String partitionName,
+      boolean deleteData) {
     try {
       var partitionValues = HivePartition.extractPartitionValues(partitionName);
-      client.dropPartition(databaseName, tableName, partitionValues, b);
+      client.dropPartition(databaseName, tableName, partitionValues, deleteData);
     } catch (Exception e) {
       throw HiveExceptionConverter.toGravitinoException(
           e, ExceptionTarget.partition(partitionName));

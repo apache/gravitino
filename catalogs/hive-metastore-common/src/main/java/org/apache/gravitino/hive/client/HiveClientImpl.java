@@ -169,7 +169,7 @@ public class HiveClientImpl implements HiveClient {
     try {
       shim.close();
     } catch (Exception e) {
-      throw new RuntimeException(e);
+      throw new RuntimeException("Failed to close HiveClient", e);
     }
   }
 

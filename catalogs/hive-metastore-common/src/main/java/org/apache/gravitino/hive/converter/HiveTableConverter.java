@@ -188,8 +188,7 @@ public class HiveTableConverter {
 
     // `location` must not be null, otherwise it will result in an NPE when calling HMS `alterTable`
     // interface
-    Optional.ofNullable(table.properties().get(LOCATION))
-        .ifPresent(l -> strgDesc.setLocation(table.properties().get(LOCATION)));
+    Optional.ofNullable(table.properties().get(LOCATION)).ifPresent(strgDesc::setLocation);
 
     strgDesc.setSerdeInfo(buildSerDeInfo(table));
     StorageFormat storageFormat =
