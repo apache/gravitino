@@ -532,6 +532,11 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
               privilege.name().name().toUpperCase(),
               AuthConstants.ALLOW);
         }
+        // Since different roles of a user may simultaneously hold both "allow" and "deny"
+        // permissions
+        // for the same privilege on a given MetadataObject, the allowEnforcer must also incorporate
+        // the "deny" privilege to ensure that the authorize method correctly returns false in such
+        // cases.
         allowEnforcer.addPolicy(
             String.valueOf(roleEntity.id()),
             securableObject.type().name(),
