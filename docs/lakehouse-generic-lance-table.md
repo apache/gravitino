@@ -232,6 +232,7 @@ tableCatalog.createTable(
   - Creates new Lance table from scratch
   - Requires column schema definition
   - Initializes new Lance dataset files
+:::
 
 ## Advanced Topics
 
