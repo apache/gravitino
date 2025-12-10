@@ -140,7 +140,11 @@ public class HiveClientImpl implements HiveClient {
 
   @Override
   public void dropPartition(
-      String catalogName, String databaseName, String tableName, String partitionName, boolean deleteData) {
+      String catalogName,
+      String databaseName,
+      String tableName,
+      String partitionName,
+      boolean deleteData) {
     shim.dropPartition(catalogName, databaseName, tableName, partitionName, deleteData);
   }
 
