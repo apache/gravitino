@@ -18,7 +18,7 @@
 package org.apache.gravitino.hive.client;
 
 import static org.apache.gravitino.hive.client.HiveClientClassLoader.HiveVersion.HIVE3;
-import static org.apache.gravitino.hive.client.Util.buildConfigurationFromProperties;
+import static org.apache.gravitino.hive.client.Util.updateConfigurationFromProperties;
 
 import java.lang.reflect.Method;
 import java.util.List;
@@ -155,7 +155,7 @@ class HiveShimV3 extends HiveShimV2 {
       Class<?> confClass = classLoader.loadClass(CONFIGURATION_CLASS);
 
       Object conf = confClass.getDeclaredConstructor().newInstance();
-      buildConfigurationFromProperties(properties, (Configuration) conf);
+      updateConfigurationFromProperties(properties, (Configuration) conf);
 
       Method getProxyMethod = clientClass.getMethod(METHOD_GET_PROXY, confClass, boolean.class);
       return (IMetaStoreClient) getProxyMethod.invoke(null, conf, false);

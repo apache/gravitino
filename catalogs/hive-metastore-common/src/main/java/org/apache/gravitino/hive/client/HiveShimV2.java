@@ -18,7 +18,7 @@
 package org.apache.gravitino.hive.client;
 
 import static org.apache.gravitino.hive.client.HiveClientClassLoader.HiveVersion.HIVE2;
-import static org.apache.gravitino.hive.client.Util.buildConfigurationFromProperties;
+import static org.apache.gravitino.hive.client.Util.updateConfigurationFromProperties;
 
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
@@ -53,7 +53,7 @@ class HiveShimV2 extends HiveShim {
       Class<?> confClass = classLoader.loadClass(CONFIGURATION_CLASS);
 
       Object conf = confClass.getDeclaredConstructor().newInstance();
-      buildConfigurationFromProperties(properties, (Configuration) conf);
+      updateConfigurationFromProperties(properties, (Configuration) conf);
 
       Constructor<?> hiveConfCtor = hiveConfClass.getConstructor(confClass, Class.class);
       Object hiveConfInstance = hiveConfCtor.newInstance(conf, hiveConfClass);
