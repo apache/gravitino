@@ -207,6 +207,19 @@ public class AuthorizationExpressionConverter {
   public static String replaceAnyPrivilege(String expression) {
     expression = expression.replaceAll("SERVICE_ADMIN", "authorizer.isServiceAdmin()");
     expression = expression.replaceAll("METALAKE_USER", "authorizer.isMetalakeUser(METALAKE_NAME)");
+
+    // A single privilege—such as SELECT_TABLE—can be applied across multiple namespace levels.
+    // For example, the SELECT_TABLE privilege may be granted on metadata objects of four types:
+    // metalake, catalog, schema, and table.
+    //
+    // Importantly, if a "deny" is set for this privilege at any level, the user is not considered
+    // to possess the privilege—even if an "allow" exists at another level.
+    //
+    // Examples:
+    // - If role1 has an "allow" for SELECT_TABLE on metalake1 but a "deny" on catalog1,
+    //   then role1 is not authorized to perform SELECT_TABLE on catalog1.
+    // - Conversely, if role1 has a "deny" for SELECT_TABLE on metalake1, even an "allow"
+    //   on catalog1 will not grant the SELECT_TABLE privilege for catalog1.
     expression =
         expression.replaceAll(
             "ANY_USE_CATALOG",
