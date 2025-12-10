@@ -23,7 +23,7 @@ Currently, Gravitino fully supports the **Lance** lakehouse format, with plans t
 
 1. **Unified Metadata Management**: Single source of truth for table metadata across multiple storage backends
 2. **Multi-Format Support**: Extensible architecture to support various lakehouse table formats such as Lance, Iceberg, Hudi, etc.
-3. **Storage Flexibility**: Work with any file system - local, or cloud object stores
+3. **Storage Flexibility**: Work with any file system, local, or cloud object stores
 4. **Gravitino Integration**: Leverage Gravitino's metadata management, access control, lineage tracking, and data discovery
 5. **Easy Migration**: Register existing lakehouse tables without data movement
 
@@ -44,11 +44,9 @@ For detailed information on available operations, see [Manage Relational Metadat
 
 ### Catalog Properties
 
-#### Required Properties
-
-| Property   | Description                                  | Example                  | Required | Since Version |
-|------------|----------------------------------------------|--------------------------|----------|---------------|
-| `provider` | Catalog provider type                        | `lakehouse-generic`      | Yes      | 1.1.0         |
+| Property   | Description                                  | Example                 | Required | Since Version |
+|------------|----------------------------------------------|-------------------------|----------|---------------|
+| `provider` | Catalog provider type                        | `lakehouse-generic`     | Yes      | 1.1.0         |
 | `location` | Root storage path for all schemas and tables | `s3://bucket/lakehouse` | False    | 1.1.0         |
 
 
@@ -184,6 +182,6 @@ For additional operations, refer to [Schema Operations documentation](./manage-r
 
 ### Supported Operations
 
-Since different lakehouse formats have varying capabilities, table operation support may differ. The following are table operations for different lakehouse formats.
+Since different lakehouse table formats have varying capabilities, table operation support may differ. The following are table operations for different lakehouse formats.
 
 - [Lance Format Support](./lakehouse-generic-lance-table.md)

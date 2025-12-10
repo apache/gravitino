@@ -38,6 +38,7 @@ For Lance tables in a Generic Lakehouse Catalog, the following table summarizes 
 - **Partitioning:** Not currently supported
 - **Sort Orders:** Not currently supported
 - **Distributions:** Not currently supported
+- **Indexes:** Not currently supported
   :::
 
 ### Data Type Mappings
@@ -102,7 +103,7 @@ Required and optional properties for tables in a Generic Lakehouse Catalog:
 
 | Property              | Description                                                                                                                                                                                                                                                                                                                                     | Default  | Required     | Since Version |
 |-----------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|----------|--------------|---------------|
-| `format`              | Table format: `lance`, `iceberg`, etc. (currently only `lance` is fully supported)                                                                                                                                                                                                                                                              | (none)   | Yes          | 1.1.0         |
+| `format`              | Table format: `lance`, currently only `lance` is fully supported.                                                                                                                                                                                                                                                                               | (none)   | Yes          | 1.1.0         |
 | `location`            | Storage path for table metadata and data, Lance currently supports: S3, GCS, OSS, AZ, File, Memory and file-object-store.                                                                                                                                                                                                                       | (none)   | Conditional* | 1.1.0         |
 | `external`            | Whether the data directory is an external location. If it's `true`, dropping a table will only remove metadata in Gravitino and will not delete the data directory, and purge table will delete both. For a non-external table, dropping will drop both.                                                                                        | false    | No           | 1.1.0         |
 | `lance.creation-mode` | Create mode: for create table, it can be `CREATE`, `EXIST_OK` or `OVERWRITE`. and it should be `CREATE` or `OVERWRITE` for registering tables                                                                                                                                                                                                   | `CREATE` | No           | 1.1.0         |
@@ -113,30 +114,6 @@ Required and optional properties for tables in a Generic Lakehouse Catalog:
 **Location Requirement:** Must be specified at catalog, schema, or table level. See [Location Resolution](./lakehouse-generic-catalog.md#key-property-location).
 
 You may also set additional properties specific to your lakehouse format or custom requirements.
-
-### Index Support
-
-Index capabilities vary by lakehouse format. The following table shows Lance format support:
-
-| Index Type | Description                                                                                  | Lance Support |
-|------------|----------------------------------------------------------------------------------------------|---------------|
-| SCALAR     | Optimizes searches on scalar data types (integers, floats, etc.)                             | ✅            |
-| VECTOR     | Optimizes similarity searches in high-dimensional vector spaces                              | ✅            |
-| BTREE      | Balanced tree for sorted data with logarithmic search/insert/delete complexity               | ✅            |
-| INVERTED   | Full-text search optimization through term-to-location mapping                               | ✅            |
-| IVF_FLAT   | Vector search with inverted file and flat quantization                                       | ✅            |
-| IVF_SQ     | Vector search with scalar quantization for memory efficiency                                 | ✅            |
-| IVF_PQ     | Vector search with product quantization balancing accuracy and memory                        | ✅            |
-
-:::caution Index Creation Limitation
-**Lance tables do not support index creation during table creation.** You must:
-1. Create the table first
-2. Then create indexes on the created table
-
-This is a fundamental limitation of Lance format, not Gravitino.
-:::
-
-For more details on table indexes, see [Table Partitioning, Distribution, Sort Ordering, and Indexes](./manage-relational-metadata-using-gravitino.md#table-partitioning-distribution-sort-ordering-and-indexes).
 
 ### Table Operations
 
@@ -247,8 +224,7 @@ tableCatalog.createTable(
 
 :::tip Registration vs Creation
 - **Registration** (`lance.register: true`):
-  - Links to existing Lance dataset
-  - No data movement or copying
+  - Links to existing Lance dataset or a path placeholder
   - Schema automatically detected from Lance metadata
   - Useful for importing existing datasets
 
@@ -256,10 +232,6 @@ tableCatalog.createTable(
   - Creates new Lance table from scratch
   - Requires column schema definition
   - Initializes new Lance dataset files
-  - Data written during table creation or subsequent inserts
-
-- **Empty columns array**: When registering, leave columns empty for auto-detection from Lance table
-  :::
 
 ## Advanced Topics
 
