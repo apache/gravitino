@@ -20,6 +20,7 @@ package org.apache.gravitino.hive.client;
 
 import java.lang.reflect.InvocationTargetException;
 import java.util.Locale;
+import java.util.Set;
 import org.apache.gravitino.exceptions.AlreadyExistsException;
 import org.apache.gravitino.exceptions.ConnectionFailedException;
 import org.apache.gravitino.exceptions.GravitinoRuntimeException;
@@ -93,6 +94,15 @@ public class HiveExceptionConverter {
     }
   }
 
+  private static final Set<String> noSuchExceptionSet =
+      Set.of(
+          "NoSuchObjectException",
+          "UnknownTableException",
+          "UnknownDBException",
+          "UnknownPartitionException",
+          "InvalidObjectException",
+          "InvalidPartitionException");
+
   private HiveExceptionConverter() {}
 
   /**
@@ -144,14 +154,11 @@ public class HiveExceptionConverter {
     if (exceptionClassName.contains("AlreadyExistsException")) {
       return toAlreadyExistsException(cause, target, message);
     }
-    if (exceptionClassName.contains("NoSuchObjectException")
-        || exceptionClassName.contains("UnknownTableException")
-        || exceptionClassName.contains("UnknownDBException")
-        || exceptionClassName.contains("UnknownPartitionException")
-        || exceptionClassName.contains("InvalidObjectException")
-        || exceptionClassName.contains("InvalidPartitionException")) {
+
+    if (noSuchExceptionSet.contains(exceptionClassName)) {
       return toNoSuchObjectException(cause, target, message);
     }
+
     if (exceptionClassName.contains("InvalidOperationException")) {
       if (isNonEmptySchemaMessage(lowerMessage)) {
         return new NonEmptySchemaException(
