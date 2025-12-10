@@ -30,7 +30,6 @@ import java.lang.reflect.Method;
 import java.util.Properties;
 import org.apache.commons.lang3.reflect.MethodUtils;
 import org.apache.gravitino.exceptions.GravitinoRuntimeException;
-import org.apache.gravitino.utils.PrincipalUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.slf4j.Logger;
@@ -169,12 +168,7 @@ public final class HiveClientFactory {
     ClassLoader origLoader = Thread.currentThread().getContextClassLoader();
     Thread.currentThread().setContextClassLoader(classloader);
     try {
-      UserGroupInformation ugi;
-      ugi = UserGroupInformation.getCurrentUser();
-      if (!ugi.getUserName().equals(PrincipalUtils.getCurrentUserName())) {
-        ugi = UserGroupInformation.createProxyUser(PrincipalUtils.getCurrentUserName(), ugi);
-      }
-      return createProxyHiveClientImpl(classloader.getHiveVersion(), properties, ugi, classloader);
+      return createHiveClientImpl(classloader.getHiveVersion(), properties, classloader);
     } catch (Exception e) {
       throw HiveExceptionConverter.toGravitinoException(
           e,
