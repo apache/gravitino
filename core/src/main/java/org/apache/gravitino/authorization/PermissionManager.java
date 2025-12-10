@@ -625,6 +625,7 @@ class PermissionManager {
     return securableObject;
   }
 
+  @SuppressWarnings("deprecation")
   private static SecurableObject updateRevokedSecurableObject(
       String metalake,
       String role,
@@ -636,7 +637,31 @@ class PermissionManager {
     // Use set to deduplicate the privileges
     Set<Privilege> updatePrivileges = Sets.newHashSet();
     updatePrivileges.addAll(targetObject.privileges());
+    // Remove the privileges that are being revoked from the current privilege set
     privileges.forEach(updatePrivileges::remove);
+
+    // Handle backward compatibility for model privilege revocation
+    // When revoking privileges, we need to handle both old and new privilege names to ensure
+    // complete removal regardless of which name was used when granting the privilege.
+    for (Privilege privilege : privileges) {
+      // Check if this is a deprecated privilege and remove its new equivalent
+      Privilege.Name newPrivilegeName =
+          AuthorizationUtils.DEPRECATED_PRIVILEGE_MAP.get(privilege.name());
+      if (newPrivilegeName != null) {
+        // This is a deprecated privilege, remove its new equivalent
+        updatePrivileges.remove(
+            AuthorizationUtils.replaceLegacyPrivilege(privilege.name(), privilege.condition()));
+      }
+
+      // Check if this privilege has a deprecated equivalent and remove it
+      Privilege.Name deprecatedPrivilegeName =
+          AuthorizationUtils.DEPRECATED_PRIVILEGE_MAP.inverse().get(privilege.name());
+      if (deprecatedPrivilegeName != null) {
+        // This privilege has a deprecated equivalent, remove it
+        updatePrivileges.remove(
+            AuthorizationUtils.getLegacyPrivilege(privilege.name(), privilege.condition()));
+      }
+    }
 
     // If the object still contains privilege, we should update the object
     // with new privileges

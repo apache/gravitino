@@ -261,11 +261,17 @@ DENY `WRITE_FILESET` won‘t deny the `READ_FILESET` operation if the user has t
 
 ### Model privileges
 
-| Name                 | Supports Securable Object        | Operation                                                          |
-|----------------------|----------------------------------|--------------------------------------------------------------------|
-| CREATE_MODEL         | Metalake, Catalog, Schema        | Create a model                                                     |
-| CREATE_MODEL_VERSION | Metalake, Catalog, Schema, Model | Create a model version                                             |
-| USE_MODEL            | Metalake, Catalog, Schema, Model | View the metadata of the model and download all the model versions |
+:::caution Deprecated Privileges
+The privileges `CREATE_MODEL` and `CREATE_MODEL_VERSION` are deprecated and will be removed in a future release. Please use `REGISTER_MODEL` and `LINK_MODEL_VERSION` instead. The deprecated privileges still work for backward compatibility.
+:::
+
+| Name                 | Supports Securable Object        | Operation                                                                          |
+|----------------------|----------------------------------|------------------------------------------------------------------------------------|
+| REGISTER_MODEL       | Metalake, Catalog, Schema        | Register a model                                                                   |
+| LINK_MODEL_VERSION   | Metalake, Catalog, Schema, Model | Link a model version                                                               |
+| USE_MODEL            | Metalake, Catalog, Schema, Model | View the metadata of the model and download all the model versions                 |
+| CREATE_MODEL         | Metalake, Catalog, Schema        | Register a model, this is deprecated. Please use `REGISTER_MODEL` instead.         |
+| CREATE_MODEL_VERSION | Metalake, Catalog, Schema, Model | Link a model version, this is deprecated. Please use `LINK_MODEL_VERSION` instead. |
 
 ### Tag privileges
 
@@ -1025,9 +1031,9 @@ The following table lists the required privileges for each API.
 | drop fileset                      | First, you should have the privilege to load the catalog and the schema. Then, you are one of the owners of the fileset, schema, catalog, metalake                                                                                            |
 | list fileset                      | First, you should have the privilege to load the catalog and the schema. Then, you are one of the owners of the schema, catalog, metalake can see all the filesets, others can see the filesets which they can load                           |
 | load fileset                      | First, you should have the privilege to load the catalog and the schema. Then, you are one of the owners of the fileset, schema, metalake, catalog or have either `READ_FILESET` or `WRITE_FILESET` on the fileset, schema, catalog, metalake |
-| list file                         | First, you should have the privilege to load the catalog and the schema. Then, you are one of the owners of the fileset, schema, metalake, catalog or have either `READ_FILESET` or `WRITE_FILESET` on the fileset, schema, catalog, metalake |
-| register model                    | First, you should have the privilege to load the catalog and the schema. Then, you have `CREATE_MODEL` on the metalake, catalog, schema or are the owner of the metalake, catalog, schema                                                     |
-| link model version                | First, you should have the privilege to load the catalog, the schema and the model. Then, you have `CREATE_MODEL_VERSION` on the metalake, catalog, schema, model or are the owner of the metalake, catalog, schema, model                    |
+| list fileset                      | First, you should have the privilege to load the catalog and the schema. Then, you are one of the owners of the fileset, schema, metalake, catalog or have either `READ_FILESET` or `WRITE_FILESET` on the fileset, schema, catalog, metalake |
+| register model                    | First, you should have the privilege to load the catalog and the schema. Then, you have `REGISTER_MODEL` on the metalake, catalog, schema or are the owner of the metalake, catalog, schema                                                   |
+| link model version                | First, you should have the privilege to load the catalog, the schema and the model. Then, you have `LINK_MODEL_VERSION` on the metalake, catalog, schema, model or are the owner of the metalake, catalog, schema, model                      |
 | alter model                       | First, you should have the privilege to load the catalog and the schema. Then, you are one of the owners of the model, schema, catalog, metalake                                                                                              |
 | drop model                        | First, you should have the privilege to load the catalog and the schema. Then, you are one of the owners of the model, schema, catalog, metalake                                                                                              |
 | list model                        | First, you should have the privilege to load the catalog and the schema. Then the owner of the schema, catalog, metalake can see all the models, others can see the models which they can load                                                |
