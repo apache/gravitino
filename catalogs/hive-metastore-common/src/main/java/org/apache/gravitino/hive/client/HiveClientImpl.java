@@ -31,7 +31,7 @@ import org.apache.hadoop.security.UserGroupInformation;
  */
 public class HiveClientImpl implements HiveClient {
 
-  Shim shim;
+  HiveShim shim;
 
   public HiveClientImpl(HiveClientClassLoader.HiveVersion hiveVersion, Properties properties) {
     switch (hiveVersion) {

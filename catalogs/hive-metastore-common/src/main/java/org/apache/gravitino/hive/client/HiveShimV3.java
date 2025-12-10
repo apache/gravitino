@@ -18,12 +18,13 @@
 package org.apache.gravitino.hive.client;
 
 import static org.apache.gravitino.hive.client.HiveClientClassLoader.HiveVersion.HIVE3;
-import static org.apache.gravitino.hive.client.Util.buildConfiguration;
+import static org.apache.gravitino.hive.client.Util.buildConfigurationFromProperties;
 
 import java.lang.reflect.Method;
 import java.util.List;
 import java.util.Properties;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.reflect.MethodUtils;
 import org.apache.gravitino.hive.HivePartition;
 import org.apache.gravitino.hive.HiveSchema;
 import org.apache.gravitino.hive.HiveTable;
@@ -33,6 +34,7 @@ import org.apache.gravitino.hive.converter.HiveTableConverter;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hive.metastore.IMetaStoreClient;
 import org.apache.hadoop.hive.metastore.api.Database;
+import org.apache.hadoop.hive.metastore.api.Table;
 
 class HiveShimV3 extends HiveShimV2 {
 
@@ -132,12 +134,12 @@ class HiveShimV3 extends HiveShimV2 {
 
       // SetCatalogName methods for Hive3
       this.databaseSetCatalogNameMethod =
-          Util.findMethod(Database.class, "setCatalogName", String.class);
+          MethodUtils.getAccessibleMethod(Database.class, "setCatalogName", String.class);
       this.tableSetCatalogNameMethod =
-          Util.findMethod(
+          MethodUtils.getAccessibleMethod(
               org.apache.hadoop.hive.metastore.api.Table.class, "setCatName", String.class);
       this.partitionSetCatalogNameMethod =
-          Util.findMethod(
+          MethodUtils.getAccessibleMethod(
               org.apache.hadoop.hive.metastore.api.Partition.class, "setCatName", String.class);
 
     } catch (Exception e) {
@@ -153,7 +155,7 @@ class HiveShimV3 extends HiveShimV2 {
       Class<?> confClass = classLoader.loadClass(CONFIGURATION_CLASS);
 
       Object conf = confClass.getDeclaredConstructor().newInstance();
-      buildConfiguration(properties, (Configuration) conf);
+      buildConfigurationFromProperties(properties, (Configuration) conf);
 
       Method getProxyMethod = clientClass.getMethod(METHOD_GET_PROXY, confClass, boolean.class);
       return (IMetaStoreClient) getProxyMethod.invoke(null, conf, false);
@@ -406,7 +408,7 @@ class HiveShimV3 extends HiveShimV2 {
   public List<HiveTable> getTableObjectsByName(
       String catalogName, String databaseName, List<String> allTables) {
     var tables =
-        (List<org.apache.hadoop.hive.metastore.api.Table>)
+        (List<Table>)
             invoke(
                 ExceptionTarget.schema(databaseName),
                 client,
