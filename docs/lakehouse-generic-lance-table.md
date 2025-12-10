@@ -1,12 +1,11 @@
 ---
-title: "Generic lakehouse catalog with Lance"
-slug: /lakehouse-generic-catalog-with-lance
+title: "Lance table support"
+slug: /lance-table-support
 keywords:
 - lakehouse
 - lance
 - metadata
 - generic catalog
-- file system
 license: "This software is licensed under the Apache License version 2."
 ---
 
@@ -25,15 +24,15 @@ This document describes how to use Apache Gravitino to manage a generic lakehous
 
 For Lance tables in a Generic Lakehouse Catalog, the following table summarizes supported operations:
 
-| Operation | Support Status |
-|-----------|----------------|
-| List      | ✅ Full         |
-| Load      | ✅ Full         |
-| Alter     | No support now |
-| Create    | ✅ Full         |
-| Register  | ✅ Full         |
-| Drop      | ✅ Full         |
-| Truncate  | ✅ Full         |
+| Operation | Support Status  |
+|-----------|-----------------|
+| List      | ✅ Full          |
+| Load      | ✅ Full          |
+| Alter     | Not support now |
+| Create    | ✅ Full          |
+| Register  | ✅ Full          |
+| Drop      | ✅ Full          |
+| Purge     | ✅ Full          |
 
 :::note Feature Limitations
 - **Partitioning:** Not currently supported
@@ -281,11 +280,6 @@ Solution: Check file system permissions and credentials for the storage backend
 **Issue: Table not found after registration**
 ```
 Solution: Verify the location path points to a valid Lance dataset directory
-```
-
-**Issue: Metadata inconsistency**
-```
-Solution: Ensure Gravitino server has stable connection to metadata backend
 ```
 
 ### Migration Guide
