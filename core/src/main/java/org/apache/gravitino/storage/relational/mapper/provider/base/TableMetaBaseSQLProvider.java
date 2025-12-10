@@ -263,7 +263,7 @@ public class TableMetaBaseSQLProvider {
             %s cm ON mm.metalake_id = cm.metalake_id
             AND cm.catalog_name = #{catalogName}
             AND cm.deleted_at = 0
-        INNER JOIN
+        LEFT JOIN
             %s sm ON cm.catalog_id = sm.catalog_id
             AND sm.schema_name = #{schemaName}
             AND sm.deleted_at = 0
