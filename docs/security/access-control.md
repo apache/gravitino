@@ -71,7 +71,7 @@ gravitino.authorization.impl = org.apache.gravitino.server.authorization.PassThr
 
 :::info
 **Prerequisites for Built-in Authorization:**
-- Authentication must be enabled
+- Authorization must be enabled
 - Users must be granted appropriate privileges
 - See [API Required Conditions](#api-required-conditions) for privilege requirements for each REST API
 :::
