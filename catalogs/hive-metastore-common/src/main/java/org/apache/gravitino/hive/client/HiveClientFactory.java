@@ -91,10 +91,10 @@ public final class HiveClientFactory {
       throw new RuntimeException("Failed to connect to Hive Metastore", e);
     }
 
-    return tryCreateHiveClientWithBackend();
+    return createHiveClientWithBackend();
   }
 
-  public synchronized HiveClient tryCreateHiveClientWithBackend() {
+  public synchronized HiveClient createHiveClientWithBackend() {
     HiveClient client = null;
     HiveClientClassLoader classloader = null;
     try {
