@@ -19,6 +19,8 @@ docker run --rm -d -p 8090:8090 -p 9001:9001 apache/gravitino:0.7.0-incubating
 
 Changelog
 
+- apache/gravitino:1.1.0
+  - Based on Gravitino 1.1.0, you can know more information from 1.1.0 [release notes](https://github.com/apache/gravitino/releases/tag/v1.1.0).
 
 - apache/gravitino:1.0.0
   - Based on Gravitino 1.0.0, you can know more information from 1.0.0 [release notes](https://github.com/apache/gravitino/releases/tag/v1.0.0).
@@ -72,6 +74,14 @@ docker run --rm -d -p 9001:9001 apache/gravitino-iceberg-rest:0.7.0-incubating
 ```
 
 Changelog
+
+- apache/gravitino-iceberg-rest:1.1.0
+  - Support scan planning endpoint
+  - Support get credentials endpoint
+  - Support table metadata cache
+  - Support access control
+  - For more information, see 1.1.0 [release notes](https://github.com/apache/gravitino/releases/tag/v1.1.0).
+
 - apache/gravitino-iceberg-rest:1.0.0
   - Upgrade Iceberg version to 1.9
   - Supports to specify the catalog name using warehouse parameter
@@ -116,6 +126,10 @@ docker run --rm -d -p 8000:8000 apache/gravitino-mcp-server:latest --metalake te
 ```
 
 Changelog
+
+- apache/gravitino-mcp-server:1.1.0
+  - Built with Gravitino 1.1.0. For more information, see 1.1.0 [release notes](https://github.com/apache/gravitino/releases/tag/v1.1.0).
+
 - apache/gravitino-mcp-server:1.0.0
   - Supports read operations for `catalog`, `schema`, `table`, `fileset`, `model`, `policy`, `topic`, `statistic`, `job`.
   - Supports associate&disassociate tag, policy to metadata
@@ -125,8 +139,10 @@ Changelog
 
 You can deploy the standalone Gravitino Lance REST server with the Docker image.
 
+Container startup commands
+
 ```shell
-docker run --rm -d -p 9102:9102 -e LANCE_REST_GRAVITINO_METALAKE_NAME=test -e LANCE_REST_PORT=9102 apache/gravitino-lance-rest:latest 
+docker run --rm -d -p 9102:9102 -e LANCE_REST_GRAVITINO_METALAKE_NAME=test -e LANCE_REST_PORT=9102 apache/gravitino-lance-rest:latest
 ```
 
 Currently, Gravitino Lance REST server supports setting the following environment variables
@@ -138,7 +154,12 @@ Currently, Gravitino Lance REST server supports setting the following environmen
 
 It's not advised to change `LANCE_REST_NAMESPACE_BACKEND`, `LANCE_REST_HOST` and `LANCE_REST_PORT` if you are not familiar with Gravitino Lance REST server and no special requirements.
 
+Changelog
 
+- apache/gravitino-lance-rest:1.1.0
+  - Initial release of Lance REST server
+  - Support Lance tables integration through REST API
+  - Built with Gravitino 1.1.0. For more information, see 1.1.0 [release notes](https://github.com/apache/gravitino/releases/tag/v1.1.0).
 
 ## Playground Docker image
 
@@ -165,6 +186,8 @@ Changelog
 
 Changelog
 
+- apache/gravitino-playground:trino-435-gravitino-1.1.0
+  - Use Gravitino release 1.1.0 Dockerfile to build the image.
 
 - apache/gravitino-playground:trino-435-gravitino-1.0.0
   - Use Gravitino release 1.0.0 Dockerfile to build the image.
