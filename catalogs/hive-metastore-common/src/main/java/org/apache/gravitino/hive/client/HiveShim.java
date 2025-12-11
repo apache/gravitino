@@ -37,8 +37,6 @@ public abstract class HiveShim {
 
   protected static final String RETRYING_META_STORE_CLIENT_CLASS =
       "org.apache.hadoop.hive.metastore.RetryingMetaStoreClient";
-  protected static final String IMETA_STORE_CLIENT_CLASS =
-      "org.apache.hadoop.hive.metastore.IMetaStoreClient";
   protected static final String HIVE_CONF_CLASS = "org.apache.hadoop.hive.conf.HiveConf";
   protected static final String CONFIGURATION_CLASS = "org.apache.hadoop.conf.Configuration";
   protected static final String METHOD_GET_PROXY = "getProxy";
