@@ -21,6 +21,7 @@ package org.apache.gravitino.hive.client;
 import java.lang.reflect.InvocationTargetException;
 import java.util.Locale;
 import java.util.Set;
+import java.util.stream.Stream;
 import org.apache.gravitino.exceptions.AlreadyExistsException;
 import org.apache.gravitino.exceptions.ConnectionFailedException;
 import org.apache.gravitino.exceptions.GravitinoRuntimeException;
@@ -94,7 +95,7 @@ public class HiveExceptionConverter {
     }
   }
 
-  private static final Set<String> noSuchExceptionSet =
+  private static final Set<String> NO_SUCH_EXCEPTION_SET =
       Set.of(
           "NoSuchObjectException",
           "UnknownTableException",
@@ -155,7 +156,7 @@ public class HiveExceptionConverter {
       return toAlreadyExistsException(cause, target, message);
     }
 
-    if (noSuchExceptionSet.contains(exceptionClassName)) {
+    if (NO_SUCH_EXCEPTION_SET.contains(exceptionClassName)) {
       return toNoSuchObjectException(cause, target, message);
     }
 
@@ -178,11 +179,7 @@ public class HiveExceptionConverter {
       if (lowerMessage.contains("already exists")) {
         return toAlreadyExistsException(cause, target, message);
       }
-      if (lowerMessage.contains("does not exist")
-          || lowerMessage.contains("not found")
-          || lowerMessage.contains("no such")
-          || lowerMessage.contains("there is no")
-          || lowerMessage.contains("invalid partition")) {
+      if (isNotFoundKeyword(lowerMessage)) {
         return toNoSuchObjectException(cause, target, message);
       }
       if (isNonEmptySchemaMessage(lowerMessage)) {
@@ -202,11 +199,14 @@ public class HiveExceptionConverter {
     return new GravitinoRuntimeException(cause, message);
   }
 
+  private static boolean isNotFoundKeyword(String lowerMessage) {
+    return Stream.of("does not exist", "not found", "no such", "there is no")
+        .anyMatch(lowerMessage::contains);
+  }
+
   private static boolean isConnectionKeyword(String lowerMessage) {
-    return lowerMessage.contains("connection")
-        || lowerMessage.contains("connect")
-        || lowerMessage.contains("timeout")
-        || lowerMessage.contains("network");
+    return Stream.of("connection", "connect", "timeout", "network")
+        .anyMatch(lowerMessage::contains);
   }
 
   private static boolean isNonEmptySchemaMessage(String lowerMessage) {
