@@ -36,7 +36,7 @@ public class AiService {
                       Arrays.toString(table.columns()),
                       "paimon",
                       Arrays.toString(table.index()),
-                      Arrays.toString(table.supportPartitions().listPartitions()),
+                      "",
                       table.properties()));
           // TODO Persist to database and support querying via  REST API.
           log.info("Evaluation result: {}", evaluationResult);

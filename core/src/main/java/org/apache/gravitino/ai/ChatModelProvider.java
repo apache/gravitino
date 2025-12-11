@@ -19,7 +19,7 @@ public class ChatModelProvider {
     if (chatModel == null) {
       synchronized (ChatModelProvider.class) {
         if (chatModel == null) {
-          ChatModelFactory.createChatModel(config);
+          chatModel = ChatModelFactory.createChatModel(config);
         }
       }
     }
