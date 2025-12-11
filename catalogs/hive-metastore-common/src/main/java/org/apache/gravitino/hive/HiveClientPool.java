@@ -40,10 +40,10 @@ public class HiveClientPool extends ClientPoolImpl<HiveClient, GravitinoRuntimeE
    * @param poolSize The number of clients in the pool.
    * @param properties The configuration used to initialize the Hive Metastore clients.
    */
-  public HiveClientPool(int poolSize, Properties properties) {
+  public HiveClientPool(String name, int poolSize, Properties properties) {
     // Do not allow retry by default as we rely on RetryingHiveClient
     super(poolSize, GravitinoRuntimeException.class, false);
-    this.clientFactory = new HiveClientFactory(properties, "xxx");
+    this.clientFactory = new HiveClientFactory(properties, name);
   }
 
   @Override

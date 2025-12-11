@@ -214,7 +214,7 @@ public class CatalogHive2IT extends BaseIT {
     hiveClientProperties.setProperty(HiveConf.ConfVars.METASTOREURIS.varname, hive_metastore_uris);
 
     // Check if Hive client can connect to Hive metastore
-    hiveClientPool = new HiveClientPool(1, hiveClientProperties);
+    hiveClientPool = new HiveClientPool("hive", 1, hiveClientProperties);
     List<String> dbs = hiveClientPool.run(client -> client.getAllDatabases(HMS_CATALOG));
     Assertions.assertFalse(dbs.isEmpty());
 

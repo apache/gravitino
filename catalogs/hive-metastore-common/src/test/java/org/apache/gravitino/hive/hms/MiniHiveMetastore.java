@@ -192,7 +192,7 @@ public class MiniHiveMetastore {
 
       Properties properties = new Properties();
       properties.put("hive.metastore.uris", "thrift://localhost:" + port);
-      this.clientPool = new HiveClientPool(1, properties);
+      this.clientPool = new HiveClientPool("min-ms", 1, properties);
     } catch (Exception e) {
       throw new RuntimeException("Cannot start TestHiveMetastore", e);
     }

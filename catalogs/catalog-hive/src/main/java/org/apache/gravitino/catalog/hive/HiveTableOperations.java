@@ -42,9 +42,6 @@ import org.slf4j.LoggerFactory;
 public class HiveTableOperations implements TableOperations, SupportsPartitions {
   public static final Logger LOG = LoggerFactory.getLogger(HiveTableOperations.class);
 
-  private static final String PARTITION_NAME_DELIMITER = "/";
-  private static final String PARTITION_VALUE_DELIMITER = "=";
-
   private final HiveTableHandle tableHandle;
 
   public HiveTableOperations(HiveTableHandle tableHandle) {

@@ -57,8 +57,9 @@ public class CachedClientPool implements ClientPool<HiveClient, GravitinoRuntime
   private final Properties conf;
   private final int clientPoolSize;
   private final ScheduledThreadPoolExecutor scheduler;
+  private final String name;
 
-  public CachedClientPool(Properties hiveConf, Map<String, String> properties) {
+  public CachedClientPool(String name, Properties hiveConf, Map<String, String> properties) {
     int clientPoolSize =
         (int) PROPERTIES_METADATA.getOrDefault(properties, HiveConstants.CLIENT_POOL_SIZE);
     long evictionInterval =
@@ -66,6 +67,7 @@ public class CachedClientPool implements ClientPool<HiveClient, GravitinoRuntime
             PROPERTIES_METADATA.getOrDefault(
                 properties, HiveConstants.CLIENT_POOL_CACHE_EVICTION_INTERVAL_MS);
 
+    this.name = name;
     this.conf = hiveConf;
     this.clientPoolSize = clientPoolSize;
     // Since Caffeine does not ensure that removalListener will be involved after expiration
@@ -82,7 +84,7 @@ public class CachedClientPool implements ClientPool<HiveClient, GravitinoRuntime
   @VisibleForTesting
   public HiveClientPool clientPool() {
     Key key = extractKey();
-    return clientPoolCache.get(key, k -> new HiveClientPool(clientPoolSize, conf));
+    return clientPoolCache.get(key, k -> new HiveClientPool(name, clientPoolSize, conf));
   }
 
   @VisibleForTesting

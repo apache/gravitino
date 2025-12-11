@@ -284,7 +284,7 @@ public class TestHiveTableOperations extends MiniHiveMetastoreService {
               hiveTable.supportPartitions().dropPartition("does_not_exist_partition");
             });
     Assertions.assertEquals(
-        "Error partition format: does_not_exist_partition", exception5.getMessage());
+        "Invalid partition format: does_not_exist_partition", exception5.getMessage());
 
     Assertions.assertFalse(
         hiveTable.supportPartitions().dropPartition("city=not_exist"),

@@ -67,7 +67,7 @@ public class TestHudiHMSBackendOps extends MiniHiveMetastoreService {
 
     Properties properties = new Properties();
     properties.setProperty(HiveConf.ConfVars.METASTOREURIS.varname, hiveMetastoreUris);
-    hiveClientPool = new HiveClientPool(1, properties);
+    hiveClientPool = new HiveClientPool("hudi", 1, properties);
 
     // create a hive table using HiveClient
     createHiveTable();

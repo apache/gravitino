@@ -89,7 +89,6 @@ import org.apache.gravitino.rel.expressions.transforms.Transforms;
 import org.apache.gravitino.rel.indexes.Index;
 import org.apache.gravitino.rel.types.Type;
 import org.apache.gravitino.utils.PrincipalUtils;
-import org.apache.hadoop.security.UserGroupInformation;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -139,7 +138,8 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
     this.propertiesMetadata = propertiesMetadata;
 
     Properties prop = mergeProperties(conf);
-    this.clientPool = new CachedClientPool(prop, conf);
+    String catalogKey = String.format("hive-%s", info.id());
+    this.clientPool = new CachedClientPool(catalogKey, prop, conf);
     this.listAllTables = enableListAllTables(conf);
 
     // Initialize the HMS catalog name from catalog properties (default to DEFAULT_HMS_CATALOG)
@@ -243,7 +243,6 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
       NameIdentifier ident, String comment, Map<String, String> properties)
       throws NoSuchCatalogException, SchemaAlreadyExistsException {
     try {
-      UserGroupInformation current = UserGroupInformation.getCurrentUser();
       HiveSchema hiveSchema =
           HiveSchema.builder()
               .withName(ident.name())

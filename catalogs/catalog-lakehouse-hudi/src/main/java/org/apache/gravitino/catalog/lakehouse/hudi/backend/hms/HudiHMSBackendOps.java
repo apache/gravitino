@@ -35,6 +35,7 @@ import org.apache.gravitino.SchemaChange;
 import org.apache.gravitino.catalog.lakehouse.hudi.HudiSchema;
 import org.apache.gravitino.catalog.lakehouse.hudi.HudiTable;
 import org.apache.gravitino.catalog.lakehouse.hudi.ops.HudiCatalogBackendOps;
+import org.apache.gravitino.catalog.lakehouse.hudi.utils.CatalogUtils;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchTableException;
@@ -62,8 +63,6 @@ public class HudiHMSBackendOps implements HudiCatalogBackendOps {
 
   @VisibleForTesting CachedClientPool clientPool;
 
-  public static final String GRAVITINO_KEYTAB_FORMAT = "keytabs/gravitino-lakehouse-hudi-%s-keytab";
-
   @Override
   public void initialize(Map<String, String> properties) {
     Properties clientProperties = new Properties();
@@ -82,7 +81,9 @@ public class HudiHMSBackendOps implements HudiCatalogBackendOps {
         });
     byPassConfigs.forEach(clientProperties::setProperty);
     convertedConfigs.forEach(clientProperties::setProperty);
-    this.clientPool = new CachedClientPool(clientProperties, properties);
+    String catalogKey = "hudi-" + properties.getOrDefault(CatalogUtils.CATALOG_ID_KEY, "0");
+    this.clientPool = new CachedClientPool(catalogKey, clientProperties, properties);
+    LOG.info("Hudi HMS Backend Ops initialized with properties: {}", properties);
   }
 
   @Override

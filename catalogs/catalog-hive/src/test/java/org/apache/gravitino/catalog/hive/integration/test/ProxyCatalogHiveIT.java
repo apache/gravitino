@@ -118,7 +118,7 @@ public class ProxyCatalogHiveIT extends BaseIT {
     hiveClientProperties.setProperty(HiveConf.ConfVars.METASTOREURIS.varname, HIVE_METASTORE_URIS);
 
     // Check if Hive client can connect to Hive metastore
-    hiveClientPool = new HiveClientPool(1, hiveClientProperties);
+    hiveClientPool = new HiveClientPool("hive", 1, hiveClientProperties);
 
     Configuration conf = new Configuration();
     conf.set(
