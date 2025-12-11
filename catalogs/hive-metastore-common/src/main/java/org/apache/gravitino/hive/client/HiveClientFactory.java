@@ -30,6 +30,9 @@ import java.lang.reflect.Method;
 import java.util.Properties;
 import org.apache.commons.lang3.reflect.MethodUtils;
 import org.apache.gravitino.exceptions.GravitinoRuntimeException;
+import org.apache.gravitino.hive.kerberos.AuthenticationConfig;
+import org.apache.gravitino.hive.kerberos.KerberosClient;
+import org.apache.gravitino.utils.PrincipalUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.slf4j.Logger;
@@ -38,17 +41,23 @@ import org.slf4j.LoggerFactory;
 public final class HiveClientFactory {
   private static final Logger LOG = LoggerFactory.getLogger(HiveClientFactory.class);
 
+  public static final String GRAVITINO_KEYTAB_FORMAT = "keytabs/gravitino-%s-keytab";
+
   // Remember which Hive backend classloader worked successfully for this factory.
   private volatile HiveClientClassLoader backendClassLoader;
   private final Object classLoaderLock = new Object();
 
-  @SuppressWarnings("UnusedVariable")
-  private final Configuration hadoopConf;
+  private boolean enableKerberos;
+  private boolean enableImpersonation = false;
+  private KerberosClient kerberosClient;
 
+  private final Configuration hadoopConf;
   private final Properties properties;
+  private final String keytabPath;
 
   /**
-   * Creates a {@link HiveClientFactory} bound to the given configuration properties.
+   * Creates a {@link HiveClientFactory} boundGRAVITINO_KEYTAB_FORMAT to the given configuration
+   * properties.
    *
    * @param properties Hive client configuration, must not be null.
    * @param id An identifier for this factory instance.
@@ -56,10 +65,18 @@ public final class HiveClientFactory {
   public HiveClientFactory(Properties properties, String id) {
     Preconditions.checkArgument(properties != null, "Properties cannot be null");
     this.properties = properties;
+    this.keytabPath = String.format(GRAVITINO_KEYTAB_FORMAT, id);
 
     try {
       this.hadoopConf = new Configuration();
       updateConfigurationFromProperties(properties, hadoopConf);
+
+      initKerberosIfNecessary();
+      if (enableKerberos) {
+        // set hive client to kerberos client for retrieving delegation token
+        HiveClient client = createHiveClient();
+        kerberosClient.setHiveClient(client);
+      }
     } catch (Exception e) {
       throw new RuntimeException("Failed to initialize HiveClientFactory", e);
     }
@@ -169,7 +186,23 @@ public final class HiveClientFactory {
     ClassLoader origLoader = Thread.currentThread().getContextClassLoader();
     Thread.currentThread().setContextClassLoader(classloader);
     try {
-      return createHiveClientImpl(classloader.getHiveVersion(), properties, classloader);
+      if (enableImpersonation) {
+        UserGroupInformation ugi;
+        if (enableKerberos) {
+          ugi = kerberosClient.loginProxyUser(PrincipalUtils.getCurrentUserName());
+        } else {
+          ugi = UserGroupInformation.getCurrentUser();
+          if (!ugi.getUserName().equals(PrincipalUtils.getCurrentUserName())) {
+            ugi = UserGroupInformation.createProxyUser(PrincipalUtils.getCurrentUserName(), ugi);
+          }
+        }
+        return createProxyHiveClientImpl(
+            classloader.getHiveVersion(), properties, ugi, classloader);
+
+      } else {
+        return createHiveClientImpl(classloader.getHiveVersion(), properties, classloader);
+      }
+
     } catch (Exception e) {
       throw HiveExceptionConverter.toGravitinoException(
           e,
@@ -180,18 +213,39 @@ public final class HiveClientFactory {
     }
   }
 
+  private void initKerberosIfNecessary() {
+    try {
+      AuthenticationConfig authenticationConfig = new AuthenticationConfig(properties, hadoopConf);
+      enableKerberos = authenticationConfig.isKerberosAuth();
+      enableImpersonation = authenticationConfig.isImpersonationEnable();
+      if (!enableKerberos) {
+        return;
+      }
+
+      kerberosClient = new KerberosClient(properties, hadoopConf, true, keytabPath);
+      kerberosClient.login();
+
+    } catch (Exception e) {
+      throw new RuntimeException("Failed to initialize kerberos client", e);
+    }
+  }
+
   /** Release resources held by this factory. */
   public void close() {
-    synchronized (classLoaderLock) {
-      try {
+    try {
+      if (kerberosClient != null) {
+        kerberosClient.close();
+        kerberosClient = null;
+      }
+
+      synchronized (classLoaderLock) {
         if (backendClassLoader != null) {
           backendClassLoader.close();
           backendClassLoader = null;
         }
-
-      } catch (Exception e) {
-        LOG.warn("Failed to close HiveClientFactory", e);
       }
+    } catch (Exception e) {
+      LOG.warn("Failed to close HiveClientFactory", e);
     }
   }
 }
