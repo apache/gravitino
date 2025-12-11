@@ -289,7 +289,7 @@ public class TableMetaService {
                 mapper ->
                     mapper.softDeletePolicyMetadataObjectRelsByTableId(
                         namespacedEntityId.entityId()));
-            SessionUtils.doWithCommit(
+            SessionUtils.doWithoutCommit(
                 TableVersionMapper.class,
                 mapper ->
                     mapper.softDeleteTableVersionByTableIdAndVersion(
