@@ -19,6 +19,7 @@
 
 package org.apache.gravitino.catalog.hive.integration.test;
 
+import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
 import java.net.URI;
 import java.util.HashMap;
@@ -29,7 +30,6 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.spark.sql.SparkSession;
 import org.junit.jupiter.api.condition.EnabledIf;
-import org.testcontainers.shaded.com.google.common.collect.ImmutableMap;
 import org.testcontainers.utility.MountableFile;
 
 @EnabledIf(value = "isGCSConfigured", disabledReason = "Google Cloud Storage(GCS) is not prepared.")
