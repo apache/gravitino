@@ -123,8 +123,8 @@ To enable the Lance REST service within Gravitino server, configure the followin
 |-------------------------------------------|------------------------------------------------------------------------------|-------------------------|----------|---------------|
 | `gravitino.auxService.names`              | Auxiliary services to run. Include `lance-rest` to enable Lance REST service | iceberg-rest,lance-rest | Yes      | 0.2.0         |
 | `gravitino.lance-rest.classpath`          | Classpath for Lance REST service, relative to Gravitino home directory       | lance-rest-server/libs  | Yes      | 1.1.0         |
-| `gravitino.lance-rest.httpPort`           | Port number for Lance REST service                                           | 9101                    | Yes      | 1.1.0         |
-| `gravitino.lance-rest.host`               | Hostname for Lance REST service                                              | 0.0.0.0                 | Yes      | 1.1.0         |
+| `gravitino.lance-rest.httpPort`           | Port number for Lance REST service                                           | 9101                    | No       | 1.1.0         |
+| `gravitino.lance-rest.host`               | Hostname for Lance REST service                                              | 0.0.0.0                 | No       | 1.1.0         |
 | `gravitino.lance-rest.namespace-backend`  | Namespace metadata backend (currently only `gravitino` is supported)         | gravitino               | Yes      | 1.1.0         |
 | `gravitino.lance-rest.gravitino-uri`      | Gravitino server URI (required when namespace-backend is `gravitino`)        | http://localhost:8090   | Yes      | 1.1.0         |
 | `gravitino.lance-rest.gravitino-metalake` | Gravitino metalake name (required when namespace-backend is `gravitino`)     | (none)                  | Yes      | 1.1.0         |
@@ -181,9 +181,9 @@ Access the service at `http://localhost:9101`.
 
 | Environment Variable                 | Configuration Property                    | Required | Default Value           | Since Version |
 |--------------------------------------|-------------------------------------------|----------|-------------------------|---------------|
-| `LANCE_REST_NAMESPACE_BACKEND`       | `gravitino.lance-rest.namespace-backend`  | No       | `gravitino`             | 1.1.0         |
+| `LANCE_REST_NAMESPACE_BACKEND`       | `gravitino.lance-rest.namespace-backend`  | Yes      | `gravitino`             | 1.1.0         |
 | `LANCE_REST_GRAVITINO_METALAKE_NAME` | `gravitino.lance-rest.gravitino-metalake` | Yes      | (none)                  | 1.1.0         |
-| `LANCE_REST_GRAVITINO_URI`           | `gravitino.lance-rest.gravitino-uri`      | No       | `http://localhost:8090` | 1.1.0         |
+| `LANCE_REST_GRAVITINO_URI`           | `gravitino.lance-rest.gravitino-uri`      | Yes      | `http://localhost:8090` | 1.1.0         |
 | `LANCE_REST_HOST`                    | `gravitino.lance-rest.host`               | No       | `0.0.0.0`               | 1.1.0         |
 | `LANCE_REST_PORT`                    | `gravitino.lance-rest.httpPort`           | No       | `9101`                  | 1.1.0         |
 
