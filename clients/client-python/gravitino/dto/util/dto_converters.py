@@ -479,6 +479,20 @@ class DTOConverters:
             .build()
         )
 
+    @to_dto.register
+    @staticmethod
+    def _(obj: SortOrderDTO) -> SortOrderDTO:
+        return obj
+
+    @to_dto.register
+    @staticmethod
+    def _(obj: SortOrder) -> SortOrderDTO:
+        return SortOrderDTO(
+            sort_term=DTOConverters.to_function_arg(obj.expression()),
+            direction=obj.direction(),
+            null_ordering=obj.null_ordering(),
+        )
+
     @overload
     @staticmethod
     def to_dtos(dtos: list[Column]) -> list[ColumnDTO]: ...
@@ -490,6 +504,10 @@ class DTOConverters:
     @overload
     @staticmethod
     def to_dtos(dtos: list[SortOrder]) -> list[SortOrderDTO]: ...
+
+    @overload
+    @staticmethod
+    def to_dtos(dtos: list[SortOrderDTO]) -> list[SortOrderDTO]: ...
 
     @overload
     @staticmethod
