@@ -768,3 +768,20 @@ class TestDTOConverters(unittest.TestCase):
         )
         converted = DTOConverters.to_dto(partition)
         self.assertTrue(converted == expected)
+
+    def test_to_dtos_columns(self):
+        column_names = {f"column_{i}" for i in range(2)}
+        column_data_types = {Types.IntegerType.get(), Types.BooleanType.get()}
+        columns: list[Column] = [
+            Column.of(name=column_name, data_type=column_data_type)
+            for column_name, column_data_type in zip(column_names, column_data_types)
+        ]
+        expected = [
+            ColumnDTO.builder()
+            .with_name(column.name())
+            .with_data_type(column.data_type())
+            .with_default_value(Column.DEFAULT_VALUE_NOT_SET)
+            .build()
+            for column in columns
+        ]
+        self.assertListEqual(DTOConverters.to_dtos(columns), expected)
