@@ -387,7 +387,11 @@ class HiveShimV3 extends HiveShimV2 {
 
   @Override
   public void dropPartition(
-      String catalogName, String databaseName, String tableName, String partitionName, boolean b) {
+      String catalogName,
+      String databaseName,
+      String tableName,
+      String partitionName,
+      boolean deleteData) {
     var partitionValues = HivePartition.extractPartitionValues(partitionName);
     invoke(
         ExceptionTarget.partition(partitionName),
@@ -397,7 +401,7 @@ class HiveShimV3 extends HiveShimV2 {
         databaseName,
         tableName,
         partitionValues,
-        b);
+        deleteData);
   }
 
   @Override
