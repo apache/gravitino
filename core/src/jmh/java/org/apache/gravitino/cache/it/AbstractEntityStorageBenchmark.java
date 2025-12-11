@@ -35,6 +35,7 @@ import static org.apache.gravitino.Configs.VERSION_RETENTION_COUNT;
 import static org.mockito.Mockito.mock;
 
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import java.io.File;
 import java.io.IOException;
@@ -82,7 +83,6 @@ import org.openjdk.jmh.annotations.State;
 import org.openjdk.jmh.annotations.TearDown;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.testcontainers.shaded.com.google.common.collect.ImmutableMap;
 
 /**
  * Benchmark base class for evaluating {@code EntityStorage} performance using JMH.

@@ -130,34 +130,24 @@ allprojects {
           "$1"
         )
         replaceRegex(
-          "Use Guava Sets instead of shadowed Glassfish Sets",
-          "import\\s+org\\.glassfish\\.jersey\\.internal\\.guava\\.Sets;",
-          "import com.google.common.collect.Sets;"
+          "Use Guava collect classes instead of any shadowed versions",
+          "import\\s+(?:.*\\.com\\.google\\.common\\.collect|org\\.glassfish\\.jersey\\.internal\\.guava)\\.(Sets|Maps|Lists|ImmutableList|ImmutableMap|ImmutableSet|ImmutableBiMap|Iterables|Iterators|Multimap|SetMultimap|ListMultimap|BiMap|Table);",
+          "import com.google.common.collect.${'$'}1;"
         )
         replaceRegex(
-          "Use Guava Maps instead of shadowed Glassfish Maps",
-          "import\\s+org\\.glassfish\\.jersey\\.internal\\.guava\\.Maps;",
-          "import com.google.common.collect.Maps;"
+          "Use Guava base classes instead of any shadowed versions",
+          "import\\s+(?:.*\\.com\\.google\\.common\\.base|org\\.glassfish\\.jersey\\.internal\\.guava)\\.(Preconditions|Strings|Optional|Predicate|Function|Supplier|Joiner|Splitter|Objects);",
+          "import com.google.common.base.${'$'}1;"
         )
         replaceRegex(
-          "Use Guava Lists instead of shadowed Glassfish Lists",
-          "import\\s+org\\.glassfish\\.jersey\\.internal\\.guava\\.Lists;",
-          "import com.google.common.collect.Lists;"
+          "Use Guava io classes instead of any shadowed versions",
+          "import\\s+.*\\.com\\.google\\.common\\.io\\.(Files|Resources|ByteStreams|CharStreams);",
+          "import com.google.common.io.${'$'}1;"
         )
         replaceRegex(
-          "Use Guava Sets instead of shadowed Avro Sets",
-          "import\\s+org\\.apache\\.avro\\.shaded\\.com\\.google\\.common\\.collect\\.Sets;",
-          "import com.google.common.collect.Sets;"
-        )
-        replaceRegex(
-          "Use Guava Maps instead of shadowed Avro Maps",
-          "import\\s+org\\.apache\\.avro\\.shaded\\.com\\.google\\.common\\.collect\\.Maps;",
-          "import com.google.common.collect.Maps;"
-        )
-        replaceRegex(
-          "Use Guava Lists instead of shadowed Avro Lists",
-          "import\\s+org\\.apache\\.avro\\.shaded\\.com\\.google\\.common\\.collect\\.Lists;",
-          "import com.google.common.collect.Lists;"
+          "Use Guava util.concurrent classes instead of any shadowed versions",
+          "import\\s+.*\\.com\\.google\\.common\\.util\\.concurrent\\.(ListenableFuture|Futures|MoreExecutors);",
+          "import com.google.common.util.concurrent.${'$'}1;"
         )
 
         targetExclude("**/build/**", "**/.pnpm/***")
