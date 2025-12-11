@@ -1,0 +1,12 @@
+Remove a property of a Metalake, use --property to specify the property to remove.
+
+Note:
+The Metalake for the CLI can be set using one of the following methods:
+1. Passed in on the command line via the --metalake parameter.
+2. Set via the GRAVITINO_METALAKE environment variable.
+3. Stored in the Gravitino CLI configuration file.
+
+Example commands
+
+# Remove a property of a metalake
+gcli metalake remove --metalake my_metalake --property key1

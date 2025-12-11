@@ -1,0 +1,9 @@
+Display a catalog's properties, use --output to specify the output format.
+
+Example commands
+
+# Display a catalog's properties in plain format
+gcli catalog properties -m demo_metalake --name catalog_mysql --output PLAIN
+
+# Display a catalog's properties in Table format
+gcli catalog properties -m demo_metalake --name catalog_mysql --output TABLE

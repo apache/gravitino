@@ -1,0 +1,6 @@
+List models
+
+Example commands
+
+# List models
+gcli model list -m my_metalake --name hadoop.schema

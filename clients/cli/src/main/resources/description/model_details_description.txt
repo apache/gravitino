@@ -1,0 +1,9 @@
+Get details of a model or get audit information for a model, use --audit option to get audit information.
+
+Example commands
+
+# Show a model's details
+gcli model details -m my_metalake --name hadoop.schema.model
+
+# Show model audit information
+gcli model details -m my_metalake --name hadoop.schema.model --audit

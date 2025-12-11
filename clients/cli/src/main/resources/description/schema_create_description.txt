@@ -1,0 +1,6 @@
+Create a new schema in a Metalake catalog.
+
+Example commands
+
+# Create a new schema in a Metalake.catalog
+gcli schema create -m demo_metalake --name catalog_postgres.new_db;

@@ -1,0 +1,6 @@
+List all properties of a schema in a Metalake catalog
+
+Example commands
+
+# List all properties of a schema in a Metalake.catalog
+gcli schema properties -m demo_metalake --name catalog_postgres.hr;

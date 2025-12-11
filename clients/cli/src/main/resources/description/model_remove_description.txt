@@ -1,0 +1,18 @@
+Remove property/alias of a model version by alias or version, or remove property of a model.
+
+Example commands
+
+# Remove property of a model
+gcli model remove -m my_metalake --name catalog.schema.model --property key1
+
+# Remove alias of a model version by alias
+gcli model remove -m my_metalake --name catalog.schema.model --alias my_alias --property key1
+
+# Remove property of a model version by version
+gcli model remove -m my_metalake --name catalog.schema.model --version 1 --property key1
+
+# Remove alias of a model version by version
+gcli model remove -m my_metalake --name catalog.schema.model --version 1 --removealias my_alias
+
+# Remove alias of a model version by alias
+gcli model remove -m my_metalake --name catalog.schema.model --alias alias1 --removealias my_alias

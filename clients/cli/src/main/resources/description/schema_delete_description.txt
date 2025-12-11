@@ -1,0 +1,9 @@
+Delete a schema from a Metalake catalog; you can specify the --force option to bypass the confirmation prompt.
+
+Example commands
+
+# Delete a schema from a Metalake.catalog
+gcli schema delete -m demo_metalake --name catalog_postgres.old_db
+
+# Force delete a schema from a Metalake.catalog"
+gcli schema delete -m demo_metalake --name catalog_postgres.old_db --force;
