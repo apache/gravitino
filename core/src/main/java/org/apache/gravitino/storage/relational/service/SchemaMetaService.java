@@ -327,6 +327,12 @@ public class SchemaMetaService {
             "Entity %s has sub-entities, you should remove sub-entities first", identifier);
       }
 
+      if (TopicMetaService.getInstance().topicsExistInSchema(identifier)) {
+        throw new NonEmptyEntityException(
+            "Entity %s has sub-entities (Topics), you should remove sub-entities first",
+            identifier);
+      }
+
       SessionUtils.doMultipleWithCommit(
           () ->
               SessionUtils.doWithoutCommit(

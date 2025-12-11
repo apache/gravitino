@@ -184,6 +184,20 @@ public class TopicMetaService {
     return POConverters.fromTopicPO(topicPO, identifier.namespace());
   }
 
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "topicsExistInSchema")
+  public boolean topicsExistInSchema(NameIdentifier schemaIdentifier) {
+    NameIdentifierUtil.checkSchema(schemaIdentifier);
+    Long schemaId = EntityIdService.getEntityId(schemaIdentifier, Entity.EntityType.SCHEMA);
+
+    Integer topicCount =
+        SessionUtils.getWithoutCommit(
+            TopicMetaMapper.class, mapper -> mapper.countTopicMetasBySchemaId(schemaId));
+
+    return topicCount != null && topicCount > 0;
+  }
+
   @Monitored(metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME, baseMetricName = "deleteTopic")
   public boolean deleteTopic(NameIdentifier identifier) {
     NameIdentifierUtil.checkTopic(identifier);

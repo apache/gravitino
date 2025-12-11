@@ -62,6 +62,9 @@ public interface TopicMetaMapper {
   Long selectTopicIdBySchemaIdAndName(
       @Param("schemaId") Long schemaId, @Param("topicName") String name);
 
+  @SelectProvider(type = TopicMetaSQLProviderFactory.class, method = "countTopicMetasBySchemaId")
+  Integer countTopicMetasBySchemaId(@Param("schemaId") Long schemaId);
+
   @UpdateProvider(
       type = TopicMetaSQLProviderFactory.class,
       method = "softDeleteTopicMetasByTopicId")
