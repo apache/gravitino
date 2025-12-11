@@ -493,6 +493,20 @@ class DTOConverters:
             null_ordering=obj.null_ordering(),
         )
 
+    @to_dto.register
+    @staticmethod
+    def _(obj: IndexDTO) -> IndexDTO:
+        return obj
+
+    @to_dto.register
+    @staticmethod
+    def _(obj: Index) -> IndexDTO:
+        return IndexDTO(
+            index_type=obj.type(),
+            name=obj.name(),
+            field_names=obj.field_names(),
+        )
+
     @overload
     @staticmethod
     def to_dtos(dtos: list[Column]) -> list[ColumnDTO]: ...
@@ -500,6 +514,10 @@ class DTOConverters:
     @overload
     @staticmethod
     def to_dtos(dtos: list[Index]) -> list[IndexDTO]: ...
+
+    @overload
+    @staticmethod
+    def to_dtos(dtos: list[IndexDTO]) -> list[IndexDTO]: ...
 
     @overload
     @staticmethod
