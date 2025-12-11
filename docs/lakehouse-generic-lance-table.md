@@ -39,7 +39,7 @@ For Lance tables in a Generic Lakehouse Catalog, the following table summarizes 
 - **Sort Orders:** Not currently supported
 - **Distributions:** Not currently supported
 - **Indexes:** Not currently supported
-  :::
+:::
 
 ### Data Type Mappings
 
@@ -107,9 +107,12 @@ Required and optional properties for tables in a Generic Lakehouse Catalog:
 | `location`            | Storage path for table metadata and data, Lance currently supports: S3, GCS, OSS, AZ, File, Memory and file-object-store.                                                                                                                                                                                                                       | (none)   | Conditional* | 1.1.0         |
 | `external`            | Whether the data directory is an external location. If it's `true`, dropping a table will only remove metadata in Gravitino and will not delete the data directory, and purge table will delete both. For a non-external table, dropping will drop both.                                                                                        | false    | No           | 1.1.0         |
 | `lance.creation-mode` | Create mode: for create table, it can be `CREATE`, `EXIST_OK` or `OVERWRITE`. and it should be `CREATE` or `OVERWRITE` for registering tables                                                                                                                                                                                                   | `CREATE` | No           | 1.1.0         |
-| `lance.register`      | Whether it is a register table operation. This API will not create data directory actually and it's the user's responsibility to create and manage the data directory.                                                                                                                                                                          | false    | No           | 1.1.0         |
+| `lance.register`      | Whether it is a register table operation. If it's `true`, This API will not create data directory actually and it's the user's responsibility to create and manage the data directory. `false` it will actually create a table.                                                                                                                 | false    | No           | 1.1.0         |
 | `lance.storage.xxxx`  | Any additional storage-specific properties required by Lance format (e.g., S3 credentials, HDFS configs). Replace `xxxx` with actual property names. For example, we can use `lance.storage.aws_access_key_id` to set S3 aws_access_key_id when using a S3 location, for detail, please refer to https://lancedb.com/docs/storage/integrations/ | (none)   | No           | 1.1.0         |
 
+- `CREATE`: Create a new table, fail if the table already exists.
+- `EXIST_OK`: Create a new table if it does not exist, otherwise do nothing.
+- `OVERWRITE`: Create a new table, overwrite if the table already exists, it will delete the existing data directory first if the table is not a registered table and then create a new one.
 
 **Location Requirement:** Must be specified at catalog, schema, or table level. See [Location Resolution](./lakehouse-generic-catalog.md#key-property-location).
 
@@ -162,7 +165,7 @@ tableCatalog.createTable(
     NameIdentifier.of("schema", "lance_table"),
     new Column[] {
         Column.of("id", Types.IntegerType.get(), "Primary identifier", 
-                  false, true, Literals.integerLiteral(-1))
+                  true, false, null)
     },
     "Example Lance table",
     tableProperties,
@@ -267,27 +270,34 @@ Solution: Verify the location path points to a valid Lance dataset directory
 
 **Example Migration Script:**
 
-```python
-import lance_namespace as ln
-
-# Connect to Lance REST service
-ns = ln.connect("rest", {"uri": "http://localhost:9101/lance"})
-
+```shell
 # List of existing Lance tables to register
-tables_to_migrate = [
-    ("sales", "orders", "/data/sales/orders"),
-    ("sales", "customers", "/data/sales/customers"),
-    ("inventory", "products", "/data/inventory/products")
-]
+tables_to_migrate=(
+    "sales orders /data/sales/orders"
+    "sales customers /data/sales/customers"
+    "inventory products /data/inventory/products"
+)
 
 # Register each table
-for schema, table, location in tables_to_migrate:
-    register_req = ln.RegisterTableRequest(
-        id=[f'lakehouse_catalog', schema, table],
-        location=location
-    )
-    ns.register_table(register_req)
-    print(f"Registered {schema}.{table}")
+for entry in "${tables_to_migrate[@]}"; do
+    read -r schema table location <<< "$entry"
+    echo ${schema}
+    echo ${table}
+
+    curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
+      -H "Content-Type: application/json" -d "{
+      \"name\": \"${table}\",
+      \"comment\": \"Registered existing Lance table\",
+      \"columns\": [],
+      \"properties\": {
+        \"format\": \"lance\",
+        \"lance.register\": \"true\",
+        \"location\": \"${location}\"
+      }
+    }" http://localhost:8090/api/metalakes/test/catalogs/generic_lakehouse_lance_catalog/schemas/$schema/tables
+
+    echo "Registered ${schema}.${table}"
+done
 ```
 
 Other table operations (load, alter, drop, truncate) follow standard relational catalog patterns. See [Table Operations](./manage-relational-metadata-using-gravitino.md#table-operations) for details.

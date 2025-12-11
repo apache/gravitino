@@ -98,7 +98,7 @@ Some operations have specific behaviors and modes. Below are important details t
 **RegisterTable vs CreateTable**:
 - **RegisterTable**: Links existing Lance datasets into Gravitino catalog without data movement
 - **CreateTable**: Creates new Lance table with schema and write metadata files
-:::
+:::note
 The `version` field of `CreateTable` response is always null, which stands for the latest version. 
 :::
 
@@ -111,7 +111,7 @@ The `version` field of `CreateTable` response is always null, which stands for t
 
 ### Running with Gravitino Server
 
-To enable the Lance REST service within Gravitino server, configure the following properties in your Gravitino configuration file:
+To enable the Lance REST service within Gravitino server, configure the following properties in your Gravitino configuration file `${GRAVITINO_HOME}/conf/gravitino.conf`:
 
 | Configuration Property                    | Description                                                                  | Default Value           | Required | Since Version |
 |-------------------------------------------|------------------------------------------------------------------------------|-------------------------|----------|---------------|
@@ -136,7 +136,7 @@ gravitino.lance-rest.gravitino-metalake = my_metalake
 
 ### Running Standalone
 
-To run Lance REST service independently without Gravitino server:
+To run Lance REST service independently without Gravitino server (You need to start Gravitino server first):
 
 ```shell
 {GRAVITINO_HOME}/bin/gravitino-lance-rest-server.sh start
@@ -159,7 +159,7 @@ In most cases, you only need to configure `gravitino.lance-rest.gravitino-metala
 
 ### Running with Docker
 
-Launch Lance REST service using Docker:
+Launch Lance REST service using Docker(You need to start Gravitino server first):
 
 ```shell
 docker run -d --name lance-rest-service -p 9101:9101 \
@@ -356,7 +356,7 @@ ns.createTable(createTableRequest, body);
 import lance_namespace as ln
 
 # Connect to Lance REST service
-ns = ln.connect("rest", {"uri": "http://localhost:9101/lance"})
+ns = ln.connect("rest", {"uri": "http://your_lance_rest:9101/lance"})
 
 # Create catalog namespace
 create_catalog_ns_request = ln.CreateNamespaceRequest(id=["lance_catalog"])

@@ -47,7 +47,7 @@ For detailed information on available operations, see [Manage Relational Metadat
 | Property   | Description                                  | Example                 | Required | Since Version |
 |------------|----------------------------------------------|-------------------------|----------|---------------|
 | `provider` | Catalog provider type                        | `lakehouse-generic`     | Yes      | 1.1.0         |
-| `location` | Root storage path for all schemas and tables | `s3://bucket/lakehouse` | False    | 1.1.0         |
+| `location` | Root storage path for all schemas and tables | `s3://bucket/lakehouse` | No       | 1.1.0         |
 
 #### Key Property: `location`
 
@@ -60,10 +60,24 @@ The `location` property specifies the root directory for the lakehouse table. Al
 
 **Example Location Hierarchy:**
 ```
+Case1: only catalog location is set
 Catalog location: hdfs://namenode:9000/lakehouse
-└── Schema: sales (hdfs://namenode:9000/lakehouse/sales)
-    ├── Table: orders (hdfs://namenode:9000/lakehouse/sales/orders)
-    └── Table: customers (custom: s3://analytics-bucket/customers)
+└── Schema: sales
+    ├── Table: orders. Final ocation of table: hdfs://namenode:9000/lakehouse/sales/orders
+    └── Table: customers. Final ocation of table: hdfs://namenode:9000/lakehouse/sales/customers
+    
+case2: schema location is set, overriding catalog location and table location is not set   
+Catalog location: hdfs://namenode:9000/lakehouse
+└── Schema: sales: s3://sales-bucket/data
+    ├── Table: orders.  Final ocation of table: s3://sales-bucket/data/orders
+    └── Table: customers.  Final ocation of table: s3://sales-bucket/data/customers
+
+case3: table location is set, overriding both schema and catalog locations
+Catalog location: hdfs://namenode:9000/lakehouse
+└── Schema: sales: s3://sales-bucket/data
+    ├── Table: orders.  table location: 3://sales-bucket/my_orders,  Final ocation of table: s3://sales-bucket/my_orders
+    └── Table: customers. table location: 3://sales-bucket/my_customers,  Final ocation of table: s3://sales-bucket/my_customers
+    
 ```
 
 ### Creating a Catalog
@@ -178,6 +192,8 @@ catalog.asSchemas().createSchema(
 </Tabs>
 
 For additional operations, refer to [Schema Operations documentation](./manage-relational-metadata-using-gravitino.md#schema-operations).
+
+## Table management
 
 ### Supported Operations
 
