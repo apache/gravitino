@@ -58,7 +58,8 @@ public final class HiveClientFactory {
     this.properties = properties;
 
     try {
-      this.hadoopConf = updateConfigurationFromProperties(properties, new Configuration());
+      this.hadoopConf = new Configuration();
+      updateConfigurationFromProperties(properties, hadoopConf);
     } catch (Exception e) {
       throw new RuntimeException("Failed to initialize HiveClientFactory", e);
     }
