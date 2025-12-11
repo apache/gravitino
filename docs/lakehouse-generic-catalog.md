@@ -63,20 +63,20 @@ The `location` property specifies the root directory for the lakehouse table. Al
 Case1: only catalog location is set
 Catalog location: hdfs://namenode:9000/lakehouse
 └── Schema: sales
-    ├── Table: orders. Final ocation of table: hdfs://namenode:9000/lakehouse/sales/orders
-    └── Table: customers. Final ocation of table: hdfs://namenode:9000/lakehouse/sales/customers
+    ├── Table: orders. Final location of table: hdfs://namenode:9000/lakehouse/sales/orders
+    └── Table: customers. Final location of table: hdfs://namenode:9000/lakehouse/sales/customers
     
 case2: schema location is set, overriding catalog location and table location is not set   
 Catalog location: hdfs://namenode:9000/lakehouse
 └── Schema: sales: s3://sales-bucket/data
-    ├── Table: orders.  Final ocation of table: s3://sales-bucket/data/orders
-    └── Table: customers.  Final ocation of table: s3://sales-bucket/data/customers
+    ├── Table: orders. Final location of table: s3://sales-bucket/data/orders
+    └── Table: customers. Final location of table: s3://sales-bucket/data/customers
 
 case3: table location is set, overriding both schema and catalog locations
 Catalog location: hdfs://namenode:9000/lakehouse
 └── Schema: sales: s3://sales-bucket/data
-    ├── Table: orders.  table location: 3://sales-bucket/my_orders,  Final ocation of table: s3://sales-bucket/my_orders
-    └── Table: customers. table location: 3://sales-bucket/my_customers,  Final ocation of table: s3://sales-bucket/my_customers
+    ├── Table: orders.  Table location: s3://sales-bucket/my_orders, Final location of table: s3://sales-bucket/my_orders
+    └── Table: customers. Table location: s3://sales-bucket/my_customers, Final location of table: s3://sales-bucket/my_customers
     
 ```
 
