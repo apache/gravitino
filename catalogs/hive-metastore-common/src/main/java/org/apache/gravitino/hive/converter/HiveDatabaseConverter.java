@@ -20,8 +20,8 @@ package org.apache.gravitino.hive.converter;
 
 import static org.apache.gravitino.catalog.hive.HiveConstants.LOCATION;
 
-import avro.shaded.com.google.common.collect.Maps;
 import com.google.common.base.Preconditions;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
 import org.apache.gravitino.hive.HiveSchema;
@@ -68,7 +68,7 @@ public class HiveDatabaseConverter {
    * @return A map of schema properties.
    */
   public static Map<String, String> buildSchemaProperties(Database database) {
-    Map<String, String> properties = Maps.newHashMap(database.getParameters());
+    Map<String, String> properties = new HashMap<>(database.getParameters());
     properties.put(LOCATION, database.getLocationUri());
     return properties;
   }
@@ -85,7 +85,7 @@ public class HiveDatabaseConverter {
     hiveDb.setOwnerName(hiveSchema.auditInfo().creator());
     hiveDb.setOwnerType(PrincipalType.USER);
 
-    Map<String, String> parameters = Maps.newHashMap(hiveSchema.properties());
+    Map<String, String> parameters = new HashMap<>(hiveSchema.properties());
     parameters.remove(LOCATION);
     hiveDb.setParameters(parameters);
 

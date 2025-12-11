@@ -18,12 +18,11 @@
 package org.apache.gravitino.hive.client;
 
 import static org.apache.gravitino.hive.client.HiveClientClassLoader.HiveVersion.HIVE3;
-import static org.apache.gravitino.hive.client.Util.buildConfigurationFromProperties;
+import static org.apache.gravitino.hive.client.Util.updateConfigurationFromProperties;
 
 import java.lang.reflect.Method;
 import java.util.List;
 import java.util.Properties;
-import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.reflect.MethodUtils;
 import org.apache.gravitino.hive.HivePartition;
 import org.apache.gravitino.hive.HiveSchema;
@@ -37,8 +36,6 @@ import org.apache.hadoop.hive.metastore.api.Database;
 import org.apache.hadoop.hive.metastore.api.Table;
 
 class HiveShimV3 extends HiveShimV2 {
-
-  private static final String DEFAULT_HIVE3_CATALOG = "hive";
 
   private final Method createDatabaseMethod;
   private final Method getDatabaseMethod;
@@ -155,7 +152,7 @@ class HiveShimV3 extends HiveShimV2 {
       Class<?> confClass = classLoader.loadClass(CONFIGURATION_CLASS);
 
       Object conf = confClass.getDeclaredConstructor().newInstance();
-      buildConfigurationFromProperties(properties, (Configuration) conf);
+      updateConfigurationFromProperties(properties, (Configuration) conf);
 
       Method getProxyMethod = clientClass.getMethod(METHOD_GET_PROXY, confClass, boolean.class);
       return (IMetaStoreClient) getProxyMethod.invoke(null, conf, false);
@@ -170,7 +167,6 @@ class HiveShimV3 extends HiveShimV2 {
   public void createDatabase(HiveSchema database) {
     Database db = HiveDatabaseConverter.toHiveDb(database);
     String catalogName = database.catalogName();
-    catalogName = StringUtils.isEmpty(catalogName) ? DEFAULT_HIVE3_CATALOG : catalogName;
     invoke(ExceptionTarget.other(""), db, databaseSetCatalogNameMethod, catalogName);
     invoke(ExceptionTarget.schema(database.name()), client, createDatabaseMethod, db);
   }
@@ -391,7 +387,11 @@ class HiveShimV3 extends HiveShimV2 {
 
   @Override
   public void dropPartition(
-      String catalogName, String databaseName, String tableName, String partitionName, boolean b) {
+      String catalogName,
+      String databaseName,
+      String tableName,
+      String partitionName,
+      boolean deleteData) {
     var partitionValues = HivePartition.extractPartitionValues(partitionName);
     invoke(
         ExceptionTarget.partition(partitionName),
@@ -401,7 +401,7 @@ class HiveShimV3 extends HiveShimV2 {
         databaseName,
         tableName,
         partitionValues,
-        b);
+        deleteData);
   }
 
   @Override

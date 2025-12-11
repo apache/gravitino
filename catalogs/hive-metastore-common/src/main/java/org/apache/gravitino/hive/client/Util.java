@@ -27,7 +27,7 @@ public class Util {
 
   public static final String HIVE_CONFIG_RESOURCES = "hive.config.resources";
 
-  public static Configuration buildConfigurationFromProperties(
+  public static void updateConfigurationFromProperties(
       Properties properties, Configuration config) {
     try {
       String configResources = properties.getProperty(HIVE_CONFIG_RESOURCES);
@@ -41,7 +41,6 @@ public class Util {
       }
 
       properties.forEach((k, v) -> config.set(k.toString(), v.toString()));
-      return config;
     } catch (Exception e) {
       throw new RuntimeException("Failed to create configuration", e);
     }

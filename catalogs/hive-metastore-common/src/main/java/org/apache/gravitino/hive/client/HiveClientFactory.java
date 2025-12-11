@@ -22,7 +22,7 @@ package org.apache.gravitino.hive.client;
 import static org.apache.gravitino.catalog.hive.HiveConstants.HIVE_METASTORE_URIS;
 import static org.apache.gravitino.hive.client.HiveClientClassLoader.HiveVersion.HIVE2;
 import static org.apache.gravitino.hive.client.HiveClientClassLoader.HiveVersion.HIVE3;
-import static org.apache.gravitino.hive.client.Util.buildConfigurationFromProperties;
+import static org.apache.gravitino.hive.client.Util.updateConfigurationFromProperties;
 
 import com.google.common.base.Preconditions;
 import java.lang.reflect.Constructor;
@@ -68,7 +68,7 @@ public final class HiveClientFactory {
 
     try {
       this.hadoopConf = new Configuration();
-      buildConfigurationFromProperties(properties, hadoopConf);
+      updateConfigurationFromProperties(properties, hadoopConf);
 
       initKerberosIfNecessary();
       if (enableKerberos) {
