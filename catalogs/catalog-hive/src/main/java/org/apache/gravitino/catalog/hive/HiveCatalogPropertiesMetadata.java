@@ -69,7 +69,7 @@ public class HiveCatalogPropertiesMetadata extends BaseCatalogPropertiesMetadata
               PropertyEntry.stringOptionalPropertyEntry(
                   DEFAULT_CATALOG,
                   "The default Hive Metastore catalog name used when talking to HMS",
-                  false /* immutable */,
+                  true /* immutable */,
                   HIVE_DEFAULT_CATALOG,
                   false /* hidden */))
           .put(
