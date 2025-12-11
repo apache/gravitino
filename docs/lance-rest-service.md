@@ -39,8 +39,14 @@ The Lance REST service acts as a bridge between Lance datasets and applications:
          │ HTTP/REST
          ▼
 ┌─────────────────┐
-│  Lance REST      │◄──── Gravitino Metalake
-│    Service       │      (Metadata Backend)
+│   Lance REST     │
+│    Service       │ 
+└────────┬────────┘
+         │ 
+         ▼ Gravitino Client API
+┌─────────────────┐
+│ Gravitino Server │ 
+│(Metadata Backend)│
 └────────┬────────┘
          │ File System Operations
          ▼
