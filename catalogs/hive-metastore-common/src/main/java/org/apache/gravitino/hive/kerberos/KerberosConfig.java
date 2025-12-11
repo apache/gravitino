@@ -71,11 +71,8 @@ public class KerberosConfig extends AuthenticationConfig {
 
   public KerberosConfig(Properties properties, Configuration configuration) {
     super(properties, configuration);
-    loadFromHdfsConfiguration(configuration);
     loadFromMap((Map) properties, k -> true);
   }
-
-  private void loadFromHdfsConfiguration(Configuration configuration) {}
 
   public String getPrincipalName() {
     return get(PRINCIPAL_ENTRY);
