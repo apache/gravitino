@@ -115,4 +115,4 @@ gravitino.lance-rest.namespace-backend = gravitino
 # The uri of the Lance REST service gravitino namespace backend
 gravitino.lance-rest.gravitino-uri = http://localhost:8090
 # The metalake name used for Lance REST service gravitino namespace backend, please create the metalake first before using it, and configure the metalake name here.
-# gravitino.lance-rest.gravitino.metalake = metalake
+# gravitino.lance-rest.gravitino-metalake = metalake
