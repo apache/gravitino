@@ -207,6 +207,21 @@ public class AuthorizationExpressionConverter {
   public static String replaceAnyPrivilege(String expression) {
     expression = expression.replaceAll("SERVICE_ADMIN", "authorizer.isServiceAdmin()");
     expression = expression.replaceAll("METALAKE_USER", "authorizer.isMetalakeUser(METALAKE_NAME)");
+
+    // A single privilege (e.g., SELECT_TABLE) can be granted or denied at multiple namespace
+    // levels: metalake, catalog, schema, and table.
+    //
+    // Deny takes precedence over allow: if deny is set for the privilege at any level in the
+    // hierarchy,
+    // the user is not considered to have that privilege—even if an allow exists at a more specific
+    // level.
+    //
+    // Examples:
+    // - If role1 is allowed SELECT_TABLE on metalake1 but denied on catalog1,
+    //   then SELECT_TABLE is denied for all objects under catalog1.
+    // - If role1 is denied SELECT_TABLE on metalake1, any allow on catalog1 (or deeper) is
+    // overridden,
+    //   and SELECT_TABLE remains denied for catalog1 and its descendants.
     expression =
         expression.replaceAll(
             "ANY_USE_CATALOG",
