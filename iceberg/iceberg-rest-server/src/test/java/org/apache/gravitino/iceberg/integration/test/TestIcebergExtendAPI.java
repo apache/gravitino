@@ -19,6 +19,7 @@
 
 package org.apache.gravitino.iceberg.integration.test;
 
+import com.google.common.collect.ImmutableMap;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
@@ -39,7 +40,6 @@ import org.junit.jupiter.api.TestInstance.Lifecycle;
 import org.junit.jupiter.api.condition.EnabledIf;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.testcontainers.shaded.com.google.common.collect.ImmutableMap;
 
 @TestInstance(Lifecycle.PER_CLASS)
 // We couldn't add REST extension package jar in deploy mode, so just test embedded mode.
