@@ -22,6 +22,7 @@ import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_CREAT
 import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_TABLE_REGISTER;
 
 import com.google.common.base.Preconditions;
+import com.google.common.collect.Maps;
 import com.lancedb.lance.Dataset;
 import com.lancedb.lance.WriteParams;
 import com.lancedb.lance.index.DistanceType;
@@ -259,8 +260,15 @@ public class LanceTableOperations extends ManagedTableOperations {
       throws NoSuchSchemaException, TableAlreadyExistsException {
 
     if (register) {
+      // If this is a register operation, it should be a external table.
+      Map<String, String> stringStringMap = Maps.newHashMap(properties);
+      if (!properties.containsKey(Table.PROPERTY_EXTERNAL)
+          || !Boolean.parseBoolean(properties.get(Table.PROPERTY_EXTERNAL))) {
+        stringStringMap.put(Table.PROPERTY_EXTERNAL, "true");
+      }
+
       return super.createTable(
-          ident, columns, comment, properties, partitions, distribution, sortOrders, indexes);
+          ident, columns, comment, stringStringMap, partitions, distribution, sortOrders, indexes);
     }
 
     Map<String, String> storageProps = LancePropertiesUtils.getLanceStorageOptions(properties);

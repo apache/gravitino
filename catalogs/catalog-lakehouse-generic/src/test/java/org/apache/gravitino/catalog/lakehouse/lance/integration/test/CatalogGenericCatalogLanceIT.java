@@ -292,6 +292,34 @@ public class CatalogGenericCatalogLanceIT extends BaseIT {
   }
 
   @Test
+  void testRegisterAndDropTable() {
+    String tableName = GravitinoITUtils.genRandomName(TABLE_PREFIX);
+    NameIdentifier nameIdentifier = NameIdentifier.of(schemaName, tableName);
+    Map<String, String> properties = createProperties();
+
+    String tableLocation = tempDirectory + "/" + tableName;
+    properties.put("format", "lance");
+    properties.put("location", tableLocation);
+    properties.put("lance.register", "true");
+
+    catalog
+        .asTableCatalog()
+        .createTable(
+            nameIdentifier,
+            new Column[] {},
+            TABLE_COMMENT,
+            properties,
+            Transforms.EMPTY_TRANSFORM,
+            null,
+            null);
+
+    Table loadedTable = catalog.asTableCatalog().loadTable(nameIdentifier);
+    Assertions.assertEquals(tableName, loadedTable.name());
+
+    Assertions.assertDoesNotThrow(() -> catalog.asTableCatalog().dropTable(nameIdentifier));
+  }
+
+  @Test
   void testLanceTableFormat() {
     String tableName = GravitinoITUtils.genRandomName(TABLE_PREFIX);
     Column[] columns = createColumns();
