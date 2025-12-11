@@ -38,10 +38,6 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
-import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -51,7 +47,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
-import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.ThreadFactory;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.ArrayUtils;
@@ -100,13 +95,13 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
 
   @VisibleForTesting CachedClientPool clientPool;
 
+  @SuppressWarnings("UnusedVariable")
   private CatalogInfo info;
 
   private HasPropertyMetadata propertiesMetadata;
 
   private String catalogName;
 
-  private ScheduledThreadPoolExecutor checkTgtExecutor;
   private boolean listAllTables = true;
   // The maximum number of tables that can be returned by the listTableNamesByFilter function.
   // The default value is -1, which means that all tables are returned.
@@ -138,7 +133,8 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
     this.propertiesMetadata = propertiesMetadata;
 
     Properties prop = mergeProperties(conf);
-    String catalogKey = String.format("hive-%s", info.id() == null ? "0" : info.id());
+    String catalogKey =
+        String.format("hive-%s", info == null || info.id() == null ? "0" : info.id());
     this.clientPool = new CachedClientPool(catalogKey, prop, conf);
     this.listAllTables = enableListAllTables(conf);
 
@@ -189,20 +185,6 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
     if (clientPool != null) {
       clientPool.close();
       clientPool = null;
-    }
-
-    if (checkTgtExecutor != null) {
-      checkTgtExecutor.shutdown();
-      checkTgtExecutor = null;
-    }
-
-    Path keytabPath = Paths.get(String.format(GRAVITINO_KEYTAB_FORMAT, info.id()));
-    if (Files.exists(keytabPath)) {
-      try {
-        Files.delete(keytabPath);
-      } catch (IOException e) {
-        LOG.error("Fail to delete key tab file {}", keytabPath.toAbsolutePath(), e);
-      }
     }
   }
 
