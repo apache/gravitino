@@ -212,6 +212,5 @@ public class TopicMetaBaseSQLProvider {
         + " FROM "
         + TABLE_NAME
         + " WHERE schema_id = #{schemaId} AND deleted_at = 0";
-
   }
 }
