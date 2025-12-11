@@ -459,3 +459,44 @@ class DTOConverters:
         raise IllegalArgumentException(
             f"Unsupported partition type: {obj.__class__.__name__}"
         )
+
+    @to_dto.register
+    @staticmethod
+    def _(obj: Column) -> ColumnDTO:
+        return (
+            ColumnDTO.builder()
+            .with_name(obj.name())
+            .with_data_type(obj.data_type())
+            .with_comment(obj.comment())
+            .with_nullable(obj.nullable())
+            .with_auto_increment(obj.auto_increment())
+            .with_default_value(
+                Column.DEFAULT_VALUE_NOT_SET
+                if obj.default_value() is None
+                or obj.default_value() is Column.DEFAULT_VALUE_NOT_SET
+                else DTOConverters.to_function_arg(obj.default_value())
+            )
+            .build()
+        )
+
+    @overload
+    @staticmethod
+    def to_dtos(dtos: list[Column]) -> list[ColumnDTO]: ...
+
+    @overload
+    @staticmethod
+    def to_dtos(dtos: list[Index]) -> list[IndexDTO]: ...
+
+    @overload
+    @staticmethod
+    def to_dtos(dtos: list[SortOrder]) -> list[SortOrderDTO]: ...
+
+    @overload
+    @staticmethod
+    def to_dtos(dtos: list[Transform]) -> list[Partitioning]: ...
+
+    @staticmethod
+    def to_dtos(dtos):
+        if not dtos:
+            return []
+        return [DTOConverters.to_dto(dto) for dto in dtos]
