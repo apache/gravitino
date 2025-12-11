@@ -18,15 +18,11 @@
  */
 package org.apache.gravitino.catalog.lakehouse.hudi.backend.hms;
 
-import static org.apache.gravitino.catalog.lakehouse.hudi.HudiTablePropertiesMetadata.COMMENT;
-import static org.apache.gravitino.catalog.lakehouse.hudi.HudiTablePropertiesMetadata.INPUT_FORMAT;
-import static org.apache.gravitino.catalog.lakehouse.hudi.HudiTablePropertiesMetadata.LOCATION;
-import static org.apache.gravitino.catalog.lakehouse.hudi.HudiTablePropertiesMetadata.OUTPUT_FORMAT;
-
 import org.apache.gravitino.catalog.lakehouse.hudi.HudiColumn;
 import org.apache.gravitino.catalog.lakehouse.hudi.HudiTable;
-import org.apache.gravitino.hive.converter.HiveTableConverter;
-import org.apache.hadoop.hive.metastore.api.Table;
+import org.apache.gravitino.meta.AuditInfo;
+import org.apache.gravitino.rel.Column;
+import org.apache.gravitino.rel.Table;
 
 public class HudiHMSTable extends HudiTable<Table> {
   public static Builder builder() {
@@ -60,25 +56,31 @@ public class HudiHMSTable extends HudiTable<Table> {
 
     @Override
     protected HudiHMSTable buildFromTable(Table hmsTable) {
-      name = hmsTable.getTableName();
-      comment = hmsTable.getParameters().get(COMMENT);
-      columns = HiveTableConverter.getColumns(hmsTable, HudiColumn.builder());
-      partitioning = HiveTableConverter.getPartitioning(hmsTable);
+      name = hmsTable.name();
+      comment = hmsTable.comment();
+      Column[] backendColumns = hmsTable.columns();
+      HudiColumn[] hudiColumns = new HudiColumn[backendColumns.length];
+      for (int i = 0; i < backendColumns.length; i++) {
+        Column c = backendColumns[i];
+        hudiColumns[i] =
+            HudiColumn.builder()
+                .withName(c.name())
+                .withComment(c.comment())
+                .withType(c.dataType())
+                .withNullable(c.nullable())
+                .withAutoIncrement(c.autoIncrement())
+                .withDefaultValue(c.defaultValue())
+                .build();
+      }
+      columns = hudiColumns;
+      partitioning = hmsTable.partitioning();
 
-      // Should always be SortOrders.NONE since Hudi using clustering to sort data (see
-      // https://hudi.apache.org/docs/next/clustering/)
-      // but is run as a background table service
-      sortOrders = HiveTableConverter.getSortOrders(hmsTable);
+      sortOrders = hmsTable.sortOrder();
 
-      // Should always be Distributions.NONE since Hudi doesn't support distribution
-      distribution = HiveTableConverter.getDistribution(hmsTable);
-      auditInfo = HiveTableConverter.getAuditInfo(hmsTable);
+      distribution = hmsTable.distribution();
+      auditInfo = AuditInfo.builder().withCreator(hmsTable.auditInfo().creator()).build();
 
-      properties = hmsTable.getParameters();
-      properties.put(LOCATION, hmsTable.getSd().getLocation());
-      properties.put(INPUT_FORMAT, hmsTable.getSd().getInputFormat());
-      properties.put(OUTPUT_FORMAT, hmsTable.getSd().getOutputFormat());
-
+      properties = hmsTable.properties();
       return simpleBuild();
     }
   }

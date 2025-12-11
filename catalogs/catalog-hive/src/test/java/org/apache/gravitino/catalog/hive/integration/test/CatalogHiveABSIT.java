@@ -37,7 +37,7 @@ import org.testcontainers.shaded.com.google.common.collect.ImmutableMap;
 @EnabledIf(
     value = "isAzureBlobStorageConfigured",
     disabledReason = "Azure Blob Storage is not prepared.")
-public class CatalogHiveABSIT extends CatalogHiveIT {
+public class CatalogHiveABSIT extends CatalogHive2IT {
 
   private static final String ABS_BUCKET_NAME = System.getenv("ABS_CONTAINER_NAME");
   private static final String ABS_USER_ACCOUNT_NAME = System.getenv("ABS_ACCOUNT_NAME");
@@ -56,7 +56,7 @@ public class CatalogHiveABSIT extends CatalogHiveIT {
 
     containerSuite.startHiveContainerWithS3(hiveContainerEnv);
 
-    HIVE_METASTORE_URIS =
+    hive_metastore_uris =
         String.format(
             "thrift://%s:%d",
             containerSuite.getHiveContainerWithS3().getContainerIpAddress(),
@@ -83,7 +83,7 @@ public class CatalogHiveABSIT extends CatalogHiveIT {
         SparkSession.builder()
             .master("local[1]")
             .appName("Hive Catalog integration test")
-            .config("hive.metastore.uris", HIVE_METASTORE_URIS)
+            .config("hive.metastore.uris", hive_metastore_uris)
             .config(
                 "spark.sql.warehouse.dir",
                 String.format(

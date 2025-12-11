@@ -18,15 +18,17 @@
  */
 package org.apache.gravitino.catalog.hive.integration.test;
 
-import static org.apache.gravitino.catalog.hive.HiveCatalogPropertiesMetadata.METASTORE_URIS;
-import static org.apache.gravitino.catalog.hive.HiveTablePropertiesMetadata.COMMENT;
-import static org.apache.gravitino.catalog.hive.HiveTablePropertiesMetadata.EXTERNAL;
-import static org.apache.gravitino.catalog.hive.HiveTablePropertiesMetadata.FORMAT;
-import static org.apache.gravitino.catalog.hive.HiveTablePropertiesMetadata.INPUT_FORMAT;
-import static org.apache.gravitino.catalog.hive.HiveTablePropertiesMetadata.OUTPUT_FORMAT;
-import static org.apache.gravitino.catalog.hive.HiveTablePropertiesMetadata.SERDE_LIB;
-import static org.apache.gravitino.catalog.hive.HiveTablePropertiesMetadata.TABLE_TYPE;
-import static org.apache.gravitino.catalog.hive.HiveTablePropertiesMetadata.TRANSIENT_LAST_DDL_TIME;
+import static org.apache.gravitino.catalog.hive.HiveConstants.COMMENT;
+import static org.apache.gravitino.catalog.hive.HiveConstants.EXTERNAL;
+import static org.apache.gravitino.catalog.hive.HiveConstants.FORMAT;
+import static org.apache.gravitino.catalog.hive.HiveConstants.INPUT_FORMAT;
+import static org.apache.gravitino.catalog.hive.HiveConstants.LOCATION;
+import static org.apache.gravitino.catalog.hive.HiveConstants.METASTORE_URIS;
+import static org.apache.gravitino.catalog.hive.HiveConstants.OUTPUT_FORMAT;
+import static org.apache.gravitino.catalog.hive.HiveConstants.SERDE_LIB;
+import static org.apache.gravitino.catalog.hive.HiveConstants.SERDE_NAME;
+import static org.apache.gravitino.catalog.hive.HiveConstants.TABLE_TYPE;
+import static org.apache.gravitino.catalog.hive.HiveConstants.TRANSIENT_LAST_DDL_TIME;
 import static org.apache.gravitino.catalog.hive.TableType.EXTERNAL_TABLE;
 import static org.apache.gravitino.catalog.hive.TableType.MANAGED_TABLE;
 import static org.apache.hadoop.hive.serde.serdeConstants.DATE_TYPE_NAME;
@@ -39,13 +41,13 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import java.io.IOException;
 import java.time.LocalDate;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Properties;
 import java.util.Set;
 import java.util.stream.Collectors;
 import org.apache.gravitino.Catalog;
@@ -58,7 +60,6 @@ import org.apache.gravitino.SchemaChange;
 import org.apache.gravitino.SupportsSchemas;
 import org.apache.gravitino.auth.AuthConstants;
 import org.apache.gravitino.catalog.hive.HiveCatalogOperations;
-import org.apache.gravitino.catalog.hive.HiveSchemaPropertiesMetadata;
 import org.apache.gravitino.catalog.hive.HiveStorageConstants;
 import org.apache.gravitino.catalog.hive.HiveTablePropertiesMetadata;
 import org.apache.gravitino.catalog.hive.TableType;
@@ -66,9 +67,13 @@ import org.apache.gravitino.client.GravitinoMetalake;
 import org.apache.gravitino.connector.BaseCatalog;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
+import org.apache.gravitino.exceptions.NoSuchPartitionException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.hive.HiveClientPool;
+import org.apache.gravitino.hive.HivePartition;
+import org.apache.gravitino.hive.HiveSchema;
+import org.apache.gravitino.hive.HiveTable;
 import org.apache.gravitino.integration.test.container.ContainerSuite;
 import org.apache.gravitino.integration.test.container.HiveContainer;
 import org.apache.gravitino.integration.test.util.BaseIT;
@@ -98,9 +103,6 @@ import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.conf.HiveConf;
-import org.apache.hadoop.hive.metastore.api.Database;
-import org.apache.hadoop.hive.metastore.api.FieldSchema;
-import org.apache.hadoop.hive.metastore.api.NoSuchObjectException;
 import org.apache.spark.sql.SparkSession;
 import org.apache.thrift.TException;
 import org.junit.jupiter.api.AfterAll;
@@ -113,8 +115,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 @Tag("gravitino-docker-test")
-public class CatalogHiveIT extends BaseIT {
-  private static final Logger LOG = LoggerFactory.getLogger(CatalogHiveIT.class);
+public class CatalogHive2IT extends BaseIT {
+  private static final Logger LOG = LoggerFactory.getLogger(CatalogHive2IT.class);
+  private static final String HMS_CATALOG = "hive";
   public static final String metalakeName =
       GravitinoITUtils.genRandomName("CatalogHiveIT_metalake");
   public String catalogName = GravitinoITUtils.genRandomName("CatalogHiveIT_catalog");
@@ -127,7 +130,7 @@ public class CatalogHiveIT extends BaseIT {
   public static final String HIVE_COL_NAME1 = "hive_col_name1";
   public static final String HIVE_COL_NAME2 = "hive_col_name2";
   public static final String HIVE_COL_NAME3 = "hive_col_name3";
-  protected String HIVE_METASTORE_URIS;
+  protected String hive_metastore_uris;
   protected final String provider = "hive";
   protected final ContainerSuite containerSuite = ContainerSuite.getInstance();
   private HiveClientPool hiveClientPool;
@@ -161,9 +164,10 @@ public class CatalogHiveIT extends BaseIT {
           "'gravitino_it_test'");
 
   protected void startNecessaryContainer() {
-    containerSuite.startHiveContainer();
+    containerSuite.startHiveContainer(
+        ImmutableMap.of(HiveContainer.HIVE_RUNTIME_VERSION, HiveContainer.HIVE2));
 
-    HIVE_METASTORE_URIS =
+    hive_metastore_uris =
         String.format(
             "thrift://%s:%d",
             containerSuite.getHiveContainer().getContainerIpAddress(),
@@ -175,7 +179,7 @@ public class CatalogHiveIT extends BaseIT {
         SparkSession.builder()
             .master("local[1]")
             .appName("Hive Catalog integration test")
-            .config("hive.metastore.uris", HIVE_METASTORE_URIS)
+            .config("hive.metastore.uris", hive_metastore_uris)
             .config(
                 "spark.sql.warehouse.dir",
                 String.format(
@@ -204,11 +208,14 @@ public class CatalogHiveIT extends BaseIT {
     startNecessaryContainer();
 
     HiveConf hiveConf = new HiveConf();
-    hiveConf.set(HiveConf.ConfVars.METASTOREURIS.varname, HIVE_METASTORE_URIS);
+    hiveConf.set(HiveConf.ConfVars.METASTOREURIS.varname, hive_metastore_uris);
+
+    Properties hiveClientProperties = new Properties();
+    hiveClientProperties.setProperty(HiveConf.ConfVars.METASTOREURIS.varname, hive_metastore_uris);
 
     // Check if Hive client can connect to Hive metastore
-    hiveClientPool = new HiveClientPool(1, hiveConf);
-    List<String> dbs = hiveClientPool.run(client -> client.getAllDatabases());
+    hiveClientPool = new HiveClientPool(1, hiveClientProperties);
+    List<String> dbs = hiveClientPool.run(client -> client.getAllDatabases(HMS_CATALOG));
     Assertions.assertFalse(dbs.isEmpty());
 
     initSparkSession();
@@ -251,7 +258,6 @@ public class CatalogHiveIT extends BaseIT {
     } catch (Exception e) {
       LOG.error("Failed to close CloseableGroup", e);
     }
-
     client = null;
   }
 
@@ -259,8 +265,8 @@ public class CatalogHiveIT extends BaseIT {
   public void resetSchema() throws TException, InterruptedException {
     catalog.asSchemas().dropSchema(schemaName, true);
     assertThrows(
-        NoSuchObjectException.class,
-        () -> hiveClientPool.run(client -> client.getDatabase(schemaName)));
+        NoSuchSchemaException.class,
+        () -> hiveClientPool.run(client -> client.getDatabase(HMS_CATALOG, schemaName)));
     createSchema();
   }
 
@@ -277,7 +283,7 @@ public class CatalogHiveIT extends BaseIT {
 
   protected void createCatalog() {
     Map<String, String> properties = Maps.newHashMap();
-    properties.put(METASTORE_URIS, HIVE_METASTORE_URIS);
+    properties.put(METASTORE_URIS, hive_metastore_uris);
 
     metalake.createCatalog(catalogName, Catalog.Type.RELATIONAL, provider, "comment", properties);
 
@@ -293,14 +299,14 @@ public class CatalogHiveIT extends BaseIT {
     Assertions.assertEquals(comment, loadSchema.comment());
     Assertions.assertEquals("val1", loadSchema.properties().get("key1"));
     Assertions.assertEquals("val2", loadSchema.properties().get("key2"));
-    Assertions.assertNotNull(loadSchema.properties().get(HiveSchemaPropertiesMetadata.LOCATION));
+    Assertions.assertNotNull(loadSchema.properties().get(LOCATION));
 
     // Directly get database from Hive metastore to verify the schema creation
-    Database database = hiveClientPool.run(client -> client.getDatabase(schemaName));
-    Assertions.assertEquals(schemaName.toLowerCase(), database.getName());
-    Assertions.assertEquals(comment, database.getDescription());
-    Assertions.assertEquals("val1", database.getParameters().get("key1"));
-    Assertions.assertEquals("val2", database.getParameters().get("key2"));
+    HiveSchema hiveSchema = loadHiveSchema(schemaName);
+    Assertions.assertEquals(schemaName.toLowerCase(), hiveSchema.name());
+    Assertions.assertEquals(comment, hiveSchema.comment());
+    Assertions.assertEquals("val1", hiveSchema.properties().get("key1"));
+    Assertions.assertEquals("val2", hiveSchema.properties().get("key2"));
   }
 
   private Column[] createColumns() {
@@ -310,28 +316,42 @@ public class CatalogHiveIT extends BaseIT {
     return new Column[] {col1, col2, col3};
   }
 
-  private void checkTableReadWrite(org.apache.hadoop.hive.metastore.api.Table table) {
-    String dbName = table.getDbName();
-    String tableName = table.getTableName();
+  private void checkTableReadWrite(HiveTable table) {
+    String dbName = table.databaseName();
+    String tableName = table.name();
     long count = sparkSession.sql(String.format(SELECT_ALL_TEMPLATE, dbName, tableName)).count();
+
+    List<String> partitionFields = table.partitionFieldNames();
+    Map<String, Column> columnByName =
+        Arrays.stream(table.columns()).collect(Collectors.toMap(Column::name, c -> c));
+    List<Column> dataColumns =
+        Arrays.stream(table.columns())
+            .filter(c -> !partitionFields.contains(c.name()))
+            .collect(Collectors.toList());
+
     String values =
-        table.getSd().getCols().stream()
-            .map(f -> typeConstant.get(f.getType()))
-            .map(Object::toString)
-            .collect(Collectors.joining(","));
-    if (table.getPartitionKeys().isEmpty()) {
+        dataColumns.stream().map(this::sampleValueForColumn).collect(Collectors.joining(","));
+    if (partitionFields.isEmpty()) {
       sparkSession.sql(getInsertWithoutPartitionSql(dbName, tableName, values));
     } else {
       String partitionExpressions =
-          table.getPartitionKeys().stream()
-              .map(f -> f.getName() + "=" + typeConstant.get(f.getType()))
+          partitionFields.stream()
+              .map(
+                  field -> {
+                    Column column = columnByName.get(field);
+                    Assertions.assertNotNull(
+                        column, "Partition column " + field + " is missing from definition");
+                    return field + "=" + sampleValueForColumn(column);
+                  })
               .collect(Collectors.joining(","));
       sparkSession.sql(getInsertWithPartitionSql(dbName, tableName, partitionExpressions, values));
     }
     Assertions.assertEquals(
         count + 1, sparkSession.sql(String.format(SELECT_ALL_TEMPLATE, dbName, tableName)).count());
-    // Assert HDFS owner
-    Path tableDirectory = new Path(table.getSd().getLocation());
+
+    String tableLocation = table.properties().get(LOCATION);
+    Assertions.assertNotNull(tableLocation, "Table location should not be null");
+    Path tableDirectory = new Path(tableLocation);
     FileStatus[] fileStatuses;
     try {
       fileStatuses = fileSystem.listStatus(tableDirectory);
@@ -352,6 +372,112 @@ public class CatalogHiveIT extends BaseIT {
     return properties;
   }
 
+  private String sampleValueForColumn(Column column) {
+    if (column.dataType().equals(Types.ByteType.get())) {
+      return typeConstant.get(TINYINT_TYPE_NAME);
+    } else if (column.dataType().equals(Types.IntegerType.get())) {
+      return typeConstant.get(INT_TYPE_NAME);
+    } else if (column.dataType().equals(Types.DateType.get())) {
+      return typeConstant.get(DATE_TYPE_NAME);
+    } else if (column.dataType().equals(Types.StringType.get())) {
+      return typeConstant.get(STRING_TYPE_NAME);
+    }
+    throw new IllegalArgumentException(
+        "Unsupported column type for sample value: " + column.dataType());
+  }
+
+  private HiveTable loadHiveTable(String schema, String table) throws InterruptedException {
+    return hiveClientPool.run(client -> client.getTable(HMS_CATALOG, schema, table));
+  }
+
+  private HivePartition loadHivePartition(String schema, String table, String partition)
+      throws InterruptedException {
+    return hiveClientPool.run(
+        client -> {
+          HiveTable hiveTable = client.getTable(HMS_CATALOG, schema, table);
+          return client.getPartition(hiveTable, partition);
+        });
+  }
+
+  private HiveSchema loadHiveSchema(String schema) throws InterruptedException {
+    return hiveClientPool.run(client -> client.getDatabase(HMS_CATALOG, schema));
+  }
+
+  private boolean hiveTableExists(String schema, String table) throws InterruptedException {
+    return hiveClientPool.run(
+        client -> {
+          try {
+            client.getTable(HMS_CATALOG, schema, table);
+            return true;
+          } catch (NoSuchTableException e) {
+            return false;
+          }
+        });
+  }
+
+  private void dropHiveTable(String schema, String table, boolean deleteData, boolean ifPurge)
+      throws InterruptedException {
+    hiveClientPool.run(
+        client -> {
+          client.dropTable(HMS_CATALOG, schema, table, deleteData, ifPurge);
+          return null;
+        });
+  }
+
+  private List<String> partitionValues(HivePartition partition) {
+    return Arrays.stream(partition.values())
+        .map(literal -> literal.value().toString())
+        .collect(Collectors.toList());
+  }
+
+  private void compareDistributions(Distribution expected, Distribution actual) {
+    boolean expectedEmpty = expected == null || Distributions.NONE.equals(expected);
+    boolean actualEmpty = actual == null || Distributions.NONE.equals(actual);
+    Assertions.assertEquals(expectedEmpty, actualEmpty);
+    if (expectedEmpty) {
+      return;
+    }
+
+    Assertions.assertEquals(expected.number(), actual.number());
+    List<String> expectedFields =
+        Arrays.stream(expected.expressions())
+            .map(expr -> ((NamedReference.FieldReference) expr).fieldName()[0])
+            .collect(Collectors.toList());
+    List<String> actualFields =
+        Arrays.stream(actual.expressions())
+            .map(expr -> ((NamedReference.FieldReference) expr).fieldName()[0])
+            .collect(Collectors.toList());
+    Assertions.assertEquals(expectedFields, actualFields);
+  }
+
+  private void compareSortOrders(SortOrder[] expected, SortOrder[] actual) {
+    int expectedLength = expected == null ? 0 : expected.length;
+    int actualLength = actual == null ? 0 : actual.length;
+    Assertions.assertEquals(expectedLength, actualLength);
+    for (int i = 0; i < expectedLength; i++) {
+      SortOrder expectedOrder = expected[i];
+      SortOrder actualOrder = actual[i];
+      Assertions.assertEquals(expectedOrder.direction(), actualOrder.direction());
+      Assertions.assertEquals(expectedOrder.nullOrdering(), actualOrder.nullOrdering());
+      Assertions.assertEquals(
+          ((NamedReference.FieldReference) expectedOrder.expression()).fieldName()[0],
+          ((NamedReference.FieldReference) actualOrder.expression()).fieldName()[0]);
+    }
+  }
+
+  private void comparePartitioning(Transform[] expected, List<String> actualPartitionFields) {
+    if (expected == null || expected.length == 0) {
+      Assertions.assertTrue(actualPartitionFields == null || actualPartitionFields.isEmpty());
+      return;
+    }
+
+    List<String> expectedPartitionFields =
+        Arrays.stream(expected)
+            .map(p -> ((Transform.SingleFieldTransform) p).fieldName()[0])
+            .collect(Collectors.toList());
+    Assertions.assertEquals(expectedPartitionFields, actualPartitionFields);
+  }
+
   @Test
   public void testCreateHiveTableWithDistributionAndSortOrder()
       throws TException, InterruptedException {
@@ -365,10 +491,7 @@ public class CatalogHiveIT extends BaseIT {
 
     final SortOrder[] sortOrders =
         new SortOrder[] {
-          SortOrders.of(
-              NamedReference.field(HIVE_COL_NAME2),
-              SortDirection.DESCENDING,
-              NullOrdering.NULLS_FIRST)
+          SortOrders.of(NamedReference.field(HIVE_COL_NAME2), SortDirection.DESCENDING)
         };
 
     Map<String, String> properties = createProperties();
@@ -385,12 +508,11 @@ public class CatalogHiveIT extends BaseIT {
                 sortOrders);
 
     // Directly get table from Hive metastore to check if the table is created successfully.
-    org.apache.hadoop.hive.metastore.api.Table hiveTab =
-        hiveClientPool.run(client -> client.getTable(schemaName, tableName));
+    HiveTable hiveTab = loadHiveTable(schemaName, tableName);
     properties
         .keySet()
         .forEach(
-            key -> Assertions.assertEquals(properties.get(key), hiveTab.getParameters().get(key)));
+            key -> Assertions.assertEquals(properties.get(key), hiveTab.properties().get(key)));
     assertTableEquals(createdTable, hiveTab);
     checkTableReadWrite(hiveTab);
 
@@ -402,13 +524,11 @@ public class CatalogHiveIT extends BaseIT {
             .createTable(nameIdentifier, columns, TABLE_COMMENT, properties, (Transform[]) null);
 
     // Directly get table from Hive metastore to check if the table is created successfully.
-    org.apache.hadoop.hive.metastore.api.Table hiveTable1 =
-        hiveClientPool.run(client -> client.getTable(schemaName, tableName));
+    HiveTable hiveTable1 = loadHiveTable(schemaName, tableName);
     properties
         .keySet()
         .forEach(
-            key ->
-                Assertions.assertEquals(properties.get(key), hiveTable1.getParameters().get(key)));
+            key -> Assertions.assertEquals(properties.get(key), hiveTable1.properties().get(key)));
     assertTableEquals(createdTable1, hiveTable1);
     checkTableReadWrite(hiveTable1);
 
@@ -466,12 +586,11 @@ public class CatalogHiveIT extends BaseIT {
                 nameIdentifier, columns, TABLE_COMMENT, properties, Transforms.EMPTY_TRANSFORM);
 
     // Directly get table from Hive metastore to check if the table is created successfully.
-    org.apache.hadoop.hive.metastore.api.Table hiveTab =
-        hiveClientPool.run(client -> client.getTable(schemaName, tableName));
+    HiveTable hiveTab = loadHiveTable(schemaName, tableName);
     properties
         .keySet()
         .forEach(
-            key -> Assertions.assertEquals(properties.get(key), hiveTab.getParameters().get(key)));
+            key -> Assertions.assertEquals(properties.get(key), hiveTab.properties().get(key)));
     assertTableEquals(createdTable, hiveTab);
     checkTableReadWrite(hiveTab);
 
@@ -481,10 +600,9 @@ public class CatalogHiveIT extends BaseIT {
         catalog
             .asTableCatalog()
             .createTable(nameIdentifier, columns, null, properties, Transforms.EMPTY_TRANSFORM);
-    org.apache.hadoop.hive.metastore.api.Table hiveTab2 =
-        hiveClientPool.run(client -> client.getTable(schemaName, tableName));
+    HiveTable hiveTab2 = loadHiveTable(schemaName, tableName);
     assertTableEquals(createdTable, hiveTab2);
-    checkTableReadWrite(hiveTab);
+    checkTableReadWrite(hiveTab2);
 
     // test null partition
     resetSchema();
@@ -494,13 +612,11 @@ public class CatalogHiveIT extends BaseIT {
             .createTable(nameIdentifier, columns, TABLE_COMMENT, properties, (Transform[]) null);
 
     // Directly get table from Hive metastore to check if the table is created successfully.
-    org.apache.hadoop.hive.metastore.api.Table hiveTable1 =
-        hiveClientPool.run(client -> client.getTable(schemaName, tableName));
+    HiveTable hiveTable1 = loadHiveTable(schemaName, tableName);
     properties
         .keySet()
         .forEach(
-            key ->
-                Assertions.assertEquals(properties.get(key), hiveTable1.getParameters().get(key)));
+            key -> Assertions.assertEquals(properties.get(key), hiveTable1.properties().get(key)));
     assertTableEquals(createdTable1, hiveTable1);
     checkTableReadWrite(hiveTable1);
 
@@ -562,8 +678,7 @@ public class CatalogHiveIT extends BaseIT {
             nameIdentifier, columns, TABLE_COMMENT, createProperties(), Transforms.EMPTY_TRANSFORM);
     Table loadedTable1 = catalog.asTableCatalog().loadTable(nameIdentifier);
     HiveTablePropertiesMetadata tablePropertiesMetadata = new HiveTablePropertiesMetadata();
-    org.apache.hadoop.hive.metastore.api.Table actualTable =
-        hiveClientPool.run(client -> client.getTable(schemaName, tableName));
+    HiveTable actualTable = loadHiveTable(schemaName, tableName);
     assertDefaultTableProperties(loadedTable1, actualTable);
     checkTableReadWrite(actualTable);
 
@@ -582,23 +697,22 @@ public class CatalogHiveIT extends BaseIT {
             properties,
             Transforms.EMPTY_TRANSFORM);
     Table loadedTable2 = catalog.asTableCatalog().loadTable(NameIdentifier.of(schemaName, table2));
-    org.apache.hadoop.hive.metastore.api.Table actualTable2 =
-        hiveClientPool.run(client -> client.getTable(schemaName, table2));
+    HiveTable actualTable2 = loadHiveTable(schemaName, table2);
 
     Assertions.assertEquals(
-        HiveStorageConstants.OPENCSV_SERDE_CLASS,
-        actualTable2.getSd().getSerdeInfo().getSerializationLib());
+        HiveStorageConstants.OPENCSV_SERDE_CLASS, actualTable2.properties().get(SERDE_LIB));
     Assertions.assertEquals(
-        HiveStorageConstants.TEXT_INPUT_FORMAT_CLASS, actualTable2.getSd().getInputFormat());
+        HiveStorageConstants.TEXT_INPUT_FORMAT_CLASS, actualTable2.properties().get(INPUT_FORMAT));
     Assertions.assertEquals(
         HiveStorageConstants.IGNORE_KEY_OUTPUT_FORMAT_CLASS,
-        actualTable2.getSd().getOutputFormat());
-    Assertions.assertEquals(EXTERNAL_TABLE.name(), actualTable2.getTableType());
-    Assertions.assertEquals(table2.toLowerCase(), actualTable2.getSd().getSerdeInfo().getName());
-    Assertions.assertEquals(TABLE_COMMENT, actualTable2.getParameters().get(COMMENT));
+        actualTable2.properties().get(OUTPUT_FORMAT));
+    Assertions.assertEquals(
+        EXTERNAL_TABLE.name(), actualTable2.properties().get(TABLE_TYPE).toUpperCase());
+    Assertions.assertEquals(table2.toLowerCase(), actualTable2.properties().get(SERDE_NAME));
+    Assertions.assertEquals(TABLE_COMMENT, actualTable2.comment());
     Assertions.assertEquals(
         ((Boolean) tablePropertiesMetadata.getDefaultValue(EXTERNAL)).toString().toUpperCase(),
-        actualTable.getParameters().get(EXTERNAL));
+        actualTable.properties().get(EXTERNAL));
     Assertions.assertNotNull(loadedTable2.properties().get(TRANSIENT_LAST_DDL_TIME));
 
     // S3 doesn't support NUM_FILES and TOTAL_SIZE
@@ -646,12 +760,12 @@ public class CatalogHiveIT extends BaseIT {
     String schemaName = GravitinoITUtils.genRandomName(SCHEMA_PREFIX);
 
     Map<String, String> schemaProperties = createSchemaProperties();
-    String expectedHDFSSchemaLocation = schemaProperties.get(HiveSchemaPropertiesMetadata.LOCATION);
+    String expectedHDFSSchemaLocation = schemaProperties.get(LOCATION);
 
     catalog.asSchemas().createSchema(schemaName, "comment", schemaProperties);
 
-    Database actualSchema = hiveClientPool.run(client -> client.getDatabase(schemaName));
-    String actualSchemaLocation = actualSchema.getLocationUri();
+    HiveSchema actualSchema = loadHiveSchema(schemaName);
+    String actualSchemaLocation = actualSchema.properties().get(LOCATION);
     Assertions.assertTrue(actualSchemaLocation.endsWith(expectedHDFSSchemaLocation));
 
     NameIdentifier tableIdent =
@@ -659,8 +773,7 @@ public class CatalogHiveIT extends BaseIT {
 
     Map<String, String> tableProperties = createProperties();
     String expectedSchemaLocation =
-        tableProperties.getOrDefault(
-            HiveSchemaPropertiesMetadata.LOCATION, expectedHDFSSchemaLocation);
+        tableProperties.getOrDefault(LOCATION, expectedHDFSSchemaLocation);
 
     catalog
         .asTableCatalog()
@@ -670,13 +783,12 @@ public class CatalogHiveIT extends BaseIT {
             TABLE_COMMENT,
             tableProperties,
             Transforms.EMPTY_TRANSFORM);
-    org.apache.hadoop.hive.metastore.api.Table actualTable =
-        hiveClientPool.run(client -> client.getTable(schemaName, tableIdent.name()));
-    String actualTableLocation = actualTable.getSd().getLocation();
+    HiveTable actualTable = loadHiveTable(schemaName, tableIdent.name());
+    String actualTableLocation = actualTable.properties().get(LOCATION);
     // use `tableIdent.name().toLowerCase()` because HMS will convert table name to lower
 
-    // actualTable.getSd().getLocation() is null for S3
-    if (!tableProperties.containsKey(HiveTablePropertiesMetadata.LOCATION)) {
+    // actualTableLocation is null for S3
+    if (!tableProperties.containsKey(LOCATION) && actualTableLocation != null) {
       String expectedTableLocation = expectedSchemaLocation + "/" + tableIdent.name().toLowerCase();
       Assertions.assertTrue(actualTableLocation.endsWith(expectedTableLocation));
     }
@@ -703,12 +815,11 @@ public class CatalogHiveIT extends BaseIT {
                 });
 
     // Directly get table from Hive metastore to check if the table is created successfully.
-    org.apache.hadoop.hive.metastore.api.Table hiveTab =
-        hiveClientPool.run(client -> client.getTable(schemaName, tableName));
+    HiveTable hiveTab = loadHiveTable(schemaName, tableName);
     properties
         .keySet()
         .forEach(
-            key -> Assertions.assertEquals(properties.get(key), hiveTab.getParameters().get(key)));
+            key -> Assertions.assertEquals(properties.get(key), hiveTab.properties().get(key)));
     assertTableEquals(createdTable, hiveTab);
     checkTableReadWrite(hiveTab);
 
@@ -824,15 +935,13 @@ public class CatalogHiveIT extends BaseIT {
         "hive_col_name2=2023-01-01/hive_col_name3=gravitino_it_test", partition.name());
 
     // Directly get partition from Hive metastore
-    org.apache.hadoop.hive.metastore.api.Partition hivePartition =
-        hiveClientPool.run(
-            client -> client.getPartition(schemaName, createdTable.name(), partition.name()));
-    Assertions.assertEquals(
-        partition.values()[0].value().toString(), hivePartition.getValues().get(0));
-    Assertions.assertEquals(
-        partition.values()[1].value().toString(), hivePartition.getValues().get(1));
+    HivePartition hivePartition =
+        loadHivePartition(schemaName, createdTable.name(), partition.name());
+    List<String> hiveValues = partitionValues(hivePartition);
+    Assertions.assertEquals(partition.values()[0].value().toString(), hiveValues.get(0));
+    Assertions.assertEquals(partition.values()[1].value().toString(), hiveValues.get(1));
     Assertions.assertNotNull(partition.properties());
-    Assertions.assertEquals(partition.properties(), hivePartition.getParameters());
+    Assertions.assertEquals(partition.properties(), hivePartition.properties());
   }
 
   @Test
@@ -851,20 +960,18 @@ public class CatalogHiveIT extends BaseIT {
         (IdentityPartition) createdTable.supportPartitions().addPartition(identity);
 
     // Directly get partition from hive metastore to check if the partition is created successfully.
-    org.apache.hadoop.hive.metastore.api.Partition partitionGot =
-        hiveClientPool.run(
-            client -> client.getPartition(schemaName, createdTable.name(), partitionAdded.name()));
-    Assertions.assertEquals(
-        partitionAdded.values()[0].value().toString(), partitionGot.getValues().get(0));
-    Assertions.assertEquals(
-        partitionAdded.values()[1].value().toString(), partitionGot.getValues().get(1));
-    Assertions.assertEquals(partitionAdded.properties(), partitionGot.getParameters());
+    HivePartition partitionGot =
+        loadHivePartition(schemaName, createdTable.name(), partitionAdded.name());
+    List<String> partitionValues = partitionValues(partitionGot);
+    Assertions.assertEquals(partitionAdded.values()[0].value().toString(), partitionValues.get(0));
+    Assertions.assertEquals(partitionAdded.values()[1].value().toString(), partitionValues.get(1));
+    Assertions.assertEquals(partitionAdded.properties(), partitionGot.properties());
 
     // test the new partition can be read and write successfully by dynamic partition
     String selectTemplate =
         "SELECT * FROM %s.%s WHERE hive_col_name2 = '2023-01-02' AND hive_col_name3 = 'gravitino_it_test2'";
-    long count =
-        sparkSession.sql(String.format(selectTemplate, schemaName, createdTable.name())).count();
+    String sql = String.format(selectTemplate, schemaName, createdTable.name());
+    long count = sparkSession.sql(sql).count();
     Assertions.assertEquals(0, count);
 
     String insertTemplate =
@@ -899,27 +1006,23 @@ public class CatalogHiveIT extends BaseIT {
     IdentityPartition partitionAdded =
         (IdentityPartition) createdTable.supportPartitions().addPartition(identity);
     // Directly get partition from hive metastore to check if the partition is created successfully.
-    org.apache.hadoop.hive.metastore.api.Partition partitionGot =
-        hiveClientPool.run(
-            client -> client.getPartition(schemaName, createdTable.name(), partitionAdded.name()));
-    Assertions.assertEquals(
-        partitionAdded.values()[0].value().toString(), partitionGot.getValues().get(0));
-    Assertions.assertEquals(
-        partitionAdded.values()[1].value().toString(), partitionGot.getValues().get(1));
-    Assertions.assertEquals(partitionAdded.properties(), partitionGot.getParameters());
+    HivePartition partitionGot =
+        loadHivePartition(schemaName, createdTable.name(), partitionAdded.name());
+    List<String> partitionValues = partitionValues(partitionGot);
+    Assertions.assertEquals(partitionAdded.values()[0].value().toString(), partitionValues.get(0));
+    Assertions.assertEquals(partitionAdded.values()[1].value().toString(), partitionValues.get(1));
+    Assertions.assertEquals(partitionAdded.properties(), partitionGot.properties());
 
     // test drop partition "hive_col_name2=2023-01-02/hive_col_name3=gravitino_it_test2"
     boolean dropRes1 = createdTable.supportPartitions().dropPartition(partitionAdded.name());
     Assertions.assertTrue(dropRes1);
     Assertions.assertThrows(
-        NoSuchObjectException.class,
-        () ->
-            hiveClientPool.run(
-                client ->
-                    client.getPartition(schemaName, createdTable.name(), partitionAdded.name())));
-    org.apache.hadoop.hive.metastore.api.Table hiveTab =
-        hiveClientPool.run(client -> client.getTable(schemaName, createdTable.name()));
-    Path partitionDirectory = new Path(hiveTab.getSd().getLocation() + identity.name());
+        NoSuchPartitionException.class,
+        () -> loadHivePartition(schemaName, createdTable.name(), partitionAdded.name()));
+    HiveTable hiveTable = loadHiveTable(schemaName, createdTable.name());
+    String tableLocation = hiveTable.properties().get(LOCATION);
+    Assertions.assertNotNull(tableLocation, "Table location should not be null");
+    Path partitionDirectory = new Path(tableLocation + identity.name());
     Assertions.assertFalse(
         fileSystem.exists(partitionDirectory), "The partition directory should not exist");
 
@@ -934,14 +1037,14 @@ public class CatalogHiveIT extends BaseIT {
         (IdentityPartition) createdTable.supportPartitions().addPartition(identity1);
 
     // Directly get partition from Hive metastore to check if the partition is created successfully.
-    org.apache.hadoop.hive.metastore.api.Partition partitionGot1 =
-        hiveClientPool.run(
-            client -> client.getPartition(schemaName, createdTable.name(), partitionAdded1.name()));
+    HivePartition partitionGot1 =
+        loadHivePartition(schemaName, createdTable.name(), partitionAdded1.name());
+    List<String> partitionValues1 = partitionValues(partitionGot1);
     Assertions.assertEquals(
-        partitionAdded1.values()[0].value().toString(), partitionGot1.getValues().get(0));
+        partitionAdded1.values()[0].value().toString(), partitionValues1.get(0));
     Assertions.assertEquals(
-        partitionAdded1.values()[1].value().toString(), partitionGot1.getValues().get(1));
-    Assertions.assertEquals(partitionAdded1.properties(), partitionGot1.getParameters());
+        partitionAdded1.values()[1].value().toString(), partitionValues1.get(1));
+    Assertions.assertEquals(partitionAdded1.properties(), partitionGot1.properties());
 
     // add partition "hive_col_name2=2024-01-02/hive_col_name3=gravitino_it_test3"
     String[] field5 = new String[] {"hive_col_name2"};
@@ -953,34 +1056,28 @@ public class CatalogHiveIT extends BaseIT {
     IdentityPartition partitionAdded2 =
         (IdentityPartition) createdTable.supportPartitions().addPartition(identity2);
     // Directly get partition from Hive metastore to check if the partition is created successfully.
-    org.apache.hadoop.hive.metastore.api.Partition partitionGot2 =
-        hiveClientPool.run(
-            client -> client.getPartition(schemaName, createdTable.name(), partitionAdded2.name()));
+    HivePartition partitionGot2 =
+        loadHivePartition(schemaName, createdTable.name(), partitionAdded2.name());
+    List<String> partitionValues2 = partitionValues(partitionGot2);
     Assertions.assertEquals(
-        partitionAdded2.values()[0].value().toString(), partitionGot2.getValues().get(0));
+        partitionAdded2.values()[0].value().toString(), partitionValues2.get(0));
     Assertions.assertEquals(
-        partitionAdded2.values()[1].value().toString(), partitionGot2.getValues().get(1));
-    Assertions.assertEquals(partitionAdded2.properties(), partitionGot2.getParameters());
+        partitionAdded2.values()[1].value().toString(), partitionValues2.get(1));
+    Assertions.assertEquals(partitionAdded2.properties(), partitionGot2.properties());
 
     // test drop partition "hive_col_name2=2024-01-02"
     boolean dropRes2 = createdTable.supportPartitions().dropPartition("hive_col_name2=2024-01-02");
     Assertions.assertTrue(dropRes2);
     Assertions.assertThrows(
-        NoSuchObjectException.class,
-        () ->
-            hiveClientPool.run(
-                client ->
-                    client.getPartition(schemaName, createdTable.name(), partitionAdded1.name())));
-    Path partitionDirectory1 = new Path(hiveTab.getSd().getLocation() + identity1.name());
+        NoSuchPartitionException.class,
+        () -> loadHivePartition(schemaName, createdTable.name(), partitionAdded1.name()));
+    Path partitionDirectory1 = new Path(tableLocation + identity1.name());
     Assertions.assertFalse(
         fileSystem.exists(partitionDirectory1), "The partition directory should not exist");
     Assertions.assertThrows(
-        NoSuchObjectException.class,
-        () ->
-            hiveClientPool.run(
-                client ->
-                    client.getPartition(schemaName, createdTable.name(), partitionAdded2.name())));
-    Path partitionDirectory2 = new Path(hiveTab.getSd().getLocation() + identity2.name());
+        NoSuchPartitionException.class,
+        () -> loadHivePartition(schemaName, createdTable.name(), partitionAdded2.name()));
+    Path partitionDirectory2 = new Path(tableLocation + identity2.name());
     Assertions.assertFalse(
         fileSystem.exists(partitionDirectory2), "The partition directory should not exist");
 
@@ -1014,65 +1111,30 @@ public class CatalogHiveIT extends BaseIT {
                 new Transform[] {
                   Transforms.identity(columns[1].name()), Transforms.identity(columns[2].name())
                 });
-    org.apache.hadoop.hive.metastore.api.Table actualTable =
-        hiveClientPool.run(client -> client.getTable(schemaName, table.name()));
+    HiveTable actualTable = loadHiveTable(schemaName, table.name());
     checkTableReadWrite(actualTable);
     return table;
   }
 
-  private void assertTableEquals(
-      Table createdTable, org.apache.hadoop.hive.metastore.api.Table hiveTab) {
-    Distribution distribution = createdTable.distribution();
-    SortOrder[] sortOrders = createdTable.sortOrder();
+  private void assertTableEquals(Table createdTable, HiveTable hiveTable) {
+    Assertions.assertEquals(schemaName.toLowerCase(), hiveTable.databaseName());
+    Assertions.assertEquals(createdTable.name(), hiveTable.name());
+    Assertions.assertEquals(createdTable.comment(), hiveTable.comment());
 
-    List<FieldSchema> actualColumns = new ArrayList<>();
-    actualColumns.addAll(hiveTab.getSd().getCols());
-    actualColumns.addAll(hiveTab.getPartitionKeys());
-    Assertions.assertEquals(schemaName.toLowerCase(), hiveTab.getDbName());
-    Assertions.assertEquals(tableName.toLowerCase(), hiveTab.getTableName());
-    Assertions.assertEquals("MANAGED_TABLE", hiveTab.getTableType());
-    Assertions.assertEquals(createdTable.comment(), hiveTab.getParameters().get("comment"));
-
-    Assertions.assertEquals(HIVE_COL_NAME1, actualColumns.get(0).getName());
-    Assertions.assertEquals("tinyint", actualColumns.get(0).getType());
-    Assertions.assertEquals("col_1_comment", actualColumns.get(0).getComment());
-
-    Assertions.assertEquals(HIVE_COL_NAME2, actualColumns.get(1).getName());
-    Assertions.assertEquals("date", actualColumns.get(1).getType());
-    Assertions.assertEquals("col_2_comment", actualColumns.get(1).getComment());
-
-    Assertions.assertEquals(HIVE_COL_NAME3, actualColumns.get(2).getName());
-    Assertions.assertEquals("string", actualColumns.get(2).getType());
-    Assertions.assertEquals("col_3_comment", actualColumns.get(2).getComment());
-
-    Assertions.assertEquals(
-        distribution == null ? 0 : distribution.number(), hiveTab.getSd().getNumBuckets());
-
-    List<String> resultDistributionCols =
-        distribution == null
-            ? Collections.emptyList()
-            : Arrays.stream(distribution.expressions())
-                .map(t -> ((NamedReference.FieldReference) t).fieldName()[0])
-                .collect(Collectors.toList());
-    Assertions.assertEquals(resultDistributionCols, hiveTab.getSd().getBucketCols());
-
-    for (int i = 0; i < sortOrders.length; i++) {
-      Assertions.assertEquals(
-          sortOrders[i].direction() == SortDirection.ASCENDING ? 1 : 0,
-          hiveTab.getSd().getSortCols().get(i).getOrder());
-      Assertions.assertEquals(
-          ((NamedReference.FieldReference) sortOrders[i].expression()).fieldName()[0],
-          hiveTab.getSd().getSortCols().get(i).getCol());
+    Column[] expectedColumns = createdTable.columns();
+    Column[] actualColumns = hiveTable.columns();
+    Assertions.assertEquals(expectedColumns.length, actualColumns.length);
+    for (int i = 0; i < expectedColumns.length; i++) {
+      Column expectedColumn = expectedColumns[i];
+      Column actualColumn = actualColumns[i];
+      Assertions.assertEquals(expectedColumn.name(), actualColumn.name());
+      Assertions.assertEquals(expectedColumn.dataType(), actualColumn.dataType());
+      Assertions.assertEquals(expectedColumn.comment(), actualColumn.comment());
     }
-    Assertions.assertNotNull(createdTable.partitioning());
-    Assertions.assertEquals(createdTable.partitioning().length, hiveTab.getPartitionKeys().size());
-    List<String> partitionKeys =
-        Arrays.stream(createdTable.partitioning())
-            .map(p -> ((Transform.SingleFieldTransform) p).fieldName()[0])
-            .collect(Collectors.toList());
-    List<String> hivePartitionKeys =
-        hiveTab.getPartitionKeys().stream().map(FieldSchema::getName).collect(Collectors.toList());
-    Assertions.assertEquals(partitionKeys, hivePartitionKeys);
+
+    compareDistributions(createdTable.distribution(), hiveTable.distribution());
+    compareSortOrders(createdTable.sortOrder(), hiveTable.sortOrder());
+    comparePartitioning(createdTable.partitioning(), hiveTable.partitionFieldNames());
   }
 
   @Test
@@ -1123,26 +1185,26 @@ public class CatalogHiveIT extends BaseIT {
     Assertions.assertEquals(AuthConstants.ANONYMOUS_USER, alteredTable.auditInfo().lastModifier());
 
     // Direct get table from Hive metastore to check if the table is altered successfully.
-    org.apache.hadoop.hive.metastore.api.Table hiveTab =
-        hiveClientPool.run(client -> client.getTable(schemaName, ALTER_TABLE_NAME));
-    Assertions.assertEquals(schemaName.toLowerCase(), hiveTab.getDbName());
-    Assertions.assertEquals(ALTER_TABLE_NAME, hiveTab.getTableName());
-    Assertions.assertEquals("val2_new", hiveTab.getParameters().get("key2"));
+    HiveTable hiveTab = loadHiveTable(schemaName, ALTER_TABLE_NAME);
+    Assertions.assertEquals(schemaName.toLowerCase(), hiveTab.databaseName());
+    Assertions.assertEquals(ALTER_TABLE_NAME, hiveTab.name());
+    Assertions.assertEquals("val2_new", hiveTab.properties().get("key2"));
 
-    Assertions.assertEquals(HIVE_COL_NAME1, hiveTab.getSd().getCols().get(0).getName());
-    Assertions.assertEquals("int", hiveTab.getSd().getCols().get(0).getType());
-    Assertions.assertEquals("comment_new", hiveTab.getSd().getCols().get(0).getComment());
+    Column[] hiveColumns = hiveTab.columns();
+    Assertions.assertEquals(HIVE_COL_NAME1, hiveColumns[0].name());
+    Assertions.assertEquals(Types.IntegerType.get(), hiveColumns[0].dataType());
+    Assertions.assertEquals("comment_new", hiveColumns[0].comment());
 
-    Assertions.assertEquals("col_2_new", hiveTab.getSd().getCols().get(1).getName());
-    Assertions.assertEquals("date", hiveTab.getSd().getCols().get(1).getType());
-    Assertions.assertEquals("col_2_comment", hiveTab.getSd().getCols().get(1).getComment());
+    Assertions.assertEquals("col_2_new", hiveColumns[1].name());
+    Assertions.assertEquals(Types.DateType.get(), hiveColumns[1].dataType());
+    Assertions.assertEquals("col_2_comment", hiveColumns[1].comment());
 
-    Assertions.assertEquals("col_4", hiveTab.getSd().getCols().get(2).getName());
-    Assertions.assertEquals("string", hiveTab.getSd().getCols().get(2).getType());
-    Assertions.assertNull(hiveTab.getSd().getCols().get(2).getComment());
+    Assertions.assertEquals("col_4", hiveColumns[2].name());
+    Assertions.assertEquals(Types.StringType.get(), hiveColumns[2].dataType());
+    Assertions.assertNull(hiveColumns[2].comment());
 
-    Assertions.assertEquals(1, hiveTab.getPartitionKeys().size());
-    Assertions.assertEquals(columns[2].name(), hiveTab.getPartitionKeys().get(0).getName());
+    Assertions.assertEquals(1, hiveTab.partitionFieldNames().size());
+    Assertions.assertEquals(columns[2].name(), hiveTab.partitionFieldNames().get(0));
     assertDefaultTableProperties(alteredTable, hiveTab);
     checkTableReadWrite(hiveTab);
 
@@ -1235,27 +1297,26 @@ public class CatalogHiveIT extends BaseIT {
                 "please ensure that the type of the new column position is compatible with the old one"));
   }
 
-  private void assertDefaultTableProperties(
-      Table gravitinoReturnTable, org.apache.hadoop.hive.metastore.api.Table actualTable) {
+  private void assertDefaultTableProperties(Table gravitinoReturnTable, HiveTable actualTable) {
     HiveTablePropertiesMetadata tablePropertiesMetadata = new HiveTablePropertiesMetadata();
     Assertions.assertEquals(
         tablePropertiesMetadata.getDefaultValue(SERDE_LIB),
-        actualTable.getSd().getSerdeInfo().getSerializationLib());
+        actualTable.properties().get(SERDE_LIB));
     Assertions.assertEquals(
         tablePropertiesMetadata.getDefaultValue(INPUT_FORMAT),
-        actualTable.getSd().getInputFormat());
+        actualTable.properties().get(INPUT_FORMAT));
     Assertions.assertEquals(
         tablePropertiesMetadata.getDefaultValue(OUTPUT_FORMAT),
-        actualTable.getSd().getOutputFormat());
+        actualTable.properties().get(OUTPUT_FORMAT));
     Assertions.assertEquals(
         ((TableType) tablePropertiesMetadata.getDefaultValue(TABLE_TYPE)).name(),
-        actualTable.getTableType());
-    Assertions.assertEquals(tableName.toLowerCase(), actualTable.getSd().getSerdeInfo().getName());
+        actualTable.properties().get(TABLE_TYPE));
+    Assertions.assertEquals(tableName.toLowerCase(), actualTable.properties().get(SERDE_NAME));
     Assertions.assertEquals(
         ((Boolean) tablePropertiesMetadata.getDefaultValue(EXTERNAL)).toString().toUpperCase(),
-        actualTable.getParameters().get(EXTERNAL));
-    Assertions.assertNotNull(actualTable.getParameters().get(COMMENT));
-    Assertions.assertNotNull(actualTable.getSd().getLocation());
+        actualTable.properties().get(EXTERNAL));
+    Assertions.assertNotNull(actualTable.properties().get(COMMENT));
+    Assertions.assertNotNull(actualTable.properties().get(LOCATION));
     Assertions.assertNotNull(gravitinoReturnTable.properties().get(TRANSIENT_LAST_DDL_TIME));
   }
 
@@ -1272,9 +1333,7 @@ public class CatalogHiveIT extends BaseIT {
     catalog.asTableCatalog().dropTable(NameIdentifier.of(schemaName, ALTER_TABLE_NAME));
 
     // Directly get table from Hive metastore to check if the table is dropped successfully.
-    assertThrows(
-        NoSuchObjectException.class,
-        () -> hiveClientPool.run(client -> client.getTable(schemaName, ALTER_TABLE_NAME)));
+    assertThrows(NoSuchTableException.class, () -> loadHiveTable(schemaName, ALTER_TABLE_NAME));
   }
 
   @Test
@@ -1299,8 +1358,8 @@ public class CatalogHiveIT extends BaseIT {
     Assertions.assertFalse(properties2.containsKey("key1"));
     Assertions.assertEquals("val2-alter", properties2.get("key2"));
 
-    Database database = hiveClientPool.run(client -> client.getDatabase(schemaName));
-    Map<String, String> properties3 = database.getParameters();
+    HiveSchema database = loadHiveSchema(schemaName);
+    Map<String, String> properties3 = database.properties();
     Assertions.assertFalse(properties3.containsKey("key1"));
     Assertions.assertEquals("val2-alter", properties3.get("key2"));
   }
@@ -1385,7 +1444,7 @@ public class CatalogHiveIT extends BaseIT {
         Catalog.Type.RELATIONAL,
         provider,
         "comment",
-        ImmutableMap.of(METASTORE_URIS, HIVE_METASTORE_URIS));
+        ImmutableMap.of(METASTORE_URIS, hive_metastore_uris));
 
     Catalog catalog = metalake.loadCatalog(catalogName);
     // Test rename catalog
@@ -1484,13 +1543,14 @@ public class CatalogHiveIT extends BaseIT {
             new Transform[] {Transforms.identity(columns[2].name())});
 
     // Directly get table from Hive metastore to check if the table is created successfully.
-    org.apache.hadoop.hive.metastore.api.Table hiveTab =
-        hiveClientPool.run(client -> client.getTable(schemaName, tableName));
+    HiveTable hiveTab = loadHiveTable(schemaName, tableName);
     checkTableReadWrite(hiveTab);
-    Assertions.assertEquals(MANAGED_TABLE.name(), hiveTab.getTableType());
-    Path tableDirectory = new Path(hiveTab.getSd().getLocation());
+    Assertions.assertEquals(MANAGED_TABLE.name(), hiveTab.properties().get(TABLE_TYPE));
+    String tableLocation = hiveTab.properties().get(LOCATION);
+    Assertions.assertNotNull(tableLocation, "Table location should not be null");
+    Path tableDirectory = new Path(tableLocation);
     catalog.asTableCatalog().dropTable(NameIdentifier.of(schemaName, tableName));
-    Boolean existed = hiveClientPool.run(client -> client.tableExists(schemaName, tableName));
+    Boolean existed = hiveTableExists(schemaName, tableName);
     Assertions.assertFalse(existed, "The Hive table should not exist");
     Assertions.assertFalse(
         fileSystem.exists(tableDirectory), "The table directory should not exist");
@@ -1511,15 +1571,16 @@ public class CatalogHiveIT extends BaseIT {
             properties,
             new Transform[] {Transforms.identity(columns[2].name())});
     // Directly get table from Hive metastore to check if the table is created successfully.
-    org.apache.hadoop.hive.metastore.api.Table hiveTab =
-        hiveClientPool.run(client -> client.getTable(schemaName, tableName));
+    HiveTable hiveTab = loadHiveTable(schemaName, tableName);
     checkTableReadWrite(hiveTab);
-    Assertions.assertEquals(EXTERNAL_TABLE.name(), hiveTab.getTableType());
+    Assertions.assertEquals(EXTERNAL_TABLE.name(), hiveTab.properties().get(TABLE_TYPE));
     catalog.asTableCatalog().dropTable(NameIdentifier.of(schemaName, tableName));
 
-    Boolean existed = hiveClientPool.run(client -> client.tableExists(schemaName, tableName));
+    Boolean existed = hiveTableExists(schemaName, tableName);
     Assertions.assertFalse(existed, "The table should be not exist");
-    Path tableDirectory = new Path(hiveTab.getSd().getLocation());
+    String tableLocation = hiveTab.properties().get(LOCATION);
+    Assertions.assertNotNull(tableLocation, "Table location should not be null");
+    Path tableDirectory = new Path(tableLocation);
     Assertions.assertTrue(
         fileSystem.listStatus(tableDirectory).length > 0, "The table should not be empty");
   }
@@ -1537,18 +1598,19 @@ public class CatalogHiveIT extends BaseIT {
             new Transform[] {Transforms.identity(columns[2].name())});
 
     // Directly get table from Hive metastore to check if the table is created successfully.
-    org.apache.hadoop.hive.metastore.api.Table hiveTab =
-        hiveClientPool.run(client -> client.getTable(schemaName, tableName));
+    HiveTable hiveTab = loadHiveTable(schemaName, tableName);
     checkTableReadWrite(hiveTab);
-    Assertions.assertEquals(MANAGED_TABLE.name(), hiveTab.getTableType());
+    Assertions.assertEquals(MANAGED_TABLE.name(), hiveTab.properties().get(TABLE_TYPE));
     catalog.asTableCatalog().purgeTable(NameIdentifier.of(schemaName, tableName));
-    Boolean existed = hiveClientPool.run(client -> client.tableExists(schemaName, tableName));
+    Boolean existed = hiveTableExists(schemaName, tableName);
     Assertions.assertFalse(existed, "The Hive table should not exist");
     // purging non-exist table should return false
     Assertions.assertFalse(
         catalog.asTableCatalog().purgeTable(NameIdentifier.of(schemaName, tableName)),
         "The table should not be found in the catalog");
-    Path tableDirectory = new Path(hiveTab.getSd().getLocation());
+    String tableLocation = hiveTab.properties().get(LOCATION);
+    Assertions.assertNotNull(tableLocation, "Table location should not be null");
+    Path tableDirectory = new Path(tableLocation);
     Assertions.assertFalse(
         fileSystem.exists(tableDirectory), "The table directory should not exist");
     Path trashDirectory = fileSystem.getTrashRoot(tableDirectory);
@@ -1571,10 +1633,9 @@ public class CatalogHiveIT extends BaseIT {
             new Transform[] {Transforms.identity(columns[2].name())});
 
     // Directly get table from Hive metastore to check if the table is created successfully.
-    org.apache.hadoop.hive.metastore.api.Table hiveTab =
-        hiveClientPool.run(client -> client.getTable(schemaName, tableName));
+    HiveTable hiveTab = loadHiveTable(schemaName, tableName);
     checkTableReadWrite(hiveTab);
-    Assertions.assertEquals(EXTERNAL_TABLE.name(), hiveTab.getTableType());
+    Assertions.assertEquals(EXTERNAL_TABLE.name(), hiveTab.properties().get(TABLE_TYPE));
     TableCatalog tableCatalog = catalog.asTableCatalog();
     NameIdentifier id = NameIdentifier.of(schemaName, tableName);
     Assertions.assertThrows(
@@ -1584,9 +1645,11 @@ public class CatalogHiveIT extends BaseIT {
         },
         "Can't purge a external Hive table");
 
-    Boolean existed = hiveClientPool.run(client -> client.tableExists(schemaName, tableName));
+    Boolean existed = hiveTableExists(schemaName, tableName);
     Assertions.assertTrue(existed, "The table should be still exist");
-    Path tableDirectory = new Path(hiveTab.getSd().getLocation());
+    String tableLocation = hiveTab.properties().get(LOCATION);
+    Assertions.assertNotNull(tableLocation, "Table location should not be null");
+    Path tableDirectory = new Path(tableLocation);
     Assertions.assertTrue(
         fileSystem.listStatus(tableDirectory).length > 0, "The table should not be empty");
   }
@@ -1604,11 +1667,7 @@ public class CatalogHiveIT extends BaseIT {
             new Transform[] {Transforms.identity(columns[2].name())});
 
     // Directly drop table from Hive metastore.
-    hiveClientPool.run(
-        client -> {
-          client.dropTable(schemaName, tableName, true, false, false);
-          return null;
-        });
+    dropHiveTable(schemaName, tableName, true, false);
 
     // Drop table from catalog, drop non-exist table should return false;
     Assertions.assertFalse(
@@ -1633,11 +1692,7 @@ public class CatalogHiveIT extends BaseIT {
             new Transform[] {Transforms.identity(columns[2].name())});
 
     // Directly drop table from Hive metastore.
-    hiveClientPool.run(
-        client -> {
-          client.dropTable(schemaName, tableName, true, false, true);
-          return null;
-        });
+    dropHiveTable(schemaName, tableName, true, true);
 
     // Drop table from catalog, drop non-exist table should return false;
     Assertions.assertFalse(
@@ -1666,7 +1721,7 @@ public class CatalogHiveIT extends BaseIT {
     Map<String, String> properties = Maps.newHashMap();
     String nameOfCatalog = GravitinoITUtils.genRandomName("catalog");
     // Wrong Hive HIVE_METASTORE_URIS
-    String wrongHiveMetastoreURI = HIVE_METASTORE_URIS + "_wrong";
+    String wrongHiveMetastoreURI = hive_metastore_uris + "_wrong";
     properties.put(METASTORE_URIS, wrongHiveMetastoreURI);
     Catalog createdCatalog =
         metalake.createCatalog(
@@ -1685,8 +1740,8 @@ public class CatalogHiveIT extends BaseIT {
 
     Catalog newCatalog =
         metalake.alterCatalog(
-            nameOfCatalog, CatalogChange.setProperty(METASTORE_URIS, HIVE_METASTORE_URIS));
-    Assertions.assertEquals(HIVE_METASTORE_URIS, newCatalog.properties().get(METASTORE_URIS));
+            nameOfCatalog, CatalogChange.setProperty(METASTORE_URIS, hive_metastore_uris));
+    Assertions.assertEquals(hive_metastore_uris, newCatalog.properties().get(METASTORE_URIS));
 
     // The URI has restored, so it should not throw exception.
     Assertions.assertDoesNotThrow(
@@ -1700,7 +1755,7 @@ public class CatalogHiveIT extends BaseIT {
 
   private void createCatalogWithCustomOperation(String catalogName, String customImpl) {
     Map<String, String> properties = Maps.newHashMap();
-    properties.put(METASTORE_URIS, HIVE_METASTORE_URIS);
+    properties.put(METASTORE_URIS, hive_metastore_uris);
     properties.put(BaseCatalog.CATALOG_OPERATION_IMPL, customImpl);
 
     Catalog catalog =

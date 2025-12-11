@@ -18,15 +18,12 @@
  */
 package org.apache.gravitino.catalog.lakehouse.hudi.backend.hms;
 
-import static org.apache.gravitino.catalog.lakehouse.hudi.HudiSchemaPropertiesMetadata.LOCATION;
-
-import com.google.common.collect.Maps;
 import java.util.Optional;
+import org.apache.gravitino.Schema;
 import org.apache.gravitino.catalog.lakehouse.hudi.HudiSchema;
 import org.apache.gravitino.meta.AuditInfo;
-import org.apache.hadoop.hive.metastore.api.Database;
 
-public class HudiHMSSchema extends HudiSchema<Database> {
+public class HudiHMSSchema extends HudiSchema<Schema> {
 
   public static Builder builder() {
     return new Builder();
@@ -37,11 +34,11 @@ public class HudiHMSSchema extends HudiSchema<Database> {
   }
 
   @Override
-  public Database fromHudiSchema() {
+  public Schema fromHudiSchema() {
     throw new UnsupportedOperationException("Not implemented yet");
   }
 
-  public static class Builder extends HudiSchema.Builder<Database> {
+  public static class Builder extends HudiSchema.Builder<Schema> {
 
     @Override
     protected HudiHMSSchema simpleBuild() {
@@ -54,15 +51,13 @@ public class HudiHMSSchema extends HudiSchema<Database> {
     }
 
     @Override
-    protected HudiHMSSchema buildFromSchema(Database database) {
-      name = database.getName();
-      comment = database.getDescription();
+    protected HudiHMSSchema buildFromSchema(Schema database) {
+      name = database.name();
+      comment = database.comment();
 
-      properties = Maps.newHashMap(database.getParameters());
-      properties.put(LOCATION, database.getLocationUri());
-
+      properties = database.properties();
       AuditInfo.Builder auditInfoBuilder = AuditInfo.builder();
-      Optional.ofNullable(database.getOwnerName()).ifPresent(auditInfoBuilder::withCreator);
+      Optional.ofNullable(database.auditInfo().creator()).ifPresent(auditInfoBuilder::withCreator);
       auditInfo = auditInfoBuilder.build();
 
       return simpleBuild();

@@ -16,23 +16,23 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.catalog.lakehouse.hudi.utils;
-
-import static org.apache.gravitino.catalog.lakehouse.hudi.HudiCatalogPropertiesMetadata.CATALOG_BACKEND;
+package org.apache.gravitino.catalog.hive.integration.test;
 
 import com.google.common.collect.ImmutableMap;
-import org.apache.gravitino.catalog.lakehouse.hudi.backend.HudiCatalogBackend;
-import org.apache.gravitino.catalog.lakehouse.hudi.backend.hms.HudiHMSBackend;
-import org.apache.gravitino.catalog.lakehouse.hudi.backend.hms.HudiHMSBackendOps;
-import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.Test;
+import org.apache.gravitino.integration.test.container.HiveContainer;
+import org.junit.jupiter.api.Tag;
 
-public class TestCatalogUtils {
-  @Test
-  public void testLoadHudiCatalogBackend() {
-    HudiCatalogBackend catalogBackend =
-        CatalogUtils.loadHudiCatalogBackend(ImmutableMap.of(CATALOG_BACKEND, "hms"));
-    Assertions.assertInstanceOf(HudiHMSBackend.class, catalogBackend);
-    Assertions.assertInstanceOf(HudiHMSBackendOps.class, catalogBackend.backendOps());
+@Tag("gravitino-docker-test")
+public class CatalogHive3IT extends CatalogHive2IT {
+  @Override
+  protected void startNecessaryContainer() {
+    containerSuite.startHiveContainer(
+        ImmutableMap.of(HiveContainer.HIVE_RUNTIME_VERSION, HiveContainer.HIVE3));
+
+    hive_metastore_uris =
+        String.format(
+            "thrift://%s:%d",
+            containerSuite.getHiveContainer().getContainerIpAddress(),
+            HiveContainer.HIVE_METASTORE_PORT);
   }
 }

@@ -52,6 +52,7 @@ import org.apache.gravitino.rel.indexes.Indexes;
 import org.apache.gravitino.rel.types.Types;
 import org.apache.gravitino.utils.RandomNameUtils;
 import org.apache.spark.sql.SparkSession;
+import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Tag;
@@ -93,6 +94,14 @@ public class HudiCatalogHMSIT extends BaseIT {
             "lakehouse-hudi",
             "hudi catalog for hms",
             ImmutableMap.of(CATALOG_BACKEND, "hms", URI, hmsURI));
+  }
+
+  @AfterAll
+  public void close() {
+    if (sparkSession != null) {
+      sparkSession.close();
+      sparkSession = null;
+    }
   }
 
   @Test
