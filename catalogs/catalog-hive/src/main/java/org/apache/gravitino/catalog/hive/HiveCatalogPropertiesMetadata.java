@@ -19,6 +19,8 @@
 
 package org.apache.gravitino.catalog.hive;
 
+import static org.apache.gravitino.catalog.hive.HiveConstants.HIVE_DEFAULT_CATALOG;
+
 import com.google.common.collect.ImmutableMap;
 import java.util.Map;
 import org.apache.gravitino.connector.BaseCatalogPropertiesMetadata;
@@ -37,8 +39,6 @@ public class HiveCatalogPropertiesMetadata extends BaseCatalogPropertiesMetadata
   public static final String IMPERSONATION_ENABLE = HiveConstants.IMPERSONATION_ENABLE;
 
   public static final boolean DEFAULT_IMPERSONATION_ENABLE = false;
-
-  public static final String DEFAULT_HMS_CATALOG = "hive";
 
   public static final String KEY_TAB_URI = HiveConstants.KEY_TAB_URI;
 
@@ -70,7 +70,7 @@ public class HiveCatalogPropertiesMetadata extends BaseCatalogPropertiesMetadata
                   DEFAULT_CATALOG,
                   "The default Hive Metastore catalog name used when talking to HMS",
                   false /* immutable */,
-                  DEFAULT_HMS_CATALOG,
+                  HIVE_DEFAULT_CATALOG,
                   false /* hidden */))
           .put(
               IMPERSONATION_ENABLE,

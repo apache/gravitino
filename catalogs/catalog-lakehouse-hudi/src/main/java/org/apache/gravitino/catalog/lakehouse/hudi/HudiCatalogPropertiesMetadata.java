@@ -18,11 +18,13 @@
  */
 package org.apache.gravitino.catalog.lakehouse.hudi;
 
+import static org.apache.gravitino.catalog.hive.HiveConstants.HIVE_DEFAULT_CATALOG;
 import static org.apache.gravitino.connector.PropertyEntry.enumImmutablePropertyEntry;
 import static org.apache.gravitino.connector.PropertyEntry.stringRequiredPropertyEntry;
 
 import com.google.common.collect.ImmutableMap;
 import java.util.Map;
+import org.apache.gravitino.catalog.hive.HiveConstants;
 import org.apache.gravitino.catalog.lakehouse.hudi.backend.BackendType;
 import org.apache.gravitino.connector.BaseCatalogPropertiesMetadata;
 import org.apache.gravitino.connector.PropertyEntry;
@@ -30,6 +32,7 @@ import org.apache.gravitino.hive.ClientPropertiesMetadata;
 
 public class HudiCatalogPropertiesMetadata extends BaseCatalogPropertiesMetadata {
   public static final String CATALOG_BACKEND = "catalog-backend";
+  public static final String DEFAULT_CATALOG = HiveConstants.DEFAULT_CATALOG;
   public static final String URI = "uri";
   private static final ClientPropertiesMetadata CLIENT_PROPERTIES_METADATA =
       new ClientPropertiesMetadata();
@@ -46,6 +49,14 @@ public class HudiCatalogPropertiesMetadata extends BaseCatalogPropertiesMetadata
                   null /* defaultValue */,
                   false /* hidden */,
                   false /* reserved */))
+          .put(
+              DEFAULT_CATALOG,
+              PropertyEntry.stringOptionalPropertyEntry(
+                  DEFAULT_CATALOG,
+                  "The default Hive Metastore catalog name used when talking to HMS",
+                  false /* immutable */,
+                  HIVE_DEFAULT_CATALOG,
+                  false /* hidden */))
           .put(
               URI,
               stringRequiredPropertyEntry(

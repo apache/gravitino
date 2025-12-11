@@ -18,8 +18,10 @@
  */
 package org.apache.gravitino.catalog.lakehouse.hudi.backend.hms;
 
+import static org.apache.gravitino.catalog.hive.HiveConstants.HIVE_DEFAULT_CATALOG;
 import static org.apache.gravitino.catalog.hive.HiveConstants.HIVE_METASTORE_URIS;
 import static org.apache.gravitino.catalog.hive.HiveConstants.INPUT_FORMAT;
+import static org.apache.gravitino.catalog.lakehouse.hudi.HudiCatalogPropertiesMetadata.DEFAULT_CATALOG;
 import static org.apache.gravitino.catalog.lakehouse.hudi.HudiCatalogPropertiesMetadata.URI;
 import static org.apache.gravitino.connector.BaseCatalog.CATALOG_BYPASS_PREFIX;
 
@@ -62,6 +64,8 @@ public class HudiHMSBackendOps implements HudiCatalogBackendOps {
 
   private static final String HUDI_PACKAGE_PREFIX = "org.apache.hudi";
 
+  private String catalogName;
+
   @VisibleForTesting CachedClientPool clientPool;
 
   @Override
@@ -82,6 +86,8 @@ public class HudiHMSBackendOps implements HudiCatalogBackendOps {
         });
     byPassConfigs.forEach(clientProperties::setProperty);
     convertedConfigs.forEach(clientProperties::setProperty);
+
+    this.catalogName = properties.getOrDefault(DEFAULT_CATALOG, HIVE_DEFAULT_CATALOG);
     String catalogKey = "hudi-" + properties.getOrDefault(CatalogUtils.CATALOG_ID_KEY, "0");
     this.clientPool = new CachedClientPool(catalogKey, clientProperties, properties);
     LOG.info("Hudi HMS Backend Ops initialized with properties: {}", properties);
@@ -90,7 +96,8 @@ public class HudiHMSBackendOps implements HudiCatalogBackendOps {
   @Override
   public HudiSchema loadSchema(NameIdentifier schemaIdent) throws NoSuchSchemaException {
     try {
-      Schema database = clientPool.run(client -> client.getDatabase("", schemaIdent.name()));
+      Schema database =
+          clientPool.run(client -> client.getDatabase(catalogName, schemaIdent.name()));
       return HudiHMSSchema.builder().buildFromSchema(database);
     } catch (InterruptedException e) {
       throw new RuntimeException(e);
@@ -102,7 +109,7 @@ public class HudiHMSBackendOps implements HudiCatalogBackendOps {
     try {
       return clientPool.run(
           c ->
-              c.getAllDatabases("").stream()
+              c.getAllDatabases(catalogName).stream()
                   .map(db -> NameIdentifier.of(namespace, db))
                   .toArray(NameIdentifier[]::new));
     } catch (InterruptedException e) {
@@ -138,8 +145,8 @@ public class HudiHMSBackendOps implements HudiCatalogBackendOps {
     try {
       return clientPool.run(
           c -> {
-            List<String> allTables = c.getAllTables("", schemaIdent.name());
-            return c.getTableObjectsByName("", schemaIdent.name(), allTables).stream()
+            List<String> allTables = c.getAllTables(catalogName, schemaIdent.name());
+            return c.getTableObjectsByName(catalogName, schemaIdent.name(), allTables).stream()
                 .filter(this::checkHudiTable)
                 .map(t -> NameIdentifier.of(namespace, t.name()))
                 .toArray(NameIdentifier[]::new);
@@ -155,7 +162,8 @@ public class HudiHMSBackendOps implements HudiCatalogBackendOps {
 
     try {
       Table table =
-          clientPool.run(client -> client.getTable("", schemaIdent.name(), tableIdent.name()));
+          clientPool.run(
+              client -> client.getTable(catalogName, schemaIdent.name(), tableIdent.name()));
       if (!checkHudiTable(table)) {
         throw new NoSuchTableException(
             "Table %s is not a Hudi table in Hive Metastore", tableIdent.name());
