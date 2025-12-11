@@ -234,13 +234,8 @@ public final class HiveClientFactory {
   public void close() {
     try {
       if (kerberosClient != null) {
-        try {
-          kerberosClient.close();
-        } catch (Exception e) {
-          LOG.warn("Failed to close Kerberos client", e);
-        } finally {
-          kerberosClient = null;
-        }
+        kerberosClient.close();
+        kerberosClient = null;
       }
 
       synchronized (classLoaderLock) {
