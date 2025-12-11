@@ -825,3 +825,26 @@ class TestDTOConverters(unittest.TestCase):
             self.assertTrue(converted.null_ordering() == expected.null_ordering())
 
         self.assertListEqual(DTOConverters.to_dtos(converted_dtos), converted_dtos)
+
+    def test_to_dtos_indexes(self):
+        field_names = [[f"field_{i}"] for i in range(2)]
+
+        indexes: list[Index] = [
+            Indexes.of(index_type, index_type.value, field_names)
+            for index_type in Index.IndexType
+        ]
+        expected_dtos: list[IndexDTO] = [
+            IndexDTO(
+                index_type=index_type,
+                name=index_type.value,
+                field_names=field_names,
+            )
+            for index_type in Index.IndexType
+        ]
+        converted_dtos = DTOConverters.to_dtos(indexes)
+        for converted, expected in zip(converted_dtos, expected_dtos):
+            self.assertTrue(converted.type() == expected.type())
+            self.assertTrue(converted.name() == expected.name())
+            self.assertListEqual(converted.field_names(), expected.field_names())
+
+        self.assertListEqual(DTOConverters.to_dtos(converted_dtos), converted_dtos)
