@@ -29,8 +29,10 @@ import static org.apache.gravitino.Entity.EntityType.USER;
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.Lists;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -730,5 +732,102 @@ public class NameIdentifierUtil {
       default:
         throw new IllegalArgumentException("Metalake has no parent entity type");
     }
+  }
+
+  /**
+   * Build a NameIdentifier for the given entity type and name, using the provided entity context.
+   * This method constructs the identifier hierarchically using the parent entity type
+   * relationships.
+   *
+   * @param type The entity type
+   * @param name The entity name
+   * @param entities Map containing the metalake, catalog, schema names
+   * @return The created NameIdentifier
+   * @throws IllegalArgumentException if the entity type is not supported or required parent
+   *     entities are missing
+   */
+  public static NameIdentifier buildNameIdentifier(
+      Entity.EntityType type, String name, Map<Entity.EntityType, String> entities) {
+    String metalake = entities.get(Entity.EntityType.METALAKE);
+
+    // Handle metalake as the root
+    if (type == Entity.EntityType.METALAKE) {
+      return ofMetalake(metalake);
+    }
+
+    // Build the full name path by traversing the hierarchy
+    List<String> namePath = Lists.newArrayList();
+    namePath.add(name);
+
+    Entity.EntityType currentType = type;
+    while (currentType != Entity.EntityType.METALAKE) {
+      Entity.EntityType parentType = parentEntityType(currentType);
+      String parentName = entities.get(parentType);
+
+      if (parentType == Entity.EntityType.METALAKE) {
+        namePath.add(0, metalake);
+        break;
+      } else if (parentName == null) {
+        throw new IllegalArgumentException(
+            "Cannot build NameIdentifier for type "
+                + type
+                + ": missing parent entity of type "
+                + parentType);
+      }
+
+      namePath.add(0, parentName);
+      currentType = parentType;
+    }
+
+    if (SUPPORT_VIRTUAL_NAMESPACE_TYPES.contains(type)) {
+      Namespace namespace = createVirtualNamespace(type, metalake);
+      return NameIdentifier.of(namespace, name);
+    }
+
+    // Create NameIdentifier from the full path
+    return NameIdentifier.of(namePath.toArray(new String[0]));
+  }
+
+  private static Namespace createVirtualNamespace(Entity.EntityType type, String metalake) {
+    switch (type) {
+      case USER:
+        return NamespaceUtil.ofUser(metalake);
+      case GROUP:
+        return NamespaceUtil.ofGroup(metalake);
+      case ROLE:
+        return NamespaceUtil.ofRole(metalake);
+      case TAG:
+        return NamespaceUtil.ofTag(metalake);
+      case POLICY:
+        return NamespaceUtil.ofPolicy(metalake);
+      case JOB:
+        return NamespaceUtil.ofJob(metalake);
+      case JOB_TEMPLATE:
+        return NamespaceUtil.ofJobTemplate(metalake);
+      default:
+        throw new IllegalArgumentException("Unsupported virtual namespace type: " + type);
+    }
+  }
+
+  /**
+   * Build a map of NameIdentifiers from entity data.
+   *
+   * @param entities Map containing entity types and their names (e.g., METALAKE, CATALOG, SCHEMA,
+   *     etc.)
+   * @return Map of entity types to their NameIdentifiers
+   */
+  public static Map<Entity.EntityType, NameIdentifier> buildNameIdentifierMap(
+      Map<Entity.EntityType, String> entities) {
+    Map<Entity.EntityType, NameIdentifier> nameIdentifierMap = new java.util.HashMap<>();
+
+    entities.forEach(
+        (type, name) -> {
+          NameIdentifier identifier = buildNameIdentifier(type, name, entities);
+          if (identifier != null) {
+            nameIdentifierMap.put(type, identifier);
+          }
+        });
+
+    return nameIdentifierMap;
   }
 }
