@@ -42,16 +42,17 @@ import org.apache.hadoop.security.token.Token;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+/** Kerberos client for Hive Metastore. */
 public class KerberosClient implements java.io.Closeable {
   private static final Logger LOG = LoggerFactory.getLogger(KerberosClient.class);
 
-  private volatile ScheduledThreadPoolExecutor checkTgtExecutor;
+  private ScheduledThreadPoolExecutor checkTgtExecutor;
   private final Properties conf;
   private final Configuration hadoopConf;
   private final boolean refreshCredentials;
-  private volatile UserGroupInformation realLoginUgi;
+  private UserGroupInformation realLoginUgi;
   private final String keytabFilePath;
-  private volatile HiveClient hiveClient = null;
+  private HiveClient hiveClient = null;
 
   public KerberosClient(
       Properties properties,
@@ -66,15 +67,21 @@ public class KerberosClient implements java.io.Closeable {
     this.keytabFilePath = keyTabFile.getAbsolutePath();
   }
 
+  /**
+   * Login proxy user for the given user name.
+   *
+   * @param currentUser The user name to login
+   * @return The UserGroupInformation for the proxy user
+   */
   public UserGroupInformation loginProxyUser(String currentUser) {
     try {
+      // hiveClient is null in case the initial the kerbers client with the login user
       if (currentUser.equals(realLoginUgi.getUserName()) || hiveClient == null) {
         return realLoginUgi;
       }
 
       String tokenSignature = conf.getProperty(HIVE_METASTORE_TOKEN_SIGNATURE, "");
       String principal = conf.getProperty(PRINCIPAL_KEY, "");
-      @SuppressWarnings("null")
       List<String> principalComponents = Splitter.on('@').splitToList(principal);
       Preconditions.checkArgument(
           principalComponents.size() == 2, "The principal has the wrong format");
@@ -91,7 +98,6 @@ public class KerberosClient implements java.io.Closeable {
       proxyUser = UserGroupInformation.createProxyUser(finalPrincipalName, realLoginUgi);
 
       // Acquire HMS delegation token for the proxy user and attach it to UGI
-      Preconditions.checkArgument(hiveClient != null, "HiveClient is not set in KerberosClient");
       String tokenStr =
           hiveClient.getDelegationToken(finalPrincipalName, realLoginUgi.getUserName());
 
@@ -106,6 +112,12 @@ public class KerberosClient implements java.io.Closeable {
     }
   }
 
+  /**
+   * Login the Kerberos user from the principal and keytab file.
+   *
+   * @return
+   * @throws Exception
+   */
   public UserGroupInformation login() throws Exception {
     KerberosConfig kerberosConfig = new KerberosConfig(conf, hadoopConf);
 

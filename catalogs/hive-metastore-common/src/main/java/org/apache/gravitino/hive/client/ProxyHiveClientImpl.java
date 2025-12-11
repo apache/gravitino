@@ -24,10 +24,15 @@ import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
 import java.lang.reflect.UndeclaredThrowableException;
+import java.security.PrivilegedActionException;
 import java.security.PrivilegedExceptionAction;
 import java.util.Properties;
 import org.apache.hadoop.security.UserGroupInformation;
 
+/**
+ * A {@link HiveClient} proxy that executes all methods as a given user via {@link
+ * UserGroupInformation#doAs(PrivilegedExceptionAction)}.
+ */
 public class ProxyHiveClientImpl implements InvocationHandler {
 
   private final HiveClient delegate;
@@ -68,30 +73,16 @@ public class ProxyHiveClientImpl implements InvocationHandler {
   @Override
   public Object invoke(Object proxy, Method method, Object[] args) throws Throwable {
     try {
-      return ugi.doAs(
-          (PrivilegedExceptionAction<Object>)
-              () -> {
-                try {
-                  return method.invoke(delegate, args);
-                } catch (InvocationTargetException ite) {
-                  Throwable cause = ite.getCause();
-                  if (cause instanceof Exception) {
-                    throw (Exception) cause;
-                  }
-                  throw new RuntimeException(cause != null ? cause : ite);
-                }
-              });
+      return ugi.doAs((PrivilegedExceptionAction<Object>) () -> method.invoke(delegate, args));
     } catch (UndeclaredThrowableException e) {
-      Throwable inner = e.getCause();
-      if (inner instanceof InvocationTargetException) {
-        Throwable cause = inner.getCause();
-        throw cause != null ? cause : inner;
+      Throwable innerException = e.getCause();
+      if (innerException instanceof PrivilegedActionException) {
+        throw innerException.getCause();
+      } else if (innerException instanceof InvocationTargetException) {
+        throw innerException.getCause();
+      } else {
+        throw innerException;
       }
-      Throwable cause = inner != null ? inner : e;
-      throw cause;
-    } catch (IOException e) {
-      Throwable cause = e.getCause();
-      throw cause != null ? cause : e;
     }
   }
 }

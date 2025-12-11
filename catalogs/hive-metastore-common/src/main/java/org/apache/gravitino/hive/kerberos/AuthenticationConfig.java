@@ -29,6 +29,7 @@ import org.apache.gravitino.config.ConfigConstants;
 import org.apache.gravitino.config.ConfigEntry;
 import org.apache.hadoop.conf.Configuration;
 
+/** Configuration for authentication */
 public class AuthenticationConfig extends Config {
 
   // The key for the authentication type, currently we support Kerberos and simple
@@ -56,15 +57,14 @@ public class AuthenticationConfig extends Config {
 
   public static final ConfigEntry<String> AUTH_TYPE_ENTRY =
       new ConfigBuilder(AUTH_TYPE_KEY)
-          .doc(
-              "The type of authentication for Hudi catalog, currently we only support simple and Kerberos")
+          .doc("The type of authentication, currently we only support simple and Kerberos")
           .version(ConfigConstants.VERSION_1_0_0)
           .stringConf()
           .createWithDefault("simple");
 
   public static final ConfigEntry<Boolean> ENABLE_IMPERSONATION_ENTRY =
       new ConfigBuilder(IMPERSONATION_ENABLE_KEY)
-          .doc("Whether to enable impersonation for the Hudi catalog")
+          .doc("Whether to enable impersonation")
           .version(ConfigConstants.VERSION_1_0_0)
           .booleanConf()
           .createWithDefault(KERBEROS_DEFAULT_IMPERSONATION_ENABLE);

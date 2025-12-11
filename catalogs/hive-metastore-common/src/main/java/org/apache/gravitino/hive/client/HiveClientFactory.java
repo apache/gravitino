@@ -41,7 +41,7 @@ import org.slf4j.LoggerFactory;
 public final class HiveClientFactory {
   private static final Logger LOG = LoggerFactory.getLogger(HiveClientFactory.class);
 
-  public static final String GRAVITINO_KEYTAB_FORMAT = "keytabs/gravitino-hive-%s-keytab";
+  public static final String GRAVITINO_KEYTAB_FORMAT = "keytabs/gravitino-%s-keytab";
 
   // Remember which Hive backend classloader worked successfully for this factory.
   private volatile HiveClientClassLoader backendClassLoader;
@@ -56,7 +56,8 @@ public final class HiveClientFactory {
   private final String keytabPath;
 
   /**
-   * Creates a {@link HiveClientFactory} bound to the given configuration properties.
+   * Creates a {@link HiveClientFactory} boundGRAVITINO_KEYTAB_FORMAT to the given configuration
+   * properties.
    *
    * @param properties Hive client configuration, must not be null.
    * @param id An identifier for this factory instance.
@@ -64,7 +65,7 @@ public final class HiveClientFactory {
   public HiveClientFactory(Properties properties, String id) {
     Preconditions.checkArgument(properties != null, "Properties cannot be null");
     this.properties = properties;
-    this.keytabPath = String.format("keytabs/gravitino-%s-keytab", id);
+    this.keytabPath = String.format(GRAVITINO_KEYTAB_FORMAT, id);
 
     try {
       this.hadoopConf = new Configuration();
@@ -185,20 +186,21 @@ public final class HiveClientFactory {
     ClassLoader origLoader = Thread.currentThread().getContextClassLoader();
     Thread.currentThread().setContextClassLoader(classloader);
     try {
-      if (!enableImpersonation) {
-        return createHiveClientImpl(classloader.getHiveVersion(), properties, classloader);
-      } else {
+      if (enableImpersonation) {
         UserGroupInformation ugi;
-        if (!enableKerberos) {
+        if (enableKerberos) {
+          ugi = kerberosClient.loginProxyUser(PrincipalUtils.getCurrentUserName());
+        } else {
           ugi = UserGroupInformation.getCurrentUser();
           if (!ugi.getUserName().equals(PrincipalUtils.getCurrentUserName())) {
             ugi = UserGroupInformation.createProxyUser(PrincipalUtils.getCurrentUserName(), ugi);
           }
-        } else {
-          ugi = kerberosClient.loginProxyUser(PrincipalUtils.getCurrentUserName());
         }
         return createProxyHiveClientImpl(
             classloader.getHiveVersion(), properties, ugi, classloader);
+
+      } else {
+        return createHiveClientImpl(classloader.getHiveVersion(), properties, classloader);
       }
 
     } catch (Exception e) {
