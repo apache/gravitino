@@ -19,6 +19,7 @@
 package org.apache.gravitino.catalog.lakehouse.hudi.backend.hms;
 
 import static org.apache.gravitino.catalog.hive.HiveConstants.HIVE_METASTORE_URIS;
+import static org.apache.gravitino.catalog.hive.HiveConstants.INPUT_FORMAT;
 import static org.apache.gravitino.catalog.lakehouse.hudi.HudiCatalogPropertiesMetadata.URI;
 import static org.apache.gravitino.connector.BaseCatalog.CATALOG_BYPASS_PREFIX;
 
@@ -204,9 +205,7 @@ public class HudiHMSBackendOps implements HudiCatalogBackendOps {
     // uses `org.apache.hudi.hadoop.HoodieParquetInputFormat` and MOR table
     // uses `org.apache.hudi.hadoop.HoodieParquetRealtimeInputFormat`, to
     // simplify the logic, we just check the prefix of the input format
-
-    // todo yuhui: better way to identify Hudi table?
-    String inputFormat = table.properties().get("input-format");
+    String inputFormat = table.properties().get(INPUT_FORMAT);
     return inputFormat != null && inputFormat.startsWith(HUDI_PACKAGE_PREFIX);
   }
 }

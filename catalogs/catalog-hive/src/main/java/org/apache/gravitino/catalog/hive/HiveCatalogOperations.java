@@ -91,7 +91,6 @@ import org.slf4j.LoggerFactory;
 public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas, TableCatalog {
 
   public static final Logger LOG = LoggerFactory.getLogger(HiveCatalogOperations.class);
-  public static final String GRAVITINO_KEYTAB_FORMAT = "keytabs/gravitino-hive-%s-keytab";
 
   @VisibleForTesting CachedClientPool clientPool;
 

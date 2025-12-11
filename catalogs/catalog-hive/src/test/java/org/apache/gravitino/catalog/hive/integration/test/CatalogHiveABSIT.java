@@ -56,7 +56,7 @@ public class CatalogHiveABSIT extends CatalogHive2IT {
 
     containerSuite.startHiveContainerWithS3(hiveContainerEnv);
 
-    hive_metastore_uris =
+    hiveMetastoreUris =
         String.format(
             "thrift://%s:%d",
             containerSuite.getHiveContainerWithS3().getContainerIpAddress(),
@@ -83,7 +83,7 @@ public class CatalogHiveABSIT extends CatalogHive2IT {
         SparkSession.builder()
             .master("local[1]")
             .appName("Hive Catalog integration test")
-            .config("hive.metastore.uris", hive_metastore_uris)
+            .config("hive.metastore.uris", hiveMetastoreUris)
             .config(
                 "spark.sql.warehouse.dir",
                 String.format(

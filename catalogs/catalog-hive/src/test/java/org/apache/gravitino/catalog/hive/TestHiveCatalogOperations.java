@@ -26,6 +26,7 @@ import static org.apache.gravitino.Catalog.PROPERTY_IN_USE;
 import static org.apache.gravitino.catalog.hive.HiveCatalogPropertiesMetadata.CHECK_INTERVAL_SEC;
 import static org.apache.gravitino.catalog.hive.HiveCatalogPropertiesMetadata.CLIENT_POOL_CACHE_EVICTION_INTERVAL_MS;
 import static org.apache.gravitino.catalog.hive.HiveCatalogPropertiesMetadata.CLIENT_POOL_SIZE;
+import static org.apache.gravitino.catalog.hive.HiveCatalogPropertiesMetadata.DEFAULT_CATALOG;
 import static org.apache.gravitino.catalog.hive.HiveCatalogPropertiesMetadata.FETCH_TIMEOUT_SEC;
 import static org.apache.gravitino.catalog.hive.HiveCatalogPropertiesMetadata.IMPERSONATION_ENABLE;
 import static org.apache.gravitino.catalog.hive.HiveCatalogPropertiesMetadata.KEY_TAB_URI;
@@ -68,6 +69,7 @@ class TestHiveCatalogOperations {
     Assertions.assertTrue(propertyEntryMap.containsKey(CLIENT_POOL_SIZE));
     Assertions.assertTrue(propertyEntryMap.containsKey(IMPERSONATION_ENABLE));
     Assertions.assertTrue(propertyEntryMap.containsKey(LIST_ALL_TABLES));
+    Assertions.assertTrue(propertyEntryMap.containsKey(DEFAULT_CATALOG));
     Assertions.assertTrue(propertyEntryMap.get(METASTORE_URIS).isRequired());
     Assertions.assertFalse(propertyEntryMap.get(Catalog.PROPERTY_PACKAGE).isRequired());
     Assertions.assertFalse(propertyEntryMap.get(CLIENT_POOL_SIZE).isRequired());

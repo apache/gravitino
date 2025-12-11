@@ -29,7 +29,7 @@ public class CatalogHive3IT extends CatalogHive2IT {
     containerSuite.startHiveContainer(
         ImmutableMap.of(HiveContainer.HIVE_RUNTIME_VERSION, HiveContainer.HIVE3));
 
-    hive_metastore_uris =
+    hiveMetastoreUris =
         String.format(
             "thrift://%s:%d",
             containerSuite.getHiveContainer().getContainerIpAddress(),

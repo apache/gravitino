@@ -130,7 +130,7 @@ public class CatalogHive2IT extends BaseIT {
   public static final String HIVE_COL_NAME1 = "hive_col_name1";
   public static final String HIVE_COL_NAME2 = "hive_col_name2";
   public static final String HIVE_COL_NAME3 = "hive_col_name3";
-  protected String hive_metastore_uris;
+  protected String hiveMetastoreUris;
   protected final String provider = "hive";
   protected final ContainerSuite containerSuite = ContainerSuite.getInstance();
   private HiveClientPool hiveClientPool;
@@ -167,7 +167,7 @@ public class CatalogHive2IT extends BaseIT {
     containerSuite.startHiveContainer(
         ImmutableMap.of(HiveContainer.HIVE_RUNTIME_VERSION, HiveContainer.HIVE2));
 
-    hive_metastore_uris =
+    hiveMetastoreUris =
         String.format(
             "thrift://%s:%d",
             containerSuite.getHiveContainer().getContainerIpAddress(),
@@ -179,7 +179,7 @@ public class CatalogHive2IT extends BaseIT {
         SparkSession.builder()
             .master("local[1]")
             .appName("Hive Catalog integration test")
-            .config("hive.metastore.uris", hive_metastore_uris)
+            .config("hive.metastore.uris", hiveMetastoreUris)
             .config(
                 "spark.sql.warehouse.dir",
                 String.format(
@@ -208,10 +208,10 @@ public class CatalogHive2IT extends BaseIT {
     startNecessaryContainer();
 
     HiveConf hiveConf = new HiveConf();
-    hiveConf.set(HiveConf.ConfVars.METASTOREURIS.varname, hive_metastore_uris);
+    hiveConf.set(HiveConf.ConfVars.METASTOREURIS.varname, hiveMetastoreUris);
 
     Properties hiveClientProperties = new Properties();
-    hiveClientProperties.setProperty(HiveConf.ConfVars.METASTOREURIS.varname, hive_metastore_uris);
+    hiveClientProperties.setProperty(HiveConf.ConfVars.METASTOREURIS.varname, hiveMetastoreUris);
 
     // Check if Hive client can connect to Hive metastore
     hiveClientPool = new HiveClientPool("hive", 1, hiveClientProperties);
@@ -283,7 +283,7 @@ public class CatalogHive2IT extends BaseIT {
 
   protected void createCatalog() {
     Map<String, String> properties = Maps.newHashMap();
-    properties.put(METASTORE_URIS, hive_metastore_uris);
+    properties.put(METASTORE_URIS, hiveMetastoreUris);
 
     metalake.createCatalog(catalogName, Catalog.Type.RELATIONAL, provider, "comment", properties);
 
@@ -1444,7 +1444,7 @@ public class CatalogHive2IT extends BaseIT {
         Catalog.Type.RELATIONAL,
         provider,
         "comment",
-        ImmutableMap.of(METASTORE_URIS, hive_metastore_uris));
+        ImmutableMap.of(METASTORE_URIS, hiveMetastoreUris));
 
     Catalog catalog = metalake.loadCatalog(catalogName);
     // Test rename catalog
@@ -1721,7 +1721,7 @@ public class CatalogHive2IT extends BaseIT {
     Map<String, String> properties = Maps.newHashMap();
     String nameOfCatalog = GravitinoITUtils.genRandomName("catalog");
     // Wrong Hive HIVE_METASTORE_URIS
-    String wrongHiveMetastoreURI = hive_metastore_uris + "_wrong";
+    String wrongHiveMetastoreURI = hiveMetastoreUris + "_wrong";
     properties.put(METASTORE_URIS, wrongHiveMetastoreURI);
     Catalog createdCatalog =
         metalake.createCatalog(
@@ -1740,8 +1740,8 @@ public class CatalogHive2IT extends BaseIT {
 
     Catalog newCatalog =
         metalake.alterCatalog(
-            nameOfCatalog, CatalogChange.setProperty(METASTORE_URIS, hive_metastore_uris));
-    Assertions.assertEquals(hive_metastore_uris, newCatalog.properties().get(METASTORE_URIS));
+            nameOfCatalog, CatalogChange.setProperty(METASTORE_URIS, hiveMetastoreUris));
+    Assertions.assertEquals(hiveMetastoreUris, newCatalog.properties().get(METASTORE_URIS));
 
     // The URI has restored, so it should not throw exception.
     Assertions.assertDoesNotThrow(
@@ -1755,7 +1755,7 @@ public class CatalogHive2IT extends BaseIT {
 
   private void createCatalogWithCustomOperation(String catalogName, String customImpl) {
     Map<String, String> properties = Maps.newHashMap();
-    properties.put(METASTORE_URIS, hive_metastore_uris);
+    properties.put(METASTORE_URIS, hiveMetastoreUris);
     properties.put(BaseCatalog.CATALOG_OPERATION_IMPL, customImpl);
 
     Catalog catalog =
