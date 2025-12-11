@@ -92,14 +92,6 @@ public interface GravitinoAuthorizer extends Closeable {
   boolean isSelf(Entity.EntityType type, NameIdentifier nameIdentifier);
 
   /**
-   * Determine whether the user is the metalake user
-   *
-   * @param metalake metalake
-   * @return authorization result
-   */
-  boolean isMetalakeUser(String metalake);
-
-  /**
    * Determine whether the user can set owner
    *
    * @param metalake metalake
