@@ -312,6 +312,8 @@ jcasbin = { group='org.casbin', name='jcasbin', version.ref="jcasbin" }
 openlineage-java= { group = "io.openlineage", name = "openlineage-java", version.ref = "openlineage" }
 ognl = { group='ognl', name='ognl', version.ref="ognl" }
 
+langchain4j-openai = { group='dev.langchain4j',name='langchain4j-open-ai',version='1.9.1'}
+
 [bundles]
 log4j = ["slf4j-api", "log4j-slf4j2-impl", "log4j-api", "log4j-core", "log4j-12-api", "log4j-layout-template-json"]
 jetty = ["jetty-server", "jetty-servlet", "jetty-webapp", "jetty-servlets"]

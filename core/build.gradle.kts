@@ -44,6 +44,8 @@ dependencies {
   implementation(libs.guava)
   implementation(libs.h2db)
   implementation(libs.jackson.jaxrs.json.provider) // This is required by lance
+  implementation(libs.langchain4j.openai)
+
   implementation(libs.lance) {
     exclude(group = "com.fasterxml.jackson.core", module = "*") // provided by gravitino
     exclude(group = "com.fasterxml.jackson.datatype", module = "*") // provided by gravitino
