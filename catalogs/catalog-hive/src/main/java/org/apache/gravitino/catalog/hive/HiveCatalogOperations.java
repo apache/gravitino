@@ -138,7 +138,7 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
     this.propertiesMetadata = propertiesMetadata;
 
     Properties prop = mergeProperties(conf);
-    String catalogKey = String.format("hive-%s", info.id());
+    String catalogKey = String.format("hive-%s", info.id() == null ? "0" : info.id());
     this.clientPool = new CachedClientPool(catalogKey, prop, conf);
     this.listAllTables = enableListAllTables(conf);
 

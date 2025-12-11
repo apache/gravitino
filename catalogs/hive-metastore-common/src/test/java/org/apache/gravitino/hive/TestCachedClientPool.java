@@ -41,8 +41,7 @@ public class TestCachedClientPool extends MiniHiveMetastoreService {
             "1",
             HiveConstants.CLIENT_POOL_CACHE_EVICTION_INTERVAL_MS,
             "5000");
-    // todo yuhui
-    CachedClientPool clientPool = new CachedClientPool(new Properties(), props);
+    CachedClientPool clientPool = new CachedClientPool("pool", new Properties(), props);
     HiveClientPool clientPool1 = clientPool.clientPool();
     HiveClientPool cachedClientPool =
         clientPool.clientPoolCache().getIfPresent(CachedClientPool.extractKey());
