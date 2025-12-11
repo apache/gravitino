@@ -85,6 +85,7 @@ Gravitino currently supports the following catalogs:
 * [**PostgreSQL catalog**](./jdbc-postgresql-catalog.md)
 * [**OceanBase catalog**](./jdbc-oceanbase-catalog.md)
 * [**StarRocks catalog**](./jdbc-starrocks-catalog.md)
+* [**Lakehouse generic catalog**](./lakehouse-generic-catalog.md)
 
 If you want to operate table and partition statistics, you can refer to the [document](./manage-statistics-in-gravitino.md).
 
@@ -134,6 +135,7 @@ Gravitino supports different catalogs to manage the metadata in different source
 * [Paimon catalog](./lakehouse-paimon-catalog.md): a complete guide to using Gravitino to manage Apache Paimon data.
 * [PostgreSQL catalog](./jdbc-postgresql-catalog.md): a complete guide to using Gravitino to manage PostgreSQL data.
 * [OceanBase catalog](./jdbc-oceanbase-catalog.md): a complete guide to using Gravitino to manage OceanBase data.
+* [Lakehouse generic catalog](./lakehouse-generic-catalog.md): a complete guide to using Gravitino to manage lakehouse data sources.
 
 ### Governance
 
@@ -150,6 +152,10 @@ Gravitino provides governance features to manage metadata in a unified way. See:
 
 * [Iceberg REST catalog service](./iceberg-rest-service.md): a guide to using Gravitino
   as an Apache Iceberg REST catalog service.
+
+### Gravitino Lance REST catalog service
+* [Lance REST catalog service](./lance-rest-service.md): a guide to using Gravitino
+  as a Lance REST catalog service.
 
 ### Connectors
 
