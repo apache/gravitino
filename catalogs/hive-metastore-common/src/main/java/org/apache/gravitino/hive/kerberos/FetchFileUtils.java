@@ -54,7 +54,7 @@ public class FetchFileUtils {
 
         default:
           throw new IllegalArgumentException(
-              String.format("Doesn't support the scheme %s", scheme));
+              String.format("The scheme '%s' is not supported", scheme));
       }
     } catch (URISyntaxException ue) {
       throw new IllegalArgumentException("The uri of file has the wrong format", ue);

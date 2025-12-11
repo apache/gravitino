@@ -163,7 +163,7 @@ public class KerberosClient implements java.io.Closeable {
     String keyTabUri = kerberosConfig.getKeytab();
     Preconditions.checkArgument(StringUtils.isNotBlank(keyTabUri), "Keytab uri can't be blank");
     Preconditions.checkArgument(
-        !keyTabUri.trim().startsWith("hdfs"), "Keytab uri doesn't support to use HDFS");
+        !keyTabUri.trim().startsWith("hdfs"), "HDFS URIs are not supported for keytab files");
 
     File keytabsDir = new File("keytabs");
     if (!keytabsDir.exists()) {
