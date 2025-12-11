@@ -31,6 +31,7 @@ from gravitino.api.rel.expressions.literals.literals import Literals
 from gravitino.api.rel.expressions.named_reference import FieldReference
 from gravitino.api.rel.expressions.sorts.null_ordering import NullOrdering
 from gravitino.api.rel.expressions.sorts.sort_direction import SortDirection
+from gravitino.api.rel.expressions.sorts.sort_order import SortOrder
 from gravitino.api.rel.expressions.sorts.sort_orders import SortOrders
 from gravitino.api.rel.expressions.transforms.transforms import Transforms
 from gravitino.api.rel.expressions.unparsed_expression import UnparsedExpression
@@ -785,3 +786,42 @@ class TestDTOConverters(unittest.TestCase):
             for column in columns
         ]
         self.assertListEqual(DTOConverters.to_dtos(columns), expected)
+
+    def test_to_dtos_sort_orders(self):
+        directions = {SortDirection.ASCENDING, SortDirection.DESCENDING}
+        null_orderings = {NullOrdering.NULLS_LAST, NullOrdering.NULLS_FIRST}
+        field_names = [
+            [f"score_{i}"] for i in range(len(directions) * len(null_orderings))
+        ]
+        sort_orders: list[SortOrder] = []
+        expected_dtos: list[SortOrderDTO] = []
+        for field_name, (direction, null_ordering) in zip(
+            field_names, product(directions, null_orderings)
+        ):
+            field_ref = FieldReference(field_names=field_name)
+            sort_orders.append(
+                SortOrders.of(
+                    expression=field_ref,
+                    direction=direction,
+                    null_ordering=null_ordering,
+                )
+            )
+            field_ref_dto = (
+                FieldReferenceDTO.builder()
+                .with_field_name(field_name=field_name)
+                .build()
+            )
+            expected_dtos.append(
+                SortOrderDTO(
+                    sort_term=field_ref_dto,
+                    direction=direction,
+                    null_ordering=null_ordering,
+                )
+            )
+        converted_dtos = DTOConverters.to_dtos(sort_orders)
+        for converted, expected in zip(converted_dtos, expected_dtos):
+            self.assertTrue(converted.sort_term() == expected.sort_term())
+            self.assertTrue(converted.direction() == expected.direction())
+            self.assertTrue(converted.null_ordering() == expected.null_ordering())
+
+        self.assertListEqual(DTOConverters.to_dtos(converted_dtos), converted_dtos)
