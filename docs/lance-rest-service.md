@@ -165,6 +165,7 @@ Launch Lance REST service using Docker(You need to start Gravitino server first)
 docker run -d --name lance-rest-service -p 9101:9101 \
   -e LANCE_REST_GRAVITINO_URI=http://gravitino-host:8090 \
   -e LANCE_REST_GRAVITINO_METALAKE_NAME=your_metalake_name \
+  -e LANCE_REST_GRAVITINO_URI=http://gravitino-host:port \
   apache/gravitino-lance-rest:latest
 ```
 
@@ -182,7 +183,7 @@ Access the service at `http://localhost:9101`.
 
 :::tip Configuration Tips
 - **Required:** Set `LANCE_REST_GRAVITINO_METALAKE_NAME` to your Gravitino metalake name
-- **Conditional:** Update `LANCE_REST_GRAVITINO_URI` if Gravitino server is not on `localhost`
+- **Conditional:** Update `LANCE_REST_GRAVITINO_URI` if Gravitino server is not on `localhost` in the docker instance.
 - **Optional:** Other variables can use default values unless you have specific requirements
 :::
 
