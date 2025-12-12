@@ -50,7 +50,7 @@ class ColumnDTO(Column, DataClassJsonMixin):
     )
     """The data type of the column."""
 
-    _comment: str = field(metadata=config(field_name="comment"))
+    _comment: Optional[str] = field(default=None, metadata=config(field_name="comment"))
     """The comment associated with the column."""
 
     _default_value: Optional[Union[Expression, List[Expression]]] = field(
