@@ -28,7 +28,6 @@ import org.apache.gravitino.Entity;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.NameIdentifier;
-import org.apache.gravitino.server.authorization.MetadataAuthzHelper;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationFullName;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationMetadata;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationObjectType;
@@ -88,7 +87,7 @@ public class ParameterUtil {
         NameIdentifier nameIdentifier =
             MetadataObjectUtil.toEntityIdent(metalake, MetadataObjects.parse(fullName.get(), type));
         nameIdentifierMap.putAll(
-            MetadataAuthzHelper.splitMetadataNames(
+            NameIdentifierUtil.splitNameIdentifier(
                 metalake, MetadataObjectUtil.toEntityType(type), nameIdentifier));
       }
     }

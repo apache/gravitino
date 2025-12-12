@@ -30,11 +30,6 @@ import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Maps;
-import java.util.Arrays;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.apache.gravitino.Entity;
@@ -857,6 +852,28 @@ public class NameIdentifierUtil {
       default:
         throw new IllegalArgumentException("Metalake has no parent entity type");
     }
+  }
+
+  /**
+   * Extract the parent metadata from NameIdentifier. For example, when given a Table
+   * NameIdentifier, it returns a map containing the Table itself along with its parent Schema and
+   * Catalog.
+   *
+   * @param metalake metalake
+   * @param entityType metadata type
+   * @param nameIdentifier metadata name
+   * @return A map containing the metadata object and all its parent objects, keyed by their types
+   */
+  public static Map<Entity.EntityType, NameIdentifier> splitNameIdentifier(
+      String metalake, Entity.EntityType entityType, NameIdentifier nameIdentifier) {
+    Map<Entity.EntityType, NameIdentifier> nameIdentifierMap = new HashMap<>();
+    nameIdentifierMap.put(Entity.EntityType.METALAKE, ofMetalake(metalake));
+    while (entityType != Entity.EntityType.METALAKE) {
+      nameIdentifierMap.put(entityType, nameIdentifier);
+      entityType = parentEntityType(entityType);
+      nameIdentifier = parentNameIdentifier(nameIdentifier, entityType);
+    }
+    return nameIdentifierMap;
   }
 
   private static Namespace createVirtualNamespace(Entity.EntityType type, String metalake) {
