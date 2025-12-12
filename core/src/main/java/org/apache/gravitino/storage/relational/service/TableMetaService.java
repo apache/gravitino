@@ -28,6 +28,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 import org.apache.gravitino.Entity;
+import org.apache.gravitino.Entity.EntityType;
 import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
@@ -85,11 +86,26 @@ public class TableMetaService {
   public TableEntity getTableByIdentifier(NameIdentifier identifier) {
     NameIdentifierUtil.checkTable(identifier);
 
-    Long schemaId =
-        EntityIdService.getEntityId(
-            NameIdentifier.of(identifier.namespace().levels()), Entity.EntityType.SCHEMA);
+    String[] namespaceLevels = identifier.namespace().levels();
+    String metalakeName = namespaceLevels[0];
+    String catalogName = namespaceLevels[1];
+    String schemaName = namespaceLevels[2];
+    String tableName = identifier.name();
+    TablePO tablePO = getTableByFullQualifiedName(metalakeName, catalogName, schemaName, tableName);
+    if (tablePO.getSchemaId() == null) {
+      throw new NoSuchEntityException(
+          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
+          EntityType.SCHEMA.name().toLowerCase(),
+          schemaName);
+    }
 
-    TablePO tablePO = getTablePOBySchemaIdAndName(schemaId, identifier.name());
+    if (tablePO.getTableId() == null) {
+      throw new NoSuchEntityException(
+          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
+          EntityType.TABLE.name().toLowerCase(),
+          tableName);
+    }
+
     List<ColumnPO> columnPOs =
         TableColumnMetaService.getInstance()
             .getColumnsByTableIdAndVersion(tablePO.getTableId(), tablePO.getCurrentVersion());
@@ -340,6 +356,24 @@ public class TableMetaService {
           Entity.EntityType.TABLE.name().toLowerCase(),
           tableName);
     }
+    return tablePO;
+  }
+
+  private TablePO getTableByFullQualifiedName(
+      String metalakeName, String catalogName, String schemaName, String tableName) {
+    TablePO tablePO =
+        SessionUtils.getWithoutCommit(
+            TableMetaMapper.class,
+            mapper ->
+                mapper.selectTableByFullQualifiedName(
+                    metalakeName, catalogName, schemaName, tableName));
+    if (tablePO == null) {
+      throw new NoSuchEntityException(
+          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
+          Entity.EntityType.TABLE.name().toLowerCase(),
+          tableName);
+    }
+
     return tablePO;
   }
 }
