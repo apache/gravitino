@@ -150,7 +150,7 @@ public class HiveExceptionConverter {
 
     String message = cause.getMessage();
     String lowerMessage = message != null ? message.toLowerCase(Locale.ROOT) : "";
-    String exceptionClassName = cause.getClass().getName();
+    String exceptionClassName = cause.getClass().getSimpleName();
 
     if (exceptionClassName.contains("AlreadyExistsException")) {
       return toAlreadyExistsException(cause, target, message);

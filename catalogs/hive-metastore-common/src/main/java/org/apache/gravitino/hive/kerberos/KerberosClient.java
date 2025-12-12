@@ -27,6 +27,8 @@ import com.google.common.base.Splitter;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.util.List;
 import java.util.Properties;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
@@ -186,8 +188,14 @@ public class KerberosClient implements java.io.Closeable {
 
   @Override
   public void close() {
-    if (checkTgtExecutor != null) {
-      checkTgtExecutor.shutdown();
+    try {
+      if (checkTgtExecutor != null) {
+        checkTgtExecutor.shutdown();
+      }
+
+      Files.deleteIfExists(Paths.get(keytabFilePath));
+    } catch (IOException e) {
+      LOG.warn("Failed to delete keytab file: {}", keytabFilePath, e);
     }
   }
 
