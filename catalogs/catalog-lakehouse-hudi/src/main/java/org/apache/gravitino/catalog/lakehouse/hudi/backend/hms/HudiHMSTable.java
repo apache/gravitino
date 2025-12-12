@@ -75,8 +75,12 @@ public class HudiHMSTable extends HudiTable<Table> {
       columns = hudiColumns;
       partitioning = hmsTable.partitioning();
 
+      // Should always be SortOrders.NONE since Hudi using clustering to sort data (see
+      // https://hudi.apache.org/docs/next/clustering/)
+      // but is run as a background table service
       sortOrders = hmsTable.sortOrder();
 
+      // Should always be Distributions.NONE since Hudi doesn't support distribution
       distribution = hmsTable.distribution();
       auditInfo = AuditInfo.builder().withCreator(hmsTable.auditInfo().creator()).build();
 
