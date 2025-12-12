@@ -27,7 +27,7 @@ import org.apache.hadoop.security.UserGroupInformation;
 /**
  * An externally visible interface to the Hive client. This interface is shared across both the
  * internal and external classloaders for a given version of Hive and thus must expose only shared
- * classes.
+ * classes except for the classes that are specific to the Hive version.
  */
 public interface HiveClient extends AutoCloseable {
 
