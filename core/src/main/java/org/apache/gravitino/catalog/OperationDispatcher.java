@@ -92,8 +92,6 @@ public abstract class OperationDispatcher {
   protected <R, E extends Throwable> R doWithCatalog(
       NameIdentifier ident, ThrowableFunction<CatalogManager.CatalogWrapper, R> fn, Class<E> ex)
       throws E {
-    catalogManager.checkCatalogInUse(store, ident);
-
     try {
       CatalogManager.CatalogWrapper c = catalogManager.loadCatalogAndWrap(ident);
       return fn.apply(c);
@@ -114,8 +112,6 @@ public abstract class OperationDispatcher {
       Class<E1> ex1,
       Class<E2> ex2)
       throws E1, E2 {
-    catalogManager.checkCatalogInUse(store, ident);
-
     try {
       CatalogManager.CatalogWrapper c = catalogManager.loadCatalogAndWrap(ident);
       return fn.apply(c);
