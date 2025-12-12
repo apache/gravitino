@@ -29,9 +29,9 @@ import static org.apache.gravitino.Entity.EntityType.USER;
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableSet;
-import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import java.util.Arrays;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -772,9 +772,10 @@ public class NameIdentifierUtil {
       return ofMetalake(metalake);
     }
 
-    // Build the full name path by traversing the hierarchy
-    List<String> namePath = Lists.newArrayList();
-    namePath.add(name);
+    // Build the full name path by traversing the hierarchy from child to root
+    // Using LinkedList for efficient prepend operations
+    LinkedList<String> levels = new LinkedList<>();
+    levels.add(name);
 
     Entity.EntityType currentType = type;
     while (currentType != Entity.EntityType.METALAKE) {
@@ -782,7 +783,7 @@ public class NameIdentifierUtil {
       String parentName = entities.get(parentType);
 
       if (parentType == Entity.EntityType.METALAKE) {
-        namePath.add(0, metalake);
+        levels.addFirst(metalake);
         break;
       } else if (parentName == null) {
         throw new IllegalArgumentException(
@@ -792,7 +793,7 @@ public class NameIdentifierUtil {
                 + parentType);
       }
 
-      namePath.add(0, parentName);
+      levels.addFirst(parentName);
       currentType = parentType;
     }
 
@@ -802,7 +803,7 @@ public class NameIdentifierUtil {
     }
 
     // Create NameIdentifier from the full path
-    return NameIdentifier.of(namePath.toArray(new String[0]));
+    return NameIdentifier.of(levels.toArray(new String[0]));
   }
 
   /**

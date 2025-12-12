@@ -23,6 +23,8 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.google.common.base.Joiner;
+import com.google.common.collect.Maps;
+import java.util.Map;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
@@ -208,7 +210,7 @@ public class TestNameIdentifierUtil {
     String userName = "john_doe";
 
     // Test 1: Build a METALAKE identifier
-    java.util.Map<Entity.EntityType, String> metalakeEntities = new java.util.HashMap<>();
+    Map<Entity.EntityType, String> metalakeEntities = Maps.newHashMap();
     metalakeEntities.put(Entity.EntityType.METALAKE, metalake);
     NameIdentifier metalakeIdent =
         NameIdentifierUtil.buildNameIdentifier(
@@ -217,7 +219,7 @@ public class TestNameIdentifierUtil {
     assertEquals(metalake, metalakeIdent.name());
 
     // Test 2: Build a CATALOG identifier
-    java.util.Map<Entity.EntityType, String> catalogEntities = new java.util.HashMap<>();
+    Map<Entity.EntityType, String> catalogEntities = Maps.newHashMap();
     catalogEntities.put(Entity.EntityType.METALAKE, metalake);
     NameIdentifier catalogIdent =
         NameIdentifierUtil.buildNameIdentifier(Entity.EntityType.CATALOG, catalog, catalogEntities);
@@ -226,7 +228,7 @@ public class TestNameIdentifierUtil {
     assertEquals(1, catalogIdent.namespace().length());
 
     // Test 3: Build a SCHEMA identifier
-    java.util.Map<Entity.EntityType, String> schemaEntities = new java.util.HashMap<>();
+    Map<Entity.EntityType, String> schemaEntities = Maps.newHashMap();
     schemaEntities.put(Entity.EntityType.METALAKE, metalake);
     schemaEntities.put(Entity.EntityType.CATALOG, catalog);
     NameIdentifier schemaIdent =
@@ -236,7 +238,7 @@ public class TestNameIdentifierUtil {
     assertEquals(2, schemaIdent.namespace().length());
 
     // Test 4: Build a TABLE identifier
-    java.util.Map<Entity.EntityType, String> tableEntities = new java.util.HashMap<>();
+    Map<Entity.EntityType, String> tableEntities = Maps.newHashMap();
     tableEntities.put(Entity.EntityType.METALAKE, metalake);
     tableEntities.put(Entity.EntityType.CATALOG, catalog);
     tableEntities.put(Entity.EntityType.SCHEMA, schema);
@@ -247,7 +249,7 @@ public class TestNameIdentifierUtil {
     assertEquals(3, tableIdent.namespace().length());
 
     // Test 5: Build a COLUMN identifier
-    java.util.Map<Entity.EntityType, String> columnEntities = new java.util.HashMap<>();
+    Map<Entity.EntityType, String> columnEntities = Maps.newHashMap();
     columnEntities.put(Entity.EntityType.METALAKE, metalake);
     columnEntities.put(Entity.EntityType.CATALOG, catalog);
     columnEntities.put(Entity.EntityType.SCHEMA, schema);
@@ -260,7 +262,7 @@ public class TestNameIdentifierUtil {
     assertEquals(4, columnIdent.namespace().length());
 
     // Test 6: Build a USER identifier (virtual namespace type)
-    java.util.Map<Entity.EntityType, String> userEntities = new java.util.HashMap<>();
+    Map<Entity.EntityType, String> userEntities = Maps.newHashMap();
     userEntities.put(Entity.EntityType.METALAKE, metalake);
     NameIdentifier userIdent =
         NameIdentifierUtil.buildNameIdentifier(Entity.EntityType.USER, userName, userEntities);
@@ -275,7 +277,7 @@ public class TestNameIdentifierUtil {
 
     // Test 7: Build a TAG identifier (virtual namespace type)
     String tagName = "sensitive";
-    java.util.Map<Entity.EntityType, String> tagEntities = new java.util.HashMap<>();
+    Map<Entity.EntityType, String> tagEntities = Maps.newHashMap();
     tagEntities.put(Entity.EntityType.METALAKE, metalake);
     NameIdentifier tagIdent =
         NameIdentifierUtil.buildNameIdentifier(Entity.EntityType.TAG, tagName, tagEntities);
@@ -285,7 +287,7 @@ public class TestNameIdentifierUtil {
 
     // Test 8: Build a ROLE identifier (virtual namespace type)
     String roleName = "admin";
-    java.util.Map<Entity.EntityType, String> roleEntities = new java.util.HashMap<>();
+    Map<Entity.EntityType, String> roleEntities = Maps.newHashMap();
     roleEntities.put(Entity.EntityType.METALAKE, metalake);
     NameIdentifier roleIdent =
         NameIdentifierUtil.buildNameIdentifier(Entity.EntityType.ROLE, roleName, roleEntities);
@@ -294,7 +296,7 @@ public class TestNameIdentifierUtil {
     assertEquals(roleName, roleIdent.name());
 
     // Test 9: Error case - missing parent entity (CATALOG without METALAKE)
-    java.util.Map<Entity.EntityType, String> invalidEntities = new java.util.HashMap<>();
+    Map<Entity.EntityType, String> invalidEntities = Maps.newHashMap();
     // Missing METALAKE entry - should throw an exception about null or empty identifiers
     Throwable exception1 =
         assertThrows(
@@ -309,7 +311,7 @@ public class TestNameIdentifierUtil {
             || exception1.getMessage().contains("missing parent entity of type"));
 
     // Test 10: Error case - missing intermediate parent (TABLE without SCHEMA)
-    java.util.Map<Entity.EntityType, String> missingSchemaEntities = new java.util.HashMap<>();
+    Map<Entity.EntityType, String> missingSchemaEntities = Maps.newHashMap();
     missingSchemaEntities.put(Entity.EntityType.METALAKE, metalake);
     missingSchemaEntities.put(Entity.EntityType.CATALOG, catalog);
     // Missing SCHEMA
@@ -324,7 +326,7 @@ public class TestNameIdentifierUtil {
 
     // Test 11: Build a FILESET identifier
     String filesetName = "my_fileset";
-    java.util.Map<Entity.EntityType, String> filesetEntities = new java.util.HashMap<>();
+    Map<Entity.EntityType, String> filesetEntities = Maps.newHashMap();
     filesetEntities.put(Entity.EntityType.METALAKE, metalake);
     filesetEntities.put(Entity.EntityType.CATALOG, catalog);
     filesetEntities.put(Entity.EntityType.SCHEMA, schema);
@@ -336,7 +338,7 @@ public class TestNameIdentifierUtil {
 
     // Test 12: Build a TOPIC identifier
     String topicName = "my_topic";
-    java.util.Map<Entity.EntityType, String> topicEntities = new java.util.HashMap<>();
+    Map<Entity.EntityType, String> topicEntities = Maps.newHashMap();
     topicEntities.put(Entity.EntityType.METALAKE, metalake);
     topicEntities.put(Entity.EntityType.CATALOG, catalog);
     topicEntities.put(Entity.EntityType.SCHEMA, schema);
