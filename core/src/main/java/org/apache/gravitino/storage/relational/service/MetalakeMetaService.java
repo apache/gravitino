@@ -372,12 +372,12 @@ public class MetalakeMetaService {
     SessionUtils.doMultipleWithCommit(
         () ->
             metalakeDeleteCount[0] =
-                SessionUtils.doWithCommitAndFetchResult(
+                SessionUtils.getWithoutCommit(
                     MetalakeMetaMapper.class,
                     mapper -> mapper.deleteMetalakeMetasByLegacyTimeline(legacyTimeline, limit)),
         () ->
             ownerRelDeleteCount[0] =
-                SessionUtils.doWithCommitAndFetchResult(
+                SessionUtils.getWithoutCommit(
                     OwnerMetaMapper.class,
                     mapper -> mapper.deleteOwnerMetasByLegacyTimeline(legacyTimeline, limit)));
     return metalakeDeleteCount[0] + ownerRelDeleteCount[0];
