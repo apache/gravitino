@@ -772,6 +772,12 @@ public class NameIdentifierUtil {
       return ofMetalake(metalake);
     }
 
+    // Handle virtual namespace types early to avoid unnecessary work
+    if (SUPPORT_VIRTUAL_NAMESPACE_TYPES.contains(type)) {
+      Namespace namespace = createVirtualNamespace(type, metalake);
+      return NameIdentifier.of(namespace, name);
+    }
+
     // Build the full name path by traversing the hierarchy from child to root
     // Using LinkedList for efficient prepend operations
     LinkedList<String> levels = new LinkedList<>();
@@ -797,10 +803,6 @@ public class NameIdentifierUtil {
       currentType = parentType;
     }
 
-    if (SUPPORT_VIRTUAL_NAMESPACE_TYPES.contains(type)) {
-      Namespace namespace = createVirtualNamespace(type, metalake);
-      return NameIdentifier.of(namespace, name);
-    }
 
     // Create NameIdentifier from the full path
     return NameIdentifier.of(levels.toArray(new String[0]));
@@ -820,9 +822,7 @@ public class NameIdentifierUtil {
     entities.forEach(
         (type, name) -> {
           NameIdentifier identifier = buildNameIdentifier(type, name, entities);
-          if (identifier != null) {
-            nameIdentifierMap.put(type, identifier);
-          }
+          nameIdentifierMap.put(type, identifier);
         });
 
     return nameIdentifierMap;
