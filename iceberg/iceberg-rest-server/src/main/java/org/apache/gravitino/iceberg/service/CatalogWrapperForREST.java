@@ -42,7 +42,6 @@ import org.apache.gravitino.credential.CredentialPropertyUtils;
 import org.apache.gravitino.credential.PathBasedCredentialContext;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
 import org.apache.gravitino.iceberg.common.ops.IcebergCatalogWrapper;
-import org.apache.gravitino.iceberg.service.cache.LocalScanPlanCache;
 import org.apache.gravitino.iceberg.service.cache.ScanPlanCache;
 import org.apache.gravitino.iceberg.service.cache.ScanPlanCacheKey;
 import org.apache.gravitino.storage.GCSProperties;
@@ -273,13 +272,11 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
 
     try {
       Table table = catalog.loadTable(tableIdentifier);
-      if (scanPlanCache != null) {
-        Optional<PlanTableScanResponse> cachedResponse =
-            scanPlanCache.get(ScanPlanCacheKey.create(tableIdentifier, table, scanRequest));
-        if (cachedResponse.isPresent()) {
-          LOG.info("Using cached scan plan for table: {}", tableIdentifier);
-          return cachedResponse.get();
-        }
+      Optional<PlanTableScanResponse> cachedResponse =
+          scanPlanCache.get(ScanPlanCacheKey.create(tableIdentifier, table, scanRequest));
+      if (cachedResponse.isPresent()) {
+        LOG.info("Using cached scan plan for table: {}", tableIdentifier);
+        return cachedResponse.get();
       }
 
       List<String> planTasks = new ArrayList<>();
@@ -340,9 +337,7 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
       PlanTableScanResponse response = responseBuilder.build();
 
       // Cache the scan plan response
-      if (scanPlanCache != null) {
-        scanPlanCache.put(ScanPlanCacheKey.create(tableIdentifier, table, scanRequest), response);
-      }
+      scanPlanCache.put(ScanPlanCacheKey.create(tableIdentifier, table, scanRequest), response);
       return response;
 
     } catch (IllegalArgumentException e) {
@@ -455,16 +450,14 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
   private ScanPlanCache loadScanPlanCache(IcebergConfig config) {
     String impl = config.get(IcebergConfig.SCAN_PLAN_CACHE_IMPL);
     if (StringUtils.isBlank(impl)) {
-      LOG.info("Scan plan cache is not configured, using default LocalScanPlanCache");
-      return new LocalScanPlanCache(
-          config.get(IcebergConfig.SCAN_PLAN_CACHE_CAPACITY),
-          config.get(IcebergConfig.SCAN_PLAN_CACHE_EXPIRE_MINUTES));
+      return ScanPlanCache.DUMMY;
     }
 
     ScanPlanCache cache =
         ClassUtils.loadAndGetInstance(impl, Thread.currentThread().getContextClassLoader());
     int capacity = config.get(IcebergConfig.SCAN_PLAN_CACHE_CAPACITY);
     int expireMinutes = config.get(IcebergConfig.SCAN_PLAN_CACHE_EXPIRE_MINUTES);
+    cache.initialize(capacity, expireMinutes);
     LOG.info(
         "Load scan plan cache for catalog: {}, impl: {}, capacity: {}, expire minutes: {}",
         catalog.name(),
