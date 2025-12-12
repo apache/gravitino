@@ -739,9 +739,57 @@ public class NameIdentifierUtil {
    * This method constructs the identifier hierarchically using the parent entity type
    * relationships.
    *
+   * <p>Examples:
+   *
+   * <pre>
+   * 1. Build a TABLE identifier:
+   *    Input:
+   *      type = Entity.EntityType.TABLE
+   *      name = "users"
+   *      entities = {
+   *        METALAKE -> "my_metalake",
+   *        CATALOG -> "my_catalog",
+   *        SCHEMA -> "my_schema"
+   *      }
+   *    Result: NameIdentifier.of("my_metalake", "my_catalog", "my_schema", "users")
+   *
+   * 2. Build a SCHEMA identifier:
+   *    Input:
+   *      type = Entity.EntityType.SCHEMA
+   *      name = "my_schema"
+   *      entities = {
+   *        METALAKE -> "my_metalake",
+   *        CATALOG -> "my_catalog"
+   *      }
+   *    Result: NameIdentifier.of("my_metalake", "my_catalog", "my_schema")
+   *
+   * 3. Build a USER identifier (virtual namespace type):
+   *    Input:
+   *      type = Entity.EntityType.USER
+   *      name = "john_doe"
+   *      entities = {
+   *        METALAKE -> "my_metalake"
+   *      }
+   *    Result: NameIdentifier.of(NamespaceUtil.ofUser("my_metalake"), "john_doe")
+   *            which creates a NameIdentifier with namespace ["my_metalake", "system", "user"]
+   *            and name "john_doe"
+   *
+   * 4. Build a COLUMN identifier:
+   *    Input:
+   *      type = Entity.EntityType.COLUMN
+   *      name = "id"
+   *      entities = {
+   *        METALAKE -> "my_metalake",
+   *        CATALOG -> "my_catalog",
+   *        SCHEMA -> "my_schema",
+   *        TABLE -> "users"
+   *      }
+   *    Result: NameIdentifier.of("my_metalake", "my_catalog", "my_schema", "users", "id")
+   * </pre>
+   *
    * @param type The entity type
    * @param name The entity name
-   * @param entities Map containing the metalake, catalog, schema names
+   * @param entities Map containing the metalake, catalog, schema names and other parent entities
    * @return The created NameIdentifier
    * @throws IllegalArgumentException if the entity type is not supported or required parent
    *     entities are missing

@@ -197,4 +197,148 @@ public class TestNameIdentifierUtil {
     Assertions.assertThrows(
         IllegalArgumentException.class, () -> NameIdentifierUtil.ofRole(null, roleName));
   }
+
+  @Test
+  void testBuildNameIdentifier() {
+    String metalake = "my_metalake";
+    String catalog = "my_catalog";
+    String schema = "my_schema";
+    String tableName = "users";
+    String columnName = "id";
+    String userName = "john_doe";
+
+    // Test 1: Build a METALAKE identifier
+    java.util.Map<Entity.EntityType, String> metalakeEntities = new java.util.HashMap<>();
+    metalakeEntities.put(Entity.EntityType.METALAKE, metalake);
+    NameIdentifier metalakeIdent =
+        NameIdentifierUtil.buildNameIdentifier(
+            Entity.EntityType.METALAKE, metalake, metalakeEntities);
+    assertEquals(NameIdentifier.of(metalake), metalakeIdent);
+    assertEquals(metalake, metalakeIdent.name());
+
+    // Test 2: Build a CATALOG identifier
+    java.util.Map<Entity.EntityType, String> catalogEntities = new java.util.HashMap<>();
+    catalogEntities.put(Entity.EntityType.METALAKE, metalake);
+    NameIdentifier catalogIdent =
+        NameIdentifierUtil.buildNameIdentifier(Entity.EntityType.CATALOG, catalog, catalogEntities);
+    assertEquals(NameIdentifier.of(metalake, catalog), catalogIdent);
+    assertEquals(catalog, catalogIdent.name());
+    assertEquals(1, catalogIdent.namespace().length());
+
+    // Test 3: Build a SCHEMA identifier
+    java.util.Map<Entity.EntityType, String> schemaEntities = new java.util.HashMap<>();
+    schemaEntities.put(Entity.EntityType.METALAKE, metalake);
+    schemaEntities.put(Entity.EntityType.CATALOG, catalog);
+    NameIdentifier schemaIdent =
+        NameIdentifierUtil.buildNameIdentifier(Entity.EntityType.SCHEMA, schema, schemaEntities);
+    assertEquals(NameIdentifier.of(metalake, catalog, schema), schemaIdent);
+    assertEquals(schema, schemaIdent.name());
+    assertEquals(2, schemaIdent.namespace().length());
+
+    // Test 4: Build a TABLE identifier
+    java.util.Map<Entity.EntityType, String> tableEntities = new java.util.HashMap<>();
+    tableEntities.put(Entity.EntityType.METALAKE, metalake);
+    tableEntities.put(Entity.EntityType.CATALOG, catalog);
+    tableEntities.put(Entity.EntityType.SCHEMA, schema);
+    NameIdentifier tableIdent =
+        NameIdentifierUtil.buildNameIdentifier(Entity.EntityType.TABLE, tableName, tableEntities);
+    assertEquals(NameIdentifier.of(metalake, catalog, schema, tableName), tableIdent);
+    assertEquals(tableName, tableIdent.name());
+    assertEquals(3, tableIdent.namespace().length());
+
+    // Test 5: Build a COLUMN identifier
+    java.util.Map<Entity.EntityType, String> columnEntities = new java.util.HashMap<>();
+    columnEntities.put(Entity.EntityType.METALAKE, metalake);
+    columnEntities.put(Entity.EntityType.CATALOG, catalog);
+    columnEntities.put(Entity.EntityType.SCHEMA, schema);
+    columnEntities.put(Entity.EntityType.TABLE, tableName);
+    NameIdentifier columnIdent =
+        NameIdentifierUtil.buildNameIdentifier(
+            Entity.EntityType.COLUMN, columnName, columnEntities);
+    assertEquals(NameIdentifier.of(metalake, catalog, schema, tableName, columnName), columnIdent);
+    assertEquals(columnName, columnIdent.name());
+    assertEquals(4, columnIdent.namespace().length());
+
+    // Test 6: Build a USER identifier (virtual namespace type)
+    java.util.Map<Entity.EntityType, String> userEntities = new java.util.HashMap<>();
+    userEntities.put(Entity.EntityType.METALAKE, metalake);
+    NameIdentifier userIdent =
+        NameIdentifierUtil.buildNameIdentifier(Entity.EntityType.USER, userName, userEntities);
+    NameIdentifier expectedUserIdent = NameIdentifierUtil.ofUser(metalake, userName);
+    assertEquals(expectedUserIdent, userIdent);
+    assertEquals(userName, userIdent.name());
+    // Virtual namespace should have 3 levels: [metalake, "system", "user"]
+    assertEquals(3, userIdent.namespace().length());
+    assertEquals(metalake, userIdent.namespace().level(0));
+    assertEquals(Entity.SYSTEM_CATALOG_RESERVED_NAME, userIdent.namespace().level(1));
+    assertEquals(Entity.USER_SCHEMA_NAME, userIdent.namespace().level(2));
+
+    // Test 7: Build a TAG identifier (virtual namespace type)
+    String tagName = "sensitive";
+    java.util.Map<Entity.EntityType, String> tagEntities = new java.util.HashMap<>();
+    tagEntities.put(Entity.EntityType.METALAKE, metalake);
+    NameIdentifier tagIdent =
+        NameIdentifierUtil.buildNameIdentifier(Entity.EntityType.TAG, tagName, tagEntities);
+    NameIdentifier expectedTagIdent = NameIdentifierUtil.ofTag(metalake, tagName);
+    assertEquals(expectedTagIdent, tagIdent);
+    assertEquals(tagName, tagIdent.name());
+
+    // Test 8: Build a ROLE identifier (virtual namespace type)
+    String roleName = "admin";
+    java.util.Map<Entity.EntityType, String> roleEntities = new java.util.HashMap<>();
+    roleEntities.put(Entity.EntityType.METALAKE, metalake);
+    NameIdentifier roleIdent =
+        NameIdentifierUtil.buildNameIdentifier(Entity.EntityType.ROLE, roleName, roleEntities);
+    NameIdentifier expectedRoleIdent = NameIdentifierUtil.ofRole(metalake, roleName);
+    assertEquals(expectedRoleIdent, roleIdent);
+    assertEquals(roleName, roleIdent.name());
+
+    // Test 9: Error case - missing parent entity (CATALOG without METALAKE)
+    java.util.Map<Entity.EntityType, String> invalidEntities = new java.util.HashMap<>();
+    // Missing METALAKE entry
+    Throwable exception1 =
+        assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                NameIdentifierUtil.buildNameIdentifier(
+                    Entity.EntityType.CATALOG, catalog, invalidEntities));
+    assertTrue(exception1.getMessage().contains("missing parent entity"));
+
+    // Test 10: Error case - missing intermediate parent (TABLE without SCHEMA)
+    java.util.Map<Entity.EntityType, String> missingSchemaEntities = new java.util.HashMap<>();
+    missingSchemaEntities.put(Entity.EntityType.METALAKE, metalake);
+    missingSchemaEntities.put(Entity.EntityType.CATALOG, catalog);
+    // Missing SCHEMA
+    Throwable exception2 =
+        assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                NameIdentifierUtil.buildNameIdentifier(
+                    Entity.EntityType.TABLE, tableName, missingSchemaEntities));
+    assertTrue(exception2.getMessage().contains("missing parent entity"));
+    assertTrue(exception2.getMessage().contains("SCHEMA"));
+
+    // Test 11: Build a FILESET identifier
+    String filesetName = "my_fileset";
+    java.util.Map<Entity.EntityType, String> filesetEntities = new java.util.HashMap<>();
+    filesetEntities.put(Entity.EntityType.METALAKE, metalake);
+    filesetEntities.put(Entity.EntityType.CATALOG, catalog);
+    filesetEntities.put(Entity.EntityType.SCHEMA, schema);
+    NameIdentifier filesetIdent =
+        NameIdentifierUtil.buildNameIdentifier(
+            Entity.EntityType.FILESET, filesetName, filesetEntities);
+    assertEquals(NameIdentifier.of(metalake, catalog, schema, filesetName), filesetIdent);
+    assertEquals(filesetName, filesetIdent.name());
+
+    // Test 12: Build a TOPIC identifier
+    String topicName = "my_topic";
+    java.util.Map<Entity.EntityType, String> topicEntities = new java.util.HashMap<>();
+    topicEntities.put(Entity.EntityType.METALAKE, metalake);
+    topicEntities.put(Entity.EntityType.CATALOG, catalog);
+    topicEntities.put(Entity.EntityType.SCHEMA, schema);
+    NameIdentifier topicIdent =
+        NameIdentifierUtil.buildNameIdentifier(Entity.EntityType.TOPIC, topicName, topicEntities);
+    assertEquals(NameIdentifier.of(metalake, catalog, schema, topicName), topicIdent);
+    assertEquals(topicName, topicIdent.name());
+  }
 }

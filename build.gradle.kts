@@ -131,23 +131,53 @@ allprojects {
         )
         replaceRegex(
           "Use Guava collect classes instead of any shadowed versions",
-          "import\\s+(?:.*\\.com\\.google\\.common\\.collect|org\\.glassfish\\.jersey\\.internal\\.guava)\\.(Sets|Maps|Lists|ImmutableList|ImmutableMap|ImmutableSet|ImmutableBiMap|Iterables|Iterators|Multimap|SetMultimap|ListMultimap|BiMap|Table);",
+          "import\\s+(?:.*\\.com\\.google\\.common\\.collect|org\\.glassfish\\.jersey\\.internal\\.guava)\\.([A-Z][a-zA-Z0-9_]*);",
           "import com.google.common.collect.${'$'}1;"
         )
         replaceRegex(
           "Use Guava base classes instead of any shadowed versions",
-          "import\\s+(?:.*\\.com\\.google\\.common\\.base|org\\.glassfish\\.jersey\\.internal\\.guava)\\.(Preconditions|Strings|Optional|Predicate|Function|Supplier|Joiner|Splitter|Objects);",
+          "import\\s+(?:.*\\.com\\.google\\.common\\.base|org\\.glassfish\\.jersey\\.internal\\.guava)\\.([A-Z][a-zA-Z0-9_]*);",
           "import com.google.common.base.${'$'}1;"
         )
         replaceRegex(
           "Use Guava io classes instead of any shadowed versions",
-          "import\\s+.*\\.com\\.google\\.common\\.io\\.(Files|Resources|ByteStreams|CharStreams);",
+          "import\\s+.*\\.com\\.google\\.common\\.io\\.([A-Z][a-zA-Z0-9_]*);",
           "import com.google.common.io.${'$'}1;"
         )
         replaceRegex(
           "Use Guava util.concurrent classes instead of any shadowed versions",
-          "import\\s+.*\\.com\\.google\\.common\\.util\\.concurrent\\.(ListenableFuture|Futures|MoreExecutors);",
+          "import\\s+.*\\.com\\.google\\.common\\.util\\.concurrent\\.([A-Z][a-zA-Z0-9_]*);",
           "import com.google.common.util.concurrent.${'$'}1;"
+        )
+        replaceRegex(
+          "Use Guava annotations classes instead of any shadowed versions",
+          "import\\s+.*\\.com\\.google\\.common\\.annotations\\.([A-Z][a-zA-Z0-9_]*);",
+          "import com.google.common.annotations.${'$'}1;"
+        )
+        replaceRegex(
+          "Use Guava cache classes instead of any shadowed versions",
+          "import\\s+.*\\.com\\.google\\.common\\.cache\\.([A-Z][a-zA-Z0-9_]*);",
+          "import com.google.common.cache.${'$'}1;"
+        )
+        replaceRegex(
+          "Use Guava primitives classes instead of any shadowed versions",
+          "import\\s+.*\\.com\\.google\\.common\\.primitives\\.([A-Z][a-zA-Z0-9_]*);",
+          "import com.google.common.primitives.${'$'}1;"
+        )
+        replaceRegex(
+          "Use Guava hash classes instead of any shadowed versions",
+          "import\\s+.*\\.com\\.google\\.common\\.hash\\.([A-Z][a-zA-Z0-9_]*);",
+          "import com.google.common.hash.${'$'}1;"
+        )
+        replaceRegex(
+          "Use Guava net classes instead of any shadowed versions",
+          "import\\s+.*\\.com\\.google\\.common\\.net\\.([A-Z][a-zA-Z0-9_]*);",
+          "import com.google.common.net.${'$'}1;"
+        )
+        replaceRegex(
+          "Use Guava reflect classes instead of any shadowed versions",
+          "import\\s+.*\\.com\\.google\\.common\\.reflect\\.([A-Z][a-zA-Z0-9_]*);",
+          "import com.google.common.reflect.${'$'}1;"
         )
 
         targetExclude("**/build/**", "**/.pnpm/***")

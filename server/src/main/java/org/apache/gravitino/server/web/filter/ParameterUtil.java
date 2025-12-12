@@ -17,11 +17,13 @@
 
 package org.apache.gravitino.server.web.filter;
 
+import java.lang.annotation.Annotation;
 import java.lang.reflect.Parameter;
 import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
@@ -72,18 +74,19 @@ public class ParameterUtil {
         NameIdentifierUtil.buildNameIdentifierMap(entities);
 
     // Extract full name and object type for metadata objects
-    String fullName = extractAnnotatedValue(parameters, args, AuthorizationFullName.class);
-    String metadataObjectType =
+    Optional<String> fullName =
+        extractAnnotatedValue(parameters, args, AuthorizationFullName.class);
+    Optional<String> metadataObjectType =
         extractAnnotatedValue(parameters, args, AuthorizationObjectType.class);
 
     // Handle fullName and metadataObjectType if present
-    if (fullName != null && metadataObjectType != null) {
+    if (fullName.isPresent() && metadataObjectType.isPresent()) {
       String metalake = entities.get(Entity.EntityType.METALAKE);
       if (metalake != null) {
         MetadataObject.Type type =
-            MetadataObject.Type.valueOf(metadataObjectType.toUpperCase(Locale.ROOT));
+            MetadataObject.Type.valueOf(metadataObjectType.get().toUpperCase(Locale.ROOT));
         NameIdentifier nameIdentifier =
-            MetadataObjectUtil.toEntityIdent(metalake, MetadataObjects.parse(fullName, type));
+            MetadataObjectUtil.toEntityIdent(metalake, MetadataObjects.parse(fullName.get(), type));
         nameIdentifierMap.putAll(
             MetadataAuthzHelper.splitMetadataNames(
                 metalake, MetadataObjectUtil.toEntityType(type), nameIdentifier));
@@ -105,28 +108,26 @@ public class ParameterUtil {
     return entities;
   }
 
-  private static String extractAnnotatedValue(
-      Parameter[] parameters,
-      Object[] args,
-      Class<? extends java.lang.annotation.Annotation> annotationClass) {
+  private static Optional<String> extractAnnotatedValue(
+      Parameter[] parameters, Object[] args, Class<? extends Annotation> annotationClass) {
     for (int i = 0; i < parameters.length; i++) {
       if (parameters[i].getAnnotation(annotationClass) != null) {
-        return String.valueOf(args[i]);
+        return Optional.of(String.valueOf(args[i]));
       }
     }
-    return null;
+    return Optional.empty();
   }
 
-  public static String extractMetadataObjectTypeFromParameters(
+  public static Optional<String> extractMetadataObjectTypeFromParameters(
       Parameter[] parameters, Object[] args) {
     for (int i = 0; i < parameters.length; i++) {
       Parameter parameter = parameters[i];
       AuthorizationObjectType objectType = parameter.getAnnotation(AuthorizationObjectType.class);
       if (objectType != null) {
-        return String.valueOf(args[i]).toUpperCase();
+        return Optional.of(String.valueOf(args[i]).toUpperCase());
       }
     }
-    return null;
+    return Optional.empty();
   }
 
   public static void buildNameIdentifierForBatchAuthorization(
