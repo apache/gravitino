@@ -46,6 +46,7 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.SupportsRelationOperations;
 import org.apache.gravitino.auth.AuthConstants;
 import org.apache.gravitino.authorization.AuthorizationRequestContext;
+import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.authorization.GravitinoAuthorizer;
 import org.apache.gravitino.authorization.Privilege;
 import org.apache.gravitino.authorization.SecurableObject;
@@ -529,15 +530,27 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
               String.valueOf(roleEntity.id()),
               securableObject.type().name(),
               String.valueOf(MetadataIdConverter.getID(securableObject, metalake)),
-              privilege.name().name().toUpperCase(),
+              AuthorizationUtils.replaceLegacyPrivilegeName(privilege.name())
+                  .name()
+                  .toUpperCase(java.util.Locale.ROOT),
               AuthConstants.ALLOW);
         }
+        // Since different roles of a user may simultaneously hold both "allow" and "deny"
+        // permissions
+        // for the same privilege on a given MetadataObject, the allowEnforcer must also incorporate
+        // the "deny" privilege to ensure that the authorize method correctly returns false in such
+        // cases. For example, if role1 has an "allow" privilege for SELECT_TABLE on table1, while
+        // role2 has a "deny" privilege for the same action on table1, then a user assigned both
+        // roles should receive a false result when calling the authorize method.
+
         allowEnforcer.addPolicy(
             String.valueOf(roleEntity.id()),
             securableObject.type().name(),
             String.valueOf(MetadataIdConverter.getID(securableObject, metalake)),
-            privilege.name().name().toUpperCase(),
-            condition.name().toLowerCase());
+            AuthorizationUtils.replaceLegacyPrivilegeName(privilege.name())
+                .name()
+                .toUpperCase(java.util.Locale.ROOT),
+            condition.name().toLowerCase(java.util.Locale.ROOT));
       }
     }
   }

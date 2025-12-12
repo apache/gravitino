@@ -129,6 +129,26 @@ allprojects {
           "import\\s+(?:static\\s+)?[^*\\s]+\\*;(\\r\\n|\\r|\\n)",
           "$1"
         )
+        replaceRegex(
+          "Use Guava collect classes instead of any shadowed versions",
+          "import\\s+(?:.*\\.com\\.google\\.common\\.collect|org\\.glassfish\\.jersey\\.internal\\.guava)\\.(Sets|Maps|Lists|ImmutableList|ImmutableMap|ImmutableSet|ImmutableBiMap|Iterables|Iterators|Multimap|SetMultimap|ListMultimap|BiMap|Table);",
+          "import com.google.common.collect.${'$'}1;"
+        )
+        replaceRegex(
+          "Use Guava base classes instead of any shadowed versions",
+          "import\\s+(?:.*\\.com\\.google\\.common\\.base|org\\.glassfish\\.jersey\\.internal\\.guava)\\.(Preconditions|Strings|Optional|Predicate|Function|Supplier|Joiner|Splitter|Objects);",
+          "import com.google.common.base.${'$'}1;"
+        )
+        replaceRegex(
+          "Use Guava io classes instead of any shadowed versions",
+          "import\\s+.*\\.com\\.google\\.common\\.io\\.(Files|Resources|ByteStreams|CharStreams);",
+          "import com.google.common.io.${'$'}1;"
+        )
+        replaceRegex(
+          "Use Guava util.concurrent classes instead of any shadowed versions",
+          "import\\s+.*\\.com\\.google\\.common\\.util\\.concurrent\\.(ListenableFuture|Futures|MoreExecutors);",
+          "import com.google.common.util.concurrent.${'$'}1;"
+        )
 
         targetExclude("**/build/**", "**/.pnpm/***")
       }
@@ -763,12 +783,12 @@ tasks {
 
       copy {
         from(projectDir.dir("licenses")) { into("${rootProject.name}-iceberg-rest-server/licenses") }
-        from(projectDir.file("LICENSE.rest")) { into("${rootProject.name}-iceberg-rest-server") }
-        from(projectDir.file("NOTICE.rest")) { into("${rootProject.name}-iceberg-rest-server") }
+        from(projectDir.file("LICENSE.iceberg")) { into("${rootProject.name}-iceberg-rest-server") }
+        from(projectDir.file("NOTICE.iceberg")) { into("${rootProject.name}-iceberg-rest-server") }
         from(projectDir.file("README.md")) { into("${rootProject.name}-iceberg-rest-server") }
         into(outputDir)
         rename { fileName ->
-          fileName.replace(".rest", "")
+          fileName.replace(".iceberg", "")
         }
       }
     }
@@ -808,12 +828,12 @@ tasks {
 
       copy {
         from(projectDir.dir("licenses")) { into("${rootProject.name}-lance-rest-server/licenses") }
-        from(projectDir.file("LICENSE.rest")) { into("${rootProject.name}-lance-rest-server") }
-        from(projectDir.file("NOTICE.rest")) { into("${rootProject.name}-lance-rest-server") }
+        from(projectDir.file("LICENSE.lance")) { into("${rootProject.name}-lance-rest-server") }
+        from(projectDir.file("NOTICE.lance")) { into("${rootProject.name}-lance-rest-server") }
         from(projectDir.file("README.md")) { into("${rootProject.name}-lance-rest-server") }
         into(outputDir)
         rename { fileName ->
-          fileName.replace(".rest", "")
+          fileName.replace(".lance", "")
         }
       }
     }

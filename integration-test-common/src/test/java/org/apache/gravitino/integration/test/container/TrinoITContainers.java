@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.integration.test.container;
 
+import com.google.common.collect.ImmutableSet;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.gravitino.integration.test.util.CommandExecutor;
@@ -27,7 +28,6 @@ import org.apache.logging.log4j.util.Strings;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testcontainers.containers.ContainerLaunchException;
-import org.testcontainers.shaded.com.google.common.collect.ImmutableSet;
 
 public class TrinoITContainers implements AutoCloseable {
   private static final Logger LOG = LoggerFactory.getLogger(TrinoITContainers.class);

@@ -20,11 +20,11 @@
 package org.apache.gravitino.trino.connector.catalog.jdbc.mysql;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.collect.ImmutableMap;
 import java.util.Map;
 import org.apache.commons.collections4.bidimap.TreeBidiMap;
 import org.apache.gravitino.catalog.mysql.MysqlConstants;
 import org.apache.gravitino.catalog.property.PropertyConverter;
-import org.apache.gravitino.shaded.com.google.common.collect.ImmutableMap;
 
 /**
  * Property converter for MySQL table properties. Handles the conversion of property keys between
