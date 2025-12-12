@@ -51,4 +51,5 @@ public class HiveConstants {
   public static final String HIVE_METASTORE_URIS = "hive.metastore.uris";
   public static final String HIVE_FILTER_FIELD_PARAMS = "hive_filter_field_params__";
   public static final String HIVE_METASTORE_TOKEN_SIGNATURE = "hive.metastore.token.signature";
+  public static final String HIVE_DEFAULT_CATALOG = "hive";
 }

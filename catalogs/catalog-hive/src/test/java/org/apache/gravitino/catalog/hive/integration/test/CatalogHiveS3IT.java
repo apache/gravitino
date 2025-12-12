@@ -34,7 +34,7 @@ import org.testcontainers.containers.Container;
 import org.testcontainers.shaded.com.google.common.collect.ImmutableMap;
 import org.testcontainers.shaded.org.awaitility.Awaitility;
 
-public class CatalogHiveS3IT extends CatalogHiveIT {
+public class CatalogHiveS3IT extends CatalogHive2IT {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(CatalogHiveS3IT.class);
 
@@ -110,7 +110,7 @@ public class CatalogHiveS3IT extends CatalogHiveIT {
 
     containerSuite.startHiveContainerWithS3(hiveContainerEnv);
 
-    HIVE_METASTORE_URIS =
+    hiveMetastoreUris =
         String.format(
             "thrift://%s:%d",
             containerSuite.getHiveContainerWithS3().getContainerIpAddress(),
@@ -138,7 +138,7 @@ public class CatalogHiveS3IT extends CatalogHiveIT {
         SparkSession.builder()
             .master("local[1]")
             .appName("Hive Catalog integration test")
-            .config("hive.metastore.uris", HIVE_METASTORE_URIS)
+            .config("hive.metastore.uris", hiveMetastoreUris)
             .config(
                 "spark.sql.warehouse.dir",
                 String.format(
