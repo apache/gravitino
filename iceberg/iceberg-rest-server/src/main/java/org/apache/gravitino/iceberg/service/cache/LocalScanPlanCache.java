@@ -44,25 +44,15 @@ public class LocalScanPlanCache implements ScanPlanCache {
 
   private static final Logger LOG = LoggerFactory.getLogger(LocalScanPlanCache.class);
 
-  private final Cache<ScanPlanCacheKey, PlanTableScanResponse> scanPlanCache;
-
+  private Cache<ScanPlanCacheKey, PlanTableScanResponse> scanPlanCache;
   /**
-   * Creates a new ScanPlanCache with the specified capacity and expiration time.
+   * Initializes the scan plan cache with specified configuration.
    *
-   * @param capacity Maximum number of scan plan results to cache. When the cache reaches this size,
-   *     least-recently-used entries will be evicted.
-   * @param expireMinutes Time in minutes after which cached scan plans expire if not accessed.
-   *     Cached entries are automatically removed after this period of inactivity.
-   *     <p><b>Memory considerations:</b> Memory usage is approximately {@code capacity} multiplied
-   *     by the average scan plan size. For example, with a capacity of 200 and an average scan plan
-   *     size of 1MB, expect approximately 200MB of memory usage for the cache. A typical scan plan
-   *     might be several KB to MB depending on table size.
-   *     <p><b>Memory considerations:</b> Memory usage is approximately {@code capacity} multiplied
-   *     by the average scan plan size. For example, with a capacity of 200 and an average scan plan
-   *     size of 1MB, expect approximately 200MB of memory usage for the cache. A typical scan plan
-   *     might be several KB to MB depending on table size.
+   * @param capacity
+   * @param expireMinutes
    */
-  public LocalScanPlanCache(int capacity, int expireMinutes) {
+  @Override
+  public void initialize(int capacity, int expireMinutes) {
     if (capacity <= 0) {
       throw new IllegalArgumentException("Cache capacity must be positive, got: " + capacity);
     }

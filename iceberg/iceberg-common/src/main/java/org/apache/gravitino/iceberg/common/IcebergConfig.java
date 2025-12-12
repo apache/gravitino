@@ -303,6 +303,7 @@ public class IcebergConfig extends Config implements OverwriteDefaultConfig {
                   + "depending on table size.")
           .version(ConfigConstants.VERSION_1_1_0)
           .intConf()
+          .checkValue(value -> value > 0, ConfigConstants.POSITIVE_NUMBER_ERROR_MSG)
           .createWithDefault(200);
 
   public static final ConfigEntry<Integer> SCAN_PLAN_CACHE_EXPIRE_MINUTES =
@@ -311,6 +312,7 @@ public class IcebergConfig extends Config implements OverwriteDefaultConfig {
               "Time in minutes after which cached scan plans expire if not accessed. Cached entries are automatically removed after this period of inactivity.")
           .version(ConfigConstants.VERSION_1_1_0)
           .intConf()
+          .checkValue(value -> value > 0, ConfigConstants.POSITIVE_NUMBER_ERROR_MSG)
           .createWithDefault(60);
 
   public String getJdbcDriver() {

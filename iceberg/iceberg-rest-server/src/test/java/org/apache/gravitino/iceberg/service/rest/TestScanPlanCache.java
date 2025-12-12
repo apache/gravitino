@@ -49,7 +49,8 @@ public class TestScanPlanCache {
 
   @BeforeEach
   public void setUp() {
-    scanPlanCache = new LocalScanPlanCache(10, 60);
+    scanPlanCache = new LocalScanPlanCache();
+    scanPlanCache.initialize(10, 60);
     tableIdentifier = TableIdentifier.of(Namespace.of("test_db"), "test_table");
 
     mockSnapshot = mock(Snapshot.class);
