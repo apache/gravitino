@@ -61,7 +61,6 @@ import org.glassfish.jersey.logging.LoggingFeature;
 import org.glassfish.jersey.logging.LoggingFeature.Verbosity;
 import org.glassfish.jersey.server.ResourceConfig;
 import org.junit.jupiter.params.provider.Arguments;
-import org.slf4j.Logger;
 
 public class IcebergRestTestUtil {
 
@@ -97,7 +96,10 @@ public class IcebergRestTestUtil {
     if (DEBUG_SERVER_LOG_ENABLED) {
       resourceConfig.register(
           new LoggingFeature(
-              Logger.getLogger(LoggingFeature.DEFAULT_LOGGER_NAME),
+              // Use fully qualified name to avoid ambiguity. Jersey's LoggingFeature requires
+              // java.util.logging.Logger, not org.slf4j.Logger which is commonly used elsewhere
+              // in the Gravitino codebase.
+              java.util.logging.Logger.getLogger(LoggingFeature.DEFAULT_LOGGER_NAME),
               Level.INFO,
               Verbosity.PAYLOAD_ANY,
               10000));
