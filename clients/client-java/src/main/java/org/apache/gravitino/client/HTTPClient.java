@@ -722,6 +722,12 @@ public class HTTPClient implements RESTClient {
       GravitinoClientConfiguration clientConfiguration) {
     PoolingHttpClientConnectionManagerBuilder connectionManagerBuilder =
         PoolingHttpClientConnectionManagerBuilder.create();
+
+    // Configure connection pool size
+    connectionManagerBuilder.setMaxConnTotal(clientConfiguration.getClientMaxConnections());
+    connectionManagerBuilder.setMaxConnPerRoute(
+        clientConfiguration.getClientMaxConnectionsPerRoute());
+
     ConnectionConfig connectionConfig = configureConnectionConfig(clientConfiguration);
     connectionManagerBuilder.setDefaultConnectionConfig(connectionConfig);
     return connectionManagerBuilder.build();
