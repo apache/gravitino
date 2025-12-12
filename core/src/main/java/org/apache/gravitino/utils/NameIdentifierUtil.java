@@ -803,7 +803,6 @@ public class NameIdentifierUtil {
       currentType = parentType;
     }
 
-
     // Create NameIdentifier from the full path
     return NameIdentifier.of(levels.toArray(new String[0]));
   }
