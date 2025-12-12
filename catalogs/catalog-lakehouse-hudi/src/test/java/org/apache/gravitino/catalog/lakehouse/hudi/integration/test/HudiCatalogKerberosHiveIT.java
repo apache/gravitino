@@ -235,7 +235,7 @@ public class HudiCatalogKerberosHiveIT extends BaseIT {
     Assertions.assertTrue(
         exception
             .getMessage()
-            .contains("Hudi table does not exist: " + TABLE_NAME + " in Hive Metastore"),
+            .contains("Hive table " + TABLE_NAME + " does not exist in Hive Metastore"),
         "Unexpected exception message: " + exception.getMessage());
   }
 
