@@ -19,10 +19,10 @@
 
 package org.apache.gravitino.iceberg.service;
 
+import com.google.common.collect.ImmutableMap;
 import java.util.Map;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
-import org.testcontainers.shaded.com.google.common.collect.ImmutableMap;
 
 public class TestCatalogWrapperForREST {
 

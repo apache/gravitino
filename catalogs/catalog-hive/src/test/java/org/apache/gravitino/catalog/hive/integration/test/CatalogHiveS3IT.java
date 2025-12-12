@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.catalog.hive.integration.test;
 
+import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
 import java.net.URI;
 import java.util.HashMap;
@@ -31,7 +32,6 @@ import org.apache.spark.sql.SparkSession;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testcontainers.containers.Container;
-import org.testcontainers.shaded.com.google.common.collect.ImmutableMap;
 import org.testcontainers.shaded.org.awaitility.Awaitility;
 
 public class CatalogHiveS3IT extends CatalogHive2IT {
