@@ -19,6 +19,7 @@
 package org.apache.gravitino.catalog;
 
 import java.lang.reflect.InvocationHandler;
+import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.NameIdentifier;
@@ -63,6 +64,11 @@ public class OperationDispatcherInterceptor implements InvocationHandler {
             });
       }
     }
-    return method.invoke(dispatcher, args);
+
+    try {
+      return method.invoke(dispatcher, args);
+    } catch (InvocationTargetException e) {
+      throw e.getTargetException();
+    }
   }
 }
