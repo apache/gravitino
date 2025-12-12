@@ -35,7 +35,7 @@ public class RunJobAuthorizationExecutor implements AuthorizationExecutor {
   private final Map<Entity.EntityType, NameIdentifier> metadataContext;
   private final AuthorizationExpressionEvaluator authorizationExpressionEvaluator;
   private final Map<String, Object> pathParams;
-  private final String entityType;
+  private final Optional<String> entityType;
 
   public RunJobAuthorizationExecutor(
       Parameter[] parameters,
@@ -43,7 +43,7 @@ public class RunJobAuthorizationExecutor implements AuthorizationExecutor {
       Map<Entity.EntityType, NameIdentifier> metadataContext,
       AuthorizationExpressionEvaluator authorizationExpressionEvaluator,
       Map<String, Object> pathParams,
-      String entityType) {
+      Optional<String> entityType) {
     this.parameters = parameters;
     this.args = args;
     this.metadataContext = metadataContext;
@@ -73,6 +73,6 @@ public class RunJobAuthorizationExecutor implements AuthorizationExecutor {
     metadataContext.put(Entity.EntityType.JOB_TEMPLATE, jobTemplateNameIdentifier);
 
     return authorizationExpressionEvaluator.evaluate(
-        metadataContext, pathParams, context, Optional.ofNullable(entityType));
+        metadataContext, pathParams, context, entityType);
   }
 }

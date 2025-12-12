@@ -49,7 +49,7 @@ public class AssociatePolicyAuthorizationExecutor extends CommonAuthorizerExecut
       Map<Entity.EntityType, NameIdentifier> metadataContext,
       AuthorizationExpressionEvaluator authorizationExpressionEvaluator,
       Map<String, Object> pathParams,
-      String entityType) {
+      Optional<String> entityType) {
     super(expression, metadataContext, authorizationExpressionEvaluator, pathParams, entityType);
     this.parameters = parameters;
     this.args = args;
@@ -100,7 +100,7 @@ public class AssociatePolicyAuthorizationExecutor extends CommonAuthorizerExecut
 
       boolean authorized =
           authorizationExpressionEvaluator.evaluate(
-              currentContext, pathParams, context, Optional.ofNullable(entityType));
+              currentContext, pathParams, context, entityType);
 
       if (!authorized) {
         return false; // Fail fast on first unauthorized policy

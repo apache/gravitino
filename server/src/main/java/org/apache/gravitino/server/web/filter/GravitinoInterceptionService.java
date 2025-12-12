@@ -30,6 +30,7 @@ import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import javax.ws.rs.core.Response;
 import org.aopalliance.intercept.ConstructorInterceptor;
@@ -146,7 +147,7 @@ public class GravitinoInterceptionService implements InterceptionService {
         if (expressionAnnotation != null) {
           String expression = expressionAnnotation.expression();
           Object[] args = methodInvocation.getArguments();
-          String entityType = extractMetadataObjectTypeFromParameters(parameters, args);
+          Optional<String> entityType = extractMetadataObjectTypeFromParameters(parameters, args);
           Map<Entity.EntityType, NameIdentifier> metadataContext =
               extractNameIdentifierFromParameters(parameters, args);
 

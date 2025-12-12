@@ -30,6 +30,7 @@ import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.meta.RoleEntity;
 import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.meta.UserEntity;
+import org.apache.gravitino.utils.MetadataObjectUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
 
 /**
@@ -103,79 +104,10 @@ public class ReverseIndexRules {
               .securableObjects()
               .forEach(
                   securableObject -> {
-                    Namespace namespace = Namespace.empty();
-                    Entity.EntityType entityType = Entity.EntityType.METALAKE;
-                    switch (securableObject.type()) {
-                      case METALAKE:
-                        entityType = Entity.EntityType.METALAKE;
-                        namespace = NamespaceUtil.ofMetalake();
-                        break;
-                      case CATALOG:
-                        entityType = Entity.EntityType.CATALOG;
-                        namespace = NamespaceUtil.ofCatalog(roleEntity.namespace().level(0));
-                        break;
-                      case SCHEMA:
-                        entityType = Entity.EntityType.SCHEMA;
-                        Namespace nsSchema = Namespace.fromString(securableObject.parent());
-                        namespace =
-                            NamespaceUtil.ofSchema(
-                                roleEntity.namespace().level(0), nsSchema.level(0));
-                        break;
-                      case TABLE:
-                        entityType = Entity.EntityType.TABLE;
-                        Namespace nsTable = Namespace.fromString(securableObject.parent());
-                        namespace =
-                            NamespaceUtil.ofTable(
-                                roleEntity.namespace().level(0),
-                                nsTable.level(0),
-                                nsTable.level(1));
-                        break;
-                      case TOPIC:
-                        entityType = Entity.EntityType.TOPIC;
-                        Namespace nsTopic = Namespace.fromString(securableObject.parent());
-                        namespace =
-                            NamespaceUtil.ofTopic(
-                                roleEntity.namespace().level(0),
-                                nsTopic.level(0),
-                                nsTopic.level(1));
-                        break;
-                      case MODEL:
-                        entityType = Entity.EntityType.MODEL;
-                        Namespace nsModel = Namespace.fromString(securableObject.parent());
-                        namespace =
-                            NamespaceUtil.ofModel(
-                                roleEntity.namespace().level(0),
-                                nsModel.level(0),
-                                nsModel.level(1));
-                        break;
-                      case FILESET:
-                        entityType = Entity.EntityType.FILESET;
-                        Namespace nsFileset = Namespace.fromString(securableObject.parent());
-                        namespace =
-                            NamespaceUtil.ofFileset(
-                                roleEntity.namespace().level(0),
-                                nsFileset.level(0),
-                                nsFileset.level(1));
-                        break;
-                      case TAG:
-                        entityType = Entity.EntityType.TAG;
-                        namespace = NamespaceUtil.ofTag(roleEntity.namespace().level(0));
-                        break;
-                      case POLICY:
-                        entityType = Entity.EntityType.POLICY;
-                        namespace = NamespaceUtil.ofPolicy(roleEntity.namespace().level(0));
-                        break;
-                      case JOB_TEMPLATE:
-                        entityType = Entity.EntityType.JOB_TEMPLATE;
-                        namespace = NamespaceUtil.ofJobTemplate(roleEntity.namespace().level(0));
-                        break;
-                      default:
-                        throw new UnsupportedOperationException(
-                            "Don't support securable object type: " + securableObject.type());
-                    }
-                    Namespace securableObjectNamespace = Namespace.of(namespace.levels());
                     NameIdentifier securableObjectIdent =
-                        NameIdentifier.of(securableObjectNamespace, securableObject.name());
+                        MetadataObjectUtil.toEntityIdent(
+                            roleEntity.namespace().level(0), securableObject);
+                    EntityType entityType = MetadataObjectUtil.toEntityType(securableObject.type());
                     reverseIndexCache.put(securableObjectIdent, entityType, key);
                   });
         }
