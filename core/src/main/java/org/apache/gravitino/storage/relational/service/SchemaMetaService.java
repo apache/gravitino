@@ -37,6 +37,7 @@ import org.apache.gravitino.meta.ModelEntity;
 import org.apache.gravitino.meta.NamespacedEntityId;
 import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.meta.TableEntity;
+import org.apache.gravitino.meta.TopicEntity;
 import org.apache.gravitino.metrics.Monitored;
 import org.apache.gravitino.storage.relational.helper.SchemaIds;
 import org.apache.gravitino.storage.relational.mapper.FilesetMetaMapper;
@@ -323,6 +324,18 @@ public class SchemaMetaService {
                       identifier.namespace().level(1),
                       schemaName));
       if (!modelEntities.isEmpty()) {
+        throw new NonEmptyEntityException(
+            "Entity %s has sub-entities, you should remove sub-entities first", identifier);
+      }
+
+      List<TopicEntity> topicEntities =
+          TopicMetaService.getInstance()
+              .listTopicsByNamespace(
+                  NamespaceUtil.ofTopic(
+                      identifier.namespace().level(0),
+                      identifier.namespace().level(1),
+                      schemaName));
+      if (!topicEntities.isEmpty()) {
         throw new NonEmptyEntityException(
             "Entity %s has sub-entities, you should remove sub-entities first", identifier);
       }
