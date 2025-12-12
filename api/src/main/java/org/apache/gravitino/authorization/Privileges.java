@@ -127,8 +127,12 @@ public class Privileges {
         return ManageGrants.allow();
 
         //  Model
+      case REGISTER_MODEL:
+        return RegisterModel.allow();
       case CREATE_MODEL:
         return CreateModel.allow();
+      case LINK_MODEL_VERSION:
+        return LinkModelVersion.allow();
       case CREATE_MODEL_VERSION:
         return CreateModelVersion.allow();
       case USE_MODEL:
@@ -231,8 +235,12 @@ public class Privileges {
         return ManageGrants.deny();
 
         // Model
+      case REGISTER_MODEL:
+        return RegisterModel.deny();
       case CREATE_MODEL:
         return CreateModel.deny();
+      case LINK_MODEL_VERSION:
+        return LinkModelVersion.deny();
       case CREATE_MODEL_VERSION:
         return CreateModelVersion.deny();
       case USE_MODEL:
@@ -839,28 +847,28 @@ public class Privileges {
     }
   }
 
-  /** The privilege to create a model */
-  public static class CreateModel extends GenericPrivilege<CreateModel> {
-    private static final CreateModel ALLOW_INSTANCE =
-        new CreateModel(Condition.ALLOW, Name.CREATE_MODEL);
-    private static final CreateModel DENY_INSTANCE =
-        new CreateModel(Condition.DENY, Name.CREATE_MODEL);
+  /** The privilege to register a model */
+  public static class RegisterModel extends GenericPrivilege<RegisterModel> {
+    private static final RegisterModel ALLOW_INSTANCE =
+        new RegisterModel(Condition.ALLOW, Name.REGISTER_MODEL);
+    private static final RegisterModel DENY_INSTANCE =
+        new RegisterModel(Condition.DENY, Name.REGISTER_MODEL);
 
-    private CreateModel(Condition condition, Name name) {
+    private RegisterModel(Condition condition, Name name) {
       super(condition, name);
     }
 
     /**
      * @return The instance with allow condition of the privilege.
      */
-    public static CreateModel allow() {
+    public static RegisterModel allow() {
       return ALLOW_INSTANCE;
     }
 
     /**
      * @return The instance with deny condition of the privilege.
      */
-    public static CreateModel deny() {
+    public static RegisterModel deny() {
       return DENY_INSTANCE;
     }
 
@@ -899,7 +907,71 @@ public class Privileges {
     }
   }
 
+  /** The privilege to link a model version */
+  public static class LinkModelVersion extends GenericPrivilege<LinkModelVersion> {
+    private static final LinkModelVersion ALLOW_INSTANCE =
+        new LinkModelVersion(Condition.ALLOW, Name.LINK_MODEL_VERSION);
+    private static final LinkModelVersion DENY_INSTANCE =
+        new LinkModelVersion(Condition.DENY, Name.LINK_MODEL_VERSION);
+
+    private LinkModelVersion(Condition condition, Name name) {
+      super(condition, name);
+    }
+
+    /**
+     * @return The instance with allow condition of the privilege.
+     */
+    public static LinkModelVersion allow() {
+      return ALLOW_INSTANCE;
+    }
+
+    /**
+     * @return The instance with deny condition of the privilege.
+     */
+    public static LinkModelVersion deny() {
+      return DENY_INSTANCE;
+    }
+
+    @Override
+    public boolean canBindTo(MetadataObject.Type type) {
+      return MODEL_SUPPORTED_TYPES.contains(type);
+    }
+  }
+
+  /** The privilege to create a model. */
+  @Deprecated
+  public static class CreateModel extends GenericPrivilege<CreateModel> {
+    private static final CreateModel ALLOW_INSTANCE =
+        new CreateModel(Condition.ALLOW, Name.CREATE_MODEL);
+    private static final CreateModel DENY_INSTANCE =
+        new CreateModel(Condition.DENY, Name.CREATE_MODEL);
+
+    private CreateModel(Condition condition, Name name) {
+      super(condition, name);
+    }
+
+    /**
+     * @return The instance with allow condition of the privilege.
+     */
+    public static CreateModel allow() {
+      return ALLOW_INSTANCE;
+    }
+
+    /**
+     * @return The instance with deny condition of the privilege.
+     */
+    public static CreateModel deny() {
+      return DENY_INSTANCE;
+    }
+
+    @Override
+    public boolean canBindTo(MetadataObject.Type type) {
+      return SCHEMA_SUPPORTED_TYPES.contains(type);
+    }
+  }
+
   /** The privilege to create a model version */
+  @Deprecated
   public static class CreateModelVersion extends GenericPrivilege<CreateModelVersion> {
     private static final CreateModelVersion ALLOW_INSTANCE =
         new CreateModelVersion(Condition.ALLOW, Name.CREATE_MODEL_VERSION);

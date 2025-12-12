@@ -17,6 +17,7 @@
 
 package org.apache.gravitino.client.integration.test.authorization;
 
+import com.google.common.collect.ImmutableMap;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -29,7 +30,6 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.testcontainers.shaded.com.google.common.collect.ImmutableMap;
 
 public class BaseRestApiAuthorizationIT extends BaseIT {
 
