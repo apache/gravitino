@@ -30,6 +30,7 @@ import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Lists;
+import com.google.common.collect.Maps;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
@@ -702,38 +703,6 @@ public class NameIdentifierUtil {
     }
   }
 
-  public static Entity.EntityType parentEntityType(Entity.EntityType type) {
-    switch (type) {
-      case COLUMN:
-        return Entity.EntityType.TABLE;
-      case MODEL_VERSION:
-        return Entity.EntityType.MODEL;
-
-      case TABLE:
-      case FILESET:
-      case MODEL:
-      case TOPIC:
-        return Entity.EntityType.SCHEMA;
-
-      case SCHEMA:
-        return Entity.EntityType.CATALOG;
-
-      case CATALOG:
-      case USER:
-      case GROUP:
-      case ROLE:
-      case TAG:
-      case POLICY:
-      case JOB:
-      case JOB_TEMPLATE:
-        return Entity.EntityType.METALAKE;
-
-      case METALAKE:
-      default:
-        throw new IllegalArgumentException("Metalake has no parent entity type");
-    }
-  }
-
   /**
    * Build a NameIdentifier for the given entity type and name, using the provided entity context.
    * This method constructs the identifier hierarchically using the parent entity type
@@ -836,6 +805,60 @@ public class NameIdentifierUtil {
     return NameIdentifier.of(namePath.toArray(new String[0]));
   }
 
+  /**
+   * Build a map of NameIdentifiers from entity data.
+   *
+   * @param entities Map containing entity types and their names (e.g., METALAKE, CATALOG, SCHEMA,
+   *     etc.)
+   * @return Map of entity types to their NameIdentifiers
+   */
+  public static Map<Entity.EntityType, NameIdentifier> buildNameIdentifierMap(
+      Map<Entity.EntityType, String> entities) {
+    Map<Entity.EntityType, NameIdentifier> nameIdentifierMap = Maps.newHashMap();
+
+    entities.forEach(
+        (type, name) -> {
+          NameIdentifier identifier = buildNameIdentifier(type, name, entities);
+          if (identifier != null) {
+            nameIdentifierMap.put(type, identifier);
+          }
+        });
+
+    return nameIdentifierMap;
+  }
+
+  public static Entity.EntityType parentEntityType(Entity.EntityType type) {
+    switch (type) {
+      case COLUMN:
+        return Entity.EntityType.TABLE;
+      case MODEL_VERSION:
+        return Entity.EntityType.MODEL;
+
+      case TABLE:
+      case FILESET:
+      case MODEL:
+      case TOPIC:
+        return Entity.EntityType.SCHEMA;
+
+      case SCHEMA:
+        return Entity.EntityType.CATALOG;
+
+      case CATALOG:
+      case USER:
+      case GROUP:
+      case ROLE:
+      case TAG:
+      case POLICY:
+      case JOB:
+      case JOB_TEMPLATE:
+        return Entity.EntityType.METALAKE;
+
+      case METALAKE:
+      default:
+        throw new IllegalArgumentException("Metalake has no parent entity type");
+    }
+  }
+
   private static Namespace createVirtualNamespace(Entity.EntityType type, String metalake) {
     switch (type) {
       case USER:
@@ -855,27 +878,5 @@ public class NameIdentifierUtil {
       default:
         throw new IllegalArgumentException("Unsupported virtual namespace type: " + type);
     }
-  }
-
-  /**
-   * Build a map of NameIdentifiers from entity data.
-   *
-   * @param entities Map containing entity types and their names (e.g., METALAKE, CATALOG, SCHEMA,
-   *     etc.)
-   * @return Map of entity types to their NameIdentifiers
-   */
-  public static Map<Entity.EntityType, NameIdentifier> buildNameIdentifierMap(
-      Map<Entity.EntityType, String> entities) {
-    Map<Entity.EntityType, NameIdentifier> nameIdentifierMap = new java.util.HashMap<>();
-
-    entities.forEach(
-        (type, name) -> {
-          NameIdentifier identifier = buildNameIdentifier(type, name, entities);
-          if (identifier != null) {
-            nameIdentifierMap.put(type, identifier);
-          }
-        });
-
-    return nameIdentifierMap;
   }
 }
