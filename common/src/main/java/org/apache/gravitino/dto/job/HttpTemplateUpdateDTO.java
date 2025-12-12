@@ -18,10 +18,7 @@
  */
 package org.apache.gravitino.dto.job;
 
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.fasterxml.jackson.annotation.JsonSubTypes;
-import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
@@ -31,48 +28,49 @@ import lombok.ToString;
 import lombok.experimental.SuperBuilder;
 import org.apache.gravitino.job.JobTemplateChange;
 
-/** DTO for updating a Job Template. */
-@JsonIgnoreProperties(ignoreUnknown = true)
-@JsonTypeInfo(use = JsonTypeInfo.Id.NAME, include = JsonTypeInfo.As.PROPERTY)
-@JsonSubTypes({
-  @JsonSubTypes.Type(value = ShellTemplateUpdateDTO.class, name = "shell"),
-  @JsonSubTypes.Type(value = SparkTemplateUpdateDTO.class, name = "spark"),
-  @JsonSubTypes.Type(value = HttpTemplateUpdateDTO.class, name = "http")
-})
+/** DTO for updating an HTTP Job Template. */
 @Getter
-@EqualsAndHashCode
+@EqualsAndHashCode(callSuper = true)
 @SuperBuilder(setterPrefix = "with")
-@ToString
-public abstract class TemplateUpdateDTO {
+@ToString(callSuper = true)
+public class HttpTemplateUpdateDTO extends TemplateUpdateDTO {
 
   @Nullable
-  @JsonProperty("newExecutable")
-  private String newExecutable;
+  @JsonProperty("newUrl")
+  private String newUrl;
 
   @Nullable
-  @JsonProperty("newArguments")
-  private List<String> newArguments;
+  @JsonProperty("newHeaders")
+  private Map<String, String> newHeaders;
 
   @Nullable
-  @JsonProperty("newEnvironments")
-  private Map<String, String> newEnvironments;
+  @JsonProperty("newBody")
+  private String newBody;
 
   @Nullable
-  @JsonProperty("newCustomFields")
-  private Map<String, String> newCustomFields;
+  @JsonProperty("newQueryParams")
+  private List<String> newQueryParams;
 
   /**
    * The default constructor for Jackson. This constructor is required for deserialization of the
    * DTO.
    */
-  protected TemplateUpdateDTO() {
+  private HttpTemplateUpdateDTO() {
     // Default constructor for Jackson
+    super();
   }
 
-  /**
-   * Converts this DTO to a TemplateUpdate object.
-   *
-   * @return the corresponding TemplateUpdate object
-   */
-  public abstract JobTemplateChange.TemplateUpdate toTemplateUpdate();
+  @Override
+  public JobTemplateChange.TemplateUpdate toTemplateUpdate() {
+    return JobTemplateChange.HttpTemplateUpdate.builder()
+        .withNewExecutable(getNewExecutable())
+        .withNewArguments(getNewArguments())
+        .withNewEnvironments(getNewEnvironments())
+        .withNewCustomFields(getNewCustomFields())
+        .withNewUrl(newUrl)
+        .withNewHeaders(newHeaders)
+        .withNewBody(newBody)
+        .withNewQueryParams(newQueryParams)
+        .build();
+  }
 }

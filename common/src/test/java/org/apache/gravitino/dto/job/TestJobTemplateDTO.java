@@ -437,4 +437,235 @@ public class TestJobTemplateDTO {
         },
         "\"jobType\" is required and cannot be null");
   }
+
+  @Test
+  public void testHttpJobTemplateDTO() throws JsonProcessingException {
+    JobTemplateDTO httpJobTemplateDTO =
+        HttpJobTemplateDTO.builder()
+            .withJobType(JobTemplate.JobType.HTTP)
+            .withName("testHttpJob")
+            .withComment("This is a test HTTP job template")
+            .withExecutable("GET")
+            .withArguments(Lists.newArrayList("arg1", "arg2"))
+            .withEnvironments(ImmutableMap.of("ENV_VAR", "value"))
+            .withCustomFields(ImmutableMap.of("customField1", "value1"))
+            .withUrl("http://example.com/api")
+            .withHeaders(ImmutableMap.of("Content-Type", "application/json"))
+            .withBody("{\"key\": \"value\"}")
+            .withQueryParams(Lists.newArrayList("param1=value1", "param2=value2"))
+            .withAudit(AuditDTO.builder().withCreator("test").withCreateTime(Instant.now()).build())
+            .build();
+
+    Assertions.assertDoesNotThrow(httpJobTemplateDTO::validate);
+
+    String serJson = JsonUtils.objectMapper().writeValueAsString(httpJobTemplateDTO);
+    JobTemplateDTO deserJobTemplateDTO =
+        JsonUtils.objectMapper().readValue(serJson, JobTemplateDTO.class);
+    Assertions.assertEquals(httpJobTemplateDTO, deserJobTemplateDTO);
+
+    // Test comment is null
+    HttpJobTemplateDTO nullCommentJobTemplateDTO =
+        HttpJobTemplateDTO.builder()
+            .withJobType(JobTemplate.JobType.HTTP)
+            .withName("testHttpJobNullComment")
+            .withExecutable("POST")
+            .withUrl("http://example.com/api")
+            .withHeaders(ImmutableMap.of("Content-Type", "application/json"))
+            .withBody("{\"key\": \"value\"}")
+            .withQueryParams(Lists.newArrayList("param1=value1", "param2=value2"))
+            .withAudit(AuditDTO.builder().withCreator("test").withCreateTime(Instant.now()).build())
+            .build();
+
+    Assertions.assertDoesNotThrow(nullCommentJobTemplateDTO::validate);
+    String nullCommentSerJson =
+        JsonUtils.objectMapper().writeValueAsString(nullCommentJobTemplateDTO);
+    JobTemplateDTO nullCommentDeserJobTemplateDTO =
+        JsonUtils.objectMapper().readValue(nullCommentSerJson, JobTemplateDTO.class);
+    Assertions.assertEquals(nullCommentJobTemplateDTO, nullCommentDeserJobTemplateDTO);
+
+    // Test arguments are null
+    HttpJobTemplateDTO nullArgumentsJobTemplateDTO =
+        HttpJobTemplateDTO.builder()
+            .withJobType(JobTemplate.JobType.HTTP)
+            .withName("testHttpJobNullArguments")
+            .withExecutable("PUT")
+            .withEnvironments(ImmutableMap.of("ENV_VAR", "value"))
+            .withCustomFields(ImmutableMap.of("customField1", "value1"))
+            .withUrl("http://example.com/api")
+            .withHeaders(ImmutableMap.of("Content-Type", "application/json"))
+            .withBody("{\"key\": \"value\"}")
+            .withQueryParams(Lists.newArrayList("param1=value1", "param2=value2"))
+            .withAudit(AuditDTO.builder().withCreator("test").withCreateTime(Instant.now()).build())
+            .build();
+
+    Assertions.assertDoesNotThrow(nullArgumentsJobTemplateDTO::validate);
+    String nullArgumentsSerJson =
+        JsonUtils.objectMapper().writeValueAsString(nullArgumentsJobTemplateDTO);
+    JobTemplateDTO nullArgumentsDeserJobTemplateDTO =
+        JsonUtils.objectMapper().readValue(nullArgumentsSerJson, JobTemplateDTO.class);
+    Assertions.assertEquals(nullArgumentsJobTemplateDTO, nullArgumentsDeserJobTemplateDTO);
+
+    // Test environments are null
+    HttpJobTemplateDTO nullEnvironmentsJobTemplateDTO =
+        HttpJobTemplateDTO.builder()
+            .withJobType(JobTemplate.JobType.HTTP)
+            .withName("testHttpJobNullEnvironments")
+            .withExecutable("DELETE")
+            .withCustomFields(ImmutableMap.of("customField1", "value1"))
+            .withUrl("http://example.com/api")
+            .withHeaders(ImmutableMap.of("Content-Type", "application/json"))
+            .withBody("{\"key\": \"value\"}")
+            .withQueryParams(Lists.newArrayList("param1=value1", "param2=value2"))
+            .withAudit(AuditDTO.builder().withCreator("test").withCreateTime(Instant.now()).build())
+            .build();
+
+    Assertions.assertDoesNotThrow(nullEnvironmentsJobTemplateDTO::validate);
+    String nullEnvironmentsSerJson =
+        JsonUtils.objectMapper().writeValueAsString(nullEnvironmentsJobTemplateDTO);
+    JobTemplateDTO nullEnvironmentsDeserJobTemplateDTO =
+        JsonUtils.objectMapper().readValue(nullEnvironmentsSerJson, JobTemplateDTO.class);
+    Assertions.assertEquals(nullEnvironmentsJobTemplateDTO, nullEnvironmentsDeserJobTemplateDTO);
+
+    // Test custom fields are null
+    HttpJobTemplateDTO nullCustomFieldsJobTemplateDTO =
+        HttpJobTemplateDTO.builder()
+            .withJobType(JobTemplate.JobType.HTTP)
+            .withName("testHttpJobNullCustomFields")
+            .withExecutable("PATCH")
+            .withUrl("http://example.com/api")
+            .withHeaders(ImmutableMap.of("Content-Type", "application/json"))
+            .withBody("{\"key\": \"value\"}")
+            .withQueryParams(Lists.newArrayList("param1=value1", "param2=value2"))
+            .withAudit(AuditDTO.builder().withCreator("test").withCreateTime(Instant.now()).build())
+            .build();
+
+    Assertions.assertDoesNotThrow(nullCustomFieldsJobTemplateDTO::validate);
+    String nullCustomFieldsSerJson =
+        JsonUtils.objectMapper().writeValueAsString(nullCustomFieldsJobTemplateDTO);
+    JobTemplateDTO nullCustomFieldsDeserJobTemplateDTO =
+        JsonUtils.objectMapper().readValue(nullCustomFieldsSerJson, JobTemplateDTO.class);
+    Assertions.assertEquals(nullCustomFieldsJobTemplateDTO, nullCustomFieldsDeserJobTemplateDTO);
+
+    // Test headers are null
+    HttpJobTemplateDTO nullHeadersJobTemplateDTO =
+        HttpJobTemplateDTO.builder()
+            .withJobType(JobTemplate.JobType.HTTP)
+            .withName("testHttpJobNullHeaders")
+            .withExecutable("HEAD")
+            .withUrl("http://example.com/api")
+            .withBody("{\"key\": \"value\"}")
+            .withQueryParams(Lists.newArrayList("param1=value1", "param2=value2"))
+            .withAudit(AuditDTO.builder().withCreator("test").withCreateTime(Instant.now()).build())
+            .build();
+
+    Assertions.assertDoesNotThrow(nullHeadersJobTemplateDTO::validate);
+    String nullHeadersSerJson =
+        JsonUtils.objectMapper().writeValueAsString(nullHeadersJobTemplateDTO);
+    JobTemplateDTO nullHeadersDeserJobTemplateDTO =
+        JsonUtils.objectMapper().readValue(nullHeadersSerJson, JobTemplateDTO.class);
+    Assertions.assertEquals(nullHeadersJobTemplateDTO, nullHeadersDeserJobTemplateDTO);
+
+    // Test body is null
+    HttpJobTemplateDTO nullBodyJobTemplateDTO =
+        HttpJobTemplateDTO.builder()
+            .withJobType(JobTemplate.JobType.HTTP)
+            .withName("testHttpJobNullBody")
+            .withExecutable("OPTIONS")
+            .withUrl("http://example.com/api")
+            .withHeaders(ImmutableMap.of("Content-Type", "application/json"))
+            .withQueryParams(Lists.newArrayList("param1=value1", "param2=value2"))
+            .withAudit(AuditDTO.builder().withCreator("test").withCreateTime(Instant.now()).build())
+            .build();
+
+    Assertions.assertDoesNotThrow(nullBodyJobTemplateDTO::validate);
+    String nullBodySerJson = JsonUtils.objectMapper().writeValueAsString(nullBodyJobTemplateDTO);
+    JobTemplateDTO nullBodyDeserJobTemplateDTO =
+        JsonUtils.objectMapper().readValue(nullBodySerJson, JobTemplateDTO.class);
+    Assertions.assertEquals(nullBodyJobTemplateDTO, nullBodyDeserJobTemplateDTO);
+
+    // Test query params are null
+    HttpJobTemplateDTO nullQueryParamsJobTemplateDTO =
+        HttpJobTemplateDTO.builder()
+            .withJobType(JobTemplate.JobType.HTTP)
+            .withName("testHttpJobNullQueryParams")
+            .withExecutable("TRACE")
+            .withUrl("http://example.com/api")
+            .withHeaders(ImmutableMap.of("Content-Type", "application/json"))
+            .withBody("{\"key\": \"value\"}")
+            .withAudit(AuditDTO.builder().withCreator("test").withCreateTime(Instant.now()).build())
+            .build();
+
+    Assertions.assertDoesNotThrow(nullQueryParamsJobTemplateDTO::validate);
+    String nullQueryParamsSerJson =
+        JsonUtils.objectMapper().writeValueAsString(nullQueryParamsJobTemplateDTO);
+    JobTemplateDTO nullQueryParamsDeserJobTemplateDTO =
+        JsonUtils.objectMapper().readValue(nullQueryParamsSerJson, JobTemplateDTO.class);
+    Assertions.assertEquals(nullQueryParamsJobTemplateDTO, nullQueryParamsDeserJobTemplateDTO);
+
+    // Test url is null
+    HttpJobTemplateDTO nullUrlJobTemplateDTO =
+        HttpJobTemplateDTO.builder()
+            .withJobType(JobTemplate.JobType.HTTP)
+            .withName("testHttpJobNullUrl")
+            .withExecutable("GET")
+            .withHeaders(ImmutableMap.of("Content-Type", "application/json"))
+            .withBody("{\"key\": \"value\"}")
+            .withQueryParams(Lists.newArrayList("param1=value1", "param2=value2"))
+            .withAudit(AuditDTO.builder().withCreator("test").withCreateTime(Instant.now()).build())
+            .build();
+
+    Assertions.assertDoesNotThrow(nullUrlJobTemplateDTO::validate);
+    String nullUrlSerJson = JsonUtils.objectMapper().writeValueAsString(nullUrlJobTemplateDTO);
+    JobTemplateDTO nullUrlDeserJobTemplateDTO =
+        JsonUtils.objectMapper().readValue(nullUrlSerJson, JobTemplateDTO.class);
+    Assertions.assertEquals(nullUrlJobTemplateDTO, nullUrlDeserJobTemplateDTO);
+
+    // Test name is null
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> {
+          HttpJobTemplateDTO template =
+              HttpJobTemplateDTO.builder()
+                  .withJobType(JobTemplate.JobType.HTTP)
+                  .withExecutable("GET")
+                  .withUrl("http://example.com/api")
+                  .withAudit(
+                      AuditDTO.builder().withCreator("test").withCreateTime(Instant.now()).build())
+                  .build();
+          template.validate();
+        },
+        "\"name\" is required and cannot be empty");
+
+    // Test executable is null
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> {
+          HttpJobTemplateDTO template =
+              HttpJobTemplateDTO.builder()
+                  .withJobType(JobTemplate.JobType.HTTP)
+                  .withName("testHttpJobNullExecutable")
+                  .withUrl("http://example.com/api")
+                  .withAudit(
+                      AuditDTO.builder().withCreator("test").withCreateTime(Instant.now()).build())
+                  .build();
+          template.validate();
+        },
+        "\"executable\" is required and cannot be empty");
+
+    // Test jobType is null
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> {
+          HttpJobTemplateDTO template =
+              HttpJobTemplateDTO.builder()
+                  .withName("testHttpJobNullJobType")
+                  .withExecutable("GET")
+                  .withUrl("http://example.com/api")
+                  .withAudit(
+                      AuditDTO.builder().withCreator("test").withCreateTime(Instant.now()).build())
+                  .build();
+          template.validate();
+        },
+        "\"jobType\" is required and cannot be null");
+  }
 }

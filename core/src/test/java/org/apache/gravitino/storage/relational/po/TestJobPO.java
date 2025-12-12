@@ -21,6 +21,7 @@ package org.apache.gravitino.storage.relational.po;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import java.time.Instant;
+import org.apache.gravitino.job.HttpJobTemplate;
 import org.apache.gravitino.job.JobHandle;
 import org.apache.gravitino.job.JobTemplate;
 import org.apache.gravitino.job.ShellJobTemplate;
@@ -115,6 +116,44 @@ public class TestJobPO {
     Assertions.assertEquals(sparkTemplateEntity.id(), resultSparkEntity.id());
     Assertions.assertEquals(
         sparkTemplateEntity.auditInfo().creator(), resultSparkEntity.auditInfo().creator());
+
+    JobTemplate httpJobTemplate =
+        HttpJobTemplate.builder()
+            .withName("http-job-template")
+            .withComment("This is a http job template")
+            .withExecutable("GET")
+            .withUrl("http://example.com/api")
+            .withHeaders(ImmutableMap.of("Content-Type", "application/json"))
+            .withBody("{\"key\": \"value\"}")
+            .withQueryParams(Lists.newArrayList("param1=value1", "param2=value2"))
+            .build();
+
+    JobTemplateEntity httpTemplateEntity =
+        JobTemplateEntity.builder()
+            .withName(httpJobTemplate.name())
+            .withTemplateContent(JobTemplateEntity.TemplateContent.fromJobTemplate(httpJobTemplate))
+            .withComment(httpJobTemplate.comment())
+            .withNamespace(NamespaceUtil.ofJobTemplate("test"))
+            .withId(3L)
+            .withAuditInfo(
+                AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build())
+            .build();
+
+    JobTemplatePO.JobTemplatePOBuilder builder3 = JobTemplatePO.builder().withMetalakeId(1L);
+    JobTemplatePO httpJobTemplatePO =
+        JobTemplatePO.initializeJobTemplatePO(httpTemplateEntity, builder3);
+
+    JobTemplateEntity resultHttpEntity =
+        JobTemplatePO.fromJobTemplatePO(httpJobTemplatePO, NamespaceUtil.ofJobTemplate("test"));
+
+    Assertions.assertEquals(httpTemplateEntity.name(), resultHttpEntity.name());
+    Assertions.assertEquals(
+        httpTemplateEntity.templateContent(), resultHttpEntity.templateContent());
+    Assertions.assertEquals(httpTemplateEntity.comment(), resultHttpEntity.comment());
+    Assertions.assertEquals(httpTemplateEntity.namespace(), resultHttpEntity.namespace());
+    Assertions.assertEquals(httpTemplateEntity.id(), resultHttpEntity.id());
+    Assertions.assertEquals(
+        httpTemplateEntity.auditInfo().creator(), resultHttpEntity.auditInfo().creator());
   }
 
   @Test
