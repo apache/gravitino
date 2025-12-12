@@ -206,11 +206,4 @@ public class TopicMetaBaseSQLProvider {
         + TABLE_NAME
         + " WHERE deleted_at != 0 AND deleted_at < #{legacyTimeline} LIMIT #{limit}";
   }
-
-  public String countTopicMetasBySchemaId(@Param("schemaId") Long schemaId) {
-    return "SELECT count(*)"
-        + " FROM "
-        + TABLE_NAME
-        + " WHERE schema_id = #{schemaId} AND deleted_at = 0";
-  }
 }
