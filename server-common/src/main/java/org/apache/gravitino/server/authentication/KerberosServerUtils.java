@@ -378,5 +378,20 @@ public class KerberosServerUtils {
     }
   }
 
+  /**
+   * Replaces the _HOST placeholder in the principal with the canonical hostname of the current host.
+   *
+   * @param principal the principal name possibly containing _HOST placeholder
+   * @return the principal with _HOST replaced by the actual hostname
+   * @throws UnknownHostException if the local host name could not be resolved into an address
+   */
+  public static String replaceHostPlaceholder(String principal) throws UnknownHostException {
+    if (principal.contains("_HOST")) {
+      String hostname = InetAddress.getLocalHost().getCanonicalHostName();
+      return principal.replace("_HOST", hostname);
+    }
+    return principal;
+  }
+
   private KerberosServerUtils() {}
 }
