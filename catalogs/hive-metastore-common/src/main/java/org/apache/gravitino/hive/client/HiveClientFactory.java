@@ -54,18 +54,20 @@ public final class HiveClientFactory {
   private final Configuration hadoopConf;
   private final Properties properties;
   private final String keytabPath;
+  private final String name;
 
   /**
    * Creates a {@link HiveClientFactory} boundGRAVITINO_KEYTAB_FORMAT to the given configuration
    * properties.
    *
    * @param properties Hive client configuration, must not be null.
-   * @param id An identifier for this factory instance.
+   * @param name a name identifier for this factory instance.
    */
-  public HiveClientFactory(Properties properties, String id) {
+  public HiveClientFactory(Properties properties, String name) {
     Preconditions.checkArgument(properties != null, "Properties cannot be null");
+    this.name = name;
     this.properties = properties;
-    this.keytabPath = String.format(GRAVITINO_KEYTAB_FORMAT, id);
+    this.keytabPath = String.format(GRAVITINO_KEYTAB_FORMAT, name);
 
     try {
       this.hadoopConf = new Configuration();
@@ -78,7 +80,8 @@ public final class HiveClientFactory {
         kerberosClient.setHiveClient(client);
       }
     } catch (Exception e) {
-      throw new RuntimeException("Failed to initialize HiveClientFactory", e);
+      throw new RuntimeException(
+          String.format("Failed to initialize HiveClientFactory %s", this.name), e);
     }
   }
 

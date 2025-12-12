@@ -38,6 +38,7 @@ Tested and verified with Apache Hudi `0.15.0`.
 | `client.pool-size`                       | For HMS backend. The maximum number of Hive metastore clients in the pool for Gravitino.                                                                                                                                               | 1             | No       | 0.7.0-incubating |
 | `client.pool-cache.eviction-interval-ms` | For HMS backend. The cache pool eviction interval.                                                                                                                                                                                     | 300000        | No       | 0.7.0-incubating |
 | `gravitino.bypass.`                      | Property name with this prefix passed down to the underlying backend client for use. Such as `gravitino.bypass.hive.metastore.failure.retries = 3` indicate 3 times of retries upon failure of Thrift metastore calls for HMS backend. | (none)        | No       | 0.7.0-incubating |
+| `default.catalog`                        | The default catalog name for the Hive3 metastore backend; this configuration is ignored when using a Hive2 metastore.                                                                                                                  | hive          | No       | 1.1.0            |
 
 #### Catalog backend security
 
