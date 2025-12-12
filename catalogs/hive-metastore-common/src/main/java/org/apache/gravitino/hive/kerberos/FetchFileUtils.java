@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.catalog.lakehouse.hudi.backend.hms.kerberos;
+package org.apache.gravitino.hive.kerberos;
 
 import java.io.File;
 import java.net.URI;

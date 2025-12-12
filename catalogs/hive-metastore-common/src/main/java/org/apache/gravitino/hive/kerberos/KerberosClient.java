@@ -17,62 +17,122 @@
  * under the License.
  */
 
-package org.apache.gravitino.catalog.lakehouse.hudi.backend.hms.kerberos;
+package org.apache.gravitino.hive.kerberos;
+
+import static org.apache.gravitino.catalog.hive.HiveConstants.HIVE_METASTORE_TOKEN_SIGNATURE;
+import static org.apache.gravitino.hive.kerberos.KerberosConfig.PRINCIPAL_KEY;
 
 import com.google.common.base.Preconditions;
 import com.google.common.base.Splitter;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.io.File;
 import java.io.IOException;
+import java.util.List;
+import java.util.Properties;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.gravitino.hive.client.HiveClient;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hive.thrift.DelegationTokenIdentifier;
+import org.apache.hadoop.io.Text;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.hadoop.security.token.Token;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 public class KerberosClient implements java.io.Closeable {
   private static final Logger LOG = LoggerFactory.getLogger(KerberosClient.class);
 
-  private ScheduledThreadPoolExecutor checkTgtExecutor;
-  private final java.util.Map<String, String> conf;
+  private volatile ScheduledThreadPoolExecutor checkTgtExecutor;
+  private final Properties conf;
   private final Configuration hadoopConf;
   private final boolean refreshCredentials;
+  private volatile UserGroupInformation realLoginUgi;
+  private final String keytabFilePath;
+  private volatile HiveClient hiveClient = null;
 
   public KerberosClient(
-      java.util.Map<String, String> conf, Configuration hadoopConf, boolean refreshCredentials) {
-    this.conf = conf;
+      Properties properties,
+      Configuration hadoopConf,
+      boolean refreshCredentials,
+      String keytabFilePath)
+      throws IOException {
+    this.conf = properties;
     this.hadoopConf = hadoopConf;
     this.refreshCredentials = refreshCredentials;
+    File keyTabFile = saveKeyTabFileFromUri(keytabFilePath);
+    this.keytabFilePath = keyTabFile.getAbsolutePath();
   }
 
-  public String login(String keytabFilePath) throws IOException {
-    KerberosConfig kerberosConfig = new KerberosConfig(conf);
+  public UserGroupInformation loginProxyUser(String currentUser) {
+    try {
+      if (currentUser.equals(realLoginUgi.getUserName()) || hiveClient == null) {
+        return realLoginUgi;
+      }
+
+      String tokenSignature = conf.getProperty(HIVE_METASTORE_TOKEN_SIGNATURE, "");
+      String principal = conf.getProperty(PRINCIPAL_KEY, "");
+      @SuppressWarnings("null")
+      List<String> principalComponents = Splitter.on('@').splitToList(principal);
+      Preconditions.checkArgument(
+          principalComponents.size() == 2, "The principal has the wrong format");
+      String kerberosRealm = principalComponents.get(1);
+
+      UserGroupInformation proxyUser;
+      final String finalPrincipalName;
+      if (!currentUser.contains("@")) {
+        finalPrincipalName = String.format("%s@%s", currentUser, kerberosRealm);
+      } else {
+        finalPrincipalName = currentUser;
+      }
+
+      proxyUser = UserGroupInformation.createProxyUser(finalPrincipalName, realLoginUgi);
+
+      // Acquire HMS delegation token for the proxy user and attach it to UGI
+      Preconditions.checkArgument(hiveClient != null, "HiveClient is not set in KerberosClient");
+      String tokenStr =
+          hiveClient.getDelegationToken(finalPrincipalName, realLoginUgi.getUserName());
+
+      Token<DelegationTokenIdentifier> delegationToken = new Token<>();
+      delegationToken.decodeFromUrlString(tokenStr);
+      delegationToken.setService(new Text(tokenSignature));
+      proxyUser.addToken(delegationToken);
+
+      return proxyUser;
+    } catch (Exception e) {
+      throw new RuntimeException("Failed to create proxy user for Kerberos Hive client", e);
+    }
+  }
+
+  public UserGroupInformation login() throws Exception {
+    KerberosConfig kerberosConfig = new KerberosConfig(conf, hadoopConf);
 
     // Check the principal and keytab file
     String catalogPrincipal = kerberosConfig.getPrincipalName();
     Preconditions.checkArgument(
         StringUtils.isNotBlank(catalogPrincipal), "The principal can't be blank");
-    @SuppressWarnings("null")
-    java.util.List<String> principalComponents = Splitter.on('@').splitToList(catalogPrincipal);
+    List<String> principalComponents = Splitter.on('@').splitToList(catalogPrincipal);
     Preconditions.checkArgument(
         principalComponents.size() == 2, "The principal has the wrong format");
 
     // Login
     UserGroupInformation.setConfiguration(hadoopConf);
     UserGroupInformation.loginUserFromKeytab(catalogPrincipal, keytabFilePath);
-    UserGroupInformation kerberosLoginUgi = UserGroupInformation.getLoginUser();
+    UserGroupInformation loginUgi = UserGroupInformation.getLoginUser();
+    realLoginUgi = loginUgi;
 
     // Refresh the cache if it's out of date.
     if (refreshCredentials) {
-      this.checkTgtExecutor = new ScheduledThreadPoolExecutor(1, getThreadFactory("check-tgt"));
+      if (checkTgtExecutor == null) {
+        checkTgtExecutor = new ScheduledThreadPoolExecutor(1, getThreadFactory("check-tgt"));
+      }
       int checkInterval = kerberosConfig.getCheckIntervalSec();
       checkTgtExecutor.scheduleAtFixedRate(
           () -> {
             try {
-              kerberosLoginUgi.checkTGTAndReloginFromKeytab();
+              loginUgi.checkTGTAndReloginFromKeytab();
             } catch (Exception e) {
               LOG.error("Fail to refresh ugi token: ", e);
             }
@@ -82,11 +142,11 @@ public class KerberosClient implements java.io.Closeable {
           TimeUnit.SECONDS);
     }
 
-    return principalComponents.get(1);
+    return loginUgi;
   }
 
-  public File saveKeyTabFileFromUri(String keytabPath) throws IOException {
-    KerberosConfig kerberosConfig = new KerberosConfig(conf);
+  public File saveKeyTabFileFromUri(String path) throws IOException {
+    KerberosConfig kerberosConfig = new KerberosConfig(conf, hadoopConf);
 
     String keyTabUri = kerberosConfig.getKeytab();
     Preconditions.checkArgument(StringUtils.isNotBlank(keyTabUri), "Keytab uri can't be blank");
@@ -97,7 +157,7 @@ public class KerberosClient implements java.io.Closeable {
     if (!keytabsDir.exists()) {
       keytabsDir.mkdir();
     }
-    File keytabFile = new File(keytabPath);
+    File keytabFile = new File(path);
     keytabFile.deleteOnExit();
     if (keytabFile.exists() && !keytabFile.delete()) {
       throw new IllegalStateException(
@@ -117,5 +177,9 @@ public class KerberosClient implements java.io.Closeable {
     if (checkTgtExecutor != null) {
       checkTgtExecutor.shutdown();
     }
+  }
+
+  public void setHiveClient(HiveClient client) {
+    this.hiveClient = client;
   }
 }

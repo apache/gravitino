@@ -17,13 +17,15 @@
  * under the License.
  */
 
-package org.apache.gravitino.catalog.lakehouse.hudi.backend.hms.kerberos;
+package org.apache.gravitino.hive.kerberos;
 
 import java.util.Map;
+import java.util.Properties;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.config.ConfigBuilder;
 import org.apache.gravitino.config.ConfigConstants;
 import org.apache.gravitino.config.ConfigEntry;
+import org.apache.hadoop.conf.Configuration;
 
 public class KerberosConfig extends AuthenticationConfig {
   public static final String KEY_TAB_URI_KEY = "authentication.kerberos.keytab-uri";
@@ -67,10 +69,13 @@ public class KerberosConfig extends AuthenticationConfig {
           .checkValue(value -> value > 0, ConfigConstants.POSITIVE_NUMBER_ERROR_MSG)
           .createWithDefault(60);
 
-  public KerberosConfig(Map<String, String> properties) {
-    super(properties);
-    loadFromMap(properties, k -> true);
+  public KerberosConfig(Properties properties, Configuration configuration) {
+    super(properties, configuration);
+    loadFromHdfsConfiguration(configuration);
+    loadFromMap((Map) properties, k -> true);
   }
+
+  private void loadFromHdfsConfiguration(Configuration configuration) {}
 
   public String getPrincipalName() {
     return get(PRINCIPAL_ENTRY);

@@ -29,6 +29,7 @@ public class HiveCatalogPropertiesMetadata extends BaseCatalogPropertiesMetadata
 
   public static final String CLIENT_POOL_SIZE = HiveConstants.CLIENT_POOL_SIZE;
   public static final String METASTORE_URIS = HiveConstants.METASTORE_URIS;
+  public static final String DEFAULT_CATALOG = HiveConstants.DEFAULT_CATALOG;
 
   public static final String CLIENT_POOL_CACHE_EVICTION_INTERVAL_MS =
       HiveConstants.CLIENT_POOL_CACHE_EVICTION_INTERVAL_MS;
@@ -36,6 +37,8 @@ public class HiveCatalogPropertiesMetadata extends BaseCatalogPropertiesMetadata
   public static final String IMPERSONATION_ENABLE = HiveConstants.IMPERSONATION_ENABLE;
 
   public static final boolean DEFAULT_IMPERSONATION_ENABLE = false;
+
+  public static final String DEFAULT_HMS_CATALOG = "hive";
 
   public static final String KEY_TAB_URI = HiveConstants.KEY_TAB_URI;
 
@@ -60,6 +63,14 @@ public class HiveCatalogPropertiesMetadata extends BaseCatalogPropertiesMetadata
                   METASTORE_URIS,
                   "The Hive metastore URIs",
                   false /* immutable */,
+                  false /* hidden */))
+          .put(
+              DEFAULT_CATALOG,
+              PropertyEntry.stringOptionalPropertyEntry(
+                  DEFAULT_CATALOG,
+                  "The default Hive Metastore catalog name used when talking to HMS",
+                  false /* immutable */,
+                  DEFAULT_HMS_CATALOG,
                   false /* hidden */))
           .put(
               IMPERSONATION_ENABLE,

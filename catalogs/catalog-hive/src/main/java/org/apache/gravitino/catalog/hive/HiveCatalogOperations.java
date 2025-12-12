@@ -18,39 +18,43 @@
  */
 package org.apache.gravitino.catalog.hive;
 
+import static org.apache.gravitino.catalog.hive.HiveCatalogPropertiesMetadata.IMPERSONATION_ENABLE;
+import static org.apache.gravitino.catalog.hive.HiveCatalogPropertiesMetadata.KEY_TAB_URI;
 import static org.apache.gravitino.catalog.hive.HiveCatalogPropertiesMetadata.LIST_ALL_TABLES;
 import static org.apache.gravitino.catalog.hive.HiveCatalogPropertiesMetadata.METASTORE_URIS;
 import static org.apache.gravitino.catalog.hive.HiveCatalogPropertiesMetadata.PRINCIPAL;
-import static org.apache.gravitino.catalog.hive.HiveTable.SUPPORT_TABLE_TYPES;
-import static org.apache.gravitino.catalog.hive.HiveTablePropertiesMetadata.COMMENT;
-import static org.apache.gravitino.catalog.hive.HiveTablePropertiesMetadata.TABLE_TYPE;
+import static org.apache.gravitino.catalog.hive.HiveConstants.HIVE_FILTER_FIELD_PARAMS;
+import static org.apache.gravitino.catalog.hive.HiveConstants.HIVE_METASTORE_URIS;
+import static org.apache.gravitino.catalog.hive.HiveConstants.TABLE_TYPE;
+import static org.apache.gravitino.catalog.hive.TableType.EXTERNAL_TABLE;
 import static org.apache.gravitino.connector.BaseCatalog.CATALOG_BYPASS_PREFIX;
-import static org.apache.gravitino.hive.converter.HiveDataTypeConverter.CONVERTER;
-import static org.apache.hadoop.hive.metastore.TableType.EXTERNAL_TABLE;
+import static org.apache.gravitino.hive.HiveTable.SUPPORT_TABLE_TYPES;
+import static org.apache.gravitino.hive.kerberos.AuthenticationConfig.IMPERSONATION_ENABLE_KEY;
+import static org.apache.gravitino.hive.kerberos.KerberosConfig.KEY_TAB_URI_KEY;
+import static org.apache.gravitino.hive.kerberos.KerberosConfig.PRINCIPAL_KEY;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
-import com.google.common.base.Splitter;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.io.IOException;
-import java.io.UncheckedIOException;
-import java.lang.reflect.Method;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Properties;
 import java.util.Set;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.ThreadFactory;
-import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.ArrayUtils;
-import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
@@ -58,21 +62,24 @@ import org.apache.gravitino.SchemaChange;
 import org.apache.gravitino.connector.CatalogInfo;
 import org.apache.gravitino.connector.CatalogOperations;
 import org.apache.gravitino.connector.HasPropertyMetadata;
-import org.apache.gravitino.connector.ProxyPlugin;
 import org.apache.gravitino.connector.SupportsSchemas;
 import org.apache.gravitino.exceptions.ConnectionFailedException;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
+import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.exceptions.NonEmptySchemaException;
 import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
 import org.apache.gravitino.exceptions.TableAlreadyExistsException;
 import org.apache.gravitino.hive.CachedClientPool;
+import org.apache.gravitino.hive.HiveSchema;
+import org.apache.gravitino.hive.HiveTable;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.TableCatalog;
 import org.apache.gravitino.rel.TableChange;
+import org.apache.gravitino.rel.expressions.Expression;
 import org.apache.gravitino.rel.expressions.NamedReference;
 import org.apache.gravitino.rel.expressions.distributions.Distribution;
 import org.apache.gravitino.rel.expressions.distributions.Distributions;
@@ -80,21 +87,9 @@ import org.apache.gravitino.rel.expressions.sorts.SortOrder;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.expressions.transforms.Transforms;
 import org.apache.gravitino.rel.indexes.Index;
-import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.hive.conf.HiveConf;
-import org.apache.hadoop.hive.conf.HiveConf.ConfVars;
-import org.apache.hadoop.hive.metastore.IMetaStoreClient;
-import org.apache.hadoop.hive.metastore.api.AlreadyExistsException;
-import org.apache.hadoop.hive.metastore.api.Database;
-import org.apache.hadoop.hive.metastore.api.FieldSchema;
-import org.apache.hadoop.hive.metastore.api.InvalidOperationException;
-import org.apache.hadoop.hive.metastore.api.NoSuchObjectException;
-import org.apache.hadoop.hive.metastore.api.StorageDescriptor;
-import org.apache.hadoop.hive.metastore.api.UnknownDBException;
-import org.apache.hadoop.hive.metastore.api.hive_metastoreConstants;
-import org.apache.hadoop.security.SecurityUtil;
+import org.apache.gravitino.rel.types.Type;
+import org.apache.gravitino.utils.PrincipalUtils;
 import org.apache.hadoop.security.UserGroupInformation;
-import org.apache.thrift.TException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -106,15 +101,13 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
 
   @VisibleForTesting CachedClientPool clientPool;
 
-  @VisibleForTesting HiveConf hiveConf;
-
   private CatalogInfo info;
 
   private HasPropertyMetadata propertiesMetadata;
 
+  private String catalogName;
+
   private ScheduledThreadPoolExecutor checkTgtExecutor;
-  private String kerberosRealm;
-  private ProxyPlugin proxyPlugin;
   private boolean listAllTables = true;
   // The maximum number of tables that can be returned by the listTableNamesByFilter function.
   // The default value is -1, which means that all tables are returned.
@@ -124,7 +117,11 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
   // will only need to set the configuration 'METASTORE_URL' in Gravitino and Gravitino will change
   // it to `METASTOREURIS` automatically and pass it to Hive.
   public static final Map<String, String> GRAVITINO_CONFIG_TO_HIVE =
-      ImmutableMap.of(METASTORE_URIS, ConfVars.METASTOREURIS.varname);
+      ImmutableMap.of(
+          METASTORE_URIS, HIVE_METASTORE_URIS,
+          IMPERSONATION_ENABLE, IMPERSONATION_ENABLE_KEY,
+          KEY_TAB_URI, KEY_TAB_URI_KEY,
+          PRINCIPAL, PRINCIPAL_KEY);
 
   /**
    * Initializes the Hive catalog operations with the provided configuration.
@@ -141,6 +138,21 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
     this.info = info;
     this.propertiesMetadata = propertiesMetadata;
 
+    Properties prop = mergeProperties(conf);
+    this.clientPool = new CachedClientPool(prop, conf);
+    this.listAllTables = enableListAllTables(conf);
+
+    // Initialize the HMS catalog name from catalog properties (default to DEFAULT_HMS_CATALOG)
+    String defaultCatalog =
+        (String)
+            propertiesMetadata
+                .catalogPropertiesMetadata()
+                .getOrDefault(conf, HiveCatalogPropertiesMetadata.DEFAULT_CATALOG);
+    this.catalogName = defaultCatalog;
+  }
+
+  @VisibleForTesting
+  protected Properties mergeProperties(Map<String, String> conf) {
     // Key format like gravitino.bypass.a.b
     Map<String, String> byPassConfig = Maps.newHashMap();
     // Hold keys that lie in GRAVITINO_CONFIG_TO_HIVE
@@ -161,130 +173,10 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
           }
         });
 
-    Map<String, String> mergeConfig = Maps.newHashMap(byPassConfig);
-    // `gravitinoConfig` overwrite byPassConfig if possible
-    mergeConfig.putAll(gravitinoConfig);
-
-    Configuration hadoopConf = new Configuration();
-    // Set byPass first to make Gravitino config overwrite it, only keys in byPassConfig
-    // and gravitinoConfig will be passed to Hive config, and gravitinoConfig has higher priority
-    mergeConfig.forEach(hadoopConf::set);
-    hiveConf = new HiveConf(hadoopConf, HiveCatalogOperations.class);
-
-    initKerberosIfNecessary(conf, hadoopConf);
-
-    this.clientPool = new CachedClientPool(hiveConf, conf);
-
-    this.listAllTables = enableListAllTables(conf);
-  }
-
-  private void initKerberosIfNecessary(Map<String, String> conf, Configuration hadoopConf) {
-    if (UserGroupInformation.AuthenticationMethod.KERBEROS
-        == SecurityUtil.getAuthenticationMethod(hadoopConf)) {
-      try {
-        Path keytabsPath = Paths.get("keytabs");
-        if (!Files.exists(keytabsPath)) {
-          // Ignore the return value, because there exists many Hive catalog operations making
-          // this directory.
-          Files.createDirectory(keytabsPath);
-        }
-
-        // The id of entity is a random unique id.
-        Path keytabPath = Paths.get(String.format(GRAVITINO_KEYTAB_FORMAT, info.id()));
-        keytabPath.toFile().deleteOnExit();
-        if (Files.exists(keytabPath)) {
-          try {
-            Files.delete(keytabPath);
-          } catch (IOException e) {
-            throw new IllegalStateException(
-                String.format("Fail to delete keytab file %s", keytabPath.toAbsolutePath()), e);
-          }
-        }
-
-        String keytabUri =
-            (String)
-                propertiesMetadata
-                    .catalogPropertiesMetadata()
-                    .getOrDefault(conf, HiveCatalogPropertiesMetadata.KEY_TAB_URI);
-        Preconditions.checkArgument(StringUtils.isNotBlank(keytabUri), "Keytab uri can't be blank");
-        // TODO: Support to download the file from Kerberos HDFS
-        Preconditions.checkArgument(
-            !keytabUri.trim().startsWith("hdfs"), "Keytab uri doesn't support to use HDFS");
-
-        int fetchKeytabFileTimeout =
-            (int)
-                propertiesMetadata
-                    .catalogPropertiesMetadata()
-                    .getOrDefault(conf, HiveCatalogPropertiesMetadata.FETCH_TIMEOUT_SEC);
-
-        FetchFileUtils.fetchFileFromUri(
-            keytabUri, keytabPath.toFile(), fetchKeytabFileTimeout, hadoopConf);
-
-        hiveConf.setVar(
-            ConfVars.METASTORE_KERBEROS_KEYTAB_FILE, keytabPath.toAbsolutePath().toString());
-
-        String catalogPrincipal =
-            (String) propertiesMetadata.catalogPropertiesMetadata().getOrDefault(conf, PRINCIPAL);
-        Preconditions.checkArgument(
-            StringUtils.isNotBlank(catalogPrincipal), "The principal can't be blank");
-        @SuppressWarnings("null")
-        List<String> principalComponents = Splitter.on('@').splitToList(catalogPrincipal);
-        Preconditions.checkArgument(
-            principalComponents.size() == 2, "The principal has the wrong format");
-        this.kerberosRealm = principalComponents.get(1);
-
-        checkTgtExecutor =
-            new ScheduledThreadPoolExecutor(
-                1, getThreadFactory(String.format("Kerberos-check-%s", info.id())));
-
-        LOG.info("krb5 path: {}", System.getProperty("java.security.krb5.conf"));
-        refreshKerberosConfig();
-        UserGroupInformation.setConfiguration(hadoopConf);
-        UserGroupInformation.loginUserFromKeytab(
-            catalogPrincipal, keytabPath.toAbsolutePath().toString());
-
-        UserGroupInformation kerberosLoginUgi = UserGroupInformation.getCurrentUser();
-
-        int checkInterval =
-            (int)
-                propertiesMetadata
-                    .catalogPropertiesMetadata()
-                    .getOrDefault(conf, HiveCatalogPropertiesMetadata.CHECK_INTERVAL_SEC);
-
-        checkTgtExecutor.scheduleAtFixedRate(
-            () -> {
-              try {
-                kerberosLoginUgi.checkTGTAndReloginFromKeytab();
-              } catch (Exception e) {
-                LOG.error("Fail to refresh ugi token: ", e);
-              }
-            },
-            checkInterval,
-            checkInterval,
-            TimeUnit.SECONDS);
-
-      } catch (IOException ioe) {
-        throw new UncheckedIOException(ioe);
-      } catch (Exception e) {
-        throw new RuntimeException(e);
-      }
-    }
-  }
-
-  private void refreshKerberosConfig() {
-    Class<?> classRef;
-    try {
-      if (System.getProperty("java.vendor").contains("IBM")) {
-        classRef = Class.forName("com.ibm.security.krb5.internal.Config");
-      } else {
-        classRef = Class.forName("sun.security.krb5.Config");
-      }
-
-      Method refreshMethod = classRef.getMethod("refresh");
-      refreshMethod.invoke(null);
-    } catch (Exception e) {
-      throw new RuntimeException(e);
-    }
+    Properties prop = new Properties();
+    byPassConfig.forEach(prop::setProperty);
+    gravitinoConfig.forEach(prop::setProperty);
+    return prop;
   }
 
   boolean enableListAllTables(Map<String, String> conf) {
@@ -327,18 +219,10 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
       NameIdentifier[] schemas =
           clientPool.run(
               c ->
-                  c.getAllDatabases().stream()
+                  c.getAllDatabases(catalogName).stream()
                       .map(db -> NameIdentifier.of(namespace, db))
                       .toArray(NameIdentifier[]::new));
       return schemas;
-
-    } catch (TException e) {
-      throw new RuntimeException(
-          "Failed to list all schemas (database) under namespace : "
-              + namespace
-              + " in Hive Metastore",
-          e);
-
     } catch (InterruptedException e) {
       throw new RuntimeException(e);
     }
@@ -359,35 +243,31 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
       NameIdentifier ident, String comment, Map<String, String> properties)
       throws NoSuchCatalogException, SchemaAlreadyExistsException {
     try {
+      UserGroupInformation current = UserGroupInformation.getCurrentUser();
       HiveSchema hiveSchema =
           HiveSchema.builder()
               .withName(ident.name())
               .withComment(comment)
+              .withCatalogName(catalogName)
               .withProperties(properties)
               .withAuditInfo(
                   AuditInfo.builder()
-                      .withCreator(UserGroupInformation.getCurrentUser().getUserName())
+                      .withCreator(PrincipalUtils.getCurrentUserName())
                       .withCreateTime(Instant.now())
                       .build())
               .build();
 
       clientPool.run(
           client -> {
-            client.createDatabase(hiveSchema.toHiveDB());
+            client.createDatabase(hiveSchema);
             return null;
           });
 
       LOG.info("Created Hive schema (database) {} in Hive Metastore", ident.name());
       return hiveSchema;
 
-    } catch (AlreadyExistsException e) {
-      throw new SchemaAlreadyExistsException(
-          e, "Hive schema (database) '%s' already exists in Hive Metastore", ident.name());
-
-    } catch (TException e) {
-      throw new RuntimeException(
-          "Failed to create Hive schema (database) " + ident.name() + " in Hive Metastore", e);
-
+    } catch (NoSuchCatalogException | SchemaAlreadyExistsException ne) {
+      throw ne;
     } catch (Exception e) {
       throw new RuntimeException(e);
     }
@@ -403,20 +283,12 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
   @Override
   public HiveSchema loadSchema(NameIdentifier ident) throws NoSuchSchemaException {
     try {
-      Database database = clientPool.run(client -> client.getDatabase(ident.name()));
-      HiveSchema hiveSchema = HiveSchema.fromHiveDB(database);
+      HiveSchema database = clientPool.run(client -> client.getDatabase(catalogName, ident.name()));
 
       LOG.info("Loaded Hive schema (database) {} from Hive Metastore ", ident.name());
-      return hiveSchema;
-
-    } catch (NoSuchObjectException | UnknownDBException e) {
-      throw new NoSuchSchemaException(
-          e, "Hive schema (database) does not exist: %s in Hive Metastore", ident.name());
-
-    } catch (TException e) {
-      throw new RuntimeException(
-          "Failed to load Hive schema (database) " + ident.name() + " from Hive Metastore", e);
-
+      return database;
+    } catch (NoSuchEntityException e) {
+      throw new NoSuchSchemaException("Schema %s does not exist", ident.name());
     } catch (InterruptedException e) {
       throw new RuntimeException(e);
     }
@@ -435,8 +307,8 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
       throws NoSuchSchemaException {
     try {
       // load the database parameters
-      Database database = clientPool.run(client -> client.getDatabase(ident.name()));
-      Map<String, String> properties = HiveSchema.buildSchemaProperties(database);
+      HiveSchema database = clientPool.run(client -> client.getDatabase(catalogName, ident.name()));
+      Map<String, String> properties = database.properties();
       if (LOG.isDebugEnabled()) {
         LOG.debug(
             "Loaded properties for Hive schema (database) {} found {}",
@@ -457,28 +329,16 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
         }
       }
 
-      // alter the Hive database parameters
-      Database alteredDatabase = database.deepCopy();
-      alteredDatabase.setParameters(properties);
-
       clientPool.run(
           client -> {
-            client.alterDatabase(ident.name(), alteredDatabase);
+            client.alterDatabase(catalogName, ident.name(), database);
             return null;
           });
 
       LOG.info("Altered Hive schema (database) {} in Hive Metastore", ident.name());
-      return HiveSchema.fromHiveDB(alteredDatabase);
+      return database;
 
-    } catch (NoSuchObjectException e) {
-      throw new NoSuchSchemaException(
-          e, "Hive schema (database) %s does not exist in Hive Metastore", ident.name());
-
-    } catch (TException | InterruptedException e) {
-      throw new RuntimeException(
-          "Failed to alter Hive schema (database) " + ident.name() + " in Hive metastore", e);
-
-    } catch (Exception e) {
+    } catch (InterruptedException e) {
       throw new RuntimeException(e);
     }
   }
@@ -496,25 +356,15 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
     try {
       clientPool.run(
           client -> {
-            client.dropDatabase(ident.name(), false, false, cascade);
+            client.dropDatabase(catalogName, ident.name(), cascade);
             return null;
           });
       LOG.info("Dropped Hive schema (database) {}", ident.name());
       return true;
 
-    } catch (InvalidOperationException e) {
-      throw new NonEmptySchemaException(
-          e, "Hive schema (database) %s is not empty. One or more tables exist.", ident.name());
-
-    } catch (NoSuchObjectException e) {
-      LOG.warn("Hive schema (database) {} does not exist in Hive Metastore", ident.name());
+    } catch (NoSuchSchemaException e) {
       return false;
-
-    } catch (TException e) {
-      throw new RuntimeException(
-          "Failed to drop Hive schema (database) " + ident.name() + " in Hive Metastore", e);
-
-    } catch (Exception e) {
+    } catch (InterruptedException e) {
       throw new RuntimeException(e);
     }
   }
@@ -545,7 +395,7 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
       // first time is to retrieve all types of table names (including the missing type tables), and
       // then based on
       // those names we can obtain metadata for each individual table and get the type we needed.
-      List<String> allTables = clientPool.run(c -> c.getAllTables(schemaIdent.name()));
+      List<String> allTables = clientPool.run(c -> c.getAllTables(catalogName, schemaIdent.name()));
       if (!listAllTables) {
         // The reason for using the listTableNamesByFilter function is that the
         // getTableObjectiesByName function has poor performance. Currently, we focus on the
@@ -556,29 +406,21 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
             clientPool.run(
                 c ->
                     c.listTableNamesByFilter(
-                        schemaIdent.name(), icebergAndPaimonFilter, MAX_TABLES));
+                        catalogName, schemaIdent.name(), icebergAndPaimonFilter, MAX_TABLES));
         allTables.removeAll(icebergAndPaimonTables);
 
         // filter out the Hudi tables
-        String hudiFilter =
-            String.format(
-                "%sprovider like \"hudi\"", hive_metastoreConstants.HIVE_FILTER_FIELD_PARAMS);
+        String hudiFilter = String.format("%sprovider like \"hudi\"", HIVE_FILTER_FIELD_PARAMS);
         List<String> hudiTables =
             clientPool.run(
-                c -> c.listTableNamesByFilter(schemaIdent.name(), hudiFilter, MAX_TABLES));
+                c ->
+                    c.listTableNamesByFilter(
+                        catalogName, schemaIdent.name(), hudiFilter, MAX_TABLES));
         removeHudiTables(allTables, hudiTables);
       }
       return allTables.stream()
           .map(tbName -> NameIdentifier.of(namespace, tbName))
           .toArray(NameIdentifier[]::new);
-
-    } catch (UnknownDBException e) {
-      throw new NoSuchSchemaException(
-          "Schema (database) does not exist %s in Hive Metastore", namespace);
-
-    } catch (TException e) {
-      throw new RuntimeException(
-          "Failed to list all tables under the namespace : " + namespace + " in Hive Metastore", e);
 
     } catch (InterruptedException e) {
       throw new RuntimeException(e);
@@ -586,12 +428,8 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
   }
 
   private static String getIcebergAndPaimonFilter() {
-    String icebergFilter =
-        String.format(
-            "%stable_type like \"ICEBERG\"", hive_metastoreConstants.HIVE_FILTER_FIELD_PARAMS);
-    String paimonFilter =
-        String.format(
-            "%stable_type like \"PAIMON\"", hive_metastoreConstants.HIVE_FILTER_FIELD_PARAMS);
+    String icebergFilter = String.format("%stable_type like \"ICEBERG\"", HIVE_FILTER_FIELD_PARAMS);
+    String paimonFilter = String.format("%stable_type like \"PAIMON\"", HIVE_FILTER_FIELD_PARAMS);
     return String.format("%s or %s", icebergFilter, paimonFilter);
   }
 
@@ -614,30 +452,21 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
    */
   @Override
   public Table loadTable(NameIdentifier tableIdent) throws NoSuchTableException {
-    org.apache.hadoop.hive.metastore.api.Table table = loadHiveTable(tableIdent);
-    HiveTable hiveTable =
-        HiveTable.fromHiveTable(table)
-            .withProxyPlugin(proxyPlugin)
-            .withClientPool(clientPool)
-            .build();
+    HiveTableHandle hiveTable = loadHiveTable(tableIdent);
 
     LOG.info("Loaded Hive table {} from Hive Metastore ", tableIdent.name());
     return hiveTable;
   }
 
-  private org.apache.hadoop.hive.metastore.api.Table loadHiveTable(NameIdentifier tableIdent) {
+  private HiveTableHandle loadHiveTable(NameIdentifier tableIdent) {
     NameIdentifier schemaIdent = NameIdentifier.of(tableIdent.namespace().levels());
 
     try {
-      org.apache.hadoop.hive.metastore.api.Table table =
-          clientPool.run(c -> c.getTable(schemaIdent.name(), tableIdent.name()));
-      return table;
+      HiveTable table =
+          clientPool.run(c -> c.getTable(catalogName, schemaIdent.name(), tableIdent.name()));
+      return new HiveTableHandle(table, clientPool);
 
-    } catch (NoSuchObjectException e) {
-      throw new NoSuchTableException(
-          e, "Hive table does not exist: %s in Hive Metastore", tableIdent.name());
-
-    } catch (InterruptedException | TException e) {
+    } catch (InterruptedException e) {
       throw new RuntimeException(
           "Failed to load Hive table " + tableIdent.name() + " from Hive metastore", e);
     }
@@ -664,12 +493,10 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
     }
   }
 
-  private void validateColumnChangeForAlter(
-      TableChange[] changes, org.apache.hadoop.hive.metastore.api.Table hiveTable) {
-    Set<String> partitionFields =
-        hiveTable.getPartitionKeys().stream().map(FieldSchema::getName).collect(Collectors.toSet());
+  private void validateColumnChangeForAlter(TableChange[] changes, HiveTable hiveTable) {
+    Set<String> partitionFields = new HashSet<>(hiveTable.partitionFieldNames());
     Set<String> existingFields =
-        hiveTable.getSd().getCols().stream().map(FieldSchema::getName).collect(Collectors.toSet());
+        Arrays.stream(hiveTable.columns()).map(Column::name).collect(Collectors.toSet());
     existingFields.addAll(partitionFields);
 
     Arrays.stream(changes)
@@ -788,38 +615,30 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
       HiveTable hiveTable =
           HiveTable.builder()
               .withName(tableIdent.name())
-              .withSchemaName(schemaIdent.name())
-              .withClientPool(clientPool)
+              .withCatalogName(catalogName)
+              .withDatabaseName(schemaIdent.name())
               .withComment(comment)
               .withColumns(columns)
               .withProperties(properties)
               .withDistribution(distribution)
               .withSortOrders(sortOrders)
-              .withProxyPlugin(proxyPlugin)
               .withAuditInfo(
                   AuditInfo.builder()
-                      .withCreator(UserGroupInformation.getCurrentUser().getUserName())
+                      .withCreator(PrincipalUtils.getCurrentUserName())
                       .withCreateTime(Instant.now())
                       .build())
               .withPartitioning(partitioning)
               .build();
       clientPool.run(
           c -> {
-            c.createTable(hiveTable.toHiveTable(propertiesMetadata.tablePropertiesMetadata()));
+            c.createTable(hiveTable);
             return null;
           });
 
       LOG.info("Created Hive table {} in Hive Metastore", tableIdent.name());
-      return hiveTable;
+      return new HiveTableHandle(hiveTable, clientPool);
 
-    } catch (AlreadyExistsException e) {
-      throw new TableAlreadyExistsException(e, "Table already exists: %s", tableIdent.name());
-    } catch (TException | InterruptedException e) {
-      throw new RuntimeException(
-          "Failed to create Hive table " + tableIdent.name() + " in Hive Metastore", e);
-    } catch (RuntimeException e) {
-      throw e;
-    } catch (Exception e) {
+    } catch (InterruptedException e) {
       throw new RuntimeException(e);
     }
   }
@@ -845,57 +664,31 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
 
     try {
       // TODO(@Minghuang): require a table lock to avoid race condition
-      HiveTable table = (HiveTable) loadTable(tableIdent);
-      org.apache.hadoop.hive.metastore.api.Table alteredHiveTable =
-          table.toHiveTable(propertiesMetadata.tablePropertiesMetadata());
+      HiveTableHandle tableHandle = (HiveTableHandle) loadTable(tableIdent);
+      HiveTable currentTable = tableHandle.table();
+      validateColumnChangeForAlter(changes, currentTable);
 
-      validateColumnChangeForAlter(changes, alteredHiveTable);
+      String newTableName = currentTable.name();
+      String newComment = currentTable.comment();
+      Map<String, String> updatedProperties = new HashMap<>(currentTable.properties());
+      List<Column> updatedColumns = new ArrayList<>(Arrays.asList(currentTable.columns()));
 
       for (TableChange change : changes) {
-        // Table change
         if (change instanceof TableChange.RenameTable) {
-          doRenameTable(alteredHiveTable, (TableChange.RenameTable) change);
-
+          TableChange.RenameTable rename = (TableChange.RenameTable) change;
+          Preconditions.checkArgument(
+              rename.getNewSchemaName().isEmpty(), "Does not support rename schema yet");
+          newTableName = rename.getNewName();
         } else if (change instanceof TableChange.UpdateComment) {
-          doUpdateComment(alteredHiveTable, (TableChange.UpdateComment) change);
-
+          newComment = ((TableChange.UpdateComment) change).getNewComment();
         } else if (change instanceof TableChange.SetProperty) {
-          doSetProperty(alteredHiveTable, (TableChange.SetProperty) change);
-
+          TableChange.SetProperty setProperty = (TableChange.SetProperty) change;
+          updatedProperties.put(setProperty.getProperty(), setProperty.getValue());
         } else if (change instanceof TableChange.RemoveProperty) {
-          doRemoveProperty(alteredHiveTable, (TableChange.RemoveProperty) change);
-
+          TableChange.RemoveProperty removeProperty = (TableChange.RemoveProperty) change;
+          updatedProperties.remove(removeProperty.getProperty());
         } else if (change instanceof TableChange.ColumnChange) {
-          // Column change
-          StorageDescriptor sd = alteredHiveTable.getSd();
-          List<FieldSchema> cols = sd.getCols();
-
-          if (change instanceof TableChange.AddColumn) {
-            TableChange.AddColumn addColumn = (TableChange.AddColumn) change;
-            doAddColumn(cols, addColumn);
-
-          } else if (change instanceof TableChange.DeleteColumn) {
-            doDeleteColumn(cols, (TableChange.DeleteColumn) change);
-
-          } else if (change instanceof TableChange.RenameColumn) {
-            doRenameColumn(cols, (TableChange.RenameColumn) change);
-
-          } else if (change instanceof TableChange.UpdateColumnComment) {
-            doUpdateColumnComment(cols, (TableChange.UpdateColumnComment) change);
-
-          } else if (change instanceof TableChange.UpdateColumnPosition) {
-            doUpdateColumnPosition(cols, (TableChange.UpdateColumnPosition) change);
-
-          } else if (change instanceof TableChange.UpdateColumnType) {
-            doUpdateColumnType(cols, (TableChange.UpdateColumnType) change);
-
-          } else if (change instanceof TableChange.UpdateColumnAutoIncrement) {
-            throw new IllegalArgumentException(
-                "Hive does not support altering column auto increment");
-          } else {
-            throw new IllegalArgumentException(
-                "Unsupported column change type: " + change.getClass().getSimpleName());
-          }
+          applyColumnChange(updatedColumns, (TableChange.ColumnChange) change);
         } else {
           throw new IllegalArgumentException(
               "Unsupported table change type: "
@@ -903,21 +696,22 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
         }
       }
 
+      HiveTable updatedTable =
+          buildAlteredHiveTable(
+              currentTable, newTableName, newComment, updatedProperties, updatedColumns);
+
+      HiveTable finalUpdatedTable = updatedTable;
       clientPool.run(
           c -> {
-            c.alter_table(schemaIdent.name(), tableIdent.name(), alteredHiveTable);
+            c.alterTable(catalogName, schemaIdent.name(), tableIdent.name(), finalUpdatedTable);
             return null;
           });
 
       LOG.info("Altered Hive table {} in Hive Metastore", tableIdent.name());
-      return HiveTable.fromHiveTable(alteredHiveTable)
-          .withProxyPlugin(proxyPlugin)
-          .withClientPool(clientPool)
-          .build();
+      return new HiveTableHandle(updatedTable, clientPool);
 
-    } catch (TException | InterruptedException e) {
-      if (e.getMessage() != null
-          && e.getMessage().contains("types incompatible with the existing columns")) {
+    } catch (IllegalArgumentException e) {
+      if (e.getMessage().contains("types incompatible with the existing columns")) {
         throw new IllegalArgumentException(
             "Failed to alter Hive table ["
                 + tableIdent.name()
@@ -927,18 +721,65 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
                 + "otherwise the alter operation will fail in Hive metastore.",
             e);
       }
-      throw new RuntimeException(
-          "Failed to alter Hive table " + tableIdent.name() + " in Hive metastore", e);
-    } catch (IllegalArgumentException | NoSuchTableException e) {
       throw e;
-    } catch (Exception e) {
+    } catch (InterruptedException e) {
       throw new RuntimeException(e);
     }
   }
 
-  private int columnPosition(List<FieldSchema> columns, TableChange.ColumnPosition position) {
-    Preconditions.checkArgument(position != null, "Column position cannot be null");
-    if (position instanceof TableChange.After) {
+  private HiveTable buildAlteredHiveTable(
+      HiveTable original,
+      String tableName,
+      String comment,
+      Map<String, String> properties,
+      List<Column> columns) {
+    HiveTable.Builder builder =
+        HiveTable.builder()
+            .withName(tableName)
+            .withColumns(columns.toArray(new Column[0]))
+            .withProperties(properties)
+            .withAuditInfo(original.auditInfo())
+            .withDistribution(original.distribution())
+            .withSortOrders(original.sortOrder())
+            .withPartitioning(original.partitioning())
+            .withCatalogName(original.catalogName())
+            .withDatabaseName(original.databaseName());
+
+    if (comment != null) {
+      builder.withComment(comment);
+    }
+    return builder.build();
+  }
+
+  private void applyColumnChange(List<Column> columns, TableChange.ColumnChange change) {
+    if (change instanceof TableChange.AddColumn) {
+      doAddColumn(columns, (TableChange.AddColumn) change);
+    } else if (change instanceof TableChange.DeleteColumn) {
+      doDeleteColumn(columns, (TableChange.DeleteColumn) change);
+    } else if (change instanceof TableChange.RenameColumn) {
+      doRenameColumn(columns, (TableChange.RenameColumn) change);
+    } else if (change instanceof TableChange.UpdateColumnComment) {
+      doUpdateColumnComment(columns, (TableChange.UpdateColumnComment) change);
+    } else if (change instanceof TableChange.UpdateColumnPosition) {
+      doUpdateColumnPosition(columns, (TableChange.UpdateColumnPosition) change);
+    } else if (change instanceof TableChange.UpdateColumnType) {
+      doUpdateColumnType(columns, (TableChange.UpdateColumnType) change);
+    } else if (change instanceof TableChange.UpdateColumnDefaultValue) {
+      doUpdateColumnDefaultValue(columns, (TableChange.UpdateColumnDefaultValue) change);
+    } else if (change instanceof TableChange.UpdateColumnNullability) {
+      doUpdateColumnNullability(columns, (TableChange.UpdateColumnNullability) change);
+    } else if (change instanceof TableChange.UpdateColumnAutoIncrement) {
+      throw new IllegalArgumentException("Hive does not support altering column auto increment");
+    } else {
+      throw new IllegalArgumentException(
+          "Unsupported column change type: " + change.getClass().getSimpleName());
+    }
+  }
+
+  private int columnPosition(List<Column> columns, TableChange.ColumnPosition position) {
+    if (position == null || position instanceof TableChange.Default) {
+      return columns.size();
+    } else if (position instanceof TableChange.After) {
       String afterColumn = ((TableChange.After) position).getColumn();
       int indexOfColumn = indexOfColumn(columns, afterColumn);
       Preconditions.checkArgument(indexOfColumn != -1, "Column does not exist: " + afterColumn);
@@ -951,114 +792,141 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
     }
   }
 
-  /**
-   * Returns the index of a column in the given list of FieldSchema objects, based on the field
-   * name.
-   *
-   * @param columns The list of Hive columns.
-   * @param fieldName The name of the field to be searched.
-   * @return The index of the column if found, otherwise -1.
-   */
-  private int indexOfColumn(List<FieldSchema> columns, String fieldName) {
-    return columns.stream()
-        .map(FieldSchema::getName)
-        .collect(Collectors.toList())
-        .indexOf(fieldName);
+  private int indexOfColumn(List<Column> columns, String fieldName) {
+    for (int i = 0; i < columns.size(); i++) {
+      if (columns.get(i).name().equals(fieldName)) {
+        return i;
+      }
+    }
+    return -1;
   }
 
-  private void doRenameTable(
-      org.apache.hadoop.hive.metastore.api.Table hiveTable, TableChange.RenameTable change) {
-    Preconditions.checkArgument(
-        !change.getNewSchemaName().isPresent(), "Does not support rename schema yet");
-    hiveTable.setTableName(change.getNewName());
-  }
-
-  private void doUpdateComment(
-      org.apache.hadoop.hive.metastore.api.Table hiveTable, TableChange.UpdateComment change) {
-    Map<String, String> parameters = hiveTable.getParameters();
-    parameters.put(COMMENT, change.getNewComment());
-  }
-
-  private void doSetProperty(
-      org.apache.hadoop.hive.metastore.api.Table hiveTable, TableChange.SetProperty change) {
-    Map<String, String> parameters = hiveTable.getParameters();
-    parameters.put(change.getProperty(), change.getValue());
-  }
-
-  private void doRemoveProperty(
-      org.apache.hadoop.hive.metastore.api.Table hiveTable, TableChange.RemoveProperty change) {
-    Map<String, String> parameters = hiveTable.getParameters();
-    parameters.remove(change.getProperty());
-  }
-
-  private void doAddColumn(List<FieldSchema> cols, TableChange.AddColumn change) {
-    int targetPosition;
+  private void doAddColumn(List<Column> columns, TableChange.AddColumn change) {
+    String columnName = topLevelFieldName(change.getFieldName());
     if (change.isAutoIncrement()) {
       throw new IllegalArgumentException("Hive catalog does not support auto-increment column");
     }
-    if (change.getPosition() instanceof TableChange.Default) {
-      // add to the end by default
-      targetPosition = cols.size();
-      LOG.info(
-          "Hive catalog add column {} to the end of non-partition columns by default",
-          change.fieldName()[0]);
-    } else {
-      targetPosition = columnPosition(cols, change.getPosition());
-    }
-    cols.add(
+    Preconditions.checkArgument(
+        indexOfColumn(columns, columnName) == -1, "Column already exists: " + columnName);
+    int targetPosition = columnPosition(columns, change.getPosition());
+    columns.add(
         targetPosition,
-        new FieldSchema(
-            change.fieldName()[0],
-            CONVERTER.fromGravitino(change.getDataType()).getQualifiedName(),
-            change.getComment()));
+        Column.of(
+            columnName,
+            change.getDataType(),
+            change.getComment(),
+            change.isNullable(),
+            change.isAutoIncrement(),
+            defaultValueOrUnset(change.getDefaultValue())));
   }
 
-  private void doDeleteColumn(List<FieldSchema> cols, TableChange.DeleteColumn change) {
-    String columnName = change.fieldName()[0];
-    if (!cols.removeIf(c -> c.getName().equals(columnName)) && !change.getIfExists()) {
-      throw new IllegalArgumentException("DeleteColumn does not exist: " + columnName);
+  private void doDeleteColumn(List<Column> columns, TableChange.DeleteColumn change) {
+    String columnName = topLevelFieldName(change.fieldName());
+    int index = indexOfColumn(columns, columnName);
+    if (index == -1) {
+      if (!change.getIfExists()) {
+        throw new IllegalArgumentException("DeleteColumn does not exist: " + columnName);
+      }
+      return;
     }
+    columns.remove(index);
   }
 
-  private void doRenameColumn(List<FieldSchema> cols, TableChange.RenameColumn change) {
-    String columnName = change.fieldName()[0];
-    if (indexOfColumn(cols, columnName) == -1) {
+  private void doRenameColumn(List<Column> columns, TableChange.RenameColumn change) {
+    String columnName = topLevelFieldName(change.fieldName());
+    int index = indexOfColumn(columns, columnName);
+    if (index == -1) {
       throw new IllegalArgumentException("RenameColumn does not exist: " + columnName);
     }
-
     String newName = change.getNewName();
-    if (indexOfColumn(cols, newName) != -1) {
-      throw new IllegalArgumentException("Column already exists: " + newName);
-    }
-    cols.get(indexOfColumn(cols, columnName)).setName(newName);
+    Preconditions.checkArgument(
+        indexOfColumn(columns, newName) == -1, "Column already exists: " + newName);
+    Column existing = columns.get(index);
+    columns.set(index, rebuildColumn(existing, newName, null, null, null, null, null));
   }
 
-  private void doUpdateColumnComment(
-      List<FieldSchema> cols, TableChange.UpdateColumnComment change) {
-    cols.get(indexOfColumn(cols, change.fieldName()[0])).setComment(change.getNewComment());
+  private void doUpdateColumnComment(List<Column> columns, TableChange.UpdateColumnComment change) {
+    int index = indexOfColumn(columns, topLevelFieldName(change.fieldName()));
+    if (index == -1) {
+      throw new IllegalArgumentException(
+          "UpdateColumnComment does not exist: " + change.fieldName()[0]);
+    }
+    Column existing = columns.get(index);
+    columns.set(
+        index, rebuildColumn(existing, null, null, change.getNewComment(), null, null, null));
   }
 
   private void doUpdateColumnPosition(
-      List<FieldSchema> cols, TableChange.UpdateColumnPosition change) {
-    String columnName = change.fieldName()[0];
-    int sourceIndex = indexOfColumn(cols, columnName);
+      List<Column> columns, TableChange.UpdateColumnPosition change) {
+    String columnName = topLevelFieldName(change.fieldName());
+    int sourceIndex = indexOfColumn(columns, columnName);
     if (sourceIndex == -1) {
       throw new IllegalArgumentException("UpdateColumnPosition does not exist: " + columnName);
     }
-
-    // update column position: remove then add to given position
-    FieldSchema hiveColumn = cols.remove(sourceIndex);
-    cols.add(columnPosition(cols, change.getPosition()), hiveColumn);
+    Column column = columns.remove(sourceIndex);
+    int targetIndex = columnPosition(columns, change.getPosition());
+    columns.add(targetIndex, column);
   }
 
-  private void doUpdateColumnType(List<FieldSchema> cols, TableChange.UpdateColumnType change) {
-    String columnName = change.fieldName()[0];
-    int indexOfColumn = indexOfColumn(cols, columnName);
-    if (indexOfColumn == -1) {
+  private void doUpdateColumnType(List<Column> columns, TableChange.UpdateColumnType change) {
+    String columnName = topLevelFieldName(change.getFieldName());
+    int index = indexOfColumn(columns, columnName);
+    if (index == -1) {
       throw new IllegalArgumentException("UpdateColumnType does not exist: " + columnName);
     }
-    cols.get(indexOfColumn)
-        .setType(CONVERTER.fromGravitino(change.getNewDataType()).getQualifiedName());
+    Column existing = columns.get(index);
+    columns.set(
+        index, rebuildColumn(existing, null, change.getNewDataType(), null, null, null, null));
+  }
+
+  private void doUpdateColumnDefaultValue(
+      List<Column> columns, TableChange.UpdateColumnDefaultValue change) {
+    String columnName = topLevelFieldName(change.fieldName());
+    int index = indexOfColumn(columns, columnName);
+    if (index == -1) {
+      throw new IllegalArgumentException("UpdateColumnDefaultValue does not exist: " + columnName);
+    }
+    Column existing = columns.get(index);
+    columns.set(
+        index, rebuildColumn(existing, null, null, null, null, null, change.getNewDefaultValue()));
+  }
+
+  private void doUpdateColumnNullability(
+      List<Column> columns, TableChange.UpdateColumnNullability change) {
+    String columnName = topLevelFieldName(change.fieldName());
+    int index = indexOfColumn(columns, columnName);
+    if (index == -1) {
+      throw new IllegalArgumentException("UpdateColumnNullability does not exist: " + columnName);
+    }
+    Column existing = columns.get(index);
+    columns.set(index, rebuildColumn(existing, null, null, null, change.nullable(), null, null));
+  }
+
+  private Column rebuildColumn(
+      Column existing,
+      String name,
+      Type dataType,
+      String comment,
+      Boolean nullable,
+      Boolean autoIncrement,
+      Expression defaultValue) {
+    return Column.of(
+        name != null ? name : existing.name(),
+        dataType != null ? dataType : existing.dataType(),
+        comment != null ? comment : existing.comment(),
+        nullable != null ? nullable : existing.nullable(),
+        autoIncrement != null ? autoIncrement : existing.autoIncrement(),
+        defaultValue != null ? defaultValue : existing.defaultValue());
+  }
+
+  private Expression defaultValueOrUnset(Expression defaultValue) {
+    return defaultValue == null ? Column.DEFAULT_VALUE_NOT_SET : defaultValue;
+  }
+
+  private String topLevelFieldName(String[] fieldName) {
+    Preconditions.checkArgument(
+        fieldName.length == 1, "Hive catalog only supports top-level column operations");
+    return fieldName[0];
   }
 
   /**
@@ -1120,7 +988,9 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
       String comment,
       Map<String, String> properties) {
     try {
-      clientPool.run(IMetaStoreClient::getAllDatabases);
+      clientPool.run(c -> c.getAllDatabases(catalogName));
+    } catch (ConnectionFailedException e) {
+      throw e;
     } catch (Exception e) {
       throw new ConnectionFailedException(
           e, "Failed to run getAllDatabases in Hive Metastore: %s", e.getMessage());
@@ -1141,20 +1011,16 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
     try {
       clientPool.run(
           c -> {
-            c.dropTable(schemaIdent.name(), tableIdent.name(), deleteData, false, ifPurge);
+            c.dropTable(catalogName, schemaIdent.name(), tableIdent.name(), deleteData, ifPurge);
             return null;
           });
 
       LOG.info("Dropped Hive table {}", tableIdent.name());
       return true;
 
-    } catch (NoSuchObjectException e) {
-      LOG.warn("Hive table {} does not exist in Hive Metastore", tableIdent.name());
+    } catch (NoSuchTableException e) {
       return false;
-    } catch (TException | InterruptedException e) {
-      throw new RuntimeException(
-          "Failed to drop Hive table " + tableIdent.name() + " in Hive Metastore", e);
-    } catch (Exception e) {
+    } catch (InterruptedException e) {
       throw new RuntimeException(e);
     }
   }
@@ -1163,24 +1029,12 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
     return clientPool;
   }
 
-  HiveConf getHiveConf() {
-    return hiveConf;
-  }
-
   private boolean isExternalTable(NameIdentifier tableIdent) {
-    org.apache.hadoop.hive.metastore.api.Table hiveTable = loadHiveTable(tableIdent);
+    HiveTableHandle hiveTable = loadHiveTable(tableIdent);
     return EXTERNAL_TABLE.name().equalsIgnoreCase(hiveTable.getTableType());
   }
 
   private static ThreadFactory getThreadFactory(String factoryName) {
     return new ThreadFactoryBuilder().setDaemon(true).setNameFormat(factoryName + "-%d").build();
-  }
-
-  public String getKerberosRealm() {
-    return kerberosRealm;
-  }
-
-  void setProxyPlugin(HiveProxyPlugin hiveProxyPlugin) {
-    this.proxyPlugin = hiveProxyPlugin;
   }
 }

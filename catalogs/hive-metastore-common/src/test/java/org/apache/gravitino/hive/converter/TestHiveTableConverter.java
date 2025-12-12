@@ -22,7 +22,6 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import java.util.Arrays;
 import java.util.List;
-import org.apache.gravitino.connector.BaseColumn;
 import org.apache.gravitino.rel.Column;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.metastore.api.StorageDescriptor;
@@ -53,9 +52,7 @@ public class TestHiveTableConverter {
             new FieldSchema("month", "int", "Month partition"));
     table.setPartitionKeys(partitionKeys);
 
-    // Get columns using a test column builder
-    TestColumnBuilder builder = new TestColumnBuilder();
-    Column[] columns = HiveTableConverter.getColumns(table, builder);
+    Column[] columns = HiveTableConverter.getColumns(table);
 
     // Should have all 5 columns (3 regular + 2 partition)
     assertEquals(5, columns.length);
@@ -90,9 +87,7 @@ public class TestHiveTableConverter {
             );
     table.setPartitionKeys(partitionKeys);
 
-    // Get columns using a test column builder
-    TestColumnBuilder builder = new TestColumnBuilder();
-    Column[] columns = HiveTableConverter.getColumns(table, builder);
+    Column[] columns = HiveTableConverter.getColumns(table);
 
     // Should have only 4 columns (3 regular + 1 unique partition)
     // The duplicates (date and name) should not be added again
@@ -126,9 +121,7 @@ public class TestHiveTableConverter {
             new FieldSchema("col3", "double", "Column 3 partition"));
     table.setPartitionKeys(partitionKeys);
 
-    // Get columns using a test column builder
-    TestColumnBuilder builder = new TestColumnBuilder();
-    Column[] columns = HiveTableConverter.getColumns(table, builder);
+    Column[] columns = HiveTableConverter.getColumns(table);
 
     // Should have only 3 columns (all from regular columns, no duplicates from partition keys)
     assertEquals(3, columns.length);
@@ -154,59 +147,11 @@ public class TestHiveTableConverter {
     // Empty partition keys
     table.setPartitionKeys(Arrays.asList());
 
-    // Get columns using a test column builder
-    TestColumnBuilder builder = new TestColumnBuilder();
-    Column[] columns = HiveTableConverter.getColumns(table, builder);
+    Column[] columns = HiveTableConverter.getColumns(table);
 
     // Should have only 2 columns from regular columns
     assertEquals(2, columns.length);
     assertEquals("id", columns[0].name());
     assertEquals("name", columns[1].name());
   }
-
-  // Test column implementation for testing
-  static class TestColumn extends BaseColumn {
-    private TestColumn() {}
-
-    static class Builder extends BaseColumn.BaseColumnBuilder<Builder, TestColumn> {
-      @Override
-      protected TestColumn internalBuild() {
-        TestColumn column = new TestColumn();
-        // Use reflection to set protected fields
-        try {
-          java.lang.reflect.Field nameField = BaseColumn.class.getDeclaredField("name");
-          nameField.setAccessible(true);
-          nameField.set(column, name);
-
-          java.lang.reflect.Field commentField = BaseColumn.class.getDeclaredField("comment");
-          commentField.setAccessible(true);
-          commentField.set(column, comment);
-
-          java.lang.reflect.Field dataTypeField = BaseColumn.class.getDeclaredField("dataType");
-          dataTypeField.setAccessible(true);
-          dataTypeField.set(column, dataType);
-
-          java.lang.reflect.Field nullableField = BaseColumn.class.getDeclaredField("nullable");
-          nullableField.setAccessible(true);
-          nullableField.set(column, nullable);
-
-          java.lang.reflect.Field autoIncrementField =
-              BaseColumn.class.getDeclaredField("autoIncrement");
-          autoIncrementField.setAccessible(true);
-          autoIncrementField.set(column, autoIncrement);
-
-          java.lang.reflect.Field defaultValueField =
-              BaseColumn.class.getDeclaredField("defaultValue");
-          defaultValueField.setAccessible(true);
-          defaultValueField.set(column, defaultValue);
-        } catch (Exception e) {
-          throw new RuntimeException("Failed to build TestColumn", e);
-        }
-        return column;
-      }
-    }
-  }
-
-  // Test column builder helper
-  static class TestColumnBuilder extends TestColumn.Builder {}
 }

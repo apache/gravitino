@@ -24,20 +24,18 @@ import com.github.benmanes.caffeine.cache.Scheduler;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.Lists;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
-import java.io.IOException;
-import java.io.UncheckedIOException;
 import java.util.List;
 import java.util.Map;
+import java.util.Properties;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
 import org.apache.gravitino.catalog.hive.HiveConstants;
+import org.apache.gravitino.exceptions.GravitinoRuntimeException;
+import org.apache.gravitino.hive.client.HiveClient;
 import org.apache.gravitino.utils.ClientPool;
-import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.hive.metastore.IMetaStoreClient;
-import org.apache.hadoop.security.UserGroupInformation;
-import org.apache.thrift.TException;
+import org.apache.gravitino.utils.PrincipalUtils;
 import org.immutables.value.Value;
 
 /**
@@ -50,17 +48,17 @@ import org.immutables.value.Value;
  *
  * <p>A ClientPool that caches the underlying HiveClientPool instances.
  */
-public class CachedClientPool implements ClientPool<IMetaStoreClient, TException> {
+public class CachedClientPool implements ClientPool<HiveClient, GravitinoRuntimeException> {
   private static final ClientPropertiesMetadata PROPERTIES_METADATA =
       new ClientPropertiesMetadata();
 
   private final Cache<Key, HiveClientPool> clientPoolCache;
 
-  private final Configuration conf;
+  private final Properties conf;
   private final int clientPoolSize;
   private final ScheduledThreadPoolExecutor scheduler;
 
-  public CachedClientPool(Configuration hiveConf, Map<String, String> properties) {
+  public CachedClientPool(Properties hiveConf, Map<String, String> properties) {
     int clientPoolSize =
         (int) PROPERTIES_METADATA.getOrDefault(properties, HiveConstants.CLIENT_POOL_SIZE);
     long evictionInterval =
@@ -93,26 +91,21 @@ public class CachedClientPool implements ClientPool<IMetaStoreClient, TException
   }
 
   @Override
-  public <R> R run(Action<R, IMetaStoreClient, TException> action)
-      throws TException, InterruptedException {
+  public <R> R run(Action<R, HiveClient, GravitinoRuntimeException> action)
+      throws GravitinoRuntimeException, InterruptedException {
     return clientPool().run(action);
   }
 
   @Override
-  public <R> R run(Action<R, IMetaStoreClient, TException> action, boolean retry)
-      throws TException, InterruptedException {
+  public <R> R run(Action<R, HiveClient, GravitinoRuntimeException> action, boolean retry)
+      throws GravitinoRuntimeException, InterruptedException {
     return clientPool().run(action, retry);
   }
 
   @VisibleForTesting
   public static Key extractKey() {
     List<Object> elements = Lists.newArrayList();
-    try {
-      elements.add(UserGroupInformation.getCurrentUser().getUserName());
-    } catch (IOException e) {
-      throw new UncheckedIOException(e);
-    }
-
+    elements.add(PrincipalUtils.getCurrentUserName());
     return Key.of(elements);
   }
 
@@ -154,6 +147,5 @@ public class CachedClientPool implements ClientPool<IMetaStoreClient, TException
     // class loader is closed.
     clientPoolCache.asMap().forEach((key, value) -> value.close());
     clientPoolCache.invalidateAll();
-    scheduler.shutdownNow();
   }
 }

@@ -158,13 +158,17 @@ public abstract class BaseTable implements Table {
     return indexes;
   }
 
+  public Optional<ProxyPlugin> proxyPlugin() {
+    return proxyPlugin;
+  }
+
   /**
    * Builder interface for creating instances of {@link BaseTable}.
    *
    * @param <SELF> The type of the builder.
    * @param <T> The type of the table being built.
    */
-  interface Builder<SELF extends Builder<SELF, T>, T extends BaseTable> {
+  public interface Builder<SELF extends Builder<SELF, T>, T extends BaseTable> {
 
     SELF withName(String name);
 
