@@ -28,7 +28,6 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.logging.Level;
-import java.util.logging.Logger;
 import java.util.stream.Stream;
 import javax.servlet.http.HttpServletRequest;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
@@ -62,6 +61,7 @@ import org.glassfish.jersey.logging.LoggingFeature;
 import org.glassfish.jersey.logging.LoggingFeature.Verbosity;
 import org.glassfish.jersey.server.ResourceConfig;
 import org.junit.jupiter.params.provider.Arguments;
+import org.slf4j.Logger;
 
 public class IcebergRestTestUtil {
 

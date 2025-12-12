@@ -139,6 +139,21 @@ allprojects {
           "import\\s+.*\\.com\\.google\\.common\\.(io|util\\.concurrent|annotations|cache|primitives|hash|net|reflect)\\.([A-Z][a-zA-Z0-9_]*);",
           "import com.google.common.${'$'}1.${'$'}2;"
         )
+        replaceRegex(
+          "Use Apache Commons Lang3 instead of shadowed versions",
+          "import\\s+.*\\.org\\.apache\\.commons\\.lang3\\.([A-Z][a-zA-Z0-9_]*);",
+          "import org.apache.commons.lang3.${'$'}1;"
+        )
+        replaceRegex(
+          "Use Apache Commons IO instead of shadowed versions",
+          "import\\s+.*\\.org\\.apache\\.commons\\.io\\.([A-Z][a-zA-Z0-9_]*);",
+          "import org.apache.commons.io.${'$'}1;"
+        )
+        replaceRegex(
+          "Use SLF4J Logger instead of other logging frameworks",
+          "import\\s+.*\\.(Logger|LoggerFactory);",
+          "import org.slf4j.${'$'}1;"
+        )
 
         targetExclude("**/build/**", "**/.pnpm/***")
       }
