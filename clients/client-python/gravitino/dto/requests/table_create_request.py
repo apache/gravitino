@@ -36,11 +36,12 @@ from gravitino.utils.precondition import Precondition
 
 
 @dataclass
-class TableCreateRequest(RESTRequest):
+class TableCreateRequest(RESTRequest):  # pylint: disable=too-many-instance-attributes
     """Represents a request to create a table."""
 
     _name: str = field(metadata=config(field_name="name"))
     _columns: list[ColumnDTO] = field(metadata=config(field_name="columns"))
+    _comment: Optional[str] = field(default=None, metadata=config(field_name="comment"))
     _partitioning: Optional[list[Partitioning]] = field(
         default=None,
         metadata=config(
