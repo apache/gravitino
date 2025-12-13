@@ -87,8 +87,8 @@ class TableCatalog(ABC):
         self,
         identifier: NameIdentifier,
         columns: list[Column],
-        comment: str,
-        properties: dict[str, str],
+        comment: Optional[str] = None,
+        properties: Optional[dict[str, str]] = None,
         partitioning: Optional[list[Transform]] = None,
         distribution: Optional[Distribution] = None,
         sort_orders: Optional[list[SortOrder]] = None,
@@ -101,18 +101,18 @@ class TableCatalog(ABC):
                 A table identifier.
             columns (list[Column]):
                 The columns of the new table.
-            comment (str):
-                The table comment.
-            properties (dict[str, str]):
-                The table properties.
+            comment (str, optional):
+                The table comment. Defaults to `None`.
+            properties (dict[str, str], optional):
+                The table properties. Defaults to `None`.
             partitioning (Optional[list[Transform]], optional):
                 The table partitioning. Defaults to None.
             distribution (Optional[Distribution], optional):
-                The distribution of the table. Defaults to None.
+                The distribution of the table. Defaults to `None`.
             sort_orders (Optional[list[SortOrder]], optional):
-                The sort orders of the table. Defaults to None.
+                The sort orders of the table. Defaults to `None`.
             indexes (Optional[list[Index]], optional):
-                The table indexes. Defaults to None.
+                The table indexes. Defaults to `None`.
 
         Raises:
             NoSuchSchemaException:
