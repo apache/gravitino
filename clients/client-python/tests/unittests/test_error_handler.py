@@ -23,6 +23,7 @@ from gravitino.exceptions.base import (
     CatalogAlreadyExistsException,
     CatalogNotInUseException,
     ConnectionFailedException,
+    ForbiddenException,
     IllegalArgumentException,
     InternalError,
     MetalakeAlreadyExistsException,
@@ -41,6 +42,7 @@ from gravitino.exceptions.base import (
     PartitionAlreadyExistsException,
     RESTException,
     SchemaAlreadyExistsException,
+    TableAlreadyExistsException,
     UnsupportedOperationException,
 )
 from gravitino.exceptions.handlers.catalog_error_handler import CATALOG_ERROR_HANDLER
@@ -54,6 +56,7 @@ from gravitino.exceptions.handlers.partition_error_handler import (
 )
 from gravitino.exceptions.handlers.rest_error_handler import REST_ERROR_HANDLER
 from gravitino.exceptions.handlers.schema_error_handler import SCHEMA_ERROR_HANDLER
+from gravitino.exceptions.handlers.table_error_handler import TABLE_ERROR_HANDLER
 
 
 class TestErrorHandler(unittest.TestCase):
@@ -338,5 +341,80 @@ class TestErrorHandler(unittest.TestCase):
 
         with self.assertRaises(RESTException):
             PARTITION_ERROR_HANDLER.handle(
+                ErrorResponse.generate_error_response(Exception, "mock error")
+            )
+
+    def test_table_error_handler(self):
+        with self.assertRaises(IllegalArgumentException):
+            TABLE_ERROR_HANDLER.handle(
+                ErrorResponse.generate_error_response(
+                    IllegalArgumentException, "mock error"
+                )
+            )
+
+        with self.assertRaises(NoSuchSchemaException):
+            TABLE_ERROR_HANDLER.handle(
+                ErrorResponse.generate_error_response(
+                    NoSuchSchemaException, "mock error"
+                )
+            )
+
+        with self.assertRaises(NoSuchTableException):
+            TABLE_ERROR_HANDLER.handle(
+                ErrorResponse.generate_error_response(
+                    NoSuchTableException, "mock error"
+                )
+            )
+
+        with self.assertRaises(NotFoundException):
+            TABLE_ERROR_HANDLER.handle(
+                ErrorResponse.generate_error_response(NotFoundException, "mock error")
+            )
+
+        with self.assertRaises(TableAlreadyExistsException):
+            TABLE_ERROR_HANDLER.handle(
+                ErrorResponse.generate_error_response(
+                    TableAlreadyExistsException, "mock error"
+                )
+            )
+
+        with self.assertRaises(RuntimeError):
+            TABLE_ERROR_HANDLER.handle(
+                ErrorResponse.generate_error_response(RuntimeError, "mock error")
+            )
+
+        with self.assertRaises(UnsupportedOperationException):
+            TABLE_ERROR_HANDLER.handle(
+                ErrorResponse.generate_error_response(
+                    UnsupportedOperationException, "mock error"
+                )
+            )
+
+        with self.assertRaises(ForbiddenException):
+            TABLE_ERROR_HANDLER.handle(
+                ErrorResponse.generate_error_response(ForbiddenException, "mock error")
+            )
+
+        with self.assertRaises(CatalogNotInUseException):
+            TABLE_ERROR_HANDLER.handle(
+                ErrorResponse.generate_error_response(
+                    CatalogNotInUseException, "mock error"
+                )
+            )
+
+        with self.assertRaises(MetalakeNotInUseException):
+            TABLE_ERROR_HANDLER.handle(
+                ErrorResponse.generate_error_response(
+                    MetalakeNotInUseException, "mock error"
+                )
+            )
+
+        with self.assertRaises(NotInUseException):
+            TABLE_ERROR_HANDLER.handle(
+                ErrorResponse.generate_error_response(NotInUseException, "mock error")
+            )
+
+        with self.assertRaises(RESTException):
+            TABLE_ERROR_HANDLER.handle(
                 ErrorResponse.generate_error_response(Exception, "mock error")
             )
