@@ -41,14 +41,14 @@ class TableCatalog(ABC):
     """
 
     @abstractmethod
-    def list_tables(self, namespace: Namespace) -> NameIdentifier:
+    def list_tables(self, namespace: Namespace) -> list[NameIdentifier]:
         """List the tables in a namespace from the catalog.
 
         Args:
             namespace (Namespace): A namespace.
 
         Returns:
-            NameIdentifier: An array of table identifiers in the namespace.
+            list[NameIdentifier]: An array of table identifiers in the namespace.
 
         Raises:
             NoSuchSchemaException: If the schema does not exist.

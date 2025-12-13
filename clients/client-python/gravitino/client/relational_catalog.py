@@ -30,8 +30,10 @@ from gravitino.client.relational_table import RelationalTable
 from gravitino.dto.audit_dto import AuditDTO
 from gravitino.dto.rel.distribution_dto import DistributionDTO
 from gravitino.dto.requests.table_create_request import TableCreateRequest
+from gravitino.dto.responses.entity_list_response import EntityListResponse
 from gravitino.dto.responses.table_response import TableResponse
 from gravitino.dto.util.dto_converters import DTOConverters
+from gravitino.exceptions.handlers.table_error_handler import TABLE_ERROR_HANDLER
 from gravitino.name_identifier import NameIdentifier
 from gravitino.namespace import Namespace
 from gravitino.rest.rest_utils import encode_string
@@ -157,10 +159,25 @@ class RelationalCatalog(BaseSchemaCatalog, TableCatalog):
         )
         req.validate()
         full_namespace = self._get_table_full_namespace(identifier.namespace())
-        rest_client_resp = self.rest_client.post(
+        resp = self.rest_client.post(
             self._format_table_request_path(full_namespace),
             json=req,
+            error_handler=TABLE_ERROR_HANDLER,
         )
-        resp = TableResponse.from_json(rest_client_resp.body, infer_missing=True)
-        resp.validate()
-        return RelationalTable(full_namespace, resp.table(), self.rest_client)
+        table_resp = TableResponse.from_json(resp.body, infer_missing=True)
+        table_resp.validate()
+        return RelationalTable(full_namespace, table_resp.table(), self.rest_client)
+
+    def list_tables(self, namespace: Namespace) -> list[NameIdentifier]:
+        RelationalCatalog.check_table_namespace(namespace)
+        full_namespace = self._get_table_full_namespace(namespace)
+        resp = self.rest_client.get(
+            self._format_table_request_path(full_namespace),
+            error_handler=TABLE_ERROR_HANDLER,
+        )
+        entity_list_resp = EntityListResponse.from_json(resp.body, infer_missing=True)
+        entity_list_resp.validate()
+        return [
+            NameIdentifier.of(ident.namespace().level(2), ident.name())
+            for ident in entity_list_resp.identifiers()
+        ]
