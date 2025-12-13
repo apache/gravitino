@@ -181,3 +181,15 @@ class RelationalCatalog(BaseSchemaCatalog, TableCatalog):
             NameIdentifier.of(ident.namespace().level(2), ident.name())
             for ident in entity_list_resp.identifiers()
         ]
+
+    def load_table(self, identifier: NameIdentifier) -> Table:
+        RelationalCatalog.check_table_name_identifier(identifier)
+        full_namespace = self._get_table_full_namespace(identifier.namespace())
+        resp = self.rest_client.get(
+            f"{self._format_table_request_path(full_namespace)}"
+            f"/{encode_string(identifier.name())}",
+            error_handler=TABLE_ERROR_HANDLER,
+        )
+        table_resp = TableResponse.from_json(resp.body, infer_missing=True)
+        table_resp.validate()
+        return RelationalTable(full_namespace, table_resp.table(), self.rest_client)
