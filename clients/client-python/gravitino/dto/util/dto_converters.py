@@ -594,6 +594,22 @@ class DTOConverters:
             )
         raise IllegalArgumentException(f"Unsupported transform: {obj.name()}")
 
+    @to_dto.register
+    @staticmethod
+    def _(obj: Distribution) -> DistributionDTO:
+        if obj is None or obj is Distributions.NONE:
+            return DistributionDTO.NONE
+        if isinstance(obj, DistributionDTO):
+            return obj
+        return DistributionDTO(
+            strategy=obj.strategy(),
+            number=obj.number(),
+            args=[
+                DTOConverters.to_function_arg(expression)
+                for expression in obj.expressions()
+            ],
+        )
+
     @overload
     @staticmethod
     def to_dtos(dtos: list[Column]) -> list[ColumnDTO]: ...  # pragma: no cover
