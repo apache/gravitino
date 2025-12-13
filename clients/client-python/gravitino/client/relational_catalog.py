@@ -131,8 +131,8 @@ class RelationalCatalog(BaseSchemaCatalog, TableCatalog):
         self,
         identifier: NameIdentifier,
         columns: list[Column],
-        comment: str,
-        properties: dict[str, str],
+        comment: Optional[str] = None,
+        properties: Optional[dict[str, str]] = None,
         partitioning: Optional[list[Transform]] = None,
         distribution: Optional[Distribution] = None,
         sort_orders: Optional[list[SortOrder]] = None,
@@ -193,3 +193,13 @@ class RelationalCatalog(BaseSchemaCatalog, TableCatalog):
         table_resp = TableResponse.from_json(resp.body, infer_missing=True)
         table_resp.validate()
         return RelationalTable(full_namespace, table_resp.table(), self.rest_client)
+
+    # TODO: We shall implement the following methods after integration tests for relational table
+    def drop_table(self, identifier: NameIdentifier) -> bool:
+        raise NotImplementedError("Drop table is not implemented yet.")
+
+    def alter_table(self, identifier: NameIdentifier, *changes) -> Table:
+        raise NotImplementedError("Alter table is not implemented yet.")
+
+    def purge_table(self, identifier: NameIdentifier) -> bool:
+        raise NotImplementedError("Purge table is not implemented yet.")
