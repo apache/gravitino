@@ -964,3 +964,25 @@ class TestDTOConverters(unittest.TestCase):
             DTOConverters.to_dto(
                 cast(Transform, MagicMock(name="UnsupportedTransform", spec=Transform))
             )
+
+    def test_to_dto_distribution(self):
+        field_names = [f"field_{i}" for i in range(2)]
+        field_ref_dtos = [
+            FieldReferenceDTO.builder().with_field_name(field_name=[field_name]).build()
+            for field_name in field_names
+        ]
+        distribution = Distributions.of(
+            Strategy.HASH,
+            4,
+            *[FieldReference(field_names=[field_name]) for field_name in field_names],
+        )
+        distribution_dto = DistributionDTO(
+            strategy=Strategy.HASH, number=4, args=field_ref_dtos
+        )
+        converted = DTOConverters.to_dto(distribution)
+        self.assertTrue(converted == distribution_dto)
+
+        self.assertTrue(
+            DTOConverters.to_dto(Distributions.NONE) == DistributionDTO.NONE
+        )
+        self.assertTrue(DTOConverters.to_dto(distribution_dto) == distribution_dto)
