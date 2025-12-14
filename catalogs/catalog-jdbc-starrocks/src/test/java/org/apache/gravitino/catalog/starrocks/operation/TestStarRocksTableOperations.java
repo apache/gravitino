@@ -37,7 +37,7 @@ import org.apache.gravitino.catalog.jdbc.converter.JdbcTypeConverter;
 import org.apache.gravitino.catalog.jdbc.operation.JdbcTablePartitionOperations;
 import org.apache.gravitino.catalog.starrocks.converter.StarRocksTypeConverter;
 import org.apache.gravitino.catalog.starrocks.operations.StarRocksTablePartitionOperations;
-import org.apache.gravitino.exceptions.IllegalPropertyException;
+import org.apache.gravitino.exceptions.GravitinoRuntimeException;
 import org.apache.gravitino.integration.test.util.GravitinoITUtils;
 import org.apache.gravitino.rel.TableChange;
 import org.apache.gravitino.rel.expressions.Expression;
@@ -583,7 +583,7 @@ public class TestStarRocksTableOperations extends TestStarRocks {
   }
 
   @Test
-  public void testUnsupportedPropertyThrows() {
+  public void testAlterTableSetPropertyBehavior() {
     String tableName = GravitinoITUtils.genRandomName("starrocks_alter_test_table");
 
     String tableComment = "test_comment";
@@ -605,9 +605,29 @@ public class TestStarRocksTableOperations extends TestStarRocks {
         null,
         indexes);
 
-    TableChange.SetProperty change = new TableChange.SetProperty("unsupported.property", "value");
+    Assertions.assertDoesNotThrow(
+        () ->
+            TABLE_OPERATIONS.alterTable(
+                databaseName, tableName, TableChange.setProperty("replication_num", "1")));
+
     Assertions.assertThrows(
-        IllegalPropertyException.class,
-        () -> TABLE_OPERATIONS.alterTable(databaseName, tableName, change));
+        GravitinoRuntimeException.class,
+        () ->
+            TABLE_OPERATIONS.alterTable(
+                databaseName,
+                tableName,
+                TableChange.setProperty("dynamic_partition.enable", "true")));
+
+    Assertions.assertThrows(
+        GravitinoRuntimeException.class,
+        () ->
+            TABLE_OPERATIONS.alterTable(
+                databaseName, tableName, TableChange.setProperty("binlog.enable", "true")));
+
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            TABLE_OPERATIONS.alterTable(
+                databaseName, tableName, TableChange.setProperty("unsupported.property", "VIEW")));
   }
 }

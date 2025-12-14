@@ -41,13 +41,17 @@ public class FieldReferenceDTO implements FunctionArg, NamedReference {
     this.fieldName = fieldName;
   }
 
-  /** @return The field name. */
+  /**
+   * @return The field name.
+   */
   @Override
   public String[] fieldName() {
     return fieldName;
   }
 
-  /** @return The name of the field reference. */
+  /**
+   * @return The name of the field reference.
+   */
   @Override
   public ArgType argType() {
     return ArgType.FIELD;
@@ -92,7 +96,9 @@ public class FieldReferenceDTO implements FunctionArg, NamedReference {
     }
   }
 
-  /** @return the builder for creating a new instance of FieldReferenceDTO. */
+  /**
+   * @return the builder for creating a new instance of FieldReferenceDTO.
+   */
   public static Builder builder() {
     return new Builder();
   }

@@ -52,7 +52,7 @@ public class TableColumnBaseSQLProvider {
     return "<script>"
         + "INSERT INTO "
         + TableColumnMapper.COLUMN_TABLE_NAME
-        + "(column_id, column_name, column_position, metalake_id, catalog_id, schema_id,"
+        + " (column_id, column_name, column_position, metalake_id, catalog_id, schema_id,"
         + " table_id, table_version,"
         + " column_type, column_comment, column_nullable, column_auto_increment,"
         + " column_default_value, column_op_type, deleted_at, audit_info)"
@@ -153,8 +153,8 @@ public class TableColumnBaseSQLProvider {
         + " c.deleted_at AS deletedAt, c.audit_info AS auditInfo"
         + " FROM "
         + TableColumnMapper.COLUMN_TABLE_NAME
-        + " c "
-        + "JOIN ("
+        + " c"
+        + " JOIN ("
         + "    SELECT column_id, MAX(table_version) AS max_version"
         + "    FROM "
         + TableColumnMapper.COLUMN_TABLE_NAME
@@ -163,13 +163,13 @@ public class TableColumnBaseSQLProvider {
         + "          #{columnId}"
         + "        </foreach>"
         + "    ) AND deleted_at = 0 GROUP BY column_id"
-        + ") latest "
-        + "ON c.column_id = latest.column_id AND c.table_version = latest.max_version"
+        + " ) latest"
+        + " ON c.column_id = latest.column_id AND c.table_version = latest.max_version"
         + " WHERE c.column_id IN ("
         + "<foreach collection='columnIds' item='columnId' separator=','>"
         + "#{columnId}"
         + "</foreach>"
-        + ") "
+        + ")"
         + " AND c.deleted_at = 0"
         + "</script>";
   }

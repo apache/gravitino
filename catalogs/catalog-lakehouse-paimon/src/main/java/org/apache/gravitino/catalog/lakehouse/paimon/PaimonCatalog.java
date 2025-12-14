@@ -39,7 +39,9 @@ public class PaimonCatalog extends BaseCatalog<PaimonCatalog> {
   static final PaimonTablePropertiesMetadata TABLE_PROPERTIES_META =
       new PaimonTablePropertiesMetadata();
 
-  /** @return The short name of the catalog. */
+  /**
+   * @return The short name of the catalog.
+   */
   @Override
   public String shortName() {
     return "lakehouse-paimon";

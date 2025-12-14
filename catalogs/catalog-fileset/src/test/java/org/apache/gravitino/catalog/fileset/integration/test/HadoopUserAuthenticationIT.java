@@ -252,6 +252,7 @@ public class HadoopUserAuthenticationIT extends BaseIT {
     properties.put(KEY_TAB_URI_KEY, TMP_DIR + HADOOP_CLIENT_KEYTAB);
     properties.put(PRINCIPAL_KEY, HADOOP_CLIENT_PRINCIPAL);
     properties.put("location", HDFS_URL + "/user/hadoop/");
+    properties.put("gravitino.bypass.dfs.namenode.kerberos.principal.pattern", "*");
 
     kerberosHiveContainer.executeInContainer("hadoop", "fs", "-mkdir", "/user/hadoop");
 
@@ -327,6 +328,7 @@ public class HadoopUserAuthenticationIT extends BaseIT {
     properties.put(KEY_TAB_URI_KEY, TMP_DIR + HADOOP_CLIENT_KEYTAB);
     properties.put(PRINCIPAL_KEY, HADOOP_CLIENT_PRINCIPAL);
     properties.put("location", location);
+    properties.put("gravitino.bypass.dfs.namenode.kerberos.principal.pattern", "*");
 
     kerberosHiveContainer.executeInContainer(
         "hadoop", "fs", "-mkdir", "-p", "/user/hadoop/" + catalogName);
@@ -430,6 +432,7 @@ public class HadoopUserAuthenticationIT extends BaseIT {
     properties.put(KEY_TAB_URI_KEY, TMP_DIR + HADOOP_CLIENT_KEYTAB);
     properties.put(PRINCIPAL_KEY, HADOOP_CLIENT_PRINCIPAL);
     properties.put("location", location);
+    properties.put("gravitino.bypass.dfs.namenode.kerberos.principal.pattern", "*");
 
     kerberosHiveContainer.executeInContainer(
         "hadoop", "fs", "-mkdir", "-p", "/user/hadoop/" + catalogName);
@@ -578,6 +581,7 @@ public class HadoopUserAuthenticationIT extends BaseIT {
     properties.put(PRINCIPAL_KEY, HADOOP_CLIENT_PRINCIPAL);
     properties.put(AUTH_TYPE_KEY, "kerberos");
     properties.put("location", localtion);
+    properties.put("gravitino.bypass.dfs.namenode.kerberos.principal.pattern", "*");
 
     kerberosHiveContainer.executeInContainer(
         "hadoop", "fs", "-mkdir", "-p", "/user/hadoop/" + catalogName);

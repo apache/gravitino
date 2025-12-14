@@ -251,6 +251,15 @@ public class TestSupportsStatistics extends TestBase {
     Assertions.assertThrows(
         UnmodifiableStatisticException.class,
         () -> supportsStatistics.dropStatistics(statisticsToDrop));
+
+    // Test null statistics list exception
+    Assertions.assertThrows(
+        IllegalArgumentException.class, () -> supportsStatistics.dropStatistics(null));
+
+    // Test empty statistics list exception
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> supportsStatistics.dropStatistics(Collections.emptyList()));
   }
 
   private String getTableStatisticsPath() {

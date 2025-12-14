@@ -21,9 +21,9 @@ package org.apache.gravitino.storage.relational.service;
 import static org.apache.gravitino.metrics.source.MetricsSource.GRAVITINO_RELATIONAL_STORE_METRIC_NAME;
 
 import com.google.common.base.Joiner;
-import com.google.common.base.Splitter;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
+import com.google.common.collect.Maps;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -32,15 +32,19 @@ import java.util.stream.Collectors;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
+import org.apache.gravitino.job.JobHandle;
 import org.apache.gravitino.meta.GenericEntity;
 import org.apache.gravitino.metrics.Monitored;
 import org.apache.gravitino.storage.relational.mapper.CatalogMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.FilesetMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.JobTemplateMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.MetalakeMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.ModelMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.PolicyMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.SchemaMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.TableColumnMapper;
 import org.apache.gravitino.storage.relational.mapper.TableMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.TagMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.TopicMetaMapper;
 import org.apache.gravitino.storage.relational.po.CatalogPO;
 import org.apache.gravitino.storage.relational.po.ColumnPO;
@@ -62,21 +66,82 @@ public class MetadataObjectService {
 
   private static final String DOT = ".";
   private static final Joiner DOT_JOINER = Joiner.on(DOT);
-  private static final Splitter DOT_SPLITTER = Splitter.on(DOT);
-
   private static final Logger LOG = LoggerFactory.getLogger(MetadataObjectService.class);
 
   static final Map<MetadataObject.Type, Function<List<Long>, Map<Long, String>>>
       TYPE_TO_FULLNAME_FUNCTION_MAP =
-          ImmutableMap.of(
-              MetadataObject.Type.METALAKE, MetadataObjectService::getMetalakeObjectsFullName,
-              MetadataObject.Type.CATALOG, MetadataObjectService::getCatalogObjectsFullName,
-              MetadataObject.Type.SCHEMA, MetadataObjectService::getSchemaObjectsFullName,
-              MetadataObject.Type.TABLE, MetadataObjectService::getTableObjectsFullName,
-              MetadataObject.Type.FILESET, MetadataObjectService::getFilesetObjectsFullName,
-              MetadataObject.Type.MODEL, MetadataObjectService::getModelObjectsFullName,
-              MetadataObject.Type.TOPIC, MetadataObjectService::getTopicObjectsFullName,
-              MetadataObject.Type.COLUMN, MetadataObjectService::getColumnObjectsFullName);
+          ImmutableMap.<MetadataObject.Type, Function<List<Long>, Map<Long, String>>>builder()
+              .put(MetadataObject.Type.METALAKE, MetadataObjectService::getMetalakeObjectsFullName)
+              .put(MetadataObject.Type.CATALOG, MetadataObjectService::getCatalogObjectsFullName)
+              .put(MetadataObject.Type.SCHEMA, MetadataObjectService::getSchemaObjectsFullName)
+              .put(MetadataObject.Type.TABLE, MetadataObjectService::getTableObjectsFullName)
+              .put(MetadataObject.Type.FILESET, MetadataObjectService::getFilesetObjectsFullName)
+              .put(MetadataObject.Type.MODEL, MetadataObjectService::getModelObjectsFullName)
+              .put(MetadataObject.Type.TOPIC, MetadataObjectService::getTopicObjectsFullName)
+              .put(MetadataObject.Type.COLUMN, MetadataObjectService::getColumnObjectsFullName)
+              .put(MetadataObject.Type.TAG, MetadataObjectService::getTagObjectsFullName)
+              .put(MetadataObject.Type.POLICY, MetadataObjectService::getPolicyObjectsFullName)
+              .put(MetadataObject.Type.JOB, MetadataObjectService::getJobObjectsFullName)
+              .put(
+                  MetadataObject.Type.JOB_TEMPLATE,
+                  MetadataObjectService::getJobTemplateObjectsFullName)
+              .build();
+
+  private static Map<Long, String> getPolicyObjectsFullName(List<Long> policyIds) {
+    if (policyIds == null || policyIds.isEmpty()) {
+      return Map.of();
+    }
+    return policyIds.stream()
+        .collect(
+            Collectors.toMap(
+                policyId -> policyId,
+                policyId ->
+                    SessionUtils.getWithoutCommit(
+                        PolicyMetaMapper.class,
+                        policyMetaMapper ->
+                            policyMetaMapper.selectPolicyByPolicyId(policyId).getPolicyName())));
+  }
+
+  private static Map<Long, String> getJobObjectsFullName(List<Long> jobIds) {
+    if (jobIds == null || jobIds.isEmpty()) {
+      return Maps.newHashMap();
+    }
+
+    return jobIds.stream()
+        .collect(Collectors.toMap(jobId -> jobId, jobId -> JobHandle.JOB_ID_PREFIX + jobId));
+  }
+
+  private static Map<Long, String> getJobTemplateObjectsFullName(List<Long> jobTemplateIds) {
+    if (jobTemplateIds == null || jobTemplateIds.isEmpty()) {
+      return Maps.newHashMap();
+    }
+
+    return jobTemplateIds.stream()
+        .collect(
+            Collectors.toMap(
+                jobTemplateId -> jobTemplateId,
+                jobTemplateId ->
+                    SessionUtils.getWithoutCommit(
+                        JobTemplateMetaMapper.class,
+                        jobTemplateMetaMapper ->
+                            jobTemplateMetaMapper
+                                .selectJobTemplateById(jobTemplateId)
+                                .jobTemplateName())));
+  }
+
+  private static Map<Long, String> getTagObjectsFullName(List<Long> tagIds) {
+    if (tagIds == null || tagIds.isEmpty()) {
+      return Map.of();
+    }
+    return tagIds.stream()
+        .collect(
+            Collectors.toMap(
+                tagId -> tagId,
+                tagId ->
+                    SessionUtils.getWithoutCommit(
+                        TagMetaMapper.class,
+                        tagMetaMapper -> tagMetaMapper.selectTagByTagId(tagId).getTagName())));
+  }
 
   private MetadataObjectService() {}
 
@@ -113,55 +178,6 @@ public class MetadataObjectService {
     }
 
     return metadataObjects;
-  }
-
-  @Monitored(
-      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
-      baseMetricName = "getMetadataObjectId")
-  public static long getMetadataObjectId(
-      long metalakeId, String fullName, MetadataObject.Type type) {
-    if (type == MetadataObject.Type.METALAKE) {
-      return MetalakeMetaService.getInstance().getMetalakeIdByName(fullName);
-    }
-
-    if (type == MetadataObject.Type.ROLE) {
-      return RoleMetaService.getInstance().getRoleIdByMetalakeIdAndName(metalakeId, fullName);
-    }
-    List<String> names = DOT_SPLITTER.splitToList(fullName);
-
-    long catalogId =
-        CatalogMetaService.getInstance().getCatalogIdByMetalakeIdAndName(metalakeId, names.get(0));
-    if (type == MetadataObject.Type.CATALOG) {
-      return catalogId;
-    }
-
-    long schemaId =
-        SchemaMetaService.getInstance().getSchemaIdByCatalogIdAndName(catalogId, names.get(1));
-    if (type == MetadataObject.Type.SCHEMA) {
-      return schemaId;
-    }
-
-    if (type == MetadataObject.Type.FILESET) {
-      return FilesetMetaService.getInstance().getFilesetIdBySchemaIdAndName(schemaId, names.get(2));
-    } else if (type == MetadataObject.Type.TOPIC) {
-      return TopicMetaService.getInstance().getTopicIdBySchemaIdAndName(schemaId, names.get(2));
-    } else if (type == MetadataObject.Type.MODEL) {
-      return ModelMetaService.getInstance()
-          .getModelIdBySchemaIdAndModelName(schemaId, names.get(2));
-    }
-
-    long tableId =
-        TableMetaService.getInstance().getTableIdBySchemaIdAndName(schemaId, names.get(2));
-    if (type == MetadataObject.Type.TABLE) {
-      return tableId;
-    }
-
-    if (type == MetadataObject.Type.COLUMN) {
-      return TableColumnMetaService.getInstance()
-          .getColumnIdByTableIdAndName(tableId, names.get(3));
-    }
-
-    throw new IllegalArgumentException(String.format("Doesn't support the type %s", type));
   }
 
   /**

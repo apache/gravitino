@@ -63,6 +63,13 @@ public class TestExtractMetricNameAndLabel {
         ImmutableMap.of());
 
     checkResult(
+        MetricsSource.LANCE_REST_SERVER_METRIC_NAME + "." + MetricNames.SERVER_IDLE_THREAD_NUM,
+        Collector.sanitizeMetricName(MetricsSource.LANCE_REST_SERVER_METRIC_NAME)
+            + "_"
+            + Collector.sanitizeMetricName(MetricNames.SERVER_IDLE_THREAD_NUM),
+        ImmutableMap.of());
+
+    checkResult(
         MetricsSource.ICEBERG_REST_SERVER_METRIC_NAME
             + ".update-table."
             + MetricNames.HTTP_PROCESS_DURATION,
@@ -70,6 +77,15 @@ public class TestExtractMetricNameAndLabel {
             + "_"
             + Collector.sanitizeMetricName(MetricNames.HTTP_PROCESS_DURATION),
         ImmutableMap.of("operation", "update-table"));
+
+    checkResult(
+        MetricsSource.LANCE_REST_SERVER_METRIC_NAME
+            + ".load-namespace."
+            + MetricNames.HTTP_PROCESS_DURATION,
+        Collector.sanitizeMetricName(MetricsSource.LANCE_REST_SERVER_METRIC_NAME)
+            + "_"
+            + Collector.sanitizeMetricName(MetricNames.HTTP_PROCESS_DURATION),
+        ImmutableMap.of("operation", "load-namespace"));
 
     checkResult(
         MetricsSource.GRAVITINO_SERVER_METRIC_NAME

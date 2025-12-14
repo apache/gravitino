@@ -52,10 +52,12 @@ import io.trino.spi.connector.RowChangeParadigm;
 import io.trino.spi.connector.SaveMode;
 import io.trino.spi.connector.SchemaTableName;
 import io.trino.spi.connector.SortItem;
+import io.trino.spi.connector.SystemTable;
 import io.trino.spi.connector.TopNApplicationResult;
 import io.trino.spi.expression.ConnectorExpression;
 import io.trino.spi.expression.Constant;
 import io.trino.spi.security.TrinoPrincipal;
+import io.trino.spi.statistics.ColumnStatistics;
 import io.trino.spi.statistics.ComputedStatistics;
 import io.trino.spi.statistics.TableStatistics;
 import io.trino.spi.type.Type;
@@ -149,6 +151,11 @@ public class GravitinoMetadata implements ConnectorMetadata {
         catalogConnectorMetadata.getTable(
             gravitinoTableHandle.getSchemaName(), gravitinoTableHandle.getTableName());
     return metadataAdapter.getTableMetadata(table);
+  }
+
+  @Override
+  public Optional<SystemTable> getSystemTable(ConnectorSession session, SchemaTableName tableName) {
+    return internalMetadata.getSystemTable(session, tableName);
   }
 
   @Override
@@ -585,7 +592,20 @@ public class GravitinoMetadata implements ConnectorMetadata {
   @Override
   public TableStatistics getTableStatistics(
       ConnectorSession session, ConnectorTableHandle tableHandle) {
-    return internalMetadata.getTableStatistics(session, GravitinoHandle.unWrap(tableHandle));
+    TableStatistics originTableStatistics =
+        internalMetadata.getTableStatistics(session, GravitinoHandle.unWrap(tableHandle));
+    Map<ColumnHandle, ColumnStatistics> columnStatistics =
+        originTableStatistics.getColumnStatistics().entrySet().stream()
+            .collect(
+                Collectors.toMap(
+                    entry ->
+                        new GravitinoColumnHandle(
+                            getColumnName(
+                                session, GravitinoHandle.unWrap(tableHandle), entry.getKey()),
+                            entry.getKey()),
+                    entry -> entry.getValue()));
+
+    return new TableStatistics(originTableStatistics.getRowCount(), columnStatistics);
   }
 
   @Override

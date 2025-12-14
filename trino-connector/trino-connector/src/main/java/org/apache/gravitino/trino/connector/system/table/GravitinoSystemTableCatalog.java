@@ -88,7 +88,7 @@ public class GravitinoSystemTableCatalog extends GravitinoSystemTable {
     BlockBuilder propertyColumnBuilder = VARCHAR.createBlockBuilder(null, size);
 
     for (GravitinoCatalog catalog : gravitinoCatalogs) {
-      Preconditions.checkNotNull(catalog, "catalog should not be null");
+      Preconditions.checkArgument(catalog != null, "catalog should not be null");
 
       VARCHAR.writeString(nameColumnBuilder, catalog.getName());
       VARCHAR.writeString(providerColumnBuilder, catalog.getProvider());

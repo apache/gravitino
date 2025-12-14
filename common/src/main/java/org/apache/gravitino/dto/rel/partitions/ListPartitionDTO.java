@@ -34,7 +34,9 @@ public class ListPartitionDTO implements PartitionDTO, ListPartition {
   private final LiteralDTO[][] lists;
   private final Map<String, String> properties;
 
-  /** @return The builder for ListPartitionDTO. */
+  /**
+   * @return The builder for ListPartitionDTO.
+   */
   public static Builder builder() {
     return new Builder();
   }
@@ -49,25 +51,33 @@ public class ListPartitionDTO implements PartitionDTO, ListPartition {
     this.properties = properties;
   }
 
-  /** @return The name of the partition. */
+  /**
+   * @return The name of the partition.
+   */
   @Override
   public String name() {
     return name;
   }
 
-  /** @return The lists of the partition. */
+  /**
+   * @return The lists of the partition.
+   */
   @Override
   public LiteralDTO[][] lists() {
     return lists;
   }
 
-  /** @return The properties of the partition. */
+  /**
+   * @return The properties of the partition.
+   */
   @Override
   public Map<String, String> properties() {
     return properties;
   }
 
-  /** @return The type of the partition. */
+  /**
+   * @return The type of the partition.
+   */
   @Override
   public Type type() {
     return Type.LIST;

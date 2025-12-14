@@ -48,6 +48,7 @@ env_map = {
     "GRAVITINO_OSS_REGION": "oss-region",
     "GRAVITINO_OSS_ROLE_ARN": "oss-role-arn",
     "GRAVITINO_OSS_EXTERNAL_ID": "oss-external-id",
+    "GRAVITINO_ICEBERG_REST_HTTP_PORT": "httpPort",
 }
 
 init_config = {

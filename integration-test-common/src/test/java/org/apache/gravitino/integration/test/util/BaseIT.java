@@ -21,6 +21,8 @@ package org.apache.gravitino.integration.test.util;
 import static org.apache.gravitino.Configs.ENTITY_RELATIONAL_JDBC_BACKEND_PATH;
 import static org.apache.gravitino.integration.test.util.TestDatabaseName.PG_CATALOG_POSTGRESQL_IT;
 import static org.apache.gravitino.integration.test.util.TestDatabaseName.PG_JDBC_BACKEND;
+import static org.apache.gravitino.lance.common.config.LanceConfig.LANCE_CONFIG_PREFIX;
+import static org.apache.gravitino.lance.common.config.LanceConfig.METALAKE_NAME;
 import static org.apache.gravitino.server.GravitinoServer.WEBSERVER_CONF_PREFIX;
 
 import com.google.common.base.Splitter;
@@ -53,6 +55,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.auth.AuthenticatorType;
+import org.apache.gravitino.auxiliary.AuxiliaryServiceManager;
 import org.apache.gravitino.client.GravitinoAdminClient;
 import org.apache.gravitino.config.ConfigConstants;
 import org.apache.gravitino.integration.test.MiniGravitino;
@@ -102,7 +105,9 @@ public class BaseIT {
 
   protected Map<String, String> customConfigs = new HashMap<>();
 
-  protected boolean ignoreIcebergRestService = true;
+  protected boolean ignoreIcebergAuxRestService = true;
+
+  protected boolean ignoreLanceAuxRestService = true;
 
   public String DOWNLOAD_MYSQL_JDBC_DRIVER_URL =
       "https://repo1.maven.org/maven2/mysql/mysql-connector-java/8.0.26/mysql-connector-java-8.0.26.jar";
@@ -131,6 +136,16 @@ public class BaseIT {
 
   public void registerCustomConfigs(Map<String, String> configs) {
     customConfigs.putAll(configs);
+  }
+
+  protected int getLanceRESTServerPort() {
+    JettyServerConfig lanceServerConfig =
+        JettyServerConfig.fromConfig(serverConfig, LANCE_CONFIG_PREFIX);
+    return lanceServerConfig.getHttpPort();
+  }
+
+  protected String getLanceRESTServerMetalakeName() {
+    return serverConfig.getRawString(LANCE_CONFIG_PREFIX + METALAKE_NAME.getKey());
   }
 
   private void rewriteGravitinoServerConfig() throws IOException {
@@ -297,7 +312,7 @@ public class BaseIT {
 
     LOG.info("Running Gravitino Server in {} mode", testMode);
 
-    if ("MySQL".equalsIgnoreCase(System.getenv("jdbcBackend"))) {
+    if ("MySQL".equalsIgnoreCase(getJDBCBackend())) {
       // Start MySQL docker instance.
       String jdbcURL = startAndInitMySQLBackend();
       customConfigs.put(Configs.ENTITY_STORE_KEY, "relational");
@@ -307,7 +322,7 @@ public class BaseIT {
           Configs.ENTITY_RELATIONAL_JDBC_BACKEND_DRIVER_KEY, "com.mysql.cj.jdbc.Driver");
       customConfigs.put(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_USER_KEY, "root");
       customConfigs.put(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_PASSWORD_KEY, "root");
-    } else if ("PostgreSQL".equalsIgnoreCase(System.getenv("jdbcBackend"))) {
+    } else if ("PostgreSQL".equalsIgnoreCase(getJDBCBackend())) {
       // Start PostgreSQL docker instance.
       String pgJdbcUrl = startAndInitPGBackend();
       customConfigs.put(Configs.ENTITY_STORE_KEY, "relational");
@@ -329,9 +344,21 @@ public class BaseIT {
 
     serverConfig = new ServerConfig();
     customConfigs.put(ENTITY_RELATIONAL_JDBC_BACKEND_PATH.getKey(), file.getAbsolutePath());
+    if (ignoreLanceAuxRestService && ignoreIcebergAuxRestService) {
+      customConfigs.put(
+          AuxiliaryServiceManager.GRAVITINO_AUX_SERVICE_PREFIX
+              + AuxiliaryServiceManager.AUX_SERVICE_NAMES,
+          "");
+    }
+    if (!ignoreLanceAuxRestService) {
+      customConfigs.put(
+          LANCE_CONFIG_PREFIX + METALAKE_NAME.getKey(),
+          GravitinoITUtils.genRandomName("LanceRESTService_metalake"));
+    }
     if (testMode != null && testMode.equals(ITUtils.EMBEDDED_TEST_MODE)) {
       MiniGravitinoContext context =
-          new MiniGravitinoContext(customConfigs, ignoreIcebergRestService);
+          new MiniGravitinoContext(
+              customConfigs, ignoreIcebergAuxRestService, ignoreLanceAuxRestService);
       miniGravitino = new MiniGravitino(context);
       miniGravitino.start();
       serverConfig = miniGravitino.getServerConfig();
@@ -583,5 +610,16 @@ public class BaseIT {
       }
     }
     return null;
+  }
+
+  protected String getIcebergRestServiceUri() {
+    JettyServerConfig jettyServerConfig =
+        JettyServerConfig.fromConfig(serverConfig, String.format("gravitino.iceberg-rest."));
+    return String.format(
+        "http://%s:%d/iceberg/", jettyServerConfig.getHost(), jettyServerConfig.getHttpPort());
+  }
+
+  protected String getJDBCBackend() {
+    return System.getenv("jdbcBackend");
   }
 }

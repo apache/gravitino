@@ -64,25 +64,33 @@ public class MetalakeDTO implements Metalake {
     this.audit = audit;
   }
 
-  /** @return The name of the Metalake DTO. */
+  /**
+   * @return The name of the Metalake DTO.
+   */
   @Override
   public String name() {
     return name;
   }
 
-  /** @return The comment of the Metalake DTO. */
+  /**
+   * @return The comment of the Metalake DTO.
+   */
   @Override
   public String comment() {
     return comment;
   }
 
-  /** @return The properties of the Metalake DTO. */
+  /**
+   * @return The properties of the Metalake DTO.
+   */
   @Override
   public Map<String, String> properties() {
     return properties;
   }
 
-  /** @return The audit information of the Metalake DTO. */
+  /**
+   * @return The audit information of the Metalake DTO.
+   */
   @Override
   public Audit auditInfo() {
     return audit;
@@ -203,7 +211,9 @@ public class MetalakeDTO implements Metalake {
     return Objects.hashCode(name, comment, audit, properties);
   }
 
-  /** @return the builder for creating a new instance of MetalakeDTO. */
+  /**
+   * @return the builder for creating a new instance of MetalakeDTO.
+   */
   public static Builder builder() {
     return new Builder();
   }

@@ -19,6 +19,7 @@ from abc import ABC, abstractmethod
 from typing import List, Dict
 from .job_handle import JobHandle
 from .job_template import JobTemplate
+from .job_template_change import JobTemplateChange
 
 
 class SupportsJobs(ABC):
@@ -89,6 +90,27 @@ class SupportsJobs(ABC):
         """
         pass
 
+    def alter_job_template(
+        self, job_template_name: str, *changes: JobTemplateChange
+    ) -> JobTemplate:
+        """
+        Alters a job template by applying the specified changes. This allows for modifying the
+        properties of an existing job template, such as its name, description, or parameters.
+
+        Args:
+            job_template_name: The name of the job template.
+            changes: The changes to apply to the job template.
+
+        Raises:
+            NoSuchJobTemplateException: If the job template does not exist.
+            IllegalArgumentException: If any of the changes cannot be applied to the job template.
+
+        Returns:
+            The altered job template.
+        """
+        pass
+
+    @abstractmethod
     def list_jobs(self, job_template_name: str = None) -> List[JobHandle]:
         """
         Lists all the jobs in Gravitino. If a job template name is provided, it will filter the jobs

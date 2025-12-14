@@ -82,12 +82,12 @@ public class FlinkHiveCatalogIT extends FlinkCommonIT {
 
   @AfterAll
   static void hiveStop() {
-    Preconditions.checkNotNull(metalake);
+    Preconditions.checkArgument(metalake != null, "metalake should not be null");
     metalake.dropCatalog(DEFAULT_HIVE_CATALOG, true);
   }
 
   protected void initDefaultHiveCatalog() {
-    Preconditions.checkNotNull(metalake);
+    Preconditions.checkArgument(metalake != null, "metalake should not be null");
     hiveCatalog =
         metalake.createCatalog(
             DEFAULT_HIVE_CATALOG,

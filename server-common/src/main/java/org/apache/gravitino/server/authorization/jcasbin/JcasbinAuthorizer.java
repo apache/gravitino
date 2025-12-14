@@ -46,6 +46,7 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.SupportsRelationOperations;
 import org.apache.gravitino.auth.AuthConstants;
 import org.apache.gravitino.authorization.AuthorizationRequestContext;
+import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.authorization.GravitinoAuthorizer;
 import org.apache.gravitino.authorization.Privilege;
 import org.apache.gravitino.authorization.SecurableObject;
@@ -84,12 +85,6 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
    */
   private Set<Long> loadedRoles = ConcurrentHashMap.newKeySet();
 
-  /**
-   * loadedOwners is used to cache owners that have loaded permissions. When the permissions of a
-   * role are updated, they should be removed from it.
-   */
-  private Set<Long> loadedOwners = ConcurrentHashMap.newKeySet();
-
   private Map<Long, Long> ownerRel = new ConcurrentHashMap<>();
 
   private Executor executor = null;
@@ -115,7 +110,7 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
   private Model getModel(String modelFilePath) {
     Model model = new Model();
     try (InputStream modelStream = JcasbinAuthorizer.class.getResourceAsStream(modelFilePath)) {
-      Preconditions.checkNotNull(modelStream, "Jcasbin model file can not found.");
+      Preconditions.checkArgument(modelStream != null, "Jcasbin model file can not found.");
       String modelData = IOUtils.toString(modelStream, StandardCharsets.UTF_8);
       model.loadModelFromText(modelData);
     } catch (IOException e) {
@@ -145,12 +140,13 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
                     authorizationKey.getPrivilege().name(),
                     requestContext));
     LOG.debug(
-        "principal {},metalake {},metadata object {},privilege {}, result {}",
+        "Authorization expression: {},privilege {}, result {}\n, principal {},metalake {},metadata object {}",
+        requestContext.getOriginalAuthorizationExpression(),
+        privilege,
+        result,
         principal,
         metalake,
-        metadataObject,
-        privilege,
-        result);
+        metadataObject);
     return result;
   }
 
@@ -175,17 +171,22 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
                     authorizationKey.getPrivilege().name(),
                     requestContext));
     LOG.debug(
-        "principal {},metalake {},metadata object {},privilege {},deny result {}",
+        "Authorization expression: {},privilege {},deny result {}\n, principal {},metalake {},metadata object {}",
+        requestContext.getOriginalAuthorizationExpression(),
+        privilege,
+        result,
         principal,
         metalake,
-        metadataObject,
-        privilege,
-        result);
+        metadataObject);
     return result;
   }
 
   @Override
-  public boolean isOwner(Principal principal, String metalake, MetadataObject metadataObject) {
+  public boolean isOwner(
+      Principal principal,
+      String metalake,
+      MetadataObject metadataObject,
+      AuthorizationRequestContext requestContext) {
     Long userId;
     boolean result;
     try {
@@ -200,12 +201,13 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
       result = false;
     }
     LOG.debug(
-        "principal {},metalake {},metadata object {},privilege {},deny result {}",
+        "Authorization expression: {},privilege {},owner result {}\n,principal {},metalake {},metadata object {}",
+        requestContext.getOriginalAuthorizationExpression(),
+        "OWNER",
+        result,
         principal,
         metalake,
-        metadataObject,
-        "OWNER",
-        result);
+        metadataObject);
     return result;
   }
 
@@ -222,6 +224,7 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
     if (StringUtils.isBlank(currentUserName)) {
       return false;
     }
+
     try {
       return GravitinoEnv.getInstance()
               .entityStore()
@@ -274,14 +277,14 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
     MetadataObject metalakeObject =
         MetadataObjects.of(ImmutableList.of(metalake), MetadataObject.Type.METALAKE);
     // metalake owner can set owner in metalake.
-    if (isOwner(currentPrincipal, metalake, metalakeObject)) {
+    if (isOwner(currentPrincipal, metalake, metalakeObject, requestContext)) {
       return true;
     }
     MetadataObject.Type metadataType = MetadataObject.Type.valueOf(type.toUpperCase());
     MetadataObject metadataObject =
         MetadataObjects.of(Arrays.asList(fullName.split("\\.")), metadataType);
     do {
-      if (isOwner(currentPrincipal, metalake, metadataObject)) {
+      if (isOwner(currentPrincipal, metalake, metadataObject, requestContext)) {
         MetadataObject.Type tempType = metadataObject.type();
         if (tempType == MetadataObject.Type.SCHEMA) {
           // schema owner need use catalog privilege
@@ -365,7 +368,6 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
     MetadataObject metadataObject = NameIdentifierUtil.toMetadataObject(nameIdentifier, type);
     Long metadataId = MetadataIdConverter.getID(metadataObject, metalake);
     ownerRel.remove(metadataId);
-    loadedOwners.remove(metadataId);
   }
 
   @Override
@@ -491,7 +493,7 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
   }
 
   private void loadOwnerPolicy(String metalake, MetadataObject metadataObject, Long metadataId) {
-    if (loadedOwners.contains(metadataId)) {
+    if (ownerRel.containsKey(metadataId)) {
       LOG.debug("Metadata {} OWNER has bean loaded.", metadataId);
       return;
     }
@@ -509,7 +511,6 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
         if (ownerEntity instanceof UserEntity) {
           UserEntity user = (UserEntity) ownerEntity;
           ownerRel.put(metadataId, user.id());
-          loadedOwners.add(metadataId);
         }
       }
     } catch (IOException e) {
@@ -529,15 +530,27 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
               String.valueOf(roleEntity.id()),
               securableObject.type().name(),
               String.valueOf(MetadataIdConverter.getID(securableObject, metalake)),
-              privilege.name().name().toUpperCase(),
+              AuthorizationUtils.replaceLegacyPrivilegeName(privilege.name())
+                  .name()
+                  .toUpperCase(java.util.Locale.ROOT),
               AuthConstants.ALLOW);
         }
+        // Since different roles of a user may simultaneously hold both "allow" and "deny"
+        // permissions
+        // for the same privilege on a given MetadataObject, the allowEnforcer must also incorporate
+        // the "deny" privilege to ensure that the authorize method correctly returns false in such
+        // cases. For example, if role1 has an "allow" privilege for SELECT_TABLE on table1, while
+        // role2 has a "deny" privilege for the same action on table1, then a user assigned both
+        // roles should receive a false result when calling the authorize method.
+
         allowEnforcer.addPolicy(
             String.valueOf(roleEntity.id()),
             securableObject.type().name(),
             String.valueOf(MetadataIdConverter.getID(securableObject, metalake)),
-            privilege.name().name().toUpperCase(),
-            condition.name().toLowerCase());
+            AuthorizationUtils.replaceLegacyPrivilegeName(privilege.name())
+                .name()
+                .toUpperCase(java.util.Locale.ROOT),
+            condition.name().toLowerCase(java.util.Locale.ROOT));
       }
     }
   }

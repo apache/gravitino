@@ -38,6 +38,7 @@ val scalaCollectionCompatVersion: String = libs.versions.scala.collection.compat
 val artifactName = "${rootProject.name}-spark-${sparkMajorVersion}_$scalaVersion"
 
 if (hasProperty("excludePackagesForSparkConnector")) {
+  @Suppress("UNCHECKED_CAST")
   val configureFunc = properties["excludePackagesForSparkConnector"] as? (Project) -> Unit
   configureFunc?.invoke(project)
 }
@@ -177,6 +178,7 @@ tasks.test {
     dependsOn(":catalogs:catalog-lakehouse-iceberg:jar")
     dependsOn(":catalogs:catalog-hive:jar")
     dependsOn(":iceberg:iceberg-rest-server:jar")
+    dependsOn(":lance:lance-rest-server:jar")
     dependsOn(":catalogs:catalog-lakehouse-paimon:jar")
     dependsOn(":catalogs:catalog-jdbc-mysql:jar")
     dependsOn(":catalogs:catalog-jdbc-postgresql:jar")

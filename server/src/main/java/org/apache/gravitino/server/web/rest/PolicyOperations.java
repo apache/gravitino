@@ -39,6 +39,7 @@ import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.Response;
+import org.apache.gravitino.Entity;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.dto.policy.PolicyDTO;
 import org.apache.gravitino.dto.requests.PolicyCreateRequest;
@@ -58,7 +59,12 @@ import org.apache.gravitino.metrics.MetricNames;
 import org.apache.gravitino.policy.Policy;
 import org.apache.gravitino.policy.PolicyChange;
 import org.apache.gravitino.policy.PolicyDispatcher;
+import org.apache.gravitino.server.authorization.MetadataAuthzHelper;
+import org.apache.gravitino.server.authorization.annotations.AuthorizationExpression;
+import org.apache.gravitino.server.authorization.annotations.AuthorizationMetadata;
+import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants;
 import org.apache.gravitino.server.web.Utils;
+import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -80,8 +86,10 @@ public class PolicyOperations {
   @Produces("application/vnd.gravitino.v1+json")
   @Timed(name = "list-policies." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "list-policies", absolute = true)
+  @AuthorizationExpression(expression = "")
   public Response listPolicies(
-      @PathParam("metalake") String metalake,
+      @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
+          String metalake,
       @QueryParam("details") @DefaultValue("false") boolean verbose) {
     LOG.info(
         "Received list policy {} request for metalake: {}", verbose ? "infos" : "names", metalake);
@@ -96,14 +104,26 @@ public class PolicyOperations {
                   Arrays.stream(policies)
                       .map(p -> toDTO(p, Optional.empty()))
                       .toArray(PolicyDTO[]::new);
-
+              policyDTOs =
+                  MetadataAuthzHelper.filterByExpression(
+                      metalake,
+                      AuthorizationExpressionConstants.loadPolicyAuthorizationExpression,
+                      Entity.EntityType.POLICY,
+                      policyDTOs,
+                      (policyDTO -> NameIdentifierUtil.ofPolicy(metalake, policyDTO.name())));
               LOG.info("List {} policies info under metalake: {}", policyDTOs.length, metalake);
               return Utils.ok(new PolicyListResponse(policyDTOs));
 
             } else {
               String[] policyNames = policyDispatcher.listPolicies(metalake);
               policyNames = policyNames == null ? new String[0] : policyNames;
-
+              policyNames =
+                  MetadataAuthzHelper.filterByExpression(
+                      metalake,
+                      AuthorizationExpressionConstants.loadPolicyAuthorizationExpression,
+                      Entity.EntityType.POLICY,
+                      policyNames,
+                      (policyName -> NameIdentifierUtil.ofPolicy(metalake, policyName)));
               LOG.info("List {} policies under metalake: {}", policyNames.length, metalake);
               return Utils.ok(new NameListResponse(policyNames));
             }
@@ -117,8 +137,11 @@ public class PolicyOperations {
   @Produces("application/vnd.gravitino.v1+json")
   @Timed(name = "create-policy." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "create-policy", absolute = true)
+  @AuthorizationExpression(expression = "METALAKE::OWNER || METALAKE::CREATE_POLICY")
   public Response createPolicy(
-      @PathParam("metalake") String metalake, PolicyCreateRequest request) {
+      @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
+          String metalake,
+      PolicyCreateRequest request) {
     LOG.info("Received create policy request under metalake: {}", metalake);
 
     try {
@@ -149,8 +172,12 @@ public class PolicyOperations {
   @Produces("application/vnd.gravitino.v1+json")
   @Timed(name = "get-policy." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "get-policy", absolute = true)
+  @AuthorizationExpression(
+      expression = AuthorizationExpressionConstants.loadPolicyAuthorizationExpression)
   public Response getPolicy(
-      @PathParam("metalake") String metalake, @PathParam("policy") String name) {
+      @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
+          String metalake,
+      @PathParam("policy") @AuthorizationMetadata(type = Entity.EntityType.POLICY) String name) {
     LOG.info("Received get policy request for policy: {} under metalake: {}", name, metalake);
 
     try {
@@ -171,9 +198,11 @@ public class PolicyOperations {
   @Produces("application/vnd.gravitino.v1+json")
   @Timed(name = "alter-policy." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "alter-policy", absolute = true)
+  @AuthorizationExpression(expression = "METALAKE::OWNER || POLICY::OWNER")
   public Response alterPolicy(
-      @PathParam("metalake") String metalake,
-      @PathParam("policy") String name,
+      @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
+          String metalake,
+      @PathParam("policy") @AuthorizationMetadata(type = Entity.EntityType.POLICY) String name,
       PolicyUpdatesRequest request) {
     LOG.info("Received alter policy request for policy: {} under metalake: {}", name, metalake);
 
@@ -202,9 +231,11 @@ public class PolicyOperations {
   @Produces("application/vnd.gravitino.v1+json")
   @Timed(name = "set-policy." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "set-policy", absolute = true)
+  @AuthorizationExpression(expression = "METALAKE::OWNER || POLICY::OWNER")
   public Response setPolicy(
-      @PathParam("metalake") String metalake,
-      @PathParam("policy") String name,
+      @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
+          String metalake,
+      @PathParam("policy") @AuthorizationMetadata(type = Entity.EntityType.POLICY) String name,
       PolicySetRequest request) {
     LOG.info("Received set policy request for policy: {} under metalake: {}", name, metalake);
 
@@ -238,8 +269,11 @@ public class PolicyOperations {
   @Produces("application/vnd.gravitino.v1+json")
   @Timed(name = "delete-policy." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "delete-policy", absolute = true)
+  @AuthorizationExpression(expression = "METALAKE::OWNER || POLICY::OWNER")
   public Response deletePolicy(
-      @PathParam("metalake") String metalake, @PathParam("policy") String name) {
+      @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
+          String metalake,
+      @PathParam("policy") @AuthorizationMetadata(type = Entity.EntityType.POLICY) String name) {
     LOG.info("Received delete policy request for policy: {} under metalake: {}", name, metalake);
 
     try {
@@ -265,8 +299,13 @@ public class PolicyOperations {
   @Produces("application/vnd.gravitino.v1+json")
   @Timed(name = "list-objects-for-policy." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "list-objects-for-policy", absolute = true)
+  @AuthorizationExpression(
+      expression = AuthorizationExpressionConstants.loadPolicyAuthorizationExpression)
   public Response listMetadataObjectsForPolicy(
-      @PathParam("metalake") String metalake, @PathParam("policy") String policyName) {
+      @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
+          String metalake,
+      @PathParam("policy") @AuthorizationMetadata(type = Entity.EntityType.POLICY)
+          String policyName) {
     LOG.info("Received list objects for policy: {} under metalake: {}", policyName, metalake);
 
     try {
@@ -276,7 +315,7 @@ public class PolicyOperations {
             MetadataObject[] objects =
                 policyDispatcher.listMetadataObjectsForPolicy(metalake, policyName);
             objects = objects == null ? new MetadataObject[0] : objects;
-
+            objects = MetadataAuthzHelper.filterMetadataObject(metalake, objects);
             LOG.info(
                 "List {} objects for policy: {} under metalake: {}",
                 objects.length,
@@ -285,6 +324,7 @@ public class PolicyOperations {
 
             MetadataObjectDTO[] objectDTOs =
                 Arrays.stream(objects).map(DTOConverters::toDTO).toArray(MetadataObjectDTO[]::new);
+
             return Utils.ok(new MetadataObjectListResponse(objectDTOs));
           });
 

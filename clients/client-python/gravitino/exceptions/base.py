@@ -199,3 +199,15 @@ class IllegalStatisticNameException(IllegalArgumentException):
 
 class UnmodifiableStatisticException(UnsupportedOperationException):
     """An exception thrown when users modify an unmodifiable statistic"""
+
+
+class NoSuchTableException(NotFoundException):
+    """An exception thrown when a table with specified name is not existed."""
+
+
+class NoSuchPartitionException(NotFoundException):
+    """An exception thrown when a partition with specified name is not existed."""
+
+
+class PartitionAlreadyExistsException(AlreadyExistsException):
+    """An exception thrown when a partition with specified name already exists."""

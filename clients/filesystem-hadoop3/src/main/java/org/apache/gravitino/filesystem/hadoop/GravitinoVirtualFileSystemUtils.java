@@ -66,6 +66,29 @@ public class GravitinoVirtualFileSystemUtils {
   }
 
   /**
+   * Extract non-default configuration from Hadoop Configuration.
+   *
+   * @param configuration The Hadoop configuration.
+   * @return The configuration map.
+   */
+  public static Map<String, String> extractNonDefaultConfig(Configuration configuration) {
+    Map<String, String> maps = Maps.newHashMap();
+    // Don't use entry.getKey() directly in the lambda, because it cannot
+    // handle variable expansion in the Configuration values.
+    Configuration defaultConf = new Configuration();
+    configuration.forEach(
+        entry -> {
+          String key = entry.getKey();
+          String value = configuration.get(key);
+          // ignore the default configuration
+          if (!StringUtils.equals(value, defaultConf.get(key))) {
+            maps.put(key, value);
+          }
+        });
+    return maps;
+  }
+
+  /**
    * Get Gravitino client by the configuration.
    *
    * @param configuration The configuration for the Gravitino client.

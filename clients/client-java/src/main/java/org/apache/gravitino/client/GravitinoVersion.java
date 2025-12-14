@@ -35,7 +35,9 @@ public class GravitinoVersion extends VersionDTO {
   }
 
   @VisibleForTesting
-  /** @return parse the version number for a version string */
+  /**
+   * @return parse the version number for a version string
+   */
   int[] getVersionNumber() {
     return Version.parseVersionNumber(version());
   }

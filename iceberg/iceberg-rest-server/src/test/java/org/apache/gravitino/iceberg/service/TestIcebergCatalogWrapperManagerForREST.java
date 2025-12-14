@@ -22,9 +22,11 @@ import com.google.common.collect.Maps;
 import java.util.Map;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.iceberg.common.ops.IcebergCatalogWrapper;
+import org.apache.gravitino.iceberg.service.authorization.IcebergRESTServerContext;
 import org.apache.gravitino.iceberg.service.provider.IcebergConfigProvider;
 import org.apache.gravitino.iceberg.service.provider.IcebergConfigProviderFactory;
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
@@ -43,6 +45,7 @@ public class TestIcebergCatalogWrapperManagerForREST {
     config.put(String.format("catalog.%s.catalog-backend-name", prefix), prefix);
     IcebergConfigProvider configProvider = IcebergConfigProviderFactory.create(config);
     configProvider.initialize(config);
+    IcebergRESTServerContext.create(configProvider, false);
     IcebergCatalogWrapperManager manager = new IcebergCatalogWrapperManager(config, configProvider);
 
     IcebergCatalogWrapper ops = manager.getOps(rawPrefix);
@@ -60,8 +63,26 @@ public class TestIcebergCatalogWrapperManagerForREST {
     Map<String, String> config = Maps.newHashMap();
     IcebergConfigProvider configProvider = IcebergConfigProviderFactory.create(config);
     configProvider.initialize(config);
+    IcebergRESTServerContext.create(configProvider, false);
     IcebergCatalogWrapperManager manager = new IcebergCatalogWrapperManager(config, configProvider);
 
     Assertions.assertThrowsExactly(IllegalArgumentException.class, () -> manager.getOps(rawPrefix));
+  }
+
+  @Test
+  public void testAuthorizationRequiresDynamicProvider() {
+    Map<String, String> config = Maps.newHashMap();
+    IcebergConfigProvider configProvider = IcebergConfigProviderFactory.create(config);
+    configProvider.initialize(config);
+    IcebergRESTServerContext.create(configProvider, true);
+    IcebergCatalogWrapperManager manager = new IcebergCatalogWrapperManager(config, configProvider);
+
+    IllegalArgumentException exception =
+        Assertions.assertThrowsExactly(
+            IllegalArgumentException.class, () -> manager.getCatalogWrapper("any"));
+    Assertions.assertTrue(
+        exception
+            .getMessage()
+            .contains("gravitino.iceberg-rest.catalog-config-provider=dynamic-config-provider"));
   }
 }

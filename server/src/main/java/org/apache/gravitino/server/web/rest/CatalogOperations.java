@@ -54,7 +54,7 @@ import org.apache.gravitino.dto.responses.DropResponse;
 import org.apache.gravitino.dto.responses.EntityListResponse;
 import org.apache.gravitino.dto.util.DTOConverters;
 import org.apache.gravitino.metrics.MetricNames;
-import org.apache.gravitino.server.authorization.MetadataFilterHelper;
+import org.apache.gravitino.server.authorization.MetadataAuthzHelper;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationExpression;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationMetadata;
 import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants;
@@ -84,8 +84,10 @@ public class CatalogOperations {
   @Produces("application/vnd.gravitino.v1+json")
   @Timed(name = "list-catalog." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "list-catalog", absolute = true)
+  @AuthorizationExpression(expression = "")
   public Response listCatalogs(
-      @PathParam("metalake") String metalake,
+      @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
+          String metalake,
       @QueryParam("details") @DefaultValue("false") boolean verbose) {
     LOG.info(
         "Received list catalog {} request for metalake: {}, ",
@@ -100,7 +102,7 @@ public class CatalogOperations {
             if (verbose) {
               Catalog[] catalogs = catalogDispatcher.listCatalogsInfo(catalogNS);
               catalogs =
-                  MetadataFilterHelper.filterByExpression(
+                  MetadataAuthzHelper.filterByExpression(
                       metalake,
                       AuthorizationExpressionConstants.loadCatalogAuthorizationExpression,
                       Entity.EntityType.CATALOG,
@@ -113,7 +115,7 @@ public class CatalogOperations {
             } else {
               NameIdentifier[] idents = catalogDispatcher.listCatalogs(catalogNS);
               idents =
-                  MetadataFilterHelper.filterByExpression(
+                  MetadataAuthzHelper.filterByExpression(
                       metalake,
                       AuthorizationExpressionConstants.loadCatalogAuthorizationExpression,
                       Entity.EntityType.CATALOG,
@@ -168,6 +170,9 @@ public class CatalogOperations {
   @Path("testConnection")
   @Produces("application/vnd.gravitino.v1+json")
   @Timed(name = "test-connection." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
+  @AuthorizationExpression(
+      expression = "METALAKE::CREATE_CATALOG || METALAKE::OWNER",
+      accessMetadataType = MetadataObject.Type.METALAKE)
   @ResponseMetered(name = "test-connection", absolute = true)
   public Response testConnection(
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
@@ -213,12 +218,15 @@ public class CatalogOperations {
           String catalogName,
       CatalogSetRequest request) {
     LOG.info("Received set request for catalog: {}.{}", metalake, catalogName);
+
+    OperationType op = request.isInUse() ? OperationType.ENABLE : OperationType.DISABLE;
+
     try {
       return Utils.doAs(
           httpRequest,
           () -> {
             NameIdentifier ident = NameIdentifierUtil.ofCatalog(metalake, catalogName);
-            if (request.isInUse()) {
+            if (op == OperationType.ENABLE) {
               catalogDispatcher.enableCatalog(ident);
             } else {
               catalogDispatcher.disableCatalog(ident);
@@ -239,8 +247,7 @@ public class CatalogOperations {
           request.isInUse() ? "enable" : "disable",
           metalake,
           catalogName);
-      return ExceptionHandlers.handleCatalogException(
-          OperationType.ENABLE, catalogName, metalake, e);
+      return ExceptionHandlers.handleCatalogException(op, catalogName, metalake, e);
     }
   }
 

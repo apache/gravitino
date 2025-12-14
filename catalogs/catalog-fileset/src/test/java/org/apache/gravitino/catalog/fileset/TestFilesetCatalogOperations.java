@@ -37,9 +37,11 @@ import static org.apache.gravitino.catalog.fileset.FilesetCatalogImpl.FILESET_PR
 import static org.apache.gravitino.catalog.fileset.FilesetCatalogImpl.SCHEMA_PROPERTIES_META;
 import static org.apache.gravitino.catalog.fileset.FilesetCatalogPropertiesMetadata.DISABLE_FILESYSTEM_OPS;
 import static org.apache.gravitino.catalog.fileset.FilesetCatalogPropertiesMetadata.LOCATION;
+import static org.apache.gravitino.catalog.hadoop.fs.FileSystemProvider.GRAVITINO_BYPASS;
 import static org.apache.gravitino.file.Fileset.LOCATION_NAME_UNKNOWN;
 import static org.apache.gravitino.file.Fileset.PROPERTY_DEFAULT_LOCATION_NAME;
 import static org.apache.gravitino.file.Fileset.PROPERTY_MULTIPLE_LOCATIONS_PREFIX;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.when;
@@ -79,6 +81,9 @@ import org.apache.gravitino.UserPrincipal;
 import org.apache.gravitino.audit.CallerContext;
 import org.apache.gravitino.audit.FilesetAuditConstants;
 import org.apache.gravitino.audit.FilesetDataOperation;
+import org.apache.gravitino.catalog.hadoop.fs.FileSystemProvider;
+import org.apache.gravitino.catalog.hadoop.fs.FileSystemUtils;
+import org.apache.gravitino.catalog.hadoop.fs.LocalFileSystemProvider;
 import org.apache.gravitino.connector.CatalogInfo;
 import org.apache.gravitino.connector.HasPropertyMetadata;
 import org.apache.gravitino.connector.PropertiesMetadata;
@@ -104,16 +109,19 @@ import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.PrincipalUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.LocalFileSystem;
 import org.apache.hadoop.fs.Path;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.MockedStatic;
 import org.mockito.Mockito;
+import org.testcontainers.shaded.org.awaitility.Awaitility;
 
 public class TestFilesetCatalogOperations {
 
@@ -350,7 +358,7 @@ public class TestFilesetCatalogOperations {
 
     CatalogInfo catalogInfo = randomCatalogInfo();
     ops.initialize(emptyProps, catalogInfo, FILESET_PROPERTIES_METADATA);
-    Configuration conf = ops.getHadoopConf();
+    Configuration conf = FileSystemUtils.createConfiguration(GRAVITINO_BYPASS, ops.getConf());
     String value = conf.get("fs.defaultFS");
     Assertions.assertEquals("file:///", value);
 
@@ -1145,7 +1153,7 @@ public class TestFilesetCatalogOperations {
   }
 
   @Test
-  public void testFormalizePath() throws IOException, IllegalAccessException {
+  public void testFormalizePath() throws IOException, IllegalAccessException, InterruptedException {
 
     String[] paths =
         new String[] {"tmp/catalog", "/tmp/catalog", "file:/tmp/catalog", "file:///tmp/catalog"};
@@ -1453,9 +1461,9 @@ public class TestFilesetCatalogOperations {
       String subPath = "/test/test.parquet";
       when(mockOps.getFileLocation(filesetIdent, subPath)).thenCallRealMethod();
       when(mockOps.getFileLocation(filesetIdent, subPath, null)).thenCallRealMethod();
-      when(mockOps.getFileSystem(Mockito.any(), Mockito.any()))
+      when(mockOps.getFileSystem(any(), any()))
           .thenReturn(FileSystem.getLocal(new Configuration()));
-      when(mockOps.getFileSystemWithCache(Mockito.any(), Mockito.any())).thenCallRealMethod();
+      when(mockOps.getFileSystemWithCache(any(), any())).thenCallRealMethod();
       String fileLocation = mockOps.getFileLocation(filesetIdent, subPath);
       Assertions.assertEquals(
           String.format("%s%s", mockFileset.storageLocation(), subPath.substring(1)), fileLocation);
@@ -1724,21 +1732,6 @@ public class TestFilesetCatalogOperations {
                   createMultiLocationSchema("s1", "comment", ImmutableMap.of(), illegalLocations));
       Assertions.assertEquals("Location name must not be blank", exception.getMessage());
 
-      // empty location name in storage location
-      exception =
-          Assertions.assertThrows(
-              IllegalArgumentException.class,
-              () ->
-                  createMultiLocationFileset(
-                      "fileset_test",
-                      "s1",
-                      null,
-                      Fileset.Type.MANAGED,
-                      ImmutableMap.of(),
-                      ImmutableMap.of("", TEST_ROOT_PATH + "/fileset31"),
-                      null));
-      Assertions.assertEquals("Location name must not be blank", exception.getMessage());
-
       // empty location in catalog location
       Map<String, String> illegalLocations2 =
           new HashMap<String, String>() {
@@ -1767,23 +1760,6 @@ public class TestFilesetCatalogOperations {
       Assertions.assertEquals(
           "The value of the schema property location must not be blank", exception.getMessage());
 
-      // empty fileset storage location
-      exception =
-          Assertions.assertThrows(
-              IllegalArgumentException.class,
-              () ->
-                  createMultiLocationFileset(
-                      "fileset_test",
-                      "s1",
-                      null,
-                      Fileset.Type.MANAGED,
-                      ImmutableMap.of(),
-                      ImmutableMap.of("location1", ""),
-                      null));
-      Assertions.assertEquals(
-          "Storage location must not be blank for location name: location1",
-          exception.getMessage());
-
       // storage location is parent of schema location
       Schema multipLocationSchema =
           createMultiLocationSchema(
@@ -1810,6 +1786,38 @@ public class TestFilesetCatalogOperations {
               .contains(
                   "The fileset property default-location-name must be set and must be one of the fileset locations"),
           "Exception message: " + exception.getMessage());
+
+      // empty location name in storage location
+      exception =
+          Assertions.assertThrows(
+              IllegalArgumentException.class,
+              () ->
+                  createMultiLocationFileset(
+                      "fileset_test",
+                      "s1",
+                      null,
+                      Fileset.Type.MANAGED,
+                      ImmutableMap.of(),
+                      ImmutableMap.of("", TEST_ROOT_PATH + "/fileset31"),
+                      null));
+      Assertions.assertEquals("Location name must not be blank", exception.getMessage());
+
+      // empty fileset storage location
+      exception =
+          Assertions.assertThrows(
+              IllegalArgumentException.class,
+              () ->
+                  createMultiLocationFileset(
+                      "fileset_test",
+                      "s1",
+                      null,
+                      Fileset.Type.MANAGED,
+                      ImmutableMap.of(),
+                      ImmutableMap.of("location1", ""),
+                      null));
+      Assertions.assertEquals(
+          "Storage location must not be blank for location name: location1",
+          exception.getMessage());
     }
   }
 
@@ -1863,6 +1871,44 @@ public class TestFilesetCatalogOperations {
         callerContextHolder.when(CallerContext.CallerContextHolder::get).thenReturn(callerContext);
         Assertions.assertEquals("file://a/b/e", ops.getTargetLocation(filesetWithMultipleLocation));
       }
+    }
+  }
+
+  @Test
+  @Timeout(20)
+  void testGetFileSystemTimeoutThrowsException() throws Exception {
+    FieldUtils.writeField(
+        GravitinoEnv.getInstance(), "entityStore", new RelationalEntityStore(), true);
+
+    try (FilesetCatalogOperations filesetCatalogOperations = new FilesetCatalogOperations()) {
+      LocalFileSystemProvider localFileSystemProvider = Mockito.mock(LocalFileSystemProvider.class);
+      when(localFileSystemProvider.scheme()).thenReturn("file");
+      when(localFileSystemProvider.getFileSystem(Mockito.any(Path.class), Mockito.anyMap()))
+          .thenAnswer(
+              invocation -> {
+                // Block 100s, however, the timeout is set to 6s by default in
+                // FilesetCatalogOperations, so it's expected to be over within 10s
+                Awaitility.await().forever().until(() -> false);
+                return new LocalFileSystem();
+              });
+      Map<String, FileSystemProvider> fileSystemProviderMapOriginal = new HashMap<>();
+      fileSystemProviderMapOriginal.put("file", localFileSystemProvider);
+      FieldUtils.writeField(
+          filesetCatalogOperations, "fileSystemProvidersMap", fileSystemProviderMapOriginal, true);
+
+      FieldUtils.writeField(
+          filesetCatalogOperations, "propertiesMetadata", FILESET_PROPERTIES_METADATA, true);
+
+      // We use Annotation `Timeout` to make sure the test will not run forever as `getFileSystem`
+      // will throw IOException after timeout(6s)
+      Exception e =
+          Assertions.assertThrows(
+              IOException.class,
+              () ->
+                  filesetCatalogOperations.getFileSystem(
+                      new Path("file:///tmp"), ImmutableMap.of()));
+
+      Assertions.assertTrue(e.getMessage().contains("Failed to get FileSystem for path"));
     }
   }
 
@@ -2887,7 +2933,7 @@ public class TestFilesetCatalogOperations {
 
       NameIdentifier schemaIdent = NameIdentifierUtil.ofSchema("m1", "c1", name);
       Map<String, String> schemaProps = Maps.newHashMap();
-      StringIdentifier stringId = StringIdentifier.fromId(idGenerator.nextId());
+      StringIdentifier stringId = StringIdentifier.fromId(testId);
       schemaProps = Maps.newHashMap(StringIdentifier.newPropertiesWithId(stringId, schemaProps));
 
       if (schemaPath != null) {

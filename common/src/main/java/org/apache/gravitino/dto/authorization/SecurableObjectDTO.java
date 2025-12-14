@@ -43,7 +43,9 @@ public class SecurableObjectDTO implements SecurableObject {
   /** Default constructor for Jackson deserialization. */
   protected SecurableObjectDTO() {}
 
-  /** @return The full name of the securable object. */
+  /**
+   * @return The full name of the securable object.
+   */
   @JsonProperty("fullName")
   public String getFullName() {
     return fullName();
@@ -91,7 +93,9 @@ public class SecurableObjectDTO implements SecurableObject {
     return Collections.unmodifiableList(Arrays.asList(privileges));
   }
 
-  /** @return the builder for creating a new instance of SecurableObjectDTO. */
+  /**
+   * @return the builder for creating a new instance of SecurableObjectDTO.
+   */
   public static Builder builder() {
     return new Builder();
   }

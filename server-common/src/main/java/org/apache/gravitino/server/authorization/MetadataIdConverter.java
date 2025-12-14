@@ -38,6 +38,8 @@ import org.apache.gravitino.meta.CatalogEntity;
 import org.apache.gravitino.meta.ColumnEntity;
 import org.apache.gravitino.meta.FilesetEntity;
 import org.apache.gravitino.meta.GroupEntity;
+import org.apache.gravitino.meta.JobEntity;
+import org.apache.gravitino.meta.JobTemplateEntity;
 import org.apache.gravitino.meta.ModelEntity;
 import org.apache.gravitino.meta.ModelVersionEntity;
 import org.apache.gravitino.meta.RoleEntity;
@@ -51,18 +53,6 @@ import org.apache.gravitino.utils.MetadataObjectUtil;
 /** It is used to convert MetadataObject to MetadataId */
 public class MetadataIdConverter {
 
-  // Maps metadata type to entity type
-  private static final Map<MetadataObject.Type, Entity.EntityType> METADATA_TO_ENTITY_TYPE_MAPPING =
-      ImmutableMap.of(
-          MetadataObject.Type.METALAKE, Entity.EntityType.METALAKE,
-          MetadataObject.Type.CATALOG, Entity.EntityType.CATALOG,
-          MetadataObject.Type.SCHEMA, Entity.EntityType.SCHEMA,
-          MetadataObject.Type.TABLE, Entity.EntityType.TABLE,
-          MetadataObject.Type.MODEL, Entity.EntityType.MODEL,
-          MetadataObject.Type.FILESET, Entity.EntityType.FILESET,
-          MetadataObject.Type.TOPIC, Entity.EntityType.TOPIC,
-          MetadataObject.Type.COLUMN, Entity.EntityType.COLUMN,
-          MetadataObject.Type.ROLE, Entity.EntityType.ROLE);
   // Maps metadata type to capability scope
   private static final Map<MetadataObject.Type, Capability.Scope> METADATA_SCOPE_MAPPING =
       ImmutableMap.of(
@@ -88,6 +78,8 @@ public class MetadataIdConverter {
           .put(Entity.EntityType.USER, UserEntity.class)
           .put(Entity.EntityType.GROUP, GroupEntity.class)
           .put(Entity.EntityType.ROLE, RoleEntity.class)
+          .put(Entity.EntityType.JOB_TEMPLATE, JobTemplateEntity.class)
+          .put(Entity.EntityType.JOB, JobEntity.class)
           .build();
 
   private MetadataIdConverter() {}
@@ -110,7 +102,7 @@ public class MetadataIdConverter {
     NameIdentifier normalizedIdent =
         normalizeCaseSensitive(ident, METADATA_SCOPE_MAPPING.get(metadataType), catalogManager);
 
-    Entity.EntityType entityType = getEntityType(metadataType);
+    Entity.EntityType entityType = MetadataObjectUtil.toEntityType(metadataType);
 
     Entity entity;
     try {
@@ -132,10 +124,6 @@ public class MetadataIdConverter {
 
     Capability capability = CapabilityHelpers.getCapability(ident, catalogManager);
     return CapabilityHelpers.applyCaseSensitive(ident, scope, capability);
-  }
-
-  private static Entity.EntityType getEntityType(MetadataObject.Type metadataType) {
-    return METADATA_TO_ENTITY_TYPE_MAPPING.get(metadataType);
   }
 
   private static Long extractIdFromEntity(Entity entity) {

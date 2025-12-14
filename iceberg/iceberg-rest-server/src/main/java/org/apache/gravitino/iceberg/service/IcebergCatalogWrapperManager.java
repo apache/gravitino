@@ -29,7 +29,12 @@ import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
+import org.apache.gravitino.iceberg.common.authentication.AuthenticationConfig;
+import org.apache.gravitino.iceberg.common.authentication.SupportsKerberos;
 import org.apache.gravitino.iceberg.common.ops.IcebergCatalogWrapper;
+import org.apache.gravitino.iceberg.common.ops.KerberosAwareIcebergCatalogProxy;
+import org.apache.gravitino.iceberg.service.authorization.IcebergRESTServerContext;
+import org.apache.gravitino.iceberg.service.provider.DynamicIcebergConfigProvider;
 import org.apache.gravitino.iceberg.service.provider.IcebergConfigProvider;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -74,7 +79,7 @@ public class IcebergCatalogWrapperManager implements AutoCloseable {
    * @return the instance of IcebergCatalogWrapper.
    */
   public CatalogWrapperForREST getOps(String rawPrefix) {
-    String catalogName = IcebergRestUtils.getCatalogName(rawPrefix);
+    String catalogName = IcebergRESTUtils.getCatalogName(rawPrefix);
     return getCatalogWrapper(catalogName);
   }
 
@@ -88,6 +93,14 @@ public class IcebergCatalogWrapperManager implements AutoCloseable {
   }
 
   private CatalogWrapperForREST createCatalogWrapper(String catalogName) {
+    IcebergRESTServerContext serverContext = IcebergRESTServerContext.getInstance();
+    if (serverContext.isAuthorizationEnabled()
+        && !(configProvider instanceof DynamicIcebergConfigProvider)) {
+      throw new IllegalArgumentException(
+          "Authorization is enabled. Set `gravitino.iceberg-rest.catalog-config-provider="
+              + "dynamic-config-provider` in gravitino.conf for Iceberg REST.");
+    }
+
     Optional<IcebergConfig> icebergConfig = configProvider.getIcebergCatalogConfig(catalogName);
     if (!icebergConfig.isPresent()) {
       throw new NoSuchCatalogException(
@@ -100,7 +113,15 @@ public class IcebergCatalogWrapperManager implements AutoCloseable {
   @VisibleForTesting
   protected CatalogWrapperForREST createCatalogWrapper(
       String catalogName, IcebergConfig icebergConfig) {
-    return new CatalogWrapperForREST(catalogName, icebergConfig);
+    CatalogWrapperForREST rest = new CatalogWrapperForREST(catalogName, icebergConfig);
+    AuthenticationConfig authenticationConfig =
+        new AuthenticationConfig(icebergConfig.getAllConfig());
+    if (rest.getCatalog() instanceof SupportsKerberos && authenticationConfig.isKerberosAuth()) {
+      return (CatalogWrapperForREST)
+          new KerberosAwareIcebergCatalogProxy(rest).getProxy(catalogName, icebergConfig);
+    }
+
+    return rest;
   }
 
   private void closeIcebergCatalogWrapper(IcebergCatalogWrapper catalogWrapper) {

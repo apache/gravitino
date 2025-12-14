@@ -406,7 +406,9 @@ class GenericModelCatalog extends BaseSchemaCatalog implements ModelCatalog {
     return new GenericModelVersion(resp.getModelVersion());
   }
 
-  /** @return A new builder instance for {@link GenericModelCatalog}. */
+  /**
+   * @return A new builder instance for {@link GenericModelCatalog}.
+   */
   public static Builder builder() {
     return new Builder();
   }

@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.authorization;
 
+import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.util.List;
 import java.util.Optional;
@@ -64,6 +65,9 @@ public class OwnerManager implements OwnerDispatcher {
   @Override
   public void setOwner(
       String metalake, MetadataObject metadataObject, String ownerName, Owner.Type ownerType) {
+    // TODO(ISSUE-9375): Support GROUP type owner in the future.
+    Preconditions.checkArgument(
+        ownerType == Owner.Type.USER, "Only USER type is supported as owner currently.");
     NameIdentifier objectIdent = MetadataObjectUtil.toEntityIdent(metalake, metadataObject);
     try {
       Optional<Owner> originOwner = getOwner(metalake, metadataObject);

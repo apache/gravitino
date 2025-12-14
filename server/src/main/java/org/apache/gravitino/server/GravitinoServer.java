@@ -56,7 +56,7 @@ import org.apache.gravitino.server.web.mapper.JsonMappingExceptionMapper;
 import org.apache.gravitino.server.web.mapper.JsonParseExceptionMapper;
 import org.apache.gravitino.server.web.mapper.JsonProcessingExceptionMapper;
 import org.apache.gravitino.server.web.ui.WebUIFilter;
-import org.apache.gravitino.stats.StatisticManager;
+import org.apache.gravitino.stats.StatisticDispatcher;
 import org.apache.gravitino.tag.TagDispatcher;
 import org.glassfish.hk2.api.InterceptionService;
 import org.glassfish.hk2.utilities.binding.AbstractBinder;
@@ -148,7 +148,7 @@ public class GravitinoServer extends ResourceConfig {
             bind(gravitinoEnv.modelDispatcher()).to(ModelDispatcher.class).ranked(1);
             bind(lineageService).to(LineageDispatcher.class).ranked(1);
             bind(gravitinoEnv.jobOperationDispatcher()).to(JobOperationDispatcher.class).ranked(1);
-            bind(gravitinoEnv.statisticManager()).to(StatisticManager.class).ranked(1);
+            bind(gravitinoEnv.statisticDispatcher()).to(StatisticDispatcher.class).ranked(1);
           }
         });
     register(JsonProcessingExceptionMapper.class);

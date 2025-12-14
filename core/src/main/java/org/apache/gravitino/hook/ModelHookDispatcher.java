@@ -24,7 +24,6 @@ import org.apache.gravitino.Entity;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
-import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.authorization.Owner;
 import org.apache.gravitino.authorization.OwnerDispatcher;
 import org.apache.gravitino.catalog.ModelDispatcher;
@@ -67,10 +66,6 @@ public class ModelHookDispatcher implements ModelDispatcher {
   @Override
   public Model registerModel(NameIdentifier ident, String comment, Map<String, String> properties)
       throws NoSuchSchemaException, ModelAlreadyExistsException {
-    // Check whether the current user exists or not
-    AuthorizationUtils.checkCurrentUser(
-        ident.namespace().level(0), PrincipalUtils.getCurrentUserName());
-
     Model model = dispatcher.registerModel(ident, comment, properties);
 
     // Set the creator as owner of the model.
@@ -159,10 +154,6 @@ public class ModelHookDispatcher implements ModelDispatcher {
       Map<String, String> properties)
       throws NoSuchSchemaException, ModelAlreadyExistsException,
           ModelVersionAliasesAlreadyExistException {
-    // Check whether the current user exists or not
-    AuthorizationUtils.checkCurrentUser(
-        ident.namespace().level(0), PrincipalUtils.getCurrentUserName());
-
     Model model = dispatcher.registerModel(ident, uris, aliases, comment, properties);
 
     // Set the creator as owner of the model.

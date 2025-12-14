@@ -308,7 +308,9 @@ public class Transforms {
       this.ref = ref;
     }
 
-    /** @return The name of the transform. */
+    /**
+     * @return The name of the transform.
+     */
     @Override
     public String name() {
       return NAME_OF_IDENTITY;
@@ -331,7 +333,9 @@ public class Transforms {
       this.ref = ref;
     }
 
-    /** @return The name of the transform. */
+    /**
+     * @return The name of the transform.
+     */
     @Override
     public String name() {
       return NAME_OF_YEAR;
@@ -354,7 +358,9 @@ public class Transforms {
       this.ref = ref;
     }
 
-    /** @return The name of the transform. */
+    /**
+     * @return The name of the transform.
+     */
     @Override
     public String name() {
       return NAME_OF_MONTH;
@@ -377,7 +383,9 @@ public class Transforms {
       this.ref = ref;
     }
 
-    /** @return The name of the transform. */
+    /**
+     * @return The name of the transform.
+     */
     @Override
     public String name() {
       return NAME_OF_DAY;
@@ -400,7 +408,9 @@ public class Transforms {
       this.ref = ref;
     }
 
-    /** @return The name of the transform. */
+    /**
+     * @return The name of the transform.
+     */
     @Override
     public String name() {
       return NAME_OF_HOUR;
@@ -428,23 +438,31 @@ public class Transforms {
       this.fields = fields;
     }
 
-    /** @return The number of buckets to use. */
+    /**
+     * @return The number of buckets to use.
+     */
     public int numBuckets() {
       return numBuckets.value();
     }
 
-    /** @return The field names to transform. */
+    /**
+     * @return The field names to transform.
+     */
     public String[][] fieldNames() {
       return Arrays.stream(fields).map(NamedReference::fieldName).toArray(String[][]::new);
     }
 
-    /** @return The name of the transform. */
+    /**
+     * @return The name of the transform.
+     */
     @Override
     public String name() {
       return NAME_OF_BUCKET;
     }
 
-    /** @return The arguments to the transform. */
+    /**
+     * @return The arguments to the transform.
+     */
     @Override
     public Expression[] arguments() {
       return ObjectArrays.concat(new Expression[] {numBuckets}, fields, Expression.class);
@@ -481,23 +499,31 @@ public class Transforms {
       this.field = field;
     }
 
-    /** @return The width to truncate to. */
+    /**
+     * @return The width to truncate to.
+     */
     public int width() {
       return width.value();
     }
 
-    /** @return The field name to transform. */
+    /**
+     * @return The field name to transform.
+     */
     public String[] fieldName() {
       return field.fieldName();
     }
 
-    /** @return The name of the transform. */
+    /**
+     * @return The name of the transform.
+     */
     @Override
     public String name() {
       return NAME_OF_TRUNCATE;
     }
 
-    /** @return The arguments to the transform. */
+    /**
+     * @return The arguments to the transform.
+     */
     @Override
     public Expression[] arguments() {
       return new Expression[] {width, field};
@@ -537,24 +563,32 @@ public class Transforms {
       this.assignments = assignments;
     }
 
-    /** @return The field names to include in the list. */
+    /**
+     * @return The field names to include in the list.
+     */
     public String[][] fieldNames() {
       return Arrays.stream(fields).map(NamedReference::fieldName).toArray(String[][]::new);
     }
 
-    /** @return The name of the transform. */
+    /**
+     * @return The name of the transform.
+     */
     @Override
     public String name() {
       return NAME_OF_LIST;
     }
 
-    /** @return The arguments to the transform. */
+    /**
+     * @return The arguments to the transform.
+     */
     @Override
     public Expression[] arguments() {
       return fields;
     }
 
-    /** @return The assignments to the transform. */
+    /**
+     * @return The assignments to the transform.
+     */
     @Override
     public ListPartition[] assignments() {
       return assignments;
@@ -594,24 +628,32 @@ public class Transforms {
       this.assignments = assignments;
     }
 
-    /** @return The field name to transform. */
+    /**
+     * @return The field name to transform.
+     */
     public String[] fieldName() {
       return field.fieldName();
     }
 
-    /** @return The name of the transform. */
+    /**
+     * @return The name of the transform.
+     */
     @Override
     public String name() {
       return NAME_OF_RANGE;
     }
 
-    /** @return The arguments to the transform. */
+    /**
+     * @return The arguments to the transform.
+     */
     @Override
     public Expression[] arguments() {
       return new Expression[] {field};
     }
 
-    /** @return The assignments to the transform. */
+    /**
+     * @return The assignments to the transform.
+     */
     @Override
     public RangePartition[] assignments() {
       return assignments;
@@ -642,13 +684,17 @@ public class Transforms {
       this.arguments = arguments;
     }
 
-    /** @return The name of the function to apply. */
+    /**
+     * @return The name of the function to apply.
+     */
     @Override
     public String name() {
       return name;
     }
 
-    /** @return The arguments to the function. */
+    /**
+     * @return The arguments to the function.
+     */
     @Override
     public Expression[] arguments() {
       return arguments;

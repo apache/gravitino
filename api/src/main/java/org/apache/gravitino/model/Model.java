@@ -42,7 +42,9 @@ import org.apache.gravitino.tag.SupportsTags;
 @Evolving
 public interface Model extends Auditable {
 
-  /** @return Name of the model object. */
+  /**
+   * @return Name of the model object.
+   */
   String name();
 
   /**

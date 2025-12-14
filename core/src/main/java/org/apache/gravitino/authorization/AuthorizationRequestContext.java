@@ -36,6 +36,8 @@ public class AuthorizationRequestContext {
   /** Used to determine whether the role has already been loaded. */
   private final AtomicBoolean hasLoadRole = new AtomicBoolean();
 
+  private volatile String originalAuthorizationExpression;
+
   /**
    * check allow
    *
@@ -80,8 +82,25 @@ public class AuthorizationRequestContext {
     if (hasLoadRole.get()) {
       return;
     }
-    runnable.run();
-    hasLoadRole.set(true);
+    synchronized (this) {
+      if (hasLoadRole.get()) {
+        return;
+      }
+      try {
+        runnable.run();
+        hasLoadRole.set(true);
+      } catch (Exception e) {
+        throw new RuntimeException("Failed to load role: ", e);
+      }
+    }
+  }
+
+  public String getOriginalAuthorizationExpression() {
+    return originalAuthorizationExpression;
+  }
+
+  public void setOriginalAuthorizationExpression(String originalAuthorizationExpression) {
+    this.originalAuthorizationExpression = originalAuthorizationExpression;
   }
 
   public static class AuthorizationKey {

@@ -269,15 +269,14 @@ public class PaimonCatalogOperations implements CatalogOperations, SupportsSchem
   public NameIdentifier[] listTables(Namespace namespace) throws NoSuchSchemaException {
     String[] levels = namespace.levels();
     NameIdentifier schemaIdentifier = NameIdentifier.of(levels[levels.length - 1]);
-    if (!schemaExists(schemaIdentifier)) {
-      throw new NoSuchSchemaException(NO_SUCH_SCHEMA_EXCEPTION, namespace.toString());
-    }
+
     List<String> tables;
     try {
       tables = paimonCatalogOps.listTables(schemaIdentifier.name());
     } catch (Catalog.DatabaseNotExistException e) {
-      throw new NoSuchSchemaException(NO_SUCH_SCHEMA_EXCEPTION, namespace.toString());
+      throw new NoSuchSchemaException(e, NO_SUCH_SCHEMA_EXCEPTION, namespace.toString());
     }
+
     return tables.stream()
         .map(
             tableIdentifier ->

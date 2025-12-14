@@ -2,10 +2,11 @@ name: Build gvfs-fuse and testing
 
 # Controls when the workflow will run
 on:
-  push:
-    branches: [ "main", "branch-*" ]
-  pull_request:
-    branches: [ "main", "branch-*" ]
+  # Temporarily disable
+  # push:
+  #  branches: [ "main", "branch-*" ]
+  # pull_request:
+  #  branches: [ "main", "branch-*" ]
   workflow_dispatch:
 
 concurrency:
@@ -77,8 +78,8 @@ jobs:
 
       - name: Integration test
         run: |
-          ./gradlew build -x :clients:client-python:build -x test -x web -PjdkVersion=${{ matrix.java-version }}
-          ./gradlew compileDistribution -x :clients:client-python:build -x test -x web -PjdkVersion=${{ matrix.java-version }}
+          ./gradlew build -x :clients:client-python:build -x test -x web 
+          ./gradlew compileDistribution -x :clients:client-python:build -x test -x web 
           cd clients/filesystem-fuse
           make test-s3
           make test-fuse-it

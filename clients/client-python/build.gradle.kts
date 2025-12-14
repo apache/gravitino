@@ -174,7 +174,7 @@ tasks {
     args = listOf("./gravitino", "./tests", "./scripts")
   }
 
-  val integrationCoverageReport by registering(VenvTask::class){
+  register("integrationCoverageReport", VenvTask::class){
     venvExec = "coverage"
     args = listOf("html")
     workingDir = projectDir.resolve("./tests/integration")
@@ -239,7 +239,7 @@ tasks {
     finalizedBy(unitCoverageReport)
   }
 
-  val test by registering(VenvTask::class) {
+  register("test", VenvTask::class) {
     val skipUTs = project.hasProperty("skipTests")
     val skipITs = project.hasProperty("skipITs")
     val skipAllTests = skipUTs && skipITs
@@ -254,7 +254,7 @@ tasks {
     }
   }
 
-  val doc by registering(VenvTask::class) {
+  register("doc", VenvTask::class) {
     workingDir = projectDir.resolve("./docs")
     venvExec = "make"
     args = listOf("html")
@@ -283,14 +283,14 @@ tasks {
   }
 
   // Deploy to https://pypi.org/project/gravitino/
-  val deploy by registering(VenvTask::class) {
+  register("deploy", VenvTask::class) {
     dependsOn(distribution)
     val twine_password = System.getenv("TWINE_PASSWORD")
     venvExec = "twine"
     args = listOf("upload", "dist/*", "-p${twine_password}")
   }
 
-  val clean by registering(Delete::class) {
+  register("clean", Delete::class) {
     delete("build")
     delete("dist")
     delete("docs/build")

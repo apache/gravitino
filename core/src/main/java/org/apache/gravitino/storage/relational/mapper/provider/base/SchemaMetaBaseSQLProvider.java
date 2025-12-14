@@ -45,11 +45,11 @@ public class SchemaMetaBaseSQLProvider {
         + " deleted_at as deletedAt"
         + " FROM "
         + TABLE_NAME
-        + " WHERE schema_id in ("
+        + " WHERE schema_id IN ("
         + "<foreach collection='schemaIds' item='schemaId' separator=','>"
         + "#{schemaId}"
         + "</foreach>"
-        + ") "
+        + ")"
         + " AND deleted_at = 0"
         + "</script>";
   }
@@ -88,10 +88,10 @@ public class SchemaMetaBaseSQLProvider {
   public String insertSchemaMeta(@Param("schemaMeta") SchemaPO schemaPO) {
     return "INSERT INTO "
         + TABLE_NAME
-        + "(schema_id, schema_name, metalake_id,"
+        + " (schema_id, schema_name, metalake_id,"
         + " catalog_id, schema_comment, properties, audit_info,"
         + " current_version, last_version, deleted_at)"
-        + " VALUES("
+        + " VALUES ("
         + " #{schemaMeta.schemaId},"
         + " #{schemaMeta.schemaName},"
         + " #{schemaMeta.metalakeId},"
@@ -108,10 +108,10 @@ public class SchemaMetaBaseSQLProvider {
   public String insertSchemaMetaOnDuplicateKeyUpdate(@Param("schemaMeta") SchemaPO schemaPO) {
     return "INSERT INTO "
         + TABLE_NAME
-        + "(schema_id, schema_name, metalake_id,"
+        + " (schema_id, schema_name, metalake_id,"
         + " catalog_id, schema_comment, properties, audit_info,"
         + " current_version, last_version, deleted_at)"
-        + " VALUES("
+        + " VALUES ("
         + " #{schemaMeta.schemaId},"
         + " #{schemaMeta.schemaName},"
         + " #{schemaMeta.metalakeId},"
@@ -152,7 +152,8 @@ public class SchemaMetaBaseSQLProvider {
         + " AND schema_name = #{oldSchemaMeta.schemaName}"
         + " AND metalake_id = #{oldSchemaMeta.metalakeId}"
         + " AND catalog_id = #{oldSchemaMeta.catalogId}"
-        + " AND (schema_comment IS NULL OR schema_comment = #{oldSchemaMeta.schemaComment})"
+        + " AND (schema_comment = #{oldSchemaMeta.schemaComment}"
+        + "   OR (schema_comment IS NULL and #{oldSchemaMeta.schemaComment} IS NULL))"
         + " AND properties = #{oldSchemaMeta.properties}"
         + " AND audit_info = #{oldSchemaMeta.auditInfo}"
         + " AND current_version = #{oldSchemaMeta.currentVersion}"
@@ -195,7 +196,7 @@ public class SchemaMetaBaseSQLProvider {
       @Param("metalakeName") String metalakeName,
       @Param("catalogName") String catalogName,
       @Param("schemaName") String schemaName) {
-    return "SELECT metalake_meta.metalake_id as metalakeId, catalog_meta.catalog_id as catalogId, "
+    return "SELECT metalake_meta.metalake_id as metalakeId, catalog_meta.catalog_id as catalogId,"
         + " schema_id as schemaId"
         + " FROM metalake_meta"
         + " JOIN catalog_meta ON metalake_meta.metalake_id = catalog_meta.metalake_id"

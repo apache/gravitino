@@ -21,6 +21,7 @@ package org.apache.gravitino.catalog.hive;
 public class HiveConstants {
   // Catalog properties
   public static final String METASTORE_URIS = "metastore.uris";
+  public static final String DEFAULT_CATALOG = "default.catalog";
   public static final String CLIENT_POOL_SIZE = "client.pool-size";
   public static final String CLIENT_POOL_CACHE_EVICTION_INTERVAL_MS =
       "client.pool-cache.eviction-interval-ms";
@@ -45,4 +46,10 @@ public class HiveConstants {
   public static final String SERDE_LIB = "serde-lib";
   public static final String SERDE_PARAMETER_PREFIX = "serde.parameter.";
   public static final String TRANSIENT_LAST_DDL_TIME = "transient_lastDdlTime";
+
+  // Hive metastore constants
+  public static final String HIVE_METASTORE_URIS = "hive.metastore.uris";
+  public static final String HIVE_FILTER_FIELD_PARAMS = "hive_filter_field_params__";
+  public static final String HIVE_METASTORE_TOKEN_SIGNATURE = "hive.metastore.token.signature";
+  public static final String HIVE_DEFAULT_CATALOG = "hive";
 }

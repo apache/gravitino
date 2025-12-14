@@ -30,6 +30,7 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.Schema;
 import org.apache.gravitino.SchemaChange;
+import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NonEmptySchemaException;
 import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
@@ -298,6 +299,24 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces {
   }
 
   @Override
+  public boolean tableExists(Identifier ident) {
+    // Gravitino uses loadTable() to verify table existence, which requires LOAD_TABLE privilege.
+    // For CREATE TABLE IF NOT EXISTS operations, users may only have CREATE_TABLE privilege.
+    // When ForbiddenException is thrown (lacking LOAD_TABLE privilege), we return false to allow
+    // the CREATE TABLE operation to proceed.
+    // See: https://github.com/apache/gravitino/issues/9180
+    try {
+      loadGravitinoTable(ident);
+      return true;
+    } catch (NoSuchTableException e) {
+      return false;
+    } catch (ForbiddenException e) {
+      // User lacks LOAD_TABLE privilege, return false to allow CREATE TABLE IF NOT EXISTS
+      return false;
+    }
+  }
+
+  @Override
   public void renameTable(Identifier oldIdent, Identifier newIdent)
       throws NoSuchTableException, TableAlreadyExistsException {
     String oldDatabase = getDatabase(oldIdent);
@@ -461,5 +480,10 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces {
               String.join(".", getDatabase(ident), ident.name())),
           e);
     }
+  }
+
+  @Override
+  public void invalidateTable(Identifier ident) {
+    sparkCatalog.invalidateTable(ident);
   }
 }

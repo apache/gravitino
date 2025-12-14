@@ -132,7 +132,6 @@ const CreateCatalogDialog = props => {
       return item
     })
     setInnerProps(updateProps)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [catalogBackendSelect])
 
   const handleFormChange = ({ index, event }) => {
@@ -278,33 +277,13 @@ const CreateCatalogDialog = props => {
           ...others
         } = prevProperties
 
-        if (
-          catalogBackend &&
-          ['rest', 'hive'].includes(catalogBackend) &&
-          ['lakehouse-iceberg', 'lakehouse-paimon'].includes(providerSelect)
-        ) {
-          properties = {
-            'catalog-backend': catalogBackend,
-            uri: uri,
-            ...others
-          }
-          warehouse && (properties['warehouse'] = warehouse)
-        } else if (catalogBackend && catalogBackend === 'filesystem' && providerSelect === 'lakehouse-paimon') {
-          properties = {
-            'catalog-backend': catalogBackend,
-            ...others
-          }
-          uri && (properties['uri'] = uri)
-        } else {
-          properties = {
-            uri: uri,
-            ...others
-          }
-          catalogBackend && (properties['catalog-backend'] = catalogBackend)
-          jdbcDriver && (properties['jdbc-driver'] = jdbcDriver)
-          jdbcUser && (properties['jdbc-user'] = jdbcUser)
-          jdbcPwd && (properties['jdbc-password'] = jdbcPwd)
-        }
+        properties = { ...others }
+        catalogBackend && (properties['catalog-backend'] = catalogBackend)
+        uri && (properties['uri'] = uri)
+        warehouse && (properties['warehouse'] = warehouse)
+        jdbcDriver && (properties['jdbc-driver'] = jdbcDriver)
+        jdbcUser && (properties['jdbc-user'] = jdbcUser)
+        jdbcPwd && (properties['jdbc-password'] = jdbcPwd)
         authType && (properties['authentication.type'] = authType)
         kerberosPrincipal && (properties['authentication.kerberos.principal'] = kerberosPrincipal)
         kerberosKeytabUri && (properties['authentication.kerberos.keytab-uri'] = kerberosKeytabUri)
@@ -360,8 +339,6 @@ const CreateCatalogDialog = props => {
         break
       }
     }
-
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [typeSelect, open])
 
   useEffect(() => {
@@ -378,8 +355,6 @@ const CreateCatalogDialog = props => {
       setInnerProps(defaultProps)
       setValue('propItems', defaultProps)
     }
-
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [providerSelect])
 
   useEffect(() => {

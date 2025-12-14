@@ -19,7 +19,13 @@
 package org.apache.gravitino.catalog.hadoop.fs;
 
 import static org.apache.gravitino.catalog.hadoop.fs.Constants.BUILTIN_HDFS_FS_PROVIDER;
+import static org.apache.gravitino.catalog.hadoop.fs.Constants.DEFAULT_CONNECTION_TIMEOUT;
+import static org.apache.gravitino.catalog.hadoop.fs.Constants.DEFAULT_HDFS_IPC_PING;
+import static org.apache.gravitino.catalog.hadoop.fs.Constants.HDFS_IPC_CLIENT_CONNECT_TIMEOUT_KEY;
+import static org.apache.gravitino.catalog.hadoop.fs.Constants.HDFS_IPC_PING_KEY;
 
+import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.Maps;
 import java.io.IOException;
 import java.util.Map;
 import javax.annotation.Nonnull;
@@ -28,21 +34,51 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 
 public class HDFSFileSystemProvider implements FileSystemProvider {
+  public static final String IPC_FALLBACK_TO_SIMPLE_AUTH_ALLOWED =
+      "hadoop.rpc.protection.fallback-to-simple-auth-allowed";
+  public static final String SCHEME_HDFS = "hdfs";
 
   @Override
   public FileSystem getFileSystem(@Nonnull Path path, @Nonnull Map<String, String> config)
       throws IOException {
-    Configuration configuration = FileSystemUtils.createConfiguration(GRAVITINO_BYPASS, config);
+    Map<String, String> hadoopConfMap = additionalHDFSConfig(config);
+    Configuration configuration =
+        FileSystemUtils.createConfiguration(GRAVITINO_BYPASS, hadoopConfMap);
     return FileSystem.newInstance(path.toUri(), configuration);
   }
 
   @Override
   public String scheme() {
-    return "hdfs";
+    return SCHEME_HDFS;
   }
 
   @Override
   public String name() {
     return BUILTIN_HDFS_FS_PROVIDER;
+  }
+
+  /**
+   * Add additional HDFS specific configurations.
+   *
+   * @param configs Original configurations.
+   * @return Configurations with additional HDFS specific configurations.
+   */
+  private Map<String, String> additionalHDFSConfig(Map<String, String> configs) {
+    Map<String, String> additionalConfigs = Maps.newHashMap(configs);
+
+    // Avoid multiple retries to speed up failure in test cases.
+    // Use hard code instead of CommonConfigurationKeysPublic.IPC_CLIENT_CONNECT_TIMEOUT_KEY to
+    // avoid dependency on a specific Hadoop version.
+    if (!configs.containsKey(HDFS_IPC_CLIENT_CONNECT_TIMEOUT_KEY)) {
+      additionalConfigs.put(HDFS_IPC_CLIENT_CONNECT_TIMEOUT_KEY, DEFAULT_CONNECTION_TIMEOUT);
+    }
+
+    if (!configs.containsKey(HDFS_IPC_PING_KEY)) {
+      additionalConfigs.put(HDFS_IPC_PING_KEY, DEFAULT_HDFS_IPC_PING);
+    }
+
+    // More tuning can be added here.
+
+    return ImmutableMap.copyOf(additionalConfigs);
   }
 }

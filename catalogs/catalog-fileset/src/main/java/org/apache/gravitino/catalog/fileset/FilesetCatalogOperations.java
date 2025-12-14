@@ -18,7 +18,6 @@
  */
 package org.apache.gravitino.catalog.fileset;
 
-import static org.apache.gravitino.connector.BaseCatalog.CATALOG_BYPASS_PREFIX;
 import static org.apache.gravitino.file.Fileset.LOCATION_NAME_UNKNOWN;
 import static org.apache.gravitino.file.Fileset.PROPERTY_CATALOG_PLACEHOLDER;
 import static org.apache.gravitino.file.Fileset.PROPERTY_DEFAULT_LOCATION_NAME;
@@ -47,8 +46,13 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
+import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -100,8 +104,6 @@ import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.security.UserGroupInformation;
-import org.awaitility.Awaitility;
-import org.awaitility.core.ConditionTimeoutException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -137,6 +139,23 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
 
   @VisibleForTesting ScheduledThreadPoolExecutor scheduler;
   @VisibleForTesting Cache<FileSystemCacheKey, FileSystem> fileSystemCache;
+
+  private final ThreadPoolExecutor fileSystemExecutor =
+      new ThreadPoolExecutor(
+          Math.max(2, Math.min(Runtime.getRuntime().availableProcessors() * 2, 16)),
+          Math.max(2, Math.min(Runtime.getRuntime().availableProcessors() * 2, 32)),
+          5L,
+          TimeUnit.SECONDS,
+          new ArrayBlockingQueue<>(1000),
+          new ThreadFactoryBuilder()
+              .setDaemon(true)
+              .setNameFormat("fileset-filesystem-getter-pool-%d")
+              .build(),
+          new ThreadPoolExecutor.AbortPolicy()) {
+        {
+          allowCoreThreadTimeOut(true);
+        }
+      };
 
   FilesetCatalogOperations(EntityStore store) {
     this.store = store;
@@ -198,12 +217,6 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
 
   public CatalogInfo getCatalogInfo() {
     return catalogInfo;
-  }
-
-  public Configuration getHadoopConf() {
-    Configuration configuration = new Configuration();
-    conf.forEach((k, v) -> configuration.set(k.replace(CATALOG_BYPASS_PREFIX, ""), v));
-    return configuration;
   }
 
   public Map<String, String> getConf() {
@@ -467,13 +480,18 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
       try {
         // formalize the path to avoid path without scheme, uri, authority, etc.
         for (Map.Entry<String, Path> entry : filesetPaths.entrySet()) {
-
-          FileSystem tmpFs = getFileSystemWithCache(entry.getValue(), conf);
+          // merge the properties from catalog, schema and fileset to get the final configuration
+          // for fileset.
+          // the priority is: fileset properties > schema properties > catalog properties
+          Map<String, String> fsConf = new HashMap<>(conf);
+          fsConf.putAll(schemaEntity.properties());
+          fsConf.putAll(properties);
+          FileSystem tmpFs = getFileSystemWithCache(entry.getValue(), fsConf);
           Path formalizePath =
               entry.getValue().makeQualified(tmpFs.getUri(), tmpFs.getWorkingDirectory());
 
           filesetPathsBuilder.put(entry.getKey(), formalizePath);
-          FileSystem fs = getFileSystemWithCache(formalizePath, conf);
+          FileSystem fs = getFileSystemWithCache(formalizePath, fsConf);
 
           if (fs.exists(formalizePath) && fs.getFileStatus(formalizePath).isFile()) {
             throw new IllegalArgumentException(
@@ -878,8 +896,7 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
       // may mis-delete the storage location of the external fileset if it happens to be under
       // the schema path.
       ClassLoader cl = Thread.currentThread().getContextClassLoader();
-      filesets
-          .parallelStream()
+      filesets.parallelStream()
           .filter(f -> f.filesetType() == Fileset.Type.MANAGED)
           .forEach(
               f -> {
@@ -995,6 +1012,10 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
     // do nothing
     if (scheduler != null) {
       scheduler.shutdownNow();
+    }
+
+    if (!fileSystemExecutor.isShutdown()) {
+      fileSystemExecutor.shutdownNow();
     }
 
     if (fileSystemCache != null) {
@@ -1398,30 +1419,47 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
                 .catalogPropertiesMetadata()
                 .getOrDefault(
                     config, FilesetCatalogPropertiesMetadata.FILESYSTEM_CONNECTION_TIMEOUT_SECONDS);
+
+    Future<FileSystem> fileSystemFuture =
+        fileSystemExecutor.submit(() -> provider.getFileSystem(path, config));
+
     try {
-      AtomicReference<FileSystem> fileSystem = new AtomicReference<>();
-      Awaitility.await()
-          .atMost(timeoutSeconds, TimeUnit.SECONDS)
-          .pollInterval(1, TimeUnit.MILLISECONDS)
-          .until(
-              () -> {
-                fileSystem.set(provider.getFileSystem(path, config));
-                return true;
-              });
-      return fileSystem.get();
-    } catch (ConditionTimeoutException e) {
+      return fileSystemFuture.get(timeoutSeconds, TimeUnit.SECONDS);
+    } catch (TimeoutException e) {
+      fileSystemFuture.cancel(true);
+
+      LOG.warn(
+          "Timeout when getting FileSystem for path: {}, scheme: {}, provider: {} within {} seconds",
+          path,
+          scheme,
+          provider,
+          timeoutSeconds,
+          e);
+
       throw new IOException(
           String.format(
-              "Failed to get FileSystem for path: %s, scheme: %s, provider: %s, config: %s within %s "
+              "Failed to get FileSystem for path: %s, scheme: %s, provider: %s within %s "
                   + "seconds, please check the configuration or increase the "
                   + "file system connection timeout time by setting catalog property: %s",
               path,
               scheme,
               provider,
-              config,
               timeoutSeconds,
               FilesetCatalogPropertiesMetadata.FILESYSTEM_CONNECTION_TIMEOUT_SECONDS),
           e);
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+      LOG.warn(
+          "Interrupted when getting FileSystem for path: {}, possibly the server is"
+              + " shutting down or catalog is been dropped",
+          path);
+      throw new RuntimeException("Interrupted when getting FileSystem for path: " + path, e);
+    } catch (ExecutionException e) {
+      Throwable cause = e.getCause();
+      if (cause instanceof IOException) {
+        throw (IOException) cause;
+      }
+      throw new IOException("Failed to create FileSystem", cause);
     }
   }
 }

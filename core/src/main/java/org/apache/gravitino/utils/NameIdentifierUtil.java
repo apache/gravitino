@@ -18,10 +18,20 @@
  */
 package org.apache.gravitino.utils;
 
+import static org.apache.gravitino.Entity.EntityType.GROUP;
+import static org.apache.gravitino.Entity.EntityType.JOB;
+import static org.apache.gravitino.Entity.EntityType.JOB_TEMPLATE;
+import static org.apache.gravitino.Entity.EntityType.POLICY;
+import static org.apache.gravitino.Entity.EntityType.ROLE;
+import static org.apache.gravitino.Entity.EntityType.TAG;
+import static org.apache.gravitino.Entity.EntityType.USER;
+
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableSet;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.apache.gravitino.Entity;
@@ -41,6 +51,9 @@ import org.apache.gravitino.exceptions.IllegalNameIdentifierException;
 public class NameIdentifierUtil {
 
   private NameIdentifierUtil() {}
+
+  private static final Set<Entity.EntityType> SUPPORT_VIRTUAL_NAMESPACE_TYPES =
+      ImmutableSet.of(USER, GROUP, ROLE, TAG, POLICY, JOB, JOB_TEMPLATE);
 
   /**
    * Create the metalake {@link NameIdentifierUtil} with the given name.
@@ -358,6 +371,34 @@ public class NameIdentifierUtil {
   }
 
   /**
+   * Try to get the table {@link NameIdentifier} from the given {@link NameIdentifier}.
+   *
+   * @param ident The {@link NameIdentifier} to check.
+   * @return The table {@link NameIdentifier}
+   * @throws IllegalNameIdentifierException If the given {@link NameIdentifier} does not include
+   *     table name
+   */
+  public static NameIdentifier getTableIdentifier(NameIdentifier ident)
+      throws IllegalNameIdentifierException {
+    NameIdentifier.check(
+        ident.name() != null && !ident.name().isEmpty(),
+        "The name variable in the NameIdentifier must have value.");
+    Namespace.check(
+        ident.namespace() != null && !ident.namespace().isEmpty() && ident.namespace().length() > 2,
+        "Table namespace must be non-null and at least 2 level, the input namespace is %s",
+        ident.namespace());
+
+    List<String> allElems =
+        Stream.concat(Arrays.stream(ident.namespace().levels()), Stream.of(ident.name()))
+            .collect(Collectors.toList());
+    if (allElems.size() < 4) {
+      throw new IllegalNameIdentifierException(
+          "Cannot create a table NameIdentifier less than four elements.");
+    }
+    return NameIdentifier.of(allElems.get(0), allElems.get(1), allElems.get(2), allElems.get(3));
+  }
+
+  /**
    * Check the given {@link NameIdentifier} is a metalake identifier. Throw an {@link
    * IllegalNameIdentifierException} if it's not.
    *
@@ -368,6 +409,24 @@ public class NameIdentifierUtil {
     // creating NameIdentifier object.
     NameIdentifier.check(ident != null, "Metalake identifier must not be null");
     NamespaceUtil.checkMetalake(ident.namespace());
+  }
+
+  public static void checkTag(NameIdentifier ident) {
+    NameIdentifier.check(ident != null, "Tag identifier must not be null");
+    Namespace namespace = ident.namespace();
+    Namespace.check(
+        namespace != null && !namespace.isEmpty() && namespace.length() == 3,
+        "Tag namespace must be 3 level, the input namespace is %s",
+        namespace);
+  }
+
+  public static void checkPolicy(NameIdentifier ident) {
+    NameIdentifier.check(ident != null, "Policy identifier must not be null");
+    Namespace namespace = ident.namespace();
+    Namespace.check(
+        namespace != null && !namespace.isEmpty() && namespace.length() == 3,
+        "Policy namespace must be 3 level, the input namespace is %s",
+        namespace);
   }
 
   /**
@@ -459,6 +518,28 @@ public class NameIdentifierUtil {
   }
 
   /**
+   * Check the given {@link NameIdentifier} is a job identifier. Throw an {@link
+   * IllegalNameIdentifierException} if it's not.
+   *
+   * @param ident The job {@link NameIdentifier} to check.
+   */
+  public static void checkJob(NameIdentifier ident) {
+    NameIdentifier.check(ident != null, "Job identifier must not be null");
+    NamespaceUtil.checkJob(ident.namespace());
+  }
+
+  /**
+   * Check the given {@link NameIdentifier} is a job template identifier. Throw an {@link
+   * IllegalNameIdentifierException} if it's not.
+   *
+   * @param ident The job template {@link NameIdentifier} to check.
+   */
+  public static void checkJobTemplate(NameIdentifier ident) {
+    NameIdentifier.check(ident != null, "Job template identifier must not be null");
+    NamespaceUtil.checkJobTemplate(ident.namespace());
+  }
+
+  /**
    * Convert the given {@link NameIdentifier} and {@link Entity.EntityType} to {@link
    * MetadataObject}.
    *
@@ -516,6 +597,21 @@ public class NameIdentifierUtil {
       case ROLE:
         AuthorizationUtils.checkRole(ident);
         return MetadataObjects.of(null, ident.name(), MetadataObject.Type.ROLE);
+      case TAG:
+        checkTag(ident);
+        return MetadataObjects.of(null, ident.name(), MetadataObject.Type.TAG);
+
+      case POLICY:
+        checkPolicy(ident);
+        return MetadataObjects.of(null, ident.name(), MetadataObject.Type.POLICY);
+
+      case JOB:
+        checkJob(ident);
+        return MetadataObjects.of(null, ident.name(), MetadataObject.Type.JOB);
+
+      case JOB_TEMPLATE:
+        checkJobTemplate(ident);
+        return MetadataObjects.of(null, ident.name(), MetadataObject.Type.JOB_TEMPLATE);
 
       default:
         throw new IllegalArgumentException(
@@ -588,5 +684,51 @@ public class NameIdentifierUtil {
           "Cannot create a model NameIdentifier less than four elements.");
     }
     return NameIdentifier.of(allElems.get(0), allElems.get(1), allElems.get(2), allElems.get(3));
+  }
+
+  public static NameIdentifier parentNameIdentifier(
+      NameIdentifier nameIdentifier, Entity.EntityType type) {
+
+    if (SUPPORT_VIRTUAL_NAMESPACE_TYPES.contains(type)) {
+      return NameIdentifier.of(NameIdentifierUtil.getMetalake(nameIdentifier));
+
+    } else if (nameIdentifier.hasNamespace()) {
+      return NameIdentifier.of(nameIdentifier.namespace().levels());
+
+    } else {
+      throw new IllegalArgumentException("The entity has no parent name identifier");
+    }
+  }
+
+  public static Entity.EntityType parentEntityType(Entity.EntityType type) {
+    switch (type) {
+      case COLUMN:
+        return Entity.EntityType.TABLE;
+      case MODEL_VERSION:
+        return Entity.EntityType.MODEL;
+
+      case TABLE:
+      case FILESET:
+      case MODEL:
+      case TOPIC:
+        return Entity.EntityType.SCHEMA;
+
+      case SCHEMA:
+        return Entity.EntityType.CATALOG;
+
+      case CATALOG:
+      case USER:
+      case GROUP:
+      case ROLE:
+      case TAG:
+      case POLICY:
+      case JOB:
+      case JOB_TEMPLATE:
+        return Entity.EntityType.METALAKE;
+
+      case METALAKE:
+      default:
+        throw new IllegalArgumentException("Metalake has no parent entity type");
+    }
   }
 }

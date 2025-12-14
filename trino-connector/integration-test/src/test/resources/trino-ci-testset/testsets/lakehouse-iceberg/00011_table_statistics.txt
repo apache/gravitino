@@ -1,0 +1,13 @@
+CREATE SCHEMA
+
+CREATE TABLE
+
+INSERT: 2 rows
+
+"key1","","","0.0","","1","2"
+"value1","","","0.0","","1","2"
+"","","","","2.0","",""
+
+DROP TABLE
+
+DROP SCHEMA

@@ -29,7 +29,9 @@ import org.apache.gravitino.rel.expressions.literals.Literal;
 @Evolving
 public interface UnparsedExpression extends Expression {
 
-  /** @return The unparsed expression as a string. */
+  /**
+   * @return The unparsed expression as a string.
+   */
   String unparsedExpression();
 
   @Override
@@ -55,7 +57,9 @@ public interface UnparsedExpression extends Expression {
       this.unparsedExpression = unparsedExpression;
     }
 
-    /** @return The unparsed expression as a string. */
+    /**
+     * @return The unparsed expression as a string.
+     */
     @Override
     public String unparsedExpression() {
       return unparsedExpression;
