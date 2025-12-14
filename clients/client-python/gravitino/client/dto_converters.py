@@ -19,18 +19,20 @@ from gravitino.api.catalog import Catalog
 from gravitino.api.catalog_change import CatalogChange
 from gravitino.api.job.job_template import JobTemplate, JobType
 from gravitino.api.job.job_template_change import (
-    TemplateUpdate,
-    ShellTemplateUpdate,
-    SparkTemplateUpdate,
     JobTemplateChange,
     RenameJobTemplate,
-    UpdateJobTemplateComment,
+    ShellTemplateUpdate,
+    SparkTemplateUpdate,
+    TemplateUpdate,
     UpdateJobTemplate,
+    UpdateJobTemplateComment,
 )
 from gravitino.api.job.shell_job_template import ShellJobTemplate
 from gravitino.api.job.spark_job_template import SparkJobTemplate
+from gravitino.api.metalake_change import MetalakeChange
 from gravitino.client.fileset_catalog import FilesetCatalog
 from gravitino.client.generic_model_catalog import GenericModelCatalog
+from gravitino.client.relational_catalog import RelationalCatalog
 from gravitino.dto.catalog_dto import CatalogDTO
 from gravitino.dto.job.job_template_dto import JobTemplateDTO
 from gravitino.dto.job.shell_job_template_dto import ShellJobTemplateDTO
@@ -46,9 +48,8 @@ from gravitino.dto.requests.job_template_update_request import (
     UpdateJobTemplateContentRequest,
 )
 from gravitino.dto.requests.metalake_update_request import MetalakeUpdateRequest
-from gravitino.api.metalake_change import MetalakeChange
-from gravitino.utils import HTTPClient
 from gravitino.namespace import Namespace
+from gravitino.utils import HTTPClient
 
 
 class DTOConverters:
@@ -92,6 +93,17 @@ class DTOConverters:
         if catalog.type() == Catalog.Type.MODEL:
             return GenericModelCatalog(
                 namespace=namespace,
+                name=catalog.name(),
+                catalog_type=catalog.type(),
+                provider=catalog.provider(),
+                comment=catalog.comment(),
+                properties=catalog.properties(),
+                audit=catalog.audit_info(),
+                rest_client=client,
+            )
+        if catalog.type() == Catalog.Type.RELATIONAL:
+            return RelationalCatalog(
+                catalog_namespace=namespace,
                 name=catalog.name(),
                 catalog_type=catalog.type(),
                 provider=catalog.provider(),

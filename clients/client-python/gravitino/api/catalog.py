@@ -31,7 +31,7 @@ class Catalog(Auditable):
     class Type(Enum):
         """The type of the catalog."""
 
-        RELATIONAL = ("relational", False)
+        RELATIONAL = ("relational", True)
         """"Catalog Type for Relational Data Structure, like db.table, catalog.db.table."""
 
         FILESET = ("fileset", True)
