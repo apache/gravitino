@@ -28,11 +28,37 @@ import org.apache.gravitino.lock.LockType;
 import org.apache.gravitino.lock.TreeLockUtils;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 
+/**
+ * {@code OperationDispatcherInterceptor} is an invocation handler that intercepts method calls to
+ * an operation dispatcher to perform catalog usage checks before proceeding with the actual method
+ * invocation.
+ *
+ * <p>Note: This interceptor will only intercept methods in
+ *
+ * <p>SchemaDispatcher
+ *
+ * <p>TableDispatch
+ *
+ * <p>FilesetDispatch
+ *
+ * <p>ModelDispatch
+ *
+ * <p>TopicDispatch
+ *
+ * <p>PartitionDispatch
+ */
 public class OperationDispatcherInterceptor implements InvocationHandler {
   private final Object dispatcher;
   private final CatalogManager catalogManager;
   private final EntityStore store;
 
+  /**
+   * Constructs an {@code OperationDispatcherInterceptor} with the specified dispatcher,
+   *
+   * @param dispatcher the operation dispatcher to be intercepted.
+   * @param catalogManager the catalog manager used for catalog usage checks.
+   * @param store the entity store associated with the catalogs.
+   */
   public OperationDispatcherInterceptor(
       Object dispatcher, CatalogManager catalogManager, EntityStore store) {
     this.dispatcher = dispatcher;
