@@ -130,24 +130,29 @@ allprojects {
           "$1"
         )
         replaceRegex(
-          "Use Guava collect classes instead of any shadowed versions",
-          "import\\s+(?:.*\\.com\\.google\\.common\\.collect|org\\.glassfish\\.jersey\\.internal\\.guava)\\.(Sets|Maps|Lists|ImmutableList|ImmutableMap|ImmutableSet|ImmutableBiMap|Iterables|Iterators|Multimap|SetMultimap|ListMultimap|BiMap|Table);",
-          "import com.google.common.collect.${'$'}1;"
+          "Use Guava classes from collect/base packages instead of any shadowed versions (including Jersey)",
+          "import\\s+(?:.*\\.com\\.google\\.common\\.(collect|base)|org\\.glassfish\\.jersey\\.internal\\.guava)\\.([A-Z][a-zA-Z0-9_]*);",
+          "import com.google.common.${'$'}1.${'$'}2;"
         )
         replaceRegex(
-          "Use Guava base classes instead of any shadowed versions",
-          "import\\s+(?:.*\\.com\\.google\\.common\\.base|org\\.glassfish\\.jersey\\.internal\\.guava)\\.(Preconditions|Strings|Optional|Predicate|Function|Supplier|Joiner|Splitter|Objects);",
-          "import com.google.common.base.${'$'}1;"
+          "Use Guava classes from all other packages instead of any shadowed versions",
+          "import\\s+.*\\.com\\.google\\.common\\.(io|util\\.concurrent|annotations|cache|primitives|hash|net|reflect)\\.([A-Z][a-zA-Z0-9_]*);",
+          "import com.google.common.${'$'}1.${'$'}2;"
         )
         replaceRegex(
-          "Use Guava io classes instead of any shadowed versions",
-          "import\\s+.*\\.com\\.google\\.common\\.io\\.(Files|Resources|ByteStreams|CharStreams);",
-          "import com.google.common.io.${'$'}1;"
+          "Use Apache Commons Lang3 instead of shadowed versions",
+          "import\\s+.*\\.org\\.apache\\.commons\\.lang3\\.([A-Z][a-zA-Z0-9_]*);",
+          "import org.apache.commons.lang3.${'$'}1;"
         )
         replaceRegex(
-          "Use Guava util.concurrent classes instead of any shadowed versions",
-          "import\\s+.*\\.com\\.google\\.common\\.util\\.concurrent\\.(ListenableFuture|Futures|MoreExecutors);",
-          "import com.google.common.util.concurrent.${'$'}1;"
+          "Use Apache Commons IO instead of shadowed versions",
+          "import\\s+.*\\.org\\.apache\\.commons\\.io\\.([A-Z][a-zA-Z0-9_]*);",
+          "import org.apache.commons.io.${'$'}1;"
+        )
+        replaceRegex(
+          "Use SLF4J Logger instead of other logging frameworks",
+          "import\\s+.*\\.(Logger|LoggerFactory);",
+          "import org.slf4j.${'$'}1;"
         )
 
         targetExclude("**/build/**", "**/.pnpm/***")
