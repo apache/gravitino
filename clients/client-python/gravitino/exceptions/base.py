@@ -177,6 +177,10 @@ class TagAlreadyExistsException(AlreadyExistsException):
     """An exception thrown when a tag with specified name already associated to a metadata object."""
 
 
+class TagAlreadyAssociatedException(AlreadyExistsException):
+    """Exception thrown when a tag with specified name already associated to a metadata object."""
+
+
 class JobTemplateAlreadyExistsException(AlreadyExistsException):
     """An exception thrown when a job template with specified name already exists."""
 
