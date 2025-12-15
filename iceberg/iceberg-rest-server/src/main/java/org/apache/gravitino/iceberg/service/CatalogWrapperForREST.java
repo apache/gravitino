@@ -174,6 +174,11 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
     return catalogConfigToClients;
   }
 
+  @Override
+  protected boolean useDifferentClassLoader() {
+    return false;
+  }
+
   private LoadTableResponse injectCredentialConfig(
       TableIdentifier tableIdentifier,
       LoadTableResponse loadTableResponse,

@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.lance.integration.test;
 
+import com.google.common.base.Joiner;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
@@ -82,7 +83,6 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
-import org.testcontainers.shaded.com.google.common.base.Joiner;
 
 public class LanceRESTServiceIT extends BaseIT {
   private static final String CATALOG_NAME = GravitinoITUtils.genRandomName("lance_rest_catalog");

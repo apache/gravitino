@@ -87,6 +87,11 @@ Press `CTRL+C` to stop.
 Gravitino provides a native Iceberg REST catalog service.  
 See: [Iceberg REST catalog service](https://gravitino.apache.org/docs/latest/iceberg-rest-service/)
 
+## 🗄️ Lance REST Catalog
+
+Gravitino provides a native Lance REST catalog service.  
+See: [Lance REST catalog service](https://gravitino.apache.org/docs/latest/lance-rest-service/)
+
 ## 🔌 Trino Integration
 
 Gravitino includes a Trino connector for federated metadata access.  
