@@ -24,6 +24,7 @@ import static org.apache.gravitino.server.authentication.KerberosConfig.PRINCIPA
 import static org.apache.hadoop.minikdc.MiniKdc.MAX_TICKET_LIFETIME;
 
 import com.google.common.collect.Maps;
+import com.google.common.util.concurrent.Uninterruptibles;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
 import io.jsonwebtoken.security.Keys;
@@ -52,7 +53,6 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
-import org.testcontainers.shaded.com.google.common.util.concurrent.Uninterruptibles;
 
 @Tag("gravitino-docker-test")
 public class MultiAuthOperationsIT extends BaseIT {

@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.catalog.lakehouse.hudi.backend.hms.kerberos;
+package org.apache.gravitino.hive.kerberos;
 
 import java.io.File;
 import java.net.URI;
@@ -54,7 +54,7 @@ public class FetchFileUtils {
 
         default:
           throw new IllegalArgumentException(
-              String.format("Doesn't support the scheme %s", scheme));
+              String.format("The scheme '%s' is not supported", scheme));
       }
     } catch (URISyntaxException ue) {
       throw new IllegalArgumentException("The uri of file has the wrong format", ue);

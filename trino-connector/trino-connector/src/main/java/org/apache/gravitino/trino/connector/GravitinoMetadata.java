@@ -52,6 +52,7 @@ import io.trino.spi.connector.RowChangeParadigm;
 import io.trino.spi.connector.SaveMode;
 import io.trino.spi.connector.SchemaTableName;
 import io.trino.spi.connector.SortItem;
+import io.trino.spi.connector.SystemTable;
 import io.trino.spi.connector.TopNApplicationResult;
 import io.trino.spi.expression.ConnectorExpression;
 import io.trino.spi.expression.Constant;
@@ -150,6 +151,11 @@ public class GravitinoMetadata implements ConnectorMetadata {
         catalogConnectorMetadata.getTable(
             gravitinoTableHandle.getSchemaName(), gravitinoTableHandle.getTableName());
     return metadataAdapter.getTableMetadata(table);
+  }
+
+  @Override
+  public Optional<SystemTable> getSystemTable(ConnectorSession session, SchemaTableName tableName) {
+    return internalMetadata.getSystemTable(session, tableName);
   }
 
   @Override

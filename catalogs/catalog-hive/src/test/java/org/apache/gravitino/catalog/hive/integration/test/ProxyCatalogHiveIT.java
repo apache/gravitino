@@ -20,6 +20,7 @@ package org.apache.gravitino.catalog.hive.integration.test;
 
 import static org.apache.gravitino.catalog.hive.HiveCatalogPropertiesMetadata.IMPERSONATION_ENABLE;
 import static org.apache.gravitino.catalog.hive.HiveCatalogPropertiesMetadata.METASTORE_URIS;
+import static org.apache.gravitino.catalog.hive.HiveConstants.LOCATION;
 import static org.apache.gravitino.server.GravitinoServer.WEBSERVER_CONF_PREFIX;
 
 import com.google.common.collect.ImmutableMap;
@@ -27,6 +28,7 @@ import com.google.common.collect.Maps;
 import java.time.LocalDate;
 import java.util.Collections;
 import java.util.Map;
+import java.util.Properties;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.NameIdentifier;
@@ -36,6 +38,9 @@ import org.apache.gravitino.client.GravitinoAdminClient;
 import org.apache.gravitino.client.GravitinoMetalake;
 import org.apache.gravitino.dto.rel.partitioning.Partitioning;
 import org.apache.gravitino.hive.HiveClientPool;
+import org.apache.gravitino.hive.HivePartition;
+import org.apache.gravitino.hive.HiveSchema;
+import org.apache.gravitino.hive.HiveTable;
 import org.apache.gravitino.integration.test.container.ContainerSuite;
 import org.apache.gravitino.integration.test.container.HiveContainer;
 import org.apache.gravitino.integration.test.util.BaseIT;
@@ -55,7 +60,6 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.conf.HiveConf;
-import org.apache.hadoop.hive.metastore.api.Database;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
@@ -73,6 +77,7 @@ public class ProxyCatalogHiveIT extends BaseIT {
   private static final String PROVIDER = "hive";
   private static final String EXPECT_USER = "gravitino";
   private static final String HADOOP_USER_NAME = "HADOOP_USER_NAME";
+  private static final String HMS_CATALOG = "";
 
   private static final ContainerSuite containerSuite = ContainerSuite.getInstance();
   private static GravitinoMetalake metalake;
@@ -109,8 +114,11 @@ public class ProxyCatalogHiveIT extends BaseIT {
     HiveConf hiveConf = new HiveConf();
     hiveConf.set(HiveConf.ConfVars.METASTOREURIS.varname, HIVE_METASTORE_URIS);
 
+    Properties hiveClientProperties = new Properties();
+    hiveClientProperties.setProperty(HiveConf.ConfVars.METASTOREURIS.varname, HIVE_METASTORE_URIS);
+
     // Check if Hive client can connect to Hive metastore
-    hiveClientPool = new HiveClientPool(1, hiveConf);
+    hiveClientPool = new HiveClientPool("hive", 1, hiveClientProperties);
 
     Configuration conf = new Configuration();
     conf.set(
@@ -154,10 +162,10 @@ public class ProxyCatalogHiveIT extends BaseIT {
     String comment = "comment";
     createSchema(schemaName, comment);
 
-    Database db = hiveClientPool.run(client -> client.getDatabase(schemaName));
-    Assertions.assertEquals(EXPECT_USER, db.getOwnerName());
-    Assertions.assertEquals(
-        EXPECT_USER, hdfs.getFileStatus(new Path(db.getLocationUri())).getOwner());
+    HiveSchema hiveSchema = loadHiveSchema(schemaName);
+    Assertions.assertEquals(EXPECT_USER, hiveSchema.auditInfo().creator());
+    String schemaLocation = hiveSchema.properties().get(LOCATION);
+    Assertions.assertEquals(EXPECT_USER, hdfs.getFileStatus(new Path(schemaLocation)).getOwner());
 
     // create schema with exception using the system user
     Map<String, String> properties = Maps.newHashMap();
@@ -177,10 +185,10 @@ public class ProxyCatalogHiveIT extends BaseIT {
 
     // Test the client using `withSimpleAuth(expectUser)`.
     anotherCatalogWithUsername.asSchemas().createSchema(anotherSchemaName, comment, properties);
-    db = hiveClientPool.run(client -> client.getDatabase(schemaName));
-    Assertions.assertEquals(EXPECT_USER, db.getOwnerName());
-    Assertions.assertEquals(
-        EXPECT_USER, hdfs.getFileStatus(new Path(db.getLocationUri())).getOwner());
+    hiveSchema = loadHiveSchema(schemaName);
+    Assertions.assertEquals(EXPECT_USER, hiveSchema.auditInfo().creator());
+    schemaLocation = hiveSchema.properties().get(LOCATION);
+    Assertions.assertEquals(EXPECT_USER, hdfs.getFileStatus(new Path(schemaLocation)).getOwner());
 
     // Test the client using `withSimpleAuth(unknownUser)`
     properties.put(
@@ -221,9 +229,8 @@ public class ProxyCatalogHiveIT extends BaseIT {
     Table createdTable = catalog.asTableCatalog().loadTable(nameIdentifier);
     String location = createdTable.properties().get("location");
     Assertions.assertEquals(EXPECT_USER, hdfs.getFileStatus(new Path(location)).getOwner());
-    org.apache.hadoop.hive.metastore.api.Table hiveTab =
-        hiveClientPool.run(client -> client.getTable(schemaName, tableName));
-    Assertions.assertEquals(EXPECT_USER, hiveTab.getOwner());
+    HiveTable hiveTab = loadHiveTable(schemaName, tableName);
+    Assertions.assertEquals(EXPECT_USER, hiveTab.auditInfo().creator());
 
     // create table with exception with system user
     TableCatalog tableCatalog = anotherCatalog.asTableCatalog();
@@ -245,9 +252,8 @@ public class ProxyCatalogHiveIT extends BaseIT {
         anotherCatalogWithUsername.asTableCatalog().loadTable(nameIdentifier);
     String anotherLocation = anotherCreatedTable.properties().get("location");
     Assertions.assertEquals(EXPECT_USER, hdfs.getFileStatus(new Path(anotherLocation)).getOwner());
-    org.apache.hadoop.hive.metastore.api.Table anotherHiveTab =
-        hiveClientPool.run(client -> client.getTable(schemaName, anotherTableName));
-    Assertions.assertEquals(EXPECT_USER, anotherHiveTab.getOwner());
+    HiveTable anotherHiveTab = loadHiveTable(schemaName, anotherTableName);
+    Assertions.assertEquals(EXPECT_USER, anotherHiveTab.auditInfo().creator());
 
     // Test the client using `withSimpleAuth(not-existing)`
     NameIdentifier anotherIdentWithNotExisting = NameIdentifier.of(schemaName, "new_table");
@@ -320,11 +326,12 @@ public class ProxyCatalogHiveIT extends BaseIT {
 
     Partition partition = table.supportPartitions().addPartition(identity);
 
-    org.apache.hadoop.hive.metastore.api.Partition partitionGot =
-        hiveClientPool.run(client -> client.getPartition(schemaName, tableName, partition.name()));
-
+    HiveTable hiveTable = loadHiveTable(schemaName, tableName);
+    HivePartition partitionGot = loadHivePartition(schemaName, tableName, partition.name());
+    String tableLocation = hiveTable.properties().get(LOCATION);
+    Assertions.assertNotNull(tableLocation, "Table location should not be null");
     Assertions.assertEquals(
-        EXPECT_USER, hdfs.getFileStatus(new Path(partitionGot.getSd().getLocation())).getOwner());
+        EXPECT_USER, hdfs.getFileStatus(new Path(tableLocation, partitionGot.name())).getOwner());
 
     Literal<?> anotherSecondaryPartition = Literals.stringLiteral("gravitino_it_test3");
     Partition anotherIdentity =
@@ -351,13 +358,11 @@ public class ProxyCatalogHiveIT extends BaseIT {
             .loadTable(nameIdentifier)
             .supportPartitions()
             .addPartition(anotherIdentity);
-    org.apache.hadoop.hive.metastore.api.Partition anotherPartitionGot =
-        hiveClientPool.run(
-            client -> client.getPartition(schemaName, tableName, anotherPartition.name()));
-
+    HivePartition anotherPartitionGot =
+        loadHivePartition(schemaName, tableName, anotherPartition.name());
     Assertions.assertEquals(
         EXPECT_USER,
-        hdfs.getFileStatus(new Path(anotherPartitionGot.getSd().getLocation())).getOwner());
+        hdfs.getFileStatus(new Path(tableLocation, anotherPartitionGot.name())).getOwner());
 
     // Test the client using `withSimpleAuth(not-existing)`.
     Literal<?> anotherNewSecondaryPartition = Literals.stringLiteral("gravitino_it_test4");
@@ -421,5 +426,23 @@ public class ProxyCatalogHiveIT extends BaseIT {
 
     anotherCatalogWithNotExistingName =
         anotherClientWithNotExistingName.loadMetalake(METALAKE_NAME).loadCatalog(CATALOG_NAME);
+  }
+
+  private static HiveSchema loadHiveSchema(String schemaName) throws InterruptedException {
+    return hiveClientPool.run(client -> client.getDatabase(HMS_CATALOG, schemaName));
+  }
+
+  private static HiveTable loadHiveTable(String schemaName, String tableName)
+      throws InterruptedException {
+    return hiveClientPool.run(client -> client.getTable(HMS_CATALOG, schemaName, tableName));
+  }
+
+  private static HivePartition loadHivePartition(
+      String schemaName, String tableName, String partitionName) throws InterruptedException {
+    return hiveClientPool.run(
+        client -> {
+          HiveTable hiveTable = client.getTable(HMS_CATALOG, schemaName, tableName);
+          return client.getPartition(hiveTable, partitionName);
+        });
   }
 }
