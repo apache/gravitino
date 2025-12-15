@@ -20,7 +20,6 @@ package org.apache.gravitino.server.authorization;
 import java.lang.reflect.Array;
 import java.security.Principal;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -69,7 +68,7 @@ public class MetadataAuthzHelper {
         authorizationRequestContext,
         metalake -> {
           String metalakeName = metalake.name();
-          return splitMetadataNames(
+          return NameIdentifierUtil.splitNameIdentifier(
               metalakeName,
               Entity.EntityType.METALAKE,
               NameIdentifierUtil.ofMetalake(metalakeName));
@@ -93,7 +92,7 @@ public class MetadataAuthzHelper {
         GravitinoAuthorizerProvider.getInstance().getGravitinoAuthorizer(),
         new AuthorizationRequestContext(),
         metadataObject ->
-            splitMetadataNames(
+            NameIdentifierUtil.splitNameIdentifier(
                 metalake,
                 MetadataObjectUtil.toEntityType(metadataObject.type()),
                 MetadataObjectUtil.toEntityIdent(metalake, metadataObject)),
@@ -116,7 +115,7 @@ public class MetadataAuthzHelper {
         GravitinoAuthorizerProvider.getInstance().getGravitinoAuthorizer(),
         new AuthorizationRequestContext(),
         metadataObject ->
-            splitMetadataNames(
+            NameIdentifierUtil.splitNameIdentifier(
                 metalake,
                 MetadataObjectUtil.toEntityType(metadataObject.type()),
                 MetadataObjectUtil.toEntityIdent(metalake, metadataObject)),
@@ -156,7 +155,7 @@ public class MetadataAuthzHelper {
 
     String metalake = NameIdentifierUtil.getMetalake(identifier);
     Map<Entity.EntityType, NameIdentifier> nameIdentifierMap =
-        splitMetadataNames(metalake, entityType, identifier);
+        NameIdentifierUtil.splitNameIdentifier(metalake, entityType, identifier);
     AuthorizationExpressionEvaluator authorizationExpressionEvaluator =
         new AuthorizationExpressionEvaluator(expression);
     return authorizationExpressionEvaluator.evaluate(
@@ -191,7 +190,7 @@ public class MetadataAuthzHelper {
         authorizationRequestContext,
         (entity) -> {
           NameIdentifier nameIdentifier = toNameIdentifier.apply(entity);
-          return splitMetadataNames(metalake, entityType, nameIdentifier);
+          return NameIdentifierUtil.splitNameIdentifier(metalake, entityType, nameIdentifier);
         },
         (unused) -> null);
   }
@@ -231,7 +230,7 @@ public class MetadataAuthzHelper {
         authorizationRequestContext,
         (entity) -> {
           NameIdentifier nameIdentifier = toNameIdentifier.apply(entity);
-          return splitMetadataNames(metalake, entityType, nameIdentifier);
+          return NameIdentifierUtil.splitNameIdentifier(metalake, entityType, nameIdentifier);
         },
         (unused) -> null);
   }
@@ -293,28 +292,6 @@ public class MetadataAuthzHelper {
         .map(CompletableFuture::join)
         .filter(Objects::nonNull)
         .toArray(size -> (E[]) Array.newInstance(entities.getClass().getComponentType(), size));
-  }
-
-  /**
-   * Extract the parent metadata from NameIdentifier. For example, when given a Table
-   * NameIdentifier, it returns a map containing the Table itself along with its parent Schema and
-   * Catalog.
-   *
-   * @param metalake metalake
-   * @param entityType metadata type
-   * @param nameIdentifier metadata name
-   * @return A map containing the metadata object and all its parent objects, keyed by their types
-   */
-  public static Map<Entity.EntityType, NameIdentifier> splitMetadataNames(
-      String metalake, Entity.EntityType entityType, NameIdentifier nameIdentifier) {
-    Map<Entity.EntityType, NameIdentifier> nameIdentifierMap = new HashMap<>();
-    nameIdentifierMap.put(Entity.EntityType.METALAKE, NameIdentifierUtil.ofMetalake(metalake));
-    while (entityType != Entity.EntityType.METALAKE) {
-      nameIdentifierMap.put(entityType, nameIdentifier);
-      entityType = NameIdentifierUtil.parentEntityType(entityType);
-      nameIdentifier = NameIdentifierUtil.parentNameIdentifier(nameIdentifier, entityType);
-    }
-    return nameIdentifierMap;
   }
 
   private static boolean enableAuthorization() {
