@@ -31,6 +31,7 @@ public class AiService {
           ChatModel chatModel = ChatModelProvider.getInstance().getChatModel();
           String evaluationResult =
               chatModel.chat(
+                  // TODO support load prompts from config file.
                   Prompts.CREATE_TABLE_EVALUATION.formatted(
                       nameIdentifier,
                       Arrays.toString(table.columns()),
@@ -38,7 +39,7 @@ public class AiService {
                       Arrays.toString(table.index()),
                       "",
                       table.properties()));
-          // TODO Persist to database and support querying via  REST API.
+          // TODO Persist to database and support querying via REST API.
           log.info("Evaluation result: {}", evaluationResult);
         },
         executor);
