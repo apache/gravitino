@@ -229,9 +229,11 @@ public abstract class ManagedTableOperations implements TableCatalog {
       if (change instanceof TableChange.RenameTable rename) {
         Namespace oldNs = oldTableEntity.namespace();
         newName = rename.getNewName();
-        newNs = rename.getNewSchemaName()
-            .map(s -> NamespaceUtil.ofTable(oldNs.level(0), oldNs.level(1), s))
-            .orElse(oldNs);
+        newNs =
+            rename
+                .getNewSchemaName()
+                .map(s -> NamespaceUtil.ofTable(oldNs.level(0), oldNs.level(1), s))
+                .orElse(oldNs);
 
       } else if (change instanceof TableChange.UpdateComment updateComment) {
         newComment = updateComment.getNewComment();
