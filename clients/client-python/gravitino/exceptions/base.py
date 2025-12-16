@@ -174,7 +174,7 @@ class NoSuchTagException(NotFoundException):
 
 
 class TagAlreadyExistsException(AlreadyExistsException):
-    """An exception thrown when a tag with specified name already associated to a metadata object."""
+    """An exception thrown when a tag with specified name already exists."""
 
 
 class TagAlreadyAssociatedException(AlreadyExistsException):

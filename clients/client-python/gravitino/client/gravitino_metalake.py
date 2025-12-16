@@ -75,7 +75,8 @@ class GravitinoMetalake(
     API_METALAKES_CATALOGS_PATH = "api/metalakes/{}/catalogs/{}"
     API_METALAKES_JOB_TEMPLATES_PATH = "api/metalakes/{}/jobs/templates"
     API_METALAKES_JOB_RUNS_PATH = "api/metalakes/{}/jobs/runs"
-    API_METALAKES_TAGS_PATH = "api/metalakes/{}/tags/{}"
+    API_METALAKES_TAG_PATH = "api/metalakes/{}/tags/{}"
+    API_METALAKES_TAGS_PATH = "api/metalakes/{}/tags"
 
     def __init__(self, metalake: MetalakeDTO = None, client: HTTPClient = None):
         super().__init__(
@@ -573,7 +574,9 @@ class GravitinoMetalake(
         Precondition.check_string_not_empty(
             tag_name, "tag name must not be null or empty"
         )
-        url = self.API_METALAKES_TAGS_PATH.format(encode_string(self.name()))
+        url = self.API_METALAKES_TAG_PATH.format(
+            encode_string(self.name()), encode_string(tag_name)
+        )
         response = self.rest_client.get(
             url, error_handler=ErrorHandlers.tag_error_handler()
         )

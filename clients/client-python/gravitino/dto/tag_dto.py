@@ -71,7 +71,7 @@ class TagDTO(Tag):
         """
         return self._name
 
-    def comment(self):
+    def comment(self) -> str:
         """Get the comment of the tag.
 
         Returns:

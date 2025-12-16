@@ -23,7 +23,7 @@ from gravitino.dto.requests import TagCreateRequest
 
 
 class TestTagCreateRequest(unittest.TestCase):
-    def tag_create_request_serde(self) -> None:
+    def test_tag_create_request_serde(self) -> None:
         # test without properties
         tag_create_request = TagCreateRequest("tag_test", "tag comment", None)
         ser_json = _json.dumps(tag_create_request.to_dict())

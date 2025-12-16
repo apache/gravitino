@@ -55,6 +55,16 @@ class AuditDTO(Audit, DataClassJsonMixin):
             )
         )
 
+    def __eq__(self, other) -> bool:
+        if not isinstance(other, AuditDTO):
+            return False
+        return (
+            self.creator() == other.creator()
+            and self.create_time() == other.create_time()
+            and self.last_modifier() == other.last_modifier()
+            and self.last_modified_time() == other.last_modified_time()
+        )
+
     def creator(self) -> str:
         """The creator of the entity.
 
