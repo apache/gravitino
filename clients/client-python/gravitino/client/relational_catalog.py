@@ -74,6 +74,7 @@ class RelationalCatalog(BaseSchemaCatalog, TableCatalog):
 
     def _check_table_name_identifier(self, identifier: NameIdentifier) -> None:
         """Check whether the `NameIdentifier` of a table is valid.
+
         Args:
             identifier (NameIdentifier):
                 The NameIdentifier to check, which should be "schema.table" format.
