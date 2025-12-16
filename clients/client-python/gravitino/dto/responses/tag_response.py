@@ -19,13 +19,14 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from dataclasses_json import config
+from dataclasses_json import config, dataclass_json
 
 from gravitino.dto.responses.base_response import BaseResponse
 from gravitino.dto.tag_dto import TagDTO
 from gravitino.utils.precondition import Precondition
 
 
+@dataclass_json
 @dataclass
 class TagNamesListResponse(BaseResponse):
     """Represents a response for a Tag Names List request."""
@@ -46,6 +47,7 @@ class TagNamesListResponse(BaseResponse):
             )
 
 
+@dataclass_json
 @dataclass
 class TagListResponse(BaseResponse):
     """Represents a response for a Tag List request."""
@@ -58,6 +60,7 @@ class TagListResponse(BaseResponse):
         return self._tags
 
 
+@dataclass_json
 @dataclass
 class TagResponse(BaseResponse):
     """Represents a response for a tag."""
@@ -68,3 +71,6 @@ class TagResponse(BaseResponse):
         Precondition.check_argument(
             self._tag is not None, "Tag response should have a tag"
         )
+
+    def tag(self) -> TagDTO:
+        return self._tag

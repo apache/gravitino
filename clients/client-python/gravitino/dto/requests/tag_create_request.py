@@ -31,7 +31,7 @@ class TagCreateRequest(RESTRequest):
     """Represents a request to create a tag."""
 
     _name: str = field(metadata=config(field_name="name"))
-    _comment: Optional[str] = field(metadata=config(field_name="comment"))
+    _comment: Optional[str] = field(default=None, metadata=config(field_name="comment"))
     _properties: Optional[dict[str, str]] = field(
         default_factory=dict, metadata=config(field_name="properties")
     )

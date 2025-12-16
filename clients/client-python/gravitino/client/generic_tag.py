@@ -97,7 +97,7 @@ class GenericTag(Tag, Tag.AssociatedObjects):
 
     def audit_info(self) -> AuditDTO:
         """
-        Retrieve The audit information of the entity.
+        Retrieve the audit information of the entity.
 
         Returns:
             AuditDTO: The audit information of the entity.
@@ -115,7 +115,7 @@ class GenericTag(Tag, Tag.AssociatedObjects):
 
     def objects(self) -> list[MetadataObject]:
         """
-        Retrieve The list of objects that are associated with this tag.
+        Retrieve the list of objects that are associated with this tag.
 
         Returns:
             list[MetadataObject]: The list of objects that are associated with this tag.
@@ -135,7 +135,7 @@ class GenericTag(Tag, Tag.AssociatedObjects):
 
     def get_response(self, url: str, error_handler: ErrorHandler) -> Response:
         """
-        Get the response from the server. for test convenience.
+        Get the response from the server, for testing convenience.
 
         Args:
             url (str): The url to get the response from.

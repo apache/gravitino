@@ -31,7 +31,7 @@ class MetadataObjectListResponse(BaseResponse):
     """Represents a response containing a list of metadata objects."""
 
     _metadata_objects: list[MetadataObjectDTO] = field(
-        metadata=config(field_name="metadataObjects")
+        default_factory=list, metadata=config(field_name="metadataObjects")
     )
 
     def metadata_objects(self) -> list[MetadataObjectDTO]:
@@ -55,5 +55,5 @@ class MetadataObjectListResponse(BaseResponse):
                 and metadata_object.type() is not None
                 and (name := metadata_object.name()) is not None
                 and name.strip() != "",
-                "metadataObject must not be null and it's field cannot null or empty",
+                "metadataObject must not be null and its field cannot null or empty",
             )

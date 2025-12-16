@@ -213,16 +213,18 @@ class TestGenericTagEntity(GenericTag):
             tag_dto,
             client,
         )
-        self.dump_object = dump_object
-        self.throw_error = throw_error
+        self.__dump_object = dump_object
+        self.__throw_error = throw_error
 
-    def get_response(self, url, _=None):
-        if self.throw_error is not None:
-            raise self.throw_error(f"Raise {self.throw_error.__name__} Error")
+    def get_response(self, url, _=None) -> Response[MagicMock]:
+        if self.__throw_error is not None:
+            raise self.__throw_error(f"Raise {self.__throw_error.__name__} Error")
 
         mock_response = MagicMock()
         mock_response.getcode.return_value = 0
-        mock_response.read.return_value = _json.dumps(self.dump_object).encode("utf-8")
+        mock_response.read.return_value = _json.dumps(self.__dump_object).encode(
+            "utf-8"
+        )
 
         mock_response.url = url
         mock_response.info.return_value = {"Content-Type": "application/json"}

@@ -123,7 +123,7 @@ class Tag(Auditable):
 
         def count(self) -> int:
             """
-            Retrive the number of objects that are associated with this Tag
+            Retrieve the number of objects that are associated with this Tag
 
             Returns:
                 int: The number of objects that are associated with this Tag
@@ -133,7 +133,7 @@ class Tag(Auditable):
         @abstractmethod
         def objects(self) -> list[MetadataObject]:
             """
-            Retrieve The list of objects that are associated with this tag.
+            Retrieve the list of objects that are associated with this tag.
 
             Raises:
                 NotImplementedError: if the method is not implemented.

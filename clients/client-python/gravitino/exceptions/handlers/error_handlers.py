@@ -18,9 +18,11 @@
 from gravitino.exceptions.handlers.job_error_handler import (
     JOB_ERROR_HANDLER,
 )
+from gravitino.exceptions.handlers.rest_error_handler import (
+    RestErrorHandler,
+)
 from gravitino.exceptions.handlers.tag_error_handler import (
     TAG_ERROR_HANDLER,
-    RestErrorHandler,
 )
 
 
