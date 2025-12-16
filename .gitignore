@@ -36,6 +36,7 @@ gen
 out/**
 *.iws
 *.ipr
+**/keytabs/
 
 distribution
 common/src/main/resources/gravitino-build-info.properties
