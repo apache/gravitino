@@ -72,8 +72,7 @@ class RelationalCatalog(BaseSchemaCatalog, TableCatalog):
     def as_table_catalog(self) -> TableCatalog:
         return self
 
-    @staticmethod
-    def check_table_name_identifier(identifier: NameIdentifier) -> None:
+    def _check_table_name_identifier(self, identifier: NameIdentifier) -> None:
         """Check whether the `NameIdentifier` of a table is valid.
         Args:
             identifier (NameIdentifier):
@@ -87,10 +86,9 @@ class RelationalCatalog(BaseSchemaCatalog, TableCatalog):
             identifier.name() is not None and identifier.name() != "",
             "NameIdentifier name must not be empty",
         )
-        RelationalCatalog.check_table_namespace(identifier.namespace())
+        self._check_table_namespace(identifier.namespace())
 
-    @staticmethod
-    def check_table_namespace(namespace: Namespace) -> None:
+    def _check_table_namespace(self, namespace: Namespace) -> None:
         """Check whether the namespace of a table is valid, which should be "schema".
 
         Args:
@@ -138,7 +136,7 @@ class RelationalCatalog(BaseSchemaCatalog, TableCatalog):
         sort_orders: Optional[list[SortOrder]] = None,
         indexes: Optional[list[Index]] = None,
     ) -> Table:
-        RelationalCatalog.check_table_name_identifier(identifier)
+        self._check_table_name_identifier(identifier)
         req = TableCreateRequest(
             _name=identifier.name(),
             _columns=DTOConverters.to_dtos(columns),
@@ -169,7 +167,7 @@ class RelationalCatalog(BaseSchemaCatalog, TableCatalog):
         return RelationalTable(full_namespace, table_resp.table(), self.rest_client)
 
     def list_tables(self, namespace: Namespace) -> list[NameIdentifier]:
-        RelationalCatalog.check_table_namespace(namespace)
+        self._check_table_namespace(namespace)
         full_namespace = self._get_table_full_namespace(namespace)
         resp = self.rest_client.get(
             self._format_table_request_path(full_namespace),
@@ -183,7 +181,7 @@ class RelationalCatalog(BaseSchemaCatalog, TableCatalog):
         ]
 
     def load_table(self, identifier: NameIdentifier) -> Table:
-        RelationalCatalog.check_table_name_identifier(identifier)
+        self._check_table_name_identifier(identifier)
         full_namespace = self._get_table_full_namespace(identifier.namespace())
         resp = self.rest_client.get(
             f"{self._format_table_request_path(full_namespace)}"
