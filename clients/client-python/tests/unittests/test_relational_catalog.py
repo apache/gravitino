@@ -26,6 +26,11 @@ from gravitino.dto.rel.table_dto import TableDTO
 from gravitino.dto.responses.entity_list_response import EntityListResponse
 from gravitino.dto.responses.table_response import TableResponse
 from gravitino.dto.util.dto_converters import DTOConverters
+from gravitino.exceptions.base import (
+    NoSuchSchemaException,
+    NoSuchTableException,
+    TableAlreadyExistsException,
+)
 from gravitino.name_identifier import NameIdentifier
 from gravitino.namespace import Namespace
 from gravitino.utils import HTTPClient, Response
@@ -178,9 +183,9 @@ class TestRelationalCatalog(unittest.TestCase):
         """
         cls.table_dto = TableDTO.from_json(cls.TABLE_DTO_JSON_STRING)
 
-    def _get_mock_http_resp(self, json_str: str):
+    def _get_mock_http_resp(self, json_str: str, return_code: int = 200):
         mock_http_resp = Mock(HTTPResponse)
-        mock_http_resp.getcode.return_value = 200
+        mock_http_resp.getcode.return_value = return_code
         mock_http_resp.read.return_value = json_str
         mock_http_resp.info.return_value = None
         mock_http_resp.url = None
@@ -244,3 +249,30 @@ class TestRelationalCatalog(unittest.TestCase):
             tables = self.catalog.list_tables(namespace=Namespace.of(self.schema_name))
             self.assertEqual(len(tables), 1)
             self.assertEqual(tables[0], self.table_identifier)
+
+    def test_load_table_not_exists(self):
+        with patch(
+            "gravitino.utils.http_client.HTTPClient.get",
+            side_effect=NoSuchTableException("Table not found"),
+        ):
+            with self.assertRaises(NoSuchTableException):
+                self.catalog.load_table(self.table_identifier)
+
+    def test_create_table_already_exists(self):
+        with patch(
+            "gravitino.utils.http_client.HTTPClient.post",
+            side_effect=TableAlreadyExistsException("Table already exists"),
+        ):
+            with self.assertRaises(TableAlreadyExistsException):
+                self.catalog.create_table(
+                    identifier=self.table_identifier,
+                    columns=DTOConverters.from_dtos(self.table_dto.columns()),
+                )
+
+    def test_list_tables_invalid_namespace(self):
+        with patch(
+            "gravitino.utils.http_client.HTTPClient.get",
+            side_effect=NoSuchSchemaException("Schema not found"),
+        ):
+            with self.assertRaises(NoSuchSchemaException):
+                self.catalog.list_tables(namespace=Namespace.of("invalid_schema"))
