@@ -85,6 +85,10 @@ public interface HiveClient extends AutoCloseable {
 
   List<String> getCatalogs();
 
+  void createCatalog(String catalogName, String location);
+
+  void createCatalog(String catalogName, String location, String description);
+
   void close();
 
   UserGroupInformation getUser();
