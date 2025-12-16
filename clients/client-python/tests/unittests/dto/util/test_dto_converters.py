@@ -829,9 +829,9 @@ class TestDTOConverters(unittest.TestCase):
             )
         converted_dtos = DTOConverters.to_dtos(sort_orders)
         for converted, expected in zip(converted_dtos, expected_dtos):
-            self.assertTrue(converted.sort_term() == expected.sort_term())
-            self.assertTrue(converted.direction() == expected.direction())
-            self.assertTrue(converted.null_ordering() == expected.null_ordering())
+            self.assertEqual(converted.sort_term(), expected.sort_term())
+            self.assertEqual(converted.direction(), expected.direction())
+            self.assertEqual(converted.null_ordering(), expected.null_ordering())
 
         self.assertListEqual(DTOConverters.to_dtos(converted_dtos), converted_dtos)
 
@@ -852,8 +852,8 @@ class TestDTOConverters(unittest.TestCase):
         ]
         converted_dtos = DTOConverters.to_dtos(indexes)
         for converted, expected in zip(converted_dtos, expected_dtos):
-            self.assertTrue(converted.type() == expected.type())
-            self.assertTrue(converted.name() == expected.name())
+            self.assertEqual(converted.type(), expected.type())
+            self.assertEqual(converted.name(), expected.name())
             self.assertListEqual(converted.field_names(), expected.field_names())
 
         self.assertListEqual(DTOConverters.to_dtos(converted_dtos), converted_dtos)
@@ -865,7 +865,7 @@ class TestDTOConverters(unittest.TestCase):
                 key
             ]
             expected = transform_class(*converted.field_name())
-            self.assertTrue(converted.field_name() == expected.field_name())
+            self.assertEqual(converted.field_name(), expected.field_name())
 
     def test_to_dtos_bucket_truncate_transforms(self):
         num_buckets, width = 10, 5
@@ -956,7 +956,7 @@ class TestDTOConverters(unittest.TestCase):
         )
         expected = FunctionPartitioningDTO(function_name, *args)
         converted = DTOConverters.to_dto(apply_transform)
-        self.assertTrue(converted.function_name() == expected.function_name())
+        self.assertEqual(converted.function_name(), expected.function_name())
         self.assertListEqual(converted.args(), expected.args())
 
     def test_to_dtos_raise_exception(self):
@@ -980,9 +980,7 @@ class TestDTOConverters(unittest.TestCase):
             strategy=Strategy.HASH, number=4, args=field_ref_dtos
         )
         converted = DTOConverters.to_dto(distribution)
-        self.assertTrue(converted == distribution_dto)
+        self.assertEqual(converted, distribution_dto)
 
-        self.assertTrue(
-            DTOConverters.to_dto(Distributions.NONE) == DistributionDTO.NONE
-        )
-        self.assertTrue(DTOConverters.to_dto(distribution_dto) == distribution_dto)
+        self.assertEqual(DTOConverters.to_dto(Distributions.NONE), DistributionDTO.NONE)
+        self.assertEqual(DTOConverters.to_dto(distribution_dto), distribution_dto)
