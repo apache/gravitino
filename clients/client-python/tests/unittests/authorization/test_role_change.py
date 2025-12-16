@@ -37,7 +37,7 @@ class TestRoleChange(unittest.TestCase):
         self.assertEqual(role_change.securable_object, securable_object)
         self.assertEqual(
             str(role_change),
-            "ADDSECURABLEOBJECT role_name + SecurableObject: "
+            "ADDSECURABLEOBJECT role_name SecurableObject: "
             + "[fullName=test_catalog], [type=Type.CATALOG], [privileges=[allow_create_schema]]",
         )
 

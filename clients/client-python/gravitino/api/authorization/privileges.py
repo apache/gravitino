@@ -88,60 +88,86 @@ class Privilege(ABC):
     class Name(Enum):
         """The name of this privilege."""
 
-        # The privilege to create a catalog.
         CREATE_CATALOG = (0, 1 << 0)
-        # The privilege to use a catalog.
+        """The privilege to create a catalog."""
+
         USE_CATALOG = (0, 1 << 2)
-        # The privilege to create a schema.
+        """The privilege to use a catalog."""
+
         CREATE_SCHEMA = (0, 1 << 3)
-        # The privilege to use a schema.
+        """The privilege to create a schema."""
+
         USE_SCHEMA = (0, 1 << 4)
-        # The privilege to create a table.
+        """The privilege to use a schema."""
+
         CREATE_TABLE = (0, 1 << 5)
-        # The privilege to modify a table.
+        """The privilege to create a table."""
+
         MODIFY_TABLE = (0, 1 << 6)
-        # The privilege to select data from a table.
+        """The privilege to modify a table."""
+
         SELECT_TABLE = (0, 1 << 7)
-        # The privilege to create a fileset.
+        """The privilege to select data from a table."""
+
         CREATE_FILESET = (0, 1 << 8)
-        # The privilege to write a fileset.
+        """The privilege to create a fileset."""
+
         WRITE_FILESET = (0, 1 << 9)
-        # The privilege to read a fileset.
+        """The privilege to write a fileset."""
+
         READ_FILESET = (0, 1 << 10)
-        # The privilege to create a topic.
+        """The privilege to read a fileset."""
+
         CREATE_TOPIC = (0, 1 << 11)
-        # The privilege to produce to a topic.
+        """The privilege to create a topic."""
+
         PRODUCE_TOPIC = (0, 1 << 12)
-        # The privilege to consume from a topic.
+        """The privilege to produce to a topic."""
+
         CONSUME_TOPIC = (0, 1 << 13)
-        # The privilege to manage users
+        """The privilege to consume from a topic."""
+
         MANAGE_USERS = (0, 1 << 14)
-        # The privilege to manage groups
+        """The privilege to manage users."""
+
         MANAGE_GROUPS = (0, 1 << 15)
-        # The privilege to create a role
+        """The privilege to manage groups."""
+
         CREATE_ROLE = (0, 1 << 16)
-        # The privilege to grant or revoke a role for the user or the group.
+        """The privilege to create a role."""
+
         MANAGE_GRANTS = (0, 1 << 17)
-        # The privilege to create a model
+        """The privilege to grant or revoke a role for the user or the group."""
+
         CREATE_MODEL = (0, 1 << 18)
-        # The privilege to create a model version
+        """The privilege to create a model."""
+
         CREATE_MODEL_VERSION = (0, 1 << 19)
-        # The privilege to view the metadata of the model and download all the model versions
+        """The privilege to create a model version."""
+
         USE_MODEL = (0, 1 << 20)
-        # The privilege to create a tag
+        """The privilege to view model metadata and download all model versions."""
+
         CREATE_TAG = (0, 1 << 21)
-        # The privilege to apply a tag
+        """The privilege to create a tag."""
+
         APPLY_TAG = (0, 1 << 22)
-        # The privilege to create a policy
+        """The privilege to apply a tag."""
+
         CREATE_POLICY = (0, 1 << 23)
-        # The privilege to apply a policy
+        """The privilege to create a policy."""
+
         APPLY_POLICY = (0, 1 << 24)
-        # The privilege to register a job template
+        """The privilege to apply a policy."""
+
         REGISTER_JOB_TEMPLATE = (0, 1 << 25)
-        # The privilege to use a job template
+        """The privilege to register a job template."""
+
         USE_JOB_TEMPLATE = (0, 1 << 26)
-        # The privilege to run a job
+        """The privilege to use a job template."""
+
         RUN_JOB = (0, 1 << 27)
+        """The privilege to run a job."""
 
         def __init__(self, high_bits: int, low_bits: int) -> None:
             """

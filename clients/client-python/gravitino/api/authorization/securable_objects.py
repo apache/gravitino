@@ -213,11 +213,9 @@ class SecurableObjects:
         Returns:
             SecurableObjectImpl: The created schema SecurableObject.
         """
-        names = catalog.full_name().split(".")
-        names.append(schema)
         return SecurableObjects.of(
             MetadataObject.Type.SCHEMA,
-            names,
+            [catalog.full_name(), schema],
             privileges,
         )
 
@@ -238,8 +236,7 @@ class SecurableObjects:
         Returns:
             SecurableObjectImpl: The created table SecurableObject.
         """
-        names = schema.full_name().split(".")
-        names.append(table)
+        names = [*schema.full_name().split("."), table]
         return SecurableObjects.of(
             MetadataObject.Type.TABLE,
             names,

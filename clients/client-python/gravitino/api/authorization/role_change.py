@@ -121,7 +121,7 @@ class RoleChange(ABC):
             Returns:
                 str: A string representation of the AddSecurableObject instance.
             """
-            return f"ADDSECURABLEOBJECT {self._role_name} + {self._securable_object}"
+            return f"ADDSECURABLEOBJECT {self._role_name} {self._securable_object}"
 
     @dataclass(frozen=True, eq=True)
     class RemoveSecurableObject:
