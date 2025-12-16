@@ -48,7 +48,7 @@ Lance uses Apache Arrow for table schemas. The following table shows type mappin
 | Gravitino Type                   | Arrow Type                              |
 |----------------------------------|-----------------------------------------|
 | `Struct`                         | `Struct`                                |
-| `Map`                            | `Map`                                   |
+| `Map`                            | Not supported by Lance                  |
 | `List`                           | `Array`                                 |
 | `Boolean`                        | `Boolean`                               |
 | `Byte`                           | `Int8`                                  |
@@ -72,7 +72,7 @@ Lance uses Apache Arrow for table schemas. The following table shows type mappin
 | `Time`/`Time(9)`                 | `Time Nanosecond`                       |
 | `Null`                           | `Null`                                  |
 | `Fixed(n)`                       | `Fixed-Size Binary(n)`                  |
-| `Interval_year`                  | `Interval(YearMonth)`                   |
+| `Interval_year`                  | Not supported by Lance                  |
 | `Interval_day`                   | `Duration(Microsecond)`                 |
 | `External(arrow_field_json_str)` | Any Arrow Field                         |
 
