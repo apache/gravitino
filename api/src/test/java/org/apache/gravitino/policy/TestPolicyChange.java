@@ -49,7 +49,7 @@ public class TestPolicyChange {
   }
 
   @Test
-  void test() {
+  void testUpdateContentChange() {
     PolicyContent newContent =
         PolicyContents.custom(
             ImmutableMap.of("rule2", "value2"),
@@ -113,9 +113,9 @@ public class TestPolicyChange {
     Assertions.assertEquals(updateContent1.hashCode(), updateContent2.hashCode());
 
     Assertions.assertNotEquals(updateContent1, updateContent3);
-    Assertions.assertNotEquals(updateComment1.hashCode(), updateComment3.hashCode());
+    Assertions.assertNotEquals(updateContent1.hashCode(), updateContent3.hashCode());
 
     Assertions.assertNotEquals(updateContent2, updateContent3);
-    Assertions.assertNotEquals(updateComment2.hashCode(), updateComment3.hashCode());
+    Assertions.assertNotEquals(updateContent2.hashCode(), updateContent3.hashCode());
   }
 }

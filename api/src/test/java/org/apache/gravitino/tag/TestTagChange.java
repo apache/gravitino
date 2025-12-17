@@ -55,7 +55,7 @@ public class TestTagChange {
   }
 
   @Test
-  void test() {
+  void testSetPropertyChange() {
     String property = "property1";
     String value = "value1";
     TagChange tagChange = TagChange.setProperty(property, value);
