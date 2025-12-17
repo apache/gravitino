@@ -67,10 +67,10 @@ class TagResponse(BaseResponse):
 
     _tag: TagDTO = field(default=None, metadata=config(field_name="tag"))
 
+    def tag(self) -> TagDTO:
+        return self._tag
+
     def validate(self) -> None:
         Precondition.check_argument(
             self._tag is not None, "Tag response should have a tag"
         )
-
-    def tag(self) -> TagDTO:
-        return self._tag
