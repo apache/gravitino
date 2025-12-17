@@ -190,14 +190,9 @@ public class CatalogHive2IT extends BaseIT {
                     containerSuite.getHiveContainer().getContainerIpAddress(),
                     HiveContainer.HDFS_DEFAULTFS_PORT))
             .config("spark.sql.storeAssignmentPolicy", "LEGACY")
-            .config("mapreduce.input.fileinputformat.input.dir.recursive", "true");
-
-    // Ensure Spark queries are directed to the expected Hive catalog (e.g. mycatalog)
-    if (!hmsCatalog.isEmpty()) {
-      builder.config("hive.metastore.default.catalog", hmsCatalog);
-    }
-
-    sparkSession = builder.enableHiveSupport().getOrCreate();
+            .config("mapreduce.input.fileinputformat.input.dir.recursive", "true")
+            .enableHiveSupport();
+    sparkSession = builder.getOrCreate();
   }
 
   protected void initFileSystem() throws IOException {
