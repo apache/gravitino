@@ -24,8 +24,10 @@ import org.junit.jupiter.api.Tag;
 
 @Tag("gravitino-docker-test")
 public class CatalogHive3IT extends CatalogHive2IT {
+
   @Override
   protected void startNecessaryContainer() {
+    hmsCatalog = "hive";
     containerSuite.startHiveContainer(
         ImmutableMap.of(HiveContainer.HIVE_RUNTIME_VERSION, HiveContainer.HIVE3));
 
