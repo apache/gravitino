@@ -646,6 +646,58 @@ public class HTTPClient implements RESTClient {
   }
 
   /**
+   * Sends an HTTP DELETE request with a request body to the specified path and processes the
+   * response.
+   *
+   * @param path The URL path to send the DELETE request to.
+   * @param body The request body to place in the DELETE request.
+   * @param responseType The class type of the response for deserialization (Must be registered with
+   *     the ObjectMapper).
+   * @param headers A map of request headers (key-value pairs) to include in the request (can be
+   *     null).
+   * @param errorHandler The error handler delegated for HTTP responses, which handles server error
+   *     responses.
+   * @param <T> The class type of the response for deserialization.
+   * @return The response entity parsed and converted to its type T.
+   */
+  @Override
+  public <T extends RESTResponse> T delete(
+      String path,
+      RESTRequest body,
+      Class<T> responseType,
+      Map<String, String> headers,
+      Consumer<ErrorResponse> errorHandler) {
+    return execute(Method.DELETE, path, null, body, responseType, headers, errorHandler);
+  }
+
+  /**
+   * Sends an HTTP DELETE request with query parameters and a request body to the specified path and
+   * processes the response.
+   *
+   * @param path The URL path to send the DELETE request to.
+   * @param queryParams A map of query parameters (key-value pairs) to include in the request URL.
+   * @param body The request body to place in the DELETE request.
+   * @param responseType The class type of the response for deserialization (Must be registered with
+   *     the ObjectMapper).
+   * @param headers A map of request headers (key-value pairs) to include in the request (can be
+   *     null).
+   * @param errorHandler The error handler delegated for HTTP responses, which handles server error
+   *     responses.
+   * @param <T> The class type of the response for deserialization.
+   * @return The response entity parsed and converted to its type T.
+   */
+  @Override
+  public <T extends RESTResponse> T delete(
+      String path,
+      Map<String, String> queryParams,
+      RESTRequest body,
+      Class<T> responseType,
+      Map<String, String> headers,
+      Consumer<ErrorResponse> errorHandler) {
+    return execute(Method.DELETE, path, queryParams, body, responseType, headers, errorHandler);
+  }
+
+  /**
    * Sends an HTTP POST request with form data to the specified path and processes the response.
    *
    * @param path The URL path to send the POST request to.

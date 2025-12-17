@@ -130,6 +130,47 @@ public interface RESTClient extends Closeable {
       Consumer<ErrorResponse> errorHandler);
 
   /**
+   * Perform a DELETE request on the specified path with the given request body.
+   *
+   * @param path The path to be requested.
+   * @param body The request body to be included in the delete request.
+   * @param responseType The class representing the type of the response.
+   * @param headers The headers to be included in the request.
+   * @param errorHandler The consumer for handling error responses.
+   * @param <T> The type of the response.
+   * @return The response of the DELETE request.
+   */
+  default <T extends RESTResponse> T delete(
+      String path,
+      RESTRequest body,
+      Class<T> responseType,
+      Map<String, String> headers,
+      Consumer<ErrorResponse> errorHandler) {
+    return delete(path, ImmutableMap.of(), body, responseType, headers, errorHandler);
+  }
+
+  /**
+   * Perform a DELETE request on the specified path with the given request body and query
+   * parameters.
+   *
+   * @param path The path to be requested.
+   * @param queryParams The query parameters to be included in the request.
+   * @param body The request body to be included in the delete request.
+   * @param responseType The class representing the type of the response.
+   * @param headers The headers to be included in the request.
+   * @param errorHandler The consumer for handling error responses.
+   * @param <T> The type of the response.
+   * @return The response of the DELETE request.
+   */
+  <T extends RESTResponse> T delete(
+      String path,
+      Map<String, String> queryParams,
+      RESTRequest body,
+      Class<T> responseType,
+      Map<String, String> headers,
+      Consumer<ErrorResponse> errorHandler);
+
+  /**
    * Perform a GET request on the specified path with given information and no query parameters.
    *
    * @param path The path to be requested.
