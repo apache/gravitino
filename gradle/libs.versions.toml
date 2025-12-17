@@ -316,6 +316,8 @@ openlineage-java= { group = "io.openlineage", name = "openlineage-java", version
 ognl = { group='ognl', name='ognl', version.ref="ognl" }
 
 langchain4j-openai = { group='dev.langchain4j',name='langchain4j-open-ai',version='1.9.1'}
+langchain4j = { group='dev.langchain4j',name='langchain4j',version='1.9.1'}
+
 
 [bundles]
 log4j = ["slf4j-api", "log4j-slf4j2-impl", "log4j-api", "log4j-core", "log4j-12-api", "log4j-layout-template-json"]
