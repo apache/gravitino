@@ -59,6 +59,7 @@ dependencies {
     exclude(group = "com.lancedb", module = "lance-namespace-core") // This is unnecessary in the core module
   }
   implementation(libs.mybatis)
+  implementation(libs.mysql.driver)
 
   annotationProcessor(libs.lombok)
 
@@ -76,7 +77,7 @@ dependencies {
   testImplementation(libs.junit.jupiter.params)
   testImplementation(libs.mockito.core)
   testImplementation(libs.mockito.inline)
-  testImplementation(libs.mysql.driver)
+
   testImplementation(libs.postgresql.driver)
   testImplementation(libs.testcontainers)
 
