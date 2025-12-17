@@ -21,9 +21,9 @@ package org.apache.gravitino.server.web.rest;
 import com.codahale.metrics.annotation.ResponseMetered;
 import com.codahale.metrics.annotation.Timed;
 import com.google.common.base.Preconditions;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Objects;
 import javax.inject.Inject;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.DELETE;
@@ -104,13 +104,13 @@ public class FunctionOperations {
               return Utils.ok(new EntityListResponse(identifiers));
             }
 
-            List<FunctionDTO> functionDTOs = new ArrayList<>();
-            for (NameIdentifier ident : identifiers) {
-              Function[] functions = functionDispatcher.getFunction(ident);
-              if (functions != null) {
-                functionDTOs.addAll(Arrays.stream(functions).map(DTOConverters::toDTO).toList());
-              }
-            }
+            Function[] functions = functionDispatcher.listFunctionInfos(namespace);
+            functions = functions == null ? new Function[0] : functions;
+            List<FunctionDTO> functionDTOs =
+                Arrays.stream(functions)
+                    .filter(Objects::nonNull)
+                    .map(DTOConverters::toDTO)
+                    .toList();
             LOG.info(
                 "List {} function definitions under schema: {}.{}.{}",
                 functionDTOs.size(),

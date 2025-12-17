@@ -97,6 +97,7 @@ import org.apache.gravitino.function.Function;
 import org.apache.gravitino.function.FunctionColumn;
 import org.apache.gravitino.function.FunctionImpl;
 import org.apache.gravitino.function.FunctionParam;
+import org.apache.gravitino.function.FunctionParams;
 import org.apache.gravitino.function.FunctionSignature;
 import org.apache.gravitino.job.JobTemplate;
 import org.apache.gravitino.job.ShellJobTemplate;
@@ -1217,7 +1218,17 @@ public class DTOConverters {
     if (ArrayUtils.isEmpty(paramDTOs)) {
       return new FunctionParam[0];
     }
-    return Arrays.stream(paramDTOs).map(FunctionParam.class::cast).toArray(FunctionParam[]::new);
+    return Arrays.stream(paramDTOs)
+        .map(
+            p ->
+                p.defaultValue().equals(Column.DEFAULT_VALUE_NOT_SET)
+                    ? p
+                    : FunctionParams.of(
+                        p.name(),
+                        p.dataType(),
+                        p.comment(),
+                        fromFunctionArg((FunctionArg) p.defaultValue())))
+        .toArray(FunctionParam[]::new);
   }
 
   /**

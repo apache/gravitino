@@ -18,6 +18,8 @@
  */
 package org.apache.gravitino.dto.function;
 
+import static org.apache.gravitino.dto.util.DTOConverters.toFunctionArg;
+
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
@@ -33,6 +35,7 @@ import org.apache.gravitino.function.FunctionImpl;
 import org.apache.gravitino.function.FunctionSignature;
 import org.apache.gravitino.function.FunctionType;
 import org.apache.gravitino.json.JsonUtils;
+import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.types.Type;
 
 /** DTO for {@link Function}. */
@@ -133,7 +136,12 @@ public class FunctionDTO implements Function {
                                 param.name(),
                                 param.dataType(),
                                 param.comment(),
-                                param.defaultValue()))
+                                (param.defaultValue() == null
+                                        || param
+                                            .defaultValue()
+                                            .equals(Column.DEFAULT_VALUE_NOT_SET))
+                                    ? Column.DEFAULT_VALUE_NOT_SET
+                                    : toFunctionArg(param.defaultValue())))
                     .toArray(FunctionParamDTO[]::new)))
         .withFunctionType(function.functionType())
         .withDeterministic(function.deterministic())
@@ -216,6 +224,7 @@ public class FunctionDTO implements Function {
     return version;
   }
 
+  /** Builder for {@link FunctionDTO}. */
   public static class Builder {
     private FunctionSignatureDTO signature;
     private FunctionType functionType;

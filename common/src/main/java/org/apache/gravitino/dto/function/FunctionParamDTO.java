@@ -28,6 +28,7 @@ import lombok.ToString;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.function.FunctionParam;
 import org.apache.gravitino.json.JsonUtils;
+import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.expressions.Expression;
 import org.apache.gravitino.rel.types.Type;
 import org.apache.gravitino.rest.RESTRequest;
@@ -52,7 +53,7 @@ public class FunctionParamDTO implements FunctionParam, RESTRequest {
   @JsonInclude(JsonInclude.Include.NON_EMPTY)
   @JsonSerialize(using = JsonUtils.ColumnDefaultValueSerializer.class)
   @JsonDeserialize(using = JsonUtils.ColumnDefaultValueDeserializer.class)
-  private Expression defaultValue = FunctionParam.DEFAULT_VALUE_NOT_SET;
+  private Expression defaultValue = Column.DEFAULT_VALUE_NOT_SET;
 
   /** Default constructor for Jackson. */
   private FunctionParamDTO() {}
@@ -63,14 +64,13 @@ public class FunctionParamDTO implements FunctionParam, RESTRequest {
    * @param name Parameter name.
    * @param dataType Parameter data type.
    * @param comment Optional parameter comment.
-   * @param defaultValue Default value; if null, {@link FunctionParam#DEFAULT_VALUE_NOT_SET} is
-   *     used.
+   * @param defaultValue Default value; if null, {@link Column#DEFAULT_VALUE_NOT_SET} is used.
    */
   public FunctionParamDTO(String name, Type dataType, String comment, Expression defaultValue) {
     this.name = name;
     this.dataType = dataType;
     this.comment = comment;
-    this.defaultValue = defaultValue == null ? FunctionParam.DEFAULT_VALUE_NOT_SET : defaultValue;
+    this.defaultValue = defaultValue == null ? Column.DEFAULT_VALUE_NOT_SET : defaultValue;
   }
 
   /** {@inheritDoc} */

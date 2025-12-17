@@ -56,6 +56,7 @@ public interface FunctionUpdateRequest extends RESTRequest {
    */
   FunctionChange functionChange();
 
+  /** Request to update a function comment. */
   @Getter
   @EqualsAndHashCode
   @ToString
@@ -100,6 +101,7 @@ public interface FunctionUpdateRequest extends RESTRequest {
     }
   }
 
+  /** Request to replace all implementations of a function. */
   @Getter
   @EqualsAndHashCode
   @ToString
@@ -137,6 +139,7 @@ public interface FunctionUpdateRequest extends RESTRequest {
     }
   }
 
+  /** Request to add an implementation to a function. */
   @Getter
   @EqualsAndHashCode
   @ToString
