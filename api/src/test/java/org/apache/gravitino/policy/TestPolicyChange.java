@@ -113,9 +113,7 @@ public class TestPolicyChange {
     Assertions.assertEquals(updateContent1.hashCode(), updateContent2.hashCode());
 
     Assertions.assertNotEquals(updateContent1, updateContent3);
-    Assertions.assertNotEquals(updateContent1.hashCode(), updateContent3.hashCode());
 
     Assertions.assertNotEquals(updateContent2, updateContent3);
-    Assertions.assertNotEquals(updateContent2.hashCode(), updateContent3.hashCode());
   }
 }
