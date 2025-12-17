@@ -177,6 +177,12 @@ Gravitino provides a Flink connector to manage metadata in a unified way. To use
 
 * [Gravitino Flink connector](./flink-connector/flink-connector.md): a complete guide to using the Gravitino Flink connector.
 
+#### Daft connector
+
+Gravitino provides a Daft connector to access Gravitino metadata from Daft dataframes. To use the Daft connector, see:
+
+* [Gravitino Daft connector](./daft-connector/daft-connector.md): an introduction to the Gravitino Daft connector.
+
 
 ### Server administration
 
