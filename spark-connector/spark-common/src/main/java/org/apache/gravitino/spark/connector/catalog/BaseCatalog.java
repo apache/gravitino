@@ -24,6 +24,7 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
+import java.util.stream.IntStream;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.NameIdentifier;
@@ -34,13 +35,15 @@ import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NonEmptySchemaException;
 import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
+import org.apache.gravitino.function.Function;
+import org.apache.gravitino.function.FunctionImpl;
+import org.apache.gravitino.function.JavaImpl;
 import org.apache.gravitino.spark.connector.ConnectorConstants;
 import org.apache.gravitino.spark.connector.PropertiesConverter;
 import org.apache.gravitino.spark.connector.SparkTableChangeConverter;
 import org.apache.gravitino.spark.connector.SparkTransformConverter;
 import org.apache.gravitino.spark.connector.SparkTransformConverter.DistributionAndSortOrdersInfo;
 import org.apache.gravitino.spark.connector.SparkTypeConverter;
-import org.apache.gravitino.spark.connector.functions.BuiltinFunctionSupport;
 import org.apache.spark.sql.catalyst.analysis.NamespaceAlreadyExistsException;
 import org.apache.spark.sql.catalyst.analysis.NoSuchFunctionException;
 import org.apache.spark.sql.catalyst.analysis.NoSuchNamespaceException;
@@ -85,7 +88,6 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces, F
   protected Catalog gravitinoCatalogClient;
   private SparkTypeConverter sparkTypeConverter;
   private SparkTableChangeConverter sparkTableChangeConverter;
-  private final BuiltinFunctionSupport builtinFunctionSupport = new BuiltinFunctionSupport();
 
   private String catalogName;
   private final GravitinoCatalogManager gravitinoCatalogManager;
@@ -444,10 +446,37 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces, F
 
   @Override
   public Identifier[] listFunctions(String[] namespace) throws NoSuchNamespaceException {
-    String[] targetNamespace =
-        namespace.length == 0 ? new String[] {getCatalogDefaultNamespace()} : namespace;
-    validateNamespace(targetNamespace);
-    return builtinFunctionSupport.listFunctions(targetNamespace, getCatalogDefaultNamespace());
+    String gravitinoNamespace;
+    if (namespace.length == 0) {
+      gravitinoNamespace = getCatalogDefaultNamespace();
+    } else {
+      validateNamespace(namespace);
+      gravitinoNamespace = namespace[0];
+    }
+    try {
+      org.apache.gravitino.function.FunctionCatalog functionCatalog =
+          gravitinoCatalogClient.asFunctionCatalog();
+      NameIdentifier[] identifiers =
+          functionCatalog.listFunctions(Namespace.of(gravitinoNamespace));
+      org.apache.gravitino.function.Function[] functions =
+          functionCatalog.listFunctionInfos(Namespace.of(gravitinoNamespace));
+
+      return IntStream.range(0, identifiers.length)
+          .filter(
+              idx ->
+                  functions != null
+                      && functions.length > idx
+                      && functions[idx] != null
+                      && Arrays.stream(functions[idx].impls())
+                          .anyMatch(this::isSparkImplementation))
+          .mapToObj(
+              idx ->
+                  Identifier.of(
+                      new String[] {getDatabase(identifiers[idx])}, identifiers[idx].name()))
+          .toArray(Identifier[]::new);
+    } catch (NoSuchSchemaException e) {
+      throw new NoSuchNamespaceException(namespace);
+    }
   }
 
   @Override
@@ -457,11 +486,31 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces, F
         namespace.length == 0 ? new String[] {getCatalogDefaultNamespace()} : namespace;
     validateNamespace(targetNamespace);
     Identifier targetIdent = Identifier.of(targetNamespace, ident.name());
-    return builtinFunctionSupport.loadFunction(targetIdent, getCatalogDefaultNamespace());
-  }
-
-  protected BuiltinFunctionSupport getBuiltinFunctionSupport() {
-    return builtinFunctionSupport;
+    NameIdentifier gravitinoIdentifier =
+        NameIdentifier.of(targetIdent.namespace()[0], targetIdent.name());
+    try {
+      Function[] functions =
+          gravitinoCatalogClient.asFunctionCatalog().getFunction(gravitinoIdentifier);
+      for (Function function : functions) {
+        for (FunctionImpl impl : function.impls()) {
+          if (!isSparkImplementation(impl)) {
+            continue;
+          }
+          String className = extractClassName(impl);
+          if (StringUtils.isBlank(className)) {
+            continue;
+          }
+          try {
+            return instantiateFunction(className, targetIdent);
+          } catch (NoSuchFunctionException e) {
+            // try the next implementation, such as SQL implementation
+          }
+        }
+      }
+    } catch (org.apache.gravitino.exceptions.NoSuchFunctionException e) {
+      // fall through
+    }
+    throw new NoSuchFunctionException(targetIdent);
   }
 
   private void validateNamespace(String[] namespace) {
@@ -495,6 +544,33 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces, F
         gravitinoIdentifier.namespace().length() == 1,
         "Only support 1 level namespace," + gravitinoIdentifier.namespace());
     return gravitinoIdentifier.namespace().level(0);
+  }
+
+  private boolean isSparkImplementation(FunctionImpl impl) {
+    return FunctionImpl.RuntimeType.SPARK.equals(impl.runtime());
+  }
+
+  private String extractClassName(FunctionImpl impl) {
+    if (impl instanceof JavaImpl) {
+      return ((JavaImpl) impl).className();
+    }
+    throw new IllegalArgumentException(
+        String.format("Unsupported function implementation %s", impl.getClass().getName()));
+  }
+
+  private UnboundFunction instantiateFunction(String className, Identifier ident)
+      throws NoSuchFunctionException {
+    try {
+      Class<?> functionClass = Class.forName(className);
+      Object instance = functionClass.getDeclaredConstructor().newInstance();
+      if (instance instanceof UnboundFunction) {
+        return (UnboundFunction) instance;
+      }
+    } catch (ReflectiveOperationException e) {
+      throw new RuntimeException(
+          String.format("Failed to instantiate function class: %s", className), e);
+    }
+    throw new NoSuchFunctionException(ident);
   }
 
   private Table loadSparkTable(Identifier ident) {

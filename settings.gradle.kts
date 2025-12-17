@@ -64,6 +64,7 @@ include("lance:lance-rest-server")
 include("authorizations:authorization-ranger", "authorizations:authorization-common", "authorizations:authorization-chain")
 include("trino-connector:trino-connector", "trino-connector:integration-test")
 include("spark-connector:spark-common")
+include(":spark-connector:spark-udf")
 if (scalaVersion == "2.12") {
   // flink only support scala 2.12
   include("flink-connector:flink")
