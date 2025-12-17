@@ -51,6 +51,11 @@ import org.apache.gravitino.dto.authorization.UserDTO;
 import org.apache.gravitino.dto.credential.CredentialDTO;
 import org.apache.gravitino.dto.file.FileInfoDTO;
 import org.apache.gravitino.dto.file.FilesetDTO;
+import org.apache.gravitino.dto.function.FunctionColumnDTO;
+import org.apache.gravitino.dto.function.FunctionDTO;
+import org.apache.gravitino.dto.function.FunctionImplDTO;
+import org.apache.gravitino.dto.function.FunctionParamDTO;
+import org.apache.gravitino.dto.function.FunctionSignatureDTO;
 import org.apache.gravitino.dto.job.JobTemplateDTO;
 import org.apache.gravitino.dto.job.ShellJobTemplateDTO;
 import org.apache.gravitino.dto.job.SparkJobTemplateDTO;
@@ -88,6 +93,11 @@ import org.apache.gravitino.dto.tag.MetadataObjectDTO;
 import org.apache.gravitino.dto.tag.TagDTO;
 import org.apache.gravitino.file.FileInfo;
 import org.apache.gravitino.file.Fileset;
+import org.apache.gravitino.function.Function;
+import org.apache.gravitino.function.FunctionColumn;
+import org.apache.gravitino.function.FunctionImpl;
+import org.apache.gravitino.function.FunctionParam;
+import org.apache.gravitino.function.FunctionSignature;
 import org.apache.gravitino.job.JobTemplate;
 import org.apache.gravitino.job.ShellJobTemplate;
 import org.apache.gravitino.job.SparkJobTemplate;
@@ -283,6 +293,32 @@ public class DTOConverters {
         .withPartitioning(toDTOs(table.partitioning()))
         .withIndex(toDTOs(table.index()))
         .build();
+  }
+
+  /**
+   * Converts a {@link Function} to a {@link FunctionDTO}.
+   *
+   * @param function The function implementation.
+   * @return The function DTO.
+   */
+  public static FunctionDTO toDTO(Function function) {
+    if (function instanceof FunctionDTO) {
+      return (FunctionDTO) function;
+    }
+    return FunctionDTO.fromFunction(function);
+  }
+
+  /**
+   * Converts an array of {@link Function} to {@link FunctionDTO}s.
+   *
+   * @param functions The functions.
+   * @return The DTOs.
+   */
+  public static FunctionDTO[] toDTOs(Function[] functions) {
+    if (functions == null) {
+      return new FunctionDTO[0];
+    }
+    return Arrays.stream(functions).map(DTOConverters::toDTO).toArray(FunctionDTO[]::new);
   }
 
   /**
@@ -1139,6 +1175,59 @@ public class DTOConverters {
         return tableDTO.auditInfo();
       }
     };
+  }
+
+  /**
+   * Converts an array of {@link FunctionImplDTO} to {@link FunctionImpl}s.
+   *
+   * @param implDTOs The DTOs.
+   * @return The implementations.
+   */
+  public static FunctionImpl[] fromDTOs(FunctionImplDTO[] implDTOs) {
+    if (ArrayUtils.isEmpty(implDTOs)) {
+      return new FunctionImpl[0];
+    }
+    return Arrays.stream(implDTOs)
+        .map(FunctionImplDTO::toFunctionImpl)
+        .toArray(FunctionImpl[]::new);
+  }
+
+  /**
+   * Converts an array of {@link FunctionColumnDTO} to {@link FunctionColumn}s.
+   *
+   * @param columnDTOs The DTOs.
+   * @return The columns.
+   */
+  public static FunctionColumn[] fromDTOs(FunctionColumnDTO[] columnDTOs) {
+    if (ArrayUtils.isEmpty(columnDTOs)) {
+      return new FunctionColumn[0];
+    }
+    return Arrays.stream(columnDTOs)
+        .map(FunctionColumnDTO::toFunctionColumn)
+        .toArray(FunctionColumn[]::new);
+  }
+
+  /**
+   * Converts an array of {@link FunctionParamDTO} to {@link FunctionParam}s.
+   *
+   * @param paramDTOs The DTOs.
+   * @return The params.
+   */
+  public static FunctionParam[] fromDTOs(FunctionParamDTO[] paramDTOs) {
+    if (ArrayUtils.isEmpty(paramDTOs)) {
+      return new FunctionParam[0];
+    }
+    return Arrays.stream(paramDTOs).map(FunctionParam.class::cast).toArray(FunctionParam[]::new);
+  }
+
+  /**
+   * Converts a {@link FunctionSignatureDTO} to {@link FunctionSignature}.
+   *
+   * @param signature The DTO.
+   * @return The signature.
+   */
+  public static FunctionSignature fromDTO(FunctionSignatureDTO signature) {
+    return signature == null ? null : signature.toFunctionSignature();
   }
 
   /**

@@ -39,7 +39,6 @@ import org.apache.spark.sql.catalyst.analysis.NoSuchFunctionException;
 import org.apache.spark.sql.catalyst.analysis.NoSuchNamespaceException;
 import org.apache.spark.sql.catalyst.analysis.NoSuchProcedureException;
 import org.apache.spark.sql.catalyst.analysis.NoSuchTableException;
-import org.apache.spark.sql.connector.catalog.FunctionCatalog;
 import org.apache.spark.sql.connector.catalog.Identifier;
 import org.apache.spark.sql.connector.catalog.TableCatalog;
 import org.apache.spark.sql.connector.catalog.functions.UnboundFunction;
@@ -55,7 +54,7 @@ import org.apache.spark.sql.util.CaseInsensitiveStringMap;
  * function management tailored to the needs of Iceberg tables.
  */
 public class GravitinoIcebergCatalog extends BaseCatalog
-    implements FunctionCatalog, ProcedureCatalog, HasIcebergCatalog {
+    implements ProcedureCatalog, HasIcebergCatalog {
 
   @Override
   protected TableCatalog createAndInitSparkCatalog(
@@ -109,12 +108,22 @@ public class GravitinoIcebergCatalog extends BaseCatalog
 
   @Override
   public Identifier[] listFunctions(String[] namespace) throws NoSuchNamespaceException {
-    return ((SparkCatalog) sparkCatalog).listFunctions(namespace);
+    Identifier[] builtin =
+        getBuiltinFunctionSupport().listFunctions(namespace, getCatalogDefaultNamespace());
+    Identifier[] icebergFunctions = ((SparkCatalog) sparkCatalog).listFunctions(namespace);
+    Identifier[] combined = new Identifier[builtin.length + icebergFunctions.length];
+    System.arraycopy(builtin, 0, combined, 0, builtin.length);
+    System.arraycopy(icebergFunctions, 0, combined, builtin.length, icebergFunctions.length);
+    return combined;
   }
 
   @Override
   public UnboundFunction loadFunction(Identifier ident) throws NoSuchFunctionException {
-    return ((SparkCatalog) sparkCatalog).loadFunction(ident);
+    try {
+      return getBuiltinFunctionSupport().loadFunction(ident, getCatalogDefaultNamespace());
+    } catch (NoSuchFunctionException e) {
+      return ((SparkCatalog) sparkCatalog).loadFunction(ident);
+    }
   }
 
   /**

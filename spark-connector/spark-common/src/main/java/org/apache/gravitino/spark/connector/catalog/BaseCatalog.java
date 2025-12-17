@@ -40,11 +40,14 @@ import org.apache.gravitino.spark.connector.SparkTableChangeConverter;
 import org.apache.gravitino.spark.connector.SparkTransformConverter;
 import org.apache.gravitino.spark.connector.SparkTransformConverter.DistributionAndSortOrdersInfo;
 import org.apache.gravitino.spark.connector.SparkTypeConverter;
+import org.apache.gravitino.spark.connector.functions.BuiltinFunctionSupport;
 import org.apache.spark.sql.catalyst.analysis.NamespaceAlreadyExistsException;
+import org.apache.spark.sql.catalyst.analysis.NoSuchFunctionException;
 import org.apache.spark.sql.catalyst.analysis.NoSuchNamespaceException;
 import org.apache.spark.sql.catalyst.analysis.NoSuchTableException;
 import org.apache.spark.sql.catalyst.analysis.NonEmptyNamespaceException;
 import org.apache.spark.sql.catalyst.analysis.TableAlreadyExistsException;
+import org.apache.spark.sql.connector.catalog.FunctionCatalog;
 import org.apache.spark.sql.connector.catalog.Identifier;
 import org.apache.spark.sql.connector.catalog.NamespaceChange;
 import org.apache.spark.sql.connector.catalog.NamespaceChange.SetProperty;
@@ -52,6 +55,7 @@ import org.apache.spark.sql.connector.catalog.SupportsNamespaces;
 import org.apache.spark.sql.connector.catalog.Table;
 import org.apache.spark.sql.connector.catalog.TableCatalog;
 import org.apache.spark.sql.connector.catalog.TableChange;
+import org.apache.spark.sql.connector.catalog.functions.UnboundFunction;
 import org.apache.spark.sql.connector.expressions.Transform;
 import org.apache.spark.sql.types.StructField;
 import org.apache.spark.sql.types.StructType;
@@ -69,7 +73,7 @@ import org.apache.spark.sql.util.CaseInsensitiveStringMap;
  * needed, optimizing resource utilization and minimizing the overhead associated with
  * initialization.
  */
-public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces {
+public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces, FunctionCatalog {
 
   // The specific Spark catalog to do IO operations, different catalogs have different spark catalog
   // implementations, like HiveTableCatalog for Hive, JDBCTableCatalog for JDBC, SparkCatalog for
@@ -81,6 +85,7 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces {
   protected Catalog gravitinoCatalogClient;
   private SparkTypeConverter sparkTypeConverter;
   private SparkTableChangeConverter sparkTableChangeConverter;
+  private final BuiltinFunctionSupport builtinFunctionSupport = new BuiltinFunctionSupport();
 
   private String catalogName;
   private final GravitinoCatalogManager gravitinoCatalogManager;
@@ -437,13 +442,35 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces {
     return getCatalogDefaultNamespace();
   }
 
+  @Override
+  public Identifier[] listFunctions(String[] namespace) throws NoSuchNamespaceException {
+    String[] targetNamespace =
+        namespace.length == 0 ? new String[] {getCatalogDefaultNamespace()} : namespace;
+    validateNamespace(targetNamespace);
+    return builtinFunctionSupport.listFunctions(targetNamespace, getCatalogDefaultNamespace());
+  }
+
+  @Override
+  public UnboundFunction loadFunction(Identifier ident) throws NoSuchFunctionException {
+    String[] namespace = ident.namespace();
+    String[] targetNamespace =
+        namespace.length == 0 ? new String[] {getCatalogDefaultNamespace()} : namespace;
+    validateNamespace(targetNamespace);
+    Identifier targetIdent = Identifier.of(targetNamespace, ident.name());
+    return builtinFunctionSupport.loadFunction(targetIdent, getCatalogDefaultNamespace());
+  }
+
+  protected BuiltinFunctionSupport getBuiltinFunctionSupport() {
+    return builtinFunctionSupport;
+  }
+
   private void validateNamespace(String[] namespace) {
     Preconditions.checkArgument(
         namespace.length == 1,
         "Doesn't support multi level namespaces: " + String.join(".", namespace));
   }
 
-  private String getCatalogDefaultNamespace() {
+  protected String getCatalogDefaultNamespace() {
     String[] catalogDefaultNamespace = sparkCatalog.defaultNamespace();
     Preconditions.checkArgument(
         catalogDefaultNamespace != null && catalogDefaultNamespace.length == 1,

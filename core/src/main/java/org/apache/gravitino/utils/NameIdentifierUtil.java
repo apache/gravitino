@@ -104,6 +104,21 @@ public class NameIdentifierUtil {
   }
 
   /**
+   * Create the function {@link NameIdentifier} with the given metalake, catalog, schema and
+   * function name.
+   *
+   * @param metalake The metalake name
+   * @param catalog The catalog name
+   * @param schema The schema name
+   * @param function The function name
+   * @return The created function {@link NameIdentifier}
+   */
+  public static NameIdentifier ofFunction(
+      String metalake, String catalog, String schema, String function) {
+    return NameIdentifier.of(metalake, catalog, schema, function);
+  }
+
+  /**
    * Create the tag {@link NameIdentifier} with the given metalake and tag name.
    *
    * @param metalake The metalake name
