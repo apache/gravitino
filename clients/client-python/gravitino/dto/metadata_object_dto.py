@@ -21,12 +21,13 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Optional
 
-from dataclasses_json import config
+from dataclasses_json import config, dataclass_json
 
 from gravitino.api.metadata_object import MetadataObject
 from gravitino.utils.precondition import Precondition
 
 
+@dataclass_json
 @dataclass
 class MetadataObjectDTO(MetadataObject):
     """Represents a Metadata Object DTO (Data Transfer Object)."""

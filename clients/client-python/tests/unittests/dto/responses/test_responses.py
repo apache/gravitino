@@ -509,6 +509,7 @@ class TestResponses(unittest.TestCase):
         ser_json = _json.dumps(tag_resp.to_dict())
         deser_dict = _json.loads(ser_json)
 
+        self.assertEqual(tag_dto, tag_resp.tag())
         self.assertEqual(0, deser_dict["code"])
         self.assertIsNotNone(deser_dict.get("tag"))
         self.assertEqual("tag1", deser_dict["tag"]["name"])
