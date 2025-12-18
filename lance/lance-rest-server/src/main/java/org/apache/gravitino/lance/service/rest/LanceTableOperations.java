@@ -167,7 +167,8 @@ public class LanceTableOperations {
               : Maps.newHashMap(registerTableRequest.getProperties());
       props.put(LANCE_LOCATION, registerTableRequest.getLocation());
       props.put(LanceConstants.LANCE_TABLE_REGISTER, "true");
-      ModeEnum mode = registerTableRequest.getMode();
+      ModeEnum mode =
+          registerTableRequest.getMode() == null ? ModeEnum.CREATE : registerTableRequest.getMode();
 
       RegisterTableResponse response =
           lanceNamespace.asTableOps().registerTable(tableId, mode, delimiter, props);
