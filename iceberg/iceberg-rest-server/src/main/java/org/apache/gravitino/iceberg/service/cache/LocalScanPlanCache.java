@@ -35,7 +35,8 @@ import org.slf4j.LoggerFactory;
  * <p>Usage example:
  *
  * <pre>{@code
- * ScanPlanCache cache = new LocalScanPlanCache(100, 60);
+ * ScanPlanCache cache = new LocalScanPlanCache();
+ * cache.initialize(100, 60);
  * Optional<PlanTableScanResponse> response = cache.get(key);
  * response.ifPresent(r -> processResponse(r));
  * }</pre>
@@ -48,8 +49,8 @@ public class LocalScanPlanCache implements ScanPlanCache {
   /**
    * Initializes the scan plan cache with specified configuration.
    *
-   * @param capacity
-   * @param expireMinutes
+   * @param capacity the maximum number of scan plans to cache
+   * @param expireMinutes the number of minutes after which cached entries expire
    */
   @Override
   public void initialize(int capacity, int expireMinutes) {
@@ -114,7 +115,7 @@ public class LocalScanPlanCache implements ScanPlanCache {
     }
     scanPlanCache.put(key, scanResponse);
     LOG.debug(
-        "Cached scan plan for table: {}, snapshot: {}",
+        "Update scan plan for table: {}, snapshot: {}",
         key.getTableIdentifier(),
         key.getSnapshotId());
   }

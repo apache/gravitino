@@ -477,13 +477,13 @@ Gravitino caches scan plan results to speed up repeated queries with identical p
 
 | Configuration item                                         | Description                                              | Default value | Required | Since Version |
 |------------------------------------------------------------|----------------------------------------------------------|---------------|----------|---------------|
-| `gravitino.iceberg-rest.scan-plan-cache-impl`              | The implementation of the scan plan cache.               | (none)        | No       | 1.1.0         |
-| `gravitino.iceberg-rest.scan-plan-cache-capacity`          | The capacity of the scan plan cache.                     | 200           | No       | 1.1.0         |
-| `gravitino.iceberg-rest.scan-plan-cache-expire-minutes`    | The expiration time (in minutes) of the scan plan cache. | 60            | No       | 1.1.0         |
+| `gravitino.iceberg-rest.scan-plan-cache-impl`              | The implementation of the scan plan cache.               | (none)        | No       | 1.2.0         |
+| `gravitino.iceberg-rest.scan-plan-cache-capacity`          | The capacity of the scan plan cache.                     | 200           | No       | 1.2.0         |
+| `gravitino.iceberg-rest.scan-plan-cache-expire-minutes`    | The expiration time (in minutes) of the scan plan cache. | 60            | No       | 1.2.0         |
 
 The scan plan cache uses snapshot ID as part of the cache key, ensuring automatic invalidation when table data changes. This can provide significant speedup for repeated queries like dashboard refreshes or BI tool queries.
 
-Gravitino provides the built-in `org.apache.gravitino.iceberg.service.cache.LocalScanPlanCache` to store the cached data in memory. If no implementation is specified, this default implementation will be used automatically. You can also implement your custom scan plan cache by implementing the `org.apache.gravitino.iceberg.service.cache.ScanPlanCache` interface.
+Gravitino provides the built-in `org.apache.gravitino.iceberg.service.cache.LocalScanPlanCache` to store the cached data in memory. You can also implement your custom scan plan cache by implementing the `org.apache.gravitino.iceberg.service.cache.ScanPlanCache` interface.
 
 ### Misc configurations
 

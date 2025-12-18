@@ -20,9 +20,7 @@
 package org.apache.gravitino.iceberg.service.cache;
 
 import com.google.common.base.Objects;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
+import java.util.stream.Collectors;
 import org.apache.iceberg.Table;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.expressions.Expression;
@@ -82,24 +80,18 @@ public class ScanPlanCacheKey {
     Long startSnapshotId = scanRequest.startSnapshotId();
     Long endSnapshotId = scanRequest.endSnapshotId();
 
-    // Store the filter expression object directly instead of its string representation.
-    // This approach relies on Expression's equals() and hashCode() implementations,
-    // which are designed to correctly handle semantic equality of expressions.
+    // Store the filter expression object directly.
     Expression filter = scanRequest.filter();
 
     // Sort select and statsFields to make key order-independent
     String selectStr = "";
     if (scanRequest.select() != null && !scanRequest.select().isEmpty()) {
-      List<String> sortedSelect = new ArrayList<>(scanRequest.select());
-      Collections.sort(sortedSelect);
-      selectStr = String.join(",", sortedSelect);
+      selectStr = scanRequest.select().stream().sorted().collect(Collectors.joining(","));
     }
 
     String statsFieldsStr = "";
     if (scanRequest.statsFields() != null && !scanRequest.statsFields().isEmpty()) {
-      List<String> sortedStatsFields = new ArrayList<>(scanRequest.statsFields());
-      Collections.sort(sortedStatsFields);
-      statsFieldsStr = String.join(",", sortedStatsFields);
+      statsFieldsStr = scanRequest.statsFields().stream().sorted().collect(Collectors.joining(","));
     }
 
     return new ScanPlanCacheKey(
@@ -137,7 +129,9 @@ public class ScanPlanCacheKey {
         && Objects.equal(snapshotId, that.snapshotId)
         && Objects.equal(startSnapshotId, that.startSnapshotId)
         && Objects.equal(endSnapshotId, that.endSnapshotId)
-        && Objects.equal(filter, that.filter)
+        && Objects.equal(
+            filter != null ? filter.toString() : null,
+            that.filter != null ? that.filter.toString() : null)
         && Objects.equal(selectStr, that.selectStr)
         && Objects.equal(statsFieldsStr, that.statsFieldsStr);
   }
@@ -149,7 +143,7 @@ public class ScanPlanCacheKey {
         snapshotId,
         startSnapshotId,
         endSnapshotId,
-        filter,
+        filter != null ? filter.toString() : null,
         selectStr,
         statsFieldsStr,
         caseSensitive,
