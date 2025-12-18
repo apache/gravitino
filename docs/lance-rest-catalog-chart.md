@@ -75,6 +75,23 @@ helm upgrade --install gravitino ./gravitino-lance-rest-server
 _Note: \
 The path '/path/to/values.yaml' refers to the actual path to the values.yaml file._
 
+## Configuration Notes
+
+### Gravitino Backend Configuration
+
+Make sure to configure the Gravitino backend connection properly:
+
+```yaml
+lanceRest:
+  gravitinoUri: http://your-gravitino-server:8090
+  gravitinoMetalake: your-metalake-name
+```
+
+The Lance REST server requires a running Gravitino instance to function. Ensure:
+1. The Gravitino server is accessible from the Lance REST server pods
+2. The metalake specified in `gravitinoMetalake` exists in Gravitino
+3. Network policies allow communication between Lance REST and Gravitino
+
 ## Uninstall Helm Chart
 
 ```console

@@ -49,7 +49,7 @@ lanceRest:
   responseHeaderSize: 131072
   # Lance namespace backend settings
   namespaceBackend: gravitino
-  gravitinoUri: http://192.168.194.163:8090
+  gravitinoUri: http://192.168.194.200:8090
   gravitinoMetalake: "lrs_test"
 # Rest backend configs.
 additionalConfigItems: {}
@@ -126,15 +126,19 @@ livenessProbe:
   httpGet:
     path: /lance/v1/namespace/$/list
     port: http
-  initialDelaySeconds: 20
-  timeoutSeconds: 5
+  initialDelaySeconds: 60
+  timeoutSeconds: 10
+  periodSeconds: 30
+  failureThreshold: 5
 
 readinessProbe:
   httpGet:
     path: /lance/v1/namespace/$/list
     port: http
-  initialDelaySeconds: 20
-  timeoutSeconds: 5
+  initialDelaySeconds: 30
+  timeoutSeconds: 10
+  periodSeconds: 10
+  failureThreshold: 3
 
 ingress:
   enabled: false
