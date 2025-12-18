@@ -32,6 +32,8 @@ import org.apache.iceberg.Snapshot;
 import org.apache.iceberg.Table;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
+import org.apache.iceberg.expressions.Expression;
+import org.apache.iceberg.expressions.Expressions;
 import org.apache.iceberg.rest.PlanStatus;
 import org.apache.iceberg.rest.requests.PlanTableScanRequest;
 import org.apache.iceberg.rest.responses.PlanTableScanResponse;
@@ -261,5 +263,43 @@ public class TestScanPlanCache {
 
     Assertions.assertNotEquals(
         cached1.get(), cached2.get(), "Different requests should have different cache entries");
+  }
+
+  @Test
+  public void testExpressionIsEquivalentTo() {
+
+    // Test case 1: Identical simple expressions
+    Expression expr1 = Expressions.equal("status", "active");
+    Expression expr2 = Expressions.equal("status", "active");
+
+    // Reference equality - should be false
+    Assertions.assertNotSame(expr1, expr2, "Expression objects should be different instances");
+
+    // Standard isEquivalentTo()
+    Assertions.assertFalse(
+        expr1.isEquivalentTo(expr2),
+        "Standard isEquivalentTo() should return false for simple expression.");
+
+    PlanTableScanRequest request1 =
+        new PlanTableScanRequest.Builder().withFilter(expr1).withSnapshotId(1L).build();
+    PlanTableScanRequest request2 =
+        new PlanTableScanRequest.Builder().withFilter(expr2).withSnapshotId(1L).build();
+
+    ScanPlanCacheKey key1 = ScanPlanCacheKey.create(tableIdentifier, mockTable, request1);
+    ScanPlanCacheKey key2 = ScanPlanCacheKey.create(tableIdentifier, mockTable, request2);
+
+    // With string-based comparison, identical expressions should produce equal cache keys
+    // This works because expr1.toString().equals(expr2.toString()) should return true
+    Assertions.assertEquals(
+        key1, key2, "Identical expressions should produce equal cache keys with string comparison");
+
+    Assertions.assertEquals(
+        key1.hashCode(), key2.hashCode(), "Identical expressions should have the same hash code");
+
+    // Verify that the string representations are indeed equal
+    String filterStr1 = expr1.toString();
+    String filterStr2 = expr2.toString();
+    Assertions.assertEquals(
+        filterStr1, filterStr2, "Expression string representations should be equal");
   }
 }

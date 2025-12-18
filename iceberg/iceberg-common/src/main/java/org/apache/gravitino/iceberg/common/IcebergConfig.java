@@ -285,23 +285,15 @@ public class IcebergConfig extends Config implements OverwriteDefaultConfig {
 
   public static final ConfigEntry<String> SCAN_PLAN_CACHE_IMPL =
       new ConfigBuilder(IcebergConstants.SCAN_PLAN_CACHE_IMPL)
-          .doc(
-              "The implementation of the scan plan cache. Gravitino provides a built-in "
-                  + "LocalScanPlanCache that stores cached data in memory. If not specified, "
-                  + "LocalScanPlanCache will be used by default. You can implement a custom scan plan "
-                  + "cache by implementing the ScanPlanCache interface.")
+          .doc("The implementation of the scan plan cache")
           .version(ConfigConstants.VERSION_1_1_0)
           .stringConf()
           .create();
 
   public static final ConfigEntry<Integer> SCAN_PLAN_CACHE_CAPACITY =
       new ConfigBuilder(IcebergConstants.SCAN_PLAN_CACHE_CAPACITY)
-          .doc(
-              "Maximum number of scan plan results to cache. Larger values allow more queries to benefit "
-                  + "from caching but use more memory. Each cached entry stores the complete scan plan response, "
-                  + "which can be large for tables with many files. A typical scan plan might be several KB to MB "
-                  + "depending on table size.")
-          .version(ConfigConstants.VERSION_1_1_0)
+          .doc("Maximum number of scan plan results to cache.")
+          .version(ConfigConstants.VERSION_1_2_0)
           .intConf()
           .checkValue(value -> value > 0, ConfigConstants.POSITIVE_NUMBER_ERROR_MSG)
           .createWithDefault(200);
@@ -310,7 +302,7 @@ public class IcebergConfig extends Config implements OverwriteDefaultConfig {
       new ConfigBuilder(IcebergConstants.SCAN_PLAN_CACHE_EXPIRE_MINUTES)
           .doc(
               "Time in minutes after which cached scan plans expire if not accessed. Cached entries are automatically removed after this period of inactivity.")
-          .version(ConfigConstants.VERSION_1_1_0)
+          .version(ConfigConstants.VERSION_1_2_0)
           .intConf()
           .checkValue(value -> value > 0, ConfigConstants.POSITIVE_NUMBER_ERROR_MSG)
           .createWithDefault(60);
