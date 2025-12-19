@@ -36,7 +36,7 @@ import org.testcontainers.containers.Container;
 import org.testcontainers.shaded.org.awaitility.Awaitility;
 
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-public class CatalogHiveS3IT extends CatalogHive2IT {
+public class CatalogHiveS3IT extends CatalogHive3IT {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(CatalogHiveS3IT.class);
 
