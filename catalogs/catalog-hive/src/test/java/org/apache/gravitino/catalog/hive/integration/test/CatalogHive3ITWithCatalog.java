@@ -26,10 +26,12 @@ import java.util.Map;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.integration.test.container.HiveContainer;
 import org.junit.jupiter.api.Tag;
+import org.junit.jupiter.api.TestInstance;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 @Tag("gravitino-docker-test")
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
 public class CatalogHive3ITWithCatalog extends CatalogHive3IT {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(CatalogHiveS3IT.class);
