@@ -32,6 +32,7 @@ jobs:
               - common/**
               - conf/**
               - core/**
+              - lance/**
               - dev/**
               - gradle/**
               - iceberg/**
