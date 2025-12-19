@@ -36,9 +36,11 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.audit.CallerContext;
 import org.apache.gravitino.client.DefaultOAuth2TokenProvider;
 import org.apache.gravitino.client.GravitinoClient;
 import org.apache.gravitino.client.KerberosTokenProvider;
+import org.apache.gravitino.credential.CredentialConstants;
 import org.apache.hadoop.conf.Configuration;
 
 /** Utility class for Gravitino Virtual File System. */
@@ -322,6 +324,13 @@ public class GravitinoVirtualFileSystemUtils {
         identifier);
 
     return gvfsPath.substring(prefix.length());
+  }
+
+  static void setCallerContextForGetCredentials(String locationName) {
+    Map<String, String> contextMap = Maps.newHashMap();
+    contextMap.put(CredentialConstants.HTTP_HEADER_CURRENT_LOCATION_NAME, locationName);
+    CallerContext callerContext = CallerContext.builder().withContext(contextMap).build();
+    CallerContext.CallerContextHolder.set(callerContext);
   }
 
   private static void checkAuthConfig(String authType, String configKey, String configValue) {
