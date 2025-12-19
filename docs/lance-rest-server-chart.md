@@ -1,14 +1,14 @@
 ---
-title: "Install Lance Rest catalog server on Kubernetes"
-slug: /lance-rest-catalog-chart
+title: "Install Lance Rest Server on Kubernetes"
+slug: /lance-rest-server-chart
 keyword: 
-  - Lance REST Helm Chart
+  - Lance REST Server Helm Chart
 license: "This software is licensed under the Apache License version 2."
 ---
 
-# Install Lance Rest catalog server on Kubernetes
+# Install Lance Rest Server on Kubernetes
 
-This Helm chart deploys Apache Gravitino Lance REST Catalog Server on Kubernetes with customizable configurations.
+This Helm chart deploys Apache Gravitino Lance REST Server on Kubernetes with customizable configurations.
 
 ## Prerequisites
 
@@ -17,7 +17,7 @@ This Helm chart deploys Apache Gravitino Lance REST Catalog Server on Kubernetes
 
 ## Update Chart Dependency
 
-The Gravitino Lance REST Catalog Server Helm chart has not yet been officially released.   
+The Gravitino Lance REST Server Helm chart has not yet been officially released.   
 To proceed, please clone the repository, navigate to the chart directory [charts](../dev/charts), and execute the Helm dependency update command.
 
 ```console
@@ -26,9 +26,9 @@ helm dependency update [CHART]
 
 ## View Chart values
 
-You can customize values.yaml parameters to override chart default settings. Additionally, Gravitino Lance REST Catalog Server configurations in [gravitino-lance-rest-server.conf](../dev/charts/gravitino-lance-rest-server/resources/gravitino-lance-rest-server.conf) can be modified through Helm values.yaml.
+You can customize values.yaml parameters to override chart default settings. Additionally, Gravitino Lance REST Server configurations in [gravitino-lance-rest-server.conf](../dev/charts/gravitino-lance-rest-server/resources/gravitino-lance-rest-server.conf) can be modified through Helm values.yaml.
 
-To display the default values of the Gravitino chart, run:
+To display the default values of the chart, run:
 
 ```console
 helm show values [CHART]
@@ -42,7 +42,7 @@ helm install [RELEASE_NAME] [CHART] [flags]
 
 ### Deploy with Default Configuration
 
-Run the following command to deploy Gravitino Lance REST Catalog Server using the default settings, specify container image versions using --set image.tag=x.y.z (replace x, y, z with the expected version numbers):
+Run the following command to deploy Gravitino Lance REST Server using the default settings, specify container image versions using --set image.tag=x.y.z (replace x, y, z with the expected version numbers):
 
 ```console
 helm upgrade --install gravitino ./gravitino-lance-rest-server \
@@ -87,8 +87,8 @@ lanceRest:
   gravitinoMetalake: your-metalake-name
 ```
 
-The Lance REST server requires a running Gravitino instance to function. Ensure:
-1. The Gravitino server is accessible from the Lance REST server pods
+The Lance REST Server requires a running Gravitino instance to function. Ensure:
+1. The Gravitino server is accessible from the Lance REST Server pods
 2. The metalake specified in `gravitinoMetalake` exists in Gravitino
 3. Network policies allow communication between Lance REST and Gravitino
 
