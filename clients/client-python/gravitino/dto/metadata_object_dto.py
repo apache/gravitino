@@ -62,12 +62,11 @@ class MetadataObjectDTO(MetadataObject):
             full_name (str): The full name of the metadata object.
         """
         index = full_name.rfind(".")
-        if index == -1:
-            self._parent = None
-            self._name = full_name
-        else:
-            self._parent = full_name[:index]
-            self._name = full_name[index + 1 :]
+        self._parent, self._name = (
+            (None, full_name)
+            if index == -1
+            else (full_name[:index], full_name[index + 1 :])
+        )
 
     class Builder:
         def __init__(self) -> None:
