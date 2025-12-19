@@ -70,6 +70,14 @@ class RelationalCatalog(BaseSchemaCatalog, TableCatalog):
         )
 
     def as_table_catalog(self) -> TableCatalog:
+        """Return this relational catalog as a :class:`TableCatalog`.
+
+        This method returns ``self`` to provide access to table-related
+        operations defined by the :class:`TableCatalog` interface.
+
+        Returns:
+            TableCatalog: The current catalog instance as a ``TableCatalog``.
+        """
         return self
 
     def _check_table_name_identifier(self, identifier: NameIdentifier) -> None:
