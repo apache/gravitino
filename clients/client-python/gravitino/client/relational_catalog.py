@@ -41,10 +41,11 @@ from gravitino.utils import HTTPClient
 
 
 class RelationalCatalog(BaseSchemaCatalog, TableCatalog):
-    """Relational catalog is a catalog implementation that supports relational database.
+    """Relational catalog is a catalog implementation
 
-    It's like metadata operations, for example, schemas and tables list, creation, update
-    and deletion. A Relational catalog is under the metalake.
+    The `RelationalCatalog` supports relational database like metadata operations,
+    for example, schemas and tables list, creation, update and deletion. A Relational
+    catalog is under the metalake.
     """
 
     def __init__(
