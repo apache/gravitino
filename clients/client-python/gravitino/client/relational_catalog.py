@@ -151,18 +151,14 @@ class RelationalCatalog(BaseSchemaCatalog, TableCatalog):
             _columns=DTOConverters.to_dtos(columns),
             _comment=comment,
             _properties=properties,
-            _sort_orders=(
-                DTOConverters.to_dtos(sort_orders) if sort_orders is not None else []
-            ),
+            _sort_orders=DTOConverters.to_dtos(sort_orders),
             _distribution=(
                 DTOConverters.to_dto(distribution)
                 if distribution is not None
                 else DistributionDTO.NONE
             ),
-            _partitioning=(
-                DTOConverters.to_dtos(partitioning) if partitioning is not None else []
-            ),
-            _indexes=DTOConverters.to_dtos(indexes) if indexes is not None else [],
+            _partitioning=DTOConverters.to_dtos(partitioning),
+            _indexes=DTOConverters.to_dtos(indexes),
         )
         req.validate()
         full_namespace = self._get_table_full_namespace(identifier.namespace())
