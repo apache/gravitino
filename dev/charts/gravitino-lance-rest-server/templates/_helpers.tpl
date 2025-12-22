@@ -84,5 +84,5 @@ Create the name of the service account to use
 Define the gravitino.namespace
 */}}
 {{- define "gravitino-lance-rest-server.namespace" -}}
-	{{- .Release.Namespace -}}
+{{- .Release.Namespace -}}
 {{- end -}}

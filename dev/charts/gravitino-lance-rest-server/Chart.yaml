@@ -29,6 +29,7 @@ keywords:
   - metadata
   - catalog
   - analytics
+  - REST
 
 annotations:
   licenses: Apache-2.0

@@ -1,12 +1,12 @@
 ---
-title: "Install Lance Rest Server on Kubernetes"
+title: "Install Lance REST Server on Kubernetes"
 slug: /lance-rest-server-chart
 keyword: 
   - Lance REST Server Helm Chart
 license: "This software is licensed under the Apache License version 2."
 ---
 
-# Install Lance Rest Server on Kubernetes
+# Install Lance REST Server on Kubernetes
 
 This Helm chart deploys Apache Gravitino Lance REST Server on Kubernetes with customizable configurations.
 
@@ -42,13 +42,13 @@ helm install [RELEASE_NAME] [CHART] [flags]
 
 ### Deploy with Default Configuration
 
-Run the following command to deploy Gravitino Lance REST Server using the default settings, specify container image versions using --set image.tag=x.y.z (replace x, y, z with the expected version numbers):
+Run the following command to deploy Gravitino Lance REST Server using the default settings, specifying the container image version using `--set image.tag=<version>` (replace `<version>` with the desired image tag):
 
 ```console
 helm upgrade --install gravitino ./gravitino-lance-rest-server \
   -n gravitino \
   --create-namespace \
-  --set image.tag=<x.y.z> \
+  --set image.tag=<version> \
   --set replicas=2 \
   --set resources.requests.memory="4Gi" \
   --set resources.requests.cpu="2"
@@ -59,7 +59,7 @@ helm upgrade --install gravitino ./gravitino-lance-rest-server \
 To customize the deployment, use the --set flag to override specific values:
 
 ```console
-helm upgrade --install gravitino ./gravitino-lance-rest-server 
+helm upgrade --install gravitino ./gravitino-lance-rest-server \
   -n gravitino \
   --create-namespace \
   --set key1=val1,key2=val2,...
@@ -67,7 +67,7 @@ helm upgrade --install gravitino ./gravitino-lance-rest-server
 Alternatively, you can provide a custom values.yaml file:
 
 ```console
-helm upgrade --install gravitino ./gravitino-lance-rest-server 
+helm upgrade --install gravitino ./gravitino-lance-rest-server \
   -n gravitino \
   --create-namespace \
   -f /path/to/values.yaml

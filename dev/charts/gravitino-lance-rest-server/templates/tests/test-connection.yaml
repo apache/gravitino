@@ -44,7 +44,7 @@ spec:
               break
             else
               echo "Attempt $((attempt + 1)) failed with code ${http_code:-n/a}" && cat /tmp/body || true
-              sleep 1
+              sleep 2
             fi
             attempt=$((attempt + 1))
           done

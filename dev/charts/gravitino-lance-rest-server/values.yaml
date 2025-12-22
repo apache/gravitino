@@ -50,14 +50,15 @@ lanceRest:
   responseHeaderSize: 131072
   # Lance namespace backend settings
   namespaceBackend: gravitino
-  gravitinoUri: http://192.168.194.200:8090
-  gravitinoMetalake: "lrs_test"
+  gravitinoUri: http://gravitino-server:8090
+  # Name of the target metalake; must be set for your environment.
+  gravitinoMetalake: ""
 # Rest backend configs.
 additionalConfigItems: {}
 
 ## Log4j2 configuration items
 log4j2Properties:
-  status: debug
+  status: warn
 additionalLog4j2Properties:
   appender.console.type: Console
   appender.console.name: consoleLogger
@@ -125,7 +126,7 @@ service:
 
 livenessProbe:
   httpGet:
-    path: /lance/v1/namespace/$/list
+    path: /lance/v1/namespace/%24/list
     port: http
   initialDelaySeconds: 60
   timeoutSeconds: 10
@@ -134,7 +135,7 @@ livenessProbe:
 
 readinessProbe:
   httpGet:
-    path: /lance/v1/namespace/$/list
+    path: /lance/v1/namespace/%24/list
     port: http
   initialDelaySeconds: 30
   timeoutSeconds: 10
