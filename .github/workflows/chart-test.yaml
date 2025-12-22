@@ -108,7 +108,7 @@ jobs:
           docker buildx use default
           for t in gravitino:gravitino iceberg-rest-server:gravitino-iceberg-rest lance-rest-server:gravitino-lance-rest; do
             REPO_NAME=${t#*:}
-            CONTEXT_DIR="dev/docker/${t%:*}/"
+            CONTEXT_DIR="${{ github.workspace }}/dev/docker/${t%:*}/"
             
             docker build -t kind-registry:5000/${REPO_NAME}:${tag} "${CONTEXT_DIR}" && \
             docker push kind-registry:5000/${REPO_NAME}:${tag}
