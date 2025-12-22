@@ -85,8 +85,6 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - uses: actions/checkout@v4
-
       - uses: actions/setup-java@v4
         with:
           java-version: '17'
@@ -107,11 +105,13 @@ jobs:
           sudo rm -rf /opt/hostedtoolcache/CodeQL
           docker buildx use default
           for t in gravitino:gravitino iceberg-rest-server:gravitino-iceberg-rest lance-rest-server:gravitino-lance-rest; do
+            (
             REPO_NAME=${t#*:}
             CONTEXT_DIR="${{ github.workspace }}/dev/docker/${t%:*}/"
-            
-            docker build -t kind-registry:5000/${REPO_NAME}:${tag} "${CONTEXT_DIR}" && \
-            docker push kind-registry:5000/${REPO_NAME}:${tag}
+            cd ${CONTEXT_DIR}
+            docker build -t ${KIND_REGISTRY}/${REPO_NAME}:${tag} .
+            docker push ${KIND_REGISTRY}/${REPO_NAME}:${tag}
+            )
           done
 
       - name: Set up kubectl
@@ -119,15 +119,15 @@ jobs:
 
       - name: Run chart-testing (install default,gravitino)
         if: steps.list-changed.outputs.changed == 'true'
-        run: ct install --chart-dirs=dev/charts/gravitino --target-branch ${{ github.event.pull_request.base.ref }} --helm-extra-set-args "--set=image.registry='' --set image.repository=kind-registry:5000/gravitino"
+        run: ct install --chart-dirs=dev/charts/gravitino --target-branch ${{ github.event.pull_request.base.ref }} --helm-extra-set-args "--set=image.registry='' --set image.repository=${KIND_REGISTRY}/gravitino"
 
       - name: Run chart-testing (install default,gravitino-lance-rest-server)
         if: steps.list-changed.outputs.changed == 'true'
-        run: ct install --chart-dirs=dev/charts/gravitino-lance-rest-server --target-branch ${{ github.event.pull_request.base.ref }} --helm-extra-set-args "--set=image.registry='' --set image.repository=kind-registry:5000/gravitino-lance-rest"
+        run: ct install --chart-dirs=dev/charts/gravitino-lance-rest-server --target-branch ${{ github.event.pull_request.base.ref }} --helm-extra-set-args "--set=image.registry='' --set image.repository=${KIND_REGISTRY}/gravitino-lance-rest"
 
       - name: Run chart-testing (install default,gravitino-iceberg-rest-server)
         if: steps.list-changed.outputs.changed == 'true'
-        run: ct install --chart-dirs=dev/charts/gravitino-iceberg-rest-server --target-branch ${{ github.event.pull_request.base.ref }} --helm-extra-set-args "--set=image.registry='' --set image.repository=kind-registry:5000/gravitino-iceberg-rest"
+        run: ct install --chart-dirs=dev/charts/gravitino-iceberg-rest-server --target-branch ${{ github.event.pull_request.base.ref }} --helm-extra-set-args "--set=image.registry='' --set image.repository=${KIND_REGISTRY}/gravitino-iceberg-rest"
 
       - name: Run chart-testing (install mysql enable)
         if: steps.list-changed.outputs.changed == 'true'
