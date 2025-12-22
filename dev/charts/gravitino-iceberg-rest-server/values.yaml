@@ -20,7 +20,6 @@
 replicas: 1
 
 image:
-  registry: docker.io
   repository: apache/gravitino-iceberg-rest
   tag: 1.2.0-SNAPSHOT
   pullPolicy: IfNotPresent

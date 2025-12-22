@@ -72,7 +72,7 @@ spec:
       containers:
         - name: {{ include "gravitino-iceberg-rest-server.name" . }}
           # Image configuration
-          image: "{{ .Values.image.registry }}/{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           command:
             - "/bin/bash"

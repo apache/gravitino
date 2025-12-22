@@ -24,7 +24,6 @@
 replicaCount: 1
 
 image:
-  registry: docker.io
   repository: apache/gravitino-lance-rest
   pullPolicy: IfNotPresent
   # Overrides the image tag whose default is the chart appVersion.
