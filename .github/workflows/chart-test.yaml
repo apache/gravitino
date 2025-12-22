@@ -105,6 +105,7 @@ jobs:
           docker buildx use default
           rm -rf ${{ github.workspace }}/README.md
           rm -rf ${{ github.workspace }}/etc
+          rm -rf ${{ github.workspace }}/dev/charts/gravitino/Chart.lock
           for t in gravitino:gravitino iceberg-rest-server:gravitino-iceberg-rest lance-rest-server:gravitino-lance-rest; do
             (
             REPO_NAME=${t#*:}
