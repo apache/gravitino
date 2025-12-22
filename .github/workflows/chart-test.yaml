@@ -77,6 +77,7 @@ jobs:
         with:
           version: v0.27.0
           cluster_name: helm-test-cluster
+          registry: true
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
@@ -104,8 +105,13 @@ jobs:
         run: |
           sudo rm -rf /usr/local/lib/android
           sudo rm -rf /opt/hostedtoolcache/CodeQL
-          for t in gravitino:gravitino iceberg-rest-server:gravitino-iceberg-rest lance-rest-server:gravitino-lance-rest; do \
-            ./dev/docker/build-docker.sh --platform all --type ${t%:*} --image kind-registry:5000/${t#*:} --tag ${tag} --latest; \
+          docker buildx use default
+          for t in gravitino:gravitino iceberg-rest-server:gravitino-iceberg-rest lance-rest-server:gravitino-lance-rest; do
+            REPO_NAME=${t#*:}
+            CONTEXT_DIR="dev/docker/${t%:*}/"
+            
+            docker build -t kind-registry:5000/${REPO_NAME}:${tag} "${CONTEXT_DIR}" && \
+            docker push kind-registry:5000/${REPO_NAME}:${tag}
           done
 
       - name: Set up kubectl
