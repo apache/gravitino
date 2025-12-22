@@ -51,6 +51,9 @@ jobs:
           tar -xzf chart-testing_3.12.0_linux_amd64.tar.gz
           sudo mv ct /usr/local/bin/
           ct version
+          sudo wget github.com -O /usr/bin/yq
+          sudo chmod +x /usr/bin/yq
+          yq --version
 
       - name: List changed
         id: list-changed
@@ -73,12 +76,50 @@ jobs:
           version: v0.27.0
           cluster_name: helm-test-cluster
 
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Extract Image Tag
+        id: get-tag
+        run: |
+          # Use yq to parse the value. Path typically follows .image.tag structure.
+          IMAGE_TAG=$(yq '.image.tag' dev/charts/gravitino/values.yaml)
+          
+          # Remove any potential quotes and save to GitHub Outputs
+          echo "tag=$(echo $IMAGE_TAG | tr -d '\"')" >> "$GITHUB_OUTPUT"
+
+      - name: Build the Docker image to local registry
+        run: |
+          sudo rm -rf /usr/local/lib/android
+          sudo rm -rf /opt/hostedtoolcache/CodeQL
+          for t in gravitino:gravitino iceberg-rest-server:gravitino-iceberg-rest lance-rest-server:gravitino-lance-rest; do \
+            ./dev/docker/build-docker.sh --platform all --type ${t%:*} --image kind-registry:5000/${t#*:} --tag ${tag} --latest; \
+          done
+
       - name: Set up kubectl
         uses: azure/setup-kubectl@v4
 
-      - name: Run chart-testing (install default)
+      - name: Run chart-testing (install default,gravitino)
         if: steps.list-changed.outputs.changed == 'true'
-        run: ct install --chart-dirs=dev/charts --target-branch ${{ github.event.pull_request.base.ref }}
+        run: ct install --chart-dirs=dev/charts/gravitino --target-branch ${{ github.event.pull_request.base.ref }} --helm-extra-set-args "--set=image.registry='' --set image.repository=kind-registry:5000/gravitino"
+
+      - name: Run chart-testing (install default,gravitino-lance-rest-server)
+        if: steps.list-changed.outputs.changed == 'true'
+        run: ct install --chart-dirs=dev/charts/gravitino-lance-rest-server --target-branch ${{ github.event.pull_request.base.ref }} --helm-extra-set-args "--set=image.registry='' --set image.repository=kind-registry:5000/gravitino-lance-rest"
+
+      - name: Run chart-testing (install default,gravitino-iceberg-rest-server)
+        if: steps.list-changed.outputs.changed == 'true'
+        run: ct install --chart-dirs=dev/charts/gravitino-iceberg-rest-server --target-branch ${{ github.event.pull_request.base.ref }} --helm-extra-set-args "--set=image.registry='' --set image.repository=kind-registry:5000/gravitino-iceberg-rest"
 
       - name: Run chart-testing (install mysql enable)
         if: steps.list-changed.outputs.changed == 'true'
