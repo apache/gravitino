@@ -42,7 +42,8 @@ public class LanceExceptionMapper implements ExceptionMapper<Exception> {
             ? (LanceNamespaceException) ex
             : toLanceNamespaceException(instance, ex);
 
-    LOG.error("Handling Lance exception: {}", lanceException.getMessage());
+    LOG.error("Operate Lance instance with id '{}' got exception: {}", instance,
+        lanceException.getMessage());
 
     return handleLanceNamespaceException(lanceException);
   }
