@@ -30,6 +30,7 @@ from gravitino.client.relational_table import RelationalTable
 from gravitino.dto.audit_dto import AuditDTO
 from gravitino.dto.rel.distribution_dto import DistributionDTO
 from gravitino.dto.requests.table_create_request import TableCreateRequest
+from gravitino.dto.responses.drop_response import DropResponse
 from gravitino.dto.responses.entity_list_response import EntityListResponse
 from gravitino.dto.responses.table_response import TableResponse
 from gravitino.dto.util.dto_converters import DTOConverters
@@ -200,12 +201,35 @@ class RelationalCatalog(
         table_resp.validate()
         return RelationalTable(full_namespace, table_resp.table(), self.rest_client)
 
-    # TODO: We shall implement the following methods after integration tests for relational table
     def drop_table(self, identifier: NameIdentifier) -> bool:
-        raise NotImplementedError("Drop table is not implemented yet.")
+        """Drop the table with specified identifier.
+
+        Args:
+            identifier (NameIdentifier):
+                The identifier of the table, which should be "schema.table" format.
+
+        Returns:
+            bool:
+                `True` if the table is dropped successfully, `False` if the table does not exist.
+        """
+
+        return self._drop_table(identifier, purge=False)
 
     def alter_table(self, identifier: NameIdentifier, *changes) -> Table:
         raise NotImplementedError("Alter table is not implemented yet.")
 
     def purge_table(self, identifier: NameIdentifier) -> bool:
         raise NotImplementedError("Purge table is not implemented yet.")
+
+    def _drop_table(self, identifier: NameIdentifier, purge: bool) -> bool:
+        self._check_table_name_identifier(identifier)
+        full_namespace = self._get_table_full_namespace(identifier.namespace())
+        resp = self.rest_client.delete(
+            f"{self._format_table_request_path(full_namespace)}"
+            f"/{encode_string(identifier.name())}",
+            error_handler=TABLE_ERROR_HANDLER,
+            params={"purge": "true"} if purge else None,
+        )
+        drop_resp = DropResponse.from_json(resp.body, infer_missing=True)
+        drop_resp.validate()
+        return drop_resp.dropped()
