@@ -64,6 +64,12 @@ jobs:
             echo "changed=true" >> "$GITHUB_OUTPUT"
           fi
 
+      - name: Lint
+        if: steps.list-changed.outputs.changed == 'true'
+        run: |
+          helm repo add bitnami https://charts.bitnami.com/bitnami
+          ct lint --chart-dirs=dev/charts --chart-yaml-schema=dev/ci/chart_schema.yaml --lint-conf=dev/ci/lintconf.yaml --target-branch ${{ github.event.pull_request.base.ref }} --check-version-increment=false    
+
       - name: Set up kind cluster
         if: steps.list-changed.outputs.changed == 'true'
         uses: container-tools/kind-action@v2
@@ -98,6 +104,7 @@ jobs:
           sudo rm -rf /opt/hostedtoolcache/CodeQL
           docker buildx use default
           rm -rf ${{ github.workspace }}/README.md
+          rm -rf ${{ github.workspace }}/etc
           for t in gravitino:gravitino iceberg-rest-server:gravitino-iceberg-rest lance-rest-server:gravitino-lance-rest; do
             (
             REPO_NAME=${t#*:}
@@ -111,12 +118,6 @@ jobs:
 
       - name: Set up kubectl
         uses: azure/setup-kubectl@v4
-
-      - name: Lint
-        if: steps.list-changed.outputs.changed == 'true'
-        run: |
-          helm repo add bitnami https://charts.bitnami.com/bitnami
-          ct lint --chart-dirs=dev/charts --chart-yaml-schema=dev/ci/chart_schema.yaml --lint-conf=dev/ci/lintconf.yaml --target-branch ${{ github.event.pull_request.base.ref }} --check-version-increment=false
 
       - name: Run chart-testing (install default,gravitino)
         if: steps.list-changed.outputs.changed == 'true'
