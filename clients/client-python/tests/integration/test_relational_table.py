@@ -28,16 +28,10 @@ from gravitino import (
 from gravitino.api.rel.expressions.literals.literals import Literals
 from gravitino.api.rel.partitions.partitions import Partitions
 from gravitino.api.rel.types.types import Types
-from gravitino.client.relational_table import RelationalTable
 from gravitino.dto.rel.column_dto import ColumnDTO
 from gravitino.dto.rel.partitioning.identity_partitioning_dto import (
     IdentityPartitioningDTO,
 )
-from gravitino.dto.requests.catalog_create_request import CatalogCreateRequest
-from gravitino.dto.requests.schema_create_request import SchemaCreateRequest
-from gravitino.dto.requests.table_create_request import TableCreateRequest
-from gravitino.dto.responses.table_response import TableResponse
-from gravitino.rest.rest_utils import encode_string
 from gravitino.utils import HTTPClient
 from tests.integration.containers.hdfs_container import HDFSContainer
 from tests.integration.integration_test_env import IntegrationTestEnv
@@ -51,18 +45,14 @@ class TestRelationalTable(IntegrationTestEnv):
     CATALOG_PROVIDER: str = "hive"
     SCHEMA_NAME: str = "test_schema"
     TABLE_NAME: str = "test_table"
-    TABLE_IDENT: NameIdentifier = NameIdentifier.of(
-        METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME, TABLE_NAME
-    )
+    TABLE_IDENT: NameIdentifier = NameIdentifier.of(SCHEMA_NAME, TABLE_NAME)
 
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
         cls.hdfs_container: HDFSContainer = HDFSContainer()
-        cls.HIVE_METASTORE_URI = f"thrift://{cls.hdfs_container.get_ip()}:9083"
-        logger.info(
-            "Started Hive container with metastore URI: %s", cls.HIVE_METASTORE_URI
-        )
+        hive_metastore_uri = f"thrift://{cls.hdfs_container.get_ip()}:9083"
+        logger.info("Started Hive container with metastore URI: %s", hive_metastore_uri)
         cls.rest_client = HTTPClient("http://localhost:8090")
         cls.gravitino_admin_client = GravitinoAdminClient(uri="http://localhost:8090")
         cls.gravitino_admin_client.create_metalake(
@@ -73,14 +63,43 @@ class TestRelationalTable(IntegrationTestEnv):
         cls.gravitino_client: GravitinoClient = GravitinoClient(
             uri="http://localhost:8090", metalake_name=cls.METALAKE_NAME
         )
-        cls._create_test_catalog()
-        cls._create_test_schema()
-        cls._create_test_table()
+        cls.catalog = cls.gravitino_client.create_catalog(
+            name=cls.CATALOG_NAME,
+            catalog_type=Catalog.Type.RELATIONAL,
+            provider=cls.CATALOG_PROVIDER,
+            comment="Test relational catalog",
+            properties={"metastore.uris": hive_metastore_uri},
+        )
+        cls.schema = cls.catalog.as_schemas().create_schema(
+            schema_name=cls.SCHEMA_NAME,
+            comment="Test schema",
+            properties={},
+        )
+        cls.relational_catalog = cls.catalog.as_table_catalog()
+        cls.relational_table = cls.relational_catalog.create_table(
+            identifier=cls.TABLE_IDENT,
+            columns=[
+                ColumnDTO.builder()
+                .with_name("dt")
+                .with_data_type(Types.DateType.get())
+                .build(),
+                ColumnDTO.builder()
+                .with_name("country")
+                .with_data_type(Types.StringType.get())
+                .build(),
+            ],
+            partitioning=[
+                IdentityPartitioningDTO("dt"),
+                IdentityPartitioningDTO("country"),
+            ],
+        )
 
     @classmethod
     def tearDownClass(cls):
         try:
-            cls._drop_test_schema()
+            cls.catalog.as_schemas().drop_schema(
+                schema_name=cls.SCHEMA_NAME, cascade=True
+            )
             cls.gravitino_client.drop_catalog(name=cls.CATALOG_NAME, force=True)
             cls.gravitino_admin_client.drop_metalake(name=cls.METALAKE_NAME, force=True)
         except Exception as e:  # pylint: disable=broad-exception-caught
@@ -95,86 +114,9 @@ class TestRelationalTable(IntegrationTestEnv):
 
         super().tearDownClass()
 
-    @classmethod
-    def _create_test_catalog(cls):
-        catalog_req = CatalogCreateRequest(
-            name=cls.CATALOG_NAME,
-            catalog_type=Catalog.Type.RELATIONAL,
-            comment="Test relational catalog",
-            provider=cls.CATALOG_PROVIDER,
-            properties={"metastore.uris": cls.HIVE_METASTORE_URI},
-        )
-        cls.rest_client.post(
-            endpoint=f"/api/metalakes/{encode_string(cls.METALAKE_NAME)}/catalogs",
-            json=catalog_req,
-        )
-
-    @classmethod
-    def _create_test_schema(cls):
-        schema_req = SchemaCreateRequest(
-            name=cls.SCHEMA_NAME,
-            comment="Test schema",
-            properties={},
-        )
-        cls.rest_client.post(
-            endpoint=f"/api/metalakes/{encode_string(cls.METALAKE_NAME)}"
-            f"/catalogs/{encode_string(cls.CATALOG_NAME)}/schemas",
-            json=schema_req,
-        )
-
-    @classmethod
-    def _create_test_table(cls):
-        table_req = TableCreateRequest(
-            _name=cls.TABLE_NAME,
-            _columns=[
-                ColumnDTO.builder()
-                .with_name("dt")
-                .with_data_type(Types.DateType.get())
-                .build(),
-                ColumnDTO.builder()
-                .with_name("country")
-                .with_data_type(Types.StringType.get())
-                .build(),
-            ],
-            _partitioning=[
-                IdentityPartitioningDTO("dt"),
-                IdentityPartitioningDTO("country"),
-            ],
-        )
-        cls.rest_client.post(
-            endpoint=f"/api/metalakes/{encode_string(cls.METALAKE_NAME)}"
-            f"/catalogs/{encode_string(cls.CATALOG_NAME)}"
-            f"/schemas/{encode_string(cls.SCHEMA_NAME)}/tables",
-            json=table_req,
-        )
-
-    @classmethod
-    def _drop_test_schema(cls):
-        cls.rest_client.delete(
-            endpoint=f"/api/metalakes/{encode_string(cls.METALAKE_NAME)}"
-            f"/catalogs/{encode_string(cls.CATALOG_NAME)}"
-            f"/schemas/{encode_string(cls.SCHEMA_NAME)}",
-            params={"cascade": "true"},
-        )
-
-    @classmethod
-    def _load_test_table(cls) -> RelationalTable:
-        resp = cls.rest_client.get(
-            endpoint=f"/api/metalakes/{encode_string(cls.METALAKE_NAME)}"
-            f"/catalogs/{encode_string(cls.CATALOG_NAME)}"
-            f"/schemas/{encode_string(cls.SCHEMA_NAME)}"
-            f"/tables/{encode_string(cls.TABLE_NAME)}"
-        )
-        resp = TableResponse.from_json(resp.body, infer_missing=True)
-        return RelationalTable(
-            namespace=cls.TABLE_IDENT.get_namespace(),
-            table_dto=resp.table(),
-            rest_client=cls.rest_client,
-        )
-
     def test_relational_table_partition_ops(self):
         """Tests add/get/list/drop partition and list partition names of a relational table."""
-        relational_table = self._load_test_table()
+        relational_table = self.relational_catalog.load_table(self.TABLE_IDENT)
 
         # Tests list partition names
         partition_names = relational_table.list_partition_names()
