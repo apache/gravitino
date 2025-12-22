@@ -163,7 +163,7 @@ public class ModelOperations {
           """
                       ANY(OWNER, METALAKE, CATALOG) ||
                       SCHEMA_OWNER_WITH_USE_CATALOG ||
-                      ANY_USE_CATALOG && ANY_USE_SCHEMA && ANY_CREATE_MODEL
+                      ANY_USE_CATALOG && ANY_USE_SCHEMA && ANY_REGISTER_MODEL
                       """,
       accessMetadataType = MetadataObject.Type.SCHEMA)
   public Response registerModel(
@@ -408,7 +408,7 @@ public class ModelOperations {
           """
                     ANY(OWNER, METALAKE, CATALOG) ||
                     SCHEMA_OWNER_WITH_USE_CATALOG ||
-                    ANY_USE_CATALOG && ANY_USE_SCHEMA && (MODEL::OWNER || ANY_USE_MODEL && ANY_CREATE_MODEL_VERSION)
+                    ANY_USE_CATALOG && ANY_USE_SCHEMA && (MODEL::OWNER || ANY_USE_MODEL && ANY_LINK_MODEL_VERSION)
                       """,
       accessMetadataType = MetadataObject.Type.MODEL)
   public Response linkModelVersion(

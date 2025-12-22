@@ -18,23 +18,25 @@
  */
 package org.apache.gravitino.catalog.lakehouse.hudi.backend.hms;
 
+import static org.apache.gravitino.catalog.hive.HiveConstants.HIVE_DEFAULT_CATALOG;
+import static org.apache.gravitino.catalog.hive.HiveConstants.HIVE_METASTORE_URIS;
+import static org.apache.gravitino.catalog.hive.HiveConstants.INPUT_FORMAT;
+import static org.apache.gravitino.catalog.lakehouse.hudi.HudiCatalogPropertiesMetadata.DEFAULT_CATALOG;
 import static org.apache.gravitino.catalog.lakehouse.hudi.HudiCatalogPropertiesMetadata.URI;
 import static org.apache.gravitino.connector.BaseCatalog.CATALOG_BYPASS_PREFIX;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
-import java.io.File;
-import java.io.IOException;
 import java.util.List;
 import java.util.Map;
+import java.util.Properties;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.Schema;
 import org.apache.gravitino.SchemaChange;
 import org.apache.gravitino.catalog.lakehouse.hudi.HudiSchema;
 import org.apache.gravitino.catalog.lakehouse.hudi.HudiTable;
-import org.apache.gravitino.catalog.lakehouse.hudi.backend.hms.kerberos.AuthenticationConfig;
-import org.apache.gravitino.catalog.lakehouse.hudi.backend.hms.kerberos.KerberosClient;
 import org.apache.gravitino.catalog.lakehouse.hudi.ops.HudiCatalogBackendOps;
 import org.apache.gravitino.catalog.lakehouse.hudi.utils.CatalogUtils;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
@@ -45,18 +47,12 @@ import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
 import org.apache.gravitino.exceptions.TableAlreadyExistsException;
 import org.apache.gravitino.hive.CachedClientPool;
 import org.apache.gravitino.rel.Column;
+import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.TableChange;
 import org.apache.gravitino.rel.expressions.distributions.Distribution;
 import org.apache.gravitino.rel.expressions.sorts.SortOrder;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.indexes.Index;
-import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.hive.conf.HiveConf;
-import org.apache.hadoop.hive.metastore.api.Database;
-import org.apache.hadoop.hive.metastore.api.NoSuchObjectException;
-import org.apache.hadoop.hive.metastore.api.Table;
-import org.apache.hadoop.hive.metastore.api.UnknownDBException;
-import org.apache.thrift.TException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -64,35 +60,45 @@ public class HudiHMSBackendOps implements HudiCatalogBackendOps {
   private static final Logger LOG = LoggerFactory.getLogger(HudiHMSBackendOps.class);
   // Mapping from Gravitino config to Hive config
   private static final Map<String, String> CONFIG_CONVERTER =
-      ImmutableMap.of(URI, HiveConf.ConfVars.METASTOREURIS.varname);
+      ImmutableMap.of(URI, HIVE_METASTORE_URIS);
 
   private static final String HUDI_PACKAGE_PREFIX = "org.apache.hudi";
 
-  @VisibleForTesting CachedClientPool clientPool;
+  private String catalogName;
 
-  public static final String GRAVITINO_KEYTAB_FORMAT = "keytabs/gravitino-lakehouse-hudi-%s-keytab";
+  @VisibleForTesting CachedClientPool clientPool;
 
   @Override
   public void initialize(Map<String, String> properties) {
-    HiveConf hiveConf = buildHiveConfAndInitKerberosAuth(properties);
-    this.clientPool = new CachedClientPool(hiveConf, properties);
+    Properties clientProperties = new Properties();
+
+    Map<String, String> byPassConfigs = Maps.newHashMap();
+    Map<String, String> convertedConfigs = Maps.newHashMap();
+    properties.forEach(
+        (key, value) -> {
+          if (key.startsWith(CATALOG_BYPASS_PREFIX)) {
+            byPassConfigs.put(key.substring(CATALOG_BYPASS_PREFIX.length()), value);
+          } else if (CONFIG_CONVERTER.containsKey(key)) {
+            convertedConfigs.put(CONFIG_CONVERTER.get(key), value);
+          } else {
+            convertedConfigs.put(key, value);
+          }
+        });
+    byPassConfigs.forEach(clientProperties::setProperty);
+    convertedConfigs.forEach(clientProperties::setProperty);
+
+    this.catalogName = properties.getOrDefault(DEFAULT_CATALOG, HIVE_DEFAULT_CATALOG);
+    String catalogKey = "hudi-" + properties.getOrDefault(CatalogUtils.CATALOG_ID_KEY, "0");
+    this.clientPool = new CachedClientPool(catalogKey, clientProperties, properties);
+    LOG.info("Hudi HMS Backend Ops initialized with properties: {}", properties);
   }
 
   @Override
   public HudiSchema loadSchema(NameIdentifier schemaIdent) throws NoSuchSchemaException {
     try {
-      Database database = clientPool.run(client -> client.getDatabase(schemaIdent.name()));
-      return HudiHMSSchema.builder().withBackendSchema(database).build();
-
-    } catch (NoSuchObjectException | UnknownDBException e) {
-      throw new NoSuchSchemaException(
-          e, "Hudi schema (database) does not exist: %s in Hive Metastore", schemaIdent.name());
-
-    } catch (TException e) {
-      throw new RuntimeException(
-          "Failed to load Hudi schema (database) " + schemaIdent.name() + " from Hive Metastore",
-          e);
-
+      Schema database =
+          clientPool.run(client -> client.getDatabase(catalogName, schemaIdent.name()));
+      return HudiHMSSchema.builder().buildFromSchema(database);
     } catch (InterruptedException e) {
       throw new RuntimeException(e);
     }
@@ -103,17 +109,9 @@ public class HudiHMSBackendOps implements HudiCatalogBackendOps {
     try {
       return clientPool.run(
           c ->
-              c.getAllDatabases().stream()
+              c.getAllDatabases(catalogName).stream()
                   .map(db -> NameIdentifier.of(namespace, db))
                   .toArray(NameIdentifier[]::new));
-
-    } catch (TException e) {
-      throw new RuntimeException(
-          "Failed to list all schemas (database) under namespace : "
-              + namespace
-              + " in Hive Metastore",
-          e);
-
     } catch (InterruptedException e) {
       throw new RuntimeException(e);
     }
@@ -147,21 +145,12 @@ public class HudiHMSBackendOps implements HudiCatalogBackendOps {
     try {
       return clientPool.run(
           c -> {
-            List<String> allTables = c.getAllTables(schemaIdent.name());
-            return c.getTableObjectsByName(schemaIdent.name(), allTables).stream()
+            List<String> allTables = c.getAllTables(catalogName, schemaIdent.name());
+            return c.getTableObjectsByName(catalogName, schemaIdent.name(), allTables).stream()
                 .filter(this::checkHudiTable)
-                .map(t -> NameIdentifier.of(namespace, t.getTableName()))
+                .map(t -> NameIdentifier.of(namespace, t.name()))
                 .toArray(NameIdentifier[]::new);
           });
-
-    } catch (UnknownDBException e) {
-      throw new NoSuchSchemaException(
-          "Schema (database) does not exist %s in Hive Metastore", namespace);
-
-    } catch (TException e) {
-      throw new RuntimeException(
-          "Failed to list all tables under the namespace : " + namespace + " in Hive Metastore", e);
-
     } catch (InterruptedException e) {
       throw new RuntimeException(e);
     }
@@ -173,20 +162,13 @@ public class HudiHMSBackendOps implements HudiCatalogBackendOps {
 
     try {
       Table table =
-          clientPool.run(client -> client.getTable(schemaIdent.name(), tableIdent.name()));
+          clientPool.run(
+              client -> client.getTable(catalogName, schemaIdent.name(), tableIdent.name()));
       if (!checkHudiTable(table)) {
         throw new NoSuchTableException(
             "Table %s is not a Hudi table in Hive Metastore", tableIdent.name());
       }
       return HudiHMSTable.builder().withBackendTable(table).build();
-
-    } catch (NoSuchObjectException e) {
-      throw new NoSuchTableException(
-          e, "Hudi table does not exist: %s in Hive Metastore", tableIdent.name());
-
-    } catch (TException e) {
-      throw new RuntimeException(
-          "Failed to load Hudi table " + tableIdent.name() + " from Hive metastore", e);
 
     } catch (InterruptedException e) {
       throw new RuntimeException(e);
@@ -231,44 +213,7 @@ public class HudiHMSBackendOps implements HudiCatalogBackendOps {
     // uses `org.apache.hudi.hadoop.HoodieParquetInputFormat` and MOR table
     // uses `org.apache.hudi.hadoop.HoodieParquetRealtimeInputFormat`, to
     // simplify the logic, we just check the prefix of the input format
-    return table.getSd().getInputFormat() != null
-        && table.getSd().getInputFormat().startsWith(HUDI_PACKAGE_PREFIX);
-  }
-
-  private HiveConf buildHiveConfAndInitKerberosAuth(Map<String, String> properties) {
-    Configuration hadoopConf = new Configuration();
-
-    Map<String, String> byPassConfigs = Maps.newHashMap();
-    Map<String, String> convertedConfigs = Maps.newHashMap();
-    properties.forEach(
-        (key, value) -> {
-          if (key.startsWith(CATALOG_BYPASS_PREFIX)) {
-            byPassConfigs.put(key.substring(CATALOG_BYPASS_PREFIX.length()), value);
-          } else if (CONFIG_CONVERTER.containsKey(key)) {
-            convertedConfigs.put(CONFIG_CONVERTER.get(key), value);
-          } else {
-            hadoopConf.set(key, value);
-          }
-        });
-    byPassConfigs.forEach(hadoopConf::set);
-    convertedConfigs.forEach(hadoopConf::set);
-    initKerberosAuth(properties, hadoopConf);
-    return new HiveConf(hadoopConf, HudiHMSBackendOps.class);
-  }
-
-  private void initKerberosAuth(Map<String, String> properties, Configuration hadoopConf) {
-    AuthenticationConfig authenticationConfig = new AuthenticationConfig(properties);
-    if (authenticationConfig.isKerberosAuth()) {
-      try (KerberosClient kerberosClient = new KerberosClient(properties, hadoopConf, true)) {
-        String keytabPath =
-            String.format(
-                GRAVITINO_KEYTAB_FORMAT, properties.getOrDefault(CatalogUtils.CATALOG_ID_KEY, "0"));
-        File keytabFile = kerberosClient.saveKeyTabFileFromUri(keytabPath);
-        kerberosClient.login(keytabFile.getAbsolutePath());
-        LOG.info("Login with kerberos success");
-      } catch (IOException e) {
-        throw new RuntimeException("Failed to login with kerberos", e);
-      }
-    }
+    String inputFormat = table.properties().get(INPUT_FORMAT);
+    return inputFormat != null && inputFormat.startsWith(HUDI_PACKAGE_PREFIX);
   }
 }

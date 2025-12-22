@@ -60,6 +60,7 @@ import org.apache.gravitino.rel.indexes.Index;
 import org.apache.gravitino.rel.indexes.Indexes;
 import org.apache.gravitino.rel.types.Type;
 import org.apache.gravitino.storage.IdGenerator;
+import org.apache.gravitino.utils.NamespaceUtil;
 import org.apache.gravitino.utils.PrincipalUtils;
 
 public abstract class ManagedTableOperations implements TableCatalog {
@@ -208,6 +209,7 @@ public abstract class ManagedTableOperations implements TableCatalog {
 
   private TableEntity applyChanges(TableEntity oldTableEntity, TableChange... changes) {
     String newName = oldTableEntity.name();
+    Namespace newNs = oldTableEntity.namespace();
     String newComment = oldTableEntity.comment();
     Map<String, String> newProps = Maps.newHashMap(oldTableEntity.properties());
     List<ColumnEntity> newColumns = Lists.newArrayList(oldTableEntity.columns());
@@ -225,13 +227,13 @@ public abstract class ManagedTableOperations implements TableCatalog {
 
     for (TableChange change : tableChanges) {
       if (change instanceof TableChange.RenameTable rename) {
-        if (rename.getNewSchemaName().isPresent()) {
-          throw new IllegalArgumentException(
-              "Gravitino managed table doesn't support renaming "
-                  + "the table across schemas for now");
-        }
-
+        Namespace oldNs = oldTableEntity.namespace();
         newName = rename.getNewName();
+        newNs =
+            rename
+                .getNewSchemaName()
+                .map(s -> NamespaceUtil.ofTable(oldNs.level(0), oldNs.level(1), s))
+                .orElse(oldNs);
 
       } else if (change instanceof TableChange.UpdateComment updateComment) {
         newComment = updateComment.getNewComment();
@@ -269,7 +271,7 @@ public abstract class ManagedTableOperations implements TableCatalog {
     return TableEntity.builder()
         .withId(oldTableEntity.id())
         .withName(newName)
-        .withNamespace(oldTableEntity.namespace())
+        .withNamespace(newNs)
         .withComment(newComment)
         .withColumns(newColumns)
         .withProperties(newProps)

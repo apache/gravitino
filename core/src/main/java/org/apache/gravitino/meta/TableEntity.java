@@ -51,7 +51,6 @@ public class TableEntity implements Entity, Auditable, HasIdentifier {
       Field.required("audit_info", AuditInfo.class, "The audit details of the table");
   public static final Field COLUMNS =
       Field.optional("columns", List.class, "The columns of the table");
-  public static final Field FORMAT = Field.optional("format", String.class, "The table's format");
   public static final Field PROPERTIES =
       Field.optional("properties", Map.class, "The table's properties");
   public static final Field PARTITIONING =

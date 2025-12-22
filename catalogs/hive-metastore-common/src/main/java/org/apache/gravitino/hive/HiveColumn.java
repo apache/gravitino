@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.catalog.hive;
+package org.apache.gravitino.hive;
 
 import lombok.EqualsAndHashCode;
 import org.apache.gravitino.connector.BaseColumn;
@@ -46,6 +46,7 @@ public class HiveColumn extends BaseColumn {
       hiveColumn.comment = comment;
       hiveColumn.dataType = dataType;
       hiveColumn.nullable = nullable;
+      hiveColumn.autoIncrement = autoIncrement;
       hiveColumn.defaultValue = defaultValue == null ? DEFAULT_VALUE_NOT_SET : defaultValue;
       return hiveColumn;
     }

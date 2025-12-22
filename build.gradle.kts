@@ -129,6 +129,31 @@ allprojects {
           "import\\s+(?:static\\s+)?[^*\\s]+\\*;(\\r\\n|\\r|\\n)",
           "$1"
         )
+        replaceRegex(
+          "Use Guava classes from collect/base packages instead of any shadowed versions (including Jersey)",
+          "import\\s+(?:.*\\.com\\.google\\.common\\.(collect|base)|org\\.glassfish\\.jersey\\.internal\\.guava)\\.([A-Z][a-zA-Z0-9_]*);",
+          "import com.google.common.${'$'}1.${'$'}2;"
+        )
+        replaceRegex(
+          "Use Guava classes from all other packages instead of any shadowed versions",
+          "import\\s+.*\\.com\\.google\\.common\\.(io|util\\.concurrent|annotations|cache|primitives|hash|net|reflect)\\.([A-Z][a-zA-Z0-9_]*);",
+          "import com.google.common.${'$'}1.${'$'}2;"
+        )
+        replaceRegex(
+          "Use Apache Commons Lang3 instead of shadowed versions",
+          "import\\s+.*\\.org\\.apache\\.commons\\.lang3\\.([A-Z][a-zA-Z0-9_]*);",
+          "import org.apache.commons.lang3.${'$'}1;"
+        )
+        replaceRegex(
+          "Use Apache Commons IO instead of shadowed versions",
+          "import\\s+.*\\.org\\.apache\\.commons\\.io\\.([A-Z][a-zA-Z0-9_]*);",
+          "import org.apache.commons.io.${'$'}1;"
+        )
+        replaceRegex(
+          "Use SLF4J Logger instead of other logging frameworks",
+          "import\\s+.*\\.(Logger|LoggerFactory);",
+          "import org.slf4j.${'$'}1;"
+        )
 
         targetExclude("**/build/**", "**/.pnpm/***")
       }
@@ -270,6 +295,12 @@ fun excludePackagesForSparkConnector(project: Project) {
 subprojects {
   // Gravitino Python client project didn't need to apply the java plugin
   if (project.name == "client-python") {
+    return@subprojects
+  }
+
+  if (project.path == ":catalogs:hive-metastore2-libs" ||
+    project.path == ":catalogs:hive-metastore3-libs"
+  ) {
     return@subprojects
   }
 
@@ -763,12 +794,12 @@ tasks {
 
       copy {
         from(projectDir.dir("licenses")) { into("${rootProject.name}-iceberg-rest-server/licenses") }
-        from(projectDir.file("LICENSE.rest")) { into("${rootProject.name}-iceberg-rest-server") }
-        from(projectDir.file("NOTICE.rest")) { into("${rootProject.name}-iceberg-rest-server") }
+        from(projectDir.file("LICENSE.iceberg")) { into("${rootProject.name}-iceberg-rest-server") }
+        from(projectDir.file("NOTICE.iceberg")) { into("${rootProject.name}-iceberg-rest-server") }
         from(projectDir.file("README.md")) { into("${rootProject.name}-iceberg-rest-server") }
         into(outputDir)
         rename { fileName ->
-          fileName.replace(".rest", "")
+          fileName.replace(".iceberg", "")
         }
       }
     }
@@ -808,12 +839,12 @@ tasks {
 
       copy {
         from(projectDir.dir("licenses")) { into("${rootProject.name}-lance-rest-server/licenses") }
-        from(projectDir.file("LICENSE.rest")) { into("${rootProject.name}-lance-rest-server") }
-        from(projectDir.file("NOTICE.rest")) { into("${rootProject.name}-lance-rest-server") }
+        from(projectDir.file("LICENSE.lance")) { into("${rootProject.name}-lance-rest-server") }
+        from(projectDir.file("NOTICE.lance")) { into("${rootProject.name}-lance-rest-server") }
         from(projectDir.file("README.md")) { into("${rootProject.name}-lance-rest-server") }
         into(outputDir)
         rename { fileName ->
-          fileName.replace(".rest", "")
+          fileName.replace(".lance", "")
         }
       }
     }
@@ -961,8 +992,8 @@ tasks {
         !it.name.startsWith("iceberg") &&
         !it.name.startsWith("lance") &&
         !it.name.startsWith("spark") &&
+        !it.name.startsWith("hive-metastore") &&
         it.name != "hadoop-common" &&
-        it.name != "hive-metastore-common" &&
         it.name != "integration-test" &&
         it.name != "trino-connector" &&
         it.parent?.name != "bundles" &&
@@ -995,6 +1026,8 @@ tasks {
         !it.name.startsWith("integration-test") &&
         !it.name.startsWith("spark") &&
         !it.name.startsWith("trino-connector") &&
+        it.name != "hive-metastore2-libs" &&
+        it.name != "hive-metastore3-libs" &&
         it.name != "hive-metastore-common" &&
         it.name != "docs" &&
         it.name != "hadoop-common" &&
@@ -1026,6 +1059,8 @@ tasks {
       ":catalogs:catalog-lakehouse-iceberg:copyLibAndConfig",
       ":catalogs:catalog-lakehouse-paimon:copyLibAndConfig",
       ":catalogs:catalog-model:copyLibAndConfig",
+      ":catalogs:hive-metastore2-libs:copyLibs",
+      ":catalogs:hive-metastore3-libs:copyLibs",
       ":catalogs:catalog-lakehouse-generic:copyLibAndConfig"
     )
   }

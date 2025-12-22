@@ -61,7 +61,7 @@ dependencies {
 }
 
 tasks {
-  val runtimeJars by registering(Copy::class) {
+  register("runtimeJars", Copy::class) {
     from(configurations.runtimeClasspath)
     into("build/libs")
   }

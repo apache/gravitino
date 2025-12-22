@@ -19,6 +19,7 @@
 
 package org.apache.gravitino.catalog.hive.integration.test;
 
+import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
 import java.net.URI;
 import java.util.HashMap;
@@ -29,11 +30,10 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.spark.sql.SparkSession;
 import org.junit.jupiter.api.condition.EnabledIf;
-import org.testcontainers.shaded.com.google.common.collect.ImmutableMap;
 import org.testcontainers.utility.MountableFile;
 
 @EnabledIf(value = "isGCSConfigured", disabledReason = "Google Cloud Storage(GCS) is not prepared.")
-public class CatalogHiveGCSIT extends CatalogHiveIT {
+public class CatalogHiveGCSIT extends CatalogHive2IT {
 
   private static final String GCS_BUCKET_NAME = System.getenv("GCS_BUCKET_NAME");
   private static final String GCS_ACCOUNT_JSON_FILE =
@@ -51,7 +51,7 @@ public class CatalogHiveGCSIT extends CatalogHiveIT {
 
     containerSuite.startHiveContainerWithS3(hiveContainerEnv);
 
-    HIVE_METASTORE_URIS =
+    hiveMetastoreUris =
         String.format(
             "thrift://%s:%d",
             containerSuite.getHiveContainerWithS3().getContainerIpAddress(),
@@ -81,7 +81,7 @@ public class CatalogHiveGCSIT extends CatalogHiveIT {
         SparkSession.builder()
             .master("local[1]")
             .appName("Hive Catalog integration test")
-            .config("hive.metastore.uris", HIVE_METASTORE_URIS)
+            .config("hive.metastore.uris", hiveMetastoreUris)
             .config(
                 "spark.sql.warehouse.dir",
                 String.format(String.format("gs://%s/user/hive/warehouse", GCS_BUCKET_NAME)))

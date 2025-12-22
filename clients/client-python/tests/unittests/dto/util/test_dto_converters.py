@@ -31,7 +31,9 @@ from gravitino.api.rel.expressions.literals.literals import Literals
 from gravitino.api.rel.expressions.named_reference import FieldReference
 from gravitino.api.rel.expressions.sorts.null_ordering import NullOrdering
 from gravitino.api.rel.expressions.sorts.sort_direction import SortDirection
+from gravitino.api.rel.expressions.sorts.sort_order import SortOrder
 from gravitino.api.rel.expressions.sorts.sort_orders import SortOrders
+from gravitino.api.rel.expressions.transforms.transform import Transform
 from gravitino.api.rel.expressions.transforms.transforms import Transforms
 from gravitino.api.rel.expressions.unparsed_expression import UnparsedExpression
 from gravitino.api.rel.indexes.index import Index
@@ -108,6 +110,14 @@ class TestDTOConverters(unittest.TestCase):
             .with_unparsed_expression("unparsed")
             .build(),
         }
+        cls.single_field_transforms = {
+            Transforms.NAME_OF_IDENTITY: Transforms.identity("score"),
+            Transforms.NAME_OF_YEAR: Transforms.year("createTime"),
+            Transforms.NAME_OF_MONTH: Transforms.month("createTime"),
+            Transforms.NAME_OF_DAY: Transforms.day("createTime"),
+            Transforms.NAME_OF_HOUR: Transforms.hour("createTime"),
+        }
+
         cls.table_dto_json = """
         {
             "name": "example_table",
@@ -768,3 +778,209 @@ class TestDTOConverters(unittest.TestCase):
         )
         converted = DTOConverters.to_dto(partition)
         self.assertTrue(converted == expected)
+
+    def test_to_dtos_columns(self):
+        column_names = {f"column_{i}" for i in range(2)}
+        column_data_types = {Types.IntegerType.get(), Types.BooleanType.get()}
+        columns: list[Column] = [
+            Column.of(name=column_name, data_type=column_data_type)
+            for column_name, column_data_type in zip(column_names, column_data_types)
+        ]
+        expected = [
+            ColumnDTO.builder()
+            .with_name(column.name())
+            .with_data_type(column.data_type())
+            .with_default_value(Column.DEFAULT_VALUE_NOT_SET)
+            .build()
+            for column in columns
+        ]
+        self.assertListEqual(DTOConverters.to_dtos(columns), expected)
+
+    def test_to_dtos_sort_orders(self):
+        directions = {SortDirection.ASCENDING, SortDirection.DESCENDING}
+        null_orderings = {NullOrdering.NULLS_LAST, NullOrdering.NULLS_FIRST}
+        field_names = [
+            [f"score_{i}"] for i in range(len(directions) * len(null_orderings))
+        ]
+        sort_orders: list[SortOrder] = []
+        expected_dtos: list[SortOrderDTO] = []
+        for field_name, (direction, null_ordering) in zip(
+            field_names, product(directions, null_orderings)
+        ):
+            field_ref = FieldReference(field_names=field_name)
+            sort_orders.append(
+                SortOrders.of(
+                    expression=field_ref,
+                    direction=direction,
+                    null_ordering=null_ordering,
+                )
+            )
+            field_ref_dto = (
+                FieldReferenceDTO.builder()
+                .with_field_name(field_name=field_name)
+                .build()
+            )
+            expected_dtos.append(
+                SortOrderDTO(
+                    sort_term=field_ref_dto,
+                    direction=direction,
+                    null_ordering=null_ordering,
+                )
+            )
+        converted_dtos = DTOConverters.to_dtos(sort_orders)
+        for converted, expected in zip(converted_dtos, expected_dtos):
+            self.assertEqual(converted.sort_term(), expected.sort_term())
+            self.assertEqual(converted.direction(), expected.direction())
+            self.assertEqual(converted.null_ordering(), expected.null_ordering())
+
+        self.assertListEqual(DTOConverters.to_dtos(converted_dtos), converted_dtos)
+
+    def test_to_dtos_indexes(self):
+        field_names = [[f"field_{i}"] for i in range(2)]
+
+        indexes: list[Index] = [
+            Indexes.of(index_type, index_type.value, field_names)
+            for index_type in Index.IndexType
+        ]
+        expected_dtos: list[IndexDTO] = [
+            IndexDTO(
+                index_type=index_type,
+                name=index_type.value,
+                field_names=field_names,
+            )
+            for index_type in Index.IndexType
+        ]
+        converted_dtos = DTOConverters.to_dtos(indexes)
+        for converted, expected in zip(converted_dtos, expected_dtos):
+            self.assertEqual(converted.type(), expected.type())
+            self.assertEqual(converted.name(), expected.name())
+            self.assertListEqual(converted.field_names(), expected.field_names())
+
+        self.assertListEqual(DTOConverters.to_dtos(converted_dtos), converted_dtos)
+
+    def test_to_dtos_single_field_transforms(self):
+        converted_dtos = DTOConverters.to_dtos(self.single_field_transforms.values())
+        for key, converted in zip(self.single_field_transforms.keys(), converted_dtos):
+            transform_class = DTOConverters._SINGLE_FIELD_TRANSFORM_TYPES[  # pylint: disable=protected-access
+                key
+            ]
+            expected = transform_class(*converted.field_name())
+            self.assertEqual(converted.field_name(), expected.field_name())
+
+    def test_to_dtos_bucket_truncate_transforms(self):
+        num_buckets, width = 10, 5
+        field_name = ["score"]
+        bucket_transform = Transforms.bucket(num_buckets, field_name)
+        trunc_transform = Transforms.truncate(width, field_name)
+        transforms = [bucket_transform, trunc_transform]
+        converted_dtos = DTOConverters.to_dtos(transforms)
+        expected_bucket_dto = BucketPartitioningDTO(num_buckets, field_name)
+        expected_trunc_dto = TruncatePartitioningDTO(width=width, field_name=field_name)
+        expected_dtos = [expected_bucket_dto, expected_trunc_dto]
+        for converted, expected in zip(converted_dtos, expected_dtos):
+            if isinstance(expected, BucketPartitioningDTO):
+                self.assertEqual(converted.num_buckets(), expected.num_buckets())
+                self.assertListEqual(converted.field_names(), expected.field_names())
+            else:
+                self.assertEqual(converted.width(), expected.width())
+                self.assertListEqual(converted.field_name(), expected.field_name())
+
+    def test_to_dtos_list_range_transforms(self):
+        field_names = [["createTime"], ["city"]]
+        list_transform = Transforms.list(
+            field_names=field_names,
+            assignments=[
+                Partitions.list(
+                    name="p0",
+                    lists=[
+                        [Literals.date_literal(date(2025, 8, 8))],
+                        [Literals.string_literal("Los Angeles")],
+                    ],
+                    properties={},
+                ),
+            ],
+        )
+        range_transform = Transforms.range(
+            field_name=["score"],
+            assignments=[
+                Partitions.range(
+                    name="p1",
+                    lower=Literals.integer_literal(0),
+                    upper=Literals.integer_literal(100),
+                    properties={},
+                )
+            ],
+        )
+        transforms = [list_transform, range_transform]
+        converted_dtos = DTOConverters.to_dtos(transforms)
+        expected_list_dto = ListPartitioningDTO(
+            field_names=field_names,
+            assignments=[
+                DTOConverters.to_dto(assignment)
+                for assignment in list_transform.assignments()
+            ],
+        )
+        expected_range_dto = RangePartitioningDTO(
+            field_name=["score"],
+            assignments=[
+                DTOConverters.to_dto(assignment)
+                for assignment in range_transform.assignments()
+            ],
+        )
+        expected_dtos = [expected_list_dto, expected_range_dto]
+        for converted, expected in zip(converted_dtos, expected_dtos):
+            if isinstance(expected, ListPartitioningDTO):
+                self.assertListEqual(converted.field_names(), expected.field_names())
+            else:
+                self.assertListEqual(converted.field_name(), expected.field_name())
+            self.assertListEqual(converted.assignments(), expected.assignments())
+
+    def test_to_dtos_apply_transform(self):
+        function_name = "test_function"
+        args: list[FunctionArg] = [
+            LiteralDTO.builder()
+            .with_data_type(Types.IntegerType.get())
+            .with_value("-1")
+            .build(),
+            LiteralDTO.builder()
+            .with_data_type(Types.BooleanType.get())
+            .with_value("True")
+            .build(),
+        ]
+        apply_transform = Transforms.apply(
+            name=function_name,
+            arguments=[
+                Literals.of(value="-1", data_type=Types.IntegerType.get()),
+                Literals.of(value="True", data_type=Types.BooleanType.get()),
+            ],
+        )
+        expected = FunctionPartitioningDTO(function_name, *args)
+        converted = DTOConverters.to_dto(apply_transform)
+        self.assertEqual(converted.function_name(), expected.function_name())
+        self.assertListEqual(converted.args(), expected.args())
+
+    def test_to_dtos_raise_exception(self):
+        with self.assertRaisesRegex(IllegalArgumentException, "Unsupported transform"):
+            DTOConverters.to_dto(
+                cast(Transform, MagicMock(name="UnsupportedTransform", spec=Transform))
+            )
+
+    def test_to_dto_distribution(self):
+        field_names = [f"field_{i}" for i in range(2)]
+        field_ref_dtos = [
+            FieldReferenceDTO.builder().with_field_name(field_name=[field_name]).build()
+            for field_name in field_names
+        ]
+        distribution = Distributions.of(
+            Strategy.HASH,
+            4,
+            *[FieldReference(field_names=[field_name]) for field_name in field_names],
+        )
+        distribution_dto = DistributionDTO(
+            strategy=Strategy.HASH, number=4, args=field_ref_dtos
+        )
+        converted = DTOConverters.to_dto(distribution)
+        self.assertEqual(converted, distribution_dto)
+
+        self.assertEqual(DTOConverters.to_dto(Distributions.NONE), DistributionDTO.NONE)
+        self.assertEqual(DTOConverters.to_dto(distribution_dto), distribution_dto)
