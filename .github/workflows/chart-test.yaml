@@ -107,9 +107,10 @@ jobs:
           for t in gravitino:gravitino iceberg-rest-server:gravitino-iceberg-rest lance-rest-server:gravitino-lance-rest; do
             (
             REPO_NAME=${t#*:}
-            CONTEXT_DIR="${{ github.workspace }}/dev/docker/${t%:*}/"
-            cd ${CONTEXT_DIR}
-            docker build -t ${KIND_REGISTRY}/${REPO_NAME}:${tag} .
+            FOLDER_NAME=${t%:*}
+            CONTEXT_DIR="${{ github.workspace }}/dev/docker/${FOLDER_NAME}/"
+            . ${CONTEXT_DIR}/${FOLDER_NAME}-dependency.sh
+            docker build -t ${KIND_REGISTRY}/${REPO_NAME}:${tag} "${CONTEXT_DIR}"
             docker push ${KIND_REGISTRY}/${REPO_NAME}:${tag}
             )
           done
