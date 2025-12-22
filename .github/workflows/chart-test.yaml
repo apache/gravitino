@@ -121,24 +121,24 @@ jobs:
 
       - name: Run chart-testing (install default,gravitino)
         if: steps.list-changed.outputs.changed == 'true'
-        run: ct install --charts dev/charts/gravitino --target-branch ${{ github.event.pull_request.base.ref }} --helm-extra-set-args "--set image.registry='' --set image.repository=${KIND_REGISTRY}/gravitino"
+        run: ct install --charts dev/charts/gravitino --target-branch ${{ github.event.pull_request.base.ref }} --helm-extra-set-args "--set image.registry="" --set image.repository=${KIND_REGISTRY}/gravitino"
 
       - name: Run chart-testing (install default,gravitino-iceberg-rest-server)
         if: steps.list-changed.outputs.changed == 'true'
-        run: ct install --charts dev/charts/gravitino-iceberg-rest-server --target-branch ${{ github.event.pull_request.base.ref }} --helm-extra-set-args "--set image.registry='' --set image.repository=${KIND_REGISTRY}/gravitino-iceberg-rest"
+        run: ct install --charts dev/charts/gravitino-iceberg-rest-server --target-branch ${{ github.event.pull_request.base.ref }} --helm-extra-set-args "--set image.registry="" --set image.repository=${KIND_REGISTRY}/gravitino-iceberg-rest"
 
       - name: Run chart-testing (install gravitino with mysql enable,replicas 2)
         if: steps.list-changed.outputs.changed == 'true'
-        run: ct install --charts=dev/charts/gravitino --helm-extra-set-args "--values dev/charts/gravitino/resources/scenarios/ci-values.yaml --set image.registry='' --set image.repository=${KIND_REGISTRY}/gravitino" --target-branch ${{ github.event.pull_request.base.ref }}
+        run: ct install --charts=dev/charts/gravitino --helm-extra-set-args "--values dev/charts/gravitino/resources/scenarios/ci-values.yaml --set image.registry="" --set image.repository=${KIND_REGISTRY}/gravitino" --target-branch ${{ github.event.pull_request.base.ref }}
 
       - name: Run chart-testing (install gravitino with postgresql enable)
         if: steps.list-changed.outputs.changed == 'true'
-        run: ct install --charts=dev/charts/gravitino --helm-extra-set-args "--values dev/charts/gravitino/resources/scenarios/pg-values.yaml --set image.registry='' --set image.repository=${KIND_REGISTRY}/gravitino" --target-branch ${{ github.event.pull_request.base.ref }}
+        run: ct install --charts=dev/charts/gravitino --helm-extra-set-args "--values dev/charts/gravitino/resources/scenarios/pg-values.yaml --set image.registry="" --set image.repository=${KIND_REGISTRY}/gravitino" --target-branch ${{ github.event.pull_request.base.ref }}
 
       - name: Run chart-testing (install default,gravitino-lance-rest-server)
         if: steps.list-changed.outputs.changed == 'true'
         run: |
-          helm install gravitino dev/charts/gravitino -n test --create-namespace --set image.registry='' --set image.repository=${KIND_REGISTRY}/gravitino
+          helm install gravitino dev/charts/gravitino -n test --create-namespace --set image.registry="" --set image.repository=${KIND_REGISTRY}/gravitino
           while ! GRAVITINO_CLUSTER_IP=$(kubectl get svc gravitino -n test -o jsonpath='{.spec.clusterIP}') || \
           [[ -z "$GRAVITINO_CLUSTER_IP" || "$GRAVITINO_CLUSTER_IP" == "<none>" ]] || \
           ! curl -s -f -X GET -H "Content-Type: application/json" "http://$GRAVITINO_CLUSTER_IP:8090/api/version" > /dev/null; do
@@ -147,4 +147,4 @@ jobs:
           done && \
           echo "Gravitino is ready，create metalake..." && \
           curl -X POST -H "Content-Type: application/json" -H "Accept: application/vnd.gravitino.v1+json" -d '{"name":"lrs_test","comment":"Automatically created"}' "http://$GRAVITINO_CLUSTER_IP:8090/api/metalakes"
-          ct install --charts dev/charts/gravitino-lance-rest-server --target-branch ${{ github.event.pull_request.base.ref }} --helm-extra-set-args "--set image.registry='' --set image.repository=${KIND_REGISTRY}/gravitino-lance-rest --set lanceRest.gravitinoUri=http://gravitino.test:8090 --set lanceRest.gravitinoMetalake=lrs_test"
+          ct install --charts dev/charts/gravitino-lance-rest-server --target-branch ${{ github.event.pull_request.base.ref }} --helm-extra-set-args "--set image.registry="" --set image.repository=${KIND_REGISTRY}/gravitino-lance-rest --set lanceRest.gravitinoUri=http://gravitino.test:8090 --set lanceRest.gravitinoMetalake=lrs_test"
