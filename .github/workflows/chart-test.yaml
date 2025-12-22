@@ -45,15 +45,17 @@ jobs:
       - name: Install yamale
         run: pip install yamale
 
+      - name: Install yq
+        run: |
+          sudo apt update
+          sudo apt install yq
+
       - name: Install chart-testing
         run: |
           curl -LO https://github.com/helm/chart-testing/releases/download/v3.12.0/chart-testing_3.12.0_linux_amd64.tar.gz
           tar -xzf chart-testing_3.12.0_linux_amd64.tar.gz
           sudo mv ct /usr/local/bin/
           ct version
-          sudo wget github.com -O /usr/bin/yq
-          sudo chmod +x /usr/bin/yq
-          yq --version
 
       - name: List changed
         id: list-changed
