@@ -98,7 +98,7 @@ jobs:
           IMAGE_TAG=$(yq '.image.tag' dev/charts/gravitino/values.yaml)
           
           # Remove any potential quotes and save to GitHub Outputs
-          echo "tag=$(echo $IMAGE_TAG | tr -d '\"')" >> "$GITHUB_OUTPUT"
+          echo "tag=$(echo $IMAGE_TAG | tr -d '\"')" >> "$GITHUB_ENV"
 
       - name: Build the Docker image to local registry
         run: |
