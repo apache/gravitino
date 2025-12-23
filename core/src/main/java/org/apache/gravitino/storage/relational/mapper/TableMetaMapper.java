@@ -41,6 +41,14 @@ public interface TableMetaMapper {
   @SelectProvider(type = TableMetaSQLProviderFactory.class, method = "listTablePOsBySchemaId")
   List<TablePO> listTablePOsBySchemaId(@Param("schemaId") Long schemaId);
 
+  @SelectProvider(
+      type = TableMetaSQLProviderFactory.class,
+      method = "listTablePOsByFullQualifiedName")
+  List<TablePO> listTablePOsByFullQualifiedName(
+      @Param("metalakeName") String metalakeName,
+      @Param("catalogName") String catalogName,
+      @Param("schemaName") String schemaName);
+
   @SelectProvider(type = TableMetaSQLProviderFactory.class, method = "listTablePOsByTableIds")
   List<TablePO> listTablePOsByTableIds(@Param("tableIds") List<Long> tableIds);
 

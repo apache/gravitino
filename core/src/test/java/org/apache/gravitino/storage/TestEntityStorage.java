@@ -64,6 +64,7 @@ import org.apache.gravitino.Entity.EntityType;
 import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.EntityStoreFactory;
+import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.SupportsRelationOperations;
@@ -131,8 +132,15 @@ public class TestEntityStorage {
   private static final String DB_DIR = JDBC_STORE_PATH + "/testdb";
   private static final String H2_FILE = DB_DIR + ".mv.db";
 
-  static Object[] storageProvider() {
-    return new Object[] {"h2", "mysql", "postgresql"};
+  static Object[][] storageProvider() {
+    return new Object[][] {
+      {"h2", true},
+      {"h2", false},
+      {"mysql", true},
+      {"mysql", false},
+      {"postgresql", true},
+      {"postgresql", false}
+    };
   }
 
   @AfterEach
@@ -142,7 +150,7 @@ public class TestEntityStorage {
     ContainerSuite.getInstance().close();
   }
 
-  private void init(String type, Config config) {
+  private void init(String type, Config config) throws IllegalAccessException {
     Preconditions.checkArgument(StringUtils.isNotBlank(type));
     File dir = new File(DB_DIR);
     if (dir.exists() || !dir.isDirectory()) {
@@ -157,13 +165,15 @@ public class TestEntityStorage {
     Mockito.when(config.get(STORE_DELETE_AFTER_TIME)).thenReturn(20 * 60 * 1000L);
     Mockito.when(config.get(VERSION_RETENTION_COUNT)).thenReturn(1L);
     // Fix cache config for test
-    Mockito.when(config.get(Configs.CACHE_ENABLED)).thenReturn(true);
+    // Mockito.when(config.get(Configs.CACHE_ENABLED)).thenReturn(true);
     Mockito.when(config.get(Configs.CACHE_MAX_ENTRIES)).thenReturn(10_000);
     Mockito.when(config.get(Configs.CACHE_EXPIRATION_TIME)).thenReturn(3_600_000L);
     Mockito.when(config.get(Configs.CACHE_WEIGHER_ENABLED)).thenReturn(true);
     Mockito.when(config.get(Configs.CACHE_STATS_ENABLED)).thenReturn(false);
     Mockito.when(config.get(Configs.CACHE_IMPLEMENTATION)).thenReturn("caffeine");
     Mockito.when(config.get(Configs.CACHE_LOCK_SEGMENTS)).thenReturn(16);
+
+    FieldUtils.writeField(GravitinoEnv.getInstance(), "config", config, true);
 
     BaseIT baseIT = new BaseIT();
 
@@ -271,8 +281,9 @@ public class TestEntityStorage {
 
   @ParameterizedTest
   @MethodSource("storageProvider")
-  void testRestart(String type) throws IOException {
+  void testRestart(String type, boolean enableCache) throws IOException, IllegalAccessException {
     Config config = Mockito.mock(Config.class);
+    Mockito.when(config.get(Configs.CACHE_ENABLED)).thenReturn(enableCache);
     init(type, config);
     AuditInfo auditInfo =
         AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
@@ -524,8 +535,10 @@ public class TestEntityStorage {
 
   @ParameterizedTest
   @MethodSource("storageProvider")
-  void testEntityUpdate(String type) throws Exception {
+  void testEntityUpdate(String type, boolean enableCache) throws Exception {
     Config config = Mockito.mock(Config.class);
+    Mockito.when(config.get(Configs.CACHE_ENABLED)).thenReturn(enableCache);
+
     init(type, config);
 
     AuditInfo auditInfo =
@@ -627,8 +640,11 @@ public class TestEntityStorage {
 
   @ParameterizedTest
   @MethodSource("storageProvider")
-  public void testAuthorizationEntityDelete(String type) throws IOException {
+  public void testAuthorizationEntityDelete(String type, boolean enableCache)
+      throws IOException, IllegalAccessException {
     Config config = Mockito.mock(Config.class);
+    Mockito.when(config.get(Configs.CACHE_ENABLED)).thenReturn(enableCache);
+
     init(type, config);
 
     AuditInfo auditInfo =
@@ -669,12 +685,16 @@ public class TestEntityStorage {
       Assertions.assertFalse(store.exists(oneRole.nameIdentifier(), Entity.EntityType.ROLE));
       Assertions.assertFalse(store.exists(anotherRole.nameIdentifier(), Entity.EntityType.ROLE));
     }
+    destroy(type);
   }
 
   @ParameterizedTest
   @MethodSource("storageProvider")
-  void testEntityDelete(String type) throws IOException {
+  void testEntityDelete(String type, boolean enableCache)
+      throws IOException, IllegalAccessException {
     Config config = Mockito.mock(Config.class);
+    Mockito.when(config.get(Configs.CACHE_ENABLED)).thenReturn(enableCache);
+
     init(type, config);
 
     AuditInfo auditInfo =
@@ -982,8 +1002,11 @@ public class TestEntityStorage {
 
   @ParameterizedTest
   @MethodSource("storageProvider")
-  void testSameNameUnderANameSpace(String type) throws IOException {
+  void testSameNameUnderANameSpace(String type, boolean enableCache)
+      throws IOException, IllegalAccessException {
     Config config = Mockito.mock(Config.class);
+    Mockito.when(config.get(Configs.CACHE_ENABLED)).thenReturn(enableCache);
+
     init(type, config);
     try (EntityStore store = EntityStoreFactory.createEntityStore(config)) {
       store.initialize(config);
@@ -1146,8 +1169,11 @@ public class TestEntityStorage {
 
   @ParameterizedTest
   @MethodSource("storageProvider")
-  void testDeleteAndRename(String type) throws IOException {
+  void testDeleteAndRename(String type, boolean enableCache)
+      throws IOException, IllegalAccessException {
     Config config = Mockito.mock(Config.class);
+    Mockito.when(config.get(Configs.CACHE_ENABLED)).thenReturn(enableCache);
+
     init(type, config);
     try (EntityStore store = EntityStoreFactory.createEntityStore(config)) {
       store.initialize(config);
@@ -2591,8 +2617,15 @@ public class TestEntityStorage {
 
   @ParameterizedTest
   @MethodSource("storageProvider")
-  void testInvalidRelationCache(String type) throws Exception {
+  void testInvalidRelationCache(String type, boolean enableCache) throws Exception {
+    // This class will test entity cache specifically for relational stores
+    if (!enableCache) {
+      return;
+    }
+
     Config config = Mockito.mock(Config.class);
+    Mockito.when(config.get(Configs.CACHE_ENABLED)).thenReturn(enableCache);
+
     init(type, config);
 
     AuditInfo auditInfo =
@@ -2847,8 +2880,14 @@ public class TestEntityStorage {
 
   @ParameterizedTest
   @MethodSource("storageProvider")
-  void testTagRelationCache(String type) throws Exception {
+  void testTagRelationCache(String type, boolean enableCache) throws Exception {
+    if (!enableCache) {
+      return;
+    }
+
     Config config = Mockito.mock(Config.class);
+    Mockito.when(config.get(Configs.CACHE_ENABLED)).thenReturn(enableCache);
+
     init(type, config);
 
     AuditInfo auditInfo =
@@ -3087,8 +3126,11 @@ public class TestEntityStorage {
 
   @ParameterizedTest
   @MethodSource("storageProvider")
-  void testLanceTableCreateAndUpdate(String type) {
+  void testLanceTableCreateAndUpdate(String type, boolean enableCache)
+      throws IllegalAccessException {
     Config config = Mockito.mock(Config.class);
+    Mockito.when(config.get(Configs.CACHE_ENABLED)).thenReturn(enableCache);
+
     init(type, config);
 
     AuditInfo auditInfo =

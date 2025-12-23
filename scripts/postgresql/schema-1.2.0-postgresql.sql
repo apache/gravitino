@@ -1,5 +1,26 @@
 --
 -- Licensed to the Apache Software Foundation (ASF) under one
+-- or more contributor license agreements.  See the NOTICE file
+-- distributed with this work for additional information
+-- regarding copyright ownership.  The ASF licenses this file
+-- to you under the Apache License, Version 2.0 (the
+-- "License"). You may not use this file except in compliance
+-- with the License.  You may obtain a copy of the License at
+--
+--  http://www.apache.org/licenses/LICENSE-2.0
+--
+-- Unless required by applicable law or agreed to in writing,
+-- software distributed under the License is distributed on an
+-- "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+-- KIND, either express or implied.  See the License for the
+-- specific language governing permissions and limitations
+-- under the License.
+--
+-- Base schema remains the same as 1.1.0. Apply this after the 1.1.0 schema
+-- to add indexes introduced in version 1.2.0.
+
+--
+-- Licensed to the Apache Software Foundation (ASF) under one
 -- or more contributor license agreements.  See the NOTICE file--
 --  distributed with this work for additional information
 -- regarding copyright ownership.  The ASF licenses this file
@@ -79,6 +100,7 @@ COMMENT ON COLUMN catalog_meta.audit_info IS 'catalog audit info';
 COMMENT ON COLUMN catalog_meta.current_version IS 'catalog current version';
 COMMENT ON COLUMN catalog_meta.last_version IS 'catalog last version';
 COMMENT ON COLUMN catalog_meta.deleted_at IS 'catalog deleted at';
+CREATE INDEX IF NOT EXISTS catalog_meta_idx_name_da ON catalog_meta (catalog_name, deleted_at);
 
 
 CREATE TABLE IF NOT EXISTS schema_meta (
@@ -97,6 +119,8 @@ CREATE TABLE IF NOT EXISTS schema_meta (
     );
 
 CREATE INDEX IF NOT EXISTS schema_meta_idx_metalake_id ON schema_meta (metalake_id);
+CREATE INDEX IF NOT EXISTS schema_meta_idx_name_da ON schema_meta (schema_name, deleted_at);
+
 COMMENT ON TABLE schema_meta IS 'schema metadata';
 
 COMMENT ON COLUMN schema_meta.schema_id IS 'schema id';
@@ -127,6 +151,8 @@ CREATE TABLE IF NOT EXISTS table_meta (
 
 CREATE INDEX IF NOT EXISTS table_meta_idx_metalake_id ON table_meta (metalake_id);
 CREATE INDEX IF NOT EXISTS table_meta_idx_catalog_id ON table_meta (catalog_id);
+CREATE INDEX IF NOT EXISTS table_meta_idx_name_da ON table_meta (table_name, deleted_at);
+
 COMMENT ON TABLE table_meta IS 'table metadata';
 
 COMMENT ON COLUMN table_meta.table_id IS 'table id';
@@ -201,6 +227,8 @@ CREATE TABLE IF NOT EXISTS fileset_meta (
 
 CREATE INDEX IF NOT EXISTS fileset_meta_idx_metalake_id ON fileset_meta (metalake_id);
 CREATE INDEX IF NOT EXISTS fileset_meta_idx_catalog_id ON fileset_meta (catalog_id);
+CREATE INDEX IF NOT EXISTS fileset_meta_idx_name_da ON fileset_meta (fileset_name, deleted_at);
+
 COMMENT ON TABLE fileset_meta IS 'fileset metadata';
 
 COMMENT ON COLUMN fileset_meta.fileset_id IS 'fileset id';
@@ -267,6 +295,8 @@ CREATE TABLE IF NOT EXISTS topic_meta (
 
 CREATE INDEX IF NOT EXISTS topic_meta_idx_metalake_id ON topic_meta (metalake_id);
 CREATE INDEX IF NOT EXISTS topic_meta_idx_catalog_id ON topic_meta (catalog_id);
+CREATE INDEX IF NOT EXISTS topic_meta_idx_name_da ON topic_meta (topic_name, deleted_at);
+
 COMMENT ON TABLE topic_meta IS 'topic metadata';
 
 COMMENT ON COLUMN topic_meta.topic_id IS 'topic id';
@@ -519,6 +549,8 @@ CREATE TABLE IF NOT EXISTS model_meta (
 
 CREATE INDEX IF NOT EXISTS model_meta_idx_metalake_id ON model_meta (metalake_id);
 CREATE INDEX IF NOT EXISTS model_meta_idx_catalog_id ON model_meta (catalog_id);
+CREATE INDEX IF NOT EXISTS model_meta_idx_name_da ON model_meta (model_name, deleted_at);
+
 COMMENT ON TABLE model_meta IS 'model metadata';
 
 COMMENT ON COLUMN model_meta.model_id IS 'model id';
@@ -750,8 +782,8 @@ COMMENT ON COLUMN job_run_meta.last_version IS 'job run last version';
 COMMENT ON COLUMN job_run_meta.deleted_at IS 'job run deleted at';
 
 CREATE TABLE IF NOT EXISTS table_version_info (
-    table_id        BIGINT NOT NULL,
-    format          VARCHAR(64),
+                                                  table_id        BIGINT NOT NULL,
+                                                  format          VARCHAR(64),
     properties      TEXT,
     partitioning  TEXT,
     distribution TEXT,
@@ -761,7 +793,7 @@ CREATE TABLE IF NOT EXISTS table_version_info (
     version BIGINT,
     deleted_at      BIGINT DEFAULT 0,
     UNIQUE (table_id, version, deleted_at)
-);
+    );
 COMMENT ON TABLE table_version_info                  IS 'table detail information including format, location, properties, partition, distribution, sort order, index and so on';
 COMMENT ON COLUMN table_version_info.table_id        IS 'table id';
 COMMENT ON COLUMN table_version_info.format          IS 'table format, such as Lance, Iceberg and so on, it will be null if it is not a lakehouse table';
