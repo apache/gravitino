@@ -85,3 +85,8 @@ class GVFSConfig:
     # The configuration key for whether to enable auto-creation of fileset location when the
     # server-side filesystem ops are disabled and the location does not exist. The default is true.
     GVFS_FILESYSTEM_AUTO_CREATE_LOCATION = "auto_create_location"
+
+    # The configuration prefix for user-defined path-specific configurations.
+    # Format: fs.path.config.<base_location>.<property_name>=<property_value>
+    # Example: fs.path.config.s3.aws-access-key=XXX
+    FS_GRAVITINO_PATH_CONFIG_PREFIX = "fs.path.config."

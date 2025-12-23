@@ -25,6 +25,7 @@ import shutil
 
 import requests
 
+from gravitino import GravitinoAdminClient
 from gravitino.exceptions.base import GravitinoRuntimeException
 from tests.integration.config import Config
 
@@ -64,6 +65,7 @@ class IntegrationTestEnv(unittest.TestCase):
     """Provide real test environment for the Gravitino Server"""
 
     gravitino_startup_script = None
+    gravitino_admin_client: GravitinoAdminClient = None
 
     @classmethod
     def setUpClass(cls):
@@ -180,7 +182,10 @@ class IntegrationTestEnv(unittest.TestCase):
         if result.stderr:
             logger.info("stderr: %s", result.stderr)
 
-        if not check_gravitino_server_status():
+        succes = check_gravitino_server_status()
+        if succes:
+            cls.gravitino_admin_client = GravitinoAdminClient("http://localhost:8090")
+        else:
             raise GravitinoRuntimeException("ERROR: Can't start Gravitino server!")
 
     @classmethod

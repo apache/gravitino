@@ -58,8 +58,6 @@ class TestStorageHandler(unittest.TestCase):
                 [],
                 {
                     "s3-endpoint": "endpoint_from_catalog",
-                },
-                {
                     "s3_endpoint": "endpoint_from_client",
                     "s3_access_key_id": "access_key_from_client",
                     "s3_secret_access_key": "secret_key_from_client",
@@ -77,8 +75,6 @@ class TestStorageHandler(unittest.TestCase):
                 [],
                 {
                     "s3-endpoint": "endpoint_from_catalog",
-                },
-                {
                     "s3_access_key_id": "access_key_from_client",
                     "s3_secret_access_key": "secret_key_from_client",
                 },

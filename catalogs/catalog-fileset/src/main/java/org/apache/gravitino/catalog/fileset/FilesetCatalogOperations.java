@@ -245,14 +245,9 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
     }
 
     if (!disableFSOps) {
-      String fileSystemProviders =
-          (String)
-              propertiesMetadata
-                  .catalogPropertiesMetadata()
-                  .getOrDefault(config, FilesetCatalogPropertiesMetadata.FILESYSTEM_PROVIDERS);
       this.fileSystemProvidersMap =
           ImmutableMap.<String, FileSystemProvider>builder()
-              .putAll(FileSystemUtils.getFileSystemProviders(fileSystemProviders))
+              .putAll(FileSystemUtils.getFileSystemProviders())
               .build();
 
       String defaultFileSystemProviderName =
