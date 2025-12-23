@@ -19,10 +19,10 @@
 
 package org.apache.gravitino.credential;
 
+import com.google.common.collect.ImmutableSet;
 import java.util.Set;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
-import org.testcontainers.shaded.com.google.common.collect.ImmutableSet;
 
 public class TestCredentialCacheKey {
 

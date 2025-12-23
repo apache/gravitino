@@ -7,33 +7,40 @@ license: "This software is licensed under the Apache License version 2."
 
 ## Overview
 
-Apache Gravitino is a technical data catalog that uses a unified metadata paradigm to manage multiple data sources while still allowing multiple engines like Spark, Trino, and Flink, or Python to connect to these data sources for data processing through Gravitino.
+Apache Gravitino provides unified access control across multiple data sources, enabling you to manage permissions from a single interface regardless of whether your data resides in databases, message queues, or object storage systems.
 
-Because each underlying data source will have its own access control system, it can be difficult to plug in data engines with the intent of querying multiple of these data at once.
-This is especially important for data governance practitioners who have to worry about data access restrictions and data compliance issues, but this is streamlined through Gravitino.
-Therefore, in the hopes of solving this big data issue, Gravitino plans to implement a universal set of privilege models and paradigms.
-With this, users will be able to manage all of their data sources on a single access plane, regardless of whether the data source is a database, or a message queue or an object storage system.
+### The Challenge
 
-After authorizing these data sources within Gravitino’s metadata lake, authentication can then be performed in Spark, Trino, and Flink Engines, as well as our Python client.
-This abstraction allows users to control access to data and make compliant use of the data without having to obstruct other teams and worrying about the tedious work of individual access control systems.
+Managing access control across heterogeneous data sources presents significant challenges:
+- Each data source has its own access control system with unique permissions models
+- Querying multiple data sources simultaneously requires managing multiple authorization systems
+- Data governance practitioners must ensure compliance across diverse systems
+
+### The Solution
+
+Gravitino addresses these challenges by implementing a universal privilege model that:
+- **Unifies access control**: Manage all data source permissions through a single interface
+- **Supports multiple engines**: Works seamlessly with Spark, Trino, Flink, and Python clients
+- **Simplifies governance**: Enforce consistent access policies across all data sources
+- **Reduces complexity**: Eliminate the need to manage individual access control systems
 
 ### Gravitino Privilege Model
 
-Gravitino’s unified management model allows for each data source to have its own authorization features. However, each data source may come with its own dedicated authorization model and methods.
-We may not be able to properly set permissions to the underlying system, so when a given user tries to access this data, the underlying authorization system may result in permission inconsistencies and cause issues for external access.
-To mitigate this issue, Gravitino aims to provide a unified authorization model and accompanying methods that sit on top of all the data sources instead, making it much easier to manage access privileges.
+Gravitino provides a unified authorization model that works across all connected data sources while respecting each source's unique characteristics.
 
-It is important to note that Gravitino’s authorization model will not merge the access control systems of the underlying data sources to form a large and unwieldy set of privileges.
-Instead, We will summarize the usage of the privileges currently in use within the data system, and offer a set of Gravitino-native privilege models that accurately reflect it.
+**Architecture:**
 
-This is so that when users and data engines use Gravitino for data processing, this permission model is used to address the complexity of managing access control for different data sources.
-This set of permission models is meant to keep everything within the Gravitino system while still managing the access control settings of different data sources separately.
+When users or data engines access data through Gravitino, the privilege model:
+- Evaluates permissions at the Gravitino layer first
+- Translates Gravitino privileges to data source-specific permissions when needed
+- Maintains consistency across different data sources while preventing permission conflicts
 
-Gravitino adopts RBAC and DAC. 
+**Access Control Models:**
 
-Role-based Access Control (RBAC): Access privileges are assigned to roles, which are in turn assigned to users or groups.
+Gravitino adopts two complementary access control models:
 
-Discretionary Access Control(DAC): Each metadata object has an owner, who can in turn grant access to that object.
+- **Role-Based Access Control (RBAC)**: Access privileges are assigned to roles, which are in turn assigned to users or groups
+- **Discretionary Access Control (DAC)**: Each metadata object has an owner who can grant access to that object
 
 :::info
 
@@ -42,53 +49,64 @@ Gravitino doesn't support metadata authentication. It means that Gravitino won't
 
 :::
 
-## Concept
+## Core Concepts
 
 ### Authorization
 
-#### Build-in Authorization
+Gravitino provides two types of authorization mechanisms:
 
-Gravitino provides built-in metadata authorization. You can enable the built-in metadata authorization through the following configuration.
+#### Built-in Authorization
 
-```
+Gravitino includes built-in metadata authorization that you can enable with the following configuration:
+
+```properties
 gravitino.authorization.enable = true
 ```
 
-You can close the built-in metadata authorization through the following configuration.
+To disable built-in authorization and pass through all requests without authorization checks:
 
-```
+```properties
 gravitino.authorization.impl = org.apache.gravitino.server.authorization.PassThroughAuthorizer
 ```
 
 :::info
-
-Built-in metadata authorization depends on the authentication feature. To use the built-in metadata authorization, authentication must be enabled and privileges must be granted to users.You can see the privileges required for different REST APIs in the [API required conditions](##API required conditions).
-
+**Prerequisites for Built-in Authorization:**
+- Authorization must be enabled
+- Users must be granted appropriate privileges
+- See [API Required Conditions](#api-required-conditions) for privilege requirements for each REST API
 :::
 
-#### Authorization push down
+#### Authorization Pushdown
 
-Gravitino also provides a set of authorization frameworks to interact with different underlying data source
-authorization systems (e.g., MySQL's own access control management and the Apache Ranger access control management system for big data)
-in accordance with its own authorization model and methodology.
-More information you can see the [Authorization push down](authorization-pushdown.md).
+In addition to built-in authorization, Gravitino can push down authorization to underlying data sources. This allows integration with:
+- Data source native access control (e.g., MySQL privileges)
+- Enterprise authorization systems (e.g., Apache Ranger)
+
+The pushdown mechanism translates Gravitino's authorization model to data source-specific permissions while maintaining consistency.
+
+For more information, see [Authorization Pushdown](authorization-pushdown.md).
 
 ### Authentication
 
-As mentioned above, Gravitino uses Ownership to control the privileges of securable object in the management category and uses Role to control access securable objects,
-so when a user performs a specific operation on a specified resource,
-Gravitino will perform a composite authentication on the Ownership and Role to which the securable object belongs.
-When a user has more than one Role, Gravitino will use the user's all the Roles for authentication.
+Gravitino uses a combined approach for access control:
+
+- **Ownership**: Controls management operations (create, drop, alter) on securable objects
+- **Roles**: Controls access to securable objects (read, write, use)
+
+When a user performs an operation on a resource, Gravitino evaluates both ownership and role-based permissions. If a user has multiple roles, Gravitino evaluates all of them to determine the final permission set.
 
 ### Role
 
-The traditional access control system generally uses RBAC (Role-Based Access Control) for access control management,
-where each Role contains a collection of different operating privileges for a different securable object.
-When the system adds a new user or user group, you can select the Roles which they are expected to be granted to,
-so that the user can quickly start using it, without waiting for the administrator to gradually set up the access privileges to securable object for him.
+A role is a named collection of privileges on securable objects. Roles simplify access management by allowing you to:
 
-Roles also employ the concept of ownership – the owner of a Role is by default the creator of the Role,
-implying the owner has all the access control to operate the Role, including deleting the Role.
+- **Group privileges**: Bundle related permissions together
+- **Assign to multiple users**: Grant the same set of permissions to multiple users or groups
+- **Quick onboarding**: New users can start working immediately by receiving pre-configured roles
+
+**Ownership of Roles:**
+- The creator of a role is automatically the owner
+- Owners have full control over the role, including the ability to drop it
+- Only the owner can modify the role's permissions
 
 ### Privilege
 
@@ -107,12 +125,21 @@ To enforce this, we’ll introduce the concept of Ownership as a complete replac
 
 ### Ownership
 
-When you create a securable object (Gravitino Service, Metalake, Catalog, and any other entity) in Gravitino, each entity has an Owner field that defines the user (or group) to which the resource belongs.
-The owner of each entity has implicit administrative class privilege, for example, to delete that securable object.
-Only the Owner of a securable object can fully manage that resource.
-If a securable object needs to be managed by more than one person at the same time, the owner is assigned to a user group.
+Every securable object in Gravitino has an owner - the user with administrative control over that object.
 
-The metadata object that supports ownership is as follows:
+**Key Characteristics:**
+
+- **Automatic assignment**: The creator of an object automatically becomes its owner
+- **Administrative privileges**: Owners have implicit management privileges (e.g., drop, alter)
+- **Exclusive control**: Only the owner can fully manage the object
+
+:::info
+Group ownership is not currently supported. Only user ownership is available.
+:::
+
+**Supported Objects:**
+
+The following metadata objects support ownership:
 
 | Metadata Object Type |
 |----------------------|
@@ -129,46 +156,97 @@ The metadata object that supports ownership is as follows:
 | Job                  |
 
 ### User
-Users are generally granted one or multiple Roles, and users have different operating privileges depending on their Role.
+
+A user represents an individual identity in Gravitino. Users can be:
+- Granted one or more roles
+- Given different operating privileges based on their assigned roles
+- Made owners of securable objects
 
 ### Group
-To make it easier to grant a single access control to multiple users, we can add users to a user group, and then grant one or multiple roles to that user group.
-This process allows all users belonging to that user group to have the access control in those roles.
 
-### Metadata objects
+A group is a collection of users that simplifies permission management by allowing you to:
+- Grant permissions to multiple users at once
+- Manage access control for teams or departments
+- Assign roles that all group members will inherit
 
-Metadata objects are managed in Gravitino, such as `CATALOG`, `SCHEMA`, `TABLE`,
-`COLUMN`, `FILESET`, `TOPIC`, `COLUMN`, `ROLE`, `METALAKE`. A metadata object is combined by a `type` and a
-comma-separated `name`. For example, a `CATALOG` object has a name "catalog1" with type
-"CATALOG", a `SCHEMA` object has a name "catalog1.schema1" with type "SCHEMA", a `TABLE`
-object has a name "catalog1.schema1.table1" with type "TABLE". A `METALAKE` object has a name "metalake1".
+All users in a group inherit the roles and privileges granted to that group.
 
-### Securable objects
+:::info
+Groups can be granted roles and privileges, but they cannot be owners of securable objects. Only users can be owners.
+:::
 
-A metadata object to which access can be granted. Unless allowed by a grant, access is denied. 
-Every securable object resides within a logical container in a hierarchy of containers.
-The top container is the metalake. 
-Catalogs are under the metalake. Catalogs represent different kinds of data sources.
-Schemas are under the catalog. There are tables, topics, or filesets under the schema.
+### Metadata Objects
+
+Metadata objects are entities managed by Gravitino, such as catalogs, schemas, tables, filesets, topics, roles, and metalakes.
+
+**Naming Convention:**
+- Each metadata object has a **type** and a **name**
+- Names use dot notation to represent hierarchy
+
+**Examples:**
+- `METALAKE`: "metalake1"
+- `CATALOG`: "catalog1" (under a metalake)
+- `SCHEMA`: "catalog1.schema1" (under a catalog)
+- `TABLE`: "catalog1.schema1.table1" (under a schema)
+
+### Securable Objects
+
+A securable object is any metadata object to which access can be granted. The default policy is **deny-by-default**: unless explicitly granted, access is denied.
+
+**Hierarchy:**
+
+Securable objects exist in a hierarchical container structure:
+
+```
+Metalake (top level)
+└── Catalog (represents a data source)
+    └── Schema
+        ├── Table
+        ├── Topic
+        └── Fileset
+```
 
 ![object_image](../assets/security/object.png)
 
-The relationship of the concepts is as below.
+**Relationships:**
+
+The following diagrams illustrate the relationships between users, groups, roles, and securable objects:
 
 ![user_group_relationship_image](../assets/security/user-group.png)
 ![concept_relationship_image](../assets/security/role.png)
 
-## The types of roles
+## Role Types
 
 ### Service Admin
 
-Service admin is only used for managing the metalakes. Usually, this role is for the maintainer of the service.
+Service administrators are responsible for creating metalakes. This role is typically assigned to system maintainers or operators who bootstrap the initial metadata organization.
+
+**Privileges:**
+- Create metalakes
+
+**Ownership:**
+- When a service admin creates a metalake, they automatically become the owner of that metalake
+- As the owner, they have full control over the metalake, including the ability to drop it
+- Ownership can be transferred to another user if needed
+
+**Limitations:**
+- Cannot configure system-wide settings (handled through server configuration files)
+- Cannot manage service-level permissions
+
+:::info
+Service admins automatically become the owner of metalakes they create. However, ownership can be changed by setting a new owner for the metalake.
+:::
 
 ### Custom Roles
 
-You can also create a dedicated role for your business by API or the client.
+You can create custom roles tailored to your business needs using the API or client libraries. Custom roles allow you to:
+- Define specific permission sets
+- Align access control with your organization's structure
+- Implement least-privilege access policies
 
-## The types of privileges
+## Privilege Types
+
+Gravitino provides a comprehensive set of privileges organized by the type of operation and securable object. The following sections detail all available privileges.
 
 ### User privileges
 
@@ -261,11 +339,17 @@ DENY `WRITE_FILESET` won‘t deny the `READ_FILESET` operation if the user has t
 
 ### Model privileges
 
-| Name                 | Supports Securable Object        | Operation                                                          |
-|----------------------|----------------------------------|--------------------------------------------------------------------|
-| CREATE_MODEL         | Metalake, Catalog, Schema        | Create a model                                                     |
-| CREATE_MODEL_VERSION | Metalake, Catalog, Schema, Model | Create a model version                                             |
-| USE_MODEL            | Metalake, Catalog, Schema, Model | View the metadata of the model and download all the model versions |
+:::caution Deprecated Privileges
+The privileges `CREATE_MODEL` and `CREATE_MODEL_VERSION` are deprecated and will be removed in a future release. Please use `REGISTER_MODEL` and `LINK_MODEL_VERSION` instead. The deprecated privileges still work for backward compatibility.
+:::
+
+| Name                 | Supports Securable Object        | Operation                                                                          |
+|----------------------|----------------------------------|------------------------------------------------------------------------------------|
+| REGISTER_MODEL       | Metalake, Catalog, Schema        | Register a model                                                                   |
+| LINK_MODEL_VERSION   | Metalake, Catalog, Schema, Model | Link a model version                                                               |
+| USE_MODEL            | Metalake, Catalog, Schema, Model | View the metadata of the model and download all the model versions                 |
+| CREATE_MODEL         | Metalake, Catalog, Schema        | Register a model, this is deprecated. Please use `REGISTER_MODEL` instead.         |
+| CREATE_MODEL_VERSION | Metalake, Catalog, Schema, Model | Link a model version, this is deprecated. Please use `LINK_MODEL_VERSION` instead. |
 
 ### Tag privileges
 
@@ -294,53 +378,92 @@ DENY `WRITE_FILESET` won‘t deny the `READ_FILESET` operation if the user has t
 | RUN_JOB | Metalake                  | Run a job |
 
 
-## Inheritance Model
+## Privilege Inheritance
 
-Securable objects in Gravitino are hierarchical and privileges are inherited downward.
+Gravitino implements hierarchical privilege inheritance, where privileges granted at higher levels automatically apply to all objects at lower levels.
 
-This means that granting a privilege on a metalake, catalog or schema automatically grants
-the privilege to all current and future objects within the metalake, catalog or schema.
+**How It Works:**
+- Granting a privilege on a **metalake** applies it to all catalogs, schemas, and objects within that metalake
+- Granting a privilege on a **catalog** applies it to all schemas and objects within that catalog
+- Granting a privilege on a **schema** applies it to all tables, topics, and filesets within that schema
 
-For example, if you give a use that `SELECT_TABLE` privilege on a catalog, then that the user
-will be able to select(read) all tables in that catalog.
+**Example:**
 
-## Privilege Condition
+If you grant a user `SELECT_TABLE` privilege on a catalog:
+- The user can read **all tables** in that catalog
+- This includes tables in all schemas within the catalog
+- The privilege applies to both existing and future tables
 
-The privilege supports two condition: `ALLOW` and `DENY`. `ALLOW` means that you are able to use the privilege,
-`DENY` means that you aren't able to use the privilege.
-`DENY` condition is prior to `ALLOW` condition. If a role has the `ALLOW` condition and `DENY` condition at the same time. 
-The user won't be able to use the privilege.
+This inheritance model simplifies permission management for large datasets while maintaining fine-grained control when needed.
 
-If parent securable object has the same privilege name with different condition, the securable object won't override the parent object privilege.
-For example, securable metalake object allows to use the catalog, but securable catalog denies to use the catalog, the user isn't able to use the catalog.
-If securable metalake object denies to use the catalog, but securable catalog allows to use the catalog, the user isn't able to use the catalog, too.
+## Privilege Conditions
+
+Each privilege can have one of two conditions:
+
+- **`ALLOW`**: Grants permission to perform the operation
+- **`DENY`**: Explicitly denies permission to perform the operation
+
+### Priority Rules
+
+**`DENY` takes precedence over `ALLOW`:**
+- If a user has both `ALLOW` and `DENY` for the same privilege, the operation is denied
+- This applies regardless of whether the conditions come from different roles
+
+### Inheritance and Conditions
+
+Privilege conditions do **not override** parent object conditions. Both parent and child conditions are evaluated:
+
+**Example 1: Parent ALLOW, Child DENY**
+- Metalake: `USE_CATALOG` → ALLOW
+- Catalog: `USE_CATALOG` → DENY
+- **Result**: User **cannot** use the catalog (DENY wins)
+
+**Example 2: Parent DENY, Child ALLOW**
+- Metalake: `USE_CATALOG` → DENY
+- Catalog: `USE_CATALOG` → ALLOW
+- **Result**: User **cannot** use the catalog (DENY wins)
 
 ![privilege_image](../assets/security/privilege.png)
 
-## Server Configuration
+This model ensures that denials cannot be circumvented by grants at lower levels in the hierarchy.
 
-If you want to enable the access control, you should enable the authorization.
+## Configuration
 
-The related configuration is as follows.
+To enable access control in Gravitino, configure the following settings in your server configuration file:
 
-| Configuration item                       | Description                                                            | Default value | Required                         | Since Version |
-|------------------------------------------|------------------------------------------------------------------------|---------------|----------------------------------|---------------|
-| `gravitino.authorization.enable`         | Whether Gravitino enable authorization or not.                         | false         | No                               | 0.5.0         |
-| `gravitino.authorization.serviceAdmins`  | The admins of Gravitino service, multiple admins are spitted by comma. | (none)        | Yes if enables the authorization | 0.5.0         |
+| Configuration Item                      | Description                                                               | Default Value | Required                                    | Since Version |
+|-----------------------------------------|---------------------------------------------------------------------------|---------------|---------------------------------------------|---------------|
+| `gravitino.authorization.enable`        | Enable or disable authorization in Gravitino                              | `false`       | No                                          | 0.5.0         |
+| `gravitino.authorization.serviceAdmins` | Comma-separated list of service administrator usernames                   | (none)        | Yes (when authorization is enabled)         | 0.5.0         |
+
+### Important Notes
 
 :::info
-
-If you enable authorization, you should add users to the metalake first, otherwise you will fail to create metadata objects.
-If you don't set a user explicitly, you will use `anonymous` as the user.
-When you enable authorization and create a metalake, the service will add the creator to the metalake automatically.
-
+**Authorization Requirements:**
+1. **Add users first**: Users must be added to a metalake before creating metadata objects
+2. **Default user**: If no user is specified, operations use the `anonymous` user
+3. **Automatic membership**: When creating a metalake with authorization enabled, the creator is automatically added to that metalake
 :::
 
-## User Operation
+**Example Configuration:**
+
+```properties
+# Enable authorization
+gravitino.authorization.enable = true
+
+# Define service administrators
+gravitino.authorization.serviceAdmins = admin1,admin2
+```
+
+## Operations
+
+The following sections demonstrate how to perform common access control operations using both the REST API (Shell) and Java client.
+
+## User Operations
 
 ### Add a user
 
-You should add the user to your metalake before you use the authorization.
+Add a user to your metalake before using authorization features.
 
 <Tabs groupId='language' queryString>
 <TabItem value="shell" label="Shell">
@@ -366,8 +489,7 @@ User user =
 
 ### List users
 
-You can list the created users in a metalake.
-Returns the list of users if details is true, otherwise returns the list of user name.
+List all users in a metalake. Use `details=true` to get full user objects instead of just names.
 
 <Tabs groupId='language' queryString>
 <TabItem value="shell" label="Shell">
@@ -417,9 +539,9 @@ User user =
 </TabItem>
 </Tabs>
 
-### Delete a user
+### Remove a user
 
-You can delete a user by its name.
+You can remove a user by its name.
 
 <Tabs groupId='language' queryString>
 <TabItem value="shell" label="Shell">
@@ -434,7 +556,7 @@ curl -X DELETE -H "Accept: application/vnd.gravitino.v1+json" \
 
 ```java
 GravitinoClient client = ...
-boolean deleted =
+boolean removed =
     client.removeUser("user1");
 ```
 
@@ -522,9 +644,9 @@ Group group =
 </TabItem>
 </Tabs>
 
-### Delete a group
+### Remove a group
 
-You can delete a group by its name.
+You can remove a group by its name.
 
 <Tabs groupId='language' queryString>
 <TabItem value="shell" label="Shell">
@@ -539,8 +661,8 @@ curl -X DELETE -H "Accept: application/vnd.gravitino.v1+json" \
 
 ```java
 GravitinoClient client = ...
-boolean deleted =
-    client.deleteGroup("group1");
+boolean removed =
+    client.removeGroup("group1");
 ```
 
 </TabItem>
@@ -1025,9 +1147,9 @@ The following table lists the required privileges for each API.
 | drop fileset                      | First, you should have the privilege to load the catalog and the schema. Then, you are one of the owners of the fileset, schema, catalog, metalake                                                                                            |
 | list fileset                      | First, you should have the privilege to load the catalog and the schema. Then, you are one of the owners of the schema, catalog, metalake can see all the filesets, others can see the filesets which they can load                           |
 | load fileset                      | First, you should have the privilege to load the catalog and the schema. Then, you are one of the owners of the fileset, schema, metalake, catalog or have either `READ_FILESET` or `WRITE_FILESET` on the fileset, schema, catalog, metalake |
-| list file                         | First, you should have the privilege to load the catalog and the schema. Then, you are one of the owners of the fileset, schema, metalake, catalog or have either `READ_FILESET` or `WRITE_FILESET` on the fileset, schema, catalog, metalake |
-| register model                    | First, you should have the privilege to load the catalog and the schema. Then, you have `CREATE_MODEL` on the metalake, catalog, schema or are the owner of the metalake, catalog, schema                                                     |
-| link model version                | First, you should have the privilege to load the catalog, the schema and the model. Then, you have `CREATE_MODEL_VERSION` on the metalake, catalog, schema, model or are the owner of the metalake, catalog, schema, model                    |
+| list fileset                      | First, you should have the privilege to load the catalog and the schema. Then, you are one of the owners of the fileset, schema, metalake, catalog or have either `READ_FILESET` or `WRITE_FILESET` on the fileset, schema, catalog, metalake |
+| register model                    | First, you should have the privilege to load the catalog and the schema. Then, you have `REGISTER_MODEL` on the metalake, catalog, schema or are the owner of the metalake, catalog, schema                                                   |
+| link model version                | First, you should have the privilege to load the catalog, the schema and the model. Then, you have `LINK_MODEL_VERSION` on the metalake, catalog, schema, model or are the owner of the metalake, catalog, schema, model                      |
 | alter model                       | First, you should have the privilege to load the catalog and the schema. Then, you are one of the owners of the model, schema, catalog, metalake                                                                                              |
 | drop model                        | First, you should have the privilege to load the catalog and the schema. Then, you are one of the owners of the model, schema, catalog, metalake                                                                                              |
 | list model                        | First, you should have the privilege to load the catalog and the schema. Then the owner of the schema, catalog, metalake can see all the models, others can see the models which they can load                                                |
@@ -1039,11 +1161,11 @@ The following table lists the required privileges for each API.
 | alter model version               | First, you should have the privilege to load the catalog and the schema. Then, you are one of the owners of the model, schema, metalake, catalog.                                                                                             |
 | delete model version alias        | First, you should have the privilege to load the catalog and the schema. Then, you are one of the owners of the model, schema, metalake, catalog.                                                                                             |
 | add user                          | `MANAGE_USERS` on the metalake  or the owner of the metalake                                                                                                                                                                                  |
-| delete user                       | `MANAGE_USERS` on the metalake  or the owner of the metalake                                                                                                                                                                                  |
+| remove user                       | `MANAGE_USERS` on the metalake  or the owner of the metalake                                                                                                                                                                                  |
 | get user                          | `MANAGE_USERS` on the metalake  or the owner of the metalake or himself                                                                                                                                                                       |
 | list users                        | `MANAGE_USERS` on the metalake  or the owner of the metalake can see all the users, others can see himself                                                                                                                                    |
 | add group                         | `MANAGE_GROUPS` on the metalake or the owner of the metalake                                                                                                                                                                                  |
-| delete group                      | `MANAGE_GROUPS` on the metalake or the owner of the metalake                                                                                                                                                                                  |
+| remove group                      | `MANAGE_GROUPS` on the metalake or the owner of the metalake                                                                                                                                                                                  |
 | get group                         | `MANAGE_GROUPS` on the metalake or the owner of the metalake or his groups                                                                                                                                                                    |
 | list groups                       | `MANAGE_GROUPS` on the metalake or the owner of the metalake can see all the groups, others can see his group                                                                                                                                 |
 | create role                       | `CREATE_ROLE` on the metalake or the owner of the metalake                                                                                                                                                                                    |

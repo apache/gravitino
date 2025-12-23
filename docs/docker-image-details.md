@@ -14,7 +14,7 @@ You can deploy the service with the Gravitino Docker image.
 Container startup commands
 
 ```shell
-docker run --rm -d -p 8090:8090 -p 9001:9001 apache/gravitino:0.7.0-incubating
+docker run --rm -d -p 8090:8090 -p 9001:9001 apache/gravitino:latest
 ```
 
 Memory settings
@@ -23,6 +23,8 @@ JVM heap and metaspace are controlled by `GRAVITINO_MEM` (default `-Xms1024m -Xm
 
 Changelog
 
+- apache/gravitino:1.1.0
+  - Based on Gravitino 1.1.0, you can know more information from 1.1.0 [release notes](https://github.com/apache/gravitino/releases/tag/v1.1.0).
 
 - apache/gravitino:1.0.0
   - Based on Gravitino 1.0.0, you can know more information from 1.0.0 [release notes](https://github.com/apache/gravitino/releases/tag/v1.0.0).
@@ -72,7 +74,7 @@ You can deploy the standalone Gravitino Iceberg REST server with the Docker imag
 Container startup commands
 
 ```shell
-docker run --rm -d -p 9001:9001 apache/gravitino-iceberg-rest:0.7.0-incubating
+docker run --rm -d -p 9001:9001 apache/gravitino-iceberg-rest:latest
 ```
 
 Memory settings
@@ -80,6 +82,14 @@ Memory settings
 Use `GRAVITINO_MEM` to size the JVM (default `-Xms1024m -Xmx1024m -XX:MaxMetaspaceSize=512m`). Override with `-e GRAVITINO_MEM="-Xms4g -Xmx4g -XX:MaxMetaspaceSize=1g"` when you need different sizes. Launch scripts append `GRAVITINO_MEM` to `JAVA_OPTS`, so set it to change heap/metaspace settings.
 
 Changelog
+
+- apache/gravitino-iceberg-rest:1.1.0
+  - Support scan planning endpoint
+  - Support get credentials endpoint
+  - Support table metadata cache
+  - Support access control
+  - For more information, see 1.1.0 [release notes](https://github.com/apache/gravitino/releases/tag/v1.1.0).
+
 - apache/gravitino-iceberg-rest:1.0.0
   - Upgrade Iceberg version to 1.9
   - Supports to specify the catalog name using warehouse parameter
@@ -124,6 +134,10 @@ docker run --rm -d -p 8000:8000 apache/gravitino-mcp-server:latest --metalake te
 ```
 
 Changelog
+
+- apache/gravitino-mcp-server:1.1.0
+  - Built with Gravitino 1.1.0. For more information, see 1.1.0 [release notes](https://github.com/apache/gravitino/releases/tag/v1.1.0).
+
 - apache/gravitino-mcp-server:1.0.0
   - Supports read operations for `catalog`, `schema`, `table`, `fileset`, `model`, `policy`, `topic`, `statistic`, `job`.
   - Supports associate&disassociate tag, policy to metadata
@@ -133,8 +147,9 @@ Changelog
 
 You can deploy the standalone Gravitino Lance REST server with the Docker image.
 
+
 ```shell
-docker run --rm -d -p 9102:9102 -e LANCE_REST_GRAVITINO_METALAKE_NAME=test -e LANCE_REST_PORT=9102 apache/gravitino-lance-rest:latest 
+docker run --rm -d -p 9102:9102 -e LANCE_REST_GRAVITINO_METALAKE_NAME=test -e LANCE_REST_GRAVITINO_URI=http://gravitino-host:port -e LANCE_REST_PORT=9102 apache/gravitino-lance-rest:latest 
 ```
 
 Memory settings
@@ -144,13 +159,18 @@ Use `GRAVITINO_MEM` to size the JVM (default `-Xms1024m -Xmx1024m -XX:MaxMetaspa
 Currently, Gravitino Lance REST server supports setting the following environment variables
 - LANCE_REST_GRAVITINO_METALAKE_NAME: It will overwrite the configuration "gravitino.lance-rest.gravitino-metalake" in configuration file `conf/gravitino-lance-rest-server.conf`. **You should set it to your Gravitino metalake name.**
 - LANCE_REST_NAMESPACE_BACKEND: It will overwrite the configuration "gravitino.lance-rest.namespace-backend" in configuration file `conf/gravitino-lance-rest-server.conf`. The default value is "gravitino" and you should not change it as of now.
-- LANCE_REST_GRAVITINO_URI: It will overwrite the configuration "gravitino.lance-rest.gravitino-uri" in configuration file `conf/gravitino-lance-rest-server.conf`. The default value is "http://localhost:8090" and you can change it to your Gravitino server address.
+- LANCE_REST_GRAVITINO_URI: It will overwrite the configuration "gravitino.lance-rest.gravitino-uri" in configuration file `conf/gravitino-lance-rest-server.conf`. The default value is "http://localhost:8090" and you can change it to your Gravitino server address. **Be care that Gravitino server URI `http://localhost:8090` is a docker container internal address, if your Gravitino server is running outside the docker container, you should set it to your host IP address like `http://host-ip:8090`.**
 - LANCE_REST_HOST: It will overwrite the configuration "gravitino.lance-rest.host" in configuration file `conf/gravitino-lance-rest-server.conf`. The default value is `0.0.0.0`.
 - LANCE_REST_PORT: It will overwrite the configuration "gravitino.lance-rest.httpPort" in configuration file `conf/gravitino-lance-rest-server.conf`. The default value is `9101`.
 
 It's not advised to change `LANCE_REST_NAMESPACE_BACKEND`, `LANCE_REST_HOST` and `LANCE_REST_PORT` if you are not familiar with Gravitino Lance REST server and no special requirements.
 
+Changelog
 
+- apache/gravitino-lance-rest:1.1.0
+  - Initial release of Lance REST server
+  - Support Lance tables integration through REST API
+  - Built with Gravitino 1.1.0. For more information, see 1.1.0 [release notes](https://github.com/apache/gravitino/releases/tag/v1.1.0).
 
 ## Playground Docker image
 
@@ -177,6 +197,8 @@ Changelog
 
 Changelog
 
+- apache/gravitino-playground:trino-435-gravitino-1.1.0
+  - Use Gravitino release 1.1.0 Dockerfile to build the image.
 
 - apache/gravitino-playground:trino-435-gravitino-1.0.0
   - Use Gravitino release 1.0.0 Dockerfile to build the image.

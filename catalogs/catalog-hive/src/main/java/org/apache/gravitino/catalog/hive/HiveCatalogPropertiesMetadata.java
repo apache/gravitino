@@ -19,6 +19,8 @@
 
 package org.apache.gravitino.catalog.hive;
 
+import static org.apache.gravitino.catalog.hive.HiveConstants.HIVE_DEFAULT_CATALOG;
+
 import com.google.common.collect.ImmutableMap;
 import java.util.Map;
 import org.apache.gravitino.connector.BaseCatalogPropertiesMetadata;
@@ -29,6 +31,7 @@ public class HiveCatalogPropertiesMetadata extends BaseCatalogPropertiesMetadata
 
   public static final String CLIENT_POOL_SIZE = HiveConstants.CLIENT_POOL_SIZE;
   public static final String METASTORE_URIS = HiveConstants.METASTORE_URIS;
+  public static final String DEFAULT_CATALOG = HiveConstants.DEFAULT_CATALOG;
 
   public static final String CLIENT_POOL_CACHE_EVICTION_INTERVAL_MS =
       HiveConstants.CLIENT_POOL_CACHE_EVICTION_INTERVAL_MS;
@@ -60,6 +63,14 @@ public class HiveCatalogPropertiesMetadata extends BaseCatalogPropertiesMetadata
                   METASTORE_URIS,
                   "The Hive metastore URIs",
                   false /* immutable */,
+                  false /* hidden */))
+          .put(
+              DEFAULT_CATALOG,
+              PropertyEntry.stringOptionalPropertyEntry(
+                  DEFAULT_CATALOG,
+                  "The default Hive Metastore catalog name used when talking to HMS",
+                  true /* immutable */,
+                  HIVE_DEFAULT_CATALOG,
                   false /* hidden */))
           .put(
               IMPERSONATION_ENABLE,

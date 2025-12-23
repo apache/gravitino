@@ -139,7 +139,7 @@ public class TableMetaService {
                     }
                   }),
           () ->
-              SessionUtils.doWithCommit(
+              SessionUtils.doWithoutCommit(
                   TableVersionMapper.class,
                   mapper -> {
                     if (overwrite) {
@@ -213,7 +213,7 @@ public class TableMetaService {
                       TableMetaMapper.class,
                       mapper -> mapper.updateTableMeta(newTablePO, oldTablePO, newSchemaId))),
           () ->
-              SessionUtils.doWithCommit(
+              SessionUtils.doWithoutCommit(
                   TableVersionMapper.class,
                   mapper -> {
                     mapper.softDeleteTableVersionByTableIdAndVersion(
@@ -291,7 +291,7 @@ public class TableMetaService {
                 mapper ->
                     mapper.softDeletePolicyMetadataObjectRelsByTableId(
                         namespacedEntityId.entityId()));
-            SessionUtils.doWithCommit(
+            SessionUtils.doWithoutCommit(
                 TableVersionMapper.class,
                 mapper ->
                     mapper.softDeleteTableVersionByTableIdAndVersion(
