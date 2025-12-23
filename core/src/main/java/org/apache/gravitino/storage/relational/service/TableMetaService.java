@@ -28,6 +28,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 import org.apache.gravitino.Entity;
+import org.apache.gravitino.Entity.EntityType;
 import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
@@ -91,6 +92,19 @@ public class TableMetaService {
     String schemaName = namespaceLevels[2];
     String tableName = identifier.name();
     TablePO tablePO = getTableByFullQualifiedName(metalakeName, catalogName, schemaName, tableName);
+    if (tablePO.getSchemaId() == null) {
+      throw new NoSuchEntityException(
+          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
+          EntityType.SCHEMA.name().toLowerCase(),
+          schemaName);
+    }
+
+    if (tablePO.getTableId() == null) {
+      throw new NoSuchEntityException(
+          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
+          EntityType.TABLE.name().toLowerCase(),
+          tableName);
+    }
 
     List<ColumnPO> columnPOs =
         TableColumnMetaService.getInstance()
@@ -359,6 +373,7 @@ public class TableMetaService {
           Entity.EntityType.TABLE.name().toLowerCase(),
           tableName);
     }
+
     return tablePO;
   }
 }
