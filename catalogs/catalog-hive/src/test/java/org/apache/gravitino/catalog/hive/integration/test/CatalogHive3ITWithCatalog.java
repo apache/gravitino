@@ -34,8 +34,9 @@ import org.slf4j.LoggerFactory;
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 public class CatalogHive3ITWithCatalog extends CatalogHive3IT {
 
-  private static final Logger LOGGER = LoggerFactory.getLogger(CatalogHiveS3IT.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(CatalogHive3ITWithCatalog.class);
 
+  @Override
   protected void startNecessaryContainer() {
     super.startNecessaryContainer();
     hmsCatalog = "mycatalog";
@@ -45,16 +46,16 @@ public class CatalogHive3ITWithCatalog extends CatalogHive3IT {
   @Override
   protected void createCatalog() {
 
-    String localtion =
+    String location =
         String.format(
-            "hdfs://%s:%d/user/hive/warehouse/" + hmsCatalog,
+            "hdfs://%s:%d/user/hive/warehouse/%s" + hmsCatalog,
             containerSuite.getHiveContainer().getContainerIpAddress(),
             HiveContainer.HDFS_DEFAULTFS_PORT,
             schemaName.toLowerCase());
     try {
       hiveClientPool.run(
           client1 -> {
-            client1.createCatalog(hmsCatalog, localtion);
+            client1.createCatalog(hmsCatalog, location);
             return null;
           });
     } catch (Exception e) {
