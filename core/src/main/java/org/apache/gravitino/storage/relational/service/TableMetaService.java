@@ -27,8 +27,10 @@ import java.util.Objects;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
+import org.apache.gravitino.Configs;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.Entity.EntityType;
+import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
@@ -86,24 +88,36 @@ public class TableMetaService {
   public TableEntity getTableByIdentifier(NameIdentifier identifier) {
     NameIdentifierUtil.checkTable(identifier);
 
-    String[] namespaceLevels = identifier.namespace().levels();
-    String metalakeName = namespaceLevels[0];
-    String catalogName = namespaceLevels[1];
-    String schemaName = namespaceLevels[2];
-    String tableName = identifier.name();
-    TablePO tablePO = getTableByFullQualifiedName(metalakeName, catalogName, schemaName, tableName);
-    if (tablePO.getSchemaId() == null) {
-      throw new NoSuchEntityException(
-          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
-          EntityType.SCHEMA.name().toLowerCase(),
-          schemaName);
-    }
+    TablePO tablePO;
+    if (GravitinoEnv.getInstance().config().get(Configs.CACHE_ENABLED)) {
+      // If cache is enabled, we can get the table PO by schema id and table name to leverage the
+      // cache of schema id.
+      Long schemaId =
+          EntityIdService.getEntityId(
+              NameIdentifier.of(identifier.namespace().levels()), Entity.EntityType.SCHEMA);
+      tablePO = getTablePOBySchemaIdAndName(schemaId, identifier.name());
+    } else {
+      String[] namespaceLevels = identifier.namespace().levels();
+      String metalakeName = namespaceLevels[0];
+      String catalogName = namespaceLevels[1];
+      String schemaName = namespaceLevels[2];
+      String tableName = identifier.name();
+      tablePO = getTableByFullQualifiedName(metalakeName, catalogName, schemaName, tableName);
 
-    if (tablePO.getTableId() == null) {
-      throw new NoSuchEntityException(
-          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
-          EntityType.TABLE.name().toLowerCase(),
-          tableName);
+      // We use left join to fetch tablePO, so we need to check whether the parent entities exist.
+      if (tablePO.getSchemaId() == null) {
+        throw new NoSuchEntityException(
+            NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
+            EntityType.SCHEMA.name().toLowerCase(),
+            schemaName);
+      }
+
+      if (tablePO.getTableId() == null) {
+        throw new NoSuchEntityException(
+            NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
+            EntityType.TABLE.name().toLowerCase(),
+            tableName);
+      }
     }
 
     List<ColumnPO> columnPOs =
