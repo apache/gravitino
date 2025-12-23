@@ -328,13 +328,15 @@ public class TestManagedTableOperations {
     Assertions.assertEquals("table1_renamed", loadedRenamedTable.name());
 
     // Test rename the table to another schema
+    Table renamedTable1 =
+        tableOperations.alterTable(
+            NameIdentifierUtil.ofTable(METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME, "table1_renamed"),
+            TableChange.rename("table1_moved", "schema2"));
+
     NameIdentifier renamedTable1Ident =
-        NameIdentifierUtil.ofTable(METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME, "table1_renamed");
-    Assertions.assertThrows(
-        IllegalArgumentException.class,
-        () ->
-            tableOperations.alterTable(
-                renamedTable1Ident, TableChange.rename("table1_moved", "schema2")));
+        NameIdentifierUtil.ofTable(METALAKE_NAME, CATALOG_NAME, "schema2", "table1_moved");
+    Table loadedRenamedTable1 = tableOperations.loadTable(renamedTable1Ident);
+    Assertions.assertEquals(renamedTable1.name(), loadedRenamedTable1.name());
 
     // Test update the table comment
     String newComment = "Updated Test Table 1 Comment";
