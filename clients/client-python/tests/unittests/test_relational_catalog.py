@@ -23,6 +23,7 @@ from gravitino.client.relational_catalog import RelationalCatalog
 from gravitino.dto.audit_dto import AuditDTO
 from gravitino.dto.rel.distribution_dto import DistributionDTO
 from gravitino.dto.rel.table_dto import TableDTO
+from gravitino.dto.responses.drop_response import DropResponse
 from gravitino.dto.responses.entity_list_response import EntityListResponse
 from gravitino.dto.responses.table_response import TableResponse
 from gravitino.dto.util.dto_converters import DTOConverters
@@ -276,3 +277,14 @@ class TestRelationalCatalog(unittest.TestCase):
         ):
             with self.assertRaises(NoSuchSchemaException):
                 self.catalog.list_tables(namespace=Namespace.of("invalid_schema"))
+
+    def test_drop_table(self):
+        resp_body = DropResponse(0, True)
+        mock_resp = self._get_mock_http_resp(resp_body.to_json())
+
+        with patch(
+            "gravitino.utils.http_client.HTTPClient.delete",
+            return_value=mock_resp,
+        ):
+            is_dropped = self.catalog.drop_table(self.table_identifier)
+            self.assertTrue(is_dropped)
