@@ -268,7 +268,13 @@ public class GravitinoVirtualFileSystemS3CredentialAuthorizationIT extends BaseI
           Assertions.assertEquals('s', in.read());
         }
         Path denyWrite = new Path(gvfsPath, "write-denied.txt");
-        Assertions.assertThrows(IOException.class, () -> gvfs.create(denyWrite, true).close());
+        IOException ioe =
+            Assertions.assertThrows(IOException.class, () -> gvfs.create(denyWrite, true).close());
+        String msg = ioe.getMessage() == null ? "" : ioe.getMessage().toLowerCase();
+        Assertions.assertTrue(
+            msg.contains("accessdenied"),
+            "Expected auth failure access denied due to missing WRITE_FILESET privilege, but got: "
+                + ioe.getMessage());
       }
     } finally {
       metalake.revokePrivilegesFromRole(
