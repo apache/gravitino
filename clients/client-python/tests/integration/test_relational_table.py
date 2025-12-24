@@ -32,7 +32,6 @@ from gravitino.dto.rel.column_dto import ColumnDTO
 from gravitino.dto.rel.partitioning.identity_partitioning_dto import (
     IdentityPartitioningDTO,
 )
-from gravitino.utils import HTTPClient
 from tests.integration.containers.hdfs_container import HDFSContainer
 from tests.integration.integration_test_env import IntegrationTestEnv
 
@@ -53,7 +52,6 @@ class TestRelationalTable(IntegrationTestEnv):
         cls.hdfs_container: HDFSContainer = HDFSContainer()
         hive_metastore_uri = f"thrift://{cls.hdfs_container.get_ip()}:9083"
         logger.info("Started Hive container with metastore URI: %s", hive_metastore_uri)
-        cls.rest_client = HTTPClient("http://localhost:8090")
         cls.gravitino_admin_client = GravitinoAdminClient(uri="http://localhost:8090")
         cls.gravitino_admin_client.create_metalake(
             cls.METALAKE_NAME,
