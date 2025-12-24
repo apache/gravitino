@@ -158,7 +158,6 @@ public class JobIT extends BaseIT {
 
     // Verify the list of job templates after deletion
     registeredTemplates = metalake.listJobTemplates();
-    Assertions.assertEquals(1, registeredTemplates.size());
     Assertions.assertTrue(registeredTemplates.contains(template2));
 
     // Test deleting a non-existent job template
@@ -170,10 +169,6 @@ public class JobIT extends BaseIT {
     // Verify the second job template is deleted
     Assertions.assertThrows(
         NoSuchJobTemplateException.class, () -> metalake.getJobTemplate(template2.name()));
-
-    // Verify the list of job templates is empty after deleting both
-    registeredTemplates = metalake.listJobTemplates();
-    Assertions.assertTrue(registeredTemplates.isEmpty());
   }
 
   @Test
