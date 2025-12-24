@@ -467,8 +467,7 @@ class HiveShimV3 extends HiveShimV2 {
   }
 
   /**
-   * Creates an object using a constructor and applies a customizer, then converts any exception to
-   * a Gravitino exception.
+   * Creates an object using a constructor and converts any exception to a Gravitino exception.
    *
    * @param target Hive object info used in error messages and exception mapping
    * @param constructor The constructor to use for creating the object

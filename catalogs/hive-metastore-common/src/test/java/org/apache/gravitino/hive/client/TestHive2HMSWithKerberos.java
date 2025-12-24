@@ -27,6 +27,7 @@ import java.util.Properties;
 import org.apache.commons.io.FileUtils;
 import org.apache.gravitino.integration.test.container.HiveContainer;
 import org.apache.hadoop.security.authentication.util.KerberosName;
+import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.TestInstance;
@@ -122,5 +123,16 @@ public class TestHive2HMSWithKerberos extends TestHive2HMS {
     properties.setProperty("authentication.impersonation-enable", "true");
     properties.setProperty("hadoop.security.authentication", "kerberos");
     return properties;
+  }
+
+  @AfterAll
+  void cleanUp() {
+    try {
+      if (tempDir != null && tempDir.exists()) {
+        FileUtils.deleteDirectory(tempDir);
+      }
+    } catch (Exception e) {
+      throw new RuntimeException("Failed to clean up temporary files for Kerberos config", e);
+    }
   }
 }

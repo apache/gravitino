@@ -40,6 +40,7 @@ public class CatalogHive3ITWithCatalog extends CatalogHive3IT {
   protected void startNecessaryContainer() {
     super.startNecessaryContainer();
     hmsCatalog = "mycatalog";
+    // spark does not support non-default catalog, disable spark test
     enableSparkTest = false;
   }
 
@@ -48,9 +49,11 @@ public class CatalogHive3ITWithCatalog extends CatalogHive3IT {
 
     String location =
         String.format(
-            "hdfs://%s:%d/user/hive/warehouse/%s" + hmsCatalog,
+            "hdfs://%s:%d/user/hive/warehouse/%s/%s/%s",
             containerSuite.getHiveContainer().getContainerIpAddress(),
             HiveContainer.HDFS_DEFAULTFS_PORT,
+            hmsCatalog,
+            catalogName.toLowerCase(),
             schemaName.toLowerCase());
     try {
       hiveClientPool.run(
