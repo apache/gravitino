@@ -30,6 +30,7 @@ import java.util.Set;
 import java.util.concurrent.Callable;
 import javax.security.auth.Subject;
 import javax.security.auth.kerberos.KerberosKey;
+import javax.security.auth.kerberos.KerberosPrincipal;
 import javax.security.auth.kerberos.KerberosTicket;
 import javax.security.auth.login.LoginContext;
 import javax.security.auth.login.LoginException;
@@ -51,8 +52,7 @@ public final class KerberosTokenProvider implements AuthDataProvider {
   private String clientPrincipal;
   private String keytabFile;
   private String host = "localhost";
-  private LoginContext loginContext;
-  private Subject subject;
+  private SubjectProvider subjectProvider;
 
   private KerberosTokenProvider() {}
 
@@ -85,22 +85,8 @@ public final class KerberosTokenProvider implements AuthDataProvider {
   private byte[] getTokenInternal() throws Exception {
     @SuppressWarnings("null")
     List<String> principalComponents = Splitter.on('@').splitToList(clientPrincipal);
-    // Gravitino server's principal must start with HTTP. This restriction follows
-    // the style of Apache Hadoop.
     String serverPrincipal = "HTTP/" + host + "@" + principalComponents.get(1);
-    Subject currentSubject = subject;
-    if (currentSubject == null) {
-      synchronized (this) {
-        if (loginContext == null) {
-          loginContext = KerberosUtils.login(clientPrincipal, keytabFile);
-        } else if (isLoginTicketExpired() && keytabFile != null) {
-          // We only support to use keytab to re-login context
-          loginContext.logout();
-          loginContext = KerberosUtils.login(clientPrincipal, keytabFile);
-        }
-      }
-      currentSubject = loginContext.getSubject();
-    }
+    Subject currentSubject = subjectProvider.get();
 
     return KerberosUtils.doAs(
         currentSubject,
@@ -133,24 +119,11 @@ public final class KerberosTokenProvider implements AuthDataProvider {
         });
   }
 
-  @SuppressWarnings("JavaUtilDate")
-  private boolean isLoginTicketExpired() {
-    Set<KerberosTicket> tickets =
-        loginContext.getSubject().getPrivateCredentials(KerberosTicket.class);
-
-    if (tickets.isEmpty()) {
-      return false;
-    }
-
-    return tickets.iterator().next().getEndTime().getTime() < System.currentTimeMillis();
-  }
-
-  /** Closes the KerberosTokenProvider and releases any underlying resources. */
   @Override
   public void close() throws IOException {
     try {
-      if (loginContext != null) {
-        loginContext.logout();
+      if (subjectProvider != null) {
+        subjectProvider.close();
       }
     } catch (LoginException le) {
       throw new IOException("Fail to close login context", le);
@@ -159,6 +132,67 @@ public final class KerberosTokenProvider implements AuthDataProvider {
 
   void setHost(String host) {
     this.host = host;
+  }
+
+  private interface SubjectProvider {
+    Subject get() throws LoginException;
+
+    void close() throws LoginException;
+  }
+
+  private static final class ExistingSubjectProvider implements SubjectProvider {
+    private final Subject subject;
+
+    ExistingSubjectProvider(Subject subject) {
+      this.subject = subject;
+    }
+
+    @Override
+    public Subject get() {
+      return subject;
+    }
+
+    @Override
+    public void close() {
+      // no-op
+    }
+  }
+
+  private static final class LoginSubjectProvider implements SubjectProvider {
+    private final String principal;
+    private final String keytabFile;
+    private LoginContext loginContext;
+
+    LoginSubjectProvider(String principal, String keytabFile) {
+      this.principal = principal;
+      this.keytabFile = keytabFile;
+    }
+
+    @Override
+    public synchronized Subject get() throws LoginException {
+      if (loginContext == null) {
+        loginContext = KerberosUtils.login(principal, keytabFile);
+      } else if (keytabFile != null && isLoginTicketExpired(loginContext)) {
+        loginContext.logout();
+        loginContext = KerberosUtils.login(principal, keytabFile);
+      }
+      return loginContext.getSubject();
+    }
+
+    @Override
+    public void close() throws LoginException {
+      if (loginContext != null) {
+        loginContext.logout();
+      }
+    }
+
+    private boolean isLoginTicketExpired(LoginContext ctx) {
+      Set<KerberosTicket> tickets = ctx.getSubject().getPrivateCredentials(KerberosTicket.class);
+      if (tickets.isEmpty()) {
+        return false;
+      }
+      return tickets.iterator().next().getEndTime().getTime() < System.currentTimeMillis();
+    }
   }
 
   /**
@@ -206,13 +240,13 @@ public final class KerberosTokenProvider implements AuthDataProvider {
     public KerberosTokenProvider build() {
       KerberosTokenProvider provider = new KerberosTokenProvider();
 
-      // Check if there are existing Kerberos credentials in the current Subject
-      // If so, use them instead of requiring clientPrincipal and keytabFile
       java.security.AccessControlContext context = java.security.AccessController.getContext();
       Subject subject = Subject.getSubject(context);
-      if (!subject.getPrivateCredentials(KerberosKey.class).isEmpty()
-          || !subject.getPrivateCredentials(KerberosTicket.class).isEmpty()) {
-        provider.subject = subject;
+      if (subject != null
+          && (!subject.getPrivateCredentials(KerberosKey.class).isEmpty()
+              || !subject.getPrivateCredentials(KerberosTicket.class).isEmpty())) {
+        provider.subjectProvider = new ExistingSubjectProvider(subject);
+        provider.clientPrincipal = extractPrincipalFromSubject(subject);
         return provider;
       }
 
@@ -232,7 +266,16 @@ public final class KerberosTokenProvider implements AuthDataProvider {
         provider.keytabFile = keyTabFile.getAbsolutePath();
       }
 
+      provider.subjectProvider =
+          new LoginSubjectProvider(provider.clientPrincipal, provider.keytabFile);
       return provider;
+    }
+
+    private String extractPrincipalFromSubject(Subject subject) {
+      return subject.getPrincipals(KerberosPrincipal.class).stream()
+          .findFirst()
+          .map(Object::toString)
+          .orElse(null);
     }
   }
 }
