@@ -65,8 +65,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * GVFS integration test that verifies credential vending with authorization enabled on S3. -
- * READ_FILESET: can read via GVFS but cannot write. - WRITE_FILESET: can read and write via GVFS.
+ * GVFS integration test that verifies credential vending with authorization enabled on S3. <br>
+ * - READ_FILESET: can read via GVFS but cannot write. <br>
+ * - WRITE_FILESET: can read and write via GVFS.
  */
 @EnabledIf(value = "s3IsConfigured", disabledReason = "s3 with credential is not prepared")
 public class GravitinoVirtualFileSystemS3CredentialAuthorizationIT extends BaseIT {
