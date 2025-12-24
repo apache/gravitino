@@ -245,7 +245,7 @@ public class GravitinoVirtualFileSystemS3CredentialAuthorizationIT extends BaseI
         String msg = ioe.getMessage() == null ? "" : ioe.getMessage().toLowerCase();
         Assertions.assertTrue(
             msg.contains("accessdenied"),
-            "Expected auth failure access denied due to missing WRITE_FILESET privilege, but got: "
+            "Expected write to be denied due to missing WRITE_FILESET privilege, but got: "
                 + ioe.getMessage());
       }
     } finally {
