@@ -29,6 +29,7 @@ public class CatalogHive3IT extends CatalogHive2IT {
 
   @Override
   protected void startNecessaryContainer() {
+    hmsCatalog = "hive";
     containerSuite.startHiveContainer(
         ImmutableMap.of(HiveContainer.HIVE_RUNTIME_VERSION, HiveContainer.HIVE3));
 
@@ -37,6 +38,5 @@ public class CatalogHive3IT extends CatalogHive2IT {
             "thrift://%s:%d",
             containerSuite.getHiveContainer().getContainerIpAddress(),
             HiveContainer.HIVE_METASTORE_PORT);
-    hmsCatalog = "hive";
   }
 }

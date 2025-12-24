@@ -53,6 +53,7 @@ public class CatalogHiveS3IT extends CatalogHive3IT {
 
   @Override
   protected void startNecessaryContainer() {
+    hmsCatalog = "hive";
     containerSuite.startLocalStackContainer();
     gravitinoLocalStackContainer = containerSuite.getLocalStackContainer();
 
