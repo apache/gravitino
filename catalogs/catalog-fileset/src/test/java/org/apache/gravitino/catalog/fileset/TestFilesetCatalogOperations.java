@@ -216,7 +216,7 @@ public class TestFilesetCatalogOperations {
   }
 
   @BeforeAll
-  public static void setUp() {
+  public static void setUp() throws IllegalAccessException {
     Config config = Mockito.mock(Config.class);
     when(config.get(ENTITY_STORE)).thenReturn(RELATIONAL_ENTITY_STORE);
     when(config.get(ENTITY_RELATIONAL_STORE)).thenReturn(DEFAULT_ENTITY_RELATIONAL_STORE);
@@ -336,6 +336,8 @@ public class TestFilesetCatalogOperations {
     schemaMetaServiceMockedStatic
         .when(SchemaMetaService::getInstance)
         .thenReturn(spySchemaMetaService);
+
+    FieldUtils.writeField(GravitinoEnv.getInstance(), "config", config, true);
   }
 
   @AfterAll
