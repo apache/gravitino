@@ -196,35 +196,6 @@ public class GravitinoVirtualFileSystemS3CredentialAuthorizationIT extends BaseI
     }
   }
 
-  private Configuration convertGvfsConfigToRealFileSystemConfig(Configuration gvfsConf) {
-    Configuration s3Conf = new Configuration();
-    Map<String, String> map = Maps.newHashMap();
-    gvfsConf.forEach(entry -> map.put(entry.getKey(), entry.getValue()));
-    map.put(S3Properties.GRAVITINO_S3_ACCESS_KEY_ID, S3_ACCESS_KEY);
-    map.put(S3Properties.GRAVITINO_S3_SECRET_ACCESS_KEY, S3_SECRET_KEY);
-    Map<String, String> hadoopConfMap =
-        FileSystemUtils.toHadoopConfigMap(map, S3FileSystemProvider.GRAVITINO_KEY_TO_S3_HADOOP_KEY);
-    hadoopConfMap.forEach(s3Conf::set);
-    return s3Conf;
-  }
-
-  private String genStorageLocation(String fileset) {
-    return String.format("s3a://%s/%s", BUCKET_NAME, fileset);
-  }
-
-  private Path genGvfsPath(String fileset) {
-    return new Path(String.format("gvfs://fileset/%s/%s/%s", catalogName, schemaName, fileset));
-  }
-
-  private static boolean s3IsConfigured() {
-    return StringUtils.isNotBlank(System.getenv("S3_ACCESS_KEY_ID_FOR_CREDENTIAL"))
-        && StringUtils.isNotBlank(System.getenv("S3_SECRET_ACCESS_KEY_FOR_CREDENTIAL"))
-        && StringUtils.isNotBlank(System.getenv("S3_ENDPOINT_FOR_CREDENTIAL"))
-        && StringUtils.isNotBlank(System.getenv("S3_BUCKET_NAME_FOR_CREDENTIAL"))
-        && StringUtils.isNotBlank(System.getenv("S3_REGION_FOR_CREDENTIAL"))
-        && StringUtils.isNotBlank(System.getenv("S3_ROLE_ARN_FOR_CREDENTIAL"));
-  }
-
   @Test
   void testCredentialVendingWithReadPrivilegeAllowsReadOnly() throws IOException {
     String filesetName = GravitinoITUtils.genRandomName("gvfs_auth_read");
@@ -339,5 +310,34 @@ public class GravitinoVirtualFileSystemS3CredentialAuthorizationIT extends BaseI
       }
       metalake.loadCatalog(catalogName).asFilesetCatalog().dropFileset(filesetIdent);
     }
+  }
+
+  private Configuration convertGvfsConfigToRealFileSystemConfig(Configuration gvfsConf) {
+    Configuration s3Conf = new Configuration();
+    Map<String, String> map = Maps.newHashMap();
+    gvfsConf.forEach(entry -> map.put(entry.getKey(), entry.getValue()));
+    map.put(S3Properties.GRAVITINO_S3_ACCESS_KEY_ID, S3_ACCESS_KEY);
+    map.put(S3Properties.GRAVITINO_S3_SECRET_ACCESS_KEY, S3_SECRET_KEY);
+    Map<String, String> hadoopConfMap =
+        FileSystemUtils.toHadoopConfigMap(map, S3FileSystemProvider.GRAVITINO_KEY_TO_S3_HADOOP_KEY);
+    hadoopConfMap.forEach(s3Conf::set);
+    return s3Conf;
+  }
+
+  private String genStorageLocation(String fileset) {
+    return String.format("s3a://%s/%s", BUCKET_NAME, fileset);
+  }
+
+  private Path genGvfsPath(String fileset) {
+    return new Path(String.format("gvfs://fileset/%s/%s/%s", catalogName, schemaName, fileset));
+  }
+
+  private static boolean s3IsConfigured() {
+    return StringUtils.isNotBlank(System.getenv("S3_ACCESS_KEY_ID_FOR_CREDENTIAL"))
+        && StringUtils.isNotBlank(System.getenv("S3_SECRET_ACCESS_KEY_FOR_CREDENTIAL"))
+        && StringUtils.isNotBlank(System.getenv("S3_ENDPOINT_FOR_CREDENTIAL"))
+        && StringUtils.isNotBlank(System.getenv("S3_BUCKET_NAME_FOR_CREDENTIAL"))
+        && StringUtils.isNotBlank(System.getenv("S3_REGION_FOR_CREDENTIAL"))
+        && StringUtils.isNotBlank(System.getenv("S3_ROLE_ARN_FOR_CREDENTIAL"));
   }
 }
