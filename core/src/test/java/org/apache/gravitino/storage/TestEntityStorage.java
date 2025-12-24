@@ -165,7 +165,6 @@ public class TestEntityStorage {
     Mockito.when(config.get(STORE_DELETE_AFTER_TIME)).thenReturn(20 * 60 * 1000L);
     Mockito.when(config.get(VERSION_RETENTION_COUNT)).thenReturn(1L);
     // Fix cache config for test
-    // Mockito.when(config.get(Configs.CACHE_ENABLED)).thenReturn(true);
     Mockito.when(config.get(Configs.CACHE_MAX_ENTRIES)).thenReturn(10_000);
     Mockito.when(config.get(Configs.CACHE_EXPIRATION_TIME)).thenReturn(3_600_000L);
     Mockito.when(config.get(Configs.CACHE_WEIGHER_ENABLED)).thenReturn(true);
