@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package org.apache.gravitino.catalog.fileset.authentication.kerberos;
+package org.apache.gravitino.catalog.hadoop.fs.kerberos;
 
 import static org.apache.gravitino.catalog.hadoop.fs.Constants.HADOOP_KRB5_CONF;
 import static org.apache.gravitino.catalog.hadoop.fs.Constants.SECURITY_KRB5_ENV;

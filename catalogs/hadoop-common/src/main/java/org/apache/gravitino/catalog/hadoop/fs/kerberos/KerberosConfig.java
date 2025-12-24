@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package org.apache.gravitino.catalog.fileset.authentication.kerberos;
+package org.apache.gravitino.catalog.hadoop.fs.kerberos;
 
 import static org.apache.gravitino.catalog.hadoop.fs.Constants.HADOOP_SECURITY_KEYTAB;
 import static org.apache.gravitino.catalog.hadoop.fs.Constants.HADOOP_SECURITY_PRINCIPAL;
@@ -25,7 +25,6 @@ import static org.apache.gravitino.catalog.hadoop.fs.Constants.HADOOP_SECURITY_P
 import com.google.common.collect.ImmutableMap;
 import java.util.Map;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.gravitino.catalog.fileset.authentication.AuthenticationConfig;
 import org.apache.gravitino.config.ConfigBuilder;
 import org.apache.gravitino.config.ConfigConstants;
 import org.apache.gravitino.config.ConfigEntry;

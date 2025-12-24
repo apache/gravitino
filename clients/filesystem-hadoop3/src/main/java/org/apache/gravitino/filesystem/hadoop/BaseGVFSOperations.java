@@ -857,23 +857,15 @@ public abstract class BaseGVFSOperations implements Closeable {
     return fileSystemCache.get(
         new FileSystemCacheKey(scheme, uri.getAuthority(), ugi),
         cacheKey -> {
-          FileSystemProvider provider = getFileSystemProviderByScheme(scheme);
-
-          // Reset the FileSystem service loader to make sure the FileSystem will reload the
-          // service file systems, this is a temporary solution to fix the issue
-          // https://github.com/apache/gravitino/issues/5609
-          resetFileSystemServiceLoader(scheme);
           try {
-            FileSystem fs;
-            if (scheme.equals(SCHEME_HDFS)) {
-              Configuration fsConfig =
-                  FileSystemUtils.createConfiguration(GRAVITINO_BYPASS, allProperties);
-              HDFSFileSystemProxy proxy = new HDFSFileSystemProxy(actualFilePath, fsConfig);
-              fs = proxy.getProxy();
-            } else {
-              fs = provider.getFileSystem(actualFilePath, allProperties);
-            }
-            return fs;
+            FileSystemProvider provider = getFileSystemProviderByScheme(scheme);
+
+            // Reset the FileSystem service loader to make sure the FileSystem will reload the
+            // service file systems, this is a temporary solution to fix the issue
+            // https://github.com/apache/gravitino/issues/5609
+            resetFileSystemServiceLoader(scheme);
+
+            return provider.getFileSystem(actualFilePath, allProperties);
           } catch (IOException e) {
             throw new GravitinoRuntimeException(
                 e, "Cannot get FileSystem for path: %s", actualFilePath);

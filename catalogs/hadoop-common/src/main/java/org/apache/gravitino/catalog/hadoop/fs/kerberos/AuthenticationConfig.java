@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package org.apache.gravitino.catalog.fileset.authentication;
+package org.apache.gravitino.catalog.hadoop.fs.kerberos;
 
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.HADOOP_SECURITY_AUTHENTICATION;
 

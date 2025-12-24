@@ -18,14 +18,14 @@
  */
 package org.apache.gravitino.catalog.fileset;
 
-import static org.apache.gravitino.catalog.fileset.authentication.kerberos.KerberosConfig.KERBEROS_PROPERTY_ENTRIES;
+import static org.apache.gravitino.catalog.hadoop.fs.kerberos.KerberosConfig.KERBEROS_PROPERTY_ENTRIES;
 import static org.apache.gravitino.catalog.hadoop.fs.Constants.BUILTIN_LOCAL_FS_PROVIDER;
 import static org.apache.gravitino.file.Fileset.LOCATION_NAME_UNKNOWN;
 import static org.apache.gravitino.file.Fileset.PROPERTY_MULTIPLE_LOCATIONS_PREFIX;
 
 import com.google.common.collect.ImmutableMap;
 import java.util.Map;
-import org.apache.gravitino.catalog.fileset.authentication.AuthenticationConfig;
+import org.apache.gravitino.catalog.hadoop.fs.kerberos.AuthenticationConfig;
 import org.apache.gravitino.catalog.hadoop.fs.FileSystemProvider;
 import org.apache.gravitino.catalog.hadoop.fs.LocalFileSystemProvider;
 import org.apache.gravitino.connector.BaseCatalogPropertiesMetadata;

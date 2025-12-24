@@ -44,7 +44,9 @@ public class HDFSFileSystemProvider implements FileSystemProvider {
     Map<String, String> hadoopConfMap = additionalHDFSConfig(config);
     Configuration configuration =
         FileSystemUtils.createConfiguration(GRAVITINO_BYPASS, hadoopConfMap);
-    return FileSystem.newInstance(path.toUri(), configuration);
+
+    HDFSFileSystemProxy proxy = new HDFSFileSystemProxy(path, configuration);
+    return proxy.getProxy();
   }
 
   @Override

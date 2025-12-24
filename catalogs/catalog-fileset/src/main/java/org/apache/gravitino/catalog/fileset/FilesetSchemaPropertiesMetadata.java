@@ -23,8 +23,8 @@ import static org.apache.gravitino.file.Fileset.PROPERTY_MULTIPLE_LOCATIONS_PREF
 
 import com.google.common.collect.ImmutableMap;
 import java.util.Map;
-import org.apache.gravitino.catalog.fileset.authentication.AuthenticationConfig;
-import org.apache.gravitino.catalog.fileset.authentication.kerberos.KerberosConfig;
+import org.apache.gravitino.catalog.hadoop.fs.kerberos.AuthenticationConfig;
+import org.apache.gravitino.catalog.hadoop.fs.kerberos.KerberosConfig;
 import org.apache.gravitino.connector.BasePropertiesMetadata;
 import org.apache.gravitino.connector.PropertyEntry;
 import org.apache.gravitino.credential.config.CredentialConfig;

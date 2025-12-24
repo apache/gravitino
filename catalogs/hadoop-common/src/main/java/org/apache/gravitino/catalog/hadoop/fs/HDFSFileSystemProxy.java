@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.filesystem.hadoop;
+package org.apache.gravitino.catalog.hadoop.fs;
 
 import static org.apache.gravitino.catalog.hadoop.fs.Constants.AUTH_KERBEROS;
 import static org.apache.gravitino.catalog.hadoop.fs.Constants.AUTH_SIMPLE;
