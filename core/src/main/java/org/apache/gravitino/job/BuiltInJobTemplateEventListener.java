@@ -94,27 +94,28 @@ public class BuiltInJobTemplateEventListener implements EventListenerPlugin {
     // Register built-in job templates for all existing metalakes on first startup
     try {
       List<String> existingMetalakes = MetalakeManager.listInUseMetalakes(entityStore);
-      if (!existingMetalakes.isEmpty()) {
-        LOG.info(
-            "Registering built-in job templates for {} existing metalakes",
-            existingMetalakes.size());
-
-        Map<String, JobTemplate> builtInTemplates = loadBuiltInJobTemplates();
-        if (builtInTemplates.isEmpty()) {
-          LOG.info("No built-in job templates discovered via JobTemplateProvider");
-          return;
-        }
-
-        existingMetalakes.forEach(
-            metalake -> {
-              try {
-                reconcileBuiltInJobTemplates(metalake, builtInTemplates);
-              } catch (Exception e) {
-                LOG.error(
-                    "Failed to register built-in job templates for metalake: {}", metalake, e);
-              }
-            });
+      if (existingMetalakes.isEmpty()) {
+        return;
       }
+
+      LOG.info(
+          "Registering built-in job templates for {} existing metalakes", existingMetalakes.size());
+
+      Map<String, JobTemplate> builtInTemplates = loadBuiltInJobTemplates();
+      if (builtInTemplates.isEmpty()) {
+        LOG.info("No built-in job templates discovered via JobTemplateProvider");
+        return;
+      }
+
+      existingMetalakes.forEach(
+          metalake -> {
+            try {
+              reconcileBuiltInJobTemplates(metalake, builtInTemplates);
+            } catch (Exception e) {
+              LOG.error("Failed to register built-in job templates for metalake: {}", metalake, e);
+            }
+          });
+
     } catch (Exception e) {
       LOG.error("Failed to register built-in job templates for existing metalakes", e);
     }

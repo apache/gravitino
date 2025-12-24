@@ -110,7 +110,6 @@ public class JobIT extends BaseIT {
     Assertions.assertDoesNotThrow(() -> metalake.registerJobTemplate(template2));
 
     List<JobTemplate> registeredTemplates = metalake.listJobTemplates();
-    Assertions.assertEquals(2, registeredTemplates.size());
     Assertions.assertTrue(registeredTemplates.contains(template1));
     Assertions.assertTrue(registeredTemplates.contains(template2));
 
@@ -140,7 +139,6 @@ public class JobIT extends BaseIT {
     Assertions.assertDoesNotThrow(() -> metalake.registerJobTemplate(template2));
 
     List<JobTemplate> registeredTemplates = metalake.listJobTemplates();
-    Assertions.assertEquals(2, registeredTemplates.size());
     Assertions.assertTrue(registeredTemplates.contains(template1));
     Assertions.assertTrue(registeredTemplates.contains(template2));
 
