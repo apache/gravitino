@@ -286,6 +286,7 @@ public class TestEntityStorage {
     Config config = Mockito.mock(Config.class);
     Mockito.when(config.get(Configs.CACHE_ENABLED)).thenReturn(enableCache);
     init(type, config);
+    SqlSessionFactoryHelper.getInstance().init(GravitinoEnv.getInstance().config());
     AuditInfo auditInfo =
         AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
 
@@ -541,7 +542,7 @@ public class TestEntityStorage {
     Mockito.when(config.get(Configs.CACHE_ENABLED)).thenReturn(enableCache);
 
     init(type, config);
-
+    SqlSessionFactoryHelper.getInstance().init(GravitinoEnv.getInstance().config());
     AuditInfo auditInfo =
         AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
 
@@ -647,6 +648,7 @@ public class TestEntityStorage {
     Mockito.when(config.get(Configs.CACHE_ENABLED)).thenReturn(enableCache);
 
     init(type, config);
+    SqlSessionFactoryHelper.getInstance().init(GravitinoEnv.getInstance().config());
 
     AuditInfo auditInfo =
         AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
@@ -697,6 +699,7 @@ public class TestEntityStorage {
     Mockito.when(config.get(Configs.CACHE_ENABLED)).thenReturn(enableCache);
 
     init(type, config);
+    SqlSessionFactoryHelper.getInstance().init(GravitinoEnv.getInstance().config());
 
     AuditInfo auditInfo =
         AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
@@ -1009,6 +1012,8 @@ public class TestEntityStorage {
     Mockito.when(config.get(Configs.CACHE_ENABLED)).thenReturn(enableCache);
 
     init(type, config);
+    SqlSessionFactoryHelper.getInstance().init(GravitinoEnv.getInstance().config());
+
     try (EntityStore store = EntityStoreFactory.createEntityStore(config)) {
       store.initialize(config);
 
@@ -1176,6 +1181,7 @@ public class TestEntityStorage {
     Mockito.when(config.get(Configs.CACHE_ENABLED)).thenReturn(enableCache);
 
     init(type, config);
+    SqlSessionFactoryHelper.getInstance().init(GravitinoEnv.getInstance().config());
     try (EntityStore store = EntityStoreFactory.createEntityStore(config)) {
       store.initialize(config);
 
@@ -2628,6 +2634,7 @@ public class TestEntityStorage {
     Mockito.when(config.get(Configs.CACHE_ENABLED)).thenReturn(enableCache);
 
     init(type, config);
+    SqlSessionFactoryHelper.getInstance().init(GravitinoEnv.getInstance().config());
 
     AuditInfo auditInfo =
         AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
@@ -2890,6 +2897,7 @@ public class TestEntityStorage {
     Mockito.when(config.get(Configs.CACHE_ENABLED)).thenReturn(enableCache);
 
     init(type, config);
+    SqlSessionFactoryHelper.getInstance().init(GravitinoEnv.getInstance().config());
 
     AuditInfo auditInfo =
         AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
@@ -3133,6 +3141,7 @@ public class TestEntityStorage {
     Mockito.when(config.get(Configs.CACHE_ENABLED)).thenReturn(enableCache);
 
     init(type, config);
+    SqlSessionFactoryHelper.getInstance().init(GravitinoEnv.getInstance().config());
 
     AuditInfo auditInfo =
         AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
