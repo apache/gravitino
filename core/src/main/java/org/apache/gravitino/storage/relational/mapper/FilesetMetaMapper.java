@@ -85,6 +85,25 @@ public interface FilesetMetaMapper {
   @SelectProvider(type = FilesetMetaSQLProviderFactory.class, method = "listFilesetPOsBySchemaId")
   List<FilesetPO> listFilesetPOsBySchemaId(@Param("schemaId") Long schemaId);
 
+  @Results({
+    @Result(property = "filesetId", column = "fileset_id", id = true),
+    @Result(property = "filesetName", column = "fileset_name"),
+    @Result(property = "metalakeId", column = "metalake_id"),
+    @Result(property = "catalogId", column = "catalog_id"),
+    @Result(property = "schemaId", column = "schema_id"),
+    @Result(property = "type", column = "type"),
+    @Result(property = "auditInfo", column = "audit_info"),
+    @Result(property = "currentVersion", column = "current_version"),
+    @Result(property = "lastVersion", column = "last_version"),
+    @Result(property = "deletedAt", column = "deleted_at"),
+    @Result(
+        property = "filesetVersionPOs",
+        javaType = List.class,
+        column =
+            "{id,version_metalake_id,version_catalog_id,version_schema_id,version_fileset_id,version,"
+                + "fileset_comment,properties,storage_location_name,storage_location,version_deleted_at}",
+        many = @Many(resultMap = "mapToFilesetVersionPO"))
+  })
   @SelectProvider(
       type = FilesetMetaSQLProviderFactory.class,
       method = "listFilesetPOsByFullQualifiedName")

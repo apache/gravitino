@@ -52,10 +52,10 @@ public class FilesetMetaBaseSQLProvider {
       @Param("schemaName") String schemaName) {
     return """
         SELECT
-            mm.metalake_id AS metalakeId,
-            cm.catalog_id AS catalogId,
-            sm.schema_id AS schemaId,
-            fm.fileset_id,
+            mm.metalake_id,
+            cm.catalog_id,
+            sm.schema_id,
+            vi.fileset_id,
             fm.fileset_name,
             fm.type,
             fm.audit_info,
@@ -156,10 +156,10 @@ public class FilesetMetaBaseSQLProvider {
       @Param("filesetName") String filesetName) {
     return """
         SELECT
-            mm.metalake_id AS metalakeId,
-            cm.catalog_id AS catalogId,
-            sm.schema_id AS schemaId,
-            fm.fileset_id,
+            mm.metalake_id,
+            cm.catalog_id,
+            sm.schema_id,
+            vi.fileset_id,
             fm.fileset_name,
             fm.type,
             fm.audit_info,
