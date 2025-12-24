@@ -28,6 +28,8 @@ import java.util.Base64;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.Callable;
+import javax.security.auth.Subject;
+import javax.security.auth.kerberos.KerberosKey;
 import javax.security.auth.kerberos.KerberosTicket;
 import javax.security.auth.login.LoginContext;
 import javax.security.auth.login.LoginException;
@@ -50,6 +52,7 @@ public final class KerberosTokenProvider implements AuthDataProvider {
   private String keytabFile;
   private String host = "localhost";
   private LoginContext loginContext;
+  private Subject subject;
 
   private KerberosTokenProvider() {}
 
@@ -85,19 +88,22 @@ public final class KerberosTokenProvider implements AuthDataProvider {
     // Gravitino server's principal must start with HTTP. This restriction follows
     // the style of Apache Hadoop.
     String serverPrincipal = "HTTP/" + host + "@" + principalComponents.get(1);
-
-    synchronized (this) {
-      if (loginContext == null) {
-        loginContext = KerberosUtils.login(clientPrincipal, keytabFile);
-      } else if (isLoginTicketExpired() && keytabFile != null) {
-        // We only support use keytab to re-login context
-        loginContext.logout();
-        loginContext = KerberosUtils.login(clientPrincipal, keytabFile);
+    Subject currentSubject = subject;
+    if (currentSubject == null) {
+      synchronized (this) {
+        if (loginContext == null) {
+          loginContext = KerberosUtils.login(clientPrincipal, keytabFile);
+        } else if (isLoginTicketExpired() && keytabFile != null) {
+          // We only support to use keytab to re-login context
+          loginContext.logout();
+          loginContext = KerberosUtils.login(clientPrincipal, keytabFile);
+        }
       }
+      currentSubject = loginContext.getSubject();
     }
 
     return KerberosUtils.doAs(
-        loginContext.getSubject(),
+        currentSubject,
         new Callable<byte[]>() {
           @Override
           public byte[] call() throws Exception {
@@ -196,9 +202,19 @@ public final class KerberosTokenProvider implements AuthDataProvider {
      *
      * @return The built KerberosTokenProvider instance.
      */
-    @SuppressWarnings("null")
+    @SuppressWarnings("removal")
     public KerberosTokenProvider build() {
       KerberosTokenProvider provider = new KerberosTokenProvider();
+
+      // Check if there are existing Kerberos credentials in the current Subject
+      // If so, use them instead of requiring clientPrincipal and keytabFile
+      java.security.AccessControlContext context = java.security.AccessController.getContext();
+      Subject subject = Subject.getSubject(context);
+      if (!subject.getPrivateCredentials(KerberosKey.class).isEmpty()
+          || !subject.getPrivateCredentials(KerberosTicket.class).isEmpty()) {
+        provider.subject = subject;
+        return provider;
+      }
 
       Preconditions.checkArgument(
           StringUtils.isNotBlank(clientPrincipal),
