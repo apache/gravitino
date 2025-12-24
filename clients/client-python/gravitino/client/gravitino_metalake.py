@@ -16,7 +16,7 @@
 # under the License.
 
 import logging
-from typing import List, Dict
+from typing import Dict, List
 
 from gravitino.api.catalog import Catalog
 from gravitino.api.catalog_change import CatalogChange
@@ -24,6 +24,8 @@ from gravitino.api.job.job_handle import JobHandle
 from gravitino.api.job.job_template import JobTemplate
 from gravitino.api.job.job_template_change import JobTemplateChange
 from gravitino.api.job.supports_jobs import SupportsJobs
+from gravitino.api.tag.tag import Tag
+from gravitino.api.tag.tag_operations import TagOperations
 from gravitino.client.dto_converters import DTOConverters
 from gravitino.client.generic_job_handle import GenericJobHandle
 from gravitino.dto.metalake_dto import MetalakeDTO
@@ -50,11 +52,14 @@ from gravitino.exceptions.handlers.job_error_handler import JOB_ERROR_HANDLER
 from gravitino.rest.rest_utils import encode_string
 from gravitino.utils import HTTPClient
 
-
 logger = logging.getLogger(__name__)
 
 
-class GravitinoMetalake(MetalakeDTO, SupportsJobs):
+class GravitinoMetalake(
+    MetalakeDTO,
+    SupportsJobs,
+    TagOperations,
+):
     """
     Gravitino Metalake is the top-level metadata repository for users. It contains a list of catalogs
     as sub-level metadata collections. With GravitinoMetalake, users can list, create, load,
@@ -274,6 +279,10 @@ class GravitinoMetalake(MetalakeDTO, SupportsJobs):
         self.rest_client.patch(
             url, json=catalog_disable_request, error_handler=CATALOG_ERROR_HANDLER
         )
+
+    ##########
+    # Job operations
+    ##########
 
     def list_job_templates(self) -> List[JobTemplate]:
         """List all the registered job templates in Gravitino.
@@ -497,3 +506,101 @@ class GravitinoMetalake(MetalakeDTO, SupportsJobs):
         resp.validate()
 
         return GenericJobHandle(resp.job())
+
+    #########
+    # Tag operations
+    #########
+    def list_tags(self) -> list[str]:
+        """List all the tag names under a metalake.
+
+        Returns:
+            list[str]: The list of tag names.
+
+        Raises:
+            NoSuchMetalakeException: If the metalake does not exist.
+        """
+        # TODO implement list_tags
+        raise NotImplementedError()
+
+    def list_tags_info(self) -> List[Tag]:
+        """
+        List tags information under a metalake.
+
+        Returns:
+            list[Tag]: The list of tag information.
+
+        Raises:
+            NoSuchMetalakeException: If the metalake does not exist.
+        """
+        # TODO implement list_tags_info
+        raise NotImplementedError()
+
+    def get_tag(self, tag_name) -> Tag:
+        """
+        Get a tag by its name under a metalake.
+
+        Args:
+            tag_name (str): The name of the tag.
+
+        Returns:
+            Tag: The tag information.
+
+        Raises:
+            NoSuchTagException: If the tag does not exist.
+        """
+        # TODO implement get_tag
+        raise NotImplementedError()
+
+    def create_tag(self, tag_name, comment, properties) -> Tag:
+        """
+        Create a new tag under a metalake.
+
+        Raises:
+            NoSuchMetalakeException: If the metalake does not exist.
+            TagAlreadyExistsException: If the tag already exists.
+
+        Args:
+            tag_name (str): The name of the tag.
+            comment (str): The comment of the tag.
+            properties (dict[str, str]): The properties of the tag.
+
+        Returns:
+            Tag: The tag information.
+        """
+        # TODO implement create_tag
+        raise NotImplementedError()
+
+    def alter_tag(self, tag_name, *changes) -> Tag:
+        """
+        Alter a tag under a metalake.
+
+        Args:
+            tag_name (str): The name of the tag.
+            changes (TagChange): The changes to apply to the tag.
+
+        Returns:
+            Tag: The altered tag.
+
+        Raises:
+            NoSuchTagException: If the tag does not exist.
+            NoSuchMetalakeException: If the metalake does not exist.
+        """
+        # TODO implement alter_tag
+        raise NotImplementedError()
+
+    def delete_tag(self, tag_name) -> bool:
+        """
+        Delete a tag under a metalake.
+
+        Args:
+            tag_name (str): The name of the tag.
+
+        Returns:
+            bool: True if the tag was deleted, False otherwise.
+
+        Raises:
+            NoSuchTagException: If the tag does not exist.
+            NoSuchMetalakeException: If the metalake does not exist.
+        """
+        # TODO implement delete_tag
+        raise NotImplementedError()

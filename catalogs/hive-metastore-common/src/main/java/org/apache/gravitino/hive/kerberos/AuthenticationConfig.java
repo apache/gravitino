@@ -17,13 +17,19 @@
  * under the License.
  */
 
-package org.apache.gravitino.catalog.lakehouse.hudi.backend.hms.kerberos;
+package org.apache.gravitino.hive.kerberos;
 
+import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.HADOOP_SECURITY_AUTHENTICATION;
+
+import java.util.Map;
+import java.util.Properties;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.config.ConfigBuilder;
 import org.apache.gravitino.config.ConfigConstants;
 import org.apache.gravitino.config.ConfigEntry;
+import org.apache.hadoop.conf.Configuration;
 
+/** Configuration for authentication */
 public class AuthenticationConfig extends Config {
 
   // The key for the authentication type, currently we support Kerberos and simple
@@ -38,22 +44,27 @@ public class AuthenticationConfig extends Config {
 
   public static final boolean KERBEROS_DEFAULT_IMPERSONATION_ENABLE = false;
 
-  public AuthenticationConfig(java.util.Map<String, String> properties) {
+  public AuthenticationConfig(Properties properties, Configuration configuration) {
     super(false);
-    loadFromMap(properties, k -> true);
+    loadFromHdfsConfiguration(configuration);
+    loadFromMap((Map) properties, k -> true);
+  }
+
+  private void loadFromHdfsConfiguration(Configuration configuration) {
+    String authType = configuration.get(HADOOP_SECURITY_AUTHENTICATION, "simple");
+    configMap.put(AUTH_TYPE_KEY, authType);
   }
 
   public static final ConfigEntry<String> AUTH_TYPE_ENTRY =
       new ConfigBuilder(AUTH_TYPE_KEY)
-          .doc(
-              "The type of authentication for Hudi catalog, currently we only support simple and Kerberos")
+          .doc("The type of authentication, currently we only support simple and Kerberos")
           .version(ConfigConstants.VERSION_1_0_0)
           .stringConf()
           .createWithDefault("simple");
 
   public static final ConfigEntry<Boolean> ENABLE_IMPERSONATION_ENTRY =
       new ConfigBuilder(IMPERSONATION_ENABLE_KEY)
-          .doc("Whether to enable impersonation for the Hudi catalog")
+          .doc("Whether to enable impersonation")
           .version(ConfigConstants.VERSION_1_0_0)
           .booleanConf()
           .createWithDefault(KERBEROS_DEFAULT_IMPERSONATION_ENABLE);
@@ -64,5 +75,9 @@ public class AuthenticationConfig extends Config {
 
   public boolean isKerberosAuth() {
     return AuthenticationConfig.AuthenticationType.KERBEROS.name().equalsIgnoreCase(getAuthType());
+  }
+
+  public boolean isImpersonationEnable() {
+    return get(ENABLE_IMPERSONATION_ENTRY);
   }
 }

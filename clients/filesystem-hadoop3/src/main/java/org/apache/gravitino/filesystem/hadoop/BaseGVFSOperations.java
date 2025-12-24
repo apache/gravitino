@@ -71,7 +71,6 @@ import org.apache.gravitino.catalog.hadoop.fs.GravitinoFileSystemCredentialsProv
 import org.apache.gravitino.catalog.hadoop.fs.SupportsCredentialVending;
 import org.apache.gravitino.client.GravitinoClient;
 import org.apache.gravitino.credential.Credential;
-import org.apache.gravitino.credential.CredentialConstants;
 import org.apache.gravitino.exceptions.CatalogNotInUseException;
 import org.apache.gravitino.exceptions.GravitinoRuntimeException;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
@@ -788,13 +787,6 @@ public abstract class BaseGVFSOperations implements Closeable {
     CallerContext.CallerContextHolder.set(callerContext);
   }
 
-  private void setCallerContextForGetCredentials(String locationName) {
-    Map<String, String> contextMap = Maps.newHashMap();
-    contextMap.put(CredentialConstants.HTTP_HEADER_CURRENT_LOCATION_NAME, locationName);
-    CallerContext callerContext = CallerContext.builder().withContext(contextMap).build();
-    CallerContext.CallerContextHolder.set(callerContext);
-  }
-
   /**
    * Get user defined configurations for a specific location. Configuration format:
    *
@@ -989,7 +981,7 @@ public abstract class BaseGVFSOperations implements Closeable {
     ImmutableMap.Builder<String, String> mapBuilder = ImmutableMap.builder();
     try {
       Fileset fileset = getFileset(filesetIdentifier);
-      setCallerContextForGetCredentials(locationName);
+      GravitinoVirtualFileSystemUtils.setCallerContextForGetCredentials(locationName);
       Credential[] credentials = fileset.supportsCredentials().getCredentials();
       if (credentials.length > 0) {
         mapBuilder.put(

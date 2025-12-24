@@ -19,11 +19,9 @@
 package org.apache.gravitino.catalog.hive;
 
 import java.util.Map;
-import java.util.Optional;
 import org.apache.gravitino.connector.BaseCatalog;
 import org.apache.gravitino.connector.CatalogOperations;
 import org.apache.gravitino.connector.PropertiesMetadata;
-import org.apache.gravitino.connector.ProxyPlugin;
 import org.apache.gravitino.connector.capability.Capability;
 
 /** Implementation of an Apache Hive catalog in Apache Gravitino. */
@@ -63,18 +61,6 @@ public class HiveCatalog extends BaseCatalog<HiveCatalog> {
   @Override
   public Capability newCapability() {
     return new HiveCatalogCapability();
-  }
-
-  @Override
-  protected Optional<ProxyPlugin> newProxyPlugin(Map<String, String> config) {
-    boolean impersonationEnabled =
-        (boolean)
-            new HiveCatalogPropertiesMetadata()
-                .getOrDefault(config, HiveCatalogPropertiesMetadata.IMPERSONATION_ENABLE);
-    if (!impersonationEnabled) {
-      return Optional.empty();
-    }
-    return Optional.of(new HiveProxyPlugin());
   }
 
   @Override

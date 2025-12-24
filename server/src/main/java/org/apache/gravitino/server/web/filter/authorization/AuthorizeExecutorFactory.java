@@ -19,6 +19,7 @@ package org.apache.gravitino.server.web.filter.authorization;
 
 import java.lang.reflect.Parameter;
 import java.util.Map;
+import java.util.Optional;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationRequest;
@@ -32,7 +33,7 @@ public class AuthorizeExecutorFactory {
       Map<Entity.EntityType, NameIdentifier> metadataContext,
       AuthorizationExpressionEvaluator authorizationExpressionEvaluator,
       Map<String, Object> pathParams,
-      String entityType,
+      Optional<String> entityType,
       Parameter[] parameters,
       Object[] args) {
     return switch (requestType) {
