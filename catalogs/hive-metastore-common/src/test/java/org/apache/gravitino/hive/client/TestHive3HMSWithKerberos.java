@@ -55,6 +55,6 @@ public class TestHive3HMSWithKerberos extends TestHive2HMSWithKerberos {
     // Prepare Kerberos config (keytab/krb5) for client connections.
     prepareKerberosConfig();
 
-    hiveClient = new HiveClientFactory(createHiveProperties(), "").createHiveClient();
+    hiveClient = new HiveClientFactory(createHiveProperties(), "hive3-kerbers").createHiveClient();
   }
 }
