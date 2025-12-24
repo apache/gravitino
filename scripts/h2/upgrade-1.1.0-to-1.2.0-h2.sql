@@ -17,7 +17,7 @@
 -- under the License.
 --
 alter table `catalog_meta` add index catalog_meta_idx_name_da (catalog_name, deleted_at);
-alter table `schema_meta` add index schema_meta_idx_name_da (catalog_name, deleted_at);
+alter table `schema_meta` add index schema_meta_idx_name_da (schema_name, deleted_at);
 alter table `table_meta` add index table_meta_idx_name_da (table_name, deleted_at);
 alter table `fileset_meta` add index fileset_meta_idx_name_da (fileset_name, deleted_at);
 alter table `model_meta` add index model_meta_idx_name_da (model_name, deleted_at);

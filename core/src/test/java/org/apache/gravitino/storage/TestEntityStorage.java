@@ -252,7 +252,6 @@ public class TestEntityStorage {
       FileUtils.deleteQuietly(new File(H2_FILE));
     } else if (type.equalsIgnoreCase("postgresql")) {
       // Do nothing
-
     } else {
       throw new UnsupportedOperationException("Unsupported entity store type: " + type);
     }
