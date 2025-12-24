@@ -126,7 +126,9 @@ public class TestHive2HMSWithKerberos extends TestHive2HMS {
   }
 
   @AfterAll
-  void cleanUp() {
+  @Override
+  public void stopHiveContainer() throws Exception {
+    super.stopHiveContainer();
     try {
       if (tempDir != null && tempDir.exists()) {
         FileUtils.deleteDirectory(tempDir);
