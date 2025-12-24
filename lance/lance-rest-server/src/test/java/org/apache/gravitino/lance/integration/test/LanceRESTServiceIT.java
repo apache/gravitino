@@ -672,6 +672,15 @@ public class LanceRESTServiceIT extends BaseIT {
     Assertions.assertNotNull(response);
     Assertions.assertEquals(nonExistingLocation, response.getLocation());
     Assertions.assertFalse(new File(nonExistingLocation).exists());
+
+    // Test registerTable with null mode after deregister should succeed
+    registerTableRequest.setMode(null);
+    String verifyNullModeLocation = tempDir + "/" + "verify_null_mode_location/";
+    registerTableRequest.setLocation(verifyNullModeLocation);
+    registerTableRequest.setId(List.of(CATALOG_NAME, SCHEMA_NAME, "verify_null_mode_location"));
+    response = Assertions.assertDoesNotThrow(() -> ns.registerTable(registerTableRequest));
+    Assertions.assertNotNull(response);
+    Assertions.assertEquals(verifyNullModeLocation, response.getLocation());
   }
 
   @Test
