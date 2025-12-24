@@ -17,30 +17,24 @@
  * under the License.
  */
 
-package org.apache.gravitino.optimizer.api.common;
+package org.apache.gravitino.maintenance.optimizer.common;
 
-import org.apache.gravitino.annotation.DeveloperApi;
-import org.apache.gravitino.stats.StatisticValue;
+import org.apache.gravitino.maintenance.optimizer.common.conf.OptimizerConfig;
 
 /**
- * Named statistic value produced or consumed by optimizer components.
- *
- * @param <T> underlying Java type wrapped by the {@link StatisticValue}
+ * Immutable container for runtime optimizer context passed into pluggable components. Today it only
+ * exposes {@link OptimizerConfig}, but it is intended to carry additional shared resources (client
+ * handles, metrics) as the optimizer matures.
  */
-@DeveloperApi
-public interface StatisticEntry<T> {
+public class OptimizerEnv {
+  // The config items from the config file
+  private final OptimizerConfig config;
 
-  /**
-   * Stable metric key used for lookup and reporting.
-   *
-   * @return non-null metric name
-   */
-  String name();
+  public OptimizerEnv(OptimizerConfig config) {
+    this.config = config;
+  }
 
-  /**
-   * Typed statistic value wrapper.
-   *
-   * @return statistic value container
-   */
-  StatisticValue<T> value();
+  public OptimizerConfig config() {
+    return config;
+  }
 }

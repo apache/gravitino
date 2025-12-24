@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package org.apache.gravitino.optimizer.api.common;
+package org.apache.gravitino.maintenance.optimizer.api.common;
 
 import com.google.common.base.Preconditions;
 import java.util.List;

@@ -17,17 +17,17 @@
  * under the License.
  */
 
-package org.apache.gravitino.optimizer.api.common;
+package org.apache.gravitino.maintenance.optimizer.api.common;
 
 import java.util.Map;
 import org.apache.gravitino.annotation.DeveloperApi;
-import org.apache.gravitino.optimizer.api.recommender.StrategyHandler;
+import org.apache.gravitino.maintenance.optimizer.api.recommender.StrategyHandler;
 
 /**
  * Strategy definition supplied by the control plane. The recommender pulls strategies from a {@link
- * org.apache.gravitino.optimizer.api.recommender.StrategyProvider}, routes them to a {@link
- * StrategyHandler} by {@link #strategyType()}, and lets the handler interpret the remaining fields
- * as needed.
+ * org.apache.gravitino.maintenance.optimizer.api.recommender.StrategyProvider}, routes them to a
+ * {@link StrategyHandler} by {@link #strategyType()}, and lets the handler interpret the remaining
+ * fields as needed.
  */
 @DeveloperApi
 public interface Strategy {

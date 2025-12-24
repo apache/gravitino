@@ -17,10 +17,10 @@
  * under the License.
  */
 
-package org.apache.gravitino.optimizer.api.common;
+package org.apache.gravitino.maintenance.optimizer.api.common;
 
 import org.apache.gravitino.annotation.DeveloperApi;
-import org.apache.gravitino.optimizer.common.OptimizerEnv;
+import org.apache.gravitino.maintenance.optimizer.common.OptimizerEnv;
 
 /**
  * Base SPI for optimizer plug-ins (statistics, strategies, submitters). Implementations are

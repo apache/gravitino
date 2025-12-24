@@ -17,31 +17,22 @@
  * under the License.
  */
 
-package org.apache.gravitino.optimizer.api.common;
-
-import org.apache.gravitino.annotation.DeveloperApi;
+package org.apache.gravitino.maintenance.optimizer.api.recommender;
 
 /**
- * A single partition key/value pair.
- *
- * <p>For multi-level partitions, each level is represented by a separate entry (for example, {@code
- * p1=a} and {@code p2=b} for a {@code p1=a/p2=b} partition path). Combine entries with {@link
- * PartitionPath#of(java.util.List)} when returning the whole partition path.
+ * Encapsulates the scored result and job execution context for a single strategy evaluation. The
+ * recommender ranks evaluations by {@link #score()} before asking the {@link
+ * org.apache.gravitino.maintenance.optimizer.api.recommender.JobSubmitter JobSubmitter} to launch
+ * work.
  */
-@DeveloperApi
-public interface PartitionEntry {
+public interface StrategyEvaluation {
 
   /**
-   * Partition name.
-   *
-   * @return name of the partition field (for example, {@code ds} or {@code bucket_id})
+   * Score used to rank multiple recommendations of the same strategy. Higher wins; equal scores
+   * preserve the evaluation order returned by the {@code StrategyHandler}.
    */
-  String partitionName();
+  long score();
 
-  /**
-   * Partition value as a string.
-   *
-   * @return string representation of the partition value (e.g., {@code YYYY-MM-DD})
-   */
-  String partitionValue();
+  /** Job execution context for this evaluation. */
+  JobExecutionContext jobExecutionContext();
 }

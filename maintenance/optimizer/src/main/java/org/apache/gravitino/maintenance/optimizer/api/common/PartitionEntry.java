@@ -17,18 +17,31 @@
  * under the License.
  */
 
-package org.apache.gravitino.optimizer.api.recommender;
+package org.apache.gravitino.maintenance.optimizer.api.common;
 
 import org.apache.gravitino.annotation.DeveloperApi;
-import org.apache.gravitino.optimizer.api.common.Provider;
 
 /**
- * Marker interface for providers that can supply statistics to {@link StrategyHandler} instances.
- * Implementations are invoked by the {@link org.apache.gravitino.optimizer.recommender.Recommender}
- * only when a handler declares the matching {@link
- * org.apache.gravitino.optimizer.api.recommender.StrategyHandler.DataRequirement}. Most providers
- * should also implement a narrower contract such as {@link SupportTableStatistics} to expose
- * concrete capabilities.
+ * A single partition key/value pair.
+ *
+ * <p>For multi-level partitions, each level is represented by a separate entry (for example, {@code
+ * p1=a} and {@code p2=b} for a {@code p1=a/p2=b} partition path). Combine entries with {@link
+ * PartitionPath#of(java.util.List)} when returning the whole partition path.
  */
 @DeveloperApi
-public interface StatisticsProvider extends Provider {}
+public interface PartitionEntry {
+
+  /**
+   * Partition name.
+   *
+   * @return name of the partition field (for example, {@code ds} or {@code bucket_id})
+   */
+  String partitionName();
+
+  /**
+   * Partition value as a string.
+   *
+   * @return string representation of the partition value (e.g., {@code YYYY-MM-DD})
+   */
+  String partitionValue();
+}

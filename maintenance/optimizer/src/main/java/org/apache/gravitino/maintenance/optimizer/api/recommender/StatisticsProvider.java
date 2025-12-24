@@ -17,21 +17,19 @@
  * under the License.
  */
 
-package org.apache.gravitino.optimizer.api.recommender;
+package org.apache.gravitino.maintenance.optimizer.api.recommender;
+
+import org.apache.gravitino.annotation.DeveloperApi;
+import org.apache.gravitino.maintenance.optimizer.api.common.Provider;
 
 /**
- * Encapsulates the scored result and job execution context for a single strategy evaluation. The
- * recommender ranks evaluations by {@link #score()} before asking the {@link
- * org.apache.gravitino.optimizer.api.recommender.JobSubmitter JobSubmitter} to launch work.
+ * Marker interface for providers that can supply statistics to {@link StrategyHandler} instances.
+ * Implementations are invoked by the {@link
+ * org.apache.gravitino.maintenance.optimizer.recommender.Recommender} only when a handler declares
+ * the matching {@link
+ * org.apache.gravitino.maintenance.optimizer.api.recommender.StrategyHandler.DataRequirement}. Most
+ * providers should also implement a narrower contract such as {@link SupportTableStatistics} to
+ * expose concrete capabilities.
  */
-public interface StrategyEvaluation {
-
-  /**
-   * Score used to rank multiple recommendations of the same strategy. Higher wins; equal scores
-   * preserve the evaluation order returned by the {@code StrategyHandler}.
-   */
-  long score();
-
-  /** Job execution context for this evaluation. */
-  JobExecutionContext jobExecutionContext();
-}
+@DeveloperApi
+public interface StatisticsProvider extends Provider {}

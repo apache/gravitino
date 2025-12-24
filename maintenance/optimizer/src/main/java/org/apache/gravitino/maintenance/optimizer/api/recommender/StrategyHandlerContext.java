@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package org.apache.gravitino.optimizer.api.recommender;
+package org.apache.gravitino.maintenance.optimizer.api.recommender;
 
 import java.util.Collections;
 import java.util.List;
@@ -26,9 +26,9 @@ import java.util.Objects;
 import java.util.Optional;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.annotation.DeveloperApi;
-import org.apache.gravitino.optimizer.api.common.PartitionPath;
-import org.apache.gravitino.optimizer.api.common.StatisticEntry;
-import org.apache.gravitino.optimizer.api.common.Strategy;
+import org.apache.gravitino.maintenance.optimizer.api.common.PartitionPath;
+import org.apache.gravitino.maintenance.optimizer.api.common.StatisticEntry;
+import org.apache.gravitino.maintenance.optimizer.api.common.Strategy;
 import org.apache.gravitino.rel.Table;
 
 /**

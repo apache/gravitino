@@ -17,19 +17,19 @@
  * under the License.
  */
 
-package org.apache.gravitino.optimizer.api.recommender;
+package org.apache.gravitino.maintenance.optimizer.api.recommender;
 
 import java.util.List;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.annotation.DeveloperApi;
 import org.apache.gravitino.exceptions.NotFoundException;
-import org.apache.gravitino.optimizer.api.common.Provider;
-import org.apache.gravitino.optimizer.api.common.Strategy;
+import org.apache.gravitino.maintenance.optimizer.api.common.Provider;
+import org.apache.gravitino.maintenance.optimizer.api.common.Strategy;
 
 /**
  * Supplies strategies attached to identifiers (for example, tables). The recommender asks this
  * provider for strategies before instantiating {@link
- * org.apache.gravitino.optimizer.api.recommender.StrategyHandler strategy handlers}.
+ * org.apache.gravitino.maintenance.optimizer.api.recommender.StrategyHandler strategy handlers}.
  */
 @DeveloperApi
 public interface StrategyProvider extends Provider {

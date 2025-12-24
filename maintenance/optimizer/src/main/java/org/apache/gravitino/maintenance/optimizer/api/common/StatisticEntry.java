@@ -17,24 +17,30 @@
  * under the License.
  */
 
-package org.apache.gravitino.optimizer.api.recommender;
+package org.apache.gravitino.maintenance.optimizer.api.common;
 
 import org.apache.gravitino.annotation.DeveloperApi;
-import org.apache.gravitino.exceptions.NoSuchJobTemplateException;
-import org.apache.gravitino.optimizer.api.common.Provider;
+import org.apache.gravitino.stats.StatisticValue;
 
-/** Submits recommended jobs to an execution backend. */
+/**
+ * Named statistic value produced or consumed by optimizer components.
+ *
+ * @param <T> underlying Java type wrapped by the {@link StatisticValue}
+ */
 @DeveloperApi
-public interface JobSubmitter extends Provider {
+public interface StatisticEntry<T> {
 
   /**
-   * Submit a job for execution.
+   * Stable metric key used for lookup and reporting.
    *
-   * @param jobTemplateName the job template name (routes to the appropriate job template)
-   * @param jobExecutionContext execution context built by the strategy handler
-   * @return provider-specific job id
-   * @throws NoSuchJobTemplateException if the job template name does not exist
+   * @return non-null metric name
    */
-  String submitJob(String jobTemplateName, JobExecutionContext jobExecutionContext)
-      throws NoSuchJobTemplateException;
+  String name();
+
+  /**
+   * Typed statistic value wrapper.
+   *
+   * @return statistic value container
+   */
+  StatisticValue<T> value();
 }

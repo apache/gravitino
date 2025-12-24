@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package org.apache.gravitino.optimizer.common.conf;
+package org.apache.gravitino.maintenance.optimizer.common.conf;
 
 import java.util.Map;
 import org.apache.commons.lang3.StringUtils;

@@ -17,18 +17,18 @@
  * under the License.
  */
 
-package org.apache.gravitino.optimizer.common.util;
+package org.apache.gravitino.maintenance.optimizer.common.util;
 
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Streams;
 import java.util.List;
 import java.util.ServiceLoader;
 import java.util.stream.Collectors;
-import org.apache.gravitino.optimizer.api.common.Provider;
-import org.apache.gravitino.optimizer.api.recommender.JobSubmitter;
-import org.apache.gravitino.optimizer.api.recommender.StatisticsProvider;
-import org.apache.gravitino.optimizer.api.recommender.StrategyProvider;
-import org.apache.gravitino.optimizer.api.recommender.TableMetadataProvider;
+import org.apache.gravitino.maintenance.optimizer.api.common.Provider;
+import org.apache.gravitino.maintenance.optimizer.api.recommender.JobSubmitter;
+import org.apache.gravitino.maintenance.optimizer.api.recommender.StatisticsProvider;
+import org.apache.gravitino.maintenance.optimizer.api.recommender.StrategyProvider;
+import org.apache.gravitino.maintenance.optimizer.api.recommender.TableMetadataProvider;
 
 /** Helper for loading optimizer providers via {@link ServiceLoader}. */
 public class ProviderUtils {

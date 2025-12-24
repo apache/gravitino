@@ -17,28 +17,24 @@
  * under the License.
  */
 
-package org.apache.gravitino.optimizer.api.recommender;
+package org.apache.gravitino.maintenance.optimizer.api.recommender;
 
-import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.annotation.DeveloperApi;
-import org.apache.gravitino.exceptions.NoSuchTableException;
-import org.apache.gravitino.optimizer.api.common.Provider;
-import org.apache.gravitino.rel.Table;
+import org.apache.gravitino.exceptions.NoSuchJobTemplateException;
+import org.apache.gravitino.maintenance.optimizer.api.common.Provider;
 
-/**
- * Supplies table definitions to {@link StrategyHandler} implementations. The recommender calls this
- * provider only when a handler declares {@code TABLE_METADATA} in {@link
- * StrategyHandler#dataRequirements()}.
- */
+/** Submits recommended jobs to an execution backend. */
 @DeveloperApi
-public interface TableMetadataProvider extends Provider {
+public interface JobSubmitter extends Provider {
 
   /**
-   * Fetch table metadata for a fully-qualified table identifier.
+   * Submit a job for execution.
    *
-   * @param tableIdentifier catalog/schema/table identifier (must be three levels)
-   * @return table definition
-   * @throws NoSuchTableException if the table does not exist
+   * @param jobTemplateName the job template name (routes to the appropriate job template)
+   * @param jobExecutionContext execution context built by the strategy handler
+   * @return provider-specific job id
+   * @throws NoSuchJobTemplateException if the job template name does not exist
    */
-  Table tableMetadata(NameIdentifier tableIdentifier) throws NoSuchTableException;
+  String submitJob(String jobTemplateName, JobExecutionContext jobExecutionContext)
+      throws NoSuchJobTemplateException;
 }

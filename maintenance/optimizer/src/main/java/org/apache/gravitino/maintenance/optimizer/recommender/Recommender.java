@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package org.apache.gravitino.optimizer.recommender;
+package org.apache.gravitino.maintenance.optimizer.recommender;
 
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
@@ -31,23 +31,23 @@ import java.util.Set;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.NameIdentifier;
-import org.apache.gravitino.optimizer.api.common.PartitionPath;
-import org.apache.gravitino.optimizer.api.common.StatisticEntry;
-import org.apache.gravitino.optimizer.api.common.Strategy;
-import org.apache.gravitino.optimizer.api.recommender.JobExecutionContext;
-import org.apache.gravitino.optimizer.api.recommender.JobSubmitter;
-import org.apache.gravitino.optimizer.api.recommender.StatisticsProvider;
-import org.apache.gravitino.optimizer.api.recommender.StrategyEvaluation;
-import org.apache.gravitino.optimizer.api.recommender.StrategyHandler;
-import org.apache.gravitino.optimizer.api.recommender.StrategyHandler.DataRequirement;
-import org.apache.gravitino.optimizer.api.recommender.StrategyHandlerContext;
-import org.apache.gravitino.optimizer.api.recommender.StrategyProvider;
-import org.apache.gravitino.optimizer.api.recommender.SupportTableStatistics;
-import org.apache.gravitino.optimizer.api.recommender.TableMetadataProvider;
-import org.apache.gravitino.optimizer.common.CloseableGroup;
-import org.apache.gravitino.optimizer.common.OptimizerEnv;
-import org.apache.gravitino.optimizer.common.conf.OptimizerConfig;
-import org.apache.gravitino.optimizer.common.util.ProviderUtils;
+import org.apache.gravitino.maintenance.optimizer.api.common.PartitionPath;
+import org.apache.gravitino.maintenance.optimizer.api.common.StatisticEntry;
+import org.apache.gravitino.maintenance.optimizer.api.common.Strategy;
+import org.apache.gravitino.maintenance.optimizer.api.recommender.JobExecutionContext;
+import org.apache.gravitino.maintenance.optimizer.api.recommender.JobSubmitter;
+import org.apache.gravitino.maintenance.optimizer.api.recommender.StatisticsProvider;
+import org.apache.gravitino.maintenance.optimizer.api.recommender.StrategyEvaluation;
+import org.apache.gravitino.maintenance.optimizer.api.recommender.StrategyHandler;
+import org.apache.gravitino.maintenance.optimizer.api.recommender.StrategyHandler.DataRequirement;
+import org.apache.gravitino.maintenance.optimizer.api.recommender.StrategyHandlerContext;
+import org.apache.gravitino.maintenance.optimizer.api.recommender.StrategyProvider;
+import org.apache.gravitino.maintenance.optimizer.api.recommender.SupportTableStatistics;
+import org.apache.gravitino.maintenance.optimizer.api.recommender.TableMetadataProvider;
+import org.apache.gravitino.maintenance.optimizer.common.CloseableGroup;
+import org.apache.gravitino.maintenance.optimizer.common.OptimizerEnv;
+import org.apache.gravitino.maintenance.optimizer.common.conf.OptimizerConfig;
+import org.apache.gravitino.maintenance.optimizer.common.util.ProviderUtils;
 import org.apache.gravitino.rel.Table;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

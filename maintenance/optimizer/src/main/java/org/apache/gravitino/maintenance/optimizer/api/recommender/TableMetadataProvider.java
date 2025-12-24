@@ -17,40 +17,28 @@
  * under the License.
  */
 
-package org.apache.gravitino.optimizer.api.recommender;
+package org.apache.gravitino.maintenance.optimizer.api.recommender;
 
-import java.util.Map;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.annotation.DeveloperApi;
+import org.apache.gravitino.exceptions.NoSuchTableException;
+import org.apache.gravitino.maintenance.optimizer.api.common.Provider;
+import org.apache.gravitino.rel.Table;
 
 /**
- * Immutable description of a recommended optimization job. Produced by {@link StrategyHandler} and
- * consumed by {@link JobSubmitter}.
+ * Supplies table definitions to {@link StrategyHandler} implementations. The recommender calls this
+ * provider only when a handler declares {@code TABLE_METADATA} in {@link
+ * StrategyHandler#dataRequirements()}.
  */
 @DeveloperApi
-public interface JobExecutionContext {
+public interface TableMetadataProvider extends Provider {
 
   /**
-   * Target table identifier for the job.
+   * Fetch table metadata for a fully-qualified table identifier.
    *
-   * @return fully qualified table identifier (catalog/schema/table)
+   * @param tableIdentifier catalog/schema/table identifier (must be three levels)
+   * @return table definition
+   * @throws NoSuchTableException if the table does not exist
    */
-  NameIdentifier nameIdentifier();
-
-  /**
-   * Free-form job configuration, such as engine parameters (e.g., target file size bytes).
-   *
-   * <p>The {@code StrategyHandler} is free to add additional job configuration besides the job
-   * options specified in the strategy.
-   *
-   * @return immutable map of configuration entries
-   */
-  Map<String, String> jobConfig();
-
-  /**
-   * Job template name to resolve the job in the job submitter.
-   *
-   * @return job template name
-   */
-  String jobTemplateName();
+  Table tableMetadata(NameIdentifier tableIdentifier) throws NoSuchTableException;
 }

@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package org.apache.gravitino.optimizer.common;
+package org.apache.gravitino.maintenance.optimizer.common;
 
 import java.util.ArrayDeque;
 import java.util.Deque;

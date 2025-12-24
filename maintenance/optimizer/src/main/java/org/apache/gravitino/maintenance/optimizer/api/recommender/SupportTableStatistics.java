@@ -17,15 +17,15 @@
  * under the License.
  */
 
-package org.apache.gravitino.optimizer.api.recommender;
+package org.apache.gravitino.maintenance.optimizer.api.recommender;
 
 import java.util.List;
 import java.util.Map;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.annotation.DeveloperApi;
 import org.apache.gravitino.exceptions.NoSuchTableException;
-import org.apache.gravitino.optimizer.api.common.PartitionPath;
-import org.apache.gravitino.optimizer.api.common.StatisticEntry;
+import org.apache.gravitino.maintenance.optimizer.api.common.PartitionPath;
+import org.apache.gravitino.maintenance.optimizer.api.common.StatisticEntry;
 
 /**
  * Provides table and partition-level statistics to {@link StrategyHandler} implementations. The
