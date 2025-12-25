@@ -108,16 +108,19 @@ import org.apache.thrift.TException;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInstance;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 @Tag("gravitino-docker-test")
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
 public class CatalogHive2IT extends BaseIT {
   private static final Logger LOG = LoggerFactory.getLogger(CatalogHive2IT.class);
-  private static final String HMS_CATALOG = "hive";
+
   public static final String metalakeName =
       GravitinoITUtils.genRandomName("CatalogHiveIT_metalake");
   public String catalogName = GravitinoITUtils.genRandomName("CatalogHiveIT_catalog");
@@ -131,13 +134,15 @@ public class CatalogHive2IT extends BaseIT {
   public static final String HIVE_COL_NAME2 = "hive_col_name2";
   public static final String HIVE_COL_NAME3 = "hive_col_name3";
   protected String hiveMetastoreUris;
+  protected String hmsCatalog = "";
   protected final String provider = "hive";
   protected final ContainerSuite containerSuite = ContainerSuite.getInstance();
-  private HiveClientPool hiveClientPool;
+  protected HiveClientPool hiveClientPool;
   protected GravitinoMetalake metalake;
   protected Catalog catalog;
   protected SparkSession sparkSession;
   protected FileSystem fileSystem;
+  protected boolean enableSparkTest = true;
   private final String SELECT_ALL_TEMPLATE = "SELECT * FROM %s.%s";
 
   private static String getInsertWithoutPartitionSql(
@@ -175,7 +180,7 @@ public class CatalogHive2IT extends BaseIT {
   }
 
   protected void initSparkSession() {
-    sparkSession =
+    SparkSession.Builder builder =
         SparkSession.builder()
             .master("local[1]")
             .appName("Hive Catalog integration test")
@@ -188,8 +193,8 @@ public class CatalogHive2IT extends BaseIT {
                     HiveContainer.HDFS_DEFAULTFS_PORT))
             .config("spark.sql.storeAssignmentPolicy", "LEGACY")
             .config("mapreduce.input.fileinputformat.input.dir.recursive", "true")
-            .enableHiveSupport()
-            .getOrCreate();
+            .enableHiveSupport();
+    sparkSession = builder.getOrCreate();
   }
 
   protected void initFileSystem() throws IOException {
@@ -215,10 +220,10 @@ public class CatalogHive2IT extends BaseIT {
 
     // Check if Hive client can connect to Hive metastore
     hiveClientPool = new HiveClientPool("hive", 1, hiveClientProperties);
-    List<String> dbs = hiveClientPool.run(client -> client.getAllDatabases(HMS_CATALOG));
-    Assertions.assertFalse(dbs.isEmpty());
 
-    initSparkSession();
+    if (enableSparkTest) {
+      initSparkSession();
+    }
     initFileSystem();
 
     createMetalake();
@@ -250,6 +255,8 @@ public class CatalogHive2IT extends BaseIT {
       sparkSession.close();
     }
 
+    ContainerSuite.getInstance().close();
+
     if (fileSystem != null) {
       fileSystem.close();
     }
@@ -266,7 +273,7 @@ public class CatalogHive2IT extends BaseIT {
     catalog.asSchemas().dropSchema(schemaName, true);
     assertThrows(
         NoSuchSchemaException.class,
-        () -> hiveClientPool.run(client -> client.getDatabase(HMS_CATALOG, schemaName)));
+        () -> hiveClientPool.run(client -> client.getDatabase(hmsCatalog, schemaName)));
     createSchema();
   }
 
@@ -387,27 +394,27 @@ public class CatalogHive2IT extends BaseIT {
   }
 
   private HiveTable loadHiveTable(String schema, String table) throws InterruptedException {
-    return hiveClientPool.run(client -> client.getTable(HMS_CATALOG, schema, table));
+    return hiveClientPool.run(client -> client.getTable(hmsCatalog, schema, table));
   }
 
   private HivePartition loadHivePartition(String schema, String table, String partition)
       throws InterruptedException {
     return hiveClientPool.run(
         client -> {
-          HiveTable hiveTable = client.getTable(HMS_CATALOG, schema, table);
+          HiveTable hiveTable = client.getTable(hmsCatalog, schema, table);
           return client.getPartition(hiveTable, partition);
         });
   }
 
   private HiveSchema loadHiveSchema(String schema) throws InterruptedException {
-    return hiveClientPool.run(client -> client.getDatabase(HMS_CATALOG, schema));
+    return hiveClientPool.run(client -> client.getDatabase(hmsCatalog, schema));
   }
 
   private boolean hiveTableExists(String schema, String table) throws InterruptedException {
     return hiveClientPool.run(
         client -> {
           try {
-            client.getTable(HMS_CATALOG, schema, table);
+            client.getTable(hmsCatalog, schema, table);
             return true;
           } catch (NoSuchTableException e) {
             return false;
@@ -419,7 +426,7 @@ public class CatalogHive2IT extends BaseIT {
       throws InterruptedException {
     hiveClientPool.run(
         client -> {
-          client.dropTable(HMS_CATALOG, schema, table, deleteData, ifPurge);
+          client.dropTable(hmsCatalog, schema, table, deleteData, ifPurge);
           return null;
         });
   }
@@ -481,7 +488,7 @@ public class CatalogHive2IT extends BaseIT {
   @Test
   public void testCreateHiveTableWithDistributionAndSortOrder()
       throws TException, InterruptedException {
-    // Create table from Gravitino API
+    Assumptions.assumeTrue(enableSparkTest);
     Column[] columns = createColumns();
 
     NameIdentifier nameIdentifier = NameIdentifier.of(schemaName, tableName);
@@ -574,7 +581,7 @@ public class CatalogHive2IT extends BaseIT {
 
   @Test
   public void testCreateHiveTable() throws TException, InterruptedException {
-    // Create table from Gravitino API
+    Assumptions.assumeTrue(enableSparkTest);
     Column[] columns = createColumns();
 
     NameIdentifier nameIdentifier = NameIdentifier.of(schemaName, tableName);
@@ -669,6 +676,7 @@ public class CatalogHive2IT extends BaseIT {
 
   @Test
   public void testHiveTableProperties() throws TException, InterruptedException {
+    Assumptions.assumeTrue(enableSparkTest);
     Column[] columns = createColumns();
     NameIdentifier nameIdentifier = NameIdentifier.of(schemaName, tableName);
     // test default properties
@@ -756,6 +764,7 @@ public class CatalogHive2IT extends BaseIT {
 
   @Test
   public void testHiveSchemaProperties() throws TException, InterruptedException {
+    Assumptions.assumeTrue(enableSparkTest);
     // test LOCATION property
     String schemaName = GravitinoITUtils.genRandomName(SCHEMA_PREFIX);
 
@@ -797,6 +806,7 @@ public class CatalogHive2IT extends BaseIT {
 
   @Test
   public void testCreatePartitionedHiveTable() throws TException, InterruptedException {
+    Assumptions.assumeTrue(enableSparkTest);
     // Create table from Gravitino API
     Column[] columns = createColumns();
 
@@ -844,6 +854,7 @@ public class CatalogHive2IT extends BaseIT {
 
   @Test
   public void testListPartitionNames() throws TException, InterruptedException {
+    Assumptions.assumeTrue(enableSparkTest);
     // test empty partitions
     Column[] columns = createColumns();
     NameIdentifier nameIdentifier = NameIdentifier.of(schemaName, tableName);
@@ -870,6 +881,7 @@ public class CatalogHive2IT extends BaseIT {
 
   @Test
   public void testListPartitions() throws TException, InterruptedException {
+    Assumptions.assumeTrue(enableSparkTest);
     // test empty partitions
     Column[] columns = createColumns();
     NameIdentifier nameIdentifier = NameIdentifier.of(schemaName, tableName);
@@ -924,6 +936,7 @@ public class CatalogHive2IT extends BaseIT {
 
   @Test
   public void testGetPartition() throws TException, InterruptedException {
+    Assumptions.assumeTrue(enableSparkTest);
     Table createdTable = preparePartitionedTable();
 
     String[] partitionNames = createdTable.supportPartitions().listPartitionNames();
@@ -946,6 +959,7 @@ public class CatalogHive2IT extends BaseIT {
 
   @Test
   public void testAddPartition() throws TException, InterruptedException {
+    Assumptions.assumeTrue(enableSparkTest);
     Table createdTable = preparePartitionedTable();
 
     // add partition "hive_col_name2=2023-01-02/hive_col_name3=gravitino_it_test2"
@@ -994,6 +1008,7 @@ public class CatalogHive2IT extends BaseIT {
 
   @Test
   public void testDropPartition() throws TException, InterruptedException, IOException {
+    Assumptions.assumeTrue(enableSparkTest);
     Table createdTable = preparePartitionedTable();
 
     // add partition "hive_col_name2=2023-01-02/hive_col_name3=gravitino_it_test2"
@@ -1088,6 +1103,7 @@ public class CatalogHive2IT extends BaseIT {
   @Test
   public void testPurgePartition()
       throws InterruptedException, UnsupportedOperationException, TException {
+    Assumptions.assumeTrue(enableSparkTest);
     Table createdTable = preparePartitionedTable();
     Assertions.assertThrows(
         UnsupportedOperationException.class,
@@ -1151,6 +1167,7 @@ public class CatalogHive2IT extends BaseIT {
 
   @Test
   public void testAlterHiveTable() throws TException, InterruptedException {
+    Assumptions.assumeTrue(enableSparkTest);
     Column[] columns = createColumns();
     Table createdTable =
         catalog
@@ -1532,6 +1549,7 @@ public class CatalogHive2IT extends BaseIT {
 
   @Test
   public void testDropHiveManagedTable() throws TException, InterruptedException, IOException {
+    Assumptions.assumeTrue(enableSparkTest);
     Column[] columns = createColumns();
     catalog
         .asTableCatalog()
@@ -1558,6 +1576,7 @@ public class CatalogHive2IT extends BaseIT {
 
   @Test
   public void testDropHiveExternalTable() throws TException, InterruptedException, IOException {
+    Assumptions.assumeTrue(enableSparkTest);
     Column[] columns = createColumns();
     Map<String, String> properties = createProperties();
     properties.put(TABLE_TYPE, EXTERNAL_TABLE.name().toLowerCase(Locale.ROOT));
@@ -1587,6 +1606,7 @@ public class CatalogHive2IT extends BaseIT {
 
   @Test
   public void testPurgeHiveManagedTable() throws TException, InterruptedException, IOException {
+    Assumptions.assumeTrue(enableSparkTest);
     Column[] columns = createColumns();
     catalog
         .asTableCatalog()
@@ -1619,6 +1639,7 @@ public class CatalogHive2IT extends BaseIT {
 
   @Test
   public void testPurgeHiveExternalTable() throws TException, InterruptedException, IOException {
+    Assumptions.assumeTrue(enableSparkTest);
     Column[] columns = createColumns();
     Map<String, String> properties = createProperties();
     properties.put(TABLE_TYPE, EXTERNAL_TABLE.name().toLowerCase(Locale.ROOT));

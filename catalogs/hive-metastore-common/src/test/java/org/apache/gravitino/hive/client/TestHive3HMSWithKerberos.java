@@ -16,27 +16,45 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.catalog.hive.integration.test;
+
+package org.apache.gravitino.hive.client;
 
 import com.google.common.collect.ImmutableMap;
 import org.apache.gravitino.integration.test.container.HiveContainer;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.TestInstance;
 
+/**
+ * Kerberos-enabled Hive3 HMS tests. Reuses Kerberos setup from {@link TestHive2HMSWithKerberos} but
+ * starts the Hive3 container and uses the default Hive3 catalog name "hive".
+ */
 @Tag("gravitino-docker-test")
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-public class CatalogHive3IT extends CatalogHive2IT {
+public class TestHive3HMSWithKerberos extends TestHive2HMSWithKerberos {
 
+  @BeforeAll
   @Override
-  protected void startNecessaryContainer() {
-    hmsCatalog = "hive";
-    containerSuite.startHiveContainer(
-        ImmutableMap.of(HiveContainer.HIVE_RUNTIME_VERSION, HiveContainer.HIVE3));
+  public void startHiveContainer() {
+    testPrefix = "hive3_kerberos";
+    catalogName = "hive"; // Hive3 default catalog
 
-    hiveMetastoreUris =
+    containerSuite.startKerberosHiveContainer(
+        ImmutableMap.of(HiveContainer.HIVE_RUNTIME_VERSION, HiveContainer.HIVE3));
+    hiveContainer = containerSuite.getKerberosHiveContainer();
+
+    metastoreUri =
         String.format(
             "thrift://%s:%d",
-            containerSuite.getHiveContainer().getContainerIpAddress(),
-            HiveContainer.HIVE_METASTORE_PORT);
+            hiveContainer.getContainerIpAddress(), HiveContainer.HIVE_METASTORE_PORT);
+    hdfsBasePath =
+        String.format(
+            "hdfs://%s:%d/tmp/gravitino_test",
+            hiveContainer.getContainerIpAddress(), HiveContainer.HDFS_DEFAULTFS_PORT);
+
+    // Prepare Kerberos config (keytab/krb5) for client connections.
+    prepareKerberosConfig();
+
+    hiveClient = new HiveClientFactory(createHiveProperties(), "testPrefix").createHiveClient();
   }
 }

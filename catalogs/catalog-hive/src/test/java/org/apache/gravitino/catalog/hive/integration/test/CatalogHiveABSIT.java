@@ -29,6 +29,7 @@ import org.apache.gravitino.integration.test.util.GravitinoITUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.spark.sql.SparkSession;
+import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.condition.EnabledIf;
 
 // Apart from the following dependencies on environment, this test also needs hadoop3-common, please
@@ -37,6 +38,7 @@ import org.junit.jupiter.api.condition.EnabledIf;
 @EnabledIf(
     value = "isAzureBlobStorageConfigured",
     disabledReason = "Azure Blob Storage is not prepared.")
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
 public class CatalogHiveABSIT extends CatalogHive2IT {
 
   private static final String ABS_BUCKET_NAME = System.getenv("ABS_CONTAINER_NAME");
