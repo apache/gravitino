@@ -106,30 +106,6 @@ public class MetalakeManager implements MetalakeDispatcher, Closeable {
   }
 
   /**
-   * Return true if the metalake is in used, false otherwise.
-   *
-   * @param store The EntityStore to use for managing Metalakes.
-   * @param ident The identifier of the Metalake to check.
-   * @return True if the metalake is in use, false otherwise.
-   * @throws NoSuchMetalakeException If the Metalake with the given identifier does not exist.
-   */
-  public static boolean metalakeInUse(EntityStore store, NameIdentifier ident)
-      throws NoSuchMetalakeException {
-    try {
-      BaseMetalake metalake = store.get(ident, EntityType.METALAKE, BaseMetalake.class);
-      return (boolean)
-          metalake.propertiesMetadata().getOrDefault(metalake.properties(), PROPERTY_IN_USE);
-    } catch (NoSuchEntityException e) {
-      LOG.warn("Metalake {} does not exist", ident, e);
-      throw new NoSuchMetalakeException(METALAKE_DOES_NOT_EXIST_MSG, ident);
-
-    } catch (IOException e) {
-      LOG.error("Failed to do store operation", e);
-      throw new RuntimeException(e);
-    }
-  }
-
-  /**
    * Lists all available Metalakes.
    *
    * @return An array of Metalake instances representing the available Metalakes.
@@ -455,5 +431,29 @@ public class MetalakeManager implements MetalakeDispatcher, Closeable {
     }
 
     return builder.withProperties(newProps);
+  }
+
+  /**
+   * Return true if the metalake is in used, false otherwise.
+   *
+   * @param store The EntityStore to use for managing Metalakes.
+   * @param ident The identifier of the Metalake to check.
+   * @return True if the metalake is in use, false otherwise.
+   * @throws NoSuchMetalakeException If the Metalake with the given identifier does not exist.
+   */
+  private static boolean metalakeInUse(EntityStore store, NameIdentifier ident)
+      throws NoSuchMetalakeException {
+    try {
+      BaseMetalake metalake = store.get(ident, EntityType.METALAKE, BaseMetalake.class);
+      return (boolean)
+          metalake.propertiesMetadata().getOrDefault(metalake.properties(), PROPERTY_IN_USE);
+    } catch (NoSuchEntityException e) {
+      LOG.warn("Metalake {} does not exist", ident, e);
+      throw new NoSuchMetalakeException(METALAKE_DOES_NOT_EXIST_MSG, ident);
+
+    } catch (IOException e) {
+      LOG.error("Failed to do store operation", e);
+      throw new RuntimeException(e);
+    }
   }
 }

@@ -25,7 +25,6 @@ import static org.apache.gravitino.catalog.PropertiesMetadataHelpers.validatePro
 import static org.apache.gravitino.catalog.PropertiesMetadataHelpers.validatePropertyForCreate;
 import static org.apache.gravitino.connector.BaseCatalogPropertiesMetadata.BASIC_CATALOG_PROPERTIES_METADATA;
 import static org.apache.gravitino.metalake.MetalakeManager.checkMetalake;
-import static org.apache.gravitino.metalake.MetalakeManager.metalakeInUse;
 
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
@@ -76,7 +75,6 @@ import org.apache.gravitino.StringIdentifier;
 import org.apache.gravitino.connector.BaseCatalog;
 import org.apache.gravitino.connector.CatalogOperations;
 import org.apache.gravitino.connector.HasPropertyMetadata;
-import org.apache.gravitino.connector.PropertyEntry;
 import org.apache.gravitino.connector.SupportsSchemas;
 import org.apache.gravitino.connector.authorization.BaseAuthorization;
 import org.apache.gravitino.connector.capability.Capability;
@@ -562,7 +560,7 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
           checkMetalake(metalakeIdent, store);
 
           try {
-            if (catalogInUse(store, ident)) {
+            if (getCatalogInUseValue(store, ident)) {
               return null;
             }
 
@@ -602,7 +600,7 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
           checkMetalake(metalakeIdent, store);
 
           try {
-            if (!catalogInUse(store, ident)) {
+            if (getCatalogInUseValue(store, ident)) {
               return null;
             }
             store.update(
@@ -740,7 +738,7 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
         () -> {
           checkMetalake(metalakeIdent, store);
           try {
-            boolean catalogInUse = catalogInUse(store, ident);
+            boolean catalogInUse = getCatalogInUseValue(store, ident);
             if (catalogInUse && !force) {
               throw new CatalogInUseException(
                   "Catalog %s is in use, please disable it first or use force option", ident);
@@ -864,12 +862,6 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
     return catalogCache.get(ident, this::loadCatalogInternal);
   }
 
-  private boolean catalogInUse(EntityStore store, NameIdentifier ident)
-      throws NoSuchMetalakeException, NoSuchCatalogException {
-    NameIdentifier metalakeIdent = NameIdentifier.of(ident.namespace().levels());
-    return metalakeInUse(store, metalakeIdent) && getCatalogInUseValue(store, ident);
-  }
-
   private boolean getCatalogInUseValue(EntityStore store, NameIdentifier catalogIdent) {
     try {
       CatalogWrapper wrapper = catalogCache.getIfPresent(catalogIdent);
@@ -928,11 +920,9 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
     Arrays.stream(catalogChanges)
         .forEach(
             catalogChange -> {
-              if (catalogChange instanceof SetProperty) {
-                SetProperty setProperty = (SetProperty) catalogChange;
+              if (catalogChange instanceof SetProperty setProperty) {
                 upserts.put(setProperty.getProperty(), setProperty.getValue());
-              } else if (catalogChange instanceof RemoveProperty) {
-                RemoveProperty removeProperty = (RemoveProperty) catalogChange;
+              } else if (catalogChange instanceof RemoveProperty removeProperty) {
                 deletes.put(removeProperty.getProperty(), removeProperty.getProperty());
               }
             });
@@ -1009,22 +999,6 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
     try (IsolatedClassLoader classLoader = createClassLoader(provider, conf)) {
       BaseCatalog<?> catalog = createBaseCatalog(classLoader, entity);
       return classLoader.withClassLoader(cl -> catalog.properties(), RuntimeException.class);
-    }
-  }
-
-  private Set<String> getHiddenPropertyNames(CatalogEntity entity) {
-    Map<String, String> conf = entity.getProperties();
-    String provider = entity.getProvider();
-
-    try (IsolatedClassLoader classLoader = createClassLoader(provider, conf)) {
-      BaseCatalog<?> catalog = createBaseCatalog(classLoader, entity);
-      return classLoader.withClassLoader(
-          cl ->
-              catalog.catalogPropertiesMetadata().propertyEntries().values().stream()
-                  .filter(PropertyEntry::isHidden)
-                  .map(PropertyEntry::getName)
-                  .collect(Collectors.toSet()),
-          RuntimeException.class);
     }
   }
 
