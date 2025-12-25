@@ -47,7 +47,7 @@ public class SparkPiJob implements BuiltInJob {
     return SparkJobTemplate.builder()
         .withName(NAME)
         .withComment("Built-in SparkPi job template")
-        .withExecutable(resolveExecutable())
+        .withExecutable(resolveExecutable(SparkPiJob.class))
         .withClassName(SparkPiJob.class.getName())
         .withArguments(Collections.singletonList("{{slices}}"))
         .withConfigs(buildSparkConfigs())
@@ -57,7 +57,15 @@ public class SparkPiJob implements BuiltInJob {
   }
 
   public static void main(String[] args) {
-    int slices = args.length > 0 ? Integer.parseInt(args[0]) : 2;
+    int slices = 2;
+    if (args.length > 0) {
+      try {
+        slices = Integer.parseInt(args[0]);
+      } catch (NumberFormatException e) {
+        System.err.println("Invalid number of slices provided. Using default value of 2.");
+      }
+    }
+
     int samples = Math.max(slices, 1) * 100000;
 
     SparkSession spark =

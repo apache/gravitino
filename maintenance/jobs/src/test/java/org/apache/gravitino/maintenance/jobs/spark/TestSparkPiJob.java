@@ -126,7 +126,7 @@ public class TestSparkPiJob {
   @Test
   public void testResolveExecutableReturnsNonEmptyPath() {
     SparkPiJob job = new SparkPiJob();
-    String executable = job.resolveExecutable();
+    String executable = job.jobTemplate().executable();
 
     assertNotNull(executable);
     assertFalse(executable.trim().isEmpty());

@@ -37,7 +37,7 @@ public class TestBuiltInJob {
   @Test
   public void testResolveExecutableReturnsValidPath() {
     BuiltInJob job = new TestBuiltInJobImpl();
-    String executable = job.resolveExecutable();
+    String executable = job.resolveExecutable(TestBuiltInJobImpl.class);
 
     assertNotNull(executable, "Executable path should not be null");
     assertFalse(executable.trim().isEmpty(), "Executable path should not be empty");
@@ -46,7 +46,7 @@ public class TestBuiltInJob {
   @Test
   public void testResolveExecutablePointsToJarOrClassDirectory() {
     BuiltInJob job = new TestBuiltInJobImpl();
-    String executable = job.resolveExecutable();
+    String executable = job.resolveExecutable(TestBuiltInJobImpl.class);
 
     // Should end with .jar or be a directory path containing test classes
     assertTrue(

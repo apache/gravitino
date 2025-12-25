@@ -21,6 +21,7 @@ package org.apache.gravitino.maintenance.jobs;
 import java.net.URISyntaxException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.security.CodeSource;
 import org.apache.gravitino.job.JobTemplate;
 
 /** Contract for built-in jobs to expose their job template definitions. */
@@ -30,10 +31,14 @@ public interface BuiltInJob {
   JobTemplate jobTemplate();
 
   /** Resolve the executable jar that hosts the built-in jobs. */
-  default String resolveExecutable() {
+  default String resolveExecutable(Class<?> cls) {
     try {
-      Path path =
-          Paths.get(BuiltInJob.class.getProtectionDomain().getCodeSource().getLocation().toURI());
+      CodeSource codeSource = cls.getProtectionDomain().getCodeSource();
+      if (codeSource == null || codeSource.getLocation() == null) {
+        throw new RuntimeException("Failed to resolve built-in jobs jar location");
+      }
+
+      Path path = Paths.get(codeSource.getLocation().toURI());
       return path.toAbsolutePath().toString();
     } catch (URISyntaxException e) {
       throw new RuntimeException("Failed to resolve built-in jobs jar location", e);

@@ -158,32 +158,44 @@ public class BuiltInJobTemplateEventListener implements EventListenerPlugin {
     Map<String, JobTemplate> builtInTemplates = Maps.newHashMap();
 
     // Load from auxlib directory if available
-    ClassLoader auxlibClassLoader = createAuxlibClassLoader();
-    ServiceLoader<JobTemplateProvider> loader =
-        ServiceLoader.load(JobTemplateProvider.class, auxlibClassLoader);
+    ClassLoader auxlibClassLoader = null;
+    try {
+      auxlibClassLoader = createAuxlibClassLoader();
+      ServiceLoader<JobTemplateProvider> loader =
+          ServiceLoader.load(JobTemplateProvider.class, auxlibClassLoader);
 
-    loader.forEach(
-        provider ->
-            provider
-                .jobTemplates()
-                .forEach(
-                    template -> {
-                      if (!isValidBuiltInJobTemplate(template)) {
-                        LOG.warn("Skip invalid built-in job template {}", template.name());
-                        return;
-                      }
+      loader.forEach(
+          provider ->
+              provider
+                  .jobTemplates()
+                  .forEach(
+                      template -> {
+                        if (!isValidBuiltInJobTemplate(template)) {
+                          LOG.warn("Skip invalid built-in job template {}", template.name());
+                          return;
+                        }
 
-                      JobTemplate existing = builtInTemplates.get(template.name());
-                      int newVersion = version(template.customFields());
-                      int existingVersion =
-                          Optional.ofNullable(existing)
-                              .map(jt -> version(jt.customFields()))
-                              .orElse(0);
-                      if (existing == null || newVersion > existingVersion) {
-                        builtInTemplates.put(template.name(), template);
-                      }
-                    }));
-    return builtInTemplates;
+                        JobTemplate existing = builtInTemplates.get(template.name());
+                        int newVersion = version(template.customFields());
+                        int existingVersion =
+                            Optional.ofNullable(existing)
+                                .map(jt -> version(jt.customFields()))
+                                .orElse(0);
+                        if (existing == null || newVersion > existingVersion) {
+                          builtInTemplates.put(template.name(), template);
+                        }
+                      }));
+      return builtInTemplates;
+
+    } finally {
+      if (auxlibClassLoader instanceof URLClassLoader) {
+        try {
+          ((URLClassLoader) auxlibClassLoader).close();
+        } catch (IOException e) {
+          LOG.warn("Failed to close auxlib classloader", e);
+        }
+      }
+    }
   }
 
   private ClassLoader createAuxlibClassLoader() {
