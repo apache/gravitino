@@ -32,6 +32,7 @@ public class TestHive3HMSWithCatalog extends TestHive3HMS {
   @BeforeAll
   @Override
   public void startHiveContainer() {
+    testPrefix = "hive3_mycatalog";
     super.startHiveContainer();
 
     // Override catalog to a dedicated Hive3 catalog and ensure it exists.

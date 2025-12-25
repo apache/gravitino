@@ -51,6 +51,6 @@ public class TestHive3HMS extends TestHive2HMS {
             "hdfs://%s:%d/tmp/gravitino_test",
             hiveContainer.getContainerIpAddress(), HiveContainer.HDFS_DEFAULTFS_PORT);
 
-    hiveClient = new HiveClientFactory(createHiveProperties(), "").createHiveClient();
+    hiveClient = new HiveClientFactory(createHiveProperties(), testPrefix).createHiveClient();
   }
 }

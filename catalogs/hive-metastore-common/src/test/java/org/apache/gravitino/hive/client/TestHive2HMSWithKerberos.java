@@ -62,7 +62,7 @@ public class TestHive2HMSWithKerberos extends TestHive2HMS {
     prepareKerberosConfig();
 
     // Initialize client with Kerberos-aware properties.
-    hiveClient = new HiveClientFactory(createHiveProperties(), "hive2-kerveros").createHiveClient();
+    hiveClient = new HiveClientFactory(createHiveProperties(), testPrefix).createHiveClient();
   }
 
   protected void prepareKerberosConfig() {

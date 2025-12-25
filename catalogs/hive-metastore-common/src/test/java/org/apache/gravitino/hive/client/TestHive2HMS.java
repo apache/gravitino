@@ -87,7 +87,7 @@ public class TestHive2HMS {
             "hdfs://%s:%d/tmp/gravitino_test",
             hiveContainer.getContainerIpAddress(), HiveContainer.HDFS_DEFAULTFS_PORT);
 
-    hiveClient = new HiveClientFactory(createHiveProperties(), "").createHiveClient();
+    hiveClient = new HiveClientFactory(createHiveProperties(), testPrefix).createHiveClient();
   }
 
   @AfterAll
@@ -309,7 +309,7 @@ public class TestHive2HMS {
         Assertions.assertThrows(
             Exception.class,
             () -> {
-              HiveClient client = new HiveClientFactory(properties, "").createHiveClient();
+              HiveClient client = new HiveClientFactory(properties, testPrefix).createHiveClient();
               client.getAllDatabases(catalogName);
             });
 
