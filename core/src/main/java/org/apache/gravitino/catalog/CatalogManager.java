@@ -600,7 +600,7 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
           checkMetalake(metalakeIdent, store);
 
           try {
-            if (getCatalogInUseValue(store, ident)) {
+            if (!getCatalogInUseValue(store, ident)) {
               return null;
             }
             store.update(
