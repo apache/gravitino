@@ -355,8 +355,10 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
     Fileset fileset = loadFileset(filesetIdent);
     String actualPath = getFileLocation(fileset, subPath, locationName);
 
-    Map<String, String> fsConf = mergeUpLevelConfigurations(filesetIdent, fileset.properties());
-    FileSystem fileSystem = getFileSystemWithCache(locationName, new Path(actualPath), fsConf);
+    Path actualPathObj = new Path(actualPath);
+    Map<String, String> fsConf =
+        mergeUpLevelConfigurations(filesetIdent, fileset.properties(), actualPathObj);
+    FileSystem fileSystem = getFileSystemWithCache(locationName, actualPathObj, fsConf);
     Path formalizedPath =
         new Path(actualPath).makeQualified(fileSystem.getUri(), fileSystem.getWorkingDirectory());
 
@@ -485,10 +487,10 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
         for (Map.Entry<String, Path> entry : filesetPaths.entrySet()) {
           // merge the properties from catalog, schema and fileset to get the final configuration
           // for fileset.
-          // the priority is: fileset properties > schema properties > catalog properties
-          Map<String, String> fsConf = new HashMap<>(conf);
-          fsConf.putAll(schemaEntity.properties());
-          fsConf.putAll(properties);
+          // the priority is: fileset properties > schema properties > catalog properties >
+          // user-defined location configs
+          Map<String, String> fsConf =
+              mergeUpLevelConfigurations(ident, properties, entry.getValue());
           FileSystem tmpFs = getFileSystemWithCache(entry.getKey(), entry.getValue(), fsConf);
           Path formalizePath =
               entry.getValue().makeQualified(tmpFs.getUri(), tmpFs.getWorkingDirectory());
@@ -672,7 +674,7 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
             (locationName, location) -> {
               try {
                 Map<String, String> fsConf =
-                    mergeUpLevelConfigurations(ident, filesetEntity.properties());
+                    mergeUpLevelConfigurations(ident, filesetEntity.properties(), location);
                 FileSystem fs = getFileSystemWithCache(locationName, location, fsConf);
                 if (fs.exists(location)) {
                   if (!fs.delete(location, true)) {
@@ -737,11 +739,12 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
     }
 
     Map<String, Path> schemaPaths = getAndCheckSchemaPaths(ident.name(), properties);
-    Map<String, String> fsConf = mergeUpLevelConfigurations(ident, properties);
     schemaPaths.forEach(
         (locationName, schemaPath) -> {
           if (schemaPath != null && !containsPlaceholder(schemaPath.toString())) {
             try {
+              Map<String, String> fsConf =
+                  mergeUpLevelConfigurations(ident, properties, schemaPath);
               FileSystem fs = getFileSystemWithCache(locationName, schemaPath, fsConf);
               if (fs.exists(schemaPath) && fs.getFileStatus(schemaPath).isFile()) {
                 throw new IllegalArgumentException(
@@ -855,7 +858,7 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
                             try {
                               Path filesetPath = new Path(location);
                               Map<String, String> fsConf =
-                                  mergeUpLevelConfigurations(ident, f.properties());
+                                  mergeUpLevelConfigurations(ident, f.properties(), filesetPath);
                               FileSystem fs =
                                   getFileSystemWithCache(locationName, filesetPath, fsConf);
                               if (fs.exists(filesetPath)) {
@@ -888,7 +891,7 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
             (locationName, schemaPath) -> {
               try {
                 Map<String, String> fsConf =
-                    mergeUpLevelConfigurations(ident, schemaEntity.properties());
+                    mergeUpLevelConfigurations(ident, schemaEntity.properties(), schemaPath);
                 FileSystem fs = getFileSystemWithCache(locationName, schemaPath, fsConf);
                 if (fs.exists(schemaPath)) {
                   FileStatus[] statuses = fs.listStatus(schemaPath);
@@ -1056,7 +1059,11 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
 
             if (!disableFSOps && !containsPlaceholder(v)) {
               Path path = new Path(v);
-              FileSystem fs = getFileSystemWithCache(locationName, path, properties);
+              // At catalog initialization, only merge catalog config and user-defined location
+              // configs
+              Map<String, String> fsConf = new HashMap<>(conf);
+              fsConf.putAll(getUserDefinedConfigs(path));
+              FileSystem fs = getFileSystemWithCache(locationName, path, fsConf);
               try {
                 if (fs.exists(path) && fs.getFileStatus(path).isFile()) {
                   throw new IllegalArgumentException(
@@ -1484,12 +1491,17 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
     return fileLocation;
   }
 
-  public Map<String, String> mergeUpLevelConfigurations(
-      NameIdentifier ident, Map<String, String> entityProperties) {
+  @VisibleForTesting
+  Map<String, String> mergeUpLevelConfigurations(
+      NameIdentifier ident, Map<String, String> entityProperties, Path path) {
+    // Merge configurations from catalog, schema, and entity (fileset) levels, and also include
+    // user-defined configurations for the specified location.
     Map<String, String> mergedProperties = new HashMap<>(conf);
     if (ident.namespace().levels().length == 2) {
       // schema level
       mergedProperties.putAll(entityProperties);
+      // Add user-defined configs for location if provided
+      mergedProperties.putAll(getUserDefinedConfigs(path));
       return mergedProperties;
     }
 
@@ -1499,7 +1511,74 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
     Schema schema = loadSchema(schemaIdent);
     mergedProperties.putAll(schema.properties());
     mergedProperties.putAll(entityProperties);
+    // Add user-defined configs for location if provided
+    mergedProperties.putAll(getUserDefinedConfigs(path));
     return mergedProperties;
+  }
+
+  private Map<String, String> getUserDefinedConfigs(Path path) {
+    // Prepare a map to hold the properties for the specified location
+    // eg:
+    //   fs.path.config.cluster1 = s3://bucket/path/
+    //   fs.path.config.cluster1.aws-access-key = XXX1
+    //   fs.path.config.cluster1.aws-secret-key = XXX2
+    //   If path is "s3://bucket/path/fileset1", then cluster1 matches and we extract:
+    //   - aws-access-key = XXX1
+    //   - aws-secret-key = XXX2
+    Preconditions.checkArgument(path != null, "Path should not be null");
+    Map<String, String> properties = new HashMap<>();
+    String baseLocation = getBaseLocation(path);
+    String locationName = null;
+
+    // First pass: find the location name by matching baseLocation
+    String configPrefix = FilesetCatalogPropertiesMetadata.FS_GRAVITINO_PATH_CONFIG_PREFIX;
+    for (Map.Entry<String, String> entry : conf.entrySet()) {
+      String key = entry.getKey();
+      String value = entry.getValue();
+
+      // Check if this is a location definition: "fs.path.config.<name> = <location_path>"
+      // The key format should be exactly "fs.path.config.<name>" (no dot after name)
+      if (key.startsWith(configPrefix)) {
+        String suffix = key.substring(configPrefix.length());
+        // Check if this is a location definition (no dot after the name)
+        // Format: "fs.path.config.<name>" (not "fs.path.config.<name>.<property>")
+        if (!suffix.contains(".")
+            && StringUtils.isNotBlank(suffix)
+            && StringUtils.isNotBlank(value)) {
+          // This is a location definition: "fs.path.config.<name>"
+          // Extract baseLocation from the value and compare with the path's baseLocation
+          String valueBaseLocation = getBaseLocation(new Path(value));
+          if (baseLocation.equals(valueBaseLocation)) {
+            locationName = suffix;
+            break;
+          }
+        }
+      }
+    }
+
+    // Second pass: extract all properties for the matched location name
+    if (locationName != null) {
+      String propertyPrefix = configPrefix + locationName + ".";
+      for (Map.Entry<String, String> entry : conf.entrySet()) {
+        String key = entry.getKey();
+        // Check if this key is a property for the matched location
+        // e.g., "fs.path.config.cluster1.aws-ak" matches prefix "fs.path.config.cluster1."
+        if (key.startsWith(propertyPrefix)) {
+          // Extract the property name after the location prefix
+          // e.g., "fs.path.config.cluster1.aws-ak" -> "aws-ak"
+          String propertyName = key.substring(propertyPrefix.length());
+          if (!propertyName.isEmpty()) {
+            properties.put(propertyName, entry.getValue());
+          }
+        }
+      }
+    }
+
+    return properties;
+  }
+
+  private String getBaseLocation(Path targetLocation) {
+    return targetLocation.toUri().getScheme() + "://" + targetLocation.toUri().getAuthority();
   }
 
   @Override

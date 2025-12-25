@@ -74,6 +74,9 @@ public class FilesetCatalogPropertiesMetadata extends BaseCatalogPropertiesMetad
   static final String FILESYSTEM_CONNECTION_TIMEOUT_SECONDS = "filesystem-conn-timeout-secs";
   static final int DEFAULT_GET_FILESYSTEM_TIMEOUT_SECONDS = 600;
 
+  /** The prefix for user-defined location configs: {@code fs.path.config.<anme>=<path>}. */
+  public static final String FS_GRAVITINO_PATH_CONFIG_PREFIX = "fs.path.config.";
+
   /**
    * The property to disable file system operations like list, exists, mkdir operations in the
    * server side, so that the server side catalog can be used as a metadata only catalog, no need to
