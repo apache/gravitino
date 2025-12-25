@@ -173,7 +173,6 @@ abstract class AbstractFileSystemCredentialAuthorizationIT extends BaseIT {
     }
   }
 
-  // Public tests
   @Test
   void testCredentialVendingWithReadPrivilegeAllowsReadOnly() throws IOException {
     String filesetName = GravitinoITUtils.genRandomName(providerPrefix() + "_auth_read");
@@ -270,7 +269,6 @@ abstract class AbstractFileSystemCredentialAuthorizationIT extends BaseIT {
     }
   }
 
-  // Protected helpers
   protected void seedFile(String storageLocation, String fileName) throws IOException {
     Path realPath = new Path(storageLocation);
     try (FileSystem realFs =
@@ -296,7 +294,6 @@ abstract class AbstractFileSystemCredentialAuthorizationIT extends BaseIT {
     return ImmutableMap.of(CredentialConstants.CREDENTIAL_PROVIDERS, credentialProviderType());
   }
 
-  // Abstract hooks
   protected abstract String providerName();
 
   protected abstract String providerBundleName();
