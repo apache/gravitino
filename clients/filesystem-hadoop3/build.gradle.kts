@@ -36,7 +36,6 @@ dependencies {
   }
 
   implementation(libs.caffeine)
-  implementation(libs.cglib)
   implementation(libs.commons.lang3)
   implementation(libs.guava)
   implementation(libs.slf4j.api)

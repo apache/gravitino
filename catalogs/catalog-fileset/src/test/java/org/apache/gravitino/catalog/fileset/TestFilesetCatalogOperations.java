@@ -352,9 +352,7 @@ public class TestFilesetCatalogOperations {
   @Test
   public void testFilesetCatalogConfiguration() {
     Map<String, String> emptyProps = Maps.newHashMap();
-    SecureFilesetCatalogOperations secOps = new SecureFilesetCatalogOperations(store);
-
-    FilesetCatalogOperations ops = secOps.getBaseFilesetCatalogOperations();
+    FilesetCatalogOperations ops = new FilesetCatalogOperations(store);
 
     CatalogInfo catalogInfo = randomCatalogInfo();
     ops.initialize(emptyProps, catalogInfo, FILESET_PROPERTIES_METADATA);
@@ -559,7 +557,7 @@ public class TestFilesetCatalogOperations {
 
     Assertions.assertEquals(name, schema.name());
 
-    try (SecureFilesetCatalogOperations ops = new SecureFilesetCatalogOperations(store)) {
+    try (FilesetCatalogOperations ops = new FilesetCatalogOperations(store)) {
       ops.initialize(Maps.newHashMap(), randomCatalogInfo(), FILESET_PROPERTIES_METADATA);
       Schema schema1 = ops.loadSchema(NameIdentifierUtil.ofSchema("m1", "c1", name));
       Assertions.assertEquals(name, schema1.name());
@@ -585,7 +583,7 @@ public class TestFilesetCatalogOperations {
     createSchema(testId1, name1, comment1, null, null);
     createSchema(testId2, name2, comment2, null, null);
 
-    try (SecureFilesetCatalogOperations ops = new SecureFilesetCatalogOperations(store)) {
+    try (FilesetCatalogOperations ops = new FilesetCatalogOperations(store)) {
       ops.initialize(Maps.newHashMap(), randomCatalogInfo(), FILESET_PROPERTIES_METADATA);
       Set<NameIdentifier> idents =
           Arrays.stream(ops.listSchemas(Namespace.of("m1", "c1"))).collect(Collectors.toSet());
@@ -604,7 +602,7 @@ public class TestFilesetCatalogOperations {
     Schema schema = createSchema(testId, name, comment, catalogPath, null);
     Assertions.assertEquals(name, schema.name());
 
-    try (SecureFilesetCatalogOperations ops = new SecureFilesetCatalogOperations(store)) {
+    try (FilesetCatalogOperations ops = new FilesetCatalogOperations(store)) {
       ops.initialize(Maps.newHashMap(), randomCatalogInfo(), FILESET_PROPERTIES_METADATA);
       Schema schema1 = ops.loadSchema(NameIdentifierUtil.ofSchema("m1", "c1", name));
       Assertions.assertEquals(name, schema1.name());
@@ -653,7 +651,7 @@ public class TestFilesetCatalogOperations {
     Assertions.assertEquals(schemaName, schema.name());
     NameIdentifier id = NameIdentifierUtil.ofSchema("m1", "c1", schemaName);
 
-    try (SecureFilesetCatalogOperations ops = new SecureFilesetCatalogOperations(store)) {
+    try (FilesetCatalogOperations ops = new FilesetCatalogOperations(store)) {
       ops.initialize(
           ImmutableMap.of(LOCATION, catalogPath),
           randomCatalogInfo("m1", "c1"),
@@ -725,7 +723,7 @@ public class TestFilesetCatalogOperations {
     Assertions.assertEquals(schemaName, schema.name());
     NameIdentifier id = NameIdentifierUtil.ofSchema("m1", "c1", schemaName);
 
-    try (SecureFilesetCatalogOperations ops = new SecureFilesetCatalogOperations(store)) {
+    try (FilesetCatalogOperations ops = new FilesetCatalogOperations(store)) {
       ops.initialize(
           ImmutableMap.of(LOCATION, catalogPath, DISABLE_FILESYSTEM_OPS, "true"),
           randomCatalogInfo("m1", "c1"),
@@ -767,7 +765,7 @@ public class TestFilesetCatalogOperations {
     }
 
     NameIdentifier schemaIdent = NameIdentifierUtil.ofSchema("m1", "c1", schemaName);
-    try (SecureFilesetCatalogOperations ops = new SecureFilesetCatalogOperations(store)) {
+    try (FilesetCatalogOperations ops = new FilesetCatalogOperations(store)) {
       ops.initialize(catalogProps, randomCatalogInfo("m1", "c1"), FILESET_PROPERTIES_METADATA);
       if (!ops.schemaExists(schemaIdent)) {
         createSchema(generateTestId(), schemaName, comment, catalogPath, schemaPath);
@@ -824,7 +822,7 @@ public class TestFilesetCatalogOperations {
     }
 
     NameIdentifier schemaIdent = NameIdentifierUtil.ofSchema("m1", "c1", schemaName);
-    try (SecureFilesetCatalogOperations ops = new SecureFilesetCatalogOperations(store)) {
+    try (FilesetCatalogOperations ops = new FilesetCatalogOperations(store)) {
       ops.initialize(catalogProps, randomCatalogInfo("m1", "c1"), FILESET_PROPERTIES_METADATA);
       if (!ops.schemaExists(schemaIdent)) {
         createSchema(generateTestId(), schemaName, comment, catalogPath, schemaPath, true);
@@ -900,7 +898,7 @@ public class TestFilesetCatalogOperations {
             + " when it's catalog and schema "
             + "location are not set",
         exception.getMessage());
-    try (SecureFilesetCatalogOperations ops = new SecureFilesetCatalogOperations(store)) {
+    try (FilesetCatalogOperations ops = new FilesetCatalogOperations(store)) {
       ops.initialize(Maps.newHashMap(), randomCatalogInfo(), FILESET_PROPERTIES_METADATA);
       Throwable e =
           Assertions.assertThrows(
@@ -919,7 +917,7 @@ public class TestFilesetCatalogOperations {
     Assertions.assertEquals(
         "Storage location must be set for external fileset " + filesetIdent,
         exception1.getMessage());
-    try (SecureFilesetCatalogOperations ops = new SecureFilesetCatalogOperations(store)) {
+    try (FilesetCatalogOperations ops = new FilesetCatalogOperations(store)) {
       ops.initialize(Maps.newHashMap(), randomCatalogInfo(), FILESET_PROPERTIES_METADATA);
       Throwable e =
           Assertions.assertThrows(
@@ -944,7 +942,7 @@ public class TestFilesetCatalogOperations {
       createFileset(fileset, schemaName, comment, Fileset.Type.MANAGED, null, null);
     }
 
-    try (SecureFilesetCatalogOperations ops = new SecureFilesetCatalogOperations(store)) {
+    try (FilesetCatalogOperations ops = new FilesetCatalogOperations(store)) {
       ops.initialize(Maps.newHashMap(), randomCatalogInfo(), FILESET_PROPERTIES_METADATA);
       Set<NameIdentifier> idents =
           Arrays.stream(ops.listFilesets(Namespace.of("m1", "c1", schemaName)))
@@ -968,7 +966,7 @@ public class TestFilesetCatalogOperations {
     createSchema(testId, schemaName, comment, null, schemaPath);
     createFileset(filesetName, schemaName, comment, Fileset.Type.MANAGED, null, null);
 
-    try (SecureFilesetCatalogOperations ops = new SecureFilesetCatalogOperations(store)) {
+    try (FilesetCatalogOperations ops = new FilesetCatalogOperations(store)) {
       ops.initialize(Maps.newHashMap(), randomCatalogInfo(), FILESET_PROPERTIES_METADATA);
 
       Path testDir = new Path(schemaPath + "/" + filesetName);
@@ -1020,7 +1018,7 @@ public class TestFilesetCatalogOperations {
 
     Map<String, String> catalogProps = Collections.singletonMap(DISABLE_FILESYSTEM_OPS, "true");
 
-    try (SecureFilesetCatalogOperations ops = new SecureFilesetCatalogOperations(store)) {
+    try (FilesetCatalogOperations ops = new FilesetCatalogOperations(store)) {
       ops.initialize(catalogProps, randomCatalogInfo(), FILESET_PROPERTIES_METADATA);
       UnsupportedOperationException ex =
           Assertions.assertThrows(
@@ -1048,7 +1046,7 @@ public class TestFilesetCatalogOperations {
     final NameIdentifier filesetIdent =
         NameIdentifier.of("m1", "c1", schema.name(), fileset.name());
 
-    try (SecureFilesetCatalogOperations ops = new SecureFilesetCatalogOperations(store)) {
+    try (FilesetCatalogOperations ops = new FilesetCatalogOperations(store)) {
       ops.initialize(Maps.newHashMap(), randomCatalogInfo(), FILESET_PROPERTIES_METADATA);
       IllegalArgumentException ex =
           Assertions.assertThrows(
@@ -1081,7 +1079,7 @@ public class TestFilesetCatalogOperations {
     }
 
     NameIdentifier schemaIdent = NameIdentifierUtil.ofSchema("m1", "c1", schemaName);
-    try (SecureFilesetCatalogOperations ops = new SecureFilesetCatalogOperations(store)) {
+    try (FilesetCatalogOperations ops = new FilesetCatalogOperations(store)) {
       ops.initialize(catalogProps, randomCatalogInfo("m1", "c1"), FILESET_PROPERTIES_METADATA);
       if (!ops.schemaExists(schemaIdent)) {
         createSchema(generateTestId(), schemaName, comment, catalogPath, schemaPath);
@@ -1129,7 +1127,7 @@ public class TestFilesetCatalogOperations {
     FilesetChange change1 = FilesetChange.setProperty("k1", "v1");
     FilesetChange change2 = FilesetChange.removeProperty("k1");
 
-    try (SecureFilesetCatalogOperations ops = new SecureFilesetCatalogOperations(store)) {
+    try (FilesetCatalogOperations ops = new FilesetCatalogOperations(store)) {
       ops.initialize(Maps.newHashMap(), randomCatalogInfo(), FILESET_PROPERTIES_METADATA);
       NameIdentifier filesetIdent = NameIdentifier.of("m1", "c1", schemaName, filesetName);
 
@@ -1241,7 +1239,7 @@ public class TestFilesetCatalogOperations {
     Fileset fileset = createFileset(name, schemaName, comment, Fileset.Type.MANAGED, null, null);
 
     FilesetChange change1 = FilesetChange.updateComment(comment + "_new");
-    try (SecureFilesetCatalogOperations ops = new SecureFilesetCatalogOperations(store)) {
+    try (FilesetCatalogOperations ops = new FilesetCatalogOperations(store)) {
       ops.initialize(Maps.newHashMap(), randomCatalogInfo(), FILESET_PROPERTIES_METADATA);
       NameIdentifier filesetIdent = NameIdentifier.of("m1", "c1", schemaName, name);
 
@@ -1266,7 +1264,7 @@ public class TestFilesetCatalogOperations {
         createFileset(filesetName, schemaName, comment, Fileset.Type.MANAGED, null, null);
 
     FilesetChange change1 = FilesetChange.updateComment(null);
-    try (SecureFilesetCatalogOperations ops = new SecureFilesetCatalogOperations(store)) {
+    try (FilesetCatalogOperations ops = new FilesetCatalogOperations(store)) {
       ops.initialize(Maps.newHashMap(), randomCatalogInfo(), FILESET_PROPERTIES_METADATA);
       NameIdentifier filesetIdent = NameIdentifier.of("m1", "c1", schemaName, filesetName);
 
@@ -1280,7 +1278,7 @@ public class TestFilesetCatalogOperations {
 
   @Test
   public void testTestConnection() {
-    SecureFilesetCatalogOperations catalogOperations = new SecureFilesetCatalogOperations(store);
+    FilesetCatalogOperations catalogOperations = new FilesetCatalogOperations(store);
     Assertions.assertDoesNotThrow(
         () ->
             catalogOperations.testConnection(
@@ -1293,7 +1291,7 @@ public class TestFilesetCatalogOperations {
 
   @Test
   void testTrailSlash() throws IOException {
-    try (SecureFilesetCatalogOperations ops = new SecureFilesetCatalogOperations(store)) {
+    try (FilesetCatalogOperations ops = new FilesetCatalogOperations(store)) {
 
       String location = "hdfs://localhost:9000";
       Map<String, String> catalogProperties = Maps.newHashMap();
@@ -1340,7 +1338,7 @@ public class TestFilesetCatalogOperations {
         createFileset(
             filesetName, schemaName, comment, Fileset.Type.MANAGED, null, storageLocation);
 
-    try (SecureFilesetCatalogOperations ops = new SecureFilesetCatalogOperations(store)) {
+    try (FilesetCatalogOperations ops = new FilesetCatalogOperations(store)) {
       ops.initialize(Maps.newHashMap(), randomCatalogInfo(), FILESET_PROPERTIES_METADATA);
       NameIdentifier filesetIdent = NameIdentifier.of("m1", "c1", schemaName, filesetName);
       // test sub path starts with "/"
@@ -1463,16 +1461,18 @@ public class TestFilesetCatalogOperations {
       when(mockOps.getFileLocation(filesetIdent, subPath, null)).thenCallRealMethod();
       when(mockOps.getFileSystem(any(), any()))
           .thenReturn(FileSystem.getLocal(new Configuration()));
-      when(mockOps.getFileSystemWithCache(any(), any())).thenCallRealMethod();
+      when(mockOps.getFileSystemWithCache(any(), any(), any())).thenCallRealMethod();
       String fileLocation = mockOps.getFileLocation(filesetIdent, subPath);
       Assertions.assertEquals(
           String.format("%s%s", mockFileset.storageLocation(), subPath.substring(1)), fileLocation);
 
       FileSystem fs1 =
-          mockOps.getFileSystemWithCache(new Path("file:///dir1/subdir/file1"), mockOps.getConf());
+          mockOps.getFileSystemWithCache(
+              "", new Path("file:///dir1/subdir/file1"), mockOps.getConf());
 
       FileSystem fs2 =
-          mockOps.getFileSystemWithCache(new Path("file:///dir1/subdir/file2"), mockOps.getConf());
+          mockOps.getFileSystemWithCache(
+              "", new Path("file:///dir1/subdir/file2"), mockOps.getConf());
 
       Assertions.assertSame(fs1, fs2);
     }
@@ -1589,7 +1589,7 @@ public class TestFilesetCatalogOperations {
     }
 
     NameIdentifier schemaIdent = NameIdentifierUtil.ofSchema("m1", "c1", schemaName);
-    try (SecureFilesetCatalogOperations ops = new SecureFilesetCatalogOperations(store)) {
+    try (FilesetCatalogOperations ops = new FilesetCatalogOperations(store)) {
       ops.initialize(catalogProps, randomCatalogInfo("m1", "c1"), FILESET_PROPERTIES_METADATA);
       if (!ops.schemaExists(schemaIdent)) {
         createSchema(generateTestId(), schemaName, comment, catalogPath, schemaPath);
@@ -1644,7 +1644,7 @@ public class TestFilesetCatalogOperations {
     String comment = "comment_s1";
 
     NameIdentifier schemaIdent = NameIdentifierUtil.ofSchema("m1", "c1", schemaName);
-    try (SecureFilesetCatalogOperations ops = new SecureFilesetCatalogOperations(store)) {
+    try (FilesetCatalogOperations ops = new FilesetCatalogOperations(store)) {
       ops.initialize(catalogPaths, randomCatalogInfo("m1", "c1"), FILESET_PROPERTIES_METADATA);
       if (!ops.schemaExists(schemaIdent)) {
         createMultiLocationSchema(schemaName, comment, catalogPaths, schemaPaths);
@@ -1712,7 +1712,7 @@ public class TestFilesetCatalogOperations {
     // empty location name in catalog location
     Map<String, String> illegalLocations =
         ImmutableMap.of(PROPERTY_MULTIPLE_LOCATIONS_PREFIX + "", TEST_ROOT_PATH + "/catalog31_1");
-    try (SecureFilesetCatalogOperations ops = new SecureFilesetCatalogOperations(store)) {
+    try (FilesetCatalogOperations ops = new FilesetCatalogOperations(store)) {
       Exception exception =
           Assertions.assertThrows(
               IllegalArgumentException.class,
@@ -1823,7 +1823,7 @@ public class TestFilesetCatalogOperations {
 
   @Test
   public void testGetTargetLocation() throws IOException {
-    try (SecureFilesetCatalogOperations ops = new SecureFilesetCatalogOperations(store)) {
+    try (FilesetCatalogOperations ops = new FilesetCatalogOperations(store)) {
       ops.initialize(
           Collections.emptyMap(), randomCatalogInfo("m1", "c1"), FILESET_PROPERTIES_METADATA);
 
@@ -2928,7 +2928,7 @@ public class TestFilesetCatalogOperations {
       props.put(LOCATION, catalogPath);
     }
 
-    try (SecureFilesetCatalogOperations ops = new SecureFilesetCatalogOperations(store)) {
+    try (FilesetCatalogOperations ops = new FilesetCatalogOperations(store)) {
       ops.initialize(props, randomCatalogInfo("m1", "c1"), FILESET_PROPERTIES_METADATA);
 
       NameIdentifier schemaIdent = NameIdentifierUtil.ofSchema("m1", "c1", name);
@@ -2950,7 +2950,7 @@ public class TestFilesetCatalogOperations {
       Map<String, String> catalogPaths,
       Map<String, String> schemaPaths)
       throws IOException {
-    try (SecureFilesetCatalogOperations ops = new SecureFilesetCatalogOperations(store)) {
+    try (FilesetCatalogOperations ops = new FilesetCatalogOperations(store)) {
       ops.initialize(catalogPaths, randomCatalogInfo("m1", "c1"), FILESET_PROPERTIES_METADATA);
 
       NameIdentifier schemaIdent = NameIdentifierUtil.ofSchema("m1", "c1", name);
@@ -2972,7 +2972,7 @@ public class TestFilesetCatalogOperations {
       Map<String, String> storageLocations,
       Map<String, String> filesetProps)
       throws IOException {
-    try (SecureFilesetCatalogOperations ops = new SecureFilesetCatalogOperations(store)) {
+    try (FilesetCatalogOperations ops = new FilesetCatalogOperations(store)) {
       ops.initialize(catalogPaths, randomCatalogInfo("m1", "c1"), FILESET_PROPERTIES_METADATA);
 
       NameIdentifier filesetIdent = NameIdentifier.of("m1", "c1", schemaName, name);
@@ -3011,7 +3011,7 @@ public class TestFilesetCatalogOperations {
       props.put(LOCATION, catalogPath);
     }
 
-    try (SecureFilesetCatalogOperations ops = new SecureFilesetCatalogOperations(store)) {
+    try (FilesetCatalogOperations ops = new FilesetCatalogOperations(store)) {
       ops.initialize(props, randomCatalogInfo("m1", "c1"), FILESET_PROPERTIES_METADATA);
 
       NameIdentifier filesetIdent = NameIdentifier.of("m1", "c1", schemaName, name);
@@ -3037,7 +3037,7 @@ public class TestFilesetCatalogOperations {
       props.put(LOCATION, catalogPath);
     }
 
-    try (SecureFilesetCatalogOperations ops = new SecureFilesetCatalogOperations(store)) {
+    try (FilesetCatalogOperations ops = new FilesetCatalogOperations(store)) {
       ops.initialize(props, randomCatalogInfo("m1", "c1"), FILESET_PROPERTIES_METADATA);
 
       NameIdentifier filesetIdent = NameIdentifier.of("m1", "c1", schemaName, name);

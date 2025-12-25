@@ -22,13 +22,11 @@ package org.apache.gravitino.catalog.hadoop.fs.kerberos;
 import static org.apache.gravitino.catalog.hadoop.fs.Constants.HADOOP_SECURITY_KEYTAB;
 import static org.apache.gravitino.catalog.hadoop.fs.Constants.HADOOP_SECURITY_PRINCIPAL;
 
-import com.google.common.collect.ImmutableMap;
 import java.util.Map;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.config.ConfigBuilder;
 import org.apache.gravitino.config.ConfigConstants;
 import org.apache.gravitino.config.ConfigEntry;
-import org.apache.gravitino.connector.PropertyEntry;
 import org.apache.hadoop.conf.Configuration;
 
 public class KerberosConfig extends AuthenticationConfig {
@@ -101,40 +99,4 @@ public class KerberosConfig extends AuthenticationConfig {
   public int getFetchTimeoutSec() {
     return get(FETCH_TIMEOUT_SEC_ENTRY);
   }
-
-  public static final Map<String, PropertyEntry<?>> KERBEROS_PROPERTY_ENTRIES =
-      new ImmutableMap.Builder<String, PropertyEntry<?>>()
-          .put(
-              KEY_TAB_URI_KEY,
-              PropertyEntry.stringOptionalPropertyEntry(
-                  KEY_TAB_URI_KEY,
-                  "The uri of key tab for the catalog",
-                  false /* immutable */,
-                  null /* default value */,
-                  false /* hidden */))
-          .put(
-              PRINCIPAL_KEY,
-              PropertyEntry.stringOptionalPropertyEntry(
-                  PRINCIPAL_KEY,
-                  "The principal for the catalog",
-                  false /* immutable */,
-                  null /* defaultValue */,
-                  false /* hidden */))
-          .put(
-              CHECK_INTERVAL_SEC_KEY,
-              PropertyEntry.integerOptionalPropertyEntry(
-                  CHECK_INTERVAL_SEC_KEY,
-                  "The interval to check validness of the principal",
-                  true /* immutable */,
-                  60 /* defaultValue */,
-                  false /* hidden */))
-          .put(
-              FETCH_TIMEOUT_SEC_KEY,
-              PropertyEntry.integerOptionalPropertyEntry(
-                  FETCH_TIMEOUT_SEC_KEY,
-                  "The timeout to fetch key tab",
-                  false /* immutable */,
-                  60 /* defaultValue */,
-                  false /* hidden */))
-          .build();
 }

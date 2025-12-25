@@ -21,13 +21,11 @@ package org.apache.gravitino.catalog.hadoop.fs.kerberos;
 
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.HADOOP_SECURITY_AUTHENTICATION;
 
-import com.google.common.collect.ImmutableMap;
 import java.util.Map;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.config.ConfigBuilder;
 import org.apache.gravitino.config.ConfigConstants;
 import org.apache.gravitino.config.ConfigEntry;
-import org.apache.gravitino.connector.PropertyEntry;
 import org.apache.hadoop.conf.Configuration;
 
 public class AuthenticationConfig extends Config {
@@ -90,27 +88,4 @@ public class AuthenticationConfig extends Config {
   public boolean isKerberosAuth() {
     return AuthenticationType.KERBEROS.name().equalsIgnoreCase(getAuthType());
   }
-
-  public static final Map<String, PropertyEntry<?>> AUTHENTICATION_PROPERTY_ENTRIES =
-      new ImmutableMap.Builder<String, PropertyEntry<?>>()
-          .put(
-              IMPERSONATION_ENABLE_KEY,
-              PropertyEntry.booleanPropertyEntry(
-                  IMPERSONATION_ENABLE_KEY,
-                  "Whether to enable impersonation for the Fileset catalog",
-                  false /* required */,
-                  true /* immutable */,
-                  KERBEROS_DEFAULT_IMPERSONATION_ENABLE /* default value */,
-                  false /* hidden */,
-                  false /* reserved */))
-          .put(
-              AUTH_TYPE_KEY,
-              PropertyEntry.stringOptionalPropertyEntry(
-                  AUTH_TYPE_KEY,
-                  "The type of authentication for Fileset catalog, currently we only "
-                      + "support simple and Kerberos",
-                  false /* immutable */,
-                  null /* default value */,
-                  false /* hidden */))
-          .build();
 }

@@ -23,12 +23,15 @@ import static org.apache.gravitino.catalog.hadoop.fs.Constants.DEFAULT_CONNECTIO
 import static org.apache.gravitino.catalog.hadoop.fs.Constants.DEFAULT_HDFS_IPC_PING;
 import static org.apache.gravitino.catalog.hadoop.fs.Constants.HDFS_IPC_CLIENT_CONNECT_TIMEOUT_KEY;
 import static org.apache.gravitino.catalog.hadoop.fs.Constants.HDFS_IPC_PING_KEY;
+import static org.apache.gravitino.catalog.hadoop.fs.kerberos.AuthenticationConfig.IMPERSONATION_ENABLE_KEY;
+import static org.apache.gravitino.catalog.hadoop.fs.kerberos.KerberosConfig.PRINCIPAL_KEY;
 
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import java.io.IOException;
 import java.util.Map;
 import javax.annotation.Nonnull;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
@@ -45,7 +48,7 @@ public class HDFSFileSystemProvider implements FileSystemProvider {
     Configuration configuration =
         FileSystemUtils.createConfiguration(GRAVITINO_BYPASS, hadoopConfMap);
 
-    HDFSFileSystemProxy proxy = new HDFSFileSystemProxy(path, configuration);
+    HDFSFileSystemProxy proxy = new HDFSFileSystemProxy(path, configuration, config);
     return proxy.getProxy();
   }
 
@@ -57,6 +60,21 @@ public class HDFSFileSystemProvider implements FileSystemProvider {
   @Override
   public String name() {
     return BUILTIN_HDFS_FS_PROVIDER;
+  }
+
+  @Override
+  public String getFullAuthority(Path path, Map<String, String> conf) {
+    String authority = path.toUri().getAuthority();
+    String principal = conf.get(PRINCIPAL_KEY);
+    if (StringUtils.isNotBlank(principal)) {
+      principal = principal.replaceAll("@.*$", ""); // Remove realm if exists
+      authority = String.format("%s@%s", principal, authority);
+    }
+    String impersonationEnabled = conf.get(IMPERSONATION_ENABLE_KEY);
+    if (conf.containsKey(IMPERSONATION_ENABLE_KEY)) {
+      authority = String.format("%s?impersonation_enabled=%s)", authority, impersonationEnabled);
+    }
+    return authority;
   }
 
   /**
