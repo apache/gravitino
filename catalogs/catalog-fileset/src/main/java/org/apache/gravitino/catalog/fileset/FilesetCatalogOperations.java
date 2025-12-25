@@ -1064,7 +1064,7 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
               // configs
               Map<String, String> fsConf = new HashMap<>(conf);
               fsConf.putAll(
-                  FilesetUtil.getUserDefinedConfigs(
+                  FilesetUtil.getUserDefinedFileSystemConfigs(
                       path.toUri(),
                       conf,
                       FilesetCatalogPropertiesMetadata.FS_GRAVITINO_PATH_CONFIG_PREFIX));
@@ -1507,7 +1507,7 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
       mergedProperties.putAll(entityProperties);
       // Add user-defined configs for location if provided
       mergedProperties.putAll(
-          FilesetUtil.getUserDefinedConfigs(
+          FilesetUtil.getUserDefinedFileSystemConfigs(
               path.toUri(),
               mergedProperties,
               FilesetCatalogPropertiesMetadata.FS_GRAVITINO_PATH_CONFIG_PREFIX));
@@ -1522,8 +1522,10 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
     mergedProperties.putAll(entityProperties);
     // Add user-defined configs for location if provided
     mergedProperties.putAll(
-        FilesetUtil.getUserDefinedConfigs(
-            path.toUri(), mergedProperties, FilesetCatalogPropertiesMetadata.FS_GRAVITINO_PATH_CONFIG_PREFIX));
+        FilesetUtil.getUserDefinedFileSystemConfigs(
+            path.toUri(),
+            mergedProperties,
+            FilesetCatalogPropertiesMetadata.FS_GRAVITINO_PATH_CONFIG_PREFIX));
     return mergedProperties;
   }
 

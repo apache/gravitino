@@ -61,8 +61,8 @@ public class FilesetUtil {
    * @param configPrefix the prefix for path-based configurations (e.g., "fs.path.config.")
    * @return a map of user-defined configurations for the given path
    */
-  public static Map<String, String> getUserDefinedConfigs(
-    URI path, Map<String, String> conf, String configPrefix) {
+  public static Map<String, String> getUserDefinedFileSystemConfigs(
+      URI path, Map<String, String> conf, String configPrefix) {
     Preconditions.checkArgument(path != null, "Path should not be null");
     Preconditions.checkArgument(conf != null, "Configuration map should not be null");
     Preconditions.checkArgument(

@@ -18,8 +18,6 @@
  */
 package org.apache.gravitino.filesystem.hadoop;
 
-import static org.apache.gravitino.catalog.hadoop.fs.FileSystemProvider.GRAVITINO_BYPASS;
-import static org.apache.gravitino.catalog.hadoop.fs.HDFSFileSystemProvider.SCHEME_HDFS;
 import static org.apache.gravitino.file.Fileset.PROPERTY_DEFAULT_LOCATION_NAME;
 import static org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_CURRENT_LOCATION_NAME;
 import static org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_FILESET_METADATA_CACHE_ENABLE;
@@ -67,7 +65,6 @@ import org.apache.gravitino.audit.FilesetAuditConstants;
 import org.apache.gravitino.audit.FilesetDataOperation;
 import org.apache.gravitino.audit.InternalClientType;
 import org.apache.gravitino.catalog.hadoop.fs.FileSystemProvider;
-import org.apache.gravitino.catalog.hadoop.fs.FileSystemUtils;
 import org.apache.gravitino.catalog.hadoop.fs.GravitinoFileSystemCredentialsProvider;
 import org.apache.gravitino.catalog.hadoop.fs.SupportsCredentialVending;
 import org.apache.gravitino.client.GravitinoClient;
@@ -80,9 +77,9 @@ import org.apache.gravitino.exceptions.NoSuchLocationNameException;
 import org.apache.gravitino.file.Fileset;
 import org.apache.gravitino.file.FilesetCatalog;
 import org.apache.gravitino.storage.AzureProperties;
-import org.apache.gravitino.utils.FilesetUtil;
 import org.apache.gravitino.storage.OSSProperties;
 import org.apache.gravitino.storage.S3Properties;
+import org.apache.gravitino.utils.FilesetUtil;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FSDataOutputStream;
@@ -714,7 +711,9 @@ public abstract class BaseGVFSOperations implements Closeable {
 
       Path targetLocation = new Path(fileset.storageLocations().get(targetLocationName));
       Map<String, String> allProperties = getAllProperties(filesetIdent, fileset.properties());
-      allProperties.putAll(FilesetUtil.getUserDefinedConfigs(targetLocation.toUri(), allProperties, FS_GRAVITINO_PATH_CONFIG_PREFIX));
+      allProperties.putAll(
+          FilesetUtil.getUserDefinedFileSystemConfigs(
+              targetLocation.toUri(), allProperties, FS_GRAVITINO_PATH_CONFIG_PREFIX));
 
       if (enableCredentialVending()) {
         allProperties.putAll(
@@ -788,7 +787,6 @@ public abstract class BaseGVFSOperations implements Closeable {
     CallerContext callerContext = CallerContext.builder().withContext(contextMap).build();
     CallerContext.CallerContextHolder.set(callerContext);
   }
-
 
   /**
    * Get the actual file system by the given actual file path and properties.

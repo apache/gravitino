@@ -35,7 +35,6 @@ import net.sf.cglib.proxy.Enhancer;
 import net.sf.cglib.proxy.MethodInterceptor;
 import net.sf.cglib.proxy.MethodProxy;
 import org.apache.gravitino.UserPrincipal;
-import org.apache.gravitino.auth.AuthConstants;
 import org.apache.gravitino.catalog.hadoop.fs.kerberos.AuthenticationConfig;
 import org.apache.gravitino.catalog.hadoop.fs.kerberos.KerberosClient;
 import org.apache.gravitino.exceptions.GravitinoRuntimeException;
@@ -139,18 +138,22 @@ public class HDFSFileSystemProxy implements MethodInterceptor {
     java.security.AccessControlContext context = java.security.AccessController.getContext();
     Subject subject = Subject.getSubject(context);
     if (subject == null || subject.getPrincipals(UserPrincipal.class).isEmpty()) {
-      return new UserPrincipal(AuthConstants.ANONYMOUS_USER);
+      return null;
     }
-
     return subject.getPrincipals(UserPrincipal.class).iterator().next();
   }
 
   private UserGroupInformation getCurrentUgi() throws Exception {
     UserGroupInformation currentUgi = UserGroupInformation.getLoginUser();
     if (impersonationEnabled) {
-      String proxyUserName = getCurrentPrincipal().getName();
-      currentUgi = UserGroupInformation.createProxyUser(proxyUserName, loginUgi);
-      LOG.info("Kerberos impersonation enabled. Proxy user: {}", proxyUserName);
+      Principal principal = getCurrentPrincipal();
+      if (principal != null) {
+        String proxyUserName = getCurrentPrincipal().getName();
+        currentUgi = UserGroupInformation.createProxyUser(proxyUserName, loginUgi);
+        LOG.info("Kerberos impersonation enabled. Proxy user: {}", proxyUserName);
+      } else {
+        currentUgi = loginUgi;
+      }
     } else {
       currentUgi = loginUgi;
       LOG.info("Using login user without impersonation: {}", loginUgi.getUserName());
