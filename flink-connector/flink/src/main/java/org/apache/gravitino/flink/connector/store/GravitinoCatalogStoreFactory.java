@@ -31,8 +31,10 @@ import com.google.common.collect.ImmutableSet;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.flink.configuration.ConfigOption;
 import org.apache.flink.configuration.ReadableConfig;
+import org.apache.flink.configuration.SecurityOptions;
 import org.apache.flink.table.catalog.CatalogStore;
 import org.apache.flink.table.catalog.exceptions.CatalogException;
 import org.apache.flink.table.factories.CatalogStoreFactory;
@@ -93,12 +95,26 @@ public class GravitinoCatalogStoreFactory implements CatalogStoreFactory {
 
   @VisibleForTesting
   static Map<String, String> extractClientConfig(ReadableConfig options) {
-    return options.get(GRAVITINO_CLIENT_CONFIG).entrySet().stream()
-        .collect(
-            Collectors.toMap(
-                entry ->
-                    GravitinoClientConfiguration.GRAVITINO_CLIENT_CONFIG_PREFIX + entry.getKey(),
-                Map.Entry::getValue,
-                (oldVal, newVal) -> newVal));
+    Map<String, String> config =
+        options.get(GRAVITINO_CLIENT_CONFIG).entrySet().stream()
+            .collect(
+                Collectors.toMap(
+                    entry ->
+                        GravitinoClientConfiguration.GRAVITINO_CLIENT_CONFIG_PREFIX
+                            + entry.getKey(),
+                    Map.Entry::getValue,
+                    (oldVal, newVal) -> newVal));
+
+    // Set Kerberos config options if set
+    String principal = options.get(SecurityOptions.KERBEROS_LOGIN_PRINCIPAL);
+    if (StringUtils.isNotBlank(principal)) {
+      config.put(SecurityOptions.KERBEROS_LOGIN_PRINCIPAL.key(), principal);
+    }
+    String keytab = options.get(SecurityOptions.KERBEROS_LOGIN_KEYTAB);
+    if (StringUtils.isNotBlank(keytab)) {
+      config.put(SecurityOptions.KERBEROS_LOGIN_KEYTAB.key(), keytab);
+    }
+
+    return config;
   }
 }

@@ -21,12 +21,20 @@ package org.apache.gravitino.flink.connector.catalog;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
 import com.google.common.collect.Sets;
+import java.io.File;
 import java.util.Arrays;
 import java.util.Map;
 import java.util.Set;
+import org.apache.commons.lang3.StringUtils;
+import org.apache.flink.configuration.SecurityOptions;
 import org.apache.gravitino.Catalog;
+import org.apache.gravitino.auth.AuthenticatorType;
+import org.apache.gravitino.client.DefaultOAuth2TokenProvider;
 import org.apache.gravitino.client.GravitinoAdminClient;
 import org.apache.gravitino.client.GravitinoMetalake;
+import org.apache.gravitino.client.KerberosTokenProvider;
+import org.apache.gravitino.flink.connector.store.GravitinoCatalogStoreFactoryOptions;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -54,9 +62,41 @@ public class GravitinoCatalogManager {
     this.gravitinoUri = gravitinoUri;
     this.metalakeName = metalakeName;
     this.gravitinoClientConfig = gravitinoClientConfig;
-    this.gravitinoClient =
-        GravitinoAdminClient.builder(gravitinoUri).withClientConfig(gravitinoClientConfig).build();
-    this.metalake = gravitinoClient.loadMetalake(metalakeName);
+
+    String authType = gravitinoClientConfig.get(GravitinoCatalogStoreFactoryOptions.AUTH_TYPE);
+
+    // Only OAuth is explicitly configured; otherwise follow Flink security (Kerberos if enabled,
+    // simple auth otherwise).
+    if (AuthenticatorType.OAUTH.name().equalsIgnoreCase(authType)) {
+      this.gravitinoClient = buildOAuthClient(gravitinoUri, gravitinoClientConfig);
+    } else {
+      if (authType != null) {
+        throw new IllegalArgumentException(
+            String.format(
+                "Unsupported auth type '%s'. Only OAUTH is supported; leave %s unset to use Flink Kerberos settings (or simple auth if security is disabled).",
+                authType, GravitinoCatalogStoreFactoryOptions.AUTH_TYPE));
+      }
+
+      if (UserGroupInformation.isSecurityEnabled()) {
+        if (getUgi().getAuthenticationMethod()
+            != UserGroupInformation.AuthenticationMethod.KERBEROS) {
+          throw new IllegalStateException(
+              String.format(
+                  "Flink security is enabled, but current user authentication method is %s rather than KERBEROS",
+                  getUgi().getAuthenticationMethod()));
+        }
+        this.gravitinoClient = buildKerberosClient(gravitinoUri, gravitinoClientConfig);
+      } else {
+        this.gravitinoClient = buildSimpleClient(gravitinoUri, gravitinoClientConfig);
+      }
+    }
+
+    try {
+      this.metalake = gravitinoClient.loadMetalake(metalakeName);
+    } catch (Exception e) {
+      throw new IllegalStateException(
+          String.format("Failed to load metalake %s from %s", metalakeName, gravitinoUri), e);
+    }
   }
 
   /**
@@ -205,5 +245,64 @@ public class GravitinoCatalogManager {
     return gravitinoCatalogManager.gravitinoUri.equals(gravitinoUri)
         && gravitinoCatalogManager.metalakeName.equals(metalakeName)
         && gravitinoCatalogManager.gravitinoClientConfig.equals(gravitinoClientConfig);
+  }
+
+  private static GravitinoAdminClient buildOAuthClient(
+      String gravitinoUri, Map<String, String> config) {
+    String serverUri = config.get(GravitinoCatalogStoreFactoryOptions.OAUTH2_SERVER_URI);
+    String credential = config.get(GravitinoCatalogStoreFactoryOptions.OAUTH2_CREDENTIAL);
+    String path = config.get(GravitinoCatalogStoreFactoryOptions.OAUTH2_PATH);
+    String scope = config.get(GravitinoCatalogStoreFactoryOptions.OAUTH2_SCOPE);
+    Preconditions.checkArgument(
+        StringUtils.isNoneBlank(serverUri, credential, path, scope),
+        "OAuth2 auth requires serverUri, credential, path and scope");
+
+    DefaultOAuth2TokenProvider provider =
+        DefaultOAuth2TokenProvider.builder()
+            .withUri(serverUri)
+            .withCredential(credential)
+            .withPath(path)
+            .withScope(scope)
+            .build();
+
+    return GravitinoAdminClient.builder(gravitinoUri)
+        .withOAuth(provider)
+        .withClientConfig(config)
+        .build();
+  }
+
+  private static GravitinoAdminClient buildKerberosClient(
+      String gravitinoUri, Map<String, String> config) {
+    String principal = config.get(SecurityOptions.KERBEROS_LOGIN_PRINCIPAL.key());
+    String keytab = config.get(SecurityOptions.KERBEROS_LOGIN_KEYTAB.key());
+    Preconditions.checkArgument(StringUtils.isNotBlank(principal), "Kerberos principal is empty");
+
+    KerberosTokenProvider.Builder builder =
+        KerberosTokenProvider.builder().withClientPrincipal(principal);
+    if (StringUtils.isNotBlank(keytab)) {
+      builder.withKeyTabFile(new File(keytab));
+    }
+
+    return GravitinoAdminClient.builder(gravitinoUri)
+        .withKerberosAuth(builder.build())
+        .withClientConfig(config)
+        .build();
+  }
+
+  private static GravitinoAdminClient buildSimpleClient(
+      String gravitinoUri, Map<String, String> config) {
+    String userName = getUgi().getUserName();
+    return GravitinoAdminClient.builder(gravitinoUri)
+        .withSimpleAuth(userName)
+        .withClientConfig(config)
+        .build();
+  }
+
+  private static UserGroupInformation getUgi() {
+    try {
+      return UserGroupInformation.getCurrentUser();
+    } catch (Exception e) {
+      throw new IllegalStateException("Unable to get current user group information", e);
+    }
   }
 }
