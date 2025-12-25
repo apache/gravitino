@@ -802,18 +802,12 @@ public abstract class BaseGVFSOperations implements Closeable {
     Preconditions.checkArgument(
         StringUtils.isNotBlank(scheme), "Scheme of the actual file location cannot be null.");
 
-    UserGroupInformation ugi;
-    try {
-      ugi = UserGroupInformation.getCurrentUser();
-    } catch (IOException e) {
-      throw new GravitinoRuntimeException(
-          e, "Cannot get current user for path: %s", actualFilePath);
-    }
+    FileSystemProvider provider = getFileSystemProviderByScheme(scheme);
+    String authority = provider.getFullAuthority(actualFilePath, allProperties);
     return fileSystemCache.get(
-        new FileSystemCacheKey(scheme, uri.getAuthority(), ugi),
+        new FileSystemCacheKey(scheme, authority, null),
         cacheKey -> {
           try {
-            FileSystemProvider provider = getFileSystemProviderByScheme(scheme);
 
             // Reset the FileSystem service loader to make sure the FileSystem will reload the
             // service file systems, this is a temporary solution to fix the issue

@@ -34,6 +34,7 @@ import javax.security.auth.Subject;
 import net.sf.cglib.proxy.Enhancer;
 import net.sf.cglib.proxy.MethodInterceptor;
 import net.sf.cglib.proxy.MethodProxy;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.UserPrincipal;
 import org.apache.gravitino.catalog.hadoop.fs.kerberos.AuthenticationConfig;
 import org.apache.gravitino.catalog.hadoop.fs.kerberos.KerberosClient;
@@ -51,6 +52,8 @@ public class HDFSFileSystemProxy implements MethodInterceptor {
   private static final Logger LOG = LoggerFactory.getLogger(HDFSFileSystemProxy.class);
 
   public static final String GRAVITINO_KEYTAB_FORMAT = "keytabs/gravitino-%s";
+  private static final String SYSTEM_USER_NAME = System.getProperty("user.name");
+  private static final String SYSTEM_ENV_HADOOP_USER_NAME = "HADOOP_USER_NAME";
 
   private final UserGroupInformation loginUgi;
   private final FileSystem fs;
@@ -81,7 +84,11 @@ public class HDFSFileSystemProxy implements MethodInterceptor {
             UserGroupInformation.AuthenticationMethod.KERBEROS.name().toLowerCase(Locale.ROOT));
         this.loginUgi = initKerberosUgi(config, configuration);
       } else {
-        this.loginUgi = UserGroupInformation.getCurrentUser();
+        String userName = System.getenv(SYSTEM_ENV_HADOOP_USER_NAME);
+        if (StringUtils.isEmpty(userName)) {
+          userName = SYSTEM_USER_NAME;
+        }
+        this.loginUgi = UserGroupInformation.createRemoteUser(userName);
       }
 
       UserGroupInformation currentUgi = getCurrentUgi();
