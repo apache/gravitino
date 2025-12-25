@@ -80,8 +80,8 @@ public final class HiveClientFactory {
         kerberosClient.setHiveClient(client);
       }
     } catch (Exception e) {
-      throw new RuntimeException(
-          String.format("Failed to initialize HiveClientFactory %s", this.name), e);
+      throw HiveExceptionConverter.toGravitinoException(
+          e, HiveExceptionConverter.ExceptionTarget.other(this.name));
     }
   }
 

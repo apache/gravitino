@@ -16,27 +16,41 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.catalog.hive.integration.test;
+
+package org.apache.gravitino.hive.client;
 
 import com.google.common.collect.ImmutableMap;
 import org.apache.gravitino.integration.test.container.HiveContainer;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.TestInstance;
 
+/**
+ * Hive3 version of {@link TestHive2HMS}. Hive3 default catalog is "hive" and uses Hive3 container.
+ */
 @Tag("gravitino-docker-test")
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-public class CatalogHive3IT extends CatalogHive2IT {
+public class TestHive3HMS extends TestHive2HMS {
 
+  @BeforeAll
   @Override
-  protected void startNecessaryContainer() {
-    hmsCatalog = "hive";
+  public void startHiveContainer() {
+    testPrefix = "hive3";
+    catalogName = "hive"; // Hive3 default catalog
+
     containerSuite.startHiveContainer(
         ImmutableMap.of(HiveContainer.HIVE_RUNTIME_VERSION, HiveContainer.HIVE3));
+    hiveContainer = containerSuite.getHiveContainer();
 
-    hiveMetastoreUris =
+    metastoreUri =
         String.format(
             "thrift://%s:%d",
-            containerSuite.getHiveContainer().getContainerIpAddress(),
-            HiveContainer.HIVE_METASTORE_PORT);
+            hiveContainer.getContainerIpAddress(), HiveContainer.HIVE_METASTORE_PORT);
+    hdfsBasePath =
+        String.format(
+            "hdfs://%s:%d/tmp/gravitino_test",
+            hiveContainer.getContainerIpAddress(), HiveContainer.HDFS_DEFAULTFS_PORT);
+
+    hiveClient = new HiveClientFactory(createHiveProperties(), testPrefix).createHiveClient();
   }
 }

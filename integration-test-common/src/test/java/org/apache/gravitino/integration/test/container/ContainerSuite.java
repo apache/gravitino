@@ -215,7 +215,7 @@ public class ContainerSuite implements Closeable {
     }
   }
 
-  public void startKerberosHiveContainer() {
+  public void startKerberosHiveContainer(Map<String, String> envVars) {
     if (kerberosHiveContainer == null) {
       synchronized (ContainerSuite.class) {
         if (kerberosHiveContainer == null) {
@@ -225,6 +225,7 @@ public class ContainerSuite implements Closeable {
               HiveContainer.builder()
                   .withHostName("gravitino-ci-kerberos-hive")
                   .withKerberosEnabled(true)
+                  .withEnvVars(envVars)
                   .withNetwork(network);
           HiveContainer container = closer.register(hiveBuilder.build());
           container.start();
@@ -232,6 +233,10 @@ public class ContainerSuite implements Closeable {
         }
       }
     }
+  }
+
+  public void startKerberosHiveContainer() {
+    startKerberosHiveContainer(ImmutableMap.of());
   }
 
   public void startSQLBaseAuthHiveContainer(Map<String, String> envVars) {

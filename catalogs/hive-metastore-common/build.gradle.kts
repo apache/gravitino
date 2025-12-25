@@ -121,6 +121,8 @@ dependencies {
   }
   testImplementation(libs.junit.jupiter.api)
   testImplementation(libs.woodstox.core)
+  testImplementation(libs.testcontainers)
+  testImplementation(project(":integration-test-common", "testArtifacts"))
 
   testRuntimeOnly(libs.junit.jupiter.engine)
 }

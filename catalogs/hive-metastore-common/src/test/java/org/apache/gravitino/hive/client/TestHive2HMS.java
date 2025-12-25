@@ -19,6 +19,7 @@
 
 package org.apache.gravitino.hive.client;
 
+import com.google.common.collect.ImmutableMap;
 import java.time.Instant;
 import java.util.HashMap;
 import java.util.List;
@@ -38,6 +39,10 @@ import org.apache.gravitino.exceptions.TableAlreadyExistsException;
 import org.apache.gravitino.hive.HivePartition;
 import org.apache.gravitino.hive.HiveSchema;
 import org.apache.gravitino.hive.HiveTable;
+import org.apache.gravitino.integration.test.container.ContainerSuite;
+import org.apache.gravitino.integration.test.container.HiveContainer;
+import org.apache.gravitino.integration.test.util.CloseContainerExtension;
+import org.apache.gravitino.integration.test.util.PrintFuncNameExtension;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.expressions.literals.Literal;
@@ -45,50 +50,57 @@ import org.apache.gravitino.rel.expressions.literals.Literals;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.expressions.transforms.Transforms;
 import org.apache.gravitino.rel.types.Types;
+import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.Disabled;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInstance;
+import org.junit.jupiter.api.extension.ExtendWith;
 
-// This class is used for manual testing against real Hive Metastore instances.
-@Disabled
-public class TestHiveClient {
+// This class is used for testing against Hive 2.x Metastore instances using Docker containers.
+@Tag("gravitino-docker-test")
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
+@ExtendWith({PrintFuncNameExtension.class, CloseContainerExtension.class})
+public class TestHive2HMS {
 
-  private static final String HIVE2_HMS_URL = "thrift://172.17.0.4:9083";
-  private static final String HIVE2_HDFS_URL = "hdfs://172.17.0.4:9000";
-  private static final String HIVE3_HMS_URL = "thrift://172.17.0.3:9083";
-  private static final String HIVE3_HDFS_URL = "hdfs://172.17.0.3:9000";
+  protected final ContainerSuite containerSuite = ContainerSuite.getInstance();
 
-  private static final String KERBEROS_HIVE2_HMS_URL = "thrift://172.17.0.2:9083";
-  private static final String KERBEROS_HIVE2_HDFS_URL = "hdfs://172.17.0.2:9000";
-  private static final String KERBEROS_PRINCIPAL = "cli@HADOOPKRB";
-  private static final String KERBEROS_KEYTAB = "/tmp/test4310082059861441407/client.keytab";
-  private static final String KERBEROS_METASTORE_PRINCIPAL = "hive/6b1955fcb754@HADOOPKRB";
-  private static final String KERBEROS_KRB5_CONF = "/tmp/test4310082059861441407/krb5.conf";
+  protected HiveContainer hiveContainer;
+  protected String testPrefix = "hive2";
+  protected String metastoreUri;
+  protected String hdfsBasePath;
+  protected String catalogName = ""; // Hive2 doesn't support catalog
+  protected HiveClient hiveClient;
 
-  @Test
-  void testHive2Client() throws Exception {
-    runHiveClientTest("", "hive2", HIVE2_HMS_URL, HIVE2_HDFS_URL + "/tmp/gravitino_test");
+  @BeforeAll
+  public void startHiveContainer() {
+    containerSuite.startHiveContainer(
+        ImmutableMap.of(HiveContainer.HIVE_RUNTIME_VERSION, HiveContainer.HIVE2));
+    hiveContainer = containerSuite.getHiveContainer();
+    metastoreUri =
+        String.format(
+            "thrift://%s:%d",
+            hiveContainer.getContainerIpAddress(), HiveContainer.HIVE_METASTORE_PORT);
+    hdfsBasePath =
+        String.format(
+            "hdfs://%s:%d/tmp/gravitino_test",
+            hiveContainer.getContainerIpAddress(), HiveContainer.HDFS_DEFAULTFS_PORT);
+
+    hiveClient = new HiveClientFactory(createHiveProperties(), testPrefix).createHiveClient();
+  }
+
+  @AfterAll
+  public void stopHiveContainer() throws Exception {
+    containerSuite.close();
+    if (hiveClient != null) {
+      hiveClient.close();
+      hiveClient = null;
+    }
   }
 
   @Test
-  void testHive3DefaultCatalog() throws Exception {
-    // Hive3 default catalog is "hive", not empty string
-    runHiveClientTest(
-        "hive", "hive3_default", HIVE3_HMS_URL, HIVE3_HDFS_URL + "/tmp/gravitino_test");
-  }
-
-  @Test
-  void testHive3SampleCatalog() throws Exception {
-    runHiveClientTest(
-        "sample_catalog", "hive3_sample", HIVE3_HMS_URL, HIVE3_HDFS_URL + "/tmp/gravitino_test");
-  }
-
-  private void runHiveClientTest(
-      String catalogName, String testPrefix, String metastoreUri, String hdfsBasePath) {
-    Properties properties = new Properties();
-    properties.setProperty("hive.metastore.uris", metastoreUri);
-    HiveClient client = new HiveClientFactory(properties, "").createHiveClient();
-
+  void runHiveClientTest() throws Exception {
     String dbName = "gt_" + testPrefix + "_db_" + UUID.randomUUID().toString().replace("-", "");
     String tableName = "gt_" + testPrefix + "_tbl_" + UUID.randomUUID().toString().replace("-", "");
     String partitionValue = "p_" + UUID.randomUUID().toString().replace("-", "");
@@ -103,26 +115,26 @@ public class TestHiveClient {
 
     try {
       // Test database operations
-      client.createDatabase(schema);
-      List<String> allDatabases = client.getAllDatabases(catalogName);
+      hiveClient.createDatabase(schema);
+      List<String> allDatabases = hiveClient.getAllDatabases(catalogName);
       Assertions.assertTrue(allDatabases.contains(dbName), "Database should be in the list");
 
-      HiveSchema loadedDb = client.getDatabase(catalogName, dbName);
+      HiveSchema loadedDb = hiveClient.getDatabase(catalogName, dbName);
       Assertions.assertNotNull(loadedDb, "Loaded database should not be null");
       Assertions.assertEquals(dbName, loadedDb.name(), "Database name should match");
       Assertions.assertEquals(
           schema.comment(), loadedDb.comment(), "Database comment should match");
 
-      client.alterDatabase(catalogName, dbName, schema);
-      HiveSchema alteredDb = client.getDatabase(catalogName, dbName);
+      hiveClient.alterDatabase(catalogName, dbName, schema);
+      HiveSchema alteredDb = hiveClient.getDatabase(catalogName, dbName);
       Assertions.assertNotNull(alteredDb, "Altered database should not be null");
 
       // Test table operations
-      client.createTable(table);
-      List<String> allTables = client.getAllTables(catalogName, dbName);
+      hiveClient.createTable(table);
+      List<String> allTables = hiveClient.getAllTables(catalogName, dbName);
       Assertions.assertTrue(allTables.contains(tableName), "Table should be in the list");
 
-      HiveTable loadedTable = client.getTable(catalogName, dbName, tableName);
+      HiveTable loadedTable = hiveClient.getTable(catalogName, dbName, tableName);
       Assertions.assertNotNull(loadedTable, "Loaded table should not be null");
       Assertions.assertEquals(tableName, loadedTable.name(), "Table name should match");
       Assertions.assertEquals(table.comment(), loadedTable.comment(), "Table comment should match");
@@ -130,47 +142,47 @@ public class TestHiveClient {
       Assertions.assertEquals(
           1, loadedTable.partitioning().length, "Table should have 1 partition key");
 
-      client.alterTable(catalogName, dbName, tableName, loadedTable);
-      HiveTable alteredTable = client.getTable(catalogName, dbName, tableName);
+      hiveClient.alterTable(catalogName, dbName, tableName, loadedTable);
+      HiveTable alteredTable = hiveClient.getTable(catalogName, dbName, tableName);
       Assertions.assertNotNull(alteredTable, "Altered table should not be null");
 
       List<String> filteredTables =
-          client.listTableNamesByFilter(catalogName, dbName, "", (short) 10);
+          hiveClient.listTableNamesByFilter(catalogName, dbName, "", (short) 10);
       Assertions.assertTrue(
           filteredTables.contains(tableName), "Filtered tables should contain the table");
 
       List<HiveTable> tableObjects =
-          client.getTableObjectsByName(catalogName, dbName, List.of(tableName));
+          hiveClient.getTableObjectsByName(catalogName, dbName, List.of(tableName));
       Assertions.assertEquals(1, tableObjects.size(), "Should get exactly one table object");
       Assertions.assertEquals(
           tableName, tableObjects.get(0).name(), "Table object name should match");
 
       // Test partition operations
-      HivePartition addedPartition = client.addPartition(loadedTable, partition);
+      HivePartition addedPartition = hiveClient.addPartition(loadedTable, partition);
       Assertions.assertNotNull(addedPartition, "Added partition should not be null");
       Assertions.assertEquals(partitionName, addedPartition.name(), "Partition name should match");
 
-      List<String> partitionNames = client.listPartitionNames(loadedTable, (short) 10);
+      List<String> partitionNames = hiveClient.listPartitionNames(loadedTable, (short) 10);
       Assertions.assertTrue(
           partitionNames.contains(partitionName), "Partition should be in the list");
 
-      List<HivePartition> partitions = client.listPartitions(loadedTable, (short) 10);
+      List<HivePartition> partitions = hiveClient.listPartitions(loadedTable, (short) 10);
       Assertions.assertEquals(1, partitions.size(), "Should have exactly one partition");
       Assertions.assertEquals(
           partitionName, partitions.get(0).name(), "Partition name should match");
 
       List<HivePartition> filteredPartitions =
-          client.listPartitions(loadedTable, List.of(partitionValue), (short) 10);
+          hiveClient.listPartitions(loadedTable, List.of(partitionValue), (short) 10);
       Assertions.assertEquals(
           1, filteredPartitions.size(), "Should have exactly one filtered partition");
 
-      HivePartition fetchedPartition = client.getPartition(loadedTable, addedPartition.name());
+      HivePartition fetchedPartition = hiveClient.getPartition(loadedTable, addedPartition.name());
       Assertions.assertNotNull(fetchedPartition, "Fetched partition should not be null");
       Assertions.assertEquals(
           partitionName, fetchedPartition.name(), "Fetched partition name should match");
 
-      client.dropPartition(catalogName, dbName, tableName, addedPartition.name(), true);
-      List<String> partitionNamesAfterDrop = client.listPartitionNames(loadedTable, (short) 10);
+      hiveClient.dropPartition(catalogName, dbName, tableName, addedPartition.name(), true);
+      List<String> partitionNamesAfterDrop = hiveClient.listPartitionNames(loadedTable, (short) 10);
       Assertions.assertFalse(
           partitionNamesAfterDrop.contains(partitionName),
           "Partition should not be in the list after drop");
@@ -178,7 +190,7 @@ public class TestHiveClient {
       // Test delegation token (may not be available in all environments)
       try {
         String token =
-            client.getDelegationToken(
+            hiveClient.getDelegationToken(
                 System.getProperty("user.name"), System.getProperty("user.name"));
         Assertions.assertNotNull(token, "Delegation token should not be null");
       } catch (Exception e) {
@@ -186,19 +198,127 @@ public class TestHiveClient {
       }
 
       // Cleanup
-      client.dropTable(catalogName, dbName, tableName, true, true);
-      List<String> tablesAfterDrop = client.getAllTables(catalogName, dbName);
+      hiveClient.dropTable(catalogName, dbName, tableName, true, true);
+      List<String> tablesAfterDrop = hiveClient.getAllTables(catalogName, dbName);
       Assertions.assertFalse(
           tablesAfterDrop.contains(tableName), "Table should not be in the list after drop");
 
-      client.dropDatabase(catalogName, dbName, true);
-      List<String> databasesAfterDrop = client.getAllDatabases(catalogName);
+      hiveClient.dropDatabase(catalogName, dbName, true);
+      List<String> databasesAfterDrop = hiveClient.getAllDatabases(catalogName);
       Assertions.assertFalse(
           databasesAfterDrop.contains(dbName), "Database should not be in the list after drop");
     } finally {
-      safelyDropTable(client, catalogName, dbName, tableName);
-      safelyDropDatabase(client, catalogName, dbName);
+      safelyDropTable(hiveClient, catalogName, dbName, tableName);
+      safelyDropDatabase(hiveClient, catalogName, dbName);
     }
+  }
+
+  @Test
+  void testHiveExceptionHandling() throws Exception {
+    String dbName = "gt_exception_test_db_" + UUID.randomUUID().toString().replace("-", "");
+    String tableName = "gt_exception_test_tbl_" + UUID.randomUUID().toString().replace("-", "");
+    String partitionValue = "p_" + UUID.randomUUID().toString().replace("-", "");
+    String partitionName = "dt=" + partitionValue;
+
+    String dbLocation = hdfsBasePath + "/" + dbName;
+    String tableLocation = hdfsBasePath + "/" + tableName;
+
+    HiveSchema schema = createTestSchema(catalogName, dbName, dbLocation);
+    HiveTable table = createTestTable(catalogName, dbName, tableName, tableLocation);
+    HivePartition partition = createTestPartition(partitionName, partitionValue);
+
+    try {
+      // Test SchemaAlreadyExistsException - create database twice
+      try {
+        hiveClient.createDatabase(schema);
+      } catch (GravitinoRuntimeException e) {
+        // If permission error occurs, skip this test
+        if (e.getCause() != null
+            && e.getCause().getMessage() != null
+            && e.getCause().getMessage().contains("Permission denied")) {
+          return; // Skip test if permission denied
+        }
+        throw e;
+      }
+      Assertions.assertThrows(
+          SchemaAlreadyExistsException.class, () -> hiveClient.createDatabase(schema));
+
+      // Test NoSuchSchemaException - get non-existent database
+      Assertions.assertThrows(
+          NoSuchSchemaException.class,
+          () -> hiveClient.getDatabase(catalogName, "non_existent_db_" + UUID.randomUUID()));
+
+      // Test TableAlreadyExistsException - create table twice
+      hiveClient.createTable(table);
+      Assertions.assertThrows(
+          TableAlreadyExistsException.class, () -> hiveClient.createTable(table));
+
+      // Test NoSuchTableException - get non-existent table
+      Assertions.assertThrows(
+          NoSuchTableException.class,
+          () ->
+              hiveClient.getTable(catalogName, dbName, "non_existent_table_" + UUID.randomUUID()));
+
+      // Test PartitionAlreadyExistsException - add partition twice
+      HiveTable loadedTable = hiveClient.getTable(catalogName, dbName, tableName);
+      HivePartition addedPartition = hiveClient.addPartition(loadedTable, partition);
+      Assertions.assertNotNull(addedPartition, "Added partition should not be null");
+      Assertions.assertThrows(
+          PartitionAlreadyExistsException.class,
+          () -> hiveClient.addPartition(loadedTable, partition));
+
+      // Test NoSuchPartitionException - get non-existent partition
+      Assertions.assertThrows(
+          NoSuchPartitionException.class,
+          () ->
+              hiveClient.getPartition(
+                  loadedTable, "dt=non_existent_partition_" + UUID.randomUUID()));
+
+      // Test NonEmptySchemaException - try to drop database with tables (cascade=false)
+      Exception exception =
+          Assertions.assertThrows(
+              Exception.class, () -> hiveClient.dropDatabase(catalogName, dbName, false));
+      // Hive may throw different exceptions for non-empty database
+      // The converter should handle it appropriately
+      Assertions.assertTrue(
+          exception instanceof NonEmptySchemaException
+              || exception instanceof GravitinoRuntimeException,
+          "Should throw NonEmptySchemaException or GravitinoRuntimeException, got: "
+              + exception.getClass().getName());
+
+      // Cleanup
+      hiveClient.dropPartition(catalogName, dbName, tableName, addedPartition.name(), true);
+      hiveClient.dropTable(catalogName, dbName, tableName, true, true);
+      hiveClient.dropDatabase(catalogName, dbName, true);
+    } finally {
+      safelyDropTable(hiveClient, catalogName, dbName, tableName);
+      safelyDropDatabase(hiveClient, catalogName, dbName);
+    }
+  }
+
+  @Test
+  void testConnectionFailedException() {
+    // Test with invalid/unreachable Hive Metastore URI
+    String invalidMetastoreUri = "thrift://127.0.0.1:9999";
+    Properties properties = createHiveProperties();
+    properties.setProperty("hive.metastore.uris", invalidMetastoreUri);
+
+    // Connection failure may occur during client creation or operation
+    // Both should be converted to ConnectionFailedException
+    Exception exception =
+        Assertions.assertThrows(
+            Exception.class,
+            () -> {
+              HiveClient client = new HiveClientFactory(properties, testPrefix).createHiveClient();
+              client.getAllDatabases(catalogName);
+            });
+
+    // Verify the exception is converted to ConnectionFailedException
+    Assertions.assertTrue(
+        exception instanceof ConnectionFailedException,
+        "Should throw ConnectionFailedException, got: " + exception.getClass().getName());
+    Assertions.assertNotNull(
+        ((ConnectionFailedException) exception).getCause(), "Exception should have a cause");
   }
 
   private HiveSchema createTestSchema(String catalogName, String dbName, String location) {
@@ -248,6 +368,12 @@ public class TestHiveClient {
         .build();
   }
 
+  protected Properties createHiveProperties() {
+    Properties properties = new Properties();
+    properties.setProperty("hive.metastore.uris", metastoreUri);
+    return properties;
+  }
+
   private void safelyDropTable(
       HiveClient client, String catalogName, String dbName, String tableName) {
     try {
@@ -263,157 +389,5 @@ public class TestHiveClient {
     } catch (Exception ignored) {
       // ignore cleanup failures
     }
-  }
-
-  @Test
-  void testHiveExceptionHandling() throws Exception {
-    testHiveExceptionHandlingForVersion("", HIVE2_HMS_URL, HIVE2_HDFS_URL);
-  }
-
-  @Test
-  void testHive3ExceptionHandling() throws Exception {
-    testHiveExceptionHandlingForVersion("hive", HIVE3_HMS_URL, HIVE3_HDFS_URL);
-  }
-
-  private void testHiveExceptionHandlingForVersion(
-      String catalogName, String metastoreUri, String hdfsBasePath) throws Exception {
-    Properties properties = new Properties();
-    properties.setProperty("hive.metastore.uris", metastoreUri);
-    HiveClient client = new HiveClientFactory(properties, "").createHiveClient();
-
-    String dbName = "gt_exception_test_db_" + UUID.randomUUID().toString().replace("-", "");
-    String tableName = "gt_exception_test_tbl_" + UUID.randomUUID().toString().replace("-", "");
-    String partitionValue = "p_" + UUID.randomUUID().toString().replace("-", "");
-    String partitionName = "dt=" + partitionValue;
-
-    String dbLocation = hdfsBasePath + "/" + dbName;
-    String tableLocation = hdfsBasePath + "/" + tableName;
-
-    HiveSchema schema = createTestSchema(catalogName, dbName, dbLocation);
-    HiveTable table = createTestTable(catalogName, dbName, tableName, tableLocation);
-    HivePartition partition = createTestPartition(partitionName, partitionValue);
-
-    try {
-      // Test SchemaAlreadyExistsException - create database twice
-      try {
-        client.createDatabase(schema);
-      } catch (GravitinoRuntimeException e) {
-        // If permission error occurs, skip this test
-        if (e.getCause() != null
-            && e.getCause().getMessage() != null
-            && e.getCause().getMessage().contains("Permission denied")) {
-          return; // Skip test if permission denied
-        }
-        throw e;
-      }
-      Assertions.assertThrows(
-          SchemaAlreadyExistsException.class, () -> client.createDatabase(schema));
-
-      // Test NoSuchSchemaException - get non-existent database
-      Assertions.assertThrows(
-          NoSuchSchemaException.class,
-          () -> client.getDatabase(catalogName, "non_existent_db_" + UUID.randomUUID()));
-
-      // Test TableAlreadyExistsException - create table twice
-      client.createTable(table);
-      Assertions.assertThrows(TableAlreadyExistsException.class, () -> client.createTable(table));
-
-      // Test NoSuchTableException - get non-existent table
-      Assertions.assertThrows(
-          NoSuchTableException.class,
-          () -> client.getTable(catalogName, dbName, "non_existent_table_" + UUID.randomUUID()));
-
-      // Test PartitionAlreadyExistsException - add partition twice
-      HiveTable loadedTable = client.getTable(catalogName, dbName, tableName);
-      HivePartition addedPartition = client.addPartition(loadedTable, partition);
-      Assertions.assertNotNull(addedPartition, "Added partition should not be null");
-      Assertions.assertThrows(
-          PartitionAlreadyExistsException.class, () -> client.addPartition(loadedTable, partition));
-
-      // Test NoSuchPartitionException - get non-existent partition
-      Assertions.assertThrows(
-          NoSuchPartitionException.class,
-          () -> client.getPartition(loadedTable, "dt=non_existent_partition_" + UUID.randomUUID()));
-
-      // Test NonEmptySchemaException - try to drop database with tables (cascade=false)
-      Exception exception =
-          Assertions.assertThrows(
-              Exception.class, () -> client.dropDatabase(catalogName, dbName, false));
-      // Hive may throw different exceptions for non-empty database
-      // The converter should handle it appropriately
-      Assertions.assertTrue(
-          exception instanceof NonEmptySchemaException
-              || exception instanceof GravitinoRuntimeException,
-          "Should throw NonEmptySchemaException or GravitinoRuntimeException, got: "
-              + exception.getClass().getName());
-
-      // Cleanup
-      client.dropPartition(catalogName, dbName, tableName, addedPartition.name(), true);
-      client.dropTable(catalogName, dbName, tableName, true, true);
-      client.dropDatabase(catalogName, dbName, true);
-    } finally {
-      safelyDropTable(client, catalogName, dbName, tableName);
-      safelyDropDatabase(client, catalogName, dbName);
-    }
-  }
-
-  private void testConnectionFailedExceptionForVersion(String catalogName) {
-    // Test with invalid/unreachable Hive Metastore URI
-    String invalidMetastoreUri = "thrift://127.0.0.1:9999";
-    Properties properties = new Properties();
-    properties.setProperty("hive.metastore.uris", invalidMetastoreUri);
-
-    // Connection failure may occur during client creation or operation
-    // Both should be converted to ConnectionFailedException
-    Exception exception =
-        Assertions.assertThrows(
-            Exception.class,
-            () -> {
-              HiveClient client = new HiveClientFactory(properties, "").createHiveClient();
-              client.getAllDatabases(catalogName);
-            });
-
-    // Verify the exception is converted to ConnectionFailedException
-    Assertions.assertTrue(
-        exception instanceof ConnectionFailedException,
-        "Should throw ConnectionFailedException, got: " + exception.getClass().getName());
-    Assertions.assertNotNull(
-        ((ConnectionFailedException) exception).getCause(), "Exception should have a cause");
-  }
-
-  @Test
-  void testConnectionFailedException() throws Exception {
-    // Test with HIVE2
-    testConnectionFailedExceptionForVersion("");
-
-    // Test with HIVE3
-    testConnectionFailedExceptionForVersion("hive");
-  }
-
-  @Test
-  void testKerberosConnection() {
-    // This method can be implemented to test Kerberos authentication with Hive Metastore
-    // when a Kerberos-enabled environment is available.
-    Properties properties = new Properties();
-    properties.setProperty("hive.metastore.uris", KERBEROS_HIVE2_HMS_URL);
-    properties.setProperty("authentication.kerberos.principal", KERBEROS_PRINCIPAL);
-    properties.setProperty("authentication.impersonation-enable", "true");
-    properties.setProperty("authentication.kerberos.keytab-uri", KERBEROS_KEYTAB);
-    properties.setProperty("hive.metastore.kerberos.principal", KERBEROS_METASTORE_PRINCIPAL);
-    properties.setProperty("hive.metastore.sasl.enabled", "true");
-    properties.setProperty("hadoop.security.authentication", "kerberos");
-
-    System.setProperty("java.security.krb5.conf", KERBEROS_KRB5_CONF);
-
-    String catalogName = "hive";
-    String dbName = "test_kerberos_db";
-    String dbLocation = KERBEROS_HIVE2_HDFS_URL + "/tmp/gravitino_kerberos_test/" + dbName;
-
-    HiveClient client = new HiveClientFactory(properties, "00").createHiveClient();
-    HiveSchema schema = createTestSchema(catalogName, dbName, dbLocation);
-    client.createDatabase(schema);
-    List<String> allDatabases = client.getAllDatabases(catalogName);
-    Assertions.assertTrue(allDatabases.contains(dbName), "Database should be in the list");
-    client.dropDatabase(catalogName, dbName, true);
   }
 }

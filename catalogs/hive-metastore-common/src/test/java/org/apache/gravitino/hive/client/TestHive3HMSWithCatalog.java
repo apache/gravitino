@@ -16,27 +16,35 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.catalog.hive.integration.test;
 
-import com.google.common.collect.ImmutableMap;
+package org.apache.gravitino.hive.client;
+
 import org.apache.gravitino.integration.test.container.HiveContainer;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.TestInstance;
 
+/** Hive3 HMS tests with an explicitly created catalog to validate catalog operations in Hive3. */
 @Tag("gravitino-docker-test")
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-public class CatalogHive3IT extends CatalogHive2IT {
+public class TestHive3HMSWithCatalog extends TestHive3HMS {
 
+  @BeforeAll
   @Override
-  protected void startNecessaryContainer() {
-    hmsCatalog = "hive";
-    containerSuite.startHiveContainer(
-        ImmutableMap.of(HiveContainer.HIVE_RUNTIME_VERSION, HiveContainer.HIVE3));
+  public void startHiveContainer() {
+    testPrefix = "hive3_mycatalog";
+    super.startHiveContainer();
 
-    hiveMetastoreUris =
+    // Override catalog to a dedicated Hive3 catalog and ensure it exists.
+    catalogName = "mycatalog";
+    String catalogLocation =
         String.format(
-            "thrift://%s:%d",
-            containerSuite.getHiveContainer().getContainerIpAddress(),
-            HiveContainer.HIVE_METASTORE_PORT);
+            "hdfs://%s:%d/tmp/gravitino_test/catalogs/%s",
+            hiveContainer.getContainerIpAddress(), HiveContainer.HDFS_DEFAULTFS_PORT, catalogName);
+
+    // Ensure the catalog exists; only create if missing.
+    if (!hiveClient.getCatalogs().contains(catalogName)) {
+      hiveClient.createCatalog(catalogName, catalogLocation, "Hive3 catalog for tests");
+    }
   }
 }
