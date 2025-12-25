@@ -103,6 +103,7 @@ import org.apache.gravitino.meta.FilesetEntity;
 import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.metrics.MetricsSystem;
 import org.apache.gravitino.metrics.source.FilesetCatalogMetricsSource;
+import org.apache.gravitino.utils.FilesetUtil;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
 import org.apache.gravitino.utils.PrincipalUtils;
@@ -1062,7 +1063,11 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
               // At catalog initialization, only merge catalog config and user-defined location
               // configs
               Map<String, String> fsConf = new HashMap<>(conf);
-              fsConf.putAll(getUserDefinedConfigs(path));
+              fsConf.putAll(
+                  FilesetUtil.getUserDefinedConfigs(
+                      path.toUri(),
+                      conf,
+                      FilesetCatalogPropertiesMetadata.FS_GRAVITINO_PATH_CONFIG_PREFIX));
               FileSystem fs = getFileSystemWithCache(locationName, path, fsConf);
               try {
                 if (fs.exists(path) && fs.getFileStatus(path).isFile()) {
@@ -1501,7 +1506,11 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
       // schema level
       mergedProperties.putAll(entityProperties);
       // Add user-defined configs for location if provided
-      mergedProperties.putAll(getUserDefinedConfigs(path));
+      mergedProperties.putAll(
+          FilesetUtil.getUserDefinedConfigs(
+              path.toUri(),
+              mergedProperties,
+              FilesetCatalogPropertiesMetadata.FS_GRAVITINO_PATH_CONFIG_PREFIX));
       return mergedProperties;
     }
 
@@ -1512,73 +1521,10 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
     mergedProperties.putAll(schema.properties());
     mergedProperties.putAll(entityProperties);
     // Add user-defined configs for location if provided
-    mergedProperties.putAll(getUserDefinedConfigs(path));
+    mergedProperties.putAll(
+        FilesetUtil.getUserDefinedConfigs(
+            path.toUri(), mergedProperties, FilesetCatalogPropertiesMetadata.FS_GRAVITINO_PATH_CONFIG_PREFIX));
     return mergedProperties;
-  }
-
-  private Map<String, String> getUserDefinedConfigs(Path path) {
-    // Prepare a map to hold the properties for the specified location
-    // eg:
-    //   fs.path.config.cluster1 = s3://bucket/path/
-    //   fs.path.config.cluster1.aws-access-key = XXX1
-    //   fs.path.config.cluster1.aws-secret-key = XXX2
-    //   If path is "s3://bucket/path/fileset1", then cluster1 matches and we extract:
-    //   - aws-access-key = XXX1
-    //   - aws-secret-key = XXX2
-    Preconditions.checkArgument(path != null, "Path should not be null");
-    Map<String, String> properties = new HashMap<>();
-    String baseLocation = getBaseLocation(path);
-    String locationName = null;
-
-    // First pass: find the location name by matching baseLocation
-    String configPrefix = FilesetCatalogPropertiesMetadata.FS_GRAVITINO_PATH_CONFIG_PREFIX;
-    for (Map.Entry<String, String> entry : conf.entrySet()) {
-      String key = entry.getKey();
-      String value = entry.getValue();
-
-      // Check if this is a location definition: "fs.path.config.<name> = <location_path>"
-      // The key format should be exactly "fs.path.config.<name>" (no dot after name)
-      if (key.startsWith(configPrefix)) {
-        String suffix = key.substring(configPrefix.length());
-        // Check if this is a location definition (no dot after the name)
-        // Format: "fs.path.config.<name>" (not "fs.path.config.<name>.<property>")
-        if (!suffix.contains(".")
-            && StringUtils.isNotBlank(suffix)
-            && StringUtils.isNotBlank(value)) {
-          // This is a location definition: "fs.path.config.<name>"
-          // Extract baseLocation from the value and compare with the path's baseLocation
-          String valueBaseLocation = getBaseLocation(new Path(value));
-          if (baseLocation.equals(valueBaseLocation)) {
-            locationName = suffix;
-            break;
-          }
-        }
-      }
-    }
-
-    // Second pass: extract all properties for the matched location name
-    if (locationName != null) {
-      String propertyPrefix = configPrefix + locationName + ".";
-      for (Map.Entry<String, String> entry : conf.entrySet()) {
-        String key = entry.getKey();
-        // Check if this key is a property for the matched location
-        // e.g., "fs.path.config.cluster1.aws-ak" matches prefix "fs.path.config.cluster1."
-        if (key.startsWith(propertyPrefix)) {
-          // Extract the property name after the location prefix
-          // e.g., "fs.path.config.cluster1.aws-ak" -> "aws-ak"
-          String propertyName = key.substring(propertyPrefix.length());
-          if (!propertyName.isEmpty()) {
-            properties.put(propertyName, entry.getValue());
-          }
-        }
-      }
-    }
-
-    return properties;
-  }
-
-  private String getBaseLocation(Path targetLocation) {
-    return targetLocation.toUri().getScheme() + "://" + targetLocation.toUri().getAuthority();
   }
 
   @Override
