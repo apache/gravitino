@@ -659,4 +659,170 @@ public interface JobTemplateChange {
       }
     }
   }
+
+  /** A job template update for http templates. */
+  final class HttpTemplateUpdate extends TemplateUpdate {
+
+    private final String newUrl;
+
+    private final Map<String, String> newHeaders;
+
+    private final String newBody;
+
+    private final List<String> newQueryParams;
+
+    private HttpTemplateUpdate(Builder builder) {
+      super(builder);
+      this.newUrl = builder.newUrl;
+      this.newHeaders = builder.newHeaders;
+      this.newBody = builder.newBody;
+      this.newQueryParams = builder.newQueryParams;
+    }
+
+    /**
+     * Get the new URL of the http job template.
+     *
+     * @return The new URL of the http job template.
+     */
+    public String getNewUrl() {
+      return newUrl;
+    }
+
+    /**
+     * Get the new headers of the http job template.
+     *
+     * @return The new headers of the http job template.
+     */
+    public Map<String, String> getNewHeaders() {
+      return newHeaders;
+    }
+
+    /**
+     * Get the new body of the http job template.
+     *
+     * @return The new body of the http job template.
+     */
+    public String getNewBody() {
+      return newBody;
+    }
+
+    /**
+     * Get the new query parameters of the http job template.
+     *
+     * @return The new query parameters of the http job template.
+     */
+    public List<String> getNewQueryParams() {
+      return newQueryParams;
+    }
+
+    /**
+     * Checks if this HttpTemplateUpdate is equal to another object.
+     *
+     * @param o The object to compare with.
+     * @return true if the objects are equal, false otherwise.
+     */
+    @Override
+    public boolean equals(Object o) {
+      if (o == null || getClass() != o.getClass()) return false;
+      if (!super.equals(o)) return false;
+      HttpTemplateUpdate that = (HttpTemplateUpdate) o;
+      return Objects.equals(newUrl, that.newUrl)
+          && Objects.equals(newHeaders, that.newHeaders)
+          && Objects.equals(newBody, that.newBody)
+          && Objects.equals(newQueryParams, that.newQueryParams);
+    }
+
+    /**
+     * Generates a hash code for this HttpTemplateUpdate.
+     *
+     * @return The hash code.
+     */
+    @Override
+    public int hashCode() {
+      return Objects.hash(super.hashCode(), newUrl, newHeaders, newBody, newQueryParams);
+    }
+
+    /**
+     * Creates a new builder for HttpTemplateUpdate.
+     *
+     * @return A new Builder instance.
+     */
+    public static Builder builder() {
+      return new Builder();
+    }
+
+    /** Builder class for constructing HttpTemplateUpdate instances. */
+    public static class Builder extends BaseBuilder<Builder, HttpTemplateUpdate> {
+      private String newUrl;
+      private Map<String, String> newHeaders;
+      private String newBody;
+      private List<String> newQueryParams;
+
+      private Builder() {}
+
+      /**
+       * Sets the new URL for the http job template.
+       *
+       * @param newUrl The new URL to set.
+       * @return The builder instance for chaining.
+       */
+      public Builder withNewUrl(String newUrl) {
+        this.newUrl = newUrl;
+        return this;
+      }
+
+      /**
+       * Sets the new headers for the http job template.
+       *
+       * @param newHeaders The new headers to set.
+       * @return The builder instance for chaining.
+       */
+      public Builder withNewHeaders(Map<String, String> newHeaders) {
+        this.newHeaders = newHeaders;
+        return this;
+      }
+
+      /**
+       * Sets the new body for the http job template.
+       *
+       * @param newBody The new body to set.
+       * @return The builder instance for chaining.
+       */
+      public Builder withNewBody(String newBody) {
+        this.newBody = newBody;
+        return this;
+      }
+
+      /**
+       * Sets the new query parameters for the http job template.
+       *
+       * @param newQueryParams The new query parameters to set.
+       * @return The builder instance for chaining.
+       */
+      public Builder withNewQueryParams(List<String> newQueryParams) {
+        this.newQueryParams = newQueryParams;
+        return this;
+      }
+
+      /**
+       * Builds the HttpTemplateUpdate instance.
+       *
+       * @return A new HttpTemplateUpdate instance.
+       */
+      @Override
+      public HttpTemplateUpdate build() {
+        return new HttpTemplateUpdate(this);
+      }
+
+      /**
+       * Returns the builder instance itself for method chaining.
+       *
+       * @return The builder instance.
+       */
+      @Override
+      protected Builder self() {
+        return this;
+      }
+    }
+  }
 }

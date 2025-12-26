@@ -51,6 +51,7 @@ import org.apache.gravitino.dto.authorization.UserDTO;
 import org.apache.gravitino.dto.credential.CredentialDTO;
 import org.apache.gravitino.dto.file.FileInfoDTO;
 import org.apache.gravitino.dto.file.FilesetDTO;
+import org.apache.gravitino.dto.job.HttpJobTemplateDTO;
 import org.apache.gravitino.dto.job.JobTemplateDTO;
 import org.apache.gravitino.dto.job.ShellJobTemplateDTO;
 import org.apache.gravitino.dto.job.SparkJobTemplateDTO;
@@ -88,6 +89,7 @@ import org.apache.gravitino.dto.tag.MetadataObjectDTO;
 import org.apache.gravitino.dto.tag.TagDTO;
 import org.apache.gravitino.file.FileInfo;
 import org.apache.gravitino.file.Fileset;
+import org.apache.gravitino.job.HttpJobTemplate;
 import org.apache.gravitino.job.JobTemplate;
 import org.apache.gravitino.job.ShellJobTemplate;
 import org.apache.gravitino.job.SparkJobTemplate;
@@ -1237,6 +1239,20 @@ public class DTOConverters {
             .withFiles(((SparkJobTemplateDTO) jobTemplateDTO).files())
             .withArchives(((SparkJobTemplateDTO) jobTemplateDTO).archives())
             .withConfigs(((SparkJobTemplateDTO) jobTemplateDTO).configs())
+            .build();
+
+      case HTTP:
+        return HttpJobTemplate.builder()
+            .withName(jobTemplateDTO.name())
+            .withComment(jobTemplateDTO.comment())
+            .withExecutable(jobTemplateDTO.executable())
+            .withArguments(jobTemplateDTO.arguments())
+            .withEnvironments(jobTemplateDTO.environments())
+            .withCustomFields(jobTemplateDTO.customFields())
+            .withUrl(((HttpJobTemplateDTO) jobTemplateDTO).url())
+            .withHeaders(((HttpJobTemplateDTO) jobTemplateDTO).headers())
+            .withBody(((HttpJobTemplateDTO) jobTemplateDTO).body())
+            .withQueryParams(((HttpJobTemplateDTO) jobTemplateDTO).queryParams())
             .build();
 
       default:

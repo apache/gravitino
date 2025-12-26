@@ -52,7 +52,7 @@ public abstract class JobTemplate {
   /**
    * JobType is an enum to define the type of the job.
    *
-   * <p>Gravitino supports different types of jobs, such as Spark and Shell. The job type is
+   * <p>Gravitino supports different types of jobs, such as Spark, Shell, and HTTP. The job type is
    * required to determine the runtime environment for executing the job.
    */
   public enum JobType {
@@ -62,6 +62,9 @@ public abstract class JobTemplate {
 
     /** Job type for executing a shell command. */
     SHELL,
+
+    /** Job type for executing an HTTP request. */
+    HTTP,
   }
 
   /** The name of the job template. */

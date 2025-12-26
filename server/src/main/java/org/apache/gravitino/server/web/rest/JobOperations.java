@@ -43,6 +43,7 @@ import javax.ws.rs.core.Context;
 import javax.ws.rs.core.Response;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.GravitinoEnv;
+import org.apache.gravitino.dto.job.HttpJobTemplateDTO;
 import org.apache.gravitino.dto.job.JobDTO;
 import org.apache.gravitino.dto.job.JobTemplateDTO;
 import org.apache.gravitino.dto.job.ShellJobTemplateDTO;
@@ -444,6 +445,22 @@ public class JobOperations {
             .withFiles(jobTemplateEntity.templateContent().files())
             .withArchives(jobTemplateEntity.templateContent().archives())
             .withConfigs(jobTemplateEntity.templateContent().configs())
+            .withAudit(DTOConverters.toDTO(jobTemplateEntity.auditInfo()))
+            .build();
+
+      case HTTP:
+        return HttpJobTemplateDTO.builder()
+            .withName(jobTemplateEntity.name())
+            .withComment(jobTemplateEntity.comment())
+            .withJobType(jobTemplateEntity.templateContent().jobType())
+            .withExecutable(jobTemplateEntity.templateContent().executable())
+            .withArguments(jobTemplateEntity.templateContent().arguments())
+            .withEnvironments(jobTemplateEntity.templateContent().environments())
+            .withCustomFields(jobTemplateEntity.templateContent().customFields())
+            .withUrl(jobTemplateEntity.templateContent().url())
+            .withHeaders(jobTemplateEntity.templateContent().headers())
+            .withBody(jobTemplateEntity.templateContent().body())
+            .withQueryParams(jobTemplateEntity.templateContent().queryParams())
             .withAudit(DTOConverters.toDTO(jobTemplateEntity.auditInfo()))
             .build();
 
