@@ -28,6 +28,7 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 import org.apache.gravitino.Entity.EntityType;
 import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.EntityStore;
@@ -130,6 +131,29 @@ public class MetalakeManager implements MetalakeDispatcher, Closeable {
   }
 
   /**
+   * Lists all in-use Metalakes.
+   *
+   * @param entityStore The EntityStore to use for managing Metalakes.
+   * @return A list of names of in-use Metalakes.
+   * @throws RuntimeException If listing in-use Metalakes encounters storage issues.
+   */
+  public static List<String> listInUseMetalakes(EntityStore entityStore) {
+    try {
+      List<BaseMetalake> metalakes =
+          TreeLockUtils.doWithRootTreeLock(
+              LockType.READ,
+              () -> entityStore.list(Namespace.empty(), BaseMetalake.class, EntityType.METALAKE));
+      return metalakes.stream()
+          .filter(
+              m -> (boolean) m.propertiesMetadata().getOrDefault(m.properties(), PROPERTY_IN_USE))
+          .map(BaseMetalake::name)
+          .collect(Collectors.toList());
+    } catch (IOException e) {
+      throw new RuntimeException("Failed to list in-use metalakes", e);
+    }
+  }
+
+  /**
    * Lists all available Metalakes.
    *
    * @return An array of Metalake instances representing the available Metalakes.
@@ -151,6 +175,7 @@ public class MetalakeManager implements MetalakeDispatcher, Closeable {
       throw new RuntimeException(ioe);
     }
   }
+
   /**
    * Loads a Metalake.
    *

@@ -26,6 +26,7 @@ import static org.mockito.Mockito.doReturn;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Sets;
 import java.io.IOException;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.apache.gravitino.Config;
@@ -207,6 +208,35 @@ public class TestMetalakeManager {
     NameIdentifier ident1 = NameIdentifier.of("test42");
     boolean dropped1 = metalakeManager.dropMetalake(ident1);
     Assertions.assertFalse(dropped1, "metalake should be non-existent");
+  }
+
+  @Test
+  public void testListInUseMetalakes() {
+    // Create some metalakes with different in-use status
+    NameIdentifier ident1 = NameIdentifier.of("metalake1");
+    NameIdentifier ident2 = NameIdentifier.of("metalake2");
+    NameIdentifier ident3 = NameIdentifier.of("metalake3");
+
+    // Create metalakes - by default they should be in-use (PROPERTY_IN_USE defaults to true)
+    metalakeManager.createMetalake(ident1, "comment1", ImmutableMap.of());
+    metalakeManager.createMetalake(ident2, "comment2", ImmutableMap.of());
+    metalakeManager.createMetalake(ident3, "comment3", ImmutableMap.of());
+
+    // Disable metalake2
+    metalakeManager.disableMetalake(ident2);
+
+    // List in-use metalakes
+    List<String> inUseMetalakes = MetalakeManager.listInUseMetalakes(entityStore);
+
+    // Should contain metalake1 and metalake3, but not metalake2
+    Assertions.assertTrue(inUseMetalakes.contains("metalake1"));
+    Assertions.assertFalse(inUseMetalakes.contains("metalake2"));
+    Assertions.assertTrue(inUseMetalakes.contains("metalake3"));
+
+    // Cleanup
+    metalakeManager.dropMetalake(ident1, true);
+    metalakeManager.dropMetalake(ident2, true);
+    metalakeManager.dropMetalake(ident3, true);
   }
 
   private void testProperties(Map<String, String> expectedProps, Map<String, String> testProps) {

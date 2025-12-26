@@ -550,6 +550,12 @@ public class TestJobManager {
             .build();
     when(entityStore.list(Namespace.empty(), BaseMetalake.class, Entity.EntityType.METALAKE))
         .thenReturn(ImmutableList.of(mockMetalake));
+
+    // Mock MetalakeManager.listInUseMetalakes to return the test metalake
+    mockedMetalake
+        .when(() -> MetalakeManager.listInUseMetalakes(entityStore))
+        .thenReturn(ImmutableList.of(metalake));
+
     when(jobManager.listJobs(metalake, Optional.empty())).thenReturn(ImmutableList.of(job));
 
     when(jobExecutor.getJobStatus(job.jobExecutionId())).thenReturn(JobHandle.Status.QUEUED);
@@ -573,6 +579,11 @@ public class TestJobManager {
             .build();
     when(entityStore.list(Namespace.empty(), BaseMetalake.class, Entity.EntityType.METALAKE))
         .thenReturn(ImmutableList.of(mockMetalake));
+
+    // Mock MetalakeManager.listInUseMetalakes to return the test metalake
+    mockedMetalake
+        .when(() -> MetalakeManager.listInUseMetalakes(entityStore))
+        .thenReturn(ImmutableList.of(metalake));
 
     when(jobManager.listJobs(metalake, Optional.empty())).thenReturn(ImmutableList.of(job));
     Assertions.assertDoesNotThrow(() -> jobManager.cleanUpStagingDirs());
