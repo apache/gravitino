@@ -63,6 +63,13 @@ public class ModelMetaSQLProviderFactory {
     return getProvider().listModelPOsBySchemaId(schemaId);
   }
 
+  public static String listModelPOsByFullQualifiedName(
+      @Param("metalakeName") String metalakeName,
+      @Param("catalogName") String catalogName,
+      @Param("schemaName") String schemaName) {
+    return getProvider().listModelPOsByFullQualifiedName(metalakeName, catalogName, schemaName);
+  }
+
   public static String listModelPOsByModelIds(@Param("modelIds") List<Long> modelIds) {
     return getProvider().listModelPOsByModelIds(modelIds);
   }
@@ -70,6 +77,15 @@ public class ModelMetaSQLProviderFactory {
   public static String selectModelMetaBySchemaIdAndModelName(
       @Param("schemaId") Long schemaId, @Param("modelName") String modelName) {
     return getProvider().selectModelMetaBySchemaIdAndModelName(schemaId, modelName);
+  }
+
+  public static String selectModelByFullQualifiedName(
+      @Param("metalakeName") String metalakeName,
+      @Param("catalogName") String catalogName,
+      @Param("schemaName") String schemaName,
+      @Param("modelName") String modelName) {
+    return getProvider()
+        .selectModelByFullQualifiedName(metalakeName, catalogName, schemaName, modelName);
   }
 
   public static String selectModelIdBySchemaIdAndModelName(

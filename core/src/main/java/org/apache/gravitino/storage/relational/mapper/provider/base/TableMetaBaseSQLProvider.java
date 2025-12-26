@@ -21,6 +21,9 @@ package org.apache.gravitino.storage.relational.mapper.provider.base;
 import static org.apache.gravitino.storage.relational.mapper.TableMetaMapper.TABLE_NAME;
 
 import java.util.List;
+import org.apache.gravitino.storage.relational.mapper.CatalogMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.MetalakeMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.SchemaMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.TableVersionMapper;
 import org.apache.gravitino.storage.relational.po.TablePO;
 import org.apache.ibatis.annotations.Param;
@@ -70,6 +73,57 @@ public class TableMetaBaseSQLProvider {
         + "</foreach>"
         + ")"
         + "</script>";
+  }
+
+  public String listTablePOsByFullQualifiedName(
+      @Param("metalakeName") String metalakeName,
+      @Param("catalogName") String catalogName,
+      @Param("schemaName") String schemaName) {
+    return """
+        SELECT
+            sm.schema_id AS schemaId,
+            cm.catalog_id AS catalogId,
+            tm.table_id AS tableId,
+            tm.table_name AS tableName,
+            tm.metalake_id AS metalakeId,
+            tm.audit_info AS auditInfo,
+            tm.current_version AS currentVersion,
+            tm.last_version AS lastVersion,
+            tm.deleted_at AS deletedAt,
+            tvi.format AS format,
+            tvi.properties AS properties,
+            tvi.partitioning AS partitions,
+            tvi.sort_orders AS sortOrders,
+            tvi.distribution AS distribution,
+            tvi.indexes AS indexes,
+            tvi.comment AS comment
+        FROM
+            %s mm
+        INNER JOIN
+            %s cm ON mm.metalake_id = cm.metalake_id
+            AND cm.catalog_name = #{catalogName}
+            AND cm.deleted_at = 0
+        LEFT JOIN
+            %s sm ON cm.catalog_id = sm.catalog_id
+            AND sm.schema_name = #{schemaName}
+            AND sm.deleted_at = 0
+        LEFT JOIN
+            %s tm ON sm.schema_id = tm.schema_id
+            AND tm.deleted_at = 0
+        LEFT JOIN
+            %s tvi ON tm.table_id = tvi.table_id
+            AND tm.current_version = tvi.version
+            AND tvi.deleted_at = 0
+        WHERE
+            mm.metalake_name = #{metalakeName}
+            AND mm.deleted_at = 0;
+            """
+        .formatted(
+            MetalakeMetaMapper.TABLE_NAME,
+            CatalogMetaMapper.TABLE_NAME,
+            SchemaMetaMapper.TABLE_NAME,
+            TABLE_NAME,
+            TableVersionMapper.TABLE_NAME);
   }
 
   public String selectTableIdBySchemaIdAndName(
@@ -229,5 +283,58 @@ public class TableMetaBaseSQLProvider {
     return "DELETE FROM "
         + TABLE_NAME
         + " WHERE deleted_at > 0 AND deleted_at < #{legacyTimeline} LIMIT #{limit}";
+  }
+
+  public String selectTableByFullQualifiedName(
+      @Param("metalakeName") String metalakeName,
+      @Param("catalogName") String catalogName,
+      @Param("schemaName") String schemaName,
+      @Param("tableName") String tableName) {
+    return """
+        SELECT
+            sm.schema_id AS schemaId,
+            cm.catalog_id AS catalogId,
+            tm.table_id AS tableId,
+            tm.table_name AS tableName,
+            tm.metalake_id AS metalakeId,
+            tm.audit_info AS auditInfo,
+            tm.current_version AS currentVersion,
+            tm.last_version AS lastVersion,
+            tm.deleted_at AS deletedAt,
+            tvi.format AS format,
+            tvi.properties AS properties,
+            tvi.partitioning AS partitions,
+            tvi.sort_orders AS sortOrders,
+            tvi.distribution AS distribution,
+            tvi.indexes AS indexes,
+            tvi.comment AS comment
+        FROM
+            %s mm
+        INNER JOIN
+            %s cm ON mm.metalake_id = cm.metalake_id
+            AND cm.catalog_name = #{catalogName}
+            AND cm.deleted_at = 0
+        LEFT JOIN
+            %s sm ON cm.catalog_id = sm.catalog_id
+            AND sm.schema_name = #{schemaName}
+            AND sm.deleted_at = 0
+        LEFT JOIN
+            %s tm ON sm.schema_id = tm.schema_id
+            AND tm.table_name = #{tableName}
+            AND tm.deleted_at = 0
+        LEFT JOIN
+            %s tvi ON tm.table_id = tvi.table_id
+            AND tm.current_version = tvi.version
+            AND tvi.deleted_at = 0
+        WHERE
+            mm.metalake_name = #{metalakeName}
+            AND mm.deleted_at = 0;
+            """
+        .formatted(
+            MetalakeMetaMapper.TABLE_NAME,
+            CatalogMetaMapper.TABLE_NAME,
+            SchemaMetaMapper.TABLE_NAME,
+            TABLE_NAME,
+            TableVersionMapper.TABLE_NAME);
   }
 }

@@ -29,7 +29,9 @@ import java.util.Objects;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import org.apache.gravitino.Configs;
 import org.apache.gravitino.Entity;
+import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
@@ -73,12 +75,30 @@ public class ModelMetaService {
   public List<ModelEntity> listModelsByNamespace(Namespace ns) {
     NamespaceUtil.checkModel(ns);
 
-    Long schemaId =
-        EntityIdService.getEntityId(NameIdentifier.of(ns.levels()), Entity.EntityType.SCHEMA);
-
-    List<ModelPO> modelPOs =
-        SessionUtils.getWithoutCommit(
-            ModelMetaMapper.class, mapper -> mapper.listModelPOsBySchemaId(schemaId));
+    List<ModelPO> modelPOs;
+    if (GravitinoEnv.getInstance().config().get(Configs.CACHE_ENABLED)) {
+      Long schemaId =
+          EntityIdService.getEntityId(NameIdentifier.of(ns.levels()), Entity.EntityType.SCHEMA);
+      modelPOs =
+          SessionUtils.getWithoutCommit(
+              ModelMetaMapper.class, mapper -> mapper.listModelPOsBySchemaId(schemaId));
+    } else {
+      String[] namespaceLevels = ns.levels();
+      modelPOs =
+          SessionUtils.getWithoutCommit(
+              ModelMetaMapper.class,
+              mapper ->
+                  mapper.listModelPOsByFullQualifiedName(
+                      namespaceLevels[0], namespaceLevels[1], namespaceLevels[2]));
+      if (modelPOs.isEmpty() || modelPOs.get(0).getSchemaId() == null) {
+        throw new NoSuchEntityException(
+            NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
+            Entity.EntityType.SCHEMA.name().toLowerCase(Locale.ROOT),
+            namespaceLevels[2]);
+      }
+      modelPOs =
+          modelPOs.stream().filter(po -> po.getModelId() != null).collect(Collectors.toList());
+    }
 
     return modelPOs.stream().map(m -> POConverters.fromModelPO(m, ns)).collect(Collectors.toList());
   }
@@ -118,19 +138,15 @@ public class ModelMetaService {
 
   @Monitored(metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME, baseMetricName = "deleteModel")
   public boolean deleteModel(NameIdentifier ident) {
-    NameIdentifierUtil.checkModel(ident);
-
-    Long schemaId;
-    Long modelId;
+    ModelPO modelPO;
     try {
-      schemaId =
-          EntityIdService.getEntityId(
-              NameIdentifier.of(ident.namespace().levels()), Entity.EntityType.SCHEMA);
-      modelId = getModelIdBySchemaIdAndModelName(schemaId, ident.name());
+      modelPO = getModelPOByIdentifier(ident);
     } catch (NoSuchEntityException e) {
       LOG.warn("Failed to delete model: {}", ident, e);
       return false;
     }
+    Long schemaId = modelPO.getSchemaId();
+    Long modelId = modelPO.getModelId();
 
     AtomicInteger modelDeletedCount = new AtomicInteger();
     SessionUtils.doMultipleWithCommit(
@@ -249,16 +265,48 @@ public class ModelMetaService {
   ModelPO getModelPOByIdentifier(NameIdentifier ident) {
     NameIdentifierUtil.checkModel(ident);
 
-    Long schemaId =
-        EntityIdService.getEntityId(
-            NameIdentifier.of(ident.namespace().levels()), Entity.EntityType.SCHEMA);
+    if (GravitinoEnv.getInstance().config().get(Configs.CACHE_ENABLED)) {
+      Long schemaId =
+          EntityIdService.getEntityId(
+              NameIdentifier.of(ident.namespace().levels()), Entity.EntityType.SCHEMA);
 
+      ModelPO modelPO =
+          SessionUtils.getWithoutCommit(
+              ModelMetaMapper.class,
+              mapper -> mapper.selectModelMetaBySchemaIdAndModelName(schemaId, ident.name()));
+
+      if (modelPO == null) {
+        throw new NoSuchEntityException(
+            NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
+            Entity.EntityType.MODEL.name().toLowerCase(Locale.ROOT),
+            ident.toString());
+      }
+      return modelPO;
+    }
+
+    String[] namespaceLevels = ident.namespace().levels();
     ModelPO modelPO =
         SessionUtils.getWithoutCommit(
             ModelMetaMapper.class,
-            mapper -> mapper.selectModelMetaBySchemaIdAndModelName(schemaId, ident.name()));
+            mapper ->
+                mapper.selectModelByFullQualifiedName(
+                    namespaceLevels[0], namespaceLevels[1], namespaceLevels[2], ident.name()));
 
     if (modelPO == null) {
+      throw new NoSuchEntityException(
+          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
+          Entity.EntityType.MODEL.name().toLowerCase(Locale.ROOT),
+          ident.toString());
+    }
+
+    if (modelPO.getSchemaId() == null) {
+      throw new NoSuchEntityException(
+          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
+          Entity.EntityType.SCHEMA.name().toLowerCase(Locale.ROOT),
+          namespaceLevels[2]);
+    }
+
+    if (modelPO.getModelId() == null) {
       throw new NoSuchEntityException(
           NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
           Entity.EntityType.MODEL.name().toLowerCase(Locale.ROOT),

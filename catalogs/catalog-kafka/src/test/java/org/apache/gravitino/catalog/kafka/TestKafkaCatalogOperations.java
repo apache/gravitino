@@ -54,6 +54,7 @@ import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.EntityStoreFactory;
+import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.Schema;
@@ -80,6 +81,7 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.mockito.MockedStatic;
 import org.mockito.Mockito;
+import org.testcontainers.shaded.org.apache.commons.lang3.reflect.FieldUtils;
 
 public class TestKafkaCatalogOperations extends KafkaClusterEmbedded {
 
@@ -134,7 +136,7 @@ public class TestKafkaCatalogOperations extends KafkaClusterEmbedded {
   private static KafkaCatalogOperations kafkaCatalogOperations;
 
   @BeforeAll
-  public static void setUp() {
+  public static void setUp() throws IllegalAccessException {
     Config config = Mockito.mock(Config.class);
     Mockito.when(config.get(STORE_TRANSACTION_MAX_SKEW_TIME)).thenReturn(1000L);
     Mockito.when(config.get(STORE_DELETE_AFTER_TIME)).thenReturn(20 * 60 * 1000L);
@@ -209,6 +211,8 @@ public class TestKafkaCatalogOperations extends KafkaClusterEmbedded {
                     .withCreateTime(Instant.now())
                     .build())
             .build();
+
+    FieldUtils.writeField(GravitinoEnv.getInstance(), "config", config, true);
 
     kafkaCatalogOperations = new KafkaCatalogOperations(store, idGenerator);
     kafkaCatalogOperations.initialize(

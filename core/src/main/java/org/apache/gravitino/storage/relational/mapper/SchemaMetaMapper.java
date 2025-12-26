@@ -42,6 +42,12 @@ public interface SchemaMetaMapper {
   @SelectProvider(type = SchemaMetaSQLProviderFactory.class, method = "listSchemaPOsByCatalogId")
   List<SchemaPO> listSchemaPOsByCatalogId(@Param("catalogId") Long catalogId);
 
+  @SelectProvider(
+      type = SchemaMetaSQLProviderFactory.class,
+      method = "listSchemaPOsByFullQualifiedName")
+  List<SchemaPO> listSchemaPOsByFullQualifiedName(
+      @Param("metalakeName") String metalakeName, @Param("catalogName") String catalogName);
+
   @SelectProvider(type = SchemaMetaSQLProviderFactory.class, method = "listSchemaPOsBySchemaIds")
   List<SchemaPO> listSchemaPOsBySchemaIds(@Param("schemaIds") List<Long> schemaIds);
 
@@ -56,6 +62,14 @@ public interface SchemaMetaMapper {
       method = "selectSchemaMetaByCatalogIdAndName")
   SchemaPO selectSchemaMetaByCatalogIdAndName(
       @Param("catalogId") Long catalogId, @Param("schemaName") String name);
+
+  @SelectProvider(
+      type = SchemaMetaSQLProviderFactory.class,
+      method = "selectSchemaByFullQualifiedName")
+  SchemaPO selectSchemaByFullQualifiedName(
+      @Param("metalakeName") String metalakeName,
+      @Param("catalogName") String catalogName,
+      @Param("schemaName") String schemaName);
 
   @SelectProvider(type = SchemaMetaSQLProviderFactory.class, method = "selectSchemaMetaById")
   SchemaPO selectSchemaMetaById(@Param("schemaId") Long schemaId);
