@@ -99,9 +99,9 @@ public class JobManager implements JobOperationDispatcher {
 
   private final long jobStagingDirKeepTimeInMs;
 
-  private final ScheduledExecutorService cleanUpExecutor;
+  @VisibleForTesting final ScheduledExecutorService cleanUpExecutor;
 
-  private final ScheduledExecutorService statusPullExecutor;
+  @VisibleForTesting final ScheduledExecutorService statusPullExecutor;
 
   public JobManager(Config config, EntityStore entityStore, IdGenerator idGenerator) {
     this(config, entityStore, idGenerator, JobExecutorFactory.create(config));
