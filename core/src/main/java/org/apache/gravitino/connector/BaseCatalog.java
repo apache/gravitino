@@ -386,14 +386,13 @@ public abstract class BaseCatalog<T extends BaseCatalog>
             catalogEntity.getProperties().getOrDefault(Catalog.PROPERTY_METALAKE_IN_USE, "true"));
     if (!metalakeInuse) {
       throw new MetalakeNotInUseException(
-          String.format("The metalake that holds catalog %s is not in use", catalogEntity.name()));
+          "The metalake that holds catalog %s is not in use", catalogEntity.name());
     }
 
     boolean catalogInuse =
         Boolean.parseBoolean(catalogEntity.getProperties().getOrDefault(PROPERTY_IN_USE, "true"));
     if (!catalogInuse) {
-      throw new MetalakeNotInUseException(
-          String.format("The catalog %s is not in use", catalogEntity.name()));
+      throw new MetalakeNotInUseException("The catalog %s is not in use", catalogEntity.name());
     }
   }
 }
