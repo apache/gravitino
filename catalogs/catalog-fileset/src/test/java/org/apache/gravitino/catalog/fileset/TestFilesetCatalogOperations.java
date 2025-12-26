@@ -1454,6 +1454,13 @@ public class TestFilesetCatalogOperations {
                   })
               .scheduler(Scheduler.forScheduledExecutorService(mockOps.scheduler))
               .build();
+      FieldUtils.writeField(
+          mockOps,
+          "fileSystemProvidersMap",
+          ImmutableMap.<String, FileSystemProvider>builder()
+              .putAll(FileSystemUtils.getFileSystemProviders())
+              .build(),
+          true);
       when(mockOps.loadFileset(filesetIdent)).thenReturn(mockFileset);
       when(mockOps.getConf()).thenReturn(Maps.newHashMap());
       String subPath = "/test/test.parquet";
@@ -1475,6 +1482,8 @@ public class TestFilesetCatalogOperations {
               "", new Path("file:///dir1/subdir/file2"), mockOps.getConf());
 
       Assertions.assertSame(fs1, fs2);
+    } catch (Exception e) {
+      throw new RuntimeException(e);
     }
   }
 

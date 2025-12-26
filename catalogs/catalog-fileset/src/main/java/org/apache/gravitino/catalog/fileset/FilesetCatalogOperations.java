@@ -247,14 +247,9 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
     }
 
     if (!disableFSOps) {
-      String fileSystemProviders =
-          (String)
-              propertiesMetadata
-                  .catalogPropertiesMetadata()
-                  .getOrDefault(config, FilesetCatalogPropertiesMetadata.FILESYSTEM_PROVIDERS);
       this.fileSystemProvidersMap =
           ImmutableMap.<String, FileSystemProvider>builder()
-              .putAll(FileSystemUtils.getFileSystemProviders(fileSystemProviders))
+              .putAll(FileSystemUtils.getFileSystemProviders())
               .build();
 
       String defaultFileSystemProviderName =
@@ -1331,7 +1326,8 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
   FileSystem getFileSystemWithCache(String locationName, Path path, Map<String, String> conf) {
     String scheme = path.toUri().getScheme();
     FileSystemProvider provider = fileSystemProvidersMap.get(scheme);
-    String authority = provider.getFullAuthority(path, conf);
+    String authority =
+        provider != null ? provider.getFullAuthority(path, conf) : path.toUri().getAuthority();
     return fileSystemCache.get(
         new FileSystemCacheKey(scheme, authority, locationName),
         cacheKey -> {
