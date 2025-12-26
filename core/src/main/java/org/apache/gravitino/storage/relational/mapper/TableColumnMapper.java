@@ -39,6 +39,10 @@ public interface TableColumnMapper {
   @InsertProvider(type = TableColumnSQLProviderFactory.class, method = "insertColumnPOs")
   void insertColumnPOs(@Param("columnPOs") List<ColumnPO> columnPOs);
 
+  @UpdateProvider(type = TableColumnSQLProviderFactory.class, method = "updateSchemaIdByTableId")
+  void updateSchemaIdByTableId(
+      @Param("tableId") Long tableId, @Param("newSchemaId") Long newSchemaId);
+
   @UpdateProvider(type = TableColumnSQLProviderFactory.class, method = "softDeleteColumnsByTableId")
   Integer softDeleteColumnsByTableId(@Param("tableId") Long tableId);
 

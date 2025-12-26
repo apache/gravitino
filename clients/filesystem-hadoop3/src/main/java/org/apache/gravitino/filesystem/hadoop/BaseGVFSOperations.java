@@ -18,12 +18,14 @@
  */
 package org.apache.gravitino.filesystem.hadoop;
 
+import static org.apache.gravitino.catalog.hadoop.fs.FileSystemProvider.GRAVITINO_BYPASS;
+import static org.apache.gravitino.catalog.hadoop.fs.HDFSFileSystemProvider.SCHEME_HDFS;
 import static org.apache.gravitino.file.Fileset.PROPERTY_DEFAULT_LOCATION_NAME;
 import static org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_CURRENT_LOCATION_NAME;
 import static org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_FILESET_METADATA_CACHE_ENABLE;
 import static org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_FILESET_METADATA_CACHE_ENABLE_DEFAULT;
 import static org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystemUtils.extractIdentifier;
-import static org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystemUtils.getConfigMap;
+import static org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystemUtils.extractNonDefaultConfig;
 import static org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystemUtils.getSubPathFromGvfsPath;
 
 import com.github.benmanes.caffeine.cache.Cache;
@@ -38,11 +40,14 @@ import com.google.common.collect.Sets;
 import com.google.common.collect.Streams;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.io.Closeable;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.net.URI;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.ServiceLoader;
 import java.util.Set;
@@ -53,19 +58,19 @@ import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.reflect.FieldUtils;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.Schema;
 import org.apache.gravitino.audit.CallerContext;
 import org.apache.gravitino.audit.FilesetAuditConstants;
 import org.apache.gravitino.audit.FilesetDataOperation;
 import org.apache.gravitino.audit.InternalClientType;
 import org.apache.gravitino.catalog.hadoop.fs.FileSystemProvider;
+import org.apache.gravitino.catalog.hadoop.fs.FileSystemUtils;
 import org.apache.gravitino.catalog.hadoop.fs.GravitinoFileSystemCredentialsProvider;
 import org.apache.gravitino.catalog.hadoop.fs.SupportsCredentialVending;
 import org.apache.gravitino.client.GravitinoClient;
 import org.apache.gravitino.credential.Credential;
-import org.apache.gravitino.credential.CredentialConstants;
 import org.apache.gravitino.exceptions.CatalogNotInUseException;
 import org.apache.gravitino.exceptions.GravitinoRuntimeException;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
@@ -84,6 +89,7 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.security.Credentials;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.util.Progressable;
 import org.slf4j.Logger;
@@ -113,14 +119,18 @@ public abstract class BaseGVFSOperations implements Closeable {
 
   private final String metalakeName;
 
-  private final Optional<FilesetMetadataCache> filesetMetadataCache;
-  private final GravitinoClient gravitinoClient;
+  private final boolean enableFilesetMetadataCache;
+
+  // Lazy initialization of FilesetCatalogCache, see getFilesetMetadataCache() for details.
+  private volatile Optional<FilesetMetadataCache> filesetMetadataCache;
+  private final Object filesetMetadataCacheLock = new Object();
+
+  // Lazy initialization of GravitinoClient, see getGravitinoClient() for details.
+  private volatile GravitinoClient gravitinoClient;
 
   private final Configuration conf;
 
-  // Fileset nameIdentifier-locationName Pair and its corresponding FileSystem cache, the name
-  // identifier has four levels, the first level is metalake name.
-  private final Cache<Pair<NameIdentifier, String>, FileSystem> internalFileSystemCache;
+  private final Cache<FileSystemCacheKey, FileSystem> fileSystemCache;
 
   private final Map<String, FileSystemProvider> fileSystemProvidersMap;
 
@@ -131,6 +141,68 @@ public abstract class BaseGVFSOperations implements Closeable {
   private final long defaultBlockSize;
 
   private final boolean enableCredentialVending;
+
+  private final boolean autoCreateLocation;
+  /** A key class for caching FileSystem instances based on scheme, authority, and configuration. */
+  public static class FileSystemCacheKey {
+    private final String scheme;
+    private final String authority;
+    private final UserGroupInformation ugi;
+
+    /**
+     * Constructor for FileSystemCacheKey.
+     *
+     * @param scheme the scheme of the filesystem
+     * @param authority the authority of the filesystem
+     * @param ugi the user group information
+     */
+    FileSystemCacheKey(String scheme, String authority, UserGroupInformation ugi) {
+      this.scheme = scheme;
+      this.authority = authority;
+      this.ugi = ugi;
+    }
+
+    /**
+     * Get the scheme of the filesystem.
+     *
+     * @return the scheme
+     */
+    public String scheme() {
+      return scheme;
+    }
+
+    /**
+     * Get the authority of the filesystem.
+     *
+     * @return the authority
+     */
+    public String authority() {
+      return authority;
+    }
+
+    /**
+     * Get the UserGroupInformation
+     *
+     * @return the UserGroupInformation
+     */
+    public UserGroupInformation ugi() {
+      return ugi;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+      if (!(o instanceof FileSystemCacheKey)) return false;
+      FileSystemCacheKey that = (FileSystemCacheKey) o;
+      return Objects.equals(scheme, that.scheme)
+          && Objects.equals(authority, that.authority)
+          && Objects.equals(ugi, that.ugi);
+    }
+
+    @Override
+    public int hashCode() {
+      return Objects.hash(scheme, authority, ugi);
+    }
+  }
 
   /**
    * Constructs a new {@link BaseGVFSOperations} with the given {@link Configuration}.
@@ -145,17 +217,12 @@ public abstract class BaseGVFSOperations implements Closeable {
         "'%s' is not set in the configuration",
         GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_CLIENT_METALAKE_KEY);
 
-    this.gravitinoClient = GravitinoVirtualFileSystemUtils.createClient(configuration);
-    boolean enableFilesetCatalogCache =
+    this.enableFilesetMetadataCache =
         configuration.getBoolean(
             FS_GRAVITINO_FILESET_METADATA_CACHE_ENABLE,
             FS_GRAVITINO_FILESET_METADATA_CACHE_ENABLE_DEFAULT);
-    this.filesetMetadataCache =
-        enableFilesetCatalogCache
-            ? Optional.of(new FilesetMetadataCache(gravitinoClient))
-            : Optional.empty();
 
-    this.internalFileSystemCache = newFileSystemCache(configuration);
+    this.fileSystemCache = newFileSystemCache(configuration);
 
     this.fileSystemProvidersMap = ImmutableMap.copyOf(getFileSystemProviders());
 
@@ -175,26 +242,61 @@ public abstract class BaseGVFSOperations implements Closeable {
         configuration.getBoolean(
             GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_ENABLE_CREDENTIAL_VENDING,
             GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_ENABLE_CREDENTIAL_VENDING_DEFAULT);
+
+    this.autoCreateLocation =
+        configuration.getBoolean(
+            GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_AUTO_CREATE_LOCATION,
+            GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_AUTO_CREATE_LOCATION_DEFAULT);
+
     this.conf = configuration;
+  }
+
+  /**
+   * Lazy initialization of FilesetMetadataCache, see getFilesetMetadataCache() for details.
+   *
+   * @return the FilesetMetadataCache.
+   */
+  @VisibleForTesting
+  protected Optional<FilesetMetadataCache> getFilesetMetadataCache() {
+    if (filesetMetadataCache == null) {
+      synchronized (filesetMetadataCacheLock) {
+        if (filesetMetadataCache == null) {
+          this.filesetMetadataCache =
+              enableFilesetMetadataCache
+                  ? Optional.of(new FilesetMetadataCache(getGravitinoClient()))
+                  : Optional.empty();
+        }
+      }
+    }
+    return filesetMetadataCache;
   }
 
   @Override
   public void close() throws IOException {
     // close all actual FileSystems
-    for (FileSystem fileSystem : internalFileSystemCache.asMap().values()) {
+    for (FileSystem fileSystem : fileSystemCache.asMap().values()) {
       try {
         fileSystem.close();
       } catch (IOException e) {
         // ignore
       }
     }
-    internalFileSystemCache.invalidateAll();
+    fileSystemCache.invalidateAll();
 
     try {
-      if (filesetMetadataCache.isPresent()) {
+      if (filesetMetadataCache != null && filesetMetadataCache.isPresent()) {
         filesetMetadataCache.get().close();
       }
     } catch (IOException e) {
+      // ignore
+    }
+
+    // Close the GravitinoClient if it was initialized
+    try {
+      if (gravitinoClient != null) {
+        gravitinoClient.close();
+      }
+    } catch (Exception e) {
       // ignore
     }
   }
@@ -213,9 +315,9 @@ public abstract class BaseGVFSOperations implements Closeable {
    * Set the working directory. Same as {@link FileSystem#setWorkingDirectory(Path)}.
    *
    * @param gvfsDir the new working directory.
-   * @throws FilesetPathNotFoundException if the fileset path is not found.
+   * @throws FileNotFoundException if the fileset path is not found.
    */
-  public abstract void setWorkingDirectory(Path gvfsDir) throws FilesetPathNotFoundException;
+  public abstract void setWorkingDirectory(Path gvfsDir) throws FileNotFoundException;
 
   /**
    * Create a file. Same as {@link FileSystem#create(Path, FsPermission, boolean, int, short, long,
@@ -339,7 +441,7 @@ public abstract class BaseGVFSOperations implements Closeable {
    */
   protected Token<?>[] addDelegationTokensForAllFS(String renewer, Credentials credentials) {
     List<Token<?>> tokenList = Lists.newArrayList();
-    for (FileSystem fileSystem : internalFileSystemCache.asMap().values()) {
+    for (FileSystem fileSystem : fileSystemCache.asMap().values()) {
       try {
         tokenList.addAll(Arrays.asList(fileSystem.addDelegationTokens(renewer, credentials)));
       } catch (IOException e) {
@@ -394,11 +496,11 @@ public abstract class BaseGVFSOperations implements Closeable {
    * @param locationName the location name.
    * @param operation the fileset data operation.
    * @return the actual file path.
-   * @throws FilesetPathNotFoundException if the fileset path is not found.
+   * @throws FileNotFoundException if the fileset path is not found.
    */
   protected Path getActualFilePath(
       Path gvfsPath, String locationName, FilesetDataOperation operation)
-      throws FilesetPathNotFoundException {
+      throws FileNotFoundException {
     NameIdentifier filesetIdent = extractIdentifier(metalakeName, gvfsPath.toString());
     String subPath = getSubPathFromGvfsPath(filesetIdent, gvfsPath.toString());
     NameIdentifier catalogIdent =
@@ -415,14 +517,14 @@ public abstract class BaseGVFSOperations implements Closeable {
     } catch (NoSuchCatalogException | CatalogNotInUseException e) {
       String message = String.format("Cannot get fileset catalog by identifier: %s", catalogIdent);
       LOG.warn(message, e);
-      throw new FilesetPathNotFoundException(message, e);
+      throw (FileNotFoundException) new FileNotFoundException(message).initCause(e);
 
     } catch (NoSuchFilesetException e) {
       String message =
           String.format(
               "Cannot get fileset by fileset identifier: %s, sub_path %s", filesetIdent, subPath);
       LOG.warn(message, e);
-      throw new FilesetPathNotFoundException(message, e);
+      throw (FileNotFoundException) new FileNotFoundException(message).initCause(e);
 
     } catch (NoSuchLocationNameException e) {
       String message =
@@ -430,7 +532,7 @@ public abstract class BaseGVFSOperations implements Closeable {
               "Location name not found by fileset identifier: %s, sub_path %s, location_name %s",
               filesetIdent, subPath, locationName);
       LOG.warn(message, e);
-      throw new FilesetPathNotFoundException(message, e);
+      throw (FileNotFoundException) new FileNotFoundException(message).initCause(e);
     }
 
     Path actualFilePath = new Path(fileLocation);
@@ -443,6 +545,9 @@ public abstract class BaseGVFSOperations implements Closeable {
 
   private void createFilesetLocationIfNeed(
       NameIdentifier filesetIdent, FileSystem fs, Path filesetPath) {
+    if (!autoCreateLocation) {
+      return;
+    }
     NameIdentifier catalogIdent =
         NameIdentifier.of(filesetIdent.namespace().level(0), filesetIdent.namespace().level(1));
     // If the server-side filesystem ops are disabled, the fileset directory may not exist. In such
@@ -520,10 +625,10 @@ public abstract class BaseGVFSOperations implements Closeable {
    * @param filesetPath the virtual path.
    * @param locationName the location name. null means the default location.
    * @return the actual file system.
-   * @throws FilesetPathNotFoundException if the fileset path is not found.
+   * @throws FileNotFoundException if the fileset path is not found.
    */
   protected FileSystem getActualFileSystem(Path filesetPath, String locationName)
-      throws FilesetPathNotFoundException {
+      throws FileNotFoundException {
     NameIdentifier filesetIdent = extractIdentifier(metalakeName, filesetPath.toString());
     return getActualFileSystemByLocationName(filesetIdent, locationName);
   }
@@ -536,9 +641,9 @@ public abstract class BaseGVFSOperations implements Closeable {
    * @return the fileset catalog.
    */
   protected FilesetCatalog getFilesetCatalog(NameIdentifier catalogIdent) {
-    return filesetMetadataCache
+    return getFilesetMetadataCache()
         .map(cache -> cache.getFilesetCatalog(catalogIdent))
-        .orElseGet(() -> gravitinoClient.loadCatalog(catalogIdent.name()).asFilesetCatalog());
+        .orElseGet(() -> getGravitinoClient().loadCatalog(catalogIdent.name()).asFilesetCatalog());
   }
 
   /**
@@ -549,7 +654,7 @@ public abstract class BaseGVFSOperations implements Closeable {
    * @return the fileset.
    */
   protected Fileset getFileset(NameIdentifier filesetIdent) {
-    return filesetMetadataCache
+    return getFilesetMetadataCache()
         .map(cache -> cache.getFileset(filesetIdent))
         .orElseGet(
             () ->
@@ -560,9 +665,116 @@ public abstract class BaseGVFSOperations implements Closeable {
                         NameIdentifier.of(filesetIdent.namespace().level(2), filesetIdent.name())));
   }
 
+  /**
+   * Get the schema by the schema identifier from the cache or load it from the server if the cache
+   * is disabled.
+   *
+   * @param schemaIdent the schema identifier.
+   * @return the schema.
+   */
+  protected Schema getSchema(NameIdentifier schemaIdent) {
+    return filesetMetadataCache
+        .map(cache -> cache.getSchema(schemaIdent))
+        .orElseGet(
+            () -> {
+              NameIdentifier catalogIdent =
+                  NameIdentifier.of(
+                      schemaIdent.namespace().level(0), schemaIdent.namespace().level(1));
+              Catalog c = gravitinoClient.loadCatalog(catalogIdent.name());
+              return c.asSchemas().loadSchema(schemaIdent.name());
+            });
+  }
+
+  /**
+   * Get the actual file system corresponding to the given fileset identifier and location name.
+   *
+   * @param filesetIdent the fileset identifier.
+   * @param locationName the location name. null means the default location.
+   * @return the actual file system.
+   * @throws FileNotFoundException if the target location name is not found in the fileset.
+   */
+  protected FileSystem getActualFileSystemByLocationName(
+      NameIdentifier filesetIdent, String locationName) throws FileNotFoundException {
+    NameIdentifier catalogIdent =
+        NameIdentifier.of(filesetIdent.namespace().level(0), filesetIdent.namespace().level(1));
+    try {
+      Fileset fileset = getFileset(filesetIdent);
+      String targetLocationName =
+          locationName == null
+              ? fileset.properties().get(PROPERTY_DEFAULT_LOCATION_NAME)
+              : locationName;
+
+      Preconditions.checkArgument(
+          fileset.storageLocations().containsKey(targetLocationName),
+          "Location name: %s is not found in fileset: %s.",
+          targetLocationName,
+          filesetIdent);
+
+      Path targetLocation = new Path(fileset.storageLocations().get(targetLocationName));
+      Map<String, String> allProperties = getAllProperties(filesetIdent, fileset.properties());
+      allProperties.putAll(getUserDefinedConfigs(getBaseLocation(targetLocation)));
+
+      if (enableCredentialVending()) {
+        allProperties.putAll(
+            getCredentialProperties(
+                getFileSystemProviderByScheme(targetLocation.toUri().getScheme()),
+                filesetIdent,
+                locationName));
+      }
+
+      FileSystem actualFileSystem = getActualFileSystemByPath(targetLocation, allProperties);
+      createFilesetLocationIfNeed(filesetIdent, actualFileSystem, targetLocation);
+      return actualFileSystem;
+    } catch (RuntimeException e) {
+      Throwable cause = e.getCause();
+      if (cause instanceof NoSuchCatalogException || cause instanceof CatalogNotInUseException) {
+        String message =
+            String.format("Cannot get fileset catalog by identifier: %s", catalogIdent);
+        LOG.warn(message, e);
+        throw (FileNotFoundException) new FileNotFoundException(message).initCause(e);
+      }
+
+      if (cause instanceof NoSuchFilesetException) {
+        String message =
+            String.format("Cannot get fileset by fileset identifier: %s", filesetIdent);
+        LOG.warn(message, e);
+        throw (FileNotFoundException) new FileNotFoundException(message).initCause(e);
+      }
+
+      if (cause instanceof NoSuchLocationNameException) {
+        String message =
+            String.format(
+                "Location name not found by fileset identifier: %s, location_name %s",
+                filesetIdent, locationName);
+        LOG.warn(message, e);
+        throw (FileNotFoundException) new FileNotFoundException(message).initCause(e);
+      }
+
+      throw e;
+    }
+  }
+
   @VisibleForTesting
-  Cache<Pair<NameIdentifier, String>, FileSystem> internalFileSystemCache() {
-    return internalFileSystemCache;
+  Cache<FileSystemCacheKey, FileSystem> internalFileSystemCache() {
+    return fileSystemCache;
+  }
+
+  /**
+   * Lazy initialization of GravitinoClient using double-checked locking pattern. This ensures the
+   * expensive client creation only happens when actually needed.
+   *
+   * @return the GravitinoClient
+   */
+  @VisibleForTesting
+  GravitinoClient getGravitinoClient() {
+    if (gravitinoClient == null) {
+      synchronized (this) {
+        if (gravitinoClient == null) {
+          this.gravitinoClient = GravitinoVirtualFileSystemUtils.createClient(conf);
+        }
+      }
+    }
+    return gravitinoClient;
   }
 
   private void setCallerContextForGetFileLocation(FilesetDataOperation operation) {
@@ -575,96 +787,98 @@ public abstract class BaseGVFSOperations implements Closeable {
     CallerContext.CallerContextHolder.set(callerContext);
   }
 
-  private void setCallerContextForGetCredentials(String locationName) {
-    Map<String, String> contextMap = Maps.newHashMap();
-    contextMap.put(CredentialConstants.HTTP_HEADER_CURRENT_LOCATION_NAME, locationName);
-    CallerContext callerContext = CallerContext.builder().withContext(contextMap).build();
-    CallerContext.CallerContextHolder.set(callerContext);
-  }
-
-  private FileSystem getActualFileSystemByLocationName(
-      NameIdentifier filesetIdent, String locationName) throws FilesetPathNotFoundException {
-    NameIdentifier catalogIdent =
-        NameIdentifier.of(filesetIdent.namespace().level(0), filesetIdent.namespace().level(1));
-    try {
-      return internalFileSystemCache.get(
-          Pair.of(filesetIdent, locationName),
-          cacheKey -> {
-            try {
-              Fileset fileset = getFileset(cacheKey.getLeft());
-              String targetLocationName =
-                  cacheKey.getRight() == null
-                      ? fileset.properties().get(PROPERTY_DEFAULT_LOCATION_NAME)
-                      : cacheKey.getRight();
-
-              Preconditions.checkArgument(
-                  fileset.storageLocations().containsKey(targetLocationName),
-                  "Location name: %s is not found in fileset: %s.",
-                  targetLocationName,
-                  cacheKey.getLeft());
-
-              Path targetLocation = new Path(fileset.storageLocations().get(targetLocationName));
-              Map<String, String> allProperties =
-                  getAllProperties(
-                      cacheKey.getLeft(), targetLocation.toUri().getScheme(), targetLocationName);
-
-              FileSystem actualFileSystem =
-                  getActualFileSystemByPath(targetLocation, allProperties);
-              createFilesetLocationIfNeed(cacheKey.getLeft(), actualFileSystem, targetLocation);
-              return actualFileSystem;
-            } catch (IOException ioe) {
-              throw new GravitinoRuntimeException(
-                  ioe,
-                  "Exception occurs when create new FileSystem for fileset: %s, location: %s, msg: %s",
-                  cacheKey.getLeft(),
-                  cacheKey.getRight(),
-                  ioe.getMessage());
-            }
-          });
-    } catch (RuntimeException e) {
-      Throwable cause = e.getCause();
-      if (cause instanceof NoSuchCatalogException || cause instanceof CatalogNotInUseException) {
-        String message =
-            String.format("Cannot get fileset catalog by identifier: %s", catalogIdent);
-        LOG.warn(message, e);
-        throw new FilesetPathNotFoundException(message, e);
-      }
-
-      if (cause instanceof NoSuchFilesetException) {
-        String message =
-            String.format("Cannot get fileset by fileset identifier: %s", filesetIdent);
-        LOG.warn(message, e);
-        throw new FilesetPathNotFoundException(message, e);
-      }
-
-      if (cause instanceof NoSuchLocationNameException) {
-        String message =
-            String.format(
-                "Location name not found by fileset identifier: %s, location_name %s",
-                filesetIdent, locationName);
-        LOG.warn(message, e);
-        throw new FilesetPathNotFoundException(message, e);
-      }
-
-      throw e;
+  /**
+   * Get user defined configurations for a specific location. Configuration format:
+   *
+   * @param baseLocation the base location of fileset
+   * @return a map of configuration properties for the specified location
+   */
+  private Map<String, String> getUserDefinedConfigs(String baseLocation) {
+    // Prepare a map to hold the properties for the specified location
+    // fs.path.config.<location_name> = location
+    // fs.path.config.<location_name>.<property_name> = <property_value>
+    // eg:
+    //   fs.path.config.cluster1 = s3://bucket/path/
+    //   fs.path.config.cluster1.aws-access-key = XXX
+    //   fs.path.config.cluster1.aws-secret-key = XXX
+    Map<String, String> properties = new HashMap<>();
+    if (StringUtils.isBlank(baseLocation)) {
+      return properties;
     }
+    String locationPrefix =
+        GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_PATH_CONFIG_PREFIX
+            + baseLocation
+            + ".";
+
+    // Iterate through all configuration entries
+    for (Map.Entry<String, String> entry : conf) {
+      String key = entry.getKey();
+
+      // Check if this key is a property for the specified location
+      // e.g., "fs.path.config.cluster1.aws-ak" matches prefix "fs.path.config.cluster1."
+      if (key.startsWith(locationPrefix)) {
+        // Extract the property name after the location prefix
+        // e.g., "fs.path.config.cluster1.aws-ak" -> "aws-ak"
+        String propertyName = key.substring(locationPrefix.length());
+        if (!propertyName.isEmpty()) {
+          properties.put(propertyName, entry.getValue());
+        }
+      }
+    }
+
+    return properties;
   }
 
-  private FileSystem getActualFileSystemByPath(
-      Path actualFilePath, Map<String, String> allProperties) throws IOException {
+  private String getBaseLocation(Path targetLocation) {
+    return targetLocation.toUri().getScheme() + "://" + targetLocation.toUri().getAuthority();
+  }
+
+  /**
+   * Get the actual file system by the given actual file path and properties.
+   *
+   * @param actualFilePath the actual file path.
+   * @param allProperties the properties.
+   * @return the actual file system.
+   */
+  protected FileSystem getActualFileSystemByPath(
+      Path actualFilePath, Map<String, String> allProperties) {
     URI uri = actualFilePath.toUri();
     String scheme = uri.getScheme();
     Preconditions.checkArgument(
         StringUtils.isNotBlank(scheme), "Scheme of the actual file location cannot be null.");
 
-    FileSystemProvider provider = getFileSystemProviderByScheme(scheme);
+    UserGroupInformation ugi;
+    try {
+      ugi = UserGroupInformation.getCurrentUser();
+    } catch (IOException e) {
+      throw new GravitinoRuntimeException(
+          e, "Cannot get current user for path: %s", actualFilePath);
+    }
+    return fileSystemCache.get(
+        new FileSystemCacheKey(scheme, uri.getAuthority(), ugi),
+        cacheKey -> {
+          FileSystemProvider provider = getFileSystemProviderByScheme(scheme);
 
-    // Reset the FileSystem service loader to make sure the FileSystem will reload the
-    // service file systems, this is a temporary solution to fix the issue
-    // https://github.com/apache/gravitino/issues/5609
-    resetFileSystemServiceLoader(scheme);
-
-    return provider.getFileSystem(actualFilePath, allProperties);
+          // Reset the FileSystem service loader to make sure the FileSystem will reload the
+          // service file systems, this is a temporary solution to fix the issue
+          // https://github.com/apache/gravitino/issues/5609
+          resetFileSystemServiceLoader(scheme);
+          try {
+            FileSystem fs;
+            if (scheme.equals(SCHEME_HDFS)) {
+              Configuration fsConfig =
+                  FileSystemUtils.createConfiguration(GRAVITINO_BYPASS, allProperties);
+              HDFSFileSystemProxy proxy = new HDFSFileSystemProxy(actualFilePath, fsConfig);
+              fs = proxy.getProxy();
+            } else {
+              fs = provider.getFileSystem(actualFilePath, allProperties);
+            }
+            return fs;
+          } catch (IOException e) {
+            throw new GravitinoRuntimeException(
+                e, "Cannot get FileSystem for path: %s", actualFilePath);
+          }
+        });
   }
 
   private void resetFileSystemServiceLoader(String fsScheme) {
@@ -685,8 +899,7 @@ public abstract class BaseGVFSOperations implements Closeable {
     }
   }
 
-  private Cache<Pair<NameIdentifier, String>, FileSystem> newFileSystemCache(
-      Configuration configuration) {
+  private Cache<FileSystemCacheKey, FileSystem> newFileSystemCache(Configuration configuration) {
     int maxCapacity =
         configuration.getInt(
             GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_FILESET_CACHE_MAX_CAPACITY_KEY,
@@ -734,20 +947,19 @@ public abstract class BaseGVFSOperations implements Closeable {
   }
 
   private Map<String, String> getAllProperties(
-      NameIdentifier filesetIdent, String scheme, String locationName) {
+      NameIdentifier filesetIdent, Map<String, String> filesetProperties) {
+    Map<String, String> allProperties = new HashMap<>();
     Catalog catalog =
         (Catalog)
             getFilesetCatalog(
                 NameIdentifier.of(
                     filesetIdent.namespace().level(0), filesetIdent.namespace().level(1)));
+    allProperties.putAll(catalog.properties());
 
-    Map<String, String> allProperties = getNecessaryProperties(catalog.properties());
-    allProperties.putAll(getConfigMap(conf));
-    if (enableCredentialVending()) {
-      allProperties.putAll(
-          getCredentialProperties(
-              getFileSystemProviderByScheme(scheme), filesetIdent, locationName));
-    }
+    Schema schema = getSchema(NameIdentifier.parse(filesetIdent.namespace().toString()));
+    allProperties.putAll(schema.properties());
+    allProperties.putAll(filesetProperties);
+    allProperties.putAll(extractNonDefaultConfig(conf));
     return allProperties;
   }
 
@@ -769,7 +981,7 @@ public abstract class BaseGVFSOperations implements Closeable {
     ImmutableMap.Builder<String, String> mapBuilder = ImmutableMap.builder();
     try {
       Fileset fileset = getFileset(filesetIdentifier);
-      setCallerContextForGetCredentials(locationName);
+      GravitinoVirtualFileSystemUtils.setCallerContextForGetCredentials(locationName);
       Credential[] credentials = fileset.supportsCredentials().getCredentials();
       if (credentials.length > 0) {
         mapBuilder.put(

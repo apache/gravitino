@@ -27,6 +27,7 @@ import ognl.OgnlException;
 import org.apache.gravitino.dto.requests.FilesetCreateRequest;
 import org.apache.gravitino.dto.requests.FilesetUpdatesRequest;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationExpression;
+import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants;
 import org.apache.gravitino.server.web.rest.FilesetOperations;
 import org.junit.jupiter.api.Test;
 
@@ -51,6 +52,7 @@ public class TestFilesetAuthorizationExpression {
     assertFalse(mockEvaluator.getResult(ImmutableSet.of("METALAKE::USE_METALAKE")));
     assertFalse(mockEvaluator.getResult(ImmutableSet.of("CATALOG::CREATE_CATALOG")));
     assertFalse(mockEvaluator.getResult(ImmutableSet.of("SCHEMA::CREATE_FILESET")));
+    assertFalse(mockEvaluator.getResult(ImmutableSet.of("TABLE::CREATE_FILESET")));
     assertFalse(
         mockEvaluator.getResult(ImmutableSet.of("SCHEMA::CREATE_FILESET", "CATALOG::USE_CATALOG")));
     assertTrue(
@@ -80,7 +82,8 @@ public class TestFilesetAuthorizationExpression {
   @Test
   public void testLoadFileset() throws OgnlException, NoSuchFieldException, IllegalAccessException {
     Field loadFilesetAuthorizationExpressionField =
-        FilesetOperations.class.getDeclaredField("loadFilesetAuthorizationExpression");
+        AuthorizationExpressionConstants.class.getDeclaredField(
+            "loadFilesetAuthorizationExpression");
     loadFilesetAuthorizationExpressionField.setAccessible(true);
     String loadFilesetAuthorizationExpression =
         (String) loadFilesetAuthorizationExpressionField.get(null);

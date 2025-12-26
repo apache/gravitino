@@ -5,7 +5,7 @@ keyword: chart
 license: "This software is licensed under the Apache License version 2."
 ---
 
-# Apache Gravitino Helm Chart
+# Install Gravitino on Kubernetes
 
 This Helm chart deploys Apache Gravitino on Kubernetes with customizable configurations.
 

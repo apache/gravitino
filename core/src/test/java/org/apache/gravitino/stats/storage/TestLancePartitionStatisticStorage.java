@@ -25,8 +25,10 @@ import static org.mockito.Mockito.when;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import java.io.File;
+import java.nio.file.Files;
 import java.util.List;
 import java.util.Map;
+import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.GravitinoEnv;
@@ -40,7 +42,6 @@ import org.apache.gravitino.stats.StatisticValue;
 import org.apache.gravitino.stats.StatisticValues;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
-import org.testcontainers.shaded.org.apache.commons.io.FileUtils;
 
 public class TestLancePartitionStatisticStorage {
 
@@ -64,7 +65,7 @@ public class TestLancePartitionStatisticStorage {
     when(tableEntity.id()).thenReturn(1L);
     FieldUtils.writeField(GravitinoEnv.getInstance(), "entityStore", entityStore, true);
 
-    String location = "/tmp/test";
+    String location = Files.createTempDirectory("lance_stats_test").toString();
     Map<String, String> properties = Maps.newHashMap();
     properties.put("location", location);
 
@@ -227,7 +228,7 @@ public class TestLancePartitionStatisticStorage {
     when(tableEntity.id()).thenReturn(1L);
     FieldUtils.writeField(GravitinoEnv.getInstance(), "entityStore", entityStore, true);
 
-    String location = "/tmp/test";
+    String location = Files.createTempDirectory("lance_stats_test").toString();
     Map<String, String> properties = Maps.newHashMap();
     properties.put("location", location);
     properties.put("datasetCacheSize", "1000");

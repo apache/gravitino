@@ -24,12 +24,14 @@ plugins {
   id("idea")
   alias(libs.plugins.jcstress)
   alias(libs.plugins.jmh)
+  alias(libs.plugins.aspectj.post.compile.weaving)
 }
 
 dependencies {
   implementation(project(":api"))
   implementation(project(":common"))
   implementation(project(":catalogs:catalog-common"))
+  implementation(libs.aspectj.aspectjrt)
   implementation(libs.bundles.log4j)
   implementation(libs.bundles.metrics)
   implementation(libs.bundles.prometheus)
@@ -41,10 +43,17 @@ dependencies {
   implementation(libs.concurrent.trees)
   implementation(libs.guava)
   implementation(libs.h2db)
+  implementation(libs.jackson.jaxrs.json.provider) // This is required by lance
   implementation(libs.lance) {
     exclude(group = "com.fasterxml.jackson.core", module = "*") // provided by gravitino
     exclude(group = "com.fasterxml.jackson.datatype", module = "*") // provided by gravitino
     exclude(group = "commons-codec", module = "commons-codec") // provided by jcasbin
+    exclude(group = "com.google.guava", module = "guava") // provided by gravitino
+    exclude(group = "org.apache.commons", module = "commons-lang3") // provided by gravitino
+    exclude(group = "org.junit.jupiter", module = "*") // provided by test scope
+    exclude(group = "com.fasterxml.jackson.jaxrs", module = "jackson-jaxrs-json-provider") // using gravitino's version
+    exclude(group = "org.apache.httpcomponents.client5", module = "*") // provided by gravitino
+    exclude(group = "com.lancedb", module = "lance-namespace-core") // This is unnecessary in the core module
   }
   implementation(libs.mybatis)
 
@@ -71,6 +80,7 @@ dependencies {
   testRuntimeOnly(libs.junit.jupiter.engine)
 
   jcstressImplementation(libs.mockito.core)
+  jcstressImplementation(libs.aspectj.aspectjrt)
 }
 
 tasks.test {
@@ -84,12 +94,12 @@ tasks.test {
 
 tasks.withType<JavaCompile>().configureEach {
   if (name.contains("jcstress", ignoreCase = true)) {
-    options.errorprone?.excludedPaths?.set(".*/generated/.*")
+    options.errorprone.excludedPaths.set(".*/generated/.*")
   }
 }
 
 tasks.named<JavaCompile>("jmhCompileGeneratedClasses").configure {
-  options.errorprone?.isEnabled = false
+  options.errorprone.isEnabled = false
   options.compilerArgs.removeAll { it.contains("Xplugin:ErrorProne") }
 }
 

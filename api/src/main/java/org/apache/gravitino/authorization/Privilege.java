@@ -28,10 +28,14 @@ import org.apache.gravitino.annotation.Unstable;
 @Unstable
 public interface Privilege {
 
-  /** @return The generic name of the privilege. */
+  /**
+   * @return The generic name of the privilege.
+   */
   Name name();
 
-  /** @return A readable string representation for the privilege. */
+  /**
+   * @return A readable string representation for the privilege.
+   */
   String simpleString();
 
   /**
@@ -85,12 +89,59 @@ public interface Privilege {
     CREATE_ROLE(0L, 1L << 16),
     /** The privilege to grant or revoke a role for the user or the group. */
     MANAGE_GRANTS(0L, 1L << 17),
-    /** The privilege to create a model */
+    /** The privilege to register a model */
+    REGISTER_MODEL(0L, 1L << 18),
+    /**
+     * The privilege to create a model. This is deprecated. Please use REGISTER_MODEL.
+     *
+     * <p>Note: This enum shares the same bit value (1L &lt;&lt; 18) as REGISTER_MODEL for backward
+     * compatibility. This unconventional design allows legacy privilege names to be treated as
+     * equivalent to new privilege names without requiring runtime privilege translation in the
+     * authorization engine. However, this means:
+     *
+     * <ul>
+     *   <li>The bit fields do not uniquely identify an enum value
+     *   <li>Converting from bits to enum name is ambiguous
+     *   <li>Both CREATE_MODEL and REGISTER_MODEL are functionally identical at the bit level
+     * </ul>
+     */
+    @Deprecated
     CREATE_MODEL(0L, 1L << 18),
-    /** The privilege to create a model version */
+    /** The privilege to link a model version */
+    LINK_MODEL_VERSION(0L, 1L << 19),
+    /**
+     * The privilege to create a model version. This is deprecated. Please use LINK_MODEL_VERSION.
+     *
+     * <p>Note: This enum shares the same bit value (1L &lt;&lt; 19) as LINK_MODEL_VERSION for
+     * backward compatibility. This unconventional design allows legacy privilege names to be
+     * treated as equivalent to new privilege names without requiring runtime privilege translation
+     * in the authorization engine. However, this means:
+     *
+     * <ul>
+     *   <li>The bit fields do not uniquely identify an enum value
+     *   <li>Converting from bits to enum name is ambiguous
+     *   <li>Both CREATE_MODEL_VERSION and LINK_MODEL_VERSION are functionally identical at the bit
+     *       level
+     * </ul>
+     */
+    @Deprecated
     CREATE_MODEL_VERSION(0L, 1L << 19),
     /** The privilege to view the metadata of the model and download all the model versions */
-    USE_MODEL(0L, 1L << 20);
+    USE_MODEL(0L, 1L << 20),
+    /** The privilege to create a tag */
+    CREATE_TAG(0L, 1L << 21),
+    /** The privilege to apply a tag */
+    APPLY_TAG(0L, 1L << 22),
+    /** The privilege to create a policy */
+    CREATE_POLICY(0L, 1L << 23),
+    /** The privilege to apply a policy */
+    APPLY_POLICY(0L, 1L << 24),
+    /** The privilege to register a job template */
+    REGISTER_JOB_TEMPLATE(0L, 1L << 25),
+    /** The privilege to use a job template */
+    USE_JOB_TEMPLATE(0L, 1L << 26),
+    /** The privilege to run a job */
+    RUN_JOB(0L, 1L << 27);
 
     private final long highBits;
     private final long lowBits;

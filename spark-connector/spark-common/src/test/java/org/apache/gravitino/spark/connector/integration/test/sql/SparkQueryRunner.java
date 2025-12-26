@@ -30,6 +30,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
+import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.client.GravitinoAdminClient;
@@ -44,7 +45,6 @@ import org.apache.spark.sql.SparkSession;
 import org.junit.jupiter.api.Assertions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.testcontainers.shaded.org.apache.commons.io.FileUtils;
 
 /** Run and check the correctness of the SparkSQLs */
 public class SparkQueryRunner {
@@ -328,6 +328,7 @@ public class SparkQueryRunner {
             .config(GravitinoSparkConfig.GRAVITINO_METALAKE, metalakeName)
             .config(GravitinoSparkConfig.GRAVITINO_ENABLE_ICEBERG_SUPPORT, "true")
             .config("spark.gravitino.test.data.dir", dataDir)
+            .config(GravitinoSparkConfig.GRAVITINO_ENABLE_PAIMON_SUPPORT, "true")
             .config("hive.exec.dynamic.partition.mode", "nonstrict")
             // produce old parquet format
             .config("spark.sql.parquet.writeLegacyFormat", "true")

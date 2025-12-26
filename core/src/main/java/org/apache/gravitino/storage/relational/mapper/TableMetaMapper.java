@@ -56,9 +56,6 @@ public interface TableMetaMapper {
   TablePO selectTableMetaBySchemaIdAndName(
       @Param("schemaId") Long schemaId, @Param("tableName") String name);
 
-  @SelectProvider(type = TableMetaSQLProviderFactory.class, method = "selectTableMetaById")
-  TablePO selectTableMetaById(@Param("tableId") Long tableId);
-
   @InsertProvider(type = TableMetaSQLProviderFactory.class, method = "insertTableMeta")
   void insertTableMeta(@Param("tableMeta") TablePO tablePO);
 
@@ -69,7 +66,9 @@ public interface TableMetaMapper {
 
   @UpdateProvider(type = TableMetaSQLProviderFactory.class, method = "updateTableMeta")
   Integer updateTableMeta(
-      @Param("newTableMeta") TablePO newTablePO, @Param("oldTableMeta") TablePO oldTablePO);
+      @Param("newTableMeta") TablePO newTablePO,
+      @Param("oldTableMeta") TablePO oldTablePO,
+      @Param("newSchemaId") Long newSchemaId);
 
   @UpdateProvider(
       type = TableMetaSQLProviderFactory.class,

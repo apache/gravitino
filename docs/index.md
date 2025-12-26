@@ -17,8 +17,7 @@ It also provides users with unified metadata access for data and AI assets.
 You can get Gravitino from the [download page](https://gravitino.apache.org/downloads),
 or you can build Gravitino from source code. See [How to build Gravitino](./how-to-build.md).
 
-Gravitino runs on both Linux and macOS platforms, and it requires the installation of
-Java 8, Java 11, or Java 17. Gravitino trino-connector runs with Trino, and requires Java 17.
+Gravitino runs on both Linux and macOS platforms, and it requires the installation of Java 17.
 This should include JVMs on x86_64 and ARM64.
 It's easy to run locally on one machine, all you need is to have `java` installed on
 your system `PATH`, or the `JAVA_HOME` environment variable pointing to a Java installation.
@@ -65,8 +64,8 @@ You can use either to manage metadata. See
 
 Also, you can find the complete REST API definition in
 [Gravitino Open API](./api/rest/gravitino-rest-api),
-Java SDK definition in [Gravitino Java doc](pathname:///docs/1.0.0-SNAPSHOT/api/java/index.html),
-and Python SDK definition in [Gravitino Python doc](pathname:///docs/1.0.0-SNAPSHOT/api/python/index.html).
+Java SDK definition in [Gravitino Java doc](pathname:///docs/1.2.0-SNAPSHOT/api/java/index.html),
+and Python SDK definition in [Gravitino Python doc](pathname:///docs/1.2.0-SNAPSHOT/api/python/index.html).
 
 Gravitino also provides a web UI to manage the metadata. Visit the web UI in the browser via `http://<ip-address>:8090`.
 See [Gravitino web UI](./webui.md) for details.
@@ -86,6 +85,7 @@ Gravitino currently supports the following catalogs:
 * [**PostgreSQL catalog**](./jdbc-postgresql-catalog.md)
 * [**OceanBase catalog**](./jdbc-oceanbase-catalog.md)
 * [**StarRocks catalog**](./jdbc-starrocks-catalog.md)
+* [**Lakehouse generic catalog**](./lakehouse-generic-catalog.md)
 
 If you want to operate table and partition statistics, you can refer to the [document](./manage-statistics-in-gravitino.md).
 
@@ -135,6 +135,7 @@ Gravitino supports different catalogs to manage the metadata in different source
 * [Paimon catalog](./lakehouse-paimon-catalog.md): a complete guide to using Gravitino to manage Apache Paimon data.
 * [PostgreSQL catalog](./jdbc-postgresql-catalog.md): a complete guide to using Gravitino to manage PostgreSQL data.
 * [OceanBase catalog](./jdbc-oceanbase-catalog.md): a complete guide to using Gravitino to manage OceanBase data.
+* [Lakehouse generic catalog](./lakehouse-generic-catalog.md): a complete guide to using Gravitino to manage lakehouse data sources.
 
 ### Governance
 
@@ -151,6 +152,10 @@ Gravitino provides governance features to manage metadata in a unified way. See:
 
 * [Iceberg REST catalog service](./iceberg-rest-service.md): a guide to using Gravitino
   as an Apache Iceberg REST catalog service.
+
+### Gravitino Lance REST catalog service
+* [Lance REST catalog service](./lance-rest-service.md): a guide to using Gravitino
+  as a Lance REST catalog service.
 
 ### Connectors
 
@@ -171,6 +176,12 @@ Gravitino provides a Spark connector to manage metadata in a unified way. To use
 Gravitino provides a Flink connector to manage metadata in a unified way. To use the Flink connector, see:
 
 * [Gravitino Flink connector](./flink-connector/flink-connector.md): a complete guide to using the Gravitino Flink connector.
+
+#### Daft connector
+
+Gravitino provides a Daft connector to access Gravitino metadata from Daft dataframes. To use the Daft connector, see:
+
+* [Gravitino Daft connector](./daft-connector/daft-connector.md): an introduction to the Gravitino Daft connector.
 
 
 ### Server administration
@@ -198,8 +209,8 @@ Gravitino MCP server provides the ability to manage Gravitino metadata for AI to
 ### Programming guides
 
 * [Gravitino Open API](./api/rest/gravitino-rest-api): provides the complete Open API definition of Gravitino.
-* [Gravitino Java doc](pathname:///docs/1.0.0-SNAPSHOT/api/java/index.html): provides the Javadoc for the Gravitino API.
-* [Gravitino Python doc](pathname:///docs/1.0.0-SNAPSHOT/api/python/index.html): provides the Python doc for the Gravitino API.
+* [Gravitino Java doc](pathname:///docs/1.2.0-SNAPSHOT/api/java/index.html): provides the Javadoc for the Gravitino API.
+* [Gravitino Python doc](pathname:///docs/1.2.0-SNAPSHOT/api/python/index.html): provides the Python doc for the Gravitino API.
 
 ### Development guides
 

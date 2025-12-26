@@ -23,6 +23,7 @@ import io.trino.spi.connector.Connector;
 import io.trino.spi.connector.ConnectorAccessControl;
 import io.trino.spi.connector.ConnectorCapabilities;
 import io.trino.spi.connector.ConnectorMetadata;
+import io.trino.spi.connector.ConnectorNodePartitioningProvider;
 import io.trino.spi.connector.ConnectorPageSinkProvider;
 import io.trino.spi.connector.ConnectorPageSourceProvider;
 import io.trino.spi.connector.ConnectorRecordSetProvider;
@@ -65,11 +66,12 @@ public class GravitinoConnector implements Connector {
   public ConnectorTransactionHandle beginTransaction(
       IsolationLevel isolationLevel, boolean readOnly, boolean autoCommit) {
     Connector internalConnector = catalogConnectorContext.getInternalConnector();
-    Preconditions.checkNotNull(internalConnector, "Internal connector must not be null");
+    Preconditions.checkArgument(internalConnector != null, "Internal connector must not be null");
 
     ConnectorTransactionHandle internalTransactionHandler =
         internalConnector.beginTransaction(isolationLevel, readOnly, autoCommit);
-    Preconditions.checkNotNull(internalTransactionHandler, "Transaction handler must not be null");
+    Preconditions.checkArgument(
+        internalTransactionHandler != null, "Transaction handler must not be null");
 
     return new GravitinoTransactionHandle(internalTransactionHandler);
   }
@@ -83,7 +85,7 @@ public class GravitinoConnector implements Connector {
     Connector internalConnector = catalogConnectorContext.getInternalConnector();
     ConnectorMetadata internalMetadata =
         internalConnector.getMetadata(session, gravitinoTransactionHandle.getInternalHandle());
-    Preconditions.checkNotNull(internalMetadata);
+    Preconditions.checkArgument(internalMetadata != null, "Internal metadata must not be null");
 
     GravitinoMetalake metalake = catalogConnectorContext.getMetalake();
 
@@ -161,5 +163,13 @@ public class GravitinoConnector implements Connector {
   @Override
   public Set<ConnectorCapabilities> getCapabilities() {
     return catalogConnectorContext.getInternalConnector().getCapabilities();
+  }
+
+  @Override
+  public ConnectorNodePartitioningProvider getNodePartitioningProvider() {
+    Connector internalConnector = catalogConnectorContext.getInternalConnector();
+    ConnectorNodePartitioningProvider nodePartitioningProvider =
+        internalConnector.getNodePartitioningProvider();
+    return new GravitinoNodePartitioningProvider(nodePartitioningProvider);
   }
 }

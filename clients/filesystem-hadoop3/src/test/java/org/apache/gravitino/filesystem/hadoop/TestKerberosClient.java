@@ -31,6 +31,7 @@ import java.util.UUID;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.server.authentication.KerberosAuthenticator;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hc.core5.http.HttpStatus;
 import org.apache.hc.core5.http.Method;
@@ -90,14 +91,24 @@ public class TestKerberosClient extends TestGvfsBase {
         GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_CLIENT_AUTH_TYPE_KEY,
         GravitinoVirtualFileSystemConfiguration.KERBEROS_AUTH_TYPE);
     assertThrows(
-        IllegalArgumentException.class, () -> managedFilesetPath.getFileSystem(configuration));
+        IllegalArgumentException.class,
+        () -> {
+          FileSystem fs = managedFilesetPath.getFileSystem(configuration);
+          // Trigger lazy initialization
+          fs.exists(managedFilesetPath);
+        });
 
     // set not exist keytab path
     configuration.set(
         GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_CLIENT_KERBEROS_KEYTAB_FILE_PATH_KEY,
         "file://tmp/test.keytab");
     assertThrows(
-        IllegalArgumentException.class, () -> managedFilesetPath.getFileSystem(configuration));
+        IllegalArgumentException.class,
+        () -> {
+          FileSystem fs = managedFilesetPath.getFileSystem(configuration);
+          // Trigger lazy initialization
+          fs.exists(managedFilesetPath);
+        });
   }
 
   @Test
@@ -184,7 +195,13 @@ public class TestKerberosClient extends TestGvfsBase {
               return response().withStatusCode(HttpStatus.SC_OK);
             });
     Path newPath = new Path(managedFilesetPath.toString().replace(metalakeName, testMetalake));
-    Assertions.assertThrows(IllegalStateException.class, () -> newPath.getFileSystem(conf1));
+    Assertions.assertThrows(
+        IllegalStateException.class,
+        () -> {
+          FileSystem fs = newPath.getFileSystem(conf1);
+          // Trigger lazy initialization
+          fs.exists(newPath);
+        });
 
     // test with principal and invalid keytab
     File invalidKeytabFile =
@@ -201,7 +218,13 @@ public class TestKerberosClient extends TestGvfsBase {
     conf2.set(
         GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_CLIENT_KERBEROS_KEYTAB_FILE_PATH_KEY,
         invalidKeytabFile.getAbsolutePath());
-    Assertions.assertThrows(IllegalStateException.class, () -> newPath.getFileSystem(conf2));
+    Assertions.assertThrows(
+        IllegalStateException.class,
+        () -> {
+          FileSystem fs = newPath.getFileSystem(conf2);
+          // Trigger lazy initialization
+          fs.exists(newPath);
+        });
     invalidKeytabFile.delete();
 
     // test with principal and no keytab
@@ -212,6 +235,12 @@ public class TestKerberosClient extends TestGvfsBase {
     // remove keytab configuration
     conf3.unset(
         GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_CLIENT_KERBEROS_KEYTAB_FILE_PATH_KEY);
-    Assertions.assertThrows(IllegalStateException.class, () -> newPath.getFileSystem(conf3));
+    Assertions.assertThrows(
+        IllegalStateException.class,
+        () -> {
+          FileSystem fs = newPath.getFileSystem(conf3);
+          // Trigger lazy initialization
+          fs.exists(newPath);
+        });
   }
 }

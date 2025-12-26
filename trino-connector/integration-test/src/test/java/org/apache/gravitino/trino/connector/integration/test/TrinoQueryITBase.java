@@ -26,6 +26,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Map;
+import org.apache.commons.io.FileUtils;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
@@ -40,7 +41,6 @@ import org.apache.gravitino.rel.TableCatalog;
 import org.junit.jupiter.api.Assertions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.testcontainers.shaded.org.apache.commons.io.FileUtils;
 
 public class TrinoQueryITBase {
   private static final Logger LOG = LoggerFactory.getLogger(TrinoQueryITBase.class);
@@ -86,7 +86,25 @@ public class TrinoQueryITBase {
       gravitinoUri = String.format("http://127.0.0.1:%d", baseIT.getGravitinoServerPort());
 
       trinoITContainers = ContainerSuite.getTrinoITContainers();
-      trinoITContainers.launch(baseIT.getGravitinoServerPort(), trinoWorkerNum);
+
+      /**
+       * When connecting to a Hive metastore version 3.x, the Hive connector supports reading from
+       * and writing to insert-only and ACID tables, with full support for partitioning and
+       * bucketing
+       */
+      String hiveRuntimeVersion = "hive3";
+
+      /**
+       * Only Trino connector test will create Hive ACID table when deploy Hive with
+       * `/integration-test-common/docker-script/init/hive/init.sh`
+       */
+      Boolean isTrinoConnectorTest = true;
+
+      trinoITContainers.launch(
+          baseIT.getGravitinoServerPort(),
+          hiveRuntimeVersion,
+          isTrinoConnectorTest,
+          trinoWorkerNum);
 
       trinoUri = trinoITContainers.getTrinoUri();
       hiveMetastoreUri = trinoITContainers.getHiveMetastoreUri();

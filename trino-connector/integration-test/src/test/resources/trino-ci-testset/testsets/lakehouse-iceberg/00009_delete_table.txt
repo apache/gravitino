@@ -1,0 +1,42 @@
+CREATE SCHEMA
+
+CREATE TABLE
+
+INSERT: 2 rows
+
+"bob","14"
+"tom","12"
+
+DELETE: 1 row
+
+"tom","12"
+
+DELETE: 1 row
+
+"0"
+
+CREATE TABLE
+
+INSERT: 3 rows
+
+"tom","12"
+"bob","14"
+"bob","15"
+
+DELETE: 2 rows
+
+"tom","12"
+
+CREATE TABLE
+
+INSERT: 2 rows
+
+<QUERY_FAILED> Iceberg table updates require at least format version 2
+
+DROP TABLE
+
+DROP TABLE
+
+DROP TABLE
+
+DROP SCHEMA

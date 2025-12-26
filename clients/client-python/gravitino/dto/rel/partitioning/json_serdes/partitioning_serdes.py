@@ -19,7 +19,7 @@ from contextlib import suppress
 from types import MappingProxyType
 from typing import Any, Dict, Final, cast
 
-from gravitino.api.types.json_serdes.base import JsonSerializable
+from gravitino.api.rel.types.json_serdes.base import JsonSerializable
 from gravitino.dto.rel.expressions.json_serdes._helper.serdes_utils import (
     SerdesUtils as ExpressionSerdesUtils,
 )

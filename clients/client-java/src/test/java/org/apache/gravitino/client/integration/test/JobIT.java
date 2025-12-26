@@ -37,6 +37,7 @@ import org.apache.gravitino.integration.test.util.BaseIT;
 import org.apache.gravitino.integration.test.util.GravitinoITUtils;
 import org.apache.gravitino.job.JobHandle;
 import org.apache.gravitino.job.JobTemplate;
+import org.apache.gravitino.job.JobTemplateChange;
 import org.apache.gravitino.job.ShellJobTemplate;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
@@ -175,6 +176,111 @@ public class JobIT extends BaseIT {
     // Verify the list of job templates is empty after deleting both
     registeredTemplates = metalake.listJobTemplates();
     Assertions.assertTrue(registeredTemplates.isEmpty());
+  }
+
+  @Test
+  public void testRegisterAndAlterJobTemplate() {
+    ShellJobTemplate template = builder.withName("test_alter").build();
+    Assertions.assertDoesNotThrow(() -> metalake.registerJobTemplate(template));
+
+    // Rename the job template
+    JobTemplate renamedTemplate =
+        metalake.alterJobTemplate(template.name(), JobTemplateChange.rename("renamed_test_alter"));
+
+    // Verify the job template is renamed
+    Assertions.assertEquals("renamed_test_alter", renamedTemplate.name());
+    Assertions.assertEquals(template.comment(), renamedTemplate.comment());
+    Assertions.assertEquals(template.executable(), renamedTemplate.executable());
+    Assertions.assertEquals(template.arguments(), renamedTemplate.arguments());
+    Assertions.assertEquals(template.environments(), renamedTemplate.environments());
+    Assertions.assertEquals(template.customFields(), renamedTemplate.customFields());
+    Assertions.assertEquals(template.scripts(), ((ShellJobTemplate) renamedTemplate).scripts());
+
+    JobTemplate fetchedTemplate = metalake.getJobTemplate(renamedTemplate.name());
+    Assertions.assertEquals(renamedTemplate, fetchedTemplate);
+
+    // Update the job template's comment
+    JobTemplate updatedTemplate =
+        metalake.alterJobTemplate(
+            renamedTemplate.name(), JobTemplateChange.updateComment("Updated comment"));
+
+    // Verify the job template comment is updated
+    Assertions.assertEquals("Updated comment", updatedTemplate.comment());
+    Assertions.assertEquals(renamedTemplate.name(), updatedTemplate.name());
+    Assertions.assertEquals(template.executable(), updatedTemplate.executable());
+    Assertions.assertEquals(template.arguments(), updatedTemplate.arguments());
+    Assertions.assertEquals(template.environments(), updatedTemplate.environments());
+    Assertions.assertEquals(template.customFields(), updatedTemplate.customFields());
+    Assertions.assertEquals(template.scripts(), ((ShellJobTemplate) updatedTemplate).scripts());
+
+    // Fetch the updated template and verify
+    JobTemplate fetchedUpdatedTemplate = metalake.getJobTemplate(updatedTemplate.name());
+    Assertions.assertEquals(updatedTemplate, fetchedUpdatedTemplate);
+
+    // Update the job template's executable, arguments, and environments
+    JobTemplateChange.ShellTemplateUpdate update =
+        JobTemplateChange.ShellTemplateUpdate.builder()
+            .withNewExecutable("/new/path/to/executable.sh")
+            .withNewArguments(Lists.newArrayList("newArg1", "newArg2"))
+            .withNewEnvironments(ImmutableMap.of("NEW_ENV", "newValue"))
+            .build();
+
+    JobTemplate modifiedTemplate =
+        metalake.alterJobTemplate(updatedTemplate.name(), JobTemplateChange.updateTemplate(update));
+
+    // Verify the job template fields are updated
+    Assertions.assertEquals(update.getNewExecutable(), modifiedTemplate.executable());
+    Assertions.assertEquals(update.getNewArguments(), modifiedTemplate.arguments());
+    Assertions.assertEquals(update.getNewEnvironments(), modifiedTemplate.environments());
+    Assertions.assertEquals(updatedTemplate.customFields(), modifiedTemplate.customFields());
+    Assertions.assertEquals(
+        ((ShellJobTemplate) updatedTemplate).scripts(),
+        ((ShellJobTemplate) modifiedTemplate).scripts());
+
+    // Fetch the modified template and verify
+    JobTemplate fetchedModifiedTemplate = metalake.getJobTemplate(modifiedTemplate.name());
+    Assertions.assertEquals(modifiedTemplate, fetchedModifiedTemplate);
+
+    // Update the job template's custom fields and scripts
+    JobTemplateChange.ShellTemplateUpdate update1 =
+        JobTemplateChange.ShellTemplateUpdate.builder()
+            .withNewCustomFields(ImmutableMap.of("customKey", "customValue"))
+            .withNewScripts(Lists.newArrayList(testLibScriptPath, "/new/path/to/script.sh"))
+            .build();
+
+    JobTemplate finalTemplate =
+        metalake.alterJobTemplate(
+            modifiedTemplate.name(), JobTemplateChange.updateTemplate(update1));
+
+    // Verify the job template fields are updated
+    Assertions.assertEquals(modifiedTemplate.executable(), finalTemplate.executable());
+    Assertions.assertEquals(modifiedTemplate.arguments(), finalTemplate.arguments());
+    Assertions.assertEquals(modifiedTemplate.environments(), finalTemplate.environments());
+    Assertions.assertEquals(update1.getNewCustomFields(), finalTemplate.customFields());
+    Assertions.assertEquals(update1.getNewScripts(), ((ShellJobTemplate) finalTemplate).scripts());
+
+    // Fetch the final template and verify
+    JobTemplate fetchedFinalTemplate = metalake.getJobTemplate(finalTemplate.name());
+    Assertions.assertEquals(finalTemplate, fetchedFinalTemplate);
+
+    // Test altering a non-existent job template
+    Assertions.assertThrows(
+        NoSuchJobTemplateException.class,
+        () ->
+            metalake.alterJobTemplate(
+                "non_existent_template", JobTemplateChange.rename("new_name")));
+
+    // Test altering with wrong change type
+    JobTemplateChange.SparkTemplateUpdate wrongUpdate =
+        JobTemplateChange.SparkTemplateUpdate.builder()
+            .withNewClassName("com.example.Main")
+            .build();
+
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            metalake.alterJobTemplate(
+                finalTemplate.name(), JobTemplateChange.updateTemplate(wrongUpdate)));
   }
 
   @Test

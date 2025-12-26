@@ -22,6 +22,7 @@ import java.security.Principal;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.authorization.AuthorizationRequestContext;
 import org.apache.gravitino.authorization.GravitinoAuthorizer;
 import org.apache.gravitino.authorization.Privilege;
 
@@ -39,7 +40,8 @@ public class PassThroughAuthorizer implements GravitinoAuthorizer {
       Principal principal,
       String metalake,
       MetadataObject metadataObject,
-      Privilege.Name privilege) {
+      Privilege.Name privilege,
+      AuthorizationRequestContext requestContext) {
     return true;
   }
 
@@ -48,12 +50,17 @@ public class PassThroughAuthorizer implements GravitinoAuthorizer {
       Principal principal,
       String metalake,
       MetadataObject metadataObject,
-      Privilege.Name privilege) {
+      Privilege.Name privilege,
+      AuthorizationRequestContext requestContext) {
     return false;
   }
 
   @Override
-  public boolean isOwner(Principal principal, String metalake, MetadataObject metadataObject) {
+  public boolean isOwner(
+      Principal principal,
+      String metalake,
+      MetadataObject metadataObject,
+      AuthorizationRequestContext requestContext) {
     return true;
   }
 
@@ -73,12 +80,14 @@ public class PassThroughAuthorizer implements GravitinoAuthorizer {
   }
 
   @Override
-  public boolean hasSetOwnerPermission(String metalake, String type, String fullName) {
+  public boolean hasSetOwnerPermission(
+      String metalake, String type, String fullName, AuthorizationRequestContext requestContext) {
     return true;
   }
 
   @Override
-  public boolean hasMetadataPrivilegePermission(String metalake, String type, String fullName) {
+  public boolean hasMetadataPrivilegePermission(
+      String metalake, String type, String fullName, AuthorizationRequestContext requestContext) {
     return true;
   }
 

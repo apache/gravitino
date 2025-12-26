@@ -26,9 +26,12 @@ import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.permission.FsPermission;
+import org.apache.hadoop.util.Progressable;
 
-public class MockGVFSHook implements GravitinoVirtualFileSystemHook {
+public class MockGVFSHook extends NoOpHook {
 
+  boolean setOperationsContextCalled = false;
+  BaseGVFSOperations operations = null;
   boolean preSetWorkingDirectoryCalled = false;
   boolean preOpenCalled = false;
   boolean preCreateCalled = false;
@@ -51,6 +54,23 @@ public class MockGVFSHook implements GravitinoVirtualFileSystemHook {
   boolean postMkdirsCalled = false;
   boolean postGetDefaultReplicationCalled = false;
   boolean postGetDefaultBlockSizeCalled = false;
+  boolean onSetWorkingDirectoryFailureCalled = false;
+  boolean onOpenFailureCalled = false;
+  boolean onCreateFailureCalled = false;
+  boolean onAppendFailureCalled = false;
+  boolean onRenameFailureCalled = false;
+  boolean onDeleteFailureCalled = false;
+  boolean onGetFileStatusFailureCalled = false;
+  boolean onListStatusFailureCalled = false;
+  boolean onMkdirsFailureCalled = false;
+  boolean onGetDefaultReplicationFailureCalled = false;
+  boolean onGetDefaultBlockSizeFailureCalled = false;
+
+  @Override
+  public void setOperationsContext(BaseGVFSOperations operations) {
+    this.setOperationsContextCalled = true;
+    this.operations = operations;
+  }
 
   @Override
   public void initialize(Map<String, String> config) {}
@@ -198,6 +218,85 @@ public class MockGVFSHook implements GravitinoVirtualFileSystemHook {
   public long postGetDefaultBlockSize(Path gvfsPath, long blockSize) {
     this.postGetDefaultBlockSizeCalled = true;
     return blockSize;
+  }
+
+  @Override
+  public void onSetWorkingDirectoryFailure(Path path, Exception e) {
+    this.onSetWorkingDirectoryFailureCalled = true;
+    super.onSetWorkingDirectoryFailure(path, e);
+  }
+
+  @Override
+  public FSDataInputStream onOpenFailure(Path path, int bufferSize, Exception e)
+      throws IOException {
+    this.onOpenFailureCalled = true;
+    return super.onOpenFailure(path, bufferSize, e);
+  }
+
+  @Override
+  public FSDataOutputStream onCreateFailure(
+      Path path,
+      FsPermission permission,
+      boolean overwrite,
+      int bufferSize,
+      short replication,
+      long blockSize,
+      Progressable progress,
+      Exception e)
+      throws IOException {
+    this.onCreateFailureCalled = true;
+    return super.onCreateFailure(
+        path, permission, overwrite, bufferSize, replication, blockSize, progress, e);
+  }
+
+  @Override
+  public FSDataOutputStream onAppendFailure(
+      Path path, int bufferSize, Progressable progress, Exception e) throws IOException {
+    this.onAppendFailureCalled = true;
+    return super.onAppendFailure(path, bufferSize, progress, e);
+  }
+
+  @Override
+  public boolean onRenameFailure(Path src, Path dst, Exception e) throws IOException {
+    this.onRenameFailureCalled = true;
+    return super.onRenameFailure(src, dst, e);
+  }
+
+  @Override
+  public boolean onDeleteFailure(Path path, boolean recursive, Exception e) throws IOException {
+    this.onDeleteFailureCalled = true;
+    return super.onDeleteFailure(path, recursive, e);
+  }
+
+  @Override
+  public FileStatus onGetFileStatusFailure(Path path, Exception e) throws IOException {
+    this.onGetFileStatusFailureCalled = true;
+    return super.onGetFileStatusFailure(path, e);
+  }
+
+  @Override
+  public FileStatus[] onListStatusFailure(Path path, Exception e) throws IOException {
+    this.onListStatusFailureCalled = true;
+    return super.onListStatusFailure(path, e);
+  }
+
+  @Override
+  public boolean onMkdirsFailure(Path path, FsPermission permission, Exception e)
+      throws IOException {
+    this.onMkdirsFailureCalled = true;
+    return super.onMkdirsFailure(path, permission, e);
+  }
+
+  @Override
+  public short onGetDefaultReplicationFailure(Path path, Exception e) {
+    this.onGetDefaultReplicationFailureCalled = true;
+    return super.onGetDefaultReplicationFailure(path, e);
+  }
+
+  @Override
+  public long onGetDefaultBlockSizeFailure(Path f, Exception e, long defaultBlockSize) {
+    this.onGetDefaultBlockSizeFailureCalled = true;
+    return super.onGetDefaultBlockSizeFailure(f, e, defaultBlockSize);
   }
 
   @Override

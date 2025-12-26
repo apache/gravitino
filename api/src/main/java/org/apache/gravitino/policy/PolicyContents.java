@@ -88,6 +88,11 @@ public class PolicyContents {
     }
 
     @Override
+    public Map<String, Object> rules() {
+      return customRules;
+    }
+
+    @Override
     public Set<MetadataObject.Type> supportedObjectTypes() {
       return supportedObjectTypes;
     }

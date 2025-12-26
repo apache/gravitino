@@ -63,6 +63,13 @@ public class TestExtractMetricNameAndLabel {
         ImmutableMap.of());
 
     checkResult(
+        MetricsSource.LANCE_REST_SERVER_METRIC_NAME + "." + MetricNames.SERVER_IDLE_THREAD_NUM,
+        Collector.sanitizeMetricName(MetricsSource.LANCE_REST_SERVER_METRIC_NAME)
+            + "_"
+            + Collector.sanitizeMetricName(MetricNames.SERVER_IDLE_THREAD_NUM),
+        ImmutableMap.of());
+
+    checkResult(
         MetricsSource.ICEBERG_REST_SERVER_METRIC_NAME
             + ".update-table."
             + MetricNames.HTTP_PROCESS_DURATION,
@@ -72,6 +79,15 @@ public class TestExtractMetricNameAndLabel {
         ImmutableMap.of("operation", "update-table"));
 
     checkResult(
+        MetricsSource.LANCE_REST_SERVER_METRIC_NAME
+            + ".load-namespace."
+            + MetricNames.HTTP_PROCESS_DURATION,
+        Collector.sanitizeMetricName(MetricsSource.LANCE_REST_SERVER_METRIC_NAME)
+            + "_"
+            + Collector.sanitizeMetricName(MetricNames.HTTP_PROCESS_DURATION),
+        ImmutableMap.of("operation", "load-namespace"));
+
+    checkResult(
         MetricsSource.GRAVITINO_SERVER_METRIC_NAME
             + ".update-table."
             + MetricNames.HTTP_PROCESS_DURATION,
@@ -81,33 +97,30 @@ public class TestExtractMetricNameAndLabel {
         ImmutableMap.of("operation", "update-table"));
 
     checkResult(
-        MetricsSource.GRAVITINO_SERVER_METRIC_NAME
+        MetricsSource.GRAVITINO_RELATIONAL_STORE_METRIC_NAME
             + "."
-            + MetricNames.ENTITY_STORE_RELATION_DATASOURCE_ACTIVE_CONNECTIONS,
-        Collector.sanitizeMetricName(MetricsSource.GRAVITINO_SERVER_METRIC_NAME)
+            + MetricNames.DATASOURCE_ACTIVE_CONNECTIONS,
+        Collector.sanitizeMetricName(MetricsSource.GRAVITINO_RELATIONAL_STORE_METRIC_NAME)
             + "_"
-            + Collector.sanitizeMetricName(
-                MetricNames.ENTITY_STORE_RELATION_DATASOURCE_ACTIVE_CONNECTIONS),
+            + Collector.sanitizeMetricName(MetricNames.DATASOURCE_ACTIVE_CONNECTIONS),
         ImmutableMap.of());
 
     checkResult(
-        MetricsSource.GRAVITINO_SERVER_METRIC_NAME
+        MetricsSource.GRAVITINO_RELATIONAL_STORE_METRIC_NAME
             + "."
-            + MetricNames.ENTITY_STORE_RELATION_DATASOURCE_IDLE_CONNECTIONS,
-        Collector.sanitizeMetricName(MetricsSource.GRAVITINO_SERVER_METRIC_NAME)
+            + MetricNames.DATASOURCE_IDLE_CONNECTIONS,
+        Collector.sanitizeMetricName(MetricsSource.GRAVITINO_RELATIONAL_STORE_METRIC_NAME)
             + "_"
-            + Collector.sanitizeMetricName(
-                MetricNames.ENTITY_STORE_RELATION_DATASOURCE_IDLE_CONNECTIONS),
+            + Collector.sanitizeMetricName(MetricNames.DATASOURCE_IDLE_CONNECTIONS),
         ImmutableMap.of());
 
     checkResult(
-        MetricsSource.GRAVITINO_SERVER_METRIC_NAME
+        MetricsSource.GRAVITINO_RELATIONAL_STORE_METRIC_NAME
             + "."
-            + MetricNames.ENTITY_STORE_RELATION_DATASOURCE_MAX_CONNECTIONS,
-        Collector.sanitizeMetricName(MetricsSource.GRAVITINO_SERVER_METRIC_NAME)
+            + MetricNames.DATASOURCE_MAX_CONNECTIONS,
+        Collector.sanitizeMetricName(MetricsSource.GRAVITINO_RELATIONAL_STORE_METRIC_NAME)
             + "_"
-            + Collector.sanitizeMetricName(
-                MetricNames.ENTITY_STORE_RELATION_DATASOURCE_MAX_CONNECTIONS),
+            + Collector.sanitizeMetricName(MetricNames.DATASOURCE_MAX_CONNECTIONS),
         ImmutableMap.of());
   }
 }

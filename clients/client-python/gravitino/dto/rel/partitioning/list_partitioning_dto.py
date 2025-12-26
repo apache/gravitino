@@ -17,8 +17,8 @@
 
 from typing import List, Optional
 
-from gravitino.api.expressions.expression import Expression
-from gravitino.api.expressions.named_reference import NamedReference
+from gravitino.api.rel.expressions.expression import Expression
+from gravitino.api.rel.expressions.named_reference import NamedReference
 from gravitino.dto.rel.column_dto import ColumnDTO
 from gravitino.dto.rel.partition_utils import PartitionUtils
 from gravitino.dto.rel.partitioning.partitioning import Partitioning

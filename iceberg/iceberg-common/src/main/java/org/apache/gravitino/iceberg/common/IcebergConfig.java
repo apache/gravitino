@@ -262,6 +262,27 @@ public class IcebergConfig extends Config implements OverwriteDefaultConfig {
           .stringConf()
           .create();
 
+  public static final ConfigEntry<String> TABLE_METADATA_CACHE_IMPL =
+      new ConfigBuilder(IcebergConstants.TABLE_METADATA_CACHE_IMPL)
+          .doc("Table metadata cache implementation")
+          .version(ConfigConstants.VERSION_1_1_0)
+          .stringConf()
+          .create();
+
+  public static final ConfigEntry<Integer> TABLE_METADATA_CACHE_CAPACITY =
+      new ConfigBuilder(IcebergConstants.TABLE_METADATA_CACHE_CAPACITY)
+          .doc("Table metadata cache capacity")
+          .version(ConfigConstants.VERSION_1_1_0)
+          .intConf()
+          .createWithDefault(200);
+
+  public static final ConfigEntry<Integer> TABLE_METADATA_CACHE_EXPIRE_MINUTES =
+      new ConfigBuilder(IcebergConstants.TABLE_METADATA_CACHE_EXPIRE_MINUTES)
+          .doc("Table metadata cache expire minutes")
+          .version(ConfigConstants.VERSION_1_1_0)
+          .intConf()
+          .createWithDefault(60);
+
   public String getJdbcDriver() {
     return get(JDBC_DRIVER);
   }

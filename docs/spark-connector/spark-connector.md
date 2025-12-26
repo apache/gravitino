@@ -19,7 +19,7 @@ The Apache Gravitino Spark connector leverages the Spark DataSourceV2 interface 
 
 * Spark 3.3 or 3.4 or 3.5
 * Scala 2.12 or 2.13
-* JDK 8 or 11 or 17
+* JDK 8, 11 or 17
 
 ## How to use it
 
@@ -32,6 +32,7 @@ The Apache Gravitino Spark connector leverages the Spark DataSourceV2 interface 
 | spark.sql.gravitino.metalake             | string | (none)        | The metalake name that spark connector used to request to Gravitino.                            | Yes      | 0.5.0         |
 | spark.sql.gravitino.uri                  | string | (none)        | The uri of Gravitino server address.                                                            | Yes      | 0.5.0         |
 | spark.sql.gravitino.enableIcebergSupport | string | `false`       | Set to `true` to use Iceberg catalog.                                                           | No       | 0.5.1         |
+| spark.sql.gravitino.enablePaimonSupport  | string | `false`       | Set to `true` to use Paimon catalog.                                                            | No       | 1.0.0         |
 | spark.sql.gravitino.client.              | string | (none)        | The configuration key prefix for the Gravitino client config.                                   | No       | 1.0.0         |
 
 To configure the Gravitino client, use properties prefixed with `spark.sql.gravitino.client.`. These properties will be passed to the Gravitino client after removing the `spark.sql.` prefix.
@@ -83,23 +84,23 @@ The command `SHOW CATALOGS` will only display the Spark default catalog, named s
 
 Gravitino spark connector support the following datatype mapping between Spark and Gravitino.
 
-| Spark Data Type    | Gravitino Data Type           | Since Version |
-|--------------------|-------------------------------|---------------|
-| `BooleanType`      | `boolean`                     | 0.5.0         |
-| `ByteType`         | `byte`                        | 0.5.0         |
-| `ShortType`        | `short`                       | 0.5.0         |
-| `IntegerType`      | `integer`                     | 0.5.0         |
-| `LongType`         | `long`                        | 0.5.0         |
-| `FloatType`        | `float`                       | 0.5.0         |
-| `DoubleType`       | `double`                      | 0.5.0         |
-| `DecimalType`      | `decimal`                     | 0.5.0         |
-| `StringType`       | `string`                      | 0.5.0         |
-| `CharType`         | `char`                        | 0.5.0         |
-| `VarcharType`      | `varchar`                     | 0.5.0         |
-| `TimestampType`    | `timestamp with time zone`    | 0.5.0         |
-| `TimestampNTZType` | `timestamp without time zone` | 0.5.0         |
-| `DateType`         | `date`                        | 0.5.0         |
-| `BinaryType`       | `binary`                      | 0.5.0         |
-| `ArrayType`        | `array`                       | 0.5.0         |
-| `MapType`          | `map`                         | 0.5.0         |
-| `StructType`       | `struct`                      | 0.5.0         |
+| Spark Data Type                   | Gravitino Data Type           | Since Version |
+|-----------------------------------|-------------------------------|---------------|
+| `BooleanType`                     | `boolean`                     | 0.5.0         |
+| `ByteType`                        | `byte`                        | 0.5.0         |
+| `ShortType`                       | `short`                       | 0.5.0         |
+| `IntegerType`                     | `integer`                     | 0.5.0         |
+| `LongType`                        | `long`                        | 0.5.0         |
+| `FloatType`                       | `float`                       | 0.5.0         |
+| `DoubleType`                      | `double`                      | 0.5.0         |
+| `DecimalType`                     | `decimal`                     | 0.5.0         |
+| `StringType`                      | `string`                      | 0.5.0         |
+| `CharType`                        | `char`                        | 0.5.0         |
+| `VarcharType`                     | `varchar`                     | 0.5.0         |
+| `TimestampType`                   | `timestamp with time zone`    | 0.5.0         |
+| `TimestampNTZType` *(Spark 3.4+)* | `timestamp without time zone` | 0.5.0         |
+| `DateType`                        | `date`                        | 0.5.0         |
+| `BinaryType`                      | `binary`                      | 0.5.0         |
+| `ArrayType`                       | `array`                       | 0.5.0         |
+| `MapType`                         | `map`                         | 0.5.0         |
+| `StructType`                      | `struct`                      | 0.5.0         |

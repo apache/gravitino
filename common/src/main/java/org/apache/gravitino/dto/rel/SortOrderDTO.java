@@ -51,24 +51,32 @@ public class SortOrderDTO implements SortOrder {
     this.nullOrdering = nullOrdering;
   }
 
-  /** @return The sort term. */
+  /**
+   * @return The sort term.
+   */
   public FunctionArg sortTerm() {
     return sortTerm;
   }
 
-  /** @return The sort expression. */
+  /**
+   * @return The sort expression.
+   */
   @Override
   public Expression expression() {
     return sortTerm;
   }
 
-  /** @return The sort direction. */
+  /**
+   * @return The sort direction.
+   */
   @Override
   public SortDirection direction() {
     return direction;
   }
 
-  /** @return The null ordering. */
+  /**
+   * @return The null ordering.
+   */
   @Override
   public NullOrdering nullOrdering() {
     return nullOrdering;
@@ -138,12 +146,14 @@ public class SortOrderDTO implements SortOrder {
       // Default is by direction
       this.nullOrdering = nullOrdering == null ? direction.defaultNullOrdering() : nullOrdering;
 
-      Preconditions.checkNotNull(this.sortTerm, "expression cannot be null");
+      Preconditions.checkArgument(this.sortTerm != null, "expression cannot be null");
       return new SortOrderDTO(sortTerm, direction, nullOrdering);
     }
   }
 
-  /** @return the builder for creating a new instance of SortOrderDTO. */
+  /**
+   * @return the builder for creating a new instance of SortOrderDTO.
+   */
   public static Builder builder() {
     return new Builder();
   }

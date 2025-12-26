@@ -18,6 +18,11 @@
  */
 package org.apache.gravitino.gcs.fs;
 
+import static org.apache.gravitino.catalog.hadoop.fs.Constants.DEFAULT_CONNECTION_TIMEOUT;
+import static org.apache.gravitino.catalog.hadoop.fs.Constants.DEFAULT_RETRY_LIMIT;
+import static org.apache.gravitino.catalog.hadoop.fs.Constants.GCS_GCS_HTTP_CONNECT_TIMEOUT_KEY;
+import static org.apache.gravitino.catalog.hadoop.fs.Constants.GCS_HTTP_MAX_RETRY_KEY;
+
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
@@ -47,6 +52,8 @@ public class GCSFileSystemProvider implements FileSystemProvider, SupportsCreden
   public FileSystem getFileSystem(Path path, Map<String, String> config) throws IOException {
     Map<String, String> hadoopConfMap =
         FileSystemUtils.toHadoopConfigMap(config, GRAVITINO_KEY_TO_GCS_HADOOP_KEY);
+    hadoopConfMap = additionalGCSConfig(hadoopConfMap);
+
     Configuration configuration = FileSystemUtils.createConfiguration(hadoopConfMap);
     return FileSystem.newInstance(path.toUri(), configuration);
   }
@@ -70,5 +77,30 @@ public class GCSFileSystemProvider implements FileSystemProvider, SupportsCreden
   @Override
   public String name() {
     return "gcs";
+  }
+
+  /**
+   * Add additional GCS specific configuration to tune the performance.
+   *
+   * @param configs original configuration
+   * @return the configuration with additional GCS tuning parameters
+   */
+  private Map<String, String> additionalGCSConfig(Map<String, String> configs) {
+    Map<String, String> additionalConfigs = Maps.newHashMap(configs);
+
+    // Avoid multiple retries to speed up failure in test cases.
+    // Use hard code instead of GoogleHadoopFileSystemBase.GCS_HTTP_CONNECT_TIMEOUT_KEY to avoid
+    // dependency on a specific Hadoop version
+    if (!configs.containsKey(GCS_GCS_HTTP_CONNECT_TIMEOUT_KEY)) {
+      additionalConfigs.put(GCS_GCS_HTTP_CONNECT_TIMEOUT_KEY, DEFAULT_CONNECTION_TIMEOUT);
+    }
+
+    if (!configs.containsKey(GCS_HTTP_MAX_RETRY_KEY)) {
+      additionalConfigs.put(GCS_HTTP_MAX_RETRY_KEY, DEFAULT_RETRY_LIMIT);
+    }
+
+    // More tuning can be added here.
+
+    return ImmutableMap.copyOf(additionalConfigs);
   }
 }

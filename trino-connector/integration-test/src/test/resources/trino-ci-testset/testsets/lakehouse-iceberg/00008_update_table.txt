@@ -1,0 +1,25 @@
+CREATE SCHEMA
+
+CREATE TABLE
+
+INSERT: 2 rows
+
+"bob","14"
+"tom","12"
+
+UPDATE: 1 row
+
+"bob_update","14"
+"tom","12"
+
+CREATE TABLE
+
+INSERT: 2 rows
+
+<QUERY_FAILED> Iceberg table updates require at least format version 2
+
+DROP TABLE
+
+DROP TABLE
+
+DROP SCHEMA

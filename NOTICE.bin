@@ -918,3 +918,21 @@ OpenLineage
 This project includes code from the Marquez Project, part of the LFAI & Data Foundation.
 This project includes code from https://github.com/oittaa/uuid6-python repo (MIT license).
 This project includes code from https://github.com/f4b6a3/uuid-creator repo (MIT license).
+
+Eclipse Collections
+Copyright (c) 2022 Goldman Sachs and others.
+All rights reserved.
+
+This program and the accompanying materials are made available under the
+terms of the Eclipse Public License v1.0 and Eclipse Distribution License v1.0
+which accompany this distribution.
+
+FlatBuffers
+Copyright 2014 Google Inc.
+
+Apache HttpComponents Client
+Copyright 1999-2023 The Apache Software Foundation
+
+Apache HttpCore
+Copyright 2005-2020 The Apache Software Foundation
+

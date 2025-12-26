@@ -45,7 +45,11 @@ dependencies {
   implementation(libs.bundles.iceberg)
 
   implementation(libs.bundles.log4j)
-  implementation(libs.cglib)
+  implementation(libs.cglib) {
+    // The version of build-in asm is 7.1, which is not compatible with Java 17 well
+    exclude("org.ow2.asm")
+  }
+  implementation(libs.asm)
   implementation(libs.commons.collections4)
   implementation(libs.commons.io)
   implementation(libs.commons.lang3)
@@ -85,11 +89,16 @@ dependencies {
   testImplementation(libs.testcontainers.mysql)
   testImplementation(libs.testcontainers.postgresql)
 
+  // Add Hadoop 3.3+ dependencies since Spark's Hadoop is excluded
+  // Required for Iceberg 1.10+ which uses newer Hadoop APIs like FileSystem.openFile()
+  testImplementation(libs.hadoop3.client.api)
+  testImplementation(libs.hadoop3.client.runtime)
+
   testRuntimeOnly(libs.junit.jupiter.engine)
 }
 
 tasks {
-  val runtimeJars by registering(Copy::class) {
+  register("runtimeJars", Copy::class) {
     from(configurations.runtimeClasspath)
     into("build/libs")
   }
@@ -143,6 +152,8 @@ tasks.test {
     exclude("**/integration/test/**")
   } else {
     dependsOn(tasks.jar)
+    dependsOn(":iceberg:iceberg-rest-server:jar")
+    dependsOn(":lance:lance-rest-server:jar")
   }
 }
 

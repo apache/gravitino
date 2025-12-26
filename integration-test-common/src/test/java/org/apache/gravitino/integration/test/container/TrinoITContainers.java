@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.integration.test.container;
 
+import com.google.common.collect.ImmutableSet;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.gravitino.integration.test.util.CommandExecutor;
@@ -27,7 +28,6 @@ import org.apache.logging.log4j.util.Strings;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testcontainers.containers.ContainerLaunchException;
-import org.testcontainers.shaded.com.google.common.collect.ImmutableSet;
 
 public class TrinoITContainers implements AutoCloseable {
   private static final Logger LOG = LoggerFactory.getLogger(TrinoITContainers.class);
@@ -49,15 +49,22 @@ public class TrinoITContainers implements AutoCloseable {
   }
 
   public void launch(int gravitinoServerPort) throws Exception {
-    launch(gravitinoServerPort, 0);
+    launch(gravitinoServerPort, "hive2", false, 0);
   }
 
-  public void launch(int gravitinoServerPort, int trinoWokerNum) throws Exception {
+  public void launch(
+      int gravitinoServerPort,
+      String hiveRuntimeVersion,
+      boolean isTrinoConnectorTest,
+      int trinoWorkerNum)
+      throws Exception {
     shutdown();
 
     Map<String, String> env = new HashMap<>();
-    env.put("TRINO_WORKER_NUM", String.valueOf(trinoWokerNum));
+    env.put("TRINO_WORKER_NUM", String.valueOf(trinoWorkerNum));
     env.put("GRAVITINO_SERVER_PORT", String.valueOf(gravitinoServerPort));
+    env.put("HIVE_RUNTIME_VERSION", hiveRuntimeVersion);
+    env.put("TRINO_CONNECTOR_TEST", String.valueOf(isTrinoConnectorTest));
     if (System.getProperty("gravitino.log.path") != null) {
       env.put("GRAVITINO_LOG_PATH", System.getProperty("gravitino.log.path"));
     }

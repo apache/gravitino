@@ -5,7 +5,12 @@ keyword: spark connector paimon catalog
 license: "This software is licensed under the Apache License version 2."
 ---
 
-The Apache Gravitino Spark connector offers the capability to read and write Paimon tables, with the metadata managed by the Gravitino server. To enable the use of the Paimon catalog within the Spark connector now, you must set download [Paimon Spark runtime jar](https://paimon.apache.org/docs/0.8/spark/quick-start/#preparation) to Spark classpath.
+The Apache Gravitino Spark connector offers the capability to read and write Paimon tables, with the metadata managed by the Gravitino server.
+
+## Preparation
+
+1. Set `spark.sql.gravitino.enablePaimonSupport` to `true` in Spark configuration.
+2. Download Paimon Spark runtime jar to Spark classpath.
 
 ## Capabilities
 

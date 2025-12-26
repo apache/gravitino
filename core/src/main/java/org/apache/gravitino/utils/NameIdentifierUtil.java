@@ -18,10 +18,24 @@
  */
 package org.apache.gravitino.utils;
 
+import static org.apache.gravitino.Entity.EntityType.GROUP;
+import static org.apache.gravitino.Entity.EntityType.JOB;
+import static org.apache.gravitino.Entity.EntityType.JOB_TEMPLATE;
+import static org.apache.gravitino.Entity.EntityType.POLICY;
+import static org.apache.gravitino.Entity.EntityType.ROLE;
+import static org.apache.gravitino.Entity.EntityType.TAG;
+import static org.apache.gravitino.Entity.EntityType.USER;
+
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.Maps;
 import java.util.Arrays;
+import java.util.HashMap;
+import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.apache.gravitino.Entity;
@@ -41,6 +55,9 @@ import org.apache.gravitino.exceptions.IllegalNameIdentifierException;
 public class NameIdentifierUtil {
 
   private NameIdentifierUtil() {}
+
+  private static final Set<Entity.EntityType> SUPPORT_VIRTUAL_NAMESPACE_TYPES =
+      ImmutableSet.of(USER, GROUP, ROLE, TAG, POLICY, JOB, JOB_TEMPLATE);
 
   /**
    * Create the metalake {@link NameIdentifierUtil} with the given name.
@@ -358,6 +375,34 @@ public class NameIdentifierUtil {
   }
 
   /**
+   * Try to get the table {@link NameIdentifier} from the given {@link NameIdentifier}.
+   *
+   * @param ident The {@link NameIdentifier} to check.
+   * @return The table {@link NameIdentifier}
+   * @throws IllegalNameIdentifierException If the given {@link NameIdentifier} does not include
+   *     table name
+   */
+  public static NameIdentifier getTableIdentifier(NameIdentifier ident)
+      throws IllegalNameIdentifierException {
+    NameIdentifier.check(
+        ident.name() != null && !ident.name().isEmpty(),
+        "The name variable in the NameIdentifier must have value.");
+    Namespace.check(
+        ident.namespace() != null && !ident.namespace().isEmpty() && ident.namespace().length() > 2,
+        "Table namespace must be non-null and at least 2 level, the input namespace is %s",
+        ident.namespace());
+
+    List<String> allElems =
+        Stream.concat(Arrays.stream(ident.namespace().levels()), Stream.of(ident.name()))
+            .collect(Collectors.toList());
+    if (allElems.size() < 4) {
+      throw new IllegalNameIdentifierException(
+          "Cannot create a table NameIdentifier less than four elements.");
+    }
+    return NameIdentifier.of(allElems.get(0), allElems.get(1), allElems.get(2), allElems.get(3));
+  }
+
+  /**
    * Check the given {@link NameIdentifier} is a metalake identifier. Throw an {@link
    * IllegalNameIdentifierException} if it's not.
    *
@@ -368,6 +413,24 @@ public class NameIdentifierUtil {
     // creating NameIdentifier object.
     NameIdentifier.check(ident != null, "Metalake identifier must not be null");
     NamespaceUtil.checkMetalake(ident.namespace());
+  }
+
+  public static void checkTag(NameIdentifier ident) {
+    NameIdentifier.check(ident != null, "Tag identifier must not be null");
+    Namespace namespace = ident.namespace();
+    Namespace.check(
+        namespace != null && !namespace.isEmpty() && namespace.length() == 3,
+        "Tag namespace must be 3 level, the input namespace is %s",
+        namespace);
+  }
+
+  public static void checkPolicy(NameIdentifier ident) {
+    NameIdentifier.check(ident != null, "Policy identifier must not be null");
+    Namespace namespace = ident.namespace();
+    Namespace.check(
+        namespace != null && !namespace.isEmpty() && namespace.length() == 3,
+        "Policy namespace must be 3 level, the input namespace is %s",
+        namespace);
   }
 
   /**
@@ -459,6 +522,28 @@ public class NameIdentifierUtil {
   }
 
   /**
+   * Check the given {@link NameIdentifier} is a job identifier. Throw an {@link
+   * IllegalNameIdentifierException} if it's not.
+   *
+   * @param ident The job {@link NameIdentifier} to check.
+   */
+  public static void checkJob(NameIdentifier ident) {
+    NameIdentifier.check(ident != null, "Job identifier must not be null");
+    NamespaceUtil.checkJob(ident.namespace());
+  }
+
+  /**
+   * Check the given {@link NameIdentifier} is a job template identifier. Throw an {@link
+   * IllegalNameIdentifierException} if it's not.
+   *
+   * @param ident The job template {@link NameIdentifier} to check.
+   */
+  public static void checkJobTemplate(NameIdentifier ident) {
+    NameIdentifier.check(ident != null, "Job template identifier must not be null");
+    NamespaceUtil.checkJobTemplate(ident.namespace());
+  }
+
+  /**
    * Convert the given {@link NameIdentifier} and {@link Entity.EntityType} to {@link
    * MetadataObject}.
    *
@@ -516,6 +601,21 @@ public class NameIdentifierUtil {
       case ROLE:
         AuthorizationUtils.checkRole(ident);
         return MetadataObjects.of(null, ident.name(), MetadataObject.Type.ROLE);
+      case TAG:
+        checkTag(ident);
+        return MetadataObjects.of(null, ident.name(), MetadataObject.Type.TAG);
+
+      case POLICY:
+        checkPolicy(ident);
+        return MetadataObjects.of(null, ident.name(), MetadataObject.Type.POLICY);
+
+      case JOB:
+        checkJob(ident);
+        return MetadataObjects.of(null, ident.name(), MetadataObject.Type.JOB);
+
+      case JOB_TEMPLATE:
+        checkJobTemplate(ident);
+        return MetadataObjects.of(null, ident.name(), MetadataObject.Type.JOB_TEMPLATE);
 
       default:
         throw new IllegalArgumentException(
@@ -588,5 +688,218 @@ public class NameIdentifierUtil {
           "Cannot create a model NameIdentifier less than four elements.");
     }
     return NameIdentifier.of(allElems.get(0), allElems.get(1), allElems.get(2), allElems.get(3));
+  }
+
+  public static NameIdentifier parentNameIdentifier(
+      NameIdentifier nameIdentifier, Entity.EntityType type) {
+
+    if (SUPPORT_VIRTUAL_NAMESPACE_TYPES.contains(type)) {
+      return NameIdentifier.of(NameIdentifierUtil.getMetalake(nameIdentifier));
+
+    } else if (nameIdentifier.hasNamespace()) {
+      return NameIdentifier.of(nameIdentifier.namespace().levels());
+
+    } else {
+      throw new IllegalArgumentException("The entity has no parent name identifier");
+    }
+  }
+
+  /**
+   * Build a NameIdentifier for the given entity type and name, using the provided entity context.
+   * This method constructs the identifier hierarchically using the parent entity type
+   * relationships.
+   *
+   * <p>Examples:
+   *
+   * <pre>
+   * 1. Build a TABLE identifier:
+   *    Input:
+   *      type = Entity.EntityType.TABLE
+   *      name = "users"
+   *      entities = {
+   *        METALAKE -> "my_metalake",
+   *        CATALOG -> "my_catalog",
+   *        SCHEMA -> "my_schema"
+   *      }
+   *    Result: NameIdentifier.of("my_metalake", "my_catalog", "my_schema", "users")
+   *
+   * 2. Build a SCHEMA identifier:
+   *    Input:
+   *      type = Entity.EntityType.SCHEMA
+   *      name = "my_schema"
+   *      entities = {
+   *        METALAKE -> "my_metalake",
+   *        CATALOG -> "my_catalog"
+   *      }
+   *    Result: NameIdentifier.of("my_metalake", "my_catalog", "my_schema")
+   *
+   * 3. Build a USER identifier (virtual namespace type):
+   *    Input:
+   *      type = Entity.EntityType.USER
+   *      name = "john_doe"
+   *      entities = {
+   *        METALAKE -> "my_metalake"
+   *      }
+   *    Result: NameIdentifier.of(NamespaceUtil.ofUser("my_metalake"), "john_doe")
+   *            which creates a NameIdentifier with namespace ["my_metalake", "system", "user"]
+   *            and name "john_doe"
+   *
+   * 4. Build a COLUMN identifier:
+   *    Input:
+   *      type = Entity.EntityType.COLUMN
+   *      name = "id"
+   *      entities = {
+   *        METALAKE -> "my_metalake",
+   *        CATALOG -> "my_catalog",
+   *        SCHEMA -> "my_schema",
+   *        TABLE -> "users"
+   *      }
+   *    Result: NameIdentifier.of("my_metalake", "my_catalog", "my_schema", "users", "id")
+   * </pre>
+   *
+   * @param type The entity type
+   * @param name The entity name
+   * @param entities Map containing the metalake, catalog, schema names and other parent entities
+   * @return The created NameIdentifier
+   * @throws IllegalArgumentException if the entity type is not supported or required parent
+   *     entities are missing
+   */
+  public static NameIdentifier buildNameIdentifier(
+      Entity.EntityType type, String name, Map<Entity.EntityType, String> entities) {
+    String metalake = entities.get(Entity.EntityType.METALAKE);
+
+    // Handle metalake as the root
+    if (type == Entity.EntityType.METALAKE) {
+      return ofMetalake(metalake);
+    }
+
+    // Handle virtual namespace types early to avoid unnecessary work
+    if (SUPPORT_VIRTUAL_NAMESPACE_TYPES.contains(type)) {
+      Namespace namespace = createVirtualNamespace(type, metalake);
+      return NameIdentifier.of(namespace, name);
+    }
+
+    // Build the full name path by traversing the hierarchy from child to root
+    // Using LinkedList for efficient prepend operations
+    LinkedList<String> levels = new LinkedList<>();
+    levels.add(name);
+
+    Entity.EntityType currentType = type;
+    while (currentType != Entity.EntityType.METALAKE) {
+      Entity.EntityType parentType = parentEntityType(currentType);
+      String parentName = entities.get(parentType);
+
+      if (parentType == Entity.EntityType.METALAKE) {
+        levels.addFirst(metalake);
+        break;
+      } else if (parentName == null) {
+        throw new IllegalArgumentException(
+            "Cannot build NameIdentifier for type "
+                + type
+                + ": missing parent entity of type "
+                + parentType);
+      }
+
+      levels.addFirst(parentName);
+      currentType = parentType;
+    }
+
+    // Create NameIdentifier from the full path
+    return NameIdentifier.of(levels.toArray(new String[0]));
+  }
+
+  /**
+   * Build a map of NameIdentifiers from entity data.
+   *
+   * @param entities Map containing entity types and their names (e.g., METALAKE, CATALOG, SCHEMA,
+   *     etc.)
+   * @return Map of entity types to their NameIdentifiers
+   */
+  public static Map<Entity.EntityType, NameIdentifier> buildNameIdentifierMap(
+      Map<Entity.EntityType, String> entities) {
+    Map<Entity.EntityType, NameIdentifier> nameIdentifierMap = Maps.newHashMap();
+
+    entities.forEach(
+        (type, name) -> {
+          NameIdentifier identifier = buildNameIdentifier(type, name, entities);
+          nameIdentifierMap.put(type, identifier);
+        });
+
+    return nameIdentifierMap;
+  }
+
+  public static Entity.EntityType parentEntityType(Entity.EntityType type) {
+    switch (type) {
+      case COLUMN:
+        return Entity.EntityType.TABLE;
+      case MODEL_VERSION:
+        return Entity.EntityType.MODEL;
+
+      case TABLE:
+      case FILESET:
+      case MODEL:
+      case TOPIC:
+        return Entity.EntityType.SCHEMA;
+
+      case SCHEMA:
+        return Entity.EntityType.CATALOG;
+
+      case CATALOG:
+      case USER:
+      case GROUP:
+      case ROLE:
+      case TAG:
+      case POLICY:
+      case JOB:
+      case JOB_TEMPLATE:
+        return Entity.EntityType.METALAKE;
+
+      case METALAKE:
+      default:
+        throw new IllegalArgumentException("Metalake has no parent entity type");
+    }
+  }
+
+  /**
+   * Extract the parent metadata from NameIdentifier. For example, when given a Table
+   * NameIdentifier, it returns a map containing the Table itself along with its parent Schema and
+   * Catalog.
+   *
+   * @param metalake metalake
+   * @param entityType metadata type
+   * @param nameIdentifier metadata name
+   * @return A map containing the metadata object and all its parent objects, keyed by their types
+   */
+  public static Map<Entity.EntityType, NameIdentifier> splitNameIdentifier(
+      String metalake, Entity.EntityType entityType, NameIdentifier nameIdentifier) {
+    Map<Entity.EntityType, NameIdentifier> nameIdentifierMap = new HashMap<>();
+    nameIdentifierMap.put(Entity.EntityType.METALAKE, ofMetalake(metalake));
+    while (entityType != Entity.EntityType.METALAKE) {
+      nameIdentifierMap.put(entityType, nameIdentifier);
+      entityType = parentEntityType(entityType);
+      nameIdentifier = parentNameIdentifier(nameIdentifier, entityType);
+    }
+    return nameIdentifierMap;
+  }
+
+  private static Namespace createVirtualNamespace(Entity.EntityType type, String metalake) {
+    switch (type) {
+      case USER:
+        return NamespaceUtil.ofUser(metalake);
+      case GROUP:
+        return NamespaceUtil.ofGroup(metalake);
+      case ROLE:
+        return NamespaceUtil.ofRole(metalake);
+      case TAG:
+        return NamespaceUtil.ofTag(metalake);
+      case POLICY:
+        return NamespaceUtil.ofPolicy(metalake);
+      case JOB:
+        return NamespaceUtil.ofJob(metalake);
+      case JOB_TEMPLATE:
+        return NamespaceUtil.ofJobTemplate(metalake);
+      default:
+        throw new IllegalArgumentException("Unsupported virtual namespace type: " + type);
+    }
   }
 }

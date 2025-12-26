@@ -21,7 +21,7 @@ package org.apache.gravitino.iceberg.service.dispatcher;
 
 import java.util.Optional;
 import org.apache.gravitino.NameIdentifier;
-import org.apache.gravitino.iceberg.service.IcebergRestUtils;
+import org.apache.gravitino.iceberg.service.IcebergRESTUtils;
 import org.apache.gravitino.listener.EventBus;
 import org.apache.gravitino.listener.api.event.BaseEvent;
 import org.apache.gravitino.listener.api.event.IcebergCreateTableEvent;
@@ -33,9 +33,15 @@ import org.apache.gravitino.listener.api.event.IcebergDropTablePreEvent;
 import org.apache.gravitino.listener.api.event.IcebergListTableEvent;
 import org.apache.gravitino.listener.api.event.IcebergListTableFailureEvent;
 import org.apache.gravitino.listener.api.event.IcebergListTablePreEvent;
+import org.apache.gravitino.listener.api.event.IcebergLoadTableCredentialEvent;
+import org.apache.gravitino.listener.api.event.IcebergLoadTableCredentialFailureEvent;
+import org.apache.gravitino.listener.api.event.IcebergLoadTableCredentialPreEvent;
 import org.apache.gravitino.listener.api.event.IcebergLoadTableEvent;
 import org.apache.gravitino.listener.api.event.IcebergLoadTableFailureEvent;
 import org.apache.gravitino.listener.api.event.IcebergLoadTablePreEvent;
+import org.apache.gravitino.listener.api.event.IcebergPlanTableScanEvent;
+import org.apache.gravitino.listener.api.event.IcebergPlanTableScanFailureEvent;
+import org.apache.gravitino.listener.api.event.IcebergPlanTableScanPreEvent;
 import org.apache.gravitino.listener.api.event.IcebergRenameTableEvent;
 import org.apache.gravitino.listener.api.event.IcebergRenameTableFailureEvent;
 import org.apache.gravitino.listener.api.event.IcebergRenameTablePreEvent;
@@ -49,10 +55,13 @@ import org.apache.gravitino.listener.api.event.IcebergUpdateTablePreEvent;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.rest.requests.CreateTableRequest;
+import org.apache.iceberg.rest.requests.PlanTableScanRequest;
 import org.apache.iceberg.rest.requests.RenameTableRequest;
 import org.apache.iceberg.rest.requests.UpdateTableRequest;
 import org.apache.iceberg.rest.responses.ListTablesResponse;
+import org.apache.iceberg.rest.responses.LoadCredentialsResponse;
 import org.apache.iceberg.rest.responses.LoadTableResponse;
+import org.apache.iceberg.rest.responses.PlanTableScanResponse;
 
 /**
  * {@code IcebergTableEventDispatcher} is a decorator for {@link IcebergTableOperationExecutor} that
@@ -79,7 +88,7 @@ public class IcebergTableEventDispatcher implements IcebergTableOperationDispatc
       IcebergRequestContext context, Namespace namespace, CreateTableRequest createTableRequest) {
     TableIdentifier tableIdentifier = TableIdentifier.of(namespace, createTableRequest.name());
     NameIdentifier nameIdentifier =
-        IcebergRestUtils.getGravitinoNameIdentifier(
+        IcebergRESTUtils.getGravitinoNameIdentifier(
             metalakeName, context.catalogName(), tableIdentifier);
     Optional<BaseEvent> transformedEvent =
         eventBus.dispatchEvent(
@@ -112,7 +121,7 @@ public class IcebergTableEventDispatcher implements IcebergTableOperationDispatc
       TableIdentifier tableIdentifier,
       UpdateTableRequest updateTableRequest) {
     NameIdentifier gravitinoNameIdentifier =
-        IcebergRestUtils.getGravitinoNameIdentifier(
+        IcebergRESTUtils.getGravitinoNameIdentifier(
             metalakeName, context.catalogName(), tableIdentifier);
     Optional<BaseEvent> transformedEvent =
         eventBus.dispatchEvent(
@@ -143,7 +152,7 @@ public class IcebergTableEventDispatcher implements IcebergTableOperationDispatc
   public void dropTable(
       IcebergRequestContext context, TableIdentifier tableIdentifier, boolean purgeRequested) {
     NameIdentifier gravitinoNameIdentifier =
-        IcebergRestUtils.getGravitinoNameIdentifier(
+        IcebergRESTUtils.getGravitinoNameIdentifier(
             metalakeName, context.catalogName(), tableIdentifier);
     eventBus.dispatchEvent(
         new IcebergDropTablePreEvent(context, gravitinoNameIdentifier, purgeRequested));
@@ -162,7 +171,7 @@ public class IcebergTableEventDispatcher implements IcebergTableOperationDispatc
   public LoadTableResponse loadTable(
       IcebergRequestContext context, TableIdentifier tableIdentifier) {
     NameIdentifier gravitinoNameIdentifier =
-        IcebergRestUtils.getGravitinoNameIdentifier(
+        IcebergRESTUtils.getGravitinoNameIdentifier(
             metalakeName, context.catalogName(), tableIdentifier);
     eventBus.dispatchEvent(new IcebergLoadTablePreEvent(context, gravitinoNameIdentifier));
     LoadTableResponse loadTableResponse;
@@ -180,7 +189,7 @@ public class IcebergTableEventDispatcher implements IcebergTableOperationDispatc
   @Override
   public ListTablesResponse listTable(IcebergRequestContext context, Namespace namespace) {
     NameIdentifier gravitinoNameIdentifier =
-        IcebergRestUtils.getGravitinoNameIdentifier(metalakeName, context.catalogName(), namespace);
+        IcebergRESTUtils.getGravitinoNameIdentifier(metalakeName, context.catalogName(), namespace);
     eventBus.dispatchEvent(new IcebergListTablePreEvent(context, gravitinoNameIdentifier));
     ListTablesResponse listTablesResponse;
     try {
@@ -196,7 +205,7 @@ public class IcebergTableEventDispatcher implements IcebergTableOperationDispatc
   @Override
   public boolean tableExists(IcebergRequestContext context, TableIdentifier tableIdentifier) {
     NameIdentifier gravitinoNameIdentifier =
-        IcebergRestUtils.getGravitinoNameIdentifier(
+        IcebergRESTUtils.getGravitinoNameIdentifier(
             metalakeName, context.catalogName(), tableIdentifier);
     eventBus.dispatchEvent(new IcebergTableExistsPreEvent(context, gravitinoNameIdentifier));
     boolean isExists;
@@ -215,7 +224,7 @@ public class IcebergTableEventDispatcher implements IcebergTableOperationDispatc
   public void renameTable(IcebergRequestContext context, RenameTableRequest renameTableRequest) {
     TableIdentifier sourceTable = renameTableRequest.source();
     NameIdentifier gravitinoNameIdentifier =
-        IcebergRestUtils.getGravitinoNameIdentifier(
+        IcebergRESTUtils.getGravitinoNameIdentifier(
             metalakeName, context.catalogName(), sourceTable);
     eventBus.dispatchEvent(
         new IcebergRenameTablePreEvent(context, gravitinoNameIdentifier, renameTableRequest));
@@ -229,5 +238,66 @@ public class IcebergTableEventDispatcher implements IcebergTableOperationDispatc
     }
     eventBus.dispatchEvent(
         new IcebergRenameTableEvent(context, gravitinoNameIdentifier, renameTableRequest));
+  }
+
+  /**
+   * Get credentials for an Iceberg table.
+   *
+   * @param context Iceberg REST request context information.
+   * @param tableIdentifier The Iceberg table identifier.
+   * @return A {@link org.apache.iceberg.rest.responses.LoadCredentialsResponse} object containing
+   *     the credentials.
+   */
+  @Override
+  public LoadCredentialsResponse getTableCredentials(
+      IcebergRequestContext context, TableIdentifier tableIdentifier) {
+    NameIdentifier gravitinoNameIdentifier =
+        IcebergRESTUtils.getGravitinoNameIdentifier(
+            metalakeName, context.catalogName(), tableIdentifier);
+    eventBus.dispatchEvent(
+        new IcebergLoadTableCredentialPreEvent(context, gravitinoNameIdentifier));
+    LoadCredentialsResponse loadCredentialsResponse;
+    try {
+      loadCredentialsResponse =
+          icebergTableOperationDispatcher.getTableCredentials(context, tableIdentifier);
+    } catch (Exception e) {
+      eventBus.dispatchEvent(
+          new IcebergLoadTableCredentialFailureEvent(context, gravitinoNameIdentifier, e));
+      throw e;
+    }
+    eventBus.dispatchEvent(new IcebergLoadTableCredentialEvent(context, gravitinoNameIdentifier));
+    return loadCredentialsResponse;
+  }
+
+  /**
+   * Plan table scan and return scan tasks.
+   *
+   * <p>Dispatches pre/post events for table scan planning operation.
+   *
+   * @param context Iceberg REST request context information.
+   * @param tableIdentifier The Iceberg table identifier.
+   * @param scanRequest The scan request parameters
+   * @return A PlanTableScanResponse containing the scan plan with plan-id and tasks
+   */
+  @Override
+  public PlanTableScanResponse planTableScan(
+      IcebergRequestContext context,
+      TableIdentifier tableIdentifier,
+      PlanTableScanRequest scanRequest) {
+    NameIdentifier gravitinoNameIdentifier =
+        IcebergRESTUtils.getGravitinoNameIdentifier(
+            metalakeName, context.catalogName(), tableIdentifier);
+    eventBus.dispatchEvent(new IcebergPlanTableScanPreEvent(context, gravitinoNameIdentifier));
+    PlanTableScanResponse planTableScanResponse;
+    try {
+      planTableScanResponse =
+          icebergTableOperationDispatcher.planTableScan(context, tableIdentifier, scanRequest);
+    } catch (Exception e) {
+      eventBus.dispatchEvent(
+          new IcebergPlanTableScanFailureEvent(context, gravitinoNameIdentifier, e));
+      throw e;
+    }
+    eventBus.dispatchEvent(new IcebergPlanTableScanEvent(context, gravitinoNameIdentifier));
+    return planTableScanResponse;
   }
 }

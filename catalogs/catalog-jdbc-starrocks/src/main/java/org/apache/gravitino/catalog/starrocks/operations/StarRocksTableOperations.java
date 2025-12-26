@@ -178,10 +178,10 @@ public class StarRocksTableOperations extends JdbcTableOperations {
         }
         TableChange.SetProperty setProperty = (TableChange.SetProperty) change;
         if (!SUPPORTED_MODIFY_PROPERTIES.contains(setProperty.getProperty())
-            && setProperty
+            && !setProperty
                 .getProperty()
                 .startsWith(SUPPORTED_MODIFY_PROPERTIES_PREFIX_DYNAMIC_PARTITION)
-            && setProperty.getProperty().startsWith(SUPPORTED_MODIFY_PROPERTIES_PREFIX_BINLOG)) {
+            && !setProperty.getProperty().startsWith(SUPPORTED_MODIFY_PROPERTIES_PREFIX_BINLOG)) {
           throw new IllegalArgumentException(
               "Current StarRocks not support modify this table property "
                   + setProperty.getProperty());

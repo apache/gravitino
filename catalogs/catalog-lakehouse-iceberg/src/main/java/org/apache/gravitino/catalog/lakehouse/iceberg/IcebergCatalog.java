@@ -36,7 +36,9 @@ public class IcebergCatalog extends BaseCatalog<IcebergCatalog> {
   static final IcebergTablePropertiesMetadata TABLE_PROPERTIES_META =
       new IcebergTablePropertiesMetadata();
 
-  /** @return The short name of the catalog. */
+  /**
+   * @return The short name of the catalog.
+   */
   @Override
   public String shortName() {
     return "lakehouse-iceberg";

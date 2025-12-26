@@ -38,7 +38,7 @@ public class DeleteRoleFailureEvent extends RoleFailureEvent {
    * @param exception the exception that caused the failure
    * @param roleName the name of the role intended for deletion
    */
-  protected DeleteRoleFailureEvent(
+  public DeleteRoleFailureEvent(
       String user, String metalake, Exception exception, String roleName) {
     super(user, NameIdentifierUtil.ofRole(metalake, roleName), exception);
 

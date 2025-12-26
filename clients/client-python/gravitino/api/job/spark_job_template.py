@@ -23,6 +23,9 @@ from .job_template import JobTemplate, JobType
 class SparkJobTemplate(JobTemplate):
     """
     Represents a job template for executing Spark jobs.
+
+    Note: The class_name field is required for Java/Scala Spark applications but is
+    optional for PySpark applications. For PySpark jobs, this field can be None.
     """
 
     def __init__(self, builder: "SparkJobTemplate.Builder"):
@@ -41,8 +44,11 @@ class SparkJobTemplate(JobTemplate):
         """
         Returns the class name of the Spark job.
 
+        This field is required for Java/Scala Spark applications but optional for PySpark
+        applications. For PySpark jobs, this may return None.
+
         Returns:
-            the class name as a string.
+            the class name as a string, or None for PySpark applications.
         """
         return self._class_name
 
@@ -188,8 +194,11 @@ class SparkJobTemplate(JobTemplate):
             """
             Sets the class name for this Spark job template.
 
+            This field is required for Java/Scala Spark applications but optional for PySpark
+            applications. For PySpark jobs, you can omit this call or set it to None.
+
             Args:
-                class_name: The fully qualified name of the Spark job class.
+                class_name: The fully qualified name of the Spark job class, or None for PySpark applications.
 
             Returns:
                 The builder instance for method chaining.
@@ -252,10 +261,11 @@ class SparkJobTemplate(JobTemplate):
         def validate(self):
             """
             Validates the SparkJobTemplate properties.
+
+            Note: className is required for Java/Scala Spark applications but optional for PySpark.
             """
             super().validate()
-            if not self.class_name or not self.class_name.strip():
-                raise ValueError("Class name must not be null or empty")
+            # className is optional - required for Java/Scala but not for PySpark
             self.jars = self.jars or []
             self.files = self.files or []
             self.archives = self.archives or []

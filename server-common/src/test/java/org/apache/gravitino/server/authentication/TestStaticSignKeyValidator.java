@@ -27,6 +27,7 @@ import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
 import io.jsonwebtoken.security.Keys;
 import java.security.Key;
+import java.security.KeyPair;
 import java.security.Principal;
 import java.time.Instant;
 import java.util.Arrays;
@@ -227,5 +228,29 @@ public class TestStaticSignKeyValidator {
 
     assertThrows(
         UnauthorizedException.class, () -> validator.validateToken(token, serviceAudience));
+  }
+
+  @Test
+  public void testValidateTokenWithEcdsaSignature() {
+    KeyPair keyPair = Keys.keyPairFor(SignatureAlgorithm.ES256);
+    Map<String, String> config = createBaseConfig();
+    config.put(
+        "gravitino.authenticator.oauth.defaultSignKey",
+        Base64.getEncoder().encodeToString(keyPair.getPublic().getEncoded()));
+    config.put("gravitino.authenticator.oauth.signAlgorithmType", "ES256");
+    validator.initialize(createConfig(config));
+
+    String token =
+        Jwts.builder()
+            .setSubject("test-user")
+            .setAudience(serviceAudience)
+            .setIssuedAt(Date.from(Instant.now()))
+            .setExpiration(Date.from(Instant.now().plusSeconds(3600)))
+            .signWith(keyPair.getPrivate(), SignatureAlgorithm.ES256)
+            .compact();
+
+    Principal principal = validator.validateToken(token, serviceAudience);
+    assertNotNull(principal);
+    assertEquals("test-user", principal.getName());
   }
 }

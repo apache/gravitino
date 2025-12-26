@@ -81,11 +81,18 @@ Currently, it doesn't support certain query optimizations, such as pushdown and 
 
 ### Update
 
-Not support.
+`UPDATE` is only supported for transactional Hive tables with format ORC. `UPDATE` of partition or bucket columns is not supported.
 
 ### Delete
 
-Not support.
+`DELETE` applied to non-transactional tables is only supported if the table is partitioned and the `WHERE` clause matches entire partitions. 
+Transactional Hive tables with ORC format support "row-by-row" deletion, in which the `WHERE` clause may match arbitrary sets of rows.
+
+### Merge
+
+`MERGE` is only supported for ACID tables.
+
+See also [more limitation](https://trino.io/docs/current/connector/hive.html#data-management).
 
 ## Schema and table properties
 
@@ -250,13 +257,60 @@ WITH (
 Insert data into the table `table_01`:
 
 ```sql
-INSERT INTO hive_test.database_01.table_01 (name, salary) VALUES ('ice', 12, 22);
+INSERT INTO hive_test.database_01.table_01 (name, salary, month) VALUES ('ice', 12, 22);
 ```
 
 Insert data into the table `table_01` from select:
 
 ```sql
 INSERT INTO hive_test.database_01.table_01 (name, salary, month) SELECT * FROM hive_test.database_01.table_01;
+```
+
+Delete data from the table `table_01` with an entire partition:
+
+```sql
+DELETE FROM hive_test.database_01.table_01 WHERE month=22;
+```
+
+If an ACID table is defined in the schema `hive_test.database_01` as follows: 
+
+```sql
+CREATE TABLE database_01.test_acid
+(
+    id INT,
+    name STRING,
+    salary INT
+)
+CLUSTERED BY (id) INTO 4 BUCKETS
+STORED AS ORC
+TBLPROPERTIES ('transactional'='true');
+```
+
+Update data into table `test_acid`:
+
+```sql
+UPDATE hive_test.database_01.test_acid SET name='bob' WHERE id=1;
+```
+
+Delete data from table `test_acid`:
+
+```sql
+DELETE FROM hive_test.database_01.test_acid WHERE id=1;
+```
+
+Merge data into table `test_acid`:
+
+```sql
+MERGE INTO hive_test.database_01.test_acid t USING hive_test.database_01.table_01 s
+    ON (t.name = s.name)
+    WHEN MATCHED AND s.name = 'bob'
+        THEN DELETE
+    WHEN MATCHED
+        THEN UPDATE
+            SET salary = s.salary + t.salary
+    WHEN NOT MATCHED
+        THEN INSERT (id, name, salary)
+              VALUES (3, s.name, s.salary);
 ```
 
 ### Querying data

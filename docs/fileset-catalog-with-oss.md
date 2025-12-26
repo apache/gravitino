@@ -286,13 +286,11 @@ If your wants to custom your hadoop version or there is already a hadoop version
     <artifactId>gravitino-filesystem-hadoop3-runtime</artifactId>
     <version>${GRAVITINO_VERSION}</version>
   </dependency>
-
-  <dependency>
-    <groupId>org.apache.gravitino</groupId>
-    <artifactId>gravitino-aliyun</artifactId>
-    <version>${GRAVITINO_VERSION}</version>
-  </dependency>
 ```
+
+:::note
+Since version 1.1.0, the `gravitino-aliyun` JAR is no longer required, as it is now included in the `gravitino-filesystem-hadoop3-runtime` JAR.
+:::
 
 Or use the bundle jar with Hadoop environment if there is no Hadoop environment:
 
@@ -335,7 +333,7 @@ fileset_name = "your_oss_fileset"
 
 # JDK8 as follows, JDK17 will be slightly different, you need to add '--conf \"spark.driver.extraJavaOptions=--add-opens=java.base/sun.nio.ch=ALL-UNNAMED\" --conf \"spark.executor.extraJavaOptions=--add-opens=java.base/sun.nio.ch=ALL-UNNAMED\"' to the submit args.
 os.environ["PYSPARK_SUBMIT_ARGS"] = (
-    "--jars /path/to/gravitino-aliyun-{gravitino-version}.jar,"
+    "--jars "
     "/path/to/gravitino-filesystem-hadoop3-runtime-{gravitino-version}.jar,"
     "/path/to/aliyun-sdk-oss-3.13.0.jar,"
     "/path/to/hadoop-aliyun-3.3.4.jar,"
@@ -374,9 +372,10 @@ If your Spark **without Hadoop environment**, you can use the following code sni
 os.environ["PYSPARK_SUBMIT_ARGS"] = "--jars /path/to/gravitino-aliyun-bundle-{gravitino-version}.jar,/path/to/gravitino-filesystem-hadoop3-runtime-{gravitino-version}.jar, --master local[1] pyspark-shell"
 ```
 
-- [`gravitino-aliyun-bundle-${gravitino-version}.jar`](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-aliyun-bundle) is the Gravitino Aliyun jar with Hadoop environment(3.3.1) and `hadoop-oss` jar.
-- [`gravitino-aliyun-${gravitino-version}.jar`](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-aliyun) is a condensed version of the Gravitino Aliyun bundle jar without Hadoop environment and `hadoop-aliyun` jar.
--`hadoop-aliyun-3.3.4.jar`, `jdom2-2.0.6.jar`, and `aliyun-sdk-oss-3.13.0.jar` can be found in the Hadoop distribution in the `${HADOOP_HOME}/share/hadoop/tools/lib` directory.
+- [`gravitino-aliyun-bundle-${gravitino-version}.jar`](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-aliyun-bundle): A "fat" JAR that includes `gravitino-aliyun` functionality and all necessary dependencies like `hadoop-aliyun` (3.3.1) and `aliyun-sdk-oss`. Use this if your Spark environment doesn't have a pre-existing Hadoop setup.
+- [`gravitino-filesystem-hadoop3-runtime-${gravitino-version}.jar`](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-filesystem-hadoop3-runtime): A "fat" JAR that bundles Gravitino's virtual filesystem client and includes the functionality of `gravitino-aliyun`. It is required for accessing Gravitino filesets.
+- `hadoop-aliyun-3.3.4.jar`, `jdom2-2.0.6.jar`, and `aliyun-sdk-oss-3.13.0.jar`: Standard Hadoop dependencies for OSS access. If you are running in an existing Hadoop environment, you need to provide these JARs. They are typically located in the `${HADOOP_HOME}/share/hadoop/tools/lib` directory.
+- [`gravitino-aliyun-${gravitino-version}.jar`](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-aliyun): A "thin" JAR that only provides the Aliyun integration code. Its functionality is already included in the `gravitino-aliyun-bundle` and `gravitino-filesystem-hadoop3-runtime` JARs, so you do not need to add it as a direct dependency unless you want to manage all Hadoop and Aliyun dependencies manually.
 
 Please choose the correct jar according to your environment.
 
@@ -429,7 +428,7 @@ The following are examples of how to use the `hadoop fs` command to access the f
 
 2. Add the necessary jars to the Hadoop classpath.
 
-For OSS, you need to add `gravitino-filesystem-hadoop3-runtime-${gravitino-version}.jar`, `gravitino-aliyun-${gravitino-version}.jar` and `hadoop-aliyun-${hadoop-version}.jar` located at `${HADOOP_HOME}/share/hadoop/tools/lib/` to Hadoop classpath. 
+For OSS, you need to add `gravitino-filesystem-hadoop3-runtime-${gravitino-version}.jar` and `hadoop-aliyun-${hadoop-version}.jar` located at `${HADOOP_HOME}/share/hadoop/tools/lib/` to Hadoop classpath. 
 
 3. Run the following command to access the fileset:
 
@@ -482,7 +481,7 @@ The following are examples of how to use the pandas library to access the OSS fi
 import pandas as pd
 
 storage_options = {
-    "server_uri": "http://localhost:8090", 
+    "server_uri": "http://mini.io:9000", 
     "metalake_name": "test",
     "options": {
         "oss_access_key_id": "access_key",

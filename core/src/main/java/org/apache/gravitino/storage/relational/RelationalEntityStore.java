@@ -20,6 +20,7 @@ package org.apache.gravitino.storage.relational;
 
 import static org.apache.gravitino.Configs.ENTITY_RELATIONAL_STORE;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
 import java.util.List;
@@ -32,17 +33,16 @@ import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.HasIdentifier;
-import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.SupportsRelationOperations;
 import org.apache.gravitino.cache.CacheFactory;
+import org.apache.gravitino.cache.CachedEntityIdResolver;
 import org.apache.gravitino.cache.EntityCache;
 import org.apache.gravitino.cache.EntityCacheRelationKey;
 import org.apache.gravitino.cache.NoOpsCache;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
-import org.apache.gravitino.meta.TagEntity;
-import org.apache.gravitino.tag.SupportsTagOperations;
+import org.apache.gravitino.storage.relational.service.EntityIdService;
 import org.apache.gravitino.utils.Executable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -52,8 +52,7 @@ import org.slf4j.LoggerFactory;
  * MySQL, PostgreSQL, etc. If you want to use a different backend, you can implement the {@link
  * RelationalBackend} interface
  */
-public class RelationalEntityStore
-    implements EntityStore, SupportsTagOperations, SupportsRelationOperations {
+public class RelationalEntityStore implements EntityStore, SupportsRelationOperations {
   private static final Logger LOGGER = LoggerFactory.getLogger(RelationalEntityStore.class);
   public static final ImmutableMap<String, String> RELATIONAL_BACKENDS =
       ImmutableMap.of(
@@ -62,18 +61,28 @@ public class RelationalEntityStore
   private RelationalGarbageCollector garbageCollector;
   private EntityCache cache;
 
+  @VisibleForTesting
+  public EntityCache getCache() {
+    return cache;
+  }
+
   @Override
   public void initialize(Config config) throws RuntimeException {
+    if (config.get(Configs.CACHE_ENABLED)) {
+      this.cache = CacheFactory.getEntityCache(config);
+      EntityIdService.initialize(
+          new CachedEntityIdResolver(cache, new RelationalEntityStoreIdResolver()));
+    } else {
+      this.cache = new NoOpsCache(config);
+      EntityIdService.initialize(new RelationalEntityStoreIdResolver());
+    }
+
     this.backend = createRelationalEntityBackend(config);
     this.garbageCollector = new RelationalGarbageCollector(backend, config);
     this.garbageCollector.start();
-    this.cache =
-        config.get(Configs.CACHE_ENABLED)
-            ? CacheFactory.getEntityCache(config)
-            : new NoOpsCache(config);
   }
 
-  private static RelationalBackend createRelationalEntityBackend(Config config) {
+  private RelationalBackend createRelationalEntityBackend(Config config) {
     String backendName = config.get(ENTITY_RELATIONAL_STORE);
     String className =
         RELATIONAL_BACKENDS.getOrDefault(backendName, Configs.DEFAULT_ENTITY_RELATIONAL_STORE);
@@ -82,6 +91,7 @@ public class RelationalEntityStore
       RelationalBackend relationalBackend =
           (RelationalBackend) Class.forName(className).getDeclaredConstructor().newInstance();
       relationalBackend.initialize(config);
+
       return relationalBackend;
     } catch (Exception e) {
       LOGGER.error(
@@ -167,44 +177,8 @@ public class RelationalEntityStore
   }
 
   @Override
-  public SupportsTagOperations tagOperations() {
-    return this;
-  }
-
-  @Override
   public SupportsRelationOperations relationOperations() {
     return this;
-  }
-
-  @Override
-  public List<MetadataObject> listAssociatedMetadataObjectsForTag(NameIdentifier tagIdent)
-      throws IOException {
-    return backend.listAssociatedMetadataObjectsForTag(tagIdent);
-  }
-
-  @Override
-  public List<TagEntity> listAssociatedTagsForMetadataObject(
-      NameIdentifier objectIdent, Entity.EntityType objectType)
-      throws NoSuchEntityException, IOException {
-    return backend.listAssociatedTagsForMetadataObject(objectIdent, objectType);
-  }
-
-  @Override
-  public TagEntity getTagForMetadataObject(
-      NameIdentifier objectIdent, Entity.EntityType objectType, NameIdentifier tagIdent)
-      throws NoSuchEntityException, IOException {
-    return backend.getTagForMetadataObject(objectIdent, objectType, tagIdent);
-  }
-
-  @Override
-  public List<TagEntity> associateTagsWithMetadataObject(
-      NameIdentifier objectIdent,
-      Entity.EntityType objectType,
-      NameIdentifier[] tagsToAdd,
-      NameIdentifier[] tagsToRemove)
-      throws NoSuchEntityException, EntityAlreadyExistsException, IOException {
-    return backend.associateTagsWithMetadataObject(
-        objectIdent, objectType, tagsToAdd, tagsToRemove);
   }
 
   @Override
@@ -236,8 +210,37 @@ public class RelationalEntityStore
       Entity.EntityType srcType,
       NameIdentifier destEntityIdent)
       throws IOException, NoSuchEntityException {
-    // todo: support cache
-    return backend.getEntityByRelation(relType, srcIdentifier, srcType, destEntityIdent);
+    return cache.withCacheLock(
+        EntityCacheRelationKey.of(srcIdentifier, srcType, relType),
+        () -> {
+          Optional<List<E>> entities = cache.getIfPresent(relType, srcIdentifier, srcType);
+          if (entities.isPresent()) {
+            return entities.get().stream()
+                .filter(e -> e.nameIdentifier().equals(destEntityIdent))
+                .findFirst()
+                .orElseThrow(
+                    () ->
+                        new NoSuchEntityException(
+                            "No such entity with ident: %s", destEntityIdent));
+          }
+
+          // Use allFields=true to cache complete entities
+          List<E> backendEntities =
+              backend.listEntitiesByRelation(relType, srcIdentifier, srcType, true);
+
+          E r =
+              backendEntities.stream()
+                  .filter(e -> e.nameIdentifier().equals(destEntityIdent))
+                  .findFirst()
+                  .orElseThrow(
+                      () ->
+                          new NoSuchEntityException(
+                              "No such entity with ident: %s", destEntityIdent));
+
+          cache.put(srcIdentifier, srcType, relType, backendEntities);
+
+          return r;
+        });
   }
 
   @Override

@@ -31,17 +31,20 @@ public class TestGCSTokenProvider {
   @Test
   void testGetAllResources() {
     Map<String, List<String>> checkResults =
-        ImmutableMap.of(
-            "a/b", Arrays.asList("a", "a/", "a/b"),
-            "a/b/", Arrays.asList("a", "a/", "a/b"),
-            "a", Arrays.asList("a"),
-            "a/", Arrays.asList("a"),
-            "", Arrays.asList(""),
-            "/", Arrays.asList(""));
+        ImmutableMap.<String, List<String>>builder()
+            .put("a/b", Arrays.asList("a", "a/", "a/b"))
+            .put("a/b/", Arrays.asList("a", "a/", "a/b"))
+            .put("a/b/c", Arrays.asList("a", "a/", "a/b", "a/b/", "a/b/c"))
+            .put("a/b/c/", Arrays.asList("a", "a/", "a/b", "a/b/", "a/b/c"))
+            .put("a", Arrays.asList("a"))
+            .put("a/", Arrays.asList("a"))
+            .put("", Arrays.asList(""))
+            .put("/", Arrays.asList(""))
+            .build();
 
     checkResults.forEach(
         (key, value) -> {
-          List<String> parentResources = GCSTokenProvider.getAllResources(key);
+          List<String> parentResources = GCSTokenGenerator.getAllResources(key);
           Assertions.assertArrayEquals(value.toArray(), parentResources.toArray());
         });
   }
@@ -59,7 +62,7 @@ public class TestGCSTokenProvider {
 
     checkResults.forEach(
         (k, v) -> {
-          String normalizedPath = GCSTokenProvider.normalizeUriPath(k);
+          String normalizedPath = GCSTokenGenerator.normalizeUriPath(k);
           Assertions.assertEquals(v, normalizedPath);
         });
   }

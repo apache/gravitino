@@ -30,6 +30,7 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import java.time.Instant;
 import java.util.Map;
+import java.util.Optional;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.authorization.Privileges;
@@ -48,6 +49,8 @@ import org.apache.gravitino.dto.model.ModelVersionDTO;
 import org.apache.gravitino.dto.rel.ColumnDTO;
 import org.apache.gravitino.dto.rel.TableDTO;
 import org.apache.gravitino.dto.rel.partitioning.Partitioning;
+import org.apache.gravitino.dto.stats.PartitionStatisticsDTO;
+import org.apache.gravitino.dto.stats.StatisticDTO;
 import org.apache.gravitino.dto.tag.TagDTO;
 import org.apache.gravitino.dto.util.DTOConverters;
 import org.apache.gravitino.json.JsonUtils;
@@ -509,5 +512,20 @@ public class TestResponses {
 
     ModelVersionResponse response1 = new ModelVersionResponse();
     assertThrows(IllegalArgumentException.class, response1::validate);
+  }
+
+  @Test
+  void testPartitionStatisticsListResponseNullElement() {
+    AuditDTO audit = AuditDTO.builder().withCreator("user1").withCreateTime(Instant.now()).build();
+    StatisticDTO statistic =
+        StatisticDTO.builder()
+            .withName("stat")
+            .withAudit(audit)
+            .withValue(Optional.empty())
+            .build();
+    PartitionStatisticsDTO valid = PartitionStatisticsDTO.of("p1", new StatisticDTO[] {statistic});
+    PartitionStatisticsDTO[] stats = new PartitionStatisticsDTO[] {valid, null};
+    PartitionStatisticsListResponse response = new PartitionStatisticsListResponse(stats);
+    assertThrows(IllegalArgumentException.class, response::validate);
   }
 }

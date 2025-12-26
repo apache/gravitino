@@ -19,7 +19,6 @@ from unittest.mock import patch
 
 from gravitino.exceptions.base import NoSuchFilesetException
 from gravitino.filesystem.gvfs import GravitinoVirtualFileSystem
-from gravitino.filesystem.gvfs_base_operations import FilesetPathNotFoundError
 
 
 class TestGVFSWithoutFileset(unittest.TestCase):
@@ -57,10 +56,10 @@ class TestGVFSWithoutFileset(unittest.TestCase):
         )
 
         self.assertRaises(
-            FilesetPathNotFoundError, fs.ls, "fileset/test_catalog/schema/fileset"
+            FileNotFoundError, fs.ls, "fileset/test_catalog/schema/fileset"
         )
         self.assertRaises(
-            FilesetPathNotFoundError, fs.info, "fileset/test_catalog/schema/fileset"
+            FileNotFoundError, fs.info, "fileset/test_catalog/schema/fileset"
         )
 
         self.assertFalse(fs.exists("fileset/test_catalog/schema/fileset"))
@@ -72,15 +71,15 @@ class TestGVFSWithoutFileset(unittest.TestCase):
             )
 
         self.assertRaises(
-            FilesetPathNotFoundError, fs.rm, "fileset/test_catalog/schema/fileset/a"
+            FileNotFoundError, fs.rm, "fileset/test_catalog/schema/fileset/a"
         )
         self.assertRaises(
-            FilesetPathNotFoundError,
+            FileNotFoundError,
             fs.rm_file,
             "fileset/test_catalog/schema/fileset/a",
         )
         self.assertRaises(
-            FilesetPathNotFoundError, fs.rmdir, "fileset/test_catalog/schema/fileset/a"
+            FileNotFoundError, fs.rmdir, "fileset/test_catalog/schema/fileset/a"
         )
 
         self.assertRaises(OSError, fs.open, "fileset/test_catalog/schema/fileset", "w")
@@ -91,13 +90,13 @@ class TestGVFSWithoutFileset(unittest.TestCase):
         self.assertRaises(OSError, fs.open, "fileset/test_catalog/schema/fileset", "xb")
 
         self.assertRaises(
-            FilesetPathNotFoundError,
+            FileNotFoundError,
             fs.open,
             "fileset/test_catalog/schema/fileset/a",
             "r",
         )
         self.assertRaises(
-            FilesetPathNotFoundError,
+            FileNotFoundError,
             fs.open,
             "fileset/test_catalog/schema/fileset/a",
             "rb",
@@ -109,18 +108,18 @@ class TestGVFSWithoutFileset(unittest.TestCase):
         )
 
         self.assertRaises(
-            FilesetPathNotFoundError,
+            FileNotFoundError,
             fs.created,
             "fileset/test_catalog/schema/fileset/a",
         )
         self.assertRaises(
-            FilesetPathNotFoundError,
+            FileNotFoundError,
             fs.modified,
             "fileset/test_catalog/schema/fileset/a",
         )
 
         self.assertRaises(
-            FilesetPathNotFoundError,
+            FileNotFoundError,
             fs.cat_file,
             "fileset/test_catalog/schema/fileset/a",
         )

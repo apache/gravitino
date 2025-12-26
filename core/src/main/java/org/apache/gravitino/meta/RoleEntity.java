@@ -67,7 +67,9 @@ public class RoleEntity implements Role, Entity, Auditable, HasIdentifier {
     return name;
   }
 
-  /** @return The audit information of the entity. */
+  /**
+   * @return The audit information of the entity.
+   */
   @Override
   public AuditInfo auditInfo() {
     return auditInfo;

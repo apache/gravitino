@@ -63,6 +63,8 @@ public class PartitionStatisticsListResponse extends BaseResponse {
     Preconditions.checkArgument(
         partitionStatistics != null, "\"partitionStatistics\" must not be null");
     for (PartitionStatisticsDTO partitionStat : partitionStatistics) {
+      Preconditions.checkArgument(
+          partitionStat != null, "Each partition statistic must not be null");
       partitionStat.validate();
     }
   }

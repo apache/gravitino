@@ -87,4 +87,19 @@ public class JobTemplateMetaSQLProviderFactory {
       @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit) {
     return getProvider().deleteJobTemplateMetasByLegacyTimeline(legacyTimeline, limit);
   }
+
+  public static String updateJobTemplateMeta(
+      @Param("newJobTemplateMeta") JobTemplatePO newJobTemplatePO,
+      @Param("oldJobTemplateMeta") JobTemplatePO oldJobTemplatePO) {
+    return getProvider().updateJobTemplateMeta(newJobTemplatePO, oldJobTemplatePO);
+  }
+
+  public static String selectJobTemplateIdByMetalakeAndName(
+      @Param("metalakeId") Long metalakeId, @Param("jobTemplateName") String jobTemplateName) {
+    return getProvider().selectJobTemplateIdByMetalakeAndName(metalakeId, jobTemplateName);
+  }
+
+  public static String selectJobTemplateById(@Param("jobTemplateId") Long jobTemplateId) {
+    return getProvider().selectJobTemplateById(jobTemplateId);
+  }
 }

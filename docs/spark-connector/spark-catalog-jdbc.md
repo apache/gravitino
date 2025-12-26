@@ -5,7 +5,11 @@ keyword: spark connector jdbc catalog
 license: "This software is licensed under the Apache License version 2."
 ---
 
-The Apache Gravitino Spark connector offers the capability to read JDBC tables, with the metadata managed by the Gravitino server. To enable the use of the JDBC catalog within the Spark connector, you must download the jdbc driver jar which you used to Spark classpath.
+The Apache Gravitino Spark connector offers the capability to read JDBC tables, with the metadata managed by the Gravitino server.
+
+## Preparation
+
+1. Download the corresponding jdbc driver jar to Spark classpath.
 
 ## Capabilities
 

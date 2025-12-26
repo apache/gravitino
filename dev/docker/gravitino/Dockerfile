@@ -16,8 +16,11 @@
 # specific language governing permissions and limitations
 # under the License.
 #
-FROM openjdk:17-jdk-buster
+FROM eclipse-temurin:17.0.16_8-jdk-jammy
 LABEL maintainer="dev@gravitino.apache.org"
+
+RUN apt-get update && apt-get install -y \
+    python-is-python3
 
 WORKDIR /root/gravitino
 

@@ -14,16 +14,16 @@
 # KIND, either express or implied.  See the License for the
 # specific language governing permissions and limitations
 # under the License.
-from typing import Optional, Dict, List
+from typing import Dict, List, Optional
 
+from gravitino.api.credential.credential import Credential
+from gravitino.api.credential.supports_credentials import SupportsCredentials
 from gravitino.api.file.fileset import Fileset
 from gravitino.api.metadata_object import MetadataObject
-from gravitino.api.credential.supports_credentials import SupportsCredentials
-from gravitino.api.credential.credential import Credential
+from gravitino.api.metadata_objects import MetadataObjects
 from gravitino.client.metadata_object_credential_operations import (
     MetadataObjectCredentialOperations,
 )
-from gravitino.client.metadata_object_impl import MetadataObjectImpl
 from gravitino.dto.audit_dto import AuditDTO
 from gravitino.dto.fileset_dto import FilesetDTO
 from gravitino.namespace import Namespace
@@ -41,7 +41,7 @@ class GenericFileset(Fileset, SupportsCredentials):
         self, fileset: FilesetDTO, rest_client: HTTPClient, full_namespace: Namespace
     ):
         self._fileset = fileset
-        metadata_object = MetadataObjectImpl(
+        metadata_object = MetadataObjects.of(
             [full_namespace.level(1), full_namespace.level(2), fileset.name()],
             MetadataObject.Type.FILESET,
         )

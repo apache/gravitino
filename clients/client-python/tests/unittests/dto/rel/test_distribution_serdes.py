@@ -21,7 +21,7 @@ from dataclasses import dataclass, field
 
 from dataclasses_json import DataClassJsonMixin, config
 
-from gravitino.api.expressions.distributions.strategy import Strategy
+from gravitino.api.rel.expressions.distributions.strategy import Strategy
 from gravitino.dto.rel.distribution_dto import DistributionDTO
 from gravitino.dto.rel.expressions.json_serdes._helper.serdes_utils import SerdesUtils
 from gravitino.dto.rel.json_serdes.distribution_serdes import DistributionSerDes

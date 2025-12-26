@@ -25,6 +25,8 @@ metadata:
   labels:
     {{- include "gravitino-iceberg-rest-server.labels" . | nindent 4 }}
 data:
+  init.sh: |-
+    {{- tpl .Values.initScript . | nindent 4 }}
 {{ $root := . }}
 {{ range $path, $bytes := .Files.Glob "resources/*" }}
 {{ base $path | indent 2 }}: |-

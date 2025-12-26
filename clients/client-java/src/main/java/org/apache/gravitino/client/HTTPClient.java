@@ -722,6 +722,12 @@ public class HTTPClient implements RESTClient {
       GravitinoClientConfiguration clientConfiguration) {
     PoolingHttpClientConnectionManagerBuilder connectionManagerBuilder =
         PoolingHttpClientConnectionManagerBuilder.create();
+
+    // Configure connection pool size
+    connectionManagerBuilder.setMaxConnTotal(clientConfiguration.getClientMaxConnections());
+    connectionManagerBuilder.setMaxConnPerRoute(
+        clientConfiguration.getClientMaxConnectionsPerRoute());
+
     ConnectionConfig connectionConfig = configureConnectionConfig(clientConfiguration);
     connectionManagerBuilder.setDefaultConnectionConfig(connectionConfig);
     return connectionManagerBuilder.build();
@@ -765,7 +771,7 @@ public class HTTPClient implements RESTClient {
      * @return This Builder instance for method chaining.
      */
     public Builder uri(String baseUri) {
-      Preconditions.checkNotNull(baseUri, "Invalid uri for http client: null");
+      Preconditions.checkArgument(baseUri != null, "Invalid uri for http client: null");
       this.uri = RESTUtils.stripTrailingSlash(baseUri);
       return this;
     }
