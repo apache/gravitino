@@ -1,20 +1,20 @@
 /*
- *  Licensed to the Apache Software Foundation (ASF) under one
- *  or more contributor license agreements.  See the NOTICE file
- *  distributed with this work for additional information
- *  regarding copyright ownership.  The ASF licenses this file
- *  to you under the Apache License, Version 2.0 (the
- *  "License"); you may not use this file except in compliance
- *  with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *     http://www.apache.org/licenses/LICENSE-2.0
  *
- *  Unless required by applicable law or agreed to in writing,
- *  software distributed under the License is distributed on an
- *  "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
- *  KIND, either express or implied.  See the License for the
- *  specific language governing permissions and limitations
- *  under the License.
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
  */
 
 package org.apache.gravitino.filesystem.hadoop.integration.test;
@@ -37,19 +37,16 @@ import org.apache.gravitino.Configs;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.authorization.Privilege;
 import org.apache.gravitino.authorization.Privileges;
 import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.authorization.SecurableObjects;
-import org.apache.gravitino.catalog.hadoop.fs.FileSystemUtils;
 import org.apache.gravitino.client.GravitinoAdminClient;
 import org.apache.gravitino.client.GravitinoMetalake;
 import org.apache.gravitino.credential.CredentialConstants;
-import org.apache.gravitino.credential.S3TokenCredential;
 import org.apache.gravitino.file.Fileset;
 import org.apache.gravitino.integration.test.util.BaseIT;
 import org.apache.gravitino.integration.test.util.GravitinoITUtils;
-import org.apache.gravitino.s3.fs.S3FileSystemProvider;
-import org.apache.gravitino.storage.S3Properties;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FSDataOutputStream;
@@ -59,41 +56,31 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.condition.EnabledIf;
-import org.junit.platform.commons.util.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * GVFS integration test that verifies credential vending with authorization enabled on S3. <br>
- * - READ_FILESET: can read via GVFS but cannot write. <br>
- * - WRITE_FILESET: can read and write via GVFS.
+ * Base class for GVFS credential vending authorization tests across cloud providers. Subclasses
+ * supply provider-specific configuration and environment guards.
  */
-@EnabledIf(value = "s3IsConfigured", disabledReason = "s3 with credential is not prepared")
-public class GravitinoVirtualFileSystemS3CredentialAuthorizationIT extends BaseIT {
+abstract class AbstractFileSystemCredentialAuthorizationIT extends BaseIT {
   private static final Logger LOG =
-      LoggerFactory.getLogger(GravitinoVirtualFileSystemS3CredentialAuthorizationIT.class);
+      LoggerFactory.getLogger(AbstractFileSystemCredentialAuthorizationIT.class);
 
-  public static final String BUCKET_NAME = System.getenv("S3_BUCKET_NAME_FOR_CREDENTIAL");
-  public static final String S3_ACCESS_KEY = System.getenv("S3_ACCESS_KEY_ID_FOR_CREDENTIAL");
-  public static final String S3_SECRET_KEY = System.getenv("S3_SECRET_ACCESS_KEY_FOR_CREDENTIAL");
-  public static final String S3_ENDPOINT = System.getenv("S3_ENDPOINT_FOR_CREDENTIAL");
-  public static final String S3_REGION = System.getenv("S3_REGION_FOR_CREDENTIAL");
-  public static final String S3_ROLE_ARN = System.getenv("S3_ROLE_ARN_FOR_CREDENTIAL");
+  protected static final String SUPER_USER = "gravitino_admin";
+  protected static final String NORMAL_USER = "normal_user";
 
-  private static final String SUPER_USER = "gravitino_admin";
-  private static final String NORMAL_USER = "normal_user";
-  private static final String ROLE_NAME = "gvfs_s3_credential_auth_role";
+  protected GravitinoMetalake metalake;
+  protected GravitinoAdminClient adminClient;
+  protected GravitinoAdminClient normalUserClient;
+  protected Configuration gvfsConf;
 
-  private GravitinoMetalake metalake;
-  private GravitinoAdminClient adminClient;
-  private GravitinoAdminClient normalUserClient;
-  private Configuration gvfsConf;
+  protected String metalakeName;
+  protected String catalogName;
+  protected String schemaName;
+  protected String roleName;
 
-  private String metalakeName;
-  private String catalogName;
-  private String schemaName;
-
+  // Public lifecycle
   @BeforeAll
   public void startIntegrationTest() {
     // Prevent BaseIT from starting before we inject auth configs.
@@ -101,7 +88,7 @@ public class GravitinoVirtualFileSystemS3CredentialAuthorizationIT extends BaseI
 
   @BeforeAll
   public void startUp() throws Exception {
-    copyBundleJarsToHadoop("aws-bundle");
+    copyBundleJarsToHadoop(providerBundleName());
 
     Map<String, String> configs = Maps.newHashMap();
     configs.put(Configs.ENABLE_AUTHORIZATION.getKey(), "true");
@@ -114,33 +101,26 @@ public class GravitinoVirtualFileSystemS3CredentialAuthorizationIT extends BaseI
     adminClient = GravitinoAdminClient.builder(serverUri).withSimpleAuth(SUPER_USER).build();
     normalUserClient = GravitinoAdminClient.builder(serverUri).withSimpleAuth(NORMAL_USER).build();
 
-    metalakeName = GravitinoITUtils.genRandomName("gvfs_auth_metalake");
+    metalakeName = GravitinoITUtils.genRandomName("gvfs_cloud_auth_metalake");
     catalogName = GravitinoITUtils.genRandomName("catalog");
     schemaName = GravitinoITUtils.genRandomName("schema");
+    roleName = providerRoleName();
 
     metalake = adminClient.createMetalake(metalakeName, "metalake comment", Collections.emptyMap());
     Assertions.assertTrue(adminClient.metalakeExists(metalakeName));
     metalake.addUser(NORMAL_USER);
 
-    Map<String, String> properties = Maps.newHashMap();
-    properties.put(S3Properties.GRAVITINO_S3_ACCESS_KEY_ID, S3_ACCESS_KEY);
-    properties.put(S3Properties.GRAVITINO_S3_SECRET_ACCESS_KEY, S3_SECRET_KEY);
-    properties.put(S3Properties.GRAVITINO_S3_ENDPOINT, S3_ENDPOINT);
-    properties.put(
-        "gravitino.bypass.fs.s3a.aws.credentials.provider",
-        "org.apache.hadoop.fs.s3a.SimpleAWSCredentialsProvider");
-    properties.put(FILESYSTEM_PROVIDERS, "s3");
-    properties.put(S3Properties.GRAVITINO_S3_REGION, S3_REGION);
-    properties.put(S3Properties.GRAVITINO_S3_ROLE_ARN, S3_ROLE_ARN);
-    properties.put(
-        CredentialConstants.CREDENTIAL_PROVIDERS, S3TokenCredential.S3_TOKEN_CREDENTIAL_TYPE);
-
-    Catalog catalog =
-        metalake.createCatalog(
-            catalogName, Catalog.Type.FILESET, "hadoop", "catalog comment", properties);
+    Map<String, String> properties = new HashMap<>(catalogBaseProperties());
+    properties.put(FILESYSTEM_PROVIDERS, providerName());
+    properties.put(CredentialConstants.CREDENTIAL_PROVIDERS, credentialProviderType());
+    metalake.createCatalog(
+        catalogName, Catalog.Type.FILESET, "hadoop", "catalog comment", properties);
     Assertions.assertTrue(metalake.catalogExists(catalogName));
-    catalog.asSchemas().createSchema(schemaName, "schema comment", properties);
-    Assertions.assertTrue(catalog.asSchemas().schemaExists(schemaName));
+    metalake
+        .loadCatalog(catalogName)
+        .asSchemas()
+        .createSchema(schemaName, "schema comment", properties);
+    Assertions.assertTrue(metalake.loadCatalog(catalogName).asSchemas().schemaExists(schemaName));
 
     List<SecurableObject> securableObjects = new ArrayList<>();
     SecurableObject catalogObject =
@@ -150,8 +130,8 @@ public class GravitinoVirtualFileSystemS3CredentialAuthorizationIT extends BaseI
         SecurableObjects.ofSchema(
             catalogObject, schemaName, ImmutableList.of(Privileges.UseSchema.allow()));
     securableObjects.add(schemaObject);
-    metalake.createRole(ROLE_NAME, new HashMap<>(), securableObjects);
-    metalake.grantRolesToUser(ImmutableList.of(ROLE_NAME), NORMAL_USER);
+    metalake.createRole(roleName, new HashMap<>(), securableObjects);
+    metalake.grantRolesToUser(ImmutableList.of(roleName), NORMAL_USER);
 
     gvfsConf = new Configuration();
     gvfsConf.set(
@@ -161,9 +141,6 @@ public class GravitinoVirtualFileSystemS3CredentialAuthorizationIT extends BaseI
     gvfsConf.set("fs.gravitino.server.uri", serverUri);
     gvfsConf.set("fs.gravitino.client.metalake", metalakeName);
     gvfsConf.set("fs.gravitino.enableCredentialVending", "true");
-    gvfsConf.set(S3Properties.GRAVITINO_S3_ENDPOINT, S3_ENDPOINT);
-    gvfsConf.set(S3Properties.GRAVITINO_S3_REGION, S3_REGION);
-    gvfsConf.set(S3Properties.GRAVITINO_S3_ROLE_ARN, S3_ROLE_ARN);
   }
 
   @AfterAll
@@ -198,7 +175,7 @@ public class GravitinoVirtualFileSystemS3CredentialAuthorizationIT extends BaseI
 
   @Test
   void testCredentialVendingWithReadPrivilegeAllowsReadOnly() throws IOException {
-    String filesetName = GravitinoITUtils.genRandomName("gvfs_auth_read");
+    String filesetName = GravitinoITUtils.genRandomName(providerPrefix() + "_auth_read");
     NameIdentifier filesetIdent = NameIdentifier.of(schemaName, filesetName);
     String storageLocation = genStorageLocation(filesetName);
 
@@ -210,22 +187,12 @@ public class GravitinoVirtualFileSystemS3CredentialAuthorizationIT extends BaseI
             "fileset comment",
             Fileset.Type.MANAGED,
             storageLocation,
-            ImmutableMap.of(
-                CredentialConstants.CREDENTIAL_PROVIDERS,
-                S3TokenCredential.S3_TOKEN_CREDENTIAL_TYPE));
+            filesetProperties());
 
-    // Seed a file so list/open works.
-    Path realPath = new Path(storageLocation);
-    try (FileSystem realFs =
-        realPath.getFileSystem(convertGvfsConfigToRealFileSystemConfig(gvfsConf))) {
-      realFs.mkdirs(realPath);
-      try (FSDataOutputStream out = realFs.create(new Path(realPath, "seed.txt"), true)) {
-        out.write("seed".getBytes(StandardCharsets.UTF_8));
-      }
-    }
+    seedFile(storageLocation, "seed.txt");
 
     metalake.grantPrivilegesToRole(
-        ROLE_NAME,
+        roleName,
         MetadataObjects.of(
             ImmutableList.of(catalogName, schemaName, filesetName), MetadataObject.Type.FILESET),
         ImmutableList.of(Privileges.ReadFileset.allow()));
@@ -244,16 +211,12 @@ public class GravitinoVirtualFileSystemS3CredentialAuthorizationIT extends BaseI
             Assertions.assertThrows(IOException.class, () -> gvfs.create(denyWrite, true).close());
         String msg = ioe.getMessage() == null ? "" : ioe.getMessage().toLowerCase();
         Assertions.assertTrue(
-            msg.contains("accessdenied"),
-            "Expected write to be denied due to missing WRITE_FILESET privilege, but got: "
+            msg.contains("forbidden") || msg.contains("accessdenied") || msg.contains("permission"),
+            "Expected auth failure (forbidden/access denied) due to missing WRITE_FILESET privilege, but got: "
                 + ioe.getMessage());
       }
     } finally {
-      metalake.revokePrivilegesFromRole(
-          ROLE_NAME,
-          MetadataObjects.of(
-              ImmutableList.of(catalogName, schemaName, filesetName), MetadataObject.Type.FILESET),
-          ImmutableSet.of(Privileges.ReadFileset.allow()));
+      revokeRolePrivilege(filesetIdent, Privileges.ReadFileset.allow());
       if (originalUser != null) {
         System.setProperty("user.name", originalUser);
       }
@@ -263,7 +226,7 @@ public class GravitinoVirtualFileSystemS3CredentialAuthorizationIT extends BaseI
 
   @Test
   void testCredentialVendingWithWritePrivilegeAllowsReadAndWrite() throws IOException {
-    String filesetName = GravitinoITUtils.genRandomName("gvfs_auth_write");
+    String filesetName = GravitinoITUtils.genRandomName(providerPrefix() + "_auth_write");
     NameIdentifier filesetIdent = NameIdentifier.of(schemaName, filesetName);
     String storageLocation = genStorageLocation(filesetName);
 
@@ -275,12 +238,10 @@ public class GravitinoVirtualFileSystemS3CredentialAuthorizationIT extends BaseI
             "fileset comment",
             Fileset.Type.MANAGED,
             storageLocation,
-            ImmutableMap.of(
-                CredentialConstants.CREDENTIAL_PROVIDERS,
-                S3TokenCredential.S3_TOKEN_CREDENTIAL_TYPE));
+            filesetProperties());
 
     metalake.grantPrivilegesToRole(
-        ROLE_NAME,
+        roleName,
         MetadataObjects.of(
             ImmutableList.of(catalogName, schemaName, filesetName), MetadataObject.Type.FILESET),
         ImmutableList.of(Privileges.WriteFileset.allow()));
@@ -300,11 +261,7 @@ public class GravitinoVirtualFileSystemS3CredentialAuthorizationIT extends BaseI
         }
       }
     } finally {
-      metalake.revokePrivilegesFromRole(
-          ROLE_NAME,
-          MetadataObjects.of(
-              ImmutableList.of(catalogName, schemaName, filesetName), MetadataObject.Type.FILESET),
-          ImmutableSet.of(Privileges.WriteFileset.allow()));
+      revokeRolePrivilege(filesetIdent, Privileges.WriteFileset.allow());
       if (originalUser != null) {
         System.setProperty("user.name", originalUser);
       }
@@ -312,32 +269,46 @@ public class GravitinoVirtualFileSystemS3CredentialAuthorizationIT extends BaseI
     }
   }
 
-  private Configuration convertGvfsConfigToRealFileSystemConfig(Configuration gvfsConf) {
-    Configuration s3Conf = new Configuration();
-    Map<String, String> map = Maps.newHashMap();
-    gvfsConf.forEach(entry -> map.put(entry.getKey(), entry.getValue()));
-    map.put(S3Properties.GRAVITINO_S3_ACCESS_KEY_ID, S3_ACCESS_KEY);
-    map.put(S3Properties.GRAVITINO_S3_SECRET_ACCESS_KEY, S3_SECRET_KEY);
-    Map<String, String> hadoopConfMap =
-        FileSystemUtils.toHadoopConfigMap(map, S3FileSystemProvider.GRAVITINO_KEY_TO_S3_HADOOP_KEY);
-    hadoopConfMap.forEach(s3Conf::set);
-    return s3Conf;
+  protected void seedFile(String storageLocation, String fileName) throws IOException {
+    Path realPath = new Path(storageLocation);
+    try (FileSystem realFs =
+        realPath.getFileSystem(
+            convertGvfsConfigToRealFileSystemConfig(new Configuration(gvfsConf)))) {
+      realFs.mkdirs(realPath);
+      try (FSDataOutputStream out = realFs.create(new Path(realPath, fileName), true)) {
+        out.write("seed".getBytes(StandardCharsets.UTF_8));
+      }
+    }
   }
 
-  private String genStorageLocation(String fileset) {
-    return String.format("s3a://%s/%s", BUCKET_NAME, fileset);
+  protected void revokeRolePrivilege(NameIdentifier filesetIdent, Privilege privilege) {
+    metalake.revokePrivilegesFromRole(
+        roleName,
+        MetadataObjects.of(
+            ImmutableList.of(catalogName, schemaName, filesetIdent.name()),
+            MetadataObject.Type.FILESET),
+        ImmutableSet.of(privilege));
   }
 
-  private Path genGvfsPath(String fileset) {
-    return new Path(String.format("gvfs://fileset/%s/%s/%s", catalogName, schemaName, fileset));
+  protected Map<String, String> filesetProperties() {
+    return ImmutableMap.of(CredentialConstants.CREDENTIAL_PROVIDERS, credentialProviderType());
   }
 
-  private static boolean s3IsConfigured() {
-    return StringUtils.isNotBlank(System.getenv("S3_ACCESS_KEY_ID_FOR_CREDENTIAL"))
-        && StringUtils.isNotBlank(System.getenv("S3_SECRET_ACCESS_KEY_FOR_CREDENTIAL"))
-        && StringUtils.isNotBlank(System.getenv("S3_ENDPOINT_FOR_CREDENTIAL"))
-        && StringUtils.isNotBlank(System.getenv("S3_BUCKET_NAME_FOR_CREDENTIAL"))
-        && StringUtils.isNotBlank(System.getenv("S3_REGION_FOR_CREDENTIAL"))
-        && StringUtils.isNotBlank(System.getenv("S3_ROLE_ARN_FOR_CREDENTIAL"));
-  }
+  protected abstract String providerName();
+
+  protected abstract String providerBundleName();
+
+  protected abstract String credentialProviderType();
+
+  protected abstract Map<String, String> catalogBaseProperties();
+
+  protected abstract String genStorageLocation(String fileset);
+
+  protected abstract Path genGvfsPath(String fileset);
+
+  protected abstract Configuration convertGvfsConfigToRealFileSystemConfig(Configuration gvfsConf);
+
+  protected abstract String providerPrefix();
+
+  protected abstract String providerRoleName();
 }
