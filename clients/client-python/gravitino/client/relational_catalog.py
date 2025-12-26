@@ -219,7 +219,17 @@ class RelationalCatalog(
         raise NotImplementedError("Alter table is not implemented yet.")
 
     def purge_table(self, identifier: NameIdentifier) -> bool:
-        raise NotImplementedError("Purge table is not implemented yet.")
+        """Purge the table with specified identifier.
+
+        Args:
+            identifier (NameIdentifier):
+                The identifier of the table, which should be "schema.table" format.
+
+        Returns:
+            bool:
+                `True` if the table is purged successfully, `False` if the table does not exist.
+        """
+        return self._drop_table(identifier, purge=True)
 
     def _drop_table(self, identifier: NameIdentifier, purge: bool) -> bool:
         self._check_table_name_identifier(identifier)
