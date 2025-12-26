@@ -19,6 +19,7 @@
 
 package org.apache.gravitino.catalog.fileset.integration.test;
 
+import static org.apache.gravitino.catalog.fileset.FilesetCatalogPropertiesMetadata.FILESYSTEM_CONNECTION_TIMEOUT_SECONDS;
 import static org.apache.gravitino.catalog.hadoop.fs.kerberos.AuthenticationConfig.AUTH_TYPE_KEY;
 import static org.apache.gravitino.catalog.hadoop.fs.kerberos.KerberosConfig.IMPERSONATION_ENABLE_KEY;
 import static org.apache.gravitino.catalog.hadoop.fs.kerberos.KerberosConfig.KEY_TAB_URI_KEY;
@@ -337,6 +338,7 @@ public class HadoopUserAuthenticationIT extends BaseIT {
     properties.put(IMPERSONATION_ENABLE_KEY, "true");
     properties.put(KEY_TAB_URI_KEY, TMP_DIR + HADOOP_CLIENT_KEYTAB);
     properties.put(PRINCIPAL_KEY, HADOOP_CLIENT_PRINCIPAL);
+    properties.put(FILESYSTEM_CONNECTION_TIMEOUT_SECONDS, "600");
     properties.put("location", location);
     properties.put("gravitino.bypass.dfs.namenode.kerberos.principal.pattern", "*");
 

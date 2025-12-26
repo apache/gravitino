@@ -71,8 +71,8 @@ public class FilesetCatalogPropertiesMetadata extends BaseCatalogPropertiesMetad
   /** The value to indicate the cache value is not set. */
   public static final long CACHE_VALUE_NOT_SET = -1;
 
-  static final String FILESYSTEM_CONNECTION_TIMEOUT_SECONDS = "filesystem-conn-timeout-secs";
-  static final int DEFAULT_GET_FILESYSTEM_TIMEOUT_SECONDS = 600;
+  public static final String FILESYSTEM_CONNECTION_TIMEOUT_SECONDS = "filesystem-conn-timeout-secs";
+  static final int DEFAULT_GET_FILESYSTEM_TIMEOUT_SECONDS = 6;
 
   /** The prefix for user-defined location configs: {@code fs.path.config.<anme>=<path>}. */
   public static final String FS_GRAVITINO_PATH_CONFIG_PREFIX = "fs.path.config.";

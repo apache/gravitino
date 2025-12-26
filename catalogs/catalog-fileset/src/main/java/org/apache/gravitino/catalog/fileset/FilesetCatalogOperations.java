@@ -486,10 +486,6 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
       try {
         // formalize the path to avoid path without scheme, uri, authority, etc.
         for (Map.Entry<String, Path> entry : filesetPaths.entrySet()) {
-          // merge the properties from catalog, schema and fileset to get the final configuration
-          // for fileset.
-          // the priority is: fileset properties > schema properties > catalog properties >
-          // user-defined location configs
           Map<String, String> fsConf =
               mergeUpLevelConfigurations(ident, properties, entry.getValue());
           FileSystem tmpFs = getFileSystemWithCache(entry.getKey(), entry.getValue(), fsConf);

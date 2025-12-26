@@ -54,11 +54,13 @@ public class HDFSFileSystemProxy implements MethodInterceptor {
   public static final String GRAVITINO_KEYTAB_FORMAT = "keytabs/gravitino-%s";
   private static final String SYSTEM_USER_NAME = System.getProperty("user.name");
   private static final String SYSTEM_ENV_HADOOP_USER_NAME = "HADOOP_USER_NAME";
+  private static final String GRAVITINO_ID_KEY = "gravitino.identifier";
 
   private final UserGroupInformation loginUgi;
   private final FileSystem fs;
   private final Configuration configuration;
   private final boolean impersonationEnabled;
+  private String kerberosRealm;
 
   /**
    * Create a HDFSAuthenticationFileSystem with the given path and configuration. Supports both
@@ -156,6 +158,9 @@ public class HDFSFileSystemProxy implements MethodInterceptor {
       Principal principal = getCurrentPrincipal();
       if (principal != null) {
         String proxyUserName = getCurrentPrincipal().getName();
+        if (!proxyUserName.contains("@")) {
+          proxyUserName = String.format("%s@%s", proxyUserName, kerberosRealm);
+        }
         currentUgi = UserGroupInformation.createProxyUser(proxyUserName, loginUgi);
         LOG.info("Kerberos impersonation enabled. Proxy user: {}", proxyUserName);
       } else {
@@ -189,14 +194,16 @@ public class HDFSFileSystemProxy implements MethodInterceptor {
 
   private void close() {}
 
-  private static UserGroupInformation initKerberosUgi(
+  private UserGroupInformation initKerberosUgi(
       Map<String, String> properties, Configuration configuration) {
     try {
       KerberosClient client = new KerberosClient(properties, configuration, true);
-      String keytabPath = String.format(GRAVITINO_KEYTAB_FORMAT, "xxx");
+      String keytabPath =
+          String.format(GRAVITINO_KEYTAB_FORMAT, properties.getOrDefault(GRAVITINO_ID_KEY, ""));
       File keytabFile = client.saveKeyTabFileFromUri(keytabPath);
-      client.login(keytabFile.getAbsolutePath());
-      return UserGroupInformation.getLoginUser();
+      UserGroupInformation ugi = client.login(keytabFile.getAbsolutePath());
+      this.kerberosRealm = client.getKerberosRealm();
+      return ugi;
     } catch (IOException e) {
       throw new RuntimeException("Failed to login with Kerberos", e);
     }
