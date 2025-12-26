@@ -39,6 +39,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Random;
 import java.util.UUID;
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.ArrayUtils;
@@ -112,6 +113,33 @@ public class TestJobManager {
     idGenerator = new RandomIdGenerator();
     JobManager jm = new JobManager(config, entityStore, idGenerator, jobExecutor);
     jobManager = Mockito.spy(jm);
+
+    // Stop the background schedulers to prevent interference with tests
+    ScheduledExecutorService cleanUpExecutor = jobManager.cleanUpExecutor;
+    if (cleanUpExecutor != null) {
+      cleanUpExecutor.shutdownNow();
+      try {
+        if (!cleanUpExecutor.awaitTermination(100, TimeUnit.MILLISECONDS)) {
+          cleanUpExecutor.shutdownNow();
+        }
+      } catch (InterruptedException e) {
+        cleanUpExecutor.shutdownNow();
+        Thread.currentThread().interrupt();
+      }
+    }
+
+    ScheduledExecutorService statusPullExecutor = jobManager.statusPullExecutor;
+    if (statusPullExecutor != null) {
+      statusPullExecutor.shutdown();
+      try {
+        if (!statusPullExecutor.awaitTermination(100, TimeUnit.MILLISECONDS)) {
+          statusPullExecutor.shutdownNow();
+        }
+      } catch (InterruptedException e) {
+        statusPullExecutor.shutdownNow();
+        Thread.currentThread().interrupt();
+      }
+    }
 
     mockedMetalake = mockStatic(MetalakeManager.class);
   }
