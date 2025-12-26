@@ -40,7 +40,8 @@ public interface Capability {
     FILESET,
     TOPIC,
     PARTITION,
-    MODEL
+    MODEL,
+    FUNCTION
   }
 
   /**
@@ -141,6 +142,10 @@ public interface Capability {
 
     @Override
     public CapabilityResult managedStorage(Scope scope) {
+      if (scope == Scope.FUNCTION) {
+        return CapabilityResult.SUPPORTED;
+      }
+
       return CapabilityResult.unsupported(
           String.format("The %s entity is not fully managed by Gravitino.", scope));
     }
