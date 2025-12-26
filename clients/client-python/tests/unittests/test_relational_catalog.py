@@ -288,3 +288,14 @@ class TestRelationalCatalog(unittest.TestCase):
         ):
             is_dropped = self.catalog.drop_table(self.table_identifier)
             self.assertTrue(is_dropped)
+
+    def test_purge_table(self):
+        resp_body = DropResponse(0, True)
+        mock_resp = self._get_mock_http_resp(resp_body.to_json())
+
+        with patch(
+            "gravitino.utils.http_client.HTTPClient.delete",
+            return_value=mock_resp,
+        ):
+            is_dropped = self.catalog.purge_table(self.table_identifier)
+            self.assertTrue(is_dropped)
