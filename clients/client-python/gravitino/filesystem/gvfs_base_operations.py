@@ -510,9 +510,8 @@ class BaseGVFSOperations(ABC):
         fileset_props = dict(catalog.properties())
         fileset_props.update(schema.properties())
         fileset_props.update(fileset.properties())
-        # Get user-defined configurations for the base location
-        base_location = self._get_base_location(actual_location)
-        user_defined_configs = self._get_user_defined_configs(base_location)
+        # Get user-defined configurations for the actual location
+        user_defined_configs = self._get_user_defined_configs(actual_location)
         if self._options:
             fileset_props.update(self._options)
         fileset_props.update(user_defined_configs)
@@ -835,35 +834,67 @@ class BaseGVFSOperations(ABC):
         authority = parsed_uri.netloc if parsed_uri.netloc else ""
         return f"{scheme}://{authority}"
 
-    def _get_user_defined_configs(self, base_location: str) -> Dict[str, str]:
-        """Get user defined configurations for a specific location. Configuration format:
-        fs.path.config.<location_name> = location
-        fs.path.config.<location_name>.<property_name> = <property_value>
-        e.g.:
-          fs.path.config.cluster1 = s3://bucket/path/
-          fs.path.config.cluster1.aws-access-key = XXX
-          fs.path.config.cluster1.aws-secret-key = XXX
-        :param base_location: The base location of fileset (e.g., 's3://bucket')
-        :return: A map of configuration properties for the specified location
+    def _get_user_defined_configs(self, path: str) -> Dict[str, str]:
+        """Get user defined configurations for a specific path based on the path's base location
+        (scheme://authority).
+
+        The logic:
+        1. Extract baseLocation (scheme://authority) from the given path
+        2. Find config entries like "fs.path.config.<name> = <base_location>" where the
+           base_location matches the extracted baseLocation
+        3. Extract the name from the matching entry
+        4. Then find all config entries with prefix "fs.path.config.<name>." and extract properties
+
+        Example:
+          fs.path.config.cluster1 = s3://bucket1
+          fs.path.config.cluster1.aws-access-key = XXX1
+          fs.path.config.cluster1.aws-secret-key = XXX2
+          If path is "s3://bucket1/path/fileset1", then baseLocation is "s3://bucket1",
+          cluster1 matches and we extract:
+          - aws-access-key = XXX1
+          - aws-secret-key = XXX2
+
+        :param path: The path to extract configurations for (e.g., 's3://bucket/path/to/file')
+        :return: A map of configuration properties for the given path
         """
         properties: Dict[str, str] = {}
-        if not base_location:
+        if not path:
             return properties
 
-        location_prefix = (
-            GVFSConfig.FS_GRAVITINO_PATH_CONFIG_PREFIX + base_location + "."
-        )
+        base_location = self._get_base_location(path)
+        location_name = None
+        config_prefix = GVFSConfig.FS_GRAVITINO_PATH_CONFIG_PREFIX
 
-        # Iterate through all configuration entries in options
+        # First pass: find the location name by matching baseLocation
+        # Look for entries like "fs.path.config.<name> = <base_location>"
+        # The key format should be exactly "fs.path.config.<name>" (no dot after name)
         if self._options:
             for key, value in self._options.items():
-                # Check if this key is a property for the specified location
-                # e.g., "fs.path.config.s3://bucket.aws-ak" matches prefix "fs.path.config.s3://bucket."
-                if key.startswith(location_prefix):
-                    # Extract the property name after the location prefix
-                    # e.g., "fs.path.config.s3://bucket.aws-ak" -> "aws-ak"
-                    property_name = key[len(location_prefix) :]
-                    if property_name:
-                        properties[property_name] = value
+                if not key.startswith(config_prefix):
+                    continue
+
+                suffix = key[len(config_prefix) :]
+                # Check if this is a location definition (no dot after the name)
+                # Format: "fs.path.config.<name>" (not "fs.path.config.<name>.<property>")
+                if "." not in suffix and suffix and value:
+                    # This is a location definition: "fs.path.config.<name>"
+                    # Extract baseLocation from the value and compare with the path's baseLocation
+                    if base_location == value:
+                        location_name = suffix
+                        break
+
+        # Second pass: extract all properties for the matched location name
+        if location_name:
+            property_prefix = config_prefix + location_name + "."
+            if self._options:
+                for key, value in self._options.items():
+                    # Check if this key is a property for the matched location
+                    # e.g., "fs.path.config.cluster1.aws-ak" matches prefix "fs.path.config.cluster1."
+                    if key.startswith(property_prefix):
+                        # Extract the property name after the location prefix
+                        # e.g., "fs.path.config.cluster1.aws-ak" -> "aws-ak"
+                        property_name = key[len(property_prefix) :]
+                        if property_name:
+                            properties[property_name] = value
 
         return properties
