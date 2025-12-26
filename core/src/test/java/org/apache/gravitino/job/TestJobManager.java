@@ -121,10 +121,28 @@ public class TestJobManager {
       cleanUpExecutor.shutdownNow();
     }
 
+    cleanUpExecutor.shutdown();
+    try {
+      if (!cleanUpExecutor.awaitTermination(100, TimeUnit.MILLISECONDS)) {
+        cleanUpExecutor.shutdownNow();
+      }
+    } catch (InterruptedException e) {
+      cleanUpExecutor.shutdownNow();
+      Thread.currentThread().interrupt();
+    }
+
     ScheduledExecutorService statusPullExecutor =
         (ScheduledExecutorService) FieldUtils.readField(jobManager, "statusPullExecutor", true);
     if (statusPullExecutor != null) {
-      statusPullExecutor.shutdownNow();
+      statusPullExecutor.shutdown();
+      try {
+        if (!statusPullExecutor.awaitTermination(100, TimeUnit.MILLISECONDS)) {
+          statusPullExecutor.shutdownNow();
+        }
+      } catch (InterruptedException e) {
+        statusPullExecutor.shutdownNow();
+        Thread.currentThread().interrupt();
+      }
     }
 
     mockedMetalake = mockStatic(MetalakeManager.class);
@@ -132,10 +150,17 @@ public class TestJobManager {
 
   @AfterEach
   public void tearDown() throws Exception {
+    // Reset mocks to ensure test isolation
+    if (mockedMetalake != null) {
+      mockedMetalake.reset();
+    }
+    Mockito.reset(entityStore, jobManager);
     // Clean up resources if necessary
     jobManager.close();
     FileUtils.deleteDirectory(new File(testStagingDir));
-    mockedMetalake.close();
+    if (mockedMetalake != null) {
+      mockedMetalake.close();
+    }
   }
 
   @Test
