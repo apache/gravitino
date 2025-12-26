@@ -29,7 +29,10 @@ from gravitino.api.rel.expressions.literals.literals import Literals
 from gravitino.api.rel.expressions.named_reference import FieldReference, NamedReference
 from gravitino.api.rel.expressions.sorts.sort_order import SortOrder
 from gravitino.api.rel.expressions.sorts.sort_orders import SortOrders
-from gravitino.api.rel.expressions.transforms.transform import Transform
+from gravitino.api.rel.expressions.transforms.transform import (
+    SingleFieldTransform,
+    Transform,
+)
 from gravitino.api.rel.expressions.transforms.transforms import Transforms
 from gravitino.api.rel.expressions.unparsed_expression import UnparsedExpression
 from gravitino.api.rel.indexes.index import Index
@@ -49,10 +52,16 @@ from gravitino.dto.rel.expressions.literal_dto import LiteralDTO
 from gravitino.dto.rel.expressions.unparsed_expression_dto import UnparsedExpressionDTO
 from gravitino.dto.rel.indexes.index_dto import IndexDTO
 from gravitino.dto.rel.partitioning.bucket_partitioning_dto import BucketPartitioningDTO
+from gravitino.dto.rel.partitioning.day_partitioning_dto import DayPartitioningDTO
 from gravitino.dto.rel.partitioning.function_partitioning_dto import (
     FunctionPartitioningDTO,
 )
+from gravitino.dto.rel.partitioning.hour_partitioning_dto import HourPartitioningDTO
+from gravitino.dto.rel.partitioning.identity_partitioning_dto import (
+    IdentityPartitioningDTO,
+)
 from gravitino.dto.rel.partitioning.list_partitioning_dto import ListPartitioningDTO
+from gravitino.dto.rel.partitioning.month_partitioning_dto import MonthPartitioningDTO
 from gravitino.dto.rel.partitioning.partitioning import (
     Partitioning,
     SingleFieldPartitioning,
@@ -61,6 +70,7 @@ from gravitino.dto.rel.partitioning.range_partitioning_dto import RangePartition
 from gravitino.dto.rel.partitioning.truncate_partitioning_dto import (
     TruncatePartitioningDTO,
 )
+from gravitino.dto.rel.partitioning.year_partitioning_dto import YearPartitioningDTO
 from gravitino.dto.rel.partitions.identity_partition_dto import IdentityPartitionDTO
 from gravitino.dto.rel.partitions.list_partition_dto import ListPartitionDTO
 from gravitino.dto.rel.partitions.partition_dto import PartitionDTO
@@ -72,6 +82,14 @@ from gravitino.exceptions.base import IllegalArgumentException
 
 class DTOConverters:
     """Utility class for converting between DTOs and domain objects."""
+
+    _SINGLE_FIELD_TRANSFORM_TYPES = {
+        Transforms.NAME_OF_IDENTITY: IdentityPartitioningDTO,
+        Transforms.NAME_OF_YEAR: YearPartitioningDTO,
+        Transforms.NAME_OF_MONTH: MonthPartitioningDTO,
+        Transforms.NAME_OF_DAY: DayPartitioningDTO,
+        Transforms.NAME_OF_HOUR: HourPartitioningDTO,
+    }
 
     @staticmethod
     def from_function_arg(arg: FunctionArg) -> Expression:
@@ -331,19 +349,19 @@ class DTOConverters:
 
     @overload
     @staticmethod
-    def from_dtos(dtos: list[ColumnDTO]) -> list[Column]: ...
+    def from_dtos(dtos: list[ColumnDTO]) -> list[Column]: ...  # pragma: no cover
 
     @overload
     @staticmethod
-    def from_dtos(dtos: list[IndexDTO]) -> list[Index]: ...
+    def from_dtos(dtos: list[IndexDTO]) -> list[Index]: ...  # pragma: no cover
 
     @overload
     @staticmethod
-    def from_dtos(dtos: list[SortOrderDTO]) -> list[SortOrder]: ...
+    def from_dtos(dtos: list[SortOrderDTO]) -> list[SortOrder]: ...  # pragma: no cover
 
     @overload
     @staticmethod
-    def from_dtos(dtos: list[Partitioning]) -> list[Transform]: ...
+    def from_dtos(dtos: list[Partitioning]) -> list[Transform]: ...  # pragma: no cover
 
     @staticmethod
     def from_dtos(dtos):
@@ -361,6 +379,22 @@ class DTOConverters:
         if not dtos:
             return []
         return [DTOConverters.from_dto(dto) for dto in dtos]
+
+    @staticmethod
+    def to_function_args(
+        expressions: list[Expression],
+    ) -> list[FunctionArg]:
+        """Converts a list of Expressions to a list of FunctionArg DTOs.
+
+        Args:
+            expressions (list[Expression]): The expressions to be converted.
+
+        Returns:
+            list[FunctionArg]: The list of expression DTOs.
+        """
+        if not expressions:
+            return []
+        return [DTOConverters.to_function_arg(expr) for expr in expressions]
 
     @staticmethod
     def to_function_arg(expression: Expression) -> FunctionArg:
@@ -459,3 +493,153 @@ class DTOConverters:
         raise IllegalArgumentException(
             f"Unsupported partition type: {obj.__class__.__name__}"
         )
+
+    @to_dto.register
+    @staticmethod
+    def _(obj: Column) -> ColumnDTO:
+        return (
+            ColumnDTO.builder()
+            .with_name(obj.name())
+            .with_data_type(obj.data_type())
+            .with_comment(obj.comment())
+            .with_nullable(obj.nullable())
+            .with_auto_increment(obj.auto_increment())
+            .with_default_value(
+                Column.DEFAULT_VALUE_NOT_SET
+                if obj.default_value() is None
+                or obj.default_value() is Column.DEFAULT_VALUE_NOT_SET
+                else DTOConverters.to_function_arg(obj.default_value())
+            )
+            .build()
+        )
+
+    @to_dto.register
+    @staticmethod
+    def _(obj: SortOrderDTO) -> SortOrderDTO:
+        return obj
+
+    @to_dto.register
+    @staticmethod
+    def _(obj: SortOrder) -> SortOrderDTO:
+        return SortOrderDTO(
+            sort_term=DTOConverters.to_function_arg(obj.expression()),
+            direction=obj.direction(),
+            null_ordering=obj.null_ordering(),
+        )
+
+    @to_dto.register
+    @staticmethod
+    def _(obj: IndexDTO) -> IndexDTO:
+        return obj
+
+    @to_dto.register
+    @staticmethod
+    def _(obj: Index) -> IndexDTO:
+        return IndexDTO(
+            index_type=obj.type(),
+            name=obj.name(),
+            field_names=obj.field_names(),
+        )
+
+    @to_dto.register
+    @staticmethod
+    def _(obj: Partitioning) -> Partitioning:
+        return obj
+
+    @to_dto.register
+    @staticmethod
+    def _(obj: Transform) -> Partitioning:
+        if isinstance(obj, SingleFieldTransform):
+            transform_class = DTOConverters._SINGLE_FIELD_TRANSFORM_TYPES.get(
+                obj.name()
+            )
+            if transform_class is None:
+                raise IllegalArgumentException(f"Unsupported transform: {obj.name()}")
+            return transform_class(*obj.field_name())
+        if isinstance(obj, Transforms.BucketTransform):
+            bucket_transform = cast(Transforms.BucketTransform, obj)
+            return BucketPartitioningDTO(
+                bucket_transform.num_buckets(),
+                *bucket_transform.field_names(),
+            )
+        if isinstance(obj, Transforms.TruncateTransform):
+            truncate_transform = cast(Transforms.TruncateTransform, obj)
+            return TruncatePartitioningDTO(
+                truncate_transform.width(),
+                truncate_transform.field_name(),
+            )
+        if isinstance(obj, Transforms.ListTransform):
+            list_transform = cast(Transforms.ListTransform, obj)
+            list_assignments: list[ListPartitionDTO] = [
+                cast(ListPartitionDTO, DTOConverters.to_dto(assignment))
+                for assignment in list_transform.assignments()
+            ]
+            return ListPartitioningDTO(
+                field_names=list_transform.field_names(),
+                assignments=list_assignments,
+            )
+        if isinstance(obj, Transforms.RangeTransform):
+            range_transform = cast(Transforms.RangeTransform, obj)
+            range_assignments: list[RangePartitionDTO] = [
+                cast(RangePartitionDTO, DTOConverters.to_dto(assignment))
+                for assignment in range_transform.assignments()
+            ]
+            return RangePartitioningDTO(
+                field_name=range_transform.field_name(),
+                assignments=range_assignments,
+            )
+        if isinstance(obj, Transforms.ApplyTransform):
+            return FunctionPartitioningDTO(
+                obj.name(), *DTOConverters.to_function_args(obj.arguments())
+            )
+        raise IllegalArgumentException(f"Unsupported transform: {obj.name()}")
+
+    @to_dto.register
+    @staticmethod
+    def _(obj: Distribution) -> DistributionDTO:
+        if obj is None or obj is Distributions.NONE:
+            return DistributionDTO.NONE
+        if isinstance(obj, DistributionDTO):
+            return obj
+        return DistributionDTO(
+            strategy=obj.strategy(),
+            number=obj.number(),
+            args=[
+                DTOConverters.to_function_arg(expression)
+                for expression in obj.expressions()
+            ],
+        )
+
+    @overload
+    @staticmethod
+    def to_dtos(dtos: list[Column]) -> list[ColumnDTO]: ...  # pragma: no cover
+
+    @overload
+    @staticmethod
+    def to_dtos(dtos: list[Index]) -> list[IndexDTO]: ...  # pragma: no cover
+
+    @overload
+    @staticmethod
+    def to_dtos(dtos: list[IndexDTO]) -> list[IndexDTO]: ...  # pragma: no cover
+
+    @overload
+    @staticmethod
+    def to_dtos(dtos: list[SortOrder]) -> list[SortOrderDTO]: ...  # pragma: no cover
+
+    @overload
+    @staticmethod
+    def to_dtos(dtos: list[SortOrderDTO]) -> list[SortOrderDTO]: ...  # pragma: no cover
+
+    @overload
+    @staticmethod
+    def to_dtos(dtos: list[Transform]) -> list[Partitioning]: ...  # pragma: no cover
+
+    @overload
+    @staticmethod
+    def to_dtos(dtos: list[Partitioning]) -> list[Partitioning]: ...  # pragma: no cover
+
+    @staticmethod
+    def to_dtos(dtos):
+        if not dtos:
+            return []
+        return [DTOConverters.to_dto(dto) for dto in dtos]

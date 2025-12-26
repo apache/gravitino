@@ -20,9 +20,11 @@ package org.apache.gravitino.hive.client;
 import static org.apache.gravitino.hive.client.HiveClientClassLoader.HiveVersion.HIVE3;
 import static org.apache.gravitino.hive.client.Util.updateConfigurationFromProperties;
 
+import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
 import java.util.List;
 import java.util.Properties;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.reflect.MethodUtils;
 import org.apache.gravitino.hive.HivePartition;
 import org.apache.gravitino.hive.HiveSchema;
@@ -36,6 +38,8 @@ import org.apache.hadoop.hive.metastore.api.Database;
 import org.apache.hadoop.hive.metastore.api.Table;
 
 class HiveShimV3 extends HiveShimV2 {
+
+  private static final String CATALOG_CLASS = "org.apache.hadoop.hive.metastore.api.Catalog";
 
   private final Method createDatabaseMethod;
   private final Method getDatabaseMethod;
@@ -57,8 +61,14 @@ class HiveShimV3 extends HiveShimV2 {
   private final Method getTableObjectsByNameMethod;
   private final Method databaseSetCatalogNameMethod;
   private final Method getCatalogsMethod;
+  private final Method createCatalogMethod;
+
   private final Method tableSetCatalogNameMethod;
   private final Method partitionSetCatalogNameMethod;
+  private final Method catalogSetDescriptionMethod;
+
+  private final Class<?> catalogClass;
+  private final Constructor<?> catalogCreator;
 
   HiveShimV3(Properties properties) {
     super(HIVE3, properties);
@@ -128,6 +138,11 @@ class HiveShimV3 extends HiveShimV2 {
           IMetaStoreClient.class.getMethod(
               "getTableObjectsByName", String.class, String.class, List.class);
       this.getCatalogsMethod = IMetaStoreClient.class.getMethod("getCatalogs");
+
+      this.catalogClass = this.getClass().getClassLoader().loadClass(CATALOG_CLASS);
+      this.catalogCreator = this.catalogClass.getDeclaredConstructor(String.class, String.class);
+      this.createCatalogMethod = IMetaStoreClient.class.getMethod("createCatalog", catalogClass);
+      this.catalogSetDescriptionMethod = catalogClass.getMethod("setDescription", String.class);
 
       // SetCatalogName methods for Hive3
       this.databaseSetCatalogNameMethod =
@@ -294,7 +309,7 @@ class HiveShimV3 extends HiveShimV2 {
     String catalogName = hiveTable.catalogName();
     var tb = HiveTableConverter.toHiveTable(hiveTable);
     invoke(ExceptionTarget.other(""), tb, tableSetCatalogNameMethod, catalogName);
-    invoke(ExceptionTarget.schema(hiveTable.name()), client, createTableMethod, tb);
+    invoke(ExceptionTarget.table(hiveTable.name()), client, createTableMethod, tb);
   }
 
   @Override
@@ -424,6 +439,16 @@ class HiveShimV3 extends HiveShimV2 {
     return (List<String>) invoke(ExceptionTarget.other(""), client, getCatalogsMethod);
   }
 
+  @Override
+  public void createCatalog(String catalogName, String location, String description) {
+    Object catalog =
+        invoke(ExceptionTarget.other(catalogName), catalogCreator, catalogName, location);
+    if (StringUtils.isNotBlank(description)) {
+      invoke(ExceptionTarget.other(catalogName), catalog, catalogSetDescriptionMethod, description);
+    }
+    invoke(ExceptionTarget.catalog(catalogName), client, createCatalogMethod, catalog);
+  }
+
   /**
    * Invokes a method on an object and converts any exception to a Gravitino exception.
    *
@@ -436,6 +461,22 @@ class HiveShimV3 extends HiveShimV2 {
   private Object invoke(ExceptionTarget target, Object object, Method method, Object... args) {
     try {
       return method.invoke(object, args);
+    } catch (Exception e) {
+      throw HiveExceptionConverter.toGravitinoException(e, target);
+    }
+  }
+
+  /**
+   * Creates an object using a constructor and converts any exception to a Gravitino exception.
+   *
+   * @param target Hive object info used in error messages and exception mapping
+   * @param constructor The constructor to use for creating the object
+   * @param args The arguments to pass to the constructor
+   * @return The created object
+   */
+  private Object invoke(ExceptionTarget target, Constructor<?> constructor, Object... args) {
+    try {
+      return constructor.newInstance(args);
     } catch (Exception e) {
       throw HiveExceptionConverter.toGravitinoException(e, target);
     }

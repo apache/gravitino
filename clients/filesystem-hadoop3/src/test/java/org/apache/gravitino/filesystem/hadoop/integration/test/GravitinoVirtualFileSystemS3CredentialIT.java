@@ -107,10 +107,9 @@ public class GravitinoVirtualFileSystemS3CredentialIT extends GravitinoVirtualFi
     conf.set("fs.gvfs.impl.disable.cache", "true");
     conf.set("fs.gravitino.server.uri", serverUri);
     conf.set("fs.gravitino.client.metalake", metalakeName);
+    conf.set("fs.gravitino.enableCredentialVending", "true");
 
     // Pass this configuration to the real file system
-    conf.set(S3Properties.GRAVITINO_S3_SECRET_ACCESS_KEY, S3_SECRET_KEY);
-    conf.set(S3Properties.GRAVITINO_S3_ACCESS_KEY_ID, S3_ACCESS_KEY);
     conf.set(S3Properties.GRAVITINO_S3_ENDPOINT, S3_ENDPOINT);
     conf.set(S3Properties.GRAVITINO_S3_REGION, S3_REGION);
     conf.set(S3Properties.GRAVITINO_S3_ROLE_ARN, S3_ROLE_ARN);
@@ -146,6 +145,8 @@ public class GravitinoVirtualFileSystemS3CredentialIT extends GravitinoVirtualFi
 
     gvfsConf.forEach(entry -> map.put(entry.getKey(), entry.getValue()));
 
+    map.put(S3Properties.GRAVITINO_S3_ACCESS_KEY_ID, S3_ACCESS_KEY);
+    map.put(S3Properties.GRAVITINO_S3_SECRET_ACCESS_KEY, S3_SECRET_KEY);
     Map<String, String> hadoopConfMap =
         FileSystemUtils.toHadoopConfigMap(map, S3FileSystemProvider.GRAVITINO_KEY_TO_S3_HADOOP_KEY);
 
