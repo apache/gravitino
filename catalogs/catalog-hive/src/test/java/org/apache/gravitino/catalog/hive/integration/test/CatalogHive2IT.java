@@ -66,10 +66,18 @@ import org.apache.gravitino.catalog.hive.TableType;
 import org.apache.gravitino.client.GravitinoMetalake;
 import org.apache.gravitino.connector.BaseCatalog;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
+import org.apache.gravitino.exceptions.NoSuchFunctionException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.NoSuchPartitionException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchTableException;
+import org.apache.gravitino.function.Function;
+import org.apache.gravitino.function.FunctionChange;
+import org.apache.gravitino.function.FunctionDefinitions;
+import org.apache.gravitino.function.FunctionImpl;
+import org.apache.gravitino.function.FunctionImpls;
+import org.apache.gravitino.function.FunctionParams;
+import org.apache.gravitino.function.FunctionType;
 import org.apache.gravitino.hive.HiveClientPool;
 import org.apache.gravitino.hive.HivePartition;
 import org.apache.gravitino.hive.HiveSchema;
@@ -78,6 +86,7 @@ import org.apache.gravitino.integration.test.container.ContainerSuite;
 import org.apache.gravitino.integration.test.container.HiveContainer;
 import org.apache.gravitino.integration.test.util.BaseIT;
 import org.apache.gravitino.integration.test.util.GravitinoITUtils;
+import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.TableCatalog;
@@ -760,6 +769,71 @@ public class CatalogHive2IT extends BaseIT {
         .createTable(hiveTable, createColumns(), null, ImmutableMap.of("provider", "hive"));
     NameIdentifier[] tables = catalog.asTableCatalog().listTables(Namespace.of(schemaName));
     Assertions.assertEquals(1, tables.length);
+  }
+
+  @Test
+  public void testFunctions() throws InterruptedException {
+    // test list functions in a schema which not created by Gravitino
+    String schemaName1 = GravitinoITUtils.genRandomName(SCHEMA_PREFIX);
+    hiveClientPool.run(
+        client -> {
+          client.createDatabase(
+              HiveSchema.builder()
+                  .withName(schemaName1)
+                  .withCatalogName(hmsCatalog)
+                  .withAuditInfo(AuditInfo.EMPTY)
+                  .build());
+          return null;
+        });
+    NameIdentifier[] functionIdents =
+        catalog.asFunctionCatalog().listFunctions(Namespace.of(schemaName1));
+    Assertions.assertEquals(0, functionIdents.length);
+
+    // test register functions in a schema which not created by Gravitino
+    String schemaName2 = GravitinoITUtils.genRandomName(SCHEMA_PREFIX);
+    hiveClientPool.run(
+        client -> {
+          client.createDatabase(
+              HiveSchema.builder()
+                  .withName(schemaName2)
+                  .withCatalogName(hmsCatalog)
+                  .withAuditInfo(AuditInfo.EMPTY)
+                  .build());
+          return null;
+        });
+    Function function =
+        catalog
+            .asFunctionCatalog()
+            .registerFunction(
+                NameIdentifier.of(schemaName2, "test_func"),
+                "test comment",
+                FunctionType.SCALAR,
+                true,
+                Types.StringType.get(),
+                FunctionDefinitions.of(
+                    FunctionDefinitions.of(
+                        FunctionParams.of(FunctionParams.of("input", Types.StringType.get())),
+                        FunctionImpls.of(
+                            FunctionImpls.ofJava(
+                                FunctionImpl.RuntimeType.SPARK, "mock.udf.class.name")))));
+    Assertions.assertEquals("test_func", function.name());
+
+    // test alter a non-existing function under a schema which not created by Gravitino
+    String schemaName3 = GravitinoITUtils.genRandomName(SCHEMA_PREFIX);
+    NameIdentifier id = NameIdentifier.of(schemaName3, "test_func");
+    NoSuchFunctionException exception =
+        assertThrows(
+            NoSuchFunctionException.class,
+            () ->
+                catalog
+                    .asFunctionCatalog()
+                    .alterFunction(id, FunctionChange.updateComment("new comment")));
+    Assertions.assertTrue(exception.getMessage().contains("does not exist"));
+
+    // test drop a non-existing function under a chema which not created by Gravitino
+    String schemaName4 = GravitinoITUtils.genRandomName(SCHEMA_PREFIX);
+    NameIdentifier id2 = NameIdentifier.of(schemaName4, "test_func");
+    Assertions.assertFalse(catalog.asFunctionCatalog().dropFunction(id2));
   }
 
   @Test
