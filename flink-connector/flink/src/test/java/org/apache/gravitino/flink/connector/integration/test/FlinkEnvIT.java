@@ -85,8 +85,8 @@ public abstract class FlinkEnvIT extends BaseIT {
     super.startIntegrationTest();
     initGravitinoEnv();
     initMetalake();
-    initHdfsEnv();
     initFlinkEnv();
+    initHdfsEnv();
     initCatalogEnv();
     LOG.info("Startup Flink env successfully, Gravitino uri: {}.", gravitinoUri);
   }
@@ -183,12 +183,15 @@ public abstract class FlinkEnvIT extends BaseIT {
     }
   }
 
-  private static void initFlinkEnv() {
+  protected void initFlinkEnv() {
     final Configuration configuration = new Configuration();
     configuration.setString(
         "table.catalog-store.kind", GravitinoCatalogStoreFactoryOptions.GRAVITINO);
     configuration.setString("table.catalog-store.gravitino.gravitino.metalake", GRAVITINO_METALAKE);
     configuration.setString("table.catalog-store.gravitino.gravitino.uri", gravitinoUri);
+    configuration.setString("hadoop.security.authentication", "kerberos");
+    configuration.setString("security.kerberos.login.keytab", "");
+    configuration.setString("security.kerberos.login.principal", "");
     EnvironmentSettings.Builder builder =
         EnvironmentSettings.newInstance().withConfiguration(configuration);
     tableEnv = TableEnvironment.create(builder.inBatchMode().build());

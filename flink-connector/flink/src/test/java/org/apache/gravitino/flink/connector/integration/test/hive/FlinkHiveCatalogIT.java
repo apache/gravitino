@@ -67,6 +67,8 @@ import org.junit.jupiter.api.Test;
 @Tag("gravitino-docker-test")
 public class FlinkHiveCatalogIT extends FlinkCommonIT {
   private static final String DEFAULT_HIVE_CATALOG = "test_flink_hive_schema_catalog";
+  private static final String HADOOP_USER_NAME = "HADOOP_USER_NAME";
+  private static final String FLINK_USER_NAME = "gravitino";
 
   private static org.apache.gravitino.Catalog hiveCatalog;
 
@@ -103,7 +105,9 @@ public class FlinkHiveCatalogIT extends FlinkCommonIT {
     int numCatalogs = tableEnv.listCatalogs().length;
 
     // Create a new catalog.
+
     String catalogName = "gravitino_hive";
+
     Configuration configuration = new Configuration();
     configuration.set(
         CommonCatalogOptions.CATALOG_TYPE, GravitinoHiveCatalogFactoryOptions.IDENTIFIER);
@@ -115,6 +119,8 @@ public class FlinkHiveCatalogIT extends FlinkCommonIT {
 
     // Check the catalog properties.
     org.apache.gravitino.Catalog gravitinoCatalog = metalake.loadCatalog(catalogName);
+    Assertions.assertEquals(FLINK_USER_NAME, gravitinoCatalog.auditInfo().creator());
+
     Map<String, String> properties = gravitinoCatalog.properties();
     Assertions.assertEquals(hiveMetastoreUri, properties.get(HiveConstants.METASTORE_URIS));
     Map<String, String> flinkProperties =
@@ -604,5 +610,18 @@ public class FlinkHiveCatalogIT extends FlinkCommonIT {
   @Override
   protected boolean supportDropCascade() {
     return true;
+  }
+
+  @Override
+  protected void initFlinkEnv() {
+    // Set the HADOOP_USER_NAME to Flink.
+    String originUserName = System.getenv(HADOOP_USER_NAME);
+
+    setEnv(HADOOP_USER_NAME, FLINK_USER_NAME);
+
+    super.initFlinkEnv();
+
+    // Set the HADOOP_USER_NAME to origin Hadoop username.
+    setEnv(HADOOP_USER_NAME, originUserName);
   }
 }

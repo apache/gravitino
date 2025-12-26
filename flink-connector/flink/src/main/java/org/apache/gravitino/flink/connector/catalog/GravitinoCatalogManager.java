@@ -91,12 +91,7 @@ public class GravitinoCatalogManager {
       }
     }
 
-    try {
-      this.metalake = gravitinoClient.loadMetalake(metalakeName);
-    } catch (Exception e) {
-      throw new IllegalStateException(
-          String.format("Failed to load metalake %s from %s", metalakeName, gravitinoUri), e);
-    }
+    this.metalake = gravitinoClient.loadMetalake(metalakeName);
   }
 
   /**
