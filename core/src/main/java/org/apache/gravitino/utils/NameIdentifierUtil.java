@@ -561,6 +561,17 @@ public class NameIdentifierUtil {
   }
 
   /**
+   * Check the given {@link NameIdentifier} is a function identifier. Throw an {@link
+   * IllegalNameIdentifierException} if it's not.
+   *
+   * @param ident The function {@link NameIdentifier} to check.
+   */
+  public static void checkFunction(NameIdentifier ident) {
+    NameIdentifier.check(ident != null, "Function identifier must not be null");
+    NamespaceUtil.checkFunction(ident.namespace());
+  }
+
+  /**
    * Check the given {@link NameIdentifier} is a job identifier. Throw an {@link
    * IllegalNameIdentifierException} if it's not.
    *
