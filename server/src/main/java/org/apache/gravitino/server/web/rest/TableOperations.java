@@ -82,6 +82,11 @@ public class TableOperations {
   @AuthorizationExpression(
       expression = AuthorizationExpressionConstants.loadSchemaAuthorizationExpression,
       accessMetadataType = MetadataObject.Type.SCHEMA)
+  // TODO We can consider how to leverage the MCP SDK to enable Gravitino to
+  //  natively function as an MCP server, thereby reducing both development
+  //  and user operational costs. The project at
+  //  https://github.com/quarkiverse/quarkus-langchain4j/blob/main/samples/mcp-tools/src/main/java/io/quarkiverse/langchain4j/sample/chatbot/ImportmapResource.java
+  //  may contain some reference implementations worth further investigation.
   public Response listTables(
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
           String metalake,
