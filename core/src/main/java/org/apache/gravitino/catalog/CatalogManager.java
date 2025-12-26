@@ -84,7 +84,6 @@ import org.apache.gravitino.exceptions.CatalogAlreadyExistsException;
 import org.apache.gravitino.exceptions.CatalogInUseException;
 import org.apache.gravitino.exceptions.CatalogNotInUseException;
 import org.apache.gravitino.exceptions.GravitinoRuntimeException;
-import org.apache.gravitino.exceptions.MetalakeNotInUseException;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
@@ -114,17 +113,6 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
   private static final String CATALOG_DOES_NOT_EXIST_MSG = "Catalog %s does not exist";
 
   private static final Logger LOG = LoggerFactory.getLogger(CatalogManager.class);
-
-  public void checkCatalogInUse(EntityStore store, NameIdentifier ident)
-      throws NoSuchMetalakeException, NoSuchCatalogException, CatalogNotInUseException,
-          MetalakeNotInUseException {
-    NameIdentifier metalakeIdent = NameIdentifier.of(ident.namespace().levels());
-    checkMetalake(metalakeIdent, store);
-
-    if (!getCatalogInUseValue(store, ident)) {
-      throw new CatalogNotInUseException("Catalog %s is not in use, please enable it first", ident);
-    }
-  }
 
   /** Wrapper class for a catalog instance and its class loader. */
   public static class CatalogWrapper {
@@ -559,13 +547,7 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
         metalakeIdent,
         LockType.WRITE,
         () -> {
-          checkMetalake(metalakeIdent, store);
-
           try {
-            if (catalogInUse(store, ident)) {
-              return null;
-            }
-
             store.update(
                 ident,
                 CatalogEntity.class,
@@ -591,6 +573,44 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
         });
   }
 
+  public void updateCatalogProperty(
+      NameIdentifier nameIdentifier, String propertyKey, String propertyValue) {
+    try {
+      store.update(
+          nameIdentifier,
+          CatalogEntity.class,
+          EntityType.CATALOG,
+          catalog -> {
+            CatalogEntity.Builder newCatalogBuilder =
+                newCatalogBuilder(nameIdentifier.namespace(), catalog);
+
+            Map<String, String> newProps =
+                catalog.getProperties() == null
+                    ? new HashMap<>()
+                    : new HashMap<>(catalog.getProperties());
+            newProps.put(propertyKey, propertyValue);
+            newCatalogBuilder.withProperties(newProps);
+
+            return newCatalogBuilder.build();
+          });
+      catalogCache.invalidate(nameIdentifier);
+
+    } catch (NoSuchCatalogException e) {
+      LOG.error("Catalog {} does not exist", nameIdentifier, e);
+      throw new RuntimeException(e);
+    } catch (IllegalArgumentException e) {
+      LOG.error(
+          "Failed to update catalog {} property {} with unknown change",
+          nameIdentifier,
+          propertyKey,
+          e);
+      throw e;
+    } catch (IOException ioe) {
+      LOG.error("Failed to update catalog {} property {}", nameIdentifier, propertyKey, ioe);
+      throw new RuntimeException(ioe);
+    }
+  }
+
   @Override
   public void disableCatalog(NameIdentifier ident) throws NoSuchCatalogException {
     NameIdentifier metalakeIdent = NameIdentifier.of(ident.namespace().levels());
@@ -599,12 +619,7 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
         metalakeIdent,
         LockType.WRITE,
         () -> {
-          checkMetalake(metalakeIdent, store);
-
           try {
-            if (!catalogInUse(store, ident)) {
-              return null;
-            }
             store.update(
                 ident,
                 CatalogEntity.class,
@@ -646,8 +661,6 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
         ident,
         LockType.READ,
         () -> {
-          checkCatalogInUse(store, ident);
-
           // There could be a race issue that someone is using the catalog from cache while we are
           // updating it.
 
