@@ -457,7 +457,7 @@ public class IcebergCatalogOperations implements CatalogOperations, SupportsSche
         NameIdentifier destinationSchemaIdent = NameIdentifier.of(destinationLevels);
         if (!schemaExists(destinationSchemaIdent)) {
           throw new NoSuchSchemaException(
-              "Iceberg Schema (database) does not exist %s", destinationSchemaIdent);
+              "Iceberg schema does not exist %s", destinationSchemaIdent);
         }
         destinationNamespace = Namespace.of(destinationLevels);
       }

@@ -535,7 +535,9 @@ public class TestIcebergTable {
       if (icebergCatalogOperations.tableExists(renamedIdentifier)) {
         icebergCatalogOperations.dropTable(renamedIdentifier);
       }
-      icebergCatalogOperations.dropSchema(targetSchemaIdent, false);
+      if (icebergCatalogOperations.schemaExists(targetSchemaIdent)) {
+        icebergCatalogOperations.dropSchema(targetSchemaIdent, false);
+      }
     }
   }
 
