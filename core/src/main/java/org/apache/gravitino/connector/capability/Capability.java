@@ -34,6 +34,7 @@ public interface Capability {
 
   /** The scope of the capability. */
   enum Scope {
+    CATALOG,
     SCHEMA,
     TABLE,
     COLUMN,
