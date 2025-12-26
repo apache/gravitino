@@ -32,6 +32,7 @@ import org.apache.gravitino.connector.authorization.AuthorizationPlugin;
 import org.apache.gravitino.connector.authorization.BaseAuthorization;
 import org.apache.gravitino.connector.capability.Capability;
 import org.apache.gravitino.credential.CatalogCredentialManager;
+import org.apache.gravitino.exceptions.MetalakeNotInUseException;
 import org.apache.gravitino.meta.CatalogEntity;
 import org.apache.gravitino.utils.IsolatedClassLoader;
 import org.slf4j.Logger;
@@ -175,6 +176,8 @@ public abstract class BaseCatalog<T extends BaseCatalog>
           Preconditions.checkArgument(
               entity != null && conf != null, "entity and conf must be set before calling ops()");
           CatalogOperations newOps = createOps(conf);
+          // Check metalake and catalogInuse
+          checkMetalakeAndCatalogInUse(entity);
           newOps.initialize(conf, entity.toCatalogInfo(), this);
           ops =
               newProxyPlugin(conf)
@@ -375,5 +378,22 @@ public abstract class BaseCatalog<T extends BaseCatalog>
 
   private CatalogOperations asProxyOps(CatalogOperations ops, ProxyPlugin plugin) {
     return OperationsProxy.createProxy(ops, plugin);
+  }
+
+  private void checkMetalakeAndCatalogInUse(CatalogEntity catalogEntity) {
+    boolean metalakeInuse =
+        Boolean.parseBoolean(
+            catalogEntity.getProperties().getOrDefault(Catalog.PROPERTY_METALAKE_IN_USE, "true"));
+    if (!metalakeInuse) {
+      throw new MetalakeNotInUseException(
+          String.format("The metalake that holds catalog %s is not in use", catalogEntity.name()));
+    }
+
+    boolean catalogInuse =
+        Boolean.parseBoolean(catalogEntity.getProperties().getOrDefault(PROPERTY_IN_USE, "true"));
+    if (!catalogInuse) {
+      throw new MetalakeNotInUseException(
+          String.format("The catalog %s is not in use", catalogEntity.name()));
+    }
   }
 }

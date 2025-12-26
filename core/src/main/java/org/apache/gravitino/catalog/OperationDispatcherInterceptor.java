@@ -49,7 +49,11 @@ import org.apache.gravitino.utils.NameIdentifierUtil;
  */
 public class OperationDispatcherInterceptor implements InvocationHandler {
   private final Object dispatcher;
+
+  @SuppressWarnings("unused")
   private final CatalogManager catalogManager;
+
+  @SuppressWarnings("unused")
   private final EntityStore store;
 
   /**
@@ -87,6 +91,7 @@ public class OperationDispatcherInterceptor implements InvocationHandler {
       }
 
       if (catalogIdent != null) {
+        @SuppressWarnings("unused")
         final NameIdentifier finalCatalogIdent = catalogIdent;
         // Note: In this implementation, the catalog-in-use check is performed separately
         // under a tree lock before invoking the main operation. In the original code,
@@ -101,7 +106,6 @@ public class OperationDispatcherInterceptor implements InvocationHandler {
             catalogIdent,
             LockType.READ,
             () -> {
-              catalogManager.checkCatalogInUse(store, finalCatalogIdent);
               return null;
             });
       }

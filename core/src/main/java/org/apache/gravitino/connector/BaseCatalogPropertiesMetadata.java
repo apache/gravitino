@@ -88,7 +88,12 @@ public abstract class BaseCatalogPropertiesMetadata extends BasePropertiesMetada
                   PROPERTY_IN_USE,
                   "The property indicating the catalog is in use",
                   true /* default value */,
-                  false /* hidden */)),
+                  false /* hidden */),
+              PropertyEntry.booleanReservedPropertyEntry(
+                  PROPERTY_IN_USE,
+                  "The property indicating the metalake that holds the catalog is in use",
+                  true /* default value */,
+                  true /* hidden */)),
           PropertyEntry::getName);
 
   @Override
