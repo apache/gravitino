@@ -53,10 +53,12 @@ import org.apache.arrow.vector.VectorSchemaRoot;
 import org.apache.arrow.vector.ipc.ArrowReader;
 import org.apache.arrow.vector.types.pojo.ArrowType;
 import org.apache.arrow.vector.types.pojo.Field;
+import org.apache.commons.io.FileUtils;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Schema;
 import org.apache.gravitino.client.GravitinoMetalake;
+import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.integration.test.util.BaseIT;
 import org.apache.gravitino.integration.test.util.GravitinoITUtils;
 import org.apache.gravitino.rel.Column;
@@ -114,8 +116,6 @@ public class CatalogGenericCatalogLanceIT extends BaseIT {
     // Create a temp directory for test use
     Path tempDir = Files.createTempDirectory("myTempDir");
     tempDirectory = tempDir.toString();
-    File file = new File(tempDirectory);
-    file.deleteOnExit();
   }
 
   @AfterAll
@@ -141,6 +141,8 @@ public class CatalogGenericCatalogLanceIT extends BaseIT {
     }
 
     client = null;
+
+    FileUtils.deleteDirectory(new File(tempDirectory));
   }
 
   @AfterEach
@@ -933,5 +935,116 @@ public class CatalogGenericCatalogLanceIT extends BaseIT {
     // Now try to drop table, there should no problem here
     boolean dropSuccess = catalog.asTableCatalog().dropTable(newTableIdentifier);
     Assertions.assertTrue(dropSuccess);
+  }
+
+  @Test
+  void testDropCatalogWithManagedAndExternalEntities() {
+    // Create a new catalog for this test to avoid interfering with other tests
+    String testCatalogName = GravitinoITUtils.genRandomName("drop_catalog_test");
+    Map<String, String> catalogProperties = Maps.newHashMap();
+    metalake.createCatalog(
+        testCatalogName,
+        Catalog.Type.RELATIONAL,
+        provider,
+        "Test catalog for drop",
+        catalogProperties);
+
+    Catalog testCatalog = metalake.loadCatalog(testCatalogName);
+
+    // Create a schema
+    String testSchemaName = GravitinoITUtils.genRandomName(SCHEMA_PREFIX);
+    Map<String, String> schemaProperties = createSchemaProperties();
+    testCatalog.asSchemas().createSchema(testSchemaName, "Test schema", schemaProperties);
+
+    Column[] columns = createColumns();
+
+    // Create a managed (non-external) Lance table
+    String managedTableName = GravitinoITUtils.genRandomName(TABLE_PREFIX + "_managed");
+    NameIdentifier managedTableIdentifier = NameIdentifier.of(testSchemaName, managedTableName);
+    String managedTableLocation =
+        String.format("%s/%s/%s", tempDirectory, testSchemaName, managedTableName);
+
+    Map<String, String> managedTableProperties = createProperties();
+    managedTableProperties.put(Table.PROPERTY_TABLE_FORMAT, "lance");
+    managedTableProperties.put(Table.PROPERTY_LOCATION, managedTableLocation);
+
+    Table managedTable =
+        testCatalog
+            .asTableCatalog()
+            .createTable(
+                managedTableIdentifier,
+                columns,
+                "Managed table",
+                managedTableProperties,
+                Transforms.EMPTY_TRANSFORM,
+                null,
+                null);
+
+    Assertions.assertNotNull(managedTable);
+    File managedTableDir = new File(managedTableLocation);
+    Assertions.assertTrue(
+        managedTableDir.exists(), "Managed table directory should exist after creation");
+
+    // Create an external Lance table
+    String externalTableName = GravitinoITUtils.genRandomName(TABLE_PREFIX + "_external");
+    NameIdentifier externalTableIdentifier = NameIdentifier.of(testSchemaName, externalTableName);
+    String externalTableLocation =
+        String.format("%s/%s/%s", tempDirectory, testSchemaName, externalTableName);
+
+    Map<String, String> externalTableProperties = createProperties();
+    externalTableProperties.put(Table.PROPERTY_TABLE_FORMAT, "lance");
+    externalTableProperties.put(Table.PROPERTY_LOCATION, externalTableLocation);
+    externalTableProperties.put(Table.PROPERTY_EXTERNAL, "true");
+
+    Table externalTable =
+        testCatalog
+            .asTableCatalog()
+            .createTable(
+                externalTableIdentifier,
+                columns,
+                "External table",
+                externalTableProperties,
+                Transforms.EMPTY_TRANSFORM,
+                null,
+                null);
+
+    Assertions.assertNotNull(externalTable);
+    File externalTableDir = new File(externalTableLocation);
+    Assertions.assertTrue(
+        externalTableDir.exists(), "External table directory should exist after creation");
+
+    // Verify both tables exist in catalog
+    Table loadedManagedTable = testCatalog.asTableCatalog().loadTable(managedTableIdentifier);
+    Assertions.assertNotNull(loadedManagedTable);
+
+    Table loadedExternalTable = testCatalog.asTableCatalog().loadTable(externalTableIdentifier);
+    Assertions.assertNotNull(loadedExternalTable);
+
+    // Drop the catalog with force=true
+    boolean catalogDropped = metalake.dropCatalog(testCatalogName, true);
+    Assertions.assertTrue(catalogDropped, "Catalog should be dropped successfully");
+
+    // Verify the catalog is dropped
+    Assertions.assertThrows(
+        NoSuchCatalogException.class,
+        () -> metalake.loadCatalog(testCatalogName),
+        "Catalog should not exist after drop");
+
+    // Verify the managed table's physical directory is removed
+    Assertions.assertFalse(
+        managedTableDir.exists(),
+        "Managed table directory should be removed after dropping catalog");
+
+    // Verify the external table's physical directory is preserved
+    Assertions.assertTrue(
+        externalTableDir.exists(),
+        "External table directory should be preserved after dropping catalog");
+
+    // Clean up external table directory manually
+    try {
+      FileUtils.deleteDirectory(externalTableDir);
+    } catch (IOException e) {
+      LOG.warn("Failed to delete external table directory: {}", externalTableLocation, e);
+    }
   }
 }
