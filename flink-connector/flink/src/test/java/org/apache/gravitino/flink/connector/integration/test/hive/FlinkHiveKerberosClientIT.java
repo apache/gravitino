@@ -111,6 +111,7 @@ public class FlinkHiveKerberosClientIT extends FlinkEnvIT {
   public void stopIntegrationTest() {
     try {
       super.stopIntegrationTest();
+      UserGroupInformation.setConfiguration(new org.apache.hadoop.conf.Configuration(false));
       kdc.stopMiniKdc();
     } catch (Exception e) {
       throw new RuntimeException("Failed to stop Kerberos test", e);
