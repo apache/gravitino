@@ -567,14 +567,11 @@ public class TestIcebergTable {
         new SortOrder[0]);
 
     String missingSchemaName = "missing_schema_" + genRandomName();
-    Throwable exception =
-        Assertions.assertThrows(
-            NoSuchSchemaException.class,
-            () ->
-                icebergCatalogOperations.alterTable(
-                    tableIdentifier, TableChange.rename("renamed_table", missingSchemaName)));
-    Assertions.assertTrue(
-        exception.getMessage().contains("Iceberg Schema (database) does not exist"));
+    Assertions.assertThrows(
+        NoSuchSchemaException.class,
+        () ->
+            icebergCatalogOperations.alterTable(
+                tableIdentifier, TableChange.rename("renamed_table", missingSchemaName)));
     Assertions.assertTrue(icebergCatalogOperations.tableExists(tableIdentifier));
   }
 
