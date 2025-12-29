@@ -90,16 +90,6 @@ public final class KerberosTokenProvider implements AuthDataProvider {
     String serverPrincipal = "HTTP/" + host + "@" + principalComponents.get(1);
     Subject currentSubject = subjectProvider.get();
 
-    for (Principal principal : currentSubject.getPrincipals()) {
-      System.out.println("Principal: " + principal.getName());
-    }
-    for (KerberosTicket ticket : currentSubject.getPrivateCredentials(KerberosTicket.class)) {
-      System.out.println("Ticket: " + ticket.getServer().getName());
-    }
-    for (KerberosKey key : currentSubject.getPrivateCredentials(KerberosKey.class)) {
-      System.out.println("Key: " + key.getPrincipal().getName());
-    }
-
     return KerberosUtils.doAs(
         currentSubject,
         new Callable<byte[]>() {
