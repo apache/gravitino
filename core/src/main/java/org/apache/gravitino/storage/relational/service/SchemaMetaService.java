@@ -406,13 +406,9 @@ public class SchemaMetaService {
 
     String[] namespaceLevels = identifier.namespace().levels();
     SchemaPO schemaPO =
-        SessionUtils.getWithoutCommit(
-            SchemaMetaMapper.class,
-            mapper ->
-                mapper.selectSchemaByFullQualifiedName(
-                    namespaceLevels[0], namespaceLevels[1], identifier.name()));
+        getSchemaByFullQualifiedName(namespaceLevels[0], namespaceLevels[1], identifier.name());
 
-    if (schemaPO == null) {
+    if (schemaPO.getCatalogId() == null) {
       throw new NoSuchEntityException(
           NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
           Entity.EntityType.CATALOG.name().toLowerCase(),
@@ -427,6 +423,13 @@ public class SchemaMetaService {
     }
 
     return schemaPO;
+  }
+
+  private SchemaPO getSchemaByFullQualifiedName(
+      String metalakeName, String catalogName, String schemaName) {
+    return SessionUtils.getWithoutCommit(
+        SchemaMetaMapper.class,
+        mapper -> mapper.selectSchemaByFullQualifiedName(metalakeName, catalogName, schemaName));
   }
 
   private void fillSchemaPOBuilderParentEntityId(SchemaPO.Builder builder, Namespace namespace) {
