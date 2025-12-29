@@ -128,6 +128,8 @@ public class FlinkHiveKerberosClientIT extends FlinkEnvIT {
     org.apache.hadoop.conf.Configuration hadoopConfig = new org.apache.hadoop.conf.Configuration();
 
     hadoopConfig.set("hadoop.security.authentication", "kerberos");
+    hadoopConfig.set("hadoop.security.auth_to_local", "RULE:[1:$1@$0](.*@EXAMPLE.COM)s/@.*//");
+
     UserGroupInformation.setConfiguration(hadoopConfig);
     try {
       UserGroupInformation.loginUserFromKeytab(clientPrincipal, keytabFile);

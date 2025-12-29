@@ -85,8 +85,8 @@ public abstract class FlinkEnvIT extends BaseIT {
     super.startIntegrationTest();
     initGravitinoEnv();
     initMetalake();
-    initFlinkEnv();
     initHdfsEnv();
+    initFlinkEnv();
     initCatalogEnv();
     LOG.info("Startup Flink env successfully, Gravitino uri: {}.", gravitinoUri);
   }
