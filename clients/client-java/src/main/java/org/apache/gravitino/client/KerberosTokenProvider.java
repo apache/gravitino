@@ -24,6 +24,8 @@ import com.google.common.base.Splitter;
 import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.security.Principal;
+import java.time.Instant;
 import java.util.Base64;
 import java.util.List;
 import java.util.Set;
@@ -87,6 +89,16 @@ public final class KerberosTokenProvider implements AuthDataProvider {
     List<String> principalComponents = Splitter.on('@').splitToList(clientPrincipal);
     String serverPrincipal = "HTTP/" + host + "@" + principalComponents.get(1);
     Subject currentSubject = subjectProvider.get();
+
+    for (Principal principal : currentSubject.getPrincipals()) {
+      System.out.println("Principal: " + principal.getName());
+    }
+    for (KerberosTicket ticket : currentSubject.getPrivateCredentials(KerberosTicket.class)) {
+      System.out.println("Ticket: " + ticket.getServer().getName());
+    }
+    for (KerberosKey key : currentSubject.getPrivateCredentials(KerberosKey.class)) {
+      System.out.println("Key: " + key.getPrincipal().getName());
+    }
 
     return KerberosUtils.doAs(
         currentSubject,
@@ -191,7 +203,7 @@ public final class KerberosTokenProvider implements AuthDataProvider {
       if (tickets.isEmpty()) {
         return false;
       }
-      return tickets.iterator().next().getEndTime().getTime() < System.currentTimeMillis();
+      return tickets.iterator().next().getEndTime().toInstant().isBefore(Instant.now());
     }
   }
 

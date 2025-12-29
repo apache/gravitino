@@ -29,6 +29,9 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Collectors;
+import org.apache.flink.configuration.Configuration;
+import org.apache.flink.table.api.EnvironmentSettings;
+import org.apache.flink.table.api.TableEnvironment;
 import org.apache.flink.table.catalog.Catalog;
 import org.apache.flink.table.catalog.CommonCatalogOptions;
 import org.apache.flink.table.catalog.hive.factories.HiveCatalogFactoryOptions;
@@ -39,7 +42,9 @@ import org.apache.gravitino.flink.connector.PropertiesConverter;
 import org.apache.gravitino.flink.connector.hive.GravitinoHiveCatalog;
 import org.apache.gravitino.flink.connector.hive.GravitinoHiveCatalogFactoryOptions;
 import org.apache.gravitino.flink.connector.integration.test.FlinkEnvIT;
+import org.apache.gravitino.flink.connector.store.GravitinoCatalogStoreFactoryOptions;
 import org.apache.hadoop.minikdc.KerberosSecurityTestcase;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
@@ -87,45 +92,18 @@ public class FlinkHiveKerberosClientIT extends FlinkEnvIT {
     kdc.startMiniKdc();
     initKeyTab();
 
-    // Configure Gravitino server with Kerberos
+    // Configure a Gravitino server with Kerberos
     Map<String, String> configs = Maps.newHashMap();
     configs.put(Configs.AUTHENTICATORS.getKey(), AuthenticatorType.KERBEROS.name().toLowerCase());
     configs.put(PRINCIPAL.getKey(), serverPrincipal);
     configs.put(KEYTAB.getKey(), keytabFile);
+    configs.put("client.kerberos.principal", clientPrincipal);
+    configs.put("client.kerberos.keytab", keytabFile);
 
     registerCustomConfigs(configs);
 
     // Start the integration test (starts Gravitino server)
     super.startIntegrationTest();
-  }
-
-  @Override
-  protected void initFlinkEnv() {
-    // Create Flink configuration with Gravitino catalog store settings
-    final org.apache.flink.configuration.Configuration configuration =
-        new org.apache.flink.configuration.Configuration();
-    configuration.setString(
-        "table.catalog-store.kind",
-        org.apache.gravitino.flink.connector.store.GravitinoCatalogStoreFactoryOptions.GRAVITINO);
-    configuration.setString(
-        "table.catalog-store.gravitino.gravitino.metalake", GRAVITINO_METALAKE);
-    configuration.setString(
-        "table.catalog-store.gravitino.gravitino.uri",
-        String.format("http://127.0.0.1:%d", getGravitinoServerPort()));
-
-    // Add Kerberos authentication configuration for Gravitino catalog store
-    configuration.setString(
-        "table.catalog-store.gravitino.gravitino.auth.type", "kerberos");
-    configuration.setString(
-        "table.catalog-store.gravitino.gravitino.auth.kerberos.principal", clientPrincipal);
-    configuration.setString(
-        "table.catalog-store.gravitino.gravitino.auth.kerberos.keytab-uri",
-        "file://" + keytabFile);
-
-    org.apache.flink.table.api.EnvironmentSettings.Builder builder =
-        org.apache.flink.table.api.EnvironmentSettings.newInstance()
-            .withConfiguration(configuration);
-    tableEnv = org.apache.flink.table.api.TableEnvironment.create(builder.inBatchMode().build());
   }
 
   @Override
@@ -137,6 +115,27 @@ public class FlinkHiveKerberosClientIT extends FlinkEnvIT {
     } catch (Exception e) {
       throw new RuntimeException("Failed to stop Kerberos test", e);
     }
+  }
+
+  @Override
+  protected void initFlinkEnv() {
+    org.apache.hadoop.conf.Configuration hadoopConfig = new org.apache.hadoop.conf.Configuration();
+    hadoopConfig.set("hadoop.security.authentication", "kerberos");
+    UserGroupInformation.setConfiguration(hadoopConfig);
+    try {
+      UserGroupInformation.loginUserFromKeytab(clientPrincipal, keytabFile);
+    } catch (Exception e) {
+      throw new RuntimeException("Failed to obtain UGI for Kerberos user", e);
+    }
+
+    final Configuration configuration = new Configuration();
+    configuration.setString(
+        "table.catalog-store.kind", GravitinoCatalogStoreFactoryOptions.GRAVITINO);
+    configuration.setString("table.catalog-store.gravitino.gravitino.metalake", GRAVITINO_METALAKE);
+    configuration.setString("table.catalog-store.gravitino.gravitino.uri", gravitinoUri);
+    EnvironmentSettings.Builder builder =
+        EnvironmentSettings.newInstance().withConfiguration(configuration);
+    tableEnv = TableEnvironment.create(builder.inBatchMode().build());
   }
 
   @Test
@@ -208,7 +207,6 @@ public class FlinkHiveKerberosClientIT extends FlinkEnvIT {
     Optional<Catalog> droppedCatalog = tableEnv.getCatalog(catalogName);
     Assertions.assertFalse(droppedCatalog.isPresent(), "Catalog should be dropped");
   }
-
 
   private static void initKeyTab() throws Exception {
     File newKeytabFile = new File(keytabFile);

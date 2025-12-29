@@ -21,12 +21,11 @@ package org.apache.gravitino.flink.connector.catalog;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
 import com.google.common.collect.Sets;
-import java.io.File;
+import java.security.PrivilegedAction;
 import java.util.Arrays;
 import java.util.Map;
 import java.util.Set;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.flink.configuration.SecurityOptions;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.auth.AuthenticatorType;
 import org.apache.gravitino.client.DefaultOAuth2TokenProvider;
@@ -268,20 +267,15 @@ public class GravitinoCatalogManager {
 
   private static GravitinoAdminClient buildKerberosClient(
       String gravitinoUri, Map<String, String> config) {
-    String principal = config.get(SecurityOptions.KERBEROS_LOGIN_PRINCIPAL.key());
-    String keytab = config.get(SecurityOptions.KERBEROS_LOGIN_KEYTAB.key());
-    Preconditions.checkArgument(StringUtils.isNotBlank(principal), "Kerberos principal is empty");
 
-    KerberosTokenProvider.Builder builder =
-        KerberosTokenProvider.builder().withClientPrincipal(principal);
-    if (StringUtils.isNotBlank(keytab)) {
-      builder.withKeyTabFile(new File(keytab));
-    }
-
-    return GravitinoAdminClient.builder(gravitinoUri)
-        .withKerberosAuth(builder.build())
-        .withClientConfig(config)
-        .build();
+    return getUgi()
+        .doAs(
+            (PrivilegedAction<GravitinoAdminClient>)
+                () ->
+                    GravitinoAdminClient.builder(gravitinoUri)
+                        .withKerberosAuth(KerberosTokenProvider.builder().build())
+                        .withClientConfig(config)
+                        .build());
   }
 
   private static GravitinoAdminClient buildSimpleClient(
