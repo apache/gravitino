@@ -125,6 +125,10 @@ public abstract class SparkCommonIT extends SparkEnvIT {
 
   protected abstract boolean supportsUpdateColumnPosition();
 
+  protected boolean supportsListFunctions() {
+    return true;
+  }
+
   protected boolean supportsCreateTableWithComment() {
     return true;
   }
@@ -194,6 +198,25 @@ public abstract class SparkCommonIT extends SparkEnvIT {
     Assertions.assertTrue(tableNames.contains(tableName));
     Assertions.assertThrowsExactly(
         NoSuchNamespaceException.class, () -> sql("SHOW TABLES IN nonexistent_schema"));
+  }
+
+  @Test
+  void testCallUDF() {
+    // test call function
+    List<String> data =
+        getQueryData(String.format("SELECT %s.%s('abc')", functionSchemaName, functionName));
+    Assertions.assertEquals(1, data.size());
+    Assertions.assertEquals("3", data.get(0));
+  }
+
+  @Test
+  @EnabledIf("supportsListFunctions")
+  void testListFunctions() {
+    // test list functions
+    Set<String> functionNames = listUserFunctions(functionSchemaName);
+    Assertions.assertTrue(
+        functionNames.contains(
+            String.join(".", getCatalogName(), functionSchemaName, functionName)));
   }
 
   @Test
