@@ -22,6 +22,7 @@ package org.apache.gravitino.spark.connector.iceberg;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.Map;
+import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergPropertiesUtils;
@@ -109,12 +110,33 @@ public class GravitinoIcebergCatalog extends BaseCatalog
 
   @Override
   public Identifier[] listFunctions(String[] namespace) throws NoSuchNamespaceException {
-    return ((SparkCatalog) sparkCatalog).listFunctions(namespace);
+    // Get functions from Iceberg catalog
+    Identifier[] icebergFunctions = ((SparkCatalog) sparkCatalog).listFunctions(namespace);
+
+    // When the namespace is empty, to maintain compatibility with Iceberg behavior, only Iceberg
+    // functions are returned.
+    Identifier[] gravitinoFunctions =
+        namespace.length == 0 ? new Identifier[0] : super.listFunctions(namespace);
+
+    // Combine and return both sets of functions
+    Identifier[] allFunctions = new Identifier[icebergFunctions.length + gravitinoFunctions.length];
+    System.arraycopy(icebergFunctions, 0, allFunctions, 0, icebergFunctions.length);
+    System.arraycopy(
+        gravitinoFunctions, 0, allFunctions, icebergFunctions.length, gravitinoFunctions.length);
+    return allFunctions;
   }
 
   @Override
   public UnboundFunction loadFunction(Identifier ident) throws NoSuchFunctionException {
-    return ((SparkCatalog) sparkCatalog).loadFunction(ident);
+    try {
+      // When the namespace is empty, to maintain compatibility with Iceberg behavior, only Iceberg
+      // functions are returned.
+      return ident.namespace().length == 0 && ArrayUtils.isEmpty(sparkCatalog.defaultNamespace())
+          ? ((SparkCatalog) sparkCatalog).loadFunction(ident)
+          : super.loadFunction(ident);
+    } catch (NoSuchFunctionException e) {
+      return ((SparkCatalog) sparkCatalog).loadFunction(ident);
+    }
   }
 
   /**

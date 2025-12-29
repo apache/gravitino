@@ -32,4 +32,10 @@ public class SparkPaimonCatalogFilesystemBackendIT33 extends SparkPaimonCatalogF
             .getConfString("spark.sql.catalog." + getCatalogName());
     Assertions.assertEquals(GravitinoPaimonCatalogSpark33.class.getName(), catalogClass);
   }
+
+  @Override
+  protected boolean supportsListFunctions() {
+    // Spark 3.3 does not support listFunctions
+    return false;
+  }
 }

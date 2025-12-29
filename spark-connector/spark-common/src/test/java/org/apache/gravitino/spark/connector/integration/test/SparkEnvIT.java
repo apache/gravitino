@@ -27,10 +27,20 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.gravitino.Catalog;
+import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.client.GravitinoMetalake;
+import org.apache.gravitino.function.FunctionDefinition;
+import org.apache.gravitino.function.FunctionDefinitions;
+import org.apache.gravitino.function.FunctionImpl;
+import org.apache.gravitino.function.FunctionImpls;
+import org.apache.gravitino.function.FunctionParam;
+import org.apache.gravitino.function.FunctionParams;
+import org.apache.gravitino.function.FunctionType;
 import org.apache.gravitino.integration.test.container.ContainerSuite;
 import org.apache.gravitino.integration.test.container.HiveContainer;
+import org.apache.gravitino.rel.types.Types;
 import org.apache.gravitino.spark.connector.GravitinoSparkConfig;
+import org.apache.gravitino.spark.connector.functions.StringLengthFunction;
 import org.apache.gravitino.spark.connector.iceberg.IcebergPropertiesConstants;
 import org.apache.gravitino.spark.connector.integration.test.util.SparkUtilIT;
 import org.apache.gravitino.spark.connector.plugin.GravitinoSparkPlugin;
@@ -55,6 +65,8 @@ public abstract class SparkEnvIT extends SparkUtilIT {
   protected String warehouse;
   protected FileSystem hdfs;
   protected String icebergRestServiceUri;
+  protected final String functionSchemaName = "test_function_schema";
+  protected final String functionName = "my_string_length";
 
   private final String metalakeName = "test";
   private SparkSession sparkSession;
@@ -87,6 +99,7 @@ public abstract class SparkEnvIT extends SparkUtilIT {
     initHdfsFileSystem();
     initGravitinoEnv();
     initMetalakeAndCatalogs();
+    initSchemaAndFunction();
     initSparkEnv();
     LOG.info(
         "Startup Spark env successfully, Gravitino uri: {}, Hive metastore uri: {}",
@@ -128,6 +141,34 @@ public abstract class SparkEnvIT extends SparkUtilIT {
     }
     metalake.createCatalog(
         getCatalogName(), Catalog.Type.RELATIONAL, getProvider(), "", properties);
+  }
+
+  private void initSchemaAndFunction() {
+    GravitinoMetalake metalake = client.loadMetalake(metalakeName);
+    Catalog catalog = metalake.loadCatalog(getCatalogName());
+    if (!catalog.asSchemas().schemaExists(functionSchemaName)) {
+      catalog.asSchemas().createSchema(functionSchemaName, "", Collections.emptyMap());
+    }
+    if (!catalog
+        .asFunctionCatalog()
+        .functionExists(NameIdentifier.of(functionSchemaName, functionName))) {
+      catalog
+          .asFunctionCatalog()
+          .registerFunction(
+              NameIdentifier.of(functionSchemaName, functionName),
+              "Returns the length of a string",
+              FunctionType.SCALAR,
+              true /* deterministic */,
+              new FunctionDefinition[] {
+                FunctionDefinitions.of(
+                    new FunctionParam[] {FunctionParams.of("input", Types.StringType.get())},
+                    Types.IntegerType.get(),
+                    new FunctionImpl[] {
+                      FunctionImpls.ofJava(
+                          FunctionImpl.RuntimeType.SPARK, StringLengthFunction.class.getName())
+                    })
+              });
+    }
   }
 
   private void initGravitinoEnv() {
