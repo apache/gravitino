@@ -24,7 +24,6 @@ import com.google.common.base.Splitter;
 import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
-import java.security.Principal;
 import java.time.Instant;
 import java.util.Base64;
 import java.util.List;

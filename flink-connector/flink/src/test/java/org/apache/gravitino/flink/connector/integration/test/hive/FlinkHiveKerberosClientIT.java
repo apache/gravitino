@@ -119,7 +119,13 @@ public class FlinkHiveKerberosClientIT extends FlinkEnvIT {
 
   @Override
   protected void initFlinkEnv() {
+    // Initialize Kerberos authentication for Hadoop UGI.
+    // This approach follows Flink's HadoopLoginModule pattern for Kerberos authentication,
+    // which performs a login from keytab to establish a secure context before creating
+    // Flink table environment. See org.apache.flink.runtime.security.modules.HadoopLoginModule
+    // in Flink source code for reference.
     org.apache.hadoop.conf.Configuration hadoopConfig = new org.apache.hadoop.conf.Configuration();
+
     hadoopConfig.set("hadoop.security.authentication", "kerberos");
     UserGroupInformation.setConfiguration(hadoopConfig);
     try {
