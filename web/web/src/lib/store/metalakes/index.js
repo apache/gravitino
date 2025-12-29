@@ -210,7 +210,7 @@ export const setIntoTreeNodeWithFetch = createAsyncThunk(
         throw new Error(err)
       }
 
-      const { identifiers = [] } = res
+      const { identifiers = [] } = res || {}
       const expandedKeys = getState().metalakes.expandedNodes
       const loadedNodes = getState().metalakes.loadedNodes
       let reloadedEpxpandedKeys = []
@@ -254,7 +254,7 @@ export const setIntoTreeNodeWithFetch = createAsyncThunk(
         throw new Error(err)
       }
 
-      const { identifiers = [] } = res
+      const { identifiers = [] } = res || {}
 
       result.data = identifiers.map(tableItem => {
         return {
@@ -277,7 +277,7 @@ export const setIntoTreeNodeWithFetch = createAsyncThunk(
         throw new Error(err)
       }
 
-      const { identifiers = [] } = res
+      const { identifiers = [] } = res || {}
 
       result.data = identifiers.map(filesetItem => {
         return {
@@ -298,7 +298,7 @@ export const setIntoTreeNodeWithFetch = createAsyncThunk(
         throw new Error(err)
       }
 
-      const { identifiers = [] } = res
+      const { identifiers = [] } = res || {}
 
       result.data = identifiers.map(topicItem => {
         return {
@@ -319,7 +319,7 @@ export const setIntoTreeNodeWithFetch = createAsyncThunk(
         throw new Error(err)
       }
 
-      const { identifiers = [] } = res
+      const { identifiers = [] } = res || {}
 
       result.data = identifiers.map(modelItem => {
         return {
@@ -684,7 +684,7 @@ export const fetchSchemas = createAsyncThunk(
       throw new Error(err)
     }
 
-    const { identifiers = [] } = res
+    const { identifiers = [] } = res || {}
 
     const schemas = identifiers.map(schema => {
       const schemaItem = findInTree(
@@ -826,7 +826,7 @@ export const fetchTables = createAsyncThunk(
       throw new Error(err)
     }
 
-    const { identifiers = [] } = res
+    const { identifiers = [] } = res || {}
 
     const tables = identifiers.map(table => {
       return {
@@ -1070,7 +1070,7 @@ export const fetchFilesets = createAsyncThunk(
       throw new Error(err)
     }
 
-    const { identifiers = [] } = res
+    const { identifiers = [] } = res || {}
 
     const filesets = identifiers.map(fileset => {
       return {
@@ -1239,7 +1239,7 @@ export const fetchTopics = createAsyncThunk(
       throw new Error(err)
     }
 
-    const { identifiers = [] } = res
+    const { identifiers = [] } = res || {}
 
     const topics = identifiers.map(topic => {
       return {
@@ -1386,7 +1386,7 @@ export const fetchModels = createAsyncThunk(
       throw new Error(err)
     }
 
-    const { identifiers = [] } = res
+    const { identifiers = [] } = res || {}
 
     const models = identifiers.map(model => {
       return {

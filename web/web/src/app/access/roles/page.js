@@ -42,19 +42,12 @@ const CreateRoleDialog = dynamic(() => import('./CreateRoleDialog'), {
   ssr: false
 })
 
-const GrantPrivilegesForRoleDialog = dynamic(() => import('./GrantPrivilegesForRoleDialog'), {
-  loading: () => <Loading />,
-  ssr: false
-})
-
 const { Title, Paragraph } = Typography
 const { Search } = Input
 
 export default function RolesPage() {
   const [open, setOpen] = useState(false)
-  const [openGrant, setOpenGrant] = useState(false)
   const [editRole, setEditRole] = useState('')
-  const [grantOrRevokeRole, setGrantOrRevokeRole] = useState('')
   const [search, setSearch] = useState('')
   const [modal, contextHolder] = Modal.useModal()
   const [openSetOwner, setOpenSetOwner] = useState(false)
@@ -95,11 +88,6 @@ export default function RolesPage() {
   const handleUpdateRolePrivileges = role => {
     setEditRole(role)
     setOpen(true)
-  }
-
-  const handleSetPrivilege = role => {
-    setGrantOrRevokeRole(role)
-    setOpenGrant(true)
   }
 
   const handleSetOwner = role => {
@@ -249,12 +237,6 @@ export default function RolesPage() {
         />
       </Spin>
       <CreateRoleDialog open={open} setOpen={setOpen} editRole={editRole} metalake={currentMetalake} />
-      <GrantPrivilegesForRoleDialog
-        open={openGrant}
-        setOpen={setOpenGrant}
-        role={grantOrRevokeRole}
-        metalake={currentMetalake}
-      />
       <SetOwnerDialog
         open={openSetOwner}
         setOpen={(v, isRefresh) => handleOwnerDialogClose(v, isRefresh)}
