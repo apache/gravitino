@@ -114,7 +114,8 @@ public class HDFSFileSystemProxy implements MethodInterceptor {
    */
   public FileSystem getProxy() throws IOException {
     Enhancer e = new Enhancer();
-    e.setClassLoader(fs.getClass().getClassLoader());
+    ClassLoader enhancerClassLoader = Enhancer.class.getClassLoader();
+    e.setClassLoader(enhancerClassLoader);
     e.setSuperclass(fs.getClass());
     e.setCallback(this);
     FileSystem proxyFs = (FileSystem) e.create();
