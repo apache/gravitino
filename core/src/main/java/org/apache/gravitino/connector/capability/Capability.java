@@ -34,7 +34,6 @@ public interface Capability {
 
   /** The scope of the capability. */
   enum Scope {
-    CATALOG,
     SCHEMA,
     TABLE,
     COLUMN,
@@ -84,7 +83,10 @@ public interface Capability {
   }
 
   /**
-   * Check if the entity is fully managed by Gravitino in the scope.
+   * Check if the metadata entity is fully managed by Gravitino for the passed-in scope. This is
+   * used to determine whether Gravitino should manage the lifecycle of the metadata and related
+   * data. For example, if a catalog storage is managed, when the catalog is dropped, Gravitino will
+   * also delete all underlying data associated with the catalog.
    *
    * @param scope The scope of the capability.
    * @return The capability of the managed storage.

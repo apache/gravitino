@@ -43,6 +43,8 @@ import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.connector.capability.Capability;
+import org.apache.gravitino.connector.capability.CapabilityResult;
 import org.apache.gravitino.exceptions.CatalogAlreadyExistsException;
 import org.apache.gravitino.exceptions.CatalogInUseException;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
@@ -598,7 +600,11 @@ public class TestCatalogManager {
     entityStore.put(schemaEntity);
     CatalogManager.CatalogWrapper catalogWrapper =
         Mockito.mock(CatalogManager.CatalogWrapper.class);
+    Capability capability = Mockito.mock(Capability.class);
+    CapabilityResult unsupportedResult = CapabilityResult.unsupported("Not managed");
     Mockito.doReturn(catalogWrapper).when(catalogManager).loadCatalogAndWrap(ident);
+    Mockito.doReturn(capability).when(catalogWrapper).capabilities();
+    Mockito.doReturn(unsupportedResult).when(capability).managedStorage(any());
     Mockito.doThrow(new RuntimeException("Failed connect"))
         .when(catalogWrapper)
         .doWithSchemaOps(any());

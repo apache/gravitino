@@ -26,7 +26,7 @@ public class FilesetCatalogCapability implements Capability {
   @Override
   public CapabilityResult managedStorage(Scope scope) {
     Preconditions.checkArgument(scope != null, "Scope cannot be null.");
-    if (scope == Scope.CATALOG || scope == Scope.SCHEMA || scope == Scope.FILESET) {
+    if (scope == Scope.SCHEMA || scope == Scope.FILESET) {
       return CapabilityResult.SUPPORTED;
     }
     return CapabilityResult.unsupported(

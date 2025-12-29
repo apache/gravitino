@@ -27,7 +27,7 @@ public class GenericCatalogCapability implements Capability {
   @Override
   public CapabilityResult managedStorage(Scope scope) {
     Preconditions.checkArgument(scope != null, "Scope cannot be null.");
-    if (scope == Scope.TABLE || scope == Scope.SCHEMA || scope == Scope.CATALOG) {
+    if (scope == Scope.TABLE || scope == Scope.SCHEMA) {
       return CapabilityResult.SUPPORTED;
     }
 

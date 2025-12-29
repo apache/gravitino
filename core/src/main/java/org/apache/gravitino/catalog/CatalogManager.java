@@ -757,7 +757,7 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
                   "Catalog %s has schemas, please drop them first or use force option", ident);
             }
 
-            if (isManagedCatalog(catalogWrapper)) {
+            if (isManagedStorageCatalog(catalogWrapper)) {
               // For managed catalog, we need to call drop schema API to drop the underlying
               // entities as well as the related resource first. Directly deleting the metadata from
               // the store is not enough.
@@ -814,9 +814,9 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
       return false;
     }
 
-    if (isManagedCatalog(catalogWrapper)) {
-      // For managed catalog, any existing schema entities are considered user-created. At this
-      // point we already know schemaEntities is not empty, so we can return true directly
+    if (isManagedStorageCatalog(catalogWrapper)) {
+      // For managed storage catalog, any existing schema entities are considered user-created. At
+      // this point we already know schemaEntities is not empty, so we can return true directly
       // without further checks.
       return true;
     }
@@ -894,12 +894,16 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
     }
   }
 
-  private boolean isManagedCatalog(CatalogWrapper catalogWrapper) {
+  private boolean isManagedStorageCatalog(CatalogWrapper catalogWrapper) {
     try {
-      return catalogWrapper.capabilities().managedStorage(Capability.Scope.CATALOG).supported();
+      Capability capability = catalogWrapper.capabilities();
+      return capability.managedStorage(Capability.Scope.SCHEMA).supported()
+          && (capability.managedStorage(Capability.Scope.TABLE).supported()
+              || capability.managedStorage(Capability.Scope.FILESET).supported()
+              || capability.managedStorage(Capability.Scope.MODEL).supported());
     } catch (Exception e) {
-      LOG.warn("Failed to get capabilities for catalog, assuming not managed", e);
-      return false;
+      // This should not be happened, because capabilities() will never throw an exception here.
+      throw new RuntimeException(e);
     }
   }
 
