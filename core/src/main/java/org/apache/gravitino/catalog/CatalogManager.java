@@ -823,13 +823,13 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
 
     if (schemaEntities.size() == 1) {
       String provider = catalogWrapper.catalog().provider();
-      if ("kafka".equals(provider)) {
+      if ("kafka".equalsIgnoreCase(provider)) {
         return false;
-      } else if ("jdbc-postgresql".equals(provider)) {
+      } else if ("jdbc-postgresql".equalsIgnoreCase(provider)) {
         // PostgreSQL catalog includes the "public" schema, see
         // https://github.com/apache/gravitino/issues/2314
         return !schemaEntities.get(0).name().equals("public");
-      } else if ("hive".equals(provider)) {
+      } else if ("hive".equalsIgnoreCase(provider)) {
         return !schemaEntities.get(0).name().equals("default");
       }
     }
