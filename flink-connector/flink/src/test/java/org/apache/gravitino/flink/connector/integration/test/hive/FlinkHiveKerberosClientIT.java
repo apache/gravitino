@@ -24,6 +24,7 @@ import static org.apache.hadoop.minikdc.MiniKdc.MAX_TICKET_LIFETIME;
 
 import com.google.common.collect.Maps;
 import java.io.File;
+import java.security.PrivilegedAction;
 import java.util.Arrays;
 import java.util.Map;
 import java.util.Optional;
@@ -131,8 +132,9 @@ public class FlinkHiveKerberosClientIT extends FlinkEnvIT {
     hadoopConfig.set("hadoop.security.auth_to_local", "RULE:[1:$1@$0](.*@EXAMPLE.COM)s/@.*//");
 
     UserGroupInformation.setConfiguration(hadoopConfig);
+    UserGroupInformation proxyUser = null;
     try {
-      UserGroupInformation.loginUserFromKeytab(clientPrincipal, keytabFile);
+      proxyUser = UserGroupInformation.loginUserFromKeytabAndReturnUGI(clientPrincipal, keytabFile);
     } catch (Exception e) {
       throw new RuntimeException("Failed to obtain UGI for Kerberos user", e);
     }
@@ -144,7 +146,10 @@ public class FlinkHiveKerberosClientIT extends FlinkEnvIT {
     configuration.setString("table.catalog-store.gravitino.gravitino.uri", gravitinoUri);
     EnvironmentSettings.Builder builder =
         EnvironmentSettings.newInstance().withConfiguration(configuration);
-    tableEnv = TableEnvironment.create(builder.inBatchMode().build());
+    tableEnv =
+        proxyUser.doAs(
+            (PrivilegedAction<TableEnvironment>)
+                () -> TableEnvironment.create(builder.inBatchMode().build()));
   }
 
   @Test
