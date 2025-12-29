@@ -28,6 +28,7 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.Entity;
+import org.apache.gravitino.Entity.EntityType;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.MetadataObject;
@@ -408,13 +409,6 @@ public class SchemaMetaService {
     SchemaPO schemaPO =
         getSchemaByFullQualifiedName(namespaceLevels[0], namespaceLevels[1], identifier.name());
 
-    if (schemaPO.getCatalogId() == null) {
-      throw new NoSuchEntityException(
-          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
-          Entity.EntityType.CATALOG.name().toLowerCase(),
-          namespaceLevels[1]);
-    }
-
     if (schemaPO.getSchemaId() == null) {
       throw new NoSuchEntityException(
           NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
@@ -427,9 +421,19 @@ public class SchemaMetaService {
 
   private SchemaPO getSchemaByFullQualifiedName(
       String metalakeName, String catalogName, String schemaName) {
-    return SessionUtils.getWithoutCommit(
-        SchemaMetaMapper.class,
-        mapper -> mapper.selectSchemaByFullQualifiedName(metalakeName, catalogName, schemaName));
+    SchemaPO schemaPO =
+        SessionUtils.getWithoutCommit(
+            SchemaMetaMapper.class,
+            mapper ->
+                mapper.selectSchemaByFullQualifiedName(metalakeName, catalogName, schemaName));
+    if (schemaPO == null) {
+      throw new NoSuchEntityException(
+          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
+          EntityType.CATALOG.name().toLowerCase(),
+          schemaName);
+    }
+
+    return schemaPO;
   }
 
   private void fillSchemaPOBuilderParentEntityId(SchemaPO.Builder builder, Namespace namespace) {
