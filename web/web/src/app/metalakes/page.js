@@ -206,7 +206,11 @@ const MetalakeList = () => {
               </Tooltip>
             )}
             {record.properties?.['in-use'] === 'true' ? (
-              <a data-refer={`metalake-link-${record.name}`} className='hover:text-defaultPrimary' onClick={() => handleToCatalogsPage(record.name)}>
+              <a
+                data-refer={`metalake-link-${record.name}`}
+                className='hover:text-defaultPrimary'
+                onClick={() => handleToCatalogsPage(record.name)}
+              >
                 {record.name}
               </a>
             ) : (
