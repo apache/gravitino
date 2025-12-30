@@ -24,6 +24,7 @@ import java.util.Map;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.connector.capability.Capability;
+import org.apache.gravitino.exceptions.CatalogNotInUseException;
 import org.apache.gravitino.exceptions.MetalakeNotInUseException;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.CatalogEntity;
@@ -53,7 +54,7 @@ public class TestBaseCatalogInUse {
     CatalogEntity entity = buildCatalogEntity(props(true, false));
     TestCatalogImpl catalog = new TestCatalogImpl();
     Assertions.assertThrows(
-        MetalakeNotInUseException.class, () -> catalog.checkMetalakeAndCatalogInUse(entity));
+        CatalogNotInUseException.class, () -> catalog.checkMetalakeAndCatalogInUse(entity));
   }
 
   private Map<String, String> props(boolean metalakeInUse, boolean catalogInUse) {
