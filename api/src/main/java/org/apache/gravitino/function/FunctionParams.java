@@ -19,6 +19,7 @@
 package org.apache.gravitino.function;
 
 import com.google.common.base.Preconditions;
+import java.util.Arrays;
 import java.util.Objects;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.rel.Column;
@@ -29,6 +30,16 @@ import org.apache.gravitino.rel.types.Type;
 public class FunctionParams {
 
   private FunctionParams() {}
+
+  /**
+   * Create a copy of the given array of {@link FunctionParam} instances.
+   *
+   * @param params The array of parameters.
+   * @return A copy of the given array of {@link FunctionParam} instances.
+   */
+  public static FunctionParam[] of(FunctionParam... params) {
+    return Arrays.copyOf(params, params.length);
+  }
 
   /**
    * Create a {@link FunctionParam} instance.
