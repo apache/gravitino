@@ -103,6 +103,7 @@ import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.TableCatalog;
 import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.utils.IsolatedClassLoader;
+import org.apache.gravitino.utils.NamespaceUtil;
 import org.apache.gravitino.utils.PrincipalUtils;
 import org.apache.gravitino.utils.ThrowableFunction;
 import org.slf4j.Logger;
@@ -740,36 +741,31 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
         () -> {
           checkMetalake(metalakeIdent, store);
           try {
-            boolean catalogInUse = catalogInUse(store, ident);
+            boolean catalogInUse = getCatalogInUseValue(store, ident);
             if (catalogInUse && !force) {
               throw new CatalogInUseException(
                   "Catalog %s is in use, please disable it first or use force option", ident);
             }
 
-            Namespace schemaNamespace = Namespace.of(ident.namespace().level(0), ident.name());
-            CatalogWrapper catalogWrapper = loadCatalogAndWrap(ident);
-
+            Namespace schemaNs = Namespace.of(ident.namespace().level(0), ident.name());
             List<SchemaEntity> schemaEntities =
-                store.list(schemaNamespace, SchemaEntity.class, EntityType.SCHEMA);
-            CatalogEntity catalogEntity = store.get(ident, EntityType.CATALOG, CatalogEntity.class);
+                store.list(schemaNs, SchemaEntity.class, EntityType.SCHEMA);
 
-            if (!force
-                && containsUserCreatedSchemas(schemaEntities, catalogEntity, catalogWrapper)) {
+            CatalogWrapper catalogWrapper = loadCatalogAndWrap(ident);
+            if (!force && containsUserCreatedSchemas(schemaEntities, catalogWrapper)) {
               throw new NonEmptyCatalogException(
                   "Catalog %s has schemas, please drop them first or use force option", ident);
             }
 
-            if (includeManagedEntities(catalogEntity)) {
-              // code reach here in two cases:
-              // 1. the catalog does not have available schemas
-              // 2. the catalog has available schemas, and force is true
-              // for case 1, the forEach block can drop them without any side effect
-              // for case 2, the forEach block will drop all managed sub-entities
+            if (isManagedStorageCatalog(catalogWrapper)) {
+              // For managed catalog, we need to call drop schema API to drop the underlying
+              // entities as well as the related resource first. Directly deleting the metadata from
+              // the store is not enough.
               schemaEntities.forEach(
                   schema -> {
                     try {
                       catalogWrapper.doWithSchemaOps(
-                          schemaOps -> schemaOps.dropSchema(schema.nameIdentifier(), true));
+                          ops -> ops.dropSchema(schema.nameIdentifier(), true));
                     } catch (Exception e) {
                       LOG.warn("Failed to drop schema {}", schema.nameIdentifier());
                       throw new RuntimeException(
@@ -777,6 +773,8 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
                     }
                   });
             }
+
+            // Finally, delete the catalog entity as well as all its sub-entities from the store.
             catalogCache.invalidate(ident);
             return store.delete(ident, EntityType.CATALOG, true);
 
@@ -805,28 +803,33 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
    * </ul>
    *
    * @param schemaEntities The list of schema entities to check.
-   * @param catalogEntity The catalog entity to which the schemas belong.
    * @param catalogWrapper The catalog wrapper for the catalog.
    * @return True if the list of schema entities contains any valid user-created schemas, false
    *     otherwise.
    * @throws Exception If an error occurs while checking the schemas.
    */
   private boolean containsUserCreatedSchemas(
-      List<SchemaEntity> schemaEntities, CatalogEntity catalogEntity, CatalogWrapper catalogWrapper)
-      throws Exception {
+      List<SchemaEntity> schemaEntities, CatalogWrapper catalogWrapper) throws Exception {
     if (schemaEntities.isEmpty()) {
       return false;
     }
 
-    if (schemaEntities.size() == 1) {
-      if ("kafka".equals(catalogEntity.getProvider())) {
-        return false;
+    if (isManagedStorageCatalog(catalogWrapper)) {
+      // For managed storage catalog, any existing schema entities are considered user-created. At
+      // this point we already know schemaEntities is not empty, so we can return true directly
+      // without further checks.
+      return true;
+    }
 
-      } else if ("jdbc-postgresql".equals(catalogEntity.getProvider())) {
+    if (schemaEntities.size() == 1) {
+      String provider = catalogWrapper.catalog().provider();
+      if ("kafka".equalsIgnoreCase(provider)) {
+        return false;
+      } else if ("jdbc-postgresql".equalsIgnoreCase(provider)) {
         // PostgreSQL catalog includes the "public" schema, see
         // https://github.com/apache/gravitino/issues/2314
         return !schemaEntities.get(0).name().equals("public");
-      } else if ("hive".equals(catalogEntity.getProvider())) {
+      } else if ("hive".equalsIgnoreCase(provider)) {
         return !schemaEntities.get(0).name().equals("default");
       }
     }
@@ -835,7 +838,9 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
         catalogWrapper.doWithSchemaOps(
             schemaOps ->
                 schemaOps.listSchemas(
-                    Namespace.of(catalogEntity.namespace().level(0), catalogEntity.name())));
+                    NamespaceUtil.ofSchema(
+                        catalogWrapper.catalog().entity().namespace().level(0),
+                        catalogWrapper.catalog().name())));
     if (allSchemas.length == 0) {
       return false;
     }
@@ -846,10 +851,6 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
     // some schemas are dropped externally, but still exist in the entity store, those schemas are
     // invalid
     return schemaEntities.stream().map(SchemaEntity::name).anyMatch(availableSchemaNames::contains);
-  }
-
-  private boolean includeManagedEntities(CatalogEntity catalogEntity) {
-    return catalogEntity.getType().equals(FILESET);
   }
 
   /**
@@ -889,6 +890,19 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
 
     } catch (IOException e) {
       LOG.error("Failed to do store operation", e);
+      throw new RuntimeException(e);
+    }
+  }
+
+  private boolean isManagedStorageCatalog(CatalogWrapper catalogWrapper) {
+    try {
+      Capability capability = catalogWrapper.capabilities();
+      return capability.managedStorage(Capability.Scope.SCHEMA).supported()
+          && (capability.managedStorage(Capability.Scope.TABLE).supported()
+              || capability.managedStorage(Capability.Scope.FILESET).supported()
+              || capability.managedStorage(Capability.Scope.MODEL).supported());
+    } catch (Exception e) {
+      // This should not be happened, because capabilities() will never throw an exception here.
       throw new RuntimeException(e);
     }
   }
