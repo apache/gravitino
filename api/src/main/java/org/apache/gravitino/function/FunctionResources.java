@@ -26,8 +26,6 @@ import org.apache.gravitino.annotation.Evolving;
 @Evolving
 public class FunctionResources {
   private static final String[] EMPTY = new String[0];
-  private static final FunctionResources EMPTY_RESOURCES =
-      new FunctionResources(EMPTY, EMPTY, EMPTY);
 
   private final String[] jars;
   private final String[] files;
@@ -43,7 +41,7 @@ public class FunctionResources {
    * @return An empty {@link FunctionResources} instance.
    */
   public static FunctionResources empty() {
-    return EMPTY_RESOURCES;
+    return new FunctionResources(EMPTY, EMPTY, EMPTY);
   }
 
   /**
@@ -58,7 +56,7 @@ public class FunctionResources {
     if ((jars == null || jars.length == 0)
         && (files == null || files.length == 0)
         && (archives == null || archives.length == 0)) {
-      return EMPTY_RESOURCES;
+      return new FunctionResources(EMPTY, EMPTY, EMPTY);
     }
     return new FunctionResources(jars, files, archives);
   }

@@ -36,7 +36,7 @@ public class SQLImpl extends FunctionImpl {
   }
 
   /**
-   * @return The SQL body.
+   * @return The SQL that defines the function.
    */
   public String sql() {
     return sql;

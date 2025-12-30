@@ -19,8 +19,8 @@
 package org.apache.gravitino.function;
 
 import com.google.common.base.Preconditions;
-import com.google.common.base.Strings;
 import java.util.Objects;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.expressions.Expression;
 import org.apache.gravitino.rel.types.Type;
@@ -74,9 +74,11 @@ public class FunctionParams {
     private final Expression defaultValue;
 
     private FunctionParamImpl(String name, Type dataType, String comment, Expression defaultValue) {
-      Preconditions.checkArgument(!Strings.isNullOrEmpty(name), "Parameter name cannot be null");
+      Preconditions.checkArgument(
+          StringUtils.isNotBlank(name), "Parameter name cannot be null or empty");
+      Preconditions.checkArgument(dataType != null, "Parameter data type cannot be null");
       this.name = name;
-      this.dataType = Preconditions.checkNotNull(dataType, "Parameter data type cannot be null");
+      this.dataType = dataType;
       this.comment = comment;
       this.defaultValue = defaultValue == null ? Column.DEFAULT_VALUE_NOT_SET : defaultValue;
     }
@@ -106,14 +108,14 @@ public class FunctionParams {
       if (this == obj) {
         return true;
       }
-      if (!(obj instanceof FunctionParamImpl)) {
+      if (!(obj instanceof FunctionParam)) {
         return false;
       }
-      FunctionParamImpl that = (FunctionParamImpl) obj;
-      return Objects.equals(name, that.name)
-          && Objects.equals(dataType, that.dataType)
-          && Objects.equals(comment, that.comment)
-          && Objects.equals(defaultValue, that.defaultValue);
+      FunctionParam that = (FunctionParam) obj;
+      return Objects.equals(name, that.name())
+          && Objects.equals(dataType, that.dataType())
+          && Objects.equals(comment, that.comment())
+          && Objects.equals(defaultValue, that.defaultValue());
     }
 
     @Override

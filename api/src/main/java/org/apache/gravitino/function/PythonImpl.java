@@ -46,7 +46,7 @@ public class PythonImpl extends FunctionImpl {
   }
 
   /**
-   * @return The optional inline code block.
+   * @return The Python UDF code block.
    */
   public String codeBlock() {
     return codeBlock;

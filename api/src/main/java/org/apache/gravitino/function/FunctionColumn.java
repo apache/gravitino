@@ -19,8 +19,9 @@
 package org.apache.gravitino.function;
 
 import com.google.common.base.Preconditions;
-import com.google.common.base.Strings;
 import java.util.Objects;
+import javax.annotation.Nullable;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.annotation.Evolving;
 import org.apache.gravitino.rel.types.Type;
 
@@ -33,7 +34,7 @@ public class FunctionColumn {
 
   private FunctionColumn(String name, Type dataType, String comment) {
     Preconditions.checkArgument(
-        !Strings.isNullOrEmpty(name), "Function column name cannot be null");
+        StringUtils.isNotBlank(name), "Function column name cannot be null or empty");
     this.name = name;
     this.dataType = Preconditions.checkNotNull(dataType, "Function column type cannot be null");
     this.comment = comment;
@@ -68,6 +69,7 @@ public class FunctionColumn {
   /**
    * @return The optional column comment, null if not provided.
    */
+  @Nullable
   public String comment() {
     return comment;
   }
