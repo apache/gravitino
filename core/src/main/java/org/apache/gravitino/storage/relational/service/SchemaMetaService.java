@@ -147,31 +147,7 @@ public class SchemaMetaService {
   public List<SchemaEntity> listSchemasByNamespace(Namespace namespace) {
     NamespaceUtil.checkSchema(namespace);
 
-    List<SchemaPO> schemaPOs;
-    if (GravitinoEnv.getInstance().config().get(Configs.CACHE_ENABLED)) {
-      Long catalogId =
-          EntityIdService.getEntityId(
-              NameIdentifier.of(namespace.levels()), Entity.EntityType.CATALOG);
-
-      schemaPOs =
-          SessionUtils.getWithoutCommit(
-              SchemaMetaMapper.class, mapper -> mapper.listSchemaPOsByCatalogId(catalogId));
-    } else {
-      String[] namespaceLevels = namespace.levels();
-      schemaPOs =
-          SessionUtils.getWithoutCommit(
-              SchemaMetaMapper.class,
-              mapper ->
-                  mapper.listSchemaPOsByFullQualifiedName(namespaceLevels[0], namespaceLevels[1]));
-      if (schemaPOs.isEmpty() || schemaPOs.get(0).getCatalogId() == null) {
-        throw new NoSuchEntityException(
-            NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
-            Entity.EntityType.CATALOG.name().toLowerCase(),
-            namespaceLevels[1]);
-      }
-      schemaPOs =
-          schemaPOs.stream().filter(po -> po.getSchemaId() != null).collect(Collectors.toList());
-    }
+    List<SchemaPO> schemaPOs = listSchemaPOs(namespace);
     return POConverters.fromSchemaPOs(schemaPOs, namespace);
   }
 
@@ -398,25 +374,7 @@ public class SchemaMetaService {
 
   private SchemaPO getSchemaPOByIdentifier(NameIdentifier identifier) {
     NameIdentifierUtil.checkSchema(identifier);
-    if (GravitinoEnv.getInstance().config().get(Configs.CACHE_ENABLED)) {
-      Long catalogId =
-          EntityIdService.getEntityId(
-              NameIdentifier.of(identifier.namespace().levels()), Entity.EntityType.CATALOG);
-      return getSchemaPOByCatalogIdAndName(catalogId, identifier.name());
-    }
-
-    String[] namespaceLevels = identifier.namespace().levels();
-    SchemaPO schemaPO =
-        getSchemaByFullQualifiedName(namespaceLevels[0], namespaceLevels[1], identifier.name());
-
-    if (schemaPO.getSchemaId() == null) {
-      throw new NoSuchEntityException(
-          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
-          Entity.EntityType.SCHEMA.name().toLowerCase(),
-          identifier.name());
-    }
-
-    return schemaPO;
+    return schemaPOFetcher().apply(identifier);
   }
 
   private SchemaPO getSchemaByFullQualifiedName(
@@ -434,6 +392,76 @@ public class SchemaMetaService {
     }
 
     return schemaPO;
+  }
+
+  private List<SchemaPO> listSchemaPOs(Namespace namespace) {
+    return schemaListFetcher().apply(namespace);
+  }
+
+  private List<SchemaPO> listSchemaPOsByCatalogId(Namespace namespace) {
+    Long catalogId =
+        EntityIdService.getEntityId(
+            NameIdentifier.of(namespace.levels()), Entity.EntityType.CATALOG);
+
+    return SessionUtils.getWithoutCommit(
+        SchemaMetaMapper.class, mapper -> mapper.listSchemaPOsByCatalogId(catalogId));
+  }
+
+  private List<SchemaPO> listSchemaPOsByFullQualifiedName(Namespace namespace) {
+    String[] namespaceLevels = namespace.levels();
+    List<SchemaPO> schemaPOs =
+        SessionUtils.getWithoutCommit(
+            SchemaMetaMapper.class,
+            mapper ->
+                mapper.listSchemaPOsByFullQualifiedName(namespaceLevels[0], namespaceLevels[1]));
+    if (schemaPOs.isEmpty() || schemaPOs.get(0).getCatalogId() == null) {
+      throw new NoSuchEntityException(
+          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
+          Entity.EntityType.CATALOG.name().toLowerCase(),
+          namespaceLevels[1]);
+    }
+    return schemaPOs.stream().filter(po -> po.getSchemaId() != null).collect(Collectors.toList());
+  }
+
+  private SchemaPO getSchemaPOByCatalogId(NameIdentifier identifier) {
+    Long catalogId =
+        EntityIdService.getEntityId(
+            NameIdentifier.of(identifier.namespace().levels()), Entity.EntityType.CATALOG);
+    return getSchemaPOByCatalogIdAndName(catalogId, identifier.name());
+  }
+
+  private SchemaPO getSchemaPOByFullQualifiedName(NameIdentifier identifier) {
+    String[] namespaceLevels = identifier.namespace().levels();
+    SchemaPO schemaPO =
+        getSchemaByFullQualifiedName(namespaceLevels[0], namespaceLevels[1], identifier.name());
+
+    if (schemaPO.getCatalogId() == null) {
+      throw new NoSuchEntityException(
+          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
+          Entity.EntityType.CATALOG.name().toLowerCase(),
+          namespaceLevels[1]);
+    }
+
+    if (schemaPO.getSchemaId() == null) {
+      throw new NoSuchEntityException(
+          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
+          Entity.EntityType.SCHEMA.name().toLowerCase(),
+          identifier.name());
+    }
+
+    return schemaPO;
+  }
+
+  private Function<Namespace, List<SchemaPO>> schemaListFetcher() {
+    return cacheEnabled() ? this::listSchemaPOsByCatalogId : this::listSchemaPOsByFullQualifiedName;
+  }
+
+  private Function<NameIdentifier, SchemaPO> schemaPOFetcher() {
+    return cacheEnabled() ? this::getSchemaPOByCatalogId : this::getSchemaPOByFullQualifiedName;
+  }
+
+  private boolean cacheEnabled() {
+    return GravitinoEnv.getInstance().config().get(Configs.CACHE_ENABLED);
   }
 
   private void fillSchemaPOBuilderParentEntityId(SchemaPO.Builder builder, Namespace namespace) {

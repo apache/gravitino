@@ -75,31 +75,7 @@ public class ModelMetaService {
   public List<ModelEntity> listModelsByNamespace(Namespace ns) {
     NamespaceUtil.checkModel(ns);
 
-    List<ModelPO> modelPOs;
-    if (GravitinoEnv.getInstance().config().get(Configs.CACHE_ENABLED)) {
-      Long schemaId =
-          EntityIdService.getEntityId(NameIdentifier.of(ns.levels()), Entity.EntityType.SCHEMA);
-      modelPOs =
-          SessionUtils.getWithoutCommit(
-              ModelMetaMapper.class, mapper -> mapper.listModelPOsBySchemaId(schemaId));
-    } else {
-      String[] namespaceLevels = ns.levels();
-      modelPOs =
-          SessionUtils.getWithoutCommit(
-              ModelMetaMapper.class,
-              mapper ->
-                  mapper.listModelPOsByFullQualifiedName(
-                      namespaceLevels[0], namespaceLevels[1], namespaceLevels[2]));
-      if (modelPOs.isEmpty() || modelPOs.get(0).getSchemaId() == null) {
-        throw new NoSuchEntityException(
-            NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
-            Entity.EntityType.SCHEMA.name().toLowerCase(Locale.ROOT),
-            namespaceLevels[2]);
-      }
-      modelPOs =
-          modelPOs.stream().filter(po -> po.getModelId() != null).collect(Collectors.toList());
-    }
-
+    List<ModelPO> modelPOs = listModelPOs(ns);
     return modelPOs.stream().map(m -> POConverters.fromModelPO(m, ns)).collect(Collectors.toList());
   }
 
@@ -265,38 +241,71 @@ public class ModelMetaService {
   ModelPO getModelPOByIdentifier(NameIdentifier ident) {
     NameIdentifierUtil.checkModel(ident);
 
-    if (GravitinoEnv.getInstance().config().get(Configs.CACHE_ENABLED)) {
-      Long schemaId =
-          EntityIdService.getEntityId(
-              NameIdentifier.of(ident.namespace().levels()), Entity.EntityType.SCHEMA);
+    return modelPOFetcher().apply(ident);
+  }
 
-      ModelPO modelPO =
-          SessionUtils.getWithoutCommit(
-              ModelMetaMapper.class,
-              mapper -> mapper.selectModelMetaBySchemaIdAndModelName(schemaId, ident.name()));
+  private List<ModelPO> listModelPOs(Namespace namespace) {
+    return modelListFetcher().apply(namespace);
+  }
 
-      if (modelPO == null) {
-        throw new NoSuchEntityException(
-            NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
-            Entity.EntityType.MODEL.name().toLowerCase(Locale.ROOT),
-            ident.toString());
-      }
-      return modelPO;
-    }
+  private List<ModelPO> listModelPOsBySchemaId(Namespace namespace) {
+    Long schemaId =
+        EntityIdService.getEntityId(
+            NameIdentifier.of(namespace.levels()), Entity.EntityType.SCHEMA);
+    return SessionUtils.getWithoutCommit(
+        ModelMetaMapper.class, mapper -> mapper.listModelPOsBySchemaId(schemaId));
+  }
 
-    String[] namespaceLevels = ident.namespace().levels();
-    ModelPO modelPO =
+  private List<ModelPO> listModelPOsByFullQualifiedName(Namespace namespace) {
+    String[] namespaceLevels = namespace.levels();
+    List<ModelPO> modelPOs =
         SessionUtils.getWithoutCommit(
             ModelMetaMapper.class,
             mapper ->
-                mapper.selectModelByFullQualifiedName(
-                    namespaceLevels[0], namespaceLevels[1], namespaceLevels[2], ident.name()));
+                mapper.listModelPOsByFullQualifiedName(
+                    namespaceLevels[0], namespaceLevels[1], namespaceLevels[2]));
+    if (modelPOs.isEmpty() || modelPOs.get(0).getSchemaId() == null) {
+      throw new NoSuchEntityException(
+          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
+          Entity.EntityType.SCHEMA.name().toLowerCase(Locale.ROOT),
+          namespaceLevels[2]);
+    }
+    return modelPOs.stream().filter(po -> po.getModelId() != null).collect(Collectors.toList());
+  }
+
+  private ModelPO getModelPOBySchemaId(NameIdentifier identifier) {
+    Long schemaId =
+        EntityIdService.getEntityId(
+            NameIdentifier.of(identifier.namespace().levels()), Entity.EntityType.SCHEMA);
+
+    ModelPO modelPO =
+        SessionUtils.getWithoutCommit(
+            ModelMetaMapper.class,
+            mapper -> mapper.selectModelMetaBySchemaIdAndModelName(schemaId, identifier.name()));
 
     if (modelPO == null) {
       throw new NoSuchEntityException(
           NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
           Entity.EntityType.MODEL.name().toLowerCase(Locale.ROOT),
-          ident.toString());
+          identifier.toString());
+    }
+    return modelPO;
+  }
+
+  private ModelPO getModelPOByFullQualifiedName(NameIdentifier identifier) {
+    String[] namespaceLevels = identifier.namespace().levels();
+    ModelPO modelPO =
+        SessionUtils.getWithoutCommit(
+            ModelMetaMapper.class,
+            mapper ->
+                mapper.selectModelByFullQualifiedName(
+                    namespaceLevels[0], namespaceLevels[1], namespaceLevels[2], identifier.name()));
+
+    if (modelPO == null) {
+      throw new NoSuchEntityException(
+          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
+          Entity.EntityType.MODEL.name().toLowerCase(Locale.ROOT),
+          identifier.toString());
     }
 
     if (modelPO.getSchemaId() == null) {
@@ -310,9 +319,21 @@ public class ModelMetaService {
       throw new NoSuchEntityException(
           NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
           Entity.EntityType.MODEL.name().toLowerCase(Locale.ROOT),
-          ident.toString());
+          identifier.toString());
     }
     return modelPO;
+  }
+
+  private Function<Namespace, List<ModelPO>> modelListFetcher() {
+    return cacheEnabled() ? this::listModelPOsBySchemaId : this::listModelPOsByFullQualifiedName;
+  }
+
+  private Function<NameIdentifier, ModelPO> modelPOFetcher() {
+    return cacheEnabled() ? this::getModelPOBySchemaId : this::getModelPOByFullQualifiedName;
+  }
+
+  private boolean cacheEnabled() {
+    return GravitinoEnv.getInstance().config().get(Configs.CACHE_ENABLED);
   }
 
   @Monitored(metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME, baseMetricName = "updateModel")

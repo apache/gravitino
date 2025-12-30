@@ -95,33 +95,7 @@ public class TopicMetaService {
   public List<TopicEntity> listTopicsByNamespace(Namespace namespace) {
     NamespaceUtil.checkTopic(namespace);
 
-    List<TopicPO> topicPOs;
-    if (GravitinoEnv.getInstance().config().get(Configs.CACHE_ENABLED)) {
-      Long schemaId =
-          EntityIdService.getEntityId(
-              NameIdentifier.of(namespace.levels()), Entity.EntityType.SCHEMA);
-
-      topicPOs =
-          SessionUtils.getWithoutCommit(
-              TopicMetaMapper.class, mapper -> mapper.listTopicPOsBySchemaId(schemaId));
-    } else {
-      String[] namespaceLevels = namespace.levels();
-      topicPOs =
-          SessionUtils.getWithoutCommit(
-              TopicMetaMapper.class,
-              mapper ->
-                  mapper.listTopicPOsByFullQualifiedName(
-                      namespaceLevels[0], namespaceLevels[1], namespaceLevels[2]));
-      if (topicPOs.isEmpty() || topicPOs.get(0).getSchemaId() == null) {
-        throw new NoSuchEntityException(
-            NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
-            Entity.EntityType.SCHEMA.name().toLowerCase(),
-            namespaceLevels[2]);
-      }
-      topicPOs =
-          topicPOs.stream().filter(po -> po.getTopicId() != null).collect(Collectors.toList());
-    }
-
+    List<TopicPO> topicPOs = listTopicPOs(namespace);
     return POConverters.fromTopicPOs(topicPOs, namespace);
   }
 
@@ -176,13 +150,47 @@ public class TopicMetaService {
   private TopicPO getTopicPOByIdentifier(NameIdentifier identifier) {
     NameIdentifierUtil.checkTopic(identifier);
 
-    if (GravitinoEnv.getInstance().config().get(Configs.CACHE_ENABLED)) {
-      Long schemaId =
-          EntityIdService.getEntityId(
-              NameIdentifier.of(identifier.namespace().levels()), Entity.EntityType.SCHEMA);
-      return getTopicPOBySchemaIdAndName(schemaId, identifier.name());
-    }
+    return topicPOFetcher().apply(identifier);
+  }
 
+  private List<TopicPO> listTopicPOs(Namespace namespace) {
+    return topicListFetcher().apply(namespace);
+  }
+
+  private List<TopicPO> listTopicPOsBySchemaId(Namespace namespace) {
+    Long schemaId =
+        EntityIdService.getEntityId(
+            NameIdentifier.of(namespace.levels()), Entity.EntityType.SCHEMA);
+
+    return SessionUtils.getWithoutCommit(
+        TopicMetaMapper.class, mapper -> mapper.listTopicPOsBySchemaId(schemaId));
+  }
+
+  private List<TopicPO> listTopicPOsByFullQualifiedName(Namespace namespace) {
+    String[] namespaceLevels = namespace.levels();
+    List<TopicPO> topicPOs =
+        SessionUtils.getWithoutCommit(
+            TopicMetaMapper.class,
+            mapper ->
+                mapper.listTopicPOsByFullQualifiedName(
+                    namespaceLevels[0], namespaceLevels[1], namespaceLevels[2]));
+    if (topicPOs.isEmpty() || topicPOs.get(0).getSchemaId() == null) {
+      throw new NoSuchEntityException(
+          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
+          Entity.EntityType.SCHEMA.name().toLowerCase(),
+          namespaceLevels[2]);
+    }
+    return topicPOs.stream().filter(po -> po.getTopicId() != null).collect(Collectors.toList());
+  }
+
+  private TopicPO getTopicPOBySchemaId(NameIdentifier identifier) {
+    Long schemaId =
+        EntityIdService.getEntityId(
+            NameIdentifier.of(identifier.namespace().levels()), Entity.EntityType.SCHEMA);
+    return getTopicPOBySchemaIdAndName(schemaId, identifier.name());
+  }
+
+  private TopicPO getTopicPOByFullQualifiedName(NameIdentifier identifier) {
     String[] namespaceLevels = identifier.namespace().levels();
     TopicPO topicPO =
         SessionUtils.getWithoutCommit(
@@ -213,6 +221,18 @@ public class TopicMetaService {
     }
 
     return topicPO;
+  }
+
+  private Function<Namespace, List<TopicPO>> topicListFetcher() {
+    return cacheEnabled() ? this::listTopicPOsBySchemaId : this::listTopicPOsByFullQualifiedName;
+  }
+
+  private Function<NameIdentifier, TopicPO> topicPOFetcher() {
+    return cacheEnabled() ? this::getTopicPOBySchemaId : this::getTopicPOByFullQualifiedName;
+  }
+
+  private boolean cacheEnabled() {
+    return GravitinoEnv.getInstance().config().get(Configs.CACHE_ENABLED);
   }
 
   private void fillTopicPOBuilderParentEntityId(TopicPO.Builder builder, Namespace namespace) {

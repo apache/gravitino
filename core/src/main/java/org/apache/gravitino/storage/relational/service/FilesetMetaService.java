@@ -119,33 +119,37 @@ public class FilesetMetaService {
   public List<FilesetEntity> listFilesetsByNamespace(Namespace namespace) {
     NamespaceUtil.checkFileset(namespace);
 
-    List<FilesetPO> filesetPOs;
-    if (GravitinoEnv.getInstance().config().get(Configs.CACHE_ENABLED)) {
-      Long schemaId =
-          EntityIdService.getEntityId(
-              NameIdentifier.of(namespace.levels()), Entity.EntityType.SCHEMA);
-      filesetPOs =
-          SessionUtils.getWithoutCommit(
-              FilesetMetaMapper.class, mapper -> mapper.listFilesetPOsBySchemaId(schemaId));
-    } else {
-      String[] namespaceLevels = namespace.levels();
-      filesetPOs =
-          SessionUtils.getWithoutCommit(
-              FilesetMetaMapper.class,
-              mapper ->
-                  mapper.listFilesetPOsByFullQualifiedName(
-                      namespaceLevels[0], namespaceLevels[1], namespaceLevels[2]));
-      if (filesetPOs.isEmpty() || filesetPOs.get(0).getSchemaId() == null) {
-        throw new NoSuchEntityException(
-            NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
-            Entity.EntityType.SCHEMA.name().toLowerCase(),
-            namespaceLevels[2]);
-      }
-      filesetPOs =
-          filesetPOs.stream().filter(po -> po.getFilesetId() != null).collect(Collectors.toList());
-    }
-
+    List<FilesetPO> filesetPOs = listFilesetPOs(namespace);
     return POConverters.fromFilesetPOs(filesetPOs, namespace);
+  }
+
+  private List<FilesetPO> listFilesetPOs(Namespace namespace) {
+    return filesetListFetcher().apply(namespace);
+  }
+
+  private List<FilesetPO> listFilesetPOsBySchemaId(Namespace namespace) {
+    Long schemaId =
+        EntityIdService.getEntityId(
+            NameIdentifier.of(namespace.levels()), Entity.EntityType.SCHEMA);
+    return SessionUtils.getWithoutCommit(
+        FilesetMetaMapper.class, mapper -> mapper.listFilesetPOsBySchemaId(schemaId));
+  }
+
+  private List<FilesetPO> listFilesetPOsByFullQualifiedName(Namespace namespace) {
+    String[] namespaceLevels = namespace.levels();
+    List<FilesetPO> filesetPOs =
+        SessionUtils.getWithoutCommit(
+            FilesetMetaMapper.class,
+            mapper ->
+                mapper.listFilesetPOsByFullQualifiedName(
+                    namespaceLevels[0], namespaceLevels[1], namespaceLevels[2]));
+    if (filesetPOs.isEmpty() || filesetPOs.get(0).getSchemaId() == null) {
+      throw new NoSuchEntityException(
+          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
+          Entity.EntityType.SCHEMA.name().toLowerCase(),
+          namespaceLevels[2]);
+    }
+    return filesetPOs.stream().filter(po -> po.getFilesetId() != null).collect(Collectors.toList());
   }
 
   @Monitored(
@@ -353,13 +357,17 @@ public class FilesetMetaService {
   private FilesetPO getFilesetPOByIdentifier(NameIdentifier identifier) {
     NameIdentifierUtil.checkFileset(identifier);
 
-    if (GravitinoEnv.getInstance().config().get(Configs.CACHE_ENABLED)) {
-      Long schemaId =
-          EntityIdService.getEntityId(
-              NameIdentifier.of(identifier.namespace().levels()), Entity.EntityType.SCHEMA);
-      return getFilesetPOBySchemaIdAndName(schemaId, identifier.name());
-    }
+    return filesetPOFetcher().apply(identifier);
+  }
 
+  private FilesetPO getFilesetPOBySchemaId(NameIdentifier identifier) {
+    Long schemaId =
+        EntityIdService.getEntityId(
+            NameIdentifier.of(identifier.namespace().levels()), Entity.EntityType.SCHEMA);
+    return getFilesetPOBySchemaIdAndName(schemaId, identifier.name());
+  }
+
+  private FilesetPO getFilesetPOByFullQualifiedName(NameIdentifier identifier) {
     String[] namespaceLevels = identifier.namespace().levels();
     FilesetPO filesetPO =
         getFilesetByFullQualifiedName(
@@ -380,6 +388,20 @@ public class FilesetMetaService {
     }
 
     return filesetPO;
+  }
+
+  private Function<Namespace, List<FilesetPO>> filesetListFetcher() {
+    return cacheEnabled()
+        ? this::listFilesetPOsBySchemaId
+        : this::listFilesetPOsByFullQualifiedName;
+  }
+
+  private Function<NameIdentifier, FilesetPO> filesetPOFetcher() {
+    return cacheEnabled() ? this::getFilesetPOBySchemaId : this::getFilesetPOByFullQualifiedName;
+  }
+
+  private boolean cacheEnabled() {
+    return GravitinoEnv.getInstance().config().get(Configs.CACHE_ENABLED);
   }
 
   private void fillFilesetPOBuilderParentEntityId(FilesetPO.Builder builder, Namespace namespace) {
