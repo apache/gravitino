@@ -176,7 +176,7 @@ public abstract class BaseCatalog<T extends BaseCatalog>
           Preconditions.checkArgument(
               entity != null && conf != null, "entity and conf must be set before calling ops()");
           CatalogOperations newOps = createOps(conf);
-          // Check metalake and catalogInuse
+          // Check metalake and catalog in use
           checkMetalakeAndCatalogInUse(entity);
           newOps.initialize(conf, entity.toCatalogInfo(), this);
           ops =
@@ -380,17 +380,22 @@ public abstract class BaseCatalog<T extends BaseCatalog>
     return OperationsProxy.createProxy(ops, plugin);
   }
 
-  private void checkMetalakeAndCatalogInUse(CatalogEntity catalogEntity) {
+  void checkMetalakeAndCatalogInUse(CatalogEntity catalogEntity) {
+    Map<String, String> catalogProperties = catalogEntity.getProperties();
+    if (catalogProperties == null) {
+      return;
+    }
+
     boolean metalakeInuse =
         Boolean.parseBoolean(
-            catalogEntity.getProperties().getOrDefault(Catalog.PROPERTY_METALAKE_IN_USE, "true"));
+            catalogProperties.getOrDefault(Catalog.PROPERTY_METALAKE_IN_USE, "true"));
     if (!metalakeInuse) {
       throw new MetalakeNotInUseException(
           "The metalake that holds catalog %s is not in use", catalogEntity.name());
     }
 
     boolean catalogInuse =
-        Boolean.parseBoolean(catalogEntity.getProperties().getOrDefault(PROPERTY_IN_USE, "true"));
+        Boolean.parseBoolean(catalogProperties.getOrDefault(PROPERTY_IN_USE, "true"));
     if (!catalogInuse) {
       throw new MetalakeNotInUseException("The catalog %s is not in use", catalogEntity.name());
     }

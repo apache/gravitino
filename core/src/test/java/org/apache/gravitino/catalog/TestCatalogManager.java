@@ -39,6 +39,7 @@ import org.apache.gravitino.Catalog;
 import org.apache.gravitino.CatalogChange;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
+import org.apache.gravitino.Entity.EntityType;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
@@ -50,6 +51,7 @@ import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.lock.LockManager;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.BaseMetalake;
+import org.apache.gravitino.meta.CatalogEntity;
 import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.meta.SchemaVersion;
 import org.apache.gravitino.storage.RandomIdGenerator;
@@ -627,6 +629,33 @@ public class TestCatalogManager {
     Assertions.assertEquals("value2", oldCatalog.properties().get("key2"));
     Assertions.assertEquals("value3", newCatalog.properties().get("key2"));
     Assertions.assertNotEquals(oldCatalog, newCatalog);
+  }
+
+  @Test
+  public void testEnableAndDisableCatalog() throws Exception {
+    NameIdentifier ident = NameIdentifier.of("metalake", "enable_disable");
+    Map<String, String> props =
+        ImmutableMap.of(
+            "provider",
+            "test",
+            PROPERTY_KEY1,
+            "value1",
+            PROPERTY_KEY2,
+            "value2",
+            PROPERTY_KEY5_PREFIX + "1",
+            "value3");
+
+    catalogManager.createCatalog(ident, Catalog.Type.RELATIONAL, provider, "comment", props);
+
+    catalogManager.disableCatalog(ident);
+    CatalogEntity disabled = entityStore.get(ident, EntityType.CATALOG, CatalogEntity.class);
+    Assertions.assertEquals("false", disabled.getProperties().get(Catalog.PROPERTY_IN_USE));
+
+    catalogManager.enableCatalog(ident);
+    CatalogEntity enabled = entityStore.get(ident, EntityType.CATALOG, CatalogEntity.class);
+    Assertions.assertEquals("true", enabled.getProperties().get(Catalog.PROPERTY_IN_USE));
+
+    Assertions.assertNull(catalogManager.getCatalogCache().getIfPresent(ident));
   }
 
   private void testProperties(Map<String, String> expectedProps, Map<String, String> testProps) {

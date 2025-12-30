@@ -372,7 +372,7 @@ public class MetalakeManager implements MetalakeDispatcher, Closeable {
                 .list(Namespace.of(ident.name()), CatalogEntity.class, EntityType.CATALOG)
                 .forEach(
                     catalogEntity -> {
-                      // update the properties metalake-in-use in catalog to false
+                      // update the properties metalake-in-use in catalog to true
                       GravitinoEnv.getInstance()
                           .catalogManager()
                           .updateCatalogProperty(

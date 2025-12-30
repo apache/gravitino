@@ -133,7 +133,8 @@ public interface Catalog extends Auditable {
   String PROPERTY_IN_USE = "in-use";
 
   /**
-   * The property indicates the Metalake catalog is in use and this catalog is managed by Metalake.
+   * This property indicates whether the metalake that contains this catalog is in use. When a
+   * metalake is disabled, this property is set to {@code false} on all its catalogs.
    */
   String PROPERTY_METALAKE_IN_USE = "metalake-in-use";
 
