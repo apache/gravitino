@@ -52,6 +52,6 @@ public class GravitinoCatalogStoreFactoryOptions {
   // OAuth2 config keys
   public static final String OAUTH2_SERVER_URI = "gravitino.client.oauth2.serverUri";
   public static final String OAUTH2_CREDENTIAL = "gravitino.client.oauth2.credential";
-  public static final String OAUTH2_PATH = "gravitino.client.oauth2.path";
+  public static final String OAUTH2_TOKEN_PATH = "gravitino.client.oauth2.tokenPath";
   public static final String OAUTH2_SCOPE = "gravitino.client.oauth2.scope";
 }

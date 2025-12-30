@@ -66,6 +66,11 @@ public class FlinkHiveKerberosClientIT extends FlinkEnvIT {
         @Override
         public void createMiniKdcConf() {
           super.createMiniKdcConf();
+          // Use a very short ticket lifetime to speed up Kerberos expiration in tests.
+          // The test operations are executed immediately after the MiniKdc is started and
+          // are not long-running, so a 5-second lifetime is sufficient and keeps the test
+          // fast. If this test ever becomes flaky on slower environments or CI systems,
+          // consider increasing this value to a more forgiving lifetime (for example, 60s).
           getConf().setProperty(MAX_TICKET_LIFETIME, "5");
         }
       };

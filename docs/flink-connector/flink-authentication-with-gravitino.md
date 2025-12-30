@@ -9,9 +9,9 @@ license: "This software is licensed under the Apache License version 2."
 
 Flink connector supports `simple`, `oauth2`, and `kerberos` authentication when accessing the Gravitino server.
 
-| Property                   | Type   | Default Value | Description                                                                                                     | Required | Since Version |
-|----------------------------|--------|---------------|-----------------------------------------------------------------------------------------------------------------|----------|---------------|
-| gravitino.client.auth.type | string | (none)        | Only `oauth` is supported; leave unset to use Flink Kerberos settings (or simple auth if security is disabled). | No       | 1.2.0         |
+| Property                   | Type   | Default Value | Description                                                                                                                              | Required | Since Version |
+|----------------------------|--------|---------------|------------------------------------------------------------------------------------------------------------------------------------------|----------|---------------|
+| gravitino.client.auth.type | string | (none)        | When explicitly set, only `oauth` is supported. If unset, Flink selects Kerberos or simple authentication based on its security settings. | No       | 1.2.0         |
 
 ## Simple mode
 
