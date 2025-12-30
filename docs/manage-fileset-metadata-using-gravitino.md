@@ -921,3 +921,43 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
 }' http://localhost:8090/api/metalakes/test/catalogs/fileset_catalog/schemas/test_schema/filesets
 ```
 
+Alternatively, you can pass configurations for multiple clusters using the `fs.path.config.{cluster_name}.*` format when creating the fileset catalog.
+All schemas and filesets under the catalog can inherit the configuration based on the cluster name.
+The system can automatically retrieve the appropriate configuration from the fileset catalog based on the fileset's storage location.
+
+```text
+curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
+-H "Content-Type: application/json" -d '{
+  "name": "fileset_catalog",
+  "type": "FILESET",
+  "comment": "This is a fileset catalog",
+  "provider": "fileset",
+  "properties": {
+    "location": "hdfs://172.17.0.2:9000/fileset_catalog",
+    "fs.path.config.hadoop1"="hdfs://172.17.0.2:9000",
+    "fs.path.config.hadoop1.config.resources"="/etc/conf/cluster1/core-site.xml,/etc/conf/cluster1/hdfs-site.xml",
+    "fs.path.config.aws1"="s3://mybuctket",
+    "fs.path.config.aws1.access.key"="your_access_key",
+    "fs.path.config.aws1.secret.key"="your_secret_key"
+  }
+}' http://localhost:8090/api/metalakes/test/catalogs
+
+# create fileset fs1 in the default HDFS cluster
+curl -X POST -H "Accept: application/vnd.gravitino.v1+json"
+-H "Content-Type: application/json" -d '{
+  "name": "fs1",
+  "comment": "This is an example fileset",
+  "type": "MANAGED",
+  "storageLocation": "hdfs://172.17.0.2:9000/datawarehouse/fs1"
+}' http://localhost:8090/api/metalakes/test/catalogs/fileset_catalog/schemas/test_schema/filesets
+
+# create fileset fs2 in another s3 cluster
+curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
+-H "Content-Type: application/json" -d '{
+  "name": "fs2",
+  "comment": "This is an example fileset",
+  "type": "MANAGED",
+  "storageLocation": "s3://mybuctket/datawarehouse/fs2"
+}' http://localhost:8090/api/metalakes/test/catalogs/fileset_catalog/schemas/test_schema/filesets
+```
+
