@@ -23,7 +23,6 @@ import java.util.Optional;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationRequest;
-import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionEvaluator;
 
 public class AuthorizeExecutorFactory {
 
@@ -31,37 +30,21 @@ public class AuthorizeExecutorFactory {
       String expression,
       AuthorizationRequest.RequestType requestType,
       Map<Entity.EntityType, NameIdentifier> metadataContext,
-      AuthorizationExpressionEvaluator authorizationExpressionEvaluator,
       Map<String, Object> pathParams,
       Optional<String> entityType,
       Parameter[] parameters,
       Object[] args) {
     return switch (requestType) {
       case COMMON -> new CommonAuthorizerExecutor(
-          expression, metadataContext, authorizationExpressionEvaluator, pathParams, entityType);
+          expression, metadataContext, pathParams, entityType);
       case ASSOCIATE_TAG -> new AssociateTagAuthorizationExecutor(
-          expression,
-          parameters,
-          args,
-          metadataContext,
-          authorizationExpressionEvaluator,
-          pathParams,
-          entityType);
+          expression, parameters, args, metadataContext, pathParams, entityType);
       case ASSOCIATE_POLICY -> new AssociatePolicyAuthorizationExecutor(
-          expression,
-          parameters,
-          args,
-          metadataContext,
-          authorizationExpressionEvaluator,
-          pathParams,
-          entityType);
+          expression, parameters, args, metadataContext, pathParams, entityType);
       case RUN_JOB -> new RunJobAuthorizationExecutor(
-          parameters,
-          args,
-          metadataContext,
-          authorizationExpressionEvaluator,
-          pathParams,
-          entityType);
+          parameters, args, expression, metadataContext, pathParams, entityType);
+      case LOAD_TABLE -> new LoadTableAuthorizationExecutor(
+          parameters, args, expression, metadataContext, pathParams, entityType);
     };
   }
 }

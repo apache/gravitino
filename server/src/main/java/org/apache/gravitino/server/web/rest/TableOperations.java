@@ -54,6 +54,7 @@ import org.apache.gravitino.rel.TableChange;
 import org.apache.gravitino.server.authorization.MetadataAuthzHelper;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationExpression;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationMetadata;
+import org.apache.gravitino.server.authorization.annotations.AuthorizationRequest;
 import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants;
 import org.apache.gravitino.server.web.Utils;
 import org.apache.gravitino.utils.NameIdentifierUtil;
@@ -80,7 +81,7 @@ public class TableOperations {
   @Timed(name = "list-table." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "list-table", absolute = true)
   @AuthorizationExpression(
-      expression = AuthorizationExpressionConstants.loadSchemaAuthorizationExpression,
+      expression = AuthorizationExpressionConstants.LOAD_SCHEMA_AUTHORIZATION_EXPRESSION,
       accessMetadataType = MetadataObject.Type.SCHEMA)
   public Response listTables(
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
@@ -97,7 +98,7 @@ public class TableOperations {
             idents =
                 MetadataAuthzHelper.filterByExpression(
                     metalake,
-                    AuthorizationExpressionConstants.filterTableAuthorizationExpression,
+                    AuthorizationExpressionConstants.FILTER_TABLE_AUTHORIZATION_EXPRESSION,
                     Entity.EntityType.TABLE,
                     idents);
             Response response = Utils.ok(new EntityListResponse(idents));
@@ -164,14 +165,17 @@ public class TableOperations {
   @Timed(name = "load-table." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "load-table", absolute = true)
   @AuthorizationExpression(
-      expression = AuthorizationExpressionConstants.loadTableAuthorizationExpression,
+      expression = AuthorizationExpressionConstants.LOAD_TABLE_AUTHORIZATION_EXPRESSION,
       accessMetadataType = MetadataObject.Type.TABLE)
   public Response loadTable(
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
           String metalake,
       @PathParam("catalog") @AuthorizationMetadata(type = Entity.EntityType.CATALOG) String catalog,
       @PathParam("schema") @AuthorizationMetadata(type = Entity.EntityType.SCHEMA) String schema,
-      @PathParam("table") @AuthorizationMetadata(type = Entity.EntityType.TABLE) String table) {
+      @PathParam("table") @AuthorizationMetadata(type = Entity.EntityType.TABLE) String table,
+      @QueryParam("privileges")
+          @AuthorizationRequest(type = AuthorizationRequest.RequestType.LOAD_TABLE)
+          String requiredPrivileges) {
     LOG.info(
         "Received load table request for table: {}.{}.{}.{}", metalake, catalog, schema, table);
     try {
@@ -195,7 +199,7 @@ public class TableOperations {
   @Timed(name = "alter-table." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "alter-table", absolute = true)
   @AuthorizationExpression(
-      expression = AuthorizationExpressionConstants.alterTableAuthorizationExpression,
+      expression = AuthorizationExpressionConstants.MODIFY_TABLE_AUTHORIZATION_EXPRESSION,
       accessMetadataType = MetadataObject.Type.TABLE)
   public Response alterTable(
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)

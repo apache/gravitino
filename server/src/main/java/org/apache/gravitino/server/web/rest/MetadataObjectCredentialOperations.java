@@ -121,7 +121,8 @@ public class MetadataObjectCredentialOperations {
                 MetadataAuthzHelper.checkAccess(
                         identifier,
                         MetadataObjectUtil.toEntityType(object),
-                        AuthorizationExpressionConstants.filterWriteFilesetAuthorizationExpression)
+                        AuthorizationExpressionConstants
+                            .FILTER_WRITE_FILESET_AUTHORIZATION_EXPRESSION)
                     ? CredentialPrivilege.WRITE
                     : CredentialPrivilege.READ;
             List<Credential> credentials =

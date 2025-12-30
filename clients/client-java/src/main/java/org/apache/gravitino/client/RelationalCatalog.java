@@ -22,17 +22,21 @@ import static org.apache.gravitino.dto.util.DTOConverters.toDTO;
 import static org.apache.gravitino.dto.util.DTOConverters.toDTOs;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
+import com.google.common.collect.Maps;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.authorization.Privilege;
 import org.apache.gravitino.dto.AuditDTO;
 import org.apache.gravitino.dto.CatalogDTO;
 import org.apache.gravitino.dto.requests.TableCreateRequest;
@@ -60,6 +64,8 @@ import org.apache.gravitino.rest.RESTUtils;
  * catalog is under the metalake.
  */
 class RelationalCatalog extends BaseSchemaCatalog implements TableCatalog {
+
+  public static final String PRIVILEGES = "privileges";
 
   RelationalCatalog(
       Namespace namespace,
@@ -119,6 +125,26 @@ class RelationalCatalog extends BaseSchemaCatalog implements TableCatalog {
     TableResponse resp =
         restClient.get(
             formatTableRequestPath(fullNamespace) + "/" + RESTUtils.encodeString(ident.name()),
+            TableResponse.class,
+            Collections.emptyMap(),
+            ErrorHandlers.tableErrorHandler());
+    resp.validate();
+
+    return RelationalTable.from(fullNamespace, resp.getTable(), restClient);
+  }
+
+  @Override
+  public Table loadTable(NameIdentifier ident, Set<Privilege.Name> requiredPrivilegeNames)
+      throws NoSuchTableException {
+    checkTableNameIdentifier(ident);
+
+    Namespace fullNamespace = getTableFullNamespace(ident.namespace());
+    Map<String, String> queryParams = Maps.newHashMap();
+    queryParams.put(PRIVILEGES, Joiner.on(",").join(requiredPrivilegeNames));
+    TableResponse resp =
+        restClient.get(
+            formatTableRequestPath(fullNamespace) + "/" + RESTUtils.encodeString(ident.name()),
+            queryParams,
             TableResponse.class,
             Collections.emptyMap(),
             ErrorHandlers.tableErrorHandler());

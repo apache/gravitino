@@ -93,7 +93,7 @@ public class IcebergNamespaceOperations {
   @Timed(name = "list-namespace." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "list-namespace", absolute = true)
   @AuthorizationExpression(
-      expression = AuthorizationExpressionConstants.loadCatalogAuthorizationExpression,
+      expression = AuthorizationExpressionConstants.LOAD_CATALOG_AUTHORIZATION_EXPRESSION,
       accessMetadataType = MetadataObject.Type.CATALOG)
   public Response listNamespaces(
       @DefaultValue("") @Encoded() @QueryParam("parent") String parent,
@@ -343,7 +343,7 @@ public class IcebergNamespaceOperations {
     NameIdentifier[] idents =
         MetadataAuthzHelper.filterByExpression(
             metalake,
-            AuthorizationExpressionConstants.filterSchemaAuthorizationExpression,
+            AuthorizationExpressionConstants.FILTER_SCHEMA_AUTHORIZATION_EXPRESSION,
             Entity.EntityType.SCHEMA,
             toNameIdentifiers(listNamespacesResponse, metalake, catalogName));
     List<Namespace> filteredNamespaces = new ArrayList<>();
