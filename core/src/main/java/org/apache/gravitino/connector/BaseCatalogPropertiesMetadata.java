@@ -22,6 +22,7 @@ package org.apache.gravitino.connector;
 import static org.apache.gravitino.Catalog.CLOUD_NAME;
 import static org.apache.gravitino.Catalog.CLOUD_REGION_CODE;
 import static org.apache.gravitino.Catalog.PROPERTY_IN_USE;
+import static org.apache.gravitino.Catalog.PROPERTY_METALAKE_IN_USE;
 import static org.apache.gravitino.Catalog.PROPERTY_PACKAGE;
 
 import com.google.common.base.Preconditions;
@@ -90,7 +91,7 @@ public abstract class BaseCatalogPropertiesMetadata extends BasePropertiesMetada
                   true /* default value */,
                   false /* hidden */),
               PropertyEntry.booleanReservedPropertyEntry(
-                  PROPERTY_IN_USE,
+                  PROPERTY_METALAKE_IN_USE,
                   "The property indicating the metalake that holds the catalog is in use",
                   true /* default value */,
                   true /* hidden */)),

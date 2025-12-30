@@ -366,8 +366,8 @@ public class MetalakeManager implements MetalakeDispatcher, Closeable {
                 });
 
             // The only problem is that we can't make sure we can change all catalog properties
-            // in a transaction, if any of them fails, the metalake is already enabled and the value
-            // in catalog is inconsistent.
+            // in a transaction. If any catalog property update fails, the metalake is already
+            // enabled but catalog properties remain inconsistent.
             store
                 .list(Namespace.of(ident.name()), CatalogEntity.class, EntityType.CATALOG)
                 .forEach(
