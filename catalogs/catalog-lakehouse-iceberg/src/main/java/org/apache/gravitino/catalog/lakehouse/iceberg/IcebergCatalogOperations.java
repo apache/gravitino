@@ -449,17 +449,16 @@ public class IcebergCatalogOperations implements CatalogOperations, SupportsSche
   private Table renameTable(NameIdentifier tableIdent, TableChange.RenameTable renameTable)
       throws NoSuchTableException, IllegalArgumentException {
     try {
-      Namespace destinationNamespace = tableIdent.namespace();
+      Namespace destNamespace = tableIdent.namespace();
       if (renameTable.getNewSchemaName().isPresent()) {
         String[] namespaceLevels = tableIdent.namespace().levels();
-        String[] destinationLevels = Arrays.copyOf(namespaceLevels, namespaceLevels.length);
-        destinationLevels[destinationLevels.length - 1] = renameTable.getNewSchemaName().get();
-        NameIdentifier destinationSchemaIdent = NameIdentifier.of(destinationLevels);
-        if (!schemaExists(destinationSchemaIdent)) {
-          throw new NoSuchSchemaException(
-              "Iceberg schema does not exist %s", destinationSchemaIdent);
+        String[] destLevels = Arrays.copyOf(namespaceLevels, namespaceLevels.length);
+        destLevels[destLevels.length - 1] = renameTable.getNewSchemaName().get();
+        NameIdentifier destSchemaIdent = NameIdentifier.of(destLevels);
+        if (!schemaExists(destSchemaIdent)) {
+          throw new NoSuchSchemaException("Iceberg schema does not exist %s", destSchemaIdent);
         }
-        destinationNamespace = Namespace.of(destinationLevels);
+        destNamespace = Namespace.of(destLevels);
       }
 
       RenameTableRequest renameTableRequest =
@@ -467,12 +466,11 @@ public class IcebergCatalogOperations implements CatalogOperations, SupportsSche
               .withSource(IcebergCatalogWrapperHelper.buildIcebergTableIdentifier(tableIdent))
               .withDestination(
                   IcebergCatalogWrapperHelper.buildIcebergTableIdentifier(
-                      destinationNamespace, renameTable.getNewName()))
+                      destNamespace, renameTable.getNewName()))
               .build();
       icebergCatalogWrapper.renameTable(renameTableRequest);
       return loadTable(
-          NameIdentifier.of(
-              ArrayUtils.add(destinationNamespace.levels(), renameTable.getNewName())));
+          NameIdentifier.of(ArrayUtils.add(destNamespace.levels(), renameTable.getNewName())));
     } catch (org.apache.iceberg.exceptions.NoSuchTableException e) {
       throw new NoSuchTableException(e, ICEBERG_TABLE_DOES_NOT_EXIST_MSG, tableIdent.name());
     }
