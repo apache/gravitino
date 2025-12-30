@@ -245,7 +245,7 @@ public class GravitinoCatalogManager {
       String gravitinoUri, Map<String, String> config) {
     String serverUri = config.get(GravitinoCatalogStoreFactoryOptions.OAUTH2_SERVER_URI);
     String credential = config.get(GravitinoCatalogStoreFactoryOptions.OAUTH2_CREDENTIAL);
-    String path = config.get(GravitinoCatalogStoreFactoryOptions.OAUTH2_PATH);
+    String path = config.get(GravitinoCatalogStoreFactoryOptions.OAUTH2_TOKEN_PATH);
     String scope = config.get(GravitinoCatalogStoreFactoryOptions.OAUTH2_SCOPE);
     Preconditions.checkArgument(
         StringUtils.isNoneBlank(serverUri, credential, path, scope),
