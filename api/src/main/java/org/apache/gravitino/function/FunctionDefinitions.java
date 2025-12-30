@@ -27,6 +27,16 @@ public final class FunctionDefinitions {
   private FunctionDefinitions() {}
 
   /**
+   * Create an array of {@link FunctionDefinition} instances.
+   *
+   * @param definitions The function definitions.
+   * @return An array of {@link FunctionDefinition} instances.
+   */
+  public static FunctionDefinition[] of(FunctionDefinition... definitions) {
+    return Arrays.copyOf(definitions, definitions.length);
+  }
+
+  /**
    * Create a {@link FunctionDefinition} instance.
    *
    * @param parameters The parameters for this definition, it may be null or empty.

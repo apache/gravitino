@@ -41,6 +41,15 @@ public interface FunctionCatalog {
   NameIdentifier[] listFunctions(Namespace namespace) throws NoSuchSchemaException;
 
   /**
+   * List the functions with details in a namespace from the catalog.
+   *
+   * @param namespace A namespace.
+   * @return An array of functions in the namespace.
+   * @throws NoSuchSchemaException If the schema does not exist.
+   */
+  Function[] listFunctionInfos(Namespace namespace) throws NoSuchSchemaException;
+
+  /**
    * Get a function by {@link NameIdentifier} from the catalog. The identifier only contains the
    * schema and function name. A function may include multiple definitions (overloads) in the
    * result. This method returns the latest version of the function.
