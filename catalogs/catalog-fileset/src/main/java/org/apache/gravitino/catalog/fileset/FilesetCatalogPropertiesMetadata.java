@@ -74,7 +74,7 @@ public class FilesetCatalogPropertiesMetadata extends BaseCatalogPropertiesMetad
   public static final String FILESYSTEM_CONNECTION_TIMEOUT_SECONDS = "filesystem-conn-timeout-secs";
   static final int DEFAULT_GET_FILESYSTEM_TIMEOUT_SECONDS = 6;
 
-  /** The prefix for user-defined location configs: {@code fs.path.config.<anme>=<path>}. */
+  /** The prefix for user-defined location configs: {@code fs.path.config.<name>=<path>}. */
   public static final String FS_GRAVITINO_PATH_CONFIG_PREFIX = "fs.path.config.";
 
   /**

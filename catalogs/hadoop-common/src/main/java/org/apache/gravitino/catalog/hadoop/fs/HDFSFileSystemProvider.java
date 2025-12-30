@@ -72,7 +72,7 @@ public class HDFSFileSystemProvider implements FileSystemProvider {
     }
     String impersonationEnabled = conf.get(IMPERSONATION_ENABLE_KEY);
     if (conf.containsKey(IMPERSONATION_ENABLE_KEY)) {
-      authority = String.format("%s?impersonation_enabled=%s)", authority, impersonationEnabled);
+      authority = String.format("%s?impersonation_enabled=%s", authority, impersonationEnabled);
     }
     return authority;
   }

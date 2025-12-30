@@ -173,7 +173,7 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
     // authority are both null
     @Nullable private final String scheme;
     @Nullable private final String authority;
-    private String locationName;
+    @Nullable private String locationName;
     private final String currentUser;
 
     FileSystemCacheKey(String scheme, String authority, String locationName) {
