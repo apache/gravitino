@@ -378,7 +378,7 @@ public class MetalakeManager implements MetalakeDispatcher, Closeable {
                           .updateCatalogProperty(
                               catalogEntity.nameIdentifier(),
                               Catalog.PROPERTY_METALAKE_IN_USE,
-                              "false");
+                              "true");
                     });
 
             return null;
