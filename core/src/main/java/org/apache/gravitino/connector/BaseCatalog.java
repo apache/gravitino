@@ -32,6 +32,7 @@ import org.apache.gravitino.connector.authorization.AuthorizationPlugin;
 import org.apache.gravitino.connector.authorization.BaseAuthorization;
 import org.apache.gravitino.connector.capability.Capability;
 import org.apache.gravitino.credential.CatalogCredentialManager;
+import org.apache.gravitino.exceptions.CatalogNotInUseException;
 import org.apache.gravitino.exceptions.MetalakeNotInUseException;
 import org.apache.gravitino.meta.CatalogEntity;
 import org.apache.gravitino.utils.IsolatedClassLoader;
@@ -191,6 +192,39 @@ public abstract class BaseCatalog<T extends BaseCatalog>
     }
 
     return ops;
+  }
+
+  public void checkMetalakeAndCatalogInUse(CatalogEntity catalogEntity) {
+    Map<String, String> catalogProperties = catalogEntity.getProperties();
+    if (catalogProperties == null) {
+      return;
+    }
+
+    boolean metalakeInuse =
+        Boolean.parseBoolean(
+            catalogProperties.getOrDefault(Catalog.PROPERTY_METALAKE_IN_USE, "true"));
+    if (!metalakeInuse) {
+      throw new MetalakeNotInUseException(
+          "The metalake that holds catalog %s is not in use", catalogEntity.name());
+    }
+
+    // Check the stack and find whether its within method `dropCatalog` as we don't need to check
+    // the catalog in use status when dropping the catalog.
+    if (isInvokedBy("dropCatalog")) {
+      LOG.info("Skip checking catalog in use status since it's invoked by dropCatalog method.");
+      return;
+    }
+
+    boolean catalogInuse =
+        Boolean.parseBoolean(catalogProperties.getOrDefault(PROPERTY_IN_USE, "true"));
+    if (!catalogInuse) {
+      throw new CatalogNotInUseException("The catalog %s is not in use", catalogEntity.name());
+    }
+  }
+
+  private boolean isInvokedBy(String methodName) {
+    return StackWalker.getInstance()
+        .walk(frames -> frames.anyMatch(frame -> frame.getMethodName().equals(methodName)));
   }
 
   public AuthorizationPlugin getAuthorizationPlugin() {
@@ -378,26 +412,5 @@ public abstract class BaseCatalog<T extends BaseCatalog>
 
   private CatalogOperations asProxyOps(CatalogOperations ops, ProxyPlugin plugin) {
     return OperationsProxy.createProxy(ops, plugin);
-  }
-
-  void checkMetalakeAndCatalogInUse(CatalogEntity catalogEntity) {
-    Map<String, String> catalogProperties = catalogEntity.getProperties();
-    if (catalogProperties == null) {
-      return;
-    }
-
-    boolean metalakeInuse =
-        Boolean.parseBoolean(
-            catalogProperties.getOrDefault(Catalog.PROPERTY_METALAKE_IN_USE, "true"));
-    if (!metalakeInuse) {
-      throw new MetalakeNotInUseException(
-          "The metalake that holds catalog %s is not in use", catalogEntity.name());
-    }
-
-    boolean catalogInuse =
-        Boolean.parseBoolean(catalogProperties.getOrDefault(PROPERTY_IN_USE, "true"));
-    if (!catalogInuse) {
-      throw new MetalakeNotInUseException("The catalog %s is not in use", catalogEntity.name());
-    }
   }
 }

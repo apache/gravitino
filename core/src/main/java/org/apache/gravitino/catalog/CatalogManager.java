@@ -543,6 +543,7 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
   public void enableCatalog(NameIdentifier ident)
       throws NoSuchCatalogException, CatalogNotInUseException {
     NameIdentifier metalakeIdent = NameIdentifier.of(ident.namespace().levels());
+    checkMetalake(metalakeIdent, store);
 
     TreeLockUtils.doWithTreeLock(
         metalakeIdent,
@@ -615,6 +616,7 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
   @Override
   public void disableCatalog(NameIdentifier ident) throws NoSuchCatalogException {
     NameIdentifier metalakeIdent = NameIdentifier.of(ident.namespace().levels());
+    checkMetalake(metalakeIdent, store);
 
     TreeLockUtils.doWithTreeLock(
         metalakeIdent,
@@ -669,6 +671,8 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
           if (catalogWrapper == null) {
             throw new NoSuchCatalogException(CATALOG_DOES_NOT_EXIST_MSG, ident);
           }
+
+          catalogWrapper.catalog.checkMetalakeAndCatalogInUse(catalogWrapper.catalog.entity());
 
           try {
             catalogWrapper.doWithPropertiesMeta(
