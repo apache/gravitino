@@ -58,11 +58,7 @@ public abstract class FunctionImpl {
      */
     public static RuntimeType fromString(String value) {
       Preconditions.checkArgument(StringUtils.isNotBlank(value), "Function runtime must be set");
-      try {
-        return RuntimeType.valueOf(value.trim().toUpperCase());
-      } catch (IllegalArgumentException e) {
-        throw new IllegalArgumentException("Unsupported function runtime: " + value, e);
-      }
+      return RuntimeType.valueOf(value.trim().toUpperCase());
     }
   }
 

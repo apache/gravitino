@@ -21,7 +21,7 @@ package org.apache.gravitino.exceptions;
 import com.google.errorprone.annotations.FormatMethod;
 import com.google.errorprone.annotations.FormatString;
 
-/** Exception thrown when a function with specified name is not existed. */
+/** Exception thrown when a function with the specified name does not exist. */
 public class NoSuchFunctionException extends NotFoundException {
 
   /**

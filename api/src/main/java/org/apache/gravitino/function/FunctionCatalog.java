@@ -57,7 +57,8 @@ public interface FunctionCatalog {
    * in the result.
    *
    * @param ident A function identifier.
-   * @param version The function version, counted from 0.
+   * @param version The zero-based function version index (0 for the first created version), as
+   *     returned by {@link Function#version()}.
    * @return The function with the given name and version.
    * @throws NoSuchFunctionException If the function does not exist.
    * @throws NoSuchFunctionVersionException If the function version does not exist.

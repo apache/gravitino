@@ -20,6 +20,7 @@ package org.apache.gravitino.function;
 
 import static org.apache.gravitino.rel.Column.DEFAULT_VALUE_NOT_SET;
 
+import javax.annotation.Nullable;
 import org.apache.gravitino.annotation.Evolving;
 import org.apache.gravitino.rel.expressions.Expression;
 import org.apache.gravitino.rel.types.Type;
@@ -41,6 +42,7 @@ public interface FunctionParam {
   /**
    * @return The optional comment of the parameter, null if not provided.
    */
+  @Nullable
   default String comment() {
     return null;
   }

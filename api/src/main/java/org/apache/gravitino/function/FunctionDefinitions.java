@@ -29,7 +29,7 @@ public final class FunctionDefinitions {
   /**
    * Create a {@link FunctionDefinition} instance.
    *
-   * @param parameters The parameters for this definition, maybe empty but not null.
+   * @param parameters The parameters for this definition, it may be null or empty.
    * @param impls The implementations for this definition, it must not be null or empty.
    * @return A {@link FunctionDefinition} instance.
    */
@@ -63,11 +63,11 @@ public final class FunctionDefinitions {
       if (this == obj) {
         return true;
       }
-      if (!(obj instanceof FunctionDefinitionImpl)) {
+      if (!(obj instanceof FunctionDefinition)) {
         return false;
       }
-      FunctionDefinitionImpl that = (FunctionDefinitionImpl) obj;
-      return Arrays.equals(parameters, that.parameters) && Arrays.equals(impls, that.impls);
+      FunctionDefinition that = (FunctionDefinition) obj;
+      return Arrays.equals(parameters, that.parameters()) && Arrays.equals(impls, that.impls());
     }
 
     @Override

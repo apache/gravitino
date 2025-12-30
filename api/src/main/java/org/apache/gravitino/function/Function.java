@@ -26,6 +26,8 @@ import org.apache.gravitino.rel.types.Type;
 /** Represents a user-defined function registered in Gravitino. */
 @Evolving
 public interface Function extends Auditable {
+  /** An empty array of {@link FunctionColumn}. */
+  FunctionColumn[] EMPTY = new FunctionColumn[0];
 
   /**
    * @return The function name.
@@ -67,7 +69,7 @@ public interface Function extends Auditable {
    *     aggregate functions.
    */
   default FunctionColumn[] returnColumns() {
-    return new FunctionColumn[0];
+    return EMPTY;
   }
 
   /**
@@ -76,7 +78,12 @@ public interface Function extends Auditable {
   FunctionDefinition[] definitions();
 
   /**
-   * @return The version of the function, counted from 0 and incrementing on each alteration.
+   * Returns the internal revision version of the function.
+   *
+   * <p>This version is a 0-based counter, where {@code 0} represents the initial definition of the
+   * function, and the value is incremented by 1 on each later alteration.
+   *
+   * @return The 0-based revision version of the function.
    */
   int version();
 }

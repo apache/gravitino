@@ -99,6 +99,7 @@ public interface FunctionChange {
     private final String newComment;
 
     UpdateComment(String newComment) {
+      Preconditions.checkArgument(newComment != null, "New comment cannot be null");
       this.newComment = newComment;
     }
 
