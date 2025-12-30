@@ -192,6 +192,7 @@ public final class KerberosTokenProvider implements AuthDataProvider {
       if (tickets.isEmpty()) {
         return false;
       }
+      // For one principal, there should be only one TGT ticket
       return tickets.iterator().next().getEndTime().toInstant().isBefore(Instant.now());
     }
   }
@@ -247,17 +248,14 @@ public final class KerberosTokenProvider implements AuthDataProvider {
           && (!subject.getPrivateCredentials(KerberosKey.class).isEmpty()
               || !subject.getPrivateCredentials(KerberosTicket.class).isEmpty())) {
         provider.subjectProvider = new ExistingSubjectProvider(subject);
-        provider.clientPrincipal = extractPrincipalFromSubject(subject);
+
+        extractPrincipalFromSubject(subject);
+        setProviderClientPrincipal(provider);
+
         return provider;
       }
 
-      Preconditions.checkArgument(
-          StringUtils.isNotBlank(clientPrincipal),
-          "KerberosTokenProvider must set clientPrincipal");
-      Preconditions.checkArgument(
-          Splitter.on('@').splitToList(clientPrincipal).size() == 2,
-          "Principal has the wrong format");
-      provider.clientPrincipal = clientPrincipal;
+      setProviderClientPrincipal(provider);
 
       if (keyTabFile != null) {
         Preconditions.checkArgument(
@@ -272,11 +270,22 @@ public final class KerberosTokenProvider implements AuthDataProvider {
       return provider;
     }
 
-    private String extractPrincipalFromSubject(Subject subject) {
-      return subject.getPrincipals(KerberosPrincipal.class).stream()
-          .findFirst()
-          .map(Object::toString)
-          .orElse(null);
+    private void setProviderClientPrincipal(KerberosTokenProvider provider) {
+      Preconditions.checkArgument(
+          StringUtils.isNotBlank(clientPrincipal),
+          "KerberosTokenProvider must set clientPrincipal");
+      Preconditions.checkArgument(
+          Splitter.on('@').splitToList(clientPrincipal).size() == 2,
+          "Principal has the wrong format");
+      provider.clientPrincipal = clientPrincipal;
+    }
+
+    private void extractPrincipalFromSubject(Subject subject) {
+      clientPrincipal =
+          subject.getPrincipals(KerberosPrincipal.class).stream()
+              .findFirst()
+              .map(Object::toString)
+              .orElse(null);
     }
   }
 }
