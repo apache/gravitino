@@ -18,7 +18,7 @@
 --
 
 CREATE TABLE IF NOT EXISTS `metalake_meta` (
-                                               `metalake_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'metalake id',
+    `metalake_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'metalake id',
     `metalake_name` VARCHAR(128) NOT NULL COMMENT 'metalake name',
     `metalake_comment` VARCHAR(256) DEFAULT '' COMMENT 'metalake comment',
     `properties` MEDIUMTEXT DEFAULT NULL COMMENT 'metalake properties',
@@ -32,7 +32,7 @@ CREATE TABLE IF NOT EXISTS `metalake_meta` (
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'metalake metadata';
 
 CREATE TABLE IF NOT EXISTS `catalog_meta` (
-                                              `catalog_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'catalog id',
+    `catalog_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'catalog id',
     `catalog_name` VARCHAR(128) NOT NULL COMMENT 'catalog name',
     `metalake_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'metalake id',
     `type` VARCHAR(64) NOT NULL COMMENT 'catalog type',
@@ -49,7 +49,7 @@ CREATE TABLE IF NOT EXISTS `catalog_meta` (
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'catalog metadata';
 
 CREATE TABLE IF NOT EXISTS `schema_meta` (
-                                             `schema_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'schema id',
+    `schema_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'schema id',
     `schema_name` VARCHAR(128) NOT NULL COMMENT 'schema name',
     `metalake_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'metalake id',
     `catalog_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'catalog id',
@@ -66,7 +66,7 @@ CREATE TABLE IF NOT EXISTS `schema_meta` (
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'schema metadata';
 
 CREATE TABLE IF NOT EXISTS `table_meta` (
-                                            `table_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'table id',
+    `table_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'table id',
     `table_name` VARCHAR(128) NOT NULL COMMENT 'table name',
     `metalake_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'metalake id',
     `catalog_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'catalog id',
@@ -83,7 +83,7 @@ CREATE TABLE IF NOT EXISTS `table_meta` (
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'table metadata';
 
 CREATE TABLE IF NOT EXISTS `table_column_version_info` (
-                                                           `id` BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT COMMENT 'auto increment id',
+    `id` BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT COMMENT 'auto increment id',
     `metalake_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'metalake id',
     `catalog_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'catalog id',
     `schema_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'schema id',
@@ -108,7 +108,7 @@ CREATE TABLE IF NOT EXISTS `table_column_version_info` (
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'table column version info';
 
 CREATE TABLE IF NOT EXISTS `fileset_meta` (
-                                              `fileset_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'fileset id',
+    `fileset_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'fileset id',
     `fileset_name` VARCHAR(128) NOT NULL COMMENT 'fileset name',
     `metalake_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'metalake id',
     `catalog_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'catalog id',
@@ -126,7 +126,7 @@ CREATE TABLE IF NOT EXISTS `fileset_meta` (
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'fileset metadata';
 
 CREATE TABLE IF NOT EXISTS `fileset_version_info` (
-                                                      `id` BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT COMMENT 'auto increment id',
+    `id` BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT COMMENT 'auto increment id',
     `metalake_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'metalake id',
     `catalog_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'catalog id',
     `schema_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'schema id',
@@ -145,7 +145,7 @@ CREATE TABLE IF NOT EXISTS `fileset_version_info` (
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'fileset version info';
 
 CREATE TABLE IF NOT EXISTS `topic_meta` (
-                                            `topic_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'topic id',
+    `topic_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'topic id',
     `topic_name` VARCHAR(128) NOT NULL COMMENT 'topic name',
     `metalake_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'metalake id',
     `catalog_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'catalog id',
@@ -164,7 +164,7 @@ CREATE TABLE IF NOT EXISTS `topic_meta` (
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'topic metadata';
 
 CREATE TABLE IF NOT EXISTS `user_meta` (
-                                           `user_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'user id',
+    `user_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'user id',
     `user_name` VARCHAR(128) NOT NULL COMMENT 'username',
     `metalake_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'metalake id',
     `audit_info` MEDIUMTEXT NOT NULL COMMENT 'user audit info',
@@ -176,7 +176,7 @@ CREATE TABLE IF NOT EXISTS `user_meta` (
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'user metadata';
 
 CREATE TABLE IF NOT EXISTS `role_meta` (
-                                           `role_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'role id',
+    `role_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'role id',
     `role_name` VARCHAR(128) NOT NULL COMMENT 'role name',
     `metalake_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'metalake id',
     `properties` MEDIUMTEXT DEFAULT NULL COMMENT 'schema properties',
@@ -189,7 +189,7 @@ CREATE TABLE IF NOT EXISTS `role_meta` (
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'role metadata';
 
 CREATE TABLE IF NOT EXISTS `role_meta_securable_object` (
-                                                            `id` BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT COMMENT 'auto increment id',
+    `id` BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT COMMENT 'auto increment id',
     `role_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'role id',
     `metadata_object_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'The entity id of securable object',
     `type`  VARCHAR(128) NOT NULL COMMENT 'securable object type',
@@ -204,7 +204,7 @@ CREATE TABLE IF NOT EXISTS `role_meta_securable_object` (
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'securable object meta';
 
 CREATE TABLE IF NOT EXISTS `user_role_rel` (
-                                               `id` BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT COMMENT 'auto increment id',
+    `id` BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT COMMENT 'auto increment id',
     `user_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'user id',
     `role_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'role id',
     `audit_info` MEDIUMTEXT NOT NULL COMMENT 'relation audit info',
@@ -217,7 +217,7 @@ CREATE TABLE IF NOT EXISTS `user_role_rel` (
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'user role relation';
 
 CREATE TABLE IF NOT EXISTS `group_meta` (
-                                            `group_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'group id',
+    `group_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'group id',
     `group_name` VARCHAR(128) NOT NULL COMMENT 'group name',
     `metalake_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'metalake id',
     `audit_info` MEDIUMTEXT NOT NULL COMMENT 'group audit info',
@@ -229,7 +229,7 @@ CREATE TABLE IF NOT EXISTS `group_meta` (
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'group metadata';
 
 CREATE TABLE IF NOT EXISTS `group_role_rel` (
-                                                `id` BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT COMMENT 'auto increment id',
+    `id` BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT COMMENT 'auto increment id',
     `group_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'group id',
     `role_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'role id',
     `audit_info` MEDIUMTEXT NOT NULL COMMENT 'relation audit info',
@@ -242,7 +242,7 @@ CREATE TABLE IF NOT EXISTS `group_role_rel` (
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'group role relation';
 
 CREATE TABLE IF NOT EXISTS `tag_meta` (
-                                          `tag_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'tag id',
+    `tag_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'tag id',
     `tag_name` VARCHAR(128) NOT NULL COMMENT 'tag name',
     `metalake_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'metalake id',
     `tag_comment` VARCHAR(256) DEFAULT '' COMMENT 'tag comment',
@@ -256,7 +256,7 @@ CREATE TABLE IF NOT EXISTS `tag_meta` (
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'tag metadata';
 
 CREATE TABLE IF NOT EXISTS `tag_relation_meta` (
-                                                   `id` BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT COMMENT 'auto increment id',
+    `id` BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT COMMENT 'auto increment id',
     `tag_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'tag id',
     `metadata_object_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'metadata object id',
     `metadata_object_type` VARCHAR(64) NOT NULL COMMENT 'metadata object type',
@@ -271,7 +271,7 @@ CREATE TABLE IF NOT EXISTS `tag_relation_meta` (
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'tag metadata object relation';
 
 CREATE TABLE IF NOT EXISTS `owner_meta` (
-                                            `id` BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT COMMENT 'auto increment id',
+    `id` BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT COMMENT 'auto increment id',
     `metalake_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'metalake id',
     `owner_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'owner id',
     `owner_type` VARCHAR(64) NOT NULL COMMENT 'owner type',
@@ -288,7 +288,7 @@ CREATE TABLE IF NOT EXISTS `owner_meta` (
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'owner relation';
 
 CREATE TABLE IF NOT EXISTS `model_meta` (
-                                            `model_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'model id',
+    `model_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'model id',
     `model_name` VARCHAR(128) NOT NULL COMMENT 'model name',
     `metalake_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'metalake id',
     `catalog_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'catalog id',
@@ -306,7 +306,7 @@ CREATE TABLE IF NOT EXISTS `model_meta` (
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'model metadata';
 
 CREATE TABLE IF NOT EXISTS `model_version_info` (
-                                                    `id` BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT COMMENT 'auto increment id',
+    `id` BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT COMMENT 'auto increment id',
     `metalake_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'metalake id',
     `catalog_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'catalog id',
     `schema_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'schema id',
@@ -326,7 +326,7 @@ CREATE TABLE IF NOT EXISTS `model_version_info` (
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'model version info';
 
 CREATE TABLE IF NOT EXISTS `model_version_alias_rel` (
-                                                         `id` BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT COMMENT 'auto increment id',
+    `id` BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT COMMENT 'auto increment id',
     `model_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'model id',
     `model_version` INT UNSIGNED NOT NULL COMMENT 'model version',
     `model_version_alias` VARCHAR(128) NOT NULL COMMENT 'model version alias',
@@ -337,7 +337,7 @@ CREATE TABLE IF NOT EXISTS `model_version_alias_rel` (
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'model_version_alias_rel';
 
 CREATE TABLE IF NOT EXISTS `policy_meta` (
-                                             `policy_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'policy id',
+    `policy_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'policy id',
     `policy_name` VARCHAR(128) NOT NULL COMMENT 'policy name',
     `policy_type` VARCHAR(64) NOT NULL COMMENT 'policy type',
     `metalake_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'metalake id',
@@ -350,7 +350,7 @@ CREATE TABLE IF NOT EXISTS `policy_meta` (
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'policy metadata';
 
 CREATE TABLE IF NOT EXISTS `policy_version_info` (
-                                                     `id` BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT COMMENT 'auto increment id',
+    `id` BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT COMMENT 'auto increment id',
     `metalake_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'metalake id',
     `policy_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'policy id',
     `version` INT UNSIGNED NOT NULL COMMENT 'policy info version',
@@ -364,7 +364,7 @@ CREATE TABLE IF NOT EXISTS `policy_version_info` (
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'policy version info';
 
 CREATE TABLE IF NOT EXISTS `policy_relation_meta` (
-                                                      `id` BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT COMMENT 'auto increment id',
+    `id` BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT COMMENT 'auto increment id',
     `policy_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'policy id',
     `metadata_object_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'metadata object id',
     `metadata_object_type` VARCHAR(64) NOT NULL COMMENT 'metadata object type',
@@ -379,7 +379,7 @@ CREATE TABLE IF NOT EXISTS `policy_relation_meta` (
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'policy metadata object relation';
 
 CREATE TABLE IF NOT EXISTS `statistic_meta` (
-                                                `id` BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT COMMENT 'auto increment id',
+    `id` BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT COMMENT 'auto increment id',
     `statistic_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'statistic id',
     `statistic_name` VARCHAR(128) NOT NULL COMMENT 'statistic name',
     `metalake_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'metalake id',
@@ -397,7 +397,7 @@ CREATE TABLE IF NOT EXISTS `statistic_meta` (
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'statistic metadata';
 
 CREATE TABLE IF NOT EXISTS `job_template_meta` (
-                                                   `job_template_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'job template id',
+    `job_template_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'job template id',
     `job_template_name` VARCHAR(128) NOT NULL COMMENT 'job template name',
     `metalake_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'metalake id',
     `job_template_comment` TEXT DEFAULT NULL COMMENT 'job template comment',
@@ -411,7 +411,7 @@ CREATE TABLE IF NOT EXISTS `job_template_meta` (
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'job template metadata';
 
 CREATE TABLE IF NOT EXISTS `job_run_meta` (
-                                              `job_run_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'job run id',
+    `job_run_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'job run id',
     `job_template_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'job template id',
     `metalake_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'metalake id',
     `job_execution_id` varchar(256) NOT NULL COMMENT 'job execution id',
@@ -428,7 +428,7 @@ CREATE TABLE IF NOT EXISTS `job_run_meta` (
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'job run metadata';
 
 CREATE TABLE IF NOT EXISTS `table_version_info` (
-                                                    `table_id`        BIGINT(20) UNSIGNED NOT NULL COMMENT 'table id',
+    `table_id`        BIGINT(20) UNSIGNED NOT NULL COMMENT 'table id',
     `format`          VARCHAR(64) COMMENT 'table format, such as Lance, Iceberg and so on, it will be null if it is not a lakehouse table',
     `properties`      MEDIUMTEXT DEFAULT NULL COMMENT 'table properties',
     `partitioning`  MEDIUMTEXT DEFAULT NULL COMMENT 'table partition info',
