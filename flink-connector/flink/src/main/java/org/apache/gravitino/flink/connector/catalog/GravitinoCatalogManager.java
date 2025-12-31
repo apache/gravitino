@@ -249,9 +249,12 @@ public class GravitinoCatalogManager {
     String scope = config.get(GravitinoCatalogStoreFactoryOptions.OAUTH2_SCOPE);
     Preconditions.checkArgument(
         StringUtils.isNoneBlank(serverUri, credential, path, scope),
-        "OAuth2 authentication requires: gravitino.client.oauth2.serverUri, "
-            + "gravitino.client.oauth2.credential, gravitino.client.oauth2.path, "
-            + "and gravitino.client.oauth2.scope");
+        String.format(
+            "OAuth2 authentication requires: %s, %s, %s, and %s",
+            GravitinoCatalogStoreFactoryOptions.OAUTH2_SERVER_URI,
+            GravitinoCatalogStoreFactoryOptions.OAUTH2_CREDENTIAL,
+            GravitinoCatalogStoreFactoryOptions.OAUTH2_TOKEN_PATH,
+            GravitinoCatalogStoreFactoryOptions.OAUTH2_SCOPE));
 
     DefaultOAuth2TokenProvider provider =
         DefaultOAuth2TokenProvider.builder()
