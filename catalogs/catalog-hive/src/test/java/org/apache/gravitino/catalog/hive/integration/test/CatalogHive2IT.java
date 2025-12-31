@@ -778,7 +778,11 @@ public class CatalogHive2IT extends BaseIT {
     hiveClientPool.run(
         client -> {
           client.createDatabase(
-              HiveSchema.builder().withName(schemaName1).withAuditInfo(AuditInfo.EMPTY).build());
+              HiveSchema.builder()
+                  .withName(schemaName1)
+                  .withCatalogName(hmsCatalog)
+                  .withAuditInfo(AuditInfo.EMPTY)
+                  .build());
           return null;
         });
     NameIdentifier[] functionIdents =
@@ -790,7 +794,11 @@ public class CatalogHive2IT extends BaseIT {
     hiveClientPool.run(
         client -> {
           client.createDatabase(
-              HiveSchema.builder().withName(schemaName2).withAuditInfo(AuditInfo.EMPTY).build());
+              HiveSchema.builder()
+                  .withName(schemaName2)
+                  .withCatalogName(hmsCatalog)
+                  .withAuditInfo(AuditInfo.EMPTY)
+                  .build());
           return null;
         });
     Function function =
