@@ -29,8 +29,7 @@ jobs:
     if: needs.changes.outputs.source_changes == 'true'
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
@@ -44,6 +43,11 @@ jobs:
 
       - name: Install yamale
         run: pip install yamale
+
+      - name: Install yq
+        run: |
+          sudo apt update
+          sudo apt install yq
 
       - name: Install chart-testing
         run: |
@@ -72,18 +76,75 @@ jobs:
         with:
           version: v0.27.0
           cluster_name: helm-test-cluster
+          registry: true
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Extract Image Tag
+        id: get-tag
+        run: |
+          # Use yq to parse the value. Path typically follows .image.tag structure.
+          IMAGE_TAG=$(yq '.image.tag' dev/charts/gravitino/values.yaml)
+          
+          # Remove any potential quotes and save to GitHub Outputs
+          echo "tag=$(echo $IMAGE_TAG | tr -d '\"')" >> "$GITHUB_ENV"
+
+      - name: Build the Docker image to local registry
+        if: steps.list-changed.outputs.changed == 'true'
+        run: |
+          sudo rm -rf /usr/local/lib/android
+          sudo rm -rf /opt/hostedtoolcache/CodeQL
+          docker buildx use default
+          rm -rf ${{ github.workspace }}/README.md
+          rm -rf ${{ github.workspace }}/etc
+          rm -rf ${{ github.workspace }}/dev/charts/gravitino/Chart.lock
+          for t in gravitino:gravitino iceberg-rest-server:gravitino-iceberg-rest lance-rest-server:gravitino-lance-rest; do
+            (
+            REPO_NAME=${t#*:}
+            FOLDER_NAME=${t%:*}
+            CONTEXT_DIR="${{ github.workspace }}/dev/docker/${FOLDER_NAME}/"
+            . ${CONTEXT_DIR}/${FOLDER_NAME}-dependency.sh
+            docker build -t ${KIND_REGISTRY}/${REPO_NAME}:${tag} "${CONTEXT_DIR}"
+            docker push ${KIND_REGISTRY}/${REPO_NAME}:${tag}
+            )
+          done
 
       - name: Set up kubectl
         uses: azure/setup-kubectl@v4
 
-      - name: Run chart-testing (install default)
+      - name: Run chart-testing (install default,gravitino)
         if: steps.list-changed.outputs.changed == 'true'
-        run: ct install --chart-dirs=dev/charts --target-branch ${{ github.event.pull_request.base.ref }}
+        run: ct install --charts dev/charts/gravitino --target-branch ${{ github.event.pull_request.base.ref }} --helm-extra-set-args "--set image.registry="" --set image.repository=${KIND_REGISTRY}/gravitino"
 
-      - name: Run chart-testing (install mysql enable)
+      - name: Run chart-testing (install default,gravitino-iceberg-rest-server)
         if: steps.list-changed.outputs.changed == 'true'
-        run: ct install --charts=dev/charts/gravitino --helm-extra-set-args "--values dev/charts/gravitino/resources/scenarios/ci-values.yaml" --target-branch ${{ github.event.pull_request.base.ref }}
+        run: ct install --charts dev/charts/gravitino-iceberg-rest-server --target-branch ${{ github.event.pull_request.base.ref }} --helm-extra-set-args "--set image.registry="" --set image.repository=${KIND_REGISTRY}/gravitino-iceberg-rest"
 
-      - name: Run chart-testing (install postgresql enable)
+      - name: Run chart-testing (install gravitino with mysql enable,replicas 2)
         if: steps.list-changed.outputs.changed == 'true'
-        run: ct install --charts=dev/charts/gravitino --helm-extra-set-args "--values dev/charts/gravitino/resources/scenarios/pg-values.yaml" --target-branch ${{ github.event.pull_request.base.ref }}
+        run: ct install --charts=dev/charts/gravitino --helm-extra-set-args "--values dev/charts/gravitino/resources/scenarios/ci-values.yaml --set image.registry="" --set image.repository=${KIND_REGISTRY}/gravitino" --target-branch ${{ github.event.pull_request.base.ref }}
+
+      - name: Run chart-testing (install gravitino with postgresql enable)
+        if: steps.list-changed.outputs.changed == 'true'
+        run: ct install --charts=dev/charts/gravitino --helm-extra-set-args "--values dev/charts/gravitino/resources/scenarios/pg-values.yaml --set image.registry="" --set image.repository=${KIND_REGISTRY}/gravitino" --target-branch ${{ github.event.pull_request.base.ref }}
+
+      - name: Run chart-testing (install default,gravitino-lance-rest-server)
+        if: steps.list-changed.outputs.changed == 'true'
+        run: |
+          helm install gravitino dev/charts/gravitino -n test --create-namespace --set image.registry="" --set image.repository=${KIND_REGISTRY}/gravitino --wait --timeout 5m
+          kubectl run -n test --rm -i --restart=Never --image=curlimages/curl:latest metalake-setup \
+          --command -- curl -X POST \
+          -H "Content-Type: application/json" \
+          -H "Accept: application/vnd.gravitino.v1+json" \
+          -d '{"name":"lrs_test","comment":"Quick setup"}' \
+          http://gravitino.test:8090/api/metalakes
+          ct install --charts dev/charts/gravitino-lance-rest-server --target-branch ${{ github.event.pull_request.base.ref }} --helm-extra-set-args "--set image.registry="" --set image.repository=${KIND_REGISTRY}/gravitino-lance-rest --set lanceRest.gravitinoUri=http://gravitino.test:8090 --set lanceRest.gravitinoMetalake=lrs_test"
