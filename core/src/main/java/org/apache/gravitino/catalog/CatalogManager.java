@@ -575,44 +575,6 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
         });
   }
 
-  public void updateCatalogProperty(
-      NameIdentifier nameIdentifier, String propertyKey, String propertyValue) {
-    try {
-      store.update(
-          nameIdentifier,
-          CatalogEntity.class,
-          EntityType.CATALOG,
-          catalog -> {
-            CatalogEntity.Builder newCatalogBuilder =
-                newCatalogBuilder(nameIdentifier.namespace(), catalog);
-
-            Map<String, String> newProps =
-                catalog.getProperties() == null
-                    ? new HashMap<>()
-                    : new HashMap<>(catalog.getProperties());
-            newProps.put(propertyKey, propertyValue);
-            newCatalogBuilder.withProperties(newProps);
-
-            return newCatalogBuilder.build();
-          });
-      catalogCache.invalidate(nameIdentifier);
-
-    } catch (NoSuchCatalogException e) {
-      LOG.error("Catalog {} does not exist", nameIdentifier, e);
-      throw new RuntimeException(e);
-    } catch (IllegalArgumentException e) {
-      LOG.error(
-          "Failed to update catalog {} property {} with unknown change",
-          nameIdentifier,
-          propertyKey,
-          e);
-      throw e;
-    } catch (IOException ioe) {
-      LOG.error("Failed to update catalog {} property {}", nameIdentifier, propertyKey, ioe);
-      throw new RuntimeException(ioe);
-    }
-  }
-
   @Override
   public void disableCatalog(NameIdentifier ident) throws NoSuchCatalogException {
     NameIdentifier metalakeIdent = NameIdentifier.of(ident.namespace().levels());
