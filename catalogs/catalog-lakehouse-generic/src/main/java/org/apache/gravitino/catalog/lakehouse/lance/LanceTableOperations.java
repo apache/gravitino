@@ -45,6 +45,7 @@ import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.exceptions.TableAlreadyExistsException;
 import org.apache.gravitino.lance.common.ops.gravitino.LanceDataTypeConverter;
+import org.apache.gravitino.lance.common.utils.LanceConstants;
 import org.apache.gravitino.lance.common.utils.LancePropertiesUtils;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Table;
@@ -259,6 +260,18 @@ public class LanceTableOperations extends ManagedTableOperations {
       throws NoSuchSchemaException, TableAlreadyExistsException {
 
     if (register) {
+      return super.createTable(
+          ident, columns, comment, properties, partitions, distribution, sortOrders, indexes);
+    }
+
+    // Check whether it's a create empty table operation.
+    boolean createEmpty =
+        Optional.ofNullable(properties.get(LanceConstants.LANCE_TABLE_CREATE_EMTPY))
+            .map(Boolean::parseBoolean)
+            .orElse(false);
+    if (createEmpty) {
+      // For create empty table, we just create the table metadata in Gravitino without creating
+      // the underlying Lance dataset.
       return super.createTable(
           ident, columns, comment, properties, partitions, distribution, sortOrders, indexes);
     }

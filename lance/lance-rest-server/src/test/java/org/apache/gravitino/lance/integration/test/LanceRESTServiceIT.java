@@ -41,7 +41,6 @@ import com.lancedb.lance.namespace.model.DescribeTableResponse;
 import com.lancedb.lance.namespace.model.DropNamespaceRequest;
 import com.lancedb.lance.namespace.model.DropNamespaceResponse;
 import com.lancedb.lance.namespace.model.DropTableRequest;
-import com.lancedb.lance.namespace.model.DropTableResponse;
 import com.lancedb.lance.namespace.model.ErrorResponse;
 import com.lancedb.lance.namespace.model.JsonArrowField;
 import com.lancedb.lance.namespace.model.ListNamespacesRequest;
@@ -446,19 +445,20 @@ public class LanceRESTServiceIT extends BaseIT {
 
     // Try to create a table with wrong location should fail
     CreateEmptyTableRequest wrongLocationRequest = new CreateEmptyTableRequest();
-    wrongLocationRequest.setId(List.of(CATALOG_NAME, SCHEMA_NAME, "wrong_location_table"));
-    wrongLocationRequest.setLocation("hdfs://localhost:9000/invalid_path/");
-    LanceNamespaceException apiException =
-        Assertions.assertThrows(
-            LanceNamespaceException.class,
-            () -> {
-              ns.createEmptyTable(wrongLocationRequest);
-            });
-    Assertions.assertTrue(apiException.getMessage().contains("Invalid user input"));
+    wrongLocationRequest.setId(List.of(CATALOG_NAME, SCHEMA_NAME, "another_table"));
+    String another_location = tempDir + "/" + "another_location/";
+    Assertions.assertFalse(new File(another_location).exists());
+    wrongLocationRequest.setLocation(another_location);
+    response = ns.createEmptyTable(wrongLocationRequest);
+    Assertions.assertNotNull(response);
+    Assertions.assertEquals(another_location, response.getLocation());
+    // Will not touch storage, so the path should not be created.
+    Assertions.assertFalse(new File(another_location).exists());
 
     // Correct the location and try again
     String correctedLocation = tempDir + "/" + "wrong_location_table/";
     wrongLocationRequest.setLocation(correctedLocation);
+    wrongLocationRequest.setId(List.of(CATALOG_NAME, SCHEMA_NAME, "wrong_location_table"));
     CreateEmptyTableResponse wrongLocationResponse =
         Assertions.assertDoesNotThrow(() -> ns.createEmptyTable(wrongLocationRequest));
     Assertions.assertNotNull(wrongLocationResponse);
@@ -721,7 +721,7 @@ public class LanceRESTServiceIT extends BaseIT {
     Assertions.assertNotNull(deregisterTableResponse);
     Assertions.assertEquals(location, deregisterTableResponse.getLocation());
     Assertions.assertTrue(Objects.equals(ids, deregisterTableResponse.getId()));
-    Assertions.assertTrue(
+    Assertions.assertFalse(
         new File(location).exists(), "Data should still exist after deregistering the table.");
 
     // Now try to describe the table, should fail
@@ -789,12 +789,7 @@ public class LanceRESTServiceIT extends BaseIT {
     // Drop the table
     DropTableRequest dropTableRequest = new DropTableRequest();
     dropTableRequest.setId(ids);
-    DropTableResponse dropTableResponse =
-        Assertions.assertDoesNotThrow(() -> ns.dropTable(dropTableRequest));
-    Assertions.assertNotNull(dropTableResponse);
-    Assertions.assertEquals(location, dropTableResponse.getLocation());
-    Assertions.assertFalse(
-        new File(location).exists(), "Data should be deleted after dropping the table.");
+    Assertions.assertThrows(Exception.class, () -> ns.dropTable(dropTableRequest));
 
     // Describe the dropped table should fail
     DescribeTableRequest describeTableRequest = new DescribeTableRequest();
