@@ -664,10 +664,10 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
         ident,
         LockType.READ,
         () -> {
+          checkCatalogInUse(store, ident);
           // There could be a race issue that someone is using the catalog from cache while we are
           // updating it.
           CatalogWrapper catalogWrapper = loadCatalogAndWrap(ident);
-          catalogWrapper.catalog.checkMetalakeAndCatalogInUse(catalogWrapper.catalog.entity());
           if (catalogWrapper == null) {
             throw new NoSuchCatalogException(CATALOG_DOES_NOT_EXIST_MSG, ident);
           }
