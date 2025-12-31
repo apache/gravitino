@@ -21,6 +21,7 @@ from gravitino.exceptions.handlers.rest_error_handler import RestErrorHandler
 from gravitino.exceptions.base import (
     NoSuchMetalakeException,
     JobTemplateAlreadyExistsException,
+    IllegalJobTemplateOperationException,
     NoSuchJobTemplateException,
     NoSuchJobException,
     InUseException,
@@ -33,6 +34,10 @@ class JobErrorHandler(RestErrorHandler):
         error_message = error_response.format_error_message()
         code = error_response.code()
         exception_type = error_response.type()
+
+        if code == ErrorConstants.ILLEGAL_ARGUMENTS_CODE:
+            if exception_type == IllegalJobTemplateOperationException.__name__:
+                raise IllegalJobTemplateOperationException(error_message)
 
         if code == ErrorConstants.NOT_FOUND_CODE:
             if exception_type == NoSuchMetalakeException.__name__:

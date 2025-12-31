@@ -61,8 +61,10 @@ import org.apache.gravitino.hook.SchemaHookDispatcher;
 import org.apache.gravitino.hook.TableHookDispatcher;
 import org.apache.gravitino.hook.TagHookDispatcher;
 import org.apache.gravitino.hook.TopicHookDispatcher;
+import org.apache.gravitino.job.BuiltInJobTemplateEventListener;
 import org.apache.gravitino.job.JobManager;
 import org.apache.gravitino.job.JobOperationDispatcher;
+import org.apache.gravitino.job.JobTemplateValidationDispatcher;
 import org.apache.gravitino.listener.AccessControlEventDispatcher;
 import org.apache.gravitino.listener.CatalogEventDispatcher;
 import org.apache.gravitino.listener.EventBus;
@@ -612,8 +614,16 @@ public class GravitinoEnv {
         new PolicyEventDispatcher(eventBus, new PolicyManager(idGenerator, entityStore));
     this.policyDispatcher = new PolicyHookDispatcher(policyEventDispatcher);
 
+    JobManager jobManager = new JobManager(config, entityStore, idGenerator);
+    JobTemplateValidationDispatcher validationDispatcher =
+        new JobTemplateValidationDispatcher(jobManager);
     this.jobOperationDispatcher =
-        new JobEventDispatcher(
-            eventBus, new JobHookDispatcher(new JobManager(config, entityStore, idGenerator)));
+        new JobEventDispatcher(eventBus, new JobHookDispatcher(validationDispatcher));
+
+    // Register built-in job template event listener to automatically register templates
+    // when metalakes are created
+    BuiltInJobTemplateEventListener builtInJobTemplateListener =
+        new BuiltInJobTemplateEventListener(jobManager, entityStore, idGenerator);
+    eventListenerManager.addEventListener("builtin-job-template", builtInJobTemplateListener);
   }
 }
