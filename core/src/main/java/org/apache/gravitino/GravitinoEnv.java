@@ -35,6 +35,9 @@ import org.apache.gravitino.catalog.CatalogNormalizeDispatcher;
 import org.apache.gravitino.catalog.FilesetDispatcher;
 import org.apache.gravitino.catalog.FilesetNormalizeDispatcher;
 import org.apache.gravitino.catalog.FilesetOperationDispatcher;
+import org.apache.gravitino.catalog.FunctionDispatcher;
+import org.apache.gravitino.catalog.FunctionNormalizeDispatcher;
+import org.apache.gravitino.catalog.FunctionOperationDispatcher;
 import org.apache.gravitino.catalog.ModelDispatcher;
 import org.apache.gravitino.catalog.ModelNormalizeDispatcher;
 import org.apache.gravitino.catalog.ModelOperationDispatcher;
@@ -129,6 +132,8 @@ public class GravitinoEnv {
   private TopicDispatcher topicDispatcher;
 
   private ModelDispatcher modelDispatcher;
+
+  private FunctionDispatcher functionDispatcher;
 
   private MetalakeDispatcher metalakeDispatcher;
 
@@ -255,6 +260,15 @@ public class GravitinoEnv {
    */
   public ModelDispatcher modelDispatcher() {
     return modelDispatcher;
+  }
+
+  /**
+   * Get the FunctionDispatcher associated with the Gravitino environment.
+   *
+   * @return The FunctionDispatcher instance.
+   */
+  public FunctionDispatcher functionDispatcher() {
+    return functionDispatcher;
   }
 
   /**
@@ -623,6 +637,17 @@ public class GravitinoEnv {
     ModelNormalizeDispatcher modelNormalizeDispatcher =
         new ModelNormalizeDispatcher(modelHookDispatcher, catalogManager);
     this.modelDispatcher = new ModelEventDispatcher(eventBus, modelNormalizeDispatcher);
+
+    // TODO: Add FunctionHookDispatcher and FunctionEventDispatcher when needed
+    // The operation chain should be:
+    // FunctionEventDispatcher -> FunctionNormalizeDispatcher -> FunctionHookDispatcher ->
+    // FunctionOperationDispatcher
+    FunctionOperationDispatcher functionOperationDispatcher =
+        new FunctionOperationDispatcher(
+            catalogManager, schemaOperationDispatcher, entityStore, idGenerator);
+    this.functionDispatcher =
+        new FunctionNormalizeDispatcher(functionOperationDispatcher, catalogManager);
+
     this.statisticDispatcher =
         new StatisticEventDispatcher(
             eventBus, new StatisticManager(entityStore, idGenerator, config));
