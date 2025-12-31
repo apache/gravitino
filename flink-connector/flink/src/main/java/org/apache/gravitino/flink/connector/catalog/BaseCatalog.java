@@ -24,12 +24,14 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import com.google.common.collect.MapDifference;
 import com.google.common.collect.Maps;
+import com.google.common.collect.Sets;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.apache.flink.table.catalog.AbstractCatalog;
@@ -42,6 +44,7 @@ import org.apache.flink.table.catalog.CatalogPartitionSpec;
 import org.apache.flink.table.catalog.CatalogTable;
 import org.apache.flink.table.catalog.ObjectPath;
 import org.apache.flink.table.catalog.ResolvedCatalogBaseTable;
+import org.apache.flink.table.catalog.TableWritePrivilege;
 import org.apache.flink.table.catalog.UniqueConstraint;
 import org.apache.flink.table.catalog.exceptions.CatalogException;
 import org.apache.flink.table.catalog.exceptions.DatabaseAlreadyExistException;
@@ -65,6 +68,7 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.Schema;
 import org.apache.gravitino.SchemaChange;
+import org.apache.gravitino.authorization.Privilege;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchTableException;
@@ -218,6 +222,24 @@ public abstract class BaseCatalog extends AbstractCatalog {
           catalog()
               .asTableCatalog()
               .loadTable(NameIdentifier.of(tablePath.getDatabaseName(), tablePath.getObjectName()));
+      return toFlinkTable(table, tablePath);
+    } catch (NoSuchTableException e) {
+      throw new TableNotExistException(catalogName(), tablePath, e);
+    } catch (Exception e) {
+      throw new CatalogException(e);
+    }
+  }
+
+  @Override
+  public CatalogBaseTable getTable(ObjectPath tablePath, Set<TableWritePrivilege> writePrivileges)
+      throws TableNotExistException, CatalogException {
+    try {
+      Table table =
+          catalog()
+              .asTableCatalog()
+              .loadTable(
+                  NameIdentifier.of(tablePath.getDatabaseName(), tablePath.getObjectName()),
+                  Sets.newHashSet(Privilege.Name.MODIFY_TABLE));
       return toFlinkTable(table, tablePath);
     } catch (NoSuchTableException e) {
       throw new TableNotExistException(catalogName(), tablePath, e);

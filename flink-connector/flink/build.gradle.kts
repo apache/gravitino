@@ -28,7 +28,7 @@ repositories {
 
 var paimonVersion: String = libs.versions.paimon.get()
 val flinkVersion: String = libs.versions.flink.get()
-val flinkMajorVersion: String = flinkVersion.substringBeforeLast(".")
+val flinkMajorVersion: String = flinkVersion.substringBeforeLast("-")
 
 val icebergVersion: String = libs.versions.iceberg4connector.get()
 
