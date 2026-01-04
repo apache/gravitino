@@ -19,7 +19,6 @@
 
 package org.apache.gravitino.job;
 
-import static org.apache.gravitino.Metalake.PROPERTY_IN_USE;
 import static org.apache.gravitino.metalake.MetalakeManager.checkMetalake;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -58,9 +57,9 @@ import org.apache.gravitino.exceptions.NoSuchJobTemplateException;
 import org.apache.gravitino.lock.LockType;
 import org.apache.gravitino.lock.TreeLockUtils;
 import org.apache.gravitino.meta.AuditInfo;
-import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.JobEntity;
 import org.apache.gravitino.meta.JobTemplateEntity;
+import org.apache.gravitino.metalake.MetalakeManager;
 import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
@@ -99,9 +98,9 @@ public class JobManager implements JobOperationDispatcher {
 
   private final long jobStagingDirKeepTimeInMs;
 
-  private final ScheduledExecutorService cleanUpExecutor;
+  @VisibleForTesting final ScheduledExecutorService cleanUpExecutor;
 
-  private final ScheduledExecutorService statusPullExecutor;
+  @VisibleForTesting final ScheduledExecutorService statusPullExecutor;
 
   public JobManager(Config config, EntityStore entityStore, IdGenerator idGenerator) {
     this(config, entityStore, idGenerator, JobExecutorFactory.create(config));
@@ -536,7 +535,7 @@ public class JobManager implements JobOperationDispatcher {
 
   @VisibleForTesting
   void pullAndUpdateJobStatus() {
-    List<String> metalakes = listInUseMetalakes(entityStore);
+    List<String> metalakes = MetalakeManager.listInUseMetalakes(entityStore);
     for (String metalake : metalakes) {
       // This unnecessary list all the jobs, we need to improve the code to only list the active
       // jobs.
@@ -626,7 +625,7 @@ public class JobManager implements JobOperationDispatcher {
 
   @VisibleForTesting
   void cleanUpStagingDirs() {
-    List<String> metalakes = listInUseMetalakes(entityStore);
+    List<String> metalakes = MetalakeManager.listInUseMetalakes(entityStore);
 
     for (String metalake : metalakes) {
       List<JobEntity> finishedJobs =
@@ -820,24 +819,6 @@ public class JobManager implements JobOperationDispatcher {
       return destFile.getAbsolutePath();
     } catch (Exception e) {
       throw new RuntimeException(String.format("Failed to fetch file from URI %s", uri), e);
-    }
-  }
-
-  private static List<String> listInUseMetalakes(EntityStore entityStore) {
-    try {
-      List<BaseMetalake> metalakes =
-          TreeLockUtils.doWithRootTreeLock(
-              LockType.READ,
-              () ->
-                  entityStore.list(
-                      Namespace.empty(), BaseMetalake.class, Entity.EntityType.METALAKE));
-      return metalakes.stream()
-          .filter(
-              m -> (boolean) m.propertiesMetadata().getOrDefault(m.properties(), PROPERTY_IN_USE))
-          .map(BaseMetalake::name)
-          .collect(Collectors.toList());
-    } catch (IOException e) {
-      throw new RuntimeException("Failed to list in-use metalakes", e);
     }
   }
 

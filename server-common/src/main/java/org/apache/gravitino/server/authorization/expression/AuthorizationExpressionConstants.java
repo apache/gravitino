@@ -80,6 +80,12 @@ public class AuthorizationExpressionConstants {
                   ANY_MODIFY_TABLE
                   """;
 
+  public static final String filterWriteFilesetAuthorizationExpression =
+      """
+                  ANY(OWNER, METALAKE, CATALOG, SCHEMA, FILESET) ||
+                  ANY_WRITE_FILESET
+                  """;
+
   public static final String filterTopicsAuthorizationExpression =
       """
               ANY(OWNER, METALAKE, CATALOG, SCHEMA, TOPIC) ||

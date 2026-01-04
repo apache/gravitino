@@ -38,6 +38,8 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 import java.util.Random;
+import java.util.UUID;
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.ArrayUtils;
@@ -70,39 +72,37 @@ import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
 import org.awaitility.Awaitility;
-import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.MockedStatic;
 import org.mockito.Mockito;
 
 public class TestJobManager {
 
-  private static JobManager jobManager;
+  private JobManager jobManager;
 
-  private static EntityStore entityStore;
+  private EntityStore entityStore;
 
-  private static Config config;
+  private Config config;
 
-  private static String testStagingDir;
+  private String testStagingDir;
 
-  private static String metalake = "test_metalake";
+  private String metalake = "test_metalake";
 
-  private static NameIdentifier metalakeIdent = NameIdentifier.of(metalake);
+  private NameIdentifier metalakeIdent = NameIdentifier.of(metalake);
 
-  private static MockedStatic<MetalakeManager> mockedMetalake;
+  private MockedStatic<MetalakeManager> mockedMetalake;
 
-  private static JobExecutor jobExecutor;
+  private JobExecutor jobExecutor;
 
-  private static IdGenerator idGenerator;
+  private IdGenerator idGenerator;
 
-  @BeforeAll
-  public static void setUp() throws IllegalAccessException {
+  @BeforeEach
+  public void setUp() throws IllegalAccessException {
     config = new Config(false) {};
-    Random rand = new Random();
-    testStagingDir = "test_staging_dir_" + rand.nextInt(100);
+    testStagingDir = "test_staging_dir_" + UUID.randomUUID().toString();
     config.set(Configs.JOB_STAGING_DIR, testStagingDir);
     config.set(Configs.JOB_STAGING_DIR_KEEP_TIME_IN_MS, 1000L);
 
@@ -114,23 +114,49 @@ public class TestJobManager {
     JobManager jm = new JobManager(config, entityStore, idGenerator, jobExecutor);
     jobManager = Mockito.spy(jm);
 
+    // Stop the background schedulers to prevent interference with tests
+    ScheduledExecutorService cleanUpExecutor = jobManager.cleanUpExecutor;
+    if (cleanUpExecutor != null) {
+      cleanUpExecutor.shutdownNow();
+      try {
+        if (!cleanUpExecutor.awaitTermination(100, TimeUnit.MILLISECONDS)) {
+          cleanUpExecutor.shutdownNow();
+        }
+      } catch (InterruptedException e) {
+        cleanUpExecutor.shutdownNow();
+        Thread.currentThread().interrupt();
+      }
+    }
+
+    ScheduledExecutorService statusPullExecutor = jobManager.statusPullExecutor;
+    if (statusPullExecutor != null) {
+      statusPullExecutor.shutdown();
+      try {
+        if (!statusPullExecutor.awaitTermination(100, TimeUnit.MILLISECONDS)) {
+          statusPullExecutor.shutdownNow();
+        }
+      } catch (InterruptedException e) {
+        statusPullExecutor.shutdownNow();
+        Thread.currentThread().interrupt();
+      }
+    }
+
     mockedMetalake = mockStatic(MetalakeManager.class);
   }
 
-  @AfterAll
-  public static void tearDown() throws Exception {
+  @AfterEach
+  public void tearDown() throws Exception {
+    // Reset mocks to ensure test isolation
+    if (mockedMetalake != null) {
+      mockedMetalake.reset();
+    }
+    Mockito.reset(entityStore, jobManager);
     // Clean up resources if necessary
     jobManager.close();
     FileUtils.deleteDirectory(new File(testStagingDir));
-    mockedMetalake.close();
-  }
-
-  @AfterEach
-  public void reset() {
-    // Reset the mocked static methods after each test
-    mockedMetalake.reset();
-    Mockito.reset(entityStore);
-    Mockito.reset(jobManager);
+    if (mockedMetalake != null) {
+      mockedMetalake.close();
+    }
   }
 
   @Test
@@ -550,6 +576,12 @@ public class TestJobManager {
             .build();
     when(entityStore.list(Namespace.empty(), BaseMetalake.class, Entity.EntityType.METALAKE))
         .thenReturn(ImmutableList.of(mockMetalake));
+
+    // Mock MetalakeManager.listInUseMetalakes to return the test metalake
+    mockedMetalake
+        .when(() -> MetalakeManager.listInUseMetalakes(entityStore))
+        .thenReturn(ImmutableList.of(metalake));
+
     when(jobManager.listJobs(metalake, Optional.empty())).thenReturn(ImmutableList.of(job));
 
     when(jobExecutor.getJobStatus(job.jobExecutionId())).thenReturn(JobHandle.Status.QUEUED);
@@ -573,6 +605,11 @@ public class TestJobManager {
             .build();
     when(entityStore.list(Namespace.empty(), BaseMetalake.class, Entity.EntityType.METALAKE))
         .thenReturn(ImmutableList.of(mockMetalake));
+
+    // Mock MetalakeManager.listInUseMetalakes to return the test metalake
+    mockedMetalake
+        .when(() -> MetalakeManager.listInUseMetalakes(entityStore))
+        .thenReturn(ImmutableList.of(metalake));
 
     when(jobManager.listJobs(metalake, Optional.empty())).thenReturn(ImmutableList.of(job));
     Assertions.assertDoesNotThrow(() -> jobManager.cleanUpStagingDirs());
@@ -810,7 +847,7 @@ public class TestJobManager {
                 oldJobTemplateEntity.nameIdentifier(), oldJobTemplateEntity, invalidChange));
   }
 
-  private static JobTemplateEntity newShellJobTemplateEntity(String name, String comment) {
+  private JobTemplateEntity newShellJobTemplateEntity(String name, String comment) {
     ShellJobTemplate shellJobTemplate =
         ShellJobTemplate.builder()
             .withName(name)
@@ -829,7 +866,7 @@ public class TestJobManager {
         .build();
   }
 
-  private static JobTemplateEntity newSparkJobTemplateEntity(String name, String comment) {
+  private JobTemplateEntity newSparkJobTemplateEntity(String name, String comment) {
     SparkJobTemplate sparkJobTemplate =
         SparkJobTemplate.builder()
             .withName(name)
@@ -849,7 +886,7 @@ public class TestJobManager {
         .build();
   }
 
-  private static JobEntity newJobEntity(String templateName, JobHandle.Status status) {
+  private JobEntity newJobEntity(String templateName, JobHandle.Status status) {
     Random rand = new Random();
     return JobEntity.builder()
         .withId(rand.nextLong())

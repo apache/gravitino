@@ -91,9 +91,7 @@ public class GravitinoVirtualFileSystemGCSCredentialIT extends GravitinoVirtualF
     conf.set("fs.gvfs.impl.disable.cache", "true");
     conf.set("fs.gravitino.server.uri", serverUri);
     conf.set("fs.gravitino.client.metalake", metalakeName);
-
-    // Pass this configuration to the real file system
-    conf.set(GCSProperties.GRAVITINO_GCS_SERVICE_ACCOUNT_FILE, SERVICE_ACCOUNT_FILE);
+    conf.set("fs.gravitino.enableCredentialVending", "true");
   }
 
   @AfterAll
@@ -123,6 +121,9 @@ public class GravitinoVirtualFileSystemGCSCredentialIT extends GravitinoVirtualF
   protected Configuration convertGvfsConfigToRealFileSystemConfig(Configuration gvfsConf) {
     Configuration gcsConf = new Configuration();
     Map<String, String> map = Maps.newHashMap();
+
+    // Pass this configuration to the real file system
+    map.put(GCSProperties.GRAVITINO_GCS_SERVICE_ACCOUNT_FILE, SERVICE_ACCOUNT_FILE);
 
     gvfsConf.forEach(entry -> map.put(entry.getKey(), entry.getValue()));
 

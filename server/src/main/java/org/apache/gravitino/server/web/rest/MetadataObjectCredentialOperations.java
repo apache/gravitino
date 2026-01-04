@@ -42,10 +42,12 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.audit.CallerContext;
 import org.apache.gravitino.credential.Credential;
 import org.apache.gravitino.credential.CredentialOperationDispatcher;
+import org.apache.gravitino.credential.CredentialPrivilege;
 import org.apache.gravitino.dto.credential.CredentialDTO;
 import org.apache.gravitino.dto.responses.CredentialResponse;
 import org.apache.gravitino.dto.util.DTOConverters;
 import org.apache.gravitino.metrics.MetricNames;
+import org.apache.gravitino.server.authorization.MetadataAuthzHelper;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationExpression;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationFullName;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationMetadata;
@@ -114,7 +116,16 @@ public class MetadataObjectCredentialOperations {
               CallerContext.CallerContextHolder.set(context);
               LOG.info("Set the caller context for getting credential: {}", context.context());
             }
-            List<Credential> credentials = credentialOperationDispatcher.getCredentials(identifier);
+
+            CredentialPrivilege privilege =
+                MetadataAuthzHelper.checkAccess(
+                        identifier,
+                        MetadataObjectUtil.toEntityType(object),
+                        AuthorizationExpressionConstants.filterWriteFilesetAuthorizationExpression)
+                    ? CredentialPrivilege.WRITE
+                    : CredentialPrivilege.READ;
+            List<Credential> credentials =
+                credentialOperationDispatcher.getCredentials(identifier, privilege);
             if (credentials == null) {
               return Utils.ok(new CredentialResponse(new CredentialDTO[0]));
             }
