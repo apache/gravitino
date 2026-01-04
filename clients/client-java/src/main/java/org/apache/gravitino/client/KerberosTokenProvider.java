@@ -135,12 +135,39 @@ public final class KerberosTokenProvider implements AuthDataProvider {
     this.host = host;
   }
 
+  /**
+   * Strategy interface for providing Kerberos Subject credentials.
+   *
+   * <p>There are two strategies:
+   *
+   * <ul>
+   *   <li>{@link ExistingSubjectProvider} - Reuses credentials maintained by the framework (e.g.,
+   *       Flink)
+   *   <li>{@link LoginSubjectProvider} - Creates and manages new credentials using keytab and
+   *       principal
+   * </ul>
+   */
   private interface SubjectProvider {
     Subject get() throws LoginException;
 
     void close() throws LoginException;
   }
 
+  /**
+   * SubjectProvider that reuses existing Kerberos credentials from the framework.
+   *
+   * <p>When Flink (or another framework) has already logged in using keytab and principal, this
+   * provider reuses those credentials instead of creating new ones. This approach:
+   *
+   * <ul>
+   *   <li>Avoids redundant Kerberos logins
+   *   <li>Lets the framework manage credential lifecycle (renewal, expiration)
+   *   <li>Reduces complexity - the client doesn't need to maintain credentials
+   * </ul>
+   *
+   * <p>The Subject is obtained from the current AccessControlContext and contains KerberosKey or
+   * KerberosTicket credentials managed by the framework.
+   */
   private static final class ExistingSubjectProvider implements SubjectProvider {
     private final Subject subject;
 
@@ -155,10 +182,25 @@ public final class KerberosTokenProvider implements AuthDataProvider {
 
     @Override
     public void close() {
-      // no-op
+      // no-op: The framework owns the Subject and is responsible for its lifecycle
     }
   }
 
+  /**
+   * SubjectProvider that performs Kerberos login using keytab and principal.
+   *
+   * <p>This provider is used when no existing Kerberos credentials are available from the
+   * framework. It:
+   *
+   * <ul>
+   *   <li>Performs initial login using the provided keytab file and principal
+   *   <li>Manages the LoginContext lifecycle
+   *   <li>Automatically re-authenticates when the TGT (Ticket Granting Ticket) expires
+   * </ul>
+   *
+   * <p>This provider is responsible for credential lifecycle management including renewal and
+   * cleanup.
+   */
   private static final class LoginSubjectProvider implements SubjectProvider {
     private final String principal;
     private final String keytabFile;
@@ -171,9 +213,12 @@ public final class KerberosTokenProvider implements AuthDataProvider {
 
     @Override
     public synchronized Subject get() throws LoginException {
+      // Perform initial login if not already logged in
       if (loginContext == null) {
         loginContext = KerberosUtils.login(principal, keytabFile);
       } else if (keytabFile != null && isLoginTicketExpired(loginContext)) {
+        // If the TGT (Ticket Granting Ticket) has expired, logout and re-authenticate
+        // This ensures we always have valid credentials for GSS context negotiation
         loginContext.logout();
         loginContext = KerberosUtils.login(principal, keytabFile);
       }
@@ -236,17 +281,31 @@ public final class KerberosTokenProvider implements AuthDataProvider {
     /**
      * Builds the instance of the KerberosTokenProvider.
      *
+     * <p>This method determines the authentication strategy:
+     *
+     * <ul>
+     *   <li>If Kerberos credentials already exist in the current context (e.g., Flink has logged
+     *       in), use {@link ExistingSubjectProvider} to reuse those credentials
+     *   <li>Otherwise, use {@link LoginSubjectProvider} to perform a new Kerberos login using the
+     *       provided keytab and principal
+     * </ul>
+     *
      * @return The built KerberosTokenProvider instance.
      */
     @SuppressWarnings("removal")
     public KerberosTokenProvider build() {
       KerberosTokenProvider provider = new KerberosTokenProvider();
 
+      // Check if the framework (e.g., Flink) has already established Kerberos credentials
       java.security.AccessControlContext context = java.security.AccessController.getContext();
       Subject subject = Subject.getSubject(context);
+
+      // If credentials exist (KerberosKey or KerberosTicket), reuse them
+      // This avoids redundant logins when Flink has already authenticated with Kerberos
       if (subject != null
           && (!subject.getPrivateCredentials(KerberosKey.class).isEmpty()
               || !subject.getPrivateCredentials(KerberosTicket.class).isEmpty())) {
+        // Use ExistingSubjectProvider: framework manages the credentials
         provider.subjectProvider = new ExistingSubjectProvider(subject);
 
         extractPrincipalFromSubject(subject);
@@ -255,6 +314,7 @@ public final class KerberosTokenProvider implements AuthDataProvider {
         return provider;
       }
 
+      // No existing credentials found - we need to login ourselves
       setProviderClientPrincipal(provider);
 
       if (keyTabFile != null) {
@@ -265,6 +325,8 @@ public final class KerberosTokenProvider implements AuthDataProvider {
         provider.keytabFile = keyTabFile.getAbsolutePath();
       }
 
+      // Use LoginSubjectProvider: client manages the credentials
+      // This provider will login using keytab/principal and handle ticket renewal
       provider.subjectProvider =
           new LoginSubjectProvider(provider.clientPrincipal, provider.keytabFile);
       return provider;
