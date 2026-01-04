@@ -98,8 +98,8 @@ public class FilesetUtil {
               break;
             }
           } catch (Exception e) {
-            // Skip invalid URI values
-            continue;
+            throw new IllegalArgumentException(
+                String.format("Invalid URI in configuration of key %s: %s", key, value), e);
           }
         }
       }
@@ -133,6 +133,7 @@ public class FilesetUtil {
    * @return the base location in format "scheme://authority"
    */
   private static String getBaseLocation(URI uri) {
+    Preconditions.checkArgument(uri.getAuthority() != null, "URI must have an authority: %s", uri);
     return uri.getScheme() + "://" + uri.getAuthority();
   }
 }

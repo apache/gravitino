@@ -926,6 +926,7 @@ All schemas and filesets under the catalog can inherit the configuration based o
 The system can automatically retrieve the appropriate configuration from the fileset catalog based on the fileset's storage location.
 
 ```text
+# create fileset catalog with multiple cluster configurations, and specify HDFS and S3 clusters configurations by logical names
 curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
 -H "Content-Type: application/json" -d '{
   "name": "fileset_catalog",
@@ -942,7 +943,7 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
   }
 }' http://localhost:8090/api/metalakes/test/catalogs
 
-# create fileset fs1 in the default HDFS cluster
+# create fileset fs1 in the default HDFS cluster, it will inherit the hadoop1 cluster configuration from the catalog
 curl -X POST -H "Accept: application/vnd.gravitino.v1+json"
 -H "Content-Type: application/json" -d '{
   "name": "fs1",
@@ -951,7 +952,7 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json"
   "storageLocation": "hdfs://172.17.0.2:9000/datawarehouse/fs1"
 }' http://localhost:8090/api/metalakes/test/catalogs/fileset_catalog/schemas/test_schema/filesets
 
-# create fileset fs2 in another s3 cluster
+# create fileset fs2 in another s3 cluster, it will inherit the aws1 cluster configuration from the catalog
 curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
 -H "Content-Type: application/json" -d '{
   "name": "fs2",
