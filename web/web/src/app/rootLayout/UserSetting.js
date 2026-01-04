@@ -49,8 +49,10 @@ export default function UserSetting() {
   const store = useAppSelector(state => state.metalakes)
 
   useEffect(() => {
-    dispatch(fetchMetalakes())
-  }, [dispatch])
+    if (pathname && !['/', '/ui', '/login', '/ui/login'].includes(pathname)) {
+      dispatch(fetchMetalakes())
+    }
+  }, [dispatch, pathname])
 
   useEffect(() => {
     const checkAuthStatus = async () => {
