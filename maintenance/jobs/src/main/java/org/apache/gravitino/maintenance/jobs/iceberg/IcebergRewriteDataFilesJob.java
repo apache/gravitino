@@ -58,11 +58,11 @@ public class IcebergRewriteDataFilesJob implements BuiltInJob {
   /**
    * Main entry point for the rewrite data files job.
    *
-   * <p>Uses named arguments for flexibility: --catalog <catalog_name> Required. Iceberg catalog
-   * name --table <table_identifier> Required. Table name (db.table) --strategy <strategy> Optional.
-   * binpack or sort --sort-order <sort_order> Optional. Sort order specification --where
-   * <where_clause> Optional. Filter predicate --options <options_json> Optional. JSON map of
-   * options
+   * <p>Uses named arguments for flexibility: --catalog &lt;catalog_name&gt; Required. Iceberg
+   * catalog name --table &lt;table_identifier&gt; Required. Table name (db.table) --strategy
+   * &lt;strategy&gt; Optional. binpack or sort --sort-order &lt;sort_order&gt; Optional. Sort order
+   * specification --where &lt;where_clause&gt; Optional. Filter predicate --options
+   * &lt;options_json&gt; Optional. JSON map of options
    *
    * <p>Example: --catalog iceberg_catalog --table db.sample --strategy binpack --options
    * '{"min-input-files":"2"}'
