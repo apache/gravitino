@@ -50,6 +50,7 @@ import java.io.IOException;
 import java.time.Instant;
 import java.util.Map;
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.EntityStore;
@@ -81,7 +82,6 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.mockito.MockedStatic;
 import org.mockito.Mockito;
-import org.testcontainers.shaded.org.apache.commons.lang3.reflect.FieldUtils;
 
 public class TestKafkaCatalogOperations extends KafkaClusterEmbedded {
 

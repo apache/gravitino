@@ -154,6 +154,11 @@ allprojects {
           "import\\s+.*\\.(Logger|LoggerFactory);",
           "import org.slf4j.${'$'}1;"
         )
+        replaceRegex(
+          "Remove Testcontainers shading",
+          "import\\s+org\\.testcontainers\\.shaded\\.([^;]+);",
+          "import $1;"
+        )
 
         targetExclude("**/build/**", "**/.pnpm/***")
       }

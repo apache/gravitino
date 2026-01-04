@@ -38,6 +38,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.reflect.FieldUtils;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.Entity;
@@ -60,7 +61,6 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.TestTemplate;
 import org.mockito.Mockito;
-import org.testcontainers.shaded.org.apache.commons.lang3.tuple.Pair;
 
 public class TestFilesetMetaService extends TestJDBCBackend {
   private final String metalakeName = GravitinoITUtils.genRandomName("tst_metalake");
