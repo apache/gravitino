@@ -133,7 +133,6 @@ public class FilesetUtil {
    * @return the base location in format "scheme://authority"
    */
   private static String getBaseLocation(URI uri) {
-    Preconditions.checkArgument(uri.getAuthority() != null, "URI must have an authority: %s", uri);
-    return uri.getScheme() + "://" + uri.getAuthority();
+    return uri.getScheme() + "://" + (uri.getAuthority() == null ? "" : uri.getAuthority());
   }
 }
