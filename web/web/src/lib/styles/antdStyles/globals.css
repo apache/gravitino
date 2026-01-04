@@ -132,11 +132,20 @@
   &.actived-default {
     @apply bg-[color:theme(colors.defaultPrimary)];
     .default-theme-radio {
-      @apply text-white !important;
+      @apply !text-white;
     }
     .default-theme-text > div {
-      @apply text-white !important;
+      @apply !text-white;
     }
+  }
+}
+
+.provider-card.actived-default:hover {
+  .default-theme-radio,
+  .default-theme-text > div,
+  .ant-typography,
+  .ant-typography-secondary {
+    @apply !text-white;
   }
 }
 
