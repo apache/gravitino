@@ -29,7 +29,6 @@ import org.apache.gravitino.Entity;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.authorization.AuthorizationRequestContext;
 import org.apache.gravitino.dto.requests.TagsAssociateRequest;
-import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionEvaluator;
 import org.apache.gravitino.server.web.rest.MetadataObjectTagOperations;
 
 /**
@@ -47,10 +46,9 @@ public class AssociateTagAuthorizationExecutor extends CommonAuthorizerExecutor
       Parameter[] parameters,
       Object[] args,
       Map<Entity.EntityType, NameIdentifier> metadataContext,
-      AuthorizationExpressionEvaluator authorizationExpressionEvaluator,
       Map<String, Object> pathParams,
       Optional<String> entityType) {
-    super(expression, metadataContext, authorizationExpressionEvaluator, pathParams, entityType);
+    super(expression, metadataContext, pathParams, entityType);
     this.parameters = parameters;
     this.args = args;
   }

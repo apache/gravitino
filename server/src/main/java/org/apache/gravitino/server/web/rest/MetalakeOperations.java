@@ -93,7 +93,7 @@ public class MetalakeOperations {
             metalakes =
                 MetadataAuthzHelper.filterMetalakes(
                     metalakes,
-                    AuthorizationExpressionConstants.loadMetalakeAuthorizationExpression);
+                    AuthorizationExpressionConstants.LOAD_METALAKE_AUTHORIZATION_EXPRESSION);
             MetalakeDTO[] metalakeDTOs =
                 Arrays.stream(metalakes).map(DTOConverters::toDTO).toArray(MetalakeDTO[]::new);
             Response response = Utils.ok(new MetalakeListResponse(metalakeDTOs));
@@ -143,7 +143,7 @@ public class MetalakeOperations {
   @Timed(name = "load-metalake." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "load-metalake", absolute = true)
   @AuthorizationExpression(
-      expression = AuthorizationExpressionConstants.loadMetalakeAuthorizationExpression)
+      expression = AuthorizationExpressionConstants.LOAD_METALAKE_AUTHORIZATION_EXPRESSION)
   public Response loadMetalake(
       @PathParam("name") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
           String metalakeName) {

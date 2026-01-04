@@ -21,9 +21,11 @@
 package org.apache.gravitino.rel;
 
 import java.util.Map;
+import java.util.Set;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.annotation.Evolving;
+import org.apache.gravitino.authorization.Privilege;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.exceptions.TableAlreadyExistsException;
@@ -59,6 +61,19 @@ public interface TableCatalog {
    * @throws NoSuchTableException If the table does not exist.
    */
   Table loadTable(NameIdentifier ident) throws NoSuchTableException;
+
+  /**
+   * Load table metadata by {@link NameIdentifier} from the catalog with required privileges.
+   *
+   * @param ident A table identifier.
+   * @param requiredPrivilegeNames The required privilege names to access the table.
+   * @return The table metadata.
+   * @throws NoSuchTableException If the table does not exist.
+   */
+  default Table loadTable(NameIdentifier ident, Set<Privilege.Name> requiredPrivilegeNames)
+      throws NoSuchTableException {
+    return loadTable(ident);
+  }
 
   /**
    * Check if a table exists using an {@link NameIdentifier} from the catalog.

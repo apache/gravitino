@@ -113,7 +113,7 @@ public class TagOperations {
               tagDTOs =
                   MetadataAuthzHelper.filterByExpression(
                       metalake,
-                      AuthorizationExpressionConstants.loadTagAuthorizationExpression,
+                      AuthorizationExpressionConstants.LOAD_TAG_AUTHORIZATION_EXPRESSION,
                       Entity.EntityType.TAG,
                       tagDTOs,
                       tagDTO -> NameIdentifierUtil.ofTag(metalake, tagDTO.name()));
@@ -126,7 +126,7 @@ public class TagOperations {
               tagNames =
                   MetadataAuthzHelper.filterByExpression(
                       metalake,
-                      AuthorizationExpressionConstants.loadTagAuthorizationExpression,
+                      AuthorizationExpressionConstants.LOAD_TAG_AUTHORIZATION_EXPRESSION,
                       Entity.EntityType.TAG,
                       tagNames,
                       tagName -> NameIdentifierUtil.ofTag(metalake, tagName));
@@ -174,7 +174,7 @@ public class TagOperations {
   @Timed(name = "get-tag." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "get-tag", absolute = true)
   @AuthorizationExpression(
-      expression = AuthorizationExpressionConstants.loadTagAuthorizationExpression,
+      expression = AuthorizationExpressionConstants.LOAD_TAG_AUTHORIZATION_EXPRESSION,
       accessMetadataType = MetadataObject.Type.TAG)
   public Response getTag(
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
@@ -264,7 +264,7 @@ public class TagOperations {
   @Timed(name = "list-objects-for-tag." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "list-objects-for-tag", absolute = true)
   @AuthorizationExpression(
-      expression = AuthorizationExpressionConstants.loadTagAuthorizationExpression)
+      expression = AuthorizationExpressionConstants.LOAD_TAG_AUTHORIZATION_EXPRESSION)
   public Response listMetadataObjectsForTag(
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
           String metalake,

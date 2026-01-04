@@ -85,7 +85,8 @@ public class TestModelAuthorizationExpression {
   @Test
   public void testLoadModel() throws OgnlException, NoSuchFieldException, IllegalAccessException {
     Field loadModelAuthorizationExpressionField =
-        AuthorizationExpressionConstants.class.getDeclaredField("loadModelAuthorizationExpression");
+        AuthorizationExpressionConstants.class.getDeclaredField(
+            "LOAD_MODEL_AUTHORIZATION_EXPRESSION");
     loadModelAuthorizationExpressionField.setAccessible(true);
     String loadModelAuthExpression = (String) loadModelAuthorizationExpressionField.get(null);
     MockAuthorizationExpressionEvaluator mockEvaluator =

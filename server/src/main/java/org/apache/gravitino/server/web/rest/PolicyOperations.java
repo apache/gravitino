@@ -107,7 +107,7 @@ public class PolicyOperations {
               policyDTOs =
                   MetadataAuthzHelper.filterByExpression(
                       metalake,
-                      AuthorizationExpressionConstants.loadPolicyAuthorizationExpression,
+                      AuthorizationExpressionConstants.LOAD_POLICY_AUTHORIZATION_EXPRESSION,
                       Entity.EntityType.POLICY,
                       policyDTOs,
                       (policyDTO -> NameIdentifierUtil.ofPolicy(metalake, policyDTO.name())));
@@ -120,7 +120,7 @@ public class PolicyOperations {
               policyNames =
                   MetadataAuthzHelper.filterByExpression(
                       metalake,
-                      AuthorizationExpressionConstants.loadPolicyAuthorizationExpression,
+                      AuthorizationExpressionConstants.LOAD_POLICY_AUTHORIZATION_EXPRESSION,
                       Entity.EntityType.POLICY,
                       policyNames,
                       (policyName -> NameIdentifierUtil.ofPolicy(metalake, policyName)));
@@ -173,7 +173,7 @@ public class PolicyOperations {
   @Timed(name = "get-policy." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "get-policy", absolute = true)
   @AuthorizationExpression(
-      expression = AuthorizationExpressionConstants.loadPolicyAuthorizationExpression)
+      expression = AuthorizationExpressionConstants.LOAD_POLICY_AUTHORIZATION_EXPRESSION)
   public Response getPolicy(
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
           String metalake,
@@ -300,7 +300,7 @@ public class PolicyOperations {
   @Timed(name = "list-objects-for-policy." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "list-objects-for-policy", absolute = true)
   @AuthorizationExpression(
-      expression = AuthorizationExpressionConstants.loadPolicyAuthorizationExpression)
+      expression = AuthorizationExpressionConstants.LOAD_POLICY_AUTHORIZATION_EXPRESSION)
   public Response listMetadataObjectsForPolicy(
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
           String metalake,

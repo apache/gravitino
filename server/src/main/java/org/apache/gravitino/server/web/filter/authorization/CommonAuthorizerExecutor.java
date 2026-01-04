@@ -35,12 +35,11 @@ public class CommonAuthorizerExecutor implements AuthorizationExecutor {
   public CommonAuthorizerExecutor(
       String expression,
       Map<Entity.EntityType, NameIdentifier> metadataContext,
-      AuthorizationExpressionEvaluator authorizationExpressionEvaluator,
       Map<String, Object> pathParams,
       Optional<String> entityType) {
     this.expression = expression;
     this.metadataContext = metadataContext;
-    this.authorizationExpressionEvaluator = authorizationExpressionEvaluator;
+    this.authorizationExpressionEvaluator = new AuthorizationExpressionEvaluator(expression);
     this.pathParams = pathParams;
     this.entityType = entityType;
   }

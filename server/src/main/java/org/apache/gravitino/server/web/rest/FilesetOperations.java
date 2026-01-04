@@ -90,7 +90,7 @@ public class FilesetOperations {
   @Timed(name = "list-fileset." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "list-fileset", absolute = true)
   @AuthorizationExpression(
-      expression = AuthorizationExpressionConstants.loadSchemaAuthorizationExpression,
+      expression = AuthorizationExpressionConstants.LOAD_SCHEMA_AUTHORIZATION_EXPRESSION,
       accessMetadataType = MetadataObject.Type.SCHEMA)
   public Response listFilesets(
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
@@ -108,7 +108,7 @@ public class FilesetOperations {
             idents =
                 MetadataAuthzHelper.filterByExpression(
                     metalake,
-                    AuthorizationExpressionConstants.filterFilesetAuthorizationExpression,
+                    AuthorizationExpressionConstants.FILTER_FILESET_AUTHORIZATION_EXPRESSION,
                     Entity.EntityType.FILESET,
                     idents);
             Response response = Utils.ok(new EntityListResponse(idents));
@@ -191,7 +191,7 @@ public class FilesetOperations {
   @Timed(name = "load-fileset." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "load-fileset", absolute = true)
   @AuthorizationExpression(
-      expression = AuthorizationExpressionConstants.loadFilesetAuthorizationExpression,
+      expression = AuthorizationExpressionConstants.LOAD_FILESET_AUTHORIZATION_EXPRESSION,
       accessMetadataType = MetadataObject.Type.FILESET)
   public Response loadFileset(
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
@@ -222,7 +222,7 @@ public class FilesetOperations {
   @Timed(name = "list-fileset-files." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "list-fileset-files", absolute = true)
   @AuthorizationExpression(
-      expression = AuthorizationExpressionConstants.loadFilesetAuthorizationExpression,
+      expression = AuthorizationExpressionConstants.LOAD_FILESET_AUTHORIZATION_EXPRESSION,
       accessMetadataType = MetadataObject.Type.FILESET)
   public Response listFiles(
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
@@ -357,7 +357,7 @@ public class FilesetOperations {
   @Timed(name = "get-file-location." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "get-file-location", absolute = true)
   @AuthorizationExpression(
-      expression = AuthorizationExpressionConstants.loadFilesetAuthorizationExpression,
+      expression = AuthorizationExpressionConstants.LOAD_FILESET_AUTHORIZATION_EXPRESSION,
       accessMetadataType = MetadataObject.Type.FILESET)
   public Response getFileLocation(
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)

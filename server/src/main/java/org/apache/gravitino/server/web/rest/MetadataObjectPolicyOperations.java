@@ -182,7 +182,7 @@ public class MetadataObjectPolicyOperations {
             nonInheritedPolicies =
                 MetadataAuthzHelper.filterByExpression(
                     metalake,
-                    AuthorizationExpressionConstants.loadPolicyAuthorizationExpression,
+                    AuthorizationExpressionConstants.LOAD_POLICY_AUTHORIZATION_EXPRESSION,
                     Entity.EntityType.POLICY,
                     nonInheritedPolicies,
                     (policyEntity -> NameIdentifierUtil.ofPolicy(metalake, policyEntity.name())));

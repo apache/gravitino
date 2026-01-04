@@ -104,7 +104,7 @@ public class CatalogOperations {
               catalogs =
                   MetadataAuthzHelper.filterByExpression(
                       metalake,
-                      AuthorizationExpressionConstants.loadCatalogAuthorizationExpression,
+                      AuthorizationExpressionConstants.LOAD_CATALOG_AUTHORIZATION_EXPRESSION,
                       Entity.EntityType.CATALOG,
                       catalogs,
                       (catalogEntity) ->
@@ -117,7 +117,7 @@ public class CatalogOperations {
               idents =
                   MetadataAuthzHelper.filterByExpression(
                       metalake,
-                      AuthorizationExpressionConstants.loadCatalogAuthorizationExpression,
+                      AuthorizationExpressionConstants.LOAD_CATALOG_AUTHORIZATION_EXPRESSION,
                       Entity.EntityType.CATALOG,
                       idents);
               Response response = Utils.ok(new EntityListResponse(idents));

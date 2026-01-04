@@ -166,7 +166,7 @@ public class IcebergTableOperationExecutor implements IcebergTableOperationDispa
         MetadataAuthzHelper.checkAccess(
             identifier,
             Entity.EntityType.TABLE,
-            AuthorizationExpressionConstants.filterModifyTableAuthorizationExpression);
+            AuthorizationExpressionConstants.FILTER_MODIFY_TABLE_AUTHORIZATION_EXPRESSION);
 
     return writable ? CredentialPrivilege.WRITE : CredentialPrivilege.READ;
   }

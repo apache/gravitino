@@ -77,7 +77,7 @@ public class TestTopicAuthorizationExpression {
   public void testLoadTopics() throws OgnlException, NoSuchFieldException, IllegalAccessException {
     Field loadTopicsAuthorizationExpressionField =
         AuthorizationExpressionConstants.class.getDeclaredField(
-            "loadTopicsAuthorizationExpression");
+            "LOAD_TOPICS_AUTHORIZATION_EXPRESSION");
     loadTopicsAuthorizationExpressionField.setAccessible(true);
     String loadTopicsAuthorizationExpression =
         (String) loadTopicsAuthorizationExpressionField.get(null);

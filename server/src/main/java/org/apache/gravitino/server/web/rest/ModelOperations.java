@@ -92,7 +92,7 @@ public class ModelOperations {
   @Timed(name = "list-model." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "list-model", absolute = true)
   @AuthorizationExpression(
-      expression = AuthorizationExpressionConstants.loadSchemaAuthorizationExpression,
+      expression = AuthorizationExpressionConstants.LOAD_SCHEMA_AUTHORIZATION_EXPRESSION,
       accessMetadataType = MetadataObject.Type.SCHEMA)
   public Response listModels(
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
@@ -111,7 +111,7 @@ public class ModelOperations {
             modelIds =
                 MetadataAuthzHelper.filterByExpression(
                     metalake,
-                    AuthorizationExpressionConstants.filterModelAuthorizationExpression,
+                    AuthorizationExpressionConstants.FILTER_MODEL_AUTHORIZATION_EXPRESSION,
                     Entity.EntityType.MODEL,
                     modelIds);
             LOG.info("List {} models under schema {}", modelIds.length, modelNs);
@@ -129,7 +129,7 @@ public class ModelOperations {
   @Timed(name = "get-model." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "get-model", absolute = true)
   @AuthorizationExpression(
-      expression = AuthorizationExpressionConstants.loadModelAuthorizationExpression,
+      expression = AuthorizationExpressionConstants.LOAD_MODEL_AUTHORIZATION_EXPRESSION,
       accessMetadataType = MetadataObject.Type.MODEL)
   public Response getModel(
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
@@ -247,7 +247,7 @@ public class ModelOperations {
   @Timed(name = "list-model-versions." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "list-model-versions", absolute = true)
   @AuthorizationExpression(
-      expression = AuthorizationExpressionConstants.loadModelAuthorizationExpression,
+      expression = AuthorizationExpressionConstants.LOAD_MODEL_AUTHORIZATION_EXPRESSION,
       accessMetadataType = MetadataObject.Type.MODEL)
   public Response listModelVersions(
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
@@ -278,7 +278,7 @@ public class ModelOperations {
                             return MetadataAuthzHelper.filterByExpression(
                                         metalake,
                                         AuthorizationExpressionConstants
-                                            .loadModelAuthorizationExpression,
+                                            .LOAD_MODEL_AUTHORIZATION_EXPRESSION,
                                         Entity.EntityType.MODEL_VERSION,
                                         nameIdentifiers)
                                     .length
@@ -303,7 +303,7 @@ public class ModelOperations {
                             return MetadataAuthzHelper.filterByExpression(
                                         metalake,
                                         AuthorizationExpressionConstants
-                                            .loadModelAuthorizationExpression,
+                                            .LOAD_MODEL_AUTHORIZATION_EXPRESSION,
                                         Entity.EntityType.MODEL_VERSION,
                                         nameIdentifiers)
                                     .length
@@ -326,7 +326,7 @@ public class ModelOperations {
   @Timed(name = "get-model-version." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "get-model-version", absolute = true)
   @AuthorizationExpression(
-      expression = AuthorizationExpressionConstants.loadModelAuthorizationExpression,
+      expression = AuthorizationExpressionConstants.LOAD_MODEL_AUTHORIZATION_EXPRESSION,
       accessMetadataType = MetadataObject.Type.MODEL)
   public Response getModelVersion(
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
@@ -365,7 +365,7 @@ public class ModelOperations {
   @Timed(name = "get-model-alias." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "get-model-alias", absolute = true)
   @AuthorizationExpression(
-      expression = AuthorizationExpressionConstants.loadModelAuthorizationExpression,
+      expression = AuthorizationExpressionConstants.LOAD_MODEL_AUTHORIZATION_EXPRESSION,
       accessMetadataType = MetadataObject.Type.MODEL)
   public Response getModelVersionByAlias(
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
@@ -704,7 +704,7 @@ public class ModelOperations {
   @Timed(name = "get-model-version-uri." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "get-model-version-uri", absolute = true)
   @AuthorizationExpression(
-      expression = AuthorizationExpressionConstants.loadModelAuthorizationExpression,
+      expression = AuthorizationExpressionConstants.LOAD_MODEL_AUTHORIZATION_EXPRESSION,
       accessMetadataType = MetadataObject.Type.MODEL)
   public Response getModelVersionUri(
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
@@ -744,7 +744,7 @@ public class ModelOperations {
   @Timed(name = "get-model-alias-uri." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "get-model-alias-uri", absolute = true)
   @AuthorizationExpression(
-      expression = AuthorizationExpressionConstants.loadModelAuthorizationExpression,
+      expression = AuthorizationExpressionConstants.LOAD_MODEL_AUTHORIZATION_EXPRESSION,
       accessMetadataType = MetadataObject.Type.MODEL)
   public Response getModelVersionUriByAlias(
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
