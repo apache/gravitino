@@ -34,7 +34,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testcontainers.containers.Container;
 
-public class CatalogHiveS3IT extends CatalogHive2IT {
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
+public class CatalogHiveS3IT extends CatalogHive3IT {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(CatalogHiveS3IT.class);
 
@@ -51,6 +52,7 @@ public class CatalogHiveS3IT extends CatalogHive2IT {
 
   @Override
   protected void startNecessaryContainer() {
+    hmsCatalog = "hive";
     containerSuite.startLocalStackContainer();
     gravitinoLocalStackContainer = containerSuite.getLocalStackContainer();
 
