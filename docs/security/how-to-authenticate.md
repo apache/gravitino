@@ -33,6 +33,16 @@ GravitinoClient client = GravitinoClient.builder(uri)
     .build();
 ```
 
+When using curl or other HTTP clients, authenticate with the `Authorization` header:
+
+```shell
+curl -v -X GET \
+  -H "Accept: application/vnd.gravitino.v1+json" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Basic $(echo -n 'admin:' | base64)" \
+  http://localhost:8090/api/version
+```
+
 ### OAuth mode
 
 Gravitino supports external OAuth 2.0 servers with two token validation methods:
