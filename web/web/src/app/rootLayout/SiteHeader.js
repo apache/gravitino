@@ -40,8 +40,10 @@ export function SiteHeader() {
   const store = useAppSelector(state => state.metalakes)
 
   useEffect(() => {
-    dispatch(fetchMetalakes())
-  }, [dispatch])
+    if (pathname && !['/', '/ui', '/login', '/ui/login'].includes(pathname)) {
+      dispatch(fetchMetalakes())
+    }
+  }, [dispatch, pathname])
 
   // Ensure URL has sensible defaults when missing:
   // - When not on `/metalakes` and `metalake` query is missing/empty/"undefined",
@@ -50,6 +52,10 @@ export function SiteHeader() {
   //   default to `relational`.
   useEffect(() => {
     try {
+      if (store.metalakes.length === 0) {
+        return
+      }
+
       const metalakeParam = searchParams.get('metalake')
       const catalogTypeParam = searchParams.get('catalogType')
 
@@ -63,9 +69,7 @@ export function SiteHeader() {
 
       // If we're not on the metalakes list page and metalake is missing, fill it
       if (!['/', '/ui', '/metalakes', '/ui/metalakes'].includes(pathname) && !metalakeParam) {
-        const first =
-          (store.metalakes && store.metalakes.length > 0 && store.metalakes[0].name) ||
-          (metalakes.length > 0 ? metalakes[0] : '')
+        const first = store.metalakes[0].name || ''
         if (first) {
           const qs = makeNewSearch({ metalake: first })
           router.replace(`${pathname}${qs ? `?${qs}` : ''}`)
@@ -100,7 +104,7 @@ export function SiteHeader() {
       className={cn(
         'sticky top-0 z-40 w-full border-b border-b-[color:theme(colors.borderWhite)] bg-slate-800 text-white',
         {
-          hidden: pathname === '/login'
+          hidden: pathname === '/login' || pathname === '/ui/login'
         }
       )}
     >
@@ -111,8 +115,8 @@ export function SiteHeader() {
             <GitHubInfo />
             <div
               className={cn('cursor-pointer rounded p-1.5 hover:bg-slate-700', {
-                'bg-gray-100 shadow-inner': pathname === '/metalakes',
-                'bg-slate-700': pathname === '/metalakes'
+                'bg-gray-100 shadow-inner': pathname === '/metalakes' || pathname === '/ui/metalakes',
+                'bg-slate-700': pathname === '/metalakes' || pathname === '/ui/metalakes'
               })}
             >
               <Tooltip title='System Mode'>
