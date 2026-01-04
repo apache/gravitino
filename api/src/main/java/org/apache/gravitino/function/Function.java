@@ -65,8 +65,12 @@ public interface Function extends Auditable {
   /**
    * The output columns for a table-valued function.
    *
-   * @return The output columns of a table-valued function, or an empty array for scalar or
-   *     aggregate functions.
+   * <p>A table-valued function is a function that returns a table instead of a scalar value or an
+   * aggregate result. The returned table has a fixed schema defined by the columns returned from
+   * this method.
+   *
+   * @return The output columns that define the schema of the table returned by this function, or an
+   *     empty array if this is a scalar or aggregate function.
    */
   default FunctionColumn[] returnColumns() {
     return EMPTY;
