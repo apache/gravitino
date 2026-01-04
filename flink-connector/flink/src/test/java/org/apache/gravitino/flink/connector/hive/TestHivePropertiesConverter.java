@@ -22,6 +22,7 @@ import com.google.common.collect.ImmutableMap;
 import java.util.Map;
 import org.apache.flink.configuration.Configuration;
 import org.apache.gravitino.catalog.hive.HiveConstants;
+import org.apache.gravitino.catalog.hive.HiveStorageConstants;
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -66,5 +67,39 @@ public class TestHivePropertiesConverter {
     Assertions.assertEquals(
         GravitinoHiveCatalogFactoryOptions.IDENTIFIER, flinkCatalogProperties.get("type"));
     Assertions.assertEquals("thrift://xxx", flinkCatalogProperties.get("hive.metastore.uris"));
+  }
+
+  @Test
+  public void testToGravitinoTablePropertiesWithoutSerdeLib() {
+    // Test that serde-lib is set to LazySimpleSerDe when not explicitly provided.
+    // This default applies ONLY to Hive tables created through the Flink connector
+    // (issue #9508). Other Hive usage paths (Spark, Trino, direct API) are unaffected.
+    Map<String, String> flinkProperties = ImmutableMap.of("key1", "value1", "key2", "value2");
+    Map<String, String> gravitinoProperties = CONVERTER.toGravitinoTableProperties(flinkProperties);
+
+    Assertions.assertEquals(3, gravitinoProperties.size());
+    Assertions.assertEquals("value1", gravitinoProperties.get("key1"));
+    Assertions.assertEquals("value2", gravitinoProperties.get("key2"));
+    Assertions.assertEquals(
+        HiveStorageConstants.LAZY_SIMPLE_SERDE_CLASS,
+        gravitinoProperties.get(HiveConstants.SERDE_LIB),
+        "serde-lib should be set to LazySimpleSerDe for Flink-Hive interoperability");
+  }
+
+  @Test
+  public void testToGravitinoTablePropertiesWithSerdeLib() {
+    // Test that explicitly provided serde-lib is preserved
+    String customSerde = "org.apache.hadoop.hive.ql.io.orc.OrcSerde";
+    Map<String, String> flinkProperties =
+        ImmutableMap.of(
+            "key1", "value1", HiveConstants.SERDE_LIB, customSerde);
+    Map<String, String> gravitinoProperties = CONVERTER.toGravitinoTableProperties(flinkProperties);
+
+    Assertions.assertEquals(2, gravitinoProperties.size());
+    Assertions.assertEquals("value1", gravitinoProperties.get("key1"));
+    Assertions.assertEquals(
+        customSerde,
+        gravitinoProperties.get(HiveConstants.SERDE_LIB),
+        "Explicitly provided serde-lib should be preserved");
   }
 }
