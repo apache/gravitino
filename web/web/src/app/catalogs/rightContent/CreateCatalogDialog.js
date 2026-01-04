@@ -358,14 +358,19 @@ export default function CreateCatalogDialog({ ...props }) {
             {renderIcon({ type: catalogType, provider: provider.value })}
           </div>
           <div className='default-theme-text'>
-            <Paragraph className='text-base'>{provider.label}</Paragraph>
-            <Paragraph type='secondary' className='text-sm'>
+            <Paragraph className={cn('text-base', { '!text-white': provider.value === currentProvider })}>
+              {provider.label}
+            </Paragraph>
+            <Paragraph
+              type='secondary'
+              className={cn('text-sm', { '!text-white': provider.value === currentProvider })}
+            >
               {provider.description}
             </Paragraph>
           </div>
         </div>
         {provider.value === currentProvider ? (
-          <Icons.CircleCheckBig className='provider-radio size-4 text-gray-400 default-theme-radio' />
+          <Icons.CircleCheckBig className='provider-radio size-4 text-white default-theme-radio' />
         ) : (
           <Icons.Circle className='provider-radio size-4 text-gray-400 default-theme-radio' />
         )}

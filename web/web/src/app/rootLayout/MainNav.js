@@ -144,7 +144,7 @@ export function MainNav() {
     if (menuItem.key === ROUTES.Catalogs) {
       router.push(`/catalogs?metalake=${currentMetalake}&catalogType=relational`)
     } else {
-      router.push(`${menuItem.key}?metalake=${currentMetalake}`)
+      router.push(currentMetalake ? `${menuItem.key}?metalake=${currentMetalake}` : menuItem.key)
     }
   }
 
