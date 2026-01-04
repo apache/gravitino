@@ -19,6 +19,7 @@
 package org.apache.gravitino.metalake;
 
 import static org.apache.gravitino.Metalake.PROPERTY_IN_USE;
+import static org.apache.gravitino.connector.BaseCatalogPropertiesMetadata.PROPERTY_METALAKE_IN_USE;
 
 import com.google.common.collect.Maps;
 import java.io.Closeable;
@@ -32,6 +33,7 @@ import java.util.stream.Collectors;
 import org.apache.gravitino.Entity.EntityType;
 import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.EntityStore;
+import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetalakeChange;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
@@ -367,24 +369,44 @@ public class MetalakeManager implements MetalakeDispatcher, Closeable {
         () -> {
           try {
             boolean inUse = metalakeInUse(store, ident);
-            if (!inUse) {
-              store.update(
-                  ident,
-                  BaseMetalake.class,
-                  EntityType.METALAKE,
-                  metalake -> {
-                    BaseMetalake.Builder builder = newMetalakeBuilder(metalake);
-
-                    Map<String, String> newProps =
-                        metalake.properties() == null
-                            ? Maps.newHashMap()
-                            : Maps.newHashMap(metalake.properties());
-                    newProps.put(PROPERTY_IN_USE, "true");
-                    builder.withProperties(newProps);
-
-                    return builder.build();
-                  });
+            if (inUse) {
+              return null;
             }
+
+            store.update(
+                ident,
+                BaseMetalake.class,
+                EntityType.METALAKE,
+                metalake -> {
+                  BaseMetalake.Builder builder = newMetalakeBuilder(metalake);
+
+                  Map<String, String> newProps =
+                      metalake.properties() == null
+                          ? Maps.newHashMap()
+                          : Maps.newHashMap(metalake.properties());
+                  newProps.put(PROPERTY_IN_USE, "true");
+                  builder.withProperties(newProps);
+
+                  return builder.build();
+                });
+
+            // The only problem is that we can't make sure we can change all catalog properties
+            // in a transaction. If any catalog property update fails, the metalake is already
+            // enabled but catalog properties remain inconsistent.
+            store
+                .list(Namespace.of(ident.name()), CatalogEntity.class, EntityType.CATALOG)
+                .forEach(
+                    catalogEntity -> {
+                      // update the properties metalake-in-use in catalog to true
+                      GravitinoEnv.getInstance()
+                          .catalogManager()
+                          .updateCatalogProperty(
+                              catalogEntity.nameIdentifier(), PROPERTY_METALAKE_IN_USE, "true");
+
+                      LOG.info(
+                          "Enabled metalake-in-use property for catalog {} success",
+                          catalogEntity.nameIdentifier());
+                    });
 
             return null;
           } catch (IOException e) {
@@ -401,24 +423,44 @@ public class MetalakeManager implements MetalakeDispatcher, Closeable {
         () -> {
           try {
             boolean inUse = metalakeInUse(store, ident);
-            if (inUse) {
-              store.update(
-                  ident,
-                  BaseMetalake.class,
-                  EntityType.METALAKE,
-                  metalake -> {
-                    BaseMetalake.Builder builder = newMetalakeBuilder(metalake);
-
-                    Map<String, String> newProps =
-                        metalake.properties() == null
-                            ? Maps.newHashMap()
-                            : Maps.newHashMap(metalake.properties());
-                    newProps.put(PROPERTY_IN_USE, "false");
-                    builder.withProperties(newProps);
-
-                    return builder.build();
-                  });
+            if (!inUse) {
+              return null;
             }
+
+            store.update(
+                ident,
+                BaseMetalake.class,
+                EntityType.METALAKE,
+                metalake -> {
+                  BaseMetalake.Builder builder = newMetalakeBuilder(metalake);
+
+                  Map<String, String> newProps =
+                      metalake.properties() == null
+                          ? Maps.newHashMap()
+                          : Maps.newHashMap(metalake.properties());
+                  newProps.put(PROPERTY_IN_USE, "false");
+                  builder.withProperties(newProps);
+
+                  return builder.build();
+                });
+
+            // The only problem is that we can't make sure we can change all catalog properties
+            // in a transaction, if any of them fails, the metalake is already enabled and the value
+            // in catalog is inconsistent.
+            store
+                .list(Namespace.of(ident.name()), CatalogEntity.class, EntityType.CATALOG)
+                .forEach(
+                    catalogEntity -> {
+                      // update the properties metalake-in-use in catalog to false
+                      GravitinoEnv.getInstance()
+                          .catalogManager()
+                          .updateCatalogProperty(
+                              catalogEntity.nameIdentifier(), PROPERTY_METALAKE_IN_USE, "false");
+
+                      LOG.info(
+                          "Disabled metalake-in-use property for catalog {} success",
+                          catalogEntity.nameIdentifier());
+                    });
             return null;
           } catch (IOException e) {
             throw new RuntimeException(e);
