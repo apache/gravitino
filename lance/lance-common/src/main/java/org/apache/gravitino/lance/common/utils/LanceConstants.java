@@ -37,5 +37,7 @@ public class LanceConstants {
 
   public static final String LANCE_TABLE_REGISTER = "lance.register";
 
+  public static final String LANCE_TABLE_CREATE_EMTPY = "lance.create-empty";
+
   public static final String LANCE_TABLE_FORMAT = "lance";
 }

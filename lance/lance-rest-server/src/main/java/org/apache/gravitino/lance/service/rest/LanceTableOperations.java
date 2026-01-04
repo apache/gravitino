@@ -20,6 +20,7 @@ package org.apache.gravitino.lance.service.rest;
 
 import static org.apache.gravitino.lance.common.ops.NamespaceWrapper.NAMESPACE_DELIMITER_DEFAULT;
 import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_LOCATION;
+import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_TABLE_CREATE_EMTPY;
 import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_TABLE_LOCATION_HEADER;
 import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_TABLE_PROPERTIES_PREFIX_HEADER;
 
@@ -122,6 +123,10 @@ public class LanceTableOperations {
     }
   }
 
+  /**
+   * According to the latest spec, `createEmptyTable` only store the metadata and store the location
+   * of lance table, and will never touch lance storage.
+   */
   @POST
   @Path("/create-empty")
   @Produces("application/json")
@@ -141,6 +146,7 @@ public class LanceTableOperations {
               ? Maps.newHashMap()
               : Maps.newHashMap(request.getProperties());
 
+      props.put(LANCE_TABLE_CREATE_EMTPY, "true");
       CreateEmptyTableResponse response =
           lanceNamespace.asTableOps().createEmptyTable(tableId, delimiter, tableLocation, props);
       return Response.ok(response).build();

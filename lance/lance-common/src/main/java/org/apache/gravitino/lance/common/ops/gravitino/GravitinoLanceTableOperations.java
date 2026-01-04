@@ -154,6 +154,7 @@ public class GravitinoLanceTableOperations implements LanceTableOperations {
   @Override
   public CreateEmptyTableResponse createEmptyTable(
       String tableId, String delimiter, String tableLocation, Map<String, String> tableProperties) {
+    // Create tables only support mode `create`.
     CreateTableResponse response =
         createTable(tableId, ModeEnum.CREATE, delimiter, tableLocation, tableProperties, null);
     CreateEmptyTableResponse emptyTableResponse = new CreateEmptyTableResponse();
