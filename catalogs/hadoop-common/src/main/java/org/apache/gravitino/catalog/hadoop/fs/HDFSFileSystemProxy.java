@@ -93,7 +93,7 @@ public class HDFSFileSystemProxy implements MethodInterceptor {
         this.loginUgi = UserGroupInformation.createRemoteUser(userName);
       }
 
-      UserGroupInformation currentUgi = getCurrentUgi();
+      UserGroupInformation currentUgi = getCurrentUser();
       this.fs =
           currentUgi.doAs(
               (PrivilegedExceptionAction<FileSystem>)
@@ -153,8 +153,8 @@ public class HDFSFileSystemProxy implements MethodInterceptor {
     return subject.getPrincipals(UserPrincipal.class).iterator().next();
   }
 
-  private UserGroupInformation getCurrentUgi() throws Exception {
-    UserGroupInformation currentUgi = UserGroupInformation.getLoginUser();
+  private UserGroupInformation getCurrentUser() throws Exception {
+    UserGroupInformation currentUgi;
     if (impersonationEnabled) {
       Principal principal = getCurrentPrincipal();
       if (principal != null) {
@@ -176,7 +176,7 @@ public class HDFSFileSystemProxy implements MethodInterceptor {
 
   /** Invoke the method on the underlying FileSystem using ugi.doAs. */
   private Object invokeWithUgi(MethodProxy methodProxy, Object[] objects) throws Throwable {
-    UserGroupInformation currentUgi = getCurrentUgi();
+    UserGroupInformation currentUgi = getCurrentUser();
     return currentUgi.doAs(
         (PrivilegedExceptionAction<Object>)
             () -> {
