@@ -25,6 +25,7 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import java.io.IOException;
+import java.security.PrivilegedAction;
 import java.util.Arrays;
 import java.util.Map;
 import java.util.Optional;
@@ -58,6 +59,7 @@ import org.apache.gravitino.rel.expressions.transforms.Transforms;
 import org.apache.gravitino.rel.types.Types;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.conf.HiveConf;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
@@ -67,6 +69,7 @@ import org.junit.jupiter.api.Test;
 @Tag("gravitino-docker-test")
 public class FlinkHiveCatalogIT extends FlinkCommonIT {
   private static final String DEFAULT_HIVE_CATALOG = "test_flink_hive_schema_catalog";
+  private static final String FLINK_USER_NAME = "gravitino";
 
   private static org.apache.gravitino.Catalog hiveCatalog;
 
@@ -103,7 +106,9 @@ public class FlinkHiveCatalogIT extends FlinkCommonIT {
     int numCatalogs = tableEnv.listCatalogs().length;
 
     // Create a new catalog.
+
     String catalogName = "gravitino_hive";
+
     Configuration configuration = new Configuration();
     configuration.set(
         CommonCatalogOptions.CATALOG_TYPE, GravitinoHiveCatalogFactoryOptions.IDENTIFIER);
@@ -115,6 +120,8 @@ public class FlinkHiveCatalogIT extends FlinkCommonIT {
 
     // Check the catalog properties.
     org.apache.gravitino.Catalog gravitinoCatalog = metalake.loadCatalog(catalogName);
+    Assertions.assertEquals(FLINK_USER_NAME, gravitinoCatalog.auditInfo().creator());
+
     Map<String, String> properties = gravitinoCatalog.properties();
     Assertions.assertEquals(hiveMetastoreUri, properties.get(HiveConstants.METASTORE_URIS));
     Map<String, String> flinkProperties =
@@ -604,5 +611,22 @@ public class FlinkHiveCatalogIT extends FlinkCommonIT {
   @Override
   protected boolean supportDropCascade() {
     return true;
+  }
+
+  @Override
+  protected void initFlinkEnv() {
+    try {
+      UserGroupInformation proxyUser =
+          UserGroupInformation.createProxyUser(
+              FLINK_USER_NAME, UserGroupInformation.getCurrentUser());
+      proxyUser.doAs(
+          (PrivilegedAction<Void>)
+              () -> {
+                super.initFlinkEnv();
+                return null;
+              });
+    } catch (IOException e) {
+      throw new RuntimeException("Failed to obtain UGI for Flink user", e);
+    }
   }
 }
