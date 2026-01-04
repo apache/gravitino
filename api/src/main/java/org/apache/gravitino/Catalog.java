@@ -133,12 +133,6 @@ public interface Catalog extends Auditable {
   String PROPERTY_IN_USE = "in-use";
 
   /**
-   * This property indicates whether the metalake that contains this catalog is in use. When a
-   * metalake is disabled, this property is set to {@code false} on all its catalogs.
-   */
-  String PROPERTY_METALAKE_IN_USE = "metalake-in-use";
-
-  /**
    * The property name for the catalog location. This property indicates the physical location of
    * the catalog's data, such as a file path or a URI.
    *

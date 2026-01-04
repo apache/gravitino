@@ -19,6 +19,7 @@
 package org.apache.gravitino.metalake;
 
 import static org.apache.gravitino.Metalake.PROPERTY_IN_USE;
+import static org.apache.gravitino.connector.BaseCatalogPropertiesMetadata.PROPERTY_METALAKE_IN_USE;
 
 import com.google.common.collect.Maps;
 import java.io.Closeable;
@@ -29,7 +30,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
-import org.apache.gravitino.Catalog;
 import org.apache.gravitino.CatalogChange;
 import org.apache.gravitino.Entity.EntityType;
 import org.apache.gravitino.EntityAlreadyExistsException;
@@ -403,7 +403,11 @@ public class MetalakeManager implements MetalakeDispatcher, Closeable {
                           .catalogManager()
                           .alterCatalog(
                               catalogEntity.nameIdentifier(),
-                              CatalogChange.setProperty(Catalog.PROPERTY_METALAKE_IN_USE, "true"));
+                              CatalogChange.setProperty(PROPERTY_METALAKE_IN_USE, "true"));
+
+                      LOG.info(
+                          "Enabled metalake-in-use property for catalog {} success",
+                          catalogEntity.nameIdentifier());
                     });
 
             return null;
@@ -454,7 +458,7 @@ public class MetalakeManager implements MetalakeDispatcher, Closeable {
                           .catalogManager()
                           .alterCatalog(
                               catalogEntity.nameIdentifier(),
-                              CatalogChange.setProperty(Catalog.PROPERTY_METALAKE_IN_USE, "false"));
+                              CatalogChange.setProperty(PROPERTY_METALAKE_IN_USE, "false"));
                     });
             return null;
           } catch (IOException e) {

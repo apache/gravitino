@@ -22,7 +22,6 @@ package org.apache.gravitino.connector;
 import static org.apache.gravitino.Catalog.CLOUD_NAME;
 import static org.apache.gravitino.Catalog.CLOUD_REGION_CODE;
 import static org.apache.gravitino.Catalog.PROPERTY_IN_USE;
-import static org.apache.gravitino.Catalog.PROPERTY_METALAKE_IN_USE;
 import static org.apache.gravitino.Catalog.PROPERTY_PACKAGE;
 
 import com.google.common.base.Preconditions;
@@ -36,6 +35,12 @@ import org.apache.gravitino.annotation.Evolving;
 
 @Evolving
 public abstract class BaseCatalogPropertiesMetadata extends BasePropertiesMetadata {
+
+  /**
+   * This property indicates whether the metalake that contains this catalog is in use. When a
+   * metalake is disabled, this property is set to {@code false} on all its catalogs.
+   */
+  public static String PROPERTY_METALAKE_IN_USE = "metalake-in-use";
 
   public static final PropertiesMetadata BASIC_CATALOG_PROPERTIES_METADATA =
       new BaseCatalogPropertiesMetadata() {

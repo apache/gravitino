@@ -24,6 +24,7 @@ import static org.apache.gravitino.StringIdentifier.DUMMY_ID;
 import static org.apache.gravitino.catalog.PropertiesMetadataHelpers.validatePropertyForAlter;
 import static org.apache.gravitino.catalog.PropertiesMetadataHelpers.validatePropertyForCreate;
 import static org.apache.gravitino.connector.BaseCatalogPropertiesMetadata.BASIC_CATALOG_PROPERTIES_METADATA;
+import static org.apache.gravitino.connector.BaseCatalogPropertiesMetadata.PROPERTY_METALAKE_IN_USE;
 import static org.apache.gravitino.metalake.MetalakeManager.checkMetalake;
 import static org.apache.gravitino.metalake.MetalakeManager.metalakeInUse;
 
@@ -84,6 +85,7 @@ import org.apache.gravitino.exceptions.CatalogAlreadyExistsException;
 import org.apache.gravitino.exceptions.CatalogInUseException;
 import org.apache.gravitino.exceptions.CatalogNotInUseException;
 import org.apache.gravitino.exceptions.GravitinoRuntimeException;
+import org.apache.gravitino.exceptions.MetalakeNotInUseException;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
@@ -555,6 +557,12 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
                 CatalogEntity.class,
                 EntityType.CATALOG,
                 catalog -> {
+                  boolean metalakeInuse = metalakeInUseByCatalogProperty(catalog.getProperties());
+                  if (!metalakeInuse) {
+                    throw new MetalakeNotInUseException(
+                        "Metalake %s is not in use, please enable it first", ident);
+                  }
+
                   CatalogEntity.Builder newCatalogBuilder =
                       newCatalogBuilder(ident.namespace(), catalog);
 
@@ -578,8 +586,6 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
   @Override
   public void disableCatalog(NameIdentifier ident) throws NoSuchCatalogException {
     NameIdentifier metalakeIdent = NameIdentifier.of(ident.namespace().levels());
-    checkMetalake(metalakeIdent, store);
-
     TreeLockUtils.doWithTreeLock(
         metalakeIdent,
         LockType.WRITE,
@@ -590,6 +596,12 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
                 CatalogEntity.class,
                 EntityType.CATALOG,
                 catalog -> {
+                  boolean metalakeInuse = metalakeInUseByCatalogProperty(catalog.getProperties());
+                  if (!metalakeInuse) {
+                    throw new MetalakeNotInUseException(
+                        "Metalake %s is not in use, please enable it first", ident);
+                  }
+
                   CatalogEntity.Builder newCatalogBuilder =
                       newCatalogBuilder(ident.namespace(), catalog);
 
@@ -1238,5 +1250,10 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
 
     // If the provider is not "hadoop", we assume it is already a fileset catalog entity.
     return entity;
+  }
+
+  private boolean metalakeInUseByCatalogProperty(Map<String, String> catalogProperties) {
+    String metaLakeInUseStr = catalogProperties.getOrDefault(PROPERTY_METALAKE_IN_USE, "true");
+    return Boolean.parseBoolean(metaLakeInUseStr);
   }
 }

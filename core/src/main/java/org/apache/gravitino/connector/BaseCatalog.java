@@ -18,6 +18,8 @@
  */
 package org.apache.gravitino.connector;
 
+import static org.apache.gravitino.connector.BaseCatalogPropertiesMetadata.PROPERTY_METALAKE_IN_USE;
+
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Maps;
 import java.io.Closeable;
@@ -201,8 +203,7 @@ public abstract class BaseCatalog<T extends BaseCatalog>
     }
 
     boolean metalakeInuse =
-        Boolean.parseBoolean(
-            catalogProperties.getOrDefault(Catalog.PROPERTY_METALAKE_IN_USE, "true"));
+        Boolean.parseBoolean(catalogProperties.getOrDefault(PROPERTY_METALAKE_IN_USE, "true"));
     if (!metalakeInuse) {
       throw new MetalakeNotInUseException(
           "The metalake that holds catalog %s is not in use", catalogEntity.name());

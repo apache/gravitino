@@ -18,6 +18,8 @@
  */
 package org.apache.gravitino.connector;
 
+import static org.apache.gravitino.connector.BaseCatalogPropertiesMetadata.PROPERTY_METALAKE_IN_USE;
+
 import java.time.Instant;
 import java.util.HashMap;
 import java.util.Map;
@@ -59,7 +61,7 @@ public class TestBaseCatalogInUse {
 
   private Map<String, String> props(boolean metalakeInUse, boolean catalogInUse) {
     Map<String, String> props = new HashMap<>();
-    props.put(Catalog.PROPERTY_METALAKE_IN_USE, String.valueOf(metalakeInUse));
+    props.put(PROPERTY_METALAKE_IN_USE, String.valueOf(metalakeInUse));
     props.put(Catalog.PROPERTY_IN_USE, String.valueOf(catalogInUse));
     return props;
   }
