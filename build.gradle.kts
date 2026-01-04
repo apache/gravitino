@@ -98,14 +98,7 @@ licenseReport {
   renderers = arrayOf<ReportRenderer>(InventoryHtmlReportRenderer("report.html", "Backend"))
   filters = arrayOf<DependencyFilter>(LicenseBundleNormalizer())
 }
-repositories {
-  mavenCentral()
-  // Fallback repository for transient Maven Central 403 errors in CI.
-  // This improves build stability without changing dependency versions or semantics.
-  maven {
-    url = uri("https://repository.apache.org/content/groups/public/")
-  }
-}
+repositories { mavenCentral() }
 
 allprojects {
   // Gravitino Python client project didn't need to apply the Spotless plugin
