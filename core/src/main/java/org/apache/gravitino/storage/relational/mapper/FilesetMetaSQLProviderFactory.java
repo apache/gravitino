@@ -56,6 +56,13 @@ public class FilesetMetaSQLProviderFactory {
     return getProvider().listFilesetPOsBySchemaId(schemaId);
   }
 
+  public static String listFilesetPOsByFullQualifiedName(
+      @Param("metalakeName") String metalakeName,
+      @Param("catalogName") String catalogName,
+      @Param("schemaName") String schemaName) {
+    return getProvider().listFilesetPOsByFullQualifiedName(metalakeName, catalogName, schemaName);
+  }
+
   public static String listFilesetPOsByFilesetIds(@Param("filesetIds") List<Long> filesetIds) {
     return getProvider().listFilesetPOsByFilesetIds(filesetIds);
   }
@@ -72,6 +79,15 @@ public class FilesetMetaSQLProviderFactory {
 
   public static String selectFilesetMetaById(@Param("filesetId") Long filesetId) {
     return getProvider().selectFilesetMetaById(filesetId);
+  }
+
+  public static String selectFilesetByFullQualifiedName(
+      @Param("metalakeName") String metalakeName,
+      @Param("catalogName") String catalogName,
+      @Param("schemaName") String schemaName,
+      @Param("filesetName") String filesetName) {
+    return getProvider()
+        .selectFilesetByFullQualifiedName(metalakeName, catalogName, schemaName, filesetName);
   }
 
   public static String insertFilesetMeta(@Param("filesetMeta") FilesetPO filesetPO) {

@@ -64,6 +64,13 @@ public class TopicMetaSQLProviderFactory {
     return getProvider().listTopicPOsBySchemaId(schemaId);
   }
 
+  public static String listTopicPOsByFullQualifiedName(
+      @Param("metalakeName") String metalakeName,
+      @Param("catalogName") String catalogName,
+      @Param("schemaName") String schemaName) {
+    return getProvider().listTopicPOsByFullQualifiedName(metalakeName, catalogName, schemaName);
+  }
+
   public static String listTopicPOsByTopicIds(@Param("topicIds") List<Long> topicIds) {
     return getProvider().listTopicPOsByTopicIds(topicIds);
   }
@@ -71,6 +78,15 @@ public class TopicMetaSQLProviderFactory {
   public static String selectTopicMetaBySchemaIdAndName(
       @Param("schemaId") Long schemaId, @Param("topicName") String topicName) {
     return getProvider().selectTopicMetaBySchemaIdAndName(schemaId, topicName);
+  }
+
+  public static String selectTopicByFullQualifiedName(
+      @Param("metalakeName") String metalakeName,
+      @Param("catalogName") String catalogName,
+      @Param("schemaName") String schemaName,
+      @Param("topicName") String topicName) {
+    return getProvider()
+        .selectTopicByFullQualifiedName(metalakeName, catalogName, schemaName, topicName);
   }
 
   public static String selectTopicMetaById(@Param("topicId") Long topicId) {

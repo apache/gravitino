@@ -41,6 +41,14 @@ public interface TableMetaMapper {
   @SelectProvider(type = TableMetaSQLProviderFactory.class, method = "listTablePOsBySchemaId")
   List<TablePO> listTablePOsBySchemaId(@Param("schemaId") Long schemaId);
 
+  @SelectProvider(
+      type = TableMetaSQLProviderFactory.class,
+      method = "listTablePOsByFullQualifiedName")
+  List<TablePO> listTablePOsByFullQualifiedName(
+      @Param("metalakeName") String metalakeName,
+      @Param("catalogName") String catalogName,
+      @Param("schemaName") String schemaName);
+
   @SelectProvider(type = TableMetaSQLProviderFactory.class, method = "listTablePOsByTableIds")
   List<TablePO> listTablePOsByTableIds(@Param("tableIds") List<Long> tableIds);
 
@@ -55,6 +63,15 @@ public interface TableMetaMapper {
       method = "selectTableMetaBySchemaIdAndName")
   TablePO selectTableMetaBySchemaIdAndName(
       @Param("schemaId") Long schemaId, @Param("tableName") String name);
+
+  @SelectProvider(
+      type = TableMetaSQLProviderFactory.class,
+      method = "selectTableByFullQualifiedName")
+  TablePO selectTableByFullQualifiedName(
+      @Param("metalakeName") String metalakeName,
+      @Param("catalogName") String catalogName,
+      @Param("schemaName") String schemaName,
+      @Param("tableName") String tableName);
 
   @InsertProvider(type = TableMetaSQLProviderFactory.class, method = "insertTableMeta")
   void insertTableMeta(@Param("tableMeta") TablePO tablePO);

@@ -51,6 +51,11 @@ public class SchemaMetaSQLProviderFactory {
 
   static class SchemaMetaH2Provider extends SchemaMetaBaseSQLProvider {}
 
+  public static String listSchemaPOsByFullQualifiedName(
+      @Param("metalakeName") String metalakeName, @Param("catalogName") String catalogName) {
+    return getProvider().listSchemaPOsByFullQualifiedName(metalakeName, catalogName);
+  }
+
   public static String listSchemaPOsBySchemaIds(@Param("schemaIds") List<Long> schemaIds) {
     return getProvider().listSchemaPOsBySchemaIds(schemaIds);
   }
@@ -67,6 +72,13 @@ public class SchemaMetaSQLProviderFactory {
   public static String selectSchemaMetaByCatalogIdAndName(
       @Param("catalogId") Long catalogId, @Param("schemaName") String name) {
     return getProvider().selectSchemaMetaByCatalogIdAndName(catalogId, name);
+  }
+
+  public static String selectSchemaByFullQualifiedName(
+      @Param("metalakeName") String metalakeName,
+      @Param("catalogName") String catalogName,
+      @Param("schemaName") String schemaName) {
+    return getProvider().selectSchemaByFullQualifiedName(metalakeName, catalogName, schemaName);
   }
 
   public static String selectSchemaMetaById(@Param("schemaId") Long schemaId) {

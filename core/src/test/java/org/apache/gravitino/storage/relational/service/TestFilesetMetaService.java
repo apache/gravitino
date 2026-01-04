@@ -37,8 +37,13 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
+import org.apache.commons.lang3.reflect.FieldUtils;
+import org.apache.commons.lang3.tuple.Pair;
+import org.apache.gravitino.Config;
+import org.apache.gravitino.Configs;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
+import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
@@ -55,7 +60,7 @@ import org.apache.ibatis.session.SqlSession;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.TestTemplate;
-import org.testcontainers.shaded.org.apache.commons.lang3.tuple.Pair;
+import org.mockito.Mockito;
 
 public class TestFilesetMetaService extends TestJDBCBackend {
   private final String metalakeName = GravitinoITUtils.genRandomName("tst_metalake");
@@ -63,7 +68,10 @@ public class TestFilesetMetaService extends TestJDBCBackend {
   private final String schemaName = GravitinoITUtils.genRandomName("tst_fs_schema");
 
   @BeforeEach
-  public void prepare() throws IOException {
+  public void prepare() throws IOException, IllegalAccessException {
+    Config config = Mockito.mock(Config.class);
+    Mockito.when(config.get(Configs.CACHE_ENABLED)).thenReturn(false);
+    FieldUtils.writeField(GravitinoEnv.getInstance(), "config", config, true);
     createAndInsertMakeLake(metalakeName);
     createAndInsertCatalog(metalakeName, catalogName);
     createAndInsertSchema(metalakeName, catalogName, schemaName);

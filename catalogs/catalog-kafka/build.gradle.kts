@@ -46,6 +46,7 @@ dependencies {
 
   testImplementation(libs.commons.io)
   testImplementation(libs.curator.test)
+  testImplementation(libs.commons.lang3)
   testImplementation(libs.junit.jupiter.api)
   testImplementation(libs.kafka)
   testImplementation(libs.mockito.core)

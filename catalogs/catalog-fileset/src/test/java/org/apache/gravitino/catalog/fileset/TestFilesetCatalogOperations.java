@@ -111,6 +111,7 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.LocalFileSystem;
 import org.apache.hadoop.fs.Path;
+import org.awaitility.Awaitility;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
@@ -121,7 +122,6 @@ import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.MockedStatic;
 import org.mockito.Mockito;
-import org.testcontainers.shaded.org.awaitility.Awaitility;
 
 public class TestFilesetCatalogOperations {
 
@@ -216,7 +216,7 @@ public class TestFilesetCatalogOperations {
   }
 
   @BeforeAll
-  public static void setUp() {
+  public static void setUp() throws IllegalAccessException {
     Config config = Mockito.mock(Config.class);
     when(config.get(ENTITY_STORE)).thenReturn(RELATIONAL_ENTITY_STORE);
     when(config.get(ENTITY_RELATIONAL_STORE)).thenReturn(DEFAULT_ENTITY_RELATIONAL_STORE);
@@ -336,6 +336,8 @@ public class TestFilesetCatalogOperations {
     schemaMetaServiceMockedStatic
         .when(SchemaMetaService::getInstance)
         .thenReturn(spySchemaMetaService);
+
+    FieldUtils.writeField(GravitinoEnv.getInstance(), "config", config, true);
   }
 
   @AfterAll
