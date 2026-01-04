@@ -29,11 +29,10 @@ import org.apache.gravitino.integration.test.container.HiveContainer;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.spark.sql.SparkSession;
-import org.junit.jupiter.api.TestInstance;
+import org.awaitility.Awaitility;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testcontainers.containers.Container;
-import org.testcontainers.shaded.org.awaitility.Awaitility;
 
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 public class CatalogHiveS3IT extends CatalogHive3IT {

@@ -149,6 +149,7 @@ dependencies {
     exclude("org.apache.hadoop")
   }
   testImplementation(libs.slf4j.api)
+  testImplementation(libs.awaitility)
   testImplementation(libs.junit.jupiter.api)
   testImplementation(libs.mysql.driver)
   testImplementation(libs.postgresql.driver)
