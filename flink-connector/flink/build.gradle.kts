@@ -96,6 +96,7 @@ dependencies {
   testImplementation(libs.testcontainers.mysql)
   testImplementation(libs.metrics.core)
   testImplementation(libs.flinkjdbc)
+  testImplementation(libs.minikdc)
 
   testImplementation("org.apache.iceberg:iceberg-core:$icebergVersion")
   testImplementation("org.apache.iceberg:iceberg-hive-metastore:$icebergVersion")
