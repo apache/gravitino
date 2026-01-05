@@ -21,6 +21,7 @@ package org.apache.gravitino.metalake;
 import static org.apache.gravitino.Metalake.PROPERTY_IN_USE;
 import static org.apache.gravitino.connector.BaseCatalogPropertiesMetadata.PROPERTY_METALAKE_IN_USE;
 
+import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import java.io.Closeable;
 import java.io.IOException;
@@ -393,21 +394,7 @@ public class MetalakeManager implements MetalakeDispatcher, Closeable {
             // The only problem is that we can't make sure we can change all catalog properties
             // in a transaction. If any catalog property update fails, the metalake is already
             // enabled but catalog properties remain inconsistent.
-            store
-                .list(Namespace.of(ident.name()), CatalogEntity.class, EntityType.CATALOG)
-                .forEach(
-                    catalogEntity -> {
-                      // update the properties metalake-in-use in catalog to true
-                      GravitinoEnv.getInstance()
-                          .catalogManager()
-                          .updateCatalogProperty(
-                              catalogEntity.nameIdentifier(), PROPERTY_METALAKE_IN_USE, "true");
-
-                      LOG.info(
-                          "Enabled metalake-in-use property for catalog {} success",
-                          catalogEntity.nameIdentifier());
-                    });
-
+            updateCatalogsInUseStatus(ident, "true");
             return null;
           } catch (IOException e) {
             throw new RuntimeException(e);
@@ -447,20 +434,7 @@ public class MetalakeManager implements MetalakeDispatcher, Closeable {
             // The only problem is that we can't make sure we can change all catalog properties
             // in a transaction, if any of them fails, the metalake is already enabled and the value
             // in catalog is inconsistent.
-            store
-                .list(Namespace.of(ident.name()), CatalogEntity.class, EntityType.CATALOG)
-                .forEach(
-                    catalogEntity -> {
-                      // update the properties metalake-in-use in catalog to false
-                      GravitinoEnv.getInstance()
-                          .catalogManager()
-                          .updateCatalogProperty(
-                              catalogEntity.nameIdentifier(), PROPERTY_METALAKE_IN_USE, "false");
-
-                      LOG.info(
-                          "Disabled metalake-in-use property for catalog {} success",
-                          catalogEntity.nameIdentifier());
-                    });
+            updateCatalogsInUseStatus(ident, "false");
             return null;
           } catch (IOException e) {
             throw new RuntimeException(e);
@@ -522,5 +496,39 @@ public class MetalakeManager implements MetalakeDispatcher, Closeable {
     }
 
     return builder.withProperties(newProps);
+  }
+
+  private void updateCatalogsInUseStatus(NameIdentifier ident, String value) throws IOException {
+    List<NameIdentifier> failedCatalogs = Lists.newArrayList();
+    store
+        .list(Namespace.of(ident.name()), CatalogEntity.class, EntityType.CATALOG)
+        .forEach(
+            catalogEntity -> {
+              try {
+                // update the properties metalake-in-use in catalog to true
+                GravitinoEnv.getInstance()
+                    .catalogManager()
+                    .updateCatalogProperty(
+                        catalogEntity.nameIdentifier(), PROPERTY_METALAKE_IN_USE, value);
+
+                LOG.info(
+                    "Enabled or disable metalake-in-use property for catalog {} success",
+                    catalogEntity.nameIdentifier());
+              } catch (Exception e) {
+                // Only log the error and continue to update other catalogs
+                LOG.error(
+                    "Failed to enable or disable metalake-in-use property for catalog {}",
+                    catalogEntity.nameIdentifier(),
+                    e);
+                failedCatalogs.add(catalogEntity.nameIdentifier());
+              }
+            });
+
+    if (!failedCatalogs.isEmpty()) {
+      LOG.error(
+          "Total failed catalogs when update properties: {}",
+          failedCatalogs.stream().map(NameIdentifier::toString).collect(Collectors.joining(", ")));
+      throw new RuntimeException("Failed to update in use status of the following catalogs.");
+    }
   }
 }
