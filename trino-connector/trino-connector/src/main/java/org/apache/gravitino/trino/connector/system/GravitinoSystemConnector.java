@@ -167,6 +167,7 @@ public class GravitinoSystemConnector implements Connector {
       return Collections.emptyList();
     }
 
+    @SuppressWarnings("removal")
     @Override
     public Object getInfo() {
       return this;

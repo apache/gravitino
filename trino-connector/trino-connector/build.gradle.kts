@@ -26,6 +26,21 @@ repositories {
   mavenCentral()
 }
 
+val trinoVersion = 478
+
+java {
+  println("Building Trino Connector for Trino version: $trinoVersion")
+  if (trinoVersion.toInt() >= 478) {
+    toolchain.languageVersion.set(JavaLanguageVersion.of(24))
+  } else if (trinoVersion.toInt() >= 448) {
+    toolchain.languageVersion.set(JavaLanguageVersion.of(22))
+  } else if (trinoVersion.toInt() >= 436) {
+    toolchain.languageVersion.set(JavaLanguageVersion.of(21))
+  } else if (trinoVersion.toInt() >= 435) {
+    toolchain.languageVersion.set(JavaLanguageVersion.of(21))
+  }
+}
+
 dependencies {
   implementation(project(":catalogs:catalog-common"))
   implementation(project(":clients:client-java-runtime", configuration = "shadow"))
@@ -33,19 +48,19 @@ dependencies {
   implementation(libs.bundles.log4j)
   implementation(libs.commons.collections4)
   implementation(libs.commons.lang3)
-  implementation(libs.trino.jdbc)
+  implementation("io.trino:trino-jdbc:$trinoVersion")
   compileOnly(libs.airlift.resolver)
-  compileOnly(libs.trino.spi) {
+  compileOnly("io.trino:trino-spi:$trinoVersion") {
     exclude("org.apache.logging.log4j")
   }
   testImplementation(libs.awaitility)
   testImplementation(libs.mockito.core)
   testImplementation(libs.mysql.driver)
-  testImplementation(libs.trino.memory) {
+  testImplementation("io.trino:trino-memory:$trinoVersion") {
     exclude("org.antlr")
     exclude("org.apache.logging.log4j")
   }
-  testImplementation(libs.trino.testing) {
+  testImplementation("io.trino:trino-testing:$trinoVersion") {
     exclude("org.apache.logging.log4j")
   }
   testRuntimeOnly(libs.junit.jupiter.engine)

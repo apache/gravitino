@@ -253,6 +253,7 @@ public class GravitinoMetadata implements ConnectorMetadata {
     return new GravitinoInsertTableHandle(insertTableHandle);
   }
 
+  @SuppressWarnings("deprecation")
   @Override
   public Optional<ConnectorOutputMetadata> finishInsert(
       ConnectorSession session,
