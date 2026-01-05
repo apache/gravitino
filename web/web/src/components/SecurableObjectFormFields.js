@@ -438,6 +438,32 @@ export default function SecurableObjectFormFields({ fieldName, fieldKey, metalak
     return selectedItems?.length && selectedItems.length < groupValues.length
   }
 
+  const getAllOptionValues = item => {
+    const groups = item === 'allowPrivileges' ? allowFilteredGroups : denyFilteredGroups
+    
+return (groups || []).flatMap(g => (g.options || []).map(o => o.value))
+  }
+
+  const handleSelectAll = (checked, item) => {
+    const allValues = getAllOptionValues(item)
+    setFieldValue(['securableObjects', fieldName, item], checked ? allValues : [])
+  }
+
+  const handleSelectAllChecked = item => {
+    const allValues = getAllOptionValues(item)
+    const selectedItems = getFieldValue(['securableObjects', fieldName, item]) || []
+    
+return allValues.length > 0 && allValues.every(v => selectedItems?.includes(v))
+  }
+
+  const handleSelectAllIndeterminate = item => {
+    const allValues = getAllOptionValues(item)
+    const selectedItems = getFieldValue(['securableObjects', fieldName, item]) || []
+    const selectedInAll = (selectedItems || []).filter(v => allValues.includes(v))
+    
+return selectedInAll.length > 0 && selectedInAll.length < allValues.length
+  }
+
   const allowSelected = getFieldValue(['securableObjects', fieldName, 'allowPrivileges']) || []
   const denySelected = getFieldValue(['securableObjects', fieldName, 'denyPrivileges']) || []
   const groupedPrivilegeOptions = privilegeGroupsMap[fieldName] || []
@@ -455,6 +481,9 @@ export default function SecurableObjectFormFields({ fieldName, fieldKey, metalak
       options: group.options.filter(opt => !allowSelected.includes(opt.value))
     }))
     .filter(group => group.options.length > 0)
+
+  const allowAllOptionValues = getAllOptionValues('allowPrivileges')
+  const denyAllOptionValues = getAllOptionValues('denyPrivileges')
 
   return (
     <div className='flex flex-col gap-2'>
@@ -689,14 +718,12 @@ export default function SecurableObjectFormFields({ fieldName, fieldKey, metalak
               const searchText = searchTextMap[fieldName] || ''
 
               const displayedOptions = searchText
-                ? optionsAll
-                    .filter(o =>
-                      String(o.label || '')
-                        .toLowerCase()
-                        .includes(String(searchText).toLowerCase())
-                    )
-                    .slice(0, 10)
-                : optionsAll.slice(0, 10)
+                ? optionsAll.filter(o =>
+                    String(o.label || '')
+                      .toLowerCase()
+                      .includes(String(searchText).toLowerCase())
+                  )
+                : optionsAll
 
               return (
                 <Select
@@ -765,6 +792,28 @@ export default function SecurableObjectFormFields({ fieldName, fieldKey, metalak
             style={{ width: '100%' }}
             loading={!!privilegeGroupsLoading[fieldName]}
           >
+            {allowAllOptionValues.length > 0 && (
+              <OptGroup
+                key='__select_all_allow__'
+                label={
+                  <Checkbox
+                    className='text-base font-medium text-black'
+                    checked={handleSelectAllChecked('allowPrivileges')}
+                    indeterminate={handleSelectAllIndeterminate('allowPrivileges')}
+                    onChange={e => handleSelectAll(e.target.checked, 'allowPrivileges')}
+                  >
+                    <span className='ant-select-item-group text-base font-semibold text-black'>Select All</span>
+                  </Checkbox>
+                }
+              >
+                <Option
+                  key='__select_all_allow_placeholder__'
+                  value='__select_all_allow_placeholder__'
+                  disabled
+                  style={{ height: 0, padding: 0, margin: 0, lineHeight: 0, display: 'none' }}
+                />
+              </OptGroup>
+            )}
             {allowFilteredGroups.map(group => (
               <OptGroup
                 key={group.label}
@@ -794,6 +843,28 @@ export default function SecurableObjectFormFields({ fieldName, fieldKey, metalak
             style={{ width: '100%' }}
             loading={!!privilegeGroupsLoading[fieldName]}
           >
+            {denyAllOptionValues.length > 0 && (
+              <OptGroup
+                key='__select_all_deny__'
+                label={
+                  <Checkbox
+                    className='text-base font-medium text-black'
+                    checked={handleSelectAllChecked('denyPrivileges')}
+                    indeterminate={handleSelectAllIndeterminate('denyPrivileges')}
+                    onChange={e => handleSelectAll(e.target.checked, 'denyPrivileges')}
+                  >
+                    <span className='ant-select-item-group text-base font-semibold text-black'>Select All</span>
+                  </Checkbox>
+                }
+              >
+                <Option
+                  key='__select_all_deny_placeholder__'
+                  value='__select_all_deny_placeholder__'
+                  disabled
+                  style={{ height: 0, padding: 0, margin: 0, lineHeight: 0, display: 'none' }}
+                />
+              </OptGroup>
+            )}
             {denyFilteredGroups.map(group => (
               <OptGroup
                 key={group.label}

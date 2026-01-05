@@ -32,6 +32,7 @@ import { cn } from '@/lib/utils/tailwind'
 import { createRole, getRoleDetails, updateRolePrivileges } from '@/lib/store/roles'
 import { to } from '@/lib/utils'
 import { useAppDispatch } from '@/lib/hooks/useStore'
+import { isArray } from '@/lib/utils/is'
 
 const { Paragraph } = Typography
 
@@ -215,7 +216,7 @@ export default function CreateRoleDialog({ ...props }) {
 
       // Lightweight internal check: avoid emitting debug logs in production
       const titleValue = form.getFieldValue(['securableObjects', fname, 'fullName'])
-      const fullNameStr = titleValue || ''
+      const fullNameStr = isArray(titleValue) ? titleValue.join('.') : titleValue
       const indexLabel = Number(fname) + 1
       const title = fullNameStr ? `Securable Object - ${fullNameStr}` : `Securable Object - ${indexLabel}`
 

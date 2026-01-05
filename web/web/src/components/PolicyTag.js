@@ -165,7 +165,7 @@ export default function PolicyTag({ ...props }) {
           policyElem
         )
       })}
-      {policiesForEntity?.length === 0 && <span>No policies</span>}
+      {policiesForEntity?.length === 0 && <span>No Policies</span>}
       {inputVisible && !readOnly && (
         <Select
           size='small'
