@@ -124,8 +124,8 @@ public class LanceTableOperations {
   }
 
   /**
-   * According to the latest spec, `createEmptyTable` only store the metadata and store the location
-   * of lance table, and will never touch lance storage.
+   * According to the latest spec, createEmptyTable only stores the table metadata including its
+   * location, and will never touch lance storage.
    */
   @POST
   @Path("/create-empty")
