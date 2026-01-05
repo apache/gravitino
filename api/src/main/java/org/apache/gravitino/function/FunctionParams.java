@@ -38,7 +38,7 @@ public class FunctionParams {
    * @return A copy of the given array of {@link FunctionParam} instances.
    */
   public static FunctionParam[] of(FunctionParam... params) {
-    return Arrays.copyOf(params, params.length);
+    return params.length == 0 ? new FunctionParam[0] : Arrays.copyOf(params, params.length);
   }
 
   /**

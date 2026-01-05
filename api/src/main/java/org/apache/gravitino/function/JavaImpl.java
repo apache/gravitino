@@ -32,7 +32,9 @@ public class JavaImpl extends FunctionImpl {
       FunctionResources resources,
       Map<String, String> properties) {
     super(Language.JAVA, runtime, resources, properties);
-    Preconditions.checkArgument(className != null, "Java class name cannot be null");
+    Preconditions.checkArgument(
+        org.apache.commons.lang3.StringUtils.isNotBlank(className),
+        "Java class name cannot be null or empty");
     this.className = className;
   }
 

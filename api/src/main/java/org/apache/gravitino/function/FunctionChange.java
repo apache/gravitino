@@ -26,6 +26,7 @@ import org.apache.gravitino.annotation.Evolving;
 /** Represents a change that can be applied to a function. */
 @Evolving
 public interface FunctionChange {
+  FunctionParam[] EMPTY_PARAMS = new FunctionParam[0];
 
   /**
    * Create a {@link FunctionChange} to update the comment of a function.
@@ -99,7 +100,9 @@ public interface FunctionChange {
     private final String newComment;
 
     UpdateComment(String newComment) {
-      Preconditions.checkArgument(newComment != null, "New comment cannot be null");
+      Preconditions.checkArgument(
+          org.apache.commons.lang3.StringUtils.isNotBlank(newComment),
+          "New comment cannot be null or empty");
       this.newComment = newComment;
     }
 
@@ -185,7 +188,7 @@ public interface FunctionChange {
      * @return The parameters that identify the definition to remove.
      */
     public FunctionParam[] parameters() {
-      return Arrays.copyOf(parameters, parameters.length);
+      return parameters.length == 0 ? EMPTY_PARAMS : Arrays.copyOf(parameters, parameters.length);
     }
 
     @Override
@@ -227,7 +230,7 @@ public interface FunctionChange {
      * @return The parameters that identify the definition to update.
      */
     public FunctionParam[] parameters() {
-      return Arrays.copyOf(parameters, parameters.length);
+      return parameters.length == 0 ? EMPTY_PARAMS : Arrays.copyOf(parameters, parameters.length);
     }
 
     /**
@@ -293,7 +296,7 @@ public interface FunctionChange {
      * @return The parameters that identify the definition to update.
      */
     public FunctionParam[] parameters() {
-      return Arrays.copyOf(parameters, parameters.length);
+      return parameters.length == 0 ? EMPTY_PARAMS : Arrays.copyOf(parameters, parameters.length);
     }
 
     /**
@@ -359,7 +362,7 @@ public interface FunctionChange {
      * @return The parameters that identify the definition to update.
      */
     public FunctionParam[] parameters() {
-      return Arrays.copyOf(parameters, parameters.length);
+      return parameters.length == 0 ? EMPTY_PARAMS : Arrays.copyOf(parameters, parameters.length);
     }
 
     /**

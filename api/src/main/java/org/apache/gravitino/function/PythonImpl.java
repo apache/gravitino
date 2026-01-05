@@ -34,7 +34,9 @@ public class PythonImpl extends FunctionImpl {
       FunctionResources resources,
       Map<String, String> properties) {
     super(Language.PYTHON, runtime, resources, properties);
-    Preconditions.checkArgument(handler != null, "Python handler cannot be null");
+    Preconditions.checkArgument(
+        org.apache.commons.lang3.StringUtils.isNotBlank(handler),
+        "Python handler cannot be null or empty");
     this.handler = handler;
     this.codeBlock = codeBlock;
   }

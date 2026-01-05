@@ -53,11 +53,6 @@ public class FunctionResources {
    * @return A {@link FunctionResources} instance.
    */
   public static FunctionResources of(String[] jars, String[] files, String[] archives) {
-    if ((jars == null || jars.length == 0)
-        && (files == null || files.length == 0)
-        && (archives == null || archives.length == 0)) {
-      return new FunctionResources(EMPTY, EMPTY, EMPTY);
-    }
     return new FunctionResources(jars, files, archives);
   }
 
@@ -65,21 +60,21 @@ public class FunctionResources {
    * @return The jar resources.
    */
   public String[] jars() {
-    return Arrays.copyOf(jars, jars.length);
+    return jars.length == 0 ? EMPTY : Arrays.copyOf(jars, jars.length);
   }
 
   /**
    * @return The file resources.
    */
   public String[] files() {
-    return Arrays.copyOf(files, files.length);
+    return files.length == 0 ? EMPTY : Arrays.copyOf(files, files.length);
   }
 
   /**
    * @return The archive resources.
    */
   public String[] archives() {
-    return Arrays.copyOf(archives, archives.length);
+    return archives.length == 0 ? EMPTY : Arrays.copyOf(archives, archives.length);
   }
 
   @Override

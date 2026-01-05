@@ -18,8 +18,10 @@
  */
 package org.apache.gravitino.function;
 
+import com.google.common.base.Preconditions;
 import java.util.Arrays;
 import java.util.Map;
+import org.apache.commons.lang3.ArrayUtils;
 
 /** Helper methods to create {@link FunctionImpl} instances. */
 public class FunctionImpls {
@@ -31,6 +33,7 @@ public class FunctionImpls {
    * @return A copy of the input array.
    */
   public static FunctionImpl[] of(FunctionImpl... impls) {
+    Preconditions.checkArgument(ArrayUtils.isNotEmpty(impls), "Impls cannot be null or empty");
     return Arrays.copyOf(impls, impls.length);
   }
 

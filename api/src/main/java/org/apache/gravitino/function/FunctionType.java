@@ -19,10 +19,12 @@
 
 package org.apache.gravitino.function;
 
+import com.google.common.base.Preconditions;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.annotation.Evolving;
 
 /** Function type supported by Gravitino. */
@@ -42,7 +44,7 @@ public enum FunctionType {
   static {
     Map<String, FunctionType> map = new HashMap<>();
     for (FunctionType value : values()) {
-      map.put(value.typeName(), value);
+      map.put(value.typeName().toLowerCase(Locale.ROOT), value);
     }
     map.put("agg", AGGREGATE);
     NAME_TO_TYPE = Collections.unmodifiableMap(map);
@@ -56,11 +58,10 @@ public enum FunctionType {
    * @throws IllegalArgumentException if the value cannot be parsed.
    */
   public static FunctionType fromString(String type) {
-    FunctionType parsed = NAME_TO_TYPE.get(type.toLowerCase(Locale.ROOT));
-    if (parsed == null) {
-      throw new IllegalArgumentException("Unknown function type: " + type);
-    }
-    return parsed;
+    Preconditions.checkArgument(
+        StringUtils.isNotBlank(type) && NAME_TO_TYPE.containsKey(type.toLowerCase(Locale.ROOT)),
+        "Invalid function type: " + type);
+    return NAME_TO_TYPE.get(type.toLowerCase(Locale.ROOT));
   }
 
   /**

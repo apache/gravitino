@@ -20,6 +20,7 @@ package org.apache.gravitino.function;
 
 import com.google.common.base.Preconditions;
 import java.util.Arrays;
+import org.apache.commons.lang3.ArrayUtils;
 
 /** Helper methods to create {@link FunctionDefinition} instances. */
 public final class FunctionDefinitions {
@@ -33,6 +34,8 @@ public final class FunctionDefinitions {
    * @return An array of {@link FunctionDefinition} instances.
    */
   public static FunctionDefinition[] of(FunctionDefinition... definitions) {
+    Preconditions.checkArgument(
+        ArrayUtils.isNotEmpty(definitions), "Definitions cannot be null or empty");
     return Arrays.copyOf(definitions, definitions.length);
   }
 
@@ -52,20 +55,21 @@ public final class FunctionDefinitions {
     private final FunctionImpl[] impls;
 
     FunctionDefinitionImpl(FunctionParam[] parameters, FunctionImpl[] impls) {
-      this.parameters = parameters == null ? new FunctionParam[0] : copy(parameters);
+      this.parameters =
+          parameters == null ? new FunctionParam[0] : Arrays.copyOf(parameters, parameters.length);
       Preconditions.checkArgument(
           impls != null && impls.length > 0, "Impls cannot be null or empty");
-      this.impls = copy(impls);
+      this.impls = Arrays.copyOf(impls, impls.length);
     }
 
     @Override
     public FunctionParam[] parameters() {
-      return copy(parameters);
+      return Arrays.copyOf(parameters, parameters.length);
     }
 
     @Override
     public FunctionImpl[] impls() {
-      return copy(impls);
+      return Arrays.copyOf(impls, impls.length);
     }
 
     @Override
@@ -94,14 +98,6 @@ public final class FunctionDefinitions {
           + ", impls="
           + Arrays.toString(impls)
           + '}';
-    }
-
-    private static FunctionParam[] copy(FunctionParam[] params) {
-      return Arrays.copyOf(params, params.length);
-    }
-
-    private static FunctionImpl[] copy(FunctionImpl[] impls) {
-      return Arrays.copyOf(impls, impls.length);
     }
   }
 }
