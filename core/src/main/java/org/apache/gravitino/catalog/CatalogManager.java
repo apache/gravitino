@@ -639,24 +639,20 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
   @Override
   public Catalog alterCatalog(NameIdentifier ident, CatalogChange... changes)
       throws NoSuchCatalogException, IllegalArgumentException {
-    NameIdentifier metalakeIdent = NameIdentifier.of(ident.namespace().levels());
 
     TreeLockUtils.doWithTreeLock(
         ident,
         LockType.READ,
         () -> {
-          checkMetalake(metalakeIdent, store);
-          boolean catalogInUse = getCatalogInUseValue(store, ident);
-          if (!catalogInUse) {
-            throw new CatalogNotInUseException("Catalog %s is not in use", ident);
-          }
-
           // There could be a race issue that someone is using the catalog from cache while we are
           // updating it.
           CatalogWrapper catalogWrapper = loadCatalogAndWrap(ident);
           if (catalogWrapper == null) {
             throw new NoSuchCatalogException(CATALOG_DOES_NOT_EXIST_MSG, ident);
           }
+
+          BaseCatalog catalog = catalogWrapper.catalog();
+          catalog.checkMetalakeAndCatalogInUse(catalog.entity());
 
           try {
             catalogWrapper.doWithPropertiesMeta(
