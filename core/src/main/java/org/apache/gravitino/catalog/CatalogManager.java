@@ -652,7 +652,7 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
           }
 
           BaseCatalog catalog = catalogWrapper.catalog();
-          catalog.checkMetalakeAndCatalogInUse(catalog.entity());
+          catalog.checkMetalakeAndCatalogInUse();
 
           try {
             catalogWrapper.doWithPropertiesMeta(

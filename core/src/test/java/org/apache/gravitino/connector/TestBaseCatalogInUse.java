@@ -23,6 +23,7 @@ import static org.apache.gravitino.connector.BaseCatalogPropertiesMetadata.PROPE
 import java.time.Instant;
 import java.util.HashMap;
 import java.util.Map;
+import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.connector.capability.Capability;
@@ -37,26 +38,29 @@ import org.mockito.Mockito;
 public class TestBaseCatalogInUse {
 
   @Test
-  void testMetalakeAndCatalogInUse() {
+  void testMetalakeAndCatalogInUse() throws IllegalAccessException {
     CatalogEntity entity = buildCatalogEntity(props(true, true));
     TestCatalogImpl catalog = new TestCatalogImpl();
-    Assertions.assertDoesNotThrow(() -> catalog.checkMetalakeAndCatalogInUse(entity));
+    FieldUtils.writeField(catalog, "entity", entity, true);
+    Assertions.assertDoesNotThrow(() -> catalog.checkMetalakeAndCatalogInUse());
   }
 
   @Test
-  void testMetalakeNotInUseThrows() {
+  void testMetalakeNotInUseThrows() throws IllegalAccessException {
     CatalogEntity entity = buildCatalogEntity(props(false, true));
     TestCatalogImpl catalog = new TestCatalogImpl();
+    FieldUtils.writeField(catalog, "entity", entity, true);
     Assertions.assertThrows(
-        MetalakeNotInUseException.class, () -> catalog.checkMetalakeAndCatalogInUse(entity));
+        MetalakeNotInUseException.class, () -> catalog.checkMetalakeAndCatalogInUse());
   }
 
   @Test
-  void testCatalogNotInUseThrows() {
+  void testCatalogNotInUseThrows() throws IllegalAccessException {
     CatalogEntity entity = buildCatalogEntity(props(true, false));
     TestCatalogImpl catalog = new TestCatalogImpl();
+    FieldUtils.writeField(catalog, "entity", entity, true);
     Assertions.assertThrows(
-        CatalogNotInUseException.class, () -> catalog.checkMetalakeAndCatalogInUse(entity));
+        CatalogNotInUseException.class, () -> catalog.checkMetalakeAndCatalogInUse());
   }
 
   private Map<String, String> props(boolean metalakeInUse, boolean catalogInUse) {
