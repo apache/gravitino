@@ -440,8 +440,8 @@ export default function SecurableObjectFormFields({ fieldName, fieldKey, metalak
 
   const getAllOptionValues = item => {
     const groups = item === 'allowPrivileges' ? allowFilteredGroups : denyFilteredGroups
-    
-return (groups || []).flatMap(g => (g.options || []).map(o => o.value))
+
+    return (groups || []).flatMap(g => (g.options || []).map(o => o.value))
   }
 
   const handleSelectAll = (checked, item) => {
@@ -452,16 +452,16 @@ return (groups || []).flatMap(g => (g.options || []).map(o => o.value))
   const handleSelectAllChecked = item => {
     const allValues = getAllOptionValues(item)
     const selectedItems = getFieldValue(['securableObjects', fieldName, item]) || []
-    
-return allValues.length > 0 && allValues.every(v => selectedItems?.includes(v))
+
+    return allValues.length > 0 && allValues.every(v => selectedItems?.includes(v))
   }
 
   const handleSelectAllIndeterminate = item => {
     const allValues = getAllOptionValues(item)
     const selectedItems = getFieldValue(['securableObjects', fieldName, item]) || []
     const selectedInAll = (selectedItems || []).filter(v => allValues.includes(v))
-    
-return selectedInAll.length > 0 && selectedInAll.length < allValues.length
+
+    return selectedInAll.length > 0 && selectedInAll.length < allValues.length
   }
 
   const allowSelected = getFieldValue(['securableObjects', fieldName, 'allowPrivileges']) || []
