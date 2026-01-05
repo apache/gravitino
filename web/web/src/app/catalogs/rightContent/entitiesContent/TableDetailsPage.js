@@ -452,7 +452,7 @@ export default function TableDetailsPage({ ...props }) {
           ) : null
       }
     ],
-    [currentMetalake, catalog, schema, table, store.activatedDetails]
+    [currentMetalake, store.activatedDetails]
   )
 
   const { resizableColumns, components, tableWidth } = useAntdColumnResize(() => {
