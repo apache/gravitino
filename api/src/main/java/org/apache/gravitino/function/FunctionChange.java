@@ -26,6 +26,7 @@ import org.apache.gravitino.annotation.Evolving;
 /** Represents a change that can be applied to a function. */
 @Evolving
 public interface FunctionChange {
+  /** An empty array of parameters. */
   FunctionParam[] EMPTY_PARAMS = new FunctionParam[0];
 
   /**
