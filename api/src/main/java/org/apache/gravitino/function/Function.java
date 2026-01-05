@@ -20,10 +20,23 @@ package org.apache.gravitino.function;
 
 import javax.annotation.Nullable;
 import org.apache.gravitino.Auditable;
+import org.apache.gravitino.Namespace;
 import org.apache.gravitino.annotation.Evolving;
 import org.apache.gravitino.rel.types.Type;
 
-/** Represents a user-defined function registered in Gravitino. */
+/**
+ * An interface representing a user-defined function under a schema {@link Namespace}. A function is
+ * a reusable computational unit that can be invoked within queries across different compute
+ * engines. Users can register a function in Gravitino to manage the function metadata and enable
+ * cross-engine function sharing. The typical use case is to define custom business logic once and
+ * reuse it across multiple compute engines like Spark, Trino, and AI engines.
+ *
+ * <p>A function is characterized by its name, type (scalar for row-by-row operations, aggregate for
+ * group operations, or table-valued for set-returning operations), whether it is deterministic, its
+ * return type or columns (for table function), and its definitions that contain parameters and
+ * implementations for different runtime engines. Each function maintains a version number starting
+ * from 0, which increments with each alteration.
+ */
 @Evolving
 public interface Function extends Auditable {
   /** An empty array of {@link FunctionColumn}. */
