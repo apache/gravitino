@@ -1031,6 +1031,8 @@ export const updateTable = createAsyncThunk(
       await dispatch(setActivatedDetailsLoading(true))
       await dispatch(getTableDetails({ init, metalake, catalog, catalogType, schema, table }))
       await dispatch(setActivatedDetailsLoading(false))
+    } else {
+      await dispatch(fetchTables({ metalake, catalog, catalogType, schema, page: 'schemas', init: true }))
     }
 
     return res.table
