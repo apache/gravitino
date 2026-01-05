@@ -33,8 +33,11 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 
-// Referred from Apache Iceberg's TestHiveClientPool implementation
-// hive-metastore/src/test/java/org/apache/iceberg/hive/TestHiveClientPool.java
+/**
+ * Referenced from Apache Iceberg's {@code TestHiveClientPool} implementation.
+ *
+ * <p>Source: hive-metastore/src/test/java/org/apache/iceberg/hive/TestHiveClientPool.java
+ */
 public class TestHiveClientPool {
 
   private HiveClientPool clients;
