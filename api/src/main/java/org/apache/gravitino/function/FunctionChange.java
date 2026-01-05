@@ -138,7 +138,8 @@ public interface FunctionChange {
     private final FunctionDefinition definition;
 
     AddDefinition(FunctionDefinition definition) {
-      this.definition = Preconditions.checkNotNull(definition, "Definition cannot be null");
+      Preconditions.checkArgument(definition != null, "Definition cannot be null");
+      this.definition = definition;
     }
 
     /**
@@ -218,8 +219,8 @@ public interface FunctionChange {
     AddImpl(FunctionParam[] parameters, FunctionImpl implementation) {
       Preconditions.checkArgument(parameters != null, "Parameters cannot be null");
       this.parameters = Arrays.copyOf(parameters, parameters.length);
-      this.implementation =
-          Preconditions.checkNotNull(implementation, "Implementation cannot be null");
+      Preconditions.checkArgument(implementation != null, "Implementation cannot be null");
+      this.implementation = implementation;
     }
 
     /**
@@ -279,9 +280,10 @@ public interface FunctionChange {
         FunctionParam[] parameters, FunctionImpl.RuntimeType runtime, FunctionImpl implementation) {
       Preconditions.checkArgument(parameters != null, "Parameters cannot be null");
       this.parameters = Arrays.copyOf(parameters, parameters.length);
-      this.runtime = Preconditions.checkNotNull(runtime, "Runtime cannot be null");
-      this.implementation =
-          Preconditions.checkNotNull(implementation, "Implementation cannot be null");
+      Preconditions.checkArgument(runtime != null, "Runtime cannot be null");
+      this.runtime = runtime;
+      Preconditions.checkArgument(implementation != null, "Implementation cannot be null");
+      this.implementation = implementation;
       Preconditions.checkArgument(
           runtime == implementation.runtime(),
           "Runtime of implementation must match the runtime being updated");
@@ -349,7 +351,8 @@ public interface FunctionChange {
     RemoveImpl(FunctionParam[] parameters, FunctionImpl.RuntimeType runtime) {
       Preconditions.checkArgument(parameters != null, "Parameters cannot be null");
       this.parameters = Arrays.copyOf(parameters, parameters.length);
-      this.runtime = Preconditions.checkNotNull(runtime, "Runtime cannot be null");
+      Preconditions.checkArgument(runtime != null, "Runtime cannot be null");
+      this.runtime = runtime;
     }
 
     /**

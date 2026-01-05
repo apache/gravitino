@@ -36,7 +36,8 @@ public class FunctionColumn {
     Preconditions.checkArgument(
         StringUtils.isNotBlank(name), "Function column name cannot be null or empty");
     this.name = name;
-    this.dataType = Preconditions.checkNotNull(dataType, "Function column type cannot be null");
+    Preconditions.checkArgument(dataType != null, "Function column type cannot be null");
+    this.dataType = dataType;
     this.comment = comment;
   }
 

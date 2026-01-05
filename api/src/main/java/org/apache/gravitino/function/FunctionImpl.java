@@ -80,9 +80,9 @@ public abstract class FunctionImpl {
       RuntimeType runtime,
       FunctionResources resources,
       Map<String, String> properties) {
-    Preconditions.checkNotNull(language, "Function implementation language must be set");
-    Preconditions.checkNotNull(runtime, "Function runtime must be set");
+    Preconditions.checkArgument(language != null, "Function implementation language must be set");
     this.language = language;
+    Preconditions.checkArgument(runtime != null, "Function runtime must be set");
     this.runtime = runtime;
     this.resources = resources == null ? FunctionResources.empty() : resources;
     this.properties = properties == null ? ImmutableMap.of() : ImmutableMap.copyOf(properties);

@@ -32,7 +32,8 @@ public class SQLImpl extends FunctionImpl {
       FunctionResources resources,
       Map<String, String> properties) {
     super(Language.SQL, runtime, resources, properties);
-    this.sql = Preconditions.checkNotNull(sql, "SQL text cannot be null");
+    Preconditions.checkArgument(sql != null, "SQL text cannot be null");
+    this.sql = sql;
   }
 
   /**
