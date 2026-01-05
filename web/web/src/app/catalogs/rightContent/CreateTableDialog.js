@@ -492,8 +492,8 @@ export default function CreateTableDialog({ ...props }) {
               if (item.comment) {
                 f.comment = item.comment
               }
-              
-return f
+
+              return f
             })
           }
         case 'union':
@@ -685,7 +685,7 @@ return f
           }
           await dispatch(createTable({ data: submitData, metalake, catalog, schema, catalogType }))
         }
-        init && treeRef.current.onLoadData({ key: `${catalog}/${schema}`, nodeType: 'schema' })
+        treeRef.current.onLoadData({ key: `${catalog}/${schema}`, nodeType: 'schema' })
         setConfirmLoading(false)
         setOpen(false)
       })
@@ -1276,7 +1276,7 @@ return f
                   label='Table Name'
                   rules={[{ required: true }, { type: 'string', max: 64 }, { pattern: new RegExp(nameRegex) }]}
                 >
-                  <Input data-refer='table-name-field' placeholder={mismatchName} disabled={!init} />
+                  <Input data-refer='table-name-field' placeholder={mismatchName} disabled={init} />
                 </Form.Item>
                 <Tabs activeKey={tabKey} onChange={onChangeTab} items={tabOptions} />
                 <Form.Item

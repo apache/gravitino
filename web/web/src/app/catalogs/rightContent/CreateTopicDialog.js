@@ -188,7 +188,7 @@ export default function CreateTopicDialog({ ...props }) {
                   label='Topic Name'
                   rules={[{ required: true }, { type: 'string', max: 64 }, { pattern: new RegExp(nameRegex) }]}
                 >
-                  <Input data-refer='topic-name-field' placeholder={mismatchName} disabled={!init} />
+                  <Input data-refer='topic-name-field' placeholder={mismatchName} disabled={!!editTopic} />
                 </Form.Item>
                 <Form.Item name='comment' label='Comment'>
                   <TextArea data-refer='topic-comment-field' />

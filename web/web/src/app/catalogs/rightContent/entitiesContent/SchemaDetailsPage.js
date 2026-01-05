@@ -611,7 +611,7 @@ export default function SchemaDetailsPage() {
               provider={catalogData?.provider}
               schema={schema}
               editTable={editTable}
-              init={true}
+              init={false}
               catalogLocation={catalogData?.properties?.location}
               schemaLocation={store.activatedDetails?.properties?.location}
             />
@@ -626,7 +626,7 @@ export default function SchemaDetailsPage() {
               schema={schema}
               locationProviders={catalogData?.properties?.['filesystem-providers']?.split(',') || []}
               editFileset={editFileset}
-              init={true}
+              init={false}
             />
           )}
           {openTopic && (
@@ -638,7 +638,7 @@ export default function SchemaDetailsPage() {
               catalogType={catalogType}
               schema={schema}
               editTopic={editTopic}
-              init={true}
+              init={false}
             />
           )}
           {openModel && (
@@ -650,7 +650,7 @@ export default function SchemaDetailsPage() {
               catalogType={catalogType}
               schema={schema}
               editModel={editModel}
-              init={true}
+              init={false}
             />
           )}
         </>
