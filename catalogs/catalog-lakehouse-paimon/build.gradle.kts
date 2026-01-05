@@ -148,6 +148,8 @@ dependencies {
   testImplementation("org.apache.paimon:paimon-spark-$sparkMajorVersion:$paimonVersion") {
     exclude("org.apache.hadoop")
   }
+
+  testImplementation(libs.awaitility)
   testImplementation(libs.slf4j.api)
   testImplementation(libs.awaitility)
   testImplementation(libs.junit.jupiter.api)
