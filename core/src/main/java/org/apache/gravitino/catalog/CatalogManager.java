@@ -383,8 +383,15 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
         ident,
         LockType.READ,
         () -> {
-          checkMetalake(metalakeIdent, store);
-          return loadCatalogAndWrap(ident).catalog;
+          BaseCatalog baseCatalog = loadCatalogAndWrap(ident).catalog;
+          boolean metalakeInuse =
+              metalakeInUseByCatalogProperty(baseCatalog.entity().getProperties());
+          if (!metalakeInuse) {
+            throw new MetalakeNotInUseException(
+                "Metalake %s is not in use, please enable it first", metalakeIdent);
+          }
+
+          return baseCatalog;
         });
   }
 
@@ -545,8 +552,6 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
   public void enableCatalog(NameIdentifier ident)
       throws NoSuchCatalogException, CatalogNotInUseException {
     NameIdentifier metalakeIdent = NameIdentifier.of(ident.namespace().levels());
-    checkMetalake(metalakeIdent, store);
-
     TreeLockUtils.doWithTreeLock(
         metalakeIdent,
         LockType.WRITE,
@@ -735,7 +740,6 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
         metalakeIdent,
         LockType.WRITE,
         () -> {
-          checkMetalake(metalakeIdent, store);
           try {
             boolean catalogInUse = getCatalogInUseValue(store, ident);
             if (catalogInUse && !force) {
@@ -751,6 +755,13 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
             if (!force && containsUserCreatedSchemas(schemaEntities, catalogWrapper)) {
               throw new NonEmptyCatalogException(
                   "Catalog %s has schemas, please drop them first or use force option", ident);
+            }
+
+            boolean metalakeInuse =
+                metalakeInUseByCatalogProperty(catalogWrapper.catalog().entity().getProperties());
+            if (!metalakeInuse) {
+              throw new MetalakeNotInUseException(
+                  "Metalake %s is not in use, please enable it first", metalakeIdent);
             }
 
             if (isManagedStorageCatalog(catalogWrapper)) {

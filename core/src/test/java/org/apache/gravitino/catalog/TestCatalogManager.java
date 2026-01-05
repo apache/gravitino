@@ -538,7 +538,7 @@ public class TestCatalogManager {
   }
 
   @Test
-  public void testDropCatalog() {
+  public void testDropCatalog() throws Exception {
     NameIdentifier ident = NameIdentifier.of("metalake", "test41");
     Map<String, String> props =
         ImmutableMap.of(
@@ -552,7 +552,8 @@ public class TestCatalogManager {
             "value3");
     String comment = "comment";
 
-    catalogManager.createCatalog(ident, Catalog.Type.RELATIONAL, provider, comment, props);
+    Catalog catalog =
+        catalogManager.createCatalog(ident, Catalog.Type.RELATIONAL, provider, comment, props);
 
     // Test drop catalog
     Exception exception =
@@ -561,6 +562,16 @@ public class TestCatalogManager {
     Assertions.assertTrue(exception.getMessage().contains("Catalog metalake.test41 is in use"));
 
     Assertions.assertDoesNotThrow(() -> catalogManager.disableCatalog(ident));
+
+    CatalogManager.CatalogWrapper catalogWrapper =
+        Mockito.mock(CatalogManager.CatalogWrapper.class);
+    Capability capability = Mockito.mock(Capability.class);
+    CapabilityResult unsupportedResult = CapabilityResult.unsupported("Not managed");
+    Mockito.doReturn(catalogWrapper).when(catalogManager).loadCatalogAndWrap(ident);
+    Mockito.doReturn(catalog).when(catalogWrapper).catalog();
+    Mockito.doReturn(capability).when(catalogWrapper).capabilities();
+    Mockito.doReturn(unsupportedResult).when(capability).managedStorage(any());
+
     boolean dropped = catalogManager.dropCatalog(ident);
     Assertions.assertTrue(dropped);
 
@@ -587,7 +598,8 @@ public class TestCatalogManager {
             PROPERTY_KEY5_PREFIX + "1",
             "value3");
     String comment = "comment";
-    catalogManager.createCatalog(ident, Catalog.Type.RELATIONAL, provider, comment, props);
+    Catalog catalog =
+        catalogManager.createCatalog(ident, Catalog.Type.RELATIONAL, provider, comment, props);
     SchemaEntity schemaEntity =
         SchemaEntity.builder()
             .withId(RandomIdGenerator.INSTANCE.nextId())
@@ -607,6 +619,7 @@ public class TestCatalogManager {
     Mockito.doReturn(catalogWrapper).when(catalogManager).loadCatalogAndWrap(ident);
     Mockito.doReturn(capability).when(catalogWrapper).capabilities();
     Mockito.doReturn(unsupportedResult).when(capability).managedStorage(any());
+    Mockito.doReturn(catalog).when(catalogWrapper).catalog();
     Mockito.doThrow(new RuntimeException("Failed connect"))
         .when(catalogWrapper)
         .doWithSchemaOps(any());
