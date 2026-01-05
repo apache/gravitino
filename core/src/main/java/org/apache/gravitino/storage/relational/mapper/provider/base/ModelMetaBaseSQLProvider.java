@@ -145,20 +145,20 @@ public class ModelMetaBaseSQLProvider {
       @Param("modelName") String modelName) {
     return """
         SELECT
-            mmm.metalake_id AS metalakeId,
+            mm.metalake_id AS metalakeId,
             cm.catalog_id AS catalogId,
             sm.schema_id AS schemaId,
-            mm.model_id AS modelId,
-            mm.model_name AS modelName,
-            mm.model_comment AS modelComment,
-            mm.model_properties AS modelProperties,
-            mm.model_latest_version AS modelLatestVersion,
-            mm.audit_info AS auditInfo,
-            mm.deleted_at AS deletedAt
+            mo.model_id AS modelId,
+            mo.model_name AS modelName,
+            mo.model_comment AS modelComment,
+            mo.model_properties AS modelProperties,
+            mo.model_latest_version AS modelLatestVersion,
+            mo.audit_info AS auditInfo,
+            mo.deleted_at AS deletedAt
         FROM
-            %s mmm
+            %s mm
         INNER JOIN
-            %s cm ON mmm.metalake_id = cm.metalake_id
+            %s cm ON mm.metalake_id = cm.metalake_id
             AND cm.catalog_name = #{catalogName}
             AND cm.deleted_at = 0
         LEFT JOIN
@@ -166,12 +166,12 @@ public class ModelMetaBaseSQLProvider {
             AND sm.schema_name = #{schemaName}
             AND sm.deleted_at = 0
         LEFT JOIN
-            %s mm ON sm.schema_id = mm.schema_id
-            AND mm.model_name = #{modelName}
-            AND mm.deleted_at = 0
+            %s mo ON sm.schema_id = mo.schema_id
+            AND mo.model_name = #{modelName}
+            AND mo.deleted_at = 0
         WHERE
-            mmm.metalake_name = #{metalakeName}
-            AND mmm.deleted_at = 0;
+            mm.metalake_name = #{metalakeName}
+            AND mm.deleted_at = 0;
             """
         .formatted(
             MetalakeMetaMapper.TABLE_NAME,
