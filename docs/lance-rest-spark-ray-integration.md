@@ -12,7 +12,7 @@ license: "This software is licensed under the Apache License version 2."
 
 ## Overview
 
-This guide shows how to use the Lance REST service from Apache Gravitino with the Lance Spark connector (`lance-spark`) and the Lance Ray connector (`lance-ray`). It builds on the Lance REST service setup described in [Lance REST service](/lance-rest-service).
+This guide shows how to use the Lance REST service from Apache Gravitino with the Lance Spark connector (`lance-spark`) and the Lance Ray connector (`lance-ray`). It builds on the Lance REST service setup described in [Lance REST service](./lance-rest-service).
 
 ## Compatibility matrix
 
