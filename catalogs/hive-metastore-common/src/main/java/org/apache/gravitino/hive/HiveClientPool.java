@@ -56,15 +56,17 @@ public class HiveClientPool extends ClientPoolImpl<HiveClient, GravitinoRuntimeE
     }
   }
 
-  // Provides a no-op reconnect implementation because we rely on the RetryingMetaStoreClient
-  // to do the actual reconnect logic.
+  /**
+   * Provides a no-op reconnect implementation. Reconnect logic is handled by
+   * RetryingMetaStoreClient.
+   */
   @Override
   protected HiveClient reconnect(HiveClient client) {
     LOG.warn("Reconnecting to Hive Metastore");
     return client;
   }
 
-  // Returns false because we do not need pool-level reconnections.
+  /** Returns false by design. Pool-level reconnection is not required. */
   @Override
   protected boolean isConnectionException(Exception e) {
     return false;

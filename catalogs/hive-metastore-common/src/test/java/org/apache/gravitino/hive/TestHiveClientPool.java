@@ -37,7 +37,7 @@ import org.mockito.Mockito;
 // hive-metastore/src/test/java/org/apache/iceberg/hive/TestHiveClientPool.java
 public class TestHiveClientPool {
 
-  HiveClientPool clients;
+  private HiveClientPool clients;
 
   @BeforeEach
   public void before() {
