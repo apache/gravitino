@@ -21,6 +21,7 @@ package org.apache.gravitino.function;
 import com.google.common.base.Preconditions;
 import java.util.Map;
 import java.util.Objects;
+import org.apache.commons.lang3.StringUtils;
 
 /** Python implementation with handler and optional inline code. */
 public class PythonImpl extends FunctionImpl {
@@ -35,8 +36,7 @@ public class PythonImpl extends FunctionImpl {
       Map<String, String> properties) {
     super(Language.PYTHON, runtime, resources, properties);
     Preconditions.checkArgument(
-        org.apache.commons.lang3.StringUtils.isNotBlank(handler),
-        "Python handler cannot be null or empty");
+        StringUtils.isNotBlank(handler), "Python handler cannot be null or empty");
     this.handler = handler;
     this.codeBlock = codeBlock;
   }

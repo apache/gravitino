@@ -21,6 +21,7 @@ package org.apache.gravitino.function;
 import com.google.common.base.Preconditions;
 import java.util.Arrays;
 import java.util.Objects;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.annotation.Evolving;
 
 /** Represents a change that can be applied to a function. */
@@ -102,8 +103,7 @@ public interface FunctionChange {
 
     UpdateComment(String newComment) {
       Preconditions.checkArgument(
-          org.apache.commons.lang3.StringUtils.isNotBlank(newComment),
-          "New comment cannot be null or empty");
+          StringUtils.isNotBlank(newComment), "New comment cannot be null or empty");
       this.newComment = newComment;
     }
 

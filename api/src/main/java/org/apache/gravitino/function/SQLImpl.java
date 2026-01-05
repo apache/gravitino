@@ -21,6 +21,7 @@ package org.apache.gravitino.function;
 import com.google.common.base.Preconditions;
 import java.util.Map;
 import java.util.Objects;
+import org.apache.commons.lang3.StringUtils;
 
 /** SQL implementation with runtime and SQL body. */
 public class SQLImpl extends FunctionImpl {
@@ -32,8 +33,7 @@ public class SQLImpl extends FunctionImpl {
       FunctionResources resources,
       Map<String, String> properties) {
     super(Language.SQL, runtime, resources, properties);
-    Preconditions.checkArgument(
-        org.apache.commons.lang3.StringUtils.isNotBlank(sql), "SQL text cannot be null or empty");
+    Preconditions.checkArgument(StringUtils.isNotBlank(sql), "SQL text cannot be null or empty");
     this.sql = sql;
   }
 

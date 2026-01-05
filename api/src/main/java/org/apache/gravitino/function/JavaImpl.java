@@ -21,6 +21,7 @@ package org.apache.gravitino.function;
 import com.google.common.base.Preconditions;
 import java.util.Map;
 import java.util.Objects;
+import org.apache.commons.lang3.StringUtils;
 
 /** Java implementation with class name. */
 public class JavaImpl extends FunctionImpl {
@@ -33,8 +34,7 @@ public class JavaImpl extends FunctionImpl {
       Map<String, String> properties) {
     super(Language.JAVA, runtime, resources, properties);
     Preconditions.checkArgument(
-        org.apache.commons.lang3.StringUtils.isNotBlank(className),
-        "Java class name cannot be null or empty");
+        StringUtils.isNotBlank(className), "Java class name cannot be null or empty");
     this.className = className;
   }
 
