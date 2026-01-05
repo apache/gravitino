@@ -80,7 +80,8 @@ public interface Entity extends Serializable {
     TABLE_STATISTIC,
     JOB_TEMPLATE,
     JOB,
-    AUDIT;
+    AUDIT,
+    FUNCTION;
   }
 
   /**
