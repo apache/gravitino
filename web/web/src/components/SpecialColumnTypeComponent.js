@@ -64,17 +64,17 @@ export default function SpecialColumnTypeComponent({ ...props }) {
 
     return (
       <div className='flex flex-col divide-y divide-solid border-b border-solid'>
-        <div className='grid grid-cols-10 divide-x divide-solid'>
+        <div className={cn('grid divide-x divide-solid', provider !== 'hive' ? 'grid-cols-10' : 'grid-cols-7')}>
           <div className='col-span-2 bg-gray-100 p-1 text-center'>Field Name</div>
           <div className='col-span-3 bg-gray-100 p-1 text-center'>Data Type</div>
           <div className='bg-gray-100 p-1 text-center'>Not Null</div>
-          <div className='col-span-3 bg-gray-100 p-1 text-center'>Comment</div>
+          {provider !== 'hive' && <div className='col-span-3 bg-gray-100 p-1 text-center'>Comment</div>}
           <div className='bg-gray-100 p-1 text-center'>Action</div>
         </div>
         {fields.slice((pageOffset - 1) * pageSize, pageOffset * pageSize).map(field => {
           return (
             <div key={field.key}>
-              <div className='grid grid-cols-10'>
+              <div className={cn('grid', provider !== 'hive' ? 'grid-cols-10' : 'grid-cols-7')}>
                 <div className='col-span-2 px-2 py-1'>
                   <Form.Item
                     noStyle
@@ -153,11 +153,13 @@ export default function SpecialColumnTypeComponent({ ...props }) {
                     <Switch size='small' disabled={provider === 'hive' || disabled} />
                   </Form.Item>
                 </div>
-                <div className='col-span-3 px-2 py-1'>
-                  <Form.Item noStyle name={[field.name, 'comment']} label=''>
-                    <Input size='small' disabled={disabled} />
-                  </Form.Item>
-                </div>
+                {provider !== 'hive' && (
+                  <div className='col-span-3 px-2 py-1'>
+                    <Form.Item noStyle name={[field.name, 'comment']} label=''>
+                      <Input size='small' disabled={disabled} />
+                    </Form.Item>
+                  </div>
+                )}
                 <div className='px-2 py-1'>
                   <Icons.Minus
                     className={cn('size-4 cursor-pointer text-gray-400 hover:text-defaultPrimary', {

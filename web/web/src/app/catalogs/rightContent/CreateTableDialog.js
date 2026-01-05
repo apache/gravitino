@@ -482,13 +482,19 @@ export default function CreateTableDialog({ ...props }) {
         case 'struct':
           return {
             type: 'struct',
-            fields: typeObj?.fieldColumns.map(item => ({
-              uniqueId: item.uniqueId || item.name,
-              name: item.name,
-              type: getColumnType(item.typeObj),
-              nullable: !item.required,
-              comment: item.comment || ''
-            }))
+            fields: typeObj?.fieldColumns.map(item => {
+              const f = {
+                uniqueId: item.uniqueId || item.name,
+                name: item.name,
+                type: getColumnType(item.typeObj),
+                nullable: !item.required
+              }
+              if (item.comment) {
+                f.comment = item.comment
+              }
+              
+return f
+            })
           }
         case 'union':
           return {
@@ -1080,10 +1086,10 @@ export default function CreateTableDialog({ ...props }) {
                 <Form.Item noStyle name={[subField.name, 'direction']} label='Direction'>
                   <Select size='small' className='w-full' placeholder='Direction' disabled={!!editTable}>
                     <Select.Option key='asc' value='asc'>
-                      {t('table.asc')}
+                      Ascending
                     </Select.Option>
                     <Select.Option key='desc' value='desc'>
-                      {t('table.desc')}
+                      Descending
                     </Select.Option>
                   </Select>
                 </Form.Item>
