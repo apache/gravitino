@@ -6,7 +6,7 @@
     to you under the Apache License, Version 2.0 (the
   "License"); you may not use this file except in compliance
   with the License.  You may obtain a copy of the License at
-  
+
   http://www.apache.org/licenses/LICENSE-2.0
 
   Unless required by applicable law or agreed to in writing,
@@ -20,14 +20,15 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: {{ include "gravitino.fullname" . }}
-  namespace: {{ include "gravitino.namespace" . }}
+  name: {{ include "gravitino-lance-rest-server.fullname" . }}
+  namespace: {{ include "gravitino-lance-rest-server.namespace" . }}
   labels:
-    {{- include "gravitino.labels" . | nindent 4 }}
+    {{- include "gravitino-lance-rest-server.labels" . | nindent 4 }}
 data:
   init.sh: |-
     {{- tpl .Values.initScript . | nindent 4 }}
-  gravitino.conf: |-
-    {{- tpl (.Files.Get "resources/config/gravitino.conf") . | nindent 4 }}
-  log4j2.properties: |-
-    {{- tpl (.Files.Get "resources/config/log4j2.properties") . | nindent 4 }}
+{{ $root := . }}
+{{ range $path, $bytes := .Files.Glob "resources/*" }}
+{{ base $path | indent 2 }}: |-
+{{ tpl ( $root.Files.Get $path ) $ | indent 4 }}
+{{ end }}
