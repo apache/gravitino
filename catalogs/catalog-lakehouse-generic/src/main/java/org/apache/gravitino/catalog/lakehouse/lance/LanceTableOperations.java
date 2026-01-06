@@ -266,7 +266,7 @@ public class LanceTableOperations extends ManagedTableOperations {
 
     // Check whether it's a create empty table operation.
     boolean createEmpty =
-        Optional.ofNullable(properties.get(LanceConstants.LANCE_TABLE_CREATE_EMTPY))
+        Optional.ofNullable(properties.get(LanceConstants.LANCE_TABLE_CREATE_EMPTY))
             .map(Boolean::parseBoolean)
             .orElse(false);
     if (createEmpty) {

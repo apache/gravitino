@@ -455,7 +455,7 @@ public class LanceRESTServiceIT extends BaseIT {
     // Will not touch storage, so the path should not be created.
     Assertions.assertFalse(new File(another_location).exists());
 
-    // Correct the location and try again
+    // Create another empty table at a new location and verify it succeeds
     String correctedLocation = tempDir + "/" + "wrong_location_table/";
     wrongLocationRequest.setLocation(correctedLocation);
     wrongLocationRequest.setId(List.of(CATALOG_NAME, SCHEMA_NAME, "wrong_location_table"));
