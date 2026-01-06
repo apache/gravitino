@@ -79,6 +79,22 @@ spark.sql("select * from schema.sample").show()
 - Add your own JVM debugging flags only when needed.
 :::
 
+The storage location in the example above is local path, if you want to use cloud storage, please refer to the following Minio example:
+
+```python
+spark.sql("""
+create table schema.sample(id int, score float)
+USING lance
+LOCATION 's3://bucket/tmp/schema/sample.lance/'
+TBLPROPERTIES (
+  'format' = 'lance',
+  'lance.storage.access_key_id' = 'ak',
+  'lance.storage.endpoint' = 'http://minio:9000',
+  'lance.storage.secret_access_key' = 'sk',
+  'lance.storage.allow_http'= 'true'
+ )
+```
+
 ## Using Lance REST with Ray
 
 The snippet below writes and reads a Lance dataset through the Lance REST namespace.
