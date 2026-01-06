@@ -131,7 +131,8 @@ public class CapabilityHelpers {
     if (identScope == Capability.Scope.TABLE
         || identScope == Capability.Scope.FILESET
         || identScope == Capability.Scope.TOPIC
-        || identScope == Capability.Scope.MODEL) {
+        || identScope == Capability.Scope.MODEL
+        || identScope == Capability.Scope.FUNCTION) {
       String schema = namespace.level(namespace.length() - 1);
       schema = applyCaseSensitiveOnName(Capability.Scope.SCHEMA, schema, capabilities);
       return Namespace.of(metalake, catalog, schema);
@@ -201,7 +202,8 @@ public class CapabilityHelpers {
     String catalog = namespace.level(1);
     if (identScope == Capability.Scope.TABLE
         || identScope == Capability.Scope.FILESET
-        || identScope == Capability.Scope.TOPIC) {
+        || identScope == Capability.Scope.TOPIC
+        || identScope == Capability.Scope.FUNCTION) {
       String schema = namespace.level(namespace.length() - 1);
       schema = applyCapabilitiesOnName(Capability.Scope.SCHEMA, schema, capabilities);
       return Namespace.of(metalake, catalog, schema);
