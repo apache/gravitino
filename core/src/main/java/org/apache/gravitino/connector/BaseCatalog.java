@@ -223,6 +223,16 @@ public abstract class BaseCatalog<T extends BaseCatalog>
     }
   }
 
+  public void checkMetalakeInUse() {
+    Map<String, String> catalogProperties = entity().getProperties();
+    String metaLakeInUseStr = catalogProperties.getOrDefault(PROPERTY_METALAKE_IN_USE, "true");
+    boolean metalakeInuse = Boolean.parseBoolean(metaLakeInUseStr);
+    if (!metalakeInuse) {
+      throw new MetalakeNotInUseException(
+          "Metalake %s is not in use, please enable it first", entity().name());
+    }
+  }
+
   private boolean isInvokedBy(String methodName) {
     return StackWalker.getInstance()
         .walk(frames -> frames.anyMatch(frame -> frame.getMethodName().equals(methodName)));

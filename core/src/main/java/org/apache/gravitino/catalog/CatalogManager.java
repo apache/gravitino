@@ -24,9 +24,7 @@ import static org.apache.gravitino.StringIdentifier.DUMMY_ID;
 import static org.apache.gravitino.catalog.PropertiesMetadataHelpers.validatePropertyForAlter;
 import static org.apache.gravitino.catalog.PropertiesMetadataHelpers.validatePropertyForCreate;
 import static org.apache.gravitino.connector.BaseCatalogPropertiesMetadata.BASIC_CATALOG_PROPERTIES_METADATA;
-import static org.apache.gravitino.connector.BaseCatalogPropertiesMetadata.PROPERTY_METALAKE_IN_USE;
 import static org.apache.gravitino.metalake.MetalakeManager.checkMetalake;
-import static org.apache.gravitino.metalake.MetalakeManager.metalakeInUse;
 
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
@@ -77,7 +75,6 @@ import org.apache.gravitino.StringIdentifier;
 import org.apache.gravitino.connector.BaseCatalog;
 import org.apache.gravitino.connector.CatalogOperations;
 import org.apache.gravitino.connector.HasPropertyMetadata;
-import org.apache.gravitino.connector.PropertyEntry;
 import org.apache.gravitino.connector.SupportsSchemas;
 import org.apache.gravitino.connector.authorization.BaseAuthorization;
 import org.apache.gravitino.connector.capability.Capability;
@@ -85,7 +82,6 @@ import org.apache.gravitino.exceptions.CatalogAlreadyExistsException;
 import org.apache.gravitino.exceptions.CatalogInUseException;
 import org.apache.gravitino.exceptions.CatalogNotInUseException;
 import org.apache.gravitino.exceptions.GravitinoRuntimeException;
-import org.apache.gravitino.exceptions.MetalakeNotInUseException;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
@@ -378,19 +374,12 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
    */
   @Override
   public Catalog loadCatalog(NameIdentifier ident) throws NoSuchCatalogException {
-    NameIdentifier metalakeIdent = NameIdentifier.of(ident.namespace().levels());
     return TreeLockUtils.doWithTreeLock(
         ident,
         LockType.READ,
         () -> {
-          BaseCatalog baseCatalog = loadCatalogAndWrap(ident).catalog;
-          boolean metalakeInuse =
-              metalakeInUseByCatalogProperty(baseCatalog.entity().getProperties());
-          if (!metalakeInuse) {
-            throw new MetalakeNotInUseException(
-                "Metalake %s is not in use, please enable it first", metalakeIdent);
-          }
-
+          BaseCatalog baseCatalog = loadCatalogAndWrap(ident).catalog();
+          baseCatalog.checkMetalakeInUse();
           return baseCatalog;
         });
   }
@@ -556,18 +545,15 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
         metalakeIdent,
         LockType.WRITE,
         () -> {
+          BaseCatalog baseCatalog = loadCatalogAndWrap(ident).catalog();
+          baseCatalog.checkMetalakeInUse();
+
           try {
             store.update(
                 ident,
                 CatalogEntity.class,
                 EntityType.CATALOG,
                 catalog -> {
-                  boolean metalakeInuse = metalakeInUseByCatalogProperty(catalog.getProperties());
-                  if (!metalakeInuse) {
-                    throw new MetalakeNotInUseException(
-                        "Metalake %s is not in use, please enable it first", ident);
-                  }
-
                   CatalogEntity.Builder newCatalogBuilder =
                       newCatalogBuilder(ident.namespace(), catalog);
 
@@ -595,18 +581,15 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
         metalakeIdent,
         LockType.WRITE,
         () -> {
+          BaseCatalog baseCatalog = loadCatalogAndWrap(ident).catalog();
+          baseCatalog.checkMetalakeInUse();
+
           try {
             store.update(
                 ident,
                 CatalogEntity.class,
                 EntityType.CATALOG,
                 catalog -> {
-                  boolean metalakeInuse = metalakeInUseByCatalogProperty(catalog.getProperties());
-                  if (!metalakeInuse) {
-                    throw new MetalakeNotInUseException(
-                        "Metalake %s is not in use, please enable it first", ident);
-                  }
-
                   CatalogEntity.Builder newCatalogBuilder =
                       newCatalogBuilder(ident.namespace(), catalog);
 
@@ -752,13 +735,7 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
               throw new NonEmptyCatalogException(
                   "Catalog %s has schemas, please drop them first or use force option", ident);
             }
-
-            boolean metalakeInuse =
-                metalakeInUseByCatalogProperty(catalogWrapper.catalog().entity().getProperties());
-            if (!metalakeInuse) {
-              throw new MetalakeNotInUseException(
-                  "Metalake %s is not in use, please enable it first", metalakeIdent);
-            }
+            catalogWrapper.catalog().checkMetalakeInUse();
 
             if (isManagedStorageCatalog(catalogWrapper)) {
               // For managed catalog, we need to call drop schema API to drop the underlying
@@ -866,12 +843,6 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
    */
   public CatalogWrapper loadCatalogAndWrap(NameIdentifier ident) throws NoSuchCatalogException {
     return catalogCache.get(ident, this::loadCatalogInternal);
-  }
-
-  private boolean catalogInUse(EntityStore store, NameIdentifier ident)
-      throws NoSuchMetalakeException, NoSuchCatalogException {
-    NameIdentifier metalakeIdent = NameIdentifier.of(ident.namespace().levels());
-    return metalakeInUse(store, metalakeIdent) && getCatalogInUseValue(store, ident);
   }
 
   private boolean getCatalogInUseValue(EntityStore store, NameIdentifier catalogIdent) {
@@ -1026,22 +997,6 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
     try (IsolatedClassLoader classLoader = createClassLoader(provider, conf)) {
       BaseCatalog<?> catalog = createBaseCatalog(classLoader, entity);
       return classLoader.withClassLoader(cl -> catalog.properties(), RuntimeException.class);
-    }
-  }
-
-  private Set<String> getHiddenPropertyNames(CatalogEntity entity) {
-    Map<String, String> conf = entity.getProperties();
-    String provider = entity.getProvider();
-
-    try (IsolatedClassLoader classLoader = createClassLoader(provider, conf)) {
-      BaseCatalog<?> catalog = createBaseCatalog(classLoader, entity);
-      return classLoader.withClassLoader(
-          cl ->
-              catalog.catalogPropertiesMetadata().propertyEntries().values().stream()
-                  .filter(PropertyEntry::isHidden)
-                  .map(PropertyEntry::getName)
-                  .collect(Collectors.toSet()),
-          RuntimeException.class);
     }
   }
 
@@ -1257,11 +1212,6 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
 
     // If the provider is not "hadoop", we assume it is already a fileset catalog entity.
     return entity;
-  }
-
-  private boolean metalakeInUseByCatalogProperty(Map<String, String> catalogProperties) {
-    String metaLakeInUseStr = catalogProperties.getOrDefault(PROPERTY_METALAKE_IN_USE, "true");
-    return Boolean.parseBoolean(metaLakeInUseStr);
   }
 
   public void updateCatalogProperty(
