@@ -22,6 +22,8 @@ import static org.apache.gravitino.server.authorization.expression.Authorization
 
 import com.codahale.metrics.annotation.ResponseMetered;
 import com.codahale.metrics.annotation.Timed;
+import com.google.common.collect.Lists;
+import java.util.List;
 import java.util.Locale;
 import java.util.stream.Collectors;
 import javax.servlet.http.HttpServletRequest;
@@ -38,8 +40,13 @@ import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.authorization.AccessControlDispatcher;
 import org.apache.gravitino.authorization.AuthorizationUtils;
+import org.apache.gravitino.authorization.Privilege;
+import org.apache.gravitino.authorization.SecurableObject;
+import org.apache.gravitino.authorization.SecurableObjects;
 import org.apache.gravitino.dto.authorization.PrivilegeDTO;
+import org.apache.gravitino.dto.authorization.SecurableObjectDTO;
 import org.apache.gravitino.dto.requests.PrivilegeGrantRequest;
+import org.apache.gravitino.dto.requests.PrivilegeOverrideRequest;
 import org.apache.gravitino.dto.requests.PrivilegeRevokeRequest;
 import org.apache.gravitino.dto.requests.RoleGrantRequest;
 import org.apache.gravitino.dto.requests.RoleRevokeRequest;
@@ -272,6 +279,56 @@ public class PermissionOperations {
     } catch (Exception e) {
       return ExceptionHandlers.handleRolePermissionOperationException(
           OperationType.REVOKE, fullName, role, e);
+    }
+  }
+
+  @PUT
+  @Path("roles/{role}/")
+  @Produces("application/vnd.gravitino.v1+json")
+  @Timed(name = "override-role-privileges." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
+  @ResponseMetered(name = "override-role-privileges", absolute = true)
+  @AuthorizationExpression(expression = "METALAKE::OWNER || METALAKE::MANAGE_GRANTS")
+  public Response overrideRolePrivileges(
+      @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
+          String metalake,
+      @PathParam("role") String role,
+      PrivilegeOverrideRequest request) {
+    try {
+
+      return Utils.doAs(
+          httpRequest,
+          () -> {
+            request.validate();
+            // Check update objects
+            List<SecurableObject> updatedObjects = Lists.newArrayList();
+
+            for (SecurableObjectDTO dto : request.getOverrides()) {
+              for (Privilege privilegeDTO : dto.privileges()) {
+                AuthorizationUtils.checkPrivilege((PrivilegeDTO) privilegeDTO, dto, metalake);
+              }
+
+              MetadataObjectUtil.checkMetadataObject(metalake, dto);
+              AuthorizationUtils.checkDuplicatedNamePrivilege(dto.privileges());
+
+              updatedObjects.add(
+                  SecurableObjects.parse(
+                      dto.fullName(),
+                      dto.type(),
+                      dto.privileges().stream()
+                          .map(
+                              privilege -> DTOConverters.fromPrivilegeDTO((PrivilegeDTO) privilege))
+                          .collect(Collectors.toList())));
+            }
+
+            return Utils.ok(
+                new RoleResponse(
+                    DTOConverters.toDTO(
+                        accessControlManager.overridePrivilegesInRole(
+                            metalake, role, updatedObjects))));
+          });
+    } catch (Exception e) {
+      return ExceptionHandlers.handleRolePermissionOperationException(
+          OperationType.UPDATE, role, metalake, e);
     }
   }
 }
