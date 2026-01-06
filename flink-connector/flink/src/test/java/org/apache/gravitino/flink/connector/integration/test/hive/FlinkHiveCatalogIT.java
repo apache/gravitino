@@ -27,12 +27,14 @@ import com.google.common.collect.Lists;
 import java.io.IOException;
 import java.security.PrivilegedAction;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.table.api.DataTypes;
 import org.apache.flink.table.api.ResultKind;
+import org.apache.flink.table.api.Schema;
 import org.apache.flink.table.api.TableResult;
 import org.apache.flink.table.api.ValidationException;
 import org.apache.flink.table.catalog.Catalog;
@@ -43,6 +45,7 @@ import org.apache.flink.table.catalog.CommonCatalogOptions;
 import org.apache.flink.table.catalog.DefaultCatalogTable;
 import org.apache.flink.table.catalog.ObjectPath;
 import org.apache.flink.table.catalog.exceptions.TableNotExistException;
+import org.apache.flink.table.catalog.hive.HiveCatalog;
 import org.apache.flink.table.catalog.hive.factories.HiveCatalogFactoryOptions;
 import org.apache.flink.types.Row;
 import org.apache.gravitino.NameIdentifier;
@@ -59,6 +62,11 @@ import org.apache.gravitino.rel.expressions.transforms.Transforms;
 import org.apache.gravitino.rel.types.Types;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.conf.HiveConf;
+import org.apache.hadoop.hive.metastore.HiveMetaStoreClient;
+import org.apache.hadoop.hive.metastore.api.StorageDescriptor;
+import org.apache.hadoop.hive.ql.io.RCFileStorageFormatDescriptor;
+import org.apache.hadoop.hive.ql.io.StorageFormatDescriptor;
+import org.apache.hadoop.hive.ql.io.StorageFormatFactory;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
@@ -474,6 +482,58 @@ public class FlinkHiveCatalogIT extends FlinkCommonIT {
   }
 
   @Test
+  public void testDefaultStorageFormatPersistedInMetastore() {
+    String databaseName = "test_default_storage_format_db";
+    String gravitinoTable = "gravitino_default_storage_table";
+    String nativeFlinkTable = "native_flink_default_storage_table";
+
+    doWithSchema(
+        metalake.loadCatalog(DEFAULT_HIVE_CATALOG),
+        databaseName,
+        catalog -> {
+          TestUtils.assertTableResult(
+              sql("CREATE TABLE %s (id STRING)", gravitinoTable), ResultKind.SUCCESS);
+
+          HiveConf hiveConf = createHiveConf();
+          HiveCatalog flinkHiveCatalog =
+              new HiveCatalog("native_hive", databaseName, hiveConf, null);
+          flinkHiveCatalog.open();
+          try {
+            CatalogTable table =
+                CatalogTable.of(
+                    Schema.newBuilder().column("id", DataTypes.STRING()).build(),
+                    null,
+                    Collections.emptyList(),
+                    ImmutableMap.of("connector", "hive"));
+            flinkHiveCatalog.createTable(
+                new ObjectPath(databaseName, nativeFlinkTable), table, false);
+          } catch (Exception e) {
+            Assertions.fail("Failed to create table with native Flink Hive catalog.", e);
+          } finally {
+            flinkHiveCatalog.close();
+          }
+
+          HiveMetaStoreClient client = null;
+          try {
+            client = new HiveMetaStoreClient(hiveConf);
+            StorageDescriptor gravitinoDescriptor =
+                client.getTable(databaseName, gravitinoTable).getSd();
+            StorageDescriptor nativeDescriptor =
+                client.getTable(databaseName, nativeFlinkTable).getSd();
+            assertDefaultStorageFormat(gravitinoDescriptor, hiveConf);
+            assertDefaultStorageFormat(nativeDescriptor, hiveConf);
+          } catch (Exception e) {
+            Assertions.fail("Failed to read table metadata from Hive metastore.", e);
+          } finally {
+            if (client != null) {
+              client.close();
+            }
+          }
+        },
+        true);
+  }
+
+  @Test
   public void testGetHiveTable() {
     Column[] columns =
         new Column[] {
@@ -591,6 +651,29 @@ public class FlinkHiveCatalogIT extends FlinkCommonIT {
           }
         },
         true);
+  }
+
+  private static HiveConf createHiveConf() {
+    HiveConf hiveConf = HiveCatalog.createHiveConf("src/test/resources/flink-tests", null);
+    hiveConf.setVar(HiveConf.ConfVars.METASTOREURIS, hiveMetastoreUri);
+    return hiveConf;
+  }
+
+  private static void assertDefaultStorageFormat(
+      StorageDescriptor storageDescriptor, HiveConf hiveConf) {
+    String defaultFormat = hiveConf.getVar(HiveConf.ConfVars.HIVEDEFAULTFILEFORMAT);
+    StorageFormatDescriptor descriptor = new StorageFormatFactory().get(defaultFormat);
+    String expectedSerde = descriptor.getSerde();
+    if (expectedSerde == null && descriptor instanceof RCFileStorageFormatDescriptor) {
+      expectedSerde = hiveConf.getVar(HiveConf.ConfVars.HIVEDEFAULTRCFILESERDE);
+    }
+    if (expectedSerde == null) {
+      expectedSerde = hiveConf.getVar(HiveConf.ConfVars.HIVEDEFAULTSERDE);
+    }
+
+    Assertions.assertEquals(descriptor.getInputFormat(), storageDescriptor.getInputFormat());
+    Assertions.assertEquals(descriptor.getOutputFormat(), storageDescriptor.getOutputFormat());
+    Assertions.assertEquals(expectedSerde, storageDescriptor.getSerdeInfo().getSerializationLib());
   }
 
   @Override

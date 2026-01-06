@@ -64,7 +64,7 @@ public class GravitinoHiveCatalogFactory implements BaseCatalogFactory {
         context.getName(),
         helper.getOptions().get(HiveCatalogFactoryOptions.DEFAULT_DATABASE),
         context.getOptions(),
-        propertiesConverter(),
+        new HivePropertiesConverter(hiveConf),
         partitionConverter(),
         hiveConf,
         helper.getOptions().get(HiveCatalogFactoryOptions.HIVE_VERSION));
@@ -115,7 +115,7 @@ public class GravitinoHiveCatalogFactory implements BaseCatalogFactory {
    */
   @Override
   public PropertiesConverter propertiesConverter() {
-    return HivePropertiesConverter.INSTANCE;
+    return new HivePropertiesConverter();
   }
 
   /**
