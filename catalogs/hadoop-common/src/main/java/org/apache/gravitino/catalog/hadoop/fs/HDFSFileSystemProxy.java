@@ -34,7 +34,6 @@ import javax.security.auth.Subject;
 import net.sf.cglib.proxy.Enhancer;
 import net.sf.cglib.proxy.MethodInterceptor;
 import net.sf.cglib.proxy.MethodProxy;
-import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.UserPrincipal;
 import org.apache.gravitino.catalog.hadoop.fs.kerberos.AuthenticationConfig;
 import org.apache.gravitino.catalog.hadoop.fs.kerberos.KerberosClient;
@@ -56,7 +55,7 @@ public class HDFSFileSystemProxy implements MethodInterceptor {
   private static final String SYSTEM_ENV_HADOOP_USER_NAME = "HADOOP_USER_NAME";
   private static final String GRAVITINO_ID_KEY = "gravitino.identifier";
 
-  private final UserGroupInformation loginUgi;
+  private final UserGroupInformation initUgi;
   private final FileSystem fs;
   private final Configuration configuration;
   private final boolean impersonationEnabled;
@@ -84,16 +83,12 @@ public class HDFSFileSystemProxy implements MethodInterceptor {
         this.configuration.set(
             HADOOP_SECURITY_AUTHENTICATION,
             UserGroupInformation.AuthenticationMethod.KERBEROS.name().toLowerCase(Locale.ROOT));
-        this.loginUgi = initKerberosUgi(config, configuration);
+        this.initUgi = initKerberosUgi(config, configuration);
       } else {
-        String userName = System.getenv(SYSTEM_ENV_HADOOP_USER_NAME);
-        if (StringUtils.isEmpty(userName)) {
-          userName = SYSTEM_USER_NAME;
-        }
-        this.loginUgi = UserGroupInformation.createRemoteUser(userName);
+        this.initUgi = UserGroupInformation.getCurrentUser();
       }
 
-      UserGroupInformation currentUgi = getCurrentUser();
+      UserGroupInformation currentUgi = getHadoopUser();
       this.fs =
           currentUgi.doAs(
               (PrivilegedExceptionAction<FileSystem>)
@@ -153,7 +148,7 @@ public class HDFSFileSystemProxy implements MethodInterceptor {
     return subject.getPrincipals(UserPrincipal.class).iterator().next();
   }
 
-  private UserGroupInformation getCurrentUser() throws Exception {
+  private UserGroupInformation getHadoopUser() throws Exception {
     UserGroupInformation currentUgi;
     if (impersonationEnabled) {
       Principal principal = getCurrentPrincipal();
@@ -162,21 +157,21 @@ public class HDFSFileSystemProxy implements MethodInterceptor {
         if (!proxyUserName.contains("@")) {
           proxyUserName = String.format("%s@%s", proxyUserName, kerberosRealm);
         }
-        currentUgi = UserGroupInformation.createProxyUser(proxyUserName, loginUgi);
+        currentUgi = UserGroupInformation.createProxyUser(proxyUserName, initUgi);
         LOG.info("Kerberos impersonation enabled. Proxy user: {}", proxyUserName);
       } else {
-        currentUgi = loginUgi;
+        currentUgi = initUgi;
       }
     } else {
-      currentUgi = loginUgi;
-      LOG.info("Using login user without impersonation: {}", loginUgi.getUserName());
+      currentUgi = initUgi;
+      LOG.info("Using login user without impersonation: {}", initUgi.getUserName());
     }
     return currentUgi;
   }
 
   /** Invoke the method on the underlying FileSystem using ugi.doAs. */
   private Object invokeWithUgi(MethodProxy methodProxy, Object[] objects) throws Throwable {
-    UserGroupInformation currentUgi = getCurrentUser();
+    UserGroupInformation currentUgi = getHadoopUser();
     return currentUgi.doAs(
         (PrivilegedExceptionAction<Object>)
             () -> {
