@@ -935,11 +935,14 @@ export const getTableDetails = createAsyncThunk(
         type: 'sortOrders',
         icon: 'mdi:letter-s-circle',
         items: sortOrders.map(i => {
+          const fields =
+            i.sortTerm?.type === 'field' ? i.sortTerm.fieldName : i.sortTerm?.funcArgs.find(f => f.fieldName)?.fieldName
+
           return {
-            fields: i.sortTerm.fieldName,
+            fields: fields,
             dir: i.direction,
             no: i.nullOrdering,
-            text: `${i.sortTerm.fieldName[0]} ${i.direction} ${i.nullOrdering}`
+            text: `${fields[0]} ${i.direction} ${i.nullOrdering}`
           }
         })
       },

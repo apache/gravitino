@@ -147,7 +147,6 @@ export default function CatalogDetailsPage() {
     <div>
       <Tags
         readOnly={true}
-        metalake={currentMetalake}
         metadataObjectType={'catalog'}
         metadataObjectFullName={store.activatedDetails?.name || catalog}
         key={`catalog-${store.activatedDetails?.name || catalog}-tags`}
@@ -159,7 +158,6 @@ export default function CatalogDetailsPage() {
     <div>
       <Policies
         readOnly={true}
-        metalake={currentMetalake}
         metadataObjectType={'catalog'}
         metadataObjectFullName={store.activatedDetails?.name || catalog}
         key={`catalog-${store.activatedDetails?.name || catalog}-policies`}
@@ -294,10 +292,9 @@ export default function CatalogDetailsPage() {
         render: (_, record) =>
           record?.node === 'schema' ? (
             <Tags
-              metalake={currentMetalake}
               metadataObjectType={'schema'}
-              metadataObjectFullName={`${catalog}.${record.name}`}
-              key={`schema-${catalog}.${record.name}-tags`}
+              metadataObjectFullName={`${record.namespace.at(-1)}.${record.name}`}
+              key={`schema-${record.namespace.at(-1)}.${record.name}-tags`}
             />
           ) : null
       },
@@ -309,10 +306,9 @@ export default function CatalogDetailsPage() {
         render: (_, record) =>
           record?.node === 'schema' ? (
             <Policies
-              metalake={currentMetalake}
               metadataObjectType={'schema'}
-              metadataObjectFullName={`${catalog}.${record.name}`}
-              key={`schema-${catalog}.${record.name}-policies`}
+              metadataObjectFullName={`${record.namespace.at(-1)}.${record.name}`}
+              key={`schema-${record.namespace.at(-1)}.${record.name}-policies`}
             />
           ) : null
       },
@@ -375,7 +371,7 @@ export default function CatalogDetailsPage() {
           ]
         : [])
     ],
-    [currentMetalake, catalogType, catalog, anthEnable]
+    [catalogType, anthEnable]
   )
 
   const { resizableColumns, components, tableWidth } = useAntdColumnResize(() => {

@@ -27,7 +27,11 @@ import { cn } from '@/lib/utils/tailwind'
 
 export default function SpecialColumnTypeComponent({ ...props }) {
   const { form, parentField, subField, columnNamespace, isEdit, columnTypes, provider } = props
-  const currentType = Form.useWatch([...parentField, subField.name, 'typeObj', ...columnNamespace, 'type'], form)
+
+  const currentType = Form.useWatch(
+    [...parentField, subField.name, 'typeObj', ...columnNamespace, 'type'],
+    form
+  )?.toLowerCase()
 
   const fieldColumns = Form.useWatch(
     [...parentField, subField.name, 'typeObj', ...columnNamespace, 'fieldColumns'],

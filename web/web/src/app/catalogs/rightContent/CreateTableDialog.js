@@ -297,7 +297,7 @@ export default function CreateTableDialog({ ...props }) {
               form.setFieldValue(['columns', key, 'comment'], table.columns[key].comment || '')
               form.setFieldValue(['columns', key, 'isEdit'], true)
               if (typeof table.columns[key].type === 'string') {
-                form.setFieldValue(['columns', key, 'typeObj', 'type'], table.columns[key].type)
+                form.setFieldValue(['columns', key, 'typeObj', 'type'], capitalizeFirstLetter(table.columns[key].type))
               } else {
                 const type = table.columns[key].type.type
                 const elementType = table.columns[key].type?.elementType
@@ -308,7 +308,10 @@ export default function CreateTableDialog({ ...props }) {
                     form.setFieldValue(['columns', key, 'typeObj'], {
                       type: table.columns[key].type?.type,
                       element: {
-                        type: typeof elementType === 'string' ? elementType : elementType.type,
+                        type:
+                          typeof elementType === 'string'
+                            ? capitalizeFirstLetter(elementType)
+                            : capitalizeFirstLetter(elementType.type),
                         required: !table.columns[key].type?.containsNull,
                         ...getElementType(table.columns[key].type?.elementType)
                       }
@@ -318,12 +321,18 @@ export default function CreateTableDialog({ ...props }) {
                     form.setFieldValue(['columns', key, 'typeObj'], {
                       type: table.columns[key].type?.type,
                       keyObj: {
-                        type: typeof keyType === 'string' ? keyType : keyType.type,
+                        type:
+                          typeof keyType === 'string'
+                            ? capitalizeFirstLetter(keyType)
+                            : capitalizeFirstLetter(keyType.type),
                         required: true,
                         ...getElementType(table.columns[key].type?.keyType)
                       },
                       valueObj: {
-                        type: typeof valueType === 'string' ? valueType : valueType.type,
+                        type:
+                          typeof valueType === 'string'
+                            ? capitalizeFirstLetter(valueType)
+                            : capitalizeFirstLetter(valueType.type),
                         required: !table.columns[key].type?.valueContainsNull,
                         ...getElementType(table.columns[key].type?.valueType)
                       }
@@ -337,7 +346,10 @@ export default function CreateTableDialog({ ...props }) {
                           id: col.name,
                           name: col.name,
                           typeObj: {
-                            type: typeof col.type === 'string' ? col.type : col.type.type,
+                            type:
+                              typeof col.type === 'string'
+                                ? capitalizeFirstLetter(col.type)
+                                : capitalizeFirstLetter(col.type.type),
                             ...getElementType(col.type)
                           },
                           required: !col.nullable,
@@ -352,7 +364,8 @@ export default function CreateTableDialog({ ...props }) {
                       types: table.columns[key].type?.types.map(type => {
                         return {
                           typeObj: {
-                            type: typeof type === 'string' ? type : type.type,
+                            type:
+                              typeof type === 'string' ? capitalizeFirstLetter(type) : capitalizeFirstLetter(type.type),
                             ...getElementType(type)
                           }
                         }
@@ -360,7 +373,10 @@ export default function CreateTableDialog({ ...props }) {
                     })
                     break
                   default:
-                    form.setFieldValue(['columns', key, 'typeObj', 'type'], table.columns[key].type)
+                    form.setFieldValue(
+                      ['columns', key, 'typeObj', 'type'],
+                      capitalizeFirstLetter(table.columns[key].type)
+                    )
                 }
               }
               if (table.columns[key].defaultValue) {
@@ -405,17 +421,19 @@ export default function CreateTableDialog({ ...props }) {
               table.indexes.forEach(item => {
                 const fields = item.fieldNames.map(f => f[0])
                 form.setFieldValue(['indexes', idxIndex, 'name'], item.name)
-                form.setFieldValue(['indexes', idxIndex, 'indexType'], item.indexType)
+                form.setFieldValue(['indexes', idxIndex, 'indexType'], capitalizeFirstLetter(item.indexType))
                 form.setFieldValue(['indexes', idxIndex, 'fieldName'], fields)
                 idxIndex++
               })
             }
             let idxProperty = 0
-            Object.entries(table.properties || {}).forEach(([key, value]) => {
-              form.setFieldValue(['properties', idxProperty, 'key'], key)
-              form.setFieldValue(['properties', idxProperty, 'value'], value)
-              idxProperty++
-            })
+            if (table.properties && Object.keys(table.properties).length) {
+              Object.entries(table.properties).forEach(([key, value]) => {
+                form.setFieldValue(['properties', idxProperty, 'key'], key)
+                form.setFieldValue(['properties', idxProperty, 'value'], value)
+                idxProperty++
+              })
+            }
             handScroll()
             setIsLoading(false)
           } catch (e) {

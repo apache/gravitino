@@ -25,6 +25,7 @@ import { cn } from '@/lib/utils/tailwind'
 import { useAppSelector, useAppDispatch } from '@/lib/hooks/useStore'
 import { associatePolicy } from '@/lib/store/policies'
 import { getCurrentEntityPolicies } from '@/lib/store/metalakes'
+import { useSearchParams } from 'next/navigation'
 
 const tagInputStyle = {
   width: 100,
@@ -34,7 +35,7 @@ const tagInputStyle = {
 }
 
 export default function PolicyTag({ ...props }) {
-  const { readOnly, metalake, metadataObjectType, metadataObjectFullName } = props
+  const { readOnly, metadataObjectType, metadataObjectFullName } = props
   const { token } = theme.useToken()
   const [inputVisible, setInputVisible] = useState(false)
   const [optionList, setOptionList] = useState([])
@@ -43,10 +44,12 @@ export default function PolicyTag({ ...props }) {
   const store = useAppSelector(state => state.policies)
   const dispatch = useAppDispatch()
   const [policiesForEntity, setPoliciesForEntity] = useState([])
+  const searchParams = useSearchParams()
+  const currentMetalake = searchParams.get('metalake')
 
   const getPoliciesForEntity = async () => {
     const { payload } = await dispatch(
-      getCurrentEntityPolicies({ metalake, metadataObjectType, metadataObjectFullName, details: true })
+      getCurrentEntityPolicies({ metalake: currentMetalake, metadataObjectType, metadataObjectFullName, details: true })
     )
 
     return payload?.policies || []
@@ -57,10 +60,10 @@ export default function PolicyTag({ ...props }) {
       const policies = await getPoliciesForEntity()
       setPoliciesForEntity(policies)
     }
-    if (metalake && metadataObjectType && metadataObjectFullName) {
+    if (currentMetalake && metadataObjectType && metadataObjectFullName) {
       initLoad()
     }
-  }, [metalake, metadataObjectType, metadataObjectFullName])
+  }, [metadataObjectType, metadataObjectFullName])
 
   useEffect(() => {
     if (inputVisible) {
@@ -101,7 +104,12 @@ export default function PolicyTag({ ...props }) {
   const handleChange = async value => {
     if (value && !policiesForEntity?.map(policy => policy.name)?.includes(value)) {
       await dispatch(
-        associatePolicy({ metalake, metadataObjectType, metadataObjectFullName, data: { policiesToAdd: [value] } })
+        associatePolicy({
+          metalake: currentMetalake,
+          metadataObjectType,
+          metadataObjectFullName,
+          data: { policiesToAdd: [value] }
+        })
       )
       const policies = await getPoliciesForEntity()
       setPoliciesForEntity(policies)
@@ -112,7 +120,7 @@ export default function PolicyTag({ ...props }) {
   const handleClose = async removedPolicy => {
     await dispatch(
       associatePolicy({
-        metalake,
+        metalake: currentMetalake,
         metadataObjectType,
         metadataObjectFullName,
         data: { policiesToRemove: [removedPolicy] }
@@ -127,7 +135,7 @@ export default function PolicyTag({ ...props }) {
   }
 
   const handleClick = name => () => {
-    router.push(`/metadataObjectsForPolicy?policy=${name}&metalake=${metalake}`)
+    router.push(`/metadataObjectsForPolicy?policy=${name}&metalake=${currentMetalake}`)
   }
 
   const tagPlusStyle = {

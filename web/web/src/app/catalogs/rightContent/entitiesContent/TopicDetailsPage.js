@@ -77,23 +77,13 @@ export default function TopicDetailsPage({ ...props }) {
 
   const tagContent = (
     <div>
-      <Tags
-        readOnly={true}
-        metalake={currentMetalake}
-        metadataObjectType={'topic'}
-        metadataObjectFullName={`${catalog}.${schema}.${topic}`}
-      />
+      <Tags readOnly={true} metadataObjectType={'topic'} metadataObjectFullName={`${catalog}.${schema}.${topic}`} />
     </div>
   )
 
   const policyContent = (
     <div>
-      <Policies
-        readOnly={true}
-        metalake={currentMetalake}
-        metadataObjectType={'topic'}
-        metadataObjectFullName={`${catalog}.${schema}.${topic}`}
-      />
+      <Policies readOnly={true} metadataObjectType={'topic'} metadataObjectFullName={`${catalog}.${schema}.${topic}`} />
     </div>
   )
   const properties = store.activatedDetails?.properties

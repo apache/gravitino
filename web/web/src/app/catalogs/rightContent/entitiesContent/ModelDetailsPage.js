@@ -118,23 +118,13 @@ export default function ModelDetailsPage({ ...props }) {
 
   const tagContent = (
     <div>
-      <Tags
-        readOnly={true}
-        metalake={currentMetalake}
-        metadataObjectType={'model'}
-        metadataObjectFullName={`${catalog}.${schema}.${model}`}
-      />
+      <Tags readOnly={true} metadataObjectType={'model'} metadataObjectFullName={`${catalog}.${schema}.${model}`} />
     </div>
   )
 
   const policyContent = (
     <div>
-      <Policies
-        readOnly={true}
-        metalake={currentMetalake}
-        metadataObjectType={'model'}
-        metadataObjectFullName={`${catalog}.${schema}.${model}`}
-      />
+      <Policies readOnly={true} metadataObjectType={'model'} metadataObjectFullName={`${catalog}.${schema}.${model}`} />
     </div>
   )
 

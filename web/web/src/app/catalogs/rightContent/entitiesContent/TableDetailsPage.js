@@ -128,23 +128,13 @@ export default function TableDetailsPage({ ...props }) {
 
   const tagContent = (
     <div>
-      <Tags
-        readOnly={true}
-        metalake={currentMetalake}
-        metadataObjectType={'table'}
-        metadataObjectFullName={`${catalog}.${schema}.${table}`}
-      />
+      <Tags readOnly={true} metadataObjectType={'table'} metadataObjectFullName={`${catalog}.${schema}.${table}`} />
     </div>
   )
 
   const policyContent = (
     <div>
-      <Policies
-        readOnly={true}
-        metalake={currentMetalake}
-        metadataObjectType={'table'}
-        metadataObjectFullName={`${catalog}.${schema}.${table}`}
-      />
+      <Policies readOnly={true} metadataObjectType={'table'} metadataObjectFullName={`${catalog}.${schema}.${table}`} />
     </div>
   )
   const properties = store.activatedDetails?.properties
@@ -432,7 +422,6 @@ export default function TableDetailsPage({ ...props }) {
         render: (_, record) =>
           !record?.node ? (
             <Tags
-              metalake={currentMetalake}
               metadataObjectType={'column'}
               metadataObjectFullName={`${catalog}.${schema}.${table}.${record.name}`}
             />
@@ -445,14 +434,13 @@ export default function TableDetailsPage({ ...props }) {
         render: (_, record) =>
           !record?.node ? (
             <Policies
-              metalake={currentMetalake}
               metadataObjectType={'column'}
               metadataObjectFullName={`${catalog}.${schema}.${table}.${record.name}`}
             />
           ) : null
       }
     ],
-    [currentMetalake, store.activatedDetails]
+    [store.activatedDetails]
   )
 
   const { resizableColumns, components, tableWidth } = useAntdColumnResize(() => {
