@@ -25,6 +25,10 @@ import org.apache.gravitino.Config;
 import org.apache.gravitino.config.ConfigBuilder;
 import org.apache.gravitino.config.ConfigConstants;
 import org.apache.gravitino.config.ConfigEntry;
+import org.apache.gravitino.maintenance.optimizer.recommender.job.NoopJobSubmitter;
+import org.apache.gravitino.maintenance.optimizer.recommender.statistics.GravitinoStatisticsProvider;
+import org.apache.gravitino.maintenance.optimizer.recommender.strategy.GravitinoStrategyProvider;
+import org.apache.gravitino.maintenance.optimizer.recommender.table.GravitinoTableMetadataProvider;
 
 /**
  * Central configuration holder for the optimizer/recommender runtime. Keys are grouped under the
@@ -51,37 +55,45 @@ public class OptimizerConfig extends Config {
       new ConfigBuilder(STATISTICS_PROVIDER)
           .doc(
               "Statistics provider implementation name (matches Provider.name()) discoverable via "
-                  + "ServiceLoader. Example: 'gravitino-statistics-provider'.")
+                  + "ServiceLoader. Example: '"
+                  + GravitinoStatisticsProvider.NAME
+                  + "'.")
           .version(ConfigConstants.VERSION_1_2_0)
           .stringConf()
-          .create();
+          .createWithDefault(GravitinoStatisticsProvider.NAME);
 
   public static final ConfigEntry<String> STRATEGY_PROVIDER_CONFIG =
       new ConfigBuilder(STRATEGY_PROVIDER)
           .doc(
               "Strategy provider implementation name (matches Provider.name()) discoverable via "
-                  + "ServiceLoader. Example: 'gravitino-strategy-provider'.")
+                  + "ServiceLoader. Example: '"
+                  + GravitinoStrategyProvider.NAME
+                  + "'.")
           .version(ConfigConstants.VERSION_1_2_0)
           .stringConf()
-          .create();
+          .createWithDefault(GravitinoStrategyProvider.NAME);
 
   public static final ConfigEntry<String> TABLE_META_PROVIDER_CONFIG =
       new ConfigBuilder(TABLE_META_PROVIDER)
           .doc(
               "Table metadata provider implementation name (matches Provider.name()) discoverable "
-                  + "via ServiceLoader. Example: 'gravitino-table-metadata-provider'.")
+                  + "via ServiceLoader. Example: '"
+                  + GravitinoTableMetadataProvider.NAME
+                  + "'.")
           .version(ConfigConstants.VERSION_1_2_0)
           .stringConf()
-          .create();
+          .createWithDefault(GravitinoTableMetadataProvider.NAME);
 
   public static final ConfigEntry<String> JOB_SUBMITTER_CONFIG =
       new ConfigBuilder(JOB_SUBMITTER)
           .doc(
               "Job submitter implementation name (matches Provider.name()) discoverable via "
-                  + "ServiceLoader. Example: 'gravitino-job-submitter'.")
+                  + "ServiceLoader. Example: '"
+                  + NoopJobSubmitter.NAME
+                  + "'.")
           .version(ConfigConstants.VERSION_1_2_0)
           .stringConf()
-          .create();
+          .createWithDefault(NoopJobSubmitter.NAME);
 
   public static final ConfigEntry<String> GRAVITINO_URI_CONFIG =
       new ConfigBuilder(GRAVITINO_URI)
