@@ -3087,6 +3087,121 @@ public class TestEntityStorage {
 
   @ParameterizedTest
   @MethodSource("storageProvider")
+  void testTagRelationMultipleBindings(String type) throws Exception {
+    Config config = Mockito.mock(Config.class);
+    init(type, config);
+
+    AuditInfo auditInfo =
+        AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
+
+    try (EntityStore store = EntityStoreFactory.createEntityStore(config)) {
+      store.initialize(config);
+
+      BaseMetalake metalake =
+          createBaseMakeLake(RandomIdGenerator.INSTANCE.nextId(), "metalake", auditInfo);
+      store.put(metalake, false);
+
+      Namespace tagNamespace = NameIdentifierUtil.ofTag("metalake", "tag1").namespace();
+      TagEntity tag1 =
+          TagEntity.builder()
+              .withId(RandomIdGenerator.INSTANCE.nextId())
+              .withNamespace(tagNamespace)
+              .withName("tag1")
+              .withAuditInfo(auditInfo)
+              .withProperties(Collections.emptyMap())
+              .build();
+
+      CatalogEntity catalog1 =
+          createCatalog(
+              RandomIdGenerator.INSTANCE.nextId(),
+              NamespaceUtil.ofCatalog("metalake"),
+              "catalog1",
+              auditInfo);
+
+      store.put(tag1, false);
+      store.put(catalog1, false);
+
+      SupportsRelationOperations relationOperations = (SupportsRelationOperations) store;
+
+      relationOperations.updateEntityRelations(
+          SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL,
+          catalog1.nameIdentifier(),
+          EntityType.CATALOG,
+          new NameIdentifier[] {tag1.nameIdentifier()},
+          new NameIdentifier[] {});
+
+      List<TagEntity> tagsForCatalog1 =
+          relationOperations.listEntitiesByRelation(
+              SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL,
+              catalog1.nameIdentifier(),
+              EntityType.CATALOG,
+              true);
+      Assertions.assertEquals(1, tagsForCatalog1.size());
+      Assertions.assertEquals(tag1, tagsForCatalog1.get(0));
+
+      List<GenericEntity> entitiesForTag1 =
+          relationOperations.listEntitiesByRelation(
+              SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL,
+              tag1.nameIdentifier(),
+              EntityType.TAG,
+              true);
+      Assertions.assertEquals(1, entitiesForTag1.size());
+      Assertions.assertEquals(catalog1.id(), entitiesForTag1.get(0).id());
+      Assertions.assertEquals(catalog1.name(), entitiesForTag1.get(0).name());
+
+      CatalogEntity catalog2 =
+          createCatalog(
+              RandomIdGenerator.INSTANCE.nextId(),
+              NamespaceUtil.ofCatalog("metalake"),
+              "catalog2",
+              auditInfo);
+      store.put(catalog2, false);
+
+      relationOperations.updateEntityRelations(
+          SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL,
+          catalog2.nameIdentifier(),
+          EntityType.CATALOG,
+          new NameIdentifier[] {tag1.nameIdentifier()},
+          new NameIdentifier[] {});
+
+      tagsForCatalog1 =
+          relationOperations.listEntitiesByRelation(
+              SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL,
+              catalog1.nameIdentifier(),
+              EntityType.CATALOG,
+              true);
+      Assertions.assertEquals(1, tagsForCatalog1.size());
+      Assertions.assertEquals(tag1, tagsForCatalog1.get(0));
+
+      List<TagEntity> tagsForCatalog2 =
+          relationOperations.listEntitiesByRelation(
+              SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL,
+              catalog2.nameIdentifier(),
+              EntityType.CATALOG,
+              true);
+      Assertions.assertEquals(1, tagsForCatalog2.size());
+      Assertions.assertEquals(tag1, tagsForCatalog2.get(0));
+
+      entitiesForTag1 =
+          relationOperations.listEntitiesByRelation(
+              SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL,
+              tag1.nameIdentifier(),
+              EntityType.TAG,
+              true);
+      Assertions.assertEquals(2, entitiesForTag1.size());
+      List<Long> entityIds =
+          entitiesForTag1.stream().map(GenericEntity::id).collect(Collectors.toList());
+      List<String> entityNames =
+          entitiesForTag1.stream().map(GenericEntity::name).collect(Collectors.toList());
+      Assertions.assertTrue(entityIds.contains(catalog1.id()));
+      Assertions.assertTrue(entityIds.contains(catalog2.id()));
+      Assertions.assertTrue(entityNames.contains(catalog1.name()));
+      Assertions.assertTrue(entityNames.contains(catalog2.name()));
+    }
+  }
+
+  @ParameterizedTest
+  @MethodSource("storageProvider")
   void testLanceTableCreateAndUpdate(String type) {
     Config config = Mockito.mock(Config.class);
     init(type, config);

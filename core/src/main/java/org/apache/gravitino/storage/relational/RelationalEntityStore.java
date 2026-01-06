@@ -253,6 +253,7 @@ public class RelationalEntityStore implements EntityStore, SupportsRelationOpera
       boolean override)
       throws IOException {
     cache.invalidate(srcIdentifier, srcType, relType);
+    cache.invalidate(dstIdentifier, dstType, relType);
     backend.insertRelation(relType, srcIdentifier, srcType, dstIdentifier, dstType, override);
   }
 
@@ -265,6 +266,14 @@ public class RelationalEntityStore implements EntityStore, SupportsRelationOpera
       NameIdentifier[] destEntitiesToRemove)
       throws IOException, NoSuchEntityException, EntityAlreadyExistsException {
     cache.invalidate(srcEntityIdent, srcEntityType, relType);
+    for (NameIdentifier destToAdd : destEntitiesToAdd) {
+      cache.invalidate(destToAdd, srcEntityType, relType);
+    }
+
+    for (NameIdentifier destToRemove : destEntitiesToRemove) {
+      cache.invalidate(destToRemove, srcEntityType, relType);
+    }
+
     return backend.updateEntityRelations(
         relType, srcEntityIdent, srcEntityType, destEntitiesToAdd, destEntitiesToRemove);
   }
