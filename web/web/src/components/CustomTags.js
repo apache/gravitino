@@ -26,6 +26,7 @@ import { Flex, Select, Space, Tag, Tooltip, theme } from 'antd'
 import { useAppSelector, useAppDispatch } from '@/lib/hooks/useStore'
 import { associateTag } from '@/lib/store/tags'
 import { getCurrentEntityTags } from '@/lib/store/metalakes'
+import { useSearchParams } from 'next/navigation'
 
 const tagInputStyle = {
   width: 100,
@@ -35,7 +36,7 @@ const tagInputStyle = {
 }
 
 export default function Tags({ ...props }) {
-  const { readOnly, metalake, metadataObjectType, metadataObjectFullName } = props
+  const { readOnly, metadataObjectType, metadataObjectFullName } = props
   const { token } = theme.useToken()
   const [inputVisible, setInputVisible] = useState(false)
   const [optionList, setOptionList] = useState([])
@@ -44,10 +45,12 @@ export default function Tags({ ...props }) {
   const store = useAppSelector(state => state.tags)
   const dispatch = useAppDispatch()
   const [tagsForEntity, setTagsForEntity] = useState([])
+  const searchParams = useSearchParams()
+  const currentMetalake = searchParams.get('metalake')
 
   const getTagsForEntity = async () => {
     const { payload } = await dispatch(
-      getCurrentEntityTags({ metalake, metadataObjectType, metadataObjectFullName, details: true })
+      getCurrentEntityTags({ metalake: currentMetalake, metadataObjectType, metadataObjectFullName, details: true })
     )
 
     return payload?.tags || []
@@ -58,10 +61,10 @@ export default function Tags({ ...props }) {
       const tags = await getTagsForEntity()
       setTagsForEntity(tags)
     }
-    if (metalake && metadataObjectType && metadataObjectFullName) {
+    if (currentMetalake && metadataObjectType && metadataObjectFullName) {
       initLoad()
     }
-  }, [metalake, metadataObjectType, metadataObjectFullName])
+  }, [metadataObjectType, metadataObjectFullName])
 
   useEffect(() => {
     if (inputVisible) {
@@ -101,7 +104,12 @@ export default function Tags({ ...props }) {
   const handleChange = async value => {
     if (value && !tagsForEntity?.map(tag => tag.name)?.includes(value)) {
       await dispatch(
-        associateTag({ metalake, metadataObjectType, metadataObjectFullName, data: { tagsToAdd: [value] } })
+        associateTag({
+          metalake: currentMetalake,
+          metadataObjectType,
+          metadataObjectFullName,
+          data: { tagsToAdd: [value] }
+        })
       )
     }
     const tags = await getTagsForEntity()
@@ -111,7 +119,12 @@ export default function Tags({ ...props }) {
 
   const handleClose = async removedTag => {
     await dispatch(
-      associateTag({ metalake, metadataObjectType, metadataObjectFullName, data: { tagsToRemove: [removedTag] } })
+      associateTag({
+        metalake: currentMetalake,
+        metadataObjectType,
+        metadataObjectFullName,
+        data: { tagsToRemove: [removedTag] }
+      })
     )
     const tags = await getTagsForEntity()
     setTagsForEntity(tags)
@@ -122,7 +135,7 @@ export default function Tags({ ...props }) {
   }
 
   const handleClick = name => () => {
-    router.push(`/metadataObjectsForTag?tag=${name}&metalake=${metalake}`)
+    router.push(`/metadataObjectsForTag?tag=${name}&metalake=${currentMetalake}`)
   }
 
   const tagPlusStyle = {

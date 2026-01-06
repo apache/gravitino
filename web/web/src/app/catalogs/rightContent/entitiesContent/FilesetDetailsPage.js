@@ -91,12 +91,7 @@ export default function FilesetDetailsPage({ ...props }) {
 
   const tagContent = (
     <div>
-      <Tags
-        readOnly={true}
-        metalake={currentMetalake}
-        metadataObjectType={'fileset'}
-        metadataObjectFullName={`${catalog}.${schema}.${fileset}`}
-      />
+      <Tags readOnly={true} metadataObjectType={'fileset'} metadataObjectFullName={`${catalog}.${schema}.${fileset}`} />
     </div>
   )
 
@@ -104,7 +99,6 @@ export default function FilesetDetailsPage({ ...props }) {
     <div>
       <Policies
         readOnly={true}
-        metalake={currentMetalake}
         metadataObjectType={'fileset'}
         metadataObjectFullName={`${catalog}.${schema}.${fileset}`}
       />

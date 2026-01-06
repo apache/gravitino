@@ -202,23 +202,13 @@ export default function SchemaDetailsPage() {
 
   const tagContent = (
     <div>
-      <Tags
-        readOnly={true}
-        metalake={currentMetalake}
-        metadataObjectType={'schema'}
-        metadataObjectFullName={`${catalog}.${schema}`}
-      />
+      <Tags readOnly={true} metadataObjectType={'schema'} metadataObjectFullName={`${catalog}.${schema}`} />
     </div>
   )
 
   const policyContent = (
     <div>
-      <Policies
-        readOnly={true}
-        metalake={currentMetalake}
-        metadataObjectType={'schema'}
-        metadataObjectFullName={`${catalog}.${schema}`}
-      />
+      <Policies readOnly={true} metadataObjectType={'schema'} metadataObjectFullName={`${catalog}.${schema}`} />
     </div>
   )
   const properties = store.activatedDetails?.properties
@@ -419,9 +409,8 @@ export default function SchemaDetailsPage() {
         render: (_, record) =>
           record?.node === entityType ? (
             <Tags
-              metalake={currentMetalake}
               metadataObjectType={entityType}
-              metadataObjectFullName={`${catalog}.${schema}.${record.name}`}
+              metadataObjectFullName={`${record.namespace.at(-2)}.${record.namespace.at(-1)}.${record.name}`}
             />
           ) : null
       },
@@ -432,9 +421,8 @@ export default function SchemaDetailsPage() {
         render: (_, record) =>
           record?.node === entityType ? (
             <Policies
-              metalake={currentMetalake}
               metadataObjectType={entityType}
-              metadataObjectFullName={`${catalog}.${schema}.${record.name}`}
+              metadataObjectFullName={`${record.namespace.at(-2)}.${record.namespace.at(-1)}.${record.name}`}
             />
           ) : null
       },
@@ -451,22 +439,14 @@ export default function SchemaDetailsPage() {
             anthEnable={anthEnable}
             handleEdit={() => handleEdit(record.name)}
             showDeleteConfirm={modal => showDeleteConfirm(modal, record, entityType)}
-            handleSetOwner={() => handleSetOwner(catalogType, `${catalog}.${schema}.${record.name}`)}
+            handleSetOwner={() =>
+              handleSetOwner(catalogType, `${record.namespace.at(-2)}.${record.namespace.at(-1)}.${record.name}`)
+            }
           />
         )
       }
     ],
-    [
-      nameCol,
-      catalog,
-      schema,
-      catalogType,
-      currentMetalake,
-      entityType,
-      store.tableLoading,
-      anthEnable,
-      catalogData?.provider
-    ]
+    [nameCol, entityType, store.tableLoading, anthEnable, catalogData?.provider]
   )
 
   const { resizableColumns, components, tableWidth } = useAntdColumnResize(() => {

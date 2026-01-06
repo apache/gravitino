@@ -83,7 +83,7 @@ export default function ColumnTypeComponent({ ...props }) {
       setIsShowParamsInput(false)
       setErrorMsg('')
       const currentTypeParam = extractNumbersInParentheses(currentType)
-      const value = currentType?.replace(/\([^)]*\)/g, '')
+      const value = currentType?.replace(/\([^)]*\)/g, '')?.toLowerCase()
       if (currentTypeParam && !paramL && ColumnWithParamType.includes(value)) {
         setParamL(currentTypeParam)
       }
@@ -95,29 +95,29 @@ export default function ColumnTypeComponent({ ...props }) {
       if (ColumnWithParamType.includes(value)) {
         form.setFieldValue(
           [...parentField, subField.name, 'typeObj', ...columnNamespace, 'type'],
-          value + `(${paramL || currentTypeParam})`
+          capitalizeFirstLetter(value) + `(${paramL || currentTypeParam})`
         )
         if (!paramL && !currentTypeParam) {
-          setErrorMsg(t('common.missL'))
+          setErrorMsg('L is missing')
         }
       }
       if (value === 'decimal') {
         form.setFieldValue(
           [...parentField, subField.name, 'typeObj', ...columnNamespace, 'type'],
-          value + `(${paramP || currentTypeParam1 || ''},${paramS || currentTypeParam2 || ''})`
+          capitalizeFirstLetter(value) + `(${paramP || currentTypeParam1 || ''},${paramS || currentTypeParam2 || ''})`
         )
         const errors = []
         if (!paramP && !currentTypeParam1) {
-          errors.push(t('common.missP'))
+          errors.push('P is missing')
         }
         if (!paramS && !currentTypeParam2) {
-          errors.push(t('common.missS'))
+          errors.push('S is missing')
         }
         if (paramP && +paramP > 38) {
-          errors.push(t('common.errorP'))
+          errors.push('P can not > 38')
         }
         if (paramS && +paramP < +paramS) {
-          errors.push(t('common.errorS'))
+          errors.push('P can not < S')
         }
         if (errors.length) {
           setErrorMsg(errors.join(', '))
@@ -149,7 +149,7 @@ export default function ColumnTypeComponent({ ...props }) {
             () => ({
               validator(_, type) {
                 if (!type) {
-                  return Promise.reject(new Error(t('table.columnTypeRequired')))
+                  return Promise.reject(new Error('The column type is required!'))
                 }
 
                 return Promise.resolve()
@@ -195,7 +195,7 @@ export default function ColumnTypeComponent({ ...props }) {
           cancelText='Cancel'
         ></Popconfirm>
 
-        {currentType && ColumnSpesicalType.includes(currentType) && (
+        {currentType && ColumnSpesicalType.includes(currentType.toLowerCase()) && (
           <Button type='link' className='ml-1 h-min p-0' onClick={editSpecialColumnType}>
             Edit
           </Button>
@@ -216,7 +216,7 @@ export default function ColumnTypeComponent({ ...props }) {
             </div>
           )}
         {typeof currentType === 'string' &&
-          currentType?.replace(/\([^)]*\)/g, '') === 'decimal' &&
+          currentType?.replace(/\([^)]*\)/g, '').toLowerCase() === 'decimal' &&
           isShowParamsInput && (
             <>
               <div className='ml-1 border-b focus-within:border-[color:theme(colors.defaultPrimary)]'>

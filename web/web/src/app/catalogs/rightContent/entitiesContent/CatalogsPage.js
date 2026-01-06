@@ -225,7 +225,6 @@ export default function CatalogsPage() {
         render: (_, record) =>
           record?.node === 'catalog' ? (
             <Tags
-              metalake={currentMetalake}
               metadataObjectType={'catalog'}
               metadataObjectFullName={record.name}
               key={`catalog-${record.name}-tags`}
@@ -240,10 +239,8 @@ export default function CatalogsPage() {
         render: (_, record) =>
           record?.node === 'catalog' ? (
             <Policies
-              metalake={currentMetalake}
               metadataObjectType={'catalog'}
               metadataObjectFullName={record.name}
-              isLoading={store.tableLoading}
               key={`catalog-${record.name}-policies`}
             />
           ) : null
@@ -318,7 +315,7 @@ export default function CatalogsPage() {
         }
       }
     ],
-    [currentMetalake, catalogType, anthEnable, store.tableLoading, store.tableData]
+    [catalogType, anthEnable, store.tableLoading, store.tableData]
   )
 
   const { resizableColumns, components, tableWidth } = useAntdColumnResize(() => {
