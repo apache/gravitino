@@ -38,7 +38,7 @@ public class TestCreateGravitinoConnector {
   public void testCreateConnectorsWithEnableSimpleCatalog() throws Exception {
     server = new GravitinoMockServer();
     Session session = testSessionBuilder().setCatalog("gravitino").build();
-    QueryRunner queryRunner = DistributedQueryRunner.builder(session).setNodeCount(1).build();
+    QueryRunner queryRunner = DistributedQueryRunner.builder(session).setWorkerCount(1).build();
 
     GravitinoAdminClient gravitinoClient = server.createGravitinoClient();
     TestGravitinoPlugin gravitinoPlugin = new TestGravitinoPlugin(gravitinoClient);
@@ -74,7 +74,7 @@ public class TestCreateGravitinoConnector {
   public void testCreateConnectorsWithDisableSimpleCatalog() throws Exception {
     server = new GravitinoMockServer();
     Session session = testSessionBuilder().setCatalog("gravitino").build();
-    QueryRunner queryRunner = DistributedQueryRunner.builder(session).setNodeCount(1).build();
+    QueryRunner queryRunner = DistributedQueryRunner.builder(session).setWorkerCount(1).build();
 
     GravitinoAdminClient gravitinoClient = server.createGravitinoClient();
     TestGravitinoPlugin gravitinoPlugin = new TestGravitinoPlugin(gravitinoClient);

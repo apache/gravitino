@@ -24,6 +24,10 @@ import org.apache.gravitino.client.GravitinoAdminClient;
 public class TestGravitinoConnectorFactory extends GravitinoConnectorFactory {
   private GravitinoAdminClient gravitinoClient;
 
+  public TestGravitinoConnectorFactory() {
+    super();
+  }
+
   public void setGravitinoClient(GravitinoAdminClient client) {
     this.gravitinoClient = client;
   }

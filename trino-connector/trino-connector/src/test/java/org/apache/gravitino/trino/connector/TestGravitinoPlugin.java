@@ -20,11 +20,13 @@ package org.apache.gravitino.trino.connector;
 
 import com.google.common.collect.ImmutableList;
 import io.trino.spi.connector.ConnectorFactory;
+import java.util.ArrayList;
+import java.util.List;
 import org.apache.gravitino.client.GravitinoAdminClient;
 import org.apache.gravitino.trino.connector.catalog.CatalogConnectorManager;
 
 public class TestGravitinoPlugin extends GravitinoPlugin {
-  private TestGravitinoConnectorFactory factory;
+  private List<TestGravitinoConnectorFactory> factorys = new ArrayList<>();
 
   private final GravitinoAdminClient gravitinoClient;
 
@@ -34,12 +36,18 @@ public class TestGravitinoPlugin extends GravitinoPlugin {
 
   @Override
   public Iterable<ConnectorFactory> getConnectorFactories() {
-    factory = new TestGravitinoConnectorFactory();
+    TestGravitinoConnectorFactory factory = new TestGravitinoConnectorFactory();
     factory.setGravitinoClient(gravitinoClient);
+    factorys.add(factory);
     return ImmutableList.of(factory);
   }
 
   public CatalogConnectorManager getCatalogConnectorManager() {
-    return factory.getCatalogConnectorManager();
+    for (TestGravitinoConnectorFactory factory : factorys) {
+      if (factory.getCatalogConnectorManager() != null) {
+        return factory.getCatalogConnectorManager();
+      }
+    }
+    throw new RuntimeException("Failed to get CatalogConnectorManager");
   }
 }

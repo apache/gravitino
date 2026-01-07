@@ -54,7 +54,7 @@ public class TestGravitinoConnectorWithMetalakeCatalogName extends AbstractTestQ
 
     try {
       DistributedQueryRunner queryRunner =
-          DistributedQueryRunner.builder(session).setNodeCount(1).build();
+          DistributedQueryRunner.builder(session).setWorkerCount(1).build();
 
       TestGravitinoPlugin gravitinoPlugin = new TestGravitinoPlugin(gravitinoClient);
       queryRunner.installPlugin(gravitinoPlugin);

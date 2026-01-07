@@ -131,8 +131,8 @@ public class CatalogConnectorManager {
    * @throws Exception if the catalog connector manager fails to start
    */
   public void start(ConnectorContext context) throws Exception {
-    catalogRegister.init(context, config);
-    if (catalogRegister.isCoordinator()) {
+    if (context.getCurrentNode().isCoordinator()) {
+      catalogRegister.init(context, config);
       executorService.scheduleWithFixedDelay(
           this::loadMetalake,
           metadataUpdateIntervalSecond,

@@ -37,6 +37,7 @@ import io.trino.spi.connector.Constraint;
 import io.trino.spi.connector.DynamicFilter;
 import io.trino.spi.connector.FixedSplitSource;
 import io.trino.spi.connector.SchemaTableName;
+import io.trino.spi.connector.SourcePage;
 import io.trino.spi.procedure.Procedure;
 import io.trino.spi.transaction.IsolationLevel;
 import java.io.IOException;
@@ -75,6 +76,9 @@ public class GravitinoSystemConnector implements Connector {
   public Set<Procedure> getProcedures() {
     return gravitinoStoredProcedureFactory.getStoredProcedures();
   }
+
+  @Override
+  public void shutdown() {}
 
   @Override
   public ConnectorMetadata getMetadata(
@@ -166,12 +170,6 @@ public class GravitinoSystemConnector implements Connector {
     public List<HostAddress> getAddresses() {
       return Collections.emptyList();
     }
-
-    @SuppressWarnings("removal")
-    @Override
-    public Object getInfo() {
-      return this;
-    }
   }
 
   /** The system table page source. */
@@ -205,12 +203,17 @@ public class GravitinoSystemConnector implements Connector {
     }
 
     @Override
-    public Page getNextPage() {
+    public SourcePage getNextSourcePage() {
       if (isFinished) {
         return null;
       }
       isFinished = true;
-      return page;
+      return SourcePage.create(page);
+    }
+
+    public Page getNextPage() {
+      SourcePage sourcePage = getNextSourcePage();
+      return sourcePage == null ? null : sourcePage.getPage();
     }
 
     @Override

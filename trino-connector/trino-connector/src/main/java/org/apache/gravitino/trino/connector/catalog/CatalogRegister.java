@@ -47,23 +47,33 @@ public class CatalogRegister {
 
   private static final Logger LOG = LoggerFactory.getLogger(CatalogRegister.class);
 
-  private static final int MIN_SUPPORT_TRINO_SPI_VERSION = 435;
-  private static final int MAX_SUPPORT_TRINO_SPI_VERSION = 439;
+  private static final int MIN_SUPPORT_TRINO_SPI_VERSION = 478;
+  private static final int MAX_SUPPORT_TRINO_SPI_VERSION = 478;
   private static final int MIN_SUPPORT_CATALOG_NAME_WITH_METALAKE_TRINO_SPI_VERSION = 446;
   private static final int EXECUTE_QUERY_MAX_RETRIES = 6;
   private static final int EXECUTE_QUERY_BACKOFF_TIME_SECOND = 5;
 
   private String trinoVersion;
   private Connection connection;
-  private boolean isCoordinator;
   private boolean isStarted = false;
   private String catalogStoreDirectory;
   private GravitinoConfig config;
 
   private void checkTrinoSpiVersion(ConnectorContext context) {
     this.trinoVersion = context.getSpiVersion();
+    validateTrinoSpiVersion(trinoVersion, config);
+  }
 
-    int version = Integer.parseInt(trinoVersion);
+  static void validateTrinoSpiVersion(String trinoVersion, GravitinoConfig config) {
+    int version;
+    try {
+      version = Integer.parseInt(trinoVersion);
+    } catch (NumberFormatException e) {
+      String errmsg =
+          String.format(
+              "Unsupported Trino-%s version. The SPI version must be a number.", trinoVersion);
+      throw new TrinoException(GravitinoErrorCode.GRAVITINO_UNSUPPORTED_TRINO_VERSION, errmsg, e);
+    }
 
     if (version < MIN_SUPPORT_TRINO_SPI_VERSION || version > MAX_SUPPORT_TRINO_SPI_VERSION) {
       Boolean skipTrinoVersionValidation = config.isSkipTrinoVersionValidation();
@@ -76,12 +86,10 @@ public class CatalogRegister {
         throw new TrinoException(GravitinoErrorCode.GRAVITINO_UNSUPPORTED_TRINO_VERSION, errmsg);
       } else {
         LOG.warn(
-            "The version %s has not undergone thorough testing with Gravitino, there may be compatiablity problem.",
+            "The version {} has not undergone thorough testing with Gravitino, there may be compatiablity problem.",
             trinoVersion);
       }
     }
-
-    isCoordinator = context.getNodeManager().getCurrentNode().isCoordinator();
   }
 
   private void checkSupportCatalogNameWithMetalake(
@@ -96,10 +104,6 @@ public class CatalogRegister {
             MIN_SUPPORT_CATALOG_NAME_WITH_METALAKE_TRINO_SPI_VERSION);
       }
     }
-  }
-
-  boolean isCoordinator() {
-    return isCoordinator;
   }
 
   boolean isTrinoStarted() {
@@ -252,6 +256,8 @@ public class CatalogRegister {
           // check the catalog is already created
           statement.execute(sql);
           return;
+        } catch (SQLException e) {
+          throw e;
         } catch (Exception e) {
           failedException = e;
           LOG.warn("Execute command failed: {}, ", sql, e);

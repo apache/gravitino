@@ -16,6 +16,9 @@
  * specific language governing permissions and limitations
  * under the License.
  */
+
+import net.ltgt.gradle.errorprone.errorprone
+
 plugins {
   `maven-publish`
   id("java")
@@ -26,18 +29,20 @@ repositories {
   mavenCentral()
 }
 
-val trinoVersion = 478
+val trinoVersion = 468
 
 java {
   println("Building Trino Connector for Trino version: $trinoVersion")
   if (trinoVersion.toInt() >= 478) {
     toolchain.languageVersion.set(JavaLanguageVersion.of(24))
+  } else if (trinoVersion.toInt() >= 468) {
+    toolchain.languageVersion.set(JavaLanguageVersion.of(23))
   } else if (trinoVersion.toInt() >= 448) {
     toolchain.languageVersion.set(JavaLanguageVersion.of(22))
   } else if (trinoVersion.toInt() >= 436) {
     toolchain.languageVersion.set(JavaLanguageVersion.of(21))
   } else if (trinoVersion.toInt() >= 435) {
-    toolchain.languageVersion.set(JavaLanguageVersion.of(21))
+    toolchain.languageVersion.set(JavaLanguageVersion.of(17))
   }
 }
 
@@ -84,4 +89,9 @@ tasks {
     from("build/libs")
     into("$rootDir/distribution/${rootProject.name}-trino-connector")
   }
+}
+
+tasks.withType<JavaCompile>().configureEach {
+  // Error Prone still crashes on the JDK 24 toolchain required by Trino 478.
+  options.errorprone.isEnabled.set(false)
 }

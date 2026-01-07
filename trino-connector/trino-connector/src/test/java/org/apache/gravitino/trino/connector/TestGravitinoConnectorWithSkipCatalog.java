@@ -20,9 +20,9 @@ package org.apache.gravitino.trino.connector;
 
 import static io.trino.testing.TestingSession.testSessionBuilder;
 import static org.apache.gravitino.Catalog.Type.RELATIONAL;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.trino.Session;
 import io.trino.plugin.memory.MemoryPlugin;
@@ -52,7 +52,7 @@ public class TestGravitinoConnectorWithSkipCatalog extends AbstractTestQueryFram
 
     try {
       DistributedQueryRunner queryRunner =
-          DistributedQueryRunner.builder(session).setNodeCount(1).build();
+          DistributedQueryRunner.builder(session).setWorkerCount(1).build();
 
       TestGravitinoPlugin gravitinoPlugin = new TestGravitinoPlugin(gravitinoClient);
       queryRunner.installPlugin(gravitinoPlugin);
