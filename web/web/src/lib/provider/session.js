@@ -29,7 +29,7 @@ import { initialVersion, fetchGitHubInfo } from '@/lib/store/sys'
 import { oauthProviderFactory } from '@/lib/auth/providers/factory'
 
 import { to } from '../utils'
-import { getAuthConfigs, setAuthToken } from '../store/auth'
+import { getAuthConfigs, setAuthToken, setAuthUser } from '../store/auth'
 
 import { useIdle } from 'react-use'
 
@@ -86,14 +86,28 @@ const AuthProvider = ({ children }) => {
     const initAuth = async () => {
       const [authConfigsErr, resAuthConfigs] = await to(dispatch(getAuthConfigs()))
       const authType = resAuthConfigs?.payload?.authType
+      const anthEnable = resAuthConfigs?.payload?.anthEnable
 
       // Always fetch GitHub info since it's a public API call
       dispatch(fetchGitHubInfo())
 
       if (authType === 'simple') {
         dispatch(initialVersion())
-        goToMetalakeListPage()
+        const sessionUser = typeof window !== 'undefined' && JSON.parse(window.sessionStorage.getItem('simpleAuthUser'))
+        if (anthEnable && !sessionUser) {
+          router.push('/login')
+        } else {
+          dispatch(setAuthUser(sessionUser))
+          goToMetalakeListPage()
+        }
       } else if (authType === 'oauth') {
+        let provider = null
+        try {
+          provider = await oauthProviderFactory.getProvider()
+        } catch (e) {
+          provider = null
+        }
+
         const tokenToUse = await oauthProviderFactory.getAccessToken()
 
         // Update local token state
@@ -101,6 +115,21 @@ const AuthProvider = ({ children }) => {
 
         if (tokenToUse) {
           dispatch(setAuthToken(tokenToUse))
+
+          // Best-effort: hydrate auth user from OAuth provider profile.
+          // Do not block navigation if the profile cannot be loaded.
+          try {
+            const profile = provider?.getUserProfile ? await provider.getUserProfile() : null
+
+            const displayName =
+              profile?.preferred_username || profile?.name || profile?.email || profile?.sub || profile?.id
+            if (displayName) {
+              dispatch(setAuthUser({ name: String(displayName), type: 'user', profile }))
+            }
+          } catch (e) {
+            // Ignore profile errors
+          }
+
           dispatch(initialVersion())
           goToMetalakeListPage()
         } else {

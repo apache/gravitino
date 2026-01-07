@@ -32,6 +32,7 @@ const devOauthUrl = process.env.NEXT_PUBLIC_OAUTH_PATH
 export const getAuthConfigs = createAsyncThunk('auth/getAuthConfigs', async () => {
   let oauthUrl = null
   let authType = null
+  let anthEnable = null
   const [err, res] = await to(getAuthConfigsApi())
 
   if (err || !res) {
@@ -42,10 +43,11 @@ export const getAuthConfigs = createAsyncThunk('auth/getAuthConfigs', async () =
 
   // ** get the first authenticator from the response. response example: "[simple, oauth]"
   authType = res['gravitino.authenticators'][0].trim()
+  anthEnable = res['gravitino.authorization.enable']
 
   localStorage.setItem('oauthUrl', oauthUrl)
 
-  return { oauthUrl, authType }
+  return { oauthUrl, authType, anthEnable }
 })
 
 export const refreshToken = createAsyncThunk('auth/refreshToken', async (data, { getState, dispatch }) => {
@@ -93,25 +95,29 @@ export const loginAction = createAsyncThunk('auth/loginAction', async ({ params,
 
 export const logoutAction = createAsyncThunk('auth/logoutAction', async ({ router }, { getState, dispatch }) => {
   // Clear provider authentication data first
-  try {
-    const provider = await oauthProviderFactory.getProvider()
-    if (provider) {
-      await provider.clearAuthData()
-      console.log('[Logout Action] Provider cleanup completed')
+  if (getState().auth.authType === 'oauth') {
+    try {
+      const provider = await oauthProviderFactory.getProvider()
+      if (provider) {
+        await provider.clearAuthData()
+        console.log('[Logout Action] Provider cleanup completed')
+      }
+    } catch (error) {
+      console.warn('[Logout Action] Provider cleanup failed:', error)
     }
-  } catch (error) {
-    console.warn('[Logout Action] Provider cleanup failed:', error)
+
+    // Clear legacy auth tokens
+    localStorage.removeItem('accessToken')
+    localStorage.removeItem('authParams')
+    localStorage.removeItem('expiredIn')
+    localStorage.removeItem('isIdle')
+    localStorage.removeItem('version')
+
+    dispatch(clearIntervalId())
+    dispatch(setAuthToken(''))
+  } else {
+    dispatch(setAuthUser(null))
   }
-
-  // Clear legacy auth tokens
-  localStorage.removeItem('accessToken')
-  localStorage.removeItem('authParams')
-  localStorage.removeItem('expiredIn')
-  localStorage.removeItem('isIdle')
-  localStorage.removeItem('version')
-
-  dispatch(clearIntervalId())
-  dispatch(setAuthToken(''))
   await router.push('/login')
 
   return { token: null }
@@ -149,7 +155,9 @@ export const authSlice = createSlice({
     authToken: null,
     authParams: null,
     expiredIn: null,
-    intervalId: null
+    intervalId: null,
+    anthEnable: null,
+    authUser: null
   },
   reducers: {
     setIntervalId(state, action) {
@@ -169,12 +177,21 @@ export const authSlice = createSlice({
     },
     setExpiredIn(state, action) {
       state.expiredIn = action.payload
+    },
+    setAuthUser(state, action) {
+      if (action.payload) {
+        sessionStorage.setItem('simpleAuthUser', JSON.stringify(action.payload))
+      } else {
+        sessionStorage.removeItem('simpleAuthUser')
+      }
+      state.authUser = action.payload
     }
   },
   extraReducers: builder => {
     builder.addCase(getAuthConfigs.fulfilled, (state, action) => {
       state.oauthUrl = action.payload.oauthUrl
       state.authType = action.payload.authType
+      state.anthEnable = action.payload.anthEnable
     })
     builder.addCase(refreshToken.fulfilled, (state, action) => {
       localStorage.setItem('accessToken', action.payload.token)
@@ -186,6 +203,6 @@ export const authSlice = createSlice({
   }
 })
 
-export const { setAuthToken, setAuthParams, setExpiredIn, clearIntervalId } = authSlice.actions
+export const { setAuthToken, setAuthParams, setExpiredIn, clearIntervalId, setAuthUser } = authSlice.actions
 
 export default authSlice.reducer
