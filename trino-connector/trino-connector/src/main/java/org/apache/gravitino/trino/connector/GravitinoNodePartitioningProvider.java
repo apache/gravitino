@@ -63,13 +63,11 @@ public class GravitinoNodePartitioningProvider implements ConnectorNodePartition
   public ToIntFunction<ConnectorSplit> getSplitBucketFunction(
       ConnectorTransactionHandle transactionHandle,
       ConnectorSession session,
-      ConnectorPartitioningHandle partitioningHandle,
-      int bucketCount) {
+      ConnectorPartitioningHandle partitioningHandle) {
     return nodePartitioningProvider.getSplitBucketFunction(
         GravitinoHandle.unWrap(transactionHandle),
         session,
-        GravitinoHandle.unWrap(partitioningHandle),
-        bucketCount);
+        GravitinoHandle.unWrap(partitioningHandle));
   }
 
   @Override

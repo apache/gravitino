@@ -22,6 +22,7 @@ package org.apache.gravitino.trino.connector.catalog.hive;
 import io.trino.spi.TrinoException;
 import org.apache.gravitino.rel.types.Types;
 import org.apache.gravitino.trino.connector.util.GeneralDataTypeTransformer;
+import org.junit.Assert;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -42,7 +43,7 @@ public class TestHiveDataTypeConverter {
 
     io.trino.spi.type.Type charLengthIsOverflow = io.trino.spi.type.CharType.createCharType(256);
     Exception e =
-        Assertions.assertThrows(
+        Assert.assertThrows(
             TrinoException.class,
             () -> generalDataTypeTransformer.getGravitinoType(charLengthIsOverflow));
     Assertions.assertTrue(
@@ -62,7 +63,7 @@ public class TestHiveDataTypeConverter {
     io.trino.spi.type.Type varcharLengthIsOverflow =
         io.trino.spi.type.VarcharType.createVarcharType(65536);
     e =
-        Assertions.assertThrows(
+        Assert.assertThrows(
             TrinoException.class,
             () -> generalDataTypeTransformer.getGravitinoType(varcharLengthIsOverflow));
     Assertions.assertTrue(

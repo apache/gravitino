@@ -19,7 +19,6 @@
 package org.apache.gravitino.trino.connector.system;
 
 import io.trino.spi.Page;
-import io.trino.spi.connector.SourcePage;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -31,11 +30,9 @@ public class TestGravitinoSystemConnector {
         new GravitinoSystemConnector.SystemTablePageSource(page)) {
 
       Assertions.assertFalse(pageSource.isFinished());
-      SourcePage first = pageSource.getNextSourcePage();
-      Assertions.assertNotNull(first);
-      Assertions.assertSame(page, first.getPage());
+      Assertions.assertSame(page, pageSource.getNextPage());
       Assertions.assertTrue(pageSource.isFinished());
-      Assertions.assertNull(pageSource.getNextSourcePage());
+      Assertions.assertNull(pageSource.getNextPage());
     }
   }
 
@@ -46,15 +43,15 @@ public class TestGravitinoSystemConnector {
         new GravitinoSystemConnector.SystemTablePageSource(page)) {
 
       // First call should return the page
-      SourcePage firstPage = pageSource.getNextSourcePage();
+      Page firstPage = pageSource.getNextPage();
       Assertions.assertNotNull(firstPage);
-      Assertions.assertSame(page, firstPage.getPage());
+      Assertions.assertSame(page, firstPage);
       Assertions.assertTrue(pageSource.isFinished());
 
       // Subsequent calls should return null
-      Assertions.assertNull(pageSource.getNextSourcePage());
-      Assertions.assertNull(pageSource.getNextSourcePage());
-      Assertions.assertNull(pageSource.getNextSourcePage());
+      Assertions.assertNull(pageSource.getNextPage());
+      Assertions.assertNull(pageSource.getNextPage());
+      Assertions.assertNull(pageSource.getNextPage());
       Assertions.assertTrue(pageSource.isFinished());
     }
   }

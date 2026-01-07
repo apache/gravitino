@@ -30,7 +30,6 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 import io.trino.plugin.memory.MemoryConnector;
 import io.trino.spi.connector.ColumnHandle;
-import io.trino.spi.connector.ColumnPosition;
 import io.trino.spi.connector.ConnectorMetadata;
 import io.trino.spi.connector.ConnectorTableHandle;
 import io.trino.spi.connector.ConnectorTableMetadata;
@@ -559,8 +558,7 @@ public class GravitinoMockServer implements AutoCloseable {
           catalogConnectorManager
               .getCatalogConnector(catalogConnectorManager.getTrinoCatalogName(catalog))
               .getMetadataAdapter();
-      metadata.addColumn(
-          null, tableHandle, metadataAdapter.getColumnMetadata(column), new ColumnPosition.Last());
+      metadata.addColumn(null, tableHandle, metadataAdapter.getColumnMetadata(column));
 
     } else if (tableChange instanceof TableChange.DeleteColumn) {
       TableChange.DeleteColumn deleteColumn = (TableChange.DeleteColumn) tableChange;

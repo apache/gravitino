@@ -41,7 +41,6 @@ public final class TypeSignatureDeserializer extends FromStringDeserializer<Type
       Class<?> clazz = classLoader.loadClass("io.trino.sql.analyzer.TypeSignatureTranslator");
       parseTypeSignatureMethod =
           clazz.getDeclaredMethod("parseTypeSignature", String.class, Set.class);
-      parseTypeSignatureMethod.setAccessible(true);
     } catch (Exception e) {
       throw new RuntimeException(e);
     }
@@ -50,7 +49,8 @@ public final class TypeSignatureDeserializer extends FromStringDeserializer<Type
   @Override
   protected TypeSignature _deserialize(String value, DeserializationContext context) {
     try {
-      return (TypeSignature) parseTypeSignatureMethod.invoke(null, value, ImmutableSet.of());
+      return (TypeSignature)
+          parseTypeSignatureMethod.invoke(null, "varchar(255)", ImmutableSet.of());
     } catch (Exception e) {
       throw new RuntimeException(e);
     }

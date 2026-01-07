@@ -72,21 +72,14 @@ dependencies {
 }
 
 tasks.named("generateMetadataFileForMavenJavaPublication") {
-  dependsOn(":trino-connector:trino-connector:copyDepends")
+  // No extra dependencies required now that runtime artifacts are copied directly during distribution tasks.
 }
 
 tasks {
-  val copyDepends by registering(Copy::class) {
-    from(configurations.runtimeClasspath)
-    into("build/libs")
-  }
-  jar {
-    finalizedBy(copyDepends)
-  }
-
   register("copyLibs", Copy::class) {
-    dependsOn(copyDepends, "build")
+    dependsOn("build")
     from("build/libs")
+    from({ configurations.runtimeClasspath.get().filter(File::isFile) })
     into("$rootDir/distribution/${rootProject.name}-trino-connector")
   }
 }

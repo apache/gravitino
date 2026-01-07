@@ -18,7 +18,6 @@
  */
 package org.apache.gravitino.trino.connector;
 
-import static io.trino.spi.StandardErrorCode.NOT_SUPPORTED;
 import static org.apache.gravitino.trino.connector.GravitinoErrorCode.GRAVITINO_COLUMN_NOT_EXISTS;
 import static org.apache.gravitino.trino.connector.GravitinoErrorCode.GRAVITINO_TABLE_NOT_EXISTS;
 
@@ -31,7 +30,6 @@ import io.trino.spi.connector.AggregationApplicationResult;
 import io.trino.spi.connector.Assignment;
 import io.trino.spi.connector.ColumnHandle;
 import io.trino.spi.connector.ColumnMetadata;
-import io.trino.spi.connector.ColumnPosition;
 import io.trino.spi.connector.ConnectorInsertTableHandle;
 import io.trino.spi.connector.ConnectorMergeTableHandle;
 import io.trino.spi.connector.ConnectorMetadata;
@@ -255,18 +253,14 @@ public class GravitinoMetadata implements ConnectorMetadata {
     return new GravitinoInsertTableHandle(insertTableHandle);
   }
 
+  @Override
   public Optional<ConnectorOutputMetadata> finishInsert(
       ConnectorSession session,
       ConnectorInsertTableHandle insertHandle,
-      List<ConnectorTableHandle> sourceTableHandles,
       Collection<Slice> fragments,
       Collection<ComputedStatistics> computedStatistics) {
     return internalMetadata.finishInsert(
-        session,
-        GravitinoHandle.unWrap(insertHandle),
-        GravitinoHandle.unWrap(sourceTableHandles),
-        fragments,
-        computedStatistics);
+        session, GravitinoHandle.unWrap(insertHandle), fragments, computedStatistics);
   }
 
   @Override
@@ -301,14 +295,7 @@ public class GravitinoMetadata implements ConnectorMetadata {
 
   @Override
   public void addColumn(
-      ConnectorSession session,
-      ConnectorTableHandle tableHandle,
-      ColumnMetadata column,
-      ColumnPosition position) {
-    if (!(position instanceof ColumnPosition.Last)) {
-      throw new TrinoException(
-          NOT_SUPPORTED, "This connector does not support adding columns with FIRST/AFTER clause");
-    }
+      ConnectorSession session, ConnectorTableHandle tableHandle, ColumnMetadata column) {
     GravitinoColumn gravitinoColumn = metadataAdapter.createColumn(column);
     catalogConnectorMetadata.addColumn(getTableName(tableHandle), gravitinoColumn);
   }
@@ -631,22 +618,9 @@ public class GravitinoMetadata implements ConnectorMetadata {
 
   @Override
   public ConnectorMergeTableHandle beginMerge(
-      ConnectorSession session,
-      ConnectorTableHandle tableHandle,
-      Map<Integer, Collection<ColumnHandle>> updateCaseColumns,
-      RetryMode retryMode) {
-    Map<Integer, Collection<ColumnHandle>> unwrappedUpdateCaseColumns =
-        updateCaseColumns.entrySet().stream()
-            .collect(
-                Collectors.toMap(
-                    Map.Entry::getKey,
-                    entry ->
-                        entry.getValue().stream()
-                            .map(GravitinoHandle::unWrap)
-                            .collect(Collectors.toList())));
+      ConnectorSession session, ConnectorTableHandle tableHandle, RetryMode retryMode) {
     ConnectorMergeTableHandle connectorMergeTableHandle =
-        internalMetadata.beginMerge(
-            session, GravitinoHandle.unWrap(tableHandle), unwrappedUpdateCaseColumns, retryMode);
+        internalMetadata.beginMerge(session, GravitinoHandle.unWrap(tableHandle), retryMode);
     SchemaTableName tableName = getTableName(tableHandle);
 
     return new GravitinoMergeTableHandle(
@@ -657,15 +631,10 @@ public class GravitinoMetadata implements ConnectorMetadata {
   public void finishMerge(
       ConnectorSession session,
       ConnectorMergeTableHandle mergeTableHandle,
-      List<ConnectorTableHandle> sourceTableHandles,
       Collection<Slice> fragments,
       Collection<ComputedStatistics> computedStatistics) {
     internalMetadata.finishMerge(
-        session,
-        GravitinoHandle.unWrap(mergeTableHandle),
-        GravitinoHandle.unWrap(sourceTableHandles),
-        fragments,
-        computedStatistics);
+        session, GravitinoHandle.unWrap(mergeTableHandle), fragments, computedStatistics);
   }
 
   @Override
