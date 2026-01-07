@@ -646,7 +646,7 @@ public class LanceRESTServiceIT extends BaseIT {
     Assertions.assertTrue(
         dropColumnException
             .getMessage()
-            .contains("Column non_existing_column not found for deletion "));
+            .contains("Column non_existing_column does not exist in the dataset"));
   }
 
   @Test

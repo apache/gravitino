@@ -338,9 +338,11 @@ public class LanceTableOperations extends ManagedTableOperations {
       if (!renameColumns.isEmpty()) {
         dataset.alterColumns(renameColumns);
       }
+    } catch (RuntimeException e) {
+      throw e;
     } catch (Exception e) {
       throw new RuntimeException(
-          "Failed to add indexes to Lance dataset at location " + location, e);
+          "Failed to handle alterations to Lance dataset at location " + location, e);
     }
   }
 
