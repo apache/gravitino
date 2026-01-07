@@ -76,7 +76,7 @@ public class ModelMetaBaseSQLProvider {
       @Param("schemaName") String schemaName) {
     return """
         SELECT
-            mmm.metalake_id AS metalakeId,
+            mm.metalake_id AS metalakeId,
             cm.catalog_id AS catalogId,
             sm.schema_id AS schemaId,
             mo.model_id AS modelId,
@@ -87,9 +87,9 @@ public class ModelMetaBaseSQLProvider {
             mo.audit_info AS auditInfo,
             mo.deleted_at AS deletedAt
         FROM
-            %s mmm
+            %s mm
         INNER JOIN
-            %s cm ON mmm.metalake_id = cm.metalake_id
+            %s cm ON mm.metalake_id = cm.metalake_id
             AND cm.catalog_name = #{catalogName}
             AND cm.deleted_at = 0
         LEFT JOIN
@@ -100,8 +100,8 @@ public class ModelMetaBaseSQLProvider {
             %s mo ON sm.schema_id = mo.schema_id
             AND mo.deleted_at = 0
         WHERE
-            mmm.metalake_name = #{metalakeName}
-            AND mmm.deleted_at = 0;
+            mm.metalake_name = #{metalakeName}
+            AND mm.deleted_at = 0;
             """
         .formatted(
             MetalakeMetaMapper.TABLE_NAME,
