@@ -729,4 +729,110 @@ public class TestManagedFunctionOperations {
       FunctionParam[] params, FunctionImpl[] impls) {
     return FunctionDefinitions.of(params, impls);
   }
+
+  @Test
+  public void testInvalidParameterOrder() {
+    // Test that parameters with default values must appear at the end
+    NameIdentifier funcIdent = getFunctionIdent("func_invalid_params");
+
+    // Create params with invalid order: (a default 1, b required, c default 2)
+    FunctionParam[] invalidParams =
+        new FunctionParam[] {
+          FunctionParams.of("a", Types.IntegerType.get(), "param a", Literals.integerLiteral(1)),
+          FunctionParams.of("b", Types.StringType.get()), // Required param after optional
+          FunctionParams.of("c", Types.IntegerType.get(), "param c", Literals.integerLiteral(2))
+        };
+    FunctionDefinition[] definitions =
+        new FunctionDefinition[] {createSimpleDefinition(invalidParams)};
+
+    // Should throw IllegalArgumentException when trying to register
+    IllegalArgumentException ex =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                functionOperations.registerFunction(
+                    funcIdent,
+                    "Invalid function",
+                    FunctionType.SCALAR,
+                    true,
+                    Types.StringType.get(),
+                    definitions));
+
+    Assertions.assertTrue(
+        ex.getMessage().contains("Invalid parameter order"),
+        "Expected error about invalid parameter order, got: " + ex.getMessage());
+    Assertions.assertTrue(
+        ex.getMessage().contains("required parameter 'b'"),
+        "Expected error to mention parameter 'b', got: " + ex.getMessage());
+    Assertions.assertTrue(
+        ex.getMessage().contains("position 1"),
+        "Expected error to mention position 1, got: " + ex.getMessage());
+
+    // Test with valid order: all optional params at the end
+    FunctionParam[] validParams =
+        new FunctionParam[] {
+          FunctionParams.of("a", Types.IntegerType.get()),
+          FunctionParams.of("b", Types.StringType.get()),
+          FunctionParams.of("c", Types.IntegerType.get(), "param c", Literals.integerLiteral(1)),
+          FunctionParams.of("d", Types.IntegerType.get(), "param d", Literals.integerLiteral(2))
+        };
+    FunctionDefinition[] validDefinitions =
+        new FunctionDefinition[] {createSimpleDefinition(validParams)};
+
+    // This should succeed
+    functionOperations.registerFunction(
+        funcIdent,
+        "Valid function",
+        FunctionType.SCALAR,
+        true,
+        Types.StringType.get(),
+        validDefinitions);
+
+    // Verify the function was registered
+    Function func = functionOperations.getFunction(funcIdent);
+    Assertions.assertNotNull(func);
+    Assertions.assertEquals("Valid function", func.comment());
+  }
+
+  @Test
+  public void testParameterOrderValidationInAlterFunction() {
+    // Test that parameter validation also works when altering functions
+    NameIdentifier funcIdent = getFunctionIdent("func_alter_invalid_params");
+
+    // First register a valid function
+    FunctionParam[] initialParams =
+        new FunctionParam[] {FunctionParams.of("a", Types.IntegerType.get())};
+    FunctionDefinition[] initialDefinitions =
+        new FunctionDefinition[] {createSimpleDefinition(initialParams)};
+
+    functionOperations.registerFunction(
+        funcIdent,
+        "Initial function",
+        FunctionType.SCALAR,
+        true,
+        Types.StringType.get(),
+        initialDefinitions);
+
+    // Try to add a definition with invalid parameter order
+    FunctionParam[] invalidParams =
+        new FunctionParam[] {
+          FunctionParams.of("x", Types.IntegerType.get(), "param x", Literals.integerLiteral(1)),
+          FunctionParams.of("y", Types.StringType.get()), // Required after optional
+        };
+
+    IllegalArgumentException ex =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                functionOperations.alterFunction(
+                    funcIdent,
+                    FunctionChange.addDefinition(createSimpleDefinition(invalidParams))));
+
+    Assertions.assertTrue(
+        ex.getMessage().contains("Invalid parameter order"),
+        "Expected error about invalid parameter order, got: " + ex.getMessage());
+    Assertions.assertTrue(
+        ex.getMessage().contains("required parameter 'y'"),
+        "Expected error to mention parameter 'y', got: " + ex.getMessage());
+  }
 }

@@ -48,6 +48,7 @@ import org.apache.gravitino.function.FunctionType;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.FunctionEntity;
 import org.apache.gravitino.rel.Column;
+import org.apache.gravitino.rel.expressions.Expression;
 import org.apache.gravitino.rel.types.Type;
 import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.utils.PrincipalUtils;
@@ -222,11 +223,7 @@ public class ManagedFunctionOperations implements FunctionCatalog {
     Preconditions.checkArgument(
         definitions != null && definitions.length > 0,
         "At least one function definition must be provided");
-
-    // Validate definitions for arity overlap when there are multiple definitions
-    if (definitions.length > 1) {
-      validateDefinitionsNoArityOverlap(definitions);
-    }
+    validateDefinitionsNoArityOverlap(definitions);
 
     String currentUser = PrincipalUtils.getCurrentUserName();
     Instant now = Instant.now();
@@ -415,6 +412,26 @@ public class ManagedFunctionOperations implements FunctionCatalog {
   private Set<String> computeArities(FunctionDefinition definition) {
     Set<String> arities = new HashSet<>();
     FunctionParam[] params = definition.parameters();
+
+    // Ensure optional parameters come last to prevent incorrect arity computation.
+    // Without this check, func(a=1, b) would wrongly generate arity "" (0 args),
+    // but 0-arg calls are invalid since 'b' is required
+    boolean foundDefault = false;
+    for (int i = 0; i < params.length; i++) {
+      Expression defaultValue = params[i].defaultValue();
+      boolean hasDefault = defaultValue != null && defaultValue != Column.DEFAULT_VALUE_NOT_SET;
+      if (foundDefault && !hasDefault) {
+        throw new IllegalArgumentException(
+            String.format(
+                "Invalid parameter order: required parameter '%s' at position %d "
+                    + "follows optional parameter(s). All parameters with default values "
+                    + "must appear at the end of the parameter list.",
+                params[i].name(), i));
+      }
+      if (hasDefault) {
+        foundDefault = true;
+      }
+    }
 
     // Find the first parameter with a default value
     int firstDefaultIndex = params.length;
