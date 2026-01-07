@@ -29,7 +29,7 @@ repositories {
   mavenCentral()
 }
 
-val trinoVersion = 468
+val trinoVersion = 435
 
 java {
   println("Building Trino Connector for Trino version: $trinoVersion")
