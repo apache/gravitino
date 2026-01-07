@@ -33,7 +33,6 @@ import org.apache.gravitino.server.web.filter.ParameterUtil;
 /**
  * Authorization executor for load table operations.
  *
- *
  * <p>This executor uses secondaryExpression and secondaryExpressionCondition from the annotation to
  * determine authorization: if the condition is met (e.g., client requests MODIFY_TABLE privilege),
  * the secondaryExpression is used for stricter authorization, otherwise the default expression is
