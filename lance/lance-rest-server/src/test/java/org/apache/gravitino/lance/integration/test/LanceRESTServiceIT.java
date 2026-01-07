@@ -443,7 +443,8 @@ public class LanceRESTServiceIT extends BaseIT {
             });
     Assertions.assertEquals(409, exception.getCode());
 
-    // Try to create a table with wrong location should fail
+    // Create an empty table with non-existent location should succeed
+    // since storage is not touched
     CreateEmptyTableRequest wrongLocationRequest = new CreateEmptyTableRequest();
     wrongLocationRequest.setId(List.of(CATALOG_NAME, SCHEMA_NAME, "another_table"));
     String another_location = tempDir + "/" + "another_location/";
