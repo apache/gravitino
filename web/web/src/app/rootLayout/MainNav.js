@@ -93,7 +93,7 @@ export function MainNav() {
         ]
 
         if (anthEnable && currentMetalake) {
-          const ownerData = await to(
+          const [resError, res] = await to(
             dispatch(
               getCurrentEntityOwner({
                 metalake: currentMetalake,
@@ -102,7 +102,8 @@ export function MainNav() {
               })
             )
           )
-          if (!authUser || (authUser && authUser.name === ownerData?.name)) {
+          const ownerData = res?.payload?.owner
+          if (anthEnable || (authUser && authUser.name === ownerData?.name)) {
             items.push({
               key: ROUTES.Access,
               icon: <Icons.iconify icon='la:users-cog' className='my-icon' />,

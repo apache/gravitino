@@ -68,7 +68,7 @@ export function SiteHeader() {
       }
 
       // If we're not on the metalakes list page and metalake is missing, fill it
-      if (!['/', '/ui', '/metalakes', '/ui/metalakes'].includes(pathname) && !metalakeParam) {
+      if (!['/', '/ui', '/metalakes', '/ui/metalakes', '/login', '/ui/login'].includes(pathname) && !metalakeParam) {
         const first = store.metalakes[0].name || ''
         if (first) {
           const qs = makeNewSearch({ metalake: first })

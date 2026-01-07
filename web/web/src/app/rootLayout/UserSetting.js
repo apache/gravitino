@@ -39,7 +39,7 @@ export default function UserSetting() {
   const [openCreateMeta, setOpenCreateMeta] = useState(false)
   const [showLogoutButton, setShowLogoutButton] = useState(false)
   const auth = useAppSelector(state => state.auth)
-  const { serviceAdmins, authUser, authToken } = auth
+  const { serviceAdmins, authUser, anthEnable } = auth
   const [session, setSession] = useState({})
   const router = useRouter()
   const pathname = usePathname()
@@ -53,30 +53,6 @@ export default function UserSetting() {
       dispatch(fetchMetalakes())
     }
   }, [dispatch, pathname])
-
-  useEffect(() => {
-    const checkAuthStatus = async () => {
-      try {
-        if (authToken) {
-          setShowLogoutButton(true)
-
-          return
-        }
-
-        const provider = await oauthProviderFactory.getProvider()
-        if (provider) {
-          const isAuth = await provider.isAuthenticated()
-          setShowLogoutButton(isAuth)
-        } else {
-          setShowLogoutButton(false)
-        }
-      } catch (error) {
-        setShowLogoutButton(false)
-      }
-    }
-
-    checkAuthStatus()
-  }, [authToken])
 
   const handleCreateMetalake = () => {
     setOpenCreateMeta(true)
@@ -140,7 +116,7 @@ export default function UserSetting() {
             )
           })) || []
       },
-      ...(showLogoutButton
+      ...(anthEnable
         ? [
             {
               key: 'divider2',
@@ -155,7 +131,7 @@ export default function UserSetting() {
           ]
         : [])
     ],
-    [authUser, serviceAdmins, store.metalakes, currentMetalake, showLogoutButton]
+    [authUser, serviceAdmins, store.metalakes, currentMetalake, anthEnable]
   )
 
   return (
