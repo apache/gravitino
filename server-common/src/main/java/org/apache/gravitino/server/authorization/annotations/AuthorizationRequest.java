@@ -32,6 +32,7 @@ public @interface AuthorizationRequest {
     COMMON,
     ASSOCIATE_TAG,
     ASSOCIATE_POLICY,
-    RUN_JOB
+    RUN_JOB,
+    LOAD_TABLE
   }
 }

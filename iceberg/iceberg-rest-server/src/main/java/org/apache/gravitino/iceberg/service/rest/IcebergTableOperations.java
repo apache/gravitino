@@ -107,7 +107,7 @@ public class IcebergTableOperations {
   @Timed(name = "list-table." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "list-table", absolute = true)
   @AuthorizationExpression(
-      expression = AuthorizationExpressionConstants.loadSchemaAuthorizationExpression,
+      expression = AuthorizationExpressionConstants.LOAD_SCHEMA_AUTHORIZATION_EXPRESSION,
       accessMetadataType = MetadataObject.Type.SCHEMA)
   public Response listTable(
       @AuthorizationMetadata(type = Entity.EntityType.CATALOG) @PathParam("prefix") String prefix,
@@ -535,7 +535,7 @@ public class IcebergTableOperations {
     NameIdentifier[] idents =
         MetadataAuthzHelper.filterByExpression(
             metalake,
-            AuthorizationExpressionConstants.filterTableAuthorizationExpression,
+            AuthorizationExpressionConstants.FILTER_TABLE_AUTHORIZATION_EXPRESSION,
             Entity.EntityType.TABLE,
             toNameIdentifiers(listTablesResponse, metalake, catalogName));
     List<TableIdentifier> filteredIdentifiers = new ArrayList<>();

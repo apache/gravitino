@@ -40,14 +40,14 @@ public class RunJobAuthorizationExecutor implements AuthorizationExecutor {
   public RunJobAuthorizationExecutor(
       Parameter[] parameters,
       Object[] args,
+      String expression,
       Map<Entity.EntityType, NameIdentifier> metadataContext,
-      AuthorizationExpressionEvaluator authorizationExpressionEvaluator,
       Map<String, Object> pathParams,
       Optional<String> entityType) {
     this.parameters = parameters;
     this.args = args;
     this.metadataContext = metadataContext;
-    this.authorizationExpressionEvaluator = authorizationExpressionEvaluator;
+    this.authorizationExpressionEvaluator = new AuthorizationExpressionEvaluator(expression);
     this.pathParams = pathParams;
     this.entityType = entityType;
   }

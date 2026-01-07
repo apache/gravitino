@@ -93,7 +93,7 @@ public class RoleOperations {
             names =
                 MetadataAuthzHelper.filterByExpression(
                     metalake,
-                    AuthorizationExpressionConstants.loadRoleAuthorizationExpression,
+                    AuthorizationExpressionConstants.LOAD_ROLE_AUTHORIZATION_EXPRESSION,
                     Entity.EntityType.ROLE,
                     names,
                     roleName -> NameIdentifierUtil.ofRole(metalake, roleName));
@@ -110,7 +110,7 @@ public class RoleOperations {
   @Timed(name = "get-role." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "get-role", absolute = true)
   @AuthorizationExpression(
-      expression = AuthorizationExpressionConstants.loadRoleAuthorizationExpression)
+      expression = AuthorizationExpressionConstants.LOAD_ROLE_AUTHORIZATION_EXPRESSION)
   public Response getRole(
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
           String metalake,
