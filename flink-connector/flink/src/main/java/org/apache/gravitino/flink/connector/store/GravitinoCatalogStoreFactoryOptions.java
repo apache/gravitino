@@ -46,4 +46,12 @@ public class GravitinoCatalogStoreFactoryOptions {
           .mapType()
           .defaultValue(ImmutableMap.of())
           .withDescription("The config of Gravitino client");
+
+  public static final String AUTH_TYPE = "gravitino.client.auth.type";
+
+  // OAuth2 config keys
+  public static final String OAUTH2_SERVER_URI = "gravitino.client.oauth2.serverUri";
+  public static final String OAUTH2_CREDENTIAL = "gravitino.client.oauth2.credential";
+  public static final String OAUTH2_TOKEN_PATH = "gravitino.client.oauth2.tokenPath";
+  public static final String OAUTH2_SCOPE = "gravitino.client.oauth2.scope";
 }

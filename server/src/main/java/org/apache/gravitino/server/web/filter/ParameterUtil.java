@@ -17,16 +17,17 @@
 
 package org.apache.gravitino.server.web.filter;
 
+import java.lang.annotation.Annotation;
 import java.lang.reflect.Parameter;
 import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.NameIdentifier;
-import org.apache.gravitino.server.authorization.MetadataAuthzHelper;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationFullName;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationMetadata;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationObjectType;
@@ -65,134 +66,67 @@ public class ParameterUtil {
 
   public static Map<Entity.EntityType, NameIdentifier> extractNameIdentifierFromParameters(
       Parameter[] parameters, Object[] args) {
-    Map<Entity.EntityType, String> entities = new HashMap<>();
-    Map<Entity.EntityType, NameIdentifier> nameIdentifierMap = new HashMap<>();
-    // Extract AuthorizationMetadata
-    for (int i = 0; i < parameters.length; i++) {
-      Parameter parameter = parameters[i];
-      AuthorizationMetadata authorizeResource =
-          parameter.getAnnotation(AuthorizationMetadata.class);
-      if (authorizeResource == null) {
-        continue;
+    Map<Entity.EntityType, String> entities = extractEntitiesFromAnnotations(parameters, args);
+
+    // Build name identifiers from extracted entities
+    Map<Entity.EntityType, NameIdentifier> nameIdentifierMap =
+        NameIdentifierUtil.buildNameIdentifierMap(entities);
+
+    // Extract full name and object type for metadata objects
+    Optional<String> fullName =
+        extractAnnotatedValue(parameters, args, AuthorizationFullName.class);
+    Optional<String> metadataObjectType =
+        extractAnnotatedValue(parameters, args, AuthorizationObjectType.class);
+
+    // Handle fullName and metadataObjectType if present
+    if (fullName.isPresent() && metadataObjectType.isPresent()) {
+      String metalake = entities.get(Entity.EntityType.METALAKE);
+      if (metalake != null) {
+        MetadataObject.Type type =
+            MetadataObject.Type.valueOf(metadataObjectType.get().toUpperCase(Locale.ROOT));
+        NameIdentifier nameIdentifier =
+            MetadataObjectUtil.toEntityIdent(metalake, MetadataObjects.parse(fullName.get(), type));
+        nameIdentifierMap.putAll(
+            NameIdentifierUtil.splitNameIdentifier(
+                metalake, MetadataObjectUtil.toEntityType(type), nameIdentifier));
       }
-      Entity.EntityType type = authorizeResource.type();
-      entities.put(type, String.valueOf(args[i]));
-    }
-
-    String metalake = entities.get(Entity.EntityType.METALAKE);
-    String catalog = entities.get(Entity.EntityType.CATALOG);
-    String schema = entities.get(Entity.EntityType.SCHEMA);
-    String table = entities.get(Entity.EntityType.TABLE);
-    String topic = entities.get(Entity.EntityType.TOPIC);
-    String fileset = entities.get(Entity.EntityType.FILESET);
-
-    // Extract full name and types
-    String fullName = null;
-    String metadataObjectType = null;
-    for (int i = 0; i < parameters.length; i++) {
-      Parameter parameter = parameters[i];
-      AuthorizationFullName authorizeFullName =
-          parameter.getAnnotation(AuthorizationFullName.class);
-      if (authorizeFullName != null) {
-        fullName = String.valueOf(args[i]);
-      }
-
-      AuthorizationObjectType objectType = parameter.getAnnotation(AuthorizationObjectType.class);
-      if (objectType != null) {
-        metadataObjectType = String.valueOf(args[i]);
-      }
-    }
-
-    entities.forEach(
-        (type, metadata) -> {
-          switch (type) {
-            case CATALOG:
-              nameIdentifierMap.put(
-                  Entity.EntityType.CATALOG, NameIdentifierUtil.ofCatalog(metalake, catalog));
-              break;
-            case SCHEMA:
-              nameIdentifierMap.put(
-                  Entity.EntityType.SCHEMA, NameIdentifierUtil.ofSchema(metalake, catalog, schema));
-              break;
-            case TABLE:
-              nameIdentifierMap.put(
-                  Entity.EntityType.TABLE,
-                  NameIdentifierUtil.ofTable(metalake, catalog, schema, table));
-              break;
-            case TOPIC:
-              nameIdentifierMap.put(
-                  Entity.EntityType.TOPIC,
-                  NameIdentifierUtil.ofTopic(metalake, catalog, schema, topic));
-              break;
-            case FILESET:
-              nameIdentifierMap.put(
-                  Entity.EntityType.FILESET,
-                  NameIdentifierUtil.ofFileset(metalake, catalog, schema, fileset));
-              break;
-            case MODEL:
-              String model = entities.get(Entity.EntityType.MODEL);
-              nameIdentifierMap.put(
-                  Entity.EntityType.MODEL,
-                  NameIdentifierUtil.ofModel(metalake, catalog, schema, model));
-              break;
-            case METALAKE:
-              nameIdentifierMap.put(
-                  Entity.EntityType.METALAKE, NameIdentifierUtil.ofMetalake(metalake));
-              break;
-            case USER:
-              nameIdentifierMap.put(
-                  Entity.EntityType.USER,
-                  NameIdentifierUtil.ofUser(metadata, entities.get(Entity.EntityType.USER)));
-              break;
-            case GROUP:
-              nameIdentifierMap.put(
-                  Entity.EntityType.GROUP,
-                  NameIdentifierUtil.ofGroup(metalake, entities.get(Entity.EntityType.GROUP)));
-              break;
-            case ROLE:
-              nameIdentifierMap.put(
-                  Entity.EntityType.ROLE,
-                  NameIdentifierUtil.ofRole(metalake, entities.get(Entity.EntityType.ROLE)));
-              break;
-            case TAG:
-              nameIdentifierMap.put(
-                  Entity.EntityType.TAG,
-                  NameIdentifierUtil.ofTag(metalake, entities.get(Entity.EntityType.TAG)));
-              break;
-            case POLICY:
-              nameIdentifierMap.put(
-                  Entity.EntityType.POLICY,
-                  NameIdentifierUtil.ofPolicy(metalake, entities.get(Entity.EntityType.POLICY)));
-              break;
-            default:
-              break;
-          }
-        });
-
-    // Extract fullName and metadataObjectType
-    if (fullName != null && metadataObjectType != null && metalake != null) {
-      MetadataObject.Type type =
-          MetadataObject.Type.valueOf(metadataObjectType.toUpperCase(Locale.ROOT));
-      NameIdentifier nameIdentifier =
-          MetadataObjectUtil.toEntityIdent(metalake, MetadataObjects.parse(fullName, type));
-      nameIdentifierMap.putAll(
-          MetadataAuthzHelper.splitMetadataNames(
-              metalake, MetadataObjectUtil.toEntityType(type), nameIdentifier));
     }
 
     return nameIdentifierMap;
   }
 
-  public static String extractMetadataObjectTypeFromParameters(
+  private static Map<Entity.EntityType, String> extractEntitiesFromAnnotations(
+      Parameter[] parameters, Object[] args) {
+    Map<Entity.EntityType, String> entities = new HashMap<>();
+    for (int i = 0; i < parameters.length; i++) {
+      AuthorizationMetadata annotation = parameters[i].getAnnotation(AuthorizationMetadata.class);
+      if (annotation != null) {
+        entities.put(annotation.type(), String.valueOf(args[i]));
+      }
+    }
+    return entities;
+  }
+
+  private static Optional<String> extractAnnotatedValue(
+      Parameter[] parameters, Object[] args, Class<? extends Annotation> annotationClass) {
+    for (int i = 0; i < parameters.length; i++) {
+      if (parameters[i].getAnnotation(annotationClass) != null) {
+        return Optional.of(String.valueOf(args[i]));
+      }
+    }
+    return Optional.empty();
+  }
+
+  public static Optional<String> extractMetadataObjectTypeFromParameters(
       Parameter[] parameters, Object[] args) {
     for (int i = 0; i < parameters.length; i++) {
       Parameter parameter = parameters[i];
       AuthorizationObjectType objectType = parameter.getAnnotation(AuthorizationObjectType.class);
       if (objectType != null) {
-        return String.valueOf(args[i]).toUpperCase();
+        return Optional.of(String.valueOf(args[i]).toUpperCase());
       }
     }
-    return null;
+    return Optional.empty();
   }
 
   public static void buildNameIdentifierForBatchAuthorization(

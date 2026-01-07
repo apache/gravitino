@@ -28,6 +28,7 @@ There are some key difference between Gravitino Iceberg REST server and Gravitin
 - Supports event listener.
 - Supports Audit log.
 - Supports OAuth2 and HTTPS.
+- Supports access control (when running as an auxiliary service).
 - Provides a pluggable metrics store interface to store and delete Iceberg metrics.
 - Supports table metadata cache.
 
@@ -140,7 +141,7 @@ The Gravitino Iceberg REST server supports multiple catalog backend, and you cou
 | `gravitino.iceberg-rest.catalog-config-provider` | The className of catalog configuration provider, Gravitino provides build-in `static-config-provider` and `dynamic-config-provider`, you could also develop a custom class that implements `apache.gravitino.iceberg.service.provider.IcebergConfigProvider` and add the corresponding jar file to the Iceberg REST service classpath directory. | `static-config-provider` | No       | 0.7.0-incubating |
 
 Use `static-config-provider` to manage catalog configuration in the file, the catalog configuration is loaded when the server start up and couldn't be changed.
-While `dynamic-config-provider` is used to manage catalog config though Gravitino server, you could add&delete&change the catalog configurations dynamically.
+While `dynamic-config-provider` is used to manage catalog config through Gravitino server, you could add&delete&change the catalog configurations dynamically.
 
 #### Static catalog configuration provider
 
@@ -193,17 +194,17 @@ You can access different catalogs by setting the `warehouse` to the specific cat
 --conf spark.sql.catalog.default_rest_catalog.type=rest  \
 --conf spark.sql.catalog.default_rest_catalog.uri=http://127.0.0.1:9001/iceberg/ \
 ...
---conf spark.sql.catalog.hive_backend_catalog.type=rest  \
---conf spark.sql.catalog.hive_backend_catalog.uri=http://127.0.0.1:9001/iceberg/ \
---conf spark.sql.catalog.hive_backend_catalog.warehouse=hive_backend \
+--conf spark.sql.catalog.hive_backend_rest_catalog.type=rest  \
+--conf spark.sql.catalog.hive_backend_rest_catalog.uri=http://127.0.0.1:9001/iceberg/ \
+--conf spark.sql.catalog.hive_backend_rest_catalog.warehouse=hive_backend \
 ...
---conf spark.sql.catalog.jdbc_backend_catalog.type=rest  \
---conf spark.sql.catalog.jdbc_backend_catalog.uri=http://127.0.0.1:9001/iceberg/ \
---conf spark.sql.catalog.jdbc_backend_catalog.warehouse=jdbc_backend \
+--conf spark.sql.catalog.jdbc_backend_rest_catalog.type=rest  \
+--conf spark.sql.catalog.jdbc_backend_rest_catalog.uri=http://127.0.0.1:9001/iceberg/ \
+--conf spark.sql.catalog.jdbc_backend_rest_catalog.warehouse=jdbc_backend \
 ...
 ```
 
-In the Spark SQL side, you could use `default_rest_catalog` to access the default catalog backend, and use `hive_backend_catalog` and `jdbc_backend_catalog` to access the `hive_backend` and `jdbc_backend` catalog backend respectively.
+In the Spark SQL side, you could use `default_rest_catalog` to access the default catalog backend, and use `hive_backend_rest_catalog` and `jdbc_backend_rest_catalog` to access the `hive_backend` and `jdbc_backend` catalog backend respectively.
 
 ### Security
 
@@ -284,6 +285,34 @@ The detailed configuration items are as follows:
 
 Please refer to [Credential vending](./security/credential-vending.md) for more details.
 
+### Access control
+
+#### Prerequisites
+
+To use access control with the Iceberg REST service:
+
+1. The Iceberg REST service must be running as an auxiliary service within the Gravitino server (standalone mode is not supported for access control)
+2. Enable authorization in the Gravitino server by setting `gravitino.authorization.enable = true`
+3. Use the [dynamic configuration provider](#dynamic-catalog-configuration-provider) to retrieve catalog configurations from Gravitino
+
+:::note
+Access control for the Iceberg REST Catalog (IRC) is only supported when running as an auxiliary service embedded in the Gravitino server. Standalone Iceberg REST server deployments do not support access control features.
+:::
+
+Please refer to [Access Control](./security/access-control.md) for details on how to configure authorization, create roles, and grant privileges in Gravitino.
+
+#### How access control works
+
+When access control is enabled:
+
+1. Clients authenticate with the Iceberg REST service (Now we support Basic auth and OAuth2)
+2. The Iceberg REST service sends the authenticated user identity, target metadata object, and requested operation to the Gravitino server for authorization verification
+3. Gravitino verifies the user has the necessary privileges to perform the operation on the specified metadata object
+4. Upon successful authorization, the Iceberg REST service executes the operation; otherwise, it returns an authorization error
+
+Please refer to [Access Control](./security/access-control.md) for the complete list of privileges and how to grant them.
+
+
 ### Storage
 
 #### S3 configuration
@@ -299,12 +328,10 @@ For other Iceberg s3 properties not managed by Gravitino like `s3.sse.type`, you
 
 Please refer to [S3 credentials](./security/credential-vending.md#s3-credentials) for credential related configurations.
 
-:::caution
-To resolve Log4j class conflict issues that may arise when using Iceberg AWS 1.10 bundle jars alongside the Gravitino Iceberg REST server, it is recommended to remove the Log4j JAR files (specifically log4j-core and log4j-api) from the `iceberg-rest-server/libs` directory.
-:::
-
 :::info
-To configure the JDBC catalog backend, set the `gravitino.iceberg-rest.warehouse` parameter to `s3://{bucket_name}/${prefix_name}`. For the Hive catalog backend, set `gravitino.iceberg-rest.warehouse` to `s3a://{bucket_name}/${prefix_name}`. Additionally, download the [Iceberg AWS bundle](https://mvnrepository.com/artifact/org.apache.iceberg/iceberg-aws-bundle) and place it in the classpath of Iceberg REST server.
+ - For the JDBC catalog backend, set the `gravitino.iceberg-rest.warehouse` parameter to `s3://{bucket_name}/${prefix_name}`. 
+ - For the Hive catalog backend, set `gravitino.iceberg-rest.warehouse` to `s3a://{bucket_name}/${prefix_name}`. 
+ - Additionally, download the [Gravitino Iceberg AWS bundle](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-iceberg-aws-bundle) and place it in the classpath of Iceberg REST server.
 :::
 
 #### OSS configuration
@@ -319,11 +346,7 @@ For other Iceberg OSS properties not managed by Gravitino like `client.security-
 
 Please refer to [OSS credentials](./security/credential-vending.md#oss-credentials) for credential related configurations.
 
-Additionally, Iceberg doesn't provide Iceberg Aliyun bundle jar which contains OSS packages, there are two alternatives to use OSS packages:
-1. Use [Gravitino Aliyun bundle jar with hadoop packages](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-aliyun-bundle).
-2. Use [Aliyun JAVA SDK](https://gosspublic.alicdn.com/sdks/java/aliyun_java_sdk_3.10.2.zip) and extract `aliyun-sdk-oss-3.10.2.jar`, `hamcrest-core-1.1.jar`, `jdom2-2.0.6.jar` jars.
-
-Please place the above jars in the classpath of Iceberg REST server, please refer to [server management](#server-management) for classpath details.
+Additionally, please download the [Gravitino Iceberg Aliyun bundle jar](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-iceberg-aliyun-bundle) and place it in the classpath of Iceberg REST server, you can refer to [server management](#server-management) for classpath details.
 
 :::info
 Please set the `gravitino.iceberg-rest.warehouse` parameter to `oss://{bucket_name}/${prefix_name}`.
@@ -346,7 +369,7 @@ Please ensure that the credential file can be accessed by the Gravitino server. 
 :::
 
 :::info
-Please set `gravitino.iceberg-rest.warehouse` to `gs://{bucket_name}/${prefix_name}`, and download [Iceberg gcp bundle](https://mvnrepository.com/artifact/org.apache.iceberg/iceberg-gcp-bundle) and place it to the classpath of Gravitino Iceberg REST server, `iceberg-rest-server/libs` for the auxiliary server, `libs` for the standalone server.
+Please set `gravitino.iceberg-rest.warehouse` to `gs://{bucket_name}/${prefix_name}`, and download [Gravitino Iceberg gcp bundle](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-iceberg-gcp-bundle) and place it to the classpath of Gravitino Iceberg REST server, `iceberg-rest-server/libs` for the auxiliary server, `libs` for the standalone server.
 :::
 
 #### ADLS
@@ -360,7 +383,7 @@ For other Iceberg ADLS properties not managed by Gravitino like `adls.read.block
 Please refer to [ADLS credentials](./security/credential-vending.md#adls-credentials) for credential related configurations.
 
 :::info
-Please set `gravitino.iceberg-rest.warehouse` to `abfs[s]://{container-name}@{storage-account-name}.dfs.core.windows.net/{path}`, and download the [Iceberg Azure bundle](https://mvnrepository.com/artifact/org.apache.iceberg/iceberg-azure-bundle) and place it in the classpath of Iceberg REST server.
+Please set `gravitino.iceberg-rest.warehouse` to `abfs[s]://{container-name}@{storage-account-name}.dfs.core.windows.net/{path}`, and download the [Gravitino Iceberg Azure bundle](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-iceberg-azure-bundle) and place it in the classpath of Iceberg REST server.
 :::
 
 #### HDFS configuration
@@ -452,6 +475,14 @@ Gravitino provides the build-in `org.apache.gravitino.iceberg.common.cache.Local
 | Configuration item                          | Description                                                  | Default value | Required | Since Version    |
 |---------------------------------------------|--------------------------------------------------------------|---------------|----------|------------------|
 | `gravitino.iceberg-rest.extension-packages` | Comma-separated list of Iceberg REST API packages to expand. | (none)        | No       | 0.7.0-incubating |
+
+### Memory settings
+
+The Iceberg REST server uses `GRAVITINO_MEM` for JVM heap/metaspace flags. Default: `-Xms1024m -Xmx1024m -XX:MaxMetaspaceSize=512m`. Launch scripts append `GRAVITINO_MEM` to `JAVA_OPTS`; set it to adjust heap/metaspace sizes.
+Example tuning:
+- Development: `GRAVITINO_MEM="-Xms1g -Xmx1g -XX:MaxMetaspaceSize=512m"`
+- Medium workloads: `GRAVITINO_MEM="-Xms4g -Xmx4g -XX:MaxMetaspaceSize=1g"`
+- Higher concurrency or catalog counts: increase heap and metaspace accordingly.
 
 ## Starting the Iceberg REST server
 
@@ -620,7 +651,7 @@ print(table.scan().to_arrow())
 
 ## Docker instructions
 
-You could run Gravitino Iceberg REST server though docker container:
+You could run Gravitino Iceberg REST server through docker container:
 
 ```shell
 docker run -d -p 9001:9001 apache/gravitino-iceberg-rest:latest
@@ -675,3 +706,133 @@ sh ./dev/docker/build-docker.sh --platform linux/arm64 --type iceberg-rest-serve
 
 You could try Spark with Gravitino REST catalog service in our [playground](./how-to-use-the-playground.md#using-apache-iceberg-rest-service).
 
+## Quick Start: Enable Access Control for Iceberg REST Server
+
+To enable access control for the Iceberg REST server using Gravitino's dynamic configuration provider, follow these steps:
+
+### 1. Enable Authorization and Dynamic Config Provider
+
+Add the following to your Gravitino server configuration file (`gravitino.conf`). 
+Note that access control is only supported when running the Iceberg REST server as an auxiliary service within the Gravitino server:
+
+```properties
+gravitino.authorization.enable = true
+gravitino.authorization.serviceAdmins = adminUser
+
+gravitino.iceberg-rest.catalog-config-provider = dynamic-config-provider
+gravitino.iceberg-rest.gravitino-uri = http://127.0.0.1:8090
+gravitino.iceberg-rest.gravitino-metalake = test
+```
+
+Restart the Iceberg REST server after updating the configuration.
+
+---
+
+### 2. Create a Metalake
+
+```shell
+curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
+-H "Content-Type: application/json" -d '{
+  "name": "test"
+}' http://localhost:8090/api/metalakes
+```
+
+---
+
+### 3. Create a Catalog
+
+```shell
+curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
+-H "Content-Type: application/json" -d '{
+  "name": "catalog1",
+  "type": "ICEBERG",
+  "comment": "Iceberg catalog",
+  "properties": {}
+}' http://localhost:8090/api/metalakes/test/catalogs
+```
+
+---
+
+### 4. Create a Role and Grant Privileges
+
+```shell
+curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
+-H "Content-Type: application/json" -d '{
+   "name": "role1",
+   "properties": {},
+   "securableObjects": [
+      {
+         "fullName": "catalog1",
+         "type": "CATALOG",
+         "privileges": [
+            {
+               "name": "USE_CATALOG",
+               "condition": "ALLOW"
+            },
+            {
+               "name": "USE_SCHEMA",
+               "condition": "ALLOW"
+            },
+            {
+               "name": "SELECT_TABLE",
+               "condition": "ALLOW"
+            }
+         ]
+      }
+   ]
+}' http://localhost:8090/api/metalakes/test/roles
+```
+
+---
+
+#### Verify Access is Denied Without Privileges
+
+Before granting any privileges, verify that the user cannot access the catalog. Try to list tables as `user1` (replace with your actual authentication method):
+
+```shell
+curl -u user1:password -H "Accept: application/vnd.gravitino.v1+json" \
+  http://localhost:9001/iceberg/v1/catalog1/namespaces/default/tables
+```
+
+This should return an error indicating insufficient privileges (such as HTTP 403 Forbidden).
+
+---
+
+#### Grant Role to User
+
+Now grant the role with privileges to the user:
+
+```shell
+curl -X PUT -H "Accept: application/vnd.gravitino.v1+json" \
+-H "Content-Type: application/json" -d '{
+    "roleNames": ["role1"]
+}' http://localhost:8090/api/metalakes/test/permissions/users/user1/grant
+```
+
+---
+
+#### Verify Access is Granted With Privileges
+
+After granting the role with privileges, repeat the request as `user1`:
+
+```shell
+curl -u user1:password -H "Accept: application/vnd.gravitino.v1+json" \
+  http://localhost:9001/iceberg/v1/catalog1/namespaces/default/tables
+```
+
+This time, the request should succeed and return the list of tables.
+
+---
+
+**Summary:**
+- Enable authorization and set configuration provider to `dynamic-config-provider`
+- Create metalake
+- Create catalog
+- Create role and grant privileges
+- Assign role to user
+
+For more details, see the [Access Control documentation](./security/access-control.md).
+
+> **Note:** IRC (Iceberg REST Catalog) authorization is not supported for standalone Iceberg REST server deployments.
+> Access control features described here require the Iceberg REST server to be run as an auxiliary service within the Gravitino server,
+> using the dynamic configuration provider. Standalone deployments do not support IRC-based authorization.

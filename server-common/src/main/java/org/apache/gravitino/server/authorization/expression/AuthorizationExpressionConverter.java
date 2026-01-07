@@ -19,9 +19,15 @@ package org.apache.gravitino.server.authorization.expression;
 
 import static org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants.loadCatalogAuthorizationExpression;
 import static org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants.loadFilesetAuthorizationExpression;
+import static org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants.loadJobAuthorizationExpression;
+import static org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants.loadJobTemplateAuthorizationExpression;
+import static org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants.loadMetalakeAuthorizationExpression;
 import static org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants.loadModelAuthorizationExpression;
+import static org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants.loadPolicyAuthorizationExpression;
+import static org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants.loadRoleAuthorizationExpression;
 import static org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants.loadSchemaAuthorizationExpression;
 import static org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants.loadTableAuthorizationExpression;
+import static org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants.loadTagAuthorizationExpression;
 import static org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants.loadTopicsAuthorizationExpression;
 
 import java.util.Map;
@@ -164,16 +170,17 @@ public class AuthorizationExpressionConverter {
         """
               ( entityType == 'CATALOG' && (%s)) ||
               ( entityType == 'SCHEMA' && (%s)) ||
-               ( entityType == 'TABLE' && (%s)) ||
+              ( entityType == 'TABLE' && (%s)) ||
               ( entityType == 'MODEL' && (%s)) ||
               ( entityType == 'FILESET' && (%s)) ||
               ( entityType == 'TOPIC' && (%s)) ||
-              ( entityType != 'CATALOG' &&
-              entityType != 'SCHEMA' &&
-              entityType != 'TABLE' &&
-              entityType != 'MODEL' &&
-              entityType != 'FILESET' &&
-              entityType != 'TOPIC')
+              ( entityType == 'ROLE' && (%s)) ||
+              ( entityType == 'METALAKE' && (%s)) ||
+              ( entityType == 'POLICY' && (%s)) ||
+              ( entityType == 'TAG' && (%s)) ||
+              ( entityType == 'JOB' && (%s)) ||
+              ( entityType == 'JOB_TEMPLATE' && (%s)) ||
+              ( entityType == 'COLUMN' && (%s))
               """
             .formatted(
                 loadCatalogAuthorizationExpression,
@@ -181,7 +188,14 @@ public class AuthorizationExpressionConverter {
                 loadTableAuthorizationExpression,
                 loadModelAuthorizationExpression,
                 loadFilesetAuthorizationExpression,
-                loadTopicsAuthorizationExpression));
+                loadTopicsAuthorizationExpression,
+                loadRoleAuthorizationExpression,
+                loadMetalakeAuthorizationExpression,
+                loadPolicyAuthorizationExpression,
+                loadTagAuthorizationExpression,
+                loadJobAuthorizationExpression,
+                loadJobTemplateAuthorizationExpression,
+                loadTableAuthorizationExpression));
   }
 
   /**
@@ -193,6 +207,21 @@ public class AuthorizationExpressionConverter {
   public static String replaceAnyPrivilege(String expression) {
     expression = expression.replaceAll("SERVICE_ADMIN", "authorizer.isServiceAdmin()");
     expression = expression.replaceAll("METALAKE_USER", "authorizer.isMetalakeUser(METALAKE_NAME)");
+
+    // A single privilege (e.g., SELECT_TABLE) can be granted or denied at multiple namespace
+    // levels: metalake, catalog, schema, and table.
+    //
+    // Deny takes precedence over allow: if deny is set for the privilege at any level in the
+    // hierarchy,
+    // the user is not considered to have that privilege—even if an allow exists at a more specific
+    // level.
+    //
+    // Examples:
+    // - If role1 is allowed SELECT_TABLE on metalake1 but denied on catalog1,
+    //   then SELECT_TABLE is denied for all objects under catalog1.
+    // - If role1 is denied SELECT_TABLE on metalake1, any allow on catalog1 (or deeper) is
+    // overridden,
+    //   and SELECT_TABLE remains denied for catalog1 and its descendants.
     expression =
         expression.replaceAll(
             "ANY_USE_CATALOG",
@@ -241,14 +270,14 @@ public class AuthorizationExpressionConverter {
                 + "!(ANY(DENY_USE_MODEL, METALAKE, CATALOG, SCHEMA, MODEL)))");
     expression =
         expression.replaceAll(
-            "ANY_CREATE_MODEL_VERSION",
-            "((ANY(CREATE_MODEL_VERSION, METALAKE, CATALOG, SCHEMA, MODEL)) "
-                + "&& !(ANY(DENY_CREATE_MODEL_VERSION, METALAKE, CATALOG, SCHEMA, MODEL)))");
+            "ANY_LINK_MODEL_VERSION",
+            "((ANY(LINK_MODEL_VERSION, METALAKE, CATALOG, SCHEMA, MODEL)) "
+                + "&& !(ANY(DENY_LINK_MODEL_VERSION, METALAKE, CATALOG, SCHEMA, MODEL)))");
     expression =
         expression.replaceAll(
-            "ANY_CREATE_MODEL",
-            "((ANY(CREATE_MODEL, METALAKE, CATALOG, SCHEMA)) "
-                + "&& !(ANY(DENY_CREATE_MODEL, METALAKE, CATALOG, SCHEMA)))");
+            "ANY_REGISTER_MODEL",
+            "((ANY(REGISTER_MODEL, METALAKE, CATALOG, SCHEMA)) "
+                + "&& !(ANY(DENY_REGISTER_MODEL, METALAKE, CATALOG, SCHEMA)))");
     expression =
         expression.replaceAll(
             "ANY_CREATE_TOPIC",
@@ -283,6 +312,11 @@ public class AuthorizationExpressionConverter {
             "ANY_APPLY_POLICY",
             "((ANY(APPLY_POLICY, METALAKE, POLICY))"
                 + "&& !(ANY(DENY_APPLY_POLICY, METALAKE, POLICY)))");
+    expression =
+        expression.replaceAll(
+            "ANY_USE_JOB_TEMPLATE",
+            "((ANY(USE_JOB_TEMPLATE, METALAKE, JOB_TEMPLATE))"
+                + "&& !(ANY(DENY_USE_JOB_TEMPLATE, METALAKE, JOB_TEMPLATE)))");
     expression =
         expression.replaceAll(
             CAN_SET_OWNER,

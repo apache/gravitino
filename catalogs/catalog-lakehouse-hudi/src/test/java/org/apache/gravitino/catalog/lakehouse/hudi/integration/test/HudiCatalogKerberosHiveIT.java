@@ -31,12 +31,12 @@ import org.apache.gravitino.Configs;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Schema;
 import org.apache.gravitino.catalog.lakehouse.hudi.HudiCatalogPropertiesMetadata;
-import org.apache.gravitino.catalog.lakehouse.hudi.backend.hms.kerberos.AuthenticationConfig;
-import org.apache.gravitino.catalog.lakehouse.hudi.backend.hms.kerberos.KerberosConfig;
 import org.apache.gravitino.client.GravitinoAdminClient;
 import org.apache.gravitino.client.GravitinoMetalake;
 import org.apache.gravitino.client.KerberosTokenProvider;
 import org.apache.gravitino.exceptions.NoSuchTableException;
+import org.apache.gravitino.hive.kerberos.AuthenticationConfig;
+import org.apache.gravitino.hive.kerberos.KerberosConfig;
 import org.apache.gravitino.integration.test.container.ContainerSuite;
 import org.apache.gravitino.integration.test.container.HiveContainer;
 import org.apache.gravitino.integration.test.util.BaseIT;
@@ -171,8 +171,8 @@ public class HudiCatalogKerberosHiveIT extends BaseIT {
         classRef = Class.forName("sun.security.krb5.Config");
       }
 
-      java.lang.reflect.Method refershMethod = classRef.getMethod("refresh");
-      refershMethod.invoke(null);
+      java.lang.reflect.Method refreshMethod = classRef.getMethod("refresh");
+      refreshMethod.invoke(null);
     } catch (Exception e) {
       throw new RuntimeException(e);
     }
@@ -235,7 +235,7 @@ public class HudiCatalogKerberosHiveIT extends BaseIT {
     Assertions.assertTrue(
         exception
             .getMessage()
-            .contains("Hudi table does not exist: " + TABLE_NAME + " in Hive Metastore"),
+            .contains("Hive table " + TABLE_NAME + " does not exist in Hive Metastore"),
         "Unexpected exception message: " + exception.getMessage());
   }
 

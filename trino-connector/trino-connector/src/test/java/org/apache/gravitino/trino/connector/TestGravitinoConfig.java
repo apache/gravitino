@@ -20,11 +20,14 @@ package org.apache.gravitino.trino.connector;
 
 import static org.apache.gravitino.trino.connector.GravitinoErrorCode.GRAVITINO_MISSING_CONFIG;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrowsExactly;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.google.common.collect.ImmutableMap;
 import io.trino.spi.TrinoException;
 import java.util.Map;
+import java.util.regex.Pattern;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.jupiter.api.Test;
@@ -111,5 +114,53 @@ public class TestGravitinoConfig {
     Map<String, String> clientConfig = configWithClientConfig.getClientConfig();
     assertEquals(clientConfig.get("gravitino.client.socketTimeoutMs"), "10000");
     assertEquals(clientConfig.get("gravitino.client.connectionTimeoutMs"), "20000");
+  }
+
+  @Test
+  public void testGravitinoConfigWithSkipCatalogPatterns() {
+    String gravitinoUrl = "http://127.0.0.1:8000";
+    String metalake = "user_001";
+    ImmutableMap<String, String> configMap =
+        ImmutableMap.of("gravitino.uri", gravitinoUrl, "gravitino.metalake", metalake);
+    GravitinoConfig config = new GravitinoConfig(configMap);
+
+    assertFalse(skipCatalog("test_catalog", config));
+
+    ImmutableMap<String, String> configMapWithSkipCatalogList =
+        ImmutableMap.of(
+            "gravitino.uri",
+            gravitinoUrl,
+            "gravitino.metalake",
+            metalake,
+            "gravitino.trino.skip-catalog-patterns",
+            "test_.*, test1\\.c.*");
+    GravitinoConfig configWithSkipCatalogPatterns =
+        new GravitinoConfig(configMapWithSkipCatalogList);
+    assertTrue(skipCatalog("test_catalog", configWithSkipCatalogPatterns));
+    assertTrue(skipCatalog("test1.catalog", configWithSkipCatalogPatterns));
+    assertFalse(skipCatalog("test1_catalog", configWithSkipCatalogPatterns));
+    assertFalse(skipCatalog("test2_catalog", configWithSkipCatalogPatterns));
+
+    ImmutableMap<String, String> configMapWithInvalidSkipCatalogList =
+        ImmutableMap.of(
+            "gravitino.uri",
+            gravitinoUrl,
+            "gravitino.metalake",
+            metalake,
+            "gravitino.trino.skip-catalog-patterns",
+            "test_.*, (abc");
+    assertThrowsExactly(
+        TrinoException.class,
+        () -> new GravitinoConfig(configMapWithInvalidSkipCatalogList),
+        "Config `gravitino.trino.skip-catalog-patterns` is invalid because it contains an illegal regular expression");
+  }
+
+  private static boolean skipCatalog(String catalogName, GravitinoConfig config) {
+    for (Pattern pattern : config.getSkipCatalogPatterns()) {
+      if (pattern.matcher(catalogName).matches()) {
+        return true;
+      }
+    }
+    return false;
   }
 }

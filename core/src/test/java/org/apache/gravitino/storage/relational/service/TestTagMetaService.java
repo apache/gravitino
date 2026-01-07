@@ -175,6 +175,38 @@ public class TestTagMetaService extends TestJDBCBackend {
   }
 
   @TestTemplate
+  public void testUpdateTagCommentFromNull() throws IOException {
+    createAndInsertMakeLake(METALAKE_NAME);
+
+    TagMetaService tagMetaService = TagMetaService.getInstance();
+    TagEntity tagEntity =
+        TagEntity.builder()
+            .withId(RandomIdGenerator.INSTANCE.nextId())
+            .withName("tag_null_comment")
+            .withNamespace(NamespaceUtil.ofTag(METALAKE_NAME))
+            .withAuditInfo(AUDIT_INFO)
+            .build();
+    tagMetaService.insertTag(tagEntity, false);
+
+    tagMetaService.updateTag(
+        tagEntity.nameIdentifier(),
+        entity -> {
+          TagEntity tag = (TagEntity) entity;
+          return TagEntity.builder()
+              .withId(tag.id())
+              .withName(tag.name())
+              .withNamespace(tag.namespace())
+              .withComment("updated tag comment")
+              .withProperties(tag.properties())
+              .withAuditInfo(tag.auditInfo())
+              .build();
+        });
+
+    TagEntity updatedTag = tagMetaService.getTagByIdentifier(tagEntity.nameIdentifier());
+    Assertions.assertEquals("updated tag comment", updatedTag.comment());
+  }
+
+  @TestTemplate
   public void testCreateAndListTags() throws IOException {
     createAndInsertMakeLake(METALAKE_NAME);
 

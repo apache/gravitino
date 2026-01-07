@@ -18,6 +18,9 @@
  */
 package org.apache.gravitino.catalog.lakehouse.lance;
 
+import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_CREATION_MODE;
+import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_TABLE_REGISTER;
+
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import com.lancedb.lance.Dataset;
@@ -58,6 +61,12 @@ import org.slf4j.LoggerFactory;
 
 public class LanceTableOperations extends ManagedTableOperations {
   private static final Logger LOG = LoggerFactory.getLogger(LanceTableOperations.class);
+
+  public enum CreationMode {
+    CREATE,
+    EXIST_OK,
+    OVERWRITE
+  }
 
   private final EntityStore store;
 
@@ -101,45 +110,51 @@ public class LanceTableOperations extends ManagedTableOperations {
     String location = properties.get(Table.PROPERTY_LOCATION);
     Preconditions.checkArgument(
         StringUtils.isNotBlank(location), "Table location must be specified");
-    Map<String, String> storageProps = LancePropertiesUtils.getLanceStorageOptions(properties);
+
+    // Extract creation mode from properties
+    CreationMode mode =
+        Optional.ofNullable(properties.get(LANCE_CREATION_MODE))
+            .map(CreationMode::valueOf)
+            .orElse(CreationMode.CREATE);
 
     boolean register =
-        Optional.ofNullable(properties.get(LanceTableDelegator.PROPERTY_LANCE_TABLE_REGISTER))
+        Optional.ofNullable(properties.get(LANCE_TABLE_REGISTER))
             .map(Boolean::parseBoolean)
             .orElse(false);
-    if (register) {
-      // If this is a registration operation, just create the table metadata without creating a new
-      // dataset
-      return super.createTable(
-          ident, columns, comment, properties, partitions, distribution, sortOrders, indexes);
+
+    // Handle EXIST_OK mode - check if table exists first
+    if (mode == CreationMode.EXIST_OK) {
+      Preconditions.checkArgument(
+          !register, "EXIST_OK mode is not supported for register operation");
+
+      try {
+        return super.loadTable(ident);
+      } catch (NoSuchTableException e) {
+        // Table doesn't exist, proceed with creation
+      }
     }
 
-    try (Dataset ignored =
-        Dataset.create(
-            new RootAllocator(),
-            location,
-            convertColumnsToArrowSchema(columns),
-            new WriteParams.Builder().withStorageOptions(storageProps).build())) {
-      // Only create the table metadata in Gravitino after the Lance dataset is successfully
-      // created.
-      return super.createTable(
-          ident, columns, comment, properties, partitions, distribution, sortOrders, indexes);
-    } catch (NoSuchSchemaException e) {
-      throw e;
-    } catch (TableAlreadyExistsException e) {
-      // If the table metadata already exists, but the underlying lance table was just created
-      // successfully, we need to clean up the created lance table to avoid orphaned datasets.
-      Dataset.drop(location, LancePropertiesUtils.getLanceStorageOptions(properties));
-      throw e;
-    } catch (IllegalArgumentException e) {
-      if (e.getMessage().contains("Dataset already exists")) {
-        throw new TableAlreadyExistsException(
-            e, "Lance dataset already exists at location %s", location);
+    // Handle OVERWRITE mode - drop existing table if present
+    if (mode == CreationMode.OVERWRITE) {
+      if (register) {
+        dropTable(ident);
+      } else {
+        purgeTable(ident);
       }
-      throw e;
-    } catch (Exception e) {
-      throw new RuntimeException("Failed to create Lance dataset at location " + location, e);
     }
+
+    // Now create the table (for all modes after handling above)
+    return createTableInternal(
+        ident,
+        columns,
+        comment,
+        properties,
+        partitions,
+        distribution,
+        sortOrders,
+        indexes,
+        register,
+        location);
   }
 
   @Override
@@ -209,6 +224,54 @@ public class LanceTableOperations extends ManagedTableOperations {
       return false;
     } catch (Exception e) {
       throw new RuntimeException("Failed to drop Lance dataset for table " + ident, e);
+    }
+  }
+
+  // Package-private for testing
+  Table createTableInternal(
+      NameIdentifier ident,
+      Column[] columns,
+      String comment,
+      Map<String, String> properties,
+      Transform[] partitions,
+      Distribution distribution,
+      SortOrder[] sortOrders,
+      Index[] indexes,
+      boolean register,
+      String location)
+      throws NoSuchSchemaException, TableAlreadyExistsException {
+
+    if (register) {
+      return super.createTable(
+          ident, columns, comment, properties, partitions, distribution, sortOrders, indexes);
+    }
+
+    Map<String, String> storageProps = LancePropertiesUtils.getLanceStorageOptions(properties);
+    try (Dataset ignored =
+        Dataset.create(
+            new RootAllocator(),
+            location,
+            convertColumnsToArrowSchema(columns),
+            new WriteParams.Builder().withStorageOptions(storageProps).build())) {
+      // Only create the table metadata in Gravitino after the Lance dataset is successfully
+      // created.
+      return super.createTable(
+          ident, columns, comment, properties, partitions, distribution, sortOrders, indexes);
+    } catch (NoSuchSchemaException e) {
+      throw e;
+    } catch (TableAlreadyExistsException e) {
+      // If the table metadata already exists, but the underlying lance table was just created
+      // successfully, we need to clean up the created lance table to avoid orphaned datasets.
+      Dataset.drop(location, LancePropertiesUtils.getLanceStorageOptions(properties));
+      throw e;
+    } catch (IllegalArgumentException e) {
+      if (e.getMessage().contains("Dataset already exists")) {
+        throw new TableAlreadyExistsException(
+            e, "Lance dataset already exists at location %s", location);
+      }
+      throw e;
+    } catch (Exception e) {
+      throw new RuntimeException("Failed to create Lance dataset at location " + location, e);
     }
   }
 

@@ -1,0 +1,13 @@
+CREATE SCHEMA
+
+CREATE TABLE
+
+INSERT: 1 row
+
+"true"
+
+"true"
+
+DROP TABLE
+
+DROP SCHEMA

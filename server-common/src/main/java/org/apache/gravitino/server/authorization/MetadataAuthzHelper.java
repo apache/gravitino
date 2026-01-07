@@ -20,11 +20,10 @@ package org.apache.gravitino.server.authorization;
 import java.lang.reflect.Array;
 import java.security.Principal;
 import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
@@ -33,12 +32,15 @@ import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.GravitinoEnv;
+import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.Metalake;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.authorization.AuthorizationRequestContext;
 import org.apache.gravitino.authorization.GravitinoAuthorizer;
-import org.apache.gravitino.authorization.Privilege;
+import org.apache.gravitino.dto.tag.MetadataObjectDTO;
+import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants;
 import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionEvaluator;
+import org.apache.gravitino.utils.MetadataObjectUtil;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.PrincipalUtils;
 import org.slf4j.Logger;
@@ -56,58 +58,70 @@ public class MetadataAuthzHelper {
 
   private MetadataAuthzHelper() {}
 
-  /**
-   * Call {@link GravitinoAuthorizer} to filter the metadata list
-   *
-   * @param entityType for example, CATALOG, SCHEMA,TABLE, etc.
-   * @param privilege for example, CREATE_CATALOG, CREATE_TABLE, etc.
-   * @param metadataList metadata list.
-   * @return metadata List that the user has permission to access.
-   */
-  public static NameIdentifier[] filterByPrivilege(
-      String metalake,
-      Entity.EntityType entityType,
-      String privilege,
-      NameIdentifier[] metadataList) {
-    if (!enableAuthorization()) {
-      return metadataList;
-    }
-    checkExecutor();
-    GravitinoAuthorizer gravitinoAuthorizer =
-        GravitinoAuthorizerProvider.getInstance().getGravitinoAuthorizer();
-    Principal currentPrincipal = PrincipalUtils.getCurrentPrincipal();
-    AuthorizationRequestContext authorizationRequestContext = new AuthorizationRequestContext();
-    return Arrays.stream(metadataList)
-        .filter(
-            metaDataName ->
-                gravitinoAuthorizer.authorize(
-                    currentPrincipal,
-                    metalake,
-                    NameIdentifierUtil.toMetadataObject(metaDataName, entityType),
-                    Privilege.Name.valueOf(privilege),
-                    authorizationRequestContext))
-        .toArray(NameIdentifier[]::new);
-  }
-
   public static Metalake[] filterMetalakes(Metalake[] metalakes, String expression) {
-    if (!enableAuthorization()) {
-      return metalakes;
-    }
-    checkExecutor();
     AuthorizationRequestContext authorizationRequestContext = new AuthorizationRequestContext();
     return doFilter(
         expression,
         metalakes,
+        PrincipalUtils.getCurrentPrincipal(),
         GravitinoAuthorizerProvider.getInstance().getGravitinoAuthorizer(),
         authorizationRequestContext,
         metalake -> {
           String metalakeName = metalake.name();
-          return splitMetadataNames(
+          return NameIdentifierUtil.splitNameIdentifier(
               metalakeName,
               Entity.EntityType.METALAKE,
               NameIdentifierUtil.ofMetalake(metalakeName));
-        });
+        },
+        (unused) -> null);
   }
+
+  /**
+   * Filters MetadataObjectDTO array based on access permissions.
+   *
+   * @param metalake The metalake name
+   * @param metadataObjects The array of metadata object DTOs to filter
+   * @return Filtered array of metadata object DTOs that the current user has access to
+   */
+  public static MetadataObjectDTO[] filterMetadataObject(
+      String metalake, MetadataObjectDTO[] metadataObjects) {
+    return doFilter(
+        AuthorizationExpressionConstants.CAN_ACCESS_METADATA,
+        metadataObjects,
+        PrincipalUtils.getCurrentPrincipal(),
+        GravitinoAuthorizerProvider.getInstance().getGravitinoAuthorizer(),
+        new AuthorizationRequestContext(),
+        metadataObject ->
+            NameIdentifierUtil.splitNameIdentifier(
+                metalake,
+                MetadataObjectUtil.toEntityType(metadataObject.type()),
+                MetadataObjectUtil.toEntityIdent(metalake, metadataObject)),
+        metadataObject -> MetadataObjectUtil.toEntityType(metadataObject.type()));
+  }
+
+  /**
+   * Filters MetadataObject array based on access permissions.
+   *
+   * @param metalake The metalake name
+   * @param metadataObjects The array of metadata objects to filter
+   * @return Filtered array of metadata objects that the current user has access to
+   */
+  public static MetadataObject[] filterMetadataObject(
+      String metalake, MetadataObject[] metadataObjects) {
+    return doFilter(
+        AuthorizationExpressionConstants.CAN_ACCESS_METADATA,
+        metadataObjects,
+        PrincipalUtils.getCurrentPrincipal(),
+        GravitinoAuthorizerProvider.getInstance().getGravitinoAuthorizer(),
+        new AuthorizationRequestContext(),
+        metadataObject ->
+            NameIdentifierUtil.splitNameIdentifier(
+                metalake,
+                MetadataObjectUtil.toEntityType(metadataObject.type()),
+                MetadataObjectUtil.toEntityIdent(metalake, metadataObject)),
+        metadataObject -> MetadataObjectUtil.toEntityType(metadataObject.type()));
+  }
+
   /**
    * Call {@link AuthorizationExpressionEvaluator} to filter the metadata list
    *
@@ -141,7 +155,7 @@ public class MetadataAuthzHelper {
 
     String metalake = NameIdentifierUtil.getMetalake(identifier);
     Map<Entity.EntityType, NameIdentifier> nameIdentifierMap =
-        splitMetadataNames(metalake, entityType, identifier);
+        NameIdentifierUtil.splitNameIdentifier(metalake, entityType, identifier);
     AuthorizationExpressionEvaluator authorizationExpressionEvaluator =
         new AuthorizationExpressionEvaluator(expression);
     return authorizationExpressionEvaluator.evaluate(
@@ -167,8 +181,18 @@ public class MetadataAuthzHelper {
       Function<E, NameIdentifier> toNameIdentifier) {
     GravitinoAuthorizer authorizer =
         GravitinoAuthorizerProvider.getInstance().getGravitinoAuthorizer();
-    return filterByExpression(
-        metalake, expression, entityType, entities, toNameIdentifier, authorizer);
+    AuthorizationRequestContext authorizationRequestContext = new AuthorizationRequestContext();
+    return doFilter(
+        expression,
+        entities,
+        PrincipalUtils.getCurrentPrincipal(),
+        authorizer,
+        authorizationRequestContext,
+        (entity) -> {
+          NameIdentifier nameIdentifier = toNameIdentifier.apply(entity);
+          return NameIdentifierUtil.splitNameIdentifier(metalake, entityType, nameIdentifier);
+        },
+        (unused) -> null);
   }
 
   /**
@@ -180,7 +204,12 @@ public class MetadataAuthzHelper {
    * @param entityType entity type
    * @param entities metadata entities
    * @param toNameIdentifier function to convert entity to NameIdentifier
-   * @param authorizer authorizer to filter metadata
+   * @param currentPrincipal The principal to perform the authorization check as. This is intended
+   *     as an extension point for external modules to inject a specific security context, so please
+   *     do not remove it.
+   * @param authorizer The authorizer to use for the authorization check. This is intended as an
+   *     extension point for external modules to inject a specific authorization mechanism, so
+   *     please do not remove it.
    * @return Filtered Metadata Entity
    * @param <E> Entity class
    */
@@ -190,30 +219,47 @@ public class MetadataAuthzHelper {
       Entity.EntityType entityType,
       E[] entities,
       Function<E, NameIdentifier> toNameIdentifier,
+      Principal currentPrincipal,
       GravitinoAuthorizer authorizer) {
-    if (!enableAuthorization()) {
-      return entities;
-    }
-    checkExecutor();
     AuthorizationRequestContext authorizationRequestContext = new AuthorizationRequestContext();
     return doFilter(
         expression,
         entities,
+        currentPrincipal,
         authorizer,
         authorizationRequestContext,
         (entity) -> {
           NameIdentifier nameIdentifier = toNameIdentifier.apply(entity);
-          return splitMetadataNames(metalake, entityType, nameIdentifier);
-        });
+          return NameIdentifierUtil.splitNameIdentifier(metalake, entityType, nameIdentifier);
+        },
+        (unused) -> null);
   }
 
+  /**
+   * Filters entities based on authorization expression evaluation.
+   *
+   * @param expression The authorization expression to evaluate
+   * @param entities The array of entities to filter
+   * @param currentPrincipal The principal used to evaluate permissions
+   * @param authorizer The authorizer used to evaluate permissions
+   * @param authorizationRequestContext The context of the authorization request
+   * @param extractMetadataNamesMap Function to extract metadata names map from entity
+   * @param extractEntityType Function to extract entity type from entity
+   * @param <E> The type of entity
+   * @return Filtered array of entities that passed authorization check
+   */
   private static <E> E[] doFilter(
       String expression,
       E[] entities,
+      Principal currentPrincipal,
       GravitinoAuthorizer authorizer,
       AuthorizationRequestContext authorizationRequestContext,
-      Function<E, Map<Entity.EntityType, NameIdentifier>> extractMetadataNamesMap) {
-    Principal currentPrincipal = PrincipalUtils.getCurrentPrincipal();
+      Function<E, Map<Entity.EntityType, NameIdentifier>> extractMetadataNamesMap,
+      Function<E, Entity.EntityType> extractEntityType) {
+    if (!enableAuthorization()) {
+      return entities;
+    }
+    checkExecutor();
     authorizationRequestContext.setOriginalAuthorizationExpression(expression);
     List<CompletableFuture<E>> futures = new ArrayList<>();
     for (E entity : entities) {
@@ -227,7 +273,11 @@ public class MetadataAuthzHelper {
                         AuthorizationExpressionEvaluator authorizationExpressionEvaluator =
                             new AuthorizationExpressionEvaluator(expression, authorizer);
                         return authorizationExpressionEvaluator.evaluate(
-                                extractMetadataNamesMap.apply(entity), authorizationRequestContext)
+                                extractMetadataNamesMap.apply(entity),
+                                authorizationRequestContext,
+                                currentPrincipal,
+                                Optional.ofNullable(extractEntityType.apply(entity))
+                                    .map(Entity.EntityType::name))
                             ? entity
                             : null;
                       });
@@ -242,28 +292,6 @@ public class MetadataAuthzHelper {
         .map(CompletableFuture::join)
         .filter(Objects::nonNull)
         .toArray(size -> (E[]) Array.newInstance(entities.getClass().getComponentType(), size));
-  }
-
-  /**
-   * Extract the parent metadata from NameIdentifier. For example, when given a Table
-   * NameIdentifier, it returns a map containing the Table itself along with its parent Schema and
-   * Catalog.
-   *
-   * @param metalake metalake
-   * @param entityType metadata type
-   * @param nameIdentifier metadata name
-   * @return A map containing the metadata object and all its parent objects, keyed by their types
-   */
-  public static Map<Entity.EntityType, NameIdentifier> splitMetadataNames(
-      String metalake, Entity.EntityType entityType, NameIdentifier nameIdentifier) {
-    Map<Entity.EntityType, NameIdentifier> nameIdentifierMap = new HashMap<>();
-    nameIdentifierMap.put(Entity.EntityType.METALAKE, NameIdentifierUtil.ofMetalake(metalake));
-    while (entityType != Entity.EntityType.METALAKE) {
-      nameIdentifierMap.put(entityType, nameIdentifier);
-      entityType = NameIdentifierUtil.parentEntityType(entityType);
-      nameIdentifier = NameIdentifierUtil.parentNameIdentifier(nameIdentifier, entityType);
-    }
-    return nameIdentifierMap;
   }
 
   private static boolean enableAuthorization() {

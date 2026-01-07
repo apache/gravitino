@@ -125,6 +125,7 @@ public class TestMemoryEntityStore {
 
             E newE = updater.apply(e);
             NameIdentifier newIdent = NameIdentifier.of(newE.namespace(), newE.name());
+            // If the schema is changed for rename table operation, delete the old entry first
             if (!newIdent.equals(ident)) {
               delete(ident, entityType);
             }

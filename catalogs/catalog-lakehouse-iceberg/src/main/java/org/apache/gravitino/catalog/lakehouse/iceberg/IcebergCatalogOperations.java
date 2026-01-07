@@ -50,8 +50,11 @@ import org.apache.gravitino.exceptions.NonEmptySchemaException;
 import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
 import org.apache.gravitino.exceptions.TableAlreadyExistsException;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
+import org.apache.gravitino.iceberg.common.authentication.AuthenticationConfig;
+import org.apache.gravitino.iceberg.common.authentication.SupportsKerberos;
 import org.apache.gravitino.iceberg.common.ops.IcebergCatalogWrapper;
 import org.apache.gravitino.iceberg.common.ops.IcebergCatalogWrapper.IcebergTableChange;
+import org.apache.gravitino.iceberg.common.ops.KerberosAwareIcebergCatalogProxy;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Table;
@@ -113,7 +116,13 @@ public class IcebergCatalogOperations implements CatalogOperations, SupportsSche
     resultConf.put("catalog_uuid", info.id().toString());
     IcebergConfig icebergConfig = new IcebergConfig(resultConf);
 
-    this.icebergCatalogWrapper = new IcebergCatalogWrapper(icebergConfig);
+    IcebergCatalogWrapper rawWrapper = new IcebergCatalogWrapper(icebergConfig);
+
+    AuthenticationConfig authenticationConfig = new AuthenticationConfig(resultConf);
+    this.icebergCatalogWrapper =
+        authenticationConfig.isKerberosAuth() && rawWrapper.getCatalog() instanceof SupportsKerberos
+            ? new KerberosAwareIcebergCatalogProxy(rawWrapper).getProxy(icebergConfig)
+            : rawWrapper;
     this.icebergCatalogWrapperHelper =
         new IcebergCatalogWrapperHelper(icebergCatalogWrapper.getCatalog());
   }
@@ -440,15 +449,28 @@ public class IcebergCatalogOperations implements CatalogOperations, SupportsSche
   private Table renameTable(NameIdentifier tableIdent, TableChange.RenameTable renameTable)
       throws NoSuchTableException, IllegalArgumentException {
     try {
+      Namespace destNamespace = tableIdent.namespace();
+      if (renameTable.getNewSchemaName().isPresent()) {
+        String[] namespaceLevels = tableIdent.namespace().levels();
+        String[] destLevels = Arrays.copyOf(namespaceLevels, namespaceLevels.length);
+        destLevels[destLevels.length - 1] = renameTable.getNewSchemaName().get();
+        NameIdentifier destSchemaIdent = NameIdentifier.of(destLevels);
+        if (!schemaExists(destSchemaIdent)) {
+          throw new NoSuchSchemaException("Iceberg schema does not exist %s", destSchemaIdent);
+        }
+        destNamespace = Namespace.of(destLevels);
+      }
+
       RenameTableRequest renameTableRequest =
           RenameTableRequest.builder()
               .withSource(IcebergCatalogWrapperHelper.buildIcebergTableIdentifier(tableIdent))
               .withDestination(
                   IcebergCatalogWrapperHelper.buildIcebergTableIdentifier(
-                      tableIdent.namespace(), renameTable.getNewName()))
+                      destNamespace, renameTable.getNewName()))
               .build();
       icebergCatalogWrapper.renameTable(renameTableRequest);
-      return loadTable(NameIdentifier.of(tableIdent.namespace(), renameTable.getNewName()));
+      return loadTable(
+          NameIdentifier.of(ArrayUtils.add(destNamespace.levels(), renameTable.getNewName())));
     } catch (org.apache.iceberg.exceptions.NoSuchTableException e) {
       throw new NoSuchTableException(e, ICEBERG_TABLE_DOES_NOT_EXIST_MSG, tableIdent.name());
     }

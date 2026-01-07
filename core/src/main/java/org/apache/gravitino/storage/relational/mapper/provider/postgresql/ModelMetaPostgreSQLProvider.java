@@ -89,4 +89,32 @@ public class ModelMetaPostgreSQLProvider extends ModelMetaBaseSQLProvider {
         + ModelMetaMapper.TABLE_NAME
         + " WHERE deleted_at > 0 AND deleted_at < #{legacyTimeline} LIMIT #{limit})";
   }
+
+  @Override
+  public String updateModelMeta(
+      @Param("newModelMeta") ModelPO newModelPO, @Param("oldModelMeta") ModelPO oldModelPO) {
+    return "UPDATE "
+        + ModelMetaMapper.TABLE_NAME
+        + " SET model_name = #{newModelMeta.modelName},"
+        + " metalake_id = #{newModelMeta.metalakeId},"
+        + " catalog_id = #{newModelMeta.catalogId},"
+        + " schema_id = #{newModelMeta.schemaId},"
+        + " model_comment = #{newModelMeta.modelComment},"
+        + " model_properties = #{newModelMeta.modelProperties},"
+        + " model_latest_version = #{newModelMeta.modelLatestVersion},"
+        + " audit_info = #{newModelMeta.auditInfo},"
+        + " deleted_at = #{newModelMeta.deletedAt}"
+        + " WHERE model_id = #{oldModelMeta.modelId}"
+        + " AND model_name = #{oldModelMeta.modelName}"
+        + " AND metalake_id = #{oldModelMeta.metalakeId}"
+        + " AND catalog_id = #{oldModelMeta.catalogId}"
+        + " AND schema_id = #{oldModelMeta.schemaId}"
+        + " AND (model_comment = #{oldModelMeta.modelComment}"
+        + "   OR (CAST(model_comment AS VARCHAR) IS NULL"
+        + "   AND CAST(#{oldModelMeta.modelComment} AS VARCHAR) IS NULL))"
+        + " AND model_properties = #{oldModelMeta.modelProperties}"
+        + " AND model_latest_version = #{oldModelMeta.modelLatestVersion}"
+        + " AND audit_info = #{oldModelMeta.auditInfo}"
+        + " AND deleted_at = 0";
+  }
 }

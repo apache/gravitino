@@ -198,18 +198,25 @@ public class TestOwnerManager {
     Assertions.assertEquals(USER, owner.name());
     Assertions.assertEquals(Owner.Type.USER, owner.type());
 
-    // Test to set the group as the owner
-    Mockito.reset(authorizationPlugin);
-    ownerManager.setOwner(METALAKE, metalakeObject, GROUP, Owner.Type.GROUP);
-    Mockito.verify(authorizationPlugin).onOwnerSet(Mockito.any(), Mockito.any(), Mockito.any());
-
-    // Test not-existed metadata object
+    // Test not-existed metadata object when setting owner
     Assertions.assertThrows(
         NotFoundException.class,
-        () -> ownerManager.setOwner(METALAKE, notExistObject, GROUP, Owner.Type.GROUP));
+        () -> ownerManager.setOwner(METALAKE, notExistObject, USER, Owner.Type.USER));
+  }
 
-    owner = ownerManager.getOwner(METALAKE, metalakeObject).get();
-    Assertions.assertEquals(GROUP, owner.name());
-    Assertions.assertEquals(Owner.Type.GROUP, owner.type());
+  @Test
+  public void testGroupTypeOwnerNotSupported() {
+    // Test that GROUP type owner is not supported and throws IllegalArgumentException
+    MetadataObject metalakeObject =
+        MetadataObjects.of(Lists.newArrayList(METALAKE), MetadataObject.Type.METALAKE);
+
+    // Verify that setting GROUP type owner throws IllegalArgumentException
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> ownerManager.setOwner(METALAKE, metalakeObject, GROUP, Owner.Type.GROUP));
+
+    Assertions.assertEquals(
+        "Only USER type is supported as owner currently.", exception.getMessage());
   }
 }

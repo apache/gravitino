@@ -35,21 +35,19 @@ dependencies {
   implementation(project(":core")) {
     exclude("*")
   }
-  implementation(project(":lance:lance-common"))
+  implementation(project(":lance:lance-common")) {
+    exclude("*")
+  }
 
   implementation(libs.bundles.log4j)
-  implementation(libs.cglib)
-  implementation(libs.commons.collections4)
   implementation(libs.commons.io)
-  implementation(libs.commons.lang3)
   implementation(libs.guava)
-  implementation(libs.lance)
 
   annotationProcessor(libs.lombok)
 
+  compileOnly(libs.lance) // This will be provided by core module at runtime
   compileOnly(libs.lombok)
 
-  testImplementation(project(":catalogs:catalog-jdbc-common", "testArtifacts"))
   testImplementation(project(":clients:client-java"))
   testImplementation(project(":integration-test-common", "testArtifacts"))
   testImplementation(project(":server"))
@@ -57,6 +55,7 @@ dependencies {
 
   testImplementation(libs.junit.jupiter.api)
   testImplementation(libs.junit.jupiter.params)
+  testImplementation(libs.lance) // Included in the test runtime classpath for test only
   testImplementation(libs.mockito.core)
   testImplementation(libs.mysql.driver)
   testImplementation(libs.postgresql.driver)
@@ -69,7 +68,7 @@ dependencies {
 }
 
 tasks {
-  val runtimeJars by registering(Copy::class) {
+  register("runtimeJars", Copy::class) {
     from(configurations.runtimeClasspath)
     into("build/libs")
   }

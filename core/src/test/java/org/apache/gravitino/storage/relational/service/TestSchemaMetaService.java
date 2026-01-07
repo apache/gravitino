@@ -27,11 +27,14 @@ import java.time.Instant;
 import java.util.List;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
+import org.apache.gravitino.exceptions.NonEmptyEntityException;
 import org.apache.gravitino.meta.SchemaEntity;
+import org.apache.gravitino.meta.TopicEntity;
 import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.storage.relational.TestJDBCBackend;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.TestTemplate;
 
 public class TestSchemaMetaService extends TestJDBCBackend {
@@ -90,6 +93,40 @@ public class TestSchemaMetaService extends TestJDBCBackend {
   }
 
   @TestTemplate
+  public void testUpdateSchemaCommentFromNull() throws IOException {
+    createAndInsertMakeLake(metalakeName);
+    createAndInsertCatalog(metalakeName, catalogName);
+
+    SchemaMetaService schemaMetaService = SchemaMetaService.getInstance();
+    SchemaEntity schemaEntity =
+        SchemaEntity.builder()
+            .withId(RandomIdGenerator.INSTANCE.nextId())
+            .withName("schema_null_comment")
+            .withNamespace(NamespaceUtil.ofSchema(metalakeName, catalogName))
+            .withAuditInfo(AUDIT_INFO)
+            .build();
+    schemaMetaService.insertSchema(schemaEntity, false);
+
+    schemaMetaService.updateSchema(
+        schemaEntity.nameIdentifier(),
+        entity -> {
+          SchemaEntity schema = (SchemaEntity) entity;
+          return SchemaEntity.builder()
+              .withId(schema.id())
+              .withName(schema.name())
+              .withNamespace(schema.namespace())
+              .withComment("schema comment updated")
+              .withProperties(schema.properties())
+              .withAuditInfo(schema.auditInfo())
+              .build();
+        });
+
+    SchemaEntity updatedSchema =
+        schemaMetaService.getSchemaByIdentifier(schemaEntity.nameIdentifier());
+    Assertions.assertEquals("schema comment updated", updatedSchema.comment());
+  }
+
+  @TestTemplate
   public void testMetaLifeCycleFromCreationToDeletion() throws IOException {
     createAndInsertMakeLake(metalakeName);
     createAndInsertCatalog(metalakeName, catalogName);
@@ -131,5 +168,41 @@ public class TestSchemaMetaService extends TestJDBCBackend {
       backend.hardDeleteLegacyData(entityType, Instant.now().toEpochMilli() + 1000);
     }
     assertFalse(legacyRecordExistsInDB(schema.id(), Entity.EntityType.SCHEMA));
+  }
+
+  @TestTemplate
+  public void testDeleteSchemlaaNonCascadingFailsWhenTopicExists() throws IOException {
+
+    createAndInsertMakeLake(metalakeName);
+    createAndInsertCatalog(metalakeName, catalogName);
+
+    SchemaMetaService schemaMetaService = SchemaMetaService.getInstance();
+    TopicMetaService topicMetaService = TopicMetaService.getInstance();
+
+    final String schemaName = "schema_with_topic";
+    SchemaEntity schema =
+        createSchemaEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            NamespaceUtil.ofSchema(metalakeName, catalogName),
+            schemaName,
+            AUDIT_INFO);
+    schemaMetaService.insertSchema(schema, false);
+
+    final String topicName = "test_topic_dependency";
+    TopicEntity topic =
+        createTopicEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            NamespaceUtil.ofTopic(metalakeName, catalogName, schemaName),
+            topicName,
+            AUDIT_INFO);
+    topicMetaService.insertTopic(topic, false);
+
+    Assertions.assertThrows(
+        NonEmptyEntityException.class,
+        () -> schemaMetaService.deleteSchema(schema.nameIdentifier(), false),
+        "Non-cascading delete must fail when dependent topics exist.");
+
+    topicMetaService.deleteTopic(topic.nameIdentifier());
+    schemaMetaService.deleteSchema(schema.nameIdentifier(), false);
   }
 }

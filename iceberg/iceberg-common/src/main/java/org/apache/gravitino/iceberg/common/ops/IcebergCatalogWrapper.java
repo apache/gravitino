@@ -73,11 +73,13 @@ public class IcebergCatalogWrapper implements AutoCloseable {
   @Getter protected Catalog catalog;
   private SupportsNamespaces asNamespaceCatalog;
   private final IcebergCatalogBackend catalogBackend;
+  @Getter private final IcebergConfig icebergConfig;
   private String catalogUri = null;
   private Map<String, String> catalogPropertiesMap;
   private TableMetadataCache metadataCache;
 
   public IcebergCatalogWrapper(IcebergConfig icebergConfig) {
+    this.icebergConfig = icebergConfig;
     this.catalogBackend =
         IcebergCatalogBackend.valueOf(
             icebergConfig.get(IcebergConfig.CATALOG_BACKEND).toUpperCase(Locale.ROOT));
@@ -279,6 +281,7 @@ public class IcebergCatalogWrapper implements AutoCloseable {
 
   @Override
   public void close() throws Exception {
+    LOG.info("Closing IcebergCatalogWrapper for catalog: {}", catalog.name());
     if (catalog instanceof AutoCloseable) {
       // JdbcCatalog and ClosableHiveCatalog implement AutoCloseable and will handle their own
       // cleanup
@@ -286,6 +289,26 @@ public class IcebergCatalogWrapper implements AutoCloseable {
     }
     metadataCache.close();
 
+    // For Iceberg REST server which use the same classloader when recreating catalog wrapper, the
+    // Driver couldn't be reloaded after deregister()
+    if (useDifferentClassLoader()) {
+      closeJdbcDriverResources();
+    }
+  }
+
+  /**
+   * Whether the wrapper is recreated with a different classloader.
+   *
+   * <p>Returning {@code true} allows JDBC drivers loaded by an isolated classloader to be
+   * deregistered when the wrapper closes so the classloader can be garbage collected. Implementors
+   * that intentionally reuse the same classloader (for example, an Iceberg REST server instance)
+   * should override and return {@code false} to skip deregistration.
+   */
+  protected boolean useDifferentClassLoader() {
+    return true;
+  }
+
+  private void closeJdbcDriverResources() {
     // Because each catalog in Gravitino has its own classloader, after a catalog is no longer used
     // for a long time or dropped, the instance of classloader needs to be released. In order to
     // let JVM GC remove the classloader, we need to release the resources of the classloader. The

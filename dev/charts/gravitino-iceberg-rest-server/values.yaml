@@ -21,7 +21,7 @@ replicas: 1
 
 image:
   repository: apache/gravitino-iceberg-rest
-  tag: 1.1.0-SNAPSHOT
+  tag: 1.2.0-SNAPSHOT
   pullPolicy: IfNotPresent
   ## Optionally specify an array of pullSecrets (secrets must be manually created in the namespace)
   ## ref: https://kubernetes.io/docs/tasks/configure-pod-container/pull-image-private-registry/
@@ -78,6 +78,9 @@ icebergRest:
   #   ## JDBC driver class name
   #   ##
   #   driver: "com.mysql.cj.jdbc.Driver"
+  #   ## Schema version for JDBC catalog (required for view support)
+  #   ##
+  #   schemaVersion: "V1"
   ## Implementation class for Iceberg file I/O operations
   ##
   # ioImpl: "org.apache.iceberg.aws.s3.S3FileIO"
@@ -347,3 +350,77 @@ nodeSelector: {}
 tolerations: []
 
 affinity: {}
+
+## PodDisruptionBudget configuration
+## PodDisruptionBudgets limit the number of pods that can be down simultaneously during voluntary disruptions
+## (such as node drains, cluster upgrades, or pod evictions), ensuring high availability and service continuity.
+## ref: https://kubernetes.io/docs/tasks/run-application/configure-pdb/
+##
+podDisruptionBudget:
+  ## @param podDisruptionBudget.enabled Enable PodDisruptionBudget creation
+  ## Set to true to create a PodDisruptionBudget resource for the Iceberg REST Server deployment
+  ##
+  enabled: false
+
+  ## @param podDisruptionBudget.minAvailable Minimum number/percentage of pods that must remain available
+  ## Specify either an integer (e.g., 1, 2) or a percentage string (e.g., "50%")
+  ## This ensures at least this many pods stay running during voluntary disruptions
+  ##
+  ## Examples:
+  ##   minAvailable: 1           # At least 1 pod must remain available
+  ##   minAvailable: 2           # At least 2 pods must remain available
+  ##   minAvailable: "50%"       # At least 50% of pods must remain available
+  ##
+  ## When to use minAvailable:
+  ## - Use when you want to guarantee a minimum number of pods stay running
+  ## - Recommended for production deployments to ensure service availability
+  ## - With single replica (replicas: 1), minAvailable: 1 prevents all voluntary disruptions
+  ## - With multiple replicas, allows disruptions while maintaining minimum availability
+  ## Only used when podDisruptionBudget.enabled is true
+  ##
+  minAvailable: 1
+
+  ## @param podDisruptionBudget.maxUnavailable Maximum number/percentage of pods that can be unavailable
+  ## Specify either an integer (e.g., 1, 2) or a percentage string (e.g., "50%")
+  ## This limits how many pods can be down simultaneously during voluntary disruptions
+  ##
+  ## Examples:
+  ##   maxUnavailable: 1         # At most 1 pod can be unavailable
+  ##   maxUnavailable: 2         # At most 2 pods can be unavailable
+  ##   maxUnavailable: "25%"     # At most 25% of pods can be unavailable
+  ##
+  ## When to use maxUnavailable:
+  ## - Use when you want to control the rate of disruptions
+  ## - Useful for rolling updates and gradual scaling operations
+  ## - More flexible than minAvailable when scaling up/down
+  ##
+  ## IMPORTANT: Specify either minAvailable OR maxUnavailable, not both
+  ## If both are specified, Kubernetes will reject the PodDisruptionBudget and fail with an API validation error
+  ##
+  maxUnavailable: ""
+
+  ## @param podDisruptionBudget.labels Additional labels to apply to the PodDisruptionBudget resource
+  ## These labels are merged with the default Helm labels
+  ##
+  labels: {}
+  #   custom-label: value
+
+  ## @param podDisruptionBudget.annotations Additional annotations to apply to the PodDisruptionBudget resource
+  ## Useful for adding metadata or integration with other tools
+  ##
+  annotations: {}
+  #   custom-annotation: value
+
+## Relationship between PDB and replica count:
+## - Single replica (replicas: 1) + minAvailable: 1 = No voluntary disruptions allowed
+##   This prevents node drains and upgrades from evicting the only pod
+## - Multiple replicas (replicas: 3) + minAvailable: 2 = At least 2 pods must stay running
+##   Allows 1 pod to be disrupted at a time for maintenance
+## - Multiple replicas (replicas: 3) + maxUnavailable: 1 = At most 1 pod can be down
+##   Equivalent to minAvailable: 2 in this case
+##
+## Best practices:
+## - For production: Enable PDB with appropriate minAvailable or maxUnavailable
+## - For development/testing: Keep PDB disabled (default) for faster iterations
+## - Consider your replica count when setting PDB values
+## - Test PDB behavior in staging before applying to production

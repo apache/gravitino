@@ -17,6 +17,9 @@
 import json
 import unittest
 
+from gravitino.dto.rel.partitions.json_serdes.partition_dto_serdes import (
+    PartitionDTOSerdes,
+)
 from gravitino.dto.responses.credential_response import CredentialResponse
 from gravitino.dto.responses.file_location_response import FileLocationResponse
 from gravitino.dto.responses.model_response import ModelResponse
@@ -28,6 +31,7 @@ from gravitino.dto.responses.partition_name_list_response import (
     PartitionNameListResponse,
 )
 from gravitino.dto.responses.partition_response import PartitionResponse
+from gravitino.dto.responses.table_response import TableResponse
 from gravitino.exceptions.base import IllegalArgumentException
 
 
@@ -63,6 +67,133 @@ class TestResponses(unittest.TestCase):
                     "key2": "value2"
                 }
             }
+        """
+        cls.TABLE_JSON_STRING = """
+        {
+            "name": "example_table",
+            "comment": "This is an example table",
+            "audit": {
+                "creator": "anonymous",
+                "createTime":"2025-10-10T00:00:00"
+            },
+            "columns": [
+                {
+                    "name": "id",
+                    "type": "integer",
+                    "comment": "id column comment",
+                    "nullable": false,
+                    "autoIncrement": true,
+                    "defaultValue": {
+                        "type": "literal",
+                        "dataType": "integer",
+                        "value": "-1"
+                    }
+                },
+                {
+                    "name": "name",
+                    "type": "varchar(500)",
+                    "comment": "name column comment",
+                    "nullable": true,
+                    "autoIncrement": false,
+                    "defaultValue": {
+                        "type": "literal",
+                        "dataType": "null",
+                        "value": "null"
+                    }
+                },
+                {
+                    "name": "StartingDate",
+                    "type": "timestamp",
+                    "comment": "StartingDate column comment",
+                    "nullable": false,
+                    "autoIncrement": false,
+                    "defaultValue": {
+                        "type": "function",
+                        "funcName": "current_timestamp",
+                        "funcArgs": []
+                    }
+                },
+                {
+                    "name": "info",
+                    "type": {
+                        "type": "struct",
+                        "fields": [
+                            {
+                                "name": "position",
+                                "type": "string",
+                                "nullable": true,
+                                "comment": "position field comment"
+                            },
+                            {
+                                "name": "contact",
+                                "type": {
+                                "type": "list",
+                                "elementType": "integer",
+                                "containsNull": false
+                                },
+                                "nullable": true,
+                                "comment": "contact field comment"
+                            },
+                            {
+                                "name": "rating",
+                                "type": {
+                                "type": "map",
+                                "keyType": "string",
+                                "valueType": "integer",
+                                "valueContainsNull": false
+                                },
+                                "nullable": true,
+                                "comment": "rating field comment"
+                            }
+                        ]
+                    },
+                    "comment": "info column comment",
+                    "nullable": true
+                },
+                {
+                    "name": "dt",
+                    "type": "date",
+                    "comment": "dt column comment",
+                    "nullable": true
+                }
+            ],
+            "partitioning": [
+                {
+                    "strategy": "identity",
+                    "fieldName": [ "dt" ]
+                }
+            ],
+            "distribution": {
+                "strategy": "hash",
+                "number": 32,
+                "funcArgs": [
+                    {
+                        "type": "field",
+                        "fieldName": [ "id" ]
+                    }
+                ]
+            },
+            "sortOrders": [
+                {
+                    "sortTerm": {
+                        "type": "field",
+                        "fieldName": [ "id" ]
+                    },
+                    "direction": "asc",
+                    "nullOrdering": "nulls_first"
+                }
+            ],
+            "indexes": [
+                {
+                    "indexType": "primary_key",
+                    "name": "PRIMARY",
+                    "fieldNames": [["id"]]
+                }
+            ],
+            "properties": {
+                "format": "ORC"
+            }
+        }
         """
 
     def test_file_location_response(self):
@@ -336,8 +467,12 @@ class TestResponses(unittest.TestCase):
             "partition": {TestResponses.PARTITION_JSON_STRING}
         }}
         """
+        partition = PartitionDTOSerdes.deserialize(
+            json.loads(TestResponses.PARTITION_JSON_STRING)
+        )
         resp: PartitionResponse = PartitionResponse.from_json(json_string)
         resp.validate()
+        self.assertEqual(resp.get_partition(), partition)
 
     def test_partition_list_response(self):
         json_string = f"""
@@ -346,5 +481,21 @@ class TestResponses(unittest.TestCase):
             "partitions": [{TestResponses.PARTITION_JSON_STRING}]
         }}
         """
+        partitions = [
+            PartitionDTOSerdes.deserialize(
+                json.loads(TestResponses.PARTITION_JSON_STRING)
+            )
+        ]
         resp: PartitionListResponse = PartitionListResponse.from_json(json_string)
+        resp.validate()
+        self.assertListEqual(resp.get_partitions(), partitions)
+
+    def test_table_response(self):
+        json_string = f"""
+        {{
+            "code": 0,
+            "table": {TestResponses.TABLE_JSON_STRING}
+        }}
+        """
+        resp: TableResponse = TableResponse.from_json(json_string)
         resp.validate()

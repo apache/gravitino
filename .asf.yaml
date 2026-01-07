@@ -56,12 +56,10 @@ github:
     - noidname01
     - orenccl
     - sunxiaojian
-    - hdygxsj
     - bharos
     - danhuawang
     - tsungchih
     - beinan
-    - youngyjd
 
 notifications:
   commits: commits@gravitino.apache.org

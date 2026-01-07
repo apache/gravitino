@@ -60,6 +60,7 @@ import javax.ws.rs.core.Response;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.lance.common.ops.LanceTableOperations;
 import org.apache.gravitino.lance.common.ops.NamespaceWrapper;
+import org.apache.gravitino.lance.common.utils.LanceConstants;
 import org.apache.gravitino.rest.RESTUtils;
 import org.glassfish.jersey.internal.inject.AbstractBinder;
 import org.glassfish.jersey.server.ResourceConfig;
@@ -519,7 +520,8 @@ public class TestLanceNamespaceOperations extends JerseyTest {
     // Test that the "register" property is set to "true"
     RegisterTableResponse registerTableResponse = new RegisterTableResponse();
     registerTableResponse.setLocation("/path/to/registered_table");
-    registerTableResponse.setProperties(ImmutableMap.of("key", "value", "register", "true"));
+    registerTableResponse.setProperties(
+        ImmutableMap.of("key", "value", LanceConstants.LANCE_TABLE_REGISTER, "true"));
     when(tableOps.registerTable(any(), any(), any(), any())).thenReturn(registerTableResponse);
 
     RegisterTableRequest tableRequest = new RegisterTableRequest();
@@ -544,7 +546,7 @@ public class TestLanceNamespaceOperations extends JerseyTest {
             Mockito.argThat(
                 props ->
                     props != null
-                        && "true".equals(props.get("register"))
+                        && "true".equals(props.get(LanceConstants.LANCE_TABLE_REGISTER))
                         && "/path/to/registered_table".equals(props.get("location"))
                         && "custom-value".equals(props.get("custom-key"))));
   }

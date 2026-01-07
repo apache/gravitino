@@ -59,10 +59,12 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInstance;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 @Tag("gravitino-docker-test")
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
 public class HiveUserAuthenticationIT extends BaseIT {
   private static final Logger LOG = LoggerFactory.getLogger(HiveUserAuthenticationIT.class);
 
@@ -181,8 +183,8 @@ public class HiveUserAuthenticationIT extends BaseIT {
         classRef = Class.forName("sun.security.krb5.Config");
       }
 
-      Method refershMethod = classRef.getMethod("refresh");
-      refershMethod.invoke(null);
+      Method refreshMethod = classRef.getMethod("refresh");
+      refreshMethod.invoke(null);
     } catch (Exception e) {
       throw new RuntimeException(e);
     }

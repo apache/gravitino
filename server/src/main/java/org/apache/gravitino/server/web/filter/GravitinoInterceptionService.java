@@ -30,6 +30,7 @@ import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import javax.ws.rs.core.Response;
 import org.aopalliance.intercept.ConstructorInterceptor;
@@ -51,6 +52,8 @@ import org.apache.gravitino.server.web.filter.authorization.AuthorizeExecutorFac
 import org.apache.gravitino.server.web.rest.CatalogOperations;
 import org.apache.gravitino.server.web.rest.FilesetOperations;
 import org.apache.gravitino.server.web.rest.GroupOperations;
+import org.apache.gravitino.server.web.rest.JobOperations;
+import org.apache.gravitino.server.web.rest.MetadataObjectCredentialOperations;
 import org.apache.gravitino.server.web.rest.MetadataObjectPolicyOperations;
 import org.apache.gravitino.server.web.rest.MetadataObjectTagOperations;
 import org.apache.gravitino.server.web.rest.MetalakeOperations;
@@ -101,7 +104,9 @@ public class GravitinoInterceptionService implements InterceptionService {
             MetadataObjectTagOperations.class.getName(),
             TagOperations.class.getName(),
             PolicyOperations.class.getName(),
-            MetadataObjectPolicyOperations.class.getName()));
+            MetadataObjectPolicyOperations.class.getName(),
+            JobOperations.class.getName(),
+            MetadataObjectCredentialOperations.class.getName()));
   }
 
   @Override
@@ -142,7 +147,7 @@ public class GravitinoInterceptionService implements InterceptionService {
         if (expressionAnnotation != null) {
           String expression = expressionAnnotation.expression();
           Object[] args = methodInvocation.getArguments();
-          String entityType = extractMetadataObjectTypeFromParameters(parameters, args);
+          Optional<String> entityType = extractMetadataObjectTypeFromParameters(parameters, args);
           Map<Entity.EntityType, NameIdentifier> metadataContext =
               extractNameIdentifierFromParameters(parameters, args);
 
