@@ -24,6 +24,7 @@ import static org.apache.gravitino.StringIdentifier.DUMMY_ID;
 import static org.apache.gravitino.catalog.PropertiesMetadataHelpers.validatePropertyForAlter;
 import static org.apache.gravitino.catalog.PropertiesMetadataHelpers.validatePropertyForCreate;
 import static org.apache.gravitino.connector.BaseCatalogPropertiesMetadata.BASIC_CATALOG_PROPERTIES_METADATA;
+import static org.apache.gravitino.connector.BaseCatalogPropertiesMetadata.PROPERTY_METALAKE_IN_USE;
 import static org.apache.gravitino.metalake.MetalakeManager.checkMetalake;
 
 import com.github.benmanes.caffeine.cache.Cache;
@@ -548,6 +549,10 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
           BaseCatalog baseCatalog = loadCatalogAndWrap(ident).catalog();
           baseCatalog.checkMetalakeInUse();
 
+          if (baseCatalog.catalogInUse()) {
+            return null;
+          }
+
           try {
             store.update(
                 ident,
@@ -583,6 +588,10 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
         () -> {
           BaseCatalog baseCatalog = loadCatalogAndWrap(ident).catalog();
           baseCatalog.checkMetalakeInUse();
+
+          if (!baseCatalog.catalogInUse()) {
+            return null;
+          }
 
           try {
             store.update(
@@ -1214,7 +1223,17 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
     return entity;
   }
 
-  public void updateCatalogProperty(
+  /**
+   * Set the metalake in-use status in a specified catalog.
+   *
+   * @param nameIdentifier The name identifier of the catalog.
+   * @param status The in-use status to set. It can be "true" or "false".
+   */
+  public void setMetalakeInUseStatus(NameIdentifier nameIdentifier, String status) {
+    updateCatalogProperty(nameIdentifier, PROPERTY_METALAKE_IN_USE, status);
+  }
+
+  private void updateCatalogProperty(
       NameIdentifier nameIdentifier, String propertyKey, String propertyValue) {
     try {
       store.update(

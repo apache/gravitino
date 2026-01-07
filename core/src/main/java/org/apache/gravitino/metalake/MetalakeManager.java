@@ -19,7 +19,6 @@
 package org.apache.gravitino.metalake;
 
 import static org.apache.gravitino.Metalake.PROPERTY_IN_USE;
-import static org.apache.gravitino.connector.BaseCatalogPropertiesMetadata.PROPERTY_METALAKE_IN_USE;
 
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
@@ -394,7 +393,7 @@ public class MetalakeManager implements MetalakeDispatcher, Closeable {
             // The only problem is that we can't make sure we can change all catalog properties
             // in a transaction. If any catalog property update fails, the metalake is already
             // enabled but catalog properties remain inconsistent.
-            updateCatalogsInUseStatus(ident, "true");
+            updateMetalakeInUseStatusInCatalog(ident, "true");
             return null;
           } catch (IOException e) {
             throw new RuntimeException(e);
@@ -434,7 +433,7 @@ public class MetalakeManager implements MetalakeDispatcher, Closeable {
             // The only problem is that we can't make sure we can change all catalog properties
             // in a transaction, if any of them fails, the metalake is already enabled and the value
             // in catalog is inconsistent.
-            updateCatalogsInUseStatus(ident, "false");
+            updateMetalakeInUseStatusInCatalog(ident, "false");
             return null;
           } catch (IOException e) {
             throw new RuntimeException(e);
@@ -498,7 +497,8 @@ public class MetalakeManager implements MetalakeDispatcher, Closeable {
     return builder.withProperties(newProps);
   }
 
-  private void updateCatalogsInUseStatus(NameIdentifier ident, String value) throws IOException {
+  private void updateMetalakeInUseStatusInCatalog(NameIdentifier ident, String value)
+      throws IOException {
     List<NameIdentifier> failedCatalogs = Lists.newArrayList();
     store
         .list(Namespace.of(ident.name()), CatalogEntity.class, EntityType.CATALOG)
@@ -508,9 +508,7 @@ public class MetalakeManager implements MetalakeDispatcher, Closeable {
                 // update the properties metalake-in-use in catalog to true
                 GravitinoEnv.getInstance()
                     .catalogManager()
-                    .updateCatalogProperty(
-                        catalogEntity.nameIdentifier(), PROPERTY_METALAKE_IN_USE, value);
-
+                    .setMetalakeInUseStatus(catalogEntity.nameIdentifier(), value);
                 LOG.info(
                     "Enabled or disable metalake-in-use property for catalog {} success",
                     catalogEntity.nameIdentifier());

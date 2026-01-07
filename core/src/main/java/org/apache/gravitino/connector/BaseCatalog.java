@@ -233,6 +233,12 @@ public abstract class BaseCatalog<T extends BaseCatalog>
     }
   }
 
+  public boolean catalogInUse() {
+    Map<String, String> catalogProperties = entity().getProperties();
+    String catalogInUseStr = catalogProperties.getOrDefault(Catalog.PROPERTY_IN_USE, "true");
+    return Boolean.parseBoolean(catalogInUseStr);
+  }
+
   private boolean isInvokedBy(String methodName) {
     return StackWalker.getInstance()
         .walk(frames -> frames.anyMatch(frame -> frame.getMethodName().equals(methodName)));
