@@ -51,8 +51,6 @@ public class HDFSFileSystemProxy implements MethodInterceptor {
   private static final Logger LOG = LoggerFactory.getLogger(HDFSFileSystemProxy.class);
 
   public static final String GRAVITINO_KEYTAB_FORMAT = "keytabs/gravitino-%s";
-  private static final String SYSTEM_USER_NAME = System.getProperty("user.name");
-  private static final String SYSTEM_ENV_HADOOP_USER_NAME = "HADOOP_USER_NAME";
   private static final String GRAVITINO_ID_KEY = "gravitino.identifier";
 
   private final UserGroupInformation initUgi;
