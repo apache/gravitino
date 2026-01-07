@@ -18,6 +18,8 @@
  */
 package org.apache.gravitino.maintenance.jobs.iceberg;
 
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
@@ -33,13 +35,17 @@ import org.apache.spark.sql.SparkSession;
  * Built-in job for rewriting Iceberg table data files.
  *
  * <p>This job leverages Iceberg's RewriteDataFilesProcedure to optimize data file layout through
- * binpack, sort, or zorder strategies.
+ * binpack or sort strategies. Z-order is a type of sort order, not a strategy.
  */
 public class IcebergRewriteDataFilesJob implements BuiltInJob {
 
   private static final String NAME =
       JobTemplateProvider.BUILTIN_NAME_PREFIX + "iceberg-rewrite-data-files";
   private static final String VERSION = "v1";
+
+  // Valid strategy values for Iceberg rewrite_data_files procedure
+  private static final String STRATEGY_BINPACK = "binpack";
+  private static final String STRATEGY_SORT = "sort";
 
   @Override
   public SparkJobTemplate jobTemplate() {
@@ -62,10 +68,11 @@ public class IcebergRewriteDataFilesJob implements BuiltInJob {
    * catalog name --table &lt;table_identifier&gt; Required. Table name (db.table) --strategy
    * &lt;strategy&gt; Optional. binpack or sort --sort-order &lt;sort_order&gt; Optional. Sort order
    * specification --where &lt;where_clause&gt; Optional. Filter predicate --options
-   * &lt;options_json&gt; Optional. JSON map of options
+   * &lt;options_json&gt; Optional. JSON map of options --spark-conf &lt;spark_conf_json&gt;
+   * Optional. JSON map of custom Spark configurations
    *
    * <p>Example: --catalog iceberg_catalog --table db.sample --strategy binpack --options
-   * '{"min-input-files":"2"}'
+   * '{"min-input-files":"2"}' --spark-conf '{"spark.sql.shuffle.partitions":"200"}'
    */
   public static void main(String[] args) {
     if (args.length < 4) {
@@ -91,11 +98,38 @@ public class IcebergRewriteDataFilesJob implements BuiltInJob {
     String sortOrder = argMap.get("sort-order");
     String whereClause = argMap.get("where");
     String optionsJson = argMap.get("options");
+    String sparkConfJson = argMap.get("spark-conf");
 
-    SparkSession spark =
-        SparkSession.builder()
-            .appName("Gravitino Built-in Iceberg Rewrite Data Files")
-            .getOrCreate();
+    // Validate strategy if provided
+    try {
+      validateStrategy(strategy);
+    } catch (IllegalArgumentException e) {
+      System.err.println("Error: " + e.getMessage());
+      printUsage();
+      System.exit(1);
+    }
+
+    // Build Spark session with custom configs if provided
+    SparkSession.Builder sparkBuilder =
+        SparkSession.builder().appName("Gravitino Built-in Iceberg Rewrite Data Files");
+
+    // Apply custom Spark configurations if provided
+    if (sparkConfJson != null && !sparkConfJson.isEmpty()) {
+      try {
+        Map<String, String> customConfigs = parseCustomSparkConfigs(sparkConfJson);
+        validateSparkConfigs(customConfigs);
+        for (Map.Entry<String, String> entry : customConfigs.entrySet()) {
+          sparkBuilder.config(entry.getKey(), entry.getValue());
+        }
+        System.out.println("Applied custom Spark configurations: " + customConfigs);
+      } catch (IllegalArgumentException e) {
+        System.err.println("Error: " + e.getMessage());
+        printUsage();
+        System.exit(1);
+      }
+    }
+
+    SparkSession spark = sparkBuilder.getOrCreate();
 
     try {
       // Build the procedure call SQL
@@ -166,19 +200,21 @@ public class IcebergRewriteDataFilesJob implements BuiltInJob {
       String optionsJson) {
 
     StringBuilder sql = new StringBuilder();
-    sql.append("CALL ").append(catalogName).append(".system.rewrite_data_files(");
-    sql.append("table => '").append(tableIdentifier).append("'");
+    sql.append("CALL ")
+        .append(escapeSqlIdentifier(catalogName))
+        .append(".system.rewrite_data_files(");
+    sql.append("table => '").append(escapeSqlString(tableIdentifier)).append("'");
 
     if (strategy != null && !strategy.isEmpty()) {
-      sql.append(", strategy => '").append(strategy).append("'");
+      sql.append(", strategy => '").append(escapeSqlString(strategy)).append("'");
     }
 
     if (sortOrder != null && !sortOrder.isEmpty()) {
-      sql.append(", sort_order => '").append(sortOrder).append("'");
+      sql.append(", sort_order => '").append(escapeSqlString(sortOrder)).append("'");
     }
 
     if (whereClause != null && !whereClause.isEmpty()) {
-      sql.append(", where => '").append(whereClause).append("'");
+      sql.append(", where => '").append(escapeSqlString(whereClause)).append("'");
     }
 
     if (optionsJson != null && !optionsJson.isEmpty()) {
@@ -192,9 +228,9 @@ public class IcebergRewriteDataFilesJob implements BuiltInJob {
             sql.append(", ");
           }
           sql.append("'")
-              .append(entry.getKey())
+              .append(escapeSqlString(entry.getKey()))
               .append("', '")
-              .append(entry.getValue())
+              .append(escapeSqlString(entry.getValue()))
               .append("'");
           first = false;
         }
@@ -204,6 +240,33 @@ public class IcebergRewriteDataFilesJob implements BuiltInJob {
 
     sql.append(")");
     return sql.toString();
+  }
+
+  /**
+   * Escape single quotes in SQL string literals by replacing ' with ''.
+   *
+   * @param value the string value to escape
+   * @return escaped string safe for use in SQL string literals
+   */
+  static String escapeSqlString(String value) {
+    if (value == null) {
+      return null;
+    }
+    return value.replace("'", "''");
+  }
+
+  /**
+   * Escape SQL identifiers by replacing backticks and validating format.
+   *
+   * @param identifier the SQL identifier to escape
+   * @return escaped identifier safe for use in SQL
+   */
+  static String escapeSqlIdentifier(String identifier) {
+    if (identifier == null) {
+      return null;
+    }
+    // Replace backticks to prevent breaking out of identifier quotes
+    return identifier.replace("`", "``");
   }
 
   /**
@@ -236,6 +299,105 @@ public class IcebergRewriteDataFilesJob implements BuiltInJob {
     return argMap;
   }
 
+  /**
+   * Validate the strategy parameter value.
+   *
+   * @param strategy the strategy value to validate
+   * @throws IllegalArgumentException if the strategy is invalid
+   */
+  static void validateStrategy(String strategy) {
+    if (strategy == null || strategy.isEmpty()) {
+      return; // Strategy is optional
+    }
+
+    if (!STRATEGY_BINPACK.equals(strategy) && !STRATEGY_SORT.equals(strategy)) {
+      throw new IllegalArgumentException(
+          "Invalid strategy '"
+              + strategy
+              + "'. Valid values are: '"
+              + STRATEGY_BINPACK
+              + "', '"
+              + STRATEGY_SORT
+              + "'");
+    }
+  }
+
+  /**
+   * Parse custom Spark configurations from JSON string.
+   *
+   * @param sparkConfJson JSON string containing Spark configurations
+   * @return map of Spark configuration keys to values
+   * @throws IllegalArgumentException if JSON parsing fails
+   */
+  static Map<String, String> parseCustomSparkConfigs(String sparkConfJson) {
+    if (sparkConfJson == null || sparkConfJson.isEmpty()) {
+      return new HashMap<>();
+    }
+
+    try {
+      ObjectMapper mapper = new ObjectMapper();
+      Map<String, Object> parsedMap =
+          mapper.readValue(sparkConfJson, new TypeReference<Map<String, Object>>() {});
+
+      Map<String, String> configs = new HashMap<>();
+      for (Map.Entry<String, Object> entry : parsedMap.entrySet()) {
+        String key = entry.getKey();
+        Object value = entry.getValue();
+        configs.put(key, value == null ? "" : value.toString());
+      }
+      return configs;
+    } catch (Exception e) {
+      throw new IllegalArgumentException(
+          "Failed to parse Spark configurations JSON: "
+              + sparkConfJson
+              + ". Error: "
+              + e.getMessage(),
+          e);
+    }
+  }
+
+  /**
+   * Validate custom Spark configurations to prevent dangerous overrides.
+   *
+   * <p>This method checks that users don't override critical configurations that could break the
+   * job or cause security issues.
+   *
+   * @param configs map of Spark configurations to validate
+   * @throws IllegalArgumentException if any configuration is not allowed
+   */
+  static void validateSparkConfigs(Map<String, String> configs) {
+    // Define configurations that should not be overridden by users
+    // These are critical for the job to function correctly
+    String[] forbiddenPrefixes = {
+      "spark.sql.catalog.", // Catalog configs are managed by the template
+      "spark.sql.extensions", // Extensions must include Iceberg extensions
+      "spark.app.name" // App name is set by the job
+    };
+
+    for (String configKey : configs.keySet()) {
+      // Check if config key starts with any forbidden prefix
+      for (String forbiddenPrefix : forbiddenPrefixes) {
+        if (configKey.startsWith(forbiddenPrefix)) {
+          throw new IllegalArgumentException(
+              "Configuration '"
+                  + configKey
+                  + "' cannot be overridden. "
+                  + "Configs starting with '"
+                  + forbiddenPrefix
+                  + "' are managed by the job template.");
+        }
+      }
+
+      // Validate that config keys follow Spark naming convention
+      if (!configKey.startsWith("spark.")) {
+        throw new IllegalArgumentException(
+            "Invalid Spark configuration key '"
+                + configKey
+                + "'. All Spark configs must start with 'spark.'");
+      }
+    }
+  }
+
   /** Print usage information. */
   private static void printUsage() {
     System.err.println(
@@ -251,9 +413,12 @@ public class IcebergRewriteDataFilesJob implements BuiltInJob {
             + "                              For columns: 'id DESC NULLS LAST, name ASC'\n"
             + "                              For Z-Order: 'zorder(c1,c2,c3)'\n"
             + "  --where <predicate>       Filter predicate to select files\n"
-            + "                              Example: 'year = 2024 and month = 1'\n"
+            + "                              Example: 'year = 2024 and status = ''active'''\n"
             + "  --options <json>          JSON map of Iceberg rewrite options\n"
             + "                              Example: '{\"min-input-files\":\"2\"}'\n"
+            + "  --spark-conf <json>       JSON map of custom Spark configurations\n"
+            + "                              Example: '{\"spark.sql.shuffle.partitions\":\"200\"}'\n"
+            + "                              Note: Cannot override catalog, extensions, or app name configs\n"
             + "\n"
             + "Examples:\n"
             + "  # Basic binpack\n"
@@ -264,12 +429,27 @@ public class IcebergRewriteDataFilesJob implements BuiltInJob {
             + "    --sort-order 'id DESC NULLS LAST'\n"
             + "\n"
             + "  # With filter and options\n"
-            + "  --catalog iceberg_prod --table db.sample --where 'year = 2024' \\\n"
-            + "    --options '{\"min-input-files\":\"2\",\"remove-dangling-deletes\":\"true\"}'");
+            + "  --catalog iceberg_prod --table db.sample --where 'year = 2024 and status = ''active''' \\\n"
+            + "    --options '{\"min-input-files\":\"2\",\"remove-dangling-deletes\":\"true\"}'\n"
+            + "\n"
+            + "  # With custom Spark configurations\n"
+            + "  --catalog iceberg_prod --table db.sample --strategy binpack \\\n"
+            + "    --spark-conf '{\"spark.sql.shuffle.partitions\":\"200\",\"spark.executor.memory\":\"4g\"}'");
   }
 
   /**
-   * Parse options from JSON string. Expected format: {"key1": "value1", "key2": "value2"}
+   * Parse options from JSON string using Jackson for robust parsing.
+   *
+   * <p>Expected format: {"key1": "value1", "key2": "value2"}
+   *
+   * <p>This method uses Jackson ObjectMapper to properly handle:
+   *
+   * <ul>
+   *   <li>Escaped quotes in values
+   *   <li>Colons and commas in values
+   *   <li>Complex JSON structures
+   *   <li>Various data types (strings, numbers, booleans)
+   * </ul>
    *
    * @param optionsJson JSON string
    * @return map of option keys to values
@@ -280,19 +460,24 @@ public class IcebergRewriteDataFilesJob implements BuiltInJob {
       return options;
     }
 
-    String cleaned =
-        optionsJson.trim().replaceAll("^\\{", "").replaceAll("\\}$", "").replaceAll("\"", "");
-    if (cleaned.isEmpty()) {
-      return options;
+    try {
+      ObjectMapper mapper = new ObjectMapper();
+      // Parse JSON into a Map<String, Object> to handle various value types
+      Map<String, Object> parsedMap =
+          mapper.readValue(optionsJson, new TypeReference<Map<String, Object>>() {});
+
+      // Convert all values to strings
+      for (Map.Entry<String, Object> entry : parsedMap.entrySet()) {
+        String key = entry.getKey();
+        Object value = entry.getValue();
+        // Convert value to string - handles strings, numbers, booleans, etc.
+        options.put(key, value == null ? "" : value.toString());
+      }
+    } catch (Exception e) {
+      throw new IllegalArgumentException(
+          "Failed to parse options JSON: " + optionsJson + ". Error: " + e.getMessage(), e);
     }
 
-    String[] pairs = cleaned.split(",");
-    for (String pair : pairs) {
-      String[] keyValue = pair.split(":", 2);
-      if (keyValue.length == 2) {
-        options.put(keyValue[0].trim(), keyValue[1].trim());
-      }
-    }
     return options;
   }
 
@@ -314,7 +499,9 @@ public class IcebergRewriteDataFilesJob implements BuiltInJob {
         "--where",
         "{{where_clause}}",
         "--options",
-        "{{options}}");
+        "{{options}}",
+        "--spark-conf",
+        "{{spark_conf}}");
   }
 
   /**

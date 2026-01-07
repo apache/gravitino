@@ -38,6 +38,7 @@ dependencies {
   compileOnly(project(":api"))
 
   compileOnly(libs.slf4j.api)
+  compileOnly(libs.jackson.databind)
   compileOnly("org.apache.spark:spark-sql_$scalaVersion:$sparkVersion") {
     exclude("org.slf4j")
     exclude("org.apache.logging.log4j")

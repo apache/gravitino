@@ -22,7 +22,9 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
 
+import java.util.HashMap;
 import java.util.Map;
 import org.apache.gravitino.job.JobTemplateProvider;
 import org.apache.gravitino.job.SparkJobTemplate;
@@ -73,7 +75,7 @@ public class TestIcebergRewriteDataFilesJob {
     SparkJobTemplate template = job.jobTemplate();
 
     assertNotNull(template.arguments());
-    assertEquals(12, template.arguments().size()); // 6 flags * 2 (flag + value)
+    assertEquals(14, template.arguments().size()); // 7 flags * 2 (flag + value)
 
     // Verify all expected arguments are present
     assertTrue(template.arguments().contains("--catalog"));
@@ -88,6 +90,8 @@ public class TestIcebergRewriteDataFilesJob {
     assertTrue(template.arguments().contains("{{where_clause}}"));
     assertTrue(template.arguments().contains("--options"));
     assertTrue(template.arguments().contains("{{options}}"));
+    assertTrue(template.arguments().contains("--spark-conf"));
+    assertTrue(template.arguments().contains("{{spark_conf}}"));
   }
 
   @Test
@@ -292,6 +296,91 @@ public class TestIcebergRewriteDataFilesJob {
   }
 
   @Test
+  public void testParseOptionsJsonWithColonsInValue() {
+    // Test handling of colons in values (e.g., file paths)
+    String json = "{\"path\":\"/data/file:backup\",\"url\":\"http://example.com:8080\"}";
+    Map<String, String> result = IcebergRewriteDataFilesJob.parseOptionsJson(json);
+
+    assertEquals(2, result.size());
+    assertEquals("/data/file:backup", result.get("path"));
+    assertEquals("http://example.com:8080", result.get("url"));
+  }
+
+  @Test
+  public void testParseOptionsJsonWithCommasInValue() {
+    // Test handling of commas in values
+    String json = "{\"list\":\"item1,item2,item3\",\"description\":\"a,b,c\"}";
+    Map<String, String> result = IcebergRewriteDataFilesJob.parseOptionsJson(json);
+
+    assertEquals(2, result.size());
+    assertEquals("item1,item2,item3", result.get("list"));
+    assertEquals("a,b,c", result.get("description"));
+  }
+
+  @Test
+  public void testParseOptionsJsonWithEscapedQuotes() {
+    // Test handling of escaped quotes in values
+    String json = "{\"message\":\"He said \\\"hello\\\"\",\"name\":\"O'Brien\"}";
+    Map<String, String> result = IcebergRewriteDataFilesJob.parseOptionsJson(json);
+
+    assertEquals(2, result.size());
+    assertEquals("He said \"hello\"", result.get("message"));
+    assertEquals("O'Brien", result.get("name"));
+  }
+
+  @Test
+  public void testParseOptionsJsonWithNumericValues() {
+    // Test handling of numeric values (should be converted to strings)
+    String json = "{\"max-size\":1073741824,\"min-files\":2,\"ratio\":0.75}";
+    Map<String, String> result = IcebergRewriteDataFilesJob.parseOptionsJson(json);
+
+    assertEquals(3, result.size());
+    assertEquals("1073741824", result.get("max-size"));
+    assertEquals("2", result.get("min-files"));
+    assertEquals("0.75", result.get("ratio"));
+  }
+
+  @Test
+  public void testParseOptionsJsonWithBooleanTypes() {
+    // Test handling of boolean values (not strings)
+    String json = "{\"enabled\":true,\"disabled\":false}";
+    Map<String, String> result = IcebergRewriteDataFilesJob.parseOptionsJson(json);
+
+    assertEquals(2, result.size());
+    assertEquals("true", result.get("enabled"));
+    assertEquals("false", result.get("disabled"));
+  }
+
+  @Test
+  public void testParseOptionsJsonWithComplexValue() {
+    // Test with a realistic complex case
+    String json =
+        "{\"file-path\":\"/data/path:backup,archive\","
+            + "\"description\":\"Rewrite with strategy: binpack, sort\","
+            + "\"max-size\":536870912,"
+            + "\"enabled\":true}";
+    Map<String, String> result = IcebergRewriteDataFilesJob.parseOptionsJson(json);
+
+    assertEquals(4, result.size());
+    assertEquals("/data/path:backup,archive", result.get("file-path"));
+    assertEquals("Rewrite with strategy: binpack, sort", result.get("description"));
+    assertEquals("536870912", result.get("max-size"));
+    assertEquals("true", result.get("enabled"));
+  }
+
+  @Test
+  public void testParseOptionsJsonWithInvalidJson() {
+    // Test that invalid JSON throws an exception
+    String json = "{invalid json}";
+    try {
+      IcebergRewriteDataFilesJob.parseOptionsJson(json);
+      fail("Expected IllegalArgumentException for invalid JSON");
+    } catch (IllegalArgumentException e) {
+      assertTrue(e.getMessage().contains("Failed to parse options JSON"));
+    }
+  }
+
+  @Test
   public void testParseOptionsJsonWithSpaces() {
     String json = "{ \"min-input-files\" : \"2\" , \"target-file-size-bytes\" : \"1024\" }";
     Map<String, String> result = IcebergRewriteDataFilesJob.parseOptionsJson(json);
@@ -411,7 +500,10 @@ public class TestIcebergRewriteDataFilesJob {
         IcebergRewriteDataFilesJob.buildProcedureCall(
             "iceberg_prod", "db.sample", null, null, whereClause, null);
 
-    assertTrue(sql.contains("where => '" + whereClause + "'"));
+    // Single quotes in the WHERE clause should be escaped
+    assertTrue(
+        sql.contains(
+            "where => 'year = 2024 AND month >= 1 AND month <= 12 AND status = ''active'''"));
   }
 
   @Test
@@ -425,5 +517,270 @@ public class TestIcebergRewriteDataFilesJob {
     assertTrue(sql.contains("'min-input-files', '5'"));
     assertTrue(sql.contains("'target-file-size-bytes', '1073741824'"));
     assertTrue(sql.contains("'remove-dangling-deletes', 'true'"));
+  }
+
+  @Test
+  public void testEscapeSqlString() {
+    // Test basic escaping of single quotes
+    assertEquals("O''Brien", IcebergRewriteDataFilesJob.escapeSqlString("O'Brien"));
+    assertEquals(
+        "test''with''quotes", IcebergRewriteDataFilesJob.escapeSqlString("test'with'quotes"));
+
+    // Test strings without quotes remain unchanged
+    assertEquals("normal_string", IcebergRewriteDataFilesJob.escapeSqlString("normal_string"));
+
+    // Test null and empty
+    assertEquals(null, IcebergRewriteDataFilesJob.escapeSqlString(null));
+    assertEquals("", IcebergRewriteDataFilesJob.escapeSqlString(""));
+  }
+
+  @Test
+  public void testEscapeSqlIdentifier() {
+    // Test basic escaping of backticks
+    assertEquals("catalog``name", IcebergRewriteDataFilesJob.escapeSqlIdentifier("catalog`name"));
+
+    // Test strings without backticks remain unchanged
+    assertEquals(
+        "normal_catalog", IcebergRewriteDataFilesJob.escapeSqlIdentifier("normal_catalog"));
+
+    // Test null
+    assertEquals(null, IcebergRewriteDataFilesJob.escapeSqlIdentifier(null));
+  }
+
+  @Test
+  public void testBuildProcedureCallWithSqlInjectionAttempt() {
+    // Test SQL injection attempt in table name
+    String maliciousTable = "db.table' OR '1'='1";
+    String sql =
+        IcebergRewriteDataFilesJob.buildProcedureCall(
+            "iceberg_catalog", maliciousTable, null, null, null, null);
+
+    // Verify single quotes are escaped (becomes '')
+    assertTrue(sql.contains("db.table'' OR ''1''=''1"));
+    assertFalse(sql.contains("' OR '1'='1"));
+
+    // Test SQL injection attempt in where clause
+    String maliciousWhere = "year = 2024' OR '1'='1";
+    sql =
+        IcebergRewriteDataFilesJob.buildProcedureCall(
+            "iceberg_catalog", "db.table", null, null, maliciousWhere, null);
+
+    assertTrue(sql.contains("year = 2024'' OR ''1''=''1"));
+
+    // Test SQL injection attempt in catalog name
+    String maliciousCatalog = "catalog`; DROP TABLE users; --";
+    sql =
+        IcebergRewriteDataFilesJob.buildProcedureCall(
+            maliciousCatalog, "db.table", null, null, null, null);
+
+    // Verify backticks are escaped
+    assertTrue(sql.contains("catalog``; DROP TABLE users; --"));
+  }
+
+  @Test
+  public void testBuildProcedureCallEscapesAllParameters() {
+    String sql =
+        IcebergRewriteDataFilesJob.buildProcedureCall(
+            "cat'alog", "db'.table", "sort'", "id' DESC", "year' = 2024", "{\"key'\":\"val'ue\"}");
+
+    // Catalog name uses backtick escaping (but no backticks here, so unchanged)
+    assertTrue(sql.contains("cat'alog"));
+    // All single quotes in string literals should be escaped
+    assertTrue(sql.contains("db''.table"));
+    assertTrue(sql.contains("sort''"));
+    assertTrue(sql.contains("id'' DESC"));
+    assertTrue(sql.contains("year'' = 2024"));
+    assertTrue(sql.contains("key''"));
+    assertTrue(sql.contains("val''ue"));
+  }
+
+  // Tests for strategy validation
+
+  @Test
+  public void testValidateStrategyWithValidBinpack() {
+    // Should not throw exception
+    IcebergRewriteDataFilesJob.validateStrategy("binpack");
+  }
+
+  @Test
+  public void testValidateStrategyWithValidSort() {
+    // Should not throw exception
+    IcebergRewriteDataFilesJob.validateStrategy("sort");
+  }
+
+  @Test
+  public void testValidateStrategyWithNull() {
+    // Should not throw exception - strategy is optional
+    IcebergRewriteDataFilesJob.validateStrategy(null);
+  }
+
+  @Test
+  public void testValidateStrategyWithEmptyString() {
+    // Should not throw exception - strategy is optional
+    IcebergRewriteDataFilesJob.validateStrategy("");
+  }
+
+  @Test
+  public void testValidateStrategyWithInvalidValue() {
+    try {
+      IcebergRewriteDataFilesJob.validateStrategy("invalid");
+      fail("Expected IllegalArgumentException for invalid strategy");
+    } catch (IllegalArgumentException e) {
+      assertTrue(e.getMessage().contains("Invalid strategy 'invalid'"));
+      assertTrue(e.getMessage().contains("'binpack'"));
+      assertTrue(e.getMessage().contains("'sort'"));
+    }
+  }
+
+  @Test
+  public void testValidateStrategyWithZorder() {
+    // z-order is a sort order, not a strategy
+    try {
+      IcebergRewriteDataFilesJob.validateStrategy("z-order");
+      fail("Expected IllegalArgumentException for z-order as strategy");
+    } catch (IllegalArgumentException e) {
+      assertTrue(e.getMessage().contains("Invalid strategy 'z-order'"));
+      assertTrue(e.getMessage().contains("Valid values are: 'binpack', 'sort'"));
+    }
+  }
+
+  @Test
+  public void testValidateStrategyIsCaseSensitive() {
+    // Strategy validation should be case-sensitive
+    try {
+      IcebergRewriteDataFilesJob.validateStrategy("BINPACK");
+      fail("Expected IllegalArgumentException for uppercase BINPACK");
+    } catch (IllegalArgumentException e) {
+      assertTrue(e.getMessage().contains("Invalid strategy 'BINPACK'"));
+    }
+  }
+
+  // Tests for custom Spark configurations
+
+  @Test
+  public void testParseCustomSparkConfigsWithValidJson() {
+    String json = "{\"spark.sql.shuffle.partitions\":\"200\",\"spark.executor.memory\":\"4g\"}";
+    Map<String, String> configs = IcebergRewriteDataFilesJob.parseCustomSparkConfigs(json);
+
+    assertEquals(2, configs.size());
+    assertEquals("200", configs.get("spark.sql.shuffle.partitions"));
+    assertEquals("4g", configs.get("spark.executor.memory"));
+  }
+
+  @Test
+  public void testParseCustomSparkConfigsWithNumericValues() {
+    String json = "{\"spark.sql.shuffle.partitions\":200,\"spark.executor.cores\":4}";
+    Map<String, String> configs = IcebergRewriteDataFilesJob.parseCustomSparkConfigs(json);
+
+    assertEquals(2, configs.size());
+    assertEquals("200", configs.get("spark.sql.shuffle.partitions"));
+    assertEquals("4", configs.get("spark.executor.cores"));
+  }
+
+  @Test
+  public void testParseCustomSparkConfigsWithBooleanValues() {
+    String json = "{\"spark.dynamicAllocation.enabled\":true,\"spark.speculation\":false}";
+    Map<String, String> configs = IcebergRewriteDataFilesJob.parseCustomSparkConfigs(json);
+
+    assertEquals(2, configs.size());
+    assertEquals("true", configs.get("spark.dynamicAllocation.enabled"));
+    assertEquals("false", configs.get("spark.speculation"));
+  }
+
+  @Test
+  public void testParseCustomSparkConfigsWithEmptyString() {
+    Map<String, String> configs = IcebergRewriteDataFilesJob.parseCustomSparkConfigs("");
+    assertTrue(configs.isEmpty());
+  }
+
+  @Test
+  public void testParseCustomSparkConfigsWithNull() {
+    Map<String, String> configs = IcebergRewriteDataFilesJob.parseCustomSparkConfigs(null);
+    assertTrue(configs.isEmpty());
+  }
+
+  @Test
+  public void testParseCustomSparkConfigsWithInvalidJson() {
+    String json = "{invalid json}";
+    try {
+      IcebergRewriteDataFilesJob.parseCustomSparkConfigs(json);
+      fail("Expected IllegalArgumentException for invalid JSON");
+    } catch (IllegalArgumentException e) {
+      assertTrue(e.getMessage().contains("Failed to parse Spark configurations JSON"));
+    }
+  }
+
+  @Test
+  public void testValidateSparkConfigsWithValidConfigs() {
+    Map<String, String> configs = new HashMap<>();
+    configs.put("spark.sql.shuffle.partitions", "200");
+    configs.put("spark.executor.memory", "4g");
+    configs.put("spark.dynamicAllocation.enabled", "true");
+
+    // Should not throw exception
+    IcebergRewriteDataFilesJob.validateSparkConfigs(configs);
+  }
+
+  @Test
+  public void testValidateSparkConfigsRejectsCatalogOverride() {
+    Map<String, String> configs = new HashMap<>();
+    configs.put("spark.sql.catalog.my_catalog", "some.catalog.Class");
+
+    try {
+      IcebergRewriteDataFilesJob.validateSparkConfigs(configs);
+      fail("Expected IllegalArgumentException for catalog config override");
+    } catch (IllegalArgumentException e) {
+      assertTrue(e.getMessage().contains("cannot be overridden"));
+      assertTrue(e.getMessage().contains("spark.sql.catalog."));
+    }
+  }
+
+  @Test
+  public void testValidateSparkConfigsRejectsExtensionsOverride() {
+    Map<String, String> configs = new HashMap<>();
+    configs.put("spark.sql.extensions", "some.other.Extension");
+
+    try {
+      IcebergRewriteDataFilesJob.validateSparkConfigs(configs);
+      fail("Expected IllegalArgumentException for extensions config override");
+    } catch (IllegalArgumentException e) {
+      assertTrue(e.getMessage().contains("cannot be overridden"));
+      assertTrue(e.getMessage().contains("spark.sql.extensions"));
+    }
+  }
+
+  @Test
+  public void testValidateSparkConfigsRejectsAppNameOverride() {
+    Map<String, String> configs = new HashMap<>();
+    configs.put("spark.app.name", "MyCustomApp");
+
+    try {
+      IcebergRewriteDataFilesJob.validateSparkConfigs(configs);
+      fail("Expected IllegalArgumentException for app name override");
+    } catch (IllegalArgumentException e) {
+      assertTrue(e.getMessage().contains("cannot be overridden"));
+      assertTrue(e.getMessage().contains("spark.app.name"));
+    }
+  }
+
+  @Test
+  public void testValidateSparkConfigsRejectsNonSparkPrefix() {
+    Map<String, String> configs = new HashMap<>();
+    configs.put("hadoop.fs.defaultFS", "hdfs://namenode:9000");
+
+    try {
+      IcebergRewriteDataFilesJob.validateSparkConfigs(configs);
+      fail("Expected IllegalArgumentException for non-spark config");
+    } catch (IllegalArgumentException e) {
+      assertTrue(e.getMessage().contains("must start with 'spark.'"));
+      assertTrue(e.getMessage().contains("hadoop.fs.defaultFS"));
+    }
+  }
+
+  @Test
+  public void testValidateSparkConfigsWithEmptyMap() {
+    Map<String, String> configs = new HashMap<>();
+    // Should not throw exception
+    IcebergRewriteDataFilesJob.validateSparkConfigs(configs);
   }
 }
