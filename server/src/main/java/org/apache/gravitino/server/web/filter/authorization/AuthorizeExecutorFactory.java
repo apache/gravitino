@@ -33,7 +33,9 @@ public class AuthorizeExecutorFactory {
       Map<String, Object> pathParams,
       Optional<String> entityType,
       Parameter[] parameters,
-      Object[] args) {
+      Object[] args,
+      String secondaryExpression,
+      String secondaryExpressionCondition) {
     return switch (requestType) {
       case COMMON -> new CommonAuthorizerExecutor(
           expression, metadataContext, pathParams, entityType);
@@ -44,7 +46,14 @@ public class AuthorizeExecutorFactory {
       case RUN_JOB -> new RunJobAuthorizationExecutor(
           parameters, args, expression, metadataContext, pathParams, entityType);
       case LOAD_TABLE -> new LoadTableAuthorizationExecutor(
-          parameters, args, expression, metadataContext, pathParams, entityType);
+          parameters,
+          args,
+          expression,
+          metadataContext,
+          pathParams,
+          entityType,
+          secondaryExpression,
+          secondaryExpressionCondition);
     };
   }
 }

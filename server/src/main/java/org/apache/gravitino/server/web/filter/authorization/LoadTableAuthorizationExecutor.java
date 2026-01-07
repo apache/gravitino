@@ -22,6 +22,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.authorization.Privilege;
@@ -32,13 +33,10 @@ import org.apache.gravitino.server.web.filter.ParameterUtil;
 /**
  * Authorization executor for load table operations.
  *
- * <p>This executor examines the `privileges` parameter from the client to determine authorization:
- * MODIFY_TABLE privilege triggers stricter authorization, otherwise SELECT_TABLE is used.
- *
- * <p><b>Security Limitation:</b> This is a trust-based model. The client declares intended
- * privileges, and the server trusts this declaration without validation. A malicious or modified
- * client could request only SELECT_TABLE privileges to bypass MODIFY_TABLE authorization checks.
- * Legacy clients without the `privileges` parameter will use default authorization.
+ * <p>This executor uses secondaryExpression and secondaryExpressionCondition from the annotation to
+ * determine authorization: if the condition is met (e.g., client requests MODIFY_TABLE privilege),
+ * the secondaryExpression is used for stricter authorization, otherwise the default expression is
+ * used (e.g., SELECT_TABLE).
  */
 public class LoadTableAuthorizationExecutor extends CommonAuthorizerExecutor {
   public LoadTableAuthorizationExecutor(
@@ -47,22 +45,31 @@ public class LoadTableAuthorizationExecutor extends CommonAuthorizerExecutor {
       String expression,
       Map<Entity.EntityType, NameIdentifier> metadataContext,
       Map<String, Object> pathParams,
-      Optional<String> entityType) {
+      Optional<String> entityType,
+      String secondaryExpression,
+      String secondaryExpressionCondition) {
     super(expression, metadataContext, pathParams, entityType);
 
-    String privileges = (String) ParameterUtil.extractFromParameters(parameters, args);
+    // If secondaryExpression and condition are provided, evaluate the condition
+    if (StringUtils.isNotBlank(secondaryExpression)
+        && StringUtils.isNotBlank(secondaryExpressionCondition)) {
+      String privileges = (String) ParameterUtil.extractFromParameters(parameters, args);
 
-    if (privileges != null) {
-      Set<Privilege.Name> privilegeNames =
-          Arrays.stream(privileges.split(","))
-              .map(Privilege.Name::valueOf)
-              .collect(Collectors.toSet());
+      // Evaluate the condition: does the request contain MODIFY_TABLE privilege?
+      if (privileges != null
+          && secondaryExpressionCondition.equals(
+              AuthorizationExpressionConstants.REQUEST_REQUIRED_PRIVILEGES_CONTAINS_MODIFY_TABLE)) {
+        Set<Privilege.Name> privilegeNames =
+            Arrays.stream(privileges.split(","))
+                .map(Privilege.Name::valueOf)
+                .collect(Collectors.toSet());
 
-      if (privilegeNames.contains(Privilege.Name.MODIFY_TABLE)) {
-        this.expression = AuthorizationExpressionConstants.MODIFY_TABLE_AUTHORIZATION_EXPRESSION;
-        this.authorizationExpressionEvaluator =
-            new AuthorizationExpressionEvaluator(
-                AuthorizationExpressionConstants.MODIFY_TABLE_AUTHORIZATION_EXPRESSION);
+        if (privilegeNames.contains(Privilege.Name.MODIFY_TABLE)) {
+          // Use the secondary expression for stricter authorization
+          this.expression = secondaryExpression;
+          this.authorizationExpressionEvaluator =
+              new AuthorizationExpressionEvaluator(secondaryExpression);
+        }
       }
     }
   }

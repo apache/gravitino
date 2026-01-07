@@ -183,6 +183,9 @@ public class GravitinoInterceptionService implements InterceptionService {
           if (StringUtils.isNotBlank(expression)) {
             AuthorizationRequest.RequestType requestType =
                 extractAuthorizationRequestTypeFromParameters(parameters);
+            String secondaryExpression = expressionAnnotation.secondaryExpression();
+            String secondaryExpressionCondition =
+                expressionAnnotation.secondaryExpressionCondition();
             executor =
                 AuthorizeExecutorFactory.create(
                     expression,
@@ -191,7 +194,9 @@ public class GravitinoInterceptionService implements InterceptionService {
                     pathParams,
                     entityType,
                     parameters,
-                    args);
+                    args,
+                    secondaryExpression,
+                    secondaryExpressionCondition);
             boolean authorizeResult = executor.execute();
             if (!authorizeResult) {
               return buildNoAuthResponse(expressionAnnotation, metadataContext, method, expression);
