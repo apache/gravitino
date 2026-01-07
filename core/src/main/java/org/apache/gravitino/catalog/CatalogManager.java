@@ -23,7 +23,6 @@ import static org.apache.gravitino.Catalog.Type.FILESET;
 import static org.apache.gravitino.StringIdentifier.DUMMY_ID;
 import static org.apache.gravitino.catalog.PropertiesMetadataHelpers.validatePropertyForAlter;
 import static org.apache.gravitino.catalog.PropertiesMetadataHelpers.validatePropertyForCreate;
-import static org.apache.gravitino.connector.BaseCatalogPropertiesMetadata.BASIC_CATALOG_PROPERTIES_METADATA;
 import static org.apache.gravitino.connector.BaseCatalogPropertiesMetadata.PROPERTY_METALAKE_IN_USE;
 import static org.apache.gravitino.metalake.MetalakeManager.checkMetalake;
 
@@ -729,7 +728,10 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
         LockType.WRITE,
         () -> {
           try {
-            boolean catalogInUse = getCatalogInUseValue(store, ident);
+            CatalogWrapper catalogWrapper = loadCatalogAndWrap(ident);
+            catalogWrapper.catalog().checkMetalakeInUse();
+
+            boolean catalogInUse = catalogWrapper.catalog().catalogInUse();
             if (catalogInUse && !force) {
               throw new CatalogInUseException(
                   "Catalog %s is in use, please disable it first or use force option", ident);
@@ -738,13 +740,10 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
             Namespace schemaNs = Namespace.of(ident.namespace().level(0), ident.name());
             List<SchemaEntity> schemaEntities =
                 store.list(schemaNs, SchemaEntity.class, EntityType.SCHEMA);
-
-            CatalogWrapper catalogWrapper = loadCatalogAndWrap(ident);
             if (!force && containsUserCreatedSchemas(schemaEntities, catalogWrapper)) {
               throw new NonEmptyCatalogException(
                   "Catalog %s has schemas, please drop them first or use force option", ident);
             }
-            catalogWrapper.catalog().checkMetalakeInUse();
 
             if (isManagedStorageCatalog(catalogWrapper)) {
               // For managed catalog, we need to call drop schema API to drop the underlying
@@ -852,29 +851,6 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
    */
   public CatalogWrapper loadCatalogAndWrap(NameIdentifier ident) throws NoSuchCatalogException {
     return catalogCache.get(ident, this::loadCatalogInternal);
-  }
-
-  private boolean getCatalogInUseValue(EntityStore store, NameIdentifier catalogIdent) {
-    try {
-      CatalogWrapper wrapper = catalogCache.getIfPresent(catalogIdent);
-      CatalogEntity catalogEntity;
-      if (wrapper != null) {
-        catalogEntity = wrapper.catalog.entity();
-      } else {
-        catalogEntity = store.get(catalogIdent, EntityType.CATALOG, CatalogEntity.class);
-      }
-      return (boolean)
-          BASIC_CATALOG_PROPERTIES_METADATA.getOrDefault(
-              catalogEntity.getProperties(), PROPERTY_IN_USE);
-
-    } catch (NoSuchEntityException e) {
-      LOG.warn("Catalog {} does not exist", catalogIdent, e);
-      throw new NoSuchCatalogException(CATALOG_DOES_NOT_EXIST_MSG, catalogIdent);
-
-    } catch (IOException e) {
-      LOG.error("Failed to do store operation", e);
-      throw new RuntimeException(e);
-    }
   }
 
   private boolean isManagedStorageCatalog(CatalogWrapper catalogWrapper) {
@@ -1227,10 +1203,10 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
    * Set the metalake in-use status in a specified catalog.
    *
    * @param nameIdentifier The name identifier of the catalog.
-   * @param status The in-use status to set. It can be "true" or "false".
+   * @param status The in-use status to set.
    */
-  public void setMetalakeInUseStatus(NameIdentifier nameIdentifier, String status) {
-    updateCatalogProperty(nameIdentifier, PROPERTY_METALAKE_IN_USE, status);
+  public void setMetalakeInUseStatus(NameIdentifier nameIdentifier, boolean status) {
+    updateCatalogProperty(nameIdentifier, PROPERTY_METALAKE_IN_USE, String.valueOf(status));
   }
 
   private void updateCatalogProperty(

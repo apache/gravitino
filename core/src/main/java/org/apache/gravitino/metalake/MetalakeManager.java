@@ -393,7 +393,7 @@ public class MetalakeManager implements MetalakeDispatcher, Closeable {
             // The only problem is that we can't make sure we can change all catalog properties
             // in a transaction. If any catalog property update fails, the metalake is already
             // enabled but catalog properties remain inconsistent.
-            updateMetalakeInUseStatusInCatalog(ident, "true");
+            updateMetalakeInUseStatusInCatalog(ident, true);
             return null;
           } catch (IOException e) {
             throw new RuntimeException(e);
@@ -433,7 +433,7 @@ public class MetalakeManager implements MetalakeDispatcher, Closeable {
             // The only problem is that we can't make sure we can change all catalog properties
             // in a transaction, if any of them fails, the metalake is already enabled and the value
             // in catalog is inconsistent.
-            updateMetalakeInUseStatusInCatalog(ident, "false");
+            updateMetalakeInUseStatusInCatalog(ident, false);
             return null;
           } catch (IOException e) {
             throw new RuntimeException(e);
@@ -497,7 +497,7 @@ public class MetalakeManager implements MetalakeDispatcher, Closeable {
     return builder.withProperties(newProps);
   }
 
-  private void updateMetalakeInUseStatusInCatalog(NameIdentifier ident, String value)
+  private void updateMetalakeInUseStatusInCatalog(NameIdentifier ident, boolean value)
       throws IOException {
     List<NameIdentifier> failedCatalogs = Lists.newArrayList();
     store
