@@ -99,6 +99,12 @@ TBLPROPERTIES (
 
 The snippet below writes and reads a Lance dataset through the Lance REST namespace.
 
+```shell
+pip install lance-ray
+```
+Please note that ray will also be installed if not already present. Currently lance-ray only tested with ray version 2.50.0, please
+ensure ray version compatibility in your environment.
+
 ```python
 import ray
 import lance_namespace as ln
@@ -121,8 +127,3 @@ print(f"Filtered count: {result}")
 - Ensure the target Lance catalog (`lance_catalog`) and schema (`schema`) already exist in Gravitino.
 - The table path is represented as `["catalog", "schema", "table"]` when using Lance Ray helpers.
 :::
-
-## Troubleshooting
-
-- **TypeError `_BaseLanceDatasink.on_write_start()` when using Ray 2.53.3**: downgrade Ray to `2.40.0` (for example, `pip install 'ray==2.40.0'`).
-- **ValueError “too many values to unpack” from `lance_ray` datasink**: this is a known issue in `lance-ray`; track progress at [lance-format/lance-ray#68](https://github.com/lance-format/lance-ray/issues/68).
