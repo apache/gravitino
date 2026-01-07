@@ -64,6 +64,7 @@ import org.apache.gravitino.Entity.EntityType;
 import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.EntityStoreFactory;
+import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.SupportsRelationOperations;
@@ -91,6 +92,7 @@ import org.apache.gravitino.meta.GenericEntity;
 import org.apache.gravitino.meta.GroupEntity;
 import org.apache.gravitino.meta.ModelEntity;
 import org.apache.gravitino.meta.ModelVersionEntity;
+import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.meta.RoleEntity;
 import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.meta.SchemaVersion;
@@ -99,6 +101,8 @@ import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.meta.TopicEntity;
 import org.apache.gravitino.meta.UserEntity;
 import org.apache.gravitino.model.ModelVersion;
+import org.apache.gravitino.policy.Policy;
+import org.apache.gravitino.policy.PolicyContents;
 import org.apache.gravitino.rel.types.Type;
 import org.apache.gravitino.rel.types.Types;
 import org.apache.gravitino.storage.relational.RelationalBackend;
@@ -3197,6 +3201,121 @@ public class TestEntityStorage {
       Assertions.assertTrue(entityIds.contains(catalog2.id()));
       Assertions.assertTrue(entityNames.contains(catalog1.name()));
       Assertions.assertTrue(entityNames.contains(catalog2.name()));
+    }
+  }
+
+  @ParameterizedTest
+  @MethodSource("storageProvider")
+  void testPolicyRelationMultipleBindings(String type) throws Exception {
+    Config config = Mockito.mock(Config.class);
+    init(type, config);
+
+    AuditInfo auditInfo =
+        AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
+
+    try (EntityStore store = EntityStoreFactory.createEntityStore(config)) {
+      store.initialize(config);
+
+      BaseMetalake metalake =
+          createBaseMakeLake(RandomIdGenerator.INSTANCE.nextId(), "metalake", auditInfo);
+      store.put(metalake, false);
+
+      Namespace policyNamespace = NameIdentifierUtil.ofPolicy("metalake", "policy1").namespace();
+      PolicyEntity policy1 =
+          PolicyEntity.builder()
+              .withId(RandomIdGenerator.INSTANCE.nextId())
+              .withNamespace(policyNamespace)
+              .withName("policy1")
+              .withPolicyType(Policy.BuiltInType.CUSTOM)
+              .withContent(
+                  PolicyContents.custom(
+                      ImmutableMap.of("rule", "allow-all"),
+                      Collections.singleton(MetadataObject.Type.CATALOG),
+                      Collections.emptyMap()))
+              .withAuditInfo(auditInfo)
+              .build();
+
+      CatalogEntity catalog1 =
+          createCatalog(
+              RandomIdGenerator.INSTANCE.nextId(),
+              NamespaceUtil.ofCatalog("metalake"),
+              "catalog1",
+              auditInfo);
+
+      store.put(policy1, false);
+      store.put(catalog1, false);
+
+      SupportsRelationOperations relationOperations = (SupportsRelationOperations) store;
+
+      relationOperations.updateEntityRelations(
+          SupportsRelationOperations.Type.POLICY_METADATA_OBJECT_REL,
+          catalog1.nameIdentifier(),
+          EntityType.CATALOG,
+          new NameIdentifier[] {policy1.nameIdentifier()},
+          new NameIdentifier[] {});
+
+      List<PolicyEntity> policiesForCatalog1 =
+          relationOperations.listEntitiesByRelation(
+              SupportsRelationOperations.Type.POLICY_METADATA_OBJECT_REL,
+              catalog1.nameIdentifier(),
+              EntityType.CATALOG,
+              true);
+      Assertions.assertEquals(1, policiesForCatalog1.size());
+      Assertions.assertEquals(policy1, policiesForCatalog1.get(0));
+
+      List<GenericEntity> entitiesForPolicy1 =
+          relationOperations.listEntitiesByRelation(
+              SupportsRelationOperations.Type.POLICY_METADATA_OBJECT_REL,
+              policy1.nameIdentifier(),
+              EntityType.POLICY,
+              true);
+      Assertions.assertEquals(1, entitiesForPolicy1.size());
+      Assertions.assertEquals(catalog1.id(), entitiesForPolicy1.get(0).id());
+
+      CatalogEntity catalog2 =
+          createCatalog(
+              RandomIdGenerator.INSTANCE.nextId(),
+              NamespaceUtil.ofCatalog("metalake"),
+              "catalog2",
+              auditInfo);
+      store.put(catalog2, false);
+
+      relationOperations.updateEntityRelations(
+          SupportsRelationOperations.Type.POLICY_METADATA_OBJECT_REL,
+          catalog2.nameIdentifier(),
+          EntityType.CATALOG,
+          new NameIdentifier[] {policy1.nameIdentifier()},
+          new NameIdentifier[] {});
+
+      policiesForCatalog1 =
+          relationOperations.listEntitiesByRelation(
+              SupportsRelationOperations.Type.POLICY_METADATA_OBJECT_REL,
+              catalog1.nameIdentifier(),
+              EntityType.CATALOG,
+              true);
+      Assertions.assertEquals(1, policiesForCatalog1.size());
+      Assertions.assertEquals(policy1, policiesForCatalog1.get(0));
+
+      List<PolicyEntity> policiesForCatalog2 =
+          relationOperations.listEntitiesByRelation(
+              SupportsRelationOperations.Type.POLICY_METADATA_OBJECT_REL,
+              catalog2.nameIdentifier(),
+              EntityType.CATALOG,
+              true);
+      Assertions.assertEquals(1, policiesForCatalog2.size());
+      Assertions.assertEquals(policy1, policiesForCatalog2.get(0));
+
+      entitiesForPolicy1 =
+          relationOperations.listEntitiesByRelation(
+              SupportsRelationOperations.Type.POLICY_METADATA_OBJECT_REL,
+              policy1.nameIdentifier(),
+              EntityType.POLICY,
+              true);
+      Assertions.assertEquals(2, entitiesForPolicy1.size());
+      List<Long> entityIds =
+          entitiesForPolicy1.stream().map(GenericEntity::id).collect(Collectors.toList());
+      Assertions.assertTrue(entityIds.contains(catalog1.id()));
+      Assertions.assertTrue(entityIds.contains(catalog2.id()));
     }
   }
 
