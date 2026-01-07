@@ -265,6 +265,12 @@ public class RelationalEntityStore implements EntityStore, SupportsRelationOpera
       NameIdentifier[] destEntitiesToAdd,
       NameIdentifier[] destEntitiesToRemove)
       throws IOException, NoSuchEntityException, EntityAlreadyExistsException {
+
+    // We need to clear the cache of the source entity and all destination entities being added or
+    // removed. This ensures that any subsequent reads will fetch the updated relations from the
+    // backend. For example, if we are adding a tag to table, we need to invalidate the cache for
+    // that table and the tag being added or removed. Otherwise, we might return stale data if we
+    // list all tags for that table or all tables for that tag.
     cache.invalidate(srcEntityIdent, srcEntityType, relType);
     for (NameIdentifier destToAdd : destEntitiesToAdd) {
       cache.invalidate(destToAdd, srcEntityType, relType);
