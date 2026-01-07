@@ -37,6 +37,7 @@ import org.apache.gravitino.server.web.filter.ParameterUtil;
  * determine authorization: if the condition is met (e.g., client requests MODIFY_TABLE privilege),
  * the secondaryExpression is used for stricter authorization, otherwise the default expression is
  * used (e.g., SELECT_TABLE).
+ *
  * <p><b>Security Limitation:</b> This is a trust-based model. The client declares intended
  * privileges, and the server trusts this declaration without validation. A malicious or modified
  * client could request only SELECT_TABLE privileges to bypass MODIFY_TABLE authorization checks.
