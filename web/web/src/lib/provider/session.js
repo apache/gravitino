@@ -84,6 +84,7 @@ const AuthProvider = ({ children }) => {
     const initAuth = async () => {
       const [authConfigsErr, resAuthConfigs] = await to(dispatch(getAuthConfigs()))
       const authType = resAuthConfigs?.payload?.authType
+      const anthEnable = resAuthConfigs?.payload?.anthEnable
 
       // Check sessionStorage cache first, only fetch if no cache
       const cachedGithubInfo = typeof window !== 'undefined' && window.sessionStorage.getItem('githubInfo')
@@ -103,7 +104,13 @@ const AuthProvider = ({ children }) => {
 
       if (authType === 'simple') {
         dispatch(initialVersion())
-        goToMetalakeListPage()
+        const sessionUser = typeof window !== 'undefined' && JSON.parse(window.sessionStorage.getItem('simpleAuthUser'))
+        if (anthEnable && !sessionUser) {
+          router.push('/login')
+        } else {
+          dispatch(setAuthUser(sessionUser))
+          goToMetalakeListPage()
+        }
       } else if (authType === 'oauth') {
         const tokenToUse = await oauthProviderFactory.getAccessToken()
         const user = await oauthProviderFactory.getUserProfile()

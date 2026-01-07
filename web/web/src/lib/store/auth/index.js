@@ -98,25 +98,29 @@ export const loginAction = createAsyncThunk('auth/loginAction', async ({ params,
 
 export const logoutAction = createAsyncThunk('auth/logoutAction', async ({ router }, { getState, dispatch }) => {
   // Clear provider authentication data first
-  try {
-    const provider = await oauthProviderFactory.getProvider()
-    if (provider) {
-      await provider.clearAuthData()
-      console.log('[Logout Action] Provider cleanup completed')
+  if (getState().auth.authType === 'oauth') {
+    try {
+      const provider = await oauthProviderFactory.getProvider()
+      if (provider) {
+        await provider.clearAuthData()
+        console.log('[Logout Action] Provider cleanup completed')
+      }
+    } catch (error) {
+      console.warn('[Logout Action] Provider cleanup failed:', error)
     }
-  } catch (error) {
-    console.warn('[Logout Action] Provider cleanup failed:', error)
+
+    // Clear legacy auth tokens
+    localStorage.removeItem('accessToken')
+    localStorage.removeItem('authParams')
+    localStorage.removeItem('expiredIn')
+    localStorage.removeItem('isIdle')
+    localStorage.removeItem('version')
+
+    dispatch(clearIntervalId())
+    dispatch(setAuthToken(''))
+  } else {
+    dispatch(setAuthUser(null))
   }
-
-  // Clear legacy auth tokens
-  localStorage.removeItem('accessToken')
-  localStorage.removeItem('authParams')
-  localStorage.removeItem('expiredIn')
-  localStorage.removeItem('isIdle')
-  localStorage.removeItem('version')
-
-  dispatch(clearIntervalId())
-  dispatch(setAuthToken(''))
   await router.push('/login')
 
   return { token: null }
@@ -180,6 +184,11 @@ export const authSlice = createSlice({
       state.expiredIn = action.payload
     },
     setAuthUser(state, action) {
+      if (action.payload) {
+        sessionStorage.setItem('simpleAuthUser', JSON.stringify(action.payload))
+      } else {
+        sessionStorage.removeItem('simpleAuthUser')
+      }
       state.authUser = action.payload
     }
   },

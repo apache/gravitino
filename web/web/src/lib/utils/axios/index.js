@@ -206,6 +206,13 @@ const transform = {
       if (token && config?.requestOptions?.withToken !== false) {
         // ** jwt token
         config.headers.Authorization = options.authenticationScheme ? `${options.authenticationScheme} ${token}` : token
+      } else if (window.sessionStorage.getItem('simpleAuthUser')) {
+        // Simple auth fallback
+        const simpleAuthToken = window.sessionStorage.getItem('simpleAuthToken')
+        const user = JSON.parse(window.sessionStorage.getItem('simpleAuthUser'))?.name
+        if (user) {
+          config.headers.Authorization = `Basic ${Buffer.from(user || '').toString('base64')}`
+        }
       }
     } catch (error) {
       console.warn('Failed to get access token:', error)
