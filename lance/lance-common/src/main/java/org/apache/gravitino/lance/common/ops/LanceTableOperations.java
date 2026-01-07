@@ -20,6 +20,8 @@ package org.apache.gravitino.lance.common.ops;
 
 import com.lancedb.lance.namespace.model.AlterTableAddColumnsRequest;
 import com.lancedb.lance.namespace.model.AlterTableAddColumnsResponse;
+import com.lancedb.lance.namespace.model.AlterTableAlterColumnsRequest;
+import com.lancedb.lance.namespace.model.AlterTableAlterColumnsResponse;
 import com.lancedb.lance.namespace.model.AlterTableDropColumnsRequest;
 import com.lancedb.lance.namespace.model.AlterTableDropColumnsResponse;
 import com.lancedb.lance.namespace.model.CreateEmptyTableResponse;
@@ -128,6 +130,17 @@ public interface LanceTableOperations {
    */
   AlterTableDropColumnsResponse alterTableDropColumns(
       String tableId, String delimiter, AlterTableDropColumnsRequest request);
+
+  /**
+   * Alter a table to update columns.
+   *
+   * @param tableId table ids are in the format of "{namespace}{delimiter}{table_name}"
+   * @param delimiter the delimiter used in the namespace
+   * @param request the request containing columns to be altered
+   * @return the response of the alter table alter columns operation.
+   */
+  AlterTableAlterColumnsResponse alterTableAlterColumns(
+      String tableId, String delimiter, AlterTableAlterColumnsRequest request);
 
   /**
    * Alter a table to add columns.

@@ -27,7 +27,9 @@ import com.lancedb.lance.namespace.LanceNamespaceException;
 import com.lancedb.lance.namespace.LanceNamespaces;
 import com.lancedb.lance.namespace.client.apache.ApiException;
 import com.lancedb.lance.namespace.client.apache.api.TableApi;
+import com.lancedb.lance.namespace.model.AlterTableAlterColumnsRequest;
 import com.lancedb.lance.namespace.model.AlterTableDropColumnsRequest;
+import com.lancedb.lance.namespace.model.ColumnAlteration;
 import com.lancedb.lance.namespace.model.CreateEmptyTableRequest;
 import com.lancedb.lance.namespace.model.CreateEmptyTableResponse;
 import com.lancedb.lance.namespace.model.CreateNamespaceRequest;
@@ -645,6 +647,52 @@ public class LanceRESTServiceIT extends BaseIT {
         dropColumnException
             .getMessage()
             .contains("Column non_existing_column not found for deletion "));
+  }
+
+  @Test
+  void testAlterColumns() throws Exception {
+    catalog = createCatalog(CATALOG_NAME);
+    createSchema();
+
+    String location = tempDir + "/" + "alter_columns/";
+    List<String> ids = List.of(CATALOG_NAME, SCHEMA_NAME, "alter_columns_table");
+    org.apache.arrow.vector.types.pojo.Schema schema =
+        new org.apache.arrow.vector.types.pojo.Schema(
+            Arrays.asList(
+                Field.nullable("id", new ArrowType.Int(32, true)),
+                Field.nullable("value", new ArrowType.Utf8())));
+    byte[] body = ArrowUtils.generateIpcStream(schema);
+
+    CreateTableRequest request = new CreateTableRequest();
+    request.setId(ids);
+    request.setLocation(location);
+    request.setProperties(ImmutableMap.of("key1", "v1"));
+    ns.createTable(request, body);
+
+    RestNamespace restNamespace = (RestNamespace) ns;
+    TableApi tableApi = (TableApi) FieldUtils.readField(restNamespace, "tableApi", true);
+    String delimiter = RestNamespaceConfig.DELIMITER_DEFAULT;
+
+    AlterTableAlterColumnsRequest alterRequest = new AlterTableAlterColumnsRequest();
+    alterRequest.setId(ids);
+    ColumnAlteration columnAlteration = new ColumnAlteration();
+    columnAlteration.setColumn("value");
+    columnAlteration.setRename("value_new");
+    alterRequest.setAlterations(List.of(columnAlteration));
+
+    Assertions.assertDoesNotThrow(
+        () ->
+            tableApi.alterTableAlterColumns(String.join(delimiter, ids), alterRequest, delimiter));
+
+    DescribeTableRequest describeTableRequest = new DescribeTableRequest();
+    describeTableRequest.setId(ids);
+    DescribeTableResponse loadTable = ns.describeTable(describeTableRequest);
+    Assertions.assertNotNull(loadTable);
+
+    List<JsonArrowField> jsonArrowFields = loadTable.getSchema().getFields();
+    Assertions.assertEquals(2, jsonArrowFields.size());
+    Assertions.assertEquals("id", jsonArrowFields.get(0).getName());
+    Assertions.assertEquals("value_new", jsonArrowFields.get(1).getName());
   }
 
   @Test

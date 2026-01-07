@@ -30,8 +30,11 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
 import com.lancedb.lance.namespace.LanceNamespaceException;
+import com.lancedb.lance.namespace.model.AlterTableAlterColumnsRequest;
+import com.lancedb.lance.namespace.model.AlterTableAlterColumnsResponse;
 import com.lancedb.lance.namespace.model.AlterTableDropColumnsRequest;
 import com.lancedb.lance.namespace.model.AlterTableDropColumnsResponse;
+import com.lancedb.lance.namespace.model.ColumnAlteration;
 import com.lancedb.lance.namespace.model.CreateEmptyTableRequest;
 import com.lancedb.lance.namespace.model.CreateEmptyTableResponse;
 import com.lancedb.lance.namespace.model.CreateNamespaceRequest;
@@ -825,6 +828,58 @@ public class TestLanceNamespaceOperations extends JerseyTest {
             .queryParam("delimiter", delimiter)
             .request(MediaType.APPLICATION_JSON_TYPE)
             .post(Entity.entity(dropColumnsRequest, MediaType.APPLICATION_JSON_TYPE));
+    Assertions.assertEquals(Response.Status.NOT_FOUND.getStatusCode(), resp.getStatus());
+  }
+
+  @Test
+  void testAlterColumns() {
+    String tableIds = "catalog.scheme.alter_table_alter_columns";
+    String delimiter = ".";
+
+    AlterTableAlterColumnsResponse alterColumnsResponse = new AlterTableAlterColumnsResponse();
+    alterColumnsResponse.setVersion(3L);
+
+    AlterTableAlterColumnsRequest alterColumnsRequest = new AlterTableAlterColumnsRequest();
+    alterColumnsRequest.setId(List.of("catalog", "scheme", "alter_table_alter_columns"));
+    ColumnAlteration columnAlteration = new ColumnAlteration();
+    columnAlteration.setColumn("col1");
+    columnAlteration.setRename("col1_new");
+    alterColumnsRequest.setAlterations(List.of(columnAlteration));
+
+    when(tableOps.alterTableAlterColumns(any(), any(), any())).thenReturn(alterColumnsResponse);
+    Response resp =
+        target(String.format("/v1/table/%s/alter_columns", tableIds))
+            .queryParam("delimiter", delimiter)
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .post(Entity.entity(alterColumnsRequest, MediaType.APPLICATION_JSON_TYPE));
+
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp.getStatus());
+    Assertions.assertEquals(MediaType.APPLICATION_JSON_TYPE, resp.getMediaType());
+    AlterTableAlterColumnsResponse response = resp.readEntity(AlterTableAlterColumnsResponse.class);
+    Assertions.assertEquals(alterColumnsResponse.getVersion(), response.getVersion());
+
+    Mockito.reset(tableOps);
+    when(tableOps.alterTableAlterColumns(any(), any(), any()))
+        .thenThrow(new RuntimeException("Runtime exception"));
+    resp =
+        target(String.format("/v1/table/%s/alter_columns", tableIds))
+            .queryParam("delimiter", delimiter)
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .post(Entity.entity(alterColumnsRequest, MediaType.APPLICATION_JSON_TYPE));
+    Assertions.assertEquals(
+        Response.Status.INTERNAL_SERVER_ERROR.getStatusCode(), resp.getStatus());
+    Assertions.assertEquals(MediaType.APPLICATION_JSON_TYPE, resp.getMediaType());
+
+    Mockito.reset(tableOps);
+    when(tableOps.alterTableAlterColumns(any(), any(), any()))
+        .thenThrow(
+            LanceNamespaceException.notFound(
+                "Table not found", "NoSuchTableException", tableIds, ""));
+    resp =
+        target(String.format("/v1/table/%s/alter_columns", tableIds))
+            .queryParam("delimiter", delimiter)
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .post(Entity.entity(alterColumnsRequest, MediaType.APPLICATION_JSON_TYPE));
     Assertions.assertEquals(Response.Status.NOT_FOUND.getStatusCode(), resp.getStatus());
   }
 }

@@ -29,6 +29,7 @@ import com.lancedb.lance.index.DistanceType;
 import com.lancedb.lance.index.IndexParams;
 import com.lancedb.lance.index.IndexType;
 import com.lancedb.lance.index.vector.VectorIndexParams;
+import com.lancedb.lance.schema.ColumnAlteration;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
@@ -287,9 +288,9 @@ public class LanceTableOperations extends ManagedTableOperations {
   }
 
   private void handleLanceTableChange(Table table, TableChange[] changes) {
-    // Lance only supports adding indexes for now.
     List<String> dropColumns = Lists.newArrayList();
     List<Index> indexToAdd = Lists.newArrayList();
+    List<ColumnAlteration> renameColumns = Lists.newArrayList();
 
     for (TableChange change : changes) {
       if (change instanceof TableChange.DeleteColumn deleteColumn) {
@@ -301,6 +302,13 @@ public class LanceTableOperations extends ManagedTableOperations {
                 .withName(addIndex.getName())
                 .withFieldNames(addIndex.getFieldNames())
                 .build());
+      } else if (change instanceof TableChange.RenameColumn renameColumn) {
+        // Currently, only renaming columns is supported.
+        ColumnAlteration lanceColumnAlter =
+            new ColumnAlteration.Builder(renameColumn.fieldName()[0])
+                .rename(renameColumn.getNewName())
+                .build();
+        renameColumns.add(lanceColumnAlter);
       } else {
         throw new UnsupportedOperationException(
             "LanceTableOperations only supports adding indexes currently.");
@@ -309,7 +317,6 @@ public class LanceTableOperations extends ManagedTableOperations {
 
     String location = table.properties().get(Table.PROPERTY_LOCATION);
     try (Dataset dataset = Dataset.open(location, new RootAllocator())) {
-      // For Lance, we only support adding indexes, so in fact, we can't handle drop index here.
       for (Index index : indexToAdd) {
         IndexType indexType = IndexType.valueOf(index.type().name());
         IndexParams indexParams = getIndexParamsByIndexType(indexType);
@@ -322,10 +329,14 @@ public class LanceTableOperations extends ManagedTableOperations {
             Optional.of(index.name()),
             indexParams,
             true);
+      }
 
-        if (!dropColumns.isEmpty()) {
-          dataset.dropColumns(dropColumns);
-        }
+      if (!dropColumns.isEmpty()) {
+        dataset.dropColumns(dropColumns);
+      }
+
+      if (!renameColumns.isEmpty()) {
+        dataset.alterColumns(renameColumns);
       }
     } catch (Exception e) {
       throw new RuntimeException(

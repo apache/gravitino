@@ -27,6 +27,8 @@ import com.codahale.metrics.annotation.ResponseMetered;
 import com.codahale.metrics.annotation.Timed;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Maps;
+import com.lancedb.lance.namespace.model.AlterTableAlterColumnsRequest;
+import com.lancedb.lance.namespace.model.AlterTableAlterColumnsResponse;
 import com.lancedb.lance.namespace.model.AlterTableDropColumnsRequest;
 import com.lancedb.lance.namespace.model.AlterTableDropColumnsResponse;
 import com.lancedb.lance.namespace.model.CreateEmptyTableRequest;
@@ -261,6 +263,28 @@ public class LanceTableOperations {
     }
   }
 
+  // TODO: Currently, only column rename is supported in alter columns.
+  @POST
+  @Path("/alter_columns")
+  @Timed(name = "alter-columns." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
+  @ResponseMetered(name = "alter-columns", absolute = true)
+  public Response alterColumns(
+      @PathParam("id") String tableId,
+      @QueryParam("delimiter") @DefaultValue("$") String delimiter,
+      @Context HttpHeaders headers,
+      AlterTableAlterColumnsRequest alterTableAlterColumnsRequest) {
+    try {
+      validateAlterColumnsRequest(alterTableAlterColumnsRequest);
+      AlterTableAlterColumnsResponse response =
+          lanceNamespace
+              .asTableOps()
+              .alterTableAlterColumns(tableId, delimiter, alterTableAlterColumnsRequest);
+      return Response.ok(response).build();
+    } catch (Exception e) {
+      return LanceExceptionMapper.toRESTResponse(tableId, e);
+    }
+  }
+
   private void validateCreateEmptyTableRequest(
       @SuppressWarnings("unused") CreateEmptyTableRequest request) {
     // No specific fields to validate for now
@@ -296,5 +320,11 @@ public class LanceTableOperations {
   private void validateDropColumnsRequest(AlterTableDropColumnsRequest request) {
     Preconditions.checkArgument(
         !request.getColumns().isEmpty(), "Columns to drop cannot be empty.");
+  }
+
+  private void validateAlterColumnsRequest(AlterTableAlterColumnsRequest request) {
+    request.getAlterations();
+    Preconditions.checkArgument(
+        !request.getAlterations().isEmpty(), "Columns to alter cannot be empty.");
   }
 }
