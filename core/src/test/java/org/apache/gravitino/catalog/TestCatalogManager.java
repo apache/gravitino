@@ -563,6 +563,9 @@ public class TestCatalogManager {
 
     Assertions.assertDoesNotThrow(() -> catalogManager.disableCatalog(ident));
 
+    CatalogEntity oldEntity = entityStore.get(ident, EntityType.CATALOG, CatalogEntity.class);
+    FieldUtils.writeField(catalog, "entity", oldEntity, true);
+
     CatalogManager.CatalogWrapper catalogWrapper =
         Mockito.mock(CatalogManager.CatalogWrapper.class);
     Capability capability = Mockito.mock(Capability.class);
@@ -628,7 +631,7 @@ public class TestCatalogManager {
 
   @Test
   void testAlterMutableProperties() {
-    NameIdentifier ident = NameIdentifier.of("metalake", "test41");
+    NameIdentifier ident = NameIdentifier.of("metalake", "test51");
     Map<String, String> props =
         ImmutableMap.of(
             "provider",
