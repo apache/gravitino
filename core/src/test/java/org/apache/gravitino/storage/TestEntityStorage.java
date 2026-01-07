@@ -672,6 +672,7 @@ public class TestEntityStorage {
       Assertions.assertFalse(store.exists(anotherGroup.nameIdentifier(), Entity.EntityType.GROUP));
       Assertions.assertFalse(store.exists(oneRole.nameIdentifier(), Entity.EntityType.ROLE));
       Assertions.assertFalse(store.exists(anotherRole.nameIdentifier(), Entity.EntityType.ROLE));
+      destroy(type);
     }
   }
 
@@ -3086,6 +3087,7 @@ public class TestEntityStorage {
           updatedCatalog.id(), ((GenericEntity) cachedTagsByTagAfterTagReload.get(0)).id());
       Assertions.assertEquals(
           updatedCatalog.name(), ((GenericEntity) cachedTagsByTagAfterTagReload.get(0)).name());
+      destroy(type);
     }
   }
 
@@ -3201,6 +3203,7 @@ public class TestEntityStorage {
       Assertions.assertTrue(entityIds.contains(catalog2.id()));
       Assertions.assertTrue(entityNames.contains(catalog1.name()));
       Assertions.assertTrue(entityNames.contains(catalog2.name()));
+      destroy(type);
     }
   }
 
@@ -3316,6 +3319,7 @@ public class TestEntityStorage {
           entitiesForPolicy1.stream().map(GenericEntity::id).collect(Collectors.toList());
       Assertions.assertTrue(entityIds.contains(catalog1.id()));
       Assertions.assertTrue(entityIds.contains(catalog2.id()));
+      destroy(type);
     }
   }
 
