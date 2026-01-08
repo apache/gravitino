@@ -26,10 +26,8 @@ import java.util.List;
 import java.util.Objects;
 import java.util.function.Function;
 import java.util.stream.Collectors;
-import org.apache.gravitino.Configs;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.Entity.EntityType;
-import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
@@ -62,6 +60,7 @@ import org.apache.gravitino.storage.relational.po.SchemaPO;
 import org.apache.gravitino.storage.relational.utils.ExceptionUtils;
 import org.apache.gravitino.storage.relational.utils.POConverters;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
+import org.apache.gravitino.utils.CacheUtils;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
 
@@ -453,15 +452,17 @@ public class SchemaMetaService {
   }
 
   private Function<Namespace, List<SchemaPO>> schemaListFetcher() {
-    return cacheEnabled() ? this::listSchemaPOsByCatalogId : this::listSchemaPOsByFullQualifiedName;
+    // If cache is enabled, we can use catalog id to fetch schemas faster or else use full qualified
+    // name to join several tables to get the schema list.
+    return CacheUtils.cacheEnabled()
+        ? this::listSchemaPOsByCatalogId
+        : this::listSchemaPOsByFullQualifiedName;
   }
 
   private Function<NameIdentifier, SchemaPO> schemaPOFetcher() {
-    return cacheEnabled() ? this::getSchemaPOByCatalogId : this::getSchemaPOByFullQualifiedName;
-  }
-
-  private boolean cacheEnabled() {
-    return GravitinoEnv.getInstance().config().get(Configs.CACHE_ENABLED);
+    return CacheUtils.cacheEnabled()
+        ? this::getSchemaPOByCatalogId
+        : this::getSchemaPOByFullQualifiedName;
   }
 
   private void fillSchemaPOBuilderParentEntityId(SchemaPO.Builder builder, Namespace namespace) {

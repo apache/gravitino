@@ -26,9 +26,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.function.Function;
 import java.util.stream.Collectors;
-import org.apache.gravitino.Configs;
 import org.apache.gravitino.Entity;
-import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
@@ -47,6 +45,7 @@ import org.apache.gravitino.storage.relational.po.TopicPO;
 import org.apache.gravitino.storage.relational.utils.ExceptionUtils;
 import org.apache.gravitino.storage.relational.utils.POConverters;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
+import org.apache.gravitino.utils.CacheUtils;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
 
@@ -224,15 +223,15 @@ public class TopicMetaService {
   }
 
   private Function<Namespace, List<TopicPO>> topicListFetcher() {
-    return cacheEnabled() ? this::listTopicPOsBySchemaId : this::listTopicPOsByFullQualifiedName;
+    return CacheUtils.cacheEnabled()
+        ? this::listTopicPOsBySchemaId
+        : this::listTopicPOsByFullQualifiedName;
   }
 
   private Function<NameIdentifier, TopicPO> topicPOFetcher() {
-    return cacheEnabled() ? this::getTopicPOBySchemaId : this::getTopicPOByFullQualifiedName;
-  }
-
-  private boolean cacheEnabled() {
-    return GravitinoEnv.getInstance().config().get(Configs.CACHE_ENABLED);
+    return CacheUtils.cacheEnabled()
+        ? this::getTopicPOBySchemaId
+        : this::getTopicPOByFullQualifiedName;
   }
 
   private void fillTopicPOBuilderParentEntityId(TopicPO.Builder builder, Namespace namespace) {

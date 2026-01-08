@@ -28,10 +28,8 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 import java.util.stream.Collectors;
-import org.apache.gravitino.Configs;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.Entity.EntityType;
-import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
@@ -52,6 +50,7 @@ import org.apache.gravitino.storage.relational.po.TablePO;
 import org.apache.gravitino.storage.relational.utils.ExceptionUtils;
 import org.apache.gravitino.storage.relational.utils.POConverters;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
+import org.apache.gravitino.utils.CacheUtils;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
 
@@ -399,14 +398,14 @@ public class TableMetaService {
   }
 
   private Function<Namespace, List<TablePO>> tableListFetcher() {
-    return cacheEnabled() ? this::listTablePOsBySchemaId : this::listTablePOsByFullQualifiedName;
+    return CacheUtils.cacheEnabled()
+        ? this::listTablePOsBySchemaId
+        : this::listTablePOsByFullQualifiedName;
   }
 
   private Function<NameIdentifier, TablePO> tablePOFetcher() {
-    return cacheEnabled() ? this::getTablePOBySchemaId : this::getTablePOByFullQualifiedName;
-  }
-
-  private boolean cacheEnabled() {
-    return GravitinoEnv.getInstance().config().get(Configs.CACHE_ENABLED);
+    return CacheUtils.cacheEnabled()
+        ? this::getTablePOBySchemaId
+        : this::getTablePOByFullQualifiedName;
   }
 }

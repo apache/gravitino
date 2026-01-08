@@ -26,9 +26,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.function.Function;
 import java.util.stream.Collectors;
-import org.apache.gravitino.Configs;
 import org.apache.gravitino.Entity;
-import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
@@ -49,6 +47,7 @@ import org.apache.gravitino.storage.relational.po.FilesetPO;
 import org.apache.gravitino.storage.relational.utils.ExceptionUtils;
 import org.apache.gravitino.storage.relational.utils.POConverters;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
+import org.apache.gravitino.utils.CacheUtils;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
 import org.slf4j.Logger;
@@ -391,17 +390,15 @@ public class FilesetMetaService {
   }
 
   private Function<Namespace, List<FilesetPO>> filesetListFetcher() {
-    return cacheEnabled()
+    return CacheUtils.cacheEnabled()
         ? this::listFilesetPOsBySchemaId
         : this::listFilesetPOsByFullQualifiedName;
   }
 
   private Function<NameIdentifier, FilesetPO> filesetPOFetcher() {
-    return cacheEnabled() ? this::getFilesetPOBySchemaId : this::getFilesetPOByFullQualifiedName;
-  }
-
-  private boolean cacheEnabled() {
-    return GravitinoEnv.getInstance().config().get(Configs.CACHE_ENABLED);
+    return CacheUtils.cacheEnabled()
+        ? this::getFilesetPOBySchemaId
+        : this::getFilesetPOByFullQualifiedName;
   }
 
   private void fillFilesetPOBuilderParentEntityId(FilesetPO.Builder builder, Namespace namespace) {
