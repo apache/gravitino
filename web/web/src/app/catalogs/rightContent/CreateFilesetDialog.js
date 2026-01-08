@@ -141,9 +141,6 @@ export default function CreateFilesetDialog({ ...props }) {
     }
   }, [open, editFileset, metalake, catalog, schema])
 
-  // const { trigger: submitFileset, isMutating } = useCreateFilesetAsync()
-  // const { trigger: updateFileset, isMutating: isUpdateMutating } = useUpdateFilesetAsync()
-
   const handleSubmit = e => {
     e.preventDefault()
     form
@@ -185,7 +182,7 @@ export default function CreateFilesetDialog({ ...props }) {
         } else {
           await dispatch(createFileset({ data: submitData, metalake, catalog, catalogType, schema }))
         }
-        !editFileset && treeRef.current.onLoadData({ key: `${catalog}/${schema}`, nodeType: 'schema' })
+        treeRef.current.onLoadData({ key: `${catalog}/${schema}`, nodeType: 'schema' })
         setConfirmLoading(false)
         setOpen(false)
       })
@@ -250,7 +247,7 @@ export default function CreateFilesetDialog({ ...props }) {
                   label='Fileset Name'
                   rules={[{ required: true }, { type: 'string', max: 64 }, { pattern: new RegExp(nameRegex) }]}
                 >
-                  <Input data-refer='fileset-name-field' placeholder={mismatchName} disabled={!init} />
+                  <Input data-refer='fileset-name-field' placeholder={mismatchName} disabled={init} />
                 </Form.Item>
                 <Form.Item
                   name='type'

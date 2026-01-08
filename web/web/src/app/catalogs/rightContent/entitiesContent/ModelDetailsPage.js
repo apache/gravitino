@@ -491,6 +491,7 @@ export default function ModelDetailsPage({ ...props }) {
           catalog={catalog}
           schema={schema}
           editModel={model}
+          init={true}
         />
       )}
       {openOwner && (

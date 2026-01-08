@@ -377,7 +377,7 @@ export default function RegisterJobTemplateDialog({ ...props }) {
                                     <Form.Item
                                       {...restField}
                                       name={[name, 'configName']}
-                                      rules={[{ required: true, message: t('job.thConfigNameRequired') }]}
+                                      rules={[{ required: true, message: 'Please input config name!' }]}
                                       className='mb-0 w-full grow'
                                     >
                                       <Input placeholder='Config Name' />
@@ -385,7 +385,7 @@ export default function RegisterJobTemplateDialog({ ...props }) {
                                     <Form.Item
                                       {...restField}
                                       name={[name, 'configValue']}
-                                      rules={[{ required: true, message: t('job.thConfigValueRequired') }]}
+                                      rules={[{ required: true, message: 'Please input config value!' }]}
                                       className='mb-0 w-full grow'
                                     >
                                       <Input placeholder='Config Value' />

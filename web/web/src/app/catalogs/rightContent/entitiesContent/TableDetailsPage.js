@@ -205,12 +205,15 @@ export default function TableDetailsPage({ ...props }) {
   })
 
   const sortOrders = store.activatedDetails?.sortOrders?.map((i, index) => {
+    const fields =
+      i.sortTerm?.type === 'field' ? i.sortTerm.fieldName : i.sortTerm?.funcArgs.find(f => f.fieldName)?.fieldName
+
     return {
       key: index,
-      fields: i.sortTerm.fieldName,
+      fields: fields,
       dir: i.direction,
       no: i.nullOrdering,
-      text: `${i.sortTerm.fieldName[0]} ${i.direction} ${i.nullOrdering}`
+      text: `${fields[0]} ${i.direction} ${i.nullOrdering}`
     }
   })
 

@@ -28,6 +28,8 @@ import { useEffect, useState } from 'react'
 import OidcLogin from './components/OidcLogin'
 import DefaultLogin from './components/DefaultLogin'
 import { oauthProviderFactory } from '@/lib/auth/providers/factory'
+import { resetMetalakeStore } from '@/lib/store/metalakes'
+import { useAppDispatch } from '@/lib/hooks/useStore'
 
 const fonts = Roboto({ subsets: ['latin'], weight: ['400'], display: 'swap' })
 
@@ -35,6 +37,7 @@ const { Title } = Typography
 
 const LoginPage = () => {
   const [providerType, setProviderType] = useState(null)
+  const dispatch = useAppDispatch()
 
   useEffect(() => {
     const detectProviderType = async () => {
@@ -46,6 +49,7 @@ const LoginPage = () => {
       }
     }
 
+    dispatch(resetMetalakeStore())
     detectProviderType()
   }, [])
 

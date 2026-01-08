@@ -22,7 +22,7 @@
 import { useRouter } from 'next/navigation'
 import { useState, useEffect } from 'react'
 
-import { Box, IconButton } from '@mui/material'
+import { Box, IconButton, Tooltip } from '@mui/material'
 
 import Icon from '@/components/Icon'
 import { useAppDispatch, useAppSelector } from '@/lib/hooks/useStore'
@@ -34,6 +34,8 @@ const LogoutButton = () => {
   const dispatch = useAppDispatch()
   const authStore = useAppSelector(state => state.auth)
   const [showLogoutButton, setShowLogoutButton] = useState(false)
+  const authEnabled = authStore.anthEnable === true || authStore.anthEnable === 'true'
+  const userName = authStore.authUser?.name
 
   useEffect(() => {
     const checkAuthStatus = async () => {
@@ -68,10 +70,12 @@ const LogoutButton = () => {
 
   return (
     <Box>
-      {showLogoutButton ? (
-        <IconButton onClick={handleLogout}>
-          <Icon icon={'bx:exit'} />
-        </IconButton>
+      {(authEnabled && userName) || showLogoutButton ? (
+        <Tooltip title={userName || ''} disableHoverListener={!userName}>
+          <IconButton onClick={handleLogout}>
+            <Icon icon={'bx:exit'} />
+          </IconButton>
+        </Tooltip>
       ) : null}
     </Box>
   )

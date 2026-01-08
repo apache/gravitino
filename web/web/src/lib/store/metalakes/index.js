@@ -1757,7 +1757,31 @@ export const appMetalakesSlice = createSlice({
     setTableProps(state, action) {
       state.tableProps = action.payload
     },
-    resetMetalakeStore(state, action) {}
+    resetMetalakeStore(state, action) {
+      state.metalakes = []
+      state.filteredMetalakes = []
+      state.tableData = []
+      state.tableProps = []
+      state.catalogs = []
+      state.schemas = []
+      state.tables = []
+      state.columns = []
+      state.filesets = []
+      state.topics = []
+      state.models = []
+      state.versions = []
+      state.metalakeTree = []
+      state.loadedNodes = []
+      state.selectedNodes = []
+      state.expandedNodes = []
+      state.activatedDetails = null
+      state.activatedDetailsLoading = false
+      state.tableLoading = false
+      state.treeLoading = false
+      state.currentMetalakeOwner = null
+      state.currentEntityTags = []
+      state.currentEntityPolicies = []
+    }
   },
   extraReducers: builder => {
     builder.addCase(fetchMetalakes.fulfilled, (state, action) => {
