@@ -112,8 +112,15 @@ public class SetModelVersionProperty extends Command {
   @Override
   public Command validate() {
     validatePropertyAndValue(property, value);
-    if ((alias != null && version != null) || (alias == null && version == null))
-      throw new RuntimeException("Either alias or version must be provided, but not both.");
+
+    if (alias == null && version == null) {
+      throw new IllegalStateException("alias and version cannot be simultaneously null.");
+    }
+
+    if (alias != null && version != null) {
+      throw new IllegalStateException("alias and version cannot be simultaneously non-null.");
+    }
+
     return super.validate();
   }
 }
