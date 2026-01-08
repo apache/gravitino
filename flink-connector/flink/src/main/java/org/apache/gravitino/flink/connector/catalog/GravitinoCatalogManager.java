@@ -74,8 +74,10 @@ public class GravitinoCatalogManager {
                 authType, GravitinoCatalogStoreFactoryOptions.AUTH_TYPE));
       }
 
-      LOG.info("Flink security enabled: {}", UserGroupInformation.isSecurityEnabled());
-      LOG.info("Current user: {}", getUgi().getUserName());
+      LOG.info(
+          "Flink security enabled: {}, Current user: {}",
+          UserGroupInformation.isSecurityEnabled(),
+          getUgi().getUserName());
 
       if (UserGroupInformation.isSecurityEnabled()) {
         if (getUgi().getAuthenticationMethod()
