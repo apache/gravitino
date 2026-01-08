@@ -29,9 +29,10 @@ import org.apache.flink.table.catalog.hive.HiveCatalog;
 import org.apache.flink.table.catalog.hive.factories.HiveCatalogFactory;
 import org.apache.flink.table.catalog.hive.factories.HiveCatalogFactoryOptions;
 import org.apache.flink.table.factories.FactoryUtil;
+import org.apache.gravitino.flink.connector.CatalogPropertiesConverter;
 import org.apache.gravitino.flink.connector.DefaultPartitionConverter;
 import org.apache.gravitino.flink.connector.PartitionConverter;
-import org.apache.gravitino.flink.connector.PropertiesConverter;
+import org.apache.gravitino.flink.connector.SchemaAndTablePropertiesConverter;
 import org.apache.gravitino.flink.connector.catalog.BaseCatalogFactory;
 import org.apache.gravitino.flink.connector.utils.FactoryUtils;
 import org.apache.gravitino.flink.connector.utils.PropertyUtils;
@@ -64,7 +65,7 @@ public class GravitinoHiveCatalogFactory implements BaseCatalogFactory {
         context.getName(),
         helper.getOptions().get(HiveCatalogFactoryOptions.DEFAULT_DATABASE),
         context.getOptions(),
-        propertiesConverter(),
+        schemaAndTablePropertiesConverter(),
         partitionConverter(),
         hiveConf,
         helper.getOptions().get(HiveCatalogFactoryOptions.HIVE_VERSION));
@@ -108,13 +109,13 @@ public class GravitinoHiveCatalogFactory implements BaseCatalogFactory {
     return org.apache.gravitino.Catalog.Type.RELATIONAL;
   }
 
-  /**
-   * Define properties converter {@link PropertiesConverter}.
-   *
-   * @return The requested property converter.
-   */
   @Override
-  public PropertiesConverter propertiesConverter() {
+  public CatalogPropertiesConverter catalogPropertiesConverter() {
+    return HivePropertiesConverter.INSTANCE;
+  }
+
+  @Override
+  public SchemaAndTablePropertiesConverter schemaAndTablePropertiesConverter() {
     return HivePropertiesConverter.INSTANCE;
   }
 

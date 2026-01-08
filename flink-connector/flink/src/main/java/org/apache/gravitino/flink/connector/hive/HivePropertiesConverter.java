@@ -24,10 +24,12 @@ import java.util.Map;
 import java.util.stream.Collectors;
 import org.apache.flink.table.catalog.ObjectPath;
 import org.apache.gravitino.catalog.hive.HiveConstants;
-import org.apache.gravitino.flink.connector.PropertiesConverter;
+import org.apache.gravitino.flink.connector.CatalogPropertiesConverter;
+import org.apache.gravitino.flink.connector.SchemaAndTablePropertiesConverter;
 import org.apache.hadoop.hive.conf.HiveConf;
 
-public class HivePropertiesConverter implements PropertiesConverter {
+public class HivePropertiesConverter
+    implements CatalogPropertiesConverter, SchemaAndTablePropertiesConverter {
 
   private HivePropertiesConverter() {}
 

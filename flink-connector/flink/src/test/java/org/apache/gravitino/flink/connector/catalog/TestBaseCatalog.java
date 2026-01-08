@@ -34,7 +34,7 @@ import org.apache.flink.table.catalog.Column;
 import org.apache.flink.table.catalog.TableChange;
 import org.apache.gravitino.SchemaChange;
 import org.apache.gravitino.flink.connector.PartitionConverter;
-import org.apache.gravitino.flink.connector.PropertiesConverter;
+import org.apache.gravitino.flink.connector.SchemaAndTablePropertiesConverter;
 import org.apache.gravitino.rel.types.Types;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -142,7 +142,7 @@ public class TestBaseCatalog {
           "test",
           Collections.emptyMap(),
           "default",
-          Mockito.mock(PropertiesConverter.class),
+          Mockito.mock(SchemaAndTablePropertiesConverter.class),
           Mockito.mock(PartitionConverter.class));
       this.delegate = delegate;
     }

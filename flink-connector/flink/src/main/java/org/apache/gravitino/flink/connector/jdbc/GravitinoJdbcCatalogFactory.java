@@ -49,7 +49,7 @@ public abstract class GravitinoJdbcCatalogFactory implements BaseCatalogFactory 
         defaultDatabase != null,
         GravitinoJdbcCatalogFactoryOptions.DEFAULT_DATABASE.key() + " should not be null.");
     return new GravitinoJdbcCatalog(
-        context, defaultDatabase, propertiesConverter(), partitionConverter());
+        context, defaultDatabase, schemaAndTablePropertiesConverter(), partitionConverter());
   }
 
   @Override
