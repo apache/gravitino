@@ -288,8 +288,7 @@ public class LanceTableOperations extends ManagedTableOperations {
   }
 
   // Note: this method can't guarantee the atomicity of the operations on Lance dataset. For
-  // example,
-  // Only a subset of changes may be applied if an exception occurs during the process.
+  // example, only a subset of changes may be applied if an exception occurs during the process.
   private void handleLanceTableChange(Table table, TableChange[] changes) {
     List<String> dropColumns = Lists.newArrayList();
     List<Index> indexToAdd = Lists.newArrayList();
