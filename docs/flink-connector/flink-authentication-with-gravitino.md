@@ -39,7 +39,7 @@ table.catalog-store.gravitino.gravitino.metalake: my_metalake
 table.catalog-store.gravitino.gravitino.client.auth.type: oauth2
 table.catalog-store.gravitino.gravitino.client.oauth2.serverUri: https://oauth-server.example.com
 table.catalog-store.gravitino.gravitino.client.oauth2.tokenPath: /oauth/token
-table.catalog-store.gravitino.gravitino.client.oauth2.credential: your-client-credentials
+table.catalog-store.gravitino.gravitino.client.oauth2.credential: client-id:client-secret
 table.catalog-store.gravitino.gravitino.client.oauth2.scope: your-scope
 ```
 
