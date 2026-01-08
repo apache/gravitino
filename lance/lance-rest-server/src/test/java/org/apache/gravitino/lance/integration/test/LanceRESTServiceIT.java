@@ -600,7 +600,6 @@ public class LanceRESTServiceIT extends BaseIT {
 
     // Now try to drop columns in the table
     AlterTableDropColumnsRequest dropColumnsRequest = new AlterTableDropColumnsRequest();
-    List.of(ids);
     dropColumnsRequest.setId(List.of(CATALOG_NAME, SCHEMA_NAME, "table"));
     dropColumnsRequest.setColumns(List.of("value"));
 

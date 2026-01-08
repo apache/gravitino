@@ -380,10 +380,10 @@ public class GravitinoLanceTableOperations implements LanceTableOperations {
     List<TableChange> changes = new ArrayList<>();
     for (ColumnAlteration column : columns) {
       // Column name will not be null according to LanceDB spec.
-      String columName = column.getColumn();
+      String columnName = column.getColumn();
       String newName = column.getRename();
       if (StringUtils.isNotBlank(newName)) {
-        changes.add(TableChange.renameColumn(new String[] {columName}, newName));
+        changes.add(TableChange.renameColumn(new String[] {columnName}, newName));
       }
 
       // The format of ColumnAlteration#castTo is unclear, so we will skip it now
@@ -391,7 +391,7 @@ public class GravitinoLanceTableOperations implements LanceTableOperations {
       // https://github.com/lance-format/lance-namespace/blob/9d9cde12520caea2fd80ea5f41a20a4db9b92524/java/lance-namespace-apache-client/api/openapi.yaml#L4508-L4511
       if (StringUtils.isNotBlank(column.getCastTo())) {
         LOGGER.error(
-            "Altering column '{}' data type is not supported yet due to unclear spec.", columName);
+            "Altering column '{}' data type is not supported yet due to unclear spec.", columnName);
         throw new UnsupportedOperationException("Altering column data type is not supported yet.");
       }
     }

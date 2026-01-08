@@ -164,7 +164,7 @@ public class LanceTableOperations extends ManagedTableOperations {
 
     Table loadedTable = super.loadTable(ident);
     handleLanceTableChange(loadedTable, changes);
-    // After adding the index to the Lance dataset, we need to update the table metadata in
+    // After making changes to the Lance dataset, we need to update the table metadata in
     // Gravitino. If there's any failure during this process, the code will throw an exception
     // and the update won't be applied in Gravitino.
     return super.alterTable(ident, changes);
@@ -287,6 +287,9 @@ public class LanceTableOperations extends ManagedTableOperations {
     return new org.apache.arrow.vector.types.pojo.Schema(fields);
   }
 
+  // Note: this method can't guarantee the atomicity of the operations on Lance dataset. For
+  // example,
+  // Only a subset of changes may be applied if an exception occurs during the process.
   private void handleLanceTableChange(Table table, TableChange[] changes) {
     List<String> dropColumns = Lists.newArrayList();
     List<Index> indexToAdd = Lists.newArrayList();
@@ -304,6 +307,8 @@ public class LanceTableOperations extends ManagedTableOperations {
                 .build());
       } else if (change instanceof TableChange.RenameColumn renameColumn) {
         // Currently, only renaming columns is supported.
+        // TODO: Support change column type once we have a clear knowledge about the means of
+        // castTo in Lance.
         ColumnAlteration lanceColumnAlter =
             new ColumnAlteration.Builder(renameColumn.fieldName()[0])
                 .rename(renameColumn.getNewName())
@@ -311,7 +316,7 @@ public class LanceTableOperations extends ManagedTableOperations {
         renameColumns.add(lanceColumnAlter);
       } else {
         throw new UnsupportedOperationException(
-            "LanceTableOperations only supports adding indexes currently.");
+            "Unsupported changes to lance table: " + change.getClass().getSimpleName());
       }
     }
 

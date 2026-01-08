@@ -323,7 +323,6 @@ public class LanceTableOperations {
   }
 
   private void validateAlterColumnsRequest(AlterTableAlterColumnsRequest request) {
-    request.getAlterations();
     Preconditions.checkArgument(
         !request.getAlterations().isEmpty(), "Columns to alter cannot be empty.");
   }
