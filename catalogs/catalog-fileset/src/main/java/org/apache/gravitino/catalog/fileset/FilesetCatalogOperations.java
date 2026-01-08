@@ -145,6 +145,9 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
   private FilesetCatalogMetricsSource catalogMetricsSource;
 
   @VisibleForTesting ScheduledThreadPoolExecutor scheduler;
+
+  // TODO: Move the file system cache to the module of hadoop-common and reuse it in the
+  // BaseGVFSOperations
   @VisibleForTesting Cache<FileSystemCacheKey, FileSystem> fileSystemCache;
 
   private final ThreadPoolExecutor fileSystemExecutor =
@@ -171,15 +174,18 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
   static class FileSystemCacheKey {
     // When the path is a path without scheme such as 'file','hdfs', etc., then the scheme and
     // authority are both null
+
+    // NOTE: The filesystem cache key contains the schema, authority and current user.
+    // Changed the configuration of the same filesystem. will not be effected by the cached
+    // filesystem.
+
     @Nullable private final String scheme;
     @Nullable private final String authority;
-    @Nullable private String locationName;
     private final String currentUser;
 
-    FileSystemCacheKey(String scheme, String authority, String locationName) {
+    FileSystemCacheKey(String scheme, String authority) {
       this.scheme = scheme;
       this.authority = authority;
-      this.locationName = locationName;
       this.currentUser = PrincipalUtils.getCurrentUserName();
     }
 
@@ -194,7 +200,6 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
       FileSystemCacheKey that = (FileSystemCacheKey) o;
       return Objects.equals(scheme, that.scheme)
           && Objects.equals(authority, that.authority)
-          && Objects.equals(locationName, that.locationName)
           && Objects.equals(currentUser, that.currentUser);
     }
 
@@ -202,7 +207,6 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
     public int hashCode() {
       int result = 31 * (scheme == null ? 0 : scheme.hashCode());
       result = 31 * result + (authority == null ? 0 : authority.hashCode());
-      result = 31 * result + (locationName == null ? 0 : locationName.hashCode());
       result = 31 * result + currentUser.hashCode();
       return result;
     }
@@ -354,11 +358,11 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
     Path actualPathObj = new Path(actualPath);
     Map<String, String> fsConf =
         mergeUpLevelConfigurations(filesetIdent, fileset.properties(), actualPathObj);
-    FileSystem fileSystem = getFileSystemWithCache(locationName, actualPathObj, fsConf);
+    FileSystem fileSystem = getFileSystemWithCache(actualPathObj, fsConf);
     Path formalizedPath =
         new Path(actualPath).makeQualified(fileSystem.getUri(), fileSystem.getWorkingDirectory());
 
-    FileSystem fs = getFileSystemWithCache(locationName, formalizedPath, fsConf);
+    FileSystem fs = getFileSystemWithCache(formalizedPath, fsConf);
     if (!fs.exists(formalizedPath)) {
       throw new IllegalArgumentException(
           String.format(
@@ -483,12 +487,12 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
         for (Map.Entry<String, Path> entry : filesetPaths.entrySet()) {
           Map<String, String> fsConf =
               mergeUpLevelConfigurations(ident, properties, entry.getValue());
-          FileSystem tmpFs = getFileSystemWithCache(entry.getKey(), entry.getValue(), fsConf);
+          FileSystem tmpFs = getFileSystemWithCache(entry.getValue(), fsConf);
           Path formalizePath =
               entry.getValue().makeQualified(tmpFs.getUri(), tmpFs.getWorkingDirectory());
 
           filesetPathsBuilder.put(entry.getKey(), formalizePath);
-          FileSystem fs = getFileSystemWithCache(entry.getKey(), formalizePath, fsConf);
+          FileSystem fs = getFileSystemWithCache(formalizePath, fsConf);
 
           if (fs.exists(formalizePath) && fs.getFileStatus(formalizePath).isFile()) {
             throw new IllegalArgumentException(
@@ -667,7 +671,7 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
               try {
                 Map<String, String> fsConf =
                     mergeUpLevelConfigurations(ident, filesetEntity.properties(), location);
-                FileSystem fs = getFileSystemWithCache(locationName, location, fsConf);
+                FileSystem fs = getFileSystemWithCache(location, fsConf);
                 if (fs.exists(location)) {
                   if (!fs.delete(location, true)) {
                     LOG.warn(
@@ -737,7 +741,7 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
             try {
               Map<String, String> fsConf =
                   mergeUpLevelConfigurations(ident, properties, schemaPath);
-              FileSystem fs = getFileSystemWithCache(locationName, schemaPath, fsConf);
+              FileSystem fs = getFileSystemWithCache(schemaPath, fsConf);
               if (fs.exists(schemaPath) && fs.getFileStatus(schemaPath).isFile()) {
                 throw new IllegalArgumentException(
                     "Fileset schema location cannot be a file: "
@@ -851,8 +855,7 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
                               Path filesetPath = new Path(location);
                               Map<String, String> fsConf =
                                   mergeUpLevelConfigurations(ident, f.properties(), filesetPath);
-                              FileSystem fs =
-                                  getFileSystemWithCache(locationName, filesetPath, fsConf);
+                              FileSystem fs = getFileSystemWithCache(filesetPath, fsConf);
                               if (fs.exists(filesetPath)) {
                                 if (!fs.delete(filesetPath, true)) {
                                   LOG.warn(
@@ -884,7 +887,7 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
               try {
                 Map<String, String> fsConf =
                     mergeUpLevelConfigurations(ident, schemaEntity.properties(), schemaPath);
-                FileSystem fs = getFileSystemWithCache(locationName, schemaPath, fsConf);
+                FileSystem fs = getFileSystemWithCache(schemaPath, fsConf);
                 if (fs.exists(schemaPath)) {
                   FileStatus[] statuses = fs.listStatus(schemaPath);
                   if (statuses.length == 0) {
@@ -1059,7 +1062,7 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
                       path.toUri(),
                       conf,
                       FilesetCatalogPropertiesMetadata.FS_GRAVITINO_PATH_CONFIG_PREFIX));
-              FileSystem fs = getFileSystemWithCache(locationName, path, fsConf);
+              FileSystem fs = getFileSystemWithCache(path, fsConf);
               try {
                 if (fs.exists(path) && fs.getFileStatus(path).isFile()) {
                   throw new IllegalArgumentException(
@@ -1323,23 +1326,19 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
   }
 
   @VisibleForTesting
-  FileSystem getFileSystemWithCache(String locationName, Path path, Map<String, String> conf) {
+  FileSystem getFileSystemWithCache(Path path, Map<String, String> conf) {
     String scheme = path.toUri().getScheme();
     FileSystemProvider provider = fileSystemProvidersMap.get(scheme);
     String authority =
         provider != null ? provider.getFullAuthority(path, conf) : path.toUri().getAuthority();
     return fileSystemCache.get(
-        new FileSystemCacheKey(scheme, authority, locationName),
+        new FileSystemCacheKey(scheme, authority),
         cacheKey -> {
           try {
             return getFileSystem(path, conf);
           } catch (IOException e) {
             throw new GravitinoRuntimeException(
-                e,
-                "Failed to get FileSystem for fileset: location name: %s, path: %s, conf: %s",
-                locationName,
-                path,
-                conf);
+                e, "Failed to get FileSystem for fileset: path: %s, conf: %s", path, conf);
           }
         });
   }

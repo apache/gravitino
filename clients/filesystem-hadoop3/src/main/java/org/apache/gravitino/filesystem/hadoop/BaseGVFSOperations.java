@@ -153,7 +153,6 @@ public abstract class BaseGVFSOperations implements Closeable {
      *
      * @param scheme the scheme of the filesystem
      * @param authority the authority of the filesystem
-     * @param ugi the user group information
      */
     FileSystemCacheKey(String scheme, String authority, UserGroupInformation ugi) {
       this.scheme = scheme;
@@ -804,8 +803,16 @@ public abstract class BaseGVFSOperations implements Closeable {
 
     FileSystemProvider provider = getFileSystemProviderByScheme(scheme);
     String authority = provider.getFullAuthority(actualFilePath, allProperties);
+    UserGroupInformation ugi;
+    try {
+
+      ugi = UserGroupInformation.getCurrentUser();
+    } catch (IOException e) {
+      throw new GravitinoRuntimeException(
+          e, "Cannot get current user for path: %s", actualFilePath);
+    }
     return fileSystemCache.get(
-        new FileSystemCacheKey(scheme, authority, null),
+        new FileSystemCacheKey(scheme, authority, ugi),
         cacheKey -> {
           try {
 
