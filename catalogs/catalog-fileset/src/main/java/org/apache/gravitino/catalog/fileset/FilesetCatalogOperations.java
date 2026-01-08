@@ -1378,7 +1378,8 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
                     config, FilesetCatalogPropertiesMetadata.FILESYSTEM_CONNECTION_TIMEOUT_SECONDS);
 
     Future<FileSystem> fileSystemFuture =
-        fileSystemExecutor.submit(() -> provider.getFileSystem(path, config));
+        fileSystemExecutor.submit(
+            () -> provider.getFileSystem(path, config, PrincipalUtils::getCurrentUserName));
 
     try {
       return fileSystemFuture.get(timeoutSeconds, TimeUnit.SECONDS);

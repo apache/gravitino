@@ -42,13 +42,14 @@ public class HDFSFileSystemProvider implements FileSystemProvider {
   public static final String SCHEME_HDFS = "hdfs";
 
   @Override
-  public FileSystem getFileSystem(@Nonnull Path path, @Nonnull Map<String, String> config)
+  public FileSystem getFileSystem(
+      @Nonnull Path path, @Nonnull Map<String, String> config, ProxyUserHandler handler)
       throws IOException {
     Map<String, String> hadoopConfMap = additionalHDFSConfig(config);
     Configuration configuration =
         FileSystemUtils.createConfiguration(GRAVITINO_BYPASS, hadoopConfMap);
 
-    HDFSFileSystemProxy proxy = new HDFSFileSystemProxy(path, configuration, config);
+    HDFSFileSystemProxy proxy = new HDFSFileSystemProxy(path, configuration, config, handler);
     return proxy.getProxy();
   }
 

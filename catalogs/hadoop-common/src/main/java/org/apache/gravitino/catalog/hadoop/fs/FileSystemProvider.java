@@ -62,8 +62,26 @@ public interface FileSystemProvider {
    * @return The FileSystem instance.
    * @throws IOException If the FileSystem instance cannot be created.
    */
-  FileSystem getFileSystem(@Nonnull Path path, @Nonnull Map<String, String> config)
-      throws IOException;
+  default FileSystem getFileSystem(@Nonnull Path path, @Nonnull Map<String, String> config)
+      throws IOException {
+    return getFileSystem(path, config, null);
+  }
+
+  /**
+   * Get the FileSystem instance according to the configuration map , file path and proxy user
+   * handler.
+   *
+   * @param config The configuration for the FileSystem instance.
+   * @param path The path to the file system.
+   * @param proxyUserHandler The handler to get the proxy user if needed.
+   * @return The FileSystem instance.
+   * @throws IOException If the FileSystem instance cannot be created.
+   */
+  default FileSystem getFileSystem(
+      @Nonnull Path path, @Nonnull Map<String, String> config, ProxyUserHandler proxyUserHandler)
+      throws IOException {
+    return getFileSystem(path, config);
+  }
 
   /**
    * Scheme of this FileSystem provider. The value is 'file' for LocalFileSystem, 'hdfs' for HDFS,
@@ -90,5 +108,9 @@ public interface FileSystemProvider {
    */
   default String getFullAuthority(Path path, Map<String, String> conf) {
     return path.toUri().getAuthority();
+  }
+
+  interface ProxyUserHandler {
+    String getProxyUser();
   }
 }

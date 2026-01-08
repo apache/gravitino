@@ -26,15 +26,12 @@ import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.HADOOP_SECURITY
 import java.io.File;
 import java.io.IOException;
 import java.lang.reflect.Method;
-import java.security.Principal;
 import java.security.PrivilegedExceptionAction;
 import java.util.Locale;
 import java.util.Map;
-import javax.security.auth.Subject;
 import net.sf.cglib.proxy.Enhancer;
 import net.sf.cglib.proxy.MethodInterceptor;
 import net.sf.cglib.proxy.MethodProxy;
-import org.apache.gravitino.UserPrincipal;
 import org.apache.gravitino.catalog.hadoop.fs.kerberos.AuthenticationConfig;
 import org.apache.gravitino.catalog.hadoop.fs.kerberos.KerberosClient;
 import org.apache.gravitino.exceptions.GravitinoRuntimeException;
@@ -58,6 +55,7 @@ public class HDFSFileSystemProxy implements MethodInterceptor {
   private final Configuration configuration;
   private final boolean impersonationEnabled;
   private String kerberosRealm;
+  private FileSystemProvider.ProxyUserHandler proxyUserHandler;
 
   /**
    * Create a HDFSAuthenticationFileSystem with the given path and configuration. Supports both
@@ -67,11 +65,16 @@ public class HDFSFileSystemProxy implements MethodInterceptor {
    * @param conf the Hadoop configuration
    * @param config the configuration map of Gravitino
    */
-  public HDFSFileSystemProxy(Path path, Configuration conf, Map<String, String> config) {
+  public HDFSFileSystemProxy(
+      Path path,
+      Configuration conf,
+      Map<String, String> config,
+      FileSystemProvider.ProxyUserHandler handler) {
     try {
       conf.setBoolean(FS_DISABLE_CACHE, true);
       conf.setBoolean(IPC_FALLBACK_TO_SIMPLE_AUTH_ALLOWED, true);
       this.configuration = conf;
+      this.proxyUserHandler = handler;
 
       AuthenticationConfig authenticationConfig = new AuthenticationConfig(config, configuration);
       this.impersonationEnabled = authenticationConfig.isImpersonationEnabled();
@@ -136,33 +139,19 @@ public class HDFSFileSystemProxy implements MethodInterceptor {
     }
   }
 
-  @SuppressWarnings("removal")
-  public static Principal getCurrentPrincipal() {
-    java.security.AccessControlContext context = java.security.AccessController.getContext();
-    Subject subject = Subject.getSubject(context);
-    if (subject == null || subject.getPrincipals(UserPrincipal.class).isEmpty()) {
-      return null;
-    }
-    return subject.getPrincipals(UserPrincipal.class).iterator().next();
-  }
-
-  private UserGroupInformation getHadoopUser() throws Exception {
-    UserGroupInformation currentUgi;
+  private UserGroupInformation getHadoopUser() {
+    UserGroupInformation currentUgi = initUgi;
     if (impersonationEnabled) {
-      Principal principal = getCurrentPrincipal();
-      if (principal != null) {
-        String proxyUserName = getCurrentPrincipal().getName();
+      if (proxyUserHandler != null) {
+        String proxyUserName = proxyUserHandler.getProxyUser();
         if (!proxyUserName.contains("@")) {
           proxyUserName = String.format("%s@%s", proxyUserName, kerberosRealm);
         }
         currentUgi = UserGroupInformation.createProxyUser(proxyUserName, initUgi);
-        LOG.info("Kerberos impersonation enabled. Proxy user: {}", proxyUserName);
-      } else {
-        currentUgi = initUgi;
+        LOG.debug("Using login user with impersonation: {}", initUgi.getUserName());
       }
     } else {
-      currentUgi = initUgi;
-      LOG.info("Using login user without impersonation: {}", initUgi.getUserName());
+      LOG.debug("Using login user without impersonation: {}", initUgi.getUserName());
     }
     return currentUgi;
   }
