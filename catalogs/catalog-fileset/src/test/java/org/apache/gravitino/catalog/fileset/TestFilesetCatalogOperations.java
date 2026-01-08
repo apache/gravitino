@@ -1892,7 +1892,8 @@ public class TestFilesetCatalogOperations {
     try (FilesetCatalogOperations filesetCatalogOperations = new FilesetCatalogOperations()) {
       LocalFileSystemProvider localFileSystemProvider = Mockito.mock(LocalFileSystemProvider.class);
       when(localFileSystemProvider.scheme()).thenReturn("file");
-      when(localFileSystemProvider.getFileSystem(Mockito.any(Path.class), Mockito.anyMap()))
+      when(localFileSystemProvider.getFileSystem(
+              Mockito.any(Path.class), Mockito.anyMap(), Mockito.any()))
           .thenAnswer(
               invocation -> {
                 // Block 100s, however, the timeout is set to 6s by default in
@@ -1913,9 +1914,14 @@ public class TestFilesetCatalogOperations {
       Exception e =
           Assertions.assertThrows(
               IOException.class,
-              () ->
+              () -> {
+                try {
                   filesetCatalogOperations.getFileSystem(
-                      new Path("file:///tmp"), ImmutableMap.of()));
+                      new Path("file:///tmp"), ImmutableMap.of());
+                } catch (Exception xe) {
+                  throw xe;
+                }
+              });
 
       Assertions.assertTrue(e.getMessage().contains("Failed to get FileSystem for path"));
     }
