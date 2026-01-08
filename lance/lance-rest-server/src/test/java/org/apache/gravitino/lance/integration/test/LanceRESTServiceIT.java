@@ -77,6 +77,8 @@ import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.integration.test.util.BaseIT;
 import org.apache.gravitino.integration.test.util.GravitinoITUtils;
 import org.apache.gravitino.lance.common.utils.ArrowUtils;
+import org.apache.gravitino.lance.common.utils.LanceConstants;
+import org.apache.gravitino.rel.Table;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
@@ -433,6 +435,9 @@ public class LanceRESTServiceIT extends BaseIT {
     DescribeTableResponse loadTable = ns.describeTable(describeTableRequest);
     Assertions.assertNotNull(loadTable);
     Assertions.assertEquals(location, loadTable.getLocation());
+    Assertions.assertEquals(
+        "true", loadTable.getProperties().get(LanceConstants.LANCE_TABLE_CREATE_EMPTY));
+    Assertions.assertEquals("true", loadTable.getProperties().get(Table.PROPERTY_EXTERNAL));
 
     // Try to create the same table again should fail
     LanceNamespaceException exception =
