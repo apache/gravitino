@@ -25,7 +25,7 @@ import org.apache.flink.table.catalog.AbstractCatalog;
 import org.apache.flink.table.catalog.hive.HiveCatalog;
 import org.apache.flink.table.factories.Factory;
 import org.apache.gravitino.flink.connector.PartitionConverter;
-import org.apache.gravitino.flink.connector.PropertiesConverter;
+import org.apache.gravitino.flink.connector.SchemaAndTablePropertiesConverter;
 import org.apache.gravitino.flink.connector.catalog.BaseCatalog;
 import org.apache.hadoop.hive.conf.HiveConf;
 
@@ -41,11 +41,16 @@ public class GravitinoHiveCatalog extends BaseCatalog {
       String catalogName,
       String defaultDatabase,
       Map<String, String> catalogOptions,
-      PropertiesConverter propertiesConverter,
+      SchemaAndTablePropertiesConverter schemaAndTablePropertiesConverter,
       PartitionConverter partitionConverter,
       @Nullable HiveConf hiveConf,
       @Nullable String hiveVersion) {
-    super(catalogName, catalogOptions, defaultDatabase, propertiesConverter, partitionConverter);
+    super(
+        catalogName,
+        catalogOptions,
+        defaultDatabase,
+        schemaAndTablePropertiesConverter,
+        partitionConverter);
     this.hiveCatalog = new HiveCatalog(catalogName, defaultDatabase, hiveConf, hiveVersion);
   }
 

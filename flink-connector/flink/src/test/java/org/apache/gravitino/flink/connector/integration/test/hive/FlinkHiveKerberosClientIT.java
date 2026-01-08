@@ -39,7 +39,7 @@ import org.apache.flink.table.catalog.hive.factories.HiveCatalogFactoryOptions;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.auth.AuthenticatorType;
 import org.apache.gravitino.catalog.hive.HiveConstants;
-import org.apache.gravitino.flink.connector.PropertiesConverter;
+import org.apache.gravitino.flink.connector.CatalogPropertiesConverter;
 import org.apache.gravitino.flink.connector.hive.GravitinoHiveCatalog;
 import org.apache.gravitino.flink.connector.hive.GravitinoHiveCatalogFactoryOptions;
 import org.apache.gravitino.flink.connector.integration.test.FlinkEnvIT;
@@ -190,7 +190,7 @@ public class FlinkHiveKerberosClientIT extends FlinkEnvIT {
     // Verify Flink-specific properties are stored correctly
     Map<String, String> flinkProperties =
         properties.entrySet().stream()
-            .filter(e -> e.getKey().startsWith(PropertiesConverter.FLINK_PROPERTY_PREFIX))
+            .filter(e -> e.getKey().startsWith(CatalogPropertiesConverter.FLINK_PROPERTY_PREFIX))
             .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
     Assertions.assertEquals(2, flinkProperties.size());
     Assertions.assertEquals(
