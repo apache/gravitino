@@ -227,8 +227,7 @@ public class CatalogIT extends BaseIT {
         Assertions.assertThrows(
             CatalogNotInUseException.class,
             () -> metalake.alterCatalog(catalogName, CatalogChange.updateComment("new comment")));
-    Assertions.assertTrue(
-        exception.getMessage().contains("please enable it first"), exception.getMessage());
+    Assertions.assertTrue(exception.getMessage().contains("is not in use"), exception.getMessage());
 
     // test schema operations under non-in-use catalog
     SupportsSchemas schemaOps = loadedCatalog.asSchemas();
