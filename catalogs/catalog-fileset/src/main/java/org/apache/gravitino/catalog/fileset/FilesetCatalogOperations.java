@@ -176,7 +176,7 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
     // authority are both null
 
     // NOTE: The filesystem cache key contains the schema, authority and current user.
-    // Changed the configuration of the same filesystem. will not be effected by the cached
+    // Changed the configuration of the same fileset. will not be effected by the cached
     // filesystem.
 
     @Nullable private final String scheme;
