@@ -334,9 +334,15 @@ public class GravitinoLanceTableOperations implements LanceTableOperations {
         NameIdentifier.of(nsId.levelAtListPos(1), nsId.levelAtListPos(2));
 
     List<TableChange> changes = buildAlterColumnChanges(request);
+    if (changes.isEmpty()) {
+      LOGGER.warn("No valid alterations found in the request for table: {}", tableId);
+      throw new IllegalArgumentException("No valid alterations found in the request.");
+    }
     catalog.asTableCatalog().alterTable(tableIdentifier, changes.toArray(new TableChange[0]));
 
-    return new AlterTableAlterColumnsResponse();
+    AlterTableAlterColumnsResponse response = new AlterTableAlterColumnsResponse();
+    response.setVersion(0L);
+    return response;
   }
 
   @Override
