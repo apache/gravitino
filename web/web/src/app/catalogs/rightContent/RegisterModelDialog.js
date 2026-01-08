@@ -191,7 +191,7 @@ export default function RegisterModelDialog({ ...props }) {
                   label='Model Name'
                   rules={[{ required: true }, { type: 'string', max: 64 }, { pattern: new RegExp(nameRegex) }]}
                 >
-                  <Input placeholder={mismatchName} disabled={!init} />
+                  <Input placeholder={mismatchName} disabled={init} />
                 </Form.Item>
                 <Form.Item name='comment' label='Comment'>
                   <TextArea />

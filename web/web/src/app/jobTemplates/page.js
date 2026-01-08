@@ -120,7 +120,7 @@ export default function JobTemplatesPage() {
     }
 
     modal.confirm({
-      title: `Are you sure to cancel the Job Template ${jobTemplateName}?`,
+      title: `Are you sure to cancel the Job Template ${jobTemplate}?`,
       icon: <ExclamationCircleFilled />,
       content: (
         <NameContext.Consumer>
@@ -128,7 +128,7 @@ export default function JobTemplatesPage() {
             <ConfirmInput
               name={name}
               type={type}
-              confirmTips={`Please enter \"${jobTemplateName}\" to confirm deletion!`}
+              confirmTips={`Please enter \"${jobTemplate}\" to confirm deletion!`}
               notMatchTips={`The entered name does not match the job template name`}
               setConfirmInput={setConfirmInput}
               registerValidate={registerValidate}

@@ -375,7 +375,7 @@ export default function CreateTableDialog({ ...props }) {
                   default:
                     form.setFieldValue(
                       ['columns', key, 'typeObj', 'type'],
-                      capitalizeFirstLetter(table.columns[key].type)
+                      capitalizeFirstLetter(table.columns[key].type?.type)
                     )
                 }
               }
@@ -397,6 +397,7 @@ export default function CreateTableDialog({ ...props }) {
                 const fields = item.fieldName || item.fieldNames.map(f => f[0])
                 form.setFieldValue(['partitions', idxPartiton, 'strategy'], item.strategy)
                 form.setFieldValue(['partitions', idxPartiton, 'fieldName'], fields)
+                form.setFieldValue(['partitions', idxPartiton, 'number'], item.width || item.number)
                 idxPartiton++
               })
             }
@@ -405,11 +406,17 @@ export default function CreateTableDialog({ ...props }) {
               table.sortOrders.forEach(item => {
                 const strategy = item.sortTerm?.type === 'field' ? 'field' : item.sortTerm?.funcName
 
+                const number =
+                  item.sortTerm?.type === 'function'
+                    ? item.sortTerm?.funcArgs.find(f => f.type === 'literal')?.value
+                    : undefined
+
                 const fieldName =
                   item.sortTerm?.type === 'field'
                     ? item.sortTerm.fieldName[0]
                     : item.sortTerm?.funcArgs.find(f => f.fieldName)?.fieldName[0]
                 form.setFieldValue(['sortOrders', idxSortOrder, 'strategy'], strategy)
+                form.setFieldValue(['sortOrders', idxSortOrder, 'number'], number)
                 form.setFieldValue(['sortOrders', idxSortOrder, 'fieldName'], fieldName)
                 form.setFieldValue(['sortOrders', idxSortOrder, 'direction'], item.direction)
                 form.setFieldValue(['sortOrders', idxSortOrder, 'nullOrdering'], item.nullOrdering)

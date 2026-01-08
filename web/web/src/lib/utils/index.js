@@ -159,8 +159,8 @@ export const genUpdates = (originalData, newData, disableUpdate = false) => {
         })
       }
       if (
-        getColumnType(originalColumnsMap[key].type) !== getColumnType(newColumnsMap[key].type) ||
-        (ColumnSpesicalType.includes(getColumnType(newColumnsMap[key].type)) && !disableUpdate)
+        getColumnType(originalColumnsMap[key].type) !== getColumnType(newColumnsMap[key].type).toLowerCase() ||
+        (ColumnSpesicalType.includes(getColumnType(newColumnsMap[key].type).toLowerCase()) && !disableUpdate)
       ) {
         updates.push({
           '@type': 'updateColumnType',

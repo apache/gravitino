@@ -64,7 +64,7 @@ function DefaultLogin() {
       {store.authType === 'simple' && store.anthEnable ? (
         <>
           <Form.Item label='Username' name='username' rules={[{ required: true, message: 'Username is required' }]}>
-            <Input placeholder='' />
+            <Input placeholder='Please enter your username' />
           </Form.Item>
         </>
       ) : (

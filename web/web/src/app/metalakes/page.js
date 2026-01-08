@@ -378,7 +378,7 @@ const MetalakeList = () => {
               placeholder='Search...'
               onChange={onSearchTable}
             />
-            {([...(serviceAdmins || '').split(',')].includes(authUser?.name) || !authUser) && (
+            {([...(serviceAdmins || '').split(',')].includes(authUser?.name) || !anthEnable) && (
               <Button
                 data-refer='create-metalake-btn'
                 type='primary'
