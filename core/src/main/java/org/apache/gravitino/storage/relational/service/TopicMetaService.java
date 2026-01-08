@@ -45,7 +45,6 @@ import org.apache.gravitino.storage.relational.po.TopicPO;
 import org.apache.gravitino.storage.relational.utils.ExceptionUtils;
 import org.apache.gravitino.storage.relational.utils.POConverters;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
-import org.apache.gravitino.utils.CacheUtils;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
 
@@ -223,13 +222,13 @@ public class TopicMetaService {
   }
 
   private Function<Namespace, List<TopicPO>> topicListFetcher() {
-    return CacheUtils.cacheEnabled()
+    return GravitinoEnv.getInstance().cacheEnabled()
         ? this::listTopicPOsBySchemaId
         : this::listTopicPOsByFullQualifiedName;
   }
 
   private Function<NameIdentifier, TopicPO> topicPOFetcher() {
-    return CacheUtils.cacheEnabled()
+    return GravitinoEnv.getInstance().cacheEnabled()
         ? this::getTopicPOBySchemaId
         : this::getTopicPOByFullQualifiedName;
   }

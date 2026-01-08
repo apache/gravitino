@@ -60,7 +60,6 @@ import org.apache.gravitino.storage.relational.po.SchemaPO;
 import org.apache.gravitino.storage.relational.utils.ExceptionUtils;
 import org.apache.gravitino.storage.relational.utils.POConverters;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
-import org.apache.gravitino.utils.CacheUtils;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
 
@@ -454,13 +453,13 @@ public class SchemaMetaService {
   private Function<Namespace, List<SchemaPO>> schemaListFetcher() {
     // If cache is enabled, we can use catalog id to fetch schemas faster or else use full qualified
     // name to join several tables to get the schema list.
-    return CacheUtils.cacheEnabled()
+    return GravitinoEnv.getInstance().cacheEnabled()
         ? this::listSchemaPOsByCatalogId
         : this::listSchemaPOsByFullQualifiedName;
   }
 
   private Function<NameIdentifier, SchemaPO> schemaPOFetcher() {
-    return CacheUtils.cacheEnabled()
+    return GravitinoEnv.getInstance().cacheEnabled()
         ? this::getSchemaPOByCatalogId
         : this::getSchemaPOByFullQualifiedName;
   }

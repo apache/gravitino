@@ -50,7 +50,6 @@ import org.apache.gravitino.storage.relational.po.TablePO;
 import org.apache.gravitino.storage.relational.utils.ExceptionUtils;
 import org.apache.gravitino.storage.relational.utils.POConverters;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
-import org.apache.gravitino.utils.CacheUtils;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
 
@@ -398,13 +397,13 @@ public class TableMetaService {
   }
 
   private Function<Namespace, List<TablePO>> tableListFetcher() {
-    return CacheUtils.cacheEnabled()
+    return GravitinoEnv.getInstance().cacheEnabled()
         ? this::listTablePOsBySchemaId
         : this::listTablePOsByFullQualifiedName;
   }
 
   private Function<NameIdentifier, TablePO> tablePOFetcher() {
-    return CacheUtils.cacheEnabled()
+    return GravitinoEnv.getInstance().cacheEnabled()
         ? this::getTablePOBySchemaId
         : this::getTablePOByFullQualifiedName;
   }

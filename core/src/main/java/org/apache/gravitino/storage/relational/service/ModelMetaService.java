@@ -50,7 +50,6 @@ import org.apache.gravitino.storage.relational.po.ModelPO;
 import org.apache.gravitino.storage.relational.utils.ExceptionUtils;
 import org.apache.gravitino.storage.relational.utils.POConverters;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
-import org.apache.gravitino.utils.CacheUtils;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
 import org.slf4j.Logger;
@@ -324,13 +323,13 @@ public class ModelMetaService {
   }
 
   private Function<Namespace, List<ModelPO>> modelListFetcher() {
-    return CacheUtils.cacheEnabled()
+    return GravitinoEnv.getInstance().cacheEnabled()
         ? this::listModelPOsBySchemaId
         : this::listModelPOsByFullQualifiedName;
   }
 
   private Function<NameIdentifier, ModelPO> modelPOFetcher() {
-    return CacheUtils.cacheEnabled()
+    return GravitinoEnv.getInstance().cacheEnabled()
         ? this::getModelPOBySchemaId
         : this::getModelPOByFullQualifiedName;
   }
