@@ -39,13 +39,9 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.security.UserGroupInformation;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /** A FileSystem wrapper that runs all operations under a specific UGI (UserGroupInformation). */
 public class HDFSFileSystemProxy implements MethodInterceptor {
-
-  private static final Logger LOG = LoggerFactory.getLogger(HDFSFileSystemProxy.class);
 
   public static final String GRAVITINO_KEYTAB_FORMAT = "keytabs/gravitino-%s";
   private static final String GRAVITINO_ID_KEY = "gravitino.identifier";
