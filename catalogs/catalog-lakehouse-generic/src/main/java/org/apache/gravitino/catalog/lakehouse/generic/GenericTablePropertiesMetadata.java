@@ -40,7 +40,10 @@ public class GenericTablePropertiesMetadata extends BasePropertiesMetadata {
         ImmutableList.of(
             stringOptionalPropertyEntry(
                 Table.PROPERTY_LOCATION,
-                "The root directory of the generic table.",
+                "The directory of the table. For managed table, if this is not specified"
+                    + " in the table property, it will use the one in catalog / schema level and "
+                    + "concatenate with the table name. For external table, this property is"
+                    + "required.",
                 false /* immutable */,
                 null, /* defaultValue */
                 false /* hidden */),
