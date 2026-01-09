@@ -43,7 +43,7 @@ abstract class AbstractGravitinoConnectorTest extends AbstractTestQueryFramework
       DistributedQueryRunner queryRunner =
           DistributedQueryRunner.builder(session).setNodeCount(1).build();
 
-      TestGravitinoPlugin gravitinoPlugin = new TestGravitinoPlugin(gravitinoClient);
+      GravitinoPlugin gravitinoPlugin = createGravitinoPulgin(gravitinoClient);
       queryRunner.installPlugin(gravitinoPlugin);
 
       configureCatalogs(queryRunner, gravitinoClient);
@@ -64,6 +64,10 @@ abstract class AbstractGravitinoConnectorTest extends AbstractTestQueryFramework
     } catch (Exception e) {
       throw new RuntimeException("Create query runner failed", e);
     }
+  }
+
+  protected GravitinoPlugin createGravitinoPulgin(GravitinoAdminClient client) {
+    return new GravitinoPlugin(client);
   }
 
   protected GravitinoAdminClient createGravitinoClient() {

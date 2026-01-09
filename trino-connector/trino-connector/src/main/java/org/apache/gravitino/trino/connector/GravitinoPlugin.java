@@ -18,15 +18,36 @@
  */
 package org.apache.gravitino.trino.connector;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
 import io.trino.spi.Plugin;
 import io.trino.spi.connector.ConnectorFactory;
+import org.apache.gravitino.client.GravitinoAdminClient;
+import org.apache.gravitino.trino.connector.catalog.CatalogConnectorManager;
 
 /** Trino plugin endpoint, using java spi mechanism */
 public class GravitinoPlugin implements Plugin {
+  private GravitinoConnectorFactory factory;
+  private GravitinoAdminClient client;
+
+  public GravitinoPlugin() {}
+
+  public GravitinoPlugin(GravitinoAdminClient client) {
+    this.client = client;
+  }
 
   @Override
   public Iterable<ConnectorFactory> getConnectorFactories() {
-    return ImmutableList.of(new GravitinoConnectorFactory());
+    factory = createConnectorFactory(client);
+    return ImmutableList.of(factory);
+  }
+
+  protected GravitinoConnectorFactory createConnectorFactory(GravitinoAdminClient client) {
+    return new GravitinoConnectorFactory(client);
+  }
+
+  @VisibleForTesting
+  CatalogConnectorManager getCatalogConnectorManager() {
+    return factory.getCatalogConnectorManager();
   }
 }

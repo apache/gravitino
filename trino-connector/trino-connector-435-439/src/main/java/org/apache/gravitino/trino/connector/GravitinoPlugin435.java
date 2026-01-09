@@ -18,15 +18,17 @@
  */
 package org.apache.gravitino.trino.connector;
 
-import com.google.common.collect.ImmutableList;
-import io.trino.spi.Plugin;
-import io.trino.spi.connector.ConnectorFactory;
+import org.apache.gravitino.client.GravitinoAdminClient;
 
 /** Trino plugin endpoint, using java spi mechanism */
-public class GravitinoPlugin435 implements Plugin {
+public class GravitinoPlugin435 extends GravitinoPlugin {
+
+  public GravitinoPlugin435(GravitinoAdminClient client) {
+    super(client);
+  }
 
   @Override
-  public Iterable<ConnectorFactory> getConnectorFactories() {
-    return ImmutableList.of(new GravitinoConnectorFactory435());
+  protected GravitinoConnectorFactory createConnectorFactory(GravitinoAdminClient client) {
+    return new GravitinoConnectorFactory435(client);
   }
 }

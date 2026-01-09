@@ -28,7 +28,6 @@ import io.trino.spi.connector.Connector;
 import io.trino.spi.connector.ConnectorContext;
 import io.trino.spi.connector.ConnectorFactory;
 import java.util.Map;
-import java.util.function.Supplier;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.client.GravitinoAdminClient;
 import org.apache.gravitino.trino.connector.catalog.CatalogConnectorContext;
@@ -53,6 +52,12 @@ public class GravitinoConnectorFactory implements ConnectorFactory {
   private GravitinoSystemTableFactory gravitinoSystemTableFactory;
 
   private CatalogConnectorManager catalogConnectorManager;
+
+  private GravitinoAdminClient client;
+
+  public GravitinoConnectorFactory(GravitinoAdminClient client) {
+    this.client = client;
+  }
 
   @Override
   public String getName() {
@@ -93,7 +98,7 @@ public class GravitinoConnectorFactory implements ConnectorFactory {
           CatalogConnectorFactory catalogConnectorFactory = createCatalogConnectorFactory(config);
           catalogConnectorManager =
               new CatalogConnectorManager(catalogRegister, catalogConnectorFactory);
-          catalogConnectorManager.config(config, clientProvider().get());
+          catalogConnectorManager.config(config, client);
           catalogConnectorManager.start(trinoConnectorContext);
 
           gravitinoSystemTableFactory = new GravitinoSystemTableFactory(catalogConnectorManager);
@@ -135,11 +140,6 @@ public class GravitinoConnectorFactory implements ConnectorFactory {
   protected GravitinoSystemConnector createSystemConnector(
       GravitinoStoredProcedureFactory storedProcedureFactory) {
     return new GravitinoSystemConnector(storedProcedureFactory);
-  }
-
-  @VisibleForTesting
-  Supplier<GravitinoAdminClient> clientProvider() {
-    return () -> null;
   }
 
   private CatalogConnectorFactory createCatalogConnectorFactory(GravitinoConfig config) {

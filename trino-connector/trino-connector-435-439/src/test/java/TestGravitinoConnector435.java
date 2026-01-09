@@ -17,6 +17,14 @@
  * under the License.
  */
 
+import org.apache.gravitino.client.GravitinoAdminClient;
+import org.apache.gravitino.trino.connector.GravitinoPlugin;
+import org.apache.gravitino.trino.connector.GravitinoPlugin435;
 import org.apache.gravitino.trino.connector.TestGravitinoConnector;
 
-public class TestGravitinoConnector435 extends TestGravitinoConnector {}
+public class TestGravitinoConnector435 extends TestGravitinoConnector {
+  @Override
+  protected GravitinoPlugin createGravitinoPulgin(GravitinoAdminClient client) {
+    return new GravitinoPlugin435(client);
+  }
+}

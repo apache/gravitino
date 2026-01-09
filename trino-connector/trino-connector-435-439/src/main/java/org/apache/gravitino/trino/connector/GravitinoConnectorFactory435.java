@@ -18,11 +18,16 @@
  */
 package org.apache.gravitino.trino.connector;
 
+import org.apache.gravitino.client.GravitinoAdminClient;
 import org.apache.gravitino.trino.connector.catalog.CatalogConnectorContext;
 import org.apache.gravitino.trino.connector.system.GravitinoSystemConnector;
 import org.apache.gravitino.trino.connector.system.storedprocedure.GravitinoStoredProcedureFactory;
 
 public class GravitinoConnectorFactory435 extends GravitinoConnectorFactory {
+
+  public GravitinoConnectorFactory435(GravitinoAdminClient client) {
+    super(client);
+  }
 
   @Override
   protected GravitinoConnector createConnector(CatalogConnectorContext connectorContext) {
