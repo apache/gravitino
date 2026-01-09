@@ -41,7 +41,6 @@ dependencies {
 sourceSets {
   main {
     java.srcDirs("../trino-connector/src/main/java")
-    resources.srcDirs("../trino-connector/src/main/resources")
   }
 }
 

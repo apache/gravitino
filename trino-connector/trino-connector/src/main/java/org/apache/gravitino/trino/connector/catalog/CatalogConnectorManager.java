@@ -21,7 +21,6 @@ package org.apache.gravitino.trino.connector.catalog;
 import com.google.common.base.Preconditions;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import io.trino.spi.TrinoException;
-import io.trino.spi.connector.Connector;
 import io.trino.spi.connector.ConnectorContext;
 import java.util.Arrays;
 import java.util.HashSet;
@@ -369,9 +368,9 @@ public class CatalogConnectorManager {
    * @param connectorName the name of the connector
    * @param config the Gravitino configuration
    * @param context the Trino connector context
-   * @return the created connector
+   * @return the created catalog connector context
    */
-  public Connector createConnector(
+  public CatalogConnectorContext createCatalogConnectorContext(
       String connectorName, GravitinoConfig config, ConnectorContext context) {
     try {
       String catalogConfig = config.getCatalogConfig();
@@ -386,7 +385,7 @@ public class CatalogConnectorManager {
       CatalogConnectorContext connectorContext = builder.build();
       catalogConnectors.put(connectorName, connectorContext);
       LOG.info("Create connector {} successful", connectorName);
-      return connectorContext.getConnector();
+      return connectorContext;
     } catch (Exception e) {
       LOG.error("Failed to create connector: {}", connectorName, e);
       throw new TrinoException(

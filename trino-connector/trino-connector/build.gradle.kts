@@ -20,7 +20,6 @@
 import net.ltgt.gradle.errorprone.errorprone
 
 plugins {
-  `maven-publish`
   id("java")
   id("idea")
 }
@@ -29,16 +28,18 @@ repositories {
   mavenCentral()
 }
 
-val trinoVersion = 435
+val trinoVersionProvider =
+  providers.gradleProperty("trinoVersion").map { it.toInt() }.orElse(435)
+val trinoVersion = trinoVersionProvider.get()
 
 java {
   println("Building Trino Connector for Trino version: $trinoVersion")
   if (trinoVersion.toInt() >= 478) {
     toolchain.languageVersion.set(JavaLanguageVersion.of(24))
   } else if (trinoVersion.toInt() >= 468) {
-    toolchain.languageVersion.set(JavaLanguageVersion.of(23))
+    toolchain.languageVersion.set(JavaLanguageVersion.of(17))
   } else if (trinoVersion.toInt() >= 448) {
-    toolchain.languageVersion.set(JavaLanguageVersion.of(22))
+    toolchain.languageVersion.set(JavaLanguageVersion.of(17))
   } else if (trinoVersion.toInt() >= 436) {
     toolchain.languageVersion.set(JavaLanguageVersion.of(21))
   } else if (trinoVersion.toInt() >= 435) {

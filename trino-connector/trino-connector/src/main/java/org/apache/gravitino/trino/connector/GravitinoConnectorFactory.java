@@ -31,6 +31,7 @@ import java.util.Map;
 import java.util.function.Supplier;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.client.GravitinoAdminClient;
+import org.apache.gravitino.trino.connector.catalog.CatalogConnectorContext;
 import org.apache.gravitino.trino.connector.catalog.CatalogConnectorFactory;
 import org.apache.gravitino.trino.connector.catalog.CatalogConnectorManager;
 import org.apache.gravitino.trino.connector.catalog.CatalogRegister;
@@ -74,12 +75,13 @@ public class GravitinoConnectorFactory implements ConnectorFactory {
    *
    * @param catalogName the connector name of catalog
    * @param requiredConfig the config of connector
-   * @param context Trino connector context
    * @return Trino connector
    */
   @Override
   public Connector create(
-      String catalogName, Map<String, String> requiredConfig, ConnectorContext context) {
+      String catalogName,
+      Map<String, String> requiredConfig,
+      ConnectorContext trinoConnectorContext) {
     Preconditions.checkArgument(requiredConfig != null, "requiredConfig is not null");
     GravitinoConfig config = new GravitinoConfig(requiredConfig);
 
@@ -92,7 +94,7 @@ public class GravitinoConnectorFactory implements ConnectorFactory {
           catalogConnectorManager =
               new CatalogConnectorManager(catalogRegister, catalogConnectorFactory);
           catalogConnectorManager.config(config, clientProvider().get());
-          catalogConnectorManager.start(context);
+          catalogConnectorManager.start(trinoConnectorContext);
 
           gravitinoSystemTableFactory = new GravitinoSystemTableFactory(catalogConnectorManager);
         } catch (Exception e) {
@@ -106,7 +108,12 @@ public class GravitinoConnectorFactory implements ConnectorFactory {
     if (config.isDynamicConnector()) {
       // The dynamic connector is an instance of GravitinoConnector. It is loaded from Gravitino
       // server.
-      return catalogConnectorManager.createConnector(catalogName, config, context);
+      CatalogConnectorContext catalogConnectorContext =
+          catalogConnectorManager.createCatalogConnectorContext(
+              catalogName, config, trinoConnectorContext);
+      GravitinoConnector catalogConnector = createConnector(catalogConnectorContext);
+      catalogConnectorContext.bindConnector(catalogConnector);
+      return catalogConnectorContext.getConnector();
     } else {
       // The static connector is an instance of GravitinoSystemConnector. It is loaded by Trino
       // using the connector configuration.
@@ -117,8 +124,17 @@ public class GravitinoConnectorFactory implements ConnectorFactory {
       }
       GravitinoStoredProcedureFactory gravitinoStoredProcedureFactory =
           new GravitinoStoredProcedureFactory(catalogConnectorManager, metalake);
-      return new GravitinoSystemConnector(gravitinoStoredProcedureFactory);
+      return createSystemConnector(gravitinoStoredProcedureFactory);
     }
+  }
+
+  protected GravitinoConnector createConnector(CatalogConnectorContext connectorContext) {
+    return new GravitinoConnector(connectorContext);
+  }
+
+  protected GravitinoSystemConnector createSystemConnector(
+      GravitinoStoredProcedureFactory storedProcedureFactory) {
+    return new GravitinoSystemConnector(storedProcedureFactory);
   }
 
   @VisibleForTesting

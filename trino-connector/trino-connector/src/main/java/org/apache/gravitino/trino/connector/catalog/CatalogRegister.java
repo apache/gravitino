@@ -227,6 +227,8 @@ public class CatalogRegister {
             }
           }
           return false;
+        } catch (SQLException e) {
+          throw e;
         } catch (Exception e) {
           failedException = e;
           LOG.warn("Execute command failed: {}, ", showCatalogCommand, e);
@@ -252,6 +254,8 @@ public class CatalogRegister {
           // check the catalog is already created
           statement.execute(sql);
           return;
+        } catch (SQLException e) {
+          throw e;
         } catch (Exception e) {
           failedException = e;
           LOG.warn("Execute command failed: {}, ", sql, e);
