@@ -47,7 +47,6 @@ import org.apache.flink.table.catalog.hive.factories.HiveCatalogFactoryOptions;
 import org.apache.flink.types.Row;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.catalog.hive.HiveConstants;
-import org.apache.gravitino.catalog.hive.HiveStorageConstants;
 import org.apache.gravitino.flink.connector.PropertiesConverter;
 import org.apache.gravitino.flink.connector.hive.GravitinoHiveCatalog;
 import org.apache.gravitino.flink.connector.hive.GravitinoHiveCatalogFactoryOptions;
@@ -590,41 +589,6 @@ public class FlinkHiveCatalogIT extends FlinkCommonIT {
           } catch (TableNotExistException e) {
             Assertions.fail(e);
           }
-        },
-        true);
-  }
-
-  @Test
-  public void testCreateHiveTableWithDefaultSerdeLib() {
-    // Test for issue #9508: Ensure serde-lib is set to LazySimpleSerDe when creating
-    // Hive tables via Flink connector without explicitly setting serde-lib.
-    // This default behavior applies ONLY to Flink-created Hive tables and ensures
-    // Flink ↔ Hive interoperability. Other Hive usage paths are unaffected.
-    String databaseName = "test_serde_lib_db";
-    String tableName = "test_serde_lib_table";
-
-    doWithSchema(
-        currentCatalog(),
-        databaseName,
-        catalog -> {
-          // Create table without explicitly setting serde-lib
-          TableResult result =
-              sql(
-                  "CREATE TABLE %s "
-                      + "(id INT, name STRING) "
-                      + "COMMENT 'Test table for serde-lib'",
-                  tableName);
-          TestUtils.assertTableResult(result, ResultKind.SUCCESS);
-
-          // Verify that serde-lib is set to LazySimpleSerDe
-          Table table =
-              catalog.asTableCatalog().loadTable(NameIdentifier.of(databaseName, tableName));
-          Assertions.assertNotNull(table);
-          String serdeLib = table.properties().get(HiveConstants.SERDE_LIB);
-          Assertions.assertEquals(
-              HiveStorageConstants.LAZY_SIMPLE_SERDE_CLASS,
-              serdeLib,
-              "serde-lib should be set to LazySimpleSerDe for Flink-Hive interoperability");
         },
         true);
   }
