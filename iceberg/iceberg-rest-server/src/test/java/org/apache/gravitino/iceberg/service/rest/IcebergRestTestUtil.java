@@ -28,7 +28,6 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.logging.Level;
-import java.util.logging.Logger;
 import java.util.stream.Stream;
 import javax.servlet.http.HttpServletRequest;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
@@ -97,7 +96,10 @@ public class IcebergRestTestUtil {
     if (DEBUG_SERVER_LOG_ENABLED) {
       resourceConfig.register(
           new LoggingFeature(
-              Logger.getLogger(LoggingFeature.DEFAULT_LOGGER_NAME),
+              // Use fully qualified name to avoid ambiguity. Jersey's LoggingFeature requires
+              // java.util.logging.Logger, not org.slf4j.Logger which is commonly used elsewhere
+              // in the Gravitino codebase.
+              java.util.logging.Logger.getLogger(LoggingFeature.DEFAULT_LOGGER_NAME),
               Level.INFO,
               Verbosity.PAYLOAD_ANY,
               10000));
@@ -129,11 +131,10 @@ public class IcebergRestTestUtil {
           "true");
       IcebergConfigProvider configProvider = IcebergConfigProviderFactory.create(catalogConf);
       configProvider.initialize(catalogConf);
+      IcebergRESTServerContext.create(configProvider, false);
       // used to override register table interface
       IcebergCatalogWrapperManager icebergCatalogWrapperManager =
           new IcebergCatalogWrapperManagerForTest(catalogConf, configProvider);
-
-      IcebergRESTServerContext.create(configProvider, false);
 
       EventBus eventBus = new EventBus(eventListenerPlugins);
 

@@ -29,7 +29,6 @@ import org.apache.gravitino.Entity;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.authorization.AuthorizationRequestContext;
 import org.apache.gravitino.dto.requests.TagsAssociateRequest;
-import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionEvaluator;
 import org.apache.gravitino.server.web.rest.MetadataObjectTagOperations;
 
 /**
@@ -47,10 +46,9 @@ public class AssociateTagAuthorizationExecutor extends CommonAuthorizerExecutor
       Parameter[] parameters,
       Object[] args,
       Map<Entity.EntityType, NameIdentifier> metadataContext,
-      AuthorizationExpressionEvaluator authorizationExpressionEvaluator,
       Map<String, Object> pathParams,
-      String entityType) {
-    super(expression, metadataContext, authorizationExpressionEvaluator, pathParams, entityType);
+      Optional<String> entityType) {
+    super(expression, metadataContext, pathParams, entityType);
     this.parameters = parameters;
     this.args = args;
   }
@@ -100,7 +98,7 @@ public class AssociateTagAuthorizationExecutor extends CommonAuthorizerExecutor
 
       boolean authorized =
           authorizationExpressionEvaluator.evaluate(
-              currentContext, pathParams, context, Optional.ofNullable(entityType));
+              currentContext, pathParams, context, entityType);
 
       if (!authorized) {
         return false; // Fail fast on first unauthorized tag

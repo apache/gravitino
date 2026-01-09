@@ -33,6 +33,7 @@ import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.NotImplementedException;
 import org.apache.gravitino.Catalog;
@@ -193,23 +194,23 @@ public class CatalogConnectorManager {
   }
 
   private void loadCatalogs(GravitinoMetalake metalake) {
-    String[] catalogNames;
+    List<String> catalogNames;
     try {
-      catalogNames = metalake.listCatalogs();
+      catalogNames =
+          Arrays.stream(metalake.listCatalogs())
+              .filter(id -> !skipCatalog(getTrinoCatalogName(metalake.name(), id)))
+              .collect(Collectors.toList());
     } catch (Exception e) {
       LOG.error("Failed to list catalogs in metalake {}.", metalake.name(), e);
       return;
     }
 
-    LOG.debug(
-        "Load metalake {}'s catalogs. catalogs: {}.",
-        metalake.name(),
-        Arrays.toString(catalogNames));
+    LOG.debug("Load metalake {}'s catalogs. catalogs: {}.", metalake.name(), catalogNames);
 
     // Delete those catalogs that have been deleted in Gravitino server
     Set<String> catalogNameStrings =
-        Arrays.stream(catalogNames)
-            .map(id -> config.singleMetalakeMode() ? id : getTrinoCatalogName(metalake.name(), id))
+        catalogNames.stream()
+            .map(id -> getTrinoCatalogName(metalake.name(), id))
             .collect(Collectors.toSet());
 
     for (Map.Entry<String, CatalogConnectorContext> entry : catalogConnectors.entrySet()) {
@@ -226,7 +227,7 @@ public class CatalogConnectorManager {
     }
 
     // Load new catalogs belows to the metalake.
-    Arrays.stream(catalogNames)
+    catalogNames.stream()
         .forEach(
             (String catalogName) -> {
               try {
@@ -414,5 +415,22 @@ public class CatalogConnectorManager {
    */
   public GravitinoMetalake getMetalake(String metalake) {
     return metalakes.computeIfAbsent(metalake, this::retrieveMetalake);
+  }
+
+  /**
+   * Whether skip loading catalog or not
+   *
+   * @param catalogName catalog name
+   * @return whether skip loading catalog or not
+   */
+  public boolean skipCatalog(String catalogName) {
+    for (Pattern pattern : config.getSkipCatalogPatterns()) {
+      if (pattern.matcher(catalogName).matches()) {
+        LOG.debug(
+            "Skip catalog {} with config `gravitino.trino.skip-catalog-patterns`.", catalogName);
+        return true;
+      }
+    }
+    return false;
   }
 }

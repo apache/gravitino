@@ -40,6 +40,14 @@ public interface ModelMetaMapper {
   @SelectProvider(type = ModelMetaSQLProviderFactory.class, method = "listModelPOsBySchemaId")
   List<ModelPO> listModelPOsBySchemaId(@Param("schemaId") Long schemaId);
 
+  @SelectProvider(
+      type = ModelMetaSQLProviderFactory.class,
+      method = "listModelPOsByFullQualifiedName")
+  List<ModelPO> listModelPOsByFullQualifiedName(
+      @Param("metalakeName") String metalakeName,
+      @Param("catalogName") String catalogName,
+      @Param("schemaName") String schemaName);
+
   @SelectProvider(type = ModelMetaSQLProviderFactory.class, method = "listModelPOsByModelIds")
   List<ModelPO> listModelPOsByModelIds(@Param("modelIds") List<Long> modelIds);
 
@@ -48,6 +56,15 @@ public interface ModelMetaMapper {
       method = "selectModelMetaBySchemaIdAndModelName")
   ModelPO selectModelMetaBySchemaIdAndModelName(
       @Param("schemaId") Long schemaId, @Param("modelName") String modelName);
+
+  @SelectProvider(
+      type = ModelMetaSQLProviderFactory.class,
+      method = "selectModelByFullQualifiedName")
+  ModelPO selectModelByFullQualifiedName(
+      @Param("metalakeName") String metalakeName,
+      @Param("catalogName") String catalogName,
+      @Param("schemaName") String schemaName,
+      @Param("modelName") String modelName);
 
   @SelectProvider(
       type = ModelMetaSQLProviderFactory.class,

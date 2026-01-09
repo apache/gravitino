@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.catalog.hive.integration.test;
 
+import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
 import java.net.URI;
 import java.util.HashMap;
@@ -28,13 +29,14 @@ import org.apache.gravitino.integration.test.container.HiveContainer;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.spark.sql.SparkSession;
+import org.awaitility.Awaitility;
+import org.junit.jupiter.api.TestInstance;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testcontainers.containers.Container;
-import org.testcontainers.shaded.com.google.common.collect.ImmutableMap;
-import org.testcontainers.shaded.org.awaitility.Awaitility;
 
-public class CatalogHiveS3IT extends CatalogHiveIT {
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
+public class CatalogHiveS3IT extends CatalogHive3IT {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(CatalogHiveS3IT.class);
 
@@ -51,6 +53,7 @@ public class CatalogHiveS3IT extends CatalogHiveIT {
 
   @Override
   protected void startNecessaryContainer() {
+    hmsCatalog = "hive";
     containerSuite.startLocalStackContainer();
     gravitinoLocalStackContainer = containerSuite.getLocalStackContainer();
 
@@ -110,7 +113,7 @@ public class CatalogHiveS3IT extends CatalogHiveIT {
 
     containerSuite.startHiveContainerWithS3(hiveContainerEnv);
 
-    HIVE_METASTORE_URIS =
+    hiveMetastoreUris =
         String.format(
             "thrift://%s:%d",
             containerSuite.getHiveContainerWithS3().getContainerIpAddress(),
@@ -138,7 +141,7 @@ public class CatalogHiveS3IT extends CatalogHiveIT {
         SparkSession.builder()
             .master("local[1]")
             .appName("Hive Catalog integration test")
-            .config("hive.metastore.uris", HIVE_METASTORE_URIS)
+            .config("hive.metastore.uris", hiveMetastoreUris)
             .config(
                 "spark.sql.warehouse.dir",
                 String.format(

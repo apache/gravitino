@@ -29,18 +29,17 @@ public class CommonAuthorizerExecutor implements AuthorizationExecutor {
   protected Map<Entity.EntityType, NameIdentifier> metadataContext;
   protected AuthorizationExpressionEvaluator authorizationExpressionEvaluator;
   protected Map<String, Object> pathParams;
-  protected String entityType;
+  protected Optional<String> entityType;
   protected String expression;
 
   public CommonAuthorizerExecutor(
       String expression,
       Map<Entity.EntityType, NameIdentifier> metadataContext,
-      AuthorizationExpressionEvaluator authorizationExpressionEvaluator,
       Map<String, Object> pathParams,
-      String entityType) {
+      Optional<String> entityType) {
     this.expression = expression;
     this.metadataContext = metadataContext;
-    this.authorizationExpressionEvaluator = authorizationExpressionEvaluator;
+    this.authorizationExpressionEvaluator = new AuthorizationExpressionEvaluator(expression);
     this.pathParams = pathParams;
     this.entityType = entityType;
   }
@@ -50,9 +49,6 @@ public class CommonAuthorizerExecutor implements AuthorizationExecutor {
     AuthorizationRequestContext authorizationRequestContext = new AuthorizationRequestContext();
     authorizationRequestContext.setOriginalAuthorizationExpression(expression);
     return authorizationExpressionEvaluator.evaluate(
-        metadataContext,
-        pathParams,
-        new AuthorizationRequestContext(),
-        Optional.ofNullable(entityType));
+        metadataContext, pathParams, new AuthorizationRequestContext(), entityType);
   }
 }

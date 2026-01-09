@@ -414,6 +414,10 @@
    fsspec
    Google auth HTTP
    Google auth Credentials
+   Apache HttpComponents Client5
+   Apache HttpComponents Core5
+   Helger Profiler
+   OpenAPI Tools Jackson Databind Nullable
 
    This product bundles various third-party components also under the
    MIT license
@@ -448,6 +452,7 @@
    Eclipse Public License 1.0
 
    Logback
+   Eclipse Collections
    Eclipse Jetty
    Eclipse Jetty Continuation
    Eclipse Jetty Security

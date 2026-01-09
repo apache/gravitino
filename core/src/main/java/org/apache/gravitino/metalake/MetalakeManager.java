@@ -20,6 +20,7 @@ package org.apache.gravitino.metalake;
 
 import static org.apache.gravitino.Metalake.PROPERTY_IN_USE;
 
+import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import java.io.Closeable;
 import java.io.IOException;
@@ -28,9 +29,11 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 import org.apache.gravitino.Entity.EntityType;
 import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.EntityStore;
+import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetalakeChange;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
@@ -130,6 +133,29 @@ public class MetalakeManager implements MetalakeDispatcher, Closeable {
   }
 
   /**
+   * Lists all in-use Metalakes.
+   *
+   * @param entityStore The EntityStore to use for managing Metalakes.
+   * @return A list of names of in-use Metalakes.
+   * @throws RuntimeException If listing in-use Metalakes encounters storage issues.
+   */
+  public static List<String> listInUseMetalakes(EntityStore entityStore) {
+    try {
+      List<BaseMetalake> metalakes =
+          TreeLockUtils.doWithRootTreeLock(
+              LockType.READ,
+              () -> entityStore.list(Namespace.empty(), BaseMetalake.class, EntityType.METALAKE));
+      return metalakes.stream()
+          .filter(
+              m -> (boolean) m.propertiesMetadata().getOrDefault(m.properties(), PROPERTY_IN_USE))
+          .map(BaseMetalake::name)
+          .collect(Collectors.toList());
+    } catch (IOException e) {
+      throw new RuntimeException("Failed to list in-use metalakes", e);
+    }
+  }
+
+  /**
    * Lists all available Metalakes.
    *
    * @return An array of Metalake instances representing the available Metalakes.
@@ -151,6 +177,7 @@ public class MetalakeManager implements MetalakeDispatcher, Closeable {
       throw new RuntimeException(ioe);
     }
   }
+
   /**
    * Loads a Metalake.
    *
@@ -342,25 +369,31 @@ public class MetalakeManager implements MetalakeDispatcher, Closeable {
         () -> {
           try {
             boolean inUse = metalakeInUse(store, ident);
-            if (!inUse) {
-              store.update(
-                  ident,
-                  BaseMetalake.class,
-                  EntityType.METALAKE,
-                  metalake -> {
-                    BaseMetalake.Builder builder = newMetalakeBuilder(metalake);
-
-                    Map<String, String> newProps =
-                        metalake.properties() == null
-                            ? Maps.newHashMap()
-                            : Maps.newHashMap(metalake.properties());
-                    newProps.put(PROPERTY_IN_USE, "true");
-                    builder.withProperties(newProps);
-
-                    return builder.build();
-                  });
+            if (inUse) {
+              return null;
             }
 
+            store.update(
+                ident,
+                BaseMetalake.class,
+                EntityType.METALAKE,
+                metalake -> {
+                  BaseMetalake.Builder builder = newMetalakeBuilder(metalake);
+
+                  Map<String, String> newProps =
+                      metalake.properties() == null
+                          ? Maps.newHashMap()
+                          : Maps.newHashMap(metalake.properties());
+                  newProps.put(PROPERTY_IN_USE, "true");
+                  builder.withProperties(newProps);
+
+                  return builder.build();
+                });
+
+            // The only problem is that we can't make sure we can change all catalog properties
+            // in a transaction. If any catalog property update fails, the metalake is already
+            // enabled but catalog properties remain inconsistent.
+            updateMetalakeInUseStatusInCatalog(ident, true);
             return null;
           } catch (IOException e) {
             throw new RuntimeException(e);
@@ -376,24 +409,31 @@ public class MetalakeManager implements MetalakeDispatcher, Closeable {
         () -> {
           try {
             boolean inUse = metalakeInUse(store, ident);
-            if (inUse) {
-              store.update(
-                  ident,
-                  BaseMetalake.class,
-                  EntityType.METALAKE,
-                  metalake -> {
-                    BaseMetalake.Builder builder = newMetalakeBuilder(metalake);
-
-                    Map<String, String> newProps =
-                        metalake.properties() == null
-                            ? Maps.newHashMap()
-                            : Maps.newHashMap(metalake.properties());
-                    newProps.put(PROPERTY_IN_USE, "false");
-                    builder.withProperties(newProps);
-
-                    return builder.build();
-                  });
+            if (!inUse) {
+              return null;
             }
+
+            store.update(
+                ident,
+                BaseMetalake.class,
+                EntityType.METALAKE,
+                metalake -> {
+                  BaseMetalake.Builder builder = newMetalakeBuilder(metalake);
+
+                  Map<String, String> newProps =
+                      metalake.properties() == null
+                          ? Maps.newHashMap()
+                          : Maps.newHashMap(metalake.properties());
+                  newProps.put(PROPERTY_IN_USE, "false");
+                  builder.withProperties(newProps);
+
+                  return builder.build();
+                });
+
+            // The only problem is that we can't make sure we can change all catalog properties
+            // in a transaction, if any of them fails, the metalake is already enabled and the value
+            // in catalog is inconsistent.
+            updateMetalakeInUseStatusInCatalog(ident, false);
             return null;
           } catch (IOException e) {
             throw new RuntimeException(e);
@@ -455,5 +495,38 @@ public class MetalakeManager implements MetalakeDispatcher, Closeable {
     }
 
     return builder.withProperties(newProps);
+  }
+
+  private void updateMetalakeInUseStatusInCatalog(NameIdentifier ident, boolean value)
+      throws IOException {
+    List<NameIdentifier> failedCatalogs = Lists.newArrayList();
+    store
+        .list(Namespace.of(ident.name()), CatalogEntity.class, EntityType.CATALOG)
+        .forEach(
+            catalogEntity -> {
+              try {
+                // update the properties metalake-in-use in catalog to true
+                GravitinoEnv.getInstance()
+                    .catalogManager()
+                    .setMetalakeInUseStatus(catalogEntity.nameIdentifier(), value);
+                LOG.info(
+                    "Enabled or disable metalake-in-use property for catalog {} success",
+                    catalogEntity.nameIdentifier());
+              } catch (Exception e) {
+                // Only log the error and continue to update other catalogs
+                LOG.error(
+                    "Failed to enable or disable metalake-in-use property for catalog {}",
+                    catalogEntity.nameIdentifier(),
+                    e);
+                failedCatalogs.add(catalogEntity.nameIdentifier());
+              }
+            });
+
+    if (!failedCatalogs.isEmpty()) {
+      LOG.error(
+          "Total failed catalogs when update properties: {}",
+          failedCatalogs.stream().map(NameIdentifier::toString).collect(Collectors.joining(", ")));
+      throw new RuntimeException("Failed to update in use status of the following catalogs.");
+    }
   }
 }

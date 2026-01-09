@@ -146,9 +146,10 @@ GRAVITINO_SERVER_NAME=org.apache.gravitino.lance.server.GravitinoLanceRESTServer
 GRAVITINO_SIMPLE_SERVER_NAME=gravitino-lance-rest-server
 
 JAVA_OPTS+=" -Dfile.encoding=UTF-8"
-JAVA_OPTS+=" -Dlog4j2.configurationFile=file://${GRAVITINO_CONF_DIR}/log4j2.properties"
-JAVA_OPTS+=" -Dgravitino.log.path=${GRAVITINO_LOG_DIR} ${GRAVITINO_MEM}"
-JAVA_OPTS+=" -Dgravitino.server.name=${GRAVITINO_SIMPLE_SERVER_NAME}"
+JAVA_OPTS+=" -Dlog4j2.configurationFile=file://${GRAVITINO_CONF_DIR}/gravitino-lance-rest-log4j2.properties"
+JAVA_OPTS+=" -Dgravitino.lance-rest-server.log.path=${GRAVITINO_LOG_DIR}"
+JAVA_OPTS+=" -Dgravitino.lance-rest-server.name=${GRAVITINO_SIMPLE_SERVER_NAME}"
+JAVA_OPTS+=" ${GRAVITINO_MEM}"
 if [ "$JVM_VERSION" -eq 17 ]; then
   JAVA_OPTS+=" -XX:+IgnoreUnrecognizedVMOptions"
   JAVA_OPTS+=" --add-opens java.base/java.io=ALL-UNNAMED"

@@ -18,6 +18,9 @@
  */
 package org.apache.gravitino.trino.connector;
 
+import static io.trino.spi.StandardErrorCode.NOT_SUPPORTED;
+
+import com.google.common.base.Splitter;
 import io.trino.spi.TrinoException;
 import java.io.FileInputStream;
 import java.io.IOException;
@@ -27,6 +30,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
 
@@ -66,6 +70,7 @@ public class GravitinoConfig {
 
   private static final Map<String, ConfigEntry> CONFIG_DEFINITIONS = new HashMap<>();
   private final Map<String, String> config;
+  private final List<Pattern> skipCatalogPatternList;
 
   // Gravitino config entity
   private static final ConfigEntry GRAVITINO_URI =
@@ -132,6 +137,13 @@ public class GravitinoConfig {
   private static final ConfigEntry GRAVITINO_CLIENT_CONFIG_PREFIX =
       new ConfigEntry("gravitino.client.", "The config prefix for Grivitino client", "", false);
 
+  private static final ConfigEntry GRAVITINO_TRINO_SKIP_CATALOG_PATTERNS =
+      new ConfigEntry(
+          "gravitino.trino.skip-catalog-patterns",
+          "The property to specify a comma-separated list of catalog name regex patterns that should be excluded from loading.",
+          "",
+          false);
+
   /**
    * Constructs a new GravitinoConfig with the specified configuration.
    *
@@ -152,6 +164,14 @@ public class GravitinoConfig {
       throw new TrinoException(
           GravitinoErrorCode.GRAVITINO_MISSING_CONFIG,
           "Incomplete Dynamic catalog connector config");
+    }
+    try {
+      skipCatalogPatternList = initSkipCatalogPatterns();
+    } catch (Exception e) {
+      throw new TrinoException(
+          NOT_SUPPORTED,
+          "Config `gravitino.trino.skip-catalog-patterns` is invalid because it contains an illegal regular expression",
+          e);
     }
   }
 
@@ -327,6 +347,34 @@ public class GravitinoConfig {
         config.getOrDefault(
             GRAVITINO_TRINO_SKIP_VERSION_VALIDATION.key,
             GRAVITINO_TRINO_SKIP_VERSION_VALIDATION.defaultValue));
+  }
+
+  /**
+   * Init a comma-separated list of catalog name regex patterns that should be excluded from loading
+   *
+   * @return a list of catalog name regex patterns
+   */
+  private List<Pattern> initSkipCatalogPatterns() {
+    String skipCatalogConfig =
+        config.getOrDefault(
+            GRAVITINO_TRINO_SKIP_CATALOG_PATTERNS.key,
+            GRAVITINO_TRINO_SKIP_CATALOG_PATTERNS.defaultValue);
+    return Splitter.on(',')
+        .trimResults()
+        .omitEmptyStrings()
+        .splitToStream(skipCatalogConfig)
+        .map(Pattern::compile)
+        .collect(Collectors.toList());
+  }
+
+  /**
+   * Retrieves a comma-separated list of catalog name regex patterns that should be excluded from
+   * loading
+   *
+   * @return a list of catalog name regex patterns
+   */
+  public List<Pattern> getSkipCatalogPatterns() {
+    return skipCatalogPatternList;
   }
 
   static class ConfigEntry {
