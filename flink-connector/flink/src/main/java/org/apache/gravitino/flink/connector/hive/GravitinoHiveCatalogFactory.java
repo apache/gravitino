@@ -61,11 +61,13 @@ public class GravitinoHiveCatalogFactory implements BaseCatalogFactory {
     HiveConf hiveConf = HiveCatalog.createHiveConf(hiveConfDir, hadoopConfDir);
     // Put the hadoop properties managed by Gravitino into the hiveConf
     PropertyUtils.getHadoopAndHiveProperties(context.getOptions()).forEach(hiveConf::set);
+    SchemaAndTablePropertiesConverter tablePropertiesConverter =
+        new HivePropertiesConverter(hiveConf);
     return new GravitinoHiveCatalog(
         context.getName(),
         helper.getOptions().get(HiveCatalogFactoryOptions.DEFAULT_DATABASE),
         context.getOptions(),
-        schemaAndTablePropertiesConverter(),
+        tablePropertiesConverter,
         partitionConverter(),
         hiveConf,
         helper.getOptions().get(HiveCatalogFactoryOptions.HIVE_VERSION));
