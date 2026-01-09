@@ -29,10 +29,8 @@ import java.util.HashMap;
 import java.util.List;
 import org.apache.gravitino.client.GravitinoAdminClient;
 import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 
-@Disabled
 public class TestGravitinoConnectorWithMetalakeCatalogName extends AbstractGravitinoConnectorTest {
 
   @Override
@@ -42,23 +40,19 @@ public class TestGravitinoConnectorWithMetalakeCatalogName extends AbstractGravi
     HashMap<String, String> properties = new HashMap<>();
     properties.put("gravitino.metalake", "test");
     properties.put("gravitino.uri", "http://127.0.0.1:8090");
-    properties.put("gravitino.simplify-catalog-names", "false");
-    properties.put("trino.catalog.store", queryRunner.getCoordinator().getBaseDataDir().toString());
-    properties.put(
-        "trino.jdbc.uri",
-        queryRunner.getCoordinator().getBaseUrl().toString().replace("http", "jdbc:trino"));
+    properties.put("gravitino.use-single-metalake", "false");
+    properties.put("catalog.config-dir", queryRunner.getCoordinator().getBaseDataDir().toString());
+    properties.put("discovery.uri", queryRunner.getCoordinator().getBaseUrl().toString());
     queryRunner.createCatalog("gravitino", "gravitino", properties);
 
     // create a gravitino connector named test1 using metalake gravitino1
     HashMap<String, String> secondProperties = new HashMap<>();
     secondProperties.put("gravitino.metalake", "test1");
     secondProperties.put("gravitino.uri", "http://127.0.0.1:8090");
-    secondProperties.put("gravitino.simplify-catalog-names", "false");
+    secondProperties.put("gravitino.use-single-metalake", "false");
     secondProperties.put(
-        "trino.catalog.store", queryRunner.getCoordinator().getBaseDataDir().toString());
-    secondProperties.put(
-        "trino.jdbc.uri",
-        queryRunner.getCoordinator().getBaseUrl().toString().replace("http", "jdbc:trino"));
+        "catalog.config-dir", queryRunner.getCoordinator().getBaseDataDir().toString());
+    secondProperties.put("discovery.uri", queryRunner.getCoordinator().getBaseUrl().toString());
     queryRunner.createCatalog("gravitino1", "gravitino", secondProperties);
   }
 
@@ -113,7 +107,7 @@ public class TestGravitinoConnectorWithMetalakeCatalogName extends AbstractGravi
 
   @Test
   public void testCreateTable() {
-    String fullSchemaName = "\"test.memory\".db_01";
+    String fullSchemaName = "\\\\\\\"test.memory\\\\\\\".db_01";
     String tableName = "tb_01";
     String fullTableName = fullSchemaName + "." + tableName;
 

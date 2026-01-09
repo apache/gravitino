@@ -92,6 +92,16 @@ public class GravitinoMockServer implements AutoCloseable {
   public GravitinoAdminClient createGravitinoClient() {
     GravitinoAdminClient client = mock(GravitinoAdminClient.class);
 
+    when(client.listMetalakes())
+        .thenAnswer(
+            new Answer<GravitinoMetalake[]>() {
+              @Override
+              public GravitinoMetalake[] answer(InvocationOnMock invocation) throws Throwable {
+                return metalakes.values().stream()
+                    .map(metalake -> metalake.metalake)
+                    .toArray(GravitinoMetalake[]::new);
+              }
+            });
     when(client.createMetalake(anyString(), anyString(), anyMap()))
         .thenAnswer(
             new Answer<GravitinoMetalake>() {
