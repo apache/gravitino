@@ -120,7 +120,7 @@ public class TestManagedFunctionOperations {
         new FunctionParam[] {FunctionParams.of("input", Types.StringType.get())};
     FunctionDefinition[] definitions = new FunctionDefinition[] {createSimpleDefinition(params)};
 
-    org.apache.gravitino.function.Function newFunc =
+    Function newFunc =
         functionOperations.registerFunction(
             funcIdent,
             "My test function",
@@ -214,6 +214,179 @@ public class TestManagedFunctionOperations {
                 true,
                 Types.StringType.get(),
                 definitions));
+  }
+
+  @Test
+  public void testInvalidParameterOrder() {
+    // Test that parameters with default values must appear at the end
+    NameIdentifier funcIdent = getFunctionIdent("func_invalid_params");
+
+    // Create params with invalid order: (a default 1, b required, c default 2)
+    FunctionParam[] invalidParams =
+        new FunctionParam[] {
+          FunctionParams.of("a", Types.IntegerType.get(), "param a", Literals.integerLiteral(1)),
+          FunctionParams.of("b", Types.StringType.get()), // Required param after optional
+          FunctionParams.of("c", Types.IntegerType.get(), "param c", Literals.integerLiteral(2))
+        };
+    FunctionDefinition[] definitions =
+        new FunctionDefinition[] {createSimpleDefinition(invalidParams)};
+
+    // Should throw IllegalArgumentException when trying to register
+    IllegalArgumentException ex =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                functionOperations.registerFunction(
+                    funcIdent,
+                    "Invalid function",
+                    FunctionType.SCALAR,
+                    true,
+                    Types.StringType.get(),
+                    definitions));
+
+    Assertions.assertTrue(
+        ex.getMessage().contains("Invalid parameter order"),
+        "Expected error about invalid parameter order, got: " + ex.getMessage());
+    Assertions.assertTrue(
+        ex.getMessage().contains("required parameter 'b'"),
+        "Expected error to mention parameter 'b', got: " + ex.getMessage());
+    Assertions.assertTrue(
+        ex.getMessage().contains("position 1"),
+        "Expected error to mention position 1, got: " + ex.getMessage());
+
+    // Test with valid order: all optional params at the end
+    FunctionParam[] validParams =
+        new FunctionParam[] {
+          FunctionParams.of("a", Types.IntegerType.get()),
+          FunctionParams.of("b", Types.StringType.get()),
+          FunctionParams.of("c", Types.IntegerType.get(), "param c", Literals.integerLiteral(1)),
+          FunctionParams.of("d", Types.IntegerType.get(), "param d", Literals.integerLiteral(2))
+        };
+    FunctionDefinition[] validDefinitions =
+        new FunctionDefinition[] {createSimpleDefinition(validParams)};
+
+    // This should succeed
+    functionOperations.registerFunction(
+        funcIdent,
+        "Valid function",
+        FunctionType.SCALAR,
+        true,
+        Types.StringType.get(),
+        validDefinitions);
+
+    // Verify the function was registered
+    Function func = functionOperations.getFunction(funcIdent);
+    Assertions.assertNotNull(func);
+    Assertions.assertEquals("Valid function", func.comment());
+  }
+
+  @Test
+  public void testNonOverlappingDefinitions() {
+    // Test that definitions with different arities can coexist
+    NameIdentifier funcIdent = getFunctionIdent("func_non_overlap");
+
+    // Two definitions with completely different parameter types (no overlap)
+    FunctionParam[] params1 = new FunctionParam[] {FunctionParams.of("a", Types.IntegerType.get())};
+    FunctionParam[] params2 = new FunctionParam[] {FunctionParams.of("a", Types.StringType.get())};
+
+    FunctionDefinition[] definitions =
+        new FunctionDefinition[] {createSimpleDefinition(params1), createSimpleDefinition(params2)};
+
+    // Should succeed - no arity overlap
+    Function func =
+        functionOperations.registerFunction(
+            funcIdent,
+            "Non-overlapping function",
+            FunctionType.SCALAR,
+            true,
+            Types.StringType.get(),
+            definitions);
+
+    Assertions.assertNotNull(func);
+    Assertions.assertEquals(2, func.definitions().length);
+  }
+
+  @Test
+  public void testNoArgsFunction() {
+    // Test function with no parameters
+    NameIdentifier funcIdent = getFunctionIdent("func_no_args");
+
+    FunctionParam[] params = new FunctionParam[] {};
+    FunctionDefinition[] definitions = new FunctionDefinition[] {createSimpleDefinition(params)};
+
+    Function func =
+        functionOperations.registerFunction(
+            funcIdent,
+            "No args function",
+            FunctionType.SCALAR,
+            true,
+            Types.StringType.get(),
+            definitions);
+
+    Assertions.assertNotNull(func);
+    Assertions.assertEquals(0, func.definitions()[0].parameters().length);
+  }
+
+  @Test
+  public void testMultipleDefaultParams() {
+    // Test function with multiple default parameters generates correct arities
+    NameIdentifier funcIdent = getFunctionIdent("func_multi_default");
+
+    // foo(int a, float b default 1.0, string c default 'x')
+    // Should generate arities: ["integer"], ["integer,float"], ["integer,float,string"]
+    FunctionParam[] params =
+        new FunctionParam[] {
+          FunctionParams.of("a", Types.IntegerType.get()),
+          FunctionParams.of("b", Types.FloatType.get(), "param b", Literals.floatLiteral(1.0f)),
+          FunctionParams.of("c", Types.StringType.get(), "param c", Literals.stringLiteral("x"))
+        };
+    FunctionDefinition[] definitions = new FunctionDefinition[] {createSimpleDefinition(params)};
+
+    Function func =
+        functionOperations.registerFunction(
+            funcIdent,
+            "Multi default function",
+            FunctionType.SCALAR,
+            true,
+            Types.StringType.get(),
+            definitions);
+
+    Assertions.assertNotNull(func);
+    Assertions.assertEquals(3, func.definitions()[0].parameters().length);
+  }
+
+  @Test
+  public void testOverlappingAritiesWithDifferentTypes() {
+    // Test that two definitions with same arity count but different types don't overlap
+    NameIdentifier funcIdent = getFunctionIdent("func_same_arity_diff_types");
+
+    // foo(int, int) and foo(string, string) - same arity count but different types
+    FunctionParam[] params1 =
+        new FunctionParam[] {
+          FunctionParams.of("a", Types.IntegerType.get()),
+          FunctionParams.of("b", Types.IntegerType.get())
+        };
+    FunctionParam[] params2 =
+        new FunctionParam[] {
+          FunctionParams.of("a", Types.StringType.get()),
+          FunctionParams.of("b", Types.StringType.get())
+        };
+
+    FunctionDefinition[] definitions =
+        new FunctionDefinition[] {createSimpleDefinition(params1), createSimpleDefinition(params2)};
+
+    // Should succeed - arities are "integer,integer" vs "string,string"
+    Function func =
+        functionOperations.registerFunction(
+            funcIdent,
+            "Same arity different types",
+            FunctionType.SCALAR,
+            true,
+            Types.StringType.get(),
+            definitions);
+
+    Assertions.assertNotNull(func);
+    Assertions.assertEquals(2, func.definitions().length);
   }
 
   @SuppressWarnings("unchecked")
@@ -317,74 +490,5 @@ public class TestManagedFunctionOperations {
   private FunctionDefinition createSimpleDefinition(FunctionParam[] params) {
     FunctionImpl impl = FunctionImpls.ofJava(FunctionImpl.RuntimeType.SPARK, "com.example.TestUDF");
     return FunctionDefinitions.of(params, new FunctionImpl[] {impl});
-  }
-
-  private FunctionDefinition createDefinitionWithImpls(
-      FunctionParam[] params, FunctionImpl[] impls) {
-    return FunctionDefinitions.of(params, impls);
-  }
-
-  @Test
-  public void testInvalidParameterOrder() {
-    // Test that parameters with default values must appear at the end
-    NameIdentifier funcIdent = getFunctionIdent("func_invalid_params");
-
-    // Create params with invalid order: (a default 1, b required, c default 2)
-    FunctionParam[] invalidParams =
-        new FunctionParam[] {
-          FunctionParams.of("a", Types.IntegerType.get(), "param a", Literals.integerLiteral(1)),
-          FunctionParams.of("b", Types.StringType.get()), // Required param after optional
-          FunctionParams.of("c", Types.IntegerType.get(), "param c", Literals.integerLiteral(2))
-        };
-    FunctionDefinition[] definitions =
-        new FunctionDefinition[] {createSimpleDefinition(invalidParams)};
-
-    // Should throw IllegalArgumentException when trying to register
-    IllegalArgumentException ex =
-        Assertions.assertThrows(
-            IllegalArgumentException.class,
-            () ->
-                functionOperations.registerFunction(
-                    funcIdent,
-                    "Invalid function",
-                    FunctionType.SCALAR,
-                    true,
-                    Types.StringType.get(),
-                    definitions));
-
-    Assertions.assertTrue(
-        ex.getMessage().contains("Invalid parameter order"),
-        "Expected error about invalid parameter order, got: " + ex.getMessage());
-    Assertions.assertTrue(
-        ex.getMessage().contains("required parameter 'b'"),
-        "Expected error to mention parameter 'b', got: " + ex.getMessage());
-    Assertions.assertTrue(
-        ex.getMessage().contains("position 1"),
-        "Expected error to mention position 1, got: " + ex.getMessage());
-
-    // Test with valid order: all optional params at the end
-    FunctionParam[] validParams =
-        new FunctionParam[] {
-          FunctionParams.of("a", Types.IntegerType.get()),
-          FunctionParams.of("b", Types.StringType.get()),
-          FunctionParams.of("c", Types.IntegerType.get(), "param c", Literals.integerLiteral(1)),
-          FunctionParams.of("d", Types.IntegerType.get(), "param d", Literals.integerLiteral(2))
-        };
-    FunctionDefinition[] validDefinitions =
-        new FunctionDefinition[] {createSimpleDefinition(validParams)};
-
-    // This should succeed
-    functionOperations.registerFunction(
-        funcIdent,
-        "Valid function",
-        FunctionType.SCALAR,
-        true,
-        Types.StringType.get(),
-        validDefinitions);
-
-    // Verify the function was registered
-    Function func = functionOperations.getFunction(funcIdent);
-    Assertions.assertNotNull(func);
-    Assertions.assertEquals("Valid function", func.comment());
   }
 }

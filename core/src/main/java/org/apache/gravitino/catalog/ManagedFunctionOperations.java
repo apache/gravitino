@@ -24,6 +24,7 @@ import java.time.Instant;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
@@ -123,7 +124,13 @@ public class ManagedFunctionOperations implements FunctionCatalog {
       FunctionDefinition[] definitions)
       throws NoSuchSchemaException, FunctionAlreadyExistsException {
     return doRegisterFunction(
-        ident, comment, functionType, deterministic, returnType, null, definitions);
+        ident,
+        comment,
+        functionType,
+        deterministic,
+        Optional.of(returnType),
+        Optional.empty(),
+        definitions);
   }
 
   @Override
@@ -135,7 +142,13 @@ public class ManagedFunctionOperations implements FunctionCatalog {
       FunctionDefinition[] definitions)
       throws NoSuchSchemaException, FunctionAlreadyExistsException {
     return doRegisterFunction(
-        ident, comment, FunctionType.TABLE, deterministic, null, returnColumns, definitions);
+        ident,
+        comment,
+        FunctionType.TABLE,
+        deterministic,
+        Optional.empty(),
+        Optional.of(returnColumns),
+        definitions);
   }
 
   @Override
@@ -161,8 +174,8 @@ public class ManagedFunctionOperations implements FunctionCatalog {
       String comment,
       FunctionType functionType,
       boolean deterministic,
-      Type returnType,
-      FunctionColumn[] returnColumns,
+      Optional<Type> returnType,
+      Optional<FunctionColumn[]> returnColumns,
       FunctionDefinition[] definitions)
       throws NoSuchSchemaException, FunctionAlreadyExistsException {
     Preconditions.checkArgument(
@@ -182,8 +195,8 @@ public class ManagedFunctionOperations implements FunctionCatalog {
             .withComment(comment)
             .withFunctionType(functionType)
             .withDeterministic(deterministic)
-            .withReturnType(returnType)
-            .withReturnColumns(returnColumns)
+            .withReturnType(returnType.orElse(null))
+            .withReturnColumns(returnColumns.orElse(null))
             .withDefinitions(definitions)
             .withVersion(INIT_VERSION)
             .withAuditInfo(auditInfo)
@@ -256,9 +269,11 @@ public class ManagedFunctionOperations implements FunctionCatalog {
     Set<String> arities = new HashSet<>();
     FunctionParam[] params = definition.parameters();
 
-    // Ensure optional parameters come last to prevent incorrect arity computation.
+    // Validate parameter order and find the first parameter with a default value in a single pass.
+    // Optional parameters must come last to prevent incorrect arity computation.
     // Without this check, func(a=1, b) would wrongly generate arity "" (0 args),
-    // but 0-arg calls are invalid since 'b' is required
+    // but 0-arg calls are invalid since 'b' is required.
+    int firstDefaultIndex = params.length;
     boolean foundDefault = false;
     for (int i = 0; i < params.length; i++) {
       Expression defaultValue = params[i].defaultValue();
@@ -271,17 +286,9 @@ public class ManagedFunctionOperations implements FunctionCatalog {
                     + "must appear at the end of the parameter list.",
                 params[i].name(), i));
       }
-      if (hasDefault) {
+      if (hasDefault && !foundDefault) {
         foundDefault = true;
-      }
-    }
-
-    // Find the first parameter with a default value
-    int firstDefaultIndex = params.length;
-    for (int i = 0; i < params.length; i++) {
-      if (params[i].defaultValue() != Column.DEFAULT_VALUE_NOT_SET) {
         firstDefaultIndex = i;
-        break;
       }
     }
 
