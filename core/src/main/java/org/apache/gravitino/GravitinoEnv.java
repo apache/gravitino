@@ -430,6 +430,10 @@ public class GravitinoEnv {
     return statisticDispatcher;
   }
 
+  public boolean cacheEnabled() {
+    return config.get(Configs.CACHE_ENABLED);
+  }
+
   public void start() {
     metricsSystem.start();
     eventListenerManager.start();

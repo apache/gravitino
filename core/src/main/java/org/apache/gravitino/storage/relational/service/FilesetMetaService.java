@@ -26,7 +26,6 @@ import java.util.List;
 import java.util.Objects;
 import java.util.function.Function;
 import java.util.stream.Collectors;
-import org.apache.gravitino.Configs;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.HasIdentifier;
@@ -391,17 +390,15 @@ public class FilesetMetaService {
   }
 
   private Function<Namespace, List<FilesetPO>> filesetListFetcher() {
-    return cacheEnabled()
+    return GravitinoEnv.getInstance().cacheEnabled()
         ? this::listFilesetPOsBySchemaId
         : this::listFilesetPOsByFullQualifiedName;
   }
 
   private Function<NameIdentifier, FilesetPO> filesetPOFetcher() {
-    return cacheEnabled() ? this::getFilesetPOBySchemaId : this::getFilesetPOByFullQualifiedName;
-  }
-
-  private boolean cacheEnabled() {
-    return GravitinoEnv.getInstance().config().get(Configs.CACHE_ENABLED);
+    return GravitinoEnv.getInstance().cacheEnabled()
+        ? this::getFilesetPOBySchemaId
+        : this::getFilesetPOByFullQualifiedName;
   }
 
   private void fillFilesetPOBuilderParentEntityId(FilesetPO.Builder builder, Namespace namespace) {

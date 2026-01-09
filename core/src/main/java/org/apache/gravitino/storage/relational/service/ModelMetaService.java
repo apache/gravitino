@@ -29,7 +29,6 @@ import java.util.Objects;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
 import java.util.stream.Collectors;
-import org.apache.gravitino.Configs;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.HasIdentifier;
@@ -325,15 +324,15 @@ public class ModelMetaService {
   }
 
   private Function<Namespace, List<ModelPO>> modelListFetcher() {
-    return cacheEnabled() ? this::listModelPOsBySchemaId : this::listModelPOsByFullQualifiedName;
+    return GravitinoEnv.getInstance().cacheEnabled()
+        ? this::listModelPOsBySchemaId
+        : this::listModelPOsByFullQualifiedName;
   }
 
   private Function<NameIdentifier, ModelPO> modelPOFetcher() {
-    return cacheEnabled() ? this::getModelPOBySchemaId : this::getModelPOByFullQualifiedName;
-  }
-
-  private boolean cacheEnabled() {
-    return GravitinoEnv.getInstance().config().get(Configs.CACHE_ENABLED);
+    return GravitinoEnv.getInstance().cacheEnabled()
+        ? this::getModelPOBySchemaId
+        : this::getModelPOByFullQualifiedName;
   }
 
   @Monitored(metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME, baseMetricName = "updateModel")

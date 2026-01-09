@@ -26,7 +26,6 @@ import java.util.List;
 import java.util.Objects;
 import java.util.function.Function;
 import java.util.stream.Collectors;
-import org.apache.gravitino.Configs;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.HasIdentifier;
@@ -224,15 +223,15 @@ public class TopicMetaService {
   }
 
   private Function<Namespace, List<TopicPO>> topicListFetcher() {
-    return cacheEnabled() ? this::listTopicPOsBySchemaId : this::listTopicPOsByFullQualifiedName;
+    return GravitinoEnv.getInstance().cacheEnabled()
+        ? this::listTopicPOsBySchemaId
+        : this::listTopicPOsByFullQualifiedName;
   }
 
   private Function<NameIdentifier, TopicPO> topicPOFetcher() {
-    return cacheEnabled() ? this::getTopicPOBySchemaId : this::getTopicPOByFullQualifiedName;
-  }
-
-  private boolean cacheEnabled() {
-    return GravitinoEnv.getInstance().config().get(Configs.CACHE_ENABLED);
+    return GravitinoEnv.getInstance().cacheEnabled()
+        ? this::getTopicPOBySchemaId
+        : this::getTopicPOByFullQualifiedName;
   }
 
   private void fillTopicPOBuilderParentEntityId(TopicPO.Builder builder, Namespace namespace) {

@@ -28,7 +28,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 import java.util.stream.Collectors;
-import org.apache.gravitino.Configs;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.Entity.EntityType;
 import org.apache.gravitino.GravitinoEnv;
@@ -399,14 +398,14 @@ public class TableMetaService {
   }
 
   private Function<Namespace, List<TablePO>> tableListFetcher() {
-    return cacheEnabled() ? this::listTablePOsBySchemaId : this::listTablePOsByFullQualifiedName;
+    return GravitinoEnv.getInstance().cacheEnabled()
+        ? this::listTablePOsBySchemaId
+        : this::listTablePOsByFullQualifiedName;
   }
 
   private Function<NameIdentifier, TablePO> tablePOFetcher() {
-    return cacheEnabled() ? this::getTablePOBySchemaId : this::getTablePOByFullQualifiedName;
-  }
-
-  private boolean cacheEnabled() {
-    return GravitinoEnv.getInstance().config().get(Configs.CACHE_ENABLED);
+    return GravitinoEnv.getInstance().cacheEnabled()
+        ? this::getTablePOBySchemaId
+        : this::getTablePOByFullQualifiedName;
   }
 }
