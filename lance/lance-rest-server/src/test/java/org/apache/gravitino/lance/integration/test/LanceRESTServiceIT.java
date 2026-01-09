@@ -22,6 +22,8 @@ import com.google.common.base.Joiner;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
+import com.lancedb.lance.Dataset;
+import com.lancedb.lance.WriteParams;
 import com.lancedb.lance.namespace.LanceNamespace;
 import com.lancedb.lance.namespace.LanceNamespaceException;
 import com.lancedb.lance.namespace.LanceNamespaces;
@@ -594,7 +596,7 @@ public class LanceRESTServiceIT extends BaseIT {
   }
 
   @Test
-  void testRegisterTable() {
+  void testRegisterTable() throws IOException {
     catalog = createCatalog(CATALOG_NAME);
     createSchema();
 
@@ -606,11 +608,18 @@ public class LanceRESTServiceIT extends BaseIT {
     registerTableRequest.setId(ids);
     registerTableRequest.setProperties(ImmutableMap.of("key1", "value1"));
 
+    // Register a table with non-existing location should fail
+    Assertions.assertThrows(
+        LanceNamespaceException.class, () -> ns.registerTable(registerTableRequest));
+
+    // Create a valid lance table first
+    createLanceTable(location);
+
+    // Now register the table again
     RegisterTableResponse response = ns.registerTable(registerTableRequest);
     Assertions.assertNotNull(response);
-    // The location should not exist yet as we do not create it in advanced.
     Assertions.assertEquals(location, response.getLocation());
-    Assertions.assertFalse(new File(location).exists());
+    Assertions.assertTrue(new File(location).exists());
 
     DescribeTableRequest describeTableRequest = new DescribeTableRequest();
     describeTableRequest.setId(ids);
@@ -621,18 +630,19 @@ public class LanceRESTServiceIT extends BaseIT {
 
     // Test register again with OVERWRITE mode
     String newLocation = tempDir + "/" + "register_new/";
+    createLanceTable(newLocation);
+
     registerTableRequest.setMode(ModeEnum.OVERWRITE);
     registerTableRequest.setLocation(newLocation);
     response = Assertions.assertDoesNotThrow(() -> ns.registerTable(registerTableRequest));
     Assertions.assertNotNull(response);
     Assertions.assertEquals(newLocation, response.getLocation());
-    // The location should not exist yet as we do not create it in advanced.
-    Assertions.assertFalse(new File(newLocation).exists());
+    Assertions.assertTrue(new File(newLocation).exists());
 
     // Register a new table with location exists
     String existingLocation = tempDir + "/" + "existing_location/";
-    new File(existingLocation).mkdirs();
-    Assertions.assertTrue(new File(existingLocation).exists());
+    createLanceTable(existingLocation);
+
     registerTableRequest.setMode(ModeEnum.CREATE);
     registerTableRequest.setLocation(existingLocation);
     registerTableRequest.setId(List.of(CATALOG_NAME, SCHEMA_NAME, "table_with_existing_location"));
@@ -654,7 +664,8 @@ public class LanceRESTServiceIT extends BaseIT {
     Assertions.assertTrue(
         new File(Objects.requireNonNull(deregisterExistingLocationResponse.getLocation()))
             .exists());
-    new File(existingLocation).deleteOnExit();
+    // Clean up
+    FileUtils.deleteDirectory(new File(existingLocation));
 
     // Test deregister table
     DeregisterTableRequest deregisterTableRequest = new DeregisterTableRequest();
@@ -664,23 +675,41 @@ public class LanceRESTServiceIT extends BaseIT {
     Assertions.assertEquals(newLocation, deregisterTableResponse.getLocation());
 
     // Test Overwrite again after deregister
+    // We need a valid location for overwrite
     String nonExistingLocation = tempDir + "/" + "non_existing_location/";
+    createLanceTable(nonExistingLocation);
+
     registerTableRequest.setMode(ModeEnum.OVERWRITE);
     registerTableRequest.setId(ids);
     registerTableRequest.setLocation(nonExistingLocation);
     response = Assertions.assertDoesNotThrow(() -> ns.registerTable(registerTableRequest));
     Assertions.assertNotNull(response);
     Assertions.assertEquals(nonExistingLocation, response.getLocation());
-    Assertions.assertFalse(new File(nonExistingLocation).exists());
+    Assertions.assertTrue(new File(nonExistingLocation).exists());
 
     // Test registerTable with null mode after deregister should succeed
     registerTableRequest.setMode(null);
     String verifyNullModeLocation = tempDir + "/" + "verify_null_mode_location/";
+    createLanceTable(verifyNullModeLocation);
+
     registerTableRequest.setLocation(verifyNullModeLocation);
     registerTableRequest.setId(List.of(CATALOG_NAME, SCHEMA_NAME, "verify_null_mode_location"));
     response = Assertions.assertDoesNotThrow(() -> ns.registerTable(registerTableRequest));
     Assertions.assertNotNull(response);
     Assertions.assertEquals(verifyNullModeLocation, response.getLocation());
+  }
+
+  private void createLanceTable(String location) {
+    org.apache.arrow.vector.types.pojo.Schema schema =
+        new org.apache.arrow.vector.types.pojo.Schema(
+            Arrays.asList(
+                Field.nullable("id", new ArrowType.Int(32, true)),
+                Field.nullable("value", new ArrowType.Utf8())));
+    try (Dataset dataset =
+        Dataset.create(allocator, location, schema, new WriteParams.Builder().build())) {
+    } catch (Exception e) {
+      throw new RuntimeException(e);
+    }
   }
 
   @Test

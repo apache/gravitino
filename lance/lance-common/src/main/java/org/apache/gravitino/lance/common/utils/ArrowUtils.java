@@ -18,17 +18,28 @@
  */
 package org.apache.gravitino.lance.common.utils;
 
+import static org.apache.gravitino.lance.common.ops.gravitino.LanceDataTypeConverter.CONVERTER;
+import static org.apache.gravitino.rel.Column.DEFAULT_VALUE_NOT_SET;
+
 import com.google.common.base.Preconditions;
+import com.lancedb.lance.namespace.model.JsonArrowSchema;
+import com.lancedb.lance.namespace.util.JsonArrowSchemaConverter;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.channels.Channels;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.stream.Collectors;
 import org.apache.arrow.memory.BufferAllocator;
 import org.apache.arrow.memory.RootAllocator;
 import org.apache.arrow.vector.VectorSchemaRoot;
 import org.apache.arrow.vector.ipc.ArrowStreamReader;
 import org.apache.arrow.vector.ipc.ArrowStreamWriter;
+import org.apache.arrow.vector.types.pojo.Field;
 import org.apache.arrow.vector.types.pojo.Schema;
+import org.apache.gravitino.rel.Column;
 
 public class ArrowUtils {
   public static byte[] generateIpcStream(Schema arrowSchema) throws IOException {
@@ -68,5 +79,43 @@ public class ArrowUtils {
 
     Preconditions.checkArgument(schema != null, "No schema found in Arrow IPC stream");
     return schema;
+  }
+
+  /**
+   * Extract Gravitino Columns from Arrow Schema in Lance table
+   *
+   * @param arrowSchema the Arrow Schema
+   * @return the list of Gravitino Columns
+   */
+  public static List<Column> extractColumns(Schema arrowSchema) {
+    List<Column> columns = new ArrayList<>();
+
+    for (org.apache.arrow.vector.types.pojo.Field field : arrowSchema.getFields()) {
+      columns.add(
+          Column.of(
+              field.getName(),
+              CONVERTER.toGravitino(field),
+              null,
+              field.isNullable(),
+              false,
+              DEFAULT_VALUE_NOT_SET));
+    }
+    return columns;
+  }
+
+  /**
+   * Convert Gravitino Columns to JsonArrowSchema
+   *
+   * @param columns the Gravitino Columns
+   * @return the JsonArrowSchema
+   */
+  public static JsonArrowSchema toJsonArrowSchema(Column[] columns) {
+    List<Field> fields =
+        Arrays.stream(columns)
+            .map(col -> CONVERTER.toArrowField(col.name(), col.dataType(), col.nullable()))
+            .collect(Collectors.toList());
+
+    return JsonArrowSchemaConverter.convertToJsonArrowSchema(
+        new org.apache.arrow.vector.types.pojo.Schema(fields));
   }
 }

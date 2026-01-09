@@ -795,12 +795,20 @@ public class CatalogGenericCatalogLanceIT extends BaseIT {
     Assertions.assertNotNull(registeredTable);
 
     // Register again with OVERWRITE mode - should replace metadata
-    Column[] newColumns =
-        new Column[] {
-          Column.of(LANCE_COL_NAME1, Types.IntegerType.get(), "col_1_comment"),
-          Column.of(LANCE_COL_NAME2, Types.StringType.get(), "col_2_comment"),
-          Column.of(LANCE_COL_NAME3, Types.LongType.get(), "col_3_comment")
-        };
+    // Remove the old dataset and create a new one with different schema
+    FileUtils.deleteDirectory(new File(location));
+    arrowSchema =
+        new org.apache.arrow.vector.types.pojo.Schema(
+            Arrays.asList(
+                Field.nullable("lance_col_name1", new ArrowType.Int(32, true)),
+                Field.nullable("lance_col_name2", new ArrowType.Utf8()),
+                Field.nullable("lance_col_name3", new ArrowType.Int(64, true))));
+
+    try (RootAllocator allocator = new RootAllocator();
+        Dataset dataset =
+            Dataset.create(allocator, location, arrowSchema, new WriteParams.Builder().build())) {
+      // Dataset created successfully
+    }
 
     Map<String, String> overwriteProperties = createProperties();
     overwriteProperties.put(Table.PROPERTY_LOCATION, location);
@@ -814,7 +822,7 @@ public class CatalogGenericCatalogLanceIT extends BaseIT {
             .asTableCatalog()
             .createTable(
                 tableIdentifier,
-                newColumns,
+                new Column[0],
                 "Updated comment",
                 overwriteProperties,
                 Transforms.EMPTY_TRANSFORM,
@@ -898,11 +906,50 @@ public class CatalogGenericCatalogLanceIT extends BaseIT {
                     Transforms.EMPTY_TRANSFORM,
                     Distributions.NONE,
                     new SortOrder[0]));
+
+    // Test register table without specifying the location
+    String newTableName = GravitinoITUtils.genRandomName(TABLE_PREFIX);
+    NameIdentifier newTableIdentifier = NameIdentifier.of(schemaName, newTableName);
+    Map<String, String> newCreateProperties = createProperties();
+    newCreateProperties.put(Table.PROPERTY_TABLE_FORMAT, LANCE_TABLE_FORMAT);
+    newCreateProperties.put(Table.PROPERTY_EXTERNAL, "true");
+    newCreateProperties.put(LANCE_TABLE_REGISTER, "true");
+
+    String finalNewLocation = String.format("%s/%s/%s/", tempDirectory, schemaName, newTableName);
+
+    try (RootAllocator allocator = new RootAllocator();
+        Dataset dataset =
+            Dataset.create(
+                allocator, finalNewLocation, arrowSchema, new WriteParams.Builder().build())) {
+      // Dataset created
+    }
+
+    newCreateProperties.put(Table.PROPERTY_LOCATION, finalNewLocation);
+    Table registerTableWithoutColumn =
+        catalog
+            .asTableCatalog()
+            .createTable(
+                newTableIdentifier,
+                new Column[0],
+                TABLE_COMMENT,
+                properties,
+                Transforms.EMPTY_TRANSFORM,
+                Distributions.NONE,
+                new SortOrder[0]);
+    Assertions.assertNotNull(registerTableWithoutColumn);
+
+    Table loadRegisterTable = catalog.asTableCatalog().loadTable(newTableIdentifier);
+    Assertions.assertEquals(registerTableWithoutColumn.name(), loadRegisterTable.name());
+    Column[] columnsLoaded = loadRegisterTable.columns();
+    Assertions.assertEquals(2, columnsLoaded.length);
+    // The first named `lance_col_name1` and the second named `lance_col_name2`
+    Assertions.assertEquals(LANCE_COL_NAME1, columnsLoaded[0].name());
+    Assertions.assertEquals(LANCE_COL_NAME2, columnsLoaded[1].name());
   }
 
   @Test
   void testRegisterWithNonExistLocation() {
-    // Now try to register a table with non-existing location with CREATE mode - should succeed
+    // Now try to register a table with non-existing location with CREATE mode - should fail
     String newTableName = GravitinoITUtils.genRandomName(TABLE_PREFIX);
     NameIdentifier newTableIdentifier = NameIdentifier.of(schemaName, newTableName);
     Map<String, String> newCreateProperties = createProperties();
@@ -915,26 +962,19 @@ public class CatalogGenericCatalogLanceIT extends BaseIT {
     newCreateProperties.put(Table.PROPERTY_EXTERNAL, "true");
     newCreateProperties.put(LANCE_TABLE_REGISTER, "true");
 
-    Table nonExistingTable =
-        catalog
-            .asTableCatalog()
-            .createTable(
-                newTableIdentifier,
-                new Column[0],
-                "Updated comment",
-                newCreateProperties,
-                Transforms.EMPTY_TRANSFORM,
-                Distributions.NONE,
-                new SortOrder[0]);
-
-    Assertions.assertNotNull(nonExistingTable);
-    Assertions.assertEquals(
-        newLocation, nonExistingTable.properties().get(Table.PROPERTY_LOCATION));
-    Assertions.assertEquals(dirExists, new File(newLocation).exists());
-
-    // Now try to drop table, there should no problem here
-    boolean dropSuccess = catalog.asTableCatalog().dropTable(newTableIdentifier);
-    Assertions.assertTrue(dropSuccess);
+    Assertions.assertThrows(
+        Exception.class,
+        () ->
+            catalog
+                .asTableCatalog()
+                .createTable(
+                    newTableIdentifier,
+                    new Column[0],
+                    "Updated comment",
+                    newCreateProperties,
+                    Transforms.EMPTY_TRANSFORM,
+                    Distributions.NONE,
+                    new SortOrder[0]));
   }
 
   @Test

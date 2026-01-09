@@ -74,6 +74,19 @@ dependencies {
     exclude(group = "org.junit.jupiter")
   }
 
+  testImplementation(libs.lance) {
+    exclude(group = "com.fasterxml.jackson.core", module = "*") // provided by gravitino
+    exclude(group = "com.fasterxml.jackson.datatype", module = "*") // provided by gravitino
+    exclude(group = "commons-codec", module = "commons-codec") // provided by jcasbin
+    exclude(group = "com.google.guava", module = "guava") // provided by gravitino
+    exclude(group = "org.apache.commons", module = "commons-lang3") // provided by gravitino
+    exclude(group = "org.junit.jupiter", module = "*") // provided by test scope
+    exclude(group = "com.fasterxml.jackson.jaxrs", module = "jackson-jaxrs-json-provider") // using gravitino's version
+    exclude(group = "org.apache.httpcomponents.client5", module = "*") // provided by gravitino
+    exclude(group = "com.lancedb", module = "lance-namespace-core") // This is unnecessary in the core module
+  }
+
+
   testImplementation(libs.junit.jupiter.api)
   testImplementation(libs.mockito.inline)
   testImplementation(libs.mysql.driver)

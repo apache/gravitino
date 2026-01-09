@@ -19,11 +19,9 @@
 
 package org.apache.gravitino.lance.common.ops.gravitino;
 
-import static org.apache.gravitino.lance.common.ops.gravitino.LanceDataTypeConverter.CONVERTER;
 import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_CREATION_MODE;
 import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_LOCATION;
 import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_TABLE_FORMAT;
-import static org.apache.gravitino.rel.Column.DEFAULT_VALUE_NOT_SET;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
@@ -37,19 +35,13 @@ import com.lancedb.lance.namespace.model.CreateTableResponse;
 import com.lancedb.lance.namespace.model.DeregisterTableResponse;
 import com.lancedb.lance.namespace.model.DescribeTableResponse;
 import com.lancedb.lance.namespace.model.DropTableResponse;
-import com.lancedb.lance.namespace.model.JsonArrowSchema;
 import com.lancedb.lance.namespace.model.RegisterTableRequest;
 import com.lancedb.lance.namespace.model.RegisterTableResponse;
 import com.lancedb.lance.namespace.util.CommonUtil;
-import com.lancedb.lance.namespace.util.JsonArrowSchemaConverter;
-import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.regex.Pattern;
-import java.util.stream.Collectors;
-import org.apache.arrow.vector.types.pojo.Field;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.exceptions.NoSuchTableException;
@@ -89,7 +81,7 @@ public class GravitinoLanceTableOperations implements LanceTableOperations {
     DescribeTableResponse response = new DescribeTableResponse();
     response.setProperties(table.properties());
     response.setLocation(table.properties().get(LANCE_LOCATION));
-    response.setSchema(toJsonArrowSchema(table.columns()));
+    response.setSchema(ArrowUtils.toJsonArrowSchema(table.columns()));
     response.setVersion(null);
     response.setStorageOptions(LancePropertiesUtils.getLanceStorageOptions(table.properties()));
     return response;
@@ -112,7 +104,7 @@ public class GravitinoLanceTableOperations implements LanceTableOperations {
     if (arrowStreamBody != null) {
       org.apache.arrow.vector.types.pojo.Schema schema =
           ArrowUtils.parseArrowIpcStream(arrowStreamBody);
-      columns = extractColumns(schema);
+      columns = ArrowUtils.extractColumns(schema);
     }
 
     String catalogName = nsId.levelAtListPos(0);
@@ -282,31 +274,5 @@ public class GravitinoLanceTableOperations implements LanceTableOperations {
     response.setTransactionId(List.of());
 
     return response;
-  }
-
-  private List<Column> extractColumns(org.apache.arrow.vector.types.pojo.Schema arrowSchema) {
-    List<Column> columns = new ArrayList<>();
-
-    for (org.apache.arrow.vector.types.pojo.Field field : arrowSchema.getFields()) {
-      columns.add(
-          Column.of(
-              field.getName(),
-              CONVERTER.toGravitino(field),
-              null,
-              field.isNullable(),
-              false,
-              DEFAULT_VALUE_NOT_SET));
-    }
-    return columns;
-  }
-
-  private JsonArrowSchema toJsonArrowSchema(Column[] columns) {
-    List<Field> fields =
-        Arrays.stream(columns)
-            .map(col -> CONVERTER.toArrowField(col.name(), col.dataType(), col.nullable()))
-            .collect(Collectors.toList());
-
-    return JsonArrowSchemaConverter.convertToJsonArrowSchema(
-        new org.apache.arrow.vector.types.pojo.Schema(fields));
   }
 }
