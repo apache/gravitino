@@ -116,11 +116,6 @@ public class GravitinoHiveCatalogFactory implements BaseCatalogFactory {
     return HiveCatalogPropertiesConverter.INSTANCE;
   }
 
-  @Override
-  public SchemaAndTablePropertiesConverter schemaAndTablePropertiesConverter() {
-    return HiveSchemaAndTablePropertiesConverter.INSTANCE;
-  }
-
   /**
    * Define partition converter.
    *

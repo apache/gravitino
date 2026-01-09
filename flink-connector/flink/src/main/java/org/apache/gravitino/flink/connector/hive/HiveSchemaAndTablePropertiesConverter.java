@@ -33,16 +33,12 @@ import org.apache.hadoop.hive.ql.io.RCFileStorageFormatDescriptor;
 import org.apache.hadoop.hive.ql.io.StorageFormatDescriptor;
 import org.apache.hadoop.hive.ql.io.StorageFormatFactory;
 
-public class HiveSchemaAndTablePropertiesConverter
-    implements SchemaAndTablePropertiesConverter {
-
-  public static final HiveSchemaAndTablePropertiesConverter INSTANCE =
-      new HiveSchemaAndTablePropertiesConverter(null);
+public class HiveSchemaAndTablePropertiesConverter implements SchemaAndTablePropertiesConverter {
 
   private static final StorageFormatFactory STORAGE_FORMAT_FACTORY = new StorageFormatFactory();
   private final HiveConf hiveConf;
 
-  HiveSchemaAndTablePropertiesConverter(@Nullable HiveConf hiveConf) {
+  HiveSchemaAndTablePropertiesConverter(HiveConf hiveConf) {
     this.hiveConf = hiveConf;
   }
 

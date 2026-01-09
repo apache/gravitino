@@ -36,7 +36,6 @@ public class GravitinoMysqlJdbcCatalogFactory extends GravitinoJdbcCatalogFactor
     return MysqlPropertiesConverter.INSTANCE;
   }
 
-  @Override
   public SchemaAndTablePropertiesConverter schemaAndTablePropertiesConverter() {
     return MysqlPropertiesConverter.INSTANCE;
   }

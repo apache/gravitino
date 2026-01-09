@@ -23,7 +23,6 @@ import org.apache.flink.table.factories.CatalogFactory;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.flink.connector.CatalogPropertiesConverter;
 import org.apache.gravitino.flink.connector.PartitionConverter;
-import org.apache.gravitino.flink.connector.SchemaAndTablePropertiesConverter;
 
 public interface BaseCatalogFactory extends CatalogFactory {
 
@@ -47,13 +46,6 @@ public interface BaseCatalogFactory extends CatalogFactory {
    * @return The requested catalog properties converter.
    */
   CatalogPropertiesConverter catalogPropertiesConverter();
-
-  /**
-   * Define schema and table properties converter {@link SchemaAndTablePropertiesConverter}.
-   *
-   * @return The requested schema and table properties converter.
-   */
-  SchemaAndTablePropertiesConverter schemaAndTablePropertiesConverter();
 
   /**
    * Define partition converter.

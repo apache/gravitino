@@ -77,7 +77,6 @@ public class GravitinoPaimonCatalogFactory implements BaseCatalogFactory {
     return PaimonPropertiesConverter.INSTANCE;
   }
 
-  @Override
   public SchemaAndTablePropertiesConverter schemaAndTablePropertiesConverter() {
     return PaimonPropertiesConverter.INSTANCE;
   }

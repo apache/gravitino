@@ -26,6 +26,7 @@ import org.apache.flink.table.factories.FactoryUtil;
 import org.apache.flink.util.Preconditions;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.flink.connector.PartitionConverter;
+import org.apache.gravitino.flink.connector.SchemaAndTablePropertiesConverter;
 import org.apache.gravitino.flink.connector.UnsupportPartitionConverter;
 import org.apache.gravitino.flink.connector.catalog.BaseCatalogFactory;
 import org.apache.gravitino.flink.connector.utils.FactoryUtils;
@@ -35,6 +36,8 @@ import org.apache.gravitino.flink.connector.utils.FactoryUtils;
  * discovery in Flink.
  */
 public abstract class GravitinoJdbcCatalogFactory implements BaseCatalogFactory {
+
+  protected abstract SchemaAndTablePropertiesConverter schemaAndTablePropertiesConverter();
 
   @Override
   public org.apache.flink.table.catalog.Catalog createCatalog(Context context) {

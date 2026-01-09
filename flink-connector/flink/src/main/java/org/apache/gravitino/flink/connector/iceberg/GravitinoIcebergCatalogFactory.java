@@ -85,7 +85,6 @@ public class GravitinoIcebergCatalogFactory implements BaseCatalogFactory {
     return IcebergPropertiesConverter.INSTANCE;
   }
 
-  @Override
   public SchemaAndTablePropertiesConverter schemaAndTablePropertiesConverter() {
     return IcebergPropertiesConverter.INSTANCE;
   }
