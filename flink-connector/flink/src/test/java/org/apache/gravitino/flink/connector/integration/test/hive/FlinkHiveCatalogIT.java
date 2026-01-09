@@ -25,16 +25,21 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.security.PrivilegedAction;
 import java.util.Arrays;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.table.api.DataTypes;
+import org.apache.flink.table.api.EnvironmentSettings;
 import org.apache.flink.table.api.ResultKind;
+import org.apache.flink.table.api.TableEnvironment;
 import org.apache.flink.table.api.TableResult;
 import org.apache.flink.table.api.ValidationException;
+import org.apache.flink.table.api.internal.TableEnvironmentImpl;
 import org.apache.flink.table.catalog.Catalog;
 import org.apache.flink.table.catalog.CatalogBaseTable;
 import org.apache.flink.table.catalog.CatalogDescriptor;
@@ -77,6 +82,7 @@ public class FlinkHiveCatalogIT extends FlinkCommonIT {
   private static final String FLINK_USER_NAME = "gravitino";
 
   private static org.apache.gravitino.Catalog hiveCatalog;
+  private static String hiveConfDir;
 
   @Override
   protected boolean supportsPrimaryKey() {
@@ -85,6 +91,7 @@ public class FlinkHiveCatalogIT extends FlinkCommonIT {
 
   @BeforeAll
   void hiveStartUp() {
+    initHiveConfDir();
     initDefaultHiveCatalog();
   }
 
@@ -103,6 +110,45 @@ public class FlinkHiveCatalogIT extends FlinkCommonIT {
             getProvider(),
             null,
             ImmutableMap.of("metastore.uris", hiveMetastoreUri));
+  }
+
+  private void initHiveConfDir() {
+    if (hiveConfDir != null) {
+      return;
+    }
+    try {
+      java.nio.file.Path dir = java.nio.file.Files.createTempDirectory("flink-hive-conf");
+      java.nio.file.Path hiveSite = dir.resolve("hive-site.xml");
+      String hiveSiteXml =
+          "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
+              + "<?xml-stylesheet type=\"text/xsl\" href=\"configuration.xsl\"?>\n"
+              + "<configuration>\n"
+              + "  <property>\n"
+              + "    <name>hive.metastore.sasl.enabled</name>\n"
+              + "    <value>false</value>\n"
+              + "  </property>\n"
+              + "  <property>\n"
+              + "    <name>hive.metastore.uris</name>\n"
+              + "    <value>"
+              + hiveMetastoreUri
+              + "</value>\n"
+              + "  </property>\n"
+              + "  <property>\n"
+              + "    <name>hadoop.security.authentication</name>\n"
+              + "    <value>simple</value>\n"
+              + "  </property>\n"
+              + "  <property>\n"
+              + "    <name>hive.metastore.warehouse.dir</name>\n"
+              + "    <value>"
+              + warehouse
+              + "</value>\n"
+              + "  </property>\n"
+              + "</configuration>\n";
+      java.nio.file.Files.write(hiveSite, hiveSiteXml.getBytes(StandardCharsets.UTF_8));
+      hiveConfDir = dir.toAbsolutePath().toString();
+    } catch (IOException e) {
+      throw new RuntimeException("Failed to prepare hive conf dir for ITs", e);
+    }
   }
 
   @Test
@@ -482,7 +528,7 @@ public class FlinkHiveCatalogIT extends FlinkCommonIT {
   public void testRowFormatSerdeOverridesDefaultFormat() {
     String databaseName = "test_hive_row_format_precedence_db";
     String tableName = "test_row_format_overrides_default";
-    String customSerde = "com.acme.CustomSerde";
+    String customSerde = HiveStorageConstants.OPENCSV_SERDE_CLASS;
 
     doWithSchema(
         currentCatalog(),
@@ -490,9 +536,13 @@ public class FlinkHiveCatalogIT extends FlinkCommonIT {
         catalog -> {
           TestUtils.assertTableResult(
               sql(
-                  "CREATE TABLE %s (id INT) WITH ('%s'='%s')",
+                  "CREATE TABLE %s (id STRING) WITH ('%s'='%s')",
                   tableName, Constants.SERDE_LIB_CLASS_NAME, customSerde),
               ResultKind.SUCCESS);
+          TestUtils.assertTableResult(
+              sql("INSERT INTO %s VALUES ('1')", tableName),
+              ResultKind.SUCCESS_WITH_CONTENT,
+              Row.of(-1L));
           Table tableWithRowFormat =
               catalog.asTableCatalog().loadTable(NameIdentifier.of(databaseName, tableName));
           Assertions.assertEquals(
@@ -503,6 +553,7 @@ public class FlinkHiveCatalogIT extends FlinkCommonIT {
               tableWithRowFormat.properties().get(HiveConstants.OUTPUT_FORMAT));
           Assertions.assertEquals(
               customSerde, tableWithRowFormat.properties().get(HiveConstants.SERDE_LIB));
+          assertHiveCatalogRead(databaseName, tableName, Row.of("1"));
         },
         true);
   }
@@ -511,7 +562,7 @@ public class FlinkHiveCatalogIT extends FlinkCommonIT {
   public void testStoredAsOverridesRowFormatSerde() {
     String databaseName = "test_hive_stored_as_precedence_db";
     String tableName = "test_stored_as_overrides_row_format";
-    String customSerde = "com.acme.CustomSerde";
+    String customSerde = HiveStorageConstants.OPENCSV_SERDE_CLASS;
 
     doWithSchema(
         currentCatalog(),
@@ -526,6 +577,10 @@ public class FlinkHiveCatalogIT extends FlinkCommonIT {
                   Constants.STORED_AS_FILE_FORMAT,
                   "ORC"),
               ResultKind.SUCCESS);
+          TestUtils.assertTableResult(
+              sql("INSERT INTO %s VALUES (1)", tableName),
+              ResultKind.SUCCESS_WITH_CONTENT,
+              Row.of(-1L));
           Table tableWithStoredAs =
               catalog.asTableCatalog().loadTable(NameIdentifier.of(databaseName, tableName));
           Assertions.assertEquals(
@@ -537,6 +592,7 @@ public class FlinkHiveCatalogIT extends FlinkCommonIT {
           Assertions.assertEquals(
               HiveStorageConstants.ORC_OUTPUT_FORMAT_CLASS,
               tableWithStoredAs.properties().get(HiveConstants.OUTPUT_FORMAT));
+          assertHiveCatalogRead(databaseName, tableName, Row.of(1));
         },
         true);
   }
@@ -555,6 +611,10 @@ public class FlinkHiveCatalogIT extends FlinkCommonIT {
           HiveConf hiveConf = ((GravitinoHiveCatalog) flinkCatalog.get()).getHiveConf();
           TestUtils.assertTableResult(
               sql("CREATE TABLE %s (id INT)", tableName), ResultKind.SUCCESS);
+          TestUtils.assertTableResult(
+              sql("INSERT INTO %s VALUES (1)", tableName),
+              ResultKind.SUCCESS_WITH_CONTENT,
+              Row.of(-1L));
           Table tableWithDefaults =
               catalog.asTableCatalog().loadTable(NameIdentifier.of(databaseName, tableName));
           StorageFormatFactory storageFormatFactory = new StorageFormatFactory();
@@ -576,8 +636,30 @@ public class FlinkHiveCatalogIT extends FlinkCommonIT {
           }
           Assertions.assertEquals(
               expectedSerde, tableWithDefaults.properties().get(HiveConstants.SERDE_LIB));
+          assertHiveCatalogRead(databaseName, tableName, Row.of(1));
         },
         true);
+  }
+
+  private void assertHiveCatalogRead(String databaseName, String tableName, Row expectedRow) {
+    EnvironmentSettings settings = EnvironmentSettings.newInstance().inBatchMode().build();
+    TableEnvironment hiveEnv = TableEnvironment.create(settings);
+    try {
+      TestUtils.assertTableResult(
+          hiveEnv.executeSql(
+              String.format(
+                  "CREATE CATALOG hive_it WITH ('type'='hive', 'hive-conf-dir'='%s')",
+                  hiveConfDir)),
+          ResultKind.SUCCESS);
+      TestUtils.assertTableResult(hiveEnv.executeSql("USE CATALOG hive_it"), ResultKind.SUCCESS);
+      TestUtils.assertTableResult(hiveEnv.executeSql("USE " + databaseName), ResultKind.SUCCESS);
+      TableResult result = hiveEnv.executeSql("SELECT * FROM " + tableName);
+      List<Row> rows = Lists.newArrayList(result.collect());
+      Assertions.assertEquals(1, rows.size());
+      Assertions.assertEquals(expectedRow, rows.get(0));
+    } finally {
+      ((TableEnvironmentImpl) hiveEnv).getCatalogManager().close();
+    }
   }
 
   @Test
