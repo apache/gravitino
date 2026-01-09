@@ -89,9 +89,9 @@ public class HDFSFileSystemProxy implements MethodInterceptor {
         this.initUgi = UserGroupInformation.getCurrentUser();
       }
 
-      UserGroupInformation currentUgi = getHadoopUser();
+      UserGroupInformation requestUgi = getRequestUser();
       this.fs =
-          currentUgi.doAs(
+          requestUgi.doAs(
               (PrivilegedExceptionAction<FileSystem>)
                   () -> FileSystem.newInstance(path.toUri(), conf));
 
@@ -139,26 +139,26 @@ public class HDFSFileSystemProxy implements MethodInterceptor {
     }
   }
 
-  private UserGroupInformation getHadoopUser() {
-    UserGroupInformation currentUgi = initUgi;
+  private UserGroupInformation getRequestUser() {
+    UserGroupInformation requestUgi = initUgi;
     if (impersonationEnabled) {
       if (proxyUserHandler != null) {
         String proxyUserName = proxyUserHandler.getProxyUser();
         if (!proxyUserName.contains("@")) {
           proxyUserName = String.format("%s@%s", proxyUserName, kerberosRealm);
         }
-        currentUgi = UserGroupInformation.createProxyUser(proxyUserName, initUgi);
+        requestUgi = UserGroupInformation.createProxyUser(proxyUserName, initUgi);
         LOG.debug("Using login user with impersonation: {}", initUgi.getUserName());
       }
     } else {
       LOG.debug("Using login user without impersonation: {}", initUgi.getUserName());
     }
-    return currentUgi;
+    return requestUgi;
   }
 
   /** Invoke the method on the underlying FileSystem using ugi.doAs. */
   private Object invokeWithUgi(MethodProxy methodProxy, Object[] objects) throws Throwable {
-    UserGroupInformation currentUgi = getHadoopUser();
+    UserGroupInformation currentUgi = getRequestUser();
     return currentUgi.doAs(
         (PrivilegedExceptionAction<Object>)
             () -> {
