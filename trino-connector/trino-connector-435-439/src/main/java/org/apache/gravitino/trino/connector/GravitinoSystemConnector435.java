@@ -18,28 +18,11 @@
  */
 package org.apache.gravitino.trino.connector;
 
-import com.fasterxml.jackson.annotation.JsonCreator;
-import com.fasterxml.jackson.annotation.JsonProperty;
 import io.trino.spi.Page;
-import io.trino.spi.connector.ColumnHandle;
 import io.trino.spi.connector.ConnectorPageSource;
-import io.trino.spi.connector.ConnectorSplit;
-import io.trino.spi.connector.Constraint;
 import io.trino.spi.connector.ConnectorPageSourceProvider;
-import io.trino.spi.connector.ConnectorSession;
-import io.trino.spi.connector.ConnectorSplitManager;
-import io.trino.spi.connector.ConnectorSplitSource;
-import io.trino.spi.connector.ConnectorTableHandle;
-import io.trino.spi.connector.ConnectorTransactionHandle;
-import io.trino.spi.connector.DynamicFilter;
-import io.trino.spi.connector.FixedSplitSource;
-import io.trino.spi.connector.SchemaTableName;
 import org.apache.gravitino.trino.connector.system.GravitinoSystemConnector;
-import org.apache.gravitino.trino.connector.system.GravitinoSystemConnectorMetadata;
 import org.apache.gravitino.trino.connector.system.storedprocedure.GravitinoStoredProcedureFactory;
-import org.apache.gravitino.trino.connector.system.table.GravitinoSystemTableFactory;
-
-import java.util.List;
 
 public class GravitinoSystemConnector435 extends GravitinoSystemConnector {
 
@@ -49,73 +32,20 @@ public class GravitinoSystemConnector435 extends GravitinoSystemConnector {
   }
 
   @Override
-  public ConnectorSplitManager getSplitManager() {
-    return new SplitManager435();
-  }
-
-  @Override
-  public ConnectorPageSourceProvider getPageSourceProvider() {
+  protected ConnectorPageSourceProvider createPageSourceProvider() {
     return new DatasourceProvider435();
   }
 
-  public static class SplitManager435 extends SplitManager {
-
-    @Override
-    public ConnectorSplitSource getSplits(
-        ConnectorTransactionHandle transaction,
-        ConnectorSession session,
-        ConnectorTableHandle connectorTableHandle,
-        DynamicFilter dynamicFilter,
-        Constraint constraint) {
-
-      SchemaTableName tableName =
-          ((GravitinoSystemConnectorMetadata.SystemTableHandle) connectorTableHandle).getName();
-      return new FixedSplitSource(new Split435(tableName));
-    }
-  }
-
-  public static class Split435 extends Split {
-
-    @JsonCreator
-    public Split435(@JsonProperty("tableName") SchemaTableName tableName) {
-      super(tableName);
-    }
-
-    @Override
-    public Object getInfo() {
-      return this;
-    }
-  }
-
-
   public static class DatasourceProvider435 extends DatasourceProvider {
     @Override
-    public ConnectorPageSource createPageSource(
-        ConnectorTransactionHandle transaction,
-        ConnectorSession session,
-        ConnectorSplit split,
-        ConnectorTableHandle table,
-        List<ColumnHandle> columns,
-        DynamicFilter dynamicFilter) {
-
-      SchemaTableName tableName =
-          ((GravitinoSystemConnectorMetadata.SystemTableHandle) table).getName();
-      return new SystemTablePageSource435(GravitinoSystemTableFactory.loadPageData(tableName));
+    protected ConnectorPageSource createPageSource(Page page) {
+      return new SystemTablePageSource435(page);
     }
   }
 
   public static class SystemTablePageSource435 extends SystemTablePageSource {
     public SystemTablePageSource435(Page page) {
       super(page);
-    }
-
-    @Override
-    public Page getNextPage() {
-      if (isFinished) {
-        return null;
-      }
-      isFinished = true;
-      return page;
     }
   }
 }

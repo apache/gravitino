@@ -48,7 +48,7 @@ plugins.withId("com.diffplug.spotless") {
   configure<SpotlessExtension> {
     java {
       // Keep Spotless within this module to avoid cross-project target errors.
-      target("$projectDir/src/**/*.java")
+      target(project.fileTree("src") { include("**/*.java") })
     }
   }
 }

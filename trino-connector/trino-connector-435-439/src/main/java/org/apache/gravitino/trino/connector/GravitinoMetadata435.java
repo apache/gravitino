@@ -29,5 +29,4 @@ public class GravitinoMetadata435 extends GravitinoMetadata {
       io.trino.spi.connector.ConnectorMetadata internalMetadata) {
     super(catalogConnectorMetadata, metadataAdapter, internalMetadata);
   }
-
 }

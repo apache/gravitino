@@ -26,11 +26,12 @@ public class GravitinoConnectorFactory435 extends GravitinoConnectorFactory {
 
   @Override
   protected GravitinoConnector createConnector(CatalogConnectorContext connectorContext) {
-    return  new GravitinoConnector435(connectorContext);
+    return new GravitinoConnector435(connectorContext);
   }
 
   @Override
-  public GravitinoSystemConnector createSystemConnector(GravitinoStoredProcedureFactory gravitinoStoredProcedureFactory) {
+  public GravitinoSystemConnector createSystemConnector(
+      GravitinoStoredProcedureFactory gravitinoStoredProcedureFactory) {
     return new GravitinoSystemConnector435(gravitinoStoredProcedureFactory);
   }
 }

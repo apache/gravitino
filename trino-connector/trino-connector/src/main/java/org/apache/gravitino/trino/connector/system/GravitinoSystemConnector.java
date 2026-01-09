@@ -79,16 +79,28 @@ public class GravitinoSystemConnector implements Connector {
   @Override
   public ConnectorMetadata getMetadata(
       ConnectorSession session, ConnectorTransactionHandle transactionHandle) {
+    return createMetadata();
+  }
+
+  protected ConnectorMetadata createMetadata() {
     return new GravitinoSystemConnectorMetadata();
   }
 
   @Override
   public ConnectorSplitManager getSplitManager() {
-    return new SplitManager();
+    return createSplitManager();
   }
 
   @Override
   public ConnectorPageSourceProvider getPageSourceProvider() {
+    return createPageSourceProvider();
+  }
+
+  protected ConnectorSplitManager createSplitManager() {
+    return new SplitManager();
+  }
+
+  protected ConnectorPageSourceProvider createPageSourceProvider() {
     return new DatasourceProvider();
   }
 
@@ -112,7 +124,11 @@ public class GravitinoSystemConnector implements Connector {
 
       SchemaTableName tableName =
           ((GravitinoSystemConnectorMetadata.SystemTableHandle) table).getName();
-      return new SystemTablePageSource(GravitinoSystemTableFactory.loadPageData(tableName));
+      return createPageSource(GravitinoSystemTableFactory.loadPageData(tableName));
+    }
+
+    protected ConnectorPageSource createPageSource(Page page) {
+      return new SystemTablePageSource(page);
     }
   }
 
@@ -129,7 +145,11 @@ public class GravitinoSystemConnector implements Connector {
 
       SchemaTableName tableName =
           ((GravitinoSystemConnectorMetadata.SystemTableHandle) connectorTableHandle).getName();
-      return new FixedSplitSource(new Split(tableName));
+      return new FixedSplitSource(createSplit(tableName));
+    }
+
+    protected ConnectorSplit createSplit(SchemaTableName tableName) {
+      return new Split(tableName);
     }
   }
 

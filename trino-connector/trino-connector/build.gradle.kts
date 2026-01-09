@@ -50,6 +50,8 @@ java {
 dependencies {
   implementation(project(":catalogs:catalog-common"))
   implementation(project(":clients:client-java-runtime", configuration = "shadow"))
+  // Keep IDEs resolving client APIs without altering runtime shading.
+  compileOnly(project(":clients:client-java"))
   implementation(libs.airlift.json)
   implementation(libs.bundles.log4j)
   implementation(libs.commons.collections4)

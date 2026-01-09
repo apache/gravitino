@@ -19,16 +19,13 @@
 package org.apache.gravitino.trino.connector;
 
 import io.trino.spi.connector.ConnectorMetadata;
-import org.apache.gravitino.trino.connector.GravitinoConnector;
-import org.apache.gravitino.trino.connector.GravitinoMetadata;
 import org.apache.gravitino.trino.connector.catalog.CatalogConnectorContext;
 import org.apache.gravitino.trino.connector.catalog.CatalogConnectorMetadata;
 import org.apache.gravitino.trino.connector.catalog.CatalogConnectorMetadataAdapter;
 
 public class GravitinoConnector435 extends GravitinoConnector {
 
-  public GravitinoConnector435(
-      CatalogConnectorContext connectorContext) {
+  public GravitinoConnector435(CatalogConnectorContext connectorContext) {
     super(connectorContext);
   }
 
@@ -37,7 +34,6 @@ public class GravitinoConnector435 extends GravitinoConnector {
       CatalogConnectorMetadata catalogConnectorMetadata,
       CatalogConnectorMetadataAdapter metadataAdapter,
       ConnectorMetadata internalMetadata) {
-    return new GravitinoMetadata435(
-      catalogConnectorMetadata, metadataAdapter, internalMetadata);
+    return new GravitinoMetadata435(catalogConnectorMetadata, metadataAdapter, internalMetadata);
   }
 }
