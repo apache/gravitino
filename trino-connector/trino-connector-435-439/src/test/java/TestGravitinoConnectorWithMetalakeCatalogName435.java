@@ -17,7 +17,16 @@
  * under the License.
  */
 
+import org.apache.gravitino.client.GravitinoAdminClient;
+import org.apache.gravitino.trino.connector.GravitinoPlugin;
+import org.apache.gravitino.trino.connector.GravitinoPlugin435;
 import org.apache.gravitino.trino.connector.TestGravitinoConnectorWithMetalakeCatalogName;
 
 public class TestGravitinoConnectorWithMetalakeCatalogName435
-    extends TestGravitinoConnectorWithMetalakeCatalogName {}
+    extends TestGravitinoConnectorWithMetalakeCatalogName {
+
+  @Override
+  protected GravitinoPlugin createGravitinoPulgin(GravitinoAdminClient client) {
+    return new GravitinoPlugin435(client);
+  }
+}
